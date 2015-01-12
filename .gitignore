@@ -1,0 +1,7 @@
+/.metadata/
+node_modules/
+dist/
+
+local.properties
+
+gen/
