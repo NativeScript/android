@@ -35,8 +35,8 @@
 
 -keepattributes Exceptions,InnerClasses,Signature,Deprecated,SourceFile,LineNumberTable,*Annotation*,EnclosingMethod
 
--keep class telerik.** { *; }
--keep class kimera.** { *; }
+-keep class com.** { *; }
+-keep class tns.** { *; }
 
 -keep class ** {
     *;

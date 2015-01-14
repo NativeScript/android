@@ -8,10 +8,6 @@ import android.util.Log;
 import com.tns.internal.AppBuilderCallback;
 import com.tns.internal.ExtractPolicy;
 
-import telerik.kimera.BuildConfig;
-
-
-
 public class NativeScriptApplication extends android.app.Application implements com.tns.NativeScriptHashCodeProvider {
 	public static class ActivityLifecycleCallbacks implements android.app.Application.ActivityLifecycleCallbacks, com.tns.NativeScriptHashCodeProvider {
 		public void onActivityCreated(android.app.Activity param_0, android.os.Bundle param_1) {
@@ -721,7 +717,7 @@ public class NativeScriptApplication extends android.app.Application implements 
 		
 		String packageName = super.getPackageName();
 
-		String className = packageName.equals("telerik.kimera")
+		String className = packageName.equals("com.tns")
 									? "com.tns.internal.AppBuilderCallbackTestImpl"
 									: "com.tns.internal.AppBuilderCallbackImpl";
 

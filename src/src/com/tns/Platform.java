@@ -26,11 +26,8 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import android.util.SparseArray;
-import org.json.JSONObject;
 
 import com.tns.internal.ExtractPolicy;
-
-import telerik.kimera.BuildConfig;
 
 public class Platform
 {

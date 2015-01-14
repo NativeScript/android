@@ -1,7 +1,6 @@
 package com.tns;
 
 import android.util.Log;
-import telerik.kimera.BuildConfig;
 
 public class NativeScriptActivity extends android.app.Activity implements com.tns.NativeScriptHashCodeProvider {
 	public NativeScriptActivity() {

@@ -9,8 +9,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.net.ServerSocket;
 
-import telerik.kimera.BuildConfig;
-
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;

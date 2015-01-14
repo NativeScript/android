@@ -441,7 +441,7 @@ var TestRequireDirName = function() {
 	
 	var dir = __dirname;
 	
-	var expectedDirname = "/data/data/telerik.kimera/files/app/tests";
+	var expectedDirname = "/data/data/com.tns/files/app/tests";
 		
 	Assert(dir === expectedDirname, "TestRequireDirName FAILED: Expected value '" +  expectedDirname + "', actual value=" + dir);
 }
@@ -452,7 +452,7 @@ var TestRequireFileName = function() {
 	
 	var file = __filename;
 	
-	var expectedFilename = "/data/data/telerik.kimera/files/app/tests/tests.js";
+	var expectedFilename = "/data/data/com.tns/files/app/tests/tests.js";
 		
 	Assert(file === expectedFilename, "TestRequireFileName FAILED: Expected value '" +  expectedFilename + "', actual value=" + file);
 	
