@@ -63,6 +63,7 @@ void JsDebugger::DisableAgent()
 {
 	v8::Debug::DisableAgent();
 	s_currentPort = INVALID_PORT;
+	__android_log_print(ANDROID_LOG_DEBUG, "TNS.Native", "Disable V8 debugger");
 }
 
 int JsDebugger::s_port = JsDebugger::INVALID_PORT;
