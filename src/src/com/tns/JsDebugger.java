@@ -1,11 +1,8 @@
 package com.tns;
 
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.net.ServerSocket;
 
@@ -46,27 +43,20 @@ public class JsDebugger
 		if (true) { // TODO: temporary activation for debugging check
 			File envFile = new File(context.getExternalFilesDir(null), portEnvFile);
 			if (envFile.exists()) {
-				BufferedWriter w = null;
 				BufferedReader r = null;
 				try
 				{
 					long len = envFile.length();
 					int localPort;
 					if (len == 0) {
-						w = new BufferedWriter(new FileWriter(envFile));
 						localPort = getAvailablePort();
-						if (localPort != INVALID_PORT) {
-							String strLocalPort = "" + localPort;
-							w.write(strLocalPort);
-						}
 					} else {
 						r = new BufferedReader(new FileReader(envFile));
 						String strLocalPort = r.readLine();
 						localPort = Integer.parseInt(strLocalPort);
 					}
 					port = localPort;
-				} catch (FileNotFoundException e) {
-					e.printStackTrace();
+					envFile.delete();
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
@@ -78,14 +68,6 @@ public class JsDebugger
 							e.printStackTrace();
 						}
 					}
-					if (w != null) {
-						try {
-							w.close();
-						} catch (IOException e) {
-							e.printStackTrace();
-						}
-					}
-
 				}
 			}
 		}
