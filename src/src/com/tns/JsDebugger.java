@@ -43,7 +43,7 @@ public class JsDebugger
 	int getDebuggerPortFromEnvironment() {
 		int port = INVALID_PORT;
 		
-		if (BuildConfig.DEBUG) {
+		if (true) { // TODO: temporary activation for debugging check
 			File envFile = new File(context.getExternalFilesDir(null), portEnvFile);
 			if (envFile.exists()) {
 				BufferedWriter w = null;
