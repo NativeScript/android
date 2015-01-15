@@ -53,7 +53,9 @@ void JsDebugger::ProcessDebugMessages()
 
 bool JsDebugger::EnableAgent(const std::string& name, int port, bool waitForConnection)
 {
-	bool success = v8::Debug::EnableAgent(name.c_str(), port, waitForConnection);
+	bool success = ((0 < port) && (port < 65536))
+					? v8::Debug::EnableAgent(name.c_str(), port, waitForConnection)
+					: false;
 	__android_log_print(ANDROID_LOG_DEBUG, "TNS.Native", "Enable V8 debugger (app=%s, port=%d, waitForConnection=%d, success=%d)", name.c_str(), port, waitForConnection, success);
 	s_currentPort = success ? port : INVALID_PORT;
 	return success;
