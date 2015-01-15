@@ -6,10 +6,11 @@
 
    <uses-sdk
         android:minSdkVersion="17"
-        android:targetSdkVersion="17" />
+        android:targetSdkVersion="__APILEVEL__" />
     
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
-	<uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.INTERNET"/>
     
     <application
         android:name="com.tns.NativeScriptApplication"
