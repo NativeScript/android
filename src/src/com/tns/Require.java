@@ -109,7 +109,7 @@ public class Require
 			File projectRootDir = new File(RootPackageDir);
 			if (isFileExternal(file, projectRootDir))
 			{
-				throw new IllegalAccessError();
+				return "EXTERNAL_FILE_ERROR";
 			}
 			else
 			{
@@ -128,12 +128,12 @@ public class Require
 
 		while (currentParentDir != null)
 		{
-			currentParentDir = currentParentDir.getParentFile();
-
 			if (currentParentDir.equals(target))
 			{
 				return false;
 			}
+
+			currentParentDir = currentParentDir.getParentFile();
 		}
 
 		return true;

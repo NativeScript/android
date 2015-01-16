@@ -862,6 +862,15 @@ void NativeScriptRuntime::RequireCallback(const v8::FunctionCallbackInfo<v8::Val
 		ExceptionUtil::GetInstance()->HandleInvalidState(exception, false);
 		return;
 	}
+	if (modulePath == "EXTERNAL_FILE_ERROR")
+	{
+		// module not found
+		stringstream ss;
+		ss << "Module \"" << moduleName << "\" is located on the external storage. Modules can be private application files ONLY";
+		string exception = ss.str();
+		ExceptionUtil::GetInstance()->HandleInvalidState(exception, false);
+		return;
+	}
 
 	auto it = loadedModules.find(modulePath);
 
