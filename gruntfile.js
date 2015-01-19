@@ -1,5 +1,7 @@
 module.exports = function(grunt) {
 
+    var pathModule = require("path");
+
     var outDir = "./dist";
     var rootDir = ".";
 
@@ -77,17 +79,17 @@ module.exports = function(grunt) {
             templateProject: {
                 expand: true,
                 dot: true,
-                cwd: rootDir + "/build/project-template/",
+                cwd: pathModule.join(rootDir, "build/project-template"),
                 src: [
                     "**/*.*"
                 ],
-                dest: outDir + "/"
+                dest: pathModule.join(outDir, "framework") + "/"
             },
             internalFolder: {
                 expand: true,
-                cwd: rootDir + "/src/assets",
+                cwd: pathModule.join(rootDir, "src/assets"),
                 src: ["internal/**/*.*"],
-                dest: outDir + "/framework/assets"
+                dest: pathModule.join(outDir, "framework/assets") + "/"
             },
             metadata: {
                 expand: true,
