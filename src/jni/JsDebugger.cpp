@@ -49,7 +49,10 @@ void JsDebugger::DispatchMessagesDebugAgentCallback()
 
 void JsDebugger::ProcessDebugMessages()
 {
-	v8::Debug::ProcessDebugMessages();
+	if (s_currentPort != INVALID_PORT)
+	{
+		v8::Debug::ProcessDebugMessages();
+	}
 }
 
 bool JsDebugger::EnableAgent(const std::string& name, int port, bool waitForConnection)
