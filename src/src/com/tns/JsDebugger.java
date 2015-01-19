@@ -130,7 +130,7 @@ public class JsDebugger
 		return port;
 	}
 
-	private int getAvailablePort()
+	private static int getAvailablePort()
 	{
 		int port = 0;
 		ServerSocket s = null;
@@ -184,7 +184,11 @@ public class JsDebugger
 					boolean enable = bundle.getBoolean("enable", false);
 					if (enable)
 					{
-						int port = bundle.getInt("debuggerPort", JsDebugger.INVALID_PORT);
+						int port = bundle.getInt("debuggerPort", INVALID_PORT);
+						if (port == INVALID_PORT)
+						{
+							port = getAvailablePort();
+						}
 						String packageName = bundle.getString("packageName", null);
 						boolean waitForDebugger = bundle.getBoolean("waitForDebugger", false);
 						boolean success = JsDebugger.enableAgent(packageName, port, waitForDebugger);
