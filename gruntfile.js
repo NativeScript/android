@@ -55,12 +55,6 @@ module.exports = function(grunt) {
         clean: {
             build: {
                 src: [outDir]
-            },
-            sourceSolidApi17Jar: {
-                src: [outDir + "/framework/assets/bindings/WORKINGDIR/"]
-            },
-            javaRuntime: {
-                src: ["./src/libs/nativescript.jar"]
             }
         },
         mkdir: {
@@ -68,13 +62,7 @@ module.exports = function(grunt) {
                 options: {
                     create: [outDir]
                 }
-            },
-            solidApi17JarDir: {
-                options: {
-                    mode: 0777,
-                    create: [outDir + "/framework/assets/bindings/WORKINGDIR/"]
-                }
-            },
+            }
         },
         copy: {
             pkgDef: {
@@ -94,15 +82,6 @@ module.exports = function(grunt) {
                     "**/*.*"
                 ],
                 dest: outDir + "/"
-            },
-            baseLibJars: {
-                expand: true,
-                cwd: generatorDir + "/jars/",
-                src: [
-                    "*.jar",
-                    "!android17.jar"
-                ],
-                dest: outDir + "/framework/libs/"
             },
             internalFolder: {
                 expand: true,
@@ -184,33 +163,9 @@ module.exports = function(grunt) {
                 cmd: "npm pack",
                 cwd: outDir + "/"
             },
-            createNativeRuntimeAntBuildFiles: {
-                cmd: "android update project --target 1 --name NativeScriptRuntime --path ./",
-                cwd: rootDir + "/src/"
-            },
-            revertToCustomizedBuildFiles: {
-                cmd: "git checkout -- src/project.properties src/proguard-project.txt",
-            },
-            revert_ndk_configuration: {
-                cmd: "git checkout -- src/jni/Application.mk",
-            },
-            buildCPPRuntime: {
-                cmd: "ndk-build",
-                cwd: rootDir + "/src/"
-            },
-            buildJavaRuntimeClasses: {
-                cmd: "ant release",
-                cwd: rootDir + "/src/"
-            },
-            ensureOriginalVersionFile: {
-                cmd: "git checkout -- " + localCfg.runtimeVersionHFile
-            },
-            ensureOriginalManifestFile: {
-                cmd: "git checkout -- ./src/manifest.mf"
-            },
-            jarJavaRuntime: {
-                cmd: "jar cfm ../../" + "/libs/nativescript.jar ../../manifest.mf com",
-                cwd: rootDir + "/src/bin/classes/"
+            generateRuntime: {
+                cmd: "npm install && grunt --verbose",
+                cwd: "./src"
             }
         }
     });
@@ -223,45 +178,11 @@ module.exports = function(grunt) {
     //TODO: NEEDED???
     grunt.loadNpmTasks("grunt-contrib-rename");
 
-    grunt.registerTask("updateVersionFile", [
-        "exec:ensureOriginalVersionFile",
-        "copy:updateVersionFile"
-    ]);
-
-    grunt.registerTask("generateBindingsAndMetadata", [
-                            "copy:internalFolder",
-                            "exec:createNativeRuntimeAntBuildFiles",
-                            "exec:revertToCustomizedBuildFiles",
-                            "exec:buildJavaRuntimeClasses",
-                            "exec:ensureOriginalManifestFile",
-                            "copy:updateManifestFile",
-                            "clean:javaRuntime",
-                            "exec:jarJavaRuntime",
-//                            "exec:generateMetadata",
-//                            "copy:metadata",
-//                            "exec:generateNormalJars",
-//                            "generateApi17Jars",
-//                            "copy:normalJars",
-                            "exec:ensureOriginalManifestFile"
-                        ]);
-
-    grunt.registerTask("generateCPPRuntime", [
-                            "replace:ndk_configuration",
-                            "updateVersionFile",
-                            "exec:buildCPPRuntime",
-                            "copy:CPPRuntime",
-                            "exec:revert_ndk_configuration",
-                            "exec:ensureOriginalVersionFile"
+    grunt.registerTask("generateRuntime", [
+                            "exec:generateRuntime"
                        ]);
 
-    grunt.registerTask("generateApi17Jars", [
-                "mkdir:solidApi17JarDir",
-                "rename:solidApi17Jar",
-                "exec:splitSolidApi17Jar",
-                "clean:sourceSolidApi17Jar",
-                "renameDexFile:3",
-                "renameDexFile:2",
-                "renameDexFile:1"
+    grunt.registerTask("generateMetadata", [
             ]);
 
     grunt.registerTask("default", [
@@ -269,11 +190,10 @@ module.exports = function(grunt) {
                             "mkdir:build",
                             "copy:templateProject",
                             "copy:pkgDef",
-                            "generateCPPRuntime",
-                            "generateBindingsAndMetadata",
-//                            "copy:baseLibJars",
-                            "clean:javaRuntime",
-//                            "exec:npmPack"
+                            "generateRuntime",
+//                            "generateMetadata",
+//                            "collectBindings",
+                            "exec:npmPack"
                         ]);
 
 }
