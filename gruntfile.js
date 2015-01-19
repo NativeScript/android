@@ -1,11 +1,16 @@
 module.exports = function(grunt) {
 
     var outDir = "./dist";
-    var srcDir = ".";
+    var rootDir = ".";
 
-    var generatorDir = srcDir + "/Bindings/Generator";
-    var jarCreationDir = srcDir + "/Bindings/JarCreation";
-    var kimeraDir = srcDir + "/kimera";
+    var args = {
+        metadataDir: grunt.option("metadataDir") || "../android-metadata-generator/dist",
+        libsDir: grunt.option("libsDir") || "./src/libs",
+        dexBindingsDir: grunt.option("dexBindingsDir") || "../android-bindings/dexes"
+    };
+
+    var generatorDir = rootDir + "/Bindings/Generator";
+    var jarCreationDir = rootDir + "/Bindings/JarCreation";
 
     var testPackageFile = function(filePath)
     {
@@ -37,16 +42,16 @@ module.exports = function(grunt) {
     }
 
     var localCfg = {
-        jniDir: srcDir + "/kimera/jni",
-        runtimeVersionHFile: srcDir + "/kimera/jni/Version.h",
-        packageJsonFilePath: srcDir + "/package.json",
+        jniDir: rootDir + "/src/jni",
+        runtimeVersionHFile: rootDir + "/src/jni/Version.h",
+        packageJsonFilePath: rootDir + "/package.json",
         commitVersion: process.env.GIT_COMMIT || ""
     };
 
     localCfg.packageVersion = getPackageVersion(localCfg.packageJsonFilePath);
 
     grunt.initConfig({
-        pkg: grunt.file.readJSON(srcDir + "/package.json"),
+        pkg: grunt.file.readJSON(rootDir + "/package.json"),
         clean: {
             build: {
                 src: [outDir]
@@ -71,17 +76,17 @@ module.exports = function(grunt) {
         copy: {
             pkgDef: {
                 src: [
-                    srcDir + "/package.json"
+                    rootDir + "/package.json"
                 ],
                 dest: outDir + "/",
                 options: {
                     process: updatePackageVersion
                 }
             },
-            shimProject: {
+            templateProject: {
                 expand: true,
                 dot: true,
-                cwd: srcDir + "/Build/Shim/",
+                cwd: rootDir + "/build/project-template/",
                 src: [
                     "**/*.*"
                 ],
@@ -98,7 +103,7 @@ module.exports = function(grunt) {
             },
             internalFolder: {
                 expand: true,
-                cwd: srcDir + "/kimera/assets",
+                cwd: rootDir + "/src/assets",
                 src: ["internal/**/*.*"],
                 dest: outDir + "/framework/assets"
             },
@@ -114,9 +119,9 @@ module.exports = function(grunt) {
                 cwd: jarCreationDir + "/dist/",
                 dest: outDir + "/framework/libs/"
             },
-            nativeBridge: {
+            nativeRuntime: {
                 expand: true,
-                cwd: srcDir + "/kimera/",
+                cwd: rootDir + "/src/",
                 src: [
                     "./libs/armeabi-v7a/libNativeScript.so",
                     "./libs/x86/libNativeScript.so"
@@ -142,8 +147,8 @@ module.exports = function(grunt) {
             updateManifestFile: {
                 expand: true,
                 flatten: true,
-                src: "./kimera/manifest.mf",
-                dest: "./kimera/",
+                src: "./src/manifest.mf",
+                dest: "./src/",
                 options: {
                     process: function(content, srcPath) {
                         var updatedContent = content;
@@ -167,7 +172,7 @@ module.exports = function(grunt) {
                     ]
                 },
                 files: [
-                    {src: srcDir + "/kimera/jni/Application.mk", dest: srcDir + "/kimera/jni/Application.mk"}
+                    {src: rootDir + "/src/jni/Application.mk", dest: rootDir + "/src/jni/Application.mk"}
                 ]
             }
         },
@@ -176,99 +181,41 @@ module.exports = function(grunt) {
                 cmd: "npm pack",
                 cwd: outDir + "/"
             },
-            generateNormalJars: {
-                cmd: "grunt",
-                cwd: jarCreationDir
-            },
-            generateMetadata:
-            {
-                cmd: "grunt",
-                cwd: generatorDir
-            },
-            createNativeBridgeAntBuildFiles: {
-                cmd: "android update project --target 1 --name NativeScriptBridge --path ./",
-                cwd: srcDir + "/kimera/"
+            createNativeRuntimeAntBuildFiles: {
+                cmd: "android update project --target 1 --name NativeScriptRuntime --path ./",
+                cwd: rootDir + "/src/"
             },
             revertToCustomizedBuildFiles: {
-                cmd: "git checkout -- kimera/project.properties kimera/proguard-project.txt",
+                cmd: "git checkout -- src/project.properties src/proguard-project.txt",
             },
             revert_ndk_configuration: {
-                cmd: "git checkout -- kimera/jni/Application.mk",
+                cmd: "git checkout -- src/jni/Application.mk",
             },
-            buildNativeBridge: {
+            buildNativeRuntime: {
                 cmd: "ndk-build",
-                cwd: srcDir + "/kimera/"
+                cwd: rootDir + "/src/"
             },
-            buildNativeBridgeClasses: {
+            buildNativeRuntimeClasses: {
                 cmd: "ant release",
-                cwd: srcDir + "/kimera/"
-            },
-            setupGeneratorNPM: {
-                cmd: "npm install",
-                cwd: generatorDir
-            },
-            setupJarCreationNPM: {
-                cmd: "npm install",
-                cwd: jarCreationDir
-            },
-            splitSolidApi17Jar: {
-                //TODO: Get the dx.jar as an environment variable, should be $ANDROID_SDK_ROOT/build-tools/xx.x.x/lib/dx.jar
-                cmd: "java -jar /var/lib/android-sdk-23/build-tools/20.0.0/lib/dx.jar --dex --multi-dex --output=./ ./WORKINGDIR/",
-                cwd: outDir + "/framework/assets/bindings/"
+                cwd: rootDir + "/src/"
             },
             ensureOriginalVersionFile: {
                 cmd: "git checkout -- " + localCfg.runtimeVersionHFile
             },
-            jarNativeBridge: {
-                cmd: "jar cfm ../../../" + generatorDir +"/jars/nativescript.jar ../../manifest.mf com",
-                cwd: srcDir + "/kimera/bin/classes/"
-            }
-        },
-        rename: {
-            solidApi17Jar: {
-                src: jarCreationDir + "/dist/api17-bindings.jar",
-                dest: outDir + "/framework/assets/bindings/WORKINGDIR/api17-bindings.jar"
-            },
-            dexFile: {
-                src: "__DUMMY__",
-                dest: "__DUMMY__"
+            jarJavaRuntime: {
+                cmd: "jar cfm ../../../" +  +"/jars/nativescript.jar ../../manifest.mf com",
+                cwd: rootDir + "/src/bin/classes/"
             }
         }
     });
-
-    grunt.registerTask("renameDexFile",
-                        "Renames the dex file by increasing its number suffix",
-                        function(suffixParam) {
-                            var suffix = parseInt(suffixParam);
-                            var oldSuffix = suffix.toString();
-                            if (suffix == 1) {
-                                oldSuffix = "";
-                            }
-                            
-                            var renameTask = ["rename", "dexFile"];
-                            var originalConfig = grunt.config(renameTask);
-                            var newconfig = grunt.util._.clone(originalConfig);
-                            newconfig.src = outDir + "/framework/assets/bindings/classes" + oldSuffix + ".dex";
-                            newconfig.dest = outDir + "/framework/assets/bindings/classes" + (suffix+1).toString() + ".dex";
-                            grunt.config(renameTask, newconfig);
-
-                            grunt.task.run([
-                                renameTask.join(":")
-                            ]); 
-
-                        });
 
     grunt.loadNpmTasks("grunt-contrib-clean");
     grunt.loadNpmTasks("grunt-contrib-copy");
     grunt.loadNpmTasks("grunt-mkdir");
     grunt.loadNpmTasks("grunt-exec");
     grunt.loadNpmTasks("grunt-replace");
+    //TODO: NEEDED???
     grunt.loadNpmTasks("grunt-contrib-rename");
-
-    grunt.registerTask("prepareChildren", [
-                            "exec:setupGeneratorNPM",
-                            "exec:setupJarCreationNPM"
-                        ]);
 
     grunt.registerTask("updateVersionFile", [
         "exec:ensureOriginalVersionFile",
@@ -277,11 +224,11 @@ module.exports = function(grunt) {
 
     grunt.registerTask("generateBindingsAndMetadata", [
                             "copy:internalFolder",
-                            "exec:createNativeBridgeAntBuildFiles",
+                            "exec:createNativeRuntimeAntBuildFiles",
                             "exec:revertToCustomizedBuildFiles",
-                            "exec:buildNativeBridgeClasses",
+                            "exec:buildNativeRuntimeClasses",
                             "copy:updateManifestFile",
-                            "exec:jarNativeBridge",
+                            "exec:jarJavaRuntime",
                             "exec:generateMetadata",
                             "copy:metadata",
                             "exec:generateNormalJars",
@@ -289,11 +236,11 @@ module.exports = function(grunt) {
                             "copy:normalJars"
                         ]);
 
-    grunt.registerTask("generateNativeBridge", [
+    grunt.registerTask("generateNativeRuntime", [
                             "replace:ndk_configuration",
                             "updateVersionFile",
-                            "exec:buildNativeBridge",
-                            "copy:nativeBridge",
+                            "exec:buildNativeRuntime",
+                            "copy:nativeRuntime",
                             "exec:revert_ndk_configuration"
                        ]);
 
@@ -308,15 +255,14 @@ module.exports = function(grunt) {
             ]);
 
     grunt.registerTask("default", [
-                            "prepareChildren",
                             "clean:build",
                             "mkdir:build",
-                            "copy:shimProject",
+                            "copy:templateProject",
                             "copy:pkgDef",
-                            "generateNativeBridge",
-                            "generateBindingsAndMetadata",
-                            "copy:baseLibJars",
-                            "exec:npmPack"
+                            "generateNativeRuntime",
+//                            "generateBindingsAndMetadata",
+//                            "copy:baseLibJars",
+//                            "exec:npmPack"
                         ]);
 
 }
