@@ -31,6 +31,7 @@ int JsDebugger::GetDebuggerPort()
 
 int JsDebugger::GetCurrentDebuggerPort()
 {
+	__android_log_print(ANDROID_LOG_DEBUG, "TNS.Native", "GetCurrentDebuggerPort ret=%d", s_currentPort);
 	return s_currentPort;
 }
 
@@ -41,7 +42,7 @@ string JsDebugger::GetPackageName()
 
 void JsDebugger::DispatchMessagesDebugAgentCallback()
 {
-	JEnv env;
+	JEnv env(true);
 	jboolean success = env.CallStaticBooleanMethod(s_JsDebuggerClass, s_DispatchMessagesDebugAgentCallback);
 	assert(JNI_TRUE == success);
 }

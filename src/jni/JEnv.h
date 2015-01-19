@@ -10,9 +10,11 @@ namespace tns
 	class JEnv
 	{
 	public:
-		JEnv();
+		JEnv(bool detach = false);
 
 		JEnv(JNIEnv *jniEnv);
+
+		~JEnv();
 
 		operator JNIEnv*() const;
 
@@ -275,6 +277,7 @@ namespace tns
 
 	private:
 		JNIEnv *m_env;
+		bool m_detach;
 
 		static JavaVM *s_jvm;
 

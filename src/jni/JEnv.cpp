@@ -1,6 +1,7 @@
 #include "JEnv.h"
 #include <assert.h>
 #include <sstream>
+#include <unistd.h>
 //
 #include "ObjectManager.h"
 
@@ -9,8 +10,8 @@ using namespace std;
 
 
 
-JEnv::JEnv()
-	: m_env(nullptr)
+JEnv::JEnv(bool detach)
+	: m_detach(detach), m_env(nullptr)
 {
 	JNIEnv *env = nullptr;
 	jint ret = s_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
@@ -27,6 +28,27 @@ JEnv::JEnv()
 JEnv::JEnv(JNIEnv *jniEnv)
 	: m_env(jniEnv)
 {
+}
+
+JEnv::~JEnv()
+{
+	pid_t pid = getpid();
+	pid_t tid = gettid();
+
+	if (pid != tid)
+	{
+		if (m_detach)
+		{
+			JNIEnv *env = nullptr;
+			jint ret = s_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+
+			if ((ret == JNI_OK) && (env != nullptr))
+			{
+				jint ret = s_jvm->DetachCurrentThread();
+				assert(ret == JNI_OK);
+			}
+		}
+	}
 }
 
 JEnv::operator JNIEnv*() const
