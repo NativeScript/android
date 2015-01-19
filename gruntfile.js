@@ -58,6 +58,9 @@ module.exports = function(grunt) {
             },
             sourceSolidApi17Jar: {
                 src: [outDir + "/framework/assets/bindings/WORKINGDIR/"]
+            },
+            javaRuntime: {
+                src: ["./src/libs/nativescript.jar"]
             }
         },
         mkdir: {
@@ -119,7 +122,7 @@ module.exports = function(grunt) {
                 cwd: jarCreationDir + "/dist/",
                 dest: outDir + "/framework/libs/"
             },
-            nativeRuntime: {
+            CPPRuntime: {
                 expand: true,
                 cwd: rootDir + "/src/",
                 src: [
@@ -191,19 +194,22 @@ module.exports = function(grunt) {
             revert_ndk_configuration: {
                 cmd: "git checkout -- src/jni/Application.mk",
             },
-            buildNativeRuntime: {
+            buildCPPRuntime: {
                 cmd: "ndk-build",
                 cwd: rootDir + "/src/"
             },
-            buildNativeRuntimeClasses: {
+            buildJavaRuntimeClasses: {
                 cmd: "ant release",
                 cwd: rootDir + "/src/"
             },
             ensureOriginalVersionFile: {
                 cmd: "git checkout -- " + localCfg.runtimeVersionHFile
             },
+            ensureOriginalManifestFile: {
+                cmd: "git checkout -- ./src/manifest.mf"
+            },
             jarJavaRuntime: {
-                cmd: "jar cfm ../../../" +  +"/jars/nativescript.jar ../../manifest.mf com",
+                cmd: "jar cfm ../../" + "/libs/nativescript.jar ../../manifest.mf com",
                 cwd: rootDir + "/src/bin/classes/"
             }
         }
@@ -226,22 +232,26 @@ module.exports = function(grunt) {
                             "copy:internalFolder",
                             "exec:createNativeRuntimeAntBuildFiles",
                             "exec:revertToCustomizedBuildFiles",
-                            "exec:buildNativeRuntimeClasses",
+                            "exec:buildJavaRuntimeClasses",
+                            "exec:ensureOriginalManifestFile",
                             "copy:updateManifestFile",
+                            "clean:javaRuntime",
                             "exec:jarJavaRuntime",
-                            "exec:generateMetadata",
-                            "copy:metadata",
-                            "exec:generateNormalJars",
-                            "generateApi17Jars",
-                            "copy:normalJars"
+//                            "exec:generateMetadata",
+//                            "copy:metadata",
+//                            "exec:generateNormalJars",
+//                            "generateApi17Jars",
+//                            "copy:normalJars",
+                            "exec:ensureOriginalManifestFile"
                         ]);
 
-    grunt.registerTask("generateNativeRuntime", [
+    grunt.registerTask("generateCPPRuntime", [
                             "replace:ndk_configuration",
                             "updateVersionFile",
-                            "exec:buildNativeRuntime",
-                            "copy:nativeRuntime",
-                            "exec:revert_ndk_configuration"
+                            "exec:buildCPPRuntime",
+                            "copy:CPPRuntime",
+                            "exec:revert_ndk_configuration",
+                            "exec:ensureOriginalVersionFile"
                        ]);
 
     grunt.registerTask("generateApi17Jars", [
@@ -259,9 +269,10 @@ module.exports = function(grunt) {
                             "mkdir:build",
                             "copy:templateProject",
                             "copy:pkgDef",
-                            "generateNativeRuntime",
-//                            "generateBindingsAndMetadata",
+                            "generateCPPRuntime",
+                            "generateBindingsAndMetadata",
 //                            "copy:baseLibJars",
+                            "clean:javaRuntime",
 //                            "exec:npmPack"
                         ]);
 
