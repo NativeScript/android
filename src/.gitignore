@@ -4,3 +4,6 @@
 /libs/x86/
 /jni/include/jni.h
 build.xml
+
+./dist/
+/package.json
