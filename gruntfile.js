@@ -191,6 +191,7 @@ module.exports = function(grunt) {
                             "clean:build",
                             "mkdir:build",
                             "copy:templateProject",
+                            "copy:internalFolder",
                             "copy:pkgDef",
                             "generateRuntime",
 //                            "generateMetadata",
