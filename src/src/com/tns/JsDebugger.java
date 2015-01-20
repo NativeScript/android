@@ -189,7 +189,7 @@ public class JsDebugger
 						{
 							port = getAvailablePort();
 						}
-						String packageName = bundle.getString("packageName", null);
+						String packageName = bundle.getString("packageName", context.getPackageName());
 						boolean waitForDebugger = bundle.getBoolean("waitForDebugger", false);
 						boolean success = JsDebugger.enableAgent(packageName, port, waitForDebugger);
 						if (!success)
