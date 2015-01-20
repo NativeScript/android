@@ -196,6 +196,8 @@ public class JsDebugger
 						{
 							Log.d("TNS.Java", "enableAgent = false");
 						}
+						int resultCode = success ? port : INVALID_PORT;
+						this.setResultCode(resultCode);
 					}
 					else
 					{
