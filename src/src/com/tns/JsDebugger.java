@@ -124,6 +124,7 @@ public class JsDebugger
 							e.printStackTrace();
 						}
 					}
+					envInFile.delete();
 				}
 			}
 		}
