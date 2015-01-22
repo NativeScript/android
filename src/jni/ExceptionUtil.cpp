@@ -203,7 +203,7 @@ string ExceptionUtil::GetErrorMessage(const Handle<Message>& message, const Hand
 	String::Utf8Value utfError(str);
 	ss << *utfError << endl;
 	ss << "File: \"" << ConvertToString(message->GetScriptResourceName().As<String>());
-	ss << ", line: " << message->GetLineNumber() << ", column: " << message->GetStartColumn() << endl;
+	ss << ", line: " << message->GetLineNumber() - Constants::MODULE_LINES_OFFSET << ", column: " << message->GetStartColumn() << endl;
 
 	string stackTraceMessage = GetErrorStackTrace(message->GetStackTrace());
 	ss << "StackTrace: " << endl << stackTraceMessage;
@@ -270,7 +270,7 @@ bool ExceptionUtil::CheckForException(Isolate *isolate, const string& methodName
 		String::Utf8Value file(tc.Message()->GetScriptResourceName());
 		int line = tc.Message()->GetLineNumber();
 		int column = tc.Message()->GetStartColumn();
-		DEBUG_WRITE("Error: %s @line: %d, column: %d", *error, line, column);
+		DEBUG_WRITE("Error: %s @line: %d, column: %d", *error, line - Constants::MODULE_LINES_OFFSET, column);
 
 		auto pv = new Persistent<Value>(isolate, ex);
 
