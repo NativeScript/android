@@ -33,7 +33,6 @@ namespace tns {
 			static v8::Local<v8::String> GetExtends();
 			static v8::Local<v8::String> GetIsPrototypeImplementationObject();
 			static v8::Local<v8::String> GetNativeException();
-			static v8::Local<v8::String> GetStackTrace();
 			static v8::Local<v8::String> GetLongNumber();
 			static v8::Local<v8::String> GetPrototype();
 			static v8::Local<v8::String> GetSuper();
@@ -58,7 +57,6 @@ namespace tns {
 			static const std::string EXTEND;
 			static const std::string IS_PROTOTYPE_IMPLEMENTATION_OBJECT;
 			static const std::string NATIVE_EXCEPTION;
-			static const std::string STACK_TRACE;
 			static const std::string LONG_NUMBER;
 			static const std::string PROTOTYPE;
 			static const std::string SUPER;

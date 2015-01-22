@@ -47,8 +47,6 @@ public class Platform
 	
 	private static native void adjustAmountOfExternalAllocatedMemoryNative(long changeInBytes);
 	
-	private static native void passUncaughtExceptionToJsNative(Throwable ex, String javaStackTrace);
-	
 	private static Context NativeScriptContext;
 
 	private static SparseArray<Object> strongInstances = new SparseArray<Object>();
@@ -164,8 +162,6 @@ public class Platform
 						{
 							content = e.getMessage();
 						}
-						
-						passUncaughtExceptionToJsNative(ex, content);
 					}
 					finally
 					{
@@ -191,8 +187,6 @@ public class Platform
 					{
 						h.uncaughtException(thread, ex);
 					}
-					
-					//TODO: should we kill application when an uncaught exception is thrown?!
 				}
 			};
 		}

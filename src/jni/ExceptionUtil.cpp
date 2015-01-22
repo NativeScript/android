@@ -159,19 +159,23 @@ void ExceptionUtil::OnUncaughtError(Handle<Message> message, Handle<Value> error
 	auto isFunction = handler->IsFunction();
 
 	if(!isEmpty && isFunction){
+		// call the global exception handler
 		Handle<Value> errorObject;
 
-		//if the passed error is object
 		if(error->IsObject()){
-			//create exception object
 			errorObject = error.As<Object>();
-			ExceptionUtil::SetMessageToErrorObject(errorMessage, errorObject);
+			error.As<Object>()->Set(ConvertToV8String("message"), ConvertToV8String(errorMessage));
 		}
 		else{
-			errorObject = Exception::Error(ConvertToV8String(errorMessage)); //get error object
+			errorObject = Exception::Error(ConvertToV8String(errorMessage));
 		}
 
-		CalllFuncWithError(isolate, handler, errorObject);
+		auto thiz = Object::New(isolate);
+		auto func = handler.As<Function>();
+
+		// Notify the developer for the exception and let him do some additional job here
+		// TODO: Launching UI at this point may be erroneous, think how to prevent it
+		func->Call(thiz, 1, &errorObject);
 
 		// check whether the developer marked the error as "Caught"
 		// As per discussion, it is safer to ALWAYS kill the application due to uncaught error(s)
@@ -183,24 +187,6 @@ void ExceptionUtil::OnUncaughtError(Handle<Message> message, Handle<Value> error
 
 	// go to Java through the Thread.setUncaughtExceptionHandler routine
 	//NativeScriptRuntime::APP_FAIL(errorMessage.c_str());
-}
-
-void ExceptionUtil::SetMessageToErrorObject(const string &message, Handle<Value> errorObject){
-	errorObject.As<Object>()->Set(ConvertToV8String("message"), ConvertToV8String(message));
-}
-
-void ExceptionUtil::CalllFuncWithError(Isolate* isolate, Handle<Value> &handler, Handle<Value> errorObject){
-
-	if(!handler.IsEmpty() && handler->IsFunction())
-	{
-		auto func = handler.As<Function>();
-		auto thiz = Object::New(isolate);
-		func->Call(thiz, 1, &errorObject);
-	}
-	else
-	{
-		//throw exception, or fail in some way
-	}
 }
 
 string ExceptionUtil::GetErrorMessage(const Handle<Message>& message, const Handle<Value>& error){

@@ -25,10 +25,6 @@ namespace tns {
 		return String::NewFromUtf8(Isolate::GetCurrent(), NATIVE_EXCEPTION.c_str());
 	}
 
-	Local<String> V8StringConstants::GetStackTrace(){
-		return String::NewFromUtf8(Isolate::GetCurrent(), STACK_TRACE.c_str());
-	}
-
 	Local<String> V8StringConstants::GetLongNumber(){
 		return String::NewFromUtf8(Isolate::GetCurrent(), LONG_NUMBER.c_str());
 	}
@@ -103,7 +99,6 @@ namespace tns {
 	const string V8StringConstants::EXTEND = "extend";
 	const string V8StringConstants::IS_PROTOTYPE_IMPLEMENTATION_OBJECT = "__isPrototypeImplementationObject";
 	const string V8StringConstants::NATIVE_EXCEPTION = "nativeException";
-	const string V8StringConstants::STACK_TRACE = "stackTrace";
 	const string V8StringConstants::LONG_NUMBER = "NativeScriptLongNumber";
 	const string V8StringConstants::PROTOTYPE = "prototype";
 	const string V8StringConstants::SUPER = "super";

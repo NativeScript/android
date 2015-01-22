@@ -15,7 +15,6 @@
 #include "WeakRef.h"
 #include "NativeScriptAssert.h"
 #include "JsDebugger.h"
-#include "V8GlobalHelpers.h"
 #include <sstream>
 #include <android/log.h>
 #include <assert.h>
@@ -107,7 +106,6 @@ void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring pa
 	V8::SetCaptureStackTraceForUncaughtExceptions(true, 100, StackTrace::kOverview);
 	V8::AddMessageListener(ExceptionUtil::OnUncaughtError);
 
-	// says the New(); method will be deprecated soon and to use New(Isolate* isolate); instead
 	auto globalTemplate = ObjectTemplate::New();
 
 	globalTemplate->Set(ConvertToV8String("__startNativeScriptProfiler"), FunctionTemplate::New(isolate, NativeScriptRuntime::StartProfilerCallback));
@@ -518,35 +516,4 @@ extern "C" void Java_com_tns_Platform_disableVerboseLoggingNative(JNIEnv *env, j
 extern "C" void Java_com_tns_Platform_adjustAmountOfExternalAllocatedMemoryNative(JNIEnv *env, jobject obj, jlong usedMemory)
 {
 	Isolate::GetCurrent()->AdjustAmountOfExternalAllocatedMemory(usedMemory);
-}
-
-extern "C" void Java_com_tns_Platform_passUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, jthrowable javaException, jstring javaStackTrace)
-{
-	Isolate* isolate = Isolate::GetCurrent();
-	HandleScope handleScope(isolate);
-
-	auto context = isolate->GetCurrentContext();
-	auto globalHandle = context->Global();
-	auto handler = globalHandle->Get(V8StringConstants::GetUncaughtError());
-
-	//set up v8 exception objects
-	auto message = "The application crashed because of an uncaught exception. You can look at the \"stackTrace\" or the \"nativeException\" for more information on the exception.";
-	auto errObj = Exception::Error(ConvertToV8String(message)).As<Object>();
-
-	jint javaObjectID = objectManager->GetOrCreateObjectId((jobject) javaException);
-	auto nativeExceptionObject = objectManager->GetJsObjectByJavaObject(javaObjectID);
-	auto stackTrace = ArgConverter::jstringToV8String(javaStackTrace);
-
-	if (nativeExceptionObject.IsEmpty())
-	{
-		string className = objectManager->GetClassName((jobject)javaException);
-		nativeExceptionObject = objectManager->CreateJSProxyInstance(javaObjectID, className);
-	}
-
-	//fill error object with information about the uncaught exception
-	errObj->Set(V8StringConstants::GetNativeException(), nativeExceptionObject);
-	errObj->Set(V8StringConstants::GetStackTrace(), stackTrace);
-
-	//send to JS
-	ExceptionUtil::GetInstance()->CalllFuncWithError(isolate, handler, errObj);
 }
