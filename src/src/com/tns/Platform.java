@@ -47,6 +47,8 @@ public class Platform
 	
 	private static native void adjustAmountOfExternalAllocatedMemoryNative(long changeInBytes);
 	
+	private static native void passUncaughtExceptionToJsNative(Throwable ex, String stackTrace);
+	
 	private static Context NativeScriptContext;
 
 	private static SparseArray<Object> strongInstances = new SparseArray<Object>();
@@ -162,6 +164,8 @@ public class Platform
 						{
 							content = e.getMessage();
 						}
+						
+						passUncaughtExceptionToJsNative(ex, content);
 					}
 					finally
 					{

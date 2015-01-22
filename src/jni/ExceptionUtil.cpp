@@ -170,12 +170,7 @@ void ExceptionUtil::OnUncaughtError(Handle<Message> message, Handle<Value> error
 			errorObject = Exception::Error(ConvertToV8String(errorMessage));
 		}
 
-		auto thiz = Object::New(isolate);
-		auto func = handler.As<Function>();
 
-		// Notify the developer for the exception and let him do some additional job here
-		// TODO: Launching UI at this point may be erroneous, think how to prevent it
-		func->Call(thiz, 1, &errorObject);
 
 		// check whether the developer marked the error as "Caught"
 		// As per discussion, it is safer to ALWAYS kill the application due to uncaught error(s)
@@ -187,6 +182,14 @@ void ExceptionUtil::OnUncaughtError(Handle<Message> message, Handle<Value> error
 
 	// go to Java through the Thread.setUncaughtExceptionHandler routine
 	//NativeScriptRuntime::APP_FAIL(errorMessage.c_str());
+}
+
+void ExceptionUtil::CallJFuncWithErr(Isolate* isolate, Handle<Value> handler, Handle<Value> errObj)
+{
+	auto thiz = Object::New(isolate);
+	auto func = handler.As<Function>();
+
+	func->Call(thiz, 1, &errObj);
 }
 
 string ExceptionUtil::GetErrorMessage(const Handle<Message>& message, const Handle<Value>& error){
