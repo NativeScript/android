@@ -42,6 +42,8 @@ namespace tns
 		 */
 		static void OnUncaughtError(v8::Handle<v8::Message> message, v8::Handle<v8::Value> error);
 
+		static void CalllFuncWithError(v8::Isolate* isolate, v8::Handle<v8::Value> &handler, v8::Handle<v8::Value> errorObject);
+
 		static ExceptionUtil* GetInstance();
 
 	private:
@@ -54,6 +56,8 @@ namespace tns
 		jweak TryGetJavaThrowableObject(JEnv& env, const v8::Handle<v8::Object>& jsObj);
 
 		static ExceptionUtil* instance;
+
+		static void SetMessageToErrorObject(const std::string &message, v8::Handle<v8::Value> errorObject);
 
 		bool initialized;
 
