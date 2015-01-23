@@ -1,6 +1,8 @@
 // A sample code how to catch uncaught errors
 global.__onUncaughtError = function(error){
 	if(error.nativeException){
+		Log("err.message: " + error.message);
+		Log("err.stackTrace: " + error.stackTrace);
 		// false == do not continue execution
 		return false;
 	}

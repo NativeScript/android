@@ -150,7 +150,36 @@ bool ExceptionUtil::HandleTryCatch(TryCatch& tc){
 void ExceptionUtil::OnUncaughtError(Handle<Message> message, Handle<Value> error){
 	auto errorMessage = instance->PrintErrorMessage(message, error);
 
-	auto isolate = Isolate::GetCurrent();
+	Isolate *isolate = Isolate::GetCurrent();
+	HandleScope scope(isolate);
+
+	// call the global exception handler
+	Handle<Value> errorObject;
+
+	if(error->IsObject()){
+		errorObject = error.As<Object>();
+		error.As<Object>()->Set(ConvertToV8String("message"), ConvertToV8String(errorMessage));
+	}
+	else{
+		errorObject = Exception::Error(ConvertToV8String(errorMessage));
+	}
+
+	CallJFuncWithErr(errorObject);
+
+	// check whether the developer marked the error as "Caught"
+	// As per discussion, it is safer to ALWAYS kill the application due to uncaught error(s)
+	// TODO: We may think for some per-thread specific behavior and allow execution to continue for background thread exceptions
+//		if(!returnValue.IsEmpty() && (returnValue->IsBoolean() || returnValue->IsBooleanObject())){
+//			handled = returnValue->BooleanValue();
+//		}
+}
+
+void ExceptionUtil::CallJFuncWithErr(Handle<Value> errObj)
+{
+	//create handle scope
+	Isolate *isolate = Isolate::GetCurrent();
+	HandleScope scope(isolate);
+
 	auto context = isolate->GetCurrentContext();
 	auto globalHandle = context->Global();
 
@@ -158,35 +187,13 @@ void ExceptionUtil::OnUncaughtError(Handle<Message> message, Handle<Value> error
 	auto isEmpty = handler.IsEmpty();
 	auto isFunction = handler->IsFunction();
 
-	if(!isEmpty && isFunction){
-		// call the global exception handler
-		Handle<Value> errorObject;
-
-		if(error->IsObject()){
-			errorObject = error.As<Object>();
-			error.As<Object>()->Set(ConvertToV8String("message"), ConvertToV8String(errorMessage));
-		}
-		else{
-			errorObject = Exception::Error(ConvertToV8String(errorMessage));
-		}
-
+	if(!isEmpty && isFunction)
+	{
 		auto thiz = Object::New(isolate);
 		auto func = handler.As<Function>();
 
-		// Notify the developer for the exception and let him do some additional job here
-		// TODO: Launching UI at this point may be erroneous, think how to prevent it
-		func->Call(thiz, 1, &errorObject);
-
-		// check whether the developer marked the error as "Caught"
-		// As per discussion, it is safer to ALWAYS kill the application due to uncaught error(s)
-		// TODO: We may think for some per-thread specific behavior and allow execution to continue for background thread exceptions
-//		if(!returnValue.IsEmpty() && (returnValue->IsBoolean() || returnValue->IsBooleanObject())){
-//			handled = returnValue->BooleanValue();
-//		}
+		func->Call(thiz, 1, &errObj);
 	}
-
-	// go to Java through the Thread.setUncaughtExceptionHandler routine
-	//NativeScriptRuntime::APP_FAIL(errorMessage.c_str());
 }
 
 string ExceptionUtil::GetErrorMessage(const Handle<Message>& message, const Handle<Value>& error){
@@ -200,7 +207,7 @@ string ExceptionUtil::GetErrorMessage(const Handle<Message>& message, const Hand
 	String::Utf8Value utfError(str);
 	ss << *utfError << endl;
 	ss << "File: \"" << ConvertToString(message->GetScriptResourceName().As<String>());
-	ss << ", line: " << message->GetLineNumber() << ", column: " << message->GetStartColumn() << endl;
+	ss << ", line: " << message->GetLineNumber() - Constants::MODULE_LINES_OFFSET << ", column: " << message->GetStartColumn() << endl;
 
 	string stackTraceMessage = GetErrorStackTrace(message->GetStackTrace());
 	ss << "StackTrace: " << endl << stackTraceMessage;
@@ -267,7 +274,7 @@ bool ExceptionUtil::CheckForException(Isolate *isolate, const string& methodName
 		String::Utf8Value file(tc.Message()->GetScriptResourceName());
 		int line = tc.Message()->GetLineNumber();
 		int column = tc.Message()->GetStartColumn();
-		DEBUG_WRITE("Error: %s @line: %d, column: %d", *error, line, column);
+		DEBUG_WRITE("Error: %s @line: %d, column: %d", *error, line - Constants::MODULE_LINES_OFFSET, column);
 
 		auto pv = new Persistent<Value>(isolate, ex);
 
