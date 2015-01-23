@@ -4,44 +4,6 @@ var Assert = function(condition, failMessage) {
 	}
 }
 
-var TestIonLoadImage = function(context) {
-
-	Log("TEST: TestIonLoadImage");
-	
-	var ION = com.koushikdutta.ion.Ion;
-	
-	var img = ION.with(context).load("http://www.telerik.com/sfimages/default-source/logos/telerik-logo-reversed.png");
-	
-	var bitmap = img.asBitmap().get();
-	
-	var width = bitmap.getWidth();
-	
-	Assert(width > 0, "TestIonLoadImage FAILED: Image should be visible (width=" + width + ")");
-}
-
-var TestIonStringCallback = function(context) {
-
-	Log("TEST: TestIonStringCallback");
-	
-	var content = "";
-
-	var myStringCallback = new com.koushikdutta.async.future.FutureCallback({
-		onCompleted : function(e, result) {
-			content = result;
-		}
-	});
-	
-	var Ion = com.koushikdutta.ion.Ion;
-	
-	var future = Ion.with(context, "http://www.telerik.com").asString().setCallback(myStringCallback);
-	
-	future.get();
-	
-	//Log("content=" + content);
-	
-	Assert(content.length > 0, "TestIonStringCallback FAILED: Cannot get string content with ION");
-}
-
 var TestConstructorOverrideForBuiltinType = function(context) {
 
 	Log("TEST: TestConstructorOverrideForBuiltinType");
@@ -145,8 +107,6 @@ exports.run = function(context)
 	TestConstructorOverrideForBuiltinType(context);
 	TestConstructorOverrideForBuiltinTypeWithInitMethod(context);
 	TestBuiltinNestedClassCreation(context);
-	TestIonLoadImage(context);
-	TestIonStringCallback(context);
 	TestPublicWindowManagerImplWithoutMetadata(context);
 	TestUsingClassFromAndroidSupportLibrary(context);
 	TestCanPassCharSequenceArray(context);

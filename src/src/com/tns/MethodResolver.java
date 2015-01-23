@@ -9,8 +9,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 
-import android.renderscript.Float2;
-
 class MethodResolver
 {
 	private static class Tuple<X, Y>

@@ -752,23 +752,6 @@ var TestAccessArrayElementAsObjectWithoutMetadata = function() {
 	Assert(name === "dummy", "TestAccessArrayElementAsObjectWithoutMetadata FAILED: Expected value is 'dummy', returned value is '" + name + "'");
 }
 
-var TestIonImplementInterface = function() {
-
-	Log("TEST: TestIonImplementInterface");
-	
-	var onHeadersCalled = false;
-	
-	var headers = com.koushikdutta.ion.HeadersCallback({
-		onHeaders: function() {
-			onHeadersCalled = true;
-		}
-	});
-	
-	headers.onHeaders(null);
-	
-	Assert(onHeadersCalled === true, "TestIonImplementInterface FAILED: Method onHeaders is not called");
-}
-
 var TestCallMethodThatReturnsNull = function() {
 
 	Log("TEST: TestCallMethodThatReturnsNull");
@@ -1684,7 +1667,6 @@ TestCallMethodOnAnObjectReturnedAsObjectWithoutMetadata();
 TestGetFieldOnAnObjectReturnedAsObjectWithoutMetadata();
 TestCallMethodOnAnObjectPassedAsParameterInOverriddenMethodAsAnObjectWithoutMetadata();
 TestAccessArrayElementAsObjectWithoutMetadata();
-TestIonImplementInterface();
 TestCallMethodThatReturnsNull();
 TestCallMethodThatReturnsNullString();
 TestAccessNullField();
