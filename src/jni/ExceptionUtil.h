@@ -41,7 +41,7 @@ namespace tns
 		 * Reports any uncaught non-critical errors.
 		 */
 		static void OnUncaughtError(v8::Handle<v8::Message> message, v8::Handle<v8::Value> error);
-		static void CallJFuncWithErr(v8::Isolate* isolate, v8::Handle<v8::Value> handler, v8::Handle<v8::Value> errObj);
+		static void CallJFuncWithErr(v8::Handle<v8::Value> errObj);
 
 		static ExceptionUtil* GetInstance();
 

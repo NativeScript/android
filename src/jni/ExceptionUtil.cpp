@@ -150,7 +150,36 @@ bool ExceptionUtil::HandleTryCatch(TryCatch& tc){
 void ExceptionUtil::OnUncaughtError(Handle<Message> message, Handle<Value> error){
 	auto errorMessage = instance->PrintErrorMessage(message, error);
 
-	auto isolate = Isolate::GetCurrent();
+	Isolate *isolate = Isolate::GetCurrent();
+	HandleScope scope(isolate);
+
+	// call the global exception handler
+	Handle<Value> errorObject;
+
+	if(error->IsObject()){
+		errorObject = error.As<Object>();
+		error.As<Object>()->Set(ConvertToV8String("message"), ConvertToV8String(errorMessage));
+	}
+	else{
+		errorObject = Exception::Error(ConvertToV8String(errorMessage));
+	}
+
+	CallJFuncWithErr(errorObject);
+
+	// check whether the developer marked the error as "Caught"
+	// As per discussion, it is safer to ALWAYS kill the application due to uncaught error(s)
+	// TODO: We may think for some per-thread specific behavior and allow execution to continue for background thread exceptions
+//		if(!returnValue.IsEmpty() && (returnValue->IsBoolean() || returnValue->IsBooleanObject())){
+//			handled = returnValue->BooleanValue();
+//		}
+}
+
+void ExceptionUtil::CallJFuncWithErr(Handle<Value> errObj)
+{
+	//create handle scope
+	Isolate *isolate = Isolate::GetCurrent();
+	HandleScope scope(isolate);
+
 	auto context = isolate->GetCurrentContext();
 	auto globalHandle = context->Global();
 
@@ -158,38 +187,13 @@ void ExceptionUtil::OnUncaughtError(Handle<Message> message, Handle<Value> error
 	auto isEmpty = handler.IsEmpty();
 	auto isFunction = handler->IsFunction();
 
-	if(!isEmpty && isFunction){
-		// call the global exception handler
-		Handle<Value> errorObject;
+	if(!isEmpty && isFunction)
+	{
+		auto thiz = Object::New(isolate);
+		auto func = handler.As<Function>();
 
-		if(error->IsObject()){
-			errorObject = error.As<Object>();
-			error.As<Object>()->Set(ConvertToV8String("message"), ConvertToV8String(errorMessage));
-		}
-		else{
-			errorObject = Exception::Error(ConvertToV8String(errorMessage));
-		}
-
-
-
-		// check whether the developer marked the error as "Caught"
-		// As per discussion, it is safer to ALWAYS kill the application due to uncaught error(s)
-		// TODO: We may think for some per-thread specific behavior and allow execution to continue for background thread exceptions
-//		if(!returnValue.IsEmpty() && (returnValue->IsBoolean() || returnValue->IsBooleanObject())){
-//			handled = returnValue->BooleanValue();
-//		}
+		func->Call(thiz, 1, &errObj);
 	}
-
-	// go to Java through the Thread.setUncaughtExceptionHandler routine
-	//NativeScriptRuntime::APP_FAIL(errorMessage.c_str());
-}
-
-void ExceptionUtil::CallJFuncWithErr(Isolate* isolate, Handle<Value> handler, Handle<Value> errObj)
-{
-	auto thiz = Object::New(isolate);
-	auto func = handler.As<Function>();
-
-	func->Call(thiz, 1, &errObj);
 }
 
 string ExceptionUtil::GetErrorMessage(const Handle<Message>& message, const Handle<Value>& error){

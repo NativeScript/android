@@ -520,20 +520,14 @@ extern "C" void Java_com_tns_Platform_adjustAmountOfExternalAllocatedMemoryNativ
 
 extern "C" void Java_com_tns_Platform_passUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, jthrowable exception, jstring stackTrace)
 {
-	//create handle scope
-	Isolate *isolate = Isolate::GetCurrent();
+	auto isolate = Isolate::GetCurrent();
 	HandleScope scope(isolate);
-
-	//get the global handler
-	auto context = isolate->GetCurrentContext();
-	auto globalHandle = context->Global();
-	auto handler = globalHandle->Get(V8StringConstants::GetUncaughtError());
 
 	//create error message
 	string errMsg = "The application crashed because of an uncaught exception. You can look at \"stackTrace\" or \"nativeException\" for more detailed information about the exception.";
 	auto errObj = Exception::Error(ConvertToV8String(errMsg)).As<Object>();
 
-	//create a new native exception object
+	//create a new native exception js object
 	jint javaObjectID = objectManager->GetOrCreateObjectId((jobject) exception);
 	auto nativeExceptionObject = objectManager->GetJsObjectByJavaObject(javaObjectID);
 
@@ -549,5 +543,5 @@ extern "C" void Java_com_tns_Platform_passUncaughtExceptionToJsNative(JNIEnv *en
 	errObj->Set(V8StringConstants::GetStackTrace(), ArgConverter::jstringToV8String(stackTrace));
 
 	//pass err to JS
-	ExceptionUtil::CallJFuncWithErr(isolate, handler, errObj);
+	ExceptionUtil::CallJFuncWithErr(errObj);
 }
