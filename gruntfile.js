@@ -6,7 +6,7 @@ module.exports = function(grunt) {
     var rootDir = ".";
 
     var args = {
-        metadataDir: grunt.option("metadataDir") || "../android-metadata-generator/dist",
+        metadataGen: grunt.option("metadataGen") || "../android-metadata-generator/dist/tns-android-metadata-generator-0.0.1.tgz",
         libsDir: grunt.option("libsDir") || "./src/libs",
         dexBindingsDir: grunt.option("dexBindingsDir") || "../android-bindings/dexes"
     };
@@ -47,7 +47,13 @@ module.exports = function(grunt) {
         jniDir: rootDir + "/src/jni",
         runtimeVersionHFile: rootDir + "/src/jni/Version.h",
         packageJsonFilePath: rootDir + "/package.json",
-        commitVersion: process.env.GIT_COMMIT || ""
+        commitVersion: process.env.GIT_COMMIT || "",
+        metadataGenPath: args.metadataGen,
+        android17SrcJar: pathModule.join(process.env.ANDROID_HOME, "platforms/android-17/android.jar"),
+        localAndroid17Jar: pathModule.join(rootDir, "src", "libs", "android17.jar"),
+        runtimeDir: pathModule.join(rootDir, "src"),
+        libsDir: pathModule.join(rootDir, "src", "libs"),
+        runtimeBinariesDir: pathModule.join(rootDir, "src", "dist")
     };
 
     localCfg.packageVersion = getPackageVersion(localCfg.packageJsonFilePath);
@@ -57,6 +63,9 @@ module.exports = function(grunt) {
         clean: {
             build: {
                 src: [outDir]
+            },
+            android17Lib: {
+                src: localCfg.localAndroid17Jar
             }
         },
         mkdir: {
@@ -91,26 +100,26 @@ module.exports = function(grunt) {
                 src: ["internal/**/*.*"],
                 dest: pathModule.join(outDir, "framework/assets") + "/"
             },
-            metadata: {
-                expand: true,
-                cwd: generatorDir + "/bin/",
-                src: ["*.dat"],
-                dest: outDir + "/framework/assets/metadata"
-            },
             normalJars: {
                 expand: true,
                 src: "*.jar",
                 cwd: jarCreationDir + "/dist/",
                 dest: outDir + "/framework/libs/"
             },
-            CPPRuntime: {
+            collectRuntime: {
                 expand: true,
-                cwd: rootDir + "/src/",
+                cwd: localCfg.runtimeBinariesDir,
                 src: [
-                    "./libs/armeabi-v7a/libNativeScript.so",
-                    "./libs/x86/libNativeScript.so"
+                    "**/*.*",
+                    "**/*"
                 ],
                 dest: outDir + "/framework/"
+            },
+            collectLibs: {
+                expand: true,
+                cwd: localCfg.libsDir,
+                src: ["**/*.*"],
+                dest: pathModule.join(outDir, "framework", "libs") + "/"
             },
             updateVersionFile: {
                 expand: true,
@@ -142,6 +151,10 @@ module.exports = function(grunt) {
                         return updatedContent;
                     }
                 }
+            },
+            android17Lib: {
+                src: localCfg.android17SrcJar,
+                dest: localCfg.localAndroid17Jar
             }
         },
         replace: {
@@ -168,6 +181,12 @@ module.exports = function(grunt) {
             generateRuntime: {
                 cmd: "npm install && grunt --verbose",
                 cwd: "./src"
+            },
+            installMetadataGenerator: {
+                cmd: "npm install " + localCfg.metadataGenPath
+            },
+            runMetadataGenerator: {
+                cmd: "./node_modules/.bin/generate-metadata " + localCfg.libsDir + " ./dist/framework/assets/metadata"
             }
         }
     });
@@ -182,9 +201,13 @@ module.exports = function(grunt) {
 
     grunt.registerTask("generateRuntime", [
                             "exec:generateRuntime"
-                       ]);
+            ]);
 
     grunt.registerTask("generateMetadata", [
+                "exec:installMetadataGenerator",
+                "copy:android17Lib",
+                "exec:runMetadataGenerator",
+                "clean:android17Lib"
             ]);
 
     grunt.registerTask("default", [
@@ -194,9 +217,11 @@ module.exports = function(grunt) {
                             "copy:internalFolder",
                             "copy:pkgDef",
                             "generateRuntime",
-//                            "generateMetadata",
+                            "generateMetadata",
+                            "copy:collectRuntime",
+                            "copy:collectLibs",
 //                            "collectBindings",
                             "exec:npmPack"
-                        ]);
+            ]);
 
 }
