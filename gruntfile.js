@@ -9,7 +9,9 @@ module.exports = function(grunt) {
         metadataGen: grunt.option("metadataGen") || "../android-metadata-generator/dist/tns-android-metadata-generator-0.0.1.tgz",
         libsDir: grunt.option("libsDir") || "./src/libs",
         dexBindingsDir: grunt.option("dexBindingsDir") || "../android-static-libs/DexBindings",
-        jarBindingsDir: grunt.option("jarBindingsDir") || "../android-static-libs/JarBindings"
+        jarBindingsDir: grunt.option("jarBindingsDir") || "../android-static-libs/JarBindings",
+        devmode: (grunt.option("devmode") == true) || false,
+        metadataGenSrc: grunt.option("metadataGenSrc") || "../android-metadata-generator"
     };
 
     var generatorDir = rootDir + "/Bindings/Generator";
@@ -194,6 +196,10 @@ module.exports = function(grunt) {
                 cmd: "npm install && grunt --verbose",
                 cwd: "./src"
             },
+            buildMetadataGenerator: {
+                cmd: "npm install && grunt --verbose",
+                cwd: args.metadataGenSrc
+            },
             installMetadataGenerator: {
                 cmd: "npm install " + localCfg.metadataGenPath
             },
@@ -224,6 +230,19 @@ module.exports = function(grunt) {
                 "clean:metadataGenRuntimeJar"
             ]);
 
+    grunt.registerTask("buildMetadataGenerator", (function(){
+        if (args.devmode) {
+            localCfg.metadataGenPath = pathModule.join(args.metadataGenSrc, "dist", "tns-android-metadata-generator-*.tgz");
+            grunt.config(["exec", "installMetadataGenerator"], { cmd: "npm install " + localCfg.metadataGenPath } );
+
+            return [
+                "exec:buildMetadataGenerator"
+            ];
+        } else {
+            return [];
+        }
+    })());
+
     grunt.registerTask("default", [
                             "clean:build",
                             "mkdir:build",
@@ -231,6 +250,7 @@ module.exports = function(grunt) {
                             "copy:internalFolder",
                             "copy:pkgDef",
                             "generateRuntime",
+                            "buildMetadataGenerator",
                             "generateMetadata",
                             "copy:collectRuntime",
                             "copy:collectLibs",
