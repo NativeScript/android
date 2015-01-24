@@ -24,6 +24,12 @@ module.exports = function(grunt) {
         clean: {
             build: {
                 src: [localCfg.outDir]
+            },
+            builtCPPRuntime: {
+                src: [
+                        pathModule.join(localCfg.rootDir, "libs", "x86"),
+                        pathModule.join(localCfg.rootDir, "libs", "armeabi-v7a")
+                     ]
             }
         },
         mkdir: {
@@ -149,6 +155,7 @@ module.exports = function(grunt) {
                             "updateVersionFile",
                             "exec:buildCPPRuntime",
                             "copy:CPPRuntime",
+                            "clean:builtCPPRuntime",
                             "exec:revert_ndk_configuration",
                             "exec:ensureOriginalVersionFile"
                        ]);
