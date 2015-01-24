@@ -8,7 +8,8 @@ module.exports = function(grunt) {
     var args = {
         metadataGen: grunt.option("metadataGen") || "../android-metadata-generator/dist/tns-android-metadata-generator-0.0.1.tgz",
         libsDir: grunt.option("libsDir") || "./src/libs",
-        dexBindingsDir: grunt.option("dexBindingsDir") || "../android-bindings/dexes"
+        dexBindingsDir: grunt.option("dexBindingsDir") || "../android-static-libs/DexBindings",
+        jarBindingsDir: grunt.option("jarBindingsDir") || "../android-static-libs/JarBindings"
     };
 
     var generatorDir = rootDir + "/Bindings/Generator";
@@ -53,7 +54,9 @@ module.exports = function(grunt) {
         localAndroid17Jar: pathModule.join(rootDir, "src", "libs", "android17.jar"),
         runtimeDir: pathModule.join(rootDir, "src"),
         libsDir: pathModule.join(rootDir, "src", "libs"),
-        runtimeBinariesDir: pathModule.join(rootDir, "src", "dist")
+        runtimeBinariesDir: pathModule.join(rootDir, "src", "dist"),
+        dexBindingsDir: args.dexBindingsDir,
+        jarBindingsDir: args.jarBindingsDir
     };
 
     localCfg.packageVersion = getPackageVersion(localCfg.packageJsonFilePath);
@@ -120,6 +123,12 @@ module.exports = function(grunt) {
                 cwd: localCfg.libsDir,
                 src: ["**/*.*"],
                 dest: pathModule.join(outDir, "framework", "libs") + "/"
+            },
+            collectBindings: {
+                files: [
+                    { expand: true, src: "**/*.*", cwd: localCfg.dexBindingsDir, dest: pathModule.join(outDir, "framework", "assets", "bindings") + "/" },
+                    { expand: true, src: "**/*.*", cwd: localCfg.jarBindingsDir, dest: pathModule.join(outDir, "framework", "libs") + "/" }
+                ]
             },
             updateVersionFile: {
                 expand: true,
@@ -220,7 +229,7 @@ module.exports = function(grunt) {
                             "generateMetadata",
                             "copy:collectRuntime",
                             "copy:collectLibs",
-//                            "collectBindings",
+                            "copy:collectBindings",
                             "exec:npmPack"
             ]);
 
