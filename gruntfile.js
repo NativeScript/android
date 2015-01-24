@@ -1,0 +1,236 @@
+module.exports = function(grunt) {
+
+    var pathModule = require("path");
+
+    var outDir = "./dist";
+    var rootDir = ".";
+
+    var args = {
+        metadataGen: grunt.option("metadataGen") || "../android-metadata-generator/dist/tns-android-metadata-generator-0.0.1.tgz",
+        libsDir: grunt.option("libsDir") || "./src/libs",
+        dexBindingsDir: grunt.option("dexBindingsDir") || "../android-static-libs/DexBindings",
+        jarBindingsDir: grunt.option("jarBindingsDir") || "../android-static-libs/JarBindings"
+    };
+
+    var generatorDir = rootDir + "/Bindings/Generator";
+    var jarCreationDir = rootDir + "/Bindings/JarCreation";
+
+    var testPackageFile = function(filePath)
+    {
+        var packageFileTester = /package\.json$/ig;
+        return packageFileTester.test(filePath);
+    };
+
+    var updatePackageVersion = function(content, srcPath)
+    {
+        if (!testPackageFile(srcPath))
+        {
+            return content;
+        }
+
+        var contentAsObject = JSON.parse(content);
+        contentAsObject.version = localCfg.packageVersion;
+        return JSON.stringify(contentAsObject, null, "\t");
+    };
+
+    function getPackageVersion(packageFilePath)
+    {
+        packageContent = grunt.file.readJSON(packageFilePath);
+        var buildVersion = process.env.PACKAGE_VERSION;
+        if (!buildVersion)
+        {
+            return packageContent.version;
+        }
+        return packageContent.version + "-" + buildVersion;
+    }
+
+    var localCfg = {
+        jniDir: rootDir + "/src/jni",
+        runtimeVersionHFile: rootDir + "/src/jni/Version.h",
+        packageJsonFilePath: rootDir + "/package.json",
+        commitVersion: process.env.GIT_COMMIT || "",
+        metadataGenPath: args.metadataGen,
+        android17SrcJar: pathModule.join(process.env.ANDROID_HOME, "platforms/android-17/android.jar"),
+        localAndroid17Jar: pathModule.join(rootDir, "src", "libs", "android17.jar"),
+        runtimeDir: pathModule.join(rootDir, "src"),
+        libsDir: pathModule.join(rootDir, "src", "libs"),
+        runtimeBinariesDir: pathModule.join(rootDir, "src", "dist"),
+        dexBindingsDir: args.dexBindingsDir,
+        jarBindingsDir: args.jarBindingsDir
+    };
+
+    localCfg.packageVersion = getPackageVersion(localCfg.packageJsonFilePath);
+
+    grunt.initConfig({
+        pkg: grunt.file.readJSON(rootDir + "/package.json"),
+        clean: {
+            build: {
+                src: [outDir]
+            },
+            android17Lib: {
+                src: localCfg.localAndroid17Jar
+            }
+        },
+        mkdir: {
+            build: {
+                options: {
+                    create: [outDir]
+                }
+            }
+        },
+        copy: {
+            pkgDef: {
+                src: [
+                    rootDir + "/package.json"
+                ],
+                dest: outDir + "/",
+                options: {
+                    process: updatePackageVersion
+                }
+            },
+            templateProject: {
+                expand: true,
+                dot: true,
+                cwd: pathModule.join(rootDir, "build/project-template"),
+                src: [
+                    "**/*.*"
+                ],
+                dest: pathModule.join(outDir, "framework") + "/"
+            },
+            internalFolder: {
+                expand: true,
+                cwd: pathModule.join(rootDir, "src/assets"),
+                src: ["internal/**/*.*"],
+                dest: pathModule.join(outDir, "framework/assets") + "/"
+            },
+            normalJars: {
+                expand: true,
+                src: "*.jar",
+                cwd: jarCreationDir + "/dist/",
+                dest: outDir + "/framework/libs/"
+            },
+            collectRuntime: {
+                expand: true,
+                cwd: localCfg.runtimeBinariesDir,
+                src: [
+                    "**/*.*",
+                    "**/*"
+                ],
+                dest: outDir + "/framework/"
+            },
+            collectLibs: {
+                expand: true,
+                cwd: localCfg.libsDir,
+                src: ["**/*.*"],
+                dest: pathModule.join(outDir, "framework", "libs") + "/"
+            },
+            collectBindings: {
+                files: [
+                    { expand: true, src: "**/*.*", cwd: localCfg.dexBindingsDir, dest: pathModule.join(outDir, "framework", "assets", "bindings") + "/" },
+                    { expand: true, src: "**/*.*", cwd: localCfg.jarBindingsDir, dest: pathModule.join(outDir, "framework", "libs") + "/" }
+                ]
+            },
+            updateVersionFile: {
+                expand: true,
+                flatten: true,
+                src: localCfg.runtimeVersionHFile,
+                dest: localCfg.jniDir,
+                options: {
+                    process: function(content, srcPath)
+                    {
+                        var updatedContent = content;
+                        updatedContent = updatedContent.replace(/RUNTIME_VERSION_PLACEHOLDER/ig, localCfg.packageVersion);
+                        updatedContent = updatedContent.replace(/RUNTIME_COMMIT_SHA_PLACEHOLDER/ig, localCfg.commitVersion);
+
+                        return updatedContent;
+                    }
+                }
+            },
+            updateManifestFile: {
+                expand: true,
+                flatten: true,
+                src: "./src/manifest.mf",
+                dest: "./src/",
+                options: {
+                    process: function(content, srcPath) {
+                        var updatedContent = content;
+                        updatedContent = updatedContent.replace(/RUNTIME_VERSION_PLACEHOLDER/ig, localCfg.packageVersion);
+                        updatedContent = updatedContent.replace(/RUNTIME_COMMIT_SHA_PLACEHOLDER/ig, localCfg.commitVersion);
+
+                        return updatedContent;
+                    }
+                }
+            },
+            android17Lib: {
+                src: localCfg.android17SrcJar,
+                dest: localCfg.localAndroid17Jar
+            }
+        },
+        replace: {
+            ndk_configuration: {
+                options: {
+                    patterns: [
+                        {
+                            //match: "^APP_OPTIM\\s*?:=\\s*?debug$",
+                            match: /APP_OPTIM\s*?\:=\s*?debug/ig,
+                            replacement: "APP_OPTIM := release"
+                        }
+                    ]
+                },
+                files: [
+                    {src: rootDir + "/src/jni/Application.mk", dest: rootDir + "/src/jni/Application.mk"}
+                ]
+            }
+        },
+        exec: {
+            npmPack: {
+                cmd: "npm pack",
+                cwd: outDir + "/"
+            },
+            generateRuntime: {
+                cmd: "npm install && grunt --verbose",
+                cwd: "./src"
+            },
+            installMetadataGenerator: {
+                cmd: "npm install " + localCfg.metadataGenPath
+            },
+            runMetadataGenerator: {
+                cmd: "./node_modules/.bin/generate-metadata " + localCfg.libsDir + " ./dist/framework/assets/metadata"
+            }
+        }
+    });
+
+    grunt.loadNpmTasks("grunt-contrib-clean");
+    grunt.loadNpmTasks("grunt-contrib-copy");
+    grunt.loadNpmTasks("grunt-mkdir");
+    grunt.loadNpmTasks("grunt-exec");
+    grunt.loadNpmTasks("grunt-replace");
+    //TODO: NEEDED???
+    grunt.loadNpmTasks("grunt-contrib-rename");
+
+    grunt.registerTask("generateRuntime", [
+                            "exec:generateRuntime"
+            ]);
+
+    grunt.registerTask("generateMetadata", [
+                "exec:installMetadataGenerator",
+                "copy:android17Lib",
+                "exec:runMetadataGenerator",
+                "clean:android17Lib"
+            ]);
+
+    grunt.registerTask("default", [
+                            "clean:build",
+                            "mkdir:build",
+                            "copy:templateProject",
+                            "copy:internalFolder",
+                            "copy:pkgDef",
+                            "generateRuntime",
+                            "generateMetadata",
+                            "copy:collectRuntime",
+                            "copy:collectLibs",
+                            "copy:collectBindings",
+                            "exec:npmPack"
+            ]);
+
+}
