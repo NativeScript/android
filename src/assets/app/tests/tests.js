@@ -1674,7 +1674,8 @@ TestAccessNullArrayElement();
 TestCallMethodWithIntVarArg();
 TestCallMethodWithCharVarArg();
 TestCallMethodWithObjectVarArg();
-TestCanInheritFromClassInAndroidSupportLibrary();
+// DISABLE TEST
+//TestCanInheritFromClassInAndroidSupportLibrary();
 TestCallMethodWithByteParameter();
 TestCanCallStaticMethodThroughBaseClass();
 TestUseFieldThatIsArray();
