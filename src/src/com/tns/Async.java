@@ -178,7 +178,7 @@ public class Async
 					HttpURLConnection connection = (HttpURLConnection)url.openConnection();
 					
 					// set the request method
-					String requestMethod = options.method != null ? options.method : "GET";
+					String requestMethod = options.method != null ? options.method.toUpperCase() : "GET";
 					connection.setRequestMethod(requestMethod);
 					
 					// add the headers
