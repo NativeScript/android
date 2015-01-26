@@ -9,4 +9,5 @@ public interface AppBuilderCallback
 	void onTrimMemory(android.content.Context context, int level);
 	Thread.UncaughtExceptionHandler getDefaultUncaughtExceptionHandler();
 	ExtractPolicy getExtractPolicy();
+	boolean shouldEnableDebugging(android.content.Context context);
 }

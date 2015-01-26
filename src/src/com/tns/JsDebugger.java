@@ -10,6 +10,8 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager.NameNotFoundException;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -56,8 +58,8 @@ public class JsDebugger
 	{
 		int port = INVALID_PORT;
 
-		if (true)
-		{ // TODO: temporary activation for debugging check
+		if (shouldEnableDebugging(context))
+		{
 			File baseDir = context.getExternalFilesDir(null);
 			File envOutFile = new File(baseDir, portEnvOutputFile);
 			OutputStreamWriter w = null;
@@ -236,5 +238,21 @@ public class JsDebugger
 	{
 		boolean success = mainThreadHandler.post(callProcessDebugMessages);
 		return success;
+	}
+	
+	public static boolean shouldEnableDebugging(Context context)
+	{
+		int flags;
+		try
+		{
+			flags = context.getPackageManager().getPackageInfo(context.getPackageName(), 0).applicationInfo.flags;
+		}
+		catch (NameNotFoundException e)
+		{
+			flags = 0;
+			e.printStackTrace();
+		}
+		boolean shouldEnableDebugging = ((flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0);
+		return shouldEnableDebugging;
 	}
 }

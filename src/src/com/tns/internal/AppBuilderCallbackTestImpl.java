@@ -1,5 +1,6 @@
 package com.tns.internal;
 
+import com.tns.JsDebugger;
 import com.tns.Platform;
 
 import android.util.Log;
@@ -53,5 +54,12 @@ public class AppBuilderCallbackTestImpl implements AppBuilderCallback
 		return null;
 	}
 	
+	@Override
+	public boolean shouldEnableDebugging(android.content.Context context)
+	{
+		boolean shouldEnableDebugging = JsDebugger.shouldEnableDebugging(context);
+		return shouldEnableDebugging;
+	}
+
 	private final String logTag = Platform.DEFAULT_LOG_TAG;
 }

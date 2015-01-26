@@ -675,21 +675,10 @@ public class NativeScriptApplication extends android.app.Application implements 
 		}
 	}
 	
-	private boolean shouldRegisterDebuggerIntents() {
-		// TODO: add implementation
-		return true;
-	}
-	
 	public void onCreate() {
 		try
 		{
 			prepareAppBuilderCallbackImpl();
-			
-			if (shouldRegisterDebuggerIntents())
-			{
-				JsDebugger.registerEnableDisableDebuggerReceiver(this);
-				JsDebugger.registerGetDebuggerPortReceiver(this);
-			}
 			
 			if (appBuilderCallbackImpl != null)
 			{
@@ -758,6 +747,16 @@ public class NativeScriptApplication extends android.app.Application implements 
 		ExtractPolicy policy = (appBuilderCallbackImpl != null)
 				? appBuilderCallbackImpl.getExtractPolicy()
 				: null;
+		
+		boolean shouldEnableDebugging = (appBuilderCallbackImpl != null)
+				? appBuilderCallbackImpl.shouldEnableDebugging(this)
+				: JsDebugger.shouldEnableDebugging(this);
+				
+		if (shouldEnableDebugging)
+		{
+			JsDebugger.registerEnableDisableDebuggerReceiver(this);
+			JsDebugger.registerGetDebuggerPortReceiver(this);
+		}
 				
 		Platform.setExtractPolicy(policy);
 	}
