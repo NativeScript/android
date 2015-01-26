@@ -109,7 +109,17 @@ public class Async
 			
 			public void readResponseStream(HttpURLConnection connection, Stack<Closeable> openedStreams) throws IOException
 			{
-				InputStream inStream = connection.getInputStream();
+				this.statusCode = connection.getResponseCode();
+				
+				InputStream inStream;
+				if(this.statusCode >= 400)
+				{
+					inStream = connection.getErrorStream();
+				}
+				else
+				{
+					inStream = connection.getInputStream();
+				}
 				openedStreams.push(inStream);
 				
 				BufferedInputStream buffer = new java.io.BufferedInputStream(inStream);
@@ -124,7 +134,6 @@ public class Async
 					responseStream.write(readByte);
 				}
 				
-				this.statusCode = connection.getResponseCode();
 				this.raw = responseStream;
 				
 				// make the byte array conversion here, not in the JavaScript world for better performance
