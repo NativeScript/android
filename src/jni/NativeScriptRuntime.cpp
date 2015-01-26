@@ -686,6 +686,12 @@ void NativeScriptRuntime::WaitForDebuggerMethodCallback(const v8::FunctionCallba
 		portNumber = args[0]->ToInt32()->Value();
 	}
 
+	int currentPort = JsDebugger::GetCurrentDebuggerPort();
+	if (currentPort > 0)
+	{
+		JsDebugger::DisableAgent();
+	}
+
 	string packageName = JsDebugger::GetPackageName();
 	JsDebugger::EnableAgent(packageName, portNumber, true /* waitForConnection */);
 }
