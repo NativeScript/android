@@ -406,16 +406,9 @@ extern "C" jobjectArray Java_com_tns_Platform_createJSInstanceNative(JNIEnv *_en
 	if (implementationObject.IsEmpty())
 	{
 		NativeScriptRuntime::APP_FAIL("createJSInstanceNative: implementationObject is empty");
+		return nullptr;
 	}
 	DEBUG_WRITE("createJSInstanceNative: implementationObject :%d", implementationObject->GetIdentityHash());
-
-	if (implementationObject.IsEmpty())
-	{
-		//TODO: support creating js instances after java instances with no implementations defined
-		//implementationObject = CreateJSProxyInstance(javaObjectID, jstringToString(env, canonicalName));
-		NativeScriptRuntime::APP_FAIL("createJSInstanceNative: classProxy.implementationObject not found when js instance should be created after java instance");
-	}
-
 
 	auto node = MetadataNode::GetNodeFromHandle(classProxy);
 	string name;
