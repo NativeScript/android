@@ -101,8 +101,7 @@ public class Platform
 		makeInstanceStrong(context, appJavaObjectId);
 		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "Initialized app instance id:" + appJavaObjectId);
 
-		int appBuilderWritableAssetsId = context.getResources().getIdentifier("appBuilderWritableAssets", "bool", context.getPackageName());
-		AssetExtractor.extractAssets(context, extractPolicy, appBuilderWritableAssetsId == 0 ? false : context.getResources().getBoolean(appBuilderWritableAssetsId));
+		AssetExtractor.extractAssets(context, extractPolicy);
 		int debuggerPort = jsDebugger.getDebuggerPortFromEnvironment();
 		Platform.initNativeScript(Require.getApplicationFilesPath(), appJavaObjectId, IsLogEnabled, context.getPackageName(), debuggerPort);
 		

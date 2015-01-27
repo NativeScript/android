@@ -58,13 +58,13 @@ public class AssetExtractor
 		}
 	}
 
-	public static void extractAssets(Context context, ExtractPolicy extractPolicy, boolean writableAssets)
+	public static void extractAssets(Context context, ExtractPolicy extractPolicy)
 	{
 		String appRoot = getAppRoot(context);
 		
 		if (extractPolicy.extract(appRoot))
 		{
-			extractAssetsHelper(context, extractPolicy, writableAssets);
+			extractAssetsHelper(context, extractPolicy);
 		}
 	}
 	
@@ -73,17 +73,12 @@ public class AssetExtractor
 		return context.getFilesDir().getPath();
 	}
 	
-	private static void extractAssetsHelper(Context context, ExtractPolicy extractPolicy, boolean writableAssets)
+	private static void extractAssetsHelper(Context context, ExtractPolicy extractPolicy)
 	{
 		try
 		{
 			Runtime runtime = Runtime.getRuntime();
 			String appRoot = getAppRoot(context);
-			
-			if (writableAssets)
-			{
-				runtime.exec("chmod 777 " + appRoot);
-			}
 			
 			String packageCodePath = context.getPackageCodePath();
 			Log.i(Platform.DEFAULT_LOG_TAG, "extractAssets: from " + packageCodePath);
@@ -117,16 +112,6 @@ public class AssetExtractor
 						fos = new FileOutputStream(outputFile);
 						copyStreams(zip.getInputStream(entry), fos);
 						Log("Copied " + entry + " to " + appRoot + "/" + path);
-						String curPath = outputFile.getAbsolutePath();
-						if (writableAssets)
-						{
-							do
-							{
-								runtime.exec("chmod 777 " + curPath);
-								curPath = new File(curPath).getParent();
-							}
-							while (!curPath.equals(appRoot));
-						}
 					}
 					finally
 					{
