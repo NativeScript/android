@@ -11,6 +11,38 @@ import java.util.Map;
 
 class MethodResolver
 {
+	private static Map<String, String> primitiveTypesSignature = new HashMap<String, String>();
+	
+	static
+	{
+		// Boolean
+		primitiveTypesSignature.put("boolean", "Z");
+		primitiveTypesSignature.put("Boolean", "Z");
+		// Integer
+		primitiveTypesSignature.put("int", "I");
+		primitiveTypesSignature.put("Integer", "I");
+		// Double
+		primitiveTypesSignature.put("double", "D");
+		primitiveTypesSignature.put("Double", "D");
+		// Double
+		primitiveTypesSignature.put("float", "F");
+		primitiveTypesSignature.put("Float", "F");
+		// Short
+		primitiveTypesSignature.put("short", "S");
+		primitiveTypesSignature.put("Short", "S");
+		// Long
+		primitiveTypesSignature.put("long", "J");
+		primitiveTypesSignature.put("Long", "J");
+		// Char
+		primitiveTypesSignature.put("char", "C");
+		primitiveTypesSignature.put("Character", "C");
+		// Char
+		primitiveTypesSignature.put("byte", "B");
+		primitiveTypesSignature.put("Byte", "B");
+		// Void
+		primitiveTypesSignature.put("void", "V");
+	}
+	
 	private static class Tuple<X, Y>
 	{ 
 	  public final X x; 
@@ -51,86 +83,57 @@ class MethodResolver
 	public static String getTypeSignature(Class<?> type)
 	{
 		if (type == null)
+		{
 			return "V";
+		}
 
 		Class<?> t = type;
 		
-		String typeName = t.getName().toLowerCase();
 		String array = "";
 		while (t.isArray())
 		{
 			array += "[";
 			t = type.getComponentType();
-			typeName = t.getName().toLowerCase();
 		}
-
-		if ("boolean".equals(typeName))
+		
+		String signature = primitiveTypesSignature.get(t.getName());
+		if(signature == null)
 		{
-			return array + "Z";
+			signature = "L" + t.getName().replace('.', '/') + ";";
 		}
-		else if ("int".equals(typeName))
-		{
-			return array + "I";
-		}
-		else if ("double".equals(typeName))
-		{
-			return array + "D";
-		}
-		else if ("float".equals(typeName))
-		{
-			return array + "F";
-		}
-		else if ("short".equals(typeName))
-		{
-			return array + "S";
-		}
-		else if ("long".equals(typeName))
-		{
-			return array + "J";
-		}
-		else if ("char".equals(typeName))
-		{
-			return array + "C";
-		}
-		else if ("byte".equals(typeName))
-		{
-			return array + "B";
-		}
-		else if ("void".equals(typeName))
-		{
-			return array + "V";
-		}
-		else
-		{
-			return array + "L" + t.getName().replace('.', '/') + ";";
-		}
+		
+		return array + signature;
 	}
 
 	static String resolveMethodOverload(String className, String methodName, Object[] args) throws ClassNotFoundException
 	{
 		String methodSig = null;
-		
 		Class<?> clazz = Class.forName(className);
-
-		ArrayList<Tuple<Method, Integer>> candidates = new ArrayList<Tuple<Method, Integer>>();
-		
 		int argLength = (args != null) ? args.length : 0;
 		
-		tryFindMatches(methodName, candidates, args, argLength, clazz.getMethods());
+		ArrayList<Tuple<Method, Integer>> candidates = new ArrayList<Tuple<Method, Integer>>();
 		
 		Class<?> c = clazz;
-		while (candidates.isEmpty() && (c != null))
+		int iterationIndex = 0;
+		while (c != null)
 		{
 			tryFindMatches(methodName, candidates, args, argLength, c.getDeclaredMethods());
+			if(candidates.size() > iterationIndex && candidates.get(iterationIndex).y == 0)
+			{
+				// direct matching (distance 0) found
+				break;
+			}
+			
 			c = c.getSuperclass();
+			iterationIndex++;
 		}
 		
 		if (!candidates.isEmpty())
 		{
 			if (candidates.size() > 1)
 				Collections.sort(candidates, distanceComparator);
-			Method selectedMethod = candidates.get(0).x;
-			methodSig = getMethodSignature(selectedMethod.getReturnType(), selectedMethod.getParameterTypes());
+			Method method = candidates.get(0).x;
+			methodSig = getMethodSignature(method.getReturnType(), method.getParameterTypes());
 		}
 
 		return methodSig;
@@ -140,49 +143,53 @@ class MethodResolver
 	{
 		for (Method method : methods)
 		{
+			if (!method.getName().equals(methodName))
+			{
+				continue;
+			}
+				
 			int modifiers = method.getModifiers();
 			if (!Modifier.isPublic(modifiers) && !Modifier.isProtected(modifiers))
-				continue;
-			
-			if (method.getName().equals(methodName))
 			{
-				Class<?>[] params = method.getParameterTypes();
+				continue;
+			}
+			
+			Class<?>[] params = method.getParameterTypes();
 
-				boolean success = false;
-				
-				if (params.length == argLength)
+			boolean success = false;
+			
+			if (params.length == argLength)
+			{
+				int dist = 0;
+				if (argLength == 0)
 				{
-					int dist = 0;
-					if (argLength == 0)
+					success = true;
+				}
+				else
+				{
+					for (int i = 0; i < params.length; i++)
 					{
-						success = true;
-					}
-					else
-					{
-						for (int i = 0; i < params.length; i++)
+						if (args[i] != null)
 						{
-							if (args[i] != null)
-							{
-								Tuple<Boolean, Integer> res = isAssignableFrom(params[i], args[i].getClass()); 
-								success = res.x.booleanValue();
-								dist += res.y;
-							}
-							else
-							{
-								success = !params[i].isPrimitive();
-							}
-	
-							if (!success)
-								break;
+							Tuple<Boolean, Integer> res = isAssignableFrom(params[i], args[i].getClass()); 
+							success = res.x.booleanValue();
+							dist += res.y;
 						}
-					}
+						else
+						{
+							success = !params[i].isPrimitive();
+						}
 
-					if (success)
-					{
-						candidates.add(new Tuple<Method, Integer>(method, Integer.valueOf(dist)));
-						if (dist == 0) 
+						if (!success)
 							break;
 					}
+				}
+
+				if (success)
+				{
+					candidates.add(new Tuple<Method, Integer>(method, Integer.valueOf(dist)));
+					if (dist == 0) 
+						break;
 				}
 			}
 		}

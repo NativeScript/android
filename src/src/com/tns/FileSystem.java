@@ -66,26 +66,8 @@ public class FileSystem
 	
 	public static JSONObject readJSONFile(File file) throws IOException, JSONException
 	{
-		JSONObject object = null;
-
-		BufferedInputStream inputStream = null;
-		try
-		{
-			inputStream = new BufferedInputStream(new FileInputStream(file));
-			String content = readAll(inputStream);
-			
-			if (content != null)
-			{
-				object = new JSONObject(content);
-			}
-		}
-		finally
-		{
-			if (inputStream != null)
-				inputStream.close();
-		}
-
-		return object;
+		String content = readText(file);
+		return new JSONObject(content);
 	}
 	
 	public static String resolveRelativePath(String path, String currentDirectory){

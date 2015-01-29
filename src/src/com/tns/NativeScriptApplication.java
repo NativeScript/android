@@ -73,9 +73,9 @@ public class NativeScriptApplication extends android.app.Application implements 
 
 	static {
 		System.loadLibrary("NativeScript");
-		if (BuildConfig.DEBUG) {
-			android.os.Debug.waitForDebugger();
-		}
+//		if (BuildConfig.DEBUG) {
+//			android.os.Debug.waitForDebugger();
+//		}
 	}
 
 	protected void attachBaseContext(android.content.Context param_0) {
