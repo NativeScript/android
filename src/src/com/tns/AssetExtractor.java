@@ -19,7 +19,6 @@ public class AssetExtractor
 {
 	final static String ZIP_FILTER = "assets";
 	final static int BUFSIZE = 4096;
-	final static String LOGTAG = "AssetExtractor";
 	final static byte data[] = new byte[BUFSIZE];
 
 	static void copyStreams(InputStream is, FileOutputStream fos)
@@ -72,7 +71,6 @@ public class AssetExtractor
 	{
 		try
 		{
-			Runtime runtime = Runtime.getRuntime();
 			String appRoot = getAppRoot(context);
 			
 			String packageCodePath = context.getPackageCodePath();
