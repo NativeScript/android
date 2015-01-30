@@ -79,21 +79,32 @@ MetadataEntry MetadataReader::ReadInstanceFieldEntry(uint8_t*& data)
 	MetadataEntry entry;
 	uint8_t *curPtr = data;
 
+	//read name
 	uint32_t nameOffset = *reinterpret_cast<uint32_t*>(curPtr);
 	string name = ReadName(m_nameData, nameOffset);
 	curPtr += sizeof(uint32_t);
 
 	uint16_t *nodeIdPtr = reinterpret_cast<uint16_t*>(curPtr);
 
+	//	read node pointer id
 	uint16_t nodeId = *nodeIdPtr++;
 	string fieldTypeName = ReadTypeName(nodeId);
+
+	// read modifier
+	uint8_t *nodeFinalVarPtr = reinterpret_cast<uint8_t*>(nodeIdPtr);
+	uint8_t nodeFinalVar = *nodeFinalVarPtr;
+
+	if(nodeFinalVar == MetadataTreeNode::FINAL){
+		entry.isFinal = true;
+		nodeFinalVarPtr += sizeof(uint8_t);
+	}
 
 	entry.name = name;
 	entry.type = NodeType::Field;
 	entry.sig = fieldTypeName;
 	entry.isMember = true;
 
-	data = reinterpret_cast<uint8_t*>(nodeIdPtr);
+	data = nodeFinalVarPtr;
 
 	return entry;
 }
@@ -104,7 +115,6 @@ MetadataEntry MetadataReader::ReadStaticFieldEntry(uint8_t*& data)
 	MetadataEntry entry = ReadInstanceFieldEntry(data);
 
 	uint16_t *nodeIdPtr = reinterpret_cast<uint16_t*>(data);
-
 	uint16_t nodeId = *nodeIdPtr++;
 	string declTypeName = ReadTypeName(nodeId);
 
