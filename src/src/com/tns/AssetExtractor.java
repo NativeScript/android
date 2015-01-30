@@ -18,20 +18,15 @@ import android.content.Context;
 public class AssetExtractor
 {
 	final static String ZIP_FILTER = "assets";
-	final static int BUFSIZE = 100000;
+	final static int BUFSIZE = 4096;
 	final static String LOGTAG = "AssetExtractor";
-
-	static void Log(String string)
-	{
-		Log.v(LOGTAG, string);
-	}
+	final static byte data[] = new byte[BUFSIZE];
 
 	static void copyStreams(InputStream is, FileOutputStream fos)
 	{
 		BufferedOutputStream os = null;
 		try
 		{
-			byte data[] = new byte[BUFSIZE];
 			int count;
 			os = new BufferedOutputStream(fos, BUFSIZE);
 			while ((count = is.read(data, 0, BUFSIZE)) != -1)
@@ -42,7 +37,7 @@ public class AssetExtractor
 		}
 		catch (IOException e)
 		{
-			Log("Exception while copying: " + e);
+			if (Platform.IsLogEnabled) Log.d(Platform.DEFAULT_LOG_TAG, "Exception while copying: " + e);
 		}
 		finally
 		{
@@ -53,7 +48,7 @@ public class AssetExtractor
 			}
 			catch (IOException e2)
 			{
-				Log("Exception while closing the stream: " + e2);
+				if (Platform.IsLogEnabled) Log.d(Platform.DEFAULT_LOG_TAG, "Exception while closing the stream: " + e2);
 			}
 		}
 	}
@@ -102,7 +97,7 @@ public class AssetExtractor
 
 				if (extractPolicy.shouldSkip(outputFile, zipFile, entry))
 				{
-					Log(outputFile.getName() + " already extracted.");
+					if (Platform.IsLogEnabled) Log.d(Platform.DEFAULT_LOG_TAG, outputFile.getName() + " already extracted.");
 				}
 				else
 				{
@@ -111,7 +106,7 @@ public class AssetExtractor
 					{
 						fos = new FileOutputStream(outputFile);
 						copyStreams(zip.getInputStream(entry), fos);
-						Log("Copied " + entry + " to " + appRoot + "/" + path);
+						if (Platform.IsLogEnabled) Log.d(Platform.DEFAULT_LOG_TAG, "Copied " + entry + " to " + appRoot + "/" + path);
 					}
 					finally
 					{
