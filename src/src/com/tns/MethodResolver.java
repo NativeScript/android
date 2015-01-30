@@ -96,8 +96,12 @@ class MethodResolver
 			t = type.getComponentType();
 		}
 		
-		String signature = primitiveTypesSignature.get(t.getName());
-		if(signature == null)
+		String signature;
+		if(t.isPrimitive())
+		{
+			signature = primitiveTypesSignature.get(t.getName());
+		}
+		else
 		{
 			signature = "L" + t.getName().replace('.', '/') + ";";
 		}
