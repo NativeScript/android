@@ -24,7 +24,7 @@ class MethodResolver
 		// Double
 		primitiveTypesSignature.put("double", "D");
 		primitiveTypesSignature.put("Double", "D");
-		// Double
+		// Float
 		primitiveTypesSignature.put("float", "F");
 		primitiveTypesSignature.put("Float", "F");
 		// Short
@@ -36,11 +36,9 @@ class MethodResolver
 		// Char
 		primitiveTypesSignature.put("char", "C");
 		primitiveTypesSignature.put("Character", "C");
-		// Char
+		// Byte
 		primitiveTypesSignature.put("byte", "B");
 		primitiveTypesSignature.put("Byte", "B");
-		// Void
-		primitiveTypesSignature.put("void", "V");
 	}
 	
 	private static class Tuple<X, Y>
@@ -100,6 +98,10 @@ class MethodResolver
 		if(t.isPrimitive())
 		{
 			signature = primitiveTypesSignature.get(t.getName());
+		}
+		else if(t.getName().equals("void"))
+		{
+			signature = "V";
 		}
 		else
 		{
