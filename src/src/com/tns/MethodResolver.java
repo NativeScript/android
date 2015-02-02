@@ -39,6 +39,8 @@ class MethodResolver
 		// Byte
 		primitiveTypesSignature.put("byte", "B");
 		primitiveTypesSignature.put("Byte", "B");
+		// Void
+		primitiveTypesSignature.put("void", "V");
 	}
 	
 	private static class Tuple<X, Y>
@@ -94,16 +96,8 @@ class MethodResolver
 			t = type.getComponentType();
 		}
 		
-		String signature;
-		if(t.isPrimitive())
-		{
-			signature = primitiveTypesSignature.get(t.getName());
-		}
-		else if(t.getName().equals("void"))
-		{
-			signature = "V";
-		}
-		else
+		String signature = primitiveTypesSignature.get(t.getName());
+		if(signature == null)
 		{
 			signature = "L" + t.getName().replace('.', '/') + ";";
 		}
