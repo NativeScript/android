@@ -93,11 +93,8 @@ MetadataEntry MetadataReader::ReadInstanceFieldEntry(uint8_t*& data)
 	// read modifier
 	uint8_t *nodeFinalVarPtr = reinterpret_cast<uint8_t*>(nodeIdPtr);
 	uint8_t nodeFinalVar = *nodeFinalVarPtr;
-
-	if(nodeFinalVar == MetadataTreeNode::FINAL){
-		entry.isFinal = true;
-		nodeFinalVarPtr += sizeof(uint8_t);
-	}
+	entry.isFinal = nodeFinalVar == MetadataTreeNode::FINAL;
+	nodeFinalVarPtr += sizeof(uint8_t);
 
 	entry.name = name;
 	entry.type = NodeType::Field;
