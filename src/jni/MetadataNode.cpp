@@ -280,6 +280,7 @@ Handle<Object> MetadataNode::CreateClassProxy(Isolate *isolate)
 		bool success = classProxyFunction->SetPrototype(instance); //this is needed for static functions like so: var MyButton = Button.extends(); MyButton.StaticMethod();
 		ASSERT_MESSAGE(success, "CreateClassProxy: SetPrototype failed");
 		V8SetHiddenValue(classProxyFunction, METADATA_NODE_KEY_NAME, external);
+		V8SetHiddenValue(classProxyFunction, CLASS_PROXY, Boolean::New(isolate, true));
 
 		success = classProxyFunction->SetHiddenValue(V8StringConstants::GetTSuper(), Boolean::New(isolate, true));
 		ASSERT_MESSAGE(success, "CreateClassProxy: mark classProxyFunction as super object failed");
@@ -625,6 +626,12 @@ void MetadataNode::GetterCallback(Local<String> property, const PropertyCallback
 	uint8_t nodeType = s_metadataReader.GetNodeType(node->m_treeNode);
 
 	auto superValue = thiz->GetHiddenValue(V8StringConstants::GetTSuper());
+	if (propName == V8StringConstants::TO_STRING)
+	{
+		auto classProxy = V8GetHiddenValue(thiz, CLASS_PROXY);
+		if (!classProxy.IsEmpty())
+			return;
+	}
 	bool shouldCallJSOverrideWithoutGoingToJava = !thiz.IsEmpty() && propName != V8StringConstants::TO_STRING && !isMarkedAsSuper;
 	if (shouldCallJSOverrideWithoutGoingToJava)
 	{
@@ -1482,6 +1489,7 @@ CallJavaMethodCallback MetadataNode::s_callJavaMethod = nullptr;
 RegisterInstanceCallback MetadataNode::s_registerInstance = nullptr;
 GetTypeMetadataCallback MetadataNode::s_getTypeMetadata = nullptr;
 string MetadataNode::METADATA_NODE_KEY_NAME = "t::MetadataNode";
+string MetadataNode::CLASS_PROXY = "t::ClassProxy";
 string MetadataNode::TNS_PREFIX = "com/tns/";
 string MetadataNode::TNS_TESTS_PREFIX = "com/tns/tests/";
 MetadataReader MetadataNode::s_metadataReader;

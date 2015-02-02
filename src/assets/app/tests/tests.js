@@ -1527,6 +1527,15 @@ var TestCanParseSignatureWithTypesThatContainsCapitalLettersForPrimitiveTypes = 
 	Assert(len === 2, "TestCanParseSignatureWithTypesThatContainsCapitalLettersForPrimitiveTypes FAILED: Expected length is 2, actual=" + len);	
 }
 
+var TestCanCallToStringOnClassProxy = function() {
+	Log("TEST: TestCanCallToStringOnClassProxy");
+
+	var view = android.view.View;
+	var s = view.toString();
+	
+	Assert(s.length > 0, "TestCanCallToStringOnClassProxy FAILED: Cannot call toString on class proxy");	
+}
+
 var When_accessing_class_property_on_a_extended_class_it_should_return_the_class_of_the_parent = function() {
 	Log("TEST: When_accessing_class_property_on_a_extended_class_it_should_return_the_class_of_the_parent");
 
@@ -1709,3 +1718,4 @@ TestObjectReturnValueIsTreatedAsStringWhenItIsString();
 TestCanFindImplementationObjectWhenCreateExtendedObjectFromJava();
 TestCanCallMethodThatReturnsArrayOfInterfaces();
 TestCanParseSignatureWithTypesThatContainsCapitalLettersForPrimitiveTypes();
+TestCanCallToStringOnClassProxy();

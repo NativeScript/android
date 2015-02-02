@@ -207,5 +207,6 @@ namespace tns
 
 		static MetadataReader s_metadataReader;
 
+		static std::string CLASS_PROXY;
 	};
 }
