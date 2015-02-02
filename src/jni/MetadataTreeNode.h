@@ -26,6 +26,7 @@ namespace tns
 		static const uint8_t STATIC = 1 << 2;
 		static const uint8_t ARRAY = 1 << 3;
 		static const uint8_t PRIMITIVE = 1 << 4;
+		static const uint8_t FINAL = 1 << 5;
 		static const uint8_t PRIMITIVE_BYTE		= 1 + PRIMITIVE;
 		static const uint8_t PRIMITIVE_SHORT	= 2 + PRIMITIVE;
 		static const uint8_t PRIMITIVE_INT		= 3 + PRIMITIVE;

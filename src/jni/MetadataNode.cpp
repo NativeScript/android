@@ -245,6 +245,7 @@ bool MetadataNode::IsMarkedAsSuper(const Handle<Object>& obj)
 Handle<Object> MetadataNode::CreateClassProxy(Isolate *isolate)
 {
 	auto existingClassProxy = GetExistingClassProxy(m_name);
+
 	if (!existingClassProxy.IsEmpty())
 	{
 		return existingClassProxy;
@@ -601,6 +602,7 @@ Handle<Object> MetadataNode::GetImplementationObject(const Handle<Object>& objec
 void MetadataNode::GetterCallback(Local<String> property, const PropertyCallbackInfo<Value>& info)
 {
 	string propName = ConvertToString(property);
+
 	if (propName.empty())
 		return;
 
@@ -1168,6 +1170,7 @@ vector<MetadataEntry> MetadataNode::GetMetadataCandidatesForTypeWithoutCustomMet
 		curPtr += sizeof(uint8_t) + sizeof(uint32_t);
 	}
 
+	//get candidates from instance methods metadata
 	uint16_t instanceMethodCout = *reinterpret_cast<uint16_t*>(curPtr);
 	curPtr += sizeof(uint16_t);
 	for (int i = 0; i < instanceMethodCout; i++)
@@ -1181,6 +1184,7 @@ vector<MetadataEntry> MetadataNode::GetMetadataCandidatesForTypeWithoutCustomMet
 		}
 	}
 
+	//get candidates from static methods metadata
 	uint16_t staticMethodCout = *reinterpret_cast<uint16_t*>(curPtr);
 	curPtr += sizeof(uint16_t);
 	for (int i = 0; i < staticMethodCout; i++)
@@ -1211,6 +1215,7 @@ vector<MetadataEntry> MetadataNode::GetMetadataCandidatesForTypeWithoutCustomMet
 		candidates.push_back(extendsEntry);
 	}
 
+	//get candidates from instance fields metadata
 	uint16_t instanceFieldCout = *reinterpret_cast<uint16_t*>(curPtr);
 	curPtr += sizeof(uint16_t);
 	for (int i = 0; i < instanceFieldCout; i++)
@@ -1224,6 +1229,7 @@ vector<MetadataEntry> MetadataNode::GetMetadataCandidatesForTypeWithoutCustomMet
 		}
 	}
 
+	//get candidates from static fields metadata
 	uint16_t staticFieldCout = *reinterpret_cast<uint16_t*>(curPtr);
 	curPtr += sizeof(uint16_t);
 	for (int i = 0; i < staticFieldCout; i++)
@@ -1327,13 +1333,13 @@ Handle<Function> MetadataNode::CreateFunction(const Handle<Object>& thiz, const 
 void MetadataNode::SetterCallback(Local<String> property, Local<Value> value, const PropertyCallbackInfo<Value>& info)
 {
 	string propName = ConvertToString(property);
+
 	if (propName.empty())
 		return;
 
 	auto thiz = info.This();
 	MetadataNode *node = GetNodeFromHandle(thiz);
 
-	//
 	auto& cache = node->m_childCache;
 	auto itStart = cache.begin();
 	auto itEnd = cache.end();
@@ -1341,6 +1347,7 @@ void MetadataNode::SetterCallback(Local<String> property, Local<Value> value, co
 	if (itFound != itEnd)
 	{
 		const auto& cacheItem = *itFound;
+
 		if (cacheItem.type == MetadataCacheItemType::Field)
 		{
 			bool isStatic = cacheItem.entry.type == NodeType::StaticField;
@@ -1351,9 +1358,11 @@ void MetadataNode::SetterCallback(Local<String> property, Local<Value> value, co
 		{
 			assert(false);
 		}
-		return;
+		if (!cacheItem.entry.isFinal)
+		{
+			return;
+		}
 	}
-	//
 
 	DEBUG_WRITE("MetadataNode::SetterCallback propName='%s', node='%s', hash=%d", propName.c_str(), node->m_name.c_str(), thiz->GetIdentityHash());
 
@@ -1373,12 +1382,19 @@ void MetadataNode::SetterCallback(Local<String> property, Local<Value> value, co
 
 		if ((first.type == NodeType::Field) || (first.type == NodeType::StaticField))
 		{
+			if(first.isFinal)
+			{
+				Isolate *isolate(Isolate::GetCurrent());
+				Handle<String> exceptionMessage = ConvertToV8String("You are trying to SET a final field! Final fields can only be read.");
+				Local<Value> IllegalAccessException(exceptionMessage);
+
+				isolate->ThrowException(IllegalAccessException);
+			}
 			s_setJavaField(thiz, value, node->m_name, first.name, first.sig, first.declaringType, first.isStatic);
-			//
+
 			MetadataCacheItem cacheItem(propName, nullptr, MetadataCacheItemType::Field);
 			cacheItem.entry = first;
 			cache.push_back(cacheItem);
-			//
 		}
 		else
 		{

@@ -30,6 +30,7 @@ namespace tns
 		std::string declaringType;
 		int paramCount;
 		bool isStatic;
+		bool isFinal;
 		bool isMember;
 	};
 }

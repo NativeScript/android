@@ -12,6 +12,7 @@ require("./tests/testsForTypescript");
 require("./tests/testGC");
 require("./tests/testsMemoryManagement");
 require("./tests/testIfAbleToRunExternalFile");
+require("./tests/finalFieldsSetTests");
 
 var MainActivity = com.tns.NativeScriptActivity.extends({
 			   onCreate: function() {

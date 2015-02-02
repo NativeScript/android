@@ -79,7 +79,16 @@ public class Button1 extends ButtonBase
 
 	private boolean IMAGE_ID_BOOL_PROP = false;
 	
-
+	public String GetStaticImageId()
+	{
+		return STATIC_IMAGE_ID;
+	}
+	
+	public static String SGetStaticImageId()
+	{
+		return STATIC_IMAGE_ID;
+	}
+	
 	public Button1()
 	{
 		Log.d(logTag, "Button instance created from javascript");
