@@ -3,7 +3,7 @@
 #include <sstream>
 #include <unistd.h>
 //
-#include "ObjectManager.h"
+#include "Util.h"
 
 using namespace tns;
 using namespace std;
@@ -575,6 +575,17 @@ jclass JEnv::FindClass(const string& className)
 	else
 	{
 		jclass tmp = m_env->FindClass(className.c_str());
+
+		if (m_env->ExceptionCheck() == JNI_TRUE)
+		{
+			m_env->ExceptionClear();
+			string cannonicalClassName = Util::ConvertFromJniToCanonicalName(className);
+			jstring s = m_env->NewStringUTF(cannonicalClassName.c_str());
+			tmp = reinterpret_cast<jclass>(m_env->CallStaticObjectMethod(PLATFORM_CLASS, GET_CACHED_CLASS_METHOD_ID, s));
+
+			m_env->DeleteLocalRef(s);
+		}
+
 		klass = reinterpret_cast<jclass>(m_env->NewGlobalRef(tmp));
 		s_classCache.insert(make_pair(className, klass));
 		m_env->DeleteLocalRef(tmp);
@@ -603,6 +614,12 @@ void JEnv::Init(JavaVM *jvm)
 {
 	assert(jvm != nullptr);
 	s_jvm = jvm;
+
+	JEnv env;
+	PLATFORM_CLASS = env.FindClass("com/tns/Platform");
+	assert(PLATFORM_CLASS != nullptr);
+	GET_CACHED_CLASS_METHOD_ID = env.GetStaticMethodID(PLATFORM_CLASS, "getCachedClass", "(Ljava/lang/String;)Ljava/lang/Class;");
+	assert(GET_CACHED_CLASS_METHOD_ID != nullptr);
 }
 
 
@@ -619,4 +636,5 @@ jsize JEnv::GetArrayLength(jarray array)
 
 JavaVM* JEnv::s_jvm = nullptr;
 map<string, jclass> JEnv::s_classCache;
-
+jclass JEnv::PLATFORM_CLASS = nullptr;
+jmethodID JEnv::GET_CACHED_CLASS_METHOD_ID = nullptr;

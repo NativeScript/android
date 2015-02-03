@@ -16,6 +16,7 @@ import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.zip.ZipEntry;
 
 import android.app.Activity;
@@ -50,16 +51,18 @@ public class Platform
 	private static native void passUncaughtExceptionToJsNative(Throwable ex, String stackTrace);
 	
 	private static Context NativeScriptContext;
+	
+	private static final HashMap<String, Class<?>> classCache = new HashMap<String, Class<?>>();
 
-	private static SparseArray<Object> strongInstances = new SparseArray<Object>();
+	private static final SparseArray<Object> strongInstances = new SparseArray<Object>();
 	
-	private static SparseArray<WeakReference<Object>> weakInstances = new SparseArray<WeakReference<Object>>();
+	private static final SparseArray<WeakReference<Object>> weakInstances = new SparseArray<WeakReference<Object>>();
 	
-	private static NativeScriptHashMap<Object, Integer> strongJavaObjectToID = new NativeScriptHashMap<Object, Integer>();
+	private static final NativeScriptHashMap<Object, Integer> strongJavaObjectToID = new NativeScriptHashMap<Object, Integer>();
 	
-	private static NativeScriptWeakHashMap<Object, Integer> weakJavaObjectToID = new NativeScriptWeakHashMap<Object, Integer>();
+	private static final NativeScriptWeakHashMap<Object, Integer> weakJavaObjectToID = new NativeScriptWeakHashMap<Object, Integer>();
 	
-	private static Runtime runtime = Runtime.getRuntime();
+	private static final Runtime runtime = Runtime.getRuntime();
 	
 	private final static Object keyNotFoundObject = new Object();
 	public final static String ApplicationAssetsPath = "app/";
@@ -355,7 +358,12 @@ public class Platform
 	
 	private static String[] getTypeMetadata(String className, int index) throws ClassNotFoundException
 	{
-		Class<?> clazz = Class.forName(className);
+		Class<?> clazz = classCache.get(className);
+		
+		if (clazz == null)
+		{
+			clazz = Class.forName(className);
+		}
 		
 		String[] result = getTypeMetadata(clazz, index);
 		
@@ -441,7 +449,8 @@ public class Platform
 			sb.append("I\n");
 		}
 	
-		for (Method m: clazz.getMethods())
+		Method[] allMethods = clazz.getMethods();
+		for (Method m: allMethods)
 		{
 			sb.append("M ");
 			sb.append(m.getName());
@@ -455,7 +464,8 @@ public class Platform
 			sb.append("\n");
 		}
 		
-		for (Field f: clazz.getFields())
+		Field[] allFields = clazz.getFields();
+		for (Field f: allFields)
 		{
 			sb.append("F ");
 			sb.append(f.getName());
@@ -479,7 +489,7 @@ public class Platform
 		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "Class<?> of " + classPath + " made strong id:" + key);
 		return key;
 	}
-
+	
 	private static void makeInstanceStrong(Object instance, int objectId)
 	{
 		if (instance == null)
@@ -490,10 +500,15 @@ public class Platform
 		int key = objectId;
 		strongInstances.put(key, instance);
 		strongJavaObjectToID.put(instance, key);
+		
+		Class<?> clazz = instance.getClass();
+		String className = clazz.getName();
+		if (!classCache.containsKey(className))
+		{
+			classCache.put(className, clazz);
+		}
 
 		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "MakeInstanceStrong (" + key + ", " + instance.getClass().toString() + ")");
-
-		// return key;
 	}
 
 	private static void makeInstanceWeak(int javaObjectID, boolean keepAsWeak)
@@ -860,5 +875,11 @@ public class Platform
 	public static Context getApplicationContext()
 	{
 		return NativeScriptContext;
+	}
+	
+	private static Class<?> getCachedClass(String className)
+	{
+		Class<?> clazz = classCache.get(className);
+		return clazz;
 	}
 }

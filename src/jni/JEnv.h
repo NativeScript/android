@@ -281,6 +281,10 @@ namespace tns
 
 		static JavaVM *s_jvm;
 
+		static jclass PLATFORM_CLASS;
+
+		static jmethodID GET_CACHED_CLASS_METHOD_ID;
+
 		static std::map<std::string, jclass> s_classCache;
 	};
 }
