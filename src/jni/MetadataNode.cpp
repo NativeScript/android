@@ -652,7 +652,7 @@ void MetadataNode::GetterCallback(Local<String> property, const PropertyCallback
 	{
 		auto first = candidates.front();
 
-		if (first.isMember)
+		if (first.isTypeMember)
 		{
 			if (first.type == NodeType::Method)
 			{
@@ -1142,7 +1142,7 @@ vector<MetadataEntry> MetadataNode::GetMetadataCandidatesForTypeWithCustomMetada
 				case 'F':
 				case 'M':
 					entry.name = name;
-					entry.isMember = true;
+					entry.isTypeMember = true;
 					entry.type = (chKind == 'F') ? NodeType::Field : NodeType::Method;
 					entry.sig = signature;
 					entry.paramCount = paramCount;
@@ -1182,7 +1182,7 @@ vector<MetadataEntry> MetadataNode::GetMetadataCandidatesForTypeWithoutCustomMet
 	curPtr += sizeof(uint16_t);
 	for (int i = 0; i < instanceMethodCout; i++)
 	{
-		MetadataEntry entry = s_metadataReader.ReadInstanceMethodEntry(curPtr);
+		MetadataEntry entry = s_metadataReader.ReadInstanceMethodEntry(&curPtr);
 
 		if (entry.name == propName)
 		{
@@ -1196,7 +1196,7 @@ vector<MetadataEntry> MetadataNode::GetMetadataCandidatesForTypeWithoutCustomMet
 	curPtr += sizeof(uint16_t);
 	for (int i = 0; i < staticMethodCout; i++)
 	{
-		MetadataEntry entry = s_metadataReader.ReadStaticMethodEntry(curPtr);
+		MetadataEntry entry = s_metadataReader.ReadStaticMethodEntry(&curPtr);
 
 		if (entry.name == propName)
 		{
@@ -1211,14 +1211,14 @@ vector<MetadataEntry> MetadataNode::GetMetadataCandidatesForTypeWithoutCustomMet
 		extendEntry.name = "extend";
 		extendEntry.type = NodeType::Method;
 		extendEntry.treeNode = node->m_treeNode;
-		extendEntry.isMember = true;
+		extendEntry.isTypeMember = true;
 		candidates.push_back(extendEntry);
 
 		MetadataEntry extendsEntry;
 		extendsEntry.name = "extends";
 		extendsEntry.type = NodeType::Method;
 		extendsEntry.treeNode = node->m_treeNode;
-		extendsEntry.isMember = true;
+		extendsEntry.isTypeMember = true;
 		candidates.push_back(extendsEntry);
 	}
 
@@ -1227,7 +1227,7 @@ vector<MetadataEntry> MetadataNode::GetMetadataCandidatesForTypeWithoutCustomMet
 	curPtr += sizeof(uint16_t);
 	for (int i = 0; i < instanceFieldCout; i++)
 	{
-		MetadataEntry entry = s_metadataReader.ReadInstanceFieldEntry(curPtr);
+		MetadataEntry entry = s_metadataReader.ReadInstanceFieldEntry(&curPtr);
 
 		if (entry.name == propName)
 		{
@@ -1241,7 +1241,7 @@ vector<MetadataEntry> MetadataNode::GetMetadataCandidatesForTypeWithoutCustomMet
 	curPtr += sizeof(uint16_t);
 	for (int i = 0; i < staticFieldCout; i++)
 	{
-		MetadataEntry entry = s_metadataReader.ReadStaticFieldEntry(curPtr);
+		MetadataEntry entry = s_metadataReader.ReadStaticFieldEntry(&curPtr);
 
 		if (entry.name == propName)
 		{
@@ -1258,7 +1258,7 @@ vector<MetadataEntry> MetadataNode::GetMetadataCandidatesForTypeWithoutCustomMet
 		classEntry.declaringType = node->m_name;
 		classEntry.type = NodeType::StaticField;
 		classEntry.treeNode = node->m_treeNode;
-		classEntry.isMember = true;
+		classEntry.isTypeMember = true;
 		classEntry.isStatic = true;
 		candidates.push_back(classEntry);
 	}
@@ -1306,7 +1306,7 @@ vector<MetadataEntry> MetadataNode::GetMetadataCandidatesForArray(MetadataNode *
 		classEntry.declaringType = node->m_name;
 		classEntry.type = NodeType::Field;
 		classEntry.treeNode = node->m_treeNode;
-		classEntry.isMember = true;
+		classEntry.isTypeMember = true;
 		candidates.push_back(classEntry);
 	}
 

@@ -36,7 +36,8 @@ LOCAL_SRC_FILES := com_tns_Platform.cpp com_tns_JsDebugger.cpp \
 					ArgConverter.cpp JsArgToArrayConverter.cpp JsArgConverter.cpp V8GlobalHelpers.cpp V8StringConstants.cpp \
 					FieldAccessor.cpp ArrayElementAccessor.cpp \
 					ExceptionUtil.cpp Util.cpp Logger.cpp  \
-					ObjectManager.cpp CastFunctions.cpp WeakRef.cpp
+					ObjectManager.cpp CastFunctions.cpp WeakRef.cpp \
+					MetadataMethodInfo.cpp
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/include
 LOCAL_LDLIBS    := -llog -landroid
 ifeq ($(TARGET_ARCH_ABI),armeabi-v7a)

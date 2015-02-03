@@ -20,7 +20,7 @@ namespace tns
 	struct MetadataEntry
 	{
 		MetadataEntry()
-			: isMember(false), name(std::string()), treeNode(nullptr), sig(std::string()), paramCount(0), isStatic(false), declaringType(std::string())
+			: isTypeMember(false), name(std::string()), treeNode(nullptr), sig(std::string()), paramCount(0), isStatic(false), declaringType(std::string())
 		{
 		}
 		MetadataTreeNode *treeNode;
@@ -31,10 +31,8 @@ namespace tns
 		int paramCount;
 		bool isStatic;
 		bool isFinal;
-		bool isMember;
+		bool isTypeMember;
 	};
 }
-
-
 
 #endif /* METADATAENTRY_H_ */
