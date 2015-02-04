@@ -32,7 +32,6 @@ var __extends = function(Child, Parent) {
 		function extend(child, parent) {
 	        
 			if (!child.__extended) {
-				Log("Typescript: calling extend with child.name: " + child.name);
 	        	child.__extended = parent.extend(child.prototype);
 	        	
 	        	for (var f in child.prototype)
