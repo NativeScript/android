@@ -2,6 +2,7 @@ disableVerboseLogging();
 
 require("./tests/testWeakRef");
 require("./tests/tests");
+require("./tests/testsForRuntimeBindingGenerator");
 require("./tests/propertyAccessTests");
 require("./tests/numericConversionTests");
 require("./tests/inheritanceChainResolutionTest");
@@ -11,10 +12,12 @@ require("./tests/stringConversionTests");
 require("./tests/testsForTypescript");
 require("./tests/testGC");
 require("./tests/testsMemoryManagement");
+
 require("./tests/testIfAbleToRunExternalFile");
+
 require("./tests/finalFieldsSetTests");
 
-var MainActivity = com.tns.NativeScriptActivity.extends({
+var MainActivity = com.tns.NativeScriptActivity.extend("MainActivity", {
 			   onCreate: function() {
 					this.super.onCreate(null);
 					
@@ -32,7 +35,7 @@ var MainActivity = com.tns.NativeScriptActivity.extends({
 					button.setText("Hit me");
 					layout.addView(button);
 					var counter = 0;
-					button.setOnClickListener(new android.view.View.OnClickListener({
+					button.setOnClickListener(new android.view.View.OnClickListener("AppClickListener", {
 						onClick:  function() {
 			              Log("onClick called");  
 			              button.setText("Hit that sucker one more time " + ++counter);

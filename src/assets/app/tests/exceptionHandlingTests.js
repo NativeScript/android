@@ -14,7 +14,7 @@ var TestThrowJSExceptionThroughJavaAndCatchInJS = function() {
 	
 	var ex = { myProp: "SomeValue" };
 	
-	var EH = com.tns.tests.ExceptionHandlingTest.extends({
+	var EH = com.tns.tests.ExceptionHandlingTest.extend("ExceptionHandlingTest", {
 		onEvent1: function(s) {
 			exceptionThrown = true;
 			throw ex;
@@ -50,7 +50,7 @@ var TestThrowJavaExceptionFromJsThroughJavaAndCatchInJS = function() {
 	
 	var ex = new java.lang.Exception("This exception is thrown from JavaScript!");
 	
-	var EH = com.tns.tests.ExceptionHandlingTest.extends({
+	var EH = com.tns.tests.ExceptionHandlingTest.extend("ExceptionHandlingTest53", {
 		onEvent1: function(s) {
 			exceptionThrown = true;
 			throw ex;
@@ -86,7 +86,7 @@ var TestThrowJSExceptionAndCatchInJava = function() {
 	var exceptionThrown = false;
 	var exceptionCaught = true;
 	
-	var EH = com.tns.tests.ExceptionHandlingTest.extends({
+	var EH = com.tns.tests.ExceptionHandlingTest.extend("ExceptionHandlingTest89", {
 		onEvent1: function(s) {
 			exceptionThrown = true;
 			throw "My Exception String";
@@ -118,7 +118,7 @@ var TestThrowJavaExceptionFromJsAndCatchInJava = function() {
 	
 	var ex = new java.lang.Exception("This exception is thrown from JavaScript!");
 	
-	var EH = com.tns.tests.ExceptionHandlingTest.extends({
+	var EH = com.tns.tests.ExceptionHandlingTest.extend("ExceptionHandlingTest121", {
 		onEvent1: function(s) {
 			exceptionThrown = true;
 			throw ex;

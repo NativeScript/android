@@ -74,7 +74,7 @@ var TestCanConvertNonTrivalJavaString4 = function() {
 	var isEqualsLength = false;
 	var isEqualsString = false;
 	
-	var MyStringConversionTest = com.tns.tests.StringConversionTest.extends({
+	var MyStringConversionTest = com.tns.tests.StringConversionTest.extend("StringConversionTest77", {
 		callback: function(str) {
 			s = str;
 			len = this.getLength();
