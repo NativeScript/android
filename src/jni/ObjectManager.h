@@ -31,6 +31,7 @@ namespace tns
 
 		jclass GetJavaClass(const v8::Handle<v8::Object>& instance);
 
+		void SetJavaClass(const v8::Handle<v8::Object>& instance, jclass clazz);
 		int GetOrCreateObjectId(jobject object);
 
 		static v8::Handle<v8::Object> GetJsObjectByJavaObjectStatic(int javaObjectID);

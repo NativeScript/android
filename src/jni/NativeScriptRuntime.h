@@ -27,9 +27,9 @@ namespace tns
 
 		static v8::Handle<v8::Object> CreateJSProxyInstance(jint javaObjectID, const std::string& typeName);
 
-		static jobject CreateJavaInstance(int objectID, const std::string& className, const ArgsWrapper& argWrapper, const v8::Handle<v8::Object>& implementationObject, bool isInterface);
+		static jobject CreateJavaInstance(int objectID, const std::string& name, const std::string& className, const ArgsWrapper& argWrapper, const v8::Handle<v8::Object>& implementationObject, bool isInterface);
 
-		static bool RegisterInstance(const v8::Handle<v8::Object>& jsObject, const std::string& className, const ArgsWrapper& argWrapper, const v8::Handle<v8::Object>& implementationObject, bool isInterface);
+		static bool RegisterInstance(const v8::Handle<v8::Object>& jsObject, const std::string& name, const std::string& className, const ArgsWrapper& argWrapper, const v8::Handle<v8::Object>& implementationObject, bool isInterface);
 
 		static void MakeClassInstanceOfTypeStrong(const std::string& className, const v8::Handle<v8::Object>& classObj);
 
@@ -113,7 +113,8 @@ namespace tns
 	private:
 		NativeScriptRuntime() {}
 
-		static int GetConstructorId(JEnv& env, const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& strClassName, jobjectArray javaArgs);
+		static int GetCachedConstructorId(JEnv& env, const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& name, const std::string& className);
+		static int SetCachedConstructorId(JEnv& env, const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& name, const std::string& className, int ctorId);
 
 		static int64_t AdjustAmountOfExternalAllocatedMemory(JEnv& env, v8::Isolate *isolate);
 
@@ -129,7 +130,7 @@ namespace tns
 
 		static jmethodID CREATE_INSTANCE_METHOD_ID;
 
-		static jmethodID CACHE_JAVA_CONSTRUCTOR_METHOD_ID;
+		//static jmethodID CACHE_CONSTRUCTOR_METHOD_ID;
 
 		static jmethodID APP_FAIL_METHOD_ID;
 

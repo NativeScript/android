@@ -47,20 +47,17 @@ public class ExceptionHandlingTest extends com.tns.tests.ExceptionHandlingTest i
 	}
 
 	@Override
-	public void setNativeScriptOverrides(String[] overrides)
+	public void setNativeScriptOverride(String name)
 	{
-		// Edit "if" statements when necessary
-		for (String name: overrides)
+		if (name.equals("init"))
 		{
-			if (name.equals("init"))
-			{
-				__ctorOverriden = true;
-			}
-			else if (name.equals("onEvent1"))
-			{
-				isOnEvent1Overriden = true;
-			}
+			__ctorOverriden = true;
 		}
+		else if (name.equals("onEvent1"))
+		{
+			isOnEvent1Overriden = true;
+		}
+		
 	}
 
 }

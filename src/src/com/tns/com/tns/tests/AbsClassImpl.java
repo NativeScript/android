@@ -44,14 +44,18 @@ public class AbsClassImpl extends com.tns.tests.AbsClassImpl implements com.tns.
 	{
 		for (String name: overrides)
 		{
-			if (name.equals("echoString"))
-			{
-				__echoString = true;
-			}
+			setNativeScriptOverride(name);
 		}
 	}
-	
-	private boolean __initialized;
-	private boolean __echoString;
 
+        private boolean __initialized;
+	private boolean __echoString;
+	@Override
+	public void setNativeScriptOverride(String name)
+	{
+		if (name.equals("echoString"))
+		{
+			__echoString = true;
+		}
+	}
 }

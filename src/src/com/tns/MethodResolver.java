@@ -195,11 +195,27 @@ class MethodResolver
 		}
 	}
 	
-	static Constructor<?> resolveConstructor(String classPath, Object[] args) throws ClassNotFoundException
+	static Constructor<?> resolveConstructor(String name, String classPath, Object[] args, DexFactory dexFactory, String[] methodOverrides) throws ClassNotFoundException, IOException
 	{
 		String cannonicalClassName = classPath.replace('/', '.');
 		
-		Class<?> clazz = Class.forName(cannonicalClassName);
+		Class<?> clazz = null;
+		boolean isBindingClass = cannonicalClassName.startsWith("com.tns.") && !cannonicalClassName.startsWith("com.tns.tests.") && (!cannonicalClassName.startsWith("com.tns.com.tns.Async"));
+
+		if (isBindingClass)
+		{
+			if (name == null || name == "")
+			{
+				name = "0";
+			}
+			
+			clazz = dexFactory.resolveClass(name, cannonicalClassName, methodOverrides);
+		}
+
+		if (clazz == null)
+		{
+			clazz = Class.forName(cannonicalClassName);
+		}
 
 		Constructor<?>[] constructors = clazz.getConstructors();
 

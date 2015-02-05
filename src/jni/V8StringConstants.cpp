@@ -99,7 +99,6 @@ namespace tns {
 
 	const string V8StringConstants::CLASS_IMPLEMENTATION_OBJECT = "t::ClassImplementationObject";
 	const string V8StringConstants::DEBUG_NAME = "__debugName__";
-	const string V8StringConstants::EXTENDS = "extends";
 	const string V8StringConstants::EXTEND = "extend";
 	const string V8StringConstants::IS_PROTOTYPE_IMPLEMENTATION_OBJECT = "__isPrototypeImplementationObject";
 	const string V8StringConstants::NATIVE_EXCEPTION = "nativeException";

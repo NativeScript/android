@@ -62,6 +62,7 @@ jweak ObjectManager::GetJavaObjectByJsObject(const Handle<Object>& object)
 
 JSInstanceInfo* ObjectManager::GetJSInstanceInfo(const Handle<Object>& object)
 {
+	DEBUG_WRITE("ObjectManager::GetJSInstanceInfo: called");
 	JSInstanceInfo *jsInstanceInfo = nullptr;
 
 	Isolate* isolate = Isolate::GetCurrent();
@@ -87,7 +88,7 @@ JSInstanceInfo* ObjectManager::GetJSInstanceInfo(const Handle<Object>& object)
 	}
 	else
 	{
-		DEBUG_WRITE("Hidden JSInstanceInfo not found on object: %d", object->GetIdentityHash());
+		DEBUG_WRITE_FATAL("Hidden JSInstanceInfo not found on object: %d", object->GetIdentityHash());
 	}
 
 	return jsInstanceInfo;
@@ -122,6 +123,14 @@ jclass ObjectManager::GetJavaClass(const Handle<Object>& instance)
 	jclass clazz = jsInfo->clazz;
 
 	return clazz;
+}
+
+void ObjectManager::SetJavaClass(const Handle<Object>& instance, jclass clazz)
+{
+	DEBUG_WRITE("SetClass called");
+
+	JSInstanceInfo *jsInfo = GetJSInstanceInfo(instance);
+	jsInfo->clazz = clazz;
 }
 
 

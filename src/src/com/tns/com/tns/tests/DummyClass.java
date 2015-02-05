@@ -39,6 +39,10 @@ public class DummyClass
 		public void setNativeScriptOverrides(String[] overrides)
 		{
 		}
+                @Override
+		public void setNativeScriptOverride(String override)
+		{
+		}
 	}
 
 	public static class DummyDerivedClass extends com.tns.tests.DummyClass.DummyDerivedClass implements NativeScriptHashCodeProvider
@@ -72,17 +76,6 @@ public class DummyClass
 			return super.equals(other);
 		}
 		
-		@Override
-		public void setNativeScriptOverrides(String[] overrides)
-		{
-			for (String name: overrides)
-			{
-				if (name.equals("dummyMethod"))
-				{
-					__ho0 = true;
-				}
-			}
-		}
 		
 		@Override
 		public String dummyMethod(com.tns.tests.DummyClass dummy)
@@ -99,6 +92,15 @@ public class DummyClass
 				return super.dummyMethod(dummy);
 			}
 		}
-	}
 
+		@Override
+		public void setNativeScriptOverride(String name)
+		{
+			if (name.equals("dummyMethod"))
+			{
+				__ho0 = true;
+			}
+			
+		}
+	}
 }	

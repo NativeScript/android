@@ -5,6 +5,7 @@ import com.tns.Platform;
 import android.util.Log;
 
 
+/*
 public class Button1 extends com.tns.tests.Button1 implements com.tns.NativeScriptHashCodeProvider
 {
 	public Button1()
@@ -111,26 +112,11 @@ public class Button1 extends com.tns.tests.Button1 implements com.tns.NativeScri
 		return super.equals(other);
 	}
 
-	public void setNativeScriptOverrides(String[] overrides)
+public void setNativeScriptOverrides(String[] overrides)
 	{
 		for (String name: overrides)
 		{
-			if (name.equals("init"))
-			{
-				__ctorOverriden = true;
-			}
-			else if (name.equals("echoString"))
-			{
-				__getIMAGE_ID_PROP = true;
-			}
-			else if (name.equals("toString"))
-			{
-				__toString = true;
-			}
-			else if (name.equals("echo"))
-			{
-				__isEchoOverriden = true;
-			}
+			setNativeScriptOverride(name);
 		}
 	}
 	
@@ -139,4 +125,28 @@ public class Button1 extends com.tns.tests.Button1 implements com.tns.NativeScri
 	private boolean __getIMAGE_ID_PROP;
 	private boolean __toString;
 	private boolean __isEchoOverriden;
+	
+	@Override
+	public void setNativeScriptOverride(String name)
+	{
+		if (name.equals("init"))
+		{
+			__ctorOverriden = true;
+		}
+		else if (name.equals("echoString"))
+		{
+			__getIMAGE_ID_PROP = true;
+		}
+		else if (name.equals("toString"))
+		{
+			__toString = true;
+		}
+		else if (name.equals("echo"))
+		{
+			__isEchoOverriden = true;
+		}
+		
+	}
+	
 }
+*/

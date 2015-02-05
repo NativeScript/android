@@ -286,7 +286,7 @@ jobject ConvertJsValueToJavaObject(JEnv& env, const Handle<Value>& value)
 	return javaResult;
 }
 
-extern "C" jobject Java_com_tns_Platform_callJSMethodNative(JNIEnv *_env, jobject obj, jint javaObjectID, jstring methodName, jobjectArray packagedArgs)
+extern "C" jobject Java_com_tns_Platform_callJSMethodNative(JNIEnv *_env, jobject obj, jint javaObjectID, jstring methodName, jboolean isConstructor, jobjectArray packagedArgs)
 {
 	JEnv env(_env);
 
@@ -305,6 +305,13 @@ extern "C" jobject Java_com_tns_Platform_callJSMethodNative(JNIEnv *_env, jobjec
 		// TODO: Should we kill the Java VM here?
 		ExceptionUtil::GetInstance()->HandleInvalidState(ss.str(), true);
 		return nullptr;
+	}
+
+	if (isConstructor)
+	{
+		DEBUG_WRITE("CallJSMethodNative: Updating linked instance with its real class");
+		jclass instanceClass = env.GetObjectClass(obj);
+		objectManager->SetJavaClass(jsObject, instanceClass);
 	}
 
 	DEBUG_WRITE("CallJSMethodNative called jsObject=%d", jsObject->GetIdentityHash());
@@ -409,6 +416,13 @@ extern "C" jobjectArray Java_com_tns_Platform_createJSInstanceNative(JNIEnv *_en
 		return nullptr;
 	}
 	DEBUG_WRITE("createJSInstanceNative: implementationObject :%d", implementationObject->GetIdentityHash());
+
+	if (implementationObject.IsEmpty())
+	{
+		//TODO: support creating js instances after java instances with no implementations defined
+		//implementationObject = CreateJSProxyInstance(javaObjectID, jstringToString(env, canonicalName));
+		NativeScriptRuntime::APP_FAIL("createJSInstanceNative: classProxy.implementationObject not found when js instance should be created after java instance");
+	}
 
 	auto node = MetadataNode::GetNodeFromHandle(classProxy);
 	string name;

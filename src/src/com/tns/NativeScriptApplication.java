@@ -63,6 +63,10 @@ public class NativeScriptApplication extends android.app.Application implements 
 		}
 		public void setNativeScriptOverrides(java.lang.String[] overrides) {
 		}
+		@Override
+		public void setNativeScriptOverride(String override)
+		{
+		}
 	}
 	public NativeScriptApplication() {
 		super();
@@ -1260,8 +1264,15 @@ public class NativeScriptApplication extends android.app.Application implements 
 	public int hashCode__super() {
 		return super.hashCode();
 	}
-	public void setNativeScriptOverrides(java.lang.String[] overrides) {
+public void setNativeScriptOverrides(java.lang.String[] overrides) {
 		for (java.lang.String name: overrides) {
+			setNativeScriptOverride(name);
+		}
+	}
+	
+	@Override
+	public void setNativeScriptOverride(String name)
+	{
 			if (name.equals("init")) {
 				__ctorOverridden = true;
 			}
@@ -1447,7 +1458,7 @@ public class NativeScriptApplication extends android.app.Application implements 
 				__ho11 |= (1 << 1);
 			}
 		}
-	}
+	
 	private boolean __initialized = true;
 	private boolean __ctorOverridden;
 	private byte __ho0;
