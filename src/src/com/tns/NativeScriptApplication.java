@@ -3,6 +3,7 @@ package com.tns;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 
+import android.app.Application;
 import android.util.Log;
 
 import com.tns.internal.AppBuilderCallback;
@@ -675,9 +676,15 @@ public class NativeScriptApplication extends android.app.Application implements 
 		}
 	}
 	
+	private static Application appInstance;
+	public static Application getInstance(){
+		return appInstance;
+	}
+	
 	public void onCreate() {
 		try
 		{
+			appInstance = this;
 			prepareAppBuilderCallbackImpl();
 			
 			if (appBuilderCallbackImpl != null)

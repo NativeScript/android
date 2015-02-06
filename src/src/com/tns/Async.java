@@ -15,9 +15,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Stack;
 
+import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.AsyncTask;
+import android.util.DisplayMetrics;
 
 public class Async
 {
@@ -50,6 +52,8 @@ public class Async
 			public ArrayList<KeyValuePair> headers;
 			public String content;
 			public int timeout = -1;
+			public int screenWidth = -1;
+			public int screenHeight = -1;
 			
 			public void addHeaders(HttpURLConnection connection)
 			{
@@ -107,7 +111,7 @@ public class Async
 				}
 			}
 			
-			public void readResponseStream(HttpURLConnection connection, Stack<Closeable> openedStreams) throws IOException
+			public void readResponseStream(HttpURLConnection connection, Stack<Closeable> openedStreams, RequestOptions options) throws IOException
 			{
 				this.statusCode = connection.getResponseCode();
 				
@@ -141,11 +145,39 @@ public class Async
 				// we will do it the dumb way :)
 				try
 				{
-					byte[] data = this.raw.toByteArray();
-					this.responseAsImage = BitmapFactory.decodeByteArray(data, 0, data.length);
+					// TODO: Generally this approach will not work for very large files
+					BitmapFactory.Options bitmapOptions = new BitmapFactory.Options();
+					bitmapOptions.inJustDecodeBounds = true;
+					byte[] bytes = this.raw.toByteArray();
+					
+					// check the size of the bitmap first
+					BitmapFactory.decodeByteArray(bytes, 0, bytes.length, bitmapOptions);
+					if(bitmapOptions.outWidth > 0 && bitmapOptions.outHeight > 0)
+					{
+						int scale = 1;
+						final int height = bitmapOptions.outHeight;
+					    final int width = bitmapOptions.outWidth;
+					    
+						if(bitmapOptions.outWidth > options.screenWidth || bitmapOptions.outHeight > options.screenHeight)
+						{
+							final int halfHeight = height / 2;
+					        final int halfWidth = width / 2;
+
+					        // scale down the image since it is larger than the screen resolution
+					        while ((halfWidth / scale) > options.screenWidth && 
+					        		(halfHeight / scale) > options.screenHeight) {
+					            scale *= 2;
+					        }
+						}
+						
+						bitmapOptions.inJustDecodeBounds = false;
+						bitmapOptions.inSampleSize = scale;
+						this.responseAsImage = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, bitmapOptions);
+					}
 				}
 				catch (Exception e)
 				{
+					// bitmap decoding failed, the stream is not an image
 					e.printStackTrace();
 				}
 				
@@ -157,9 +189,15 @@ public class Async
 			}
 		}
 		
-		// TODO: lower-case method
 		public static void MakeRequest(RequestOptions options, CompleteCallback callback, Object context)
 		{
+			if(options.screenWidth < 0 || options.screenHeight < 0)
+			{
+				Context appContext = NativeScriptApplication.getInstance();
+				DisplayMetrics metrics = appContext.getResources().getDisplayMetrics();
+				options.screenWidth = metrics.widthPixels;
+				options.screenHeight = metrics.heightPixels;
+			}
 			new HttpRequestTask(callback, context).execute(options);
 		}
 		
@@ -208,7 +246,7 @@ public class Async
 					
 					// build the result
 					result.getHeaders(connection);
-					result.readResponseStream(connection, openedStreams);
+					result.readResponseStream(connection, openedStreams, options);
 					
 					// close the opened streams (saves copy-paste implementation in each method that throws IOException)
 					this.closeOpenedStreams(openedStreams);
@@ -297,6 +335,4 @@ public class Async
 			this.callback.onComplete(result, this.context);
 	    }
 	}
-	
-	
 }
