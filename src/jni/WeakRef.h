@@ -34,13 +34,11 @@ namespace tns
 
 		static void WeakTargetCallback(const v8::WeakCallbackData<v8::Object, CallbackState>& data);
 
-		static void WeakHolderCallback(const v8::WeakCallbackData<v8::Object, v8::Persistent<v8::Object> >& data);
+		static void WeakHolderCallback(const v8::WeakCallbackData<v8::Object, CallbackState>& data);
 
 		static v8::Persistent<v8::Function> *s_poClearFunc;
 
 		static v8::Persistent<v8::Function> *s_poGetterFunc;
-
-		static std::set<v8::Persistent<v8::Object>*> s_releasedHolders;
 	};
 }
 

@@ -13,8 +13,6 @@ WeakRef::WeakRef()
 
 void WeakRef::ConstructorCallback(const FunctionCallbackInfo<Value>& args)
 {
-	s_releasedHolders.clear();
-
 	Isolate *isolate = Isolate::GetCurrent();
 
 	if (args.IsConstructCall())
@@ -34,7 +32,7 @@ void WeakRef::ConstructorCallback(const FunctionCallbackInfo<Value>& args)
 				auto callbackState = new CallbackState(poTarget, poHolder);
 
 				poTarget->SetWeak(callbackState, WeakTargetCallback);
-				poHolder->SetWeak(poHolder, WeakHolderCallback);
+				poHolder->SetWeak(callbackState, WeakHolderCallback);
 
 				weakRef->Set(ConvertToV8String("get"), GetGetterFunction(isolate));
 				weakRef->Set(ConvertToV8String("clear"), GetClearFunction(isolate));
@@ -64,35 +62,44 @@ void WeakRef::WeakTargetCallback(const WeakCallbackData<Object, CallbackState>& 
 	auto poTarget = callbackState->target;
 	poTarget->Reset();
 	delete poTarget;
+	callbackState->target = nullptr;
 
 	auto isolate = data.GetIsolate();
 	auto poHolder = callbackState->holder;
-	if (s_releasedHolders.find(poHolder) == s_releasedHolders.end())
+	if (poHolder != nullptr)
 	{
 		auto holder = Handle<Object>::New(isolate, *poHolder);
 		holder->SetHiddenValue(V8StringConstants::GetTarget(), External::New(isolate, nullptr));
 	}
 
-	delete callbackState;
+	if (callbackState->holder == nullptr)
+	{
+		delete callbackState;
+	}
 }
 
-void WeakRef::WeakHolderCallback(const WeakCallbackData<Object, Persistent<Object> >& data)
+void WeakRef::WeakHolderCallback(const WeakCallbackData<Object, CallbackState>& data)
 {
+	auto callbackState = data.GetParameter();
+	auto poHolder = callbackState->holder;
 	auto isolate = data.GetIsolate();
-	auto poHolder = data.GetParameter();
 	auto holder = Handle<Object>::New(isolate, *poHolder);
 
 	auto poTarget = reinterpret_cast<Persistent<Object>*>(holder->GetHiddenValue(V8StringConstants::GetTarget()).As<External>()->Value());
 
 	if (poTarget != nullptr)
 	{
-		poHolder->SetWeak(poHolder, WeakHolderCallback);
+		poHolder->SetWeak(callbackState, WeakHolderCallback);
 	}
 	else
 	{
 		poHolder->Reset();
 		delete poHolder;
-		s_releasedHolders.insert(poHolder);
+		callbackState->holder = nullptr;
+		if (callbackState->target == nullptr)
+		{
+			delete callbackState;
+		}
 	}
 }
 
@@ -152,4 +159,3 @@ Handle<Function> WeakRef::GetClearFunction(Isolate *isolate)
 
 Persistent<Function>* WeakRef::s_poClearFunc = nullptr;
 Persistent<Function>* WeakRef::s_poGetterFunc = nullptr;
-set<Persistent<Object>*> WeakRef::s_releasedHolders;
