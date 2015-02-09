@@ -18,12 +18,17 @@ class ErrorReport
 		this.activity = activity;
 	}
 	
-	static Intent getIntent(Context context, Class<?> activityClass, String errorMessage)
+	static Intent getIntent(Context context, String errorMessage)
 	{
-		Intent intent = new Intent(context, activityClass);
+		Class<?> errorActivityClass = Platform.getErrorActivityClass();
+		if(errorActivityClass == null){
+			errorActivityClass = ErrorReportActivity.class;
+		}
+		
+		Intent intent = new Intent(context, errorActivityClass);
 		
 		intent.putExtra(EXTRA_NATIVESCRIPT_ERROR_REPORT, EXTRA_ERROR_REPORT_VALUE);
-		intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+		intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
 		intent.putExtra(EXTRA_ERROR_REPORT_MSG, errorMessage);
 		
 		return intent;
@@ -72,9 +77,7 @@ class ErrorReport
 			@Override
 			public void onClick(View v)
 			{
-				// TODO: find better way to close the activity
 				activity.finish();
-				System.exit(0);
 			}
 		});
 

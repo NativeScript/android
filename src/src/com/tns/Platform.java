@@ -63,6 +63,7 @@ public class Platform
 	private static final NativeScriptWeakHashMap<Object, Integer> weakJavaObjectToID = new NativeScriptWeakHashMap<Object, Integer>();
 	
 	private static final Runtime runtime = Runtime.getRuntime();
+	private static Class<?> errorActivityClass;
 	
 	private final static Object keyNotFoundObject = new Object();
 	public final static String ApplicationAssetsPath = "app/";
@@ -85,6 +86,14 @@ public class Platform
 	public static boolean IsLogEnabled = BuildConfig.DEBUG;
 	
 	public final static String DEFAULT_LOG_TAG = "TNS.Java";
+	
+	public static Class<?> getErrorActivityClass(){
+		return errorActivityClass;
+	}
+	
+	public static void setErrorActivityClass(Class<?> clazz){
+		errorActivityClass = clazz;
+	}
 	
 	public static int init(Context context) throws Exception
 	{
@@ -183,7 +192,7 @@ public class Platform
 						@Override
 						public void run()
 						{
-							Intent intent = ErrorReport.getIntent(NativeScriptContext, ErrorReportActivity.class, errMsg);
+							Intent intent = ErrorReport.getIntent(NativeScriptContext, errMsg);
 							NativeScriptContext.startActivity(intent);
 						}
 					}.start();
