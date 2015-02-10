@@ -1,8 +1,10 @@
 #include "MetadataReader.h"
+#include "MetadataMethodInfo.h"
 #include "NativeScriptAssert.h"
 #include "Util.h"
 #include <sstream>
 #include <assert.h>
+
 
 
 using namespace std;
@@ -33,11 +35,11 @@ MetadataTreeNode* MetadataReader::BuildTree()
 
 	for (int i = 0; i < len; i++)
 	{
-		MetadataTreeNode *node = m_v[i];
+		MetadataTreeNode *node = GetNodeById(i);
 		if (nullptr == node)
 		{
 			node = new MetadataTreeNode;
-			node->name = ReadName(m_nameData, curNodeData->offsetName);
+			node->name = ReadName(curNodeData->offsetName);
 			node->offsetValue = curNodeData->offsetValue;
 			m_v[i] = node;
 		}
@@ -52,7 +54,7 @@ MetadataTreeNode* MetadataReader::BuildTree()
 			{
 				MetadataTreeNode *childNode = new MetadataTreeNode;
 				childNode->parent = node;
-				childNode->name = ReadName(m_nameData, childNodeData->offsetName);
+				childNode->name = ReadName(childNodeData->offsetName);
 				childNode->offsetValue = childNodeData->offsetValue;
 
 				node->children->push_back(childNode);
@@ -71,140 +73,84 @@ MetadataTreeNode* MetadataReader::BuildTree()
 		curNodeData++;
 	}
 
-	return m_v[0];
+	return GetNodeById(0);
 }
 
-MetadataEntry MetadataReader::ReadInstanceFieldEntry(uint8_t*& data)
+void MetadataReader::FillEntryWithFiedldInfo(FieldInfo *fi, MetadataEntry& entry)
 {
+	entry.isTypeMember = true;
+	entry.name = ReadName(fi->nameOffset);
+	entry.sig = ReadTypeName(fi->nodeId);
+	entry.isFinal = fi->finalModifier == MetadataTreeNode::FINAL;
+}
+
+void MetadataReader::FillEntryWithMethodInfo(MethodInfo& mi, MetadataEntry& entry)
+{
+	entry.type = NodeType::Method;
+	entry.isTypeMember = true;
+	entry.name = mi.GetName();
+	uint16_t sigLength = mi.GetSignatureLength();
+	assert(sigLength > 0);
+	entry.paramCount = sigLength - 1;
+	entry.sig = mi.GetSignature();
+}
+
+MetadataEntry MetadataReader::ReadInstanceFieldEntry(uint8_t **data)
+{
+	FieldInfo *fi = *reinterpret_cast<FieldInfo**>(data);
+
 	MetadataEntry entry;
-	uint8_t *curPtr = data;
-
-	//read name
-	uint32_t nameOffset = *reinterpret_cast<uint32_t*>(curPtr);
-	string name = ReadName(m_nameData, nameOffset);
-	curPtr += sizeof(uint32_t);
-
-	uint16_t *nodeIdPtr = reinterpret_cast<uint16_t*>(curPtr);
-
-	//	read node pointer id
-	uint16_t nodeId = *nodeIdPtr++;
-	string fieldTypeName = ReadTypeName(nodeId);
-
-	// read modifier
-	uint8_t *nodeFinalVarPtr = reinterpret_cast<uint8_t*>(nodeIdPtr);
-	uint8_t nodeFinalVar = *nodeFinalVarPtr;
-	entry.isFinal = nodeFinalVar == MetadataTreeNode::FINAL;
-	nodeFinalVarPtr += sizeof(uint8_t);
-
-	entry.name = name;
+	FillEntryWithFiedldInfo(fi, entry);
+	entry.isStatic = false;
 	entry.type = NodeType::Field;
-	entry.sig = fieldTypeName;
-	entry.isMember = true;
 
-	data = nodeFinalVarPtr;
+	*data += sizeof(FieldInfo);
 
 	return entry;
 }
 
-MetadataEntry MetadataReader::ReadStaticFieldEntry(uint8_t*& data)
+MetadataEntry MetadataReader::ReadStaticFieldEntry(uint8_t **data)
 {
-	uint8_t *curPtr = data;
-	MetadataEntry entry = ReadInstanceFieldEntry(data);
+	StaticFieldInfo *sfi = *reinterpret_cast<StaticFieldInfo**>(data);
 
-	uint16_t *nodeIdPtr = reinterpret_cast<uint16_t*>(data);
-	uint16_t nodeId = *nodeIdPtr++;
-	string declTypeName = ReadTypeName(nodeId);
-
-	entry.type = NodeType::StaticField;
-	entry.declaringType = declTypeName;
+	MetadataEntry entry;
+	FillEntryWithFiedldInfo(sfi, entry);
 	entry.isStatic = true;
+	entry.type = NodeType::StaticField;
+	entry.declaringType = ReadTypeName(sfi->declaringType);
 
-	data = reinterpret_cast<uint8_t*>(nodeIdPtr);
+	*data += sizeof(StaticFieldInfo);
 
 	return entry;
 }
 
-MetadataEntry MetadataReader::ReadInstanceMethodEntry(uint8_t*& data)
+MetadataEntry MetadataReader::ReadInstanceMethodEntry(uint8_t **data)
 {
 	MetadataEntry entry;
-	uint8_t *curPtr = data;
+	MethodInfo mip(*data, this); //method info pointer+
 
-	uint32_t nameOffset = *reinterpret_cast<uint32_t*>(curPtr);
-	string name = ReadName(m_nameData, nameOffset);
-	curPtr += sizeof(uint32_t);
+	FillEntryWithMethodInfo(mip, entry);
 
-	uint16_t sigLen = *reinterpret_cast<uint16_t*>(curPtr);
-	assert(sigLen > 0);
-	curPtr += sizeof(uint16_t);
-	uint16_t *nodeIdPtr = reinterpret_cast<uint16_t*>(curPtr);
-	string sig = "(";
-	string ret;
-	for (int i=0; i<sigLen; i++)
-	{
-		uint16_t nodeId = *nodeIdPtr++;
-		string curArgTypeName = ReadTypeName(nodeId);
-		MetadataTreeNode *node = m_v[nodeId];
-		uint8_t nodeType = GetNodeType(node);
-		bool isRefType = IsNodeTypeClass(nodeType) || IsNodeTypeInterface(nodeType);
-		if (i == 0)
-		{
-			if ((curArgTypeName[0] != '[') && isRefType)
-			{
-				ret.append("L");
-			}
-			ret.append(curArgTypeName);
-			if ((curArgTypeName[0] != '[') && isRefType)
-			{
-				ret.append(";");
-			}
-		}
-		else
-		{
-			if ((curArgTypeName[0] != '[') && isRefType)
-			{
-				sig.append("L");
-			}
-			sig.append(curArgTypeName);
-			if ((curArgTypeName[0] != '[') && isRefType)
-			{
-				sig.append(";");
-			}
-		}
-	}
-	if (ret.empty())
-	{
-		ret = "V";
-	}
-	sig += ")" + ret;
-
-	entry.name = name;
-	entry.paramCount = sigLen - 1;
-	entry.sig = sig;
-	entry.type = NodeType::Method;
-	entry.isMember = true;
-
-	data = reinterpret_cast<uint8_t*>(nodeIdPtr);
+	*data += mip.GetSizeOfReadMethodInfo();
 
 	return entry;
 }
 
-MetadataEntry MetadataReader::ReadStaticMethodEntry(uint8_t*& data)
+MetadataTreeNode* MetadataReader::GetNodeById(uint16_t nodeId)
 {
-	uint8_t *curPtr = data;
+	return m_v[nodeId];
+}
 
-	MetadataEntry entry = ReadInstanceMethodEntry(data);
+MetadataEntry MetadataReader::ReadStaticMethodEntry(uint8_t** data)
+{
+	MetadataEntry entry;
+	MethodInfo smip(*data, this); //static method info pointer
 
-	uint16_t *nodeIdPtr = reinterpret_cast<uint16_t*>(data);
-
-	uint16_t nodeId = *nodeIdPtr++;
-	string declTypeName = ReadTypeName(nodeId);
-
-	// TODO: static method?
-	entry.type = NodeType::Method;
-	entry.declaringType = declTypeName;
+	FillEntryWithMethodInfo(smip, entry);
 	entry.isStatic = true;
+	entry.declaringType = smip.GetDeclaringType();
 
-	data = reinterpret_cast<uint8_t*>(nodeIdPtr);
+	*data += smip.GetSizeOfReadMethodInfo();
 
 	return entry;
 }
@@ -228,18 +174,18 @@ string MetadataReader::ReadInterfaceImplementationTypeName(MetadataTreeNode *tre
 	return name;
 }
 
-string MetadataReader::ReadName(uint8_t *names, uint32_t offset)
+string MetadataReader::ReadName(uint32_t offset)
 {
-	uint16_t length = *reinterpret_cast<short*>(names + offset);
+	uint16_t length = *reinterpret_cast<short*>(m_nameData + offset);
 
-	string name(reinterpret_cast<char*>(names + offset + sizeof(uint16_t)), length);
+	string name(reinterpret_cast<char*>(m_nameData + offset + sizeof(uint16_t)), length);
 
 	return name;
 }
 
 string MetadataReader::ReadTypeName(uint16_t nodeId)
 {
-	MetadataTreeNode *treeNode = m_v[nodeId];
+	MetadataTreeNode *treeNode = GetNodeById(nodeId);
 
 	return ReadTypeName(treeNode);
 }
@@ -279,7 +225,7 @@ string MetadataReader::ReadTypeNameInternal(MetadataTreeNode *treeNode)
 		if (isArrayElement)
 		{
 			uint16_t forwardNodeId = treeNode->offsetValue - ARRAY_OFFSET;
-			MetadataTreeNode *forwardNode = m_v[forwardNodeId];
+			MetadataTreeNode *forwardNode = GetNodeById(forwardNodeId);
 			name = ReadTypeName(forwardNode);
 			uint8_t forwardNodeType = GetNodeType(forwardNode);
 			if (IsNodeTypeInterface(forwardNodeType) || IsNodeTypeClass(forwardNodeType))
@@ -403,7 +349,7 @@ uint8_t MetadataReader::GetNodeType(MetadataTreeNode *treeNode)
 			else
 			{
 				uint16_t nodeId = offsetValue - ARRAY_OFFSET;
-				MetadataTreeNode *arrElemNode = m_v[nodeId];
+				MetadataTreeNode *arrElemNode = GetNodeById(nodeId);
 				nodeType = *(m_valueData + arrElemNode->offsetValue);
 			}
 		}
@@ -567,7 +513,7 @@ MetadataTreeNode* MetadataReader::GetBaseClassNode(MetadataTreeNode *treeNode)
 
 	assert(baseClassNodeId < nodeCount);
 
-	baseClassNode = m_v[baseClassNodeId];
+	baseClassNode = GetNodeById(baseClassNodeId);
 
 	return baseClassNode;
 }
