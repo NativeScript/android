@@ -16,6 +16,7 @@ import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.zip.ZipEntry;
 
@@ -86,13 +87,13 @@ public class Platform
 	
 	public final static String DEFAULT_LOG_TAG = "TNS.Java";
 	
-	public static int init(Context context) throws Exception
+	public static int init(Context context) throws RuntimeException
 	{
 		jsDebugger = new JsDebugger(context);
 		mainThread = Thread.currentThread();
 		if (NativeScriptContext != null)
 		{
-			throw new Exception("NativeScriptApplication already initialized");
+			throw new RuntimeException("NativeScriptApplication already initialized");
 		}
 
 		Require.init(context);
@@ -224,7 +225,7 @@ public class Platform
 		extractPolicy = policy;
 	}
 
-	public static void run(String appFileName) throws Exception
+	public static void run(String appFileName)
 	{
 		String appContent = Require.getAppContent(appFileName);
 		runNativeScript(appFileName, appContent);
@@ -651,6 +652,7 @@ public class Platform
 			APP_FAIL("Application failed");
 		}
 
+		
 		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "Platform.CallJSMethod: calling js method " + methodName + " with javaObjectID " + javaObjectID + " type=" + ((javaObject != null) ? javaObject.getClass().getCanonicalName() : "null"));
 
 		Object result = dispatchCallJSMethodNative(javaObjectID, methodName, isConstructor, delay, args);

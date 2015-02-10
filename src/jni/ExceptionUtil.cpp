@@ -13,14 +13,16 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
-ExceptionUtil::ExceptionUtil()
-	: jvm(nullptr), objectManager(nullptr)
+ExceptionUtil::ExceptionUtil() :
+		jvm(nullptr), objectManager(nullptr)
 {
 	this->initialized = false;
 }
 
-ExceptionUtil* ExceptionUtil::GetInstance(){
-	if(!instance){
+ExceptionUtil* ExceptionUtil::GetInstance()
+{
+	if (!instance)
+	{
 		// TODO: Possible concurrency issues
 		instance = new ExceptionUtil();
 	}
@@ -30,7 +32,8 @@ ExceptionUtil* ExceptionUtil::GetInstance(){
 
 void ExceptionUtil::Init(JavaVM *jvm, ObjectManager *objectManager)
 {
-	if(this->initialized){
+	if (this->initialized)
+	{
 		return;
 	}
 
@@ -115,27 +118,34 @@ void ExceptionUtil::GetExceptionMessage(JEnv& env, jthrowable exception, string&
 	}
 }
 
-void ExceptionUtil::HandleInvalidState(const string& message, bool fail){
-	if(fail){
+void ExceptionUtil::HandleInvalidState(const string& message, bool fail)
+{
+	if (fail)
+	{
 		NativeScriptRuntime::APP_FAIL(message.c_str());
 	}
-	else {
+	else
+	{
 		auto error = Exception::Error(ConvertToV8String(message));
 		Isolate::GetCurrent()->ThrowException(error);
 	}
 }
 
-bool ExceptionUtil::HandleTryCatch(TryCatch& tc){
-	if(!tc.HasCaught()){
+bool ExceptionUtil::HandleTryCatch(TryCatch& tc)
+{
+	if (!tc.HasCaught())
+	{
 		return false;
 	}
 
-	if(tc.CanContinue()){
+	if (tc.CanContinue())
+	{
 		auto message = tc.Message();
 		auto error = tc.Exception();
 		OnUncaughtError(message, error);
 	}
-	else {
+	else
+	{
 		auto errorMessage = PrintErrorMessage(tc.Message(), tc.Exception());
 
 		stringstream ss;
@@ -147,7 +157,8 @@ bool ExceptionUtil::HandleTryCatch(TryCatch& tc){
 	return true;
 }
 
-void ExceptionUtil::OnUncaughtError(Handle<Message> message, Handle<Value> error){
+void ExceptionUtil::OnUncaughtError(Handle<Message> message, Handle<Value> error)
+{
 	auto errorMessage = instance->PrintErrorMessage(message, error);
 
 	Isolate *isolate = Isolate::GetCurrent();
@@ -156,11 +167,13 @@ void ExceptionUtil::OnUncaughtError(Handle<Message> message, Handle<Value> error
 	// call the global exception handler
 	Handle<Value> errorObject;
 
-	if(error->IsObject()){
+	if (error->IsObject())
+	{
 		errorObject = error.As<Object>();
 		error.As<Object>()->Set(ConvertToV8String("message"), ConvertToV8String(errorMessage));
 	}
-	else{
+	else
+	{
 		errorObject = Exception::Error(ConvertToV8String(errorMessage));
 	}
 
@@ -187,7 +200,7 @@ void ExceptionUtil::CallJFuncWithErr(Handle<Value> errObj)
 	auto isEmpty = handler.IsEmpty();
 	auto isFunction = handler->IsFunction();
 
-	if(!isEmpty && isFunction)
+	if (!isEmpty && isFunction)
 	{
 		auto thiz = Object::New(isolate);
 		auto func = handler.As<Function>();
@@ -196,7 +209,8 @@ void ExceptionUtil::CallJFuncWithErr(Handle<Value> errObj)
 	}
 }
 
-string ExceptionUtil::GetErrorMessage(const Handle<Message>& message, const Handle<Value>& error){
+string ExceptionUtil::GetErrorMessage(const Handle<Message>& message, const Handle<Value>& error)
+{
 	stringstream ss;
 
 	auto str = error->ToDetailString();
@@ -215,13 +229,15 @@ string ExceptionUtil::GetErrorMessage(const Handle<Message>& message, const Hand
 	return ss.str();
 }
 
-string ExceptionUtil::PrintErrorMessage(const Handle<Message>& message, const Handle<Value>& error){
+string ExceptionUtil::PrintErrorMessage(const Handle<Message>& message, const Handle<Value>& error)
+{
 	string errorMessage = GetErrorMessage(message, error);
 
 	// split the message by new lines to workaround the LogCat's maximum characters in a single message
 	stringstream ss(errorMessage);
 	string line;
-	while (std::getline(ss, line, '\n')) {
+	while (std::getline(ss, line, '\n'))
+	{
 		// TODO: Log in the V8's Console as well?
 		__android_log_print(ANDROID_LOG_ERROR, "TNS.Native", "%s", line.c_str());
 	}
@@ -267,14 +283,13 @@ bool ExceptionUtil::CheckForException(Isolate *isolate, const string& methodName
 	{
 		DEBUG_WRITE("Calling js method %s failed", methodName.c_str());
 
-		auto ex = tc.Exception();
-		string loggedMessage = GetErrorMessage(tc.Message(), ex);
+		Local<Value> ex = tc.Exception();
 
-		String::Utf8Value error(tc.Exception());
+		string loggedMessage = GetErrorMessage(tc.Message(), ex);
 		String::Utf8Value file(tc.Message()->GetScriptResourceName());
 		int line = tc.Message()->GetLineNumber();
 		int column = tc.Message()->GetStartColumn();
-		DEBUG_WRITE("Error: %s @line: %d, column: %d", *error, line - Constants::MODULE_LINES_OFFSET, column);
+		DEBUG_WRITE("Error: %s @line: %d, column: %d", loggedMessage.c_str(), line - Constants::MODULE_LINES_OFFSET, column);
 
 		auto pv = new Persistent<Value>(isolate, ex);
 
@@ -298,15 +313,15 @@ bool ExceptionUtil::CheckForException(Isolate *isolate, const string& methodName
 
 				jmethodID ctor = env.GetMethodID(nativeScriptExceptionClass, "<init>", "(Ljava/lang/String;J)V");
 				jstring s = env.NewStringUTF(loggedMessage.c_str());
-				jobject exObject = env.NewObject(nativeScriptExceptionClass, ctor, s, (jlong)pv);
-				jint ret = env.Throw((jthrowable)exObject);
+				jobject exObject = env.NewObject(nativeScriptExceptionClass, ctor, s, (jlong) pv);
+				jint ret = env.Throw((jthrowable) exObject);
 
 				DEBUG_WRITE("Error: Throw (2)=%d", (int)ret);
 			}
 		}
 		else
 		{
-			NativeScriptRuntime::APP_FAIL(*error);
+			NativeScriptRuntime::APP_FAIL(loggedMessage.c_str());
 		}
 	}
 
@@ -325,7 +340,7 @@ bool ExceptionUtil::CheckForJavaException(JEnv& env)
 		DEBUG_WRITE("Error during java interop");
 		// env.ExceptionDescribe(); We will print this manually in the ExceptionUtil
 		env.ExceptionClear();
-		string excClassName = objectManager->GetClassName((jobject)exc);
+		string excClassName = objectManager->GetClassName((jobject) exc);
 		if (excClassName == "com/tns/NativeScriptException")
 		{
 			jfieldID fieldID = env.GetFieldID(env.GetObjectClass(exc), "jsValueAddress", "J");
@@ -357,7 +372,7 @@ bool ExceptionUtil::CheckForJavaException(JEnv& env)
 
 			if (nativeExceptionObject.IsEmpty())
 			{
-				string className = objectManager->GetClassName((jobject)exc);
+				string className = objectManager->GetClassName((jobject) exc);
 				nativeExceptionObject = objectManager->CreateJSProxyInstance(javaObjectID, className);
 			}
 
