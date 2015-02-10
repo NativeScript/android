@@ -5,7 +5,7 @@ var __extends_ts = function (d, b) {
     d.prototype = new __();
 };
 
-var native = function(thiz) {
+var __native = function(thiz) {
 	var result = thiz.__proto__;
 
 	for (var prop in thiz) 
