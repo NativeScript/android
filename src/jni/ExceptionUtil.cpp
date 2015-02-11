@@ -270,11 +270,10 @@ bool ExceptionUtil::CheckForException(Isolate *isolate, const string& methodName
 		auto ex = tc.Exception();
 		string loggedMessage = GetErrorMessage(tc.Message(), ex);
 
-		String::Utf8Value error(tc.Exception());
 		String::Utf8Value file(tc.Message()->GetScriptResourceName());
 		int line = tc.Message()->GetLineNumber();
 		int column = tc.Message()->GetStartColumn();
-		DEBUG_WRITE("Error: %s @line: %d, column: %d", *error, line - Constants::MODULE_LINES_OFFSET, column);
+		DEBUG_WRITE("Error: %s @line: %d, column: %d", loggedMessage.c_str(), line - Constants::MODULE_LINES_OFFSET, column);
 
 		auto pv = new Persistent<Value>(isolate, ex);
 
@@ -306,7 +305,7 @@ bool ExceptionUtil::CheckForException(Isolate *isolate, const string& methodName
 		}
 		else
 		{
-			NativeScriptRuntime::APP_FAIL(*error);
+			NativeScriptRuntime::APP_FAIL(loggedMessage.c_str());
 		}
 	}
 

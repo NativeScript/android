@@ -682,29 +682,19 @@ public class NativeScriptApplication extends android.app.Application implements 
 	}
 	
 	public void onCreate() {
-		try
-		{
-			appInstance = this;
-			prepareAppBuilderCallbackImpl();
-			
-			if (appBuilderCallbackImpl != null)
-			{
-				appBuilderCallbackImpl.onCreate(this);
-			}
-			
-			Platform.init(this);
-			Platform.run(Platform.DefaultApplicationModuleName);
 
-			onCreateInternal();
-		}
-		catch (Exception ex)
+		appInstance = this;
+		prepareAppBuilderCallbackImpl();
+		
+		if (appBuilderCallbackImpl != null)
 		{
-			StringWriter sw = new StringWriter();
-			ex.printStackTrace(new PrintWriter(sw));
-			String exceptionDetails = sw.toString();
-
-			Log.e(logTag, "NativeScript platform init failed with error " + exceptionDetails);
+			appBuilderCallbackImpl.onCreate(this);
 		}
+		
+		Platform.init(this);
+		Platform.run(Platform.DefaultApplicationModuleName);
+
+		onCreateInternal();
 	}
 	
 	private void prepareAppBuilderCallbackImpl()

@@ -95,13 +95,13 @@ public class Platform
 		errorActivityClass = clazz;
 	}
 	
-	public static int init(Context context) throws Exception
+	public static int init(Context context) throws RuntimeException
 	{
 		jsDebugger = new JsDebugger(context);
 		mainThread = Thread.currentThread();
 		if (NativeScriptContext != null)
 		{
-			throw new Exception("NativeScriptApplication already initialized");
+			throw new RuntimeException("NativeScriptApplication already initialized");
 		}
 
 		Require.init(context);
@@ -233,7 +233,7 @@ public class Platform
 		extractPolicy = policy;
 	}
 
-	public static void run(String appFileName) throws Exception
+	public static void run(String appFileName)
 	{
 		String appContent = Require.getAppContent(appFileName);
 		runNativeScript(appFileName, appContent);
