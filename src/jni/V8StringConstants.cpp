@@ -14,7 +14,7 @@ namespace tns {
 	}
 
 	Local<String> V8StringConstants::GetExtends(){
-		return String::NewFromUtf8(Isolate::GetCurrent(), EXTENDS.c_str());
+		return String::NewFromUtf8(Isolate::GetCurrent(), EXTEND.c_str());
 	}
 
 	Local<String> V8StringConstants::GetIsPrototypeImplementationObject(){
