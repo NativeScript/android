@@ -1160,7 +1160,7 @@ jmethodID NativeScriptRuntime::GET_CHANGE_IN_BYTES_OF_USED_MEMORY_METHOD_ID = nu
 map<string, Persistent<Object>*> NativeScriptRuntime::loadedModules;
 MetadataTreeNode* NativeScriptRuntime::metadataRoot = nullptr;
 ObjectManager* NativeScriptRuntime::objectManager = nullptr;
-CastFunctions NativeScriptRuntime::castFunctions;
+NumericCasts NativeScriptRuntime::castFunctions;
 ArrayElementAccessor NativeScriptRuntime::arrayElementAccessor;
 FieldAccessor NativeScriptRuntime::fieldAccessor;
 string NativeScriptRuntime::APP_FILES_DIR;

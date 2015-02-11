@@ -1,12 +1,12 @@
-#ifndef CASTFUNCTIONS_H_
-#define CASTFUNCTIONS_H_
+#ifndef NUMERICCASTS_H_
+#define NUMERICCASTS_H_
 
 #include "v8.h"
 #include <string>
 
 namespace tns
 {
-	class CastFunctions
+	class NumericCasts
 	{
 	public:
 			void CreateGlobalCastFunctions(const v8::Handle<v8::ObjectTemplate>& globalTemplate);
@@ -40,9 +40,9 @@ namespace tns
 
 			static void MarkedJsObjectWeakCallback(const v8::WeakCallbackData<v8::Object, v8::Persistent<v8::Object> >& data);
 
-			static CastFunctions* GetThis(const v8::FunctionCallbackInfo<v8::Value>& args);
+			static NumericCasts* GetThis(const v8::FunctionCallbackInfo<v8::Value>& args);
 	};
 }
 
 
-#endif /* CASTFUNCTIONS_H_ */
+#endif /* NUMERICCASTS_H_ */

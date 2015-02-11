@@ -10,7 +10,7 @@
 #include "JSInstanceInfo.h"
 #include "ArgsWrapper.h"
 #include "MetadataTreeNode.h"
-#include "CastFunctions.h"
+#include "NumericCasts.h"
 #include "FieldAccessor.h"
 #include "ArrayElementAccessor.h"
 #include "ObjectManager.h"
@@ -147,7 +147,7 @@ namespace tns
 
 		static std::map<std::string, v8::Persistent<v8::Object>*> loadedModules;
 
-		static CastFunctions castFunctions;
+		static NumericCasts castFunctions;
 
 		static ArrayElementAccessor arrayElementAccessor;
 

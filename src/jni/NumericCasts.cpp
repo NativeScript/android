@@ -1,4 +1,4 @@
-#include "CastFunctions.h"
+#include "NumericCasts.h"
 #include "NativeScriptAssert.h"
 #include "Util.h"
 #include "V8GlobalHelpers.h"
@@ -8,76 +8,76 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
-void CastFunctions::CreateGlobalCastFunctions(const Handle<ObjectTemplate>& globalTemplate)
+void NumericCasts::CreateGlobalCastFunctions(const Handle<ObjectTemplate>& globalTemplate)
 {
 	auto isolate = Isolate::GetCurrent();
 	auto ext = External::New(isolate, this);
 
-	globalTemplate->Set(ConvertToV8String("long"), FunctionTemplate::New(isolate, CastFunctions::MarkAsLongCallbackStatic, ext));
-	globalTemplate->Set(ConvertToV8String("byte"), FunctionTemplate::New(isolate, CastFunctions::MarkAsByteCallbackStatic, ext));
-	globalTemplate->Set(ConvertToV8String("short"), FunctionTemplate::New(isolate, CastFunctions::MarkAsShortCallbackStatic, ext));
-	globalTemplate->Set(ConvertToV8String("double"), FunctionTemplate::New(isolate, CastFunctions::MarkAsDoubleCallbackStatic, ext));
-	globalTemplate->Set(ConvertToV8String("float"), FunctionTemplate::New(isolate, CastFunctions::MarkAsFloatCallbackStatic, ext));
-	globalTemplate->Set(ConvertToV8String("char"), FunctionTemplate::New(isolate, CastFunctions::MarkAsCharCallbackStatic, ext));
+	globalTemplate->Set(ConvertToV8String("long"), FunctionTemplate::New(isolate, NumericCasts::MarkAsLongCallbackStatic, ext));
+	globalTemplate->Set(ConvertToV8String("byte"), FunctionTemplate::New(isolate, NumericCasts::MarkAsByteCallbackStatic, ext));
+	globalTemplate->Set(ConvertToV8String("short"), FunctionTemplate::New(isolate, NumericCasts::MarkAsShortCallbackStatic, ext));
+	globalTemplate->Set(ConvertToV8String("double"), FunctionTemplate::New(isolate, NumericCasts::MarkAsDoubleCallbackStatic, ext));
+	globalTemplate->Set(ConvertToV8String("float"), FunctionTemplate::New(isolate, NumericCasts::MarkAsFloatCallbackStatic, ext));
+	globalTemplate->Set(ConvertToV8String("char"), FunctionTemplate::New(isolate, NumericCasts::MarkAsCharCallbackStatic, ext));
 }
 
-CastFunctions* CastFunctions::GetThis(const v8::FunctionCallbackInfo<Value>& args)
+NumericCasts* NumericCasts::GetThis(const v8::FunctionCallbackInfo<Value>& args)
 {
 	auto ext = args.Data().As<External>();
 
-	auto thisPtr = reinterpret_cast<CastFunctions*>(ext->Value());
+	auto thisPtr = reinterpret_cast<NumericCasts*>(ext->Value());
 
 	return thisPtr;
 }
 
-void CastFunctions::MarkAsLongCallbackStatic(const v8::FunctionCallbackInfo<Value>& args)
+void NumericCasts::MarkAsLongCallbackStatic(const v8::FunctionCallbackInfo<Value>& args)
 {
 	auto thisPtr = GetThis(args);
 
 	thisPtr->MarkAsLongCallback(args);
 }
 
-void CastFunctions::MarkAsByteCallbackStatic(const v8::FunctionCallbackInfo<Value>& args)
+void NumericCasts::MarkAsByteCallbackStatic(const v8::FunctionCallbackInfo<Value>& args)
 {
 	auto thisPtr = GetThis(args);
 
 	thisPtr->MarkAsByteCallback(args);
 }
 
-void CastFunctions::MarkAsShortCallbackStatic(const v8::FunctionCallbackInfo<Value>& args)
+void NumericCasts::MarkAsShortCallbackStatic(const v8::FunctionCallbackInfo<Value>& args)
 {
 	auto thisPtr = GetThis(args);
 
 	thisPtr->MarkAsShortCallback(args);
 }
 
-void CastFunctions::MarkAsCharCallbackStatic(const v8::FunctionCallbackInfo<Value>& args)
+void NumericCasts::MarkAsCharCallbackStatic(const v8::FunctionCallbackInfo<Value>& args)
 {
 	auto thisPtr = GetThis(args);
 
 	thisPtr->MarkAsCharCallback(args);
 }
 
-void CastFunctions::MarkAsFloatCallbackStatic(const v8::FunctionCallbackInfo<Value>& args)
+void NumericCasts::MarkAsFloatCallbackStatic(const v8::FunctionCallbackInfo<Value>& args)
 {
 	auto thisPtr = GetThis(args);
 
 	thisPtr->MarkAsFloatCallback(args);
 }
 
-void CastFunctions::MarkAsDoubleCallbackStatic(const v8::FunctionCallbackInfo<Value>& args)
+void NumericCasts::MarkAsDoubleCallbackStatic(const v8::FunctionCallbackInfo<Value>& args)
 {
 	auto thisPtr = GetThis(args);
 
 	thisPtr->MarkAsDoubleCallback(args);
 }
 
-void CastFunctions::MarkedJsObjectWeakCallback(const v8::WeakCallbackData<Object, Persistent<Object> >& data)
+void NumericCasts::MarkedJsObjectWeakCallback(const v8::WeakCallbackData<Object, Persistent<Object> >& data)
 {
 	data.GetParameter()->Reset();
 }
 
-void CastFunctions::MarkAsLongCallback(const v8::FunctionCallbackInfo<Value>& args)
+void NumericCasts::MarkAsLongCallback(const v8::FunctionCallbackInfo<Value>& args)
 {
 	ASSERT_MESSAGE(args.Length() == 1, "long(x) should be called with single parameter");
 	ASSERT_MESSAGE(args[0]->IsString() || args[0]->IsStringObject() || args[0]->IsNumber() || args[0]->IsNumberObject(), "long(x) should be called with single parameter containing a long number representation");
@@ -107,7 +107,7 @@ void CastFunctions::MarkAsLongCallback(const v8::FunctionCallbackInfo<Value>& ar
 	}
 }
 
-void CastFunctions::MarkAsByteCallback(const v8::FunctionCallbackInfo<Value>& args)
+void NumericCasts::MarkAsByteCallback(const v8::FunctionCallbackInfo<Value>& args)
 {
 	ASSERT_MESSAGE(args.Length() == 1, "byte(x) should be called with single parameter");
 	ASSERT_MESSAGE(args[0]->IsString() || args[0]->IsStringObject() || args[0]->IsInt32() || args[0]->IsNumberObject(), "byte(x) should be called with single parameter containing a byte number representation");
@@ -137,7 +137,7 @@ void CastFunctions::MarkAsByteCallback(const v8::FunctionCallbackInfo<Value>& ar
 	}
 }
 
-void CastFunctions::MarkAsShortCallback(const v8::FunctionCallbackInfo<Value>& args)
+void NumericCasts::MarkAsShortCallback(const v8::FunctionCallbackInfo<Value>& args)
 {
 	ASSERT_MESSAGE(args.Length() == 1, "short(x) should be called with single parameter");
 	ASSERT_MESSAGE(args[0]->IsString() || args[0]->IsStringObject() || args[0]->IsInt32() || args[0]->IsNumberObject(), "short(x) should be called with single parameter containing a short number representation");
@@ -167,7 +167,7 @@ void CastFunctions::MarkAsShortCallback(const v8::FunctionCallbackInfo<Value>& a
 	}
 }
 
-void CastFunctions::MarkAsCharCallback(const v8::FunctionCallbackInfo<Value>& args)
+void NumericCasts::MarkAsCharCallback(const v8::FunctionCallbackInfo<Value>& args)
 {
 	ASSERT_MESSAGE(args.Length() == 1, "char(x) should be called with single parameter");
 	ASSERT_MESSAGE(args[0]->IsString(), "char(x) should be called with single parameter containing a char representation");
@@ -190,7 +190,7 @@ void CastFunctions::MarkAsCharCallback(const v8::FunctionCallbackInfo<Value>& ar
 	}
 }
 
-void CastFunctions::MarkAsFloatCallback(const v8::FunctionCallbackInfo<Value>& args)
+void NumericCasts::MarkAsFloatCallback(const v8::FunctionCallbackInfo<Value>& args)
 {
 	ASSERT_MESSAGE(args.Length() == 1, "float(x) should be called with single parameter");
 	ASSERT_MESSAGE(args[0]->IsNumber(), "float(x) should be called with single parameter containing a float number representation");
@@ -211,7 +211,7 @@ void CastFunctions::MarkAsFloatCallback(const v8::FunctionCallbackInfo<Value>& a
 	}
 }
 
-void CastFunctions::MarkAsDoubleCallback(const v8::FunctionCallbackInfo<Value>& args)
+void NumericCasts::MarkAsDoubleCallback(const v8::FunctionCallbackInfo<Value>& args)
 {
 	ASSERT_MESSAGE(args.Length() == 1, "double(x) should be called with single parameter");
 	ASSERT_MESSAGE(args[0]->IsNumber(), "double(x) should be called with single parameter containing a double number representation");
@@ -232,7 +232,7 @@ void CastFunctions::MarkAsDoubleCallback(const v8::FunctionCallbackInfo<Value>& 
 	}
 }
 
-Persistent<Object>* CastFunctions::MarkJsObject(const Handle<Object>& object, const string& mark, const Handle<Value>& value)
+Persistent<Object>* NumericCasts::MarkJsObject(const Handle<Object>& object, const string& mark, const Handle<Value>& value)
 {
 	auto isolate = Isolate::GetCurrent();
 
