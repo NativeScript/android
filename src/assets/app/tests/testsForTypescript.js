@@ -12,6 +12,7 @@ var Assert = function(condition, failMessage) {
 	    __extends(NativeViewGroup, _super);
 	    function NativeViewGroup(view) {
 	        this._view = view;
+	        return __native(this);
 	    }
 	    
 	    NativeViewGroup.prototype.Then = function () {
@@ -32,6 +33,7 @@ var Assert = function(condition, failMessage) {
         function MyButton() {
             _super.call(this);
             this.myName = "MyName";
+            return __native(this);
         }
         
         MyButton.prototype.echo = function (s) {
@@ -63,6 +65,7 @@ var Assert = function(condition, failMessage) {
         __extends(MyButton1, _super);
         function MyButton1() {
             _super.call(this);
+            return __native(this);
         }
         
         MyButton1.prototype.init = function () {
@@ -93,6 +96,7 @@ var Assert = function(condition, failMessage) {
 	        __extends(MyButton2, _super);
 	        function MyButton2() {
 	            _super.call(this);
+	            return __native(this);
 	        }
 	        
 	        MyButton2.prototype.superToString = function () {
@@ -179,6 +183,7 @@ var Assert = function(condition, failMessage) {
 	        __extends(MyButton3, _super);
 	        function MyButton3() {
 	            _super.call(this);
+	            return __native(this);
 	        }
 	        
 	        MyButton3.prototype.toString = function (s) {
@@ -205,6 +210,7 @@ var Assert = function(condition, failMessage) {
 	    __extends(MyButtonWithArgs, _super);
 	    function MyButtonWithArgs(value) {
 	        _super.call(this, value);
+	        return __native(this);
 	    }
 	    
 	    MyButtonWithArgs.prototype.init = function () {
@@ -240,6 +246,7 @@ var Assert = function(condition, failMessage) {
 	        function MyButton4() {
 	            _super.call(this);
 	            this.my1 = "MyName";
+	            return __native(this);
 	        }
 	        
 	        MyButton4.prototype.init = function () {
@@ -272,6 +279,7 @@ var Assert = function(condition, failMessage) {
 	        function MyButton5() {
 	            _super.call(this);
 	            this.my1 = "MyName";
+	            return __native(this);
 	        }
 	        
 	        MyButton5.prototype.init = function () {
@@ -302,6 +310,7 @@ var Assert = function(condition, failMessage) {
 		        function MyButton6() {
 		            _super.call(this);
 		            this.my1 = "MyName";
+		            return __native(this);
 		        }
 		        
 		        MyButton6.prototype.init = function () {
@@ -454,6 +463,7 @@ var Assert = function(condition, failMessage) {
 	        _super.call(this);
 	
 	        this._items = items;
+	        return __native(this);
 	    }
 	    Object.defineProperty(ListViewAdapter.prototype, "items", {
 	        get: function () {
@@ -504,13 +514,15 @@ var Assert = function(condition, failMessage) {
         function MyButton9() {
             _super.call(this);
             
-            var that = this;
+            var that = __native(this);
             
-            this.setOnClickListener(new android.view.View.OnClickListener({
+            that.setOnClickListener(new android.view.View.OnClickListener({
         		onClick : function() {
         			that.buttonClicked = true;
         		}
             }));
+            
+            return that;
         }
 
         return MyButton9;

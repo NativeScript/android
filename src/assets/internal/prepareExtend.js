@@ -59,7 +59,7 @@ var __extends = function(Child, Parent) {
 		function extend(child, parent) {
 	        
 			if (!child.__extended) {
-	        	child.__extended = parent.extend(child.prototype);
+	        	child.__extended = parent.extend(child.name, child.prototype);
 	        }
 	 
 	        return child.__extended;
