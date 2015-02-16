@@ -24,7 +24,7 @@ public class Dump
 	static final String callJSMethodName = "callJSMethod";
 	static final String initInstanceMethodName = "initInstance";
 
-	 StringBuffer methodDescriptorBuilder = new StringBuffer();
+	static final StringBuffer methodDescriptorBuilder = new StringBuffer();
 	 /**
 	 * Returns the dex descriptor corresponding to the given method.
 	 * 
@@ -1130,21 +1130,27 @@ public class Dump
 		fv.visitEnd();
 	}
 
-	String[] classImplentedInterfaces = new String[] { "Lcom/tns/NativeScriptHashCodeProvider;" };
+	static final String[] classImplentedInterfaces = new String[] { "Lcom/tns/NativeScriptHashCodeProvider;" };
+	static final String[] interfaceImplementedInterfaces = new String[] { "Lcom/tns/NativeScriptHashCodeProvider;", "" };
 	private ClassVisitor generateClass(ApplicationWriter aw, Class<?> classTo, String classSignature, String tnsClassSignature)
 	{
 		ClassVisitor cv;
 		
 		int classModifiers = getDexModifiers(classTo.getModifiers());
-		
+		String[] implentedInterfaces = classImplentedInterfaces;
 		if (classTo.isInterface())
 		{
-			classImplentedInterfaces = new String[] { "Lcom/tns/NativeScriptHashCodeProvider;", classSignature };
+			interfaceImplementedInterfaces[1] = classSignature; //new String[] { "Lcom/tns/NativeScriptHashCodeProvider;", classSignature };
+			implentedInterfaces = interfaceImplementedInterfaces;
 			classSignature = objectClass;
 		}
+		else
+		{
+			implentedInterfaces = classImplentedInterfaces;
+		}
 		
-		cv = aw.visitClass(classModifiers, tnsClassSignature, null, classSignature, classImplentedInterfaces);
-		cv.visit(0, classModifiers, tnsClassSignature, null, classSignature, classImplentedInterfaces);
+		cv = aw.visitClass(classModifiers, tnsClassSignature, null, classSignature, implentedInterfaces);
+		cv.visit(0, classModifiers, tnsClassSignature, null, classSignature, implentedInterfaces);
 		cv.visitSource(classTo.getName() +  ".java", null);
 		return cv;
 	}
