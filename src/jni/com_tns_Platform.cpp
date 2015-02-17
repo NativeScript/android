@@ -394,7 +394,7 @@ extern "C" jobjectArray Java_com_tns_Platform_createJSInstanceNative(JNIEnv *_en
 		classProxy = MetadataNode::GetExistingClassProxy(jniName);
 		if (classProxy.IsEmpty())
 		{
-			string nativeScriptBindingPrefix("com/tns/");
+			string nativeScriptBindingPrefix("com/tns/gen/");
 			if (Util::StartsWith(jniName, nativeScriptBindingPrefix))
 			{
 					jniName = jniName.substr(nativeScriptBindingPrefix.length());

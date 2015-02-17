@@ -201,7 +201,8 @@ class MethodResolver
 		String cannonicalClassName = classPath.replace('/', '.');
 		
 		Class<?> clazz = null;
-		boolean isBindingClass = cannonicalClassName.startsWith("com.tns.") && !cannonicalClassName.startsWith("com.tns.tests.") && (!cannonicalClassName.startsWith("com.tns.com.tns.Async"));
+		boolean isBindingClass = cannonicalClassName.startsWith("com.tns.gen") &&
+				!cannonicalClassName.startsWith("com.tns.tests.");
 
 		if (isBindingClass)
 		{

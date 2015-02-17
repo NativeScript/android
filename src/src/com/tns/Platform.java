@@ -262,7 +262,7 @@ public class Platform
 
 	public static Object createInstance(String name, String className, Object[] args, String[] methodOverrides, int objectId, IntWrapper constructorId) throws InstantiationException, IllegalAccessException, ClassNotFoundException, NoSuchMethodException, IllegalArgumentException, InvocationTargetException, IOException
 	{
-if (IsLogEnabled)
+		if (IsLogEnabled)
 		{
 			Log.d(DEFAULT_LOG_TAG, "Creating instance for ctorId:" + constructorId + " className:" + className + " methodOverrides: " + Arrays.toString(methodOverrides));
 		}
@@ -271,7 +271,11 @@ if (IsLogEnabled)
 		int ctorId = constructorId.getInt();
 		if (ctorId == -1)
 		{
-			if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "createInstance: resolving constructor for class:" + className + " name: " + name);
+			if (IsLogEnabled)
+			{
+				Log.d(DEFAULT_LOG_TAG, "createInstance: resolving constructor for class:" + className + " name: " + name);
+			}
+			
 			ctor = MethodResolver.resolveConstructor(name, className, args, Platform.dexFactory, methodOverrides);
 			if (ctor == null)
 			{

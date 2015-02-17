@@ -234,12 +234,12 @@ public class DexFactory
 	{
 		String classToProxy = className;
 
-		if (className.startsWith("com.tns."))
+		if (className.startsWith("com.tns.gen"))
 		{
-			classToProxy = className.substring(8);
+			classToProxy = className.substring(12);
 		}
 
-		if (classToProxy.startsWith("com.tns.") && !classToProxy.startsWith("com.tns.tests"))
+		if (classToProxy.startsWith("com.tns.gen"))// && !classToProxy.startsWith("com.tns.tests"))
 		{
 			throw new InvalidClassException("Can't generate proxy of proxy");
 		}
@@ -272,12 +272,12 @@ public class DexFactory
 	private String generateProxy(String proxyName, String className, String[] methodOverrides) throws ClassNotFoundException, IOException
 	{
 		String classToProxyName = className;
-		if (className.startsWith("com.tns."))
+		if (className.startsWith("com.tns.gen."))
 		{
-			classToProxyName = className.substring(8);
+			classToProxyName = className.substring(12);
 		}
 
-		if (classToProxyName.startsWith("com.tns.") && !classToProxyName.startsWith("com.tns.tests"))
+		if (classToProxyName.startsWith("com.tns.gen."))// && !classToProxyName.startsWith("com.tns.tests"))
 		{
 			throw new InvalidClassException("Can't generate proxy of proxy");
 		}
@@ -434,72 +434,5 @@ public class DexFactory
 		}
 		
 		return null;
-	}
-
-	private String getDexName(String wrappedClassName)
-	{
-		String dexName = "";
-
-		if (wrappedClassName.startsWith("com.tns.android.widget.") || wrappedClassName.startsWith("com.tns.dalvik."))
-		{
-			dexName = "android_wrap2.jar";
-		}
-		else if (wrappedClassName.startsWith("com.tns.android."))
-		{
-			dexName = "android_wrap1.jar";
-		}
-		else
-		{
-			dexName = "android_wrap3.jar";
-		}
-
-		return dexName;
-	}
-
-	private boolean prepareDex(String dexName, File dexInternalStoragePath)
-	{
-		BufferedInputStream bis = null;
-		OutputStream dexWriter = null;
-
-		try
-		{
-			bis = new BufferedInputStream(context.getAssets().open(dexName));
-			dexWriter = new BufferedOutputStream(new FileOutputStream(dexInternalStoragePath));
-			byte[] buf = new byte[BUF_SIZE];
-			int len;
-			while ((len = bis.read(buf, 0, BUF_SIZE)) > 0)
-			{
-				dexWriter.write(buf, 0, len);
-			}
-			dexWriter.close();
-			bis.close();
-			return true;
-		}
-		catch (IOException e)
-		{
-			if (dexWriter != null)
-			{
-				try
-				{
-					dexWriter.close();
-				}
-				catch (IOException ioe)
-				{
-					ioe.printStackTrace();
-				}
-			}
-			if (bis != null)
-			{
-				try
-				{
-					bis.close();
-				}
-				catch (IOException ioe)
-				{
-					ioe.printStackTrace();
-				}
-			}
-			return false;
-		}
 	}
 }

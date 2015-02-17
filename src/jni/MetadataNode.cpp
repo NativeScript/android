@@ -1638,6 +1638,6 @@ RegisterInstanceCallback MetadataNode::s_registerInstance = nullptr;
 GetTypeMetadataCallback MetadataNode::s_getTypeMetadata = nullptr;
 string MetadataNode::METADATA_NODE_KEY_NAME = "t::MetadataNode";
 string MetadataNode::CLASS_PROXY = "t::ClassProxy";
-string MetadataNode::TNS_PREFIX = "com/tns/";
+string MetadataNode::TNS_PREFIX = "com/tns/gen/";
 string MetadataNode::TNS_TESTS_PREFIX = "com/tns/tests/";
 MetadataReader MetadataNode::s_metadataReader;
