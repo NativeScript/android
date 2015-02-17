@@ -139,13 +139,12 @@ Handle<Object> MetadataNode::CreateProxy(Isolate *isolate)
 
 	uint8_t nodeType = s_metadataReader.GetNodeType(m_treeNode);
 
-	if (s_metadataReader.IsNodeTypeClass(nodeType))
+	bool isClass = s_metadataReader.IsNodeTypeClass(nodeType),
+		isInterface = s_metadataReader.IsNodeTypeInterface(nodeType);
+
+	if (isClass || isInterface)
 	{
-		obj = CreateClassProxy(isolate);
-	}
-	else if (s_metadataReader.IsNodeTypeInterface(nodeType))
-	{
-		obj = CreateInterfaceProxy(isolate);
+		obj = CreateClassProxy(isolate, isClass);
 	}
 	else if (s_metadataReader.IsNodeTypePackage(nodeType))
 	{
@@ -153,7 +152,7 @@ Handle<Object> MetadataNode::CreateProxy(Isolate *isolate)
 	}
 	else if (m_isArray)
 	{
-		obj = CreateClassProxy(isolate);
+		obj = CreateClassProxy(isolate, isClass);
 	}
 	else
 	{
@@ -205,21 +204,6 @@ bool MetadataNode::ExistsExtendName(const string& name)
 	return true;
 }
 
-Handle<Object> MetadataNode::GetExistingInterfaceProxy(const string& name)
-{
-	auto isolate = Isolate::GetCurrent();
-
-	Handle<Object> empty;
-	auto it = MetadataNode::s_interfaceProxies.find(name);
-	if (it == MetadataNode::s_interfaceProxies.end())
-	{
-		return empty;
-	}
-
-	auto interfaceProxy = it->second;
-	return Handle<Object>::New(isolate, *interfaceProxy);
-}
-
 bool MetadataNode::IsArray()
 {
 	char prefix = *(m_name.begin());
@@ -253,7 +237,7 @@ bool MetadataNode::IsMarkedAsSuper(const Handle<Object>& obj)
 	return !obj->GetHiddenValue(V8StringConstants::GetTSuper()).IsEmpty();
 }
 
-Handle<Object> MetadataNode::CreateClassProxy(Isolate *isolate)
+Handle<Object> MetadataNode::CreateClassProxy(Isolate *isolate, bool isClass)
 {
 	auto existingClassProxy = GetExistingClassProxy(m_name);
 
@@ -281,8 +265,6 @@ Handle<Object> MetadataNode::CreateClassProxy(Isolate *isolate)
 		instance = objectTemplate->NewInstance();
 		V8SetHiddenValue(instance, METADATA_NODE_KEY_NAME, external);
 
-//		bool success = instance->SetHiddenValue(ConvertToV8String("t::super"), Boolean::New(true));
-//		ASSERT_MESSAGE(success, "CreateClassProxy: mark grand proxy instance as super object failed");
 		DEBUG_WRITE("CreateClassProxy: ClassProxy instance is  id:%d", instance->GetIdentityHash());
 
 		auto funcTemplate = FunctionTemplate::New(isolate, MetadataNode::ConstructorCallback);
@@ -291,10 +273,14 @@ Handle<Object> MetadataNode::CreateClassProxy(Isolate *isolate)
 		bool success = classProxyFunction->SetPrototype(instance); //this is needed for static functions like so: var MyButton = Button.extends(); MyButton.StaticMethod();
 		ASSERT_MESSAGE(success, "CreateClassProxy: SetPrototype failed");
 		V8SetHiddenValue(classProxyFunction, METADATA_NODE_KEY_NAME, external);
-		V8SetHiddenValue(classProxyFunction, CLASS_PROXY, Boolean::New(isolate, true));
 
-		success = classProxyFunction->SetHiddenValue(V8StringConstants::GetTSuper(), Boolean::New(isolate, true));
-		ASSERT_MESSAGE(success, "CreateClassProxy: mark classProxyFunction as super object failed");
+		if (isClass)
+		{
+			V8SetHiddenValue(classProxyFunction, CLASS_PROXY, Boolean::New(isolate, true));
+
+			success = classProxyFunction->SetHiddenValue(V8StringConstants::GetTSuper(), Boolean::New(isolate, true));
+			ASSERT_MESSAGE(success, "CreateClassProxy: mark classProxyFunction as super object failed");
+		}
 
 		classProxy = classProxyFunction;
 	}
@@ -311,39 +297,6 @@ Handle<Object> MetadataNode::CreateClassProxy(Isolate *isolate)
 void MetadataNode::SetDebugName(const string& name, const Handle<Object>& value)
 {
 	value->Set(V8StringConstants::GetDebugName(), ConvertToV8String(name));
-}
-
-Handle<Object> MetadataNode::CreateInterfaceProxy(Isolate *isolate)
-{
-	auto existingInterfaceProxy = GetExistingInterfaceProxy(m_name);
-	if (!existingInterfaceProxy.IsEmpty())
-	{
-		return existingInterfaceProxy;
-	}
-
-	EscapableHandleScope handleScope(isolate);
-
-	auto objectTemplate = ObjectTemplate::New();
-	objectTemplate->SetNamedPropertyHandler(GetterCallback, SetterCallback);
-	auto external = External::New(isolate, this);
-	auto instance = objectTemplate->NewInstance();
-	V8SetHiddenValue(instance, METADATA_NODE_KEY_NAME, external);
-	DEBUG_WRITE("CreateInterfaceProxy: proxyObject:%d", instance->GetIdentityHash());
-
-	auto funcTemplate = FunctionTemplate::New(isolate, MetadataNode::ConstructorCallback);
-	auto interfaceProxyFunction = funcTemplate->GetFunction();
-	bool success = interfaceProxyFunction->SetPrototype(instance);
-	ASSERT_MESSAGE(success, "CreateInterfaceProxy: SetPrototype failed");
-	V8SetHiddenValue(interfaceProxyFunction, METADATA_NODE_KEY_NAME, external);
-	DEBUG_WRITE("CreateInterfaceProxy: interfaceProxyFunction:%d", interfaceProxyFunction->GetIdentityHash());
-
-	SetDebugName(m_name, interfaceProxyFunction);
-
-	auto interfaceProxyPersistent = new Persistent<Object>(isolate, interfaceProxyFunction);
-	DEBUG_WRITE("CreateInterfaceProxy: InterfaceProxy for %s created id:%d", m_name.c_str(), interfaceProxyFunction->GetIdentityHash());
-	s_interfaceProxies[m_name] = interfaceProxyPersistent;
-
-	return handleScope.Escape(interfaceProxyFunction);
 }
 
 void MetadataNode::ConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -1622,7 +1575,6 @@ void MetadataNode::CreateTopLevelNamespaces(const Handle<Object>& global)
 
 
 std::map<std::string, Persistent<Object>*> MetadataNode::s_classProxies;
-std::map<std::string, Persistent<Object>*> MetadataNode::s_interfaceProxies;
 std::map<std::string, int> MetadataNode::s_usedExtendNames;
 std::map<std::string, MetadataNode*> MetadataNode::s_name2NodeCache;
 std::map<std::string, MetadataTreeNode*> MetadataNode::s_name2TreeNodeCache;

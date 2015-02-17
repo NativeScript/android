@@ -154,10 +154,9 @@ namespace tns
 
 
 		v8::Handle<v8::Object> CreatePackageProxy(v8::Isolate *isolate);
-		v8::Handle<v8::Object> CreateClassProxy(v8::Isolate *isolate);
+		v8::Handle<v8::Object> CreateClassProxy(v8::Isolate *isolate, bool isClass);
 		v8::Handle<v8::Function> CreateExtendedClassProxy(v8::Isolate *isolate, const v8::Handle<v8::Object>& classProxy, const v8::Handle<v8::Object>& implementationObject, const v8::Handle<v8::String>& name);
 		v8::Handle<v8::Object> CreateStaticClassProxy(v8::Isolate *isolate);
-		v8::Handle<v8::Object> CreateInterfaceProxy(v8::Isolate *isolate);
 		v8::Handle<v8::Function> CreateFunction(const v8::Handle<v8::Object>& thiz, const std::vector<MetadataEntry>& candidates);
 
 		bool CheckForCachedMetadataItem(const std::string& key, const v8::PropertyCallbackInfo<v8::Value>& info, const v8::Local<v8::Object>& thiz, bool isSuper);
@@ -189,15 +188,12 @@ namespace tns
 		static void ArrayIndexedPropertySetterCallback(uint32_t index, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<v8::Value>& info);
 
 		static std::map<std::string, v8::Persistent<v8::Object>* > s_classProxies;
-		static std::map<std::string, v8::Persistent<v8::Object>* > s_interfaceProxies;
 		static std::map<std::string, int> s_usedExtendNames;
 		static std::map<std::string, MetadataNode*> s_name2NodeCache;
 		static std::map<std::string, MetadataTreeNode*> s_name2TreeNodeCache;
 		static std::map<MetadataTreeNode*, MetadataNode*> s_treeNode2NodeCache;
 
 		static void SetDebugName(const std::string& name, const v8::Handle<v8::Object>& value);
-
-		static v8::Handle<v8::Object> GetExistingInterfaceProxy(const std::string& name);
 
 		static bool GetExtendLocation(std::string& extendLocation);
 		static GetJavaFieldCallback s_getJavaField;
