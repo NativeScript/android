@@ -14,7 +14,7 @@ public class Dump
 {
 	private static final String callJsMethodSignatureCtor = "Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;Z[Ljava/lang/Object;";
 	private static final String callJsMethodSignatureMethod = "Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;[Ljava/lang/Object;";
-	private static final String LCOM_TNS = "Lcom/tns/";
+	private static final String LCOM_TNS = "Lcom/tns/gen/";
 	private static final String LCOM_TNS_PLATFORM = "Lcom/tns/Platform;";
 	static final String preferenceActivityJniSignature = "Lcom/tns/android/preference/PreferenceActivity;";
 	static final String preferenceActivityClass = "Landroid/preference/PreferenceActivity;";
