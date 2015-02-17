@@ -22,3 +22,5 @@ Thumbs.db
 obj/
 [Rr]elease*/
 _ReSharper*/
+local.properties
+R.java.d
