@@ -120,8 +120,8 @@ public class RuntimeTests extends AndroidTestCase
 		Platform.implementationObject = implementationObject;	
 		
 		DexClassLoader dexClassLoader = new DexClassLoader(proxyFile.getAbsolutePath(), optimizedDexOutputPath.getAbsolutePath(), null, getContext().getClassLoader());
-		Class<?> clazz = dexClassLoader.loadClass("com.tns.com.proxy.TargetObject-0");
-		assertNotNull("Error loading proxy class com.tns.com.proxy.TargetObject", clazz);
+		Class<?> clazz = dexClassLoader.loadClass("com.tns.gen.com.proxy.TargetObject-0");
+		assertNotNull("Error loading proxy class com.tns.gen.com.proxy.TargetObject", clazz);
 		
 		Constructor<?> ctor = clazz.getConstructor();
 		TargetObject proxy = (TargetObject)ctor.newInstance(); //this cast should succeed
@@ -133,8 +133,8 @@ public class RuntimeTests extends AndroidTestCase
 		Platform.implementationObject = (Object)implementationObject;	
 		
 		DexClassLoader dexClassLoader = new DexClassLoader(proxyFile.getAbsolutePath(), optimizedDexOutputPath.getAbsolutePath(), null, getContext().getClassLoader());
-		Class<?> clazz = dexClassLoader.loadClass("com.tns." + implementationObject.getClass().getSuperclass().getCanonicalName() + "-0");
-		assertNotNull("Error loading proxy class com.tns.com.proxy.Button1", clazz);
+		Class<?> clazz = dexClassLoader.loadClass("com.tns.gen." + implementationObject.getClass().getSuperclass().getCanonicalName() + "-0");
+		assertNotNull("Error loading proxy class com.tns.gen.com.proxy.Button1", clazz);
 		
 		Constructor<?> ctor = clazz.getConstructor();
 		T proxy = (T)ctor.newInstance(); //this cast should succeed
@@ -144,8 +144,8 @@ public class RuntimeTests extends AndroidTestCase
 	private <T> T loadAnyProxyByClass(File proxyFile, Class<?> proxyClass) throws Exception
 	{
 		DexClassLoader dexClassLoader = new DexClassLoader(proxyFile.getAbsolutePath(), optimizedDexOutputPath.getAbsolutePath(), null, getContext().getClassLoader());
-		Class<?> clazz = dexClassLoader.loadClass("com.tns." + proxyClass.getName().replace('$', '_') + "-0");
-		assertNotNull("Error loading proxy class com.tns.com.proxy.Button1", clazz);
+		Class<?> clazz = dexClassLoader.loadClass("com.tns.gen." + proxyClass.getName().replace('$', '_') + "-0");
+		assertNotNull("Error loading proxy class com.tns.gen.com.proxy.Button1", clazz);
 		
 		if (!proxyClass.getName().contains("ViewGroup"))
 		{
@@ -168,8 +168,8 @@ public class RuntimeTests extends AndroidTestCase
 		Platform.implementationObject = implementationObject;	
 		
 		DexClassLoader dexClassLoader = new DexClassLoader(proxyFile.getAbsolutePath(), optimizedDexOutputPath.getAbsolutePath(), null, getContext().getClassLoader());
-		Class<?> clazz = dexClassLoader.loadClass("com.tns.com.proxy.Button1-0");
-		assertNotNull("Error loading proxy class com.tns.com.proxy.Button1", clazz);
+		Class<?> clazz = dexClassLoader.loadClass("com.tns.gen.com.proxy.Button1-0");
+		assertNotNull("Error loading proxy class com.tns.gen.com.proxy.Button1", clazz);
 		
 		Constructor<?> ctor = clazz.getConstructor();
 		Button1 proxy = (Button1)ctor.newInstance(); //this cast should succeed
@@ -181,8 +181,8 @@ public class RuntimeTests extends AndroidTestCase
 		Platform.implementationObject = implementationObject;	
 		
 		DexClassLoader dexClassLoader = new DexClassLoader(proxyFile.getAbsolutePath(), optimizedDexOutputPath.getAbsolutePath(), null, getContext().getClassLoader());
-		Class<?> clazz = dexClassLoader.loadClass("com.tns.com.proxy.TargetObject_TargetInterface-0");
-		assertNotNull("Error loading proxy class com.tns.com.proxy.TargetObject", clazz);
+		Class<?> clazz = dexClassLoader.loadClass("com.tns.gen.com.proxy.TargetObject_TargetInterface-0");
+		assertNotNull("Error loading proxy class com.tns.gen.com.proxy.TargetObject", clazz);
 		
 		Constructor<?> ctor = clazz.getConstructor();
 		TargetObject.TargetInterface proxy = (TargetObject.TargetInterface)ctor.newInstance(); //this cast should succeed
