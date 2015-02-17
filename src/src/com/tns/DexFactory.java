@@ -1,58 +1,34 @@
 package com.tns;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
-import java.io.FileReader;
-import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.InvalidClassException;
-import java.io.OutputStream;
 import java.io.OutputStreamWriter;
-import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 
 import com.tns.bindings.ProxyGenerator;
 import com.tns.multidex.MultiDex;
 
-import dalvik.system.DexClassLoader;
-
-import android.app.Activity;
-import android.app.Application;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
-import android.os.AsyncTask;
-import android.os.Looper;
-import android.os.Messenger;
-import android.os.RemoteException;
-import android.provider.ContactsContract.Directory;
 import android.util.Log;
 
 public class DexFactory
 {
 	private Context context;
 
-	// Buffer size for file copying. While 8kb is used in this sample, you
-	// may want to tweak it based on actual size of the secondary dex file
-	// involved.
-	private static final int BUF_SIZE = 8 * 1024;
-
 	private static final String SECONDARY_DEX_FOLDER_NAME = "code_cache" + File.separator + "secondary-dexes";
-
-	private static HashMap<String, Class<?>> cache = new HashMap<String, Class<?>>();
 
 	private String proxyPath;
 
@@ -122,27 +98,22 @@ public class DexFactory
 			}
 			catch (IllegalArgumentException e)
 			{
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 			catch (IllegalAccessException e)
 			{
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 			catch (NoSuchFieldException e)
 			{
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 			catch (InvocationTargetException e)
 			{
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 			catch (NoSuchMethodException e)
 			{
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 			long stopMultiDexTime = System.nanoTime();
@@ -153,7 +124,7 @@ public class DexFactory
 				Log.d(Platform.DEFAULT_LOG_TAG, "TotalMultiDexTime: " + totalMultiDexTime / 1000000.0 + "ms");
 			}
 
-			// TODO: remove after debugging
+
 			long startLoadDexTime = System.nanoTime();
 			// String classToProxyName = className.replace("$", "_");
 			// className = classToProxyName;
@@ -171,44 +142,6 @@ public class DexFactory
 		}
 
 		return context.getClassLoader().loadClass(fullClassName);
-
-		// if (cache.containsKey(className))
-		// {
-		// return cache.get(className);
-		// }
-		//
-		// String dexName = getDexName(className);
-		//
-		// if (dexName == null)
-		// {
-		// return null;
-		// }
-		//
-		// // Before the secondary dex file can be processed by the
-		// DexClassLoader,
-		// // it has to be first copied from asset resource to a storage
-		// location.
-		// final File dexInternalStoragePath = new File(context.getDir("dex",
-		// Context.MODE_PRIVATE), dexName);
-		// if (!dexInternalStoragePath.exists())
-		// {
-		// prepareDex(dexName, dexInternalStoragePath);
-		// }
-		//
-		// final File optimizedDexOutputPath = context.getDir("outdex",
-		// Context.MODE_PRIVATE);
-		//
-		// // Initialize the class loader with the secondary dex file.
-		// DexClassLoader cl = new
-		// DexClassLoader(dexInternalStoragePath.getAbsolutePath(),
-		// optimizedDexOutputPath.getAbsolutePath(), null,
-		// context.getClassLoader());
-		//
-		// Class<?> wrappedClass = cl.loadClass(className);
-		//
-		// cache.put(className, wrappedClass);
-		//
-		// return wrappedClass;
 	}
 
 	public static String strJoin(String[] array, String separator)
@@ -239,7 +172,7 @@ public class DexFactory
 			classToProxy = className.substring(12);
 		}
 
-		if (classToProxy.startsWith("com.tns.gen"))// && !classToProxy.startsWith("com.tns.tests"))
+		if (classToProxy.startsWith("com.tns.gen"))
 		{
 			throw new InvalidClassException("Can't generate proxy of proxy");
 		}
@@ -277,7 +210,7 @@ public class DexFactory
 			classToProxyName = className.substring(12);
 		}
 
-		if (classToProxyName.startsWith("com.tns.gen."))// && !classToProxyName.startsWith("com.tns.tests"))
+		if (classToProxyName.startsWith("com.tns.gen."))
 		{
 			throw new InvalidClassException("Can't generate proxy of proxy");
 		}
