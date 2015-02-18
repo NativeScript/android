@@ -330,7 +330,7 @@ extern "C" jobject Java_com_tns_Platform_callJSMethodNative(JNIEnv *_env, jobjec
 	return javaObject;
 }
 
-extern "C" jobjectArray Java_com_tns_Platform_createJSInstanceNative(JNIEnv *_env, jobject obj, jobject javaObject, jint javaObjectID, jstring canonicalName, jboolean createActivity, jobjectArray packagedCreationArgs)
+extern "C" jobjectArray Java_com_tns_Platform_createJSInstanceNative(JNIEnv *_env, jobject obj, jobject javaObject, jint javaObjectID, jstring className, jboolean createActivity, jobjectArray packagedCreationArgs)
 {
 	DEBUG_WRITE("createJSInstanceNative called");
 
@@ -341,8 +341,8 @@ extern "C" jobjectArray Java_com_tns_Platform_createJSInstanceNative(JNIEnv *_en
 	// TODO: Do we need a TryCatch here? It is currently not used anywhere
 	// TryCatch tc;
 
-	string existingClassCanonicalName = ArgConverter::jstringToString(canonicalName);
-	string jniName = Util::ConvertFromCanonicalToJniName(existingClassCanonicalName);
+	string existingClassName = ArgConverter::jstringToString(className);
+	string jniName = Util::ConvertFromCanonicalToJniName(existingClassName);
 	Handle<Object> jsInstance;
 	Handle<Object> implementationObject;
 	Handle<Object> classProxy;
@@ -390,15 +390,17 @@ extern "C" jobjectArray Java_com_tns_Platform_createJSInstanceNative(JNIEnv *_en
 	}
 	else
 	{
-		DEBUG_WRITE("createJSInstanceNative class %s", jniName.c_str());
-		classProxy = MetadataNode::GetExistingClassProxy(jniName);
+		string proxyClassName = objectManager->GetClassName(javaObject);
+
+		DEBUG_WRITE("createJSInstanceNative class %s", proxyClassName.c_str());
+		classProxy = MetadataNode::GetExistingClassProxy(proxyClassName);
 		if (classProxy.IsEmpty())
 		{
 			string nativeScriptBindingPrefix("com/tns/gen/");
-			if (Util::StartsWith(jniName, nativeScriptBindingPrefix))
+			if (Util::StartsWith(proxyClassName, nativeScriptBindingPrefix))
 			{
-					jniName = jniName.substr(nativeScriptBindingPrefix.length());
-					classProxy = MetadataNode::GetExistingClassProxy(jniName);
+				proxyClassName = proxyClassName.substr(nativeScriptBindingPrefix.length());
+				classProxy = MetadataNode::GetExistingClassProxy(proxyClassName);
 			}
 			if (classProxy.IsEmpty())
 			{

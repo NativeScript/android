@@ -387,15 +387,15 @@ for (String name: methodOverrides)
 
 		Object[] packagedArgs = packageArgs(args);
 
-		String canonicalName = instance.getClass().getCanonicalName();
+		String className = instance.getClass().getName();
 		boolean isGeneratedProxy = instance instanceof NativeScriptHashCodeProvider;
 		boolean createActivity = instance instanceof Activity;
 		if (isGeneratedProxy && !createActivity)
 		{
-			canonicalName = instance.getClass().getSuperclass().getCanonicalName();
+			className = instance.getClass().getSuperclass().getName();
 		}
 				
-		String[] methodOverrides = createJSInstanceNative(instance, javaObjectID, canonicalName, createActivity, packagedArgs);
+		String[] methodOverrides = createJSInstanceNative(instance, javaObjectID, className, createActivity, packagedArgs);
 
 		if (IsLogEnabled)
 		{
@@ -700,11 +700,11 @@ for (String name: methodOverrides)
 		Integer javaObjectID = getJavaObjectID(javaObject);
 		if (javaObjectID == null)
 		{
-			if (IsLogEnabled) Log.e(DEFAULT_LOG_TAG, "Platform.CallJSMethod: calling js method " + methodName + " with javaObjectID " + javaObjectID + " type=" + ((javaObject != null) ? javaObject.getClass().getCanonicalName() : "null"));
+			if (IsLogEnabled) Log.e(DEFAULT_LOG_TAG, "Platform.CallJSMethod: calling js method " + methodName + " with javaObjectID " + javaObjectID + " type=" + ((javaObject != null) ? javaObject.getClass().getName() : "null"));
 			APP_FAIL("Application failed");
 		}
 
-		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "Platform.CallJSMethod: calling js method " + methodName + " with javaObjectID " + javaObjectID + " type=" + ((javaObject != null) ? javaObject.getClass().getCanonicalName() : "null"));
+		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "Platform.CallJSMethod: calling js method " + methodName + " with javaObjectID " + javaObjectID + " type=" + ((javaObject != null) ? javaObject.getClass().getName() : "null"));
 
 		Object result = dispatchCallJSMethodNative(javaObjectID, methodName, isConstructor, delay, args);
 

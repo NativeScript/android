@@ -4,6 +4,6 @@ public class MyClassBase
 {
 	public static String getName()
 	{
-		return MyClassBase.class.getCanonicalName();
+		return MyClassBase.class.getName();
 	}
 }

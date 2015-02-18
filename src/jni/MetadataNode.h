@@ -155,7 +155,7 @@ namespace tns
 
 		v8::Handle<v8::Object> CreatePackageProxy(v8::Isolate *isolate);
 		v8::Handle<v8::Object> CreateClassProxy(v8::Isolate *isolate, bool isClass);
-		v8::Handle<v8::Function> CreateExtendedClassProxy(v8::Isolate *isolate, const v8::Handle<v8::Object>& classProxy, const v8::Handle<v8::Object>& implementationObject, const v8::Handle<v8::String>& name);
+		v8::Handle<v8::Function> CreateExtendedClassProxy(v8::Isolate *isolate, const v8::Handle<v8::Object>& implementationObject, const v8::Handle<v8::String>& name);
 		v8::Handle<v8::Object> CreateStaticClassProxy(v8::Isolate *isolate);
 		v8::Handle<v8::Function> CreateFunction(const v8::Handle<v8::Object>& thiz, const std::vector<MetadataEntry>& candidates);
 

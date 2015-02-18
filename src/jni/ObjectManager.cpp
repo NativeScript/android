@@ -244,8 +244,8 @@ string ObjectManager::GetClassName(jclass clazz)
 	JEnv env;
 
 	jclass javaLangClass = env.FindClass("java/lang/Class");
-	jmethodID getCanonicalNameId = env.GetMethodID(javaLangClass, "getName", "()Ljava/lang/String;");
-	JniLocalRef javaCanonicalName(env.CallObjectMethod(clazz, getCanonicalNameId));
+	jmethodID getNameId = env.GetMethodID(javaLangClass, "getName", "()Ljava/lang/String;");
+	JniLocalRef javaCanonicalName(env.CallObjectMethod(clazz, getNameId));
 
 	string className = ArgConverter::jstringToString(javaCanonicalName);
 

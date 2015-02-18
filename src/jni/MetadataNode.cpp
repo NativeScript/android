@@ -992,8 +992,6 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 		return;
 	}
 
-	V8SetHiddenValue(classProxy, "t::ext", implementationObject);
-
 	//TODO: We may need to expose super object for Typescript world
 	auto superObj = Object::New(isolate);
 	superObj->SetHiddenValue(V8StringConstants::GetTSuper(), Boolean::New(isolate, true));
@@ -1005,13 +1003,19 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 	ASSERT_MESSAGE(success, "ExtendsCallMethodHandler: SetPrototype failed on implementation object");
 	implementationObject->Set(V8StringConstants::GetPrototype(), classProxy);
 
-	auto extendedClass = node->CreateExtendedClassProxy(isolate, classProxy, implementationObject, ConvertToV8String(extendNameAndLocation));
+	Local<Function> extendedClass = node->CreateExtendedClassProxy(isolate, implementationObject, ConvertToV8String(extendNameAndLocation));
+
+	auto classProxyPersistent = new Persistent<Object>(isolate, extendedClass);
+	DEBUG_WRITE("CreateExtendedClassProxy: ExtendedClassProxy for %s created id:%d",  node->m_name.c_str(), extendedClass->GetIdentityHash());
+	s_classProxies[fullClassName] = classProxyPersistent;
+
+	V8SetHiddenValue(extendedClass, "t::ext", implementationObject);
 	s_usedExtendNames[fullClassName] = 1;
 	DEBUG_WRITE("ExtendsCallMethodHandler: created ExtendedClassProxy on %s, Id: %d", currExtClass.c_str(), extendedClass->GetIdentityHash());
 	args.GetReturnValue().Set(extendedClass);
 }
 
-Handle<Function> MetadataNode::CreateExtendedClassProxy(Isolate *isolate, const Handle<Object>& classProxy, const Handle<Object>& implementationObject, const Handle<String>& name)
+Handle<Function> MetadataNode::CreateExtendedClassProxy(Isolate *isolate, const Handle<Object>& implementationObject, const Handle<String>& name)
 {
 	EscapableHandleScope handleScope(isolate);
 

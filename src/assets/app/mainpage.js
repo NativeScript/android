@@ -12,10 +12,10 @@ require("./tests/stringConversionTests");
 require("./tests/testsForTypescript");
 require("./tests/testGC");
 require("./tests/testsMemoryManagement");
-
 require("./tests/testIfAbleToRunExternalFile");
-
 require("./tests/finalFieldsSetTests");
+require("./tests/extendedClassesTests");
+
 
 var MainActivity = com.tns.NativeScriptActivity.extend("MainActivity", {
 			   onCreate: function() {
