@@ -145,6 +145,7 @@ module.exports = function(grunt) {
     ]);
 
     grunt.registerTask("generateJavaRuntime", [
+                            "exec:createBindingGeneratorAntBuildFiles",
                             "exec:createJavaRuntimeAntBuildFiles",
                             "exec:revertToCustomizedBuildFiles",
                             "exec:buildJavaRuntimeClasses",
