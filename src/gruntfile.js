@@ -117,7 +117,7 @@ module.exports = function(grunt) {
                 cwd: localCfg.rootDir + "/"
             },
             buildJavaRuntimeClasses: {
-                cmd: "ant release",
+                cmd: "ant clean release",
                 cwd: localCfg.rootDir + "/"
             },
             ensureOriginalVersionFile: {
