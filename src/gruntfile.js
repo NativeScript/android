@@ -99,7 +99,7 @@ module.exports = function(grunt) {
         },
         exec: {
             createBindingGeneratorAntBuildFiles: {
-                cmd: "android update project --target 1 --name binding-generator --path ../binding-generator/Generator/",
+                cmd: "android update lib-project --target 1 --name binding-generator --path ../binding-generator/Generator/",
                 cwd: localCfg.rootDir + "/"
             },
             createJavaRuntimeAntBuildFiles: {
