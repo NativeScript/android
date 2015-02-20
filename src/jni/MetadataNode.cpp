@@ -1344,11 +1344,13 @@ void MetadataNode::SetterCallback(Local<String> property, Local<Value> value, co
 		{
 			if(first.isFinal)
 			{
-				Isolate *isolate(Isolate::GetCurrent());
-				Handle<String> exceptionMessage = ConvertToV8String("You are trying to SET a final field! Final fields can only be read.");
-				Local<Value> IllegalAccessException(exceptionMessage);
+				stringstream ss;
+				ss << "You are trying to SET \"" << first.name << "\" which is a final field! Final fields can only be read.";
+				string exceptionMessage = ss.str();
 
-				isolate->ThrowException(IllegalAccessException);
+				Isolate *isolate(Isolate::GetCurrent());
+				isolate->ThrowException(v8::Exception::Error((ConvertToV8String(exceptionMessage))));
+				return;
 			}
 			s_setJavaField(thiz, value, node->m_name, first.name, first.sig, first.declaringType, first.isStatic);
 
