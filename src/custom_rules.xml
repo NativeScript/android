@@ -40,7 +40,7 @@
             </condition>
         </fail>
 
-        <package-helper depends="-post-compile" >
+        <package-helper>
             <extra-jars>
                 <!-- <jarfolder path="my_jars" /> -->
                 <!-- <jarfile path="foo/bar.jar" /> -->
