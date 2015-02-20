@@ -156,6 +156,7 @@ module.exports = function(grunt) {
                             "exec:ensureOriginalManifestFile",
                             "copy:updateManifestFile",
                             "exec:jarJavaRuntime",
+                            "exec:jarJavaRuntimeCopyToDist",
                             "exec:ensureOriginalManifestFile"
                         ]);
 
