@@ -1,3 +1,4 @@
+Manifest-Version: 1.0
 Name: com/tns/
 Specification-Title: NativeScript library
 Specification-Version: RUNTIME_VERSION_PLACEHOLDER
