@@ -186,6 +186,16 @@ void NativeScriptRuntime::CallJavaMethod(const Handle<Object>& caller, const str
 	if (!isStatic)
 	{
 		callerJavaObject = objectManager->GetJavaObjectByJsObject(caller);
+		if(callerJavaObject == nullptr)
+		{
+			Isolate *isolate = Isolate::GetCurrent();
+			stringstream ss;
+			ss << "No java object found on which to call \"" << methodName << "\" method. It is possible your Javascript object is not linked with the corresponding Java class. Try passing context(this) to the constructor function.";
+			string exceptionMessage = ss.str();
+			isolate->ThrowException(v8::Exception::ReferenceError(ConvertToV8String(exceptionMessage)));
+			return;
+		}
+
 		if (isSuper)
 		{
 			clazz = env.FindClass(className);
