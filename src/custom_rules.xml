@@ -7,7 +7,7 @@
     
     
     <!--Generating executable jar-->
-	<target name="create_runtime_jar" depends="compile">
+	<target name="create_runtime_jar" depends="-compile">
 		<jar destfile="${out.dir}/${ant.project.name}.jar">
 			<fileset dir="${out.classes.absolute.dir}" />
 			<fileset dir="${source.absolute.dir}/../../binding-generator/Generator/bin"/>
