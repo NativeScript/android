@@ -13,7 +13,7 @@
 			<fileset dir="${out.classes.absolute.dir}" />
 			<fileset 
 			    dir="${source.absolute.dir}/../../binding-generator/Generator/bin/classes"
-				excludes="${source.absolute.dir}/../../binding-generator/Generator/bin/classes/com/tns/android/binding/generator/**"/>
+				excludes="${source.absolute.dir}/../../binding-generator/Generator/bin/classes/com/tns/android/binding/generator/*.class"/>
 		</jar>
 	</target>
     
