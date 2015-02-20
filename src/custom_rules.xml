@@ -25,9 +25,7 @@
     <!-- unless="${source.absolute.dir}/../binding-generator/Generator/bin/classes.jar" -->
     <!-- /> -->
 
-    <target
-        name="jar"
-        depends="-pre-compile" >
+    <target name="-pre-compile">
 
         <fail message="android-binding-generator jar file is missing." >
             <condition>
