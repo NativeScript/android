@@ -17,10 +17,20 @@
     <!-- </jar> -->
     <!-- </target> -->
 
-	<fail
-            message="android-binding-generator jar file is missing."
-            unless="${source.absolute.dir}/../binding-generator/Generator/bin/classes.jar"
-    />
+<!-- 	<fail -->
+<!--             message="android-binding-generator jar file is missing." -->
+<!--             unless="${source.absolute.dir}/../binding-generator/Generator/bin/classes.jar" -->
+<!--     /> -->
+	
+	<fail message="android-binding-generator jar file is missing.">
+	    <condition>
+	        <not>
+	            <resourcecount count="1">
+	                <fileset id="" dir="${source.absolute.dir}/../binding-generator/Generator/bin" includes="classes.jar"/>
+	            </resourcecount>
+	        </not>
+	    </condition>
+	</fail>
 
     <package-helper>
         <extra-jars>
