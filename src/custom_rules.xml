@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="android-runtime-custom-rules" default="help">
+
+	<!--Generating executable jar-->
+<!-- 	<target name="jar" depends="-post-compile"> -->
+<!-- 		<mkdir dir="${jar.dir}" /> -->
+<!-- 		<jar destfile="${jar.dir}/${ant.project.name}.jar"> -->
+<!-- 			<fileset dir="${classes.dir}" /> -->
+<!-- 			<archives> -->
+<!-- 				<zips> -->
+<!-- 					<fileset dir="${lib.dir}" includes="**/*.jar" /> -->
+<!-- 				</zips> -->
+<!-- 			</archives> -->
+<!-- 			<manifest> -->
+    <!-- <attribute name="Main-Class" value="${main-class}" /> -->
+    <!-- </manifest> -->
+    <!-- </jar> -->
+    <!-- </target> -->
+
+	<fail
+            message="android-binding-generator jar file is missing."
+            unless="${source.absolute.dir}/../binding-generator/Generator/bin/classes.jar"
+    />
+
+    <package-helper>
+        <extra-jars>
+<!--             <jarfolder path="my_jars" /> -->
+<!--             <jarfile path="foo/bar.jar" /> -->
+            <jarfile path="${source.absolute.dir}/../binding-generator/Generator/bin/classes.jar" />
+<!--             <jarfolder path="your_jars" /> -->
+        </extra-jars>
+    </package-helper>
+</project>
