@@ -25,7 +25,6 @@
     <!-- unless="${source.absolute.dir}/../binding-generator/Generator/bin/classes.jar" -->
     <!-- /> -->
 
-    <target name="-pre-compile">
 
         <fail message="android-binding-generator jar file is missing." >
             <condition>
@@ -39,15 +38,34 @@
                 </not>
             </condition>
         </fail>
-
-        <package-helper>
-            <extra-jars>
-                <!-- <jarfolder path="my_jars" /> -->
-                <!-- <jarfile path="foo/bar.jar" /> -->
-                <jarfile path="${source.absolute.dir}/../../binding-generator/Generator/bin/classes.jar" />
-                <!-- <jarfolder path="your_jars" /> -->
-            </extra-jars>
-        </package-helper>
-    </target>
+	    
+	    
+        <!-- Packages the application. -->
+	    <target name="-package" depends="-dex, -package-resources">
+	        <!-- only package apk if *not* a library project -->
+	        <do-only-if-not-library elseText="Library project: do not package apk..." >
+	            <if condition="${build.is.instrumented}">
+	                <then>
+	                    <package-helper>
+	                        <extra-jars>
+	                            <!-- Injected from external file -->
+	                            <jarfile path="${source.absolute.dir}/../../binding-generator/Generator/bin/classes.jar" />
+	                            <jarfile path="${emma.dir}/emma_device.jar" />
+	                        </extra-jars>
+	                    </package-helper>
+	                </then>
+	                <else>
+	                     <package-helper>
+				            <extra-jars>
+				                <!-- <jarfolder path="my_jars" /> -->
+				                <!-- <jarfile path="foo/bar.jar" /> -->
+				                <jarfile path="${source.absolute.dir}/../../binding-generator/Generator/bin/classes.jar" />
+				                <!-- <jarfolder path="your_jars" /> -->
+				            </extra-jars>
+				        </package-helper>
+	                </else>
+	            </if>
+	        </do-only-if-not-library>
+	    </target>
 
 </project>
