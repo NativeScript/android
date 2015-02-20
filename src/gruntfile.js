@@ -103,7 +103,7 @@ module.exports = function(grunt) {
                 cwd: localCfg.rootDir + "/"
             },
             createJavaRuntimeAntBuildFiles: {
-                cmd: "android update project --target 1 --name NativeScriptRuntime --path ./ --library ../binding-generator/Generator/",
+                cmd: "android update lib-project --target 1 --path ./ --library ../binding-generator/Generator/",
                 cwd: localCfg.rootDir + "/"
             },
             revertToCustomizedBuildFiles: {
