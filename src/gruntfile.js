@@ -128,11 +128,11 @@ module.exports = function(grunt) {
             },
             jarJavaRuntime: {
                 //cmd: "jar cfm ../../" + "/dist/libs/nativescript.jar ../../manifest.mf com",
-                cmd: "jar ufm ./manifest.mf ./bin/nativescript.jar"
+                cmd: "jar ufm ./manifest.mf ./bin/NativeScriptRuntime.jar"
                 //,cwd: pathModule.join(localCfg.rootDir, "/bin/classes")
             },
             jarJavaRuntimeCopyToDist: {
-                cmd: "cp ./bin/nativescript.jar /dist/libs/nativescript.jar"
+                cmd: "cp ./bin/NativeScriptRuntime.jar ./dist/libs/nativescript.jar"
             }
         }
     });
