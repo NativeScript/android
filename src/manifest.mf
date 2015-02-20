@@ -6,4 +6,3 @@ Specification-Vendor: Telerik
 Implementation-Title: NativeScript
 Implementation-Version: RUNTIME_COMMIT_SHA_PLACEHOLDER
 Implementation-Vendor: Telerik
-
