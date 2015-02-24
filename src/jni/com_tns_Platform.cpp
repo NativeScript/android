@@ -109,8 +109,8 @@ void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring pa
 
 	auto globalTemplate = ObjectTemplate::New();
 
-	globalTemplate->Set(ConvertToV8String("__startNDKProfiler"), FunctionTemplate::New(isolate, NativeScriptRuntime::StartProfilerCallback));
-	globalTemplate->Set(ConvertToV8String("__stopNDKProfiler"), FunctionTemplate::New(isolate, NativeScriptRuntime::StopProfilerCallback));
+	globalTemplate->Set(ConvertToV8String("__startNDKProfiler"), FunctionTemplate::New(isolate, Profiler::StartNDKProfilerCallback));
+	globalTemplate->Set(ConvertToV8String("__stopNDKProfiler"), FunctionTemplate::New(isolate, Profiler::StopNDKProfilerCallback));
 	globalTemplate->Set(ConvertToV8String("__startJSProfiler"), FunctionTemplate::New(isolate, Profiler::StartCPUProfilerCallback));
 	globalTemplate->Set(ConvertToV8String("__stopJSProfiler"), FunctionTemplate::New(isolate, Profiler::StopCPUProfilerCallback));
 	globalTemplate->Set(ConvertToV8String("Log"), FunctionTemplate::New(isolate, NativeScriptRuntime::LogMethodCallback));

@@ -1,5 +1,6 @@
 #include "Profiler.h"
 #include "V8GlobalHelpers.h"
+#include "prof.h"
 #include <assert.h>
 #include <stack>
 
@@ -166,5 +167,30 @@ bool Profiler::Write(CpuProfile *cpuProfile)
 
 	return true;
 }
+
+void Profiler::StartNDKProfilerCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
+{
+	StartNDKProfiler();
+}
+
+void Profiler::StopNDKProfilerCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
+{
+	StopNDKProfiler();
+}
+
+void Profiler::StartNDKProfiler()
+{
+#ifdef NDK_PROFILER_ENABLED
+	monstartup("libNativeScript.so");
+#endif
+}
+
+void  Profiler::StopNDKProfiler()
+{
+#ifdef NDK_PROFILER_ENABLED
+	moncleanup();
+#endif
+}
+
 
 string Profiler::s_appName;

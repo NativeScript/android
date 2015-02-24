@@ -16,7 +16,6 @@
 #include <fstream>
 #include <sys/time.h>
 #include <cstdio>
-#include "prof.h"
 #include "JavaObjectArrayCache.h"
 #include "MethodCache.h"
 #include "JsDebugger.h"
@@ -1125,32 +1124,6 @@ Handle<Value> NativeScriptRuntime::CallJSMethod(JNIEnv *_env, const Handle<Objec
 
 	return result;
 }
-
-
-void NativeScriptRuntime::StartProfilerCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
-{
-	StartProfiler();
-}
-
-void NativeScriptRuntime::StopProfilerCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
-{
-	StopProfiler();
-}
-
-void NativeScriptRuntime::StartProfiler()
-{
-#ifdef NDK_PROFILER_ENABLED
-	monstartup("libNativeScript.so");
-#endif
-}
-
-void  NativeScriptRuntime::StopProfiler()
-{
-#ifdef NDK_PROFILER_ENABLED
-	moncleanup();
-#endif
-}
-
 
 JavaVM* NativeScriptRuntime::jvm = nullptr;
 jclass NativeScriptRuntime::PlatformClass = nullptr;

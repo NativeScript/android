@@ -105,11 +105,6 @@ namespace tns
 
 		//
 
-		static void StartProfiler();
-		static void StopProfiler();
-		static void StartProfilerCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
-		static void StopProfilerCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
-
 	private:
 		NativeScriptRuntime() {}
 
