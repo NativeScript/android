@@ -936,16 +936,52 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 	{
 		if (!extendLocationFound)
 		{
-			ASSERT_FAIL("Invalid extend() call. No name specified for extend. Location: %s", extendLocation.c_str());
+			stringstream ss;
+			ss << "Invalid extend() call. No name specified for extend at location: " << extendLocation.c_str();
+			string exceptionMessage = ss.str();
+
+			Isolate *isolate(Isolate::GetCurrent());
+			isolate->ThrowException(v8::Exception::Error((ConvertToV8String(exceptionMessage))));
+			return;
 		}
 
-		ASSERT_MESSAGE(args[0]->IsObject(), "Invalid extend() call. No implementation object specified. Location: %s", extendLocation.c_str());
+
+		if (!args[0]->IsObject())
+		{
+			stringstream ss;
+			ss << "Invalid extend() call. No implementation object specified at location: " << extendLocation.c_str();
+			string exceptionMessage = ss.str();
+
+			Isolate *isolate(Isolate::GetCurrent());
+			isolate->ThrowException(v8::Exception::Error((ConvertToV8String(exceptionMessage))));
+			return;
+		}
+
 		implementationObject = args[0]->ToObject();
 	}
 	else if (args.Length() == 2)
 	{
-		ASSERT_MESSAGE(args[0]->IsString(), "Invalid extend() call. No name for extend specified. Location: %s", extendLocation.c_str());
-		ASSERT_MESSAGE(args[1]->IsObject(), "Invalid extend() call. Named extend should be called with second object parameter containing overridden methods at. Location: %s", extendLocation.c_str());
+		if (!args[0]->IsString())
+		{
+			stringstream ss;
+			ss << "Invalid extend() call. No name for extend specified at location: " << extendLocation.c_str();
+			string exceptionMessage = ss.str();
+
+			Isolate *isolate(Isolate::GetCurrent());
+			isolate->ThrowException(v8::Exception::Error((ConvertToV8String(exceptionMessage))));
+			return;
+		}
+
+		if (!args[1]->IsObject())
+		{
+			stringstream ss;
+			ss << "Invalid extend() call. Named extend should be called with second object parameter containing overridden methods at location: " << extendLocation.c_str();
+			string exceptionMessage = ss.str();
+
+			Isolate *isolate(Isolate::GetCurrent());
+			isolate->ThrowException(v8::Exception::Error((ConvertToV8String(exceptionMessage))));
+			return;
+		}
 
 		DEBUG_WRITE("ExtendsCallMethodHandler: getting extend name");
 		extendName = args[0]->ToString();
@@ -953,13 +989,29 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 	}
 	else
 	{
-		ASSERT_FAIL("Invalid extend() call. Location: %s", extendLocation.c_str());
+		stringstream ss;
+		ss << "Invalid extend() call at location: " << extendLocation.c_str();
+		string exceptionMessage = ss.str();
+
+		Isolate *isolate(Isolate::GetCurrent());
+		isolate->ThrowException(v8::Exception::Error((ConvertToV8String(exceptionMessage))));
+		return;
 	}
 
 	DEBUG_WRITE("ExtendsCallMethodHandler: called with %s", ConvertToString(extendName).c_str());
 	string currExtClass = node->m_name;
 	auto classProxy = GetExistingClassProxy(currExtClass);
-	ASSERT_MESSAGE(!classProxy.IsEmpty(), "ClassProxy %s not found when extending.", currExtClass.c_str());
+
+	if (classProxy.IsEmpty())
+	{
+		stringstream ss;
+		ss << "ClassProxy " << currExtClass.c_str() << " not found when extending.";
+		string exceptionMessage = ss.str();
+
+		Isolate *isolate(Isolate::GetCurrent());
+		isolate->ThrowException(v8::Exception::Error((ConvertToV8String(exceptionMessage))));
+		return;
+	}
 
 	auto isolate = Isolate::GetCurrent();
 
@@ -970,9 +1022,13 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 
 	if (ExistsExtendName(fullClassName))
 	{
-		DEBUG_WRITE("ExtendsCallMethodHandler: 2");
-		ASSERT_FAIL("Extend name %s already used", fullClassName.c_str());
-		APP_FAIL("Failed: Extend name already used");
+		stringstream ss;
+		ss << "Extend name " << fullClassName.c_str() << "already used.";
+		string exceptionMessage = ss.str();
+
+		Isolate *isolate(Isolate::GetCurrent());
+		isolate->ThrowException(v8::Exception::Error((ConvertToV8String(exceptionMessage))));
+		return;
 	}
 
 	auto implementationObjectPropertyName = V8StringConstants::GetClassImplementationObject();
