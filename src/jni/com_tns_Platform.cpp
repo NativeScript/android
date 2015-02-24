@@ -13,6 +13,7 @@
 #include "Version.h"
 #include "JEnv.h"
 #include "WeakRef.h"
+#include "Profiler.h"
 #include "NativeScriptAssert.h"
 #include "JsDebugger.h"
 #include <sstream>
@@ -108,8 +109,10 @@ void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring pa
 
 	auto globalTemplate = ObjectTemplate::New();
 
-	globalTemplate->Set(ConvertToV8String("__startNativeScriptProfiler"), FunctionTemplate::New(isolate, NativeScriptRuntime::StartProfilerCallback));
-	globalTemplate->Set(ConvertToV8String("__stopNativeScriptProfiler"), FunctionTemplate::New(isolate, NativeScriptRuntime::StopProfilerCallback));
+	globalTemplate->Set(ConvertToV8String("__startNDKProfiler"), FunctionTemplate::New(isolate, NativeScriptRuntime::StartProfilerCallback));
+	globalTemplate->Set(ConvertToV8String("__stopNDKProfiler"), FunctionTemplate::New(isolate, NativeScriptRuntime::StopProfilerCallback));
+	globalTemplate->Set(ConvertToV8String("__startJSProfiler"), FunctionTemplate::New(isolate, Profiler::StartCPUProfilerCallback));
+	globalTemplate->Set(ConvertToV8String("__stopJSProfiler"), FunctionTemplate::New(isolate, Profiler::StopCPUProfilerCallback));
 	globalTemplate->Set(ConvertToV8String("Log"), FunctionTemplate::New(isolate, NativeScriptRuntime::LogMethodCallback));
 	globalTemplate->Set(ConvertToV8String("dumpReferenceTables"), FunctionTemplate::New(isolate, NativeScriptRuntime::DumpReferenceTablesMethodCallback));
 	globalTemplate->Set(ConvertToV8String("waitForDebugger"), FunctionTemplate::New(isolate, NativeScriptRuntime::WaitForDebuggerMethodCallback));
@@ -140,6 +143,7 @@ void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring pa
 
 	string pckName = ArgConverter::jstringToString(packageName);
 	JsDebugger::Init(pckName, debuggerPort);
+	Profiler::Init(pckName);
 
 	PrepareExtendFunction(isolate, filesPath);
 
