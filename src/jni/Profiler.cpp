@@ -192,5 +192,64 @@ void  Profiler::StopNDKProfiler()
 #endif
 }
 
+class FileOutputStream: public OutputStream
+{
+	public:
+		FileOutputStream(FILE* stream) :
+				stream_(stream)
+		{
+		}
+
+		virtual int GetChunkSize()
+		{
+			return 65536; // big chunks == faster
+		}
+
+		virtual void EndOfStream()
+		{
+		}
+
+		virtual WriteResult WriteAsciiChunk(char* data, int size)
+		{
+			const size_t len = static_cast<size_t>(size);
+			size_t off = 0;
+
+			while (off < len && !feof(stream_) && !ferror(stream_))
+				off += fwrite(data + off, 1, len - off, stream_);
+
+			return off == len ? kContinue : kAbort;
+		}
+
+	private:
+		FILE* stream_;
+};
+
+void Profiler::HeapSnapshotMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
+{
+	struct timespec nowt;
+	clock_gettime(CLOCK_MONOTONIC, &nowt);
+	uint64_t now = (int64_t) nowt.tv_sec*1000000000LL + nowt.tv_nsec;
+
+	unsigned long sec = static_cast<unsigned long>(now / 1000000);
+	unsigned long usec = static_cast<unsigned long>(now % 1000000);
+
+	char filename[256];
+	snprintf(filename, sizeof(filename), "/sdcard/%s-heapdump-%lu.%lu.heapsnapshot", s_appName.c_str(), sec, usec);
+
+	FILE* fp = fopen(filename, "w");
+	if (fp == nullptr)
+	{
+		return;
+	}
+
+	Isolate* isolate = Isolate::GetCurrent();
+
+	const HeapSnapshot* snap = isolate->GetHeapProfiler()->TakeHeapSnapshot(String::Empty(isolate));
+
+	FileOutputStream stream(fp);
+	snap->Serialize(&stream, HeapSnapshot::kJSON);
+	fclose(fp);
+	const_cast<HeapSnapshot*>(snap)->Delete();
+}
 
 string Profiler::s_appName;

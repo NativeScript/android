@@ -87,8 +87,6 @@ namespace tns
 
 		static void DisableVerboseLoggingMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-		static void HeapSnapshotMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
-
 		static void BuildMetadata(JEnv& env, jstring filesPath);
 
 		static void CreateTopLevelNamespaces(const v8::Handle<v8::Object>& global);

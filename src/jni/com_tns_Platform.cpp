@@ -113,12 +113,12 @@ void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring pa
 	globalTemplate->Set(ConvertToV8String("__stopNDKProfiler"), FunctionTemplate::New(isolate, Profiler::StopNDKProfilerCallback));
 	globalTemplate->Set(ConvertToV8String("__startJSProfiler"), FunctionTemplate::New(isolate, Profiler::StartCPUProfilerCallback));
 	globalTemplate->Set(ConvertToV8String("__stopJSProfiler"), FunctionTemplate::New(isolate, Profiler::StopCPUProfilerCallback));
+	globalTemplate->Set(ConvertToV8String("__heapSnapshot"), FunctionTemplate::New(isolate, Profiler::HeapSnapshotMethodCallback));
 	globalTemplate->Set(ConvertToV8String("Log"), FunctionTemplate::New(isolate, NativeScriptRuntime::LogMethodCallback));
 	globalTemplate->Set(ConvertToV8String("dumpReferenceTables"), FunctionTemplate::New(isolate, NativeScriptRuntime::DumpReferenceTablesMethodCallback));
 	globalTemplate->Set(ConvertToV8String("waitForDebugger"), FunctionTemplate::New(isolate, NativeScriptRuntime::WaitForDebuggerMethodCallback));
 	globalTemplate->Set(ConvertToV8String("enableVerboseLogging"), FunctionTemplate::New(isolate, NativeScriptRuntime::EnableVerboseLoggingMethodCallback));
 	globalTemplate->Set(ConvertToV8String("disableVerboseLogging"), FunctionTemplate::New(isolate, NativeScriptRuntime::DisableVerboseLoggingMethodCallback));
-	globalTemplate->Set(ConvertToV8String("heapSnapshot"), FunctionTemplate::New(isolate, NativeScriptRuntime::HeapSnapshotMethodCallback));
 	globalTemplate->Set(ConvertToV8String("fail"), FunctionTemplate::New(isolate, NativeScriptRuntime::FailMethodCallback));
 	globalTemplate->Set(ConvertToV8String("require"), FunctionTemplate::New(isolate, NativeScriptRuntime::RequireCallback));
 	globalTemplate->Set(ConvertToV8String("WeakRef"), FunctionTemplate::New(isolate, WeakRef::ConstructorCallback));

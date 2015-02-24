@@ -20,6 +20,8 @@ namespace tns
 
 		static void StopNDKProfilerCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
+		static void HeapSnapshotMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
+
 	private:
 		Profiler();
 
