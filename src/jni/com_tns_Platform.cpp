@@ -111,8 +111,8 @@ void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring pa
 
 	globalTemplate->Set(ConvertToV8String("__startNDKProfiler"), FunctionTemplate::New(isolate, Profiler::StartNDKProfilerCallback));
 	globalTemplate->Set(ConvertToV8String("__stopNDKProfiler"), FunctionTemplate::New(isolate, Profiler::StopNDKProfilerCallback));
-	globalTemplate->Set(ConvertToV8String("__startJSProfiler"), FunctionTemplate::New(isolate, Profiler::StartCPUProfilerCallback));
-	globalTemplate->Set(ConvertToV8String("__stopJSProfiler"), FunctionTemplate::New(isolate, Profiler::StopCPUProfilerCallback));
+	globalTemplate->Set(ConvertToV8String("__startCPUProfiler"), FunctionTemplate::New(isolate, Profiler::StartCPUProfilerCallback));
+	globalTemplate->Set(ConvertToV8String("__stopCPUProfiler"), FunctionTemplate::New(isolate, Profiler::StopCPUProfilerCallback));
 	globalTemplate->Set(ConvertToV8String("__heapSnapshot"), FunctionTemplate::New(isolate, Profiler::HeapSnapshotMethodCallback));
 	globalTemplate->Set(ConvertToV8String("Log"), FunctionTemplate::New(isolate, NativeScriptRuntime::LogMethodCallback));
 	globalTemplate->Set(ConvertToV8String("dumpReferenceTables"), FunctionTemplate::New(isolate, NativeScriptRuntime::DumpReferenceTablesMethodCallback));
@@ -142,8 +142,8 @@ void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring pa
 	ArgConverter::Init(g_jvm);
 
 	string pckName = ArgConverter::jstringToString(packageName);
-	JsDebugger::Init(pckName, debuggerPort);
 	Profiler::Init(pckName);
+	JsDebugger::Init(pckName, debuggerPort);
 
 	PrepareExtendFunction(isolate, filesPath);
 
