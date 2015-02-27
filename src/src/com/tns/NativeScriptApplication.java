@@ -1,8 +1,5 @@
 package com.tns;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
-
 import android.app.Application;
 import android.util.Log;
 
@@ -12,6 +9,11 @@ import com.tns.internal.ExtractPolicy;
 public class NativeScriptApplication extends android.app.Application implements com.tns.NativeScriptHashCodeProvider {
 	public static class ActivityLifecycleCallbacks implements android.app.Application.ActivityLifecycleCallbacks, com.tns.NativeScriptHashCodeProvider {
 		public void onActivityCreated(android.app.Activity param_0, android.os.Bundle param_1) {
+			if(ErrorReport.HasApplicationCreateError)
+			{
+				return;
+			}
+			
 			java.lang.Object[] params = new Object[2];
 			params[0] = param_0;
 			params[1] = param_1;
@@ -19,6 +21,11 @@ public class NativeScriptApplication extends android.app.Application implements 
 		}
 
 		public void onActivityDestroyed(android.app.Activity param_0) {
+			if(ErrorReport.HasApplicationCreateError)
+			{
+				return;
+			}
+			
 			java.lang.Object[] params = new Object[1];
 			params[0] = param_0;
 			com.tns.Platform.callJSMethod(this, "onActivityDestroyed", params);
@@ -684,17 +691,25 @@ public class NativeScriptApplication extends android.app.Application implements 
 	public void onCreate() {
 
 		appInstance = this;
-		prepareAppBuilderCallbackImpl();
-		
-		if (appBuilderCallbackImpl != null)
+		try 
 		{
-			appBuilderCallbackImpl.onCreate(this);
+			prepareAppBuilderCallbackImpl();
+			
+			if (appBuilderCallbackImpl != null)
+			{
+				appBuilderCallbackImpl.onCreate(this);
+			}
+			
+			Platform.init(this);
+			Platform.run(Platform.DefaultApplicationModuleName);
+	
+			onCreateInternal();
 		}
-		
-		Platform.init(this);
-		Platform.run(Platform.DefaultApplicationModuleName);
-
-		onCreateInternal();
+		catch (Throwable ex)
+		{
+			ErrorReport.HasApplicationCreateError = true;
+			ErrorReport.startActivity(this, ex);
+		}
 	}
 	
 	private void prepareAppBuilderCallbackImpl()

@@ -228,15 +228,23 @@ extern "C" void Java_com_tns_Platform_runNativeScript(JNIEnv *_env, jobject obj,
 			auto thiz = Object::New(isolate);
 			auto res = moduleFunc->Call(thiz, 1, &exportsObj);
 
-			ExceptionUtil::GetInstance()->HandleTryCatch(tc);
+			// TODO: Extend the HandleTryCatch method with a second parameter
+			// HandleTryCatch(TryCatch& tc, bool rethrow)
+			// in this case we MUST rethrow, since this is a critical error for the application
+			if(ExceptionUtil::GetInstance()->HandleTryCatch(tc))
+			{
+				// TODO: We need to re-throw the error here
+			}
+			else
+			{
+				// TODO: Why do we need this line?
+				auto persistentAppModuleObject = new Persistent<Object>(Isolate::GetCurrent(), appModuleObj.As<Object>());
+			}
 		}
 		else
 		{
 			ExceptionUtil::GetInstance()->HandleInvalidState("Error running NativeScript bootstrap code.", true);
 		}
-
-		// TODO: Why do we need this line?
-		auto persistentAppModuleObject = new Persistent<Object>(Isolate::GetCurrent(), appModuleObj.As<Object>());
 	}
 
 	//NativeScriptRuntime::loadedModules.insert(make_pair(appModuleName, persistentAppModuleObject));

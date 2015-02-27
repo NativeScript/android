@@ -1245,6 +1245,13 @@ public class NativeScriptActivity extends android.app.Activity implements com.tn
 	}
 
 	protected void onCreate(android.os.Bundle param_0) {
+		if(ErrorReport.HasApplicationCreateError)
+		{
+			super.onCreate(param_0);
+			this.finish();
+			return;
+		}
+		
 		if (!__initialized) {
 			__initialized = true;
 			

@@ -1,5 +1,9 @@
 package com.tns;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
+
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
@@ -16,6 +20,52 @@ class ErrorReport
 	public ErrorReport(Activity activity)
 	{
 		this.activity = activity;
+	}
+	
+	static boolean HasApplicationCreateError = false;
+	
+	static void startActivity(final Context context, Throwable ex)
+	{
+		String errorDetailedMessage = getErrorMessage(ex);
+		final String errMsg = errorDetailedMessage;
+		
+		new Thread() {
+			@Override
+			public void run()
+			{
+				Intent intent = getIntent(context, errMsg);
+				context.startActivity(intent);
+			}
+		}.start();
+	}
+	
+	static String getErrorMessage(Throwable ex)
+	{
+		String content;
+		PrintStream ps = null;
+
+		try
+		{
+			ByteArrayOutputStream baos = new ByteArrayOutputStream();
+			ps = new PrintStream(baos);
+			ex.printStackTrace(ps);
+
+			try
+			{
+				content = baos.toString("US-ASCII");
+			}
+			catch (UnsupportedEncodingException e)
+			{
+				content = e.getMessage();
+			}
+		}
+		finally
+		{
+			if (ps != null)
+				ps.close();
+		}
+		
+		return content;
 	}
 	
 	static Intent getIntent(Context context, String errorMessage)
