@@ -61,11 +61,7 @@ Before you submit a Pull Request, consider the following guidelines.
 Search GitHub for an open or closed Pull Request that relates to your submission.
 Clone the repository.
 ```bash
-    git clone git@github.com:NativeScript/cross-platform-modules.git
-```
-Initialize the submodules.
-```bash
-    git submodule update --init --recursive
+    git clone git@github.com:NativeScript/android-runtime.git
 ```
 Make your changes in a new git branch. We use the Gitflow branching model so you will have to branch from our master branch.
 ```bash
