@@ -14,15 +14,15 @@ require("./tests/testGC");
 require("./tests/testsMemoryManagement");
 
 require("./tests/testIfAbleToRunExternalFile");
-
 require("./tests/finalFieldsSetTests");
+require("./tests/extendClassNameTests");
 
 var MainActivity = com.tns.NativeScriptActivity.extend("MainActivity", {
 			   onCreate: function() {
 					this.super.onCreate(null);
 					
 					require("./tests/testsWithContext").run(this);
-					
+
 					var layout = new android.widget.LinearLayout(this);
 					layout.setOrientation(1);
 					this.setContentView(layout);
