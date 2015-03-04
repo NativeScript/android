@@ -80,7 +80,7 @@ Push your branch to GitHub.
 ```bash
     git push origin my-fix-branch
 ```
-In GitHub, send a Pull Request to NativeScript:cross-platform-modules:master.
+In GitHub, send a Pull Request to NativeScript:android-runtime:master.
 If we suggest changes, you can modify your branch, rebase, and force a new push to your GitHub repository to update the Pull Request.
 ```bash
     git rebase master -i
