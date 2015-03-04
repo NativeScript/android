@@ -985,6 +985,17 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 
 		DEBUG_WRITE("ExtendsCallMethodHandler: getting extend name");
 		extendName = args[0]->ToString();
+		bool isValidExtendName = IsValidExtendName(extendName);
+		if(!isValidExtendName)
+		{
+			stringstream ss;
+			ss << "The extend name \"" << ConvertToString(extendName) << "\" you provided contains invalid symbols. Try using the symbols [a-z, A-Z, 0-9, _]." << endl;
+			string exceptionMessage = ss.str();
+
+			Isolate *isolate(Isolate::GetCurrent());
+			isolate->ThrowException(v8::Exception::Error((ConvertToV8String(exceptionMessage))));
+			return;
+		}
 		implementationObject = args[1]->ToObject();
 	}
 	else
@@ -1065,6 +1076,25 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 	s_usedExtendNames[fullClassName] = 1;
 	DEBUG_WRITE("ExtendsCallMethodHandler: created ExtendedClassProxy on %s, Id: %d", currExtClass.c_str(), extendedClass->GetIdentityHash());
 	args.GetReturnValue().Set(extendedClass);
+}
+
+bool MetadataNode::IsValidExtendName(const Handle<String>& name)
+{
+	string extendNam = ConvertToString(name);
+
+	for(int i = 0; i < extendNam.size(); i++)
+	{
+		char currentSymbol = extendNam[i];
+		bool isValidExtendNameSymbol = isalpha(currentSymbol) ||
+										isdigit(currentSymbol) ||
+										currentSymbol == '_';
+		if(!isValidExtendNameSymbol)
+		{
+			return false;
+		}
+	}
+
+	return true;
 }
 
 Handle<Function> MetadataNode::CreateExtendedClassProxy(Isolate *isolate, const Handle<Object>& classProxy, const Handle<Object>& implementationObject, const Handle<String>& name)

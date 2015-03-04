@@ -195,6 +195,7 @@ namespace tns
 
 		static void SetDebugName(const std::string& name, const v8::Handle<v8::Object>& value);
 
+		static bool IsValidExtendName(const v8::Handle<v8::String>& name);
 		static bool GetExtendLocation(std::string& extendLocation);
 		static GetJavaFieldCallback s_getJavaField;
 		static SetJavaFieldCallback s_setJavaField;
