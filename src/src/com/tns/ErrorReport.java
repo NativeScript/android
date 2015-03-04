@@ -1,6 +1,8 @@
 package com.tns;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 
@@ -9,6 +11,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.drawable.GradientDrawable;
 import android.text.method.ScrollingMovementMethod;
+import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
@@ -17,23 +20,31 @@ import android.widget.TextView;
 
 class ErrorReport
 {
+	public static final String ERROR_FILE_NAME = "hasError";
+	static boolean HasApplicationCreateError = false;
+	
 	public ErrorReport(Activity activity)
 	{
 		this.activity = activity;
 	}
-	
-	static boolean HasApplicationCreateError = false;
 	
 	static void startActivity(final Context context, Throwable ex)
 	{
 		String errorDetailedMessage = getErrorMessage(ex);
 		final String errMsg = errorDetailedMessage;
 		
+		final Intent intent = getIntent(context, errMsg);
+		if(intent == null)
+		{
+			return; //(if in release mode) don't do anything
+		}
+		
+		CreateErrorFile(context);
+		
 		new Thread() {
 			@Override
 			public void run()
 			{
-				Intent intent = getIntent(context, errMsg);
 				context.startActivity(intent);
 			}
 		}.start();
@@ -70,9 +81,17 @@ class ErrorReport
 	
 	static Intent getIntent(Context context, String errorMessage)
 	{
-		Class<?> errorActivityClass = Platform.getErrorActivityClass();
-		if(errorActivityClass == null){
+		Class<?> errorActivityClass = Platform.getErrorActivityClass(); //can be null or can be provided beforehand
+				
+		//if in debug and errorActivityClass is not provided use ErrorReportActivity class
+		if(errorActivityClass == null && JsDebugger.shouldEnableDebugging(context)){
 			errorActivityClass = ErrorReportActivity.class;
+		}
+
+		//if not in debug mode should return null and use the errorActivityClass implementation provided
+		if(errorActivityClass == null)
+		{
+			return null;
 		}
 		
 		Intent intent = new Intent(context, errorActivityClass);
@@ -132,6 +151,19 @@ class ErrorReport
 		});
 
 		layout.addView(btnClose);
+	}
+	
+	private static void CreateErrorFile(final Context context)
+	{
+		try
+		{
+			File errFile = new File(context.getFilesDir(), ERROR_FILE_NAME);
+			errFile.createNewFile();
+		}
+		catch (IOException e)
+		{
+			Log.d(Platform.DEFAULT_LOG_TAG, e.getMessage());
+		}
 	}
 	
 	private final Activity activity;

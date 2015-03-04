@@ -1,5 +1,7 @@
 package com.tns;
 
+import java.io.File;
+
 import android.app.Application;
 import android.util.Log;
 
@@ -688,27 +690,55 @@ public class NativeScriptApplication extends android.app.Application implements 
 		return appInstance;
 	}
 	
-	public void onCreate() {
-
-		appInstance = this;
-		try 
+	// hasErrorIntent tells you if there was an event (with an uncaught exception) raised from ErrorReport
+	private boolean hasErrorIntent()
+	{
+		boolean hasErrorIntent = false;
+		
+		try
 		{
-			prepareAppBuilderCallbackImpl();
+			 //empty file just to check if there was a raised uncaught error by ErrorReport
+			File errFile = new File(this.getFilesDir(), ErrorReport.ERROR_FILE_NAME);
 			
-			if (appBuilderCallbackImpl != null)
+			if (errFile.exists())
 			{
-				appBuilderCallbackImpl.onCreate(this);
+				errFile.delete();
+				hasErrorIntent = true;
 			}
-			
-			Platform.init(this);
-			Platform.run(Platform.DefaultApplicationModuleName);
-	
-			onCreateInternal();
 		}
-		catch (Throwable ex)
+		catch (Exception e)
 		{
-			ErrorReport.HasApplicationCreateError = true;
-			ErrorReport.startActivity(this, ex);
+			Log.d(Platform.DEFAULT_LOG_TAG, e.getMessage());
+		}
+		
+		return hasErrorIntent;
+	}
+	
+	public void onCreate() {
+		
+		boolean showErrorIntent = hasErrorIntent();
+		if (!showErrorIntent)
+		{
+			appInstance = this;
+			try 
+			{
+				prepareAppBuilderCallbackImpl();
+				
+				if (appBuilderCallbackImpl != null)
+				{
+					appBuilderCallbackImpl.onCreate(this);
+				}
+				
+				Platform.init(this);
+				Platform.run(Platform.DefaultApplicationModuleName);
+		
+				onCreateInternal();
+			}
+			catch (Throwable ex)
+			{
+				ErrorReport.HasApplicationCreateError = true;
+				ErrorReport.startActivity(this, ex);
+			}
 		}
 	}
 	

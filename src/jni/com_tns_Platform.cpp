@@ -228,12 +228,9 @@ extern "C" void Java_com_tns_Platform_runNativeScript(JNIEnv *_env, jobject obj,
 			auto thiz = Object::New(isolate);
 			auto res = moduleFunc->Call(thiz, 1, &exportsObj);
 
-			// TODO: Extend the HandleTryCatch method with a second parameter
-			// HandleTryCatch(TryCatch& tc, bool rethrow)
-			// in this case we MUST rethrow, since this is a critical error for the application
 			if(ExceptionUtil::GetInstance()->HandleTryCatch(tc))
 			{
-				// TODO: We need to re-throw the error here
+				ExceptionUtil::GetInstance()->ThrowExceptionToJava(tc);
 			}
 			else
 			{
@@ -328,7 +325,8 @@ extern "C" jobject Java_com_tns_Platform_callJSMethodNative(JNIEnv *_env, jobjec
 
 	if (tc.HasCaught())
 	{
-		ExceptionUtil::GetInstance()->CheckForException(isolate, method_name, tc);
+		DEBUG_WRITE("Calling js method %s failed", methodName);
+		ExceptionUtil::GetInstance()->ThrowExceptionToJava(tc);
 	}
 
 	jobject javaObject = ConvertJsValueToJavaObject(env, jsResult);
@@ -548,5 +546,5 @@ extern "C" void Java_com_tns_Platform_passUncaughtExceptionToJsNative(JNIEnv *en
 	errObj->Set(V8StringConstants::GetStackTrace(), ArgConverter::jstringToV8String(stackTrace));
 
 	//pass err to JS
-	ExceptionUtil::CallJFuncWithErr(errObj);
+	ExceptionUtil::CallJsFuncWithErr(errObj);
 }

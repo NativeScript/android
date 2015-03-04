@@ -152,23 +152,12 @@ public class Platform
 				public void uncaughtException(Thread thread, Throwable ex)
 				{
 					ErrorReport.startActivity(NativeScriptContext, ex);
-//					if (IsLogEnabled) Log.e(DEFAULT_LOG_TAG, "Uncaught Exception Message=" + ex.getMessage());
-//	
-//					String errorDetailedMessage = ErrorReport.getErrorMessage(ex);
-//	
-//					if (IsLogEnabled) Log.e(DEFAULT_LOG_TAG, "Uncaught Exception Stack=" + errorDetailedMessage);
-//					
-//					final String errMsg = errorDetailedMessage;
-//					
-//					new Thread() {
-//						@Override
-//						public void run()
-//						{
-//							Intent intent = ErrorReport.getIntent(NativeScriptContext, errMsg);
-//							NativeScriptContext.startActivity(intent);
-//						}
-//					}.start();
-	
+					
+					String content = ErrorReport.getErrorMessage(ex);
+					passUncaughtExceptionToJsNative(ex, content);
+					
+					if (IsLogEnabled) Log.e(DEFAULT_LOG_TAG, "Uncaught Exception Message=" + ex.getMessage());
+
 					// call the already installed handler (if any)
 					if (h != null)
 					{
@@ -178,7 +167,7 @@ public class Platform
 			};
 		}
 		
-		Thread.setDefaultUncaughtExceptionHandler(handler);
+		Thread.setDefaultUncaughtExceptionHandler(handler); 
 	}
 	
 	static void setExtractPolicy(ExtractPolicy policy)
