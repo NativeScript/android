@@ -33,6 +33,9 @@ public class Async
 	
 	public static class Http 
 	{
+		private static final String DeleteMethod = "DELETE";
+		private static final String GetMethod = "GET";
+		
 		public static class KeyValuePair
 		{
 			public String key;
@@ -225,7 +228,7 @@ public class Async
 					HttpURLConnection connection = (HttpURLConnection)url.openConnection();
 					
 					// set the request method
-					String requestMethod = options.method != null ? options.method.toUpperCase() : "GET";
+					String requestMethod = options.method != null ? options.method.toUpperCase() : GetMethod;
 					connection.setRequestMethod(requestMethod);
 					
 					// add the headers
@@ -237,7 +240,11 @@ public class Async
 						connection.setConnectTimeout(options.timeout);
 					}
 					
-					options.writeContent(connection, openedStreams);
+					// Do not attempt to write the content (body) for DELETE method, Java will throw directly
+					if(requestMethod != DeleteMethod)
+					{
+						options.writeContent(connection, openedStreams);
+					}
 					
 					// close the opened streams (saves copy-paste implementation in each method that throws IOException)
 					this.closeOpenedStreams(openedStreams);
