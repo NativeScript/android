@@ -133,14 +133,7 @@ Without at least the first 2 items in this list, we won't have any clue why you'
 
 ## Code Style
 
-All code contributed to this project should adhere to a consistent style, so please keep these in mind before you submit your Pull Requests:
+We are currently using Eclipse to write code. We are using predefined code formating rules for C++ and Java:
 
-- Tab indentation, size of 4
-- Semicolons are nice. Use them
-- Double quotes
-- No trailing whitespace
-- Declare one variable per var statement
-- Declare variables at the top of a scope
-- Return early
-
-For a more detailed guide, check the [Coding Convention](CodingConvention.md). 
+* [C++](./CodingStyle.Cpp.xml)
+* [Java](./CodingStyle.Java.xml)
