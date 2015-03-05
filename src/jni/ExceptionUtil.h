@@ -14,8 +14,6 @@ namespace tns
 
 		void Init(JavaVM *jvm, ObjectManager *objectManager);
 
-		bool CheckForException(v8::Isolate *isolate, const std::string& methodName, v8::TryCatch& tc);
-
 		bool CheckForJavaException(JEnv& env);
 
 		bool ThrowExceptionToJava(v8::TryCatch& tc);
