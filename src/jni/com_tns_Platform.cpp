@@ -228,15 +228,20 @@ extern "C" void Java_com_tns_Platform_runNativeScript(JNIEnv *_env, jobject obj,
 			auto thiz = Object::New(isolate);
 			auto res = moduleFunc->Call(thiz, 1, &exportsObj);
 
-			ExceptionUtil::GetInstance()->HandleTryCatch(tc);
+			if(ExceptionUtil::GetInstance()->HandleTryCatch(tc))
+			{
+				ExceptionUtil::GetInstance()->ThrowExceptionToJava(tc);
+			}
+			else
+			{
+				// TODO: Why do we need this line?
+				auto persistentAppModuleObject = new Persistent<Object>(Isolate::GetCurrent(), appModuleObj.As<Object>());
+			}
 		}
 		else
 		{
 			ExceptionUtil::GetInstance()->HandleInvalidState("Error running NativeScript bootstrap code.", true);
 		}
-
-		// TODO: Why do we need this line?
-		auto persistentAppModuleObject = new Persistent<Object>(Isolate::GetCurrent(), appModuleObj.As<Object>());
 	}
 
 	//NativeScriptRuntime::loadedModules.insert(make_pair(appModuleName, persistentAppModuleObject));
@@ -320,7 +325,8 @@ extern "C" jobject Java_com_tns_Platform_callJSMethodNative(JNIEnv *_env, jobjec
 
 	if (tc.HasCaught())
 	{
-		ExceptionUtil::GetInstance()->CheckForException(isolate, method_name, tc);
+		DEBUG_WRITE("Calling js method %s failed", methodName);
+		ExceptionUtil::GetInstance()->ThrowExceptionToJava(tc);
 	}
 
 	jobject javaObject = ConvertJsValueToJavaObject(env, jsResult);
@@ -540,5 +546,5 @@ extern "C" void Java_com_tns_Platform_passUncaughtExceptionToJsNative(JNIEnv *en
 	errObj->Set(V8StringConstants::GetStackTrace(), ArgConverter::jstringToV8String(stackTrace));
 
 	//pass err to JS
-	ExceptionUtil::CallJFuncWithErr(errObj);
+	ExceptionUtil::CallJsFuncWithErr(errObj);
 }

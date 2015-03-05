@@ -1,10 +1,7 @@
 package com.tns;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.InputStream;
-import java.io.PrintStream;
-import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.lang.ref.WeakReference;
@@ -16,12 +13,10 @@ import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.Map;
 import java.util.zip.ZipEntry;
 
 import android.app.Activity;
 import android.content.Context;
-import android.content.Intent;
 import android.content.res.AssetManager;
 import android.os.Handler;
 import android.os.Looper;
@@ -156,48 +151,14 @@ public class Platform
 				@Override
 				public void uncaughtException(Thread thread, Throwable ex)
 				{
+					ErrorReport.startActivity(NativeScriptContext, ex);
+					
+					String content = ErrorReport.getErrorMessage(ex);
+					passUncaughtExceptionToJsNative(ex, content);
+					
 					if (IsLogEnabled) Log.e(DEFAULT_LOG_TAG, "Uncaught Exception Message=" + ex.getMessage());
-	
-					String content;
-					PrintStream ps = null;
-	
-					try
-					{
-						ByteArrayOutputStream baos = new ByteArrayOutputStream();
-						ps = new PrintStream(baos);
-						ex.printStackTrace(ps);
-	
-						try
-						{
-							content = baos.toString("US-ASCII");
-						}
-						catch (UnsupportedEncodingException e)
-						{
-							content = e.getMessage();
-						}
-						
-						passUncaughtExceptionToJsNative(ex, content);
-					}
-					finally
-					{
-						if (ps != null)
-							ps.close();
-					}
-	
-					if (IsLogEnabled) Log.e(DEFAULT_LOG_TAG, "Uncaught Exception Stack=" + content);
-					
-					final String errMsg = content;
-					
-					new Thread() {
-						@Override
-						public void run()
-						{
-							Intent intent = ErrorReport.getIntent(NativeScriptContext, errMsg);
-							NativeScriptContext.startActivity(intent);
-						}
-					}.start();
-	
-	
+
+					// call the already installed handler (if any)
 					if (h != null)
 					{
 						h.uncaughtException(thread, ex);
@@ -206,7 +167,7 @@ public class Platform
 			};
 		}
 		
-		Thread.setDefaultUncaughtExceptionHandler(handler);
+		Thread.setDefaultUncaughtExceptionHandler(handler); 
 	}
 	
 	static void setExtractPolicy(ExtractPolicy policy)
