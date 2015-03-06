@@ -125,23 +125,26 @@ void ExceptionUtil::HandleInvalidState(const string& message, bool fail){
 	}
 }
 
-bool ExceptionUtil::HandleTryCatch(TryCatch& tc){
+bool ExceptionUtil::HandleTryCatch(TryCatch& tc, bool rethrow){
 	if(!tc.HasCaught()){
 		return false;
 	}
 
-	if(tc.CanContinue()){
-		auto message = tc.Message();
-		auto error = tc.Exception();
-		OnUncaughtError(message, error); //calls JS global function("__onUncaughtError") passing the uncaught error
-	}
-	else {
-		auto errorMessage = PrintErrorMessage(tc.Message(), tc.Exception());
+	if(rethrow)
+	{
+		if(tc.CanContinue()){
+			auto message = tc.Message();
+			auto error = tc.Exception();
+			OnUncaughtError(message, error); //calls JS global function("__onUncaughtError") passing the uncaught error
+		}
+		else {
+			auto errorMessage = PrintErrorMessage(tc.Message(), tc.Exception());
 
-		stringstream ss;
-		ss << "An uncaught error has occurred and V8's TryCatch block may not be continued. Error is: " << errorMessage;
+			stringstream ss;
+			ss << "An uncaught error has occurred and V8's TryCatch block may not be continued. Error is: " << errorMessage;
 
-		HandleInvalidState(ss.str(), true);
+			HandleInvalidState(ss.str(), true);
+		}
 	}
 
 	return true;
