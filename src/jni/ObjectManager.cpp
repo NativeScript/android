@@ -212,8 +212,8 @@ void ObjectManager::Link(const Handle<Object>& object, uint32_t javaObjectID, jc
 
 	auto hiddenString = V8StringConstants::GetHiddenJSInstance();
 
-	bool alreadyLinked = object->GetHiddenValue(hiddenString).IsEmpty();
-	ASSERT_MESSAGE(alreadyLinked, "object should not have been linked before");
+	bool alreadyLinked = !object->GetHiddenValue(hiddenString).IsEmpty();
+	ASSERT_MESSAGE(!alreadyLinked, "object should not have been linked before");
 
 	auto hiddenValue = External::New(isolate, jsInstanceInfo);
 	object->SetHiddenValue(hiddenString, hiddenValue);
