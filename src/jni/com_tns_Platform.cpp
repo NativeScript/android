@@ -440,29 +440,47 @@ extern "C" jobjectArray Java_com_tns_Platform_createJSInstanceNative(JNIEnv *_en
 
 		//call extends function on the prototype which must the be Parent function
 		auto parent = classProxy->GetPrototype().As<Function>();
-		auto extendsFunc = parent->Get(V8StringConstants::GetExtends()).As<Function>();
-		ASSERT_MESSAGE(!extendsFunc.IsEmpty(), "extends not found on activity parent");
+		auto extendsFunc = parent->Get(String::NewFromUtf8(isolate, "__activityExtend")).As<Function>();
+		//auto extendsFunc = parent->Get(V8StringConstants::GetExtends()).As<Function>();
+		ASSERT_MESSAGE(!extendsFunc.IsEmpty(), "__activityExtend support function not found on activity parent");
 
 
-		Handle<Value> arguments[1];
-		arguments[0] = implementationObject;
-		auto extended =  extendsFunc->Call(parent, 1, arguments).As<Function>();
-		ASSERT_MESSAGE(!extended.IsEmpty(), "extends result is not an function");
+		//Handle<Value> arguments[1];
+		//arguments[0] = implementationObject;
+
+		Handle<Value> arguments[3];
+		arguments[0] = parent;
+		arguments[1] = classProxy.As<Function>()->GetName();
+		arguments[2] = implementationObject;
+		auto extended =  extendsFunc->Call(parent, 3, arguments).As<Function>();
+		ASSERT_MESSAGE(!extended.IsEmpty(), "extend result is not an function");
 
 		extended->SetHiddenValue(ConvertToV8String("t::TypescriptActivity::DonNotRegisterInstance"), Boolean::New(isolate, true));
 		auto extendedObject = extended->CallAsConstructor(0, nullptr).As<Object>();
 		DEBUG_WRITE("createJSInstanceNative: typescript activity extendedObject's prototype : %d", extendedObject->GetPrototype().As<Object>()->GetIdentityHash());
 
+
+
+//		auto activityCreateFunc = parent->Get(String::NewFromUtf8(isolate, "__activityCreate")).As<Function>();
+//		ASSERT_MESSAGE(!extendsFunc.IsEmpty(), "__activityCreate support function not found on activity parent");
+//		Handle<Value> activityCreateArguments[1];
+//		arguments[0] = extendedObject;
+//		auto createdActivity =  activityCreateFunc->Call(parent, 1, activityCreateArguments).As<Function>();
+//		extendedObject = createdActivity;
+
+
+
+
 		extendedObject->SetPrototype(implementationObject);
 		extendedObject->SetHiddenValue(ConvertToV8String(MetadataNode::METADATA_NODE_KEY_NAME), External::New(isolate, node));
 
-		auto objectTemplate = ObjectTemplate::New();
-		auto instance = objectTemplate->NewInstance();
-		instance->SetPrototype(extendedObject);
+		//auto objectTemplate = ObjectTemplate::New();
+		//auto instance = objectTemplate->NewInstance();
+		//instance->SetPrototype(extendedObject);
 		bool success = extendedObject->SetHiddenValue(ConvertToV8String("t::ActivityImplementationObject"), implementationObject);
 		ASSERT_MESSAGE(success == true, "Setting up the typescript activity implementation object failed");
-		DEBUG_WRITE("createJSInstanceNative: typescript activity instance: %d", instance->GetIdentityHash());
-		DEBUG_WRITE("createJSInstanceNative: typescript activity extendedObject: %d", extendedObject->GetIdentityHash());
+		//DEBUG_WRITE("createJSInstanceNative: typescript activity instance: %d", instance->GetIdentityHash());
+		//DEBUG_WRITE("createJSInstanceNative: typescript activity extendedObject: %d", extendedObject->GetIdentityHash());
 
 		//This will cause the Link to link the extendedObject not the empty object instance. This is on par with all typescript objects created through JS
 		jsInstance = extendedObject;

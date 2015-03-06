@@ -1,4 +1,4 @@
-disableVerboseLogging();
+enableVerboseLogging();
 
 require("./tests/testWeakRef");
 require("./tests/tests");
@@ -12,35 +12,70 @@ require("./tests/stringConversionTests");
 require("./tests/testsForTypescript");
 require("./tests/testGC");
 require("./tests/testsMemoryManagement");
-
 require("./tests/testIfAbleToRunExternalFile");
-
 require("./tests/finalFieldsSetTests");
 
-var MainActivity = com.tns.NativeScriptActivity.extend("MainActivity", {
-			   onCreate: function() {
-					this.super.onCreate(null);
-					
-					require("./tests/testsWithContext").run(this);
-					
-					var layout = new android.widget.LinearLayout(this);
-					layout.setOrientation(1);
-					this.setContentView(layout);
-					
-					var textView = new android.widget.TextView(this);
-					textView.setText("Hit that sucker");
-					layout.addView(textView);
-					
-					var button = new android.widget.Button(this);
-					button.setText("Hit me");
-					layout.addView(button);
-					var counter = 0;
-					button.setOnClickListener(new android.view.View.OnClickListener("AppClickListener", {
-						onClick:  function() {
-			              Log("onClick called");  
-			              button.setText("Hit that sucker one more time " + ++counter);
-			            }}));
-          }});
+//var MainActivity = com.tns.NativeScriptActivity.extend("MainActivity", {
+//			   onCreate: function() {
+//					this.super.onCreate(null);
+//					
+//					require("./tests/testsWithContext").run(this);
+//					
+//					var layout = new android.widget.LinearLayout(this);
+//					layout.setOrientation(1);
+//					this.setContentView(layout);
+//					
+//					var textView = new android.widget.TextView(this);
+//					textView.setText("Hit that sucker");
+//					layout.addView(textView);
+//					
+//					var button = new android.widget.Button(this);
+//					button.setText("Hit me");
+//					layout.addView(button);
+//					var counter = 0;
+//					button.setOnClickListener(new android.view.View.OnClickListener("AppClickListener", {
+//						onClick:  function() {
+//			              Log("onClick called");  
+//			              button.setText("Hit that sucker one more time " + ++counter);
+//			            }}));
+//          }});
+
+
+
+var MainActivity = (function (_super) {
+    __extends(MainActivity, _super);
+    function MainActivity() {
+    }
+    
+    MainActivity.prototype.onCreate = function () {
+    	Log("onCreate from js");
+    	var k = this.toString();
+    	Log("this.toString " + k);
+    	_super.prototype.onCreate.call(this, null);
+    	//this.super.onCreate(null);
+    	
+    	require("./tests/testsWithContext").run(this);
+    	
+    	var layout = new android.widget.LinearLayout(this);
+    	layout.setOrientation(1);
+    	this.setContentView(layout);
+    	
+    	var textView = new android.widget.TextView(this);
+    	textView.setText("Hit that sucker");
+    	layout.addView(textView);
+    	
+    	var button = new android.widget.Button(this);
+    	button.setText("Hit me");
+    	layout.addView(button);
+    	var counter = 0;
+    	button.setOnClickListener(new android.view.View.OnClickListener("AppClickListener", {
+    		onClick:  function() {
+    			Log("onClick called");  
+    			button.setText("Hit that sucker one more time " + ++counter);
+    		}}));
+    };
+    return MainActivity;
+})(com.tns.NativeScriptActivity); 
 
 app.init({
 	
