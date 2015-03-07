@@ -332,7 +332,7 @@ extern "C" jobject Java_com_tns_Platform_callJSMethodNative(JNIEnv *_env, jobjec
 
 	if (tc.HasCaught())
 	{
-		DEBUG_WRITE("Calling js method %s failed", methodName);
+		DEBUG_WRITE("Calling js method %s failed", method_name.c_str());
 		ExceptionUtil::GetInstance()->ThrowExceptionToJava(tc);
 	}
 
