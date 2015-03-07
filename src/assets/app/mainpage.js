@@ -14,6 +14,7 @@ require("./tests/testGC");
 require("./tests/testsMemoryManagement");
 require("./tests/testIfAbleToRunExternalFile");
 require("./tests/finalFieldsSetTests");
+require("./tests/extendedClassesTests");
 require("./tests/extendClassNameTests");
 
 
