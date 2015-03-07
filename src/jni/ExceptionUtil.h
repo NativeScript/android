@@ -26,7 +26,7 @@ namespace tns
 		 *  - The flow may continue. In this case a check for nested TryCatch blocks will be made and if such exist the error will be re-thrown.
 		 *  - The flow may not continue. In this case a call the NativeScriptRuntime::APP_FAIL will be made. This will go to Java where the Java VM will be shut down.
 		 */
-		bool HandleTryCatch(v8::TryCatch& tc);
+		bool HandleTryCatch(v8::TryCatch& tc, bool rethrow);
 
 		/**
 		 * Provides an entry point to handle states considered invalid for the NativeScript runtime.
