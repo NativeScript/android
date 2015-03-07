@@ -95,7 +95,7 @@ void PrepareExtendFunction(Isolate *isolate, jstring filesPath)
 
 	script->Run();
 
-	ExceptionUtil::GetInstance()->HandleTryCatch(tc, true);
+	ExceptionUtil::GetInstance()->HandleTryCatch(tc);
 
 	DEBUG_WRITE("Executed prepareExtend.js script");
 }
@@ -197,7 +197,7 @@ extern "C" void Java_com_tns_Platform_runNativeScript(JNIEnv *_env, jobject obj,
 
 	DEBUG_WRITE("Compile script");
 
-	if (ExceptionUtil::GetInstance()->HandleTryCatch(tc, true))
+	if (ExceptionUtil::GetInstance()->HandleTryCatch(tc))
 	{
 		ExceptionUtil::GetInstance()->HandleInvalidState("Bootstrap script has error(s).", true);
 	}
@@ -217,7 +217,7 @@ extern "C" void Java_com_tns_Platform_runNativeScript(JNIEnv *_env, jobject obj,
 		}
 
 		auto appModuleObj = script->Run();
-		if (ExceptionUtil::GetInstance()->HandleTryCatch(tc, true))
+		if (ExceptionUtil::GetInstance()->HandleTryCatch(tc))
 		{
 			// TODO: Fail?
 		}
@@ -228,7 +228,7 @@ extern "C" void Java_com_tns_Platform_runNativeScript(JNIEnv *_env, jobject obj,
 			auto thiz = Object::New(isolate);
 			auto res = moduleFunc->Call(thiz, 1, &exportsObj);
 
-			if(ExceptionUtil::GetInstance()->HandleTryCatch(tc, false))
+			if(ExceptionUtil::GetInstance()->HandleTryCatch(tc))
 			{
 				ExceptionUtil::GetInstance()->ThrowExceptionToJava(tc);
 			}
