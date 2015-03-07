@@ -305,10 +305,6 @@ var When_calling_toString_on_an_java_object_that_has_overriden_toString_in_js_it
 }
 
 var When_extending_a_class_two_times_without_second_implementation_object = function() {
-
-	Log("//TODO: NOT WORKING: FAILS with button1Label=button1, button2Label=button1");
-	return;
-	
 	Log("TEST: When_extending_a_class_two_times_without_second_implementation_object");
 	
 	var MyButton = com.tns.tests.Button1.extend("MyButton257", {
