@@ -1,4 +1,4 @@
-enableVerboseLogging();
+disableVerboseLogging();
 
 require("./tests/testWeakRef");
 require("./tests/tests");
