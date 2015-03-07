@@ -38,7 +38,7 @@ JsArgToArrayConverter::JsArgToArrayConverter(const v8::FunctionCallbackInfo<Valu
 	}
 	else
 	{
-		m_argsLen = !hasImplementationObject ? args.Length() : args.Length() - 1;
+		m_argsLen = !hasImplementationObject ? args.Length() : args.Length() - 2;
 	}
 
 	bool success = true;

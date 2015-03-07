@@ -98,8 +98,12 @@ module.exports = function(grunt) {
             }
         },
         exec: {
+            createBindingGeneratorAntBuildFiles: {
+                cmd: "android update lib-project --target 1 --path ../binding-generator/Generator/",
+                cwd: localCfg.rootDir + "/"
+            },
             createJavaRuntimeAntBuildFiles: {
-                cmd: "android update project --target 1 --name NativeScriptRuntime --path ./",
+                cmd: "android update project --target 1 --name NativeScriptRuntime --path ./ --library ../binding-generator/Generator/",
                 cwd: localCfg.rootDir + "/"
             },
             revertToCustomizedBuildFiles: {
@@ -113,7 +117,7 @@ module.exports = function(grunt) {
                 cwd: localCfg.rootDir + "/"
             },
             buildJavaRuntimeClasses: {
-                cmd: "ant release",
+                cmd: "ant clean release",
                 cwd: localCfg.rootDir + "/"
             },
             ensureOriginalVersionFile: {
@@ -123,8 +127,12 @@ module.exports = function(grunt) {
                 cmd: "git checkout -- ./manifest.mf"
             },
             jarJavaRuntime: {
-                cmd: "jar cfm ../../" + "/dist/libs/nativescript.jar ../../manifest.mf com",
-                cwd: pathModule.join(localCfg.rootDir, "/bin/classes")
+                //cmd: "jar cfm ../../" + "/dist/libs/nativescript.jar ../../manifest.mf com",
+                cmd: "jar umf ./manifest.mf ./bin/NativeScriptRuntime.jar"
+                //,cwd: pathModule.join(localCfg.rootDir, "/bin/classes")
+            },
+            jarJavaRuntimeCopyToDist: {
+                cmd: "cp ./bin/NativeScriptRuntime.jar ./dist/libs/nativescript.jar"
             }
         }
     });
@@ -141,12 +149,14 @@ module.exports = function(grunt) {
     ]);
 
     grunt.registerTask("generateJavaRuntime", [
+                            "exec:createBindingGeneratorAntBuildFiles",
                             "exec:createJavaRuntimeAntBuildFiles",
                             "exec:revertToCustomizedBuildFiles",
                             "exec:buildJavaRuntimeClasses",
                             "exec:ensureOriginalManifestFile",
                             "copy:updateManifestFile",
                             "exec:jarJavaRuntime",
+                            "exec:jarJavaRuntimeCopyToDist",
                             "exec:ensureOriginalManifestFile"
                         ]);
 

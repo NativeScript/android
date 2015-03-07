@@ -11,7 +11,7 @@ var TestConstructorOverrideForBuiltinType = function(context) {
 	var ctorCalled = false;
 	var isConstructor = false;
 
-	var MyButton = new android.widget.Button.extends({
+	var MyButton = new android.widget.Button.extend({
 		init : function() {
 			ctorCalled = true;
 			isConstructor = arguments[arguments.length - 1];
@@ -30,7 +30,7 @@ var TestConstructorOverrideForBuiltinTypeWithInitMethod = function(context) {
 	
 	var initInvocationCount = 0;
 
-	var MyDatePicker = android.widget.DatePicker.extends({
+	var MyDatePicker = android.widget.DatePicker.extend({
 		init: function() {
 			++initInvocationCount;
 		}

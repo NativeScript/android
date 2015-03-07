@@ -9,10 +9,10 @@ var Assert = function(condition, failMessage) {
 // this test has implicit assert in com.tns.Platform.getJavaObjectByID method
 function test1() {
   
-  	function createObjects() {
+  	function createObjects(name) {
 	  	var c1 = new com.tns.tests.Class1();
 		
-		var cb1 = new com.tns.tests.Class1.Callback1({
+		var cb1 = new com.tns.tests.Class1.Callback1(name, {
 			getMessage: function() {
 				var msg = c1.getMessage();
 				return msg;
@@ -22,8 +22,8 @@ function test1() {
 		return com.tns.tests.Class1.Class2.printMessageWithDelay(cb1, 5 * 1000);
 	}
 	
-	Assert(createObjects() === true, "test1 FAILED: to enqueue first message");
-	Assert(createObjects() === true, "test1 FAILED: to enqueue second message");
+	Assert(createObjects("Callback5") === true, "test1 FAILED: to enqueue first message");
+	Assert(createObjects("Callback26") === true, "test1 FAILED: to enqueue second message");
 	gc();
 	java.lang.System.gc();
 }
@@ -39,10 +39,10 @@ function test2() {
 		return "~~~" + this.class1.getMessage();
 	}
   
-  	function createObjects() {
+  	function createObjects(name) {
 		var c1 = new indref1();
 		
-		var cb1 = new com.tns.tests.Class1.Callback1({
+		var cb1 = new com.tns.tests.Class1.Callback1(name, {
 			getMessage: function() {
 				var msg = c1.getMessage();
 				return msg;
@@ -52,8 +52,8 @@ function test2() {
 		return com.tns.tests.Class1.Class2.printMessageWithDelay(cb1, 5 * 1000);
 	}
 	
-	Assert(createObjects() === true, "test2 FAILED: to enqueue first message");
-	Assert(createObjects() === true, "test2 FAILED: to enqueue second message");
+	Assert(createObjects("Callback55") === true, "test2 FAILED: to enqueue first message");
+	Assert(createObjects("Callback56") === true, "test2 FAILED: to enqueue second message");
 	gc();
 	java.lang.System.gc();
 }
@@ -75,10 +75,10 @@ function test3() {
 		return "***" + this.class1.getMessage();
 	}
   
-  	function createObjects() {
+  	function createObjects(name) {
 		var c1 = new indref2();
 		
-		var cb1 = new com.tns.tests.Class1.Callback1({
+		var cb1 = new com.tns.tests.Class1.Callback1(name, {
 			getMessage: function() {
 				var msg = c1.getMessage();
 				return msg;
@@ -88,8 +88,8 @@ function test3() {
 		return com.tns.tests.Class1.Class2.printMessageWithDelay(cb1, 5 * 1000);
 	}
 	
-	Assert(createObjects() === true, "test3 FAILED: to enqueue first message");
-	Assert(createObjects() === true, "test3 FAILED: to enqueue second message");
+	Assert(createObjects("Callback91") === true, "test3 FAILED: to enqueue first message");
+	Assert(createObjects("Callback92") === true, "test3 FAILED: to enqueue second message");
 	gc();
 	java.lang.System.gc();
 }
@@ -117,10 +117,10 @@ function test4() {
 		return "^^^" + this.class1.getMessage();
 	}  
   	
-  	function createObjects() {
+  	function createObjects(name) {
 		var c1 = new indref3();
 		
-		var cb1 = new com.tns.tests.Class1.Callback1({
+		var cb1 = new com.tns.tests.Class1.Callback1(name, {
 			getMessage: function() {
 				var msg = c1.getMessage();
 				return msg;
@@ -130,8 +130,8 @@ function test4() {
 		return com.tns.tests.Class1.Class2.printMessageWithDelay(cb1, 5 * 1000);
 	}
 	
-	Assert(createObjects() === true, "test4 FAILED: to enqueue first message");
-	Assert(createObjects() === true, "test4 FAILED: to enqueue second message");
+	Assert(createObjects("Callback1133") === true, "test4 FAILED: to enqueue first message");
+	Assert(createObjects("Callback1134") === true, "test4 FAILED: to enqueue second message");
 	gc();
 	java.lang.System.gc();
 }
@@ -162,10 +162,10 @@ function test5() {
 		return "```" + this.class1.getMessage();
 	}
   	
-  	function createObjects() {
+  	function createObjects(name) {
 		var c1 = new indref4();
 		
-		var cb1 = new com.tns.tests.Class1.Callback1({
+		var cb1 = new com.tns.tests.Class1.Callback1(name, {
 			getMessage: function() {
 				var msg = c1.getMessage();
 				return msg;
@@ -175,8 +175,8 @@ function test5() {
 		return com.tns.tests.Class1.Class2.printMessageWithDelay(cb1, 5 * 1000);
 	}
 	
-	Assert(createObjects() === true, "test5 FAILED: to enqueue first message");
-	Assert(createObjects() === true, "test5 FAILED: to enqueue second message");
+	Assert(createObjects("Callback1178") === true, "test5 FAILED: to enqueue first message");
+	Assert(createObjects("Callback1179") === true, "test5 FAILED: to enqueue second message");
 	gc();
 	java.lang.System.gc();
 }

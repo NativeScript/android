@@ -2805,6 +2805,13 @@ public class NativeScriptActivity extends android.app.Activity implements com.tn
 	}
 	public void setNativeScriptOverrides(java.lang.String[] overrides) {
 		for (java.lang.String name: overrides) {
+			setNativeScriptOverride(name);
+		}
+	}
+	
+	@Override
+	public void setNativeScriptOverride(String name)
+	{
 			if (name.equals("init")) {
 				__ctorOverridden = true;
 			}
@@ -3247,7 +3254,7 @@ public class NativeScriptActivity extends android.app.Activity implements com.tn
 			} else if (name.equals("unregisterReceiver")) {
 				__ho27 |= (1 << 2);
 			}
-		}
+		
 	}
 	private boolean __initialized;
 	private boolean __ctorOverridden;

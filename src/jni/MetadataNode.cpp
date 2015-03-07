@@ -193,6 +193,17 @@ Handle<Object> MetadataNode::GetExistingClassProxy(const string& name)
 	return Handle<Object>::New(isolate, *classProxy);
 }
 
+bool MetadataNode::ExistsExtendName(const string& name)
+{
+	auto it = MetadataNode::s_usedExtendNames.find(name);
+	if (it == MetadataNode::s_usedExtendNames.end())
+	{
+		return false;
+	}
+
+	return true;
+}
+
 bool MetadataNode::IsArray()
 {
 	char prefix = *(m_name.begin());
@@ -290,16 +301,15 @@ void MetadataNode::SetDebugName(const string& name, const Handle<Object>& value)
 
 void MetadataNode::ConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-	//TODO: instaceof: remove args.This(). use Callee() always
-	auto thizz = args.Callee();
+	auto thiz = args.Callee();
 
-	auto e = V8GetHiddenValue(thizz, METADATA_NODE_KEY_NAME).As<External>();
+	auto e = V8GetHiddenValue(thiz, METADATA_NODE_KEY_NAME).As<External>();
 
-	if (e.IsEmpty())
-	{
-		thizz = args.Callee();
-		e = V8GetHiddenValue(thizz, METADATA_NODE_KEY_NAME).As<External>();
-	}
+//	if (e.IsEmpty())
+//	{
+//		thiz = args.Callee();
+//		e = V8GetHiddenValue(thiz, METADATA_NODE_KEY_NAME).As<External>();
+//	}
 
 	ASSERT_MESSAGE(!e.IsEmpty(), "ConstructorCallback: MetadataNode not found");
 
@@ -341,7 +351,7 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& arg
 //	  throw exception here
 //	}
 
-	if ((methodName == V8StringConstants::EXTEND) || (methodName == V8StringConstants::EXTENDS))
+	if (methodName == V8StringConstants::EXTEND)
 	{
 		ExtendCallMethodHandler(args, callbackState->node);
 		return;
@@ -741,9 +751,18 @@ void MetadataNode::InvokeClassCtor(const v8::FunctionCallbackInfo<v8::Value>& ar
 
 	auto implementationObject = GetImplementationObject(classProxy);
 
-	string name;
-	auto instance = CreateJSInstance(classProxy, node, implementationObject, name);
+	string extendName;
 
+	string extendsPropertyName = "t::ExtendsName";
+	Handle<String> v8ExtendName = V8GetHiddenValue(classProxy, extendsPropertyName).As<String>();
+	if (!v8ExtendName.IsEmpty())
+	{
+		extendName = ConvertToString(v8ExtendName);
+	}
+
+
+	string className;
+	auto instance = CreateJSInstance(classProxy, node, implementationObject, className);
 	bool shouldRegisterInstance = V8GetHiddenValue(classProxy, "t::TypescriptActivity::DonNotRegisterInstance").IsEmpty();
 
 	if (shouldRegisterInstance)
@@ -753,7 +772,7 @@ void MetadataNode::InvokeClassCtor(const v8::FunctionCallbackInfo<v8::Value>& ar
 		bool isInnerClass = ((node->m_name.find('$') != string::npos)) && !isStatic;
 
 		ArgsWrapper argWrapper(args, ArgType::Class, isInnerClass);
-		instanceCreated = s_registerInstance(instance, name, argWrapper, implementationObject, false);
+		instanceCreated = s_registerInstance(instance, extendName, className, argWrapper, implementationObject, false);
 	}
 
 	if (instanceCreated)
@@ -762,13 +781,14 @@ void MetadataNode::InvokeClassCtor(const v8::FunctionCallbackInfo<v8::Value>& ar
 	}
 }
 
-Handle<Object> MetadataNode::CreateJSInstance(const Handle<Object>& classProxy, MetadataNode *node, const Handle<Object>& implementationObject, string& name)
+Handle<Object> MetadataNode::CreateJSInstance(const Handle<Object>& classProxy, MetadataNode *node, const Handle<Object>& implementationObject, string& className)
 {
 	auto isolate = Isolate::GetCurrent();
 
 	auto instance = node->CreateInstanceProxy(isolate);
 
 	bool hasImplementationObject = !implementationObject.IsEmpty();
+
 
 	if (hasImplementationObject)
 	{
@@ -783,29 +803,29 @@ Handle<Object> MetadataNode::CreateJSInstance(const Handle<Object>& classProxy, 
 		bool startsWithTesstTelerikName = Util::StartsWith(node->m_name, TNS_TESTS_PREFIX);
 		if (startsWithTesstTelerikName)
 		{
-			name.append(TNS_PREFIX);
+			className.append(TNS_PREFIX);
 		}
 		else
 		{
 			bool startsWithTelerikName = Util::StartsWith(node->m_name, TNS_PREFIX);
 			if (!startsWithTelerikName)
 			{
-				name.append(TNS_PREFIX);
+				className.append(TNS_PREFIX);
 			}
 		}
 
-		name.append(node->m_name);
+		className.append(node->m_name);
 	}
 	else
 	{
-		name = node->m_name;
+		className = node->m_name;
 	}
 
 	bool success = instance->SetPrototype(classProxy);
 	ASSERT_MESSAGE(success, "CreateJSInstance: SetPrototype failed");
 	instance->Set(V8StringConstants::GetPrototype(), classProxy);
 
-	SetDebugName(name, instance);
+	SetDebugName(className, instance);
 
 	return instance;
 }
@@ -813,14 +833,60 @@ Handle<Object> MetadataNode::CreateJSInstance(const Handle<Object>& classProxy, 
 
 void MetadataNode::InvokeInterfaceCtor(const v8::FunctionCallbackInfo<v8::Value>& args, MetadataNode *node)
 {
-	ASSERT_MESSAGE(args.Length() == 1, "Interfaces should be created with single parameter");
-	ASSERT_MESSAGE(args[0]->IsObject(), "Interfaces  should be created with single object parameter containing overridden methods");
+	//ASSERT_MESSAGE(args.Length() == 1, "Interfaces should be created with single parameter");
+	//ASSERT_MESSAGE(args[0]->IsObject(), "Interfaces  should be created with single object parameter containing overridden methods");
+
+
+	Handle<Object> implementationObject;
+	Handle<String> v8ExtendName;
+	string extendLocation;
+	bool extendLocationFound = GetExtendLocation(extendLocation);
+	if (args.Length() == 1)
+	{
+		//ASSERT_MESSAGE(args[0]->IsObject(), "extends() should be called with object parameter containing overridden methods when no name specified");
+
+		//implementationObject = args[0]->ToObject();
+		//ASSERT_MESSAGE(args[0]->IsString(), "Invalid extends() call. No name for extend specified");
+		//ASSERT_FAIL("Invalid extend() call. No name for extend specified");
+
+		if (!extendLocationFound)
+		{
+			ASSERT_FAIL("Invalid extend() call. No name specified for extend. Location: %s", extendLocation.c_str());
+		}
+
+		ASSERT_MESSAGE(args[0]->IsObject(), "Invalid extend() call. No implementation object specified. Location: %s", extendLocation.c_str());
+		implementationObject = args[0]->ToObject();
+	}
+	else if (args.Length() == 2)
+	{
+		ASSERT_MESSAGE(args[0]->IsString(), "Invalid extend() call. No name for extend specified. Location: %s", extendLocation.c_str());
+		ASSERT_MESSAGE(args[1]->IsObject(), "Invalid extend() call. Named extend should be called with second object parameter containing overridden methods. Location: %s", extendLocation.c_str());
+
+		DEBUG_WRITE("InvokeInterfaceCtor: getting extend name");
+		v8ExtendName = args[0]->ToString();
+		implementationObject = args[1]->ToObject();
+	}
+	else
+	{
+		ASSERT_FAIL("Invalid extend() call. Location: %s", extendLocation.c_str());
+	}
+
+	string className = node->m_implType;
+	string extendName = ConvertToString(v8ExtendName);
+
+
+	string extendNameAndLocation = extendLocation + extendName;
+
+	//string fullInterfaceName = className + '-' + extendNameAndLocation;
+//	if (ExistsExtendName(fullInterfaceName))
+//	{
+//		ASSERT_FAIL("Extend name %s already used", fullInterfaceName.c_str());
+//		APP_FAIL("Failed: Extend name already used");
+//		return;
+//	}
 
 	auto isolate = Isolate::GetCurrent();
-
 	auto interfaceProxy = args.Callee();
-
-	auto implementationObject = args[0].As<Object>();
 	implementationObject->SetHiddenValue(V8StringConstants::GetClassImplementationObject(), External::New(isolate, node));
 	bool success = implementationObject->SetPrototype(interfaceProxy);
 	ASSERT_MESSAGE(success, "InvokeInterfaceCtor: SetPrototype failed on implementation object");
@@ -837,12 +903,12 @@ void MetadataNode::InvokeInterfaceCtor(const v8::FunctionCallbackInfo<v8::Value>
 	DEBUG_WRITE("InvokeInterfaceCtor: interface instanceproxy:%d", instance->GetIdentityHash());
 
 	ArgsWrapper argWrapper(args, ArgType::Interface, false);
-	string name = node->m_implType;
 
-	bool instanceCreated = s_registerInstance(instance, name, argWrapper, implementationObject, true);
+	bool instanceCreated = s_registerInstance(instance, extendNameAndLocation, className, argWrapper, implementationObject, true);
 
 	if (instanceCreated)
 	{
+		//s_usedExtendNames[fullInterfaceName] = 1;
 		args.GetReturnValue().Set(instance);
 	}
 }
@@ -861,39 +927,137 @@ string MetadataNode::ResolveMethodOverload(const v8::FunctionCallbackInfo<Value>
 
 void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Value>& args, MetadataNode *node)
 {
-	ASSERT_MESSAGE(args.Length() == 1, "extends() should be called with single parameter");
-	ASSERT_MESSAGE(args[0]->IsObject(), "extends() should be called with single object parameter containing overridden methods");
+	Handle<Object> implementationObject;
+	Handle<String> extendName;
+	string extendLocation;
+	bool extendLocationFound = GetExtendLocation(extendLocation);
 
-	//string currExtClass = node->m_parent->m_name;
-	string currExtClass = node->m_name;
-	auto classProxy = GetExistingClassProxy(currExtClass);
-	ASSERT_MESSAGE(!classProxy.IsEmpty(), "ClassProxy %s not found when extending.", currExtClass.c_str());
-
-	auto isolate = Isolate::GetCurrent();
-
-	auto implementationObject = args[0]->ToObject();
-	auto implObjPropName = V8StringConstants::GetClassImplementationObject();
-	auto implObjProp = implementationObject->GetHiddenValue(implObjPropName);
-	if (implObjProp.IsEmpty())
+	if (args.Length() == 1)
 	{
-		implementationObject->SetHiddenValue(implObjPropName, External::New(isolate, node));
+		if (!extendLocationFound)
+		{
+			stringstream ss;
+			ss << "Invalid extend() call. No name specified for extend at location: " << extendLocation.c_str();
+			string exceptionMessage = ss.str();
+
+			Isolate *isolate(Isolate::GetCurrent());
+			isolate->ThrowException(v8::Exception::Error((ConvertToV8String(exceptionMessage))));
+			return;
+		}
+
+
+		if (!args[0]->IsObject())
+		{
+			stringstream ss;
+			ss << "Invalid extend() call. No implementation object specified at location: " << extendLocation.c_str();
+			string exceptionMessage = ss.str();
+
+			Isolate *isolate(Isolate::GetCurrent());
+			isolate->ThrowException(v8::Exception::Error((ConvertToV8String(exceptionMessage))));
+			return;
+		}
+
+		implementationObject = args[0]->ToObject();
+	}
+	else if (args.Length() == 2)
+	{
+		if (!args[0]->IsString())
+		{
+			stringstream ss;
+			ss << "Invalid extend() call. No name for extend specified at location: " << extendLocation.c_str();
+			string exceptionMessage = ss.str();
+
+			Isolate *isolate(Isolate::GetCurrent());
+			isolate->ThrowException(v8::Exception::Error((ConvertToV8String(exceptionMessage))));
+			return;
+		}
+
+		if (!args[1]->IsObject())
+		{
+			stringstream ss;
+			ss << "Invalid extend() call. Named extend should be called with second object parameter containing overridden methods at location: " << extendLocation.c_str();
+			string exceptionMessage = ss.str();
+
+			Isolate *isolate(Isolate::GetCurrent());
+			isolate->ThrowException(v8::Exception::Error((ConvertToV8String(exceptionMessage))));
+			return;
+		}
+
+		DEBUG_WRITE("ExtendsCallMethodHandler: getting extend name");
+		extendName = args[0]->ToString();
+		bool isValidExtendName = IsValidExtendName(extendName);
+		if(!isValidExtendName)
+		{
+			stringstream ss;
+			ss << "The extend name \"" << ConvertToString(extendName) << "\" you provided contains invalid symbols. Try using the symbols [a-z, A-Z, 0-9, _]." << endl;
+			string exceptionMessage = ss.str();
+
+			Isolate *isolate(Isolate::GetCurrent());
+			isolate->ThrowException(v8::Exception::Error((ConvertToV8String(exceptionMessage))));
+			return;
+		}
+		implementationObject = args[1]->ToObject();
 	}
 	else
 	{
-		auto ext = implObjProp.As<External>();
-		auto extClass = static_cast<MetadataNode*>(ext->Value());
+		stringstream ss;
+		ss << "Invalid extend() call at location: " << extendLocation.c_str();
+		string exceptionMessage = ss.str();
 
-		string usedExtClass = extClass->m_name;
-
-		if (usedExtClass != currExtClass)
-		{
-			stringstream s;
-			s << "This object is used to extend another class '" << extClass->m_name << "'";
-			ExceptionUtil::GetInstance()->HandleInvalidState(s.str(), false);
-			return;
-		}
+		Isolate *isolate(Isolate::GetCurrent());
+		isolate->ThrowException(v8::Exception::Error((ConvertToV8String(exceptionMessage))));
+		return;
 	}
-	V8SetHiddenValue(classProxy, "t::ext", implementationObject);
+
+	DEBUG_WRITE("ExtendsCallMethodHandler: called with %s", ConvertToString(extendName).c_str());
+	string currExtClass = node->m_name;
+	auto classProxy = GetExistingClassProxy(currExtClass);
+
+	if (classProxy.IsEmpty())
+	{
+		stringstream ss;
+		ss << "ClassProxy " << currExtClass.c_str() << " not found when extending.";
+		string exceptionMessage = ss.str();
+
+		Isolate *isolate(Isolate::GetCurrent());
+		isolate->ThrowException(v8::Exception::Error((ConvertToV8String(exceptionMessage))));
+		return;
+	}
+
+	auto isolate = Isolate::GetCurrent();
+
+	string extendNameAndLocation = extendLocation + ConvertToString(extendName);
+	string fullClassName = node->m_name + '-' + extendNameAndLocation; //ConvertToString(extendName);
+	DEBUG_WRITE("ExtendsCallMethodHandler: extend full name %s", fullClassName.c_str());
+
+
+	if (ExistsExtendName(fullClassName))
+	{
+		stringstream ss;
+		ss << "Extend name " << fullClassName.c_str() << "already used.";
+		string exceptionMessage = ss.str();
+
+		Isolate *isolate(Isolate::GetCurrent());
+		isolate->ThrowException(v8::Exception::Error((ConvertToV8String(exceptionMessage))));
+		return;
+	}
+
+	auto implementationObjectPropertyName = V8StringConstants::GetClassImplementationObject();
+	//reuse validation - checks that implementationObject is not reused for different classes
+	auto implementationObjectProperty = implementationObject->GetHiddenValue(implementationObjectPropertyName).As<String>();
+	if (implementationObjectProperty.IsEmpty())
+	{
+		//mark the implementationObject as such and set a pointer to it's class node inside it for reuse validation later
+		implementationObject->SetHiddenValue(implementationObjectPropertyName, String::NewFromUtf8(isolate, fullClassName.c_str()));
+	}
+	else
+	{
+		string usedClassName = ConvertToString(implementationObjectProperty);
+		stringstream s;
+		s << "This object is used to extend another class '" << usedClassName << "'";
+		ExceptionUtil::GetInstance()->HandleInvalidState(s.str(), false);
+		return;
+	}
 
 	//TODO: We may need to expose super object for Typescript world
 	auto superObj = Object::New(isolate);
@@ -906,13 +1070,38 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 	ASSERT_MESSAGE(success, "ExtendsCallMethodHandler: SetPrototype failed on implementation object");
 	implementationObject->Set(V8StringConstants::GetPrototype(), classProxy);
 
-	auto extendedClass = node->CreateExtendedClassProxy(isolate, classProxy, implementationObject);
+	Local<Function> extendedClass = node->CreateExtendedClassProxy(isolate, implementationObject, ConvertToV8String(extendNameAndLocation));
 
+	auto classProxyPersistent = new Persistent<Object>(isolate, extendedClass);
+	DEBUG_WRITE("CreateExtendedClassProxy: ExtendedClassProxy for %s created id:%d",  node->m_name.c_str(), extendedClass->GetIdentityHash());
+	s_classProxies[fullClassName] = classProxyPersistent;
+
+	V8SetHiddenValue(extendedClass, "t::ext", implementationObject);
+	s_usedExtendNames[fullClassName] = 1;
 	DEBUG_WRITE("ExtendsCallMethodHandler: created ExtendedClassProxy on %s, Id: %d", currExtClass.c_str(), extendedClass->GetIdentityHash());
 	args.GetReturnValue().Set(extendedClass);
 }
 
-Handle<Function> MetadataNode::CreateExtendedClassProxy(Isolate *isolate, const Handle<Object>& classProxy, const Handle<Object>& implementationObject)
+bool MetadataNode::IsValidExtendName(const Handle<String>& name)
+{
+	string extendNam = ConvertToString(name);
+
+	for(int i = 0; i < extendNam.size(); i++)
+	{
+		char currentSymbol = extendNam[i];
+		bool isValidExtendNameSymbol = isalpha(currentSymbol) ||
+										isdigit(currentSymbol) ||
+										currentSymbol == '_';
+		if(!isValidExtendNameSymbol)
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
+Handle<Function> MetadataNode::CreateExtendedClassProxy(Isolate *isolate, const Handle<Object>& implementationObject, const Handle<String>& name)
 {
 	EscapableHandleScope handleScope(isolate);
 
@@ -925,12 +1114,67 @@ Handle<Function> MetadataNode::CreateExtendedClassProxy(Isolate *isolate, const 
 	V8SetHiddenValue(extended, METADATA_NODE_KEY_NAME, external);
 
 	success = extended->SetHiddenValue(V8StringConstants::GetTSuper(), Boolean::New(isolate, true));
-	ASSERT_MESSAGE(success, "CreateClassProxy: mark classProxyFunction as super object failed");
+	ASSERT_MESSAGE(success, "CreateExtendedClassProxy: mark classProxyFunction as super object failed");
+
+	success = extended->SetHiddenValue(String::NewFromUtf8(isolate, "t::ExtendsName"), name);
+	ASSERT_MESSAGE(success, "CreateExtendedClassProxy: setting extends name failed");
 
 	SetDebugName(m_name, extended);
 
 	return handleScope.Escape(extended);
 }
+
+bool MetadataNode::GetExtendLocation(string& extendLocation)
+{
+	stringstream extendLocationStream;
+	Local<StackTrace> stackTrace = StackTrace::CurrentStackTrace(Isolate::GetCurrent(), 1, StackTrace::kOverview);
+	if (!stackTrace.IsEmpty())
+	{
+		Handle<StackFrame> frame = stackTrace->GetFrame(0);
+		if (!frame.IsEmpty())
+		{
+			auto scriptName = frame->GetScriptName();
+			if (scriptName.IsEmpty())
+			{
+				extendLocationStream << "unkown location";
+				extendLocation = extendLocationStream.str();
+				return false;
+			}
+
+			string srcFileName = ConvertToString(scriptName);
+			std::replace(srcFileName.begin(), srcFileName.end(), '/', '-');
+			std::replace(srcFileName.begin(), srcFileName.end(), '.', '-');
+			int lineNumber = frame->GetLineNumber();
+			if (lineNumber < 0)
+			{
+				extendLocationStream << srcFileName.c_str() << " unkown line number";
+				extendLocation = extendLocationStream.str();
+				return false;
+			}
+
+			if (lineNumber > Constants::MODULE_LINES_OFFSET)
+			{
+				lineNumber -= Constants::MODULE_LINES_OFFSET;
+			}
+
+			int column = frame->GetColumn();
+			if (column < 0)
+			{
+				extendLocationStream << srcFileName.c_str() << " line:" << lineNumber << " unkown column number";
+				extendLocation = extendLocationStream.str();
+				return false;
+			}
+
+
+			extendLocationStream << "f" << srcFileName.c_str() << "-l" << lineNumber << "-c" << column << "--";
+			//DEBUG_WRITE("EXTEND_LOCATION %s", extendLocationStream.str().c_str());
+		}
+	}
+
+	extendLocation = extendLocationStream.str();
+	return true;
+}
+
 
 MetadataNode* MetadataNode::GetNodeFromHandle(const Handle<Object>& value)
 {
@@ -1158,7 +1402,7 @@ vector<MetadataEntry> MetadataNode::GetMetadataCandidatesForTypeWithoutCustomMet
 		}
 	}
 
-	if ((propName == V8StringConstants::EXTEND) || (propName == V8StringConstants::EXTENDS))
+	if (propName == V8StringConstants::EXTEND)
 	{
 		MetadataEntry extendEntry;
 		extendEntry.name = "extend";
@@ -1166,13 +1410,6 @@ vector<MetadataEntry> MetadataNode::GetMetadataCandidatesForTypeWithoutCustomMet
 		extendEntry.treeNode = node->m_treeNode;
 		extendEntry.isTypeMember = true;
 		candidates.push_back(extendEntry);
-
-		MetadataEntry extendsEntry;
-		extendsEntry.name = "extends";
-		extendsEntry.type = NodeType::Method;
-		extendsEntry.treeNode = node->m_treeNode;
-		extendsEntry.isTypeMember = true;
-		candidates.push_back(extendsEntry);
 	}
 
 	//get candidates from instance fields metadata
@@ -1430,6 +1667,7 @@ void MetadataNode::CreateTopLevelNamespaces(const Handle<Object>& global)
 
 
 std::map<std::string, Persistent<Object>*> MetadataNode::s_classProxies;
+std::map<std::string, int> MetadataNode::s_usedExtendNames;
 std::map<std::string, MetadataNode*> MetadataNode::s_name2NodeCache;
 std::map<std::string, MetadataTreeNode*> MetadataNode::s_name2TreeNodeCache;
 std::map<MetadataTreeNode*, MetadataNode*> MetadataNode::s_treeNode2NodeCache;
@@ -1444,6 +1682,6 @@ RegisterInstanceCallback MetadataNode::s_registerInstance = nullptr;
 GetTypeMetadataCallback MetadataNode::s_getTypeMetadata = nullptr;
 string MetadataNode::METADATA_NODE_KEY_NAME = "t::MetadataNode";
 string MetadataNode::CLASS_PROXY = "t::ClassProxy";
-string MetadataNode::TNS_PREFIX = "com/tns/";
+string MetadataNode::TNS_PREFIX = "com/tns/gen/";
 string MetadataNode::TNS_TESTS_PREFIX = "com/tns/tests/";
 MetadataReader MetadataNode::s_metadataReader;

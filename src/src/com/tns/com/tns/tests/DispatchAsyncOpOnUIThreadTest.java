@@ -37,18 +37,16 @@ public class DispatchAsyncOpOnUIThreadTest extends com.tns.tests.DispatchAsyncOp
 		return super.equals(other);
 	}
 
-	@Override
-	public void setNativeScriptOverrides(String[] overrides)
-	{
-		for (String name: overrides)
-		{
-			if (name.equals("processData"))
-			{
-				isDoAsyncOverriden = true;
-			}
-		}
-	}
-
 	private boolean __initialized;
 	private boolean isDoAsyncOverriden;
+	
+	@Override
+	public void setNativeScriptOverride(String name)
+	{
+		if (name.equals("processData"))
+		{
+			isDoAsyncOverriden = true;
+		}
+		
+	}
 }

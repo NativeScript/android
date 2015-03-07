@@ -47,26 +47,22 @@ public class DummyClassWithInit extends com.tns.tests.DummyClassWithInit impleme
 		return super.equals(other);
 	}
 
-	@Override
-	public void setNativeScriptOverrides(String[] overrides)
-	{
-		// Edit "if" statements when necessary
-		for (String name: overrides)
-		{
-			if (name.equals("init"))
-			{
-				__ctorOverriden = true;
-			}
-
-			if (name.equals("init"))
-			{
-				__ho1 = true;
-			}
-		}
-	}
-	
 	private boolean __initialized;
 	private boolean __ctorOverriden;
 	private boolean __ho1;
+	@Override
+	public void setNativeScriptOverride(String name)
+	{
+		if (name.equals("init"))
+		{
+			__ctorOverriden = true;
+		}
+
+		if (name.equals("init"))
+		{
+			__ho1 = true;
+		}
+		
+	}
 
 }

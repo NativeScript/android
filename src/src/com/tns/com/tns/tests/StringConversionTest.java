@@ -43,19 +43,15 @@ public class StringConversionTest extends com.tns.tests.StringConversionTest imp
 		return super.equals(other);
 	}
 
-	@Override
-	public void setNativeScriptOverrides(String[] overrides)
-	{
-		for (String name: overrides)
-		{
-			if (name.equals("callback"))
-			{
-				isCallabackOverriden = true;
-			}
-		}
-	}
-
 	private boolean __initialized;
 	private boolean isCallabackOverriden;
+	@Override
+	public void setNativeScriptOverride(String name)
+	{
+		if (name.equals("callback"))
+		{
+			isCallabackOverriden = true;
+		}
+	}
 
 }

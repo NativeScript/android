@@ -39,7 +39,7 @@ namespace tns
 
 	typedef void (*CallJavaMethodCallback)(const v8::Handle<v8::Object>& caller, const std::string& classJniSignature, const std::string& methodName, const std::string& methodJniSignature, const std::string& declaringClassJniSignature, bool isStatic, bool isSuper, const v8::FunctionCallbackInfo<v8::Value>& args);
 
-	typedef bool (*RegisterInstanceCallback)(const v8::Handle<v8::Object>& jsObject, const std::string& javaObjectFullName, const ArgsWrapper& argWrapper, const v8::Handle<v8::Object>& implementationObject, bool isInterface);
+	typedef bool (*RegisterInstanceCallback)(const v8::Handle<v8::Object>& jsObject, const std::string& name, const std::string& className, const ArgsWrapper& argWrapper, const v8::Handle<v8::Object>& implementationObject, bool isInterface);
 
 	typedef void (*MakeClassInstanceOfTypeStrongCallback)(const std::string& classPath, const v8::Handle<v8::Object>& classObj);
 
@@ -67,6 +67,8 @@ namespace tns
 		static v8::Handle<v8::Object> CreateJSInstance(const v8::Handle<v8::Object>& classProxy, MetadataNode *node, const v8::Handle<v8::Object>& implementationObject, std::string& name);
 
 		static v8::Handle<v8::Object> GetExistingClassProxy(const std::string& name);
+
+		static bool ExistsExtendName(const std::string& name);
 
 		static MetadataNode* GetNodeFromHandle(const v8::Handle<v8::Object>& value);
 
@@ -153,7 +155,7 @@ namespace tns
 
 		v8::Handle<v8::Object> CreatePackageProxy(v8::Isolate *isolate);
 		v8::Handle<v8::Object> CreateClassProxy(v8::Isolate *isolate, bool isClass);
-		v8::Handle<v8::Function> CreateExtendedClassProxy(v8::Isolate *isolate, const v8::Handle<v8::Object>& classProxy, const v8::Handle<v8::Object>& implementationObject);
+		v8::Handle<v8::Function> CreateExtendedClassProxy(v8::Isolate *isolate, const v8::Handle<v8::Object>& implementationObject, const v8::Handle<v8::String>& name);
 		v8::Handle<v8::Object> CreateStaticClassProxy(v8::Isolate *isolate);
 		v8::Handle<v8::Function> CreateFunction(const v8::Handle<v8::Object>& thiz, const std::vector<MetadataEntry>& candidates);
 
@@ -186,12 +188,15 @@ namespace tns
 		static void ArrayIndexedPropertySetterCallback(uint32_t index, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<v8::Value>& info);
 
 		static std::map<std::string, v8::Persistent<v8::Object>* > s_classProxies;
+		static std::map<std::string, int> s_usedExtendNames;
 		static std::map<std::string, MetadataNode*> s_name2NodeCache;
 		static std::map<std::string, MetadataTreeNode*> s_name2TreeNodeCache;
 		static std::map<MetadataTreeNode*, MetadataNode*> s_treeNode2NodeCache;
 
 		static void SetDebugName(const std::string& name, const v8::Handle<v8::Object>& value);
 
+		static bool IsValidExtendName(const v8::Handle<v8::String>& name);
+		static bool GetExtendLocation(std::string& extendLocation);
 		static GetJavaFieldCallback s_getJavaField;
 		static SetJavaFieldCallback s_setJavaField;
 		static GetArrayElementCallback s_getArrayElement;

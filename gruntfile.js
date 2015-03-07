@@ -8,14 +8,12 @@ module.exports = function(grunt) {
     var args = {
         metadataGen: grunt.option("metadataGen") || "../android-metadata-generator/dist/tns-android-metadata-generator-0.0.1.tgz",
         libsDir: grunt.option("libsDir") || "./src/libs",
-        dexBindingsDir: grunt.option("dexBindingsDir") || "../android-static-libs/DexBindings",
-        jarBindingsDir: grunt.option("jarBindingsDir") || "../android-static-libs/JarBindings",
         devmode: (grunt.option("devmode") == true) || false,
         metadataGenSrc: grunt.option("metadataGenSrc") || "../android-metadata-generator"
     };
 
-    var generatorDir = rootDir + "/Bindings/Generator";
-    var jarCreationDir = rootDir + "/Bindings/JarCreation";
+    //var generatorDir = rootDir + "/Bindings/Generator";
+    //var jarCreationDir = rootDir + "/Bindings/JarCreation";
 
     var testPackageFile = function(filePath)
     {
@@ -54,11 +52,11 @@ module.exports = function(grunt) {
         metadataGenPath: args.metadataGen,
         android17SrcJar: pathModule.join(process.env.ANDROID_HOME, "platforms/android-17/android.jar"),
         localAndroid17Jar: pathModule.join(rootDir, "src", "libs", "android17.jar"),
+        androidSupportLibSource: pathModule.join(rootDir, "binding-generator", "Generator", "libs", "android-support-v4.jar"),
+        androidSupportLibDestination: pathModule.join(rootDir, "src", "libs", "android-support-v4.jar"),
         runtimeDir: pathModule.join(rootDir, "src"),
         libsDir: pathModule.join(rootDir, "src", "libs"),
         runtimeBinariesDir: pathModule.join(rootDir, "src", "dist"),
-        dexBindingsDir: args.dexBindingsDir,
-        jarBindingsDir: args.jarBindingsDir,
         metadataRuntimeJarSrc: pathModule.join(rootDir, "src", "dist", "libs", "nativescript.jar"),
         metadataRuntimeJar: pathModule.join(rootDir, "src", "libs", "nativescript.jar")
     };
@@ -125,12 +123,6 @@ module.exports = function(grunt) {
                 src: ["**/*.*"],
                 dest: pathModule.join(outDir, "framework", "libs") + "/"
             },
-            collectBindings: {
-                files: [
-                    { expand: true, src: "**/*.*", cwd: localCfg.dexBindingsDir, dest: pathModule.join(outDir, "framework", "assets", "bindings") + "/" },
-                    { expand: true, src: "**/*.*", cwd: localCfg.jarBindingsDir, dest: pathModule.join(outDir, "framework", "libs") + "/" }
-                ]
-            },
             runtimeJarToLibs: {
                 src: [localCfg.metadataRuntimeJarSrc],
                 dest: localCfg.metadataRuntimeJar
@@ -169,6 +161,10 @@ module.exports = function(grunt) {
             android17Lib: {
                 src: localCfg.android17SrcJar,
                 dest: localCfg.localAndroid17Jar
+            },
+            androidSupportLib: {
+                src: localCfg.androidSupportLibSource,
+                dest: localCfg.androidSupportLibDestination
             }
         },
         replace: {
@@ -224,6 +220,7 @@ module.exports = function(grunt) {
     grunt.registerTask("generateMetadata", [
                 "exec:installMetadataGenerator",
                 "copy:android17Lib",
+                "copy:androidSupportLib",
                 "copy:runtimeJarToLibs",
                 "exec:runMetadataGenerator",
                 "clean:android17Lib",
@@ -254,7 +251,7 @@ module.exports = function(grunt) {
                             "generateMetadata",
                             "copy:collectRuntime",
                             "copy:collectLibs",
-                            "copy:collectBindings",
+                            //"copy:collectBindings",
                             "exec:npmPack"
             ]);
 

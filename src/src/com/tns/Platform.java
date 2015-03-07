@@ -1,6 +1,7 @@
 package com.tns;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.lang.Thread.UncaughtExceptionHandler;
@@ -11,6 +12,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.zip.ZipEntry;
@@ -23,6 +25,7 @@ import android.os.Looper;
 import android.util.Log;
 import android.util.SparseArray;
 
+import com.tns.bindings.ProxyGenerator;
 import com.tns.internal.ExtractPolicy;
 
 public class Platform
@@ -31,7 +34,7 @@ public class Platform
 
 	private static native void runNativeScript(String appModuleName, String appContent);
 
-	private static native Object callJSMethodNative(int javaObjectID, String methodName, Object... packagedArgs) throws NativeScriptException;
+	private static native Object callJSMethodNative(int javaObjectID, String methodName, boolean isConstructor, Object... packagedArgs) throws NativeScriptException;
 
 	private static native String[] createJSInstanceNative(Object javaObject, int javaObjectID, String canonicalName, boolean createActivity, Object[] packagedCreationArgs);
 
@@ -80,6 +83,7 @@ public class Platform
 	
 	public static boolean IsLogEnabled = BuildConfig.DEBUG;
 	
+	private static DexFactory dexFactory;
 	public final static String DEFAULT_LOG_TAG = "TNS.Java";
 	
 	public static Class<?> getErrorActivityClass(){
@@ -101,6 +105,7 @@ public class Platform
 
 		Require.init(context);
 
+		Platform.dexFactory = new DexFactory(context);
 		NativeScriptContext = context;
 
 		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "Initializing NativeScript JAVA");
@@ -131,12 +136,14 @@ public class Platform
 	public static void enableVerboseLogging()
 	{
 		IsLogEnabled = true;
+		ProxyGenerator.IsLogEnabled = true;
 		enableVerboseLoggingNative();
 	}
 
 	public static void disableVerboseLogging()
 	{
 		IsLogEnabled = false;
+		ProxyGenerator.IsLogEnabled = false;
 		disableVerboseLoggingNative();
 	}
 
@@ -200,10 +207,13 @@ public class Platform
 		runNativeScript(appFileName, appContent);
 	}
 
-	private static int cacheConstructor(String className, Object[] args) throws ClassNotFoundException
+	private static int cacheConstructor(Constructor<?> ctor) throws ClassNotFoundException
 	{
-		Constructor<?> ctor = MethodResolver.resolveConstructor(className, args);
+		//Constructor<?> ctor = MethodResolver.resolveConstructor(className, args);
+
 		
+		//TODO: Lubo: Not thread safe already.
+		//TODO: Lubo: Does not check for existing items
 		int ctorId = ctorCache.size();
 		
 		ctorCache.add(ctor);
@@ -211,11 +221,34 @@ public class Platform
 		return ctorId;
 	}
 
-	public static Object createInstance(Object[] args, String[] methodOverrides, int objectId, int constructorId) throws InstantiationException, IllegalAccessException, ClassNotFoundException, NoSuchMethodException, IllegalArgumentException, InvocationTargetException
+	public static Object createInstance(String name, String className, Object[] args, String[] methodOverrides, int objectId, IntWrapper constructorId) throws InstantiationException, IllegalAccessException, ClassNotFoundException, NoSuchMethodException, IllegalArgumentException, InvocationTargetException, IOException
 	{
-		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "Creating instance for ctorId=" + constructorId);
+		if (IsLogEnabled)
+		{
+			Log.d(DEFAULT_LOG_TAG, "Creating instance for ctorId:" + constructorId + " className:" + className + " methodOverrides: " + Arrays.toString(methodOverrides));
+		}
 		
-		Constructor<?> ctor = ctorCache.get(constructorId);
+		Constructor<?> ctor = null;
+		int ctorId = constructorId.getInt();
+		if (ctorId == -1)
+		{
+			if (IsLogEnabled)
+			{
+				Log.d(DEFAULT_LOG_TAG, "createInstance: resolving constructor for class:" + className + " name: " + name);
+			}
+			
+			ctor = MethodResolver.resolveConstructor(name, className, args, Platform.dexFactory, methodOverrides);
+			if (ctor == null)
+			{
+				throw new RuntimeException("Constructor not resolved");
+			}
+			ctorId = cacheConstructor(ctor);
+			constructorId.setInt(ctorId);
+		}
+		else
+		{
+			ctor = ctorCache.get(ctorId);
+		}
 		boolean success = MethodResolver.convertConstructorArgs(ctor, args);
 
 		if (!success)
@@ -291,7 +324,10 @@ public class Platform
 		if (instance instanceof NativeScriptHashCodeProvider)
 		{
 			NativeScriptHashCodeProvider obj = (NativeScriptHashCodeProvider) instance;
-			obj.setNativeScriptOverrides(methodOverrides);
+for (String name: methodOverrides)
+			{
+				obj.setNativeScriptOverride(name);
+			}
 		}
 
 		int objectId = Platform.currentObjectId;
@@ -312,7 +348,15 @@ public class Platform
 
 		Object[] packagedArgs = packageArgs(args);
 
-		String[] methodOverrides = createJSInstanceNative(instance, javaObjectID, instance.getClass().getCanonicalName(), instance instanceof Activity, packagedArgs);
+		String className = instance.getClass().getName();
+		boolean isGeneratedProxy = instance instanceof NativeScriptHashCodeProvider;
+		boolean createActivity = instance instanceof Activity;
+		if (isGeneratedProxy && !createActivity)
+		{
+			className = instance.getClass().getSuperclass().getName();
+		}
+				
+		String[] methodOverrides = createJSInstanceNative(instance, javaObjectID, className, createActivity, packagedArgs);
 
 		if (IsLogEnabled)
 		{
@@ -617,11 +661,11 @@ public class Platform
 		Integer javaObjectID = getJavaObjectID(javaObject);
 		if (javaObjectID == null)
 		{
-			if (IsLogEnabled) Log.e(DEFAULT_LOG_TAG, "Platform.CallJSMethod: calling js method " + methodName + " with javaObjectID " + javaObjectID + " type=" + ((javaObject != null) ? javaObject.getClass().getCanonicalName() : "null"));
+			if (IsLogEnabled) Log.e(DEFAULT_LOG_TAG, "Platform.CallJSMethod: calling js method " + methodName + " with javaObjectID " + javaObjectID + " type=" + ((javaObject != null) ? javaObject.getClass().getName() : "null"));
 			APP_FAIL("Application failed");
 		}
 
-		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "Platform.CallJSMethod: calling js method " + methodName + " with javaObjectID " + javaObjectID + " type=" + ((javaObject != null) ? javaObject.getClass().getCanonicalName() : "null"));
+		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "Platform.CallJSMethod: calling js method " + methodName + " with javaObjectID " + javaObjectID + " type=" + ((javaObject != null) ? javaObject.getClass().getName() : "null"));
 
 		Object result = dispatchCallJSMethodNative(javaObjectID, methodName, isConstructor, delay, args);
 
@@ -778,7 +822,7 @@ public class Platform
 		if (isMainThread)
 		{
 			Object[] packagedArgs = packageArgs(tmpArgs);
-			ret = callJSMethodNative(javaObjectID, methodName, packagedArgs);
+			ret = callJSMethodNative(javaObjectID, methodName, isConstructor, packagedArgs);
 		}
 		else
 		{
@@ -786,6 +830,7 @@ public class Platform
 
 			final Object[] arr = new Object[2];
 			
+			final boolean isCtor = isConstructor; 
 			Runnable r = new Runnable()
 			{
 				@Override
@@ -796,7 +841,7 @@ public class Platform
 						try
 						{
 							final Object[] packagedArgs = packageArgs(tmpArgs);
-							arr[0] = callJSMethodNative(javaObjectID, methodName, packagedArgs);
+							arr[0] = callJSMethodNative(javaObjectID, methodName, isCtor, packagedArgs);
 						}
 						finally
 						{
@@ -852,4 +897,25 @@ public class Platform
 		Class<?> clazz = classCache.get(className);
 		return clazz;
 	}
+
+        public static class IntWrapper
+	{
+		private int value;
+
+		public IntWrapper(int value)
+		{
+			setInt(value);
+		}
+
+		public int getInt()
+		{
+			return value;
+		}
+
+		public void setInt(int value)
+		{
+			this.value = value;
+		}
+	}
+
 }

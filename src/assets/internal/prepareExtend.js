@@ -57,15 +57,20 @@ var __extends = function(Child, Parent) {
 		}
 		
 		function extend(child, parent) {
-	        
+			Log("TS extend called");
 			if (!child.__extended) {
-	        	child.__extended = parent.extend(child.prototype);
+	        	child.__extended = parent.extend(child.name, child.prototype);
 	        }
 	 
 	        return child.__extended;
 	    };
 	    
-		Parent.call = function(thiz) {
+	    Parent.__activityExtend = function(parent, name, implementationObject) {
+	    	Log("__activityExtend called");
+	    	return parent.extend(name, implementationObject);
+	    };
+	    
+	    Parent.call = function(thiz) {
 			var Extended = extend(thiz.__proto__.__child, thiz.__proto__.__parent);
 			if (arguments.length > 1)
 			{

@@ -8,7 +8,7 @@ var TestProcessDataCallbackShouldBeExecutedOnUiThread = function() {
 
 	Log("TEST: TestProcessDataCallbackShouldBeExecutedOnUiThread"); 
 
-	var D = com.tns.tests.DispatchAsyncOpOnUIThreadTest.extends({
+	var D = com.tns.tests.DispatchAsyncOpOnUIThreadTest.extend("DispatchAsyncOpOnUIThreadTest", {
 		processData: function(index, data) {
 			if (index === 0) {
 				Assert(data === 123, "TestProcessDataCallbackShouldBeExecutedOnUiThread FAILED: Expected value is 123, actual value=" + data);
