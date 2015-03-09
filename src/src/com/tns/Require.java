@@ -16,7 +16,12 @@ public class Require
 	private static String ModulesFilesPath;
 	private static String NativeScriptModulesFilesPath;
 	private static boolean initialized = false;
-	private static final String ModuleContent = "(function(){\n var module = {}; module.exports = arguments[0];" + "var exports = module.exports; var __dirname = \"%s\"; var __filename = \"%s\";" + "function require(moduleName){ return global.require(moduleName, __filename); }" + "module.filename = __filename; this.__extends = global.__extends; \n %s \n return module.exports; \n})";
+	//private static final String ModuleContent = "(function(){\n var module = {}; module.exports = arguments[0];" + "var exports = module.exports; var __dirname = \"%s\"; var __filename = \"%s\";" + "function require(moduleName){ return global.require(moduleName, __filename); }" + "module.filename = __filename; this.__extends = global.__extends; \n %s \n return module.exports; \n})";
+	private static final String ModuleContent_Part1 = "(function(){\n var module = {}; module.exports = arguments[0];" + "var exports = module.exports; var __dirname = \"";
+	private static final String ModuleContent_Part2 = "\"; var __filename = \"";
+	private static final String ModuleContent_Part3 = "\";" + "function require(moduleName){ return global.require(moduleName, __filename); }" + "module.filename = __filename; this.__extends = global.__extends; \n";
+	private static final String ModuleContent_Part4 ="\n return module.exports; \n})";
+	private static final StringBuffer ModuleContent = new StringBuffer(65536);
 
 	public static void init(Context context)
 	{
@@ -70,7 +75,15 @@ public class Require
 			// We are inserting local require function in the scope of the
 			// module to pass the __fileName (calling file) variable in the
 			// global.require request.
-			return String.format(ModuleContent, file.getParent(), modulePath, moduleFileContent);
+			ModuleContent.setLength(0);
+			ModuleContent.append(ModuleContent_Part1);
+			ModuleContent.append(file.getParent());
+			ModuleContent.append(ModuleContent_Part2);
+			ModuleContent.append(modulePath);
+			ModuleContent.append(ModuleContent_Part3);
+			ModuleContent.append(moduleFileContent);
+			ModuleContent.append(ModuleContent_Part4);
+			return ModuleContent.toString();
 		}
 		catch (IOException e)
 		{
