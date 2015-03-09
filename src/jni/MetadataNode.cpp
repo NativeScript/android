@@ -940,8 +940,7 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 			ss << "Invalid extend() call. No name specified for extend at location: " << extendLocation.c_str();
 			string exceptionMessage = ss.str();
 
-			Isolate *isolate(Isolate::GetCurrent());
-			isolate->ThrowException(v8::Exception::Error((ConvertToV8String(exceptionMessage))));
+			ExceptionUtil::ThrowExceptionToJs(exceptionMessage);
 			return;
 		}
 
@@ -952,8 +951,7 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 			ss << "Invalid extend() call. No implementation object specified at location: " << extendLocation.c_str();
 			string exceptionMessage = ss.str();
 
-			Isolate *isolate(Isolate::GetCurrent());
-			isolate->ThrowException(v8::Exception::Error((ConvertToV8String(exceptionMessage))));
+			ExceptionUtil::ThrowExceptionToJs(exceptionMessage);
 			return;
 		}
 
@@ -967,8 +965,7 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 			ss << "Invalid extend() call. No name for extend specified at location: " << extendLocation.c_str();
 			string exceptionMessage = ss.str();
 
-			Isolate *isolate(Isolate::GetCurrent());
-			isolate->ThrowException(v8::Exception::Error((ConvertToV8String(exceptionMessage))));
+			ExceptionUtil::ThrowExceptionToJs(exceptionMessage);
 			return;
 		}
 
@@ -978,8 +975,7 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 			ss << "Invalid extend() call. Named extend should be called with second object parameter containing overridden methods at location: " << extendLocation.c_str();
 			string exceptionMessage = ss.str();
 
-			Isolate *isolate(Isolate::GetCurrent());
-			isolate->ThrowException(v8::Exception::Error((ConvertToV8String(exceptionMessage))));
+			ExceptionUtil::ThrowExceptionToJs(exceptionMessage);
 			return;
 		}
 
@@ -992,8 +988,7 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 			ss << "The extend name \"" << ConvertToString(extendName) << "\" you provided contains invalid symbols. Try using the symbols [a-z, A-Z, 0-9, _]." << endl;
 			string exceptionMessage = ss.str();
 
-			Isolate *isolate(Isolate::GetCurrent());
-			isolate->ThrowException(v8::Exception::Error((ConvertToV8String(exceptionMessage))));
+			ExceptionUtil::ThrowExceptionToJs(exceptionMessage);
 			return;
 		}
 		implementationObject = args[1]->ToObject();
@@ -1004,8 +999,7 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 		ss << "Invalid extend() call at location: " << extendLocation.c_str();
 		string exceptionMessage = ss.str();
 
-		Isolate *isolate(Isolate::GetCurrent());
-		isolate->ThrowException(v8::Exception::Error((ConvertToV8String(exceptionMessage))));
+		ExceptionUtil::ThrowExceptionToJs(exceptionMessage);
 		return;
 	}
 
@@ -1019,8 +1013,7 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 		ss << "ClassProxy " << currExtClass.c_str() << " not found when extending.";
 		string exceptionMessage = ss.str();
 
-		Isolate *isolate(Isolate::GetCurrent());
-		isolate->ThrowException(v8::Exception::Error((ConvertToV8String(exceptionMessage))));
+		ExceptionUtil::ThrowExceptionToJs(exceptionMessage);
 		return;
 	}
 
@@ -1037,8 +1030,7 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 		ss << "Extend name " << fullClassName.c_str() << "already used.";
 		string exceptionMessage = ss.str();
 
-		Isolate *isolate(Isolate::GetCurrent());
-		isolate->ThrowException(v8::Exception::Error((ConvertToV8String(exceptionMessage))));
+		ExceptionUtil::ThrowExceptionToJs(exceptionMessage);
 		return;
 	}
 
@@ -1585,8 +1577,7 @@ void MetadataNode::SetterCallback(Local<String> property, Local<Value> value, co
 				ss << "You are trying to SET \"" << first.name << "\" which is a final field! Final fields can only be read.";
 				string exceptionMessage = ss.str();
 
-				Isolate *isolate(Isolate::GetCurrent());
-				isolate->ThrowException(v8::Exception::Error((ConvertToV8String(exceptionMessage))));
+				ExceptionUtil::ThrowExceptionToJs(exceptionMessage);
 				return;
 			}
 			s_setJavaField(thiz, value, node->m_name, first.name, first.sig, first.declaringType, first.isStatic);

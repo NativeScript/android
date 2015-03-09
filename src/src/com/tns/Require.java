@@ -83,7 +83,7 @@ public class Require
 
 	public static String getModulePath(String moduleName, String callingModuleName)
 	{
-		// This method is called my the NativeScriptRuntime.cpp RequireCallback
+		// This method is called by the NativeScriptRuntime.cpp RequireCallback
 		// method.
 		// The currentModuleName is the fully-qualified path of the previously
 		// loaded module (if any)

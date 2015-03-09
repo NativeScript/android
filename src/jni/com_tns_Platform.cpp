@@ -61,6 +61,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved)
 
 void PrepareExtendFunction(Isolate *isolate, jstring filesPath)
 {
+	//read file prepareExtend.js
 	string fullPath = ArgConverter::jstringToString(filesPath);
 	fullPath.append("/internal/prepareExtend.js");
 
@@ -78,10 +79,12 @@ void PrepareExtendFunction(Isolate *isolate, jstring filesPath)
 
 	TryCatch tc;
 
+	//save prepareExtend.js to string (cmd)
 	auto cmd = ConvertToV8String(s);
 	auto origin = ConvertToV8String(fullPath);
-	DEBUG_WRITE("Compiling prepareExtend.js script");
 
+	//compile prepareExtend.js
+	DEBUG_WRITE("Compiling prepareExtend.js script");
 	auto script = Script::Compile(cmd, origin);
 	DEBUG_WRITE("Compile prepareExtend.js script");
 
@@ -93,10 +96,18 @@ void PrepareExtendFunction(Isolate *isolate, jstring filesPath)
 
 	DEBUG_WRITE("Compiled prepareExtend.js script");
 
+	//run prepareExtend.js
 	script->Run();
 
-	ExceptionUtil::GetInstance()->HandleTryCatch(tc, true);
+	//handle any exceptions that might occur when running the prepareExtend.js
+	if(ExceptionUtil::GetInstance()->HandleTryCatch(tc)) //should throw error if we weren't able to run prepareExtend.js -> YES(otherwise the user will not be able to make extends, and in the runtime we just assume that prepareExtend.js has run)
+																//should we crash application or throw js error or both??
+	{
+		//shouldn't crash just js error ... we expect it to be coorect because it's internal
+		DEBUG_WRITE("There was an error running the prepareExtend.js file");
+	}
 
+	//if there is no exception
 	DEBUG_WRITE("Executed prepareExtend.js script");
 }
 
@@ -184,25 +195,28 @@ extern "C" void Java_com_tns_Platform_runNativeScript(JNIEnv *_env, jobject obj,
 	jboolean isCopy;
 
 	const char* code = env.GetStringUTFChars(appCode, &isCopy);
-
 	auto cmd = ConvertToV8String(code);
 
 	env.ReleaseStringUTFChars(appCode, code);
 
 	DEBUG_WRITE("Compiling script");
-
 	auto moduleName = ArgConverter::jstringToV8String(appModuleName);
-
 	auto script = Script::Compile(cmd, moduleName);
+	DEBUG_WRITE("Compiled script");
 
-	DEBUG_WRITE("Compile script");
-
-	if (ExceptionUtil::GetInstance()->HandleTryCatch(tc, true))
+	if (ExceptionUtil::GetInstance()->HandleTryCatch(tc, "Bootstrap script has error(s)")) //handling try catch while compiling bootstrap.js
+																//if something goes wrong with compilation of bootstrap it's a JS problem because v8 handles compilation of JS
+																	// so we just need to throw exception in js for the user to fix the JS CODE in order to compile and take down the application
 	{
-		ExceptionUtil::GetInstance()->HandleInvalidState("Bootstrap script has error(s).", true);
+		//bootstrap is not internal so it can be changed
+			//if it's changed and not working we should throw js exception but not crash
+			//this way we give the user a chance to fix the bootstrap.js file and continue with app
+		ExceptionUtil::GetInstance()->HandleInvalidState("Bootstrap script has error(s).", false); //better to stay this way because we can give differen reasons why application crashed
+																								  //problem is it doesn't pass through the corret error handling path
 	}
-	else if (script.IsEmpty())
+	else if (script.IsEmpty()) //doesn't work .. when i delete the content of the bootstrap file it flies by this statement
 	{
+		//TODO: plamen5kov: fix: NEVER ENTERS
 		ExceptionUtil::GetInstance()->HandleInvalidState("Bootstrap script is empty.", true);
 	}
 	else
@@ -217,20 +231,29 @@ extern "C" void Java_com_tns_Platform_runNativeScript(JNIEnv *_env, jobject obj,
 		}
 
 		auto appModuleObj = script->Run();
-		if (ExceptionUtil::GetInstance()->HandleTryCatch(tc, true))
+
+		//by this point we compiled the bootstrap and decided there are no errors and no reasons to take down the app
+
+		//if after we run it there are some problems that are not syntactic (handled during compilation) what should we do
+		if (ExceptionUtil::GetInstance()->HandleTryCatch(tc)) // if we are absolutely certain that we handled every possible error (user or native) then we can remove this if
+																	// but even if we haven't taken care of everything we won't know if the problem is in the user code or native so
+																	// the only thing we can do here is log the error and crash the app just to be safe that it won't run in an unexpected way
 		{
-			// TODO: Fail?
+			// TODO: Fail? -> no
 		}
 		else if (!appModuleObj.IsEmpty() && appModuleObj->IsFunction())
 		{
 			auto moduleFunc = appModuleObj.As<Function>();
-			Handle<Value> exportsObj = Object::New(isolate);
 			auto thiz = Object::New(isolate);
+			Handle<Value> exportsObj = Object::New(isolate);
 			auto res = moduleFunc->Call(thiz, 1, &exportsObj);
 
-			if(ExceptionUtil::GetInstance()->HandleTryCatch(tc, false))
+			//(js problem)asd in bootstrap was such problem
+			//(native problem) would pop up here if not handled in runtime code
+			if(ExceptionUtil::GetInstance()->HandleTryCatch(tc)) //same issue as above -> we ran in runtime and we are not sure if the mistake is native or js
 			{
-				ExceptionUtil::GetInstance()->ThrowExceptionToJava(tc);
+				//we showed the error to the user and if he wants to he can try catch it
+				// TODO: Fail? -> no
 			}
 			else
 			{
@@ -240,7 +263,7 @@ extern "C" void Java_com_tns_Platform_runNativeScript(JNIEnv *_env, jobject obj,
 		}
 		else
 		{
-			ExceptionUtil::GetInstance()->HandleInvalidState("Error running NativeScript bootstrap code.", true);
+			ExceptionUtil::GetInstance()->HandleInvalidState("Error running NativeScript bootstrap code. There must be a bootstrap.js file.", true);
 		}
 	}
 
@@ -330,10 +353,10 @@ extern "C" jobject Java_com_tns_Platform_callJSMethodNative(JNIEnv *_env, jobjec
 	TryCatch tc;
 	auto jsResult = NativeScriptRuntime::CallJSMethod(env, jsObject, methodName, packagedArgs, tc);
 
-	if (tc.HasCaught())
+	if (ExceptionUtil::GetInstance()->HandleTryCatch(tc)) //we are calling js method
 	{
+		//if there is a function call inside onCreate method for instance here it will say that calling onCreate failed which is not exactly correct message
 		DEBUG_WRITE("Calling js method %s failed", method_name.c_str());
-		ExceptionUtil::GetInstance()->ThrowExceptionToJava(tc);
 	}
 
 	jobject javaObject = ConvertJsValueToJavaObject(env, jsResult);

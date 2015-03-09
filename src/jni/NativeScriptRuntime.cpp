@@ -213,7 +213,8 @@ void NativeScriptRuntime::CallJavaMethod(const Handle<Object>& caller, const str
 			stringstream ss;
 			ss << "No java object found on which to call \"" << methodName << "\" method. It is possible your Javascript object is not linked with the corresponding Java class. Try passing context(this) to the constructor function.";
 			string exceptionMessage = ss.str();
-			isolate->ThrowException(v8::Exception::ReferenceError(ConvertToV8String(exceptionMessage)));
+
+			ExceptionUtil::ThrowExceptionToJs(exceptionMessage);
 			return;
 		}
 
@@ -249,6 +250,7 @@ void NativeScriptRuntime::CallJavaMethod(const Handle<Object>& caller, const str
 			}
 			else
 			{
+
 				env.CallVoidMethodA(callerJavaObject, mid, javaArgs);
 			}
 			break;
@@ -866,7 +868,7 @@ void NativeScriptRuntime::RequireCallback(const v8::FunctionCallbackInfo<v8::Val
 		auto script = Script::Compile(scriptText, args[0].As<String>());
 		DEBUG_WRITE("Compiled script (module %s)", moduleName.c_str());
 
-		if(ExceptionUtil::GetInstance()->HandleTryCatch(tc, true)){
+		if(ExceptionUtil::GetInstance()->HandleTryCatch(tc)){
 			loadedModules.erase(modulePath);
 			tmpExportObj->Reset();
 			delete tmpExportObj;
@@ -884,12 +886,12 @@ void NativeScriptRuntime::RequireCallback(const v8::FunctionCallbackInfo<v8::Val
 
 			DEBUG_WRITE("After Running script (module %s)", moduleName.c_str());
 
-			if(ExceptionUtil::GetInstance()->HandleTryCatch(tcRequire, true)){
+			if(ExceptionUtil::GetInstance()->HandleTryCatch(tcRequire)){
 				loadedModules.erase(modulePath);
 				tmpExportObj->Reset();
 				delete tmpExportObj;
 				hasError = true;
-				tcRequire.ReThrow();
+//				tcRequire.ReThrow(); //no need we handled it
 			}
 			else {
 				if (moduleObj.IsEmpty())
@@ -913,10 +915,11 @@ void NativeScriptRuntime::RequireCallback(const v8::FunctionCallbackInfo<v8::Val
 			}
 		}
 
-		if (tc.HasCaught())
-		{
-			tc.ReThrow();
-		}
+		//no need to rethrow because we rethrow it to java with current implementation
+//		if (tc.HasCaught())
+//		{
+//			tc.ReThrow();
+//		}
 	}
 	else
 	{
@@ -1038,7 +1041,7 @@ Handle<Value> NativeScriptRuntime::CallJSMethod(JNIEnv *_env, const Handle<Objec
 		stringstream ss;
 		ss << "Cannot find method '" << name << "' implementation";
 
-		ExceptionUtil::GetInstance()->HandleInvalidState(ss.str(), false);
+		exceptionUtil->HandleInvalidState(ss.str(), false);
 
 		result = Undefined(isolate);
 	}
@@ -1049,7 +1052,7 @@ Handle<Value> NativeScriptRuntime::CallJSMethod(JNIEnv *_env, const Handle<Objec
 		stringstream ss;
 		ss << "Property '" << name << "' is not a function";
 
-		ExceptionUtil::GetInstance()->HandleInvalidState(ss.str(), false);
+		exceptionUtil->HandleInvalidState(ss.str(), false);
 
 		result = Undefined(isolate);
 	}
@@ -1073,8 +1076,7 @@ Handle<Value> NativeScriptRuntime::CallJSMethod(JNIEnv *_env, const Handle<Objec
 
 		//TODO: if javaResult is a pure js object create a java object that represents this object in java land
 
-		bool exceptionFound = exceptionUtil->HandleTryCatch(tc, true);
-		if (exceptionFound)
+		if (tc.HasCaught())
 		{
 			jsResult = Undefined(isolate);
 		}

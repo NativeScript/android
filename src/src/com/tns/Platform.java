@@ -20,6 +20,7 @@ import java.util.zip.ZipEntry;
 import android.app.Activity;
 import android.content.Context;
 import android.content.res.AssetManager;
+import android.os.Debug;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
@@ -240,7 +241,7 @@ public class Platform
 			ctor = MethodResolver.resolveConstructor(name, className, args, Platform.dexFactory, methodOverrides);
 			if (ctor == null)
 			{
-				throw new RuntimeException("Constructor not resolved");
+				throw new RuntimeException("Constructor of class " + className + " not resolved");
 			}
 			ctorId = cacheConstructor(ctor);
 			constructorId.setInt(ctorId);
@@ -658,18 +659,29 @@ for (String name: methodOverrides)
 
 	public static Object callJSMethod(Object javaObject, String methodName, boolean isConstructor, long delay, Object... args) throws NativeScriptException
 	{
-		Integer javaObjectID = getJavaObjectID(javaObject);
-		if (javaObjectID == null)
+		Object result = null;
+		
+		try
 		{
-			if (IsLogEnabled) Log.e(DEFAULT_LOG_TAG, "Platform.CallJSMethod: calling js method " + methodName + " with javaObjectID " + javaObjectID + " type=" + ((javaObject != null) ? javaObject.getClass().getName() : "null"));
-			APP_FAIL("Application failed");
+			Integer javaObjectID = getJavaObjectID(javaObject);
+			if (javaObjectID == null)
+			{
+				if (IsLogEnabled) Log.e(DEFAULT_LOG_TAG, "Platform.CallJSMethod: calling js method " + methodName + " with javaObjectID " + javaObjectID + " type=" + ((javaObject != null) ? javaObject.getClass().getName() : "null"));
+				APP_FAIL("Application failed");
+			}
+		
+			if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "Platform.CallJSMethod: calling js method " + methodName + " with javaObjectID " + javaObjectID + " type=" + ((javaObject != null) ? javaObject.getClass().getName() : "null"));
+				result = dispatchCallJSMethodNative(javaObjectID, methodName, isConstructor, delay, args);	
+			
+			}
+		catch(Throwable ex)
+		{
+			ErrorReport.HasApplicationCreateError = true;
+			ErrorReport.startActivity(getApplicationContext(), ex);
 		}
 
-		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "Platform.CallJSMethod: calling js method " + methodName + " with javaObjectID " + javaObjectID + " type=" + ((javaObject != null) ? javaObject.getClass().getName() : "null"));
-
-		Object result = dispatchCallJSMethodNative(javaObjectID, methodName, isConstructor, delay, args);
-
 		return result;
+		
 	}
 
 	// Packages args in format (typeID, value, null) except for objects where it

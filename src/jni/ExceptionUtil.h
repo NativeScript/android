@@ -16,7 +16,7 @@ namespace tns
 
 		bool CheckForJavaException(JEnv& env);
 
-		bool ThrowExceptionToJava(v8::TryCatch& tc);
+		bool ThrowExceptionToJava(v8::TryCatch& tc, std::string messageToAppend);
 
 		void GetExceptionMessage(JEnv& env, jthrowable exception, std::string& errMsg);
 
@@ -26,7 +26,7 @@ namespace tns
 		 *  - The flow may continue. In this case a check for nested TryCatch blocks will be made and if such exist the error will be re-thrown.
 		 *  - The flow may not continue. In this case a call the NativeScriptRuntime::APP_FAIL will be made. This will go to Java where the Java VM will be shut down.
 		 */
-		bool HandleTryCatch(v8::TryCatch& tc, bool rethrow);
+		bool HandleTryCatch(v8::TryCatch& tc, std::string messageToAppend = "");
 
 		/**
 		 * Provides an entry point to handle states considered invalid for the NativeScript runtime.
@@ -42,6 +42,7 @@ namespace tns
 		 */
 		static void OnUncaughtError(v8::Handle<v8::Message> message, v8::Handle<v8::Value> error);
 		static void CallJsFuncWithErr(v8::Handle<v8::Value> errObj);
+		static void ThrowExceptionToJs(std::string message);
 
 		static ExceptionUtil* GetInstance();
 

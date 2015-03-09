@@ -1274,7 +1274,15 @@ public class NativeScriptActivity extends android.app.Activity implements com.tn
 			{
 				java.lang.Object[] params = new Object[1];
 				params[0] = param_0;
-				com.tns.Platform.callJSMethod(this, "onCreate", params);
+//				try
+//				{
+					com.tns.Platform.callJSMethod(this, "onCreate", params);	
+//				}
+//				catch(Throwable ex)
+//				{
+//					ErrorReport.HasApplicationCreateError = true;
+//					ErrorReport.startActivity(this, ex);
+//				}
 			}
 		} else {
 			super.onCreate(param_0);

@@ -1,21 +1,21 @@
-disableVerboseLogging();
-
-require("./tests/testWeakRef");
-require("./tests/tests");
-require("./tests/testsForRuntimeBindingGenerator");
-require("./tests/propertyAccessTests");
-require("./tests/numericConversionTests");
-require("./tests/inheritanceChainResolutionTest");
-require("./tests/exceptionHandlingTests");
-require("./tests/dispatchCallbacksOnUiThreadTests");
-require("./tests/stringConversionTests");
-require("./tests/testsForTypescript");
-require("./tests/testGC");
-require("./tests/testsMemoryManagement");
-require("./tests/testIfAbleToRunExternalFile");
-require("./tests/finalFieldsSetTests");
-require("./tests/extendedClassesTests");
-require("./tests/extendClassNameTests");
+//disableVerboseLogging();
+//
+//require("./tests/testWeakRef");
+//require("./tests/tests");
+//require("./tests/testsForRuntimeBindingGenerator");
+//require("./tests/propertyAccessTests");
+//require("./tests/numericConversionTests");
+//require("./tests/inheritanceChainResolutionTest");
+//require("./tests/exceptionHandlingTests");
+//require("./tests/dispatchCallbacksOnUiThreadTests");
+//require("./tests/stringConversionTests");
+//require("./tests/testsForTypescript");
+//require("./tests/testGC");
+//require("./tests/testsMemoryManagement");
+//require("./tests/testIfAbleToRunExternalFile");
+//require("./tests/finalFieldsSetTests");
+//require("./tests/extendedClassesTests");
+//require("./tests/extendClassNameTests");
 
 
 //var MainActivity = com.tns.NativeScriptActivity.extend("MainActivity", {
@@ -57,7 +57,10 @@ var MainActivity = (function (_super) {
     	_super.prototype.onCreate.call(this, null);
     	//this.super.onCreate(null);
     	
-    	require("./tests/testsWithContext").run(this);
+//    	require("./tests/testsWithContext").run(this);
+    	
+    	var buttonTest = new android.widget.Button(this);
+    	buttonTest.asd();
 
     	var layout = new android.widget.LinearLayout(this);
     	layout.setOrientation(1);
