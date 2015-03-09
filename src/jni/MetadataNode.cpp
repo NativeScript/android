@@ -1547,18 +1547,27 @@ void MetadataNode::SetterCallback(Local<String> property, Local<Value> value, co
 
 		if (cacheItem.type == MetadataCacheItemType::Field)
 		{
-			bool isStatic = cacheItem.entry.type == NodeType::StaticField;
-			s_setJavaField(thiz, value, node->m_name, cacheItem.entry.name, cacheItem.entry.sig, cacheItem.entry.declaringType, cacheItem.entry.isStatic);
-			info.GetReturnValue().Set(value);
+			if (cacheItem.entry.isFinal)
+			{
+				stringstream ss;
+				ss << "You are trying to SET \"" << propName << "\" which is a final field! Final fields can only be read.";
+				string exceptionMessage = ss.str();
+
+				Isolate *isolate(Isolate::GetCurrent());
+				isolate->ThrowException(v8::Exception::Error((ConvertToV8String(exceptionMessage))));
+			}
+			else
+			{
+				bool isStatic = cacheItem.entry.type == NodeType::StaticField;
+				s_setJavaField(thiz, value, node->m_name, cacheItem.entry.name, cacheItem.entry.sig, cacheItem.entry.declaringType, cacheItem.entry.isStatic);
+				info.GetReturnValue().Set(value);
+			}
 		}
-		else if (cacheItem.type != MetadataCacheItemType::None)
+		else
 		{
-			assert(false);
+			assert(cacheItem.type == MetadataCacheItemType::None);
 		}
-		if (!cacheItem.entry.isFinal)
-		{
-			return;
-		}
+		return;
 	}
 
 	DEBUG_WRITE("MetadataNode::SetterCallback propName='%s', node='%s', hash=%d", propName.c_str(), node->m_name.c_str(), thiz->GetIdentityHash());
