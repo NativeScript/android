@@ -138,6 +138,7 @@ void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring pa
 	global->Set(ConvertToV8String("app"), appInstance, PropertyAttribute(ReadOnly | DontDelete));
 
 	global->Set(ConvertToV8String("global"), global, PropertyAttribute(ReadOnly | DontDelete));
+	global->Set(ConvertToV8String("__global"), global, PropertyAttribute(ReadOnly | DontDelete));
 
 	ArgConverter::Init(g_jvm);
 

@@ -19,7 +19,7 @@ public class Require
 	//private static final String ModuleContent = "(function(){\n var module = {}; module.exports = arguments[0];" + "var exports = module.exports; var __dirname = \"%s\"; var __filename = \"%s\";" + "function require(moduleName){ return global.require(moduleName, __filename); }" + "module.filename = __filename; this.__extends = global.__extends; \n %s \n return module.exports; \n})";
 	private static final String ModuleContent_Part1 = "(function(){\n var module = {}; module.exports = arguments[0];" + "var exports = module.exports; var __dirname = \"";
 	private static final String ModuleContent_Part2 = "\"; var __filename = \"";
-	private static final String ModuleContent_Part3 = "\";" + "function require(moduleName){ return global.require(moduleName, __filename); }" + "module.filename = __filename; this.__extends = global.__extends; \n";
+	private static final String ModuleContent_Part3 = "\";" + "function require(moduleName){ return __global.require(moduleName, __filename); }" + "module.filename = __filename; this.__extends = __global.__extends; \n";
 	private static final String ModuleContent_Part4 ="\n return module.exports; \n})";
 	private static final StringBuffer ModuleContent = new StringBuffer(65536);
 
@@ -83,7 +83,8 @@ public class Require
 			ModuleContent.append(ModuleContent_Part3);
 			ModuleContent.append(moduleFileContent);
 			ModuleContent.append(ModuleContent_Part4);
-			return ModuleContent.toString();
+			String content = ModuleContent.toString(); 
+			return content;  
 		}
 		catch (IOException e)
 		{
