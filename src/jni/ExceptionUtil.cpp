@@ -324,7 +324,7 @@ bool ExceptionUtil::CheckForJavaException(JEnv& env)
 			if (addr != 0)
 			{
 				auto pv = (Persistent<Value> *) addr;
-				v = Handle<Value>::New(Isolate::GetCurrent(), *pv);
+				v = Local<Value>::New(Isolate::GetCurrent(), *pv);
 				pv->Reset();
 			}
 			else

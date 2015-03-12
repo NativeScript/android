@@ -190,7 +190,7 @@ Handle<Object> MetadataNode::GetExistingClassProxy(const string& name)
 	}
 
 	auto classProxy = it->second;
-	return Handle<Object>::New(isolate, *classProxy);
+	return Local<Object>::New(isolate, *classProxy);
 }
 
 bool MetadataNode::ExistsExtendName(const string& name)
@@ -711,7 +711,7 @@ bool MetadataNode::CheckForCachedMetadataItem(const string& key, const PropertyC
 		if (cacheItem.type == MetadataCacheItemType::NonField)
 		{
 			const auto& pv = *cacheItem.pv;
-			value = Handle<Value>::New(Isolate::GetCurrent(), pv);
+			value = Local<Value>::New(Isolate::GetCurrent(), pv);
 		}
 		else if (cacheItem.type == MetadataCacheItemType::Field)
 		{

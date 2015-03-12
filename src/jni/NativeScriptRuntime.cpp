@@ -920,7 +920,7 @@ void NativeScriptRuntime::RequireCallback(const v8::FunctionCallbackInfo<v8::Val
 	}
 	else
 	{
-		moduleObj = Handle<Object>::New(isolate, *((*it).second));
+		moduleObj = Local<Object>::New(isolate, *((*it).second));
 	}
 
 	if(!hasError){

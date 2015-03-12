@@ -68,7 +68,7 @@ void WeakRef::WeakTargetCallback(const WeakCallbackData<Object, CallbackState>& 
 	auto poHolder = callbackState->holder;
 	if (poHolder != nullptr)
 	{
-		auto holder = Handle<Object>::New(isolate, *poHolder);
+		auto holder = Local<Object>::New(isolate, *poHolder);
 		holder->SetHiddenValue(V8StringConstants::GetTarget(), External::New(isolate, nullptr));
 	}
 
@@ -83,7 +83,7 @@ void WeakRef::WeakHolderCallback(const WeakCallbackData<Object, CallbackState>& 
 	auto callbackState = data.GetParameter();
 	auto poHolder = callbackState->holder;
 	auto isolate = data.GetIsolate();
-	auto holder = Handle<Object>::New(isolate, *poHolder);
+	auto holder = Local<Object>::New(isolate, *poHolder);
 
 	auto poTarget = reinterpret_cast<Persistent<Object>*>(holder->GetHiddenValue(V8StringConstants::GetTarget()).As<External>()->Value());
 
@@ -119,7 +119,7 @@ void WeakRef::GettertCallback(const FunctionCallbackInfo<Value>& args)
 
 	if (poTarget != nullptr)
 	{
-		auto target = Handle<Object>::New(isolate, *poTarget);
+		auto target = Local<Object>::New(isolate, *poTarget);
 		args.GetReturnValue().Set(target);
 	}
 	else
@@ -132,7 +132,7 @@ Handle<Function> WeakRef::GetGetterFunction(Isolate *isolate)
 {
 	if (s_poGetterFunc != nullptr)
 	{
-		return Handle<Function>::New(isolate, *s_poGetterFunc);
+		return Local<Function>::New(isolate, *s_poGetterFunc);
 	}
 	else
 	{
@@ -146,7 +146,7 @@ Handle<Function> WeakRef::GetClearFunction(Isolate *isolate)
 {
 	if (s_poClearFunc != nullptr)
 	{
-		return Handle<Function>::New(isolate, *s_poClearFunc);
+		return Local<Function>::New(isolate, *s_poClearFunc);
 	}
 	else
 	{

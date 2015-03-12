@@ -287,7 +287,7 @@ Local<Value> ArgConverter::ConvertFromJavaLong(jlong value)
 		char strNumber[24];
 		sprintf(strNumber, "%lld", longValue);
 		Handle<Value> strValue = ConvertToV8String(strNumber);
-		convertedValue = Handle<Function>::New(Isolate::GetCurrent(), *NATIVESCRIPT_NUMERA_CTOR_FUNC)->CallAsConstructor(1, &strValue);
+		convertedValue = Local<Function>::New(Isolate::GetCurrent(), *NATIVESCRIPT_NUMERA_CTOR_FUNC)->CallAsConstructor(1, &strValue);
 	}
 
 	return convertedValue;
