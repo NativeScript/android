@@ -50,10 +50,8 @@ module.exports = function(grunt) {
         packageJsonFilePath: rootDir + "/package.json",
         commitVersion: process.env.GIT_COMMIT || "",
         metadataGenPath: args.metadataGen,
-        android17SrcJar: pathModule.join(process.env.ANDROID_HOME, "platforms/android-17/android.jar"),
-        localAndroid17Jar: pathModule.join(rootDir, "src", "libs", "android17.jar"),
-        androidSupportLibSource: pathModule.join(rootDir, "binding-generator", "Generator", "libs", "android-support-v4.jar"),
-        androidSupportLibDestination: pathModule.join(rootDir, "src", "libs", "android-support-v4.jar"),
+        androidSrcJar: pathModule.join(process.env.ANDROID_HOME, "platforms/android-21/android.jar"),
+        localAndroidJar: pathModule.join(rootDir, "src", "libs", "android.jar"),
         runtimeDir: pathModule.join(rootDir, "src"),
         libsDir: pathModule.join(rootDir, "src", "libs"),
         runtimeBinariesDir: pathModule.join(rootDir, "src", "dist"),
@@ -69,8 +67,8 @@ module.exports = function(grunt) {
             build: {
                 src: [outDir]
             },
-            android17Lib: {
-                src: localCfg.localAndroid17Jar
+            androidLib: {
+                src: localCfg.localAndroidJar
             },
             metadataGenRuntimeJar: {
                 src: localCfg.metadataRuntimeJar
@@ -158,13 +156,9 @@ module.exports = function(grunt) {
                     }
                 }
             },
-            android17Lib: {
-                src: localCfg.android17SrcJar,
-                dest: localCfg.localAndroid17Jar
-            },
-            androidSupportLib: {
-                src: localCfg.androidSupportLibSource,
-                dest: localCfg.androidSupportLibDestination
+            androidLib: {
+                src: localCfg.androidSrcJar,
+                dest: localCfg.localAndroidJar
             }
         },
         replace: {
@@ -219,11 +213,10 @@ module.exports = function(grunt) {
 
     grunt.registerTask("generateMetadata", [
                 "exec:installMetadataGenerator",
-                "copy:android17Lib",
-                "copy:androidSupportLib",
+                "copy:androidLib",
                 "copy:runtimeJarToLibs",
                 "exec:runMetadataGenerator",
-                "clean:android17Lib",
+                "clean:androidLib",
                 "clean:metadataGenRuntimeJar"
             ]);
 
