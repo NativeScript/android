@@ -1,6 +1,5 @@
-<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.tns"
+    package="com.tns.android_runtime_testapp"
     android:versionCode="1"
     android:versionName="1.0" >
 
@@ -20,7 +19,7 @@
         android:theme="@style/AppTheme">
         <activity
             android:name="com.tns.NativeScriptActivity"
-            android:label="@string/title_activity">
+            android:label="TestApp">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -28,7 +27,7 @@
         </activity>
         <activity
             android:name="com.tns.ErrorReportActivity"
-            android:label="@string/title_activity">
+            android:label="TestApp">
         </activity>
     </application>
     

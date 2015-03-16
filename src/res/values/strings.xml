@@ -2,8 +2,7 @@
 <resources>
 
     <string name="app_name">NativeScript</string>
-    <string name="action_settings">Settings</string>
     <string name="hello_world">Hello world!</string>
-    <string name="title_activity_kimera">MainActivity</string>
+    <string name="title_activity">MainActivity</string>
 
 </resources>

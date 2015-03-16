@@ -5,3 +5,7 @@ dist/
 local.properties
 
 gen/
+armeabi-v7a/
+x86/
+obj/
+bin/
