@@ -34,7 +34,7 @@ public class Require
 
 		ApplicationFilesPath = context.getApplicationContext().getFilesDir().getPath();
 		ModulesFilesPath = "/app/";
-		NativeScriptModulesFilesPath = "/tns_modules/";
+		NativeScriptModulesFilesPath = "/app/tns_modules/";
 
 		initialized = true;
 	}
