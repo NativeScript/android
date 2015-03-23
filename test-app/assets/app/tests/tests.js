@@ -1840,7 +1840,7 @@ TestCallMethodThatReturnsLong();
 TestCallMethodWithLongParameter();
 TestCallMethodWithLongCastArgument();
 TestCallToStringOfNativeScriptLongObject();
-//TestCallMethodWithMinAndMaxLongValues();
+TestCallMethodWithMinAndMaxLongValues();
 TestCallMethodWithLongParameterWithNumberObject();
 TestCallMethodWithByteParameter();
 TestCallMethodWithFloatParameter();
