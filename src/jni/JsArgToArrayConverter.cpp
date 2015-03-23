@@ -192,8 +192,8 @@ bool JsArgToArrayConverter::ConvertArg(const Handle<Value>& arg, int index)
 			jlong value = 0;
 			if (hidden->IsString())
 			{
-				string value = ConvertToString(hidden->ToString());
-				value = atol(value.c_str());
+				auto strValue = ConvertToString(hidden->ToString());
+				value = atoll(strValue.c_str());
 			}
 			else if (hidden->IsInt32())
 			{

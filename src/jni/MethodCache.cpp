@@ -63,7 +63,6 @@ string MethodCache::EncodeSignature(const string& className, const string& metho
 
 string MethodCache::GetType(const v8::Handle<v8::Value>& value)
 {
-	int x = 1;
 	string type;
 
 	if (value->IsArray() || value->IsArrayBuffer() || value->IsArrayBufferView() || value->IsTypedArray()
@@ -117,7 +116,8 @@ string MethodCache::GetType(const v8::Handle<v8::Value>& value)
 		{
 			type = "byte";
 		}
-		else if (!object->GetHiddenValue(V8StringConstants::GetMarkedAsLong()).IsEmpty())
+		else if ((!object->GetHiddenValue(V8StringConstants::GetMarkedAsLong()).IsEmpty())
+				|| (!object->GetHiddenValue(V8StringConstants::GetJavaLong()).IsEmpty()))
 		{
 			type = "long";
 		}

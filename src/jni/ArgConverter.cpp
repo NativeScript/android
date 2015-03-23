@@ -56,6 +56,7 @@ void ArgConverter::NativeScriptLongFunctionCallback(const v8::FunctionCallbackIn
 {
 	auto isolate = Isolate::GetCurrent();
 	args.This()->SetHiddenValue(V8StringConstants::GetJavaLong(), Boolean::New(isolate, true));
+	args.This()->SetHiddenValue(ConvertToV8String(V8StringConstants::MARKED_AS_LONG), args[0]);
 	args.This()->Set(V8StringConstants::GetValue(), args[0], (PropertyAttribute)(ReadOnly | DontDelete));
 
 	args.This()->SetPrototype(Handle<NumberObject>::New(Isolate::GetCurrent(), *NAN_NUMBER_OBJECT));
@@ -287,7 +288,7 @@ Local<Value> ArgConverter::ConvertFromJavaLong(jlong value)
 		char strNumber[24];
 		sprintf(strNumber, "%lld", longValue);
 		Handle<Value> strValue = ConvertToV8String(strNumber);
-		convertedValue = Local<Function>::New(Isolate::GetCurrent(), *NATIVESCRIPT_NUMERA_CTOR_FUNC)->CallAsConstructor(1, &strValue);
+		convertedValue = Local<Function>::New(isolate, *NATIVESCRIPT_NUMERA_CTOR_FUNC)->CallAsConstructor(1, &strValue);
 	}
 
 	return convertedValue;

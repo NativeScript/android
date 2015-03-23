@@ -1837,7 +1837,7 @@ TestCanCallStaticMethodThroughBaseClass();
 TestUseFieldThatIsArray();
 TestCanAssignArrayToField();
 TestCallMethodThatReturnsLong();
-//TestCallMethodWithLongParameter();
+TestCallMethodWithLongParameter();
 TestCallMethodWithLongCastArgument();
 TestCallToStringOfNativeScriptLongObject();
 //TestCallMethodWithMinAndMaxLongValues();
