@@ -771,20 +771,6 @@ void NativeScriptRuntime::FailMethodCallback(const v8::FunctionCallbackInfo<v8::
 	auto msg = ConvertToString(args[0].As<String>());
 	ASSERT_MESSAGE(false, "%s", msg.c_str());
 	exit(-1);
-	return;
-
-	if (args.Length() > 0)
-	{
-		ASSERT_MESSAGE(!args[0]->IsUndefined() && !args[0]->IsNull(), "Fail called with undefined or null");
-		ASSERT_MESSAGE(args[0]->IsString(), "Fail should be called with string parameter");
-
-		String::Utf8Value message(args[0]->ToString());
-		NativeScriptRuntime::APP_FAIL(*message);
-	}
-	else
-	{
-		APP_FAIL("application failed with no message");
-	}
 }
 
 void NativeScriptRuntime::APP_FAIL(const char *message)
