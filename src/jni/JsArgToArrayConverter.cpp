@@ -29,9 +29,10 @@ JsArgToArrayConverter::JsArgToArrayConverter(const v8::Handle<Value>& arg, bool 
 }
 
 
-JsArgToArrayConverter::JsArgToArrayConverter(const v8::FunctionCallbackInfo<Value>& args, bool hasImplementationObject, bool isInnerClass) :
+JsArgToArrayConverter::JsArgToArrayConverter(const v8::FunctionCallbackInfo<Value>& args, bool hasImplementationObject, const Handle<Object>& outerThis) :
 		m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error())
 {
+	auto isInnerClass = !outerThis.IsEmpty();
 	if (isInnerClass)
 	{
 		m_argsLen = args.Length() + 1;
@@ -54,7 +55,7 @@ JsArgToArrayConverter::JsArgToArrayConverter(const v8::FunctionCallbackInfo<Valu
 			{
 				if (i == 0)
 				{
-					success = ConvertArg(args.This(), i);
+					success = ConvertArg(outerThis, i);
 				}
 				else
 				{

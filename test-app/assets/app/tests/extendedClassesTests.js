@@ -5,7 +5,7 @@ var Assert = function(condition, failMessage) {
 }
 
 var Instance_with_no_extension_shouldnt_use_previously_defined_implementation_object = function() {
-	var button = new com.tns.tests.Button1.extend({
+	var MyButton = new com.tns.tests.Button1.extend({
 		toString: function () {
 			return "overriden toString method of chronometer instance";
 		},
@@ -13,6 +13,7 @@ var Instance_with_no_extension_shouldnt_use_previously_defined_implementation_ob
 			return "overriden getIMAGE_ID_PROP method on button";
 		}
 	});
+	var button = new MyButton();
 	var labelToString = button.toString();
 	var labelgetIMAGE_ID_PROP = button.getIMAGE_ID_PROP();
 	//
@@ -26,7 +27,7 @@ var Instance_with_no_extension_shouldnt_use_previously_defined_implementation_ob
 }
 
 var Instance_with_extension_shouldnt_use_previously_defined_implementation_object = function() {
-	var button = new com.tns.tests.Button1.extend({
+	var MyButton = new com.tns.tests.Button1.extend({
 		toString: function () {
 			return "overriden toString method of button instance";
 		},
@@ -34,11 +35,12 @@ var Instance_with_extension_shouldnt_use_previously_defined_implementation_objec
 			return "overriden getIMAGE_ID_PROP method on button";
 		}
 	});
+	var button = new MyButton();
 	var labelToString = button.toString();
 	var labelgetIMAGE_ID_PROP = button.getIMAGE_ID_PROP();
 	//
 	
-	var button1 = new com.tns.tests.Button1.extend({
+	var MyButton1 = new com.tns.tests.Button1.extend({
 		toString: function () {
 			return "overriden toString method of button1 instance ";
 		},
@@ -46,6 +48,7 @@ var Instance_with_extension_shouldnt_use_previously_defined_implementation_objec
 			return "overriden getIMAGE_ID_PROP method on button1";
 		}
 	});
+	var button1 = new MyButton1();
 	var labelToString1 = button1.toString();
 	var labelgetIMAGE_ID_PROP1 = button1.getIMAGE_ID_PROP();
 	
@@ -59,11 +62,12 @@ var Newly_created_instances_should_behave_the_same_and_not_use_previously_define
 	var labelgetIMAGE_ID_PROP1 = button1.getIMAGE_ID_PROP();
 	
 	//
-	var button = new com.tns.tests.Button1.extend({
+	var MyButton = new com.tns.tests.Button1.extend({
 		getIMAGE_ID_PROP: function () {
 			return "overriden getIMAGE_ID_PROP method on button";
 		}
 	});
+	var button = new MyButton();
 	var labelgetIMAGE_ID_PROP = button.getIMAGE_ID_PROP();
 	//
 	

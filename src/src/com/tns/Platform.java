@@ -13,6 +13,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.zip.ZipEntry;
@@ -324,7 +325,7 @@ public class Platform
 		if (instance instanceof NativeScriptHashCodeProvider)
 		{
 			NativeScriptHashCodeProvider obj = (NativeScriptHashCodeProvider) instance;
-for (String name: methodOverrides)
+			for (String name: methodOverrides)
 			{
 				obj.setNativeScriptOverride(name);
 			}
@@ -462,37 +463,58 @@ for (String name: methodOverrides)
 		{
 			sb.append("I\n");
 		}
+		
+		Class<?> baseClass = clazz.getSuperclass();
+		sb.append("B " + ((baseClass != null) ? baseClass.getName() : "").replace('.', '/') + "\n");
 	
-		Method[] allMethods = clazz.getMethods();
-		for (Method m: allMethods)
+		Method[] methods = clazz.getDeclaredMethods();
+		Arrays.sort(methods, methodComparator);
+		
+		for (Method m: methods)
 		{
-			sb.append("M ");
-			sb.append(m.getName());
-			Class<?>[] params = m.getParameterTypes();
-			String sig = MethodResolver.getMethodSignature(m.getReturnType(), params);
-			sb.append(" ");
-			sb.append(sig);
-			int paramCount = params.length;
-			sb.append(" ");
-			sb.append(paramCount);
-			sb.append("\n");
+			int modifiers = m.getModifiers();
+			if (!Modifier.isStatic(modifiers) && (Modifier.isPublic(modifiers) || Modifier.isProtected(modifiers)))
+			{
+				sb.append("M ");
+				sb.append(m.getName());
+				Class<?>[] params = m.getParameterTypes();
+				String sig = MethodResolver.getMethodSignature(m.getReturnType(), params);
+				sb.append(" ");
+				sb.append(sig);
+				int paramCount = params.length;
+				sb.append(" ");
+				sb.append(paramCount);
+				sb.append("\n");
+			}
 		}
 		
-		Field[] allFields = clazz.getFields();
-		for (Field f: allFields)
+		Field[] fields = clazz.getDeclaredFields();
+		for (Field f: fields)
 		{
-			sb.append("F ");
-			sb.append(f.getName());
-			sb.append(" ");
-			String sig = MethodResolver.getTypeSignature(f.getType());
-			sb.append(sig);
-			sb.append(" 0\n");
+			int modifiers = f.getModifiers();
+			if (!Modifier.isStatic(modifiers) && (Modifier.isPublic(modifiers) || Modifier.isProtected(modifiers)))
+			{
+				sb.append("F ");
+				sb.append(f.getName());
+				sb.append(" ");
+				String sig = MethodResolver.getTypeSignature(f.getType());
+				sb.append(sig);
+				sb.append(" 0\n");
+			}
 		}
 		
 		String ret = sb.toString();
 		
 		return ret;
 	}
+	
+	private final static Comparator<Method> methodComparator = new Comparator<Method>()
+	{
+		public int compare(Method lhs, Method rhs)
+		{
+			return lhs.getName().compareTo(rhs.getName());
+		}
+	};
 
 	public static int makeClassInstanceOfTypeStrong(String classPath) throws InstantiationException, IllegalAccessException, ClassNotFoundException, NoSuchMethodException, IllegalArgumentException, InvocationTargetException
 	{
@@ -898,7 +920,7 @@ for (String name: methodOverrides)
 		return clazz;
 	}
 
-        public static class IntWrapper
+    public static class IntWrapper
 	{
 		private int value;
 
@@ -917,5 +939,11 @@ for (String name: methodOverrides)
 			this.value = value;
 		}
 	}
+    
+    private static Class<?> findClass(String className) throws ClassNotFoundException
+    {
+    	Class<?> clazz = dexFactory.findClass(className);
+		return clazz;
+    }
 
 }

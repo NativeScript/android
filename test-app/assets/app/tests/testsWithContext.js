@@ -57,7 +57,7 @@ var TestBuiltinNestedClassCreation = function(context) {
 	
 	var loader = new android.content.Loader(context);
 	
-	var observer = loader.ForceLoadContentObserver();
+	var observer = new loader.ForceLoadContentObserver();
 	
 	Assert(observer != null, "TestBuiltinNestedClassCreation FAILED: Cannot instantiate android.content.Loader.ForceLoadContentObserver class");
 }

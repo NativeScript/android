@@ -213,7 +213,7 @@ Handle<Array> ArgConverter::ConvertJavaArgsToJsArgs(jobjectArray args)
 				{
 					string argClassName = jstringToString(ObjectToString(argJavaClassPath));
 					argClassName = Util::ConvertFromCanonicalToJniName(argClassName);
-					jsArg = ObjectManager::CreateJSProxyInstanceStatic(javaObjectID, argClassName);
+					jsArg = ObjectManager::CreateJSWrapperStatic(javaObjectID, argClassName);
 				}
 				break;
 			}

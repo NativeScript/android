@@ -21,13 +21,13 @@ namespace tns
 	struct ArgsWrapper
 	{
 	public:
-		ArgsWrapper(v8::FunctionCallbackInfo<v8::Value> a, ArgType t, bool _isInnerClass)
-		 : args(a), type(t), isInnerClass(_isInnerClass)
+		ArgsWrapper(const v8::FunctionCallbackInfo<v8::Value>& a, ArgType t, v8::Handle<v8::Object> _outerThis)
+		 : args(a), type(t), outerThis(_outerThis)
 		{
 		}
 		v8::FunctionCallbackInfo<v8::Value> args;
 		ArgType type;
-		bool isInnerClass;
+		v8::Handle<v8::Object> outerThis;
 	};
 }
 

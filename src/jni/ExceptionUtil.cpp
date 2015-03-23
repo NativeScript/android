@@ -348,7 +348,7 @@ bool ExceptionUtil::CheckForJavaException(JEnv& env)
 			if (nativeExceptionObject.IsEmpty())
 			{
 				string className = objectManager->GetClassName((jobject)exc);
-				nativeExceptionObject = objectManager->CreateJSProxyInstance(javaObjectID, className);
+				nativeExceptionObject = objectManager->CreateJSWrapper(javaObjectID, className);
 			}
 
 			errObj->Set(V8StringConstants::GetNativeException(), nativeExceptionObject);

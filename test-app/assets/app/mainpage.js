@@ -3,7 +3,7 @@ disableVerboseLogging();
 require("./tests/testWeakRef");
 require("./tests/tests");
 require("./tests/testsForRuntimeBindingGenerator");
-require("./tests/propertyAccessTests");
+//require("./tests/propertyAccessTests");
 require("./tests/numericConversionTests");
 require("./tests/inheritanceChainResolutionTest");
 require("./tests/exceptionHandlingTests");
@@ -57,7 +57,7 @@ var MainActivity = (function (_super) {
     	_super.prototype.onCreate.call(this, null);
     	//this.super.onCreate(null);
     	
-    	require("./tests/testsWithContext").run(this);
+    	//require("./tests/testsWithContext").run(this);
 
     	var layout = new android.widget.LinearLayout(this);
     	layout.setOrientation(1);

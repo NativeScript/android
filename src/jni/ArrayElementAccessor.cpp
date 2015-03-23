@@ -278,7 +278,7 @@ Handle<Value> ArrayElementAccessor::CheckForArrayAccessException(JEnv& env, cons
 						className = objectManager->GetClassName(*(jobject*) value);
 					}
 
-					jsValue = objectManager->CreateJSProxyInstance(javaObjectID, className);
+					jsValue = objectManager->CreateJSWrapper(javaObjectID, className);
 				}
 			}
 		}

@@ -141,7 +141,13 @@ public class DexFactory
 			return loaded;
 		}
 
-		return context.getClassLoader().loadClass(fullClassName);
+		return findClass(fullClassName);
+	}
+	
+	public Class<?> findClass(String className) throws ClassNotFoundException
+	{
+		String canonicalName = className.replace('/', '.');
+		return context.getClassLoader().loadClass(canonicalName);
 	}
 
 	public static String strJoin(String[] array, String separator)

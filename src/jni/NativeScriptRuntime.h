@@ -25,7 +25,7 @@ namespace tns
 		static void Init(JavaVM *jvm, ObjectManager *objectManager);
 
 
-		static v8::Handle<v8::Object> CreateJSProxyInstance(jint javaObjectID, const std::string& typeName);
+		static v8::Handle<v8::Object> CreateJSWrapper(jint javaObjectID, const std::string& typeName);
 
 		static jobject CreateJavaInstance(int objectID, const std::string& name, const std::string& className, const ArgsWrapper& argWrapper, const v8::Handle<v8::Object>& implementationObject, bool isInterface);
 
@@ -49,9 +49,9 @@ namespace tns
 
 		//
 
-		static v8::Handle<v8::Value> GetJavaField(const v8::Handle<v8::Object>& caller, const std::string& classJniSignature, const std::string& fieldName, const std::string& fieldTypeName, const std::string& staticSignature, const bool isStatic);
+		static v8::Handle<v8::Value> GetJavaField(const v8::Handle<v8::Object>& caller, const std::string& declaringClassName, const std::string& fieldName, const std::string& fieldTypeName, const bool isStatic);
 
-		static void SetJavaField(const v8::Handle<v8::Object>& target, const v8::Handle<v8::Value>& value, const std::string& className, const std::string& fieldName, const std::string& fieldTypeName, const std::string& declaringTypeName, bool isStatic);
+		static void SetJavaField(const v8::Handle<v8::Object>& target, const v8::Handle<v8::Value>& value, const std::string& declaringTypeName, const std::string& fieldName, const std::string& fieldTypeName, bool isStatic);
 
 		//
 
@@ -108,6 +108,10 @@ namespace tns
 
 		static int GetCachedConstructorId(JEnv& env, const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& name, const std::string& className);
 		static int SetCachedConstructorId(JEnv& env, const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& name, const std::string& className, int ctorId);
+
+		static v8::Handle<v8::Object> FindClass(const std::string& className);
+
+		static int GetArrayLength(const v8::Handle<v8::Object>& arr);
 
 		static int64_t AdjustAmountOfExternalAllocatedMemory(JEnv& env, v8::Isolate *isolate);
 

@@ -34,6 +34,12 @@ ObjectManager::ObjectManager()
 	CHECK_WEAK_OBJECTS_ARE_ALIVE_METHOD_ID = env.GetStaticMethodID(PlatformClass, "checkWeakObjectAreAlive", "(Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;I)V");
 	assert(CHECK_WEAK_OBJECTS_ARE_ALIVE_METHOD_ID != nullptr);
 
+	JAVA_LANG_CLASS = env.FindClass("java/lang/Class");
+	assert(JAVA_LANG_CLASS != nullptr);
+
+	GET_NAME_METHOD_ID = env.GetMethodID(JAVA_LANG_CLASS, "getName", "()Ljava/lang/String;");
+	assert(GET_NAME_METHOD_ID != nullptr);
+
 	ObjectManager::instance = this;
 
 	V8::AddGCPrologueCallback(ObjectManager::OnGcStartedStatic, kGCTypeAll);
@@ -86,14 +92,9 @@ JSInstanceInfo* ObjectManager::GetJSInstanceInfo(const Handle<Object>& object)
 		auto external = hiddenValue.As<External>();
 		jsInstanceInfo = static_cast<JSInstanceInfo*>(external->Value());
 	}
-	else
-	{
-		DEBUG_WRITE_FATAL("Hidden JSInstanceInfo not found on object: %d", object->GetIdentityHash());
-	}
 
 	return jsInstanceInfo;
 }
-
 
 jweak ObjectManager::GetJavaObjectByID(uint32_t javaObjectID)
 {
@@ -165,41 +166,39 @@ Local<Object> ObjectManager::GetJsObjectByJavaObject(int javaObjectID)
 	return handleScope.Escape(localObject);
 }
 
-Handle<Object> ObjectManager::CreateJSProxyInstanceStatic(jint javaObjectID, const string& typeName)
+Handle<Object> ObjectManager::CreateJSWrapperStatic(jint javaObjectID, const string& typeName)
 {
-	return ObjectManager::instance->CreateJSProxyInstance(javaObjectID, typeName);
+	return ObjectManager::instance->CreateJSWrapper(javaObjectID, typeName);
 }
 
-Handle<Object> ObjectManager::CreateJSProxyInstance(jint javaObjectID, const string& typeName)
+Handle<Object> ObjectManager::CreateJSWrapper(jint javaObjectID, const string& typeName)
 {
-	return CreateJSProxyInstanceHelper(javaObjectID, typeName, nullptr);
+	return CreateJSWrapperHelper(javaObjectID, typeName, nullptr);
 }
 
-Handle<Object> ObjectManager::CreateJSProxyInstance(jint javaObjectID, const string& typeName, jobject instance)
+Handle<Object> ObjectManager::CreateJSWrapper(jint javaObjectID, const string& typeName, jobject instance)
 {
 	JEnv env;
 
 	JniLocalRef clazz(env.GetObjectClass(instance));
 
-	return CreateJSProxyInstanceHelper(javaObjectID, typeName, clazz);
+	return CreateJSWrapperHelper(javaObjectID, typeName, clazz);
 }
 
-Handle<Object> ObjectManager::CreateJSProxyInstanceHelper(jint javaObjectID, const string& typeName, jclass clazz)
+Handle<Object> ObjectManager::CreateJSWrapperHelper(jint javaObjectID, const string& typeName, jclass clazz)
 {
 	auto isolate = Isolate::GetCurrent();
 
-	string className = (clazz != nullptr) ? GetClassName(clazz) : typeName;
+	auto className = (clazz != nullptr) ? GetClassName(clazz) : typeName;
 
-	MetadataNode *node = MetadataNode::GetOrCreate(className);
+	auto node = MetadataNode::GetOrCreate(className);
 
-	auto classProxy = node->CreateProxy(isolate);
-	string name;
-	auto instance = MetadataNode::CreateJSInstance(classProxy, node, Handle<Object>(), name);
+	auto jsWrapper = node->CreateJSWrapper(isolate);
 
 	JEnv env;
-	jclass claz = env.FindClass(className);
-	Link(instance, javaObjectID, claz);
-	return instance;
+	auto claz = env.FindClass(className);
+	Link(jsWrapper, javaObjectID, claz);
+	return jsWrapper;
 }
 
 
@@ -230,6 +229,31 @@ void ObjectManager::Link(const Handle<Object>& object, uint32_t javaObjectID, jc
 	idToObject.insert(make_pair(javaObjectID, objectHandle));
 }
 
+bool ObjectManager::Unlink(Handle<Object>& object)
+{
+	auto hiddenString = V8StringConstants::GetHiddenJSInstance();
+	auto found = !object->GetHiddenValue(hiddenString).IsEmpty();
+	object->SetHiddenValue(hiddenString, Handle<Value>());
+	return found;
+}
+
+bool ObjectManager::CloneLink(const Handle<Object>& src, const Handle<Object>& dest)
+{
+	auto jsInfo = GetJSInstanceInfo(src);
+
+	auto success = jsInfo != nullptr;
+
+	if (success)
+	{
+		auto hiddenString = V8StringConstants::GetHiddenJSInstance();
+		auto hiddenValue = External::New(Isolate::GetCurrent(), jsInfo);
+		dest->SetHiddenValue(hiddenString, hiddenValue);
+	}
+
+	return success;
+}
+
+
 string ObjectManager::GetClassName(jobject javaObject)
 {
 	JEnv env;
@@ -243,9 +267,7 @@ string ObjectManager::GetClassName(jclass clazz)
 {
 	JEnv env;
 
-	jclass javaLangClass = env.FindClass("java/lang/Class");
-	jmethodID getNameId = env.GetMethodID(javaLangClass, "getName", "()Ljava/lang/String;");
-	JniLocalRef javaCanonicalName(env.CallObjectMethod(clazz, getNameId));
+	JniLocalRef javaCanonicalName(env.CallObjectMethod(clazz, GET_NAME_METHOD_ID));
 
 	string className = ArgConverter::jstringToString(javaCanonicalName);
 
@@ -284,9 +306,9 @@ void ObjectManager::JSObjectWeakCallback(Isolate *isolate, ObjectWeakCallbackSta
 		JSInstanceInfo *jsInstanceInfo = GetJSInstanceInfo(obj);
 		int javaObjectID = jsInstanceInfo->JavaObjectID;
 
-		DEBUG_WRITE("JSObjectWeakCallback objectId: %d", javaObjectID);
-
 		bool hasImplObj = HasImplObject(isolate, obj);
+
+		DEBUG_WRITE("JSObjectWeakCallback objectId: %d, hasImplObj=%d", javaObjectID, hasImplObj);
 
 		JEnv env;
 
@@ -443,8 +465,6 @@ void ObjectManager::MarkReachableObjects(Isolate *isolate, const Local<Object>& 
 
 	auto propName = String::NewFromUtf8(isolate, "t::gcNum");
 
-	auto hnode = String::NewFromUtf8(isolate, "t::MetadataNode");
-
 	assert(!m_markedForGC.empty());
 	auto& topGCInfo = m_markedForGC.top();
 	int numberOfGC = topGCInfo.numberOfGC;
@@ -488,8 +508,8 @@ void ObjectManager::MarkReachableObjects(Isolate *isolate, const Local<Object>& 
 			NativeScriptExtension::ReleaseClosureObjects(closureObjects);
 		}
 
-		auto ns = o->GetHiddenValue(hnode);
-		if (!ns.IsEmpty())
+		auto jsInfo = GetJSInstanceInfo(o);
+		if (jsInfo != nullptr)
 		{
 			o->SetHiddenValue(propName, curGCNumValue);
 		}

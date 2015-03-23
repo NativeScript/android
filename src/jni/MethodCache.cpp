@@ -63,6 +63,7 @@ string MethodCache::EncodeSignature(const string& className, const string& metho
 
 string MethodCache::GetType(const v8::Handle<v8::Value>& value)
 {
+	int x = 1;
 	string type;
 
 	if (value->IsArray() || value->IsArrayBuffer() || value->IsArrayBufferView() || value->IsTypedArray()
@@ -139,7 +140,7 @@ string MethodCache::GetType(const v8::Handle<v8::Value>& value)
 		else
 		{
 			MetadataNode *node = MetadataNode::GetNodeFromHandle(object);
-			type = node->GetName();
+			type = (node != nullptr) ? node->GetName() : "<unknown>";
 		}
 	}
 	return type;

@@ -17,7 +17,7 @@ namespace tns
 	public:
 		MetadataReader();
 
-		MetadataReader(uint32_t nodesLength, uint8_t *nodeData, uint8_t *nameData, uint8_t *valueData, GetTypeMetadataCallback getTypeMetadataCallack);
+		MetadataReader(uint32_t nodesLength, uint8_t *nodeData, uint32_t nameLength, uint8_t *nameData, uint32_t valueLength, uint8_t *valueData, GetTypeMetadataCallback getTypeMetadataCallack);
 
 		MetadataEntry ReadInstanceMethodEntry(uint8_t **data);
 
@@ -75,6 +75,8 @@ namespace tns
 
 		MetadataTreeNode *m_root;
 		uint32_t m_nodesLength;
+		uint32_t m_nameLength;
+		uint32_t m_valueLength;
 		uint8_t *m_nodeData;
 		uint8_t *m_nameData;
 		uint8_t *m_valueData;

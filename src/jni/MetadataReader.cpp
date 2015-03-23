@@ -11,12 +11,12 @@ using namespace std;
 using namespace tns;
 
 MetadataReader::MetadataReader()
-	: m_nodesLength(0), m_nodeData(nullptr), m_nameData(nullptr), m_valueData(nullptr), m_root(nullptr), m_getTypeMetadataCallback(nullptr)
+	: m_nodesLength(0), m_nodeData(nullptr), m_nameLength(0), m_nameData(nullptr), m_valueLength(0), m_valueData(nullptr), m_root(nullptr), m_getTypeMetadataCallback(nullptr)
 {
 }
 
-MetadataReader::MetadataReader(uint32_t nodesLength, uint8_t *nodeData, uint8_t *nameData, uint8_t *valueData, GetTypeMetadataCallback getTypeMetadataCallback)
-	: m_nodesLength(nodesLength), m_nodeData(nodeData), m_nameData(nameData), m_valueData(valueData), m_getTypeMetadataCallback(getTypeMetadataCallback)
+MetadataReader::MetadataReader(uint32_t nodesLength, uint8_t *nodeData, uint32_t nameLength, uint8_t *nameData, uint32_t valueLength, uint8_t *valueData, GetTypeMetadataCallback getTypeMetadataCallback)
+	: m_nodesLength(nodesLength), m_nodeData(nodeData), m_nameLength(nameLength), m_nameData(nameData), m_valueLength(valueLength), m_valueData(valueData), m_getTypeMetadataCallback(getTypeMetadataCallback)
 {
 	m_root = BuildTree();
 }
@@ -29,7 +29,7 @@ MetadataTreeNode* MetadataReader::BuildTree()
 
 	int len = m_nodesLength / sizeof(MetadataTreeNodeRawData);
 
-	m_v.resize(len);
+	m_v.resize(len + 1000);
 	MetadataTreeNode *emptyNode = nullptr;
 	fill(m_v.begin(), m_v.end(), emptyNode);
 
@@ -330,55 +330,25 @@ uint8_t MetadataReader::GetNodeType(MetadataTreeNode *treeNode)
 	{
 		uint8_t nodeType;
 
-		if (treeNode->metadata == nullptr)
-		{
-			uint32_t offsetValue = treeNode->offsetValue;
+		uint32_t offsetValue = treeNode->offsetValue;
 
-			if (offsetValue == 0)
-			{
-				nodeType = MetadataTreeNode::PACKAGE;
-			}
-			else if ((0 < offsetValue) && (offsetValue < ARRAY_OFFSET))
-			{
-				nodeType = *(m_valueData + offsetValue);
-			}
-			else if (offsetValue == ARRAY_OFFSET)
-			{
-				nodeType = MetadataTreeNode::ARRAY;
-			}
-			else
-			{
-				uint16_t nodeId = offsetValue - ARRAY_OFFSET;
-				MetadataTreeNode *arrElemNode = GetNodeById(nodeId);
-				nodeType = *(m_valueData + arrElemNode->offsetValue);
-			}
+		if (offsetValue == 0)
+		{
+			nodeType = MetadataTreeNode::PACKAGE;
+		}
+		else if ((0 < offsetValue) && (offsetValue < ARRAY_OFFSET))
+		{
+			nodeType = *(m_valueData + offsetValue);
+		}
+		else if (offsetValue == ARRAY_OFFSET)
+		{
+			nodeType = MetadataTreeNode::ARRAY;
 		}
 		else
 		{
-			const auto& metadata = *treeNode->metadata;
-			if (metadata == "P")
-			{
-				nodeType = MetadataTreeNode::PACKAGE;
-			}
-			else
-			{
-				string line;
-				stringstream s(metadata);
-				getline(s, line);
-
-				string typePart;
-				string instancePart;
-				stringstream tmp(line);
-				tmp >> typePart >> instancePart;
-
-				bool isInterface = typePart == "I";
-				bool isStatic = instancePart == "S";
-
-				nodeType = isInterface ? MetadataTreeNode::INTERFACE : MetadataTreeNode::CLASS;
-
-				if (isStatic)
-					nodeType |= MetadataTreeNode::STATIC;
-			}
+			uint16_t nodeId = offsetValue - ARRAY_OFFSET;
+			MetadataTreeNode *arrElemNode = GetNodeById(nodeId);
+			nodeType = *(m_valueData + arrElemNode->offsetValue);
 		}
 
 		treeNode->type = nodeType;
@@ -483,7 +453,46 @@ MetadataTreeNode* MetadataReader::GetOrCreateTreeNodeByName(const string& classN
 				child = new MetadataTreeNode;
 				child->name = *it++;
 				child->parent = treeNode;
-				child->metadata = new string(part);
+
+				string line;
+				string kind;
+				string name;
+				stringstream s(part);
+
+				getline(s, line);
+				stringstream typeLine(line);
+				typeLine >> kind >> name;
+				auto cKind = kind[0];
+
+				assert((cKind == 'P') || (cKind == 'C') || (cKind == 'I'));
+
+				if ((cKind == 'C') || (cKind == 'I'))
+				{
+					child->metadata = new string(part);
+					child->type = (cKind == 'C') ? MetadataTreeNode::CLASS : MetadataTreeNode::INTERFACE;
+					if (name == "S")
+					{
+						child->type |= MetadataTreeNode::STATIC;
+					}
+
+					getline(s, line);
+					stringstream baseClassLine(line);
+					baseClassLine >> kind >> name;
+					cKind = kind[0];
+
+					assert(cKind == 'B');
+					auto baseClassTreeNode = GetOrCreateTreeNodeByName(name);
+					auto baseClassNodeId = GetNodeId(baseClassTreeNode);
+
+					child->offsetValue = m_valueLength;
+					m_valueData[m_valueLength++] = child->type;
+					*reinterpret_cast<uint16_t*>(m_valueData + m_valueLength) = baseClassNodeId;
+					m_valueLength += sizeof(uint16_t);
+				}
+				else
+				{
+					child->type = MetadataTreeNode::PACKAGE;
+				}
 
 				m_v.push_back(child);
 				children->push_back(child);
@@ -507,13 +516,16 @@ MetadataTreeNode* MetadataReader::GetBaseClassNode(MetadataTreeNode *treeNode)
 {
 	MetadataTreeNode *baseClassNode = nullptr;
 
-	uint16_t baseClassNodeId = *reinterpret_cast<uint16_t*>(m_valueData + treeNode->offsetValue + 1);
+	if (treeNode != nullptr)
+	{
+		uint16_t baseClassNodeId = *reinterpret_cast<uint16_t*>(m_valueData + treeNode->offsetValue + 1);
 
-	size_t nodeCount = m_v.size();
+		size_t nodeCount = m_v.size();
 
-	assert(baseClassNodeId < nodeCount);
+		assert(baseClassNodeId < nodeCount);
 
-	baseClassNode = GetNodeById(baseClassNodeId);
+		baseClassNode = GetNodeById(baseClassNodeId);
+	}
 
 	return baseClassNode;
 }

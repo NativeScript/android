@@ -16,7 +16,7 @@ void FieldAccessor::Init(JavaVM *jvm, ObjectManager *objectManager)
 	this->objectManager = objectManager;
 }
 
-Handle<Value> FieldAccessor::GetJavaField(const Handle<Object>& caller, const string& className, const string& fieldName, const string& fieldTypeName, const string& declaringClassName, const bool isStatic)
+Handle<Value> FieldAccessor::GetJavaField(const Handle<Object>& caller, const string& declaringClassName, const string& fieldName, const string& fieldTypeName, const bool isStatic)
 {
 	JEnv env;
 
@@ -24,36 +24,6 @@ Handle<Value> FieldAccessor::GetJavaField(const Handle<Object>& caller, const st
 	EscapableHandleScope handleScope(isolate);
 
 	Handle<Value> fieldResult;
-
-	if (fieldName == "class")
-	{
-		string canonicalClassName = Util::ConvertFromJniToCanonicalName(className);
-		jclass klass = env.FindClass("java/lang/Class");
-		jmethodID m = env.GetStaticMethodID(klass, "forName", "(Ljava/lang/String;)Ljava/lang/Class;");
-		JniLocalRef s(env.NewStringUTF(canonicalClassName.c_str()));
-		JniLocalRef result(env.CallStaticObjectMethod(klass, m, (jstring)s));
-
-		assert(env.ExceptionCheck() == JNI_FALSE);
-
-		int javaObjectID = objectManager->GetOrCreateObjectId(result);
-		auto objectResult = objectManager->GetJsObjectByJavaObject(javaObjectID);
-
-		if (objectResult.IsEmpty())
-		{
-			objectResult = objectManager->CreateJSProxyInstance(javaObjectID, fieldTypeName, result);
-		}
-
-		return handleScope.Escape(objectResult);
-	}
-
-	bool isTargetArray = className[0] == '[';
-	if (isTargetArray && (fieldName == "length"))
-	{
-		jweak weakRef = objectManager->GetJavaObjectByJsObject(caller);
-		jarray arr = (jarray)weakRef;
-		jsize arrayLength = env.GetArrayLength(arr);
-		return handleScope.Escape(Integer::New(isolate, arrayLength));
-	}
 
 	jweak targetJavaObject;
 	jclass clazz;
@@ -249,7 +219,7 @@ Handle<Value> FieldAccessor::GetJavaField(const Handle<Object>& caller, const st
 
 				if (objectResult.IsEmpty())
 				{
-					objectResult = objectManager->CreateJSProxyInstance(javaObjectID, fieldTypeName, result);
+					objectResult = objectManager->CreateJSWrapper(javaObjectID, fieldTypeName, result);
 				}
 
 				env.DeleteLocalRef(result);
@@ -266,7 +236,7 @@ Handle<Value> FieldAccessor::GetJavaField(const Handle<Object>& caller, const st
 	return fieldResult;
 }
 
-void FieldAccessor::SetJavaField(const Handle<Object>& target, const Handle<Value>& value, const string& className, const string& fieldName, const std::string& fieldTypeName, const string& declaringTypeName, bool isStatic)
+void FieldAccessor::SetJavaField(const Handle<Object>& target, const Handle<Value>& value, const string& declaringTypeName, const string& fieldName, const std::string& fieldTypeName, bool isStatic)
 {
 	JEnv env;
 

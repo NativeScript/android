@@ -196,9 +196,9 @@ class MethodResolver
 		}
 	}
 	
-	static Constructor<?> resolveConstructor(String name, String classPath, Object[] args, DexFactory dexFactory, String[] methodOverrides) throws ClassNotFoundException, IOException
+	static Constructor<?> resolveConstructor(String name, String className, Object[] args, DexFactory dexFactory, String[] methodOverrides) throws ClassNotFoundException, IOException
 	{
-		String cannonicalClassName = classPath.replace('/', '.');
+		String cannonicalClassName = className.replace('/', '.');
 		
 		Class<?> clazz = null;
 		boolean isBindingClass = cannonicalClassName.startsWith("com.tns.gen") &&

@@ -38,13 +38,17 @@ namespace tns
 
 		v8::Local<v8::Object> GetJsObjectByJavaObject(int javaObjectID);
 
-		static v8::Handle<v8::Object> CreateJSProxyInstanceStatic(jint javaObjectID, const std::string& typeName);
+		static v8::Handle<v8::Object> CreateJSWrapperStatic(jint javaObjectID, const std::string& typeName);
 
-		v8::Handle<v8::Object> CreateJSProxyInstance(jint javaObjectID, const std::string& typeName);
+		v8::Handle<v8::Object> CreateJSWrapper(jint javaObjectID, const std::string& typeName);
 
-		v8::Handle<v8::Object> CreateJSProxyInstance(jint javaObjectID, const std::string& typeName, jobject instance);
+		v8::Handle<v8::Object> CreateJSWrapper(jint javaObjectID, const std::string& typeName, jobject instance);
 
 		void Link(const v8::Handle<v8::Object>& object, uint32_t javaObjectID, jclass clazz);
+
+		bool Unlink(v8::Handle<v8::Object>& object);
+
+		bool CloneLink(const v8::Handle<v8::Object>& src, const v8::Handle<v8::Object>& dest);
 
 		std::string GetClassName(jobject javaObject);
 
@@ -123,7 +127,7 @@ namespace tns
 
 		void CheckWeakObjectsAreAlive(const std::vector<PersistentObjectIdPair>& instances, DirectBuffer& inputBuff, DirectBuffer& outputBuff);
 
-		v8::Handle<v8::Object> CreateJSProxyInstanceHelper(jint javaObjectID, const std::string& typeName, jclass clazz);
+		v8::Handle<v8::Object> CreateJSWrapperHelper(jint javaObjectID, const std::string& typeName, jclass clazz);
 
 		static void JSObjectWeakCallbackStatic(const v8::WeakCallbackData<v8::Object, ObjectWeakCallbackState>& data);
 
@@ -172,6 +176,10 @@ namespace tns
 		DirectBuffer m_outBuff;
 
 		jclass PlatformClass;
+
+		jclass JAVA_LANG_CLASS;
+
+		jmethodID GET_NAME_METHOD_ID;
 
 		jmethodID GET_JAVAOBJECT_BY_ID_METHOD_ID;
 
