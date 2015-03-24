@@ -27,6 +27,7 @@ import android.util.Log;
 import android.util.SparseArray;
 
 import com.tns.bindings.ProxyGenerator;
+import com.tns.internal.DefaultEtractPolicy;
 import com.tns.internal.ExtractPolicy;
 
 public class Platform
@@ -182,21 +183,7 @@ public class Platform
 	{
 		if (policy == null)
 		{
-			policy = new ExtractPolicy()
-			{
-				@Override
-				public boolean extract(String appRoot) {
-					return true;
-				}
-				
-				@Override
-				public boolean shouldSkip(File outputFile, File zipFile, ZipEntry zipEnty)
-				{
-					boolean shouldSkip  = outputFile.exists() && (zipFile.lastModified() <= outputFile.lastModified()); //TODO: check lastModified when application is installed on sdcard with FAT32 format
-					
-					return shouldSkip;
-				}
-			};
+			policy = new DefaultEtractPolicy();
 		}
 		
 		extractPolicy = policy;
