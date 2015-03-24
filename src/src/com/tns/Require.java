@@ -34,7 +34,16 @@ public class Require
 
 		ApplicationFilesPath = context.getApplicationContext().getFilesDir().getPath();
 		ModulesFilesPath = "/app/";
-		NativeScriptModulesFilesPath = "/tns_modules/";
+		
+		NativeScriptModulesFilesPath = "/app/tns_modules/";
+		
+		// Support previous tns_modules location for now
+		// NOTE: This functionality is temporary and is to be deleted within several months
+		File file = new File(ApplicationFilesPath + NativeScriptModulesFilesPath);
+		if(!file.exists())
+		{
+			NativeScriptModulesFilesPath = "/tns_modules/"; 
+		}
 
 		initialized = true;
 	}
