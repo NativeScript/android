@@ -724,25 +724,18 @@ public class NativeScriptApplication extends android.app.Application implements 
 		if (!showErrorIntent)
 		{
 			appInstance = this;
-			try 
+			
+			prepareAppBuilderCallbackImpl();
+			
+			if (appBuilderCallbackImpl != null)
 			{
-				prepareAppBuilderCallbackImpl();
-				
-				if (appBuilderCallbackImpl != null)
-				{
-					appBuilderCallbackImpl.onCreate(this);
-				}
-				
-				Platform.init(this);
-				Platform.run(Platform.DefaultApplicationModuleName);
-		
-				onCreateInternal();
+				appBuilderCallbackImpl.onCreate(this);
 			}
-			catch (Throwable ex)
-			{
-				ErrorReport.HasApplicationCreateError = true;
-				ErrorReport.startActivity(this, ex);
-			}
+			
+			Platform.init(this);
+			Platform.run(Platform.DefaultApplicationModuleName);
+	
+			onCreateInternal();
 		}
 	}
 	

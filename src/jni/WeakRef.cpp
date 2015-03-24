@@ -42,17 +42,17 @@ void WeakRef::ConstructorCallback(const FunctionCallbackInfo<Value>& args)
 			}
 			else
 			{
-				ExceptionUtil::GetInstance()->HandleInvalidState("The WeakRef constructor expects an object argument.", false);
+				ExceptionUtil::GetInstance()->ThrowExceptionToJs("The WeakRef constructor expects an object argument.");
 			}
 		}
 		else
 		{
-			ExceptionUtil::GetInstance()->HandleInvalidState("The WeakRef constructor expects single parameter.", false);
+			ExceptionUtil::GetInstance()->ThrowExceptionToJs("The WeakRef constructor expects single parameter.");
 		}
 	}
 	else
 	{
-		ExceptionUtil::GetInstance()->HandleInvalidState("WeakRef must be used as a construct call.", false);
+		ExceptionUtil::GetInstance()->ThrowExceptionToJs("WeakRef must be used as a construct call.");
 	}
 }
 
