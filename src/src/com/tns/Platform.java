@@ -105,8 +105,6 @@ public class Platform
 			throw new RuntimeException("NativeScriptApplication already initialized");
 		}
 
-		Require.init(context);
-
 		Platform.dexFactory = new DexFactory(context);
 		NativeScriptContext = context;
 
@@ -116,6 +114,7 @@ public class Platform
 		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "Initialized app instance id:" + appJavaObjectId);
 
 		AssetExtractor.extractAssets(context, extractPolicy);
+		Require.init(context);
 		int debuggerPort = jsDebugger.getDebuggerPortFromEnvironment();
 		Platform.initNativeScript(Require.getApplicationFilesPath(), appJavaObjectId, IsLogEnabled, context.getPackageName(), debuggerPort);
 		
