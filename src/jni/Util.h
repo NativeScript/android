@@ -21,6 +21,8 @@ namespace tns
 		static std::string ConvertFromCanonicalToJniName(const std::string& name);
 
 		static bool StartsWith(const std::string& s, const std::string& prefix);
+
+		static std::string GetStackTrace(int frameCount);
 	};
 }
 
