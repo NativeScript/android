@@ -50,7 +50,7 @@ module.exports = function(grunt) {
         packageJsonFilePath: rootDir + "/package.json",
         commitVersion: process.env.GIT_COMMIT || "",
         metadataGenPath: args.metadataGen,
-        androidSrcJar: pathModule.join(process.env.ANDROID_HOME, "platforms/android-21/android.jar"),
+        androidSrcJar: pathModule.join(process.env.ANDROID_HOME, "platforms/android-17/android.jar"),
         localAndroidJar: pathModule.join(rootDir, "src", "libs", "android.jar"),
         runtimeDir: pathModule.join(rootDir, "src"),
         libsDir: pathModule.join(rootDir, "src", "libs"),
