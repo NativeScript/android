@@ -41,9 +41,7 @@ namespace tns
 
 		//
 
-		static std::string ResolveJavaMethod(const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& className, const std::string& methodName);
-
-		static void CallJavaMethod(const v8::Handle<v8::Object>& caller, const std::string& className, const std::string& methodName, const std::string& methodJniSignature, const std::string& declaringClassJniSignature, bool isStatic, bool isSuper, const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void CallJavaMethod(const v8::Handle<v8::Object>& caller, const std::string& className, const std::string& methodName, const std::string& declaringClassName, bool isStatic, bool isSuper, const v8::FunctionCallbackInfo<v8::Value>& args);
 
 		static v8::Handle<v8::Value> CallJSMethod(JNIEnv *_env, const v8::Handle<v8::Object>& jsObject, jstring methodName, jobjectArray args, v8::TryCatch& tc);
 
@@ -122,8 +120,6 @@ namespace tns
 		static JavaVM *jvm;
 
 		static jmethodID MAKE_CLASS_INSTANCE_OF_TYPE_STRONG;
-
-		static jmethodID RESOLVE_METHOD_OVERLOAD_METHOD_ID;
 
 		static jmethodID CREATE_INSTANCE_METHOD_ID;
 

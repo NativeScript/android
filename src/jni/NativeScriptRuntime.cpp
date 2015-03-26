@@ -43,9 +43,6 @@ void NativeScriptRuntime::Init(JavaVM *jvm, ObjectManager *objectManager)
 	MAKE_CLASS_INSTANCE_OF_TYPE_STRONG = env.GetStaticMethodID(PlatformClass, "makeClassInstanceOfTypeStrong", "(Ljava/lang/String;)I");
 	assert(MAKE_CLASS_INSTANCE_OF_TYPE_STRONG != nullptr);
 
-	RESOLVE_METHOD_OVERLOAD_METHOD_ID = env.GetStaticMethodID(PlatformClass, "resolveMethodOverload", "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;");
-	assert(RESOLVE_METHOD_OVERLOAD_METHOD_ID != nullptr);
-
 	CREATE_INSTANCE_METHOD_ID = env.GetStaticMethodID(PlatformClass, "createInstance", "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;[Ljava/lang/String;ILcom/tns/Platform$IntWrapper;)Ljava/lang/Object;");
 	assert(CREATE_INSTANCE_METHOD_ID != nullptr);
 
@@ -91,6 +88,8 @@ void NativeScriptRuntime::Init(JavaVM *jvm, ObjectManager *objectManager)
 	arrayElementAccessor.Init(jvm, objectManager);
 
 	JavaObjectArrayCache::Init(jvm);
+
+	MethodCache::Init();
 }
 
 bool NativeScriptRuntime::RegisterInstance(const Handle<Object>& jsObject, const std::string& name, const string& className, const ArgsWrapper& argWrapper, const Handle<Object>& implementationObject, bool isInterface)
@@ -162,32 +161,27 @@ void NativeScriptRuntime::SetJavaField(const Handle<Object>& target, const Handl
 }
 
 
-void NativeScriptRuntime::CallJavaMethod(const Handle<Object>& caller, const string& className, const string& methodName, const string& methodJniSignature, const string& declaringClassJniSignature, bool isStatic, bool isSuper, const v8::FunctionCallbackInfo<v8::Value>& args)
+void NativeScriptRuntime::CallJavaMethod(const Handle<Object>& caller, const string& className, const string& methodName, const string& declaringClassName, bool isStatic, bool isSuper, const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-	if (methodJniSignature.empty())
-	{
-		return;
-	}
-
 	JEnv env;
 
 	if (!isStatic)
 	{
-		DEBUG_WRITE("CallJavaMethod called %s.%s%s. Instance id: %d, isSuper=%d", className.c_str(), methodName.c_str(), methodJniSignature.c_str(), caller.IsEmpty() ? -42 : caller->GetIdentityHash(), isSuper);
+		DEBUG_WRITE("CallJavaMethod called %s.%s. Instance id: %d, isSuper=%d", className.c_str(), methodName.c_str(), caller.IsEmpty() ? -42 : caller->GetIdentityHash(), isSuper);
 	}
 	else
 	{
-		DEBUG_WRITE("CallJavaMethod called %s.%s%s. static method", className.c_str(), methodName.c_str(), methodJniSignature.c_str());
+		DEBUG_WRITE("CallJavaMethod called %s.%s. static method", className.c_str(), methodName.c_str());
 	}
 
-	jweak callerJavaObject;
-	jclass clazz;
-	jmethodID mid = nullptr;
+	auto mi = MethodCache::ResolveMethodSignature(className, methodName, args, isStatic);
+	if (mi.mid == nullptr)
+	{
+		DEBUG_WRITE("Cannot resolve class=%s, method=%s, isStatic=%d, isSuper=%d", className.c_str(), methodName.c_str(), isStatic, isSuper);
+		return;
+	}
 
-	int arrLength = args.Length();
-	JsArgConverter argConverter(args, false, methodJniSignature);
-
-	auto isolate = Isolate::GetCurrent();
+	JsArgConverter argConverter(args, false, mi.signature);
 
 	if (!argConverter.IsValid())
 	{
@@ -196,6 +190,12 @@ void NativeScriptRuntime::CallJavaMethod(const Handle<Object>& caller, const str
 		return;
 	}
 
+	auto isolate = Isolate::GetCurrent();
+
+	jweak callerJavaObject;
+	jclass clazz = mi.clazz;
+	jmethodID mid = mi.mid;
+
 	jvalue* javaArgs = argConverter.ToArgs();
 
 	if (!isStatic)
@@ -203,31 +203,15 @@ void NativeScriptRuntime::CallJavaMethod(const Handle<Object>& caller, const str
 		callerJavaObject = objectManager->GetJavaObjectByJsObject(caller);
 		if(callerJavaObject == nullptr)
 		{
-			Isolate *isolate = Isolate::GetCurrent();
 			stringstream ss;
 			ss << "No java object found on which to call \"" << methodName << "\" method. It is possible your Javascript object is not linked with the corresponding Java class. Try passing context(this) to the constructor function.";
 			string exceptionMessage = ss.str();
 			isolate->ThrowException(v8::Exception::ReferenceError(ConvertToV8String(exceptionMessage)));
 			return;
 		}
-
-		if (isSuper)
-		{
-			clazz = env.FindClass(className);
-		}
-		else
-		{
-			clazz = objectManager->GetJavaClass(caller);
-		}
-		mid = env.GetMethodID(clazz, methodName, methodJniSignature);
-	}
-	else
-	{
-		clazz = env.FindClass(declaringClassJniSignature);
-		mid = env.GetStaticMethodID(clazz, methodName, methodJniSignature);
 	}
 
-	string returnType = GetReturnType(methodJniSignature);
+	auto returnType = GetReturnType(mi.signature);
 
 	switch (returnType[0])
 	{
@@ -526,35 +510,6 @@ string NativeScriptRuntime::GetReturnType(const string& methodSignature)
 	return jniReturnType;
 }
 
-string NativeScriptRuntime::ResolveJavaMethod(const v8::FunctionCallbackInfo<Value>& args, const string& className, const string& methodName)
-{
-	JEnv env;
-
-	JsArgToArrayConverter argConverter(args, false);
-
-	JniLocalRef jsClassName(env.NewStringUTF(className.c_str()));
-	JniLocalRef jsMethodName(env.NewStringUTF(methodName.c_str()));
-
-	jobjectArray arrArgs = argConverter.ToJavaArray();
-
-	jstring signature = (jstring) env.CallStaticObjectMethod(PlatformClass, RESOLVE_METHOD_OVERLOAD_METHOD_ID, (jstring) jsClassName, (jstring) jsMethodName, arrArgs);
-
-	bool exceptionOccurred = ExceptionUtil::GetInstance()->CheckForJavaException(env);
-
-	string resolvedSignature;
-
-	if (!exceptionOccurred)
-	{
-		const char* str = env.GetStringUTFChars(signature, nullptr);
-		resolvedSignature = string(str);
-		env.ReleaseStringUTFChars(signature, str);
-
-		env.DeleteLocalRef(signature);
-	}
-
-	return resolvedSignature;
-}
-
 jobject NativeScriptRuntime::CreateJavaInstance(int objectID, const std::string& name, const string& className, const ArgsWrapper& argWrapper, const Handle<Object>& implementationObject, bool isInterface)
 {
 	jobject instance = nullptr;
@@ -634,7 +589,7 @@ int NativeScriptRuntime::GetCachedConstructorId(JEnv& env, const FunctionCallbac
 {
 	int ctorId;
 	string fullClassName = className + '-' + name;
-	string encodedCtorArgs = MethodCache::EncodeSignature(fullClassName, "<init>", args);
+	string encodedCtorArgs = MethodCache::EncodeSignature(fullClassName, "<init>", args, false);
 	auto itFound = s_constructorCache.find(encodedCtorArgs);
 
 
@@ -663,7 +618,7 @@ int NativeScriptRuntime::GetCachedConstructorId(JEnv& env, const FunctionCallbac
 int NativeScriptRuntime::SetCachedConstructorId(JEnv& env, const FunctionCallbackInfo<Value>& args, const string& name, const string& className, int ctorId)
 {
 	string fullClassName = className + '-' + name;
-	string encodedCtorArgs = MethodCache::EncodeSignature(fullClassName, "<init>", args);
+	string encodedCtorArgs = MethodCache::EncodeSignature(fullClassName, "<init>", args, false);
     DEBUG_WRITE("SetCachedConstructorId: encodedCtorArgs=%s, ctorId=%d", encodedCtorArgs.c_str(), ctorId);
 	s_constructorCache.insert(make_pair(encodedCtorArgs, ctorId));
 }
@@ -1108,7 +1063,6 @@ jclass NativeScriptRuntime::PlatformClass = nullptr;
 jclass NativeScriptRuntime::RequireClass = nullptr;
 jclass NativeScriptRuntime::JAVA_LANG_STRING = nullptr;
 jmethodID NativeScriptRuntime::MAKE_CLASS_INSTANCE_OF_TYPE_STRONG = nullptr;
-jmethodID NativeScriptRuntime::RESOLVE_METHOD_OVERLOAD_METHOD_ID = nullptr;
 jmethodID NativeScriptRuntime::CREATE_INSTANCE_METHOD_ID = nullptr;
 //jmethodID NativeScriptRuntime::CACHE_CONSTRUCTOR_METHOD_ID = nullptr;
 jmethodID NativeScriptRuntime::APP_FAIL_METHOD_ID = nullptr;

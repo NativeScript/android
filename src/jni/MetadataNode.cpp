@@ -766,17 +766,8 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
 	auto className = callbackData->node->m_name;
 	auto methodName = candidates.front().name;
 
-	MetadataEntry entry;
-	int candicateCount = 2;
+	const auto& entry = candidates.front();
 	int argLength = info.Length();
-	for (auto curEntry: candidates)
-	{
-		if (curEntry.paramCount == argLength)
-		{
-			entry = curEntry;
-			++candicateCount;
-		}
-	}
 
 	auto thiz = info.This();
 
@@ -798,33 +789,13 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
 		className = "android/app/Activity";
 	}
 
-	if (candicateCount == 0)
+	if ((methodName == V8StringConstants::VALUE_OF) && (argLength == 0))
 	{
-		if ((methodName == V8StringConstants::VALUE_OF) && (argLength == 0))
-		{
-			info.GetReturnValue().Set(thiz);
-		}
-		else
-		{
-			//TODO: throw js exception here
-			ASSERT_FAIL("Method %s.%s not found. Argc:%d", className.c_str(), methodName.c_str(), argLength);
-		}
-	}
-	else if (candicateCount == 1)
-	{
-		s_callJavaMethod(thiz, className, methodName, entry.sig, entry.declaringType, entry.isStatic, isSuper, info);
+		info.GetReturnValue().Set(thiz);
 	}
 	else
 	{
-		if ((methodName == V8StringConstants::VALUE_OF) && (argLength == 0))
-		{
-			info.GetReturnValue().Set(thiz);
-		}
-		else
-		{
-			string methodSignature = ResolveMethodOverload(info, className, methodName);
-			s_callJavaMethod(thiz, className, methodName, methodSignature, entry.declaringType, entry.isStatic, isSuper, info);
-		}
+		s_callJavaMethod(thiz, className, methodName, entry.declaringType, entry.isStatic, isSuper, info);
 	}
 }
 
@@ -959,17 +930,6 @@ void MetadataNode::PackageGetterCallback(Local<String> property, const PropertyC
 
 
 
-string MetadataNode::ResolveMethodOverload(const v8::FunctionCallbackInfo<Value>& args, const string& className, const string& methodName)
-{
-	string cannonicalClassName = className;
-	std::replace(cannonicalClassName.begin(), cannonicalClassName.end(), '/', '.');
-
-	string methodSignature = MethodCache::ResolveMethodSignature(cannonicalClassName, methodName, args);
-
-	DEBUG_WRITE("ResolveMethodOverload: result: %s", methodSignature.c_str());
-
-	return methodSignature;
-}
 
 bool MetadataNode::ValidateExtendArguments(const FunctionCallbackInfo<Value>& info, string& extendLocation, v8::Handle<v8::String>& extendName, Handle<Object>& implementationObject)
 {

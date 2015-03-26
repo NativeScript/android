@@ -38,7 +38,7 @@ namespace tns
 
 	typedef void (*SetArrayElementCallback)(const v8::Handle<v8::Object>& array, uint32_t index, const std::string& arraySignature, v8::Handle<v8::Value>& value);
 
-	typedef void (*CallJavaMethodCallback)(const v8::Handle<v8::Object>& caller, const std::string& classJniSignature, const std::string& methodName, const std::string& methodJniSignature, const std::string& declaringClassJniSignature, bool isStatic, bool isSuper, const v8::FunctionCallbackInfo<v8::Value>& args);
+	typedef void (*CallJavaMethodCallback)(const v8::Handle<v8::Object>& caller, const std::string& className, const std::string& methodName, const std::string& declaringClassName, bool isStatic, bool isSuper, const v8::FunctionCallbackInfo<v8::Value>& args);
 
 	typedef bool (*RegisterInstanceCallback)(const v8::Handle<v8::Object>& jsObject, const std::string& name, const std::string& className, const ArgsWrapper& argWrapper, const v8::Handle<v8::Object>& implementationObject, bool isInterface);
 
@@ -251,8 +251,6 @@ namespace tns
 		static void SuperAccessorGetterCallback(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
 		static void ArrayLengthGetterCallack(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
 
-
-		static std::string ResolveMethodOverload(const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& className, const std::string& methodName);
 
 		static void PackageGetterCallback(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
 

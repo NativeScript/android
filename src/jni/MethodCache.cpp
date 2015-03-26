@@ -1,49 +1,90 @@
 #include "MethodCache.h"
-#include "NativeScriptRuntime.h"
+#include "JniLocalRef.h"
+#include "JsArgToArrayConverter.h"
+#include "ExceptionUtil.h"
 #include "MetadataNode.h"
 #include "NativeScriptAssert.h"
 #include "Util.h"
 #include "V8GlobalHelpers.h"
 #include "V8StringConstants.h"
 #include <sstream>
+#include <assert.h>
 
 using namespace v8;
 using namespace std;
 using namespace tns;
 
-string MethodCache::ResolveMethodSignature(const string& className, const string& methodName, const FunctionCallbackInfo<Value>& args)
+int64_t getTimeNsec() {
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    return (int64_t) now.tv_sec*1000000000LL + now.tv_nsec;
+}
+
+void MethodCache::Init()
 {
-	string signature;
+	JEnv env;
+
+	PLATFORM_CLASS = env.FindClass("com/tns/Platform");
+	assert(PLATFORM_CLASS != nullptr);
+
+	RESOLVE_METHOD_OVERLOAD_METHOD_ID = env.GetStaticMethodID(PLATFORM_CLASS, "resolveMethodOverload", "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;");
+	assert(RESOLVE_METHOD_OVERLOAD_METHOD_ID != nullptr);
+}
+
+MethodCache::CacheMethodInfo MethodCache::ResolveMethodSignature(const string& className, const string& methodName, const FunctionCallbackInfo<Value>& args, bool isStatic)
+{
+	CacheMethodInfo mi;
 
 	// TODO: Possible improvement
-	string key = EncodeSignature(className, methodName, args);
+	auto key = EncodeSignature(className, methodName, args, isStatic);
 
 	auto it = s_cache.find(key);
 
 	if (it == s_cache.end())
 	{
-		signature = NativeScriptRuntime::ResolveJavaMethod(args, className, methodName);
+		auto s1 = getTimeNsec();
+		auto signature = ResolveJavaMethod(args, className, methodName);
+		auto s2 = getTimeNsec();
+		s_time += (s2 - s1);
 
 		DEBUG_WRITE("ResolveMethodSignature %s='%s'", key.c_str(), signature.c_str());
 
 		if (!signature.empty())
 		{
-			s_cache.insert(make_pair(key, signature));
+			JEnv env;
+			auto clazz = env.FindClass(className);
+			assert(clazz != nullptr);
+			mi.clazz = clazz;
+			mi.signature = signature;
+			mi.isStatic = isStatic;
+			mi.mid = isStatic
+						? env.GetStaticMethodID(clazz, methodName, signature)
+						: env.GetMethodID(clazz, methodName, signature);
+
+			s_cache.insert(make_pair(key, mi));
 		}
 	}
 	else
 	{
-		signature = (*it).second;
+		mi = (*it).second;
 	}
 
-	return signature;
+	return mi;
 }
 
 
-string MethodCache::EncodeSignature(const string& className, const string& methodName, const FunctionCallbackInfo<Value>& args)
+string MethodCache::EncodeSignature(const string& className, const string& methodName, const FunctionCallbackInfo<Value>& args, bool isStatic)
 {
 	string sig(className);
 	sig.append(".");
+	if (isStatic)
+	{
+		sig.append("S.");
+	}
+	else
+	{
+		sig.append("I.");
+	}
 	sig.append(methodName);
 	sig.append(".");
 	int len = args.Length();
@@ -147,4 +188,38 @@ string MethodCache::GetType(const v8::Handle<v8::Value>& value)
 }
 
 
-map<string, string> MethodCache::s_cache;
+string MethodCache::ResolveJavaMethod(const FunctionCallbackInfo<Value>& args, const string& className, const string& methodName)
+{
+	JEnv env;
+
+	JsArgToArrayConverter argConverter(args, false);
+
+	auto canonicalClassName = Util::ConvertFromJniToCanonicalName(className);
+	JniLocalRef jsClassName(env.NewStringUTF(canonicalClassName.c_str()));
+	JniLocalRef jsMethodName(env.NewStringUTF(methodName.c_str()));
+
+	jobjectArray arrArgs = argConverter.ToJavaArray();
+
+	jstring signature = (jstring) env.CallStaticObjectMethod(PLATFORM_CLASS, RESOLVE_METHOD_OVERLOAD_METHOD_ID, (jstring) jsClassName, (jstring) jsMethodName, arrArgs);
+
+	bool exceptionOccurred = ExceptionUtil::GetInstance()->CheckForJavaException(env);
+
+	string resolvedSignature;
+
+	if (!exceptionOccurred)
+	{
+		const char* str = env.GetStringUTFChars(signature, nullptr);
+		resolvedSignature = string(str);
+		env.ReleaseStringUTFChars(signature, str);
+
+		env.DeleteLocalRef(signature);
+	}
+
+	return resolvedSignature;
+}
+
+
+map<string, MethodCache::CacheMethodInfo> MethodCache::s_cache;
+jclass MethodCache::PLATFORM_CLASS = nullptr;
+jmethodID MethodCache::RESOLVE_METHOD_OVERLOAD_METHOD_ID = nullptr;
+int64_t MethodCache::s_time = 0;
