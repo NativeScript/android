@@ -192,7 +192,7 @@ void NativeScriptRuntime::CallJavaMethod(const Handle<Object>& caller, const str
 	if (!argConverter.IsValid())
 	{
 		JsArgConverter::Error err = argConverter.GetError();
-		ExceptionUtil::GetInstance()->HandleInvalidState(err.msg, false);
+		ExceptionUtil::GetInstance()->ThrowExceptionToJs(err.msg);
 		return;
 	}
 
@@ -624,7 +624,7 @@ jobject NativeScriptRuntime::CreateJavaInstance(int objectID, const std::string&
 	else
 	{
 		JsArgToArrayConverter::Error err = argConverter.GetError();
-		ExceptionUtil::GetInstance()->HandleInvalidState(err.msg, false);
+		ExceptionUtil::GetInstance()->ThrowExceptionToJs(err.msg);
 	}
 
 	return instance;
@@ -819,7 +819,7 @@ void NativeScriptRuntime::RequireCallback(const v8::FunctionCallbackInfo<v8::Val
 		stringstream ss;
 		ss << "Module \"" << moduleName << "\" not found";
 		string exception = ss.str();
-		ExceptionUtil::GetInstance()->HandleInvalidState(exception, false);
+		ExceptionUtil::GetInstance()->ThrowExceptionToJs(exception);
 		return;
 	}
 	if (modulePath == "EXTERNAL_FILE_ERROR")
@@ -828,7 +828,7 @@ void NativeScriptRuntime::RequireCallback(const v8::FunctionCallbackInfo<v8::Val
 		stringstream ss;
 		ss << "Module \"" << moduleName << "\" is located on the external storage. Modules can be private application files ONLY";
 		string exception = ss.str();
-		ExceptionUtil::GetInstance()->HandleInvalidState(exception, false);
+		ExceptionUtil::GetInstance()->ThrowExceptionToJs(exception);
 		return;
 	}
 
@@ -851,7 +851,7 @@ void NativeScriptRuntime::RequireCallback(const v8::FunctionCallbackInfo<v8::Val
 		auto script = Script::Compile(scriptText, args[0].As<String>());
 		DEBUG_WRITE("Compiled script (module %s)", moduleName.c_str());
 
-		if(ExceptionUtil::GetInstance()->HandleTryCatch(tc, true)){
+		if(ExceptionUtil::GetInstance()->HandleTryCatch(tc)){
 			loadedModules.erase(modulePath);
 			tmpExportObj->Reset();
 			delete tmpExportObj;
@@ -869,12 +869,11 @@ void NativeScriptRuntime::RequireCallback(const v8::FunctionCallbackInfo<v8::Val
 
 			DEBUG_WRITE("After Running script (module %s)", moduleName.c_str());
 
-			if(ExceptionUtil::GetInstance()->HandleTryCatch(tcRequire, true)){
+			if(ExceptionUtil::GetInstance()->HandleTryCatch(tcRequire)){
 				loadedModules.erase(modulePath);
 				tmpExportObj->Reset();
 				delete tmpExportObj;
 				hasError = true;
-				tcRequire.ReThrow();
 			}
 			else {
 				if (moduleObj.IsEmpty())
@@ -896,11 +895,6 @@ void NativeScriptRuntime::RequireCallback(const v8::FunctionCallbackInfo<v8::Val
 					loadedModules.insert(make_pair(modulePath, persistentModuleObject));
 				}
 			}
-		}
-
-		if (tc.HasCaught())
-		{
-			tc.ReThrow();
 		}
 	}
 	else
@@ -1027,7 +1021,7 @@ Handle<Value> NativeScriptRuntime::CallJSMethod(JNIEnv *_env, const Handle<Objec
 		stringstream ss;
 		ss << "Cannot find method '" << name << "' implementation";
 
-		ExceptionUtil::GetInstance()->HandleInvalidState(ss.str(), false);
+		ExceptionUtil::GetInstance()->ThrowExceptionToJs(ss.str());
 
 		result = Undefined(isolate);
 	}
@@ -1038,7 +1032,7 @@ Handle<Value> NativeScriptRuntime::CallJSMethod(JNIEnv *_env, const Handle<Objec
 		stringstream ss;
 		ss << "Property '" << name << "' is not a function";
 
-		ExceptionUtil::GetInstance()->HandleInvalidState(ss.str(), false);
+		ExceptionUtil::GetInstance()->ThrowExceptionToJs(ss.str());
 
 		result = Undefined(isolate);
 	}
@@ -1062,8 +1056,7 @@ Handle<Value> NativeScriptRuntime::CallJSMethod(JNIEnv *_env, const Handle<Objec
 
 		//TODO: if javaResult is a pure js object create a java object that represents this object in java land
 
-		bool exceptionFound = exceptionUtil->HandleTryCatch(tc, true);
-		if (exceptionFound)
+		if (tc.HasCaught())
 		{
 			jsResult = Undefined(isolate);
 		}

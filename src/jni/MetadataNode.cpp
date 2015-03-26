@@ -282,7 +282,7 @@ void MetadataNode::FieldAccessorSetterCallback(Local<String> property,Local<Valu
 		ss << "You are trying to set \"" << fieldCallbackData.name << "\" which is a final field! Final fields can only be read.";
 		string exceptionMessage = ss.str();
 
-		info.GetIsolate()->ThrowException(v8::Exception::Error((ConvertToV8String(exceptionMessage))));
+		ExceptionUtil::GetInstance()->ThrowExceptionToJs(exceptionMessage);
 	}
 	else
 	{
@@ -983,8 +983,7 @@ bool MetadataNode::ValidateExtendArguments(const FunctionCallbackInfo<Value>& in
 			ss << "Invalid extend() call. No name specified for extend at location: " << extendLocation.c_str();
 			string exceptionMessage = ss.str();
 
-			Isolate *isolate(Isolate::GetCurrent());
-			isolate->ThrowException(v8::Exception::Error((ConvertToV8String(exceptionMessage))));
+			ExceptionUtil::GetInstance()->ThrowExceptionToJs(exceptionMessage);
 			return false;
 		}
 
@@ -995,8 +994,7 @@ bool MetadataNode::ValidateExtendArguments(const FunctionCallbackInfo<Value>& in
 			ss << "Invalid extend() call. No implementation object specified at location: " << extendLocation.c_str();
 			string exceptionMessage = ss.str();
 
-			Isolate *isolate(Isolate::GetCurrent());
-			isolate->ThrowException(v8::Exception::Error((ConvertToV8String(exceptionMessage))));
+			ExceptionUtil::GetInstance()->ThrowExceptionToJs(exceptionMessage);
 			return false;
 		}
 
@@ -1010,8 +1008,7 @@ bool MetadataNode::ValidateExtendArguments(const FunctionCallbackInfo<Value>& in
 			ss << "Invalid extend() call. No name for extend specified at location: " << extendLocation.c_str();
 			string exceptionMessage = ss.str();
 
-			Isolate *isolate(Isolate::GetCurrent());
-			isolate->ThrowException(v8::Exception::Error((ConvertToV8String(exceptionMessage))));
+			ExceptionUtil::GetInstance()->ThrowExceptionToJs(exceptionMessage);
 			return false;
 		}
 
@@ -1021,8 +1018,7 @@ bool MetadataNode::ValidateExtendArguments(const FunctionCallbackInfo<Value>& in
 			ss << "Invalid extend() call. Named extend should be called with second object parameter containing overridden methods at location: " << extendLocation.c_str();
 			string exceptionMessage = ss.str();
 
-			Isolate *isolate(Isolate::GetCurrent());
-			isolate->ThrowException(v8::Exception::Error((ConvertToV8String(exceptionMessage))));
+			ExceptionUtil::GetInstance()->ThrowExceptionToJs(exceptionMessage);
 			return false;
 		}
 
@@ -1035,8 +1031,7 @@ bool MetadataNode::ValidateExtendArguments(const FunctionCallbackInfo<Value>& in
 			ss << "The extend name \"" << ConvertToString(extendName) << "\" you provided contains invalid symbols. Try using the symbols [a-z, A-Z, 0-9, _]." << endl;
 			string exceptionMessage = ss.str();
 
-			Isolate *isolate(Isolate::GetCurrent());
-			isolate->ThrowException(v8::Exception::Error((ConvertToV8String(exceptionMessage))));
+			ExceptionUtil::GetInstance()->ThrowExceptionToJs(exceptionMessage);
 			return false;
 		}
 		implementationObject = info[1]->ToObject();
@@ -1047,8 +1042,7 @@ bool MetadataNode::ValidateExtendArguments(const FunctionCallbackInfo<Value>& in
 		ss << "Invalid extend() call at location: " << extendLocation.c_str();
 		string exceptionMessage = ss.str();
 
-		Isolate *isolate(Isolate::GetCurrent());
-		isolate->ThrowException(v8::Exception::Error((ConvertToV8String(exceptionMessage))));
+		ExceptionUtil::GetInstance()->ThrowExceptionToJs(exceptionMessage);
 		return false;
 	}
 
@@ -1111,7 +1105,7 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 		string usedClassName = ConvertToString(implementationObjectProperty);
 		stringstream s;
 		s << "This object is used to extend another class '" << usedClassName << "'";
-		ExceptionUtil::GetInstance()->HandleInvalidState(s.str(), false);
+		ExceptionUtil::GetInstance()->ThrowExceptionToJs(s.str());
 		return;
 	}
 

@@ -191,13 +191,13 @@ void ArrayElementAccessor::SetArrayElement(const Handle<Object>& array, uint32_t
 			else
 			{
 				JsArgToArrayConverter::Error err = argConverter.GetError();
-				ExceptionUtil::GetInstance()->HandleInvalidState(err.msg, false);
+				ExceptionUtil::GetInstance()->ThrowExceptionToJs(err.msg);
 				return;
 			}
 		}
 		else
 		{
-			ExceptionUtil::GetInstance()->HandleInvalidState("Cannot assign primitive value to array of objects.", false);
+			ExceptionUtil::GetInstance()->ThrowExceptionToJs("Cannot assign primitive value to array of objects.");
 			return;
 		}
 	}
@@ -217,7 +217,7 @@ Handle<Value> ArrayElementAccessor::CheckForArrayAccessException(JEnv& env, cons
 		env.ExceptionClear();
 		string errMsg;
 		ExceptionUtil::GetInstance()->GetExceptionMessage(env, exc, errMsg);
-		ExceptionUtil::GetInstance()->HandleInvalidState(errMsg, false);
+		ExceptionUtil::GetInstance()->ThrowExceptionToJs(errMsg);
 	}
 	else if (elementSignature == "Z")
 	{

@@ -57,7 +57,7 @@ var MainActivity = (function (_super) {
     	_super.prototype.onCreate.call(this, null);
     	//this.super.onCreate(null);
     	
-    	//require("./tests/testsWithContext").run(this);
+    	require("./tests/testsWithContext").run(this);
 
     	var layout = new android.widget.LinearLayout(this);
     	layout.setOrientation(1);
