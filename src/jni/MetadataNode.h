@@ -22,6 +22,7 @@
 #include "MetadataEntry.h"
 #include "MetadataTreeNode.h"
 #include "MetadataReader.h"
+#include "FieldCallbackData.h"
 #include "ArgsWrapper.h"
 #include "ObjectManager.h"
 #include <string>
@@ -30,9 +31,9 @@
 
 namespace tns
 {
-	typedef void (*SetJavaFieldCallback)(const v8::Handle<v8::Object>& target, const v8::Handle<v8::Value>& value, const std::string& declaringTypeName, const std::string& fieldName, const std::string& fieldTypeName, bool isStatic);
+	typedef void (*SetJavaFieldCallback)(const v8::Handle<v8::Object>& target, const v8::Handle<v8::Value>& value, FieldCallbackData *fieldData);
 
-	typedef v8::Handle<v8::Value> (*GetJavaFieldCallback)(const v8::Handle<v8::Object>& caller, const std::string& declaringClassName, const std::string& fieldName, const std::string& fieldTypeName, const bool isStatic);
+	typedef v8::Handle<v8::Value> (*GetJavaFieldCallback)(const v8::Handle<v8::Object>& caller, FieldCallbackData *fieldData);
 
 	typedef v8::Handle<v8::Value> (*GetArrayElementCallback)(const v8::Handle<v8::Object>& array, uint32_t index, const std::string& arraySignature);
 
@@ -131,24 +132,6 @@ namespace tns
 			v8::Persistent<v8::Function> *extendedCtorFunction;
 			std::string extendedName;
 			MetadataNode *node;
-		};
-
-		struct FieldCallbackData
-		{
-			FieldCallbackData(const MetadataEntry& metadata)
-			{
-				name = metadata.name;
-				signature = metadata.sig;
-				declaringType = metadata.declaringType;
-				isStatic = metadata.isStatic;
-				isFinal = metadata.isFinal;
-			}
-
-			std::string name;
-			std::string signature;
-			std::string declaringType;
-			bool isStatic;
-			bool isFinal;
 		};
 
 		struct TypeMetadata

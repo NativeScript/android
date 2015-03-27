@@ -10,6 +10,7 @@
 #include "JSInstanceInfo.h"
 #include "ArgsWrapper.h"
 #include "MetadataEntry.h"
+#include "FieldCallbackData.h"
 #include "MetadataTreeNode.h"
 #include "NumericCasts.h"
 #include "FieldAccessor.h"
@@ -48,9 +49,9 @@ namespace tns
 
 		//
 
-		static v8::Handle<v8::Value> GetJavaField(const v8::Handle<v8::Object>& caller, const std::string& declaringClassName, const std::string& fieldName, const std::string& fieldTypeName, const bool isStatic);
+		static v8::Handle<v8::Value> GetJavaField(const v8::Handle<v8::Object>& caller, FieldCallbackData *fieldData);
 
-		static void SetJavaField(const v8::Handle<v8::Object>& target, const v8::Handle<v8::Value>& value, const std::string& declaringTypeName, const std::string& fieldName, const std::string& fieldTypeName, bool isStatic);
+		static void SetJavaField(const v8::Handle<v8::Object>& target, const v8::Handle<v8::Value>& value, FieldCallbackData *fieldData);
 
 		//
 

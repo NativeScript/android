@@ -263,9 +263,9 @@ void MetadataNode::ClassAccessorGetterCallback(Local<String> property, const Pro
 void MetadataNode::FieldAccessorGetterCallback(Local<String> property, const PropertyCallbackInfo<Value>& info)
 {
 	auto thiz = info.This();
-	const auto& fieldCallbackData = *reinterpret_cast<FieldCallbackData*>(info.Data().As<External>()->Value());
+	auto fieldCallbackData = reinterpret_cast<FieldCallbackData*>(info.Data().As<External>()->Value());
 
-	auto value = s_getJavaField(thiz, fieldCallbackData.declaringType, fieldCallbackData.name, fieldCallbackData.signature, fieldCallbackData.isStatic);
+	auto value = s_getJavaField(thiz, fieldCallbackData);
 	info.GetReturnValue().Set(value);
 }
 void MetadataNode::FieldAccessorSetterCallback(Local<String> property,Local<Value> value, const PropertyCallbackInfo<void>& info)
@@ -273,19 +273,19 @@ void MetadataNode::FieldAccessorSetterCallback(Local<String> property,Local<Valu
 	DEBUG_WRITE("FieldAccessorSetterCallback");
 
 	auto thiz = info.This();
-	const auto& fieldCallbackData = *reinterpret_cast<FieldCallbackData*>(info.Data().As<External>()->Value());
+	auto fieldCallbackData = reinterpret_cast<FieldCallbackData*>(info.Data().As<External>()->Value());
 
-	if (fieldCallbackData.isFinal)
+	if (fieldCallbackData->isFinal)
 	{
 		stringstream ss;
-		ss << "You are trying to set \"" << fieldCallbackData.name << "\" which is a final field! Final fields can only be read.";
+		ss << "You are trying to set \"" << fieldCallbackData->name << "\" which is a final field! Final fields can only be read.";
 		string exceptionMessage = ss.str();
 
 		ExceptionUtil::GetInstance()->ThrowExceptionToJs(exceptionMessage);
 	}
 	else
 	{
-		s_setJavaField(thiz, value, fieldCallbackData.declaringType, fieldCallbackData.name, fieldCallbackData.signature, fieldCallbackData.isStatic);
+		s_setJavaField(thiz, value, fieldCallbackData);
 		info.GetReturnValue().Set(value);
 	}
 }
@@ -334,6 +334,8 @@ Handle<Function> MetadataNode::SetMembersFromStaticMetadata(Isolate *isolate, Ha
 
 	auto nodeType = s_metadataReader.GetNodeType(treeNode);
 
+	auto curType = s_metadataReader.ReadTypeName(treeNode);
+
 	curPtr += sizeof(uint16_t /* baseClassId */);
 
 	if (s_metadataReader.IsNodeTypeInterface(nodeType))
@@ -369,7 +371,9 @@ Handle<Function> MetadataNode::SetMembersFromStaticMetadata(Isolate *isolate, Ha
 		auto entry = s_metadataReader.ReadInstanceFieldEntry(&curPtr);
 
 		auto fieldName = ConvertToV8String(entry.name);
-		auto fieldData = External::New(isolate, new FieldCallbackData(entry));
+		auto fieldInfo = new FieldCallbackData(entry);
+		fieldInfo->declaringType = curType;
+		auto fieldData = External::New(isolate, fieldInfo);
 		prototypeTemplate->SetAccessor(fieldName, FieldAccessorGetterCallback, FieldAccessorSetterCallback, fieldData, AccessControl::DEFAULT, PropertyAttribute::DontDelete);
 	}
 

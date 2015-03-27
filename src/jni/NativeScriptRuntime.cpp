@@ -150,14 +150,14 @@ void NativeScriptRuntime::SetArrayElement(const Handle<Object>& array, uint32_t 
 	ExceptionUtil::GetInstance()->CheckForJavaException(env);
 }
 
-Handle<Value> NativeScriptRuntime::GetJavaField(const Handle<Object>& caller, const string& declaringClassName, const string& fieldName, const string& fieldTypeName, const bool isStatic)
+Handle<Value> NativeScriptRuntime::GetJavaField(const Handle<Object>& caller, FieldCallbackData *fieldData)
 {
-	return fieldAccessor.GetJavaField(caller, declaringClassName, fieldName, fieldTypeName, isStatic);
+	return fieldAccessor.GetJavaField(caller, fieldData);
 }
 
-void NativeScriptRuntime::SetJavaField(const Handle<Object>& target, const Handle<Value>& value, const string& declaringTypeName, const string& fieldName, const string& fieldTypeName, bool isStatic)
+void NativeScriptRuntime::SetJavaField(const Handle<Object>& target, const Handle<Value>& value, FieldCallbackData *fieldData)
 {
-	fieldAccessor.SetJavaField(target, value, declaringTypeName, fieldName, fieldTypeName, isStatic);
+	fieldAccessor.SetJavaField(target, value, fieldData);
 }
 
 
