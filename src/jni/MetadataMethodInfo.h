@@ -20,6 +20,7 @@ namespace tns
 		};
 
 		std::string GetName();
+		uint8_t CheckIsResolved();
 		uint16_t GetSignatureLength();
 		std::string GetSignature();
 		std::string GetDeclaringType();//used only for static methods
