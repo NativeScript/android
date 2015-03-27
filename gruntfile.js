@@ -204,8 +204,6 @@ module.exports = function(grunt) {
     grunt.loadNpmTasks("grunt-mkdir");
     grunt.loadNpmTasks("grunt-exec");
     grunt.loadNpmTasks("grunt-replace");
-    //TODO: NEEDED???
-    grunt.loadNpmTasks("grunt-contrib-rename");
 
     grunt.registerTask("generateRuntime", [
                             "exec:generateRuntime"
