@@ -2,6 +2,7 @@
 #define METADATAENTRY_H_
 
 #include <string>
+#include "jni.h"
 #include "MetadataTreeNode.h"
 
 namespace tns
@@ -20,7 +21,9 @@ namespace tns
 	struct MetadataEntry
 	{
 		MetadataEntry()
-			: isTypeMember(false), name(std::string()), treeNode(nullptr), sig(std::string()), paramCount(0), isStatic(false), isFinal(false), declaringType(std::string())
+			: isTypeMember(false), name(std::string()), treeNode(nullptr), sig(std::string()), paramCount(0),
+			  isStatic(false), isFinal(false), declaringType(std::string()),
+			  isResolved(false), memberId(nullptr), clazz(nullptr)
 		{
 		}
 		MetadataTreeNode *treeNode;
@@ -32,6 +35,9 @@ namespace tns
 		bool isStatic;
 		bool isFinal;
 		bool isTypeMember;
+		bool isResolved;
+		void *memberId;
+		jclass clazz;
 	};
 }
 

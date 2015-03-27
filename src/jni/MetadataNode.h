@@ -38,7 +38,7 @@ namespace tns
 
 	typedef void (*SetArrayElementCallback)(const v8::Handle<v8::Object>& array, uint32_t index, const std::string& arraySignature, v8::Handle<v8::Value>& value);
 
-	typedef void (*CallJavaMethodCallback)(const v8::Handle<v8::Object>& caller, const std::string& className, const std::string& methodName, const std::string& declaringClassName, bool isStatic, bool isSuper, const v8::FunctionCallbackInfo<v8::Value>& args);
+	typedef void (*CallJavaMethodCallback)(const v8::Handle<v8::Object>& caller, const std::string& className, const std::string& methodName, MetadataEntry *entry, bool isStatic, bool isSuper, const v8::FunctionCallbackInfo<v8::Value>& args);
 
 	typedef bool (*RegisterInstanceCallback)(const v8::Handle<v8::Object>& jsObject, const std::string& name, const std::string& className, const ArgsWrapper& argWrapper, const v8::Handle<v8::Object>& implementationObject, bool isInterface);
 

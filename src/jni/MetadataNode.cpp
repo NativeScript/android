@@ -1,6 +1,5 @@
 #include "MetadataNode.h"
 #include "NativeScriptAssert.h"
-#include "MethodCache.h"
 #include "Constants.h"
 #include "Util.h"
 #include "V8GlobalHelpers.h"
@@ -761,18 +760,29 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
 
 	auto callbackData = reinterpret_cast<MethodCallbackData*>(e->Value());
 
-	const auto& candidates = callbackData->candidates;
+	auto& candidates = callbackData->candidates;
 
 	auto className = callbackData->node->m_name;
 	auto methodName = candidates.front().name;
 
-	const auto& entry = candidates.front();
 	int argLength = info.Length();
+	int count = 0;
+	MetadataEntry *entry = nullptr;
+	for (auto& c: candidates)
+	{
+		if (c.paramCount == argLength)
+		{
+			if (++count > 1)
+				break;
+			entry = &c;
+		}
+	}
 
 	auto thiz = info.This();
 
 	auto isSuper = false;
-	if (!entry.isStatic)
+	const auto& first = candidates.front();
+	if (!first.isStatic)
 	{
 		auto extededClassName = thiz->GetHiddenValue(ConvertToV8String("implClassName"));
 		isSuper = !extededClassName.IsEmpty();
@@ -795,7 +805,7 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
 	}
 	else
 	{
-		s_callJavaMethod(thiz, className, methodName, entry.declaringType, entry.isStatic, isSuper, info);
+		s_callJavaMethod(thiz, className, methodName, entry, first.isStatic, isSuper, info);
 	}
 }
 

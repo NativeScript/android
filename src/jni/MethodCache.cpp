@@ -14,12 +14,6 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
-int64_t getTimeNsec() {
-    struct timespec now;
-    clock_gettime(CLOCK_MONOTONIC, &now);
-    return (int64_t) now.tv_sec*1000000000LL + now.tv_nsec;
-}
-
 void MethodCache::Init()
 {
 	JEnv env;
@@ -42,10 +36,7 @@ MethodCache::CacheMethodInfo MethodCache::ResolveMethodSignature(const string& c
 
 	if (it == s_cache.end())
 	{
-		auto s1 = getTimeNsec();
 		auto signature = ResolveJavaMethod(args, className, methodName);
-		auto s2 = getTimeNsec();
-		s_time += (s2 - s1);
 
 		DEBUG_WRITE("ResolveMethodSignature %s='%s'", key.c_str(), signature.c_str());
 
@@ -222,4 +213,3 @@ string MethodCache::ResolveJavaMethod(const FunctionCallbackInfo<Value>& args, c
 map<string, MethodCache::CacheMethodInfo> MethodCache::s_cache;
 jclass MethodCache::PLATFORM_CLASS = nullptr;
 jmethodID MethodCache::RESOLVE_METHOD_OVERLOAD_METHOD_ID = nullptr;
-int64_t MethodCache::s_time = 0;

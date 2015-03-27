@@ -9,6 +9,7 @@
 #include "JEnv.h"
 #include "JSInstanceInfo.h"
 #include "ArgsWrapper.h"
+#include "MetadataEntry.h"
 #include "MetadataTreeNode.h"
 #include "NumericCasts.h"
 #include "FieldAccessor.h"
@@ -41,7 +42,7 @@ namespace tns
 
 		//
 
-		static void CallJavaMethod(const v8::Handle<v8::Object>& caller, const std::string& className, const std::string& methodName, const std::string& declaringClassName, bool isStatic, bool isSuper, const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void CallJavaMethod(const v8::Handle<v8::Object>& caller, const std::string& className, const std::string& methodName, MetadataEntry *entry, bool isStatic, bool isSuper, const v8::FunctionCallbackInfo<v8::Value>& args);
 
 		static v8::Handle<v8::Value> CallJSMethod(JNIEnv *_env, const v8::Handle<v8::Object>& jsObject, jstring methodName, jobjectArray args, v8::TryCatch& tc);
 

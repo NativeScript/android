@@ -161,9 +161,40 @@ void NativeScriptRuntime::SetJavaField(const Handle<Object>& target, const Handl
 }
 
 
-void NativeScriptRuntime::CallJavaMethod(const Handle<Object>& caller, const string& className, const string& methodName, const string& declaringClassName, bool isStatic, bool isSuper, const v8::FunctionCallbackInfo<v8::Value>& args)
+void NativeScriptRuntime::CallJavaMethod(const Handle<Object>& caller, const string& className, const string& methodName, MetadataEntry *entry, bool isStatic, bool isSuper, const v8::FunctionCallbackInfo<v8::Value>& args)
 {
 	JEnv env;
+
+	jclass clazz;
+	jmethodID mid;
+	string sig;
+
+	if ((entry != nullptr) && entry->isResolved)
+	{
+		isStatic = entry->isStatic;
+		if (entry->memberId == nullptr)
+		{
+			entry->clazz = env.FindClass(className);
+			entry->memberId = isStatic
+								? env.GetStaticMethodID(entry->clazz, methodName, entry->sig)
+								: env.GetMethodID(entry->clazz, methodName, entry->sig);
+		}
+		clazz = entry->clazz;
+		mid = reinterpret_cast<jmethodID>(entry->memberId);
+		sig = entry->sig;
+	}
+	else
+	{
+		auto mi = MethodCache::ResolveMethodSignature(className, methodName, args, isStatic);
+		if (mi.mid == nullptr)
+		{
+			DEBUG_WRITE("Cannot resolve class=%s, method=%s, isStatic=%d, isSuper=%d", className.c_str(), methodName.c_str(), isStatic, isSuper);
+			return;
+		}
+		clazz = mi.clazz;
+		mid = mi.mid;
+		sig = mi.signature;
+	}
 
 	if (!isStatic)
 	{
@@ -174,14 +205,7 @@ void NativeScriptRuntime::CallJavaMethod(const Handle<Object>& caller, const str
 		DEBUG_WRITE("CallJavaMethod called %s.%s. static method", className.c_str(), methodName.c_str());
 	}
 
-	auto mi = MethodCache::ResolveMethodSignature(className, methodName, args, isStatic);
-	if (mi.mid == nullptr)
-	{
-		DEBUG_WRITE("Cannot resolve class=%s, method=%s, isStatic=%d, isSuper=%d", className.c_str(), methodName.c_str(), isStatic, isSuper);
-		return;
-	}
-
-	JsArgConverter argConverter(args, false, mi.signature);
+	JsArgConverter argConverter(args, false, sig);
 
 	if (!argConverter.IsValid())
 	{
@@ -193,8 +217,6 @@ void NativeScriptRuntime::CallJavaMethod(const Handle<Object>& caller, const str
 	auto isolate = Isolate::GetCurrent();
 
 	jweak callerJavaObject;
-	jclass clazz = mi.clazz;
-	jmethodID mid = mi.mid;
 
 	jvalue* javaArgs = argConverter.ToArgs();
 
@@ -211,7 +233,7 @@ void NativeScriptRuntime::CallJavaMethod(const Handle<Object>& caller, const str
 		}
 	}
 
-	auto returnType = GetReturnType(mi.signature);
+	auto returnType = GetReturnType(sig);
 
 	switch (returnType[0])
 	{

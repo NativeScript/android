@@ -89,6 +89,7 @@ void MetadataReader::FillEntryWithMethodInfo(MethodInfo& mi, MetadataEntry& entr
 	entry.type = NodeType::Method;
 	entry.isTypeMember = true;
 	entry.name = mi.GetName();
+	entry.isResolved = mi.CheckIsResolved() == 1;
 	uint16_t sigLength = mi.GetSignatureLength();
 	assert(sigLength > 0);
 	entry.paramCount = sigLength - 1;

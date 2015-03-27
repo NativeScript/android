@@ -30,8 +30,6 @@ namespace tns
 
 		static std::string EncodeSignature(const std::string& className, const std::string& methodName, const v8::FunctionCallbackInfo<v8::Value>& args, bool isStatic);
 
-		static int64_t s_time;
-
 	private:
 		MethodCache() {}
 
