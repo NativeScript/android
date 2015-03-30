@@ -193,9 +193,9 @@ public class Platform
 		runNativeScript(appFileName, appContent);
 	}
 
-	private static int cacheConstructor(Constructor<?> ctor) throws ClassNotFoundException
+	private static int cacheConstructor(String name, String className, Object[] args, String[] methodOverrides) throws ClassNotFoundException, IOException
 	{
-		//Constructor<?> ctor = MethodResolver.resolveConstructor(className, args);
+		Constructor<?> ctor = MethodResolver.resolveConstructor(name, className, args, dexFactory, methodOverrides);
 
 		
 		//TODO: Lubo: Not thread safe already.
@@ -207,34 +207,14 @@ public class Platform
 		return ctorId;
 	}
 
-	public static Object createInstance(String name, String className, Object[] args, String[] methodOverrides, int objectId, IntWrapper constructorId) throws InstantiationException, IllegalAccessException, ClassNotFoundException, NoSuchMethodException, IllegalArgumentException, InvocationTargetException, IOException
+	public static Object createInstance(String name, String className, Object[] args, String[] methodOverrides, int objectId, int constructorId) throws InstantiationException, IllegalAccessException, ClassNotFoundException, NoSuchMethodException, IllegalArgumentException, InvocationTargetException, IOException
 	{
 		if (IsLogEnabled)
 		{
 			Log.d(DEFAULT_LOG_TAG, "Creating instance for ctorId:" + constructorId + " className:" + className + " methodOverrides: " + Arrays.toString(methodOverrides));
 		}
 		
-		Constructor<?> ctor = null;
-		int ctorId = constructorId.getInt();
-		if (ctorId == -1)
-		{
-			if (IsLogEnabled)
-			{
-				Log.d(DEFAULT_LOG_TAG, "createInstance: resolving constructor for class:" + className + " name: " + name);
-			}
-			
-			ctor = MethodResolver.resolveConstructor(name, className, args, Platform.dexFactory, methodOverrides);
-			if (ctor == null)
-			{
-				throw new RuntimeException("Constructor not resolved");
-			}
-			ctorId = cacheConstructor(ctor);
-			constructorId.setInt(ctorId);
-		}
-		else
-		{
-			ctor = ctorCache.get(ctorId);
-		}
+		Constructor<?> ctor = ctorCache.get(constructorId);
 		boolean success = MethodResolver.convertConstructorArgs(ctor, args);
 
 		if (!success)
@@ -905,26 +885,6 @@ public class Platform
 		return clazz;
 	}
 
-    public static class IntWrapper
-	{
-		private int value;
-
-		public IntWrapper(int value)
-		{
-			setInt(value);
-		}
-
-		public int getInt()
-		{
-			return value;
-		}
-
-		public void setInt(int value)
-		{
-			this.value = value;
-		}
-	}
-    
     private static Class<?> findClass(String className) throws ClassNotFoundException
     {
     	Class<?> clazz = dexFactory.findClass(className);

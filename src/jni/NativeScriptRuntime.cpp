@@ -43,11 +43,11 @@ void NativeScriptRuntime::Init(JavaVM *jvm, ObjectManager *objectManager)
 	MAKE_CLASS_INSTANCE_OF_TYPE_STRONG = env.GetStaticMethodID(PlatformClass, "makeClassInstanceOfTypeStrong", "(Ljava/lang/String;)I");
 	assert(MAKE_CLASS_INSTANCE_OF_TYPE_STRONG != nullptr);
 
-	CREATE_INSTANCE_METHOD_ID = env.GetStaticMethodID(PlatformClass, "createInstance", "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;[Ljava/lang/String;ILcom/tns/Platform$IntWrapper;)Ljava/lang/Object;");
+	CREATE_INSTANCE_METHOD_ID = env.GetStaticMethodID(PlatformClass, "createInstance", "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;[Ljava/lang/String;II)Ljava/lang/Object;");
 	assert(CREATE_INSTANCE_METHOD_ID != nullptr);
 
-//	CACHE_CONSTRUCTOR_METHOD_ID = env.GetStaticMethodID(PlatformClass, "cacheConstructor", "(Ljava.lang.reflect.Constructor;)I");
-//	assert(CACHE_CONSTRUCTOR_METHOD_ID != nullptr);
+	CACHE_CONSTRUCTOR_METHOD_ID = env.GetStaticMethodID(PlatformClass, "cacheConstructor", "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;[Ljava/lang/String;)I");
+	assert(CACHE_CONSTRUCTOR_METHOD_ID != nullptr);
 
 	GET_TYPE_METADATA = env.GetStaticMethodID(PlatformClass, "getTypeMetadata", "(Ljava/lang/String;I)[Ljava/lang/String;");
 	assert(GET_TYPE_METADATA != nullptr);
@@ -561,17 +561,10 @@ jobject NativeScriptRuntime::CreateJavaInstance(int objectID, const std::string&
 
 		jobjectArray javaArgs = argConverter.ToJavaArray();
 
-		int ctorId = GetCachedConstructorId(env, args, name, className);
-		bool foundCachedCtor = ctorId != -1;
-
-		//TODO: Lubo: reuse this instance to skip creating for every call
-		jclass clazz = env.FindClass("com/tns/Platform$IntWrapper");
-		jmethodID ctor = env.GetMethodID(clazz, "<init>", "(I)V");
-		jmethodID getIntMethodID = env.GetMethodID(clazz, "getInt", "()I");
-		jobject ctorIdWrapper = env.NewObject(clazz, ctor, ctorId);
-
 		JniLocalRef javaClassName(env.NewStringUTF(className.c_str()));
 		JniLocalRef javaName(env.NewStringUTF(name.c_str()));
+
+		int ctorId = GetCachedConstructorId(env, args, name, className, javaName, javaClassName, javaArgs, methodOverrides);
 
 		jobject obj = env.CallStaticObjectMethod(PlatformClass,
 				CREATE_INSTANCE_METHOD_ID,
@@ -580,23 +573,15 @@ jobject NativeScriptRuntime::CreateJavaInstance(int objectID, const std::string&
 				javaArgs,
 				methodOverrides,
 				(jint) objectID,
-				ctorIdWrapper);
+				ctorId);
 
 		bool exceptionFound = ExceptionUtil::GetInstance()->CheckForJavaException(env);
 
 		if (!exceptionFound)
 		{
-			if (!foundCachedCtor)
-			{
-				jint newCtorId = env.CallIntMethod(ctorIdWrapper, getIntMethodID);
-				DEBUG_WRITE("CreateJavaInstance:  newCtorId: %d", newCtorId);
-				SetCachedConstructorId(env, args, name, className, newCtorId);
-			}
-
 			instance = obj;
 			objectManager->UpdateCache(objectID, obj);
 		}
-		env.DeleteLocalRef(ctorIdWrapper);
 	}
 	else
 	{
@@ -607,9 +592,9 @@ jobject NativeScriptRuntime::CreateJavaInstance(int objectID, const std::string&
 	return instance;
 }
 
-int NativeScriptRuntime::GetCachedConstructorId(JEnv& env, const FunctionCallbackInfo<Value>& args, const string& name, const string& className)
+int NativeScriptRuntime::GetCachedConstructorId(JEnv& env, const FunctionCallbackInfo<Value>& args, const string& name, const string& className, jstring javaName, jstring javaClassName, jobjectArray javaArgs, jobjectArray methodOverrides)
 {
-	int ctorId;
+	int ctorId = -1;
 	string fullClassName = className + '-' + name;
 	string encodedCtorArgs = MethodCache::EncodeSignature(fullClassName, "<init>", args, false);
 	auto itFound = s_constructorCache.find(encodedCtorArgs);
@@ -621,29 +606,19 @@ int NativeScriptRuntime::GetCachedConstructorId(JEnv& env, const FunctionCallbac
 	}
 	else
 	{
-//		JniLocalRef className(env.NewStringUTF(strClassName.c_str()));
-//
-//		jint id = env.CallStaticIntMethod(PlatformClass, CACHE_JAVA_CONSTRUCTOR_METHOD_ID, (jstring)className, javaArgs);
-//
-//		if (!CheckForJavaException(env))
-//		{
-//			ctodId = id;
-//			s_constructorCache.insert(make_pair(encodedCtorArgs, ctodId));
-//		}
-		return -1;
+		jint id = env.CallStaticIntMethod(PlatformClass, CACHE_CONSTRUCTOR_METHOD_ID, javaName, javaClassName, javaArgs, methodOverrides);
+
+		if (env.ExceptionCheck() == JNI_FALSE)
+		{
+			ctorId = id;
+			s_constructorCache.insert(make_pair(encodedCtorArgs, ctorId));
+		}
 	}
 
 	DEBUG_WRITE("GetCachedConstructorId: encodedCtorArgs=%s, ctorId=%d", encodedCtorArgs.c_str(), ctorId);
 	return ctorId;
 }
 
-int NativeScriptRuntime::SetCachedConstructorId(JEnv& env, const FunctionCallbackInfo<Value>& args, const string& name, const string& className, int ctorId)
-{
-	string fullClassName = className + '-' + name;
-	string encodedCtorArgs = MethodCache::EncodeSignature(fullClassName, "<init>", args, false);
-    DEBUG_WRITE("SetCachedConstructorId: encodedCtorArgs=%s, ctorId=%d", encodedCtorArgs.c_str(), ctorId);
-	s_constructorCache.insert(make_pair(encodedCtorArgs, ctorId));
-}
 
 //delete the returned local reference after use
 jobjectArray NativeScriptRuntime::GetMethodOverrides(JEnv& env, const Handle<Object>& implementationObject)
@@ -1086,7 +1061,7 @@ jclass NativeScriptRuntime::RequireClass = nullptr;
 jclass NativeScriptRuntime::JAVA_LANG_STRING = nullptr;
 jmethodID NativeScriptRuntime::MAKE_CLASS_INSTANCE_OF_TYPE_STRONG = nullptr;
 jmethodID NativeScriptRuntime::CREATE_INSTANCE_METHOD_ID = nullptr;
-//jmethodID NativeScriptRuntime::CACHE_CONSTRUCTOR_METHOD_ID = nullptr;
+jmethodID NativeScriptRuntime::CACHE_CONSTRUCTOR_METHOD_ID = nullptr;
 jmethodID NativeScriptRuntime::APP_FAIL_METHOD_ID = nullptr;
 jmethodID NativeScriptRuntime::GET_MODULE_CONTENT_METHOD_ID = nullptr;
 jmethodID NativeScriptRuntime::GET_MODULE_PATH_METHOD_ID = nullptr;
