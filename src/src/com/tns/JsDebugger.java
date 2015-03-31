@@ -1,7 +1,9 @@
 package com.tns;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.net.ServerSocket;
@@ -101,10 +103,23 @@ public class JsDebugger
 			File envInFile = new File(baseDir, portEnvInputFile);
 			if (envInFile.exists())
 			{
+				BufferedReader reader = null;
 				try
 				{
+					reader = new BufferedReader(new FileReader(envInFile));
+					String line = reader.readLine();
+					int requestedPort;
+					try
+					{
+						requestedPort = Integer.parseInt(line);
+					}
+					catch (NumberFormatException e)
+					{
+						requestedPort = INVALID_PORT;	
+					}
+					
 					w = new OutputStreamWriter(new FileOutputStream(envOutFile, true));
-					int localPort = getAvailablePort();
+					int localPort = (requestedPort != INVALID_PORT) ? requestedPort : getAvailablePort();
 					String strLocalPort = "PORT=" + localPort + "\n";
 					w.write(strLocalPort);
 					port = localPort;
@@ -115,6 +130,17 @@ public class JsDebugger
 				}
 				finally
 				{
+					if (reader != null)
+					{
+						try
+						{
+							reader.close();
+						}
+						catch (IOException e)
+						{
+							e.printStackTrace();
+						}
+					}
 					if (w != null)
 					{
 						try
