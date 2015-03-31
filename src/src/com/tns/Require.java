@@ -2,6 +2,7 @@ package com.tns;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -22,7 +23,8 @@ public class Require
 	private static final String ModuleContent_Part3 = "\";" + "function require(moduleName){ return __global.require(moduleName, __filename); }" + "module.filename = __filename; this.__extends = __global.__extends; \n";
 	private static final String ModuleContent_Part4 ="\n return module.exports; \n})";
 	private static final StringBuffer ModuleContent = new StringBuffer(65536);
-
+	private static HashMap<String, String> modulePathCache = new HashMap<String, String>();
+	
 	public static void init(Context context)
 	{
 		if (initialized)
@@ -103,9 +105,16 @@ public class Require
 			return "";
 		}
 	}
-
+	
 	public static String getModulePath(String moduleName, String callingModuleName)
 	{
+		String cachedPath = modulePathCache.get(moduleName);
+		if (cachedPath != null)
+		{
+			return cachedPath;
+		}
+		
+		
 		// This method is called my the NativeScriptRuntime.cpp RequireCallback
 		// method.
 		// The currentModuleName is the fully-qualified path of the previously
@@ -136,7 +145,9 @@ public class Require
 			}
 			else
 			{
-				return file.getPath();
+				String result = file.getPath();
+				modulePathCache.put(moduleName, result);
+				return result;
 			}
 		}
 
@@ -164,6 +175,7 @@ public class Require
 
 	private static File findModuleFile(String moduleName, String currentDirectory)
 	{
+		
 		File directory = null;
 		File jsFile = null;
 		boolean isJSFile = moduleName.endsWith(".js");
