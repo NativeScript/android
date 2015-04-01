@@ -826,6 +826,7 @@ void NativeScriptRuntime::RequireCallback(const v8::FunctionCallbackInfo<v8::Val
 				tmpExportObj->Reset();
 				delete tmpExportObj;
 				hasError = true;
+				tcRequire.ReThrow();
 			}
 			else {
 				if (moduleObj.IsEmpty())
@@ -847,6 +848,10 @@ void NativeScriptRuntime::RequireCallback(const v8::FunctionCallbackInfo<v8::Val
 					loadedModules.insert(make_pair(modulePath, persistentModuleObject));
 				}
 			}
+		}
+		if (tc.HasCaught())
+		{
+			tc.ReThrow();
 		}
 	}
 	else
