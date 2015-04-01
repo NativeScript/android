@@ -10,6 +10,8 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 
+import android.util.Log;
+
 class MethodResolver
 {
 	private static Map<String, String> primitiveTypesSignature = new HashMap<String, String>();
@@ -106,10 +108,14 @@ class MethodResolver
 		return array + signature;
 	}
 
-	static String resolveMethodOverload(String className, String methodName, Object[] args) throws ClassNotFoundException
+	static String resolveMethodOverload(HashMap<String, Class<?>> classCache, String className, String methodName, Object[] args) throws ClassNotFoundException
 	{
 		String methodSig = null;
-		Class<?> clazz = Class.forName(className);
+		Class<?> clazz = classCache.get(className);
+		if (clazz == null)
+		{
+			clazz = Class.forName(className);
+		}
 		int argLength = (args != null) ? args.length : 0;
 		
 		ArrayList<Tuple<Method, Integer>> candidates = new ArrayList<Tuple<Method, Integer>>();

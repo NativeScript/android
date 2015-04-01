@@ -710,7 +710,7 @@ public class Platform
 	public static String resolveMethodOverload(String className, String methodName, Object[] args) throws Exception
 	{
 		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "resolveMethodOverload: Resolving method " + methodName + " on class " + className);
-		String res = MethodResolver.resolveMethodOverload(className, methodName, args);
+		String res = MethodResolver.resolveMethodOverload(classCache, className, methodName, args);
 		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "resolveMethodOverload: method found :" + res);
 		if (res == null)
 		{
