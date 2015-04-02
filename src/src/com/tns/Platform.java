@@ -78,8 +78,6 @@ public class Platform
 	
 	private static ArrayList<Constructor<?>> ctorCache = new ArrayList<Constructor<?>>();
 
-	public final static String DefaultApplicationModuleName = "./bootstrap";
-	
 	private static JsDebugger jsDebugger;
 	
 	public static boolean IsLogEnabled = BuildConfig.DEBUG;
@@ -187,10 +185,10 @@ public class Platform
 		extractPolicy = policy;
 	}
 
-	public static void run(String appFileName)
+	public static void run()
 	{
-		String appContent = Require.getAppContent(appFileName);
-		runNativeScript(appFileName, appContent);
+		String[] bootstrapInfo = Require.bootstrapApp();
+		runNativeScript(bootstrapInfo[0], bootstrapInfo[1]);
 	}
 
 	private static int cacheConstructor(String name, String className, Object[] args, String[] methodOverrides) throws ClassNotFoundException, IOException

@@ -733,7 +733,7 @@ public class NativeScriptApplication extends android.app.Application implements 
 			}
 			
 			Platform.init(this);
-			Platform.run(Platform.DefaultApplicationModuleName);
+			Platform.run();
 	
 			onCreateInternal();
 		}
