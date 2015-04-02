@@ -50,13 +50,14 @@ public class FileSystem
 	private final static byte[] buff = new byte[65536];
 	
 	public static String readText(File file) throws FileNotFoundException, IOException{
-		if (file.length() < buff.length)
+		int fileLength = (int)file.length();
+		if (fileLength < buff.length)
 		{
 			FileInputStream fis = null;
 			try
 			{
 				fis = new FileInputStream(file);
-				int length = fis.read(buff);
+				int length = fis.read(buff, 0, fileLength);
 				return new String(buff, 0, length);
 			}
 			finally
