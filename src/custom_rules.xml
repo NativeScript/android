@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project
+    name="android-runtime-custom-rules"
+    default="help" >
+
+    
+    
+    
+    <!--Generating executable jar-->
+    <!-- 			    excludes="**/R*.class" -->
+<!--     excludes="${source.absolute.dir}/../../binding-generator/Generator/bin/classes/com/tns/android/binding/generator/*.class" -->
+	<target name="create_runtime_jar" depends="-compile">
+		<jar destfile="${out.dir}/${ant.project.name}.jar">
+			<fileset dir="${out.classes.absolute.dir}" />
+			<fileset 
+			    dir="${source.absolute.dir}/../../binding-generator/Generator/bin/classes"
+			    excludes="**/R*.class"
+				/>
+		</jar>
+	</target>
+    
+	
+	<target name="-post-compile" depends="create_runtime_jar">
+	    
+	</target>
+    
+    <!-- Generating executable jar -->
+    <!-- <target name="jar" depends="-post-compile"> -->
+    <!-- <mkdir dir="${jar.dir}" /> -->
+    <!-- <jar destfile="${jar.dir}/${ant.project.name}.jar"> -->
+    <!-- <fileset dir="${classes.dir}" /> -->
+    <!-- <archives> -->
+    <!-- <zips> -->
+    <!-- <fileset dir="${lib.dir}" includes="**/*.jar" /> -->
+    <!-- </zips> -->
+    <!-- </archives> -->
+    <!-- <manifest> -->
+    <!-- <attribute name="Main-Class" value="${main-class}" /> -->
+    <!-- </manifest> -->
+    <!-- </jar> -->
+    <!-- </target> -->
+
+
+    <!-- <fail -->
+    <!-- message="android-binding-generator jar file is missing." -->
+    <!-- unless="${source.absolute.dir}/../binding-generator/Generator/bin/classes.jar" -->
+    <!-- /> -->
+
+
+<!--         <fail message="android-binding-generator jar file is missing." > -->
+<!--             <condition> -->
+<!--                 <not> -->
+<!--                     <resourcecount count="1" > -->
+<!--                         <fileset -->
+<!--                             id="" -->
+<!--                             dir="${source.absolute.dir}/../../binding-generator/Generator/bin" -->
+<!--                             includes="classes.jar" /> -->
+<!--                     </resourcecount> -->
+<!--                 </not> -->
+<!--             </condition> -->
+<!--         </fail> -->
+	    
+	    
+<!--         Packages the application. -->
+<!-- 	    <target name="-package" depends="-dex, -package-resources"> -->
+<!-- 	        only package apk if *not* a library project -->
+<!-- 	        <do-only-if-not-library elseText="Library project: do not package apk..." > -->
+<!-- 	            <if condition="${build.is.instrumented}"> -->
+<!-- 	                <then> -->
+<!-- 	                    <package-helper> -->
+<!-- 	                        <extra-jars> -->
+<!-- 	                            Injected from external file -->
+<!-- 	                            <jarfile path="${source.absolute.dir}/../../binding-generator/Generator/bin/classes.jar" /> -->
+<!-- 	                            <jarfile path="${emma.dir}/emma_device.jar" /> -->
+<!-- 	                        </extra-jars> -->
+<!-- 	                    </package-helper> -->
+<!-- 	                </then> -->
+<!-- 	                <else> -->
+<!-- 	                     <package-helper> -->
+<!-- 				            <extra-jars> -->
+<!-- 				                <jarfolder path="my_jars" /> -->
+<!-- 				                <jarfile path="foo/bar.jar" /> -->
+<!-- 				                <jarfile path="${source.absolute.dir}/../../binding-generator/Generator/bin/classes.jar" /> -->
+<!-- 				                <jarfolder path="your_jars" /> -->
+<!-- 				            </extra-jars> -->
+<!-- 				        </package-helper> -->
+<!-- 	                </else> -->
+<!-- 	            </if> -->
+<!-- 	        </do-only-if-not-library> -->
+<!-- 	    </target> -->
+
+</project>

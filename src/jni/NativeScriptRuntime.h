@@ -9,6 +9,8 @@
 #include "JEnv.h"
 #include "JSInstanceInfo.h"
 #include "ArgsWrapper.h"
+#include "MetadataEntry.h"
+#include "FieldCallbackData.h"
 #include "MetadataTreeNode.h"
 #include "NumericCasts.h"
 #include "FieldAccessor.h"
@@ -25,11 +27,11 @@ namespace tns
 		static void Init(JavaVM *jvm, ObjectManager *objectManager);
 
 
-		static v8::Handle<v8::Object> CreateJSProxyInstance(jint javaObjectID, const std::string& typeName);
+		static v8::Handle<v8::Object> CreateJSWrapper(jint javaObjectID, const std::string& typeName);
 
-		static jobject CreateJavaInstance(int objectID, const std::string& className, const ArgsWrapper& argWrapper, const v8::Handle<v8::Object>& implementationObject, bool isInterface);
+		static jobject CreateJavaInstance(int objectID, const std::string& name, const std::string& className, const ArgsWrapper& argWrapper, const v8::Handle<v8::Object>& implementationObject, bool isInterface);
 
-		static bool RegisterInstance(const v8::Handle<v8::Object>& jsObject, const std::string& className, const ArgsWrapper& argWrapper, const v8::Handle<v8::Object>& implementationObject, bool isInterface);
+		static bool RegisterInstance(const v8::Handle<v8::Object>& jsObject, const std::string& name, const std::string& className, const ArgsWrapper& argWrapper, const v8::Handle<v8::Object>& implementationObject, bool isInterface);
 
 		static void MakeClassInstanceOfTypeStrong(const std::string& className, const v8::Handle<v8::Object>& classObj);
 
@@ -41,17 +43,15 @@ namespace tns
 
 		//
 
-		static std::string ResolveJavaMethod(const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& className, const std::string& methodName);
-
-		static void CallJavaMethod(const v8::Handle<v8::Object>& caller, const std::string& className, const std::string& methodName, const std::string& methodJniSignature, const std::string& declaringClassJniSignature, bool isStatic, bool isSuper, const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void CallJavaMethod(const v8::Handle<v8::Object>& caller, const std::string& className, const std::string& methodName, MetadataEntry *entry, bool isStatic, bool isSuper, const v8::FunctionCallbackInfo<v8::Value>& args);
 
 		static v8::Handle<v8::Value> CallJSMethod(JNIEnv *_env, const v8::Handle<v8::Object>& jsObject, jstring methodName, jobjectArray args, v8::TryCatch& tc);
 
 		//
 
-		static v8::Handle<v8::Value> GetJavaField(const v8::Handle<v8::Object>& caller, const std::string& classJniSignature, const std::string& fieldName, const std::string& fieldTypeName, const std::string& staticSignature, const bool isStatic);
+		static v8::Handle<v8::Value> GetJavaField(const v8::Handle<v8::Object>& caller, FieldCallbackData *fieldData);
 
-		static void SetJavaField(const v8::Handle<v8::Object>& target, const v8::Handle<v8::Value>& value, const std::string& className, const std::string& fieldName, const std::string& fieldTypeName, const std::string& declaringTypeName, bool isStatic);
+		static void SetJavaField(const v8::Handle<v8::Object>& target, const v8::Handle<v8::Value>& value, FieldCallbackData *fieldData);
 
 		//
 
@@ -87,8 +87,6 @@ namespace tns
 
 		static void DisableVerboseLoggingMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-		static void HeapSnapshotMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
-
 		static void BuildMetadata(JEnv& env, jstring filesPath);
 
 		static void CreateTopLevelNamespaces(const v8::Handle<v8::Object>& global);
@@ -105,15 +103,14 @@ namespace tns
 
 		//
 
-		static void StartProfiler();
-		static void StopProfiler();
-		static void StartProfilerCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
-		static void StopProfilerCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
-
 	private:
 		NativeScriptRuntime() {}
 
-		static int GetConstructorId(JEnv& env, const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& strClassName, jobjectArray javaArgs);
+		static int GetCachedConstructorId(JEnv& env, const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& name, const std::string& className, jstring javaName, jstring javaClassName, jobjectArray javaArgs, jobjectArray methodOverrides);
+
+		static v8::Handle<v8::Object> FindClass(const std::string& className);
+
+		static int GetArrayLength(const v8::Handle<v8::Object>& arr);
 
 		static int64_t AdjustAmountOfExternalAllocatedMemory(JEnv& env, v8::Isolate *isolate);
 
@@ -125,11 +122,9 @@ namespace tns
 
 		static jmethodID MAKE_CLASS_INSTANCE_OF_TYPE_STRONG;
 
-		static jmethodID RESOLVE_METHOD_OVERLOAD_METHOD_ID;
-
 		static jmethodID CREATE_INSTANCE_METHOD_ID;
 
-		static jmethodID CACHE_JAVA_CONSTRUCTOR_METHOD_ID;
+		static jmethodID CACHE_CONSTRUCTOR_METHOD_ID;
 
 		static jmethodID APP_FAIL_METHOD_ID;
 

@@ -12,6 +12,15 @@ std::string MethodInfo::GetName()
 	return methodName;
 }
 
+uint8_t MethodInfo::CheckIsResolved()
+{
+	auto resolvedData = *reinterpret_cast<uint8_t*>(m_pData);
+	m_pData += sizeof(uint8_t);
+
+	return resolvedData;
+}
+
+
 uint16_t MethodInfo::GetSignatureLength()
 {
 	m_signatureLength = *reinterpret_cast<uint16_t*>(m_pData);

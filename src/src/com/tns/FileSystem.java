@@ -46,20 +46,44 @@ public class FileSystem
 		return text.toString();
 	}
 	
+	
+	private final static byte[] buff = new byte[65536];
+	
 	public static String readText(File file) throws FileNotFoundException, IOException{
-		BufferedInputStream inputStream = null;
-		try
+		int fileLength = (int)file.length();
+		if (fileLength < buff.length)
 		{
-			inputStream = new BufferedInputStream(new FileInputStream(file));
-			return readAll(inputStream);
+			FileInputStream fis = null;
+			try
+			{
+				fis = new FileInputStream(file);
+				int length = fis.read(buff, 0, fileLength);
+				return new String(buff, 0, length);
+			}
+			finally
+			{
+				if (fis != null)
+				{
+					fis.close();
+				}
+			}
 		}
-		catch (FileNotFoundException e){
-			return "";
-		}
-		finally
+		else
 		{
-			if (inputStream != null){
-				inputStream.close();
+			BufferedInputStream inputStream = null;
+			try
+			{
+				inputStream = new BufferedInputStream(new FileInputStream(file));
+				return readAll(inputStream);
+			}
+			catch (FileNotFoundException e){
+				return "";
+			}
+			finally
+			{
+				if (inputStream != null){
+					inputStream.close();
+				}
 			}
 		}
 	}

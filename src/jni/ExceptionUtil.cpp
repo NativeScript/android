@@ -115,33 +115,19 @@ void ExceptionUtil::GetExceptionMessage(JEnv& env, jthrowable exception, string&
 	}
 }
 
-void ExceptionUtil::HandleInvalidState(const string& message, bool fail){
-	if(fail){
-		NativeScriptRuntime::APP_FAIL(message.c_str());
-	}
-	else {
-		auto error = Exception::Error(ConvertToV8String(message));
-		Isolate::GetCurrent()->ThrowException(error);
-	}
-}
-
-bool ExceptionUtil::HandleTryCatch(TryCatch& tc){
+bool ExceptionUtil::HandleTryCatch(TryCatch& tc, const string& prependMessage){
 	if(!tc.HasCaught()){
 		return false;
 	}
 
 	if(tc.CanContinue()){
-		auto message = tc.Message();
-		auto error = tc.Exception();
-		OnUncaughtError(message, error);
+		ThrowExceptionToJava(tc, prependMessage);
 	}
 	else {
-		auto errorMessage = PrintErrorMessage(tc.Message(), tc.Exception());
-
 		stringstream ss;
-		ss << "An uncaught error has occurred and V8's TryCatch block may not be continued. Error is: " << errorMessage;
+		ss << endl << "An uncaught error has occurred and V8's TryCatch block may not be continued. Error is: ";
 
-		HandleInvalidState(ss.str(), true);
+		ExceptionUtil::GetInstance()->ThrowExceptionToJava(tc, ss.str());
 	}
 
 	return true;
@@ -153,18 +139,16 @@ void ExceptionUtil::OnUncaughtError(Handle<Message> message, Handle<Value> error
 	Isolate *isolate = Isolate::GetCurrent();
 	HandleScope scope(isolate);
 
-	// call the global exception handler
-	Handle<Value> errorObject;
-
+	Handle<Object> errorObject;
 	if(error->IsObject()){
 		errorObject = error.As<Object>();
-		error.As<Object>()->Set(ConvertToV8String("message"), ConvertToV8String(errorMessage));
+		errorObject->Set(ConvertToV8String("message"), ConvertToV8String(errorMessage));
 	}
 	else{
-		errorObject = Exception::Error(ConvertToV8String(errorMessage));
+		errorObject = Exception::Error(ConvertToV8String(errorMessage)).As<Object>();
 	}
 
-	CallJFuncWithErr(errorObject);
+	CallJsFuncWithErr(errorObject);
 
 	// check whether the developer marked the error as "Caught"
 	// As per discussion, it is safer to ALWAYS kill the application due to uncaught error(s)
@@ -174,7 +158,7 @@ void ExceptionUtil::OnUncaughtError(Handle<Message> message, Handle<Value> error
 //		}
 }
 
-void ExceptionUtil::CallJFuncWithErr(Handle<Value> errObj)
+void ExceptionUtil::CallJsFuncWithErr(Handle<Value> errObj)
 {
 	//create handle scope
 	Isolate *isolate = Isolate::GetCurrent();
@@ -205,12 +189,12 @@ string ExceptionUtil::GetErrorMessage(const Handle<Message>& message, const Hand
 		str = String::NewFromUtf8(Isolate::GetCurrent(), "");
 	}
 	String::Utf8Value utfError(str);
-	ss << *utfError << endl;
+	ss << endl << endl << *utfError << endl;
 	ss << "File: \"" << ConvertToString(message->GetScriptResourceName().As<String>());
-	ss << ", line: " << message->GetLineNumber() - Constants::MODULE_LINES_OFFSET << ", column: " << message->GetStartColumn() << endl;
+	ss << ", line: " << message->GetLineNumber() - Constants::MODULE_LINES_OFFSET << ", column: " << message->GetStartColumn() << endl << endl;
 
 	string stackTraceMessage = GetErrorStackTrace(message->GetStackTrace());
-	ss << "StackTrace: " << endl << stackTraceMessage;
+	ss << "StackTrace: " << endl << stackTraceMessage << endl;
 
 	return ss.str();
 }
@@ -257,59 +241,59 @@ string ExceptionUtil::GetErrorStackTrace(const Handle<StackTrace>& stackTrace)
 	return ss.str();
 }
 
-bool ExceptionUtil::CheckForException(Isolate *isolate, const string& methodName, TryCatch& tc)
+bool ExceptionUtil::ThrowExceptionToJava(TryCatch& tc, const string& prependMessage)
 {
-	bool exceptionFound = tc.HasCaught();
+	Isolate *isolate = Isolate::GetCurrent();
+	auto ex = tc.Exception();
+	string message = PrintErrorMessage(tc.Message(), ex);
+	stringstream ss;
+	ss << endl << prependMessage << message;
+	string loggedMessage = ss.str();
+
+	DEBUG_WRITE("Error: %s", loggedMessage.c_str());
 
 	JEnv env;
-
-	if (exceptionFound)
+	env.ExceptionClear();
+	if (tc.CanContinue())
 	{
-		DEBUG_WRITE("Calling js method %s failed", methodName.c_str());
-
-		auto ex = tc.Exception();
-		string loggedMessage = GetErrorMessage(tc.Message(), ex);
-
-		String::Utf8Value file(tc.Message()->GetScriptResourceName());
-		int line = tc.Message()->GetLineNumber();
-		int column = tc.Message()->GetStartColumn();
-		DEBUG_WRITE("Error: %s @line: %d, column: %d", loggedMessage.c_str(), line - Constants::MODULE_LINES_OFFSET, column);
-
-		auto pv = new Persistent<Value>(isolate, ex);
-
-		if (tc.CanContinue())
+		jweak javaThrowable = nullptr;
+		if (ex->IsObject())
 		{
-			jweak javaThrowable = nullptr;
-			if (ex->IsObject())
-			{
-				javaThrowable = TryGetJavaThrowableObject(env, ex->ToObject());
-			}
-
-			if (javaThrowable != nullptr)
-			{
-				jint ret = env.Throw(reinterpret_cast<jthrowable>(javaThrowable));
-
-				DEBUG_WRITE("Error: Throw (1)=%d", (int)ret);
-			}
-			else
-			{
-				jclass nativeScriptExceptionClass = env.FindClass("com/tns/NativeScriptException");
-
-				jmethodID ctor = env.GetMethodID(nativeScriptExceptionClass, "<init>", "(Ljava/lang/String;J)V");
-				jstring s = env.NewStringUTF(loggedMessage.c_str());
-				jobject exObject = env.NewObject(nativeScriptExceptionClass, ctor, s, (jlong)pv);
-				jint ret = env.Throw((jthrowable)exObject);
-
-				DEBUG_WRITE("Error: Throw (2)=%d", (int)ret);
-			}
+			javaThrowable = TryGetJavaThrowableObject(env, ex->ToObject());
 		}
-		else
+
+		if (javaThrowable != nullptr) //exception is object
 		{
-			NativeScriptRuntime::APP_FAIL(loggedMessage.c_str());
+			jint ret = env.Throw(reinterpret_cast<jthrowable>(javaThrowable));
+
+			DEBUG_WRITE("Error: Throw (1)=%d", (int)ret);
+		}
+		else //if exception is not object
+		{
+			//make it an object
+			jclass nativeScriptExceptionClass = env.FindClass("com/tns/NativeScriptException");
+			jmethodID ctor = env.GetMethodID(nativeScriptExceptionClass, "<init>", "(Ljava/lang/String;J)V");
+			jstring errMessage = env.NewStringUTF(loggedMessage.c_str());
+			auto pv = new Persistent<Value>(isolate, ex);
+			jobject exObject = env.NewObject(nativeScriptExceptionClass, ctor, errMessage, (jlong)pv);
+
+			//throw it
+			jint ret = env.Throw((jthrowable)exObject);
+
+			DEBUG_WRITE("Error: Throw (2)=%d", (int)ret);
 		}
 	}
+	else
+	{
+		NativeScriptRuntime::APP_FAIL(loggedMessage.c_str());
+	}
+}
 
-	return exceptionFound;
+void ExceptionUtil::ThrowExceptionToJs(const string& exceptionMessage)
+{
+	Isolate *isolate(Isolate::GetCurrent());
+	Local<Value> exception = v8::Exception::Error(ConvertToV8String(exceptionMessage));
+	isolate->ThrowException(exception);
 }
 
 bool ExceptionUtil::CheckForJavaException(JEnv& env)
@@ -333,7 +317,7 @@ bool ExceptionUtil::CheckForJavaException(JEnv& env)
 			if (addr != 0)
 			{
 				auto pv = (Persistent<Value> *) addr;
-				v = Handle<Value>::New(Isolate::GetCurrent(), *pv);
+				v = Local<Value>::New(Isolate::GetCurrent(), *pv);
 				pv->Reset();
 			}
 			else
@@ -357,7 +341,7 @@ bool ExceptionUtil::CheckForJavaException(JEnv& env)
 			if (nativeExceptionObject.IsEmpty())
 			{
 				string className = objectManager->GetClassName((jobject)exc);
-				nativeExceptionObject = objectManager->CreateJSProxyInstance(javaObjectID, className);
+				nativeExceptionObject = objectManager->CreateJSWrapper(javaObjectID, className);
 			}
 
 			errObj->Set(V8StringConstants::GetNativeException(), nativeExceptionObject);

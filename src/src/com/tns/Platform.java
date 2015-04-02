@@ -1,10 +1,8 @@
 package com.tns;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
-import java.io.PrintStream;
-import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.lang.ref.WeakReference;
@@ -14,20 +12,21 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.Map;
-import java.util.zip.ZipEntry;
 
 import android.app.Activity;
 import android.content.Context;
-import android.content.Intent;
 import android.content.res.AssetManager;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import android.util.SparseArray;
 
+import com.tns.bindings.ProxyGenerator;
+import com.tns.internal.DefaultEtractPolicy;
 import com.tns.internal.ExtractPolicy;
 
 public class Platform
@@ -36,7 +35,7 @@ public class Platform
 
 	private static native void runNativeScript(String appModuleName, String appContent);
 
-	private static native Object callJSMethodNative(int javaObjectID, String methodName, Object... packagedArgs) throws NativeScriptException;
+	private static native Object callJSMethodNative(int javaObjectID, String methodName, boolean isConstructor, Object... packagedArgs) throws NativeScriptException;
 
 	private static native String[] createJSInstanceNative(Object javaObject, int javaObjectID, String canonicalName, boolean createActivity, Object[] packagedCreationArgs);
 
@@ -85,6 +84,7 @@ public class Platform
 	
 	public static boolean IsLogEnabled = BuildConfig.DEBUG;
 	
+	private static DexFactory dexFactory;
 	public final static String DEFAULT_LOG_TAG = "TNS.Java";
 	
 	public static Class<?> getErrorActivityClass(){
@@ -104,8 +104,7 @@ public class Platform
 			throw new RuntimeException("NativeScriptApplication already initialized");
 		}
 
-		Require.init(context);
-
+		Platform.dexFactory = new DexFactory(context);
 		NativeScriptContext = context;
 
 		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "Initializing NativeScript JAVA");
@@ -114,6 +113,7 @@ public class Platform
 		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "Initialized app instance id:" + appJavaObjectId);
 
 		AssetExtractor.extractAssets(context, extractPolicy);
+		Require.init(context);
 		int debuggerPort = jsDebugger.getDebuggerPortFromEnvironment();
 		Platform.initNativeScript(Require.getApplicationFilesPath(), appJavaObjectId, IsLogEnabled, context.getPackageName(), debuggerPort);
 		
@@ -136,98 +136,52 @@ public class Platform
 	public static void enableVerboseLogging()
 	{
 		IsLogEnabled = true;
+		ProxyGenerator.IsLogEnabled = true;
 		enableVerboseLoggingNative();
 	}
 
 	public static void disableVerboseLogging()
 	{
 		IsLogEnabled = false;
+		ProxyGenerator.IsLogEnabled = false;
 		disableVerboseLoggingNative();
 	}
 
 	static void setDefaultUncaughtExceptionHandler(Thread.UncaughtExceptionHandler handler)
 	{
+		final UncaughtExceptionHandler defaultHandler = Thread.getDefaultUncaughtExceptionHandler();
+		
 		if (handler == null)
 		{
-			final UncaughtExceptionHandler h = Thread.getDefaultUncaughtExceptionHandler();
-	
 			handler = new UncaughtExceptionHandler()
 			{
 				@Override
 				public void uncaughtException(Thread thread, Throwable ex)
 				{
+					String content = ErrorReport.getErrorMessage(ex);
+					passUncaughtExceptionToJsNative(ex, content);
+
 					if (IsLogEnabled) Log.e(DEFAULT_LOG_TAG, "Uncaught Exception Message=" + ex.getMessage());
-	
-					String content;
-					PrintStream ps = null;
-	
-					try
-					{
-						ByteArrayOutputStream baos = new ByteArrayOutputStream();
-						ps = new PrintStream(baos);
-						ex.printStackTrace(ps);
-	
-						try
-						{
-							content = baos.toString("US-ASCII");
-						}
-						catch (UnsupportedEncodingException e)
-						{
-							content = e.getMessage();
-						}
-						
-						passUncaughtExceptionToJsNative(ex, content);
-					}
-					finally
-					{
-						if (ps != null)
-							ps.close();
-					}
-	
-					if (IsLogEnabled) Log.e(DEFAULT_LOG_TAG, "Uncaught Exception Stack=" + content);
+
+					//start error activity
+					boolean errorActivityHasStarted = ErrorReport.startActivity(NativeScriptContext, ex);
 					
-					final String errMsg = content;
-					
-					new Thread() {
-						@Override
-						public void run()
-						{
-							Intent intent = ErrorReport.getIntent(NativeScriptContext, errMsg);
-							NativeScriptContext.startActivity(intent);
-						}
-					}.start();
-	
-	
-					if (h != null)
+					if(!errorActivityHasStarted && defaultHandler != null) //if we are in release mode
 					{
-						h.uncaughtException(thread, ex);
+						defaultHandler.uncaughtException(thread, ex);	
 					}
 				}
 			};
 		}
 		
-		Thread.setDefaultUncaughtExceptionHandler(handler);
+		Thread.setDefaultUncaughtExceptionHandler(handler); 
 	}
 	
 	static void setExtractPolicy(ExtractPolicy policy)
 	{
 		if (policy == null)
 		{
-			policy = new ExtractPolicy()
-			{
-				@Override
-				public boolean extract(String appRoot) {
-					return true;
-				}
-				
-				@Override
-				public boolean shouldSkip(File outputFile, File zipFile, ZipEntry zipEnty)
-				{
-					boolean shouldSkip  = outputFile.exists() && (zipFile.lastModified() <= outputFile.lastModified()); //TODO: check lastModified when application is installed on sdcard with FAT32 format
-					
-					return shouldSkip;
-				}
-			};
+			policy = new DefaultEtractPolicy();
 		}
 		
 		extractPolicy = policy;
@@ -239,10 +193,13 @@ public class Platform
 		runNativeScript(appFileName, appContent);
 	}
 
-	private static int cacheConstructor(String className, Object[] args) throws ClassNotFoundException
+	private static int cacheConstructor(String name, String className, Object[] args, String[] methodOverrides) throws ClassNotFoundException, IOException
 	{
-		Constructor<?> ctor = MethodResolver.resolveConstructor(className, args);
+		Constructor<?> ctor = MethodResolver.resolveConstructor(name, className, args, dexFactory, methodOverrides);
+
 		
+		//TODO: Lubo: Not thread safe already.
+		//TODO: Lubo: Does not check for existing items
 		int ctorId = ctorCache.size();
 		
 		ctorCache.add(ctor);
@@ -250,9 +207,12 @@ public class Platform
 		return ctorId;
 	}
 
-	public static Object createInstance(Object[] args, String[] methodOverrides, int objectId, int constructorId) throws InstantiationException, IllegalAccessException, ClassNotFoundException, NoSuchMethodException, IllegalArgumentException, InvocationTargetException
+	public static Object createInstance(String name, String className, Object[] args, String[] methodOverrides, int objectId, int constructorId) throws InstantiationException, IllegalAccessException, ClassNotFoundException, NoSuchMethodException, IllegalArgumentException, InvocationTargetException, IOException
 	{
-		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "Creating instance for ctorId=" + constructorId);
+		if (IsLogEnabled)
+		{
+			Log.d(DEFAULT_LOG_TAG, "Creating instance for ctorId:" + constructorId + " className:" + className + " methodOverrides: " + Arrays.toString(methodOverrides));
+		}
 		
 		Constructor<?> ctor = ctorCache.get(constructorId);
 		boolean success = MethodResolver.convertConstructorArgs(ctor, args);
@@ -330,7 +290,10 @@ public class Platform
 		if (instance instanceof NativeScriptHashCodeProvider)
 		{
 			NativeScriptHashCodeProvider obj = (NativeScriptHashCodeProvider) instance;
-			obj.setNativeScriptOverrides(methodOverrides);
+			for (String name: methodOverrides)
+			{
+				obj.setNativeScriptOverride(name);
+			}
 		}
 
 		int objectId = Platform.currentObjectId;
@@ -351,7 +314,15 @@ public class Platform
 
 		Object[] packagedArgs = packageArgs(args);
 
-		String[] methodOverrides = createJSInstanceNative(instance, javaObjectID, instance.getClass().getCanonicalName(), instance instanceof Activity, packagedArgs);
+		String className = instance.getClass().getName();
+		boolean isGeneratedProxy = instance instanceof NativeScriptHashCodeProvider;
+		boolean createActivity = instance instanceof Activity;
+		if (isGeneratedProxy && !createActivity)
+		{
+			className = instance.getClass().getSuperclass().getName();
+		}
+				
+		String[] methodOverrides = createJSInstanceNative(instance, javaObjectID, className, createActivity, packagedArgs);
 
 		if (IsLogEnabled)
 		{
@@ -457,37 +428,58 @@ public class Platform
 		{
 			sb.append("I\n");
 		}
+		
+		Class<?> baseClass = clazz.getSuperclass();
+		sb.append("B " + ((baseClass != null) ? baseClass.getName() : "").replace('.', '/') + "\n");
 	
-		Method[] allMethods = clazz.getMethods();
-		for (Method m: allMethods)
+		Method[] methods = clazz.getDeclaredMethods();
+		Arrays.sort(methods, methodComparator);
+		
+		for (Method m: methods)
 		{
-			sb.append("M ");
-			sb.append(m.getName());
-			Class<?>[] params = m.getParameterTypes();
-			String sig = MethodResolver.getMethodSignature(m.getReturnType(), params);
-			sb.append(" ");
-			sb.append(sig);
-			int paramCount = params.length;
-			sb.append(" ");
-			sb.append(paramCount);
-			sb.append("\n");
+			int modifiers = m.getModifiers();
+			if (!Modifier.isStatic(modifiers) && (Modifier.isPublic(modifiers) || Modifier.isProtected(modifiers)))
+			{
+				sb.append("M ");
+				sb.append(m.getName());
+				Class<?>[] params = m.getParameterTypes();
+				String sig = MethodResolver.getMethodSignature(m.getReturnType(), params);
+				sb.append(" ");
+				sb.append(sig);
+				int paramCount = params.length;
+				sb.append(" ");
+				sb.append(paramCount);
+				sb.append("\n");
+			}
 		}
 		
-		Field[] allFields = clazz.getFields();
-		for (Field f: allFields)
+		Field[] fields = clazz.getDeclaredFields();
+		for (Field f: fields)
 		{
-			sb.append("F ");
-			sb.append(f.getName());
-			sb.append(" ");
-			String sig = MethodResolver.getTypeSignature(f.getType());
-			sb.append(sig);
-			sb.append(" 0\n");
+			int modifiers = f.getModifiers();
+			if (!Modifier.isStatic(modifiers) && (Modifier.isPublic(modifiers) || Modifier.isProtected(modifiers)))
+			{
+				sb.append("F ");
+				sb.append(f.getName());
+				sb.append(" ");
+				String sig = MethodResolver.getTypeSignature(f.getType());
+				sb.append(sig);
+				sb.append(" 0\n");
+			}
 		}
 		
 		String ret = sb.toString();
 		
 		return ret;
 	}
+	
+	private final static Comparator<Method> methodComparator = new Comparator<Method>()
+	{
+		public int compare(Method lhs, Method rhs)
+		{
+			return lhs.getName().compareTo(rhs.getName());
+		}
+	};
 
 	public static int makeClassInstanceOfTypeStrong(String classPath) throws InstantiationException, IllegalAccessException, ClassNotFoundException, NoSuchMethodException, IllegalArgumentException, InvocationTargetException
 	{
@@ -656,11 +648,11 @@ public class Platform
 		Integer javaObjectID = getJavaObjectID(javaObject);
 		if (javaObjectID == null)
 		{
-			if (IsLogEnabled) Log.e(DEFAULT_LOG_TAG, "Platform.CallJSMethod: calling js method " + methodName + " with javaObjectID " + javaObjectID + " type=" + ((javaObject != null) ? javaObject.getClass().getCanonicalName() : "null"));
+			if (IsLogEnabled) Log.e(DEFAULT_LOG_TAG, "Platform.CallJSMethod: calling js method " + methodName + " with javaObjectID " + javaObjectID + " type=" + ((javaObject != null) ? javaObject.getClass().getName() : "null"));
 			APP_FAIL("Application failed");
 		}
 
-		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "Platform.CallJSMethod: calling js method " + methodName + " with javaObjectID " + javaObjectID + " type=" + ((javaObject != null) ? javaObject.getClass().getCanonicalName() : "null"));
+		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "Platform.CallJSMethod: calling js method " + methodName + " with javaObjectID " + javaObjectID + " type=" + ((javaObject != null) ? javaObject.getClass().getName() : "null"));
 
 		Object result = dispatchCallJSMethodNative(javaObjectID, methodName, isConstructor, delay, args);
 
@@ -718,7 +710,7 @@ public class Platform
 	public static String resolveMethodOverload(String className, String methodName, Object[] args) throws Exception
 	{
 		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "resolveMethodOverload: Resolving method " + methodName + " on class " + className);
-		String res = MethodResolver.resolveMethodOverload(className, methodName, args);
+		String res = MethodResolver.resolveMethodOverload(classCache, className, methodName, args);
 		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "resolveMethodOverload: method found :" + res);
 		if (res == null)
 		{
@@ -817,7 +809,7 @@ public class Platform
 		if (isMainThread)
 		{
 			Object[] packagedArgs = packageArgs(tmpArgs);
-			ret = callJSMethodNative(javaObjectID, methodName, packagedArgs);
+			ret = callJSMethodNative(javaObjectID, methodName, isConstructor, packagedArgs);
 		}
 		else
 		{
@@ -825,6 +817,7 @@ public class Platform
 
 			final Object[] arr = new Object[2];
 			
+			final boolean isCtor = isConstructor; 
 			Runnable r = new Runnable()
 			{
 				@Override
@@ -835,7 +828,7 @@ public class Platform
 						try
 						{
 							final Object[] packagedArgs = packageArgs(tmpArgs);
-							arr[0] = callJSMethodNative(javaObjectID, methodName, packagedArgs);
+							arr[0] = callJSMethodNative(javaObjectID, methodName, isCtor, packagedArgs);
 						}
 						finally
 						{
@@ -891,4 +884,11 @@ public class Platform
 		Class<?> clazz = classCache.get(className);
 		return clazz;
 	}
+
+    private static Class<?> findClass(String className) throws ClassNotFoundException
+    {
+    	Class<?> clazz = dexFactory.findClass(className);
+		return clazz;
+    }
+
 }

@@ -61,11 +61,7 @@ Before you submit a Pull Request, consider the following guidelines.
 Search GitHub for an open or closed Pull Request that relates to your submission.
 Clone the repository.
 ```bash
-    git clone git@github.com:NativeScript/cross-platform-modules.git
-```
-Initialize the submodules.
-```bash
-    git submodule update --init --recursive
+    git clone git@github.com:NativeScript/android-runtime.git
 ```
 Make your changes in a new git branch. We use the Gitflow branching model so you will have to branch from our master branch.
 ```bash
@@ -84,7 +80,7 @@ Push your branch to GitHub.
 ```bash
     git push origin my-fix-branch
 ```
-In GitHub, send a Pull Request to NativeScript:cross-platform-modules:master.
+In GitHub, send a Pull Request to NativeScript:android-runtime:master.
 If we suggest changes, you can modify your branch, rebase, and force a new push to your GitHub repository to update the Pull Request.
 ```bash
     git rebase master -i
@@ -137,14 +133,7 @@ Without at least the first 2 items in this list, we won't have any clue why you'
 
 ## Code Style
 
-All code contributed to this project should adhere to a consistent style, so please keep these in mind before you submit your Pull Requests:
+We are currently using Eclipse to write code. We are using predefined code formating rules for C++ and Java:
 
-- Tab indentation, size of 4
-- Semicolons are nice. Use them
-- Double quotes
-- No trailing whitespace
-- Declare one variable per var statement
-- Declare variables at the top of a scope
-- Return early
-
-For a more detailed guide, check the [Coding Convention](CodingConvention.md). 
+* [C++](./CodingStyle.Cpp.xml)
+* [Java](./CodingStyle.Java.xml)

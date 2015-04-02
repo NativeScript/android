@@ -2,6 +2,7 @@ package com.tns;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -16,8 +17,14 @@ public class Require
 	private static String ModulesFilesPath;
 	private static String NativeScriptModulesFilesPath;
 	private static boolean initialized = false;
-	private static final String ModuleContent = "(function(){\n var module = {}; module.exports = arguments[0];" + "var exports = module.exports; var __dirname = \"%s\"; var __filename = \"%s\";" + "function require(moduleName){ return global.require(moduleName, __filename); }" + "module.filename = __filename; this.__extends = global.__extends; \n %s \n return module.exports; \n})";
-
+	//private static final String ModuleContent = "(function(){\n var module = {}; module.exports = arguments[0];" + "var exports = module.exports; var __dirname = \"%s\"; var __filename = \"%s\";" + "function require(moduleName){ return global.require(moduleName, __filename); }" + "module.filename = __filename; this.__extends = global.__extends; \n %s \n return module.exports; \n})";
+	private static final String ModuleContent_Part1 = "(function(){\n var module = {}; module.exports = arguments[0];" + "var exports = module.exports; var __dirname = \"";
+	private static final String ModuleContent_Part2 = "\"; var __filename = \"";
+	private static final String ModuleContent_Part3 = "\";" + "function require(moduleName){ return __global.require(moduleName, __filename); }" + "module.filename = __filename; this.__extends = __global.__extends; \n";
+	private static final String ModuleContent_Part4 ="\n return module.exports; \n})";
+	private static final StringBuffer ModuleContent = new StringBuffer(65536);
+	private static HashMap<String, String> modulePathCache = new HashMap<String, String>();
+	
 	public static void init(Context context)
 	{
 		if (initialized)
@@ -29,7 +36,16 @@ public class Require
 
 		ApplicationFilesPath = context.getApplicationContext().getFilesDir().getPath();
 		ModulesFilesPath = "/app/";
-		NativeScriptModulesFilesPath = "/tns_modules/";
+		
+		NativeScriptModulesFilesPath = "/app/tns_modules/";
+		
+		// Support previous tns_modules location for now
+		// NOTE: This functionality is temporary and is to be deleted within several months
+		File file = new File(ApplicationFilesPath + NativeScriptModulesFilesPath);
+		if(!file.exists())
+		{
+			NativeScriptModulesFilesPath = "/tns_modules/"; 
+		}
 
 		initialized = true;
 	}
@@ -70,7 +86,16 @@ public class Require
 			// We are inserting local require function in the scope of the
 			// module to pass the __fileName (calling file) variable in the
 			// global.require request.
-			return String.format(ModuleContent, file.getParent(), modulePath, moduleFileContent);
+			ModuleContent.setLength(0);
+			ModuleContent.append(ModuleContent_Part1);
+			ModuleContent.append(file.getParent());
+			ModuleContent.append(ModuleContent_Part2);
+			ModuleContent.append(modulePath);
+			ModuleContent.append(ModuleContent_Part3);
+			ModuleContent.append(moduleFileContent);
+			ModuleContent.append(ModuleContent_Part4);
+			String content = ModuleContent.toString(); 
+			return content;  
 		}
 		catch (IOException e)
 		{
@@ -80,9 +105,16 @@ public class Require
 			return "";
 		}
 	}
-
+	
 	public static String getModulePath(String moduleName, String callingModuleName)
 	{
+		String cachedPath = modulePathCache.get(moduleName);
+		if (cachedPath != null)
+		{
+			return cachedPath;
+		}
+		
+		
 		// This method is called my the NativeScriptRuntime.cpp RequireCallback
 		// method.
 		// The currentModuleName is the fully-qualified path of the previously
@@ -113,7 +145,9 @@ public class Require
 			}
 			else
 			{
-				return file.getPath();
+				String result = file.getPath();
+				modulePathCache.put(moduleName, result);
+				return result;
 			}
 		}
 
@@ -141,6 +175,7 @@ public class Require
 
 	private static File findModuleFile(String moduleName, String currentDirectory)
 	{
+		
 		File directory = null;
 		File jsFile = null;
 		boolean isJSFile = moduleName.endsWith(".js");

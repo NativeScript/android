@@ -16,7 +16,7 @@ void FieldAccessor::Init(JavaVM *jvm, ObjectManager *objectManager)
 	this->objectManager = objectManager;
 }
 
-Handle<Value> FieldAccessor::GetJavaField(const Handle<Object>& caller, const string& className, const string& fieldName, const string& fieldTypeName, const string& declaringClassName, const bool isStatic)
+Handle<Value> FieldAccessor::GetJavaField(const Handle<Object>& target, FieldCallbackData *fieldData)
 {
 	JEnv env;
 
@@ -25,61 +25,42 @@ Handle<Value> FieldAccessor::GetJavaField(const Handle<Object>& caller, const st
 
 	Handle<Value> fieldResult;
 
-	if (fieldName == "class")
-	{
-		string canonicalClassName = Util::ConvertFromJniToCanonicalName(className);
-		jclass klass = env.FindClass("java/lang/Class");
-		jmethodID m = env.GetStaticMethodID(klass, "forName", "(Ljava/lang/String;)Ljava/lang/Class;");
-		JniLocalRef s(env.NewStringUTF(canonicalClassName.c_str()));
-		JniLocalRef result(env.CallStaticObjectMethod(klass, m, (jstring)s));
-
-		assert(env.ExceptionCheck() == JNI_FALSE);
-
-		int javaObjectID = objectManager->GetOrCreateObjectId(result);
-		auto objectResult = objectManager->GetJsObjectByJavaObject(javaObjectID);
-
-		if (objectResult.IsEmpty())
-		{
-			objectResult = objectManager->CreateJSProxyInstance(javaObjectID, fieldTypeName, result);
-		}
-
-		return handleScope.Escape(objectResult);
-	}
-
-	bool isTargetArray = className[0] == '[';
-	if (isTargetArray && (fieldName == "length"))
-	{
-		jweak weakRef = objectManager->GetJavaObjectByJsObject(caller);
-		jarray arr = (jarray)weakRef;
-		jsize arrayLength = env.GetArrayLength(arr);
-		return handleScope.Escape(Integer::New(isolate, arrayLength));
-	}
-
 	jweak targetJavaObject;
-	jclass clazz;
-	jfieldID fieldId;
 
-	bool isPrimitiveType = fieldTypeName.size() == 1;
+	const auto& fieldTypeName = fieldData->signature;
+	auto isStatic = fieldData->isStatic;
 
-	bool isFieldArray = fieldTypeName[0] == '[';
+	auto isPrimitiveType = fieldTypeName.size() == 1;
+	auto isFieldArray = fieldTypeName[0] == '[';
 
-	string fieldJniSig = isPrimitiveType
-							? fieldTypeName
-							: (isFieldArray
+
+	if (fieldData->fid == nullptr)
+	{
+		auto fieldJniSig = isPrimitiveType
 								? fieldTypeName
-								: ("L" + fieldTypeName + ";"));
+								: (isFieldArray
+									? fieldTypeName
+									: ("L" + fieldTypeName + ";"));
 
-	if (isStatic)
-	{
-		clazz = env.FindClass(declaringClassName);
-		fieldId = env.GetStaticFieldID(clazz, fieldName, fieldJniSig);
+		if (isStatic)
+		{
+			fieldData->clazz = env.FindClass(fieldData->declaringType);
+			fieldData->fid = env.GetStaticFieldID(fieldData->clazz, fieldData->name, fieldJniSig);
+		}
+		else
+		{
+			fieldData->clazz = env.FindClass(fieldData->declaringType);
+			fieldData->fid = env.GetFieldID(fieldData->clazz, fieldData->name, fieldJniSig);
+		}
 	}
-	else
+
+	if (!isStatic)
 	{
-		targetJavaObject = objectManager->GetJavaObjectByJsObject(caller);
-		clazz = objectManager->GetJavaClass(caller);
-		fieldId = env.GetFieldID(clazz, fieldName, fieldJniSig);
+		targetJavaObject = objectManager->GetJavaObjectByJsObject(target);
 	}
+
+	auto fieldId = fieldData->fid;
+	auto clazz = fieldData->clazz;
 
 	if (isPrimitiveType)
 	{
@@ -249,7 +230,7 @@ Handle<Value> FieldAccessor::GetJavaField(const Handle<Object>& caller, const st
 
 				if (objectResult.IsEmpty())
 				{
-					objectResult = objectManager->CreateJSProxyInstance(javaObjectID, fieldTypeName, result);
+					objectResult = objectManager->CreateJSWrapper(javaObjectID, fieldTypeName, result);
 				}
 
 				env.DeleteLocalRef(result);
@@ -262,11 +243,10 @@ Handle<Value> FieldAccessor::GetJavaField(const Handle<Object>& caller, const st
 			}
 		}
 	}
-
 	return fieldResult;
 }
 
-void FieldAccessor::SetJavaField(const Handle<Object>& target, const Handle<Value>& value, const string& className, const string& fieldName, const std::string& fieldTypeName, const string& declaringTypeName, bool isStatic)
+void FieldAccessor::SetJavaField(const Handle<Object>& target, const Handle<Value>& value, FieldCallbackData *fieldData)
 {
 	JEnv env;
 
@@ -274,30 +254,45 @@ void FieldAccessor::SetJavaField(const Handle<Object>& target, const Handle<Valu
 	HandleScope handleScope(isolate);
 
 	jweak targetJavaObject;
-	jclass clazz;
-	jfieldID fieldId;
 
-	bool isPrimitiveType = fieldTypeName.size() == 1;
+	const auto& fieldTypeName = fieldData->signature;
+	auto isStatic = fieldData->isStatic;
 
-	bool isFieldArray = fieldTypeName[0] == '[';
+	auto isPrimitiveType = fieldTypeName.size() == 1;
+	auto isFieldArray = fieldTypeName[0] == '[';
 
-	string fieldJniSig = isPrimitiveType
-							? fieldTypeName
-							: (isFieldArray
-								? fieldTypeName
-								: ("L" + fieldTypeName + ";"));
 
-	if (isStatic)
+	if (fieldData->fid == nullptr)
 	{
-		clazz = env.FindClass(declaringTypeName);
-		fieldId = env.GetStaticFieldID(clazz, fieldName, fieldJniSig);
+		auto fieldJniSig = isPrimitiveType
+								? fieldTypeName
+								: (isFieldArray
+									? fieldTypeName
+									: ("L" + fieldTypeName + ";"));
+
+		if (isStatic)
+		{
+			fieldData->clazz = env.FindClass(fieldData->declaringType);
+			assert(fieldData->clazz != nullptr);
+			fieldData->fid = env.GetStaticFieldID(fieldData->clazz, fieldData->name, fieldJniSig);
+			assert(fieldData->fid != nullptr);
+		}
+		else
+		{
+			fieldData->clazz = env.FindClass(fieldData->declaringType);
+			assert(fieldData->clazz != nullptr);
+			fieldData->fid = env.GetFieldID(fieldData->clazz, fieldData->name, fieldJniSig);
+			assert(fieldData->fid != nullptr);
+		}
 	}
-	else
+
+	if (!isStatic)
 	{
 		targetJavaObject = objectManager->GetJavaObjectByJsObject(target);
-		clazz = objectManager->GetJavaClass(target);
-		fieldId = env.GetFieldID(clazz, fieldName, fieldJniSig);
 	}
+
+	auto fieldId = fieldData->fid;
+	auto clazz = fieldData->clazz;
 
 	if (isPrimitiveType)
 	{

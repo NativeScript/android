@@ -1,5 +1,6 @@
 package com.tns;
 
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -8,6 +9,8 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
+
+import android.util.Log;
 
 class MethodResolver
 {
@@ -105,10 +108,14 @@ class MethodResolver
 		return array + signature;
 	}
 
-	static String resolveMethodOverload(String className, String methodName, Object[] args) throws ClassNotFoundException
+	static String resolveMethodOverload(HashMap<String, Class<?>> classCache, String className, String methodName, Object[] args) throws ClassNotFoundException
 	{
 		String methodSig = null;
-		Class<?> clazz = Class.forName(className);
+		Class<?> clazz = classCache.get(className);
+		if (clazz == null)
+		{
+			clazz = Class.forName(className);
+		}
 		int argLength = (args != null) ? args.length : 0;
 		
 		ArrayList<Tuple<Method, Integer>> candidates = new ArrayList<Tuple<Method, Integer>>();
@@ -195,11 +202,28 @@ class MethodResolver
 		}
 	}
 	
-	static Constructor<?> resolveConstructor(String classPath, Object[] args) throws ClassNotFoundException
+	static Constructor<?> resolveConstructor(String name, String className, Object[] args, DexFactory dexFactory, String[] methodOverrides) throws ClassNotFoundException, IOException
 	{
-		String cannonicalClassName = classPath.replace('/', '.');
+		String cannonicalClassName = className.replace('/', '.');
 		
-		Class<?> clazz = Class.forName(cannonicalClassName);
+		Class<?> clazz = null;
+		boolean isBindingClass = cannonicalClassName.startsWith("com.tns.gen") &&
+				!cannonicalClassName.startsWith("com.tns.tests.");
+
+		if (isBindingClass)
+		{
+			if (name == null || name == "")
+			{
+				name = "0";
+			}
+			
+			clazz = dexFactory.resolveClass(name, cannonicalClassName, methodOverrides);
+		}
+
+		if (clazz == null)
+		{
+			clazz = Class.forName(cannonicalClassName);
+		}
 
 		Constructor<?>[] constructors = clazz.getConstructors();
 

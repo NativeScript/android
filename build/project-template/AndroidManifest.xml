@@ -4,6 +4,12 @@
     android:versionCode="1"
     android:versionName="1.0" >
 
+   <supports-screens
+        android:smallScreens="true"
+        android:normalScreens="true"
+        android:largeScreens="true"
+        android:xlargeScreens="true"/>
+	
    <uses-sdk
         android:minSdkVersion="17"
         android:targetSdkVersion="__APILEVEL__" />
@@ -29,6 +35,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity android:name="com.tns.ErrorReportActivity"/>
     </application>
 
 </manifest>

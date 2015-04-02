@@ -1,4 +1,7 @@
 #include "Util.h"
+#include "Constants.h"
+#include "V8GlobalHelpers.h"
+#include <sstream>
 
 using namespace v8;
 using namespace std;
@@ -109,4 +112,34 @@ bool Util::StartsWith(const string& s, const string& prefix)
 {
 	size_t prefixLength = prefix.length();
 	return (prefixLength < s.length()) && (s.compare(0, prefixLength, prefix) == 0);
+}
+
+string Util::GetStackTrace(int frameCount)
+{
+	stringstream ss;
+	auto stackTrace = StackTrace::CurrentStackTrace(Isolate::GetCurrent(), frameCount, StackTrace::kOverview);
+	if (!stackTrace.IsEmpty())
+	{
+		auto count = stackTrace->GetFrameCount();
+		for (int i=0; i<count; i++)
+		{
+			auto frame = stackTrace->GetFrame(i);
+			if (!frame.IsEmpty())
+			{
+				auto scriptName = frame->GetScriptName();
+				auto fileName = ConvertToString(scriptName);
+				ss << fileName;
+
+				int lineNumber = frame->GetLineNumber();
+				if (lineNumber > Constants::MODULE_LINES_OFFSET)
+				{
+					lineNumber -= Constants::MODULE_LINES_OFFSET;
+				}
+				int column = frame->GetColumn();
+				ss << ":" << lineNumber << ":" << column << "\n";
+			}
+		}
+	}
+
+	return ss.str();
 }

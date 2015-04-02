@@ -29,16 +29,17 @@ JsArgToArrayConverter::JsArgToArrayConverter(const v8::Handle<Value>& arg, bool 
 }
 
 
-JsArgToArrayConverter::JsArgToArrayConverter(const v8::FunctionCallbackInfo<Value>& args, bool hasImplementationObject, bool isInnerClass) :
+JsArgToArrayConverter::JsArgToArrayConverter(const v8::FunctionCallbackInfo<Value>& args, bool hasImplementationObject, const Handle<Object>& outerThis) :
 		m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error())
 {
+	auto isInnerClass = !outerThis.IsEmpty();
 	if (isInnerClass)
 	{
 		m_argsLen = args.Length() + 1;
 	}
 	else
 	{
-		m_argsLen = !hasImplementationObject ? args.Length() : args.Length() - 1;
+		m_argsLen = !hasImplementationObject ? args.Length() : args.Length() - 2;
 	}
 
 	bool success = true;
@@ -54,7 +55,7 @@ JsArgToArrayConverter::JsArgToArrayConverter(const v8::FunctionCallbackInfo<Valu
 			{
 				if (i == 0)
 				{
-					success = ConvertArg(args.This(), i);
+					success = ConvertArg(outerThis, i);
 				}
 				else
 				{
@@ -191,8 +192,8 @@ bool JsArgToArrayConverter::ConvertArg(const Handle<Value>& arg, int index)
 			jlong value = 0;
 			if (hidden->IsString())
 			{
-				string value = ConvertToString(hidden->ToString());
-				value = atol(value.c_str());
+				auto strValue = ConvertToString(hidden->ToString());
+				value = atoll(strValue.c_str());
 			}
 			else if (hidden->IsInt32())
 			{

@@ -1,7 +1,6 @@
 package com.tns;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
+import java.io.File;
 
 import android.app.Application;
 import android.util.Log;
@@ -12,6 +11,11 @@ import com.tns.internal.ExtractPolicy;
 public class NativeScriptApplication extends android.app.Application implements com.tns.NativeScriptHashCodeProvider {
 	public static class ActivityLifecycleCallbacks implements android.app.Application.ActivityLifecycleCallbacks, com.tns.NativeScriptHashCodeProvider {
 		public void onActivityCreated(android.app.Activity param_0, android.os.Bundle param_1) {
+			if(ErrorReport.HasApplicationCreateError)
+			{
+				return;
+			}
+			
 			java.lang.Object[] params = new Object[2];
 			params[0] = param_0;
 			params[1] = param_1;
@@ -19,6 +23,11 @@ public class NativeScriptApplication extends android.app.Application implements 
 		}
 
 		public void onActivityDestroyed(android.app.Activity param_0) {
+			if(ErrorReport.HasApplicationCreateError)
+			{
+				return;
+			}
+			
 			java.lang.Object[] params = new Object[1];
 			params[0] = param_0;
 			com.tns.Platform.callJSMethod(this, "onActivityDestroyed", params);
@@ -62,6 +71,10 @@ public class NativeScriptApplication extends android.app.Application implements 
 			return super.hashCode();
 		}
 		public void setNativeScriptOverrides(java.lang.String[] overrides) {
+		}
+		@Override
+		public void setNativeScriptOverride(String override)
+		{
 		}
 	}
 	public NativeScriptApplication() {
@@ -681,20 +694,49 @@ public class NativeScriptApplication extends android.app.Application implements 
 		return appInstance;
 	}
 	
-	public void onCreate() {
-
-		appInstance = this;
-		prepareAppBuilderCallbackImpl();
+	// hasErrorIntent tells you if there was an event (with an uncaught exception) raised from ErrorReport
+	private boolean hasErrorIntent()
+	{
+		boolean hasErrorIntent = false;
 		
-		if (appBuilderCallbackImpl != null)
+		try
 		{
-			appBuilderCallbackImpl.onCreate(this);
+			 //empty file just to check if there was a raised uncaught error by ErrorReport
+			File errFile = new File(this.getFilesDir(), ErrorReport.ERROR_FILE_NAME);
+			
+			if (errFile.exists())
+			{
+				errFile.delete();
+				hasErrorIntent = true;
+			}
+		}
+		catch (Exception e)
+		{
+			Log.d(Platform.DEFAULT_LOG_TAG, e.getMessage());
 		}
 		
-		Platform.init(this);
-		Platform.run(Platform.DefaultApplicationModuleName);
-
-		onCreateInternal();
+		return hasErrorIntent;
+	}
+	
+	public void onCreate() {
+		
+		boolean showErrorIntent = hasErrorIntent();
+		if (!showErrorIntent)
+		{
+			appInstance = this;
+			
+			prepareAppBuilderCallbackImpl();
+			
+			if (appBuilderCallbackImpl != null)
+			{
+				appBuilderCallbackImpl.onCreate(this);
+			}
+			
+			Platform.init(this);
+			Platform.run(Platform.DefaultApplicationModuleName);
+	
+			onCreateInternal();
+		}
 	}
 	
 	private void prepareAppBuilderCallbackImpl()
@@ -1260,8 +1302,15 @@ public class NativeScriptApplication extends android.app.Application implements 
 	public int hashCode__super() {
 		return super.hashCode();
 	}
-	public void setNativeScriptOverrides(java.lang.String[] overrides) {
+public void setNativeScriptOverrides(java.lang.String[] overrides) {
 		for (java.lang.String name: overrides) {
+			setNativeScriptOverride(name);
+		}
+	}
+	
+	@Override
+	public void setNativeScriptOverride(String name)
+	{
 			if (name.equals("init")) {
 				__ctorOverridden = true;
 			}
@@ -1447,7 +1496,7 @@ public class NativeScriptApplication extends android.app.Application implements 
 				__ho11 |= (1 << 1);
 			}
 		}
-	}
+	
 	private boolean __initialized = true;
 	private boolean __ctorOverridden;
 	private byte __ho0;
