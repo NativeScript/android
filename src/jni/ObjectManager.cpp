@@ -41,7 +41,10 @@ ObjectManager::ObjectManager()
 	assert(GET_NAME_METHOD_ID != nullptr);
 
 	ObjectManager::instance = this;
+}
 
+void ObjectManager::SetGCHooks()
+{
 	V8::AddGCPrologueCallback(ObjectManager::OnGcStartedStatic, kGCTypeAll);
 
 	V8::AddGCEpilogueCallback(ObjectManager::OnGcFinishedStatic, kGCTypeAll);
@@ -80,7 +83,7 @@ JSInstanceInfo* ObjectManager::GetJSInstanceInfo(const Handle<Object>& object)
 	{
 		//Typescript object layout has an object instance as child of the actual registered instance. checking for that
 		auto prototypeObject = object->GetPrototype().As<Object>();
-		if (!prototypeObject.IsEmpty())
+		if (!prototypeObject.IsEmpty() && prototypeObject->IsObject())
 		{
 			DEBUG_WRITE("GetJSInstanceInfo: need to check prototype :%d", prototypeObject->GetIdentityHash());
 			hiddenValue = prototypeObject->GetHiddenValue(v8HiddenJS);
@@ -536,7 +539,7 @@ void ObjectManager::MarkReachableObjects(Isolate *isolate, const Local<Object>& 
 					Handle<Value> setter;
 					NativeScriptExtension::GetAssessorPair(isolate, o, name, getter, setter);
 
-					if (!getter.IsEmpty())
+					if (!getter.IsEmpty() && getter->IsFunction())
 					{
 						int getterClosureObjectLength = 0;
 						auto getterClosureObjects = NativeScriptExtension::GetClosureObjects(isolate, getter.As<Function>(), &getterClosureObjectLength);
@@ -551,7 +554,7 @@ void ObjectManager::MarkReachableObjects(Isolate *isolate, const Local<Object>& 
 						NativeScriptExtension::ReleaseClosureObjects(getterClosureObjects);
 					}
 
-					if (!setter.IsEmpty())
+					if (!setter.IsEmpty() && setter->IsFunction())
 					{
 						int setterClosureObjectLength = 0;
 						auto setterClosureObjects = NativeScriptExtension::GetClosureObjects(isolate, setter.As<Function>(), &setterClosureObjectLength);

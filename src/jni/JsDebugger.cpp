@@ -21,7 +21,7 @@ void JsDebugger::Init(const string& packageName, int port)
 	s_DispatchMessagesDebugAgentCallback = env.GetStaticMethodID(s_JsDebuggerClass, "dispatchMessagesDebugAgentCallback", "()Z");
 	assert(s_DispatchMessagesDebugAgentCallback != nullptr);
 
-	v8::Debug::SetDebugMessageDispatchHandler(DispatchMessagesDebugAgentCallback);
+//	v8::Debug::SetDebugMessageDispatchHandler(DispatchMessagesDebugAgentCallback);
 }
 
 int JsDebugger::GetDebuggerPort()
@@ -57,19 +57,20 @@ void JsDebugger::ProcessDebugMessages()
 
 bool JsDebugger::EnableAgent(const std::string& name, int port, bool waitForConnection)
 {
-	bool success = ((0 < port) && (port < 65536))
-					? v8::Debug::EnableAgent(name.c_str(), port, waitForConnection)
-					: false;
-	__android_log_print(ANDROID_LOG_DEBUG, "TNS.Native", "Enable V8 debugger (app=%s, port=%d, waitForConnection=%d, success=%d)", name.c_str(), port, waitForConnection, success);
-	s_currentPort = success ? port : INVALID_PORT;
-	return success;
+//	bool success = ((0 < port) && (port < 65536))
+//					? v8::Debug::EnableAgent(name.c_str(), port, waitForConnection)
+//					: false;
+//	__android_log_print(ANDROID_LOG_DEBUG, "TNS.Native", "Enable V8 debugger (app=%s, port=%d, waitForConnection=%d, success=%d)", name.c_str(), port, waitForConnection, success);
+//	s_currentPort = success ? port : INVALID_PORT;
+//	return success;
+	return true;
 }
 
 void JsDebugger::DisableAgent()
 {
-	v8::Debug::DisableAgent();
-	s_currentPort = INVALID_PORT;
-	__android_log_print(ANDROID_LOG_DEBUG, "TNS.Native", "Disable V8 debugger");
+//	v8::Debug::DisableAgent();
+//	s_currentPort = INVALID_PORT;
+//	__android_log_print(ANDROID_LOG_DEBUG, "TNS.Native", "Disable V8 debugger");
 }
 
 int JsDebugger::s_port = JsDebugger::INVALID_PORT;

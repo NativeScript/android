@@ -1,29 +1,6 @@
 // Copyright 2010 the V8 project authors. All rights reserved.
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-//       notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-//       copyright notice, this list of conditions and the following
-//       disclaimer in the documentation and/or other materials provided
-//       with the distribution.
-//     * Neither the name of Google Inc. nor the names of its
-//       contributors may be used to endorse or promote products derived
-//       from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
 
 #ifndef V8_V8_PROFILER_H_
 #define V8_V8_PROFILER_H_
@@ -45,6 +22,14 @@ typedef uint32_t SnapshotObjectId;
  */
 class V8_EXPORT CpuProfileNode {
  public:
+  struct LineTick {
+    /** The 1-based number of the source line where the function originates. */
+    int line;
+
+    /** The count of samples associated with the source line. */
+    unsigned int hit_count;
+  };
+
   /** Returns function name (empty string for anonymous functions.) */
   Handle<String> GetFunctionName() const;
 
@@ -65,6 +50,18 @@ class V8_EXPORT CpuProfileNode {
    * kNoColumnNumberInfo if no column number information is available.
    */
   int GetColumnNumber() const;
+
+  /**
+   * Returns the number of the function's source lines that collect the samples.
+   */
+  unsigned int GetHitLineCount() const;
+
+  /** Returns the set of source lines that collect the samples.
+   *  The caller allocates buffer and responsible for releasing it.
+   *  True if all available entries are copied, otherwise false.
+   *  The function copies nothing if buffer is not large enough.
+   */
+  bool GetLineTicks(LineTick* entries, unsigned int length) const;
 
   /** Returns bailout reason for the function
     * if the optimization was disabled for it.
@@ -106,27 +103,35 @@ class V8_EXPORT CpuProfile {
   const CpuProfileNode* GetTopDownRoot() const;
 
   /**
-    * Returns number of samples recorded. The samples are not recorded unless
-    * |record_samples| parameter of CpuProfiler::StartCpuProfiling is true.
-    */
+   * Returns number of samples recorded. The samples are not recorded unless
+   * |record_samples| parameter of CpuProfiler::StartCpuProfiling is true.
+   */
   int GetSamplesCount() const;
 
   /**
-    * Returns profile node corresponding to the top frame the sample at
-    * the given index.
-    */
+   * Returns profile node corresponding to the top frame the sample at
+   * the given index.
+   */
   const CpuProfileNode* GetSample(int index) const;
 
   /**
-    * Returns time when the profile recording started (in microseconds
-    * since the Epoch).
-    */
+   * Returns the timestamp of the sample. The timestamp is the number of
+   * microseconds since some unspecified starting point.
+   * The point is equal to the starting point used by GetStartTime.
+   */
+  int64_t GetSampleTimestamp(int index) const;
+
+  /**
+   * Returns time when the profile recording was started (in microseconds)
+   * since some unspecified starting point.
+   */
   int64_t GetStartTime() const;
 
   /**
-    * Returns time when the profile recording was stopped (in microseconds
-    * since the Epoch).
-    */
+   * Returns time when the profile recording was stopped (in microseconds)
+   * since some unspecified starting point.
+   * The point is equal to the starting point used by GetStartTime.
+   */
   int64_t GetEndTime() const;
 
   /**
@@ -164,7 +169,9 @@ class V8_EXPORT CpuProfiler {
   void StartProfiling(Handle<String> title, bool record_samples = false);
 
   /** Deprecated. Use StartProfiling instead. */
-  void StartCpuProfiling(Handle<String> title, bool record_samples = false);
+  V8_DEPRECATED("Use StartProfiling",
+      void StartCpuProfiling(Handle<String> title,
+                             bool record_samples = false));
 
   /**
    * Stops collecting CPU profile with a given title and returns it.
@@ -173,7 +180,8 @@ class V8_EXPORT CpuProfiler {
   CpuProfile* StopProfiling(Handle<String> title);
 
   /** Deprecated. Use StopProfiling instead. */
-  const CpuProfile* StopCpuProfiling(Handle<String> title);
+  V8_DEPRECATED("Use StopProfiling",
+      const CpuProfile* StopCpuProfiling(Handle<String> title));
 
   /**
    * Tells the profiler whether the embedder is idle.
@@ -231,19 +239,20 @@ class V8_EXPORT HeapGraphEdge {
 class V8_EXPORT HeapGraphNode {
  public:
   enum Type {
-    kHidden = 0,        // Hidden node, may be filtered when shown to user.
-    kArray = 1,         // An array of elements.
-    kString = 2,        // A string.
-    kObject = 3,        // A JS object (except for arrays and strings).
-    kCode = 4,          // Compiled code.
-    kClosure = 5,       // Function closure.
-    kRegExp = 6,        // RegExp.
-    kHeapNumber = 7,    // Number stored in the heap.
-    kNative = 8,        // Native object (not from V8 heap).
-    kSynthetic = 9,     // Synthetic object, usualy used for grouping
-                        // snapshot items together.
-    kConsString = 10,   // Concatenated string. A pair of pointers to strings.
-    kSlicedString = 11  // Sliced string. A fragment of another string.
+    kHidden = 0,         // Hidden node, may be filtered when shown to user.
+    kArray = 1,          // An array of elements.
+    kString = 2,         // A string.
+    kObject = 3,         // A JS object (except for arrays and strings).
+    kCode = 4,           // Compiled code.
+    kClosure = 5,        // Function closure.
+    kRegExp = 6,         // RegExp.
+    kHeapNumber = 7,     // Number stored in the heap.
+    kNative = 8,         // Native object (not from V8 heap).
+    kSynthetic = 9,      // Synthetic object, usualy used for grouping
+                         // snapshot items together.
+    kConsString = 10,    // Concatenated string. A pair of pointers to strings.
+    kSlicedString = 11,  // Sliced string. A fragment of another string.
+    kSymbol = 12         // A Symbol (ES6).
   };
 
   /** Returns node type (see HeapGraphNode::Type). */
@@ -304,7 +313,7 @@ class V8_EXPORT OutputStream {  // NOLINT
    */
   virtual WriteResult WriteHeapStatsChunk(HeapStatsUpdate* data, int count) {
     return kAbort;
-  };
+  }
 };
 
 

@@ -21,6 +21,8 @@ namespace tns
 	public:
 		ObjectManager();
 
+		void SetGCHooks();
+
 		static jweak GetJavaObjectByJsObjectStatic(const v8::Handle<v8::Object>& object);
 
 		jweak GetJavaObjectByJsObject(const v8::Handle<v8::Object>& object);
