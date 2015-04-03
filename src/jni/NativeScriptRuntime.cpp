@@ -19,6 +19,7 @@
 #include "JavaObjectArrayCache.h"
 #include "MethodCache.h"
 #include "JsDebugger.h"
+#include "SimpleProfiler.h"
 
 using namespace v8;
 using namespace std;
@@ -163,6 +164,8 @@ void NativeScriptRuntime::SetJavaField(const Handle<Object>& target, const Handl
 
 void NativeScriptRuntime::CallJavaMethod(const Handle<Object>& caller, const string& className, const string& methodName, MetadataEntry *entry, bool isStatic, bool isSuper, const v8::FunctionCallbackInfo<v8::Value>& args)
 {
+	SET_PROFILER_FRAME();
+
 	JEnv env;
 
 	jclass clazz;
@@ -534,6 +537,8 @@ string NativeScriptRuntime::GetReturnType(const string& methodSignature)
 
 jobject NativeScriptRuntime::CreateJavaInstance(int objectID, const std::string& name, const string& className, const ArgsWrapper& argWrapper, const Handle<Object>& implementationObject, bool isInterface)
 {
+	SET_PROFILER_FRAME();
+
 	jobject instance = nullptr;
 	DEBUG_WRITE("CreateJavaInstance:  %s-%s", className.c_str(), (!name.empty() ? name.c_str() : "0"));
 
@@ -748,6 +753,8 @@ void NativeScriptRuntime::CreateGlobalCastFunctions(const Handle<ObjectTemplate>
 
 void NativeScriptRuntime::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
+	SET_PROFILER_FRAME();
+
 	ASSERT_MESSAGE(args.Length() == 2, "require should be called with two parameters");
 	ASSERT_MESSAGE(!args[0]->IsUndefined() && !args[0]->IsNull(), "require called with undefined moduleName parameter");
 	ASSERT_MESSAGE(!args[1]->IsUndefined() && !args[1]->IsNull(), "require called with undefined callingModulePath parameter");
@@ -958,6 +965,8 @@ void NativeScriptRuntime::CreateTopLevelNamespaces(const Handle<Object>& global)
 
 Handle<Value> NativeScriptRuntime::CallJSMethod(JNIEnv *_env, const Handle<Object>& jsObject, jstring methodName, jobjectArray args, TryCatch& tc)
 {
+	SET_PROFILER_FRAME();
+
 	JEnv env(_env);
 	Handle<Value> result;
 
@@ -1009,7 +1018,11 @@ Handle<Value> NativeScriptRuntime::CallJSMethod(JNIEnv *_env, const Handle<Objec
 
 		DEBUG_WRITE("implementationObject->GetIdentityHash()=%d", jsObject->GetIdentityHash());
 
-		auto jsResult = jsMethod->Call(jsObject, argc, argc == 0 ? nullptr : arguments);
+		Local<Value> jsResult;
+		{
+			SET_PROFILER_FRAME();
+			jsResult = jsMethod->Call(jsObject, argc, argc == 0 ? nullptr : arguments);
+		}
 
 		//TODO: if javaResult is a pure js object create a java object that represents this object in java land
 

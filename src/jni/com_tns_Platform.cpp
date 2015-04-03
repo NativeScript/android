@@ -23,7 +23,6 @@
 #include <assert.h>
 #include <string>
 
-
 using namespace v8;
 using namespace std;
 using namespace tns;
@@ -319,6 +318,8 @@ jobject ConvertJsValueToJavaObject(JEnv& env, const Handle<Value>& value)
 
 extern "C" jobject Java_com_tns_Platform_callJSMethodNative(JNIEnv *_env, jobject obj, jint javaObjectID, jstring methodName, jboolean isConstructor, jobjectArray packagedArgs)
 {
+	SET_PROFILER_FRAME();
+
 	auto isolate = g_isolate;
 	Isolate::Scope isolate_scope(isolate);
 
@@ -368,6 +369,8 @@ extern "C" jobject Java_com_tns_Platform_callJSMethodNative(JNIEnv *_env, jobjec
 
 extern "C" jobjectArray Java_com_tns_Platform_createJSInstanceNative(JNIEnv *_env, jobject obj, jobject javaObject, jint javaObjectID, jstring className, jboolean createActivity, jobjectArray packagedCreationArgs)
 {
+	SET_PROFILER_FRAME();
+
 	DEBUG_WRITE("createJSInstanceNative called");
 
 	auto isolate = g_isolate;

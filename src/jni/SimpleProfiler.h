@@ -7,10 +7,16 @@
 
 namespace tns
 {
+#ifndef SIMPLE_PROFILER
+	#define SET_PROFILER_FRAME() ((void)0)
+#else
+	#define SET_PROFILER_FRAME() SimpleProfiler __frame(__FILE__, __LINE__)
+#endif
+
 	class SimpleProfiler
 	{
 	public:
-		SimpleProfiler(void *func);
+		SimpleProfiler(char *fileName, int lineNumber);
 
 		~SimpleProfiler();
 
@@ -21,11 +27,16 @@ namespace tns
 	private:
 		struct FrameEntry
 		{
-			FrameEntry(void *_func)
-				: func(_func), stackCount(0), time(0)
+			FrameEntry(char *_fileName, int _lineNumer)
+				: fileName(_fileName), lineNumber(_lineNumer), time(0), stackCount(0)
 			{
 			}
-			void *func;
+			bool operator<(const FrameEntry &rhs) const
+			{
+				return time < rhs.time;
+			}
+			char *fileName;
+			int lineNumber;
 			int64_t time;
 			int stackCount;
 		};

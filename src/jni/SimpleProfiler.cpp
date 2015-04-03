@@ -1,4 +1,5 @@
 #include "SimpleProfiler.h"
+#include <algorithm>
 #include <time.h>
 #include <android/log.h>
 
@@ -6,12 +7,12 @@ using namespace tns;
 using namespace v8;
 
 
-SimpleProfiler::SimpleProfiler(void *func)
+SimpleProfiler::SimpleProfiler(char *fileName, int lineNumber)
 	: m_frame(nullptr), m_time(0)
 {
 	for(auto& f: s_frames)
 	{
-		if (f.func == func)
+		if ((f.fileName == fileName) && (f.lineNumber == lineNumber))
 		{
 			m_frame = &f;
 			break;
@@ -19,7 +20,7 @@ SimpleProfiler::SimpleProfiler(void *func)
 	}
 	if (m_frame == nullptr)
 	{
-		FrameEntry entry(func);
+		FrameEntry entry(fileName, lineNumber);
 		s_frames.push_back(entry);
 		m_frame = &s_frames.back();
 	}
@@ -60,9 +61,10 @@ void SimpleProfiler::PrintProfilerDataCallback(const FunctionCallbackInfo<Value>
 
 void SimpleProfiler::PrintProfilerData()
 {
+	std::sort(s_frames.begin(), s_frames.end());
 	for (auto& f: s_frames)
 	{
-		__android_log_print(ANDROID_LOG_DEBUG, "TNS.Native", "Frame: 0x%08x, Time: %lld", reinterpret_cast<uint32_t>(f.func), f.time);
+		__android_log_print(ANDROID_LOG_DEBUG, "TNS.Native", "Time: %lld, File: %s, Line: %d", f.time, f.fileName, f.lineNumber);
 	}
 }
 
