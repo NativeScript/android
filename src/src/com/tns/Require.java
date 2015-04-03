@@ -55,10 +55,29 @@ public class Require
 		return ApplicationFilesPath;
 	}
 
-	public static String getAppContent(String appFileName)
+	public static String[] bootstrapApp()
 	{
-		File bootstrapFile = findModuleFile(appFileName, "");
-		return getModuleContent(bootstrapFile.getPath());
+		// Bootstrap logic flows like:
+		// 	1. Check for package.json -> `main` field
+		// 	2. Check for index.js
+		// 	3. Check for bootstrap.js
+		
+		File bootstrapFile = findModuleFile("./", "");
+		if(!bootstrapFile.exists())
+		{
+			bootstrapFile = findModuleFile("./bootstrap", "");
+		}
+		
+		if(!bootstrapFile.exists())
+		{
+			Platform.APP_FAIL("Application entry point file not found. Please specify either package.json with main field, index.js or bootstrap.js!");
+		}
+		
+		String[] bootstrapInfo = new String[2];
+		bootstrapInfo[0] = bootstrapFile.getName();
+		bootstrapInfo[1] = getModuleContent(bootstrapFile.getPath());
+		
+		return bootstrapInfo;
 	}
 
 	public static String getModuleContent(String modulePath)
