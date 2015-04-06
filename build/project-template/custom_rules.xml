@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="custom_logic_for_metadata_generation" default="-post-compile">
+    
+    <property name="path_to_metadata" value="./assets/metadata"/>
+    <property name="ns.project.lib" value="../../lib/Android" />
+    
+    <!-- these two properties are passed from cli -->
+    <property name="ns.resources" value=""/>
+	
+
+	<target name="create_project_lib" >
+	
+		<echo message="make lib/android folder" />
+		
+		<mkdir dir="${ns.project.lib}"/>
+		
+	</target>
+	
+	
+	<target name="copy_default_sdk" >
+	
+		<copy file="${ns.resources}/android.jar" todir="${ns.project.lib}"/>
+		
+	</target>
+
+    
+    <!-- GET MIN SDK VERSION FROM MANIFEST AND SAVE IN PROP "minSdkVersion" -->
+	<target name="retrieve_min_version_from_manifest">
+	
+		<xmlproperty file="./AndroidManifest.xml" collapseAttributes="true"/>
+		
+	    <property name="relative_path_to_min_declared_sdk" value="platforms/android-${manifest.uses-sdk.android:minSdkVersion}/android.jar" />
+		
+	</target>
+	
+	
+	<!-- DOES MIN SDK EXIST, AS DECLARED IN MANIFEST? -->
+	<target name="does_min_sdk_jar_exist" depends="retrieve_min_version_from_manifest">
+	    
+	    <available file="${sdk.dir}/${relative_path_to_min_declared_sdk}" property="minSdkJar.present"/>
+	   	
+	</target>
+
+	
+	<!-- REPLACE MIN SDK JAR WITH ONE ON USER MACHINE -->
+	<target name="replace_default_sdk_if_possible" depends="does_min_sdk_jar_exist" if="minSdkJar.present">
+	    	    
+		<delete file="${ns.project.lib}/android.jar"/>
+		
+	   	<copy file="${sdk.dir}/${relative_path_to_min_declared_sdk}" todir="${ns.project.lib}"/>
+	   	
+	</target>
+		
+		
+	<target name="copy_project_jars">
+	
+	    <copy todir="${ns.project.lib}" verbose="yes" flatten="yes" failonerror="no">    
+		
+		   <fileset dir="./libs">    
+			  <include name="*.jar" />    
+		   </fileset>    
+		   
+		</copy>
+	    
+	</target>
+
+	
+	<target name="delete_old_metadata">
+	
+		 <delete>
+		 
+		  	<fileset dir="${path_to_metadata}" includes="**/*.dat"/>
+			
+		</delete>
+		
+	</target>
+	
+	
+    <!-- PASS JARS TO METADATA GENERATOR -->
+    <target name="generate_metadata_from_given_jars" depends="create_project_lib, copy_default_sdk, replace_default_sdk_if_possible, copy_project_jars, delete_old_metadata">
+        
+	    <java jar="${ns.resources}/metadata-generator.jar"
+			     fork="true"
+			     failonerror="true"
+			     maxmemory="128m">
+				 
+			<arg value="${ns.project.lib}"></arg>
+			
+			<arg value="${path_to_metadata}"></arg>
+			
+		</java>
+		
+		<echo message=" --------- created new metadata and moved it to assets/metadata" />
+		
+    </target>
+        
+    <target name="-post-compile" depends="generate_metadata_from_given_jars">
+		
+	</target>
+    
+</project> 
