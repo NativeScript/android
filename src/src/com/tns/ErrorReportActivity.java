@@ -9,4 +9,12 @@ public class ErrorReportActivity extends Activity
 		super.onCreate(savedInstanceState);
 		new ErrorReport(this).buildUI();
 	}
+
+	@Override
+	protected void onPause()
+	{
+		//the moment the error activity is not in the foreground we want to kill the process
+		super.onPause();	
+		ErrorReport.killProcess(this);
+	}
 }
