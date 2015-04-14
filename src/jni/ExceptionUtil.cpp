@@ -245,7 +245,15 @@ bool ExceptionUtil::ThrowExceptionToJava(TryCatch& tc, const string& prependMess
 {
 	Isolate *isolate = Isolate::GetCurrent();
 	auto ex = tc.Exception();
-	string message = PrintErrorMessage(tc.Message(), ex);
+
+	bool isExceptionEmpty = ex.IsEmpty();
+	bool isMessageEmpty = tc.Message().IsEmpty();
+
+	string message;
+	if(!isExceptionEmpty && !isMessageEmpty){
+		message = PrintErrorMessage(tc.Message(), ex);
+	}
+
 	stringstream ss;
 	ss << endl << prependMessage << message;
 	string loggedMessage = ss.str();
