@@ -1,7 +1,7 @@
 #include "JsDebugger.h"
-#include "v8-debug.h"
+#include "V8GlobalHelpers.h"
+#include "JniLocalRef.h"
 #include <assert.h>
-#include <android/log.h>
 
 using namespace std;
 using namespace tns;
@@ -10,18 +10,17 @@ JsDebugger::JsDebugger()
 {
 }
 
-void JsDebugger::Init(const string& packageName, int port)
+void JsDebugger::Init(v8::Isolate *isolate, const string& packageName)
 {
+	s_isolate = isolate;
 	s_packageName = packageName;
-	s_port = port;
 
 	JEnv env;
 	s_JsDebuggerClass = env.FindClass("com/tns/JsDebugger");
 	assert(s_JsDebuggerClass != nullptr);
-	s_DispatchMessagesDebugAgentCallback = env.GetStaticMethodID(s_JsDebuggerClass, "dispatchMessagesDebugAgentCallback", "()Z");
-	assert(s_DispatchMessagesDebugAgentCallback != nullptr);
 
-	v8::Debug::SetDebugMessageDispatchHandler(DispatchMessagesDebugAgentCallback);
+	s_EnqueueMessage = env.GetStaticMethodID(s_JsDebuggerClass, "enqueueMessage", "(Ljava/lang/String;)V");
+	assert(s_EnqueueMessage != nullptr);
 }
 
 int JsDebugger::GetDebuggerPort()
@@ -29,52 +28,68 @@ int JsDebugger::GetDebuggerPort()
 	return s_port;
 }
 
-int JsDebugger::GetCurrentDebuggerPort()
-{
-	__android_log_print(ANDROID_LOG_DEBUG, "TNS.Native", "GetCurrentDebuggerPort ret=%d", s_currentPort);
-	return s_currentPort;
-}
-
 string JsDebugger::GetPackageName()
 {
 	return s_packageName;
 }
 
-void JsDebugger::DispatchMessagesDebugAgentCallback()
+void JsDebugger::MyMessageHandler(const v8::Debug::Message& message)
 {
-	JEnv env(true);
-	jboolean success = env.CallStaticBooleanMethod(s_JsDebuggerClass, s_DispatchMessagesDebugAgentCallback);
-	assert(JNI_TRUE == success);
+	auto json = message.GetJSON();
+	auto str = ConvertToString(json);
+
+	JEnv env;
+	JniLocalRef s(env.NewStringUTF(str.c_str()));
+
+	env.CallStaticVoidMethod(s_JsDebuggerClass, s_EnqueueMessage, (jstring)s);
+}
+
+void JsDebugger::Enable()
+{
+	auto isolate = s_isolate;
+	v8::Isolate::Scope isolate_scope(isolate);
+	v8::HandleScope handleScope(isolate);
+
+	v8::Debug::SetMessageHandler(MyMessageHandler);
+}
+
+void JsDebugger::Disable()
+{
+	auto isolate = s_isolate;
+	v8::Isolate::Scope isolate_scope(isolate);
+	v8::HandleScope handleScope(isolate);
+
+	v8::Debug::SetMessageHandler(nullptr);
+}
+
+void JsDebugger::DebugBreak()
+{
+	auto isolate = s_isolate;
+	v8::Isolate::Scope isolate_scope(isolate);
+	v8::HandleScope handleScope(isolate);
+
+	v8::Debug::DebugBreak(isolate);
 }
 
 void JsDebugger::ProcessDebugMessages()
 {
-	if (s_currentPort != INVALID_PORT)
-	{
-		v8::Debug::ProcessDebugMessages();
-	}
+	auto isolate = s_isolate;
+	v8::Isolate::Scope isolate_scope(isolate);
+	v8::HandleScope handleScope(isolate);
+
+	v8::Debug::ProcessDebugMessages();
 }
 
-bool JsDebugger::EnableAgent(const std::string& name, int port, bool waitForConnection)
+void JsDebugger::SendCommand(uint16_t *cmd, int length)
 {
-	bool success = ((0 < port) && (port < 65536))
-					? v8::Debug::EnableAgent(name.c_str(), port, waitForConnection)
-					: false;
-	__android_log_print(ANDROID_LOG_DEBUG, "TNS.Native", "Enable V8 debugger (app=%s, port=%d, waitForConnection=%d, success=%d)", name.c_str(), port, waitForConnection, success);
-	s_currentPort = success ? port : INVALID_PORT;
-	return success;
+	auto isolate = s_isolate;
+
+	v8::Debug::SendCommand(isolate, cmd, length, nullptr);
 }
 
-void JsDebugger::DisableAgent()
-{
-	v8::Debug::DisableAgent();
-	s_currentPort = INVALID_PORT;
-	__android_log_print(ANDROID_LOG_DEBUG, "TNS.Native", "Disable V8 debugger");
-}
-
+v8::Isolate* JsDebugger::s_isolate = nullptr;
 int JsDebugger::s_port = JsDebugger::INVALID_PORT;
-int JsDebugger::s_currentPort = JsDebugger::INVALID_PORT;
 string JsDebugger::s_packageName = "";
 jclass JsDebugger::s_JsDebuggerClass = nullptr;
-jmethodID JsDebugger::s_DispatchMessagesDebugAgentCallback = nullptr;
+jmethodID JsDebugger::s_EnqueueMessage = nullptr;
 

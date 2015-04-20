@@ -1,5 +1,4 @@
 #include "v8.h"
-#include <vector>
 
 namespace v8 {
 	

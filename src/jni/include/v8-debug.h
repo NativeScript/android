@@ -1,29 +1,6 @@
 // Copyright 2008 the V8 project authors. All rights reserved.
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-//
-//     * Redistributions of source code must retain the above copyright
-//       notice, this list of conditions and the following disclaimer.
-//     * Redistributions in binary form must reproduce the above
-//       copyright notice, this list of conditions and the following
-//       disclaimer in the documentation and/or other materials provided
-//       with the distribution.
-//     * Neither the name of Google Inc. nor the names of its
-//       contributors may be used to endorse or promote products derived
-//       from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
 
 #ifndef V8_V8_DEBUG_H_
 #define V8_V8_DEBUG_H_
@@ -42,8 +19,10 @@ enum DebugEvent {
   NewFunction = 3,
   BeforeCompile = 4,
   AfterCompile  = 5,
-  ScriptCollected = 6,
-  BreakForCommand = 7
+  CompileError = 6,
+  PromiseEvent = 7,
+  AsyncTaskEvent = 8,
+  BreakForCommand = 9
 };
 
 
@@ -160,7 +139,7 @@ class V8_EXPORT Debug {
    * A EventCallback2 does not take possession of the event data,
    * and must not rely on the data persisting after the handler returns.
    */
-  typedef void (*EventCallback2)(const EventDetails& event_details);
+  typedef void (*EventCallback)(const EventDetails& event_details);
 
   /**
    * Debug message callback function.
@@ -170,73 +149,40 @@ class V8_EXPORT Debug {
    * A MessageHandler2 does not take possession of the message data,
    * and must not rely on the data persisting after the handler returns.
    */
-  typedef void (*MessageHandler2)(const Message& message);
-
-  /**
-   * Debug host dispatch callback function.
-   */
-  typedef void (*HostDispatchHandler)();
+  typedef void (*MessageHandler)(const Message& message);
 
   /**
    * Callback function for the host to ensure debug messages are processed.
    */
   typedef void (*DebugMessageDispatchHandler)();
 
-  static bool SetDebugEventListener2(EventCallback2 that,
-                                     Handle<Value> data = Handle<Value>());
-
-  // Set a JavaScript debug event listener.
-  static bool SetDebugEventListener(v8::Handle<v8::Object> that,
+  static bool SetDebugEventListener(EventCallback that,
                                     Handle<Value> data = Handle<Value>());
 
   // Schedule a debugger break to happen when JavaScript code is run
-  // in the given isolate. If no isolate is provided the default
-  // isolate is used.
-  static void DebugBreak(Isolate* isolate = NULL);
+  // in the given isolate.
+  static void DebugBreak(Isolate* isolate);
 
   // Remove scheduled debugger break in given isolate if it has not
-  // happened yet. If no isolate is provided the default isolate is
-  // used.
-  static void CancelDebugBreak(Isolate* isolate = NULL);
+  // happened yet.
+  static void CancelDebugBreak(Isolate* isolate);
+
+  // Check if a debugger break is scheduled in the given isolate.
+  static bool CheckDebugBreak(Isolate* isolate);
 
   // Break execution of JavaScript in the given isolate (this method
   // can be invoked from a non-VM thread) for further client command
   // execution on a VM thread. Client data is then passed in
   // EventDetails to EventCallback2 at the moment when the VM actually
-  // stops. If no isolate is provided the default isolate is used.
-  static void DebugBreakForCommand(ClientData* data = NULL,
-                                   Isolate* isolate = NULL);
+  // stops.
+  static void DebugBreakForCommand(Isolate* isolate, ClientData* data);
 
   // Message based interface. The message protocol is JSON.
-  static void SetMessageHandler2(MessageHandler2 handler);
+  static void SetMessageHandler(MessageHandler handler);
 
-  // If no isolate is provided the default isolate is
-  // used.
-  // TODO(dcarney): remove
-  static void SendCommand(const uint16_t* command, int length,
-                          ClientData* client_data = NULL,
-                          Isolate* isolate = NULL);
   static void SendCommand(Isolate* isolate,
                           const uint16_t* command, int length,
                           ClientData* client_data = NULL);
-
-  // Dispatch interface.
-  static void SetHostDispatchHandler(HostDispatchHandler handler,
-                                     int period = 100);
-
-  /**
-   * Register a callback function to be called when a debug message has been
-   * received and is ready to be processed. For the debug messages to be
-   * processed V8 needs to be entered, and in certain embedding scenarios this
-   * callback can be used to make sure V8 is entered for the debug message to
-   * be processed. Note that debug messages will only be processed if there is
-   * a V8 break. This can happen automatically by using the option
-   * --debugger-auto-break.
-   * \param provide_locker requires that V8 acquires v8::Locker for you before
-   *        calling handler
-   */
-  static void SetDebugMessageDispatchHandler(
-      DebugMessageDispatchHandler handler, bool provide_locker = false);
 
  /**
   * Run a JavaScript function in the debugger.
@@ -264,22 +210,6 @@ class V8_EXPORT Debug {
    */
   static Local<Value> GetMirror(v8::Handle<v8::Value> obj);
 
- /**
-  * Enable the V8 builtin debug agent. The debugger agent will listen on the
-  * supplied TCP/IP port for remote debugger connection.
-  * \param name the name of the embedding application
-  * \param port the TCP/IP port to listen on
-  * \param wait_for_connection whether V8 should pause on a first statement
-  *   allowing remote debugger to connect before anything interesting happened
-  */
-  static bool EnableAgent(const char* name, int port,
-                          bool wait_for_connection = false);
-
-  /**
-    * Disable the V8 builtin debug agent. The TCP/IP connection will be closed.
-    */
-  static void DisableAgent();
-
   /**
    * Makes V8 process all pending debug messages.
    *
@@ -290,17 +220,13 @@ class V8_EXPORT Debug {
    *
    * Generally when message arrives V8 may be in one of 3 states:
    * 1. V8 is running script; V8 will automatically interrupt and process all
-   * pending messages (however auto_break flag should be enabled);
+   * pending messages;
    * 2. V8 is suspended on debug breakpoint; in this state V8 is dedicated
    * to reading and processing debug messages;
    * 3. V8 is not running at all or has called some long-working C++ function;
    * by default it means that processing of all debug messages will be deferred
    * until V8 gets control again; however, embedding application may improve
    * this by manually calling this method.
-   *
-   * It makes sense to call this method whenever a new debug message arrived and
-   * V8 is not already running. Method v8::Debug::SetDebugMessageDispatchHandler
-   * should help with the former condition.
    *
    * Technically this method in many senses is equivalent to executing empty
    * script:
@@ -331,7 +257,7 @@ class V8_EXPORT Debug {
    * (default Isolate if not provided). V8 will abort if LiveEdit is
    * unexpectedly used. LiveEdit is enabled by default.
    */
-  static void SetLiveEditEnabled(bool enable, Isolate* isolate = NULL);
+  static void SetLiveEditEnabled(Isolate* isolate, bool enable);
 };
 
 

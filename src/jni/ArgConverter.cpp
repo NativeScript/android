@@ -57,9 +57,9 @@ void ArgConverter::NativeScriptLongFunctionCallback(const v8::FunctionCallbackIn
 	auto isolate = Isolate::GetCurrent();
 	args.This()->SetHiddenValue(V8StringConstants::GetJavaLong(), Boolean::New(isolate, true));
 	args.This()->SetHiddenValue(ConvertToV8String(V8StringConstants::MARKED_AS_LONG), args[0]);
-	args.This()->Set(V8StringConstants::GetValue(), args[0], (PropertyAttribute)(ReadOnly | DontDelete));
+	args.This()->Set(V8StringConstants::GetValue(), args[0]);
 
-	args.This()->SetPrototype(Handle<NumberObject>::New(Isolate::GetCurrent(), *NAN_NUMBER_OBJECT));
+	args.This()->SetPrototype(Local<NumberObject>::New(Isolate::GetCurrent(), *NAN_NUMBER_OBJECT));
 }
 
 

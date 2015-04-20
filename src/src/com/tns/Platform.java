@@ -31,7 +31,7 @@ import com.tns.internal.ExtractPolicy;
 
 public class Platform
 {
-	private static native void initNativeScript(String filesPath, int appJavaObjectId, boolean verboseLoggingEnabled, String packageName,  int debuggerPort);
+	private static native void initNativeScript(String filesPath, int appJavaObjectId, boolean verboseLoggingEnabled, String packageName);
 
 	private static native void runNativeScript(String appModuleName, String appContent);
 
@@ -112,8 +112,8 @@ public class Platform
 
 		AssetExtractor.extractAssets(context, extractPolicy);
 		Require.init(context);
+		Platform.initNativeScript(Require.getApplicationFilesPath(), appJavaObjectId, IsLogEnabled, context.getPackageName());
 		int debuggerPort = jsDebugger.getDebuggerPortFromEnvironment();
-		Platform.initNativeScript(Require.getApplicationFilesPath(), appJavaObjectId, IsLogEnabled, context.getPackageName(), debuggerPort);
 		
 		//
 		Date d = new Date();

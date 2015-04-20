@@ -26,7 +26,7 @@ JEnv::JEnv(bool detach)
 }
 
 JEnv::JEnv(JNIEnv *jniEnv)
-	: m_env(jniEnv)
+	: m_env(jniEnv), m_detach(false)
 {
 }
 

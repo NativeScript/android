@@ -2,6 +2,8 @@
 #define JSDEBUGGER_H_
 
 #include <string>
+#include "v8.h"
+#include "v8-debug.h"
 #include "JEnv.h"
 
 namespace tns
@@ -9,30 +11,32 @@ namespace tns
 	class JsDebugger
 	{
 	public:
-		static void Init(const std::string& packageName, int port);
+		static void Init(v8::Isolate *isolate, const std::string& packageName);
 
 		static void ProcessDebugMessages();
 
-		static bool EnableAgent(const std::string& name, int port, bool waitForConnection);
+		static void Enable();
 
-		static void DisableAgent();
+		static void Disable();
+
+		static void DebugBreak();
 
 		static int GetDebuggerPort();
 
-		static int GetCurrentDebuggerPort();
-
 		static std::string GetPackageName();
+
+		static void SendCommand(uint16_t *cmd, int length);
 
 	private:
 		JsDebugger();
 
-		static void DispatchMessagesDebugAgentCallback();
+		static void MyMessageHandler(const v8::Debug::Message& message);
 
 		static int s_port;
-		static int s_currentPort;
 		static std::string s_packageName;
 		static jclass s_JsDebuggerClass;
-		static jmethodID s_DispatchMessagesDebugAgentCallback;
+		static jmethodID s_EnqueueMessage;
+		static v8::Isolate *s_isolate;
 
 		static const int INVALID_PORT = -1;
 	};
