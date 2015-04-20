@@ -5,8 +5,17 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.io.UnsupportedEncodingException;
 import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.ArrayList;
+import java.util.NoSuchElementException;
+import java.util.Scanner;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -16,7 +25,6 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.HandlerThread;
 import android.os.Looper;
 import android.util.Log;
 
@@ -24,37 +32,284 @@ public class JsDebugger
 {
 	private static native void processDebugMessages();
 
-	private static native boolean enableAgentNative(String packageName, int port, boolean waitForConnection);
-
-	private static native void disableAgentNative();
-
-	private static native int getCurrentDebuggerPort();
+	private static native void enable();
+	
+	private static native void disable();
+	
+	private static native void debugBreak();
+	
+	private static native void sendCommand(byte[] command, int length);
 
 	private final Context context;
 
 	private static final Handler mainThreadHandler = new Handler(Looper.getMainLooper());
 
-	static final int INVALID_PORT = -1;
+	private static final int INVALID_PORT = -1;
 
 	private static final String portEnvInputFile = "envDebug.in";
 
 	private static final String portEnvOutputFile = "envDebug.out";
 
-	private static final HandlerThread getDebuggerPortHandlerThread = new HandlerThread("getDebuggerPortHandlerThread");
-
-	private static final Handler getDebuggerPortHandler;
-
-	static
+	private static int currentPort = INVALID_PORT;
+	
+	private static LinkedBlockingQueue<String> dbgMessages = new LinkedBlockingQueue<>();
+	
+	private static void enqueueMessage(String message)
 	{
-		getDebuggerPortHandlerThread.start();
-		Looper looper = getDebuggerPortHandlerThread.getLooper();
-		getDebuggerPortHandler = new Handler(looper);
+		dbgMessages.add(message);
 	}
 
 	public JsDebugger(Context context)
 	{
 		this.context = context;
 	}
+	
+	private static ServerSocket serverSocket;
+	private static ServerThread serverThread = null;
+	private static Thread javaServerThread = null;
+	
+	private static class ServerThread implements Runnable
+	{
+		private volatile boolean running;
+		private final int port;
+		private ResponseWorker responseWorker;
+		private ListenerWorker commThread;
+		
+		public ServerThread(int port)
+		{
+			this.port = port;
+			this.running = false;
+		}
+		
+		public void stop()
+		{
+			this.running = false;
+			this.responseWorker.stop();
+			try
+			{
+				serverSocket.close();
+			}
+			catch (IOException e)
+			{
+				e.printStackTrace();
+			}
+		}
+		
+		public void run()
+		{
+			try
+			{
+				serverSocket = new ServerSocket(this.port);
+				running = true;
+			}
+			catch (IOException e)
+			{
+				running = false;
+				e.printStackTrace();
+			}
+
+			while (running)
+			{
+				try
+				{
+					Socket socket = serverSocket.accept();
+					
+					this.responseWorker = new ResponseWorker(socket);
+					new Thread(this.responseWorker).start();
+					
+					commThread = new ListenerWorker(socket.getInputStream());
+					new Thread(commThread).start();
+				}
+				catch (IOException e)
+				{
+					e.printStackTrace();
+				}
+			}
+		}
+	}
+	
+	private static class ListenerWorker implements Runnable
+	{
+		private enum State
+		{
+			Header,
+			Message
+		}
+
+		private BufferedReader input;
+
+		public ListenerWorker(InputStream inputStream)
+		{
+			this.input = new BufferedReader(new InputStreamReader(inputStream));
+		}
+		
+		private volatile boolean running = true;
+		
+		public void run()
+		{
+			Scanner scanner = new Scanner(this.input);
+			scanner.useDelimiter("\r\n");
+			
+			ArrayList<String> headers = new ArrayList<String>();
+			String line;
+			State state = State.Header;
+			int messageLength = -1;
+			String leftOver = null;
+			
+			Runnable dispatchProcessDebugMessages = new Runnable()
+			{
+				@Override
+				public void run()
+				{
+					processDebugMessages();
+				}
+			};
+
+			try
+			{
+				while (running && ((line = (leftOver != null) ? leftOver : scanner.nextLine()) != null))
+				{
+					switch (state)
+					{
+					case Header:
+						if (line.length() == 0)
+						{
+							state = State.Message;
+						}
+						else
+						{
+							headers.add(line);
+							if (line.startsWith("Content-Length:"))
+							{
+								String strLen = line.substring(15).trim();
+								messageLength = Integer.parseInt(strLen);
+							}
+							if (leftOver != null)
+								leftOver = null;
+						}
+						break;
+					case Message:
+						if ((-1 < messageLength) && (messageLength <= line.length()))
+						{
+							String msg = line.substring(0, messageLength);
+							if (messageLength < line.length())
+								leftOver = line.substring(messageLength);
+							state = State.Header;
+							headers.clear();
+							
+							try
+							{
+								byte[] cmdBytes = msg.getBytes("UTF-16LE");
+								int cmdLength = cmdBytes.length;
+								sendCommand(cmdBytes, cmdLength);
+
+								boolean success = mainThreadHandler.post(dispatchProcessDebugMessages);
+								assert success;
+							}
+							catch (UnsupportedEncodingException e)
+							{
+								// TODO Auto-generated catch block
+								e.printStackTrace();
+							}
+						}
+						else
+						{
+							if (leftOver == null)
+							{
+								leftOver = line;
+							}
+							else
+							{
+								leftOver += line;
+							}
+						}
+						break;
+					}
+				}
+			}
+			catch (NoSuchElementException e)
+			{
+				e.printStackTrace();
+			}
+			finally
+			{
+				scanner.close();
+			}
+		}
+	}
+	
+	private static class ResponseWorker implements Runnable
+	{
+		private Socket socket;
+		
+		private final static String END_MSG = "#end#";
+		
+		private OutputStream output;
+		
+		public ResponseWorker(Socket clientSocket) throws IOException
+		{
+			this.socket = clientSocket;
+			this.output = this.socket.getOutputStream();
+		}
+		
+		public void stop()
+		{
+			dbgMessages.add(END_MSG);
+		}
+		
+		@Override
+		public void run()
+		{
+			byte[] LINE_END_BYTES = new byte[2];
+			LINE_END_BYTES[0] = (byte)'\r';
+			LINE_END_BYTES[1] = (byte)'\n';
+			while (true)
+			{
+				try
+				{
+					String msg = dbgMessages.take();
+
+					if (msg.equals(END_MSG))
+						break;
+					
+					byte[] utf8;
+					try
+					{
+						utf8 = msg.getBytes("UTF8");
+					}
+					catch (UnsupportedEncodingException e1)
+					{
+						utf8 = null;
+						e1.printStackTrace();
+					}
+					
+					if (utf8 != null)
+					{
+						try
+						{
+							String s = "Content-Length: " + utf8.length;
+							byte[] arr = s.getBytes("UTF8");
+							output.write(arr, 0, arr.length);
+							output.write(LINE_END_BYTES, 0, LINE_END_BYTES.length);
+							output.write(LINE_END_BYTES, 0, LINE_END_BYTES.length);
+							output.write(utf8, 0, utf8.length);
+							output.flush();
+						}
+						catch (IOException e)
+						{
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+					}
+				}
+				catch (InterruptedException e)
+				{
+					e.printStackTrace();
+				}
+			}
+		}
+	}
+
 	
 	int getDebuggerPortFromEnvironment()
 	{
@@ -115,14 +370,20 @@ public class JsDebugger
 					}
 					catch (NumberFormatException e)
 					{
-						requestedPort = INVALID_PORT;	
+						requestedPort = INVALID_PORT;
 					}
 					
 					w = new OutputStreamWriter(new FileOutputStream(envOutFile, true));
 					int localPort = (requestedPort != INVALID_PORT) ? requestedPort : getAvailablePort();
 					String strLocalPort = "PORT=" + localPort + "\n";
 					w.write(strLocalPort);
-					port = localPort;
+					port = currentPort = localPort;
+					//
+					enable();
+					debugBreak();
+					serverThread = new ServerThread(port);
+					javaServerThread = new Thread(serverThread);
+					javaServerThread.start();
 				}
 				catch (IOException e1)
 				{
@@ -188,15 +449,24 @@ public class JsDebugger
 		return port;
 	}
 
-	static boolean enableAgent(String packageName, int port, boolean waitForConnection)
+	static void enableAgent(String packageName, int port, boolean waitForConnection)
 	{
-		boolean success = enableAgentNative(packageName, port, waitForConnection);
-		return success;
+		enable();
+		if (serverThread == null)
+		{
+			serverThread = new ServerThread(port);
+		}
+		javaServerThread = new Thread(serverThread);
+		javaServerThread.start();
 	}
 
 	static void disableAgent()
 	{
-		disableAgentNative();
+		disable();
+		if (serverThread != null)
+		{
+			serverThread.stop();
+		}
 	}
 
 	static void registerEnableDisableDebuggerReceiver(Context context)
@@ -220,12 +490,8 @@ public class JsDebugger
 						}
 						String packageName = bundle.getString("packageName", context.getPackageName());
 						boolean waitForDebugger = bundle.getBoolean("waitForDebugger", false);
-						boolean success = JsDebugger.enableAgent(packageName, port, waitForDebugger);
-						if (!success)
-						{
-							Log.d("TNS.Java", "enableAgent = false");
-						}
-						int resultCode = success ? port : INVALID_PORT;
+						JsDebugger.enableAgent(packageName, port, waitForDebugger);
+						int resultCode = port;
 						this.setResultCode(resultCode);
 					}
 					else
@@ -245,27 +511,11 @@ public class JsDebugger
 			@Override
 			public void onReceive(Context context, Intent intent)
 			{
-				int port = getCurrentDebuggerPort();
-				this.setResultCode(port);
+				this.setResultCode(currentPort);
 			}
-		}, new IntentFilter(getDebuggerPortAction), null, getDebuggerPortHandler);
+		}, new IntentFilter(getDebuggerPortAction));
 	}
 
-	private static final Runnable callProcessDebugMessages = new Runnable()
-	{
-		@Override
-		public void run()
-		{
-			processDebugMessages();
-		}
-	};
-
-	private static boolean dispatchMessagesDebugAgentCallback()
-	{
-		boolean success = mainThreadHandler.post(callProcessDebugMessages);
-		return success;
-	}
-	
 	public static boolean shouldEnableDebugging(Context context)
 	{
 		int flags;

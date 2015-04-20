@@ -104,7 +104,7 @@ void PrintHashCallback(const FunctionCallbackInfo<Value>& args)
 	DEBUG_WRITE("%s, hashid=%d", ConvertToString(args[0]->ToString()).c_str(), args[1].As<Object>()->GetIdentityHash());
 }
 
-void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring packageName, int debuggerPort)
+void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring packageName)
 {
 	const char v8flags[] = "--expose_gc";
 	V8::SetFlagsFromString(v8flags, sizeof(v8flags) - 1);
@@ -154,7 +154,7 @@ void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring pa
 
 	string pckName = ArgConverter::jstringToString(packageName);
 	Profiler::Init(pckName);
-	JsDebugger::Init(pckName, debuggerPort);
+	JsDebugger::Init(isolate, pckName);
 
 	PrepareExtendFunction(isolate, filesPath);
 
@@ -163,7 +163,7 @@ void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring pa
 	NativeScriptRuntime::CreateTopLevelNamespaces(global);
 }
 
-extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj, jstring filesPath, jint appJavaObjectId, jboolean verboseLoggingEnabled, jstring packageName, jint debuggerPort)
+extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj, jstring filesPath, jint appJavaObjectId, jboolean verboseLoggingEnabled, jstring packageName)
 {
 	AppJavaObjectID = appJavaObjectId;
 	tns::LogEnabled = verboseLoggingEnabled;
@@ -183,7 +183,7 @@ extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj
 	ExceptionUtil::GetInstance()->Init(g_jvm, g_objectManager);
 
 	JEnv env(_env);
-	PrepareV8Runtime(isolate, env, filesPath, packageName, debuggerPort);
+	PrepareV8Runtime(isolate, env, filesPath, packageName);
 
 	NativeScriptRuntime::APP_FILES_DIR = ArgConverter::jstringToString(filesPath);
 }
@@ -232,8 +232,7 @@ extern "C" void Java_com_tns_Platform_runNativeScript(JNIEnv *_env, jobject obj,
 		int debuggerPort = JsDebugger::GetDebuggerPort();
 		if (debuggerPort > 0)
 		{
-			string packageName = JsDebugger::GetPackageName();
-			JsDebugger::EnableAgent(packageName, debuggerPort, true);
+			JsDebugger::Enable();
 		}
 
 		auto appModuleObj = script->Run();

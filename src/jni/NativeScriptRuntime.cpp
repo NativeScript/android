@@ -692,23 +692,7 @@ void NativeScriptRuntime::DumpReferenceTablesMethodCallback(const v8::FunctionCa
 
 void NativeScriptRuntime::WaitForDebuggerMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-	int portNumber = 8181;
-	if (args.Length() != 0)
-	{
-		ASSERT_MESSAGE(args.Length() == 1, "WaitForDebugger should be called with string parameter");
-		ASSERT_MESSAGE(!args[0]->IsUndefined() && !args[0]->IsNull(), "WaitForDebugger called with undefined");
-		ASSERT_MESSAGE(args[0]->IsInt32(), "WaitForDebugger should be called with single number parameter");
-		portNumber = args[0]->ToInt32()->Value();
-	}
-
-	int currentPort = JsDebugger::GetCurrentDebuggerPort();
-	if (currentPort > 0)
-	{
-		JsDebugger::DisableAgent();
-	}
-
-	string packageName = JsDebugger::GetPackageName();
-	JsDebugger::EnableAgent(packageName, portNumber, true /* waitForConnection */);
+	// TODO:
 }
 
 void NativeScriptRuntime::EnableVerboseLoggingMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
