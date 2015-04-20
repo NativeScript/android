@@ -52,7 +52,7 @@ public class JsDebugger
 
 	private static int currentPort = INVALID_PORT;
 	
-	private static LinkedBlockingQueue<String> dbgMessages = new LinkedBlockingQueue<>();
+	private static LinkedBlockingQueue<String> dbgMessages = new LinkedBlockingQueue<String>();
 	
 	private static void enqueueMessage(String message)
 	{
