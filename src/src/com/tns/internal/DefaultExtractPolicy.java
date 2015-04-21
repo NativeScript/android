@@ -1,6 +1,6 @@
 package com.tns.internal;
 
-public class DefaultEtractPolicy implements ExtractPolicy
+public class DefaultExtractPolicy implements ExtractPolicy
 {
 	public boolean shouldExtract(android.content.Context context)
 	{
