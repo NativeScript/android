@@ -44,7 +44,7 @@ void NativeScriptRuntime::Init(JavaVM *jvm, ObjectManager *objectManager)
 	MAKE_CLASS_INSTANCE_OF_TYPE_STRONG = env.GetStaticMethodID(PlatformClass, "makeClassInstanceOfTypeStrong", "(Ljava/lang/String;)I");
 	assert(MAKE_CLASS_INSTANCE_OF_TYPE_STRONG != nullptr);
 
-	CREATE_INSTANCE_METHOD_ID = env.GetStaticMethodID(PlatformClass, "createInstance", "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;[Ljava/lang/String;II)Ljava/lang/Object;");
+	CREATE_INSTANCE_METHOD_ID = env.GetStaticMethodID(PlatformClass, "createInstance", "([Ljava/lang/Object;[Ljava/lang/String;II)Ljava/lang/Object;");
 	assert(CREATE_INSTANCE_METHOD_ID != nullptr);
 
 	CACHE_CONSTRUCTOR_METHOD_ID = env.GetStaticMethodID(PlatformClass, "cacheConstructor", "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;[Ljava/lang/String;)I");
@@ -573,8 +573,6 @@ jobject NativeScriptRuntime::CreateJavaInstance(int objectID, const std::string&
 
 		jobject obj = env.CallStaticObjectMethod(PlatformClass,
 				CREATE_INSTANCE_METHOD_ID,
-				((jstring)javaName),
-				((jstring)javaClassName),
 				javaArgs,
 				methodOverrides,
 				(jint) objectID,

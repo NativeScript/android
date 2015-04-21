@@ -205,13 +205,8 @@ public class Platform
 		return ctorId;
 	}
 
-	public static Object createInstance(String name, String className, Object[] args, String[] methodOverrides, int objectId, int constructorId) throws InstantiationException, IllegalAccessException, ClassNotFoundException, NoSuchMethodException, IllegalArgumentException, InvocationTargetException, IOException
+	private static Object createInstance(Object[] args, String[] methodOverrides, int objectId, int constructorId) throws InstantiationException, IllegalAccessException, ClassNotFoundException, NoSuchMethodException, IllegalArgumentException, InvocationTargetException, IOException
 	{
-		if (IsLogEnabled)
-		{
-			Log.d(DEFAULT_LOG_TAG, "Creating instance for ctorId:" + constructorId + " className:" + className + " methodOverrides: " + Arrays.toString(methodOverrides));
-		}
-		
 		Constructor<?> ctor = ctorCache.get(constructorId);
 		boolean success = MethodResolver.convertConstructorArgs(ctor, args);
 
