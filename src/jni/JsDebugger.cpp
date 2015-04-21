@@ -23,11 +23,6 @@ void JsDebugger::Init(v8::Isolate *isolate, const string& packageName)
 	assert(s_EnqueueMessage != nullptr);
 }
 
-int JsDebugger::GetDebuggerPort()
-{
-	return s_port;
-}
-
 string JsDebugger::GetPackageName()
 {
 	return s_packageName;
@@ -88,7 +83,6 @@ void JsDebugger::SendCommand(uint16_t *cmd, int length)
 }
 
 v8::Isolate* JsDebugger::s_isolate = nullptr;
-int JsDebugger::s_port = JsDebugger::INVALID_PORT;
 string JsDebugger::s_packageName = "";
 jclass JsDebugger::s_JsDebuggerClass = nullptr;
 jmethodID JsDebugger::s_EnqueueMessage = nullptr;

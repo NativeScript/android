@@ -229,12 +229,6 @@ extern "C" void Java_com_tns_Platform_runNativeScript(JNIEnv *_env, jobject obj,
 	{
 		DEBUG_WRITE("Running script");
 
-		int debuggerPort = JsDebugger::GetDebuggerPort();
-		if (debuggerPort > 0)
-		{
-			JsDebugger::Enable();
-		}
-
 		auto appModuleObj = script->Run();
 		if (ExceptionUtil::GetInstance()->HandleTryCatch(tc))
 		{

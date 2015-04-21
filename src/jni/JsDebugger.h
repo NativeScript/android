@@ -21,8 +21,6 @@ namespace tns
 
 		static void DebugBreak();
 
-		static int GetDebuggerPort();
-
 		static std::string GetPackageName();
 
 		static void SendCommand(uint16_t *cmd, int length);
@@ -32,7 +30,6 @@ namespace tns
 
 		static void MyMessageHandler(const v8::Debug::Message& message);
 
-		static int s_port;
 		static std::string s_packageName;
 		static jclass s_JsDebuggerClass;
 		static jmethodID s_EnqueueMessage;
