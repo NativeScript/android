@@ -116,11 +116,14 @@ public class Platform
 		int debuggerPort = jsDebugger.getDebuggerPortFromEnvironment();
 		
 		//
-		Date d = new Date();
-		int pid = android.os.Process.myPid();
-		File f = new File("/proc/" + pid);
-		Date lastModDate = new Date(f.lastModified());
-		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "init time=" + (d.getTime() - lastModDate.getTime()));
+		if (IsLogEnabled)
+		{
+			Date d = new Date();
+			int pid = android.os.Process.myPid();
+			File f = new File("/proc/" + pid);
+			Date lastModDate = new Date(f.lastModified());
+			Log.d(DEFAULT_LOG_TAG, "init time=" + (d.getTime() - lastModDate.getTime()));
+		}
 		//
 		
 		return appJavaObjectId;
