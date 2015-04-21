@@ -26,7 +26,7 @@ import android.util.Log;
 import android.util.SparseArray;
 
 import com.tns.bindings.ProxyGenerator;
-import com.tns.internal.DefaultEtractPolicy;
+import com.tns.internal.DefaultExtractPolicy;
 import com.tns.internal.ExtractPolicy;
 
 public class Platform
@@ -182,7 +182,7 @@ public class Platform
 	{
 		if (policy == null)
 		{
-			policy = new DefaultEtractPolicy();
+			policy = new DefaultExtractPolicy();
 		}
 		
 		extractPolicy = policy;
