@@ -566,10 +566,7 @@ jobject NativeScriptRuntime::CreateJavaInstance(int objectID, const std::string&
 
 		jobjectArray javaArgs = argConverter.ToJavaArray();
 
-		JniLocalRef javaClassName(env.NewStringUTF(className.c_str()));
-		JniLocalRef javaName(env.NewStringUTF(name.c_str()));
-
-		int ctorId = GetCachedConstructorId(env, args, name, className, javaName, javaClassName, javaArgs, methodOverrides);
+		int ctorId = GetCachedConstructorId(env, args, name, className, javaArgs, methodOverrides);
 
 		jobject obj = env.CallStaticObjectMethod(PlatformClass,
 				CREATE_INSTANCE_METHOD_ID,
@@ -595,7 +592,7 @@ jobject NativeScriptRuntime::CreateJavaInstance(int objectID, const std::string&
 	return instance;
 }
 
-int NativeScriptRuntime::GetCachedConstructorId(JEnv& env, const FunctionCallbackInfo<Value>& args, const string& name, const string& className, jstring javaName, jstring javaClassName, jobjectArray javaArgs, jobjectArray methodOverrides)
+int NativeScriptRuntime::GetCachedConstructorId(JEnv& env, const FunctionCallbackInfo<Value>& args, const string& name, const string& className, jobjectArray javaArgs, jobjectArray methodOverrides)
 {
 	int ctorId = -1;
 	string fullClassName = className + '-' + name;
@@ -609,7 +606,10 @@ int NativeScriptRuntime::GetCachedConstructorId(JEnv& env, const FunctionCallbac
 	}
 	else
 	{
-		jint id = env.CallStaticIntMethod(PlatformClass, CACHE_CONSTRUCTOR_METHOD_ID, javaName, javaClassName, javaArgs, methodOverrides);
+		JniLocalRef javaName(env.NewStringUTF(name.c_str()));
+		JniLocalRef javaClassName(env.NewStringUTF(className.c_str()));
+
+		jint id = env.CallStaticIntMethod(PlatformClass, CACHE_CONSTRUCTOR_METHOD_ID, (jstring)javaName, (jstring)javaClassName, javaArgs, methodOverrides);
 
 		if (env.ExceptionCheck() == JNI_FALSE)
 		{
