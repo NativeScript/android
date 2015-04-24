@@ -16,6 +16,15 @@ Android Runtime Changelog
 ### Breaking Changes
 
   * Removed the simulated property-like support for Android types. E.g. the `android.content.Intent.getAction()` previously was accessible like `android.content.Intent.Action`. This is no longer valid as it contradicts with the Android APIs.
+  * Changed the way `extend` constructs work
+```javascript
+// WRONG
+var handler = new android.os.Handler.extend({...})();
+
+// CORRECT
+var handlerType = android.os.Handler.extend({...});
+var handler = new handlerType();
+```
   * The directory structure in the `assets` folder has changed. The `tns_modules` directory is now within the `assets/app` one. To migrate older CLI projects to the new structure simply move the content of the inner app folder one level up:
 
 ####Previous structure:
