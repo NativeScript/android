@@ -2,7 +2,7 @@ var tnsExtends = this.__extends;
 
 (function When_running_code_inside_a_module_it_should_have_acces_to_tns__exports_function() {
 	
-	Log("TEST: When_running_code_inside_a_module_it_should_have_acces_to_tns__exports_function");
+	__log("TEST: When_running_code_inside_a_module_it_should_have_acces_to_tns__exports_function");
 	
 	if (!tnsExtends)
 	{
@@ -13,6 +13,6 @@ var tnsExtends = this.__extends;
 
 module.exports = { 
 	accessGlobalObject: function(s) {
-		Log("global is working " + global);
+		__log("global is working " + global);
 	}
 }

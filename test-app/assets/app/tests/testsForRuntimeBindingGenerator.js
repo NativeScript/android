@@ -5,7 +5,7 @@ var Assert = function(condition, failMessage) {
 }
 
 var When_generating_a_proxy_of_nested_interface_at_runtime = function() {
-	Log("TEST: When_generating_a_proxy_of_nested_interface_at_runtime");
+	__log("TEST: When_generating_a_proxy_of_nested_interface_at_runtime");
 	
 	var MyButton = new com.tns.tests.Button1.extend("MyButton10", {
 		toString : function() {
@@ -31,7 +31,7 @@ var When_generating_a_proxy_of_nested_interface_at_runtime = function() {
 
 
 var When_generating_a_proxy_of_android_class_at_runtime = function() {
-	Log("TEST: When_generating_a_proxy_of_android_class_at_runtime");
+	__log("TEST: When_generating_a_proxy_of_android_class_at_runtime");
 	
 	var MyButton = new com.tns.tests.Button1.extend("MyButton36", {
 		toString : function() {

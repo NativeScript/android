@@ -6,7 +6,7 @@ var Assert = function(condition, failMessage) {
 
 var When_file_outside_the_project_folder_is_required_it_should_fail = function() {
 
-	Log("When_file_outside_the_project_folder_is_required_it_should_throw_IllegalAccessException"); 
+	__log("When_file_outside_the_project_folder_is_required_it_should_throw_IllegalAccessException"); 
 
 	var illegalAccesExceptionCaught = false;
 	var fileSeparator = "/";

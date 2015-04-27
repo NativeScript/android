@@ -6,7 +6,7 @@ var Assert = function(condition, failMessage) {
 
 var TestWeakRefGetsClearedAfterGC = function() {
 
-	Log("TEST: TestWeakRefGetsClearedAfterGC");
+	__log("TEST: TestWeakRefGetsClearedAfterGC");
 	
 	var wr = new WeakRef({ someProp: 12345 });
 	
@@ -21,7 +21,7 @@ var TestWeakRefGetsClearedAfterGC = function() {
 
 var TestWeakRefGetsClearedAfterClear = function() {
 
-	Log("TEST: TestWeakRefGetsClearedAfterClear");
+	__log("TEST: TestWeakRefGetsClearedAfterClear");
 	
 	var wr = new WeakRef({ someProp: 54321 });
 	
@@ -36,7 +36,7 @@ var TestWeakRefGetsClearedAfterClear = function() {
 
 var TestWeakRefCanCreateMultipleInstances = function() {
 
-	Log("TEST: TestWeakRefCanCreateMultipleInstances");
+	__log("TEST: TestWeakRefCanCreateMultipleInstances");
 	
 	var target = { someProp: 54321 };
 	
@@ -56,7 +56,7 @@ var TestWeakRefCanCreateMultipleInstances = function() {
 
 var TestWeakRefCanCreateMultipleInstances2 = function() {
 
-	Log("TEST: TestWeakRefCanCreateMultipleInstances2");
+	__log("TEST: TestWeakRefCanCreateMultipleInstances2");
 	
 	var target = { someProp: 54321 };
 	
@@ -75,7 +75,7 @@ var TestWeakRefCanCreateMultipleInstances2 = function() {
 
 var TestWeakRefThrowsExceptionWhenConstructedWithWrongNumberOfParameters = function() {
 	
-	Log("TEST: TestWeakRefThrowsExceptionWhenConstructedWithWrongNumberOfParameters");
+	__log("TEST: TestWeakRefThrowsExceptionWhenConstructedWithWrongNumberOfParameters");
 	
 	var exceptionCaught = false;
 	try
@@ -102,7 +102,7 @@ var TestWeakRefThrowsExceptionWhenConstructedWithWrongNumberOfParameters = funct
 
 var TestWeakRefThrowsExceptionWhenConstructedWithNonObject = function() {
 	
-	Log("TEST: TestWeakRefThrowsExceptionWhenConstructedWithNonObject");
+	__log("TEST: TestWeakRefThrowsExceptionWhenConstructedWithNonObject");
 	
 	var exceptionCaught = false;
 	try

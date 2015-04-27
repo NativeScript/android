@@ -33,11 +33,11 @@ public class JsDebugger
 	private static native void processDebugMessages();
 
 	private static native void enable();
-	
+
 	private static native void disable();
-	
+
 	private static native void debugBreak();
-	
+
 	private static native void sendCommand(byte[] command, int length);
 
 	private final Context context;
@@ -51,9 +51,9 @@ public class JsDebugger
 	private static final String portEnvOutputFile = "envDebug.out";
 
 	private static int currentPort = INVALID_PORT;
-	
+
 	private static LinkedBlockingQueue<String> dbgMessages = new LinkedBlockingQueue<String>();
-	
+
 	private static void enqueueMessage(String message)
 	{
 		dbgMessages.add(message);
@@ -63,24 +63,24 @@ public class JsDebugger
 	{
 		this.context = context;
 	}
-	
+
 	private static ServerSocket serverSocket;
 	private static ServerThread serverThread = null;
 	private static Thread javaServerThread = null;
-	
+
 	private static class ServerThread implements Runnable
 	{
 		private volatile boolean running;
 		private final int port;
 		private ResponseWorker responseWorker;
 		private ListenerWorker commThread;
-		
+
 		public ServerThread(int port)
 		{
 			this.port = port;
 			this.running = false;
 		}
-		
+
 		public void stop()
 		{
 			this.running = false;
@@ -94,7 +94,7 @@ public class JsDebugger
 				e.printStackTrace();
 			}
 		}
-		
+
 		public void run()
 		{
 			try
@@ -113,10 +113,10 @@ public class JsDebugger
 				try
 				{
 					Socket socket = serverSocket.accept();
-					
+
 					this.responseWorker = new ResponseWorker(socket);
 					new Thread(this.responseWorker).start();
-					
+
 					commThread = new ListenerWorker(socket.getInputStream());
 					new Thread(commThread).start();
 				}
@@ -127,13 +127,12 @@ public class JsDebugger
 			}
 		}
 	}
-	
+
 	private static class ListenerWorker implements Runnable
 	{
 		private enum State
 		{
-			Header,
-			Message
+			Header, Message
 		}
 
 		private BufferedReader input;
@@ -142,20 +141,20 @@ public class JsDebugger
 		{
 			this.input = new BufferedReader(new InputStreamReader(inputStream));
 		}
-		
+
 		private volatile boolean running = true;
-		
+
 		public void run()
 		{
 			Scanner scanner = new Scanner(this.input);
 			scanner.useDelimiter("\r\n");
-			
+
 			ArrayList<String> headers = new ArrayList<String>();
 			String line;
 			State state = State.Header;
 			int messageLength = -1;
 			String leftOver = null;
-			
+
 			Runnable dispatchProcessDebugMessages = new Runnable()
 			{
 				@Override
@@ -196,7 +195,7 @@ public class JsDebugger
 								leftOver = line.substring(messageLength);
 							state = State.Header;
 							headers.clear();
-							
+
 							try
 							{
 								byte[] cmdBytes = msg.getBytes("UTF-16LE");
@@ -237,32 +236,32 @@ public class JsDebugger
 			}
 		}
 	}
-	
+
 	private static class ResponseWorker implements Runnable
 	{
 		private Socket socket;
-		
+
 		private final static String END_MSG = "#end#";
-		
+
 		private OutputStream output;
-		
+
 		public ResponseWorker(Socket clientSocket) throws IOException
 		{
 			this.socket = clientSocket;
 			this.output = this.socket.getOutputStream();
 		}
-		
+
 		public void stop()
 		{
 			dbgMessages.add(END_MSG);
 		}
-		
+
 		@Override
 		public void run()
 		{
 			byte[] LINE_END_BYTES = new byte[2];
-			LINE_END_BYTES[0] = (byte)'\r';
-			LINE_END_BYTES[1] = (byte)'\n';
+			LINE_END_BYTES[0] = (byte) '\r';
+			LINE_END_BYTES[1] = (byte) '\n';
 			while (true)
 			{
 				try
@@ -271,7 +270,7 @@ public class JsDebugger
 
 					if (msg.equals(END_MSG))
 						break;
-					
+
 					byte[] utf8;
 					try
 					{
@@ -282,7 +281,7 @@ public class JsDebugger
 						utf8 = null;
 						e1.printStackTrace();
 					}
-					
+
 					if (utf8 != null)
 					{
 						try
@@ -310,7 +309,6 @@ public class JsDebugger
 		}
 	}
 
-	
 	int getDebuggerPortFromEnvironment()
 	{
 		int port = INVALID_PORT;
@@ -345,7 +343,7 @@ public class JsDebugger
 				}
 				w = null;
 			}
-			
+
 			try
 			{
 				Thread.sleep(3 * 1000);
@@ -354,7 +352,7 @@ public class JsDebugger
 			{
 				e1.printStackTrace();
 			}
-			
+
 			File envInFile = new File(baseDir, portEnvInputFile);
 			if (envInFile.exists())
 			{
@@ -372,7 +370,7 @@ public class JsDebugger
 					{
 						requestedPort = INVALID_PORT;
 					}
-					
+
 					w = new OutputStreamWriter(new FileOutputStream(envOutFile, true));
 					int localPort = (requestedPort != INVALID_PORT) ? requestedPort : getAvailablePort();
 					String strLocalPort = "PORT=" + localPort + "\n";
@@ -449,7 +447,7 @@ public class JsDebugger
 		return port;
 	}
 
-	static void enableAgent(String packageName, int port, boolean waitForConnection)
+	private static void enableAgent(String packageName, int port, boolean waitForConnection)
 	{
 		enable();
 		if (serverThread == null)
@@ -460,7 +458,7 @@ public class JsDebugger
 		javaServerThread.start();
 	}
 
-	static void disableAgent()
+	private static void disableAgent()
 	{
 		disable();
 		if (serverThread != null)

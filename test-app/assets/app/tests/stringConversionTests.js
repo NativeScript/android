@@ -6,7 +6,7 @@ var Assert = function(condition, failMessage) {
 
 var TestCanConvertNonTrivalJavaString1 = function() {
 
-	Log("TEST: TestCanConvertNonTrivalJavaString1");
+	__log("TEST: TestCanConvertNonTrivalJavaString1");
 	
 	var strConvTest = new com.tns.tests.StringConversionTest();
 	
@@ -25,7 +25,7 @@ var TestCanConvertNonTrivalJavaString1 = function() {
 
 var TestCanConvertNonTrivalJavaString2 = function() {
 
-	Log("TEST: TestCanConvertNonTrivalJavaString2");
+	__log("TEST: TestCanConvertNonTrivalJavaString2");
 
 	var strConvTest = new com.tns.tests.StringConversionTest();
 	
@@ -48,7 +48,7 @@ var TestCanConvertNonTrivalJavaString2 = function() {
 
 var TestCanConvertNonTrivalJavaString3 = function() {
 
-	Log("TEST: TestCanConvertNonTrivalJavaString3");
+	__log("TEST: TestCanConvertNonTrivalJavaString3");
 
 	var strConvTest = new com.tns.tests.StringConversionTest();
 	
@@ -67,7 +67,7 @@ var TestCanConvertNonTrivalJavaString3 = function() {
 
 var TestCanConvertNonTrivalJavaString4 = function() {
 
-	Log("TEST: TestCanConvertNonTrivalJavaString4");
+	__log("TEST: TestCanConvertNonTrivalJavaString4");
 	
 	var s = "";
 	var len = 0;

@@ -1,4 +1,4 @@
-disableVerboseLogging();
+__disableVerboseLogging();
 
 require("./tests/testWeakRef");
 require("./tests/tests");
@@ -38,7 +38,7 @@ require("./tests/extendClassNameTests");
 //					var counter = 0;
 //					button.setOnClickListener(new android.view.View.OnClickListener("AppClickListener", {
 //						onClick:  function() {
-//			              Log("onClick called");  
+//			              __log("onClick called");  
 //			              button.setText("Hit that sucker one more time " + ++counter);
 //			            }}));
 //          }});
@@ -51,9 +51,9 @@ var MainActivity = (function (_super) {
     }
     
     MainActivity.prototype.onCreate = function () {
-    	Log("onCreate from js");
+    	__log("onCreate from js");
     	var k = this.toString();
-    	Log("this.toString " + k);
+    	__log("this.toString " + k);
     	_super.prototype.onCreate.call(this, null);
     	//this.super.onCreate(null);
     	
@@ -73,7 +73,7 @@ var MainActivity = (function (_super) {
     	var counter = 0;
     	button.setOnClickListener(new android.view.View.OnClickListener("AppClickListener", {
     		onClick:  function() {
-    			Log("onClick called");  
+    			__log("onClick called");  
     			button.setText("Hit that sucker one more time " + ++counter);
     		}}));
     };
@@ -83,7 +83,7 @@ var MainActivity = (function (_super) {
 app.init({
 	
 	getActivity: function(intent) {
-		Log("intent=" + intent)
+		__log("intent=" + intent)
 		if (intent.getAction() == android.content.Intent.ACTION_MAIN) {
 			return MainActivity;
 		}
@@ -94,6 +94,6 @@ app.init({
 	
 	
 	onCreate: function() {
-		Log("Application on create called");
+		__log("Application on create called");
 	} 
 });

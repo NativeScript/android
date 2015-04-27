@@ -21,22 +21,22 @@ var objectToString = function(o){
 
 var When_extending_a_class_two_times = function() {
 	
-	Log("TEST: When_extending_a_class_two_times");
+	__log("TEST: When_extending_a_class_two_times");
 	
-	Log("TEST: Creating MyButton");
+	__log("TEST: Creating MyButton");
 	var MyButton = com.tns.tests.Button1.extend("MyButton", {
 		toString : function() {
 		  	return "button1";	
 		}
 	});
 	
-	Log("TEST: Calling MyButton ctor");
+	__log("TEST: Calling MyButton ctor");
 	var button1 = new MyButton();
-	Log("TEST: Calling button1 toString");
+	__log("TEST: Calling button1 toString");
 	var button1Label = button1.toString();
 	button1.setLabel("first button");
 	
-	Log("TEST: Creating MyButton2 class");
+	__log("TEST: Creating MyButton2 class");
 	var MyButton2 = new com.tns.tests.Button1.extend("MyButton", {
 		toString : function() {
 	  		return "button2";	
@@ -46,7 +46,7 @@ var When_extending_a_class_two_times = function() {
 	button2.setLabel("second button");
 	var button2Label = button2.toString();
 	
-	Log("but1=" + button1Label + ", but2=" + button2Label);
+	__log("but1=" + button1Label + ", but2=" + button2Label);
 	
 	Assert(button1 != button2 && button1Label == "button1" && button2Label == "button2", "FAILED: When_extending_a_class_two_times");
 	
@@ -56,22 +56,22 @@ var When_extending_a_class_two_times = function() {
 
 var When_extending_a_class_two_times_with_no_extend_names = function() {
 	
-	Log("TEST: When_extending_a_class_two_times_with_no_extend_names");
+	__log("TEST: When_extending_a_class_two_times_with_no_extend_names");
 	
-	Log("TEST: Creating MyButton");
+	__log("TEST: Creating MyButton");
 	var MyButton = com.tns.tests.Button1.extend({
 		toString : function() {
 		  	return "button1";	
 		}
 	});
 	
-	Log("TEST: Calling MyButton ctor");
+	__log("TEST: Calling MyButton ctor");
 	var button1 = new MyButton();
-	Log("TEST: Calling button1 toString");
+	__log("TEST: Calling button1 toString");
 	var button1Label = button1.toString();
 	button1.setLabel("first button");
 	
-	Log("TEST: Creating MyButton2 class");
+	__log("TEST: Creating MyButton2 class");
 	var MyButton2 = new com.tns.tests.Button1.extend({
 		toString : function() {
 	  		return "button2";	
@@ -81,7 +81,7 @@ var When_extending_a_class_two_times_with_no_extend_names = function() {
 	button2.setLabel("second button");
 	var button2Label = button2.toString();
 	
-	Log("but1=" + button1Label + ", but2=" + button2Label);
+	__log("but1=" + button1Label + ", but2=" + button2Label);
 	
 	Assert(button1 != button2 && button1Label == "button1" && button2Label == "button2", "FAILED: When_extending_a_class_two_times_with_no_extend_names");
 	
@@ -90,7 +90,7 @@ var When_extending_a_class_two_times_with_no_extend_names = function() {
 }
 
 var When_implementing_an_interface_with_new_the_overrides_should_work = function() {
-	Log("TEST: When_implementing_an_interface_with_new__the_overrides_should_work");
+	__log("TEST: When_implementing_an_interface_with_new__the_overrides_should_work");
 	
 	var MyButton = new com.tns.tests.Button1.extend("MyButton60", {
 		toString : function() {
@@ -110,7 +110,7 @@ var When_implementing_an_interface_with_new_the_overrides_should_work = function
 	Assert(buttonClicked == true, "FAILED: When_implementing_an_interface_with_new__the_overrides_should_work");
 }
 var When_calling_instanceof_on_field_result_it_should_work = function() {
-	Log("TEST: When_calling_instanceof_on_field_result_it_should_work");
+	__log("TEST: When_calling_instanceof_on_field_result_it_should_work");
 	
 	var MyButton = new com.tns.tests.Button1.extend("MyButton81", {
 		toString : function() {
@@ -126,7 +126,7 @@ var When_calling_instanceof_on_field_result_it_should_work = function() {
 }
 
 var When_calling_instanceof_on_method_result_it_should_work = function() {
-	Log("TEST: When_calling_instanceof_on_method_result_it_should_work");
+	__log("TEST: When_calling_instanceof_on_method_result_it_should_work");
 	
 	var MyButton = new com.tns.tests.Button1.extend("MyButton98", {
 		toString : function() {
@@ -142,7 +142,7 @@ var When_calling_instanceof_on_method_result_it_should_work = function() {
 }
 
 var When_calling_instanceof_on_method_argument_it_should_work = function() {
-	Log("TEST: When_calling_instanceof_on_method_argument_it_should_work");
+	__log("TEST: When_calling_instanceof_on_method_argument_it_should_work");
 	
 	var isInstanceOf;
 	
@@ -164,10 +164,10 @@ var When_calling_instanceof_on_method_argument_it_should_work = function() {
 
 var When_calling_instanceof_on_interface_it_should_work = function() {
 	
-	Log("NOT WORKING: When_calling_instanceof_on_interface_it_should_work");
+	__log("NOT WORKING: When_calling_instanceof_on_interface_it_should_work");
 	return;
 	
-	Log("TEST: When_calling_instanceof_on_interface_it_should_work");
+	__log("TEST: When_calling_instanceof_on_interface_it_should_work");
 	
 	var interfaceInstance = new android.view.View.OnClickListener("ClickListener", {
 		onClick : function() {
@@ -187,20 +187,20 @@ var When_calling_instanceof_on_interface_it_should_work = function() {
 		}
 	});
 	
-	//Log("Object get PrototypeOf" + Object.getPrototypeOf(interfaceInstance).toString());
-	//Log("Object get PrototypeOf" + Object.getPrototypeOf(secondInterfaceInstance).toString());
+	//__log("Object get PrototypeOf" + Object.getPrototypeOf(interfaceInstance).toString());
+	//__log("Object get PrototypeOf" + Object.getPrototypeOf(secondInterfaceInstance).toString());
 	
 	var isInstanceOfOnClickListener = interfaceInstance instanceof android.view.View.OnClickListener;
 	var secondIsInstanceOfOnClickListener = secondInterfaceInstance instanceof android.view.View.OnClickListener;
 	var thirdIsInstanceOfOnClickListener = thirdInterfaceInstance instanceof android.view.View.OnClickListener;
-	Log("isInstanceOfOnClickListener: " + isInstanceOfOnClickListener + " secondIsInstanceOfOnClickListener:" + secondIsInstanceOfOnClickListener + " thirdIsInstanceOfOnClickListener: " + thirdIsInstanceOfOnClickListener);
+	__log("isInstanceOfOnClickListener: " + isInstanceOfOnClickListener + " secondIsInstanceOfOnClickListener:" + secondIsInstanceOfOnClickListener + " thirdIsInstanceOfOnClickListener: " + thirdIsInstanceOfOnClickListener);
 	
 	Assert(isInstanceOfOnClickListener == true, "FAILED: When_calling_instanceof_on_interface_it_should_work. Actual isInstanceOfOnClickListener: " + isInstanceOfOnClickListener);
 	Assert(secondIsInstanceOfOnClickListener == true, "FAILED 11: When_calling_instanceof_on_interface_it_should_work. Actual secondIsInstanceOfOnClickListener: " + secondIsInstanceOfOnClickListener);
 }
 
 var When_calling_instanceof_it_should_work = function() {
-	Log("TEST: When_calling_instanceof_it_should_work");
+	__log("TEST: When_calling_instanceof_it_should_work");
 	
 	var MyButton = com.tns.tests.Button1.extend("MyButton148", {
 		toString : function() {
@@ -220,7 +220,7 @@ var When_calling_instanceof_it_should_work = function() {
 
 
 var When_accessing_a_property_it_should_call_the_get_and_set_methods_respectivelly = function() {
-	Log("TEST: When_calling_instance_and_static_member_with_same_name_the_calls_should_succeed");
+	__log("TEST: When_calling_instance_and_static_member_with_same_name_the_calls_should_succeed");
 	var MyButton = com.tns.tests.Button1.extend("MyButton167", {
 		toString : function() {
 		  	return "button1";	
@@ -243,7 +243,7 @@ var When_accessing_a_property_it_should_call_the_get_and_set_methods_respectivel
 }
 
 var When_accessing_a_bool_property_it_should_call_the_is_and_set_methods_respectivelly = function() {
-	Log("TEST: When_accessing_a_bool_property_it_should_call_the_is_and_set_methods_respectivelly");
+	__log("TEST: When_accessing_a_bool_property_it_should_call_the_is_and_set_methods_respectivelly");
 	var MyButton = com.tns.tests.Button1.extend("MyButton190", {
 		toString : function() {
 		  	return "button1";	
@@ -266,7 +266,7 @@ var When_accessing_a_bool_property_it_should_call_the_is_and_set_methods_respect
 }
 
 var When_calling_instance_and_static_member_with_same_name_the_calls_should_succeed = function() {
-	Log("TEST: When_calling_instance_and_static_member_with_same_name_the_calls_should_succeed");
+	__log("TEST: When_calling_instance_and_static_member_with_same_name_the_calls_should_succeed");
 	var MyButton = com.tns.tests.Button1.extend("MyButton213", {
 		toString : function() {
 		  	return "button1";	
@@ -287,14 +287,14 @@ var When_calling_instance_and_static_member_with_same_name_the_calls_should_succ
 
 
 var When_calling_toString_on_an_java_object_it_should_call_the_java_method = function() {
-	Log("TEST: When_calling_toString_on_an_java_object_it_should_call_the_java_method");
+	__log("TEST: When_calling_toString_on_an_java_object_it_should_call_the_java_method");
 	var instance = new com.tns.tests.DummyClass();
 	var s = instance.toString();
 	Assert(s.indexOf("com.tns.tests.DummyClass") != -1, "FAILED: When_calling_toString_on_an_java_object_it_should_call_the_java_method. Actual value: " + instance.toString());
 }
 
 var When_calling_toString_on_an_java_object_that_has_overriden_toString_in_js_it_should_call_the_js_method = function() {
-	Log("TEST: When_calling_toString_on_an_java_object_that_has_overriden_toString_in_js_it_should_call_the_js_method");
+	__log("TEST: When_calling_toString_on_an_java_object_that_has_overriden_toString_in_js_it_should_call_the_js_method");
 	var MyButton = com.tns.tests.Button1.extend("MyButton240", {
 		toString : function() {
 		  	return "button1";	
@@ -307,7 +307,7 @@ var When_calling_toString_on_an_java_object_that_has_overriden_toString_in_js_it
 }
 
 var When_extending_a_class_two_times_without_second_implementation_object = function() {
-	Log("TEST: When_extending_a_class_two_times_without_second_implementation_object");
+	__log("TEST: When_extending_a_class_two_times_without_second_implementation_object");
 	
 	var MyButton = com.tns.tests.Button1.extend("MyButton257", {
 		toString : function() {
@@ -321,7 +321,7 @@ var When_extending_a_class_two_times_without_second_implementation_object = func
 	var button2 = new com.tns.tests.Button1();
 	var button2Label = button2.toString();
 	
-	Log("button1Label=" + button1Label + ", button2Label=" + button2Label);
+	__log("button1Label=" + button1Label + ", button2Label=" + button2Label);
 	Assert(button1 !== button2 && button1Label !== button2Label, "FAILED: When_extending_a_class_two_times_without_second_implementation_object");
 	
 	
@@ -330,7 +330,7 @@ var When_extending_a_class_two_times_without_second_implementation_object = func
 }
 
 var When__calling_super_method_using_the_prototype_property_of_a_function_it_should_call_the_super_method = function() {
-	Log("TEST: When__calling_super_method_using_the_prototype_property_of_a_function_it_should_call_the_super_method");
+	__log("TEST: When__calling_super_method_using_the_prototype_property_of_a_function_it_should_call_the_super_method");
 
 	var button1 = new com.tns.tests.Button1();
 	var prop = com.tns.tests.Button1.prototype.getIMAGE_ID_PROP.call(button1);
@@ -339,7 +339,7 @@ var When__calling_super_method_using_the_prototype_property_of_a_function_it_sho
 }
 
 var When__calling_super_method_using_the_prototype_property_of_a_extended_function_it_should_call_the_super_method = function() {
-	Log("TEST: When__calling_super_method_using_the_prototype_property_of_a_extended_function_it_should_call_the_super_method");
+	__log("TEST: When__calling_super_method_using_the_prototype_property_of_a_extended_function_it_should_call_the_super_method");
 
 	var MyButton = com.tns.tests.Button1.extend("MyButton289", {});
 	var button1 = new MyButton();
@@ -348,7 +348,7 @@ var When__calling_super_method_using_the_prototype_property_of_a_extended_functi
 }
 
 var When__calling_super_method_using_the_prototype_property_of_a_extended_function_it_should_call_the_super_method2 = function() {
-	Log("TEST: When__calling_super_method_using_the_prototype_property_of_a_extended_function_it_should_call_the_super_method2");
+	__log("TEST: When__calling_super_method_using_the_prototype_property_of_a_extended_function_it_should_call_the_super_method2");
 
 	var MyButton = com.tns.tests.Button1.extend("MyButton294", {
 		getIMAGE_ID_PROP: function() { return ""; }
@@ -359,10 +359,10 @@ var When__calling_super_method_using_the_prototype_property_of_a_extended_functi
 }
 
 var When_extending_a_class_and_calling_super_toString = function() {
-	//Log("//TODO: NOT WORKING: super method calls are not working correctly. Tests fails with FAILED: When_extending_a_class_and_calling_super_toString. Actual: com.tns.com.tns.tests.Button1-MyButton305@52854640 Expected: com.tns.tests.Button1@");
+	//__log("//TODO: NOT WORKING: super method calls are not working correctly. Tests fails with FAILED: When_extending_a_class_and_calling_super_toString. Actual: com.tns.com.tns.tests.Button1-MyButton305@52854640 Expected: com.tns.tests.Button1@");
 	//return;
 	
-	Log("TEST: When_extending_a_class_and_calling_super_toString");
+	__log("TEST: When_extending_a_class_and_calling_super_toString");
 	
 	var MyButton = com.tns.tests.Button1.extend("MyButton", {
 		toString : function() {
@@ -382,7 +382,7 @@ var When_extending_a_class_and_calling_super_toString = function() {
 }
 
 var When_extending_a_class_and_calling_super_method_it_should_work = function() {
-	Log("TEST: When_extending_a_class_and_calling_super_method_it_should_work");
+	__log("TEST: When_extending_a_class_and_calling_super_method_it_should_work");
 	var MyButton = com.tns.tests.Button1.extend("MyButton318", {
 		toString : function() {
 		  	return "toString overriden";	
@@ -404,7 +404,7 @@ var When_extending_a_class_and_calling_super_method_it_should_work = function() 
 }
 
 var When_accessing_static_members_on_an_extended_class = function() {
-	Log("TEST: When_accessing_static_members_on_an_extended_class");
+	__log("TEST: When_accessing_static_members_on_an_extended_class");
 	
 	var MyButton = com.tns.tests.Button1.extend("MyButton341", {
 		hashCode : function() {
@@ -430,7 +430,7 @@ var When_accessing_static_members_on_an_extended_class = function() {
 }
 
 var When_implementing_an_interface_with_new__the_overrides_should_work = function() {
-	Log("TEST: When_implementing_an_interface_with_new__the_overrides_should_work");
+	__log("TEST: When_implementing_an_interface_with_new__the_overrides_should_work");
 	
 	var MyButton = new com.tns.tests.Button1.extends({
 		toString : function() {
@@ -451,7 +451,7 @@ var When_implementing_an_interface_with_new__the_overrides_should_work = functio
 }
 
 var When_a_java_method_returns_object_that_needs_js_instance__it_should_create_the_instance = function() {
-	Log("TEST: When_a_java_method_returns_object_that_needs_js_instance__it_should_create_the_instance");
+	__log("TEST: When_a_java_method_returns_object_that_needs_js_instance__it_should_create_the_instance");
 	
 	var MyButton = new com.tns.tests.Button1.extend("MyButton381", {
 		toString : function() {
@@ -467,7 +467,7 @@ var When_a_java_method_returns_object_that_needs_js_instance__it_should_create_t
 }
 
 var When_a_java_method_returns_object_that_needs_js_instance__it_should_create_the_instance_according_to_the_actual_return_type = function() {
-	Log("TEST: When_a_java_method_returns_object_that_needs_js_instance__it_should_create_the_instance_according_to_the_actual_return_type");
+	__log("TEST: When_a_java_method_returns_object_that_needs_js_instance__it_should_create_the_instance_according_to_the_actual_return_type");
 	
 	var Button = new com.tns.tests.Button1.extend("MyButton397", {
 		toString : function() {
@@ -483,7 +483,7 @@ var When_a_java_method_returns_object_that_needs_js_instance__it_should_create_t
 }
 
 var When_a_java_field_returns_object_that_needs_js_instance__it_should_create_the_instance_according_to_the_actual_return_type = function() {
-	Log("TEST: When_a_java_field_returns_object_that_needs_js_instance__it_should_create_the_instance_according_to_the_actual_return_type");
+	__log("TEST: When_a_java_field_returns_object_that_needs_js_instance__it_should_create_the_instance_according_to_the_actual_return_type");
 	
 	var Button = new com.tns.tests.Button1.extend("MyButton413", {
 		toString : function() {
@@ -499,7 +499,7 @@ var When_a_java_field_returns_object_that_needs_js_instance__it_should_create_th
 }
 
 var When_a_java_argument_is_passed_to_js_that_needs_js_instance__it_should_create_the_instance_according_to_the_actual_return_type = function() {
-	Log("TEST: When_a_java_argument_is_passed_to_js_that_needs_js_instance__it_should_create_the_instance_according_to_the_actual_return_type");
+	__log("TEST: When_a_java_argument_is_passed_to_js_that_needs_js_instance__it_should_create_the_instance_according_to_the_actual_return_type");
 	
 	var name = "";
 	var Button = new com.tns.tests.Button1.extend("MyButton418", {
@@ -509,7 +509,7 @@ var When_a_java_argument_is_passed_to_js_that_needs_js_instance__it_should_creat
 		
 		methodDummyClassAsObjectInArgs: function(object) {
 			name = object.getName();
-			Log("The actual name is " + name);
+			__log("The actual name is " + name);
 		}
 	});
 	
@@ -520,7 +520,7 @@ var When_a_java_argument_is_passed_to_js_that_needs_js_instance__it_should_creat
 }
 
 var When_a_java_object_is_returned_from_indexer_that_needs_js_instance__it_should_create_the_instance_according_to_the_actual_return_type = function() {
-	Log("TEST: When_a_java_object_is_returned_from_indexer_that_needs_js_instance__it_should_create_the_instance_according_to_the_actual_return_type");
+	__log("TEST: When_a_java_object_is_returned_from_indexer_that_needs_js_instance__it_should_create_the_instance_according_to_the_actual_return_type");
 	
 	var Button = new com.tns.tests.Button1.extend("MyButton450", {
 		toString : function() {
@@ -537,7 +537,7 @@ var When_a_java_object_is_returned_from_indexer_that_needs_js_instance__it_shoul
 
 var  When_accessing_a_static_field_on_a_javascript_instance_it_should_work = function() {
 	
-	Log("TEST: When_accessing_a_static_field_on_a_javascript_instance_it_should_work");
+	__log("TEST: When_accessing_a_static_field_on_a_javascript_instance_it_should_work");
 	
 	var MyButton = com.tns.tests.Button1.extend("MyButton455", {
 		hashCode : function() {
@@ -563,7 +563,7 @@ var  When_accessing_a_static_field_on_a_javascript_instance_it_should_work = fun
 
 var TestRequireDirName = function() {
 
-	Log("TEST: TestRequireDirName");
+	__log("TEST: TestRequireDirName");
 	
 	var dir = __dirname;
 	
@@ -574,7 +574,7 @@ var TestRequireDirName = function() {
 
 var TestRequireFileName = function() {
 
-	Log("TEST: TestRequireFileName");
+	__log("TEST: TestRequireFileName");
 	
 	var file = __filename;
 	
@@ -590,7 +590,7 @@ var TestRequireFileName = function() {
 
 var TestGarbageCollection = function() {
 
-	Log("TEST: TestGarbageCollection");
+	__log("TEST: TestGarbageCollection");
 	
 	var obj = new com.tns.tests.ClassX();
 	
@@ -617,7 +617,7 @@ var TestGarbageCollection = function() {
 
 var TestWorkingWithJavaArrayDoesNotMakeMemoryLeak = function() {
 
-	Log("TEST: TestWorkingWithJavaArrayDoesNotMakeMemoryLeak");
+	__log("TEST: TestWorkingWithJavaArrayDoesNotMakeMemoryLeak");
 	
 	var size = 10 * 1024 * 1024;
 	
@@ -642,7 +642,7 @@ var TestWorkingWithJavaArrayDoesNotMakeMemoryLeak = function() {
 
 var TestConstructorOverride = function() {
 
-	Log("TEST: TestConstructorOverride");
+	__log("TEST: TestConstructorOverride");
 	
 	var ctorCalled = false;
 	var isConstructor = false;
@@ -666,7 +666,7 @@ var TestConstructorOverride = function() {
 
 var TestConstructorOverrideOnTypeWithInitMethod = function() {
 
-	Log("TEST: TestConstructorOverrideOnTypeWithInitMethod");
+	__log("TEST: TestConstructorOverrideOnTypeWithInitMethod");
 	
 	var isCalled = false;
 	var isConstructor = false;
@@ -678,13 +678,13 @@ var TestConstructorOverrideOnTypeWithInitMethod = function() {
 		}
 	});
 	
-	Log("TEST: TestConstructorOverrideOnTypeWithInitMethod: calling overriden ctor");
+	__log("TEST: TestConstructorOverrideOnTypeWithInitMethod: calling overriden ctor");
 	var dummy = new MyDummyClassWithInit();
 	
 	Assert(isCalled == true, "TestConstructorOverrideOnTypeWithInitMethod FAILED: constructor not called");
 	Assert(isConstructor == true, "TestConstructorOverrideOnTypeWithInitMethod FAILED: isConstructor should be 'true'");
 	
-	Log("TEST: TestConstructorOverrideOnTypeWithInitMethod: calling ctor as regular method");
+	__log("TEST: TestConstructorOverrideOnTypeWithInitMethod: calling ctor as regular method");
 	isCalled = undefined;
 	isConstructor = undefined;
 	dummy.callInit();
@@ -694,14 +694,14 @@ var TestConstructorOverrideOnTypeWithInitMethod = function() {
 }
 
 var TestRequire = function() {
-	Log("TEST: TestRequire");
+	__log("TEST: TestRequire");
 	
 	var myModule = require("../simplemodule");
 	myModule.myLog("Hello world from NativeScript!");
 }
 
 var TestArrays = function() {
-	Log("TEST: TestArrays");
+	__log("TEST: TestArrays");
 	
 	var MyButton = com.tns.tests.Button1.extend("MyButton639", {
 		toString : function() {
@@ -733,7 +733,7 @@ var TestArrays = function() {
 
 var TestArrayLengthPropertyIsNumber = function() {
 
-	Log("TEST: TestArrayLengthPropertyIsNumber");
+	__log("TEST: TestArrayLengthPropertyIsNumber");
 	
 	var expectedLength = 10;
 
@@ -756,7 +756,7 @@ var TestArrayLengthPropertyIsNumber = function() {
 }
 
 var TestCreationOfLocationListener = function() {
-	Log("TEST: TestCreationOfLocationListener");
+	__log("TEST: TestCreationOfLocationListener");
 	
 	var onLocationChangedCalled = false;
 	var onProviderDisabledCalled = false;
@@ -788,7 +788,7 @@ var TestCreationOfLocationListener = function() {
 }
 
 var TestInnerClassCreation = function() {
-	Log("TEST: TestInnerClassCreation");
+	__log("TEST: TestInnerClassCreation");
 	
 	var MyButton = com.tns.tests.Button1.extend("MyButton726", {
 		toString : function() {
@@ -811,7 +811,7 @@ var TestInnerClassCreation = function() {
 }
 
 var TestNestedClassCreation = function() {
-	Log("TEST: TestNestedClassCreation");
+	__log("TEST: TestNestedClassCreation");
 
 	var i = 123;
 	
@@ -823,7 +823,7 @@ var TestNestedClassCreation = function() {
 }
 
 var TestCallMethodOnAnObjectReturnedAsObjectWithoutMetadata = function() {
-	Log("TEST: TestCallMethodOnAnObjectReturnedAsObjectWithoutMetadata");
+	__log("TEST: TestCallMethodOnAnObjectReturnedAsObjectWithoutMetadata");
 	
 	var dummy = new com.tns.tests.DummyClass();
 	
@@ -836,7 +836,7 @@ var TestCallMethodOnAnObjectReturnedAsObjectWithoutMetadata = function() {
 
 
 var TestGetFieldOnAnObjectReturnedAsObjectWithoutMetadata = function() {
-	Log("TEST: TestGetFieldOnAnObjectReturnedAsObjectWithoutMetadata");
+	__log("TEST: TestGetFieldOnAnObjectReturnedAsObjectWithoutMetadata");
 	
 	var dummy = new com.tns.tests.DummyClass();
 	
@@ -851,7 +851,7 @@ var TestGetFieldOnAnObjectReturnedAsObjectWithoutMetadata = function() {
 
 
 var TestCallMethodOnAnObjectPassedAsParameterInOverriddenMethodAsAnObjectWithoutMetadata = function() {
-	Log("TEST: TestCallMethodOnAnObjectPassedAsParameterInOverriddenMethodAsAnObjectWithoutMetadata");
+	__log("TEST: TestCallMethodOnAnObjectPassedAsParameterInOverriddenMethodAsAnObjectWithoutMetadata");
 	
 	var D = com.tns.tests.DummyClass.DummyDerivedClass.extend("D",{
 		dummyMethod: function(dummy) {
@@ -868,7 +868,7 @@ var TestCallMethodOnAnObjectPassedAsParameterInOverriddenMethodAsAnObjectWithout
 
 var TestAccessArrayElementAsObjectWithoutMetadata = function() {
 
-	Log("TEST: TestAccessArrayElementAsObjectWithoutMetadata");
+	__log("TEST: TestAccessArrayElementAsObjectWithoutMetadata");
 	
 	var d = new com.tns.tests.DummyClass();
 	
@@ -887,7 +887,7 @@ var TestAccessArrayElementAsObjectWithoutMetadata = function() {
 
 var TestCallMethodThatReturnsNull = function() {
 
-	Log("TEST: TestCallMethodThatReturnsNull");
+	__log("TEST: TestCallMethodThatReturnsNull");
 
 	var dummy = new com.tns.tests.DummyClass();
 	
@@ -898,7 +898,7 @@ var TestCallMethodThatReturnsNull = function() {
 
 var TestCallMethodThatReturnsNullString = function() {
 
-	Log("TEST: TestCallMethodThatReturnsNullString");
+	__log("TEST: TestCallMethodThatReturnsNullString");
 
 	var dummy = new com.tns.tests.DummyClass();
 	
@@ -909,7 +909,7 @@ var TestCallMethodThatReturnsNullString = function() {
 
 var TestAccessNullField = function() {
 
-	Log("TEST: TestAccessNullField");
+	__log("TEST: TestAccessNullField");
 
 	var dummy = new com.tns.tests.DummyClass();
 	
@@ -920,13 +920,13 @@ var TestAccessNullField = function() {
 
 var TestAccessNullArrayElement = function() {
 
-	Log("TEST: TestAccessNullArrayElement");
+	__log("TEST: TestAccessNullArrayElement");
 
 	var dummy = new com.tns.tests.DummyClass();
 	
 	var arr = dummy.getArrayWithNullElement();
 	
-	Log("arr=" + arr.length)
+	__log("arr=" + arr.length)
 	
 	var x = arr[0];
 	
@@ -935,7 +935,7 @@ var TestAccessNullArrayElement = function() {
 
 var TestCallMethodWithIntVarArg = function() {
 
-	Log("TEST: TestCallMethodWithIntVarArg");
+	__log("TEST: TestCallMethodWithIntVarArg");
 	
 	var dummy = new com.tns.tests.DummyClass();
 	
@@ -946,7 +946,7 @@ var TestCallMethodWithIntVarArg = function() {
 
 var TestCallMethodWithCharVarArg = function() {
 
-	Log("TEST: TestCallMethodWithCharVarArg");
+	__log("TEST: TestCallMethodWithCharVarArg");
 	
 	var dummy = new com.tns.tests.DummyClass();
 	
@@ -957,7 +957,7 @@ var TestCallMethodWithCharVarArg = function() {
 
 var TestCallMethodWithObjectVarArg = function() {
 
-	Log("TEST: TestCallMethodWithObjectVarArg");
+	__log("TEST: TestCallMethodWithObjectVarArg");
 	
 	var dummy = new com.tns.tests.DummyClass();
 	
@@ -968,7 +968,7 @@ var TestCallMethodWithObjectVarArg = function() {
 
 var TestCanInheritFromClassInAndroidSupportLibrary = function() {
 
-	Log("TEST: TestCanInheritFromClassInAndroidSupportLibrary");
+	__log("TEST: TestCanInheritFromClassInAndroidSupportLibrary");
 	
 	var MyParcelableCompat = android.support.v4.os.ParcelableCompat.extend("MyParcelableCompat", {
 		toString: function() {
@@ -985,7 +985,7 @@ var TestCanInheritFromClassInAndroidSupportLibrary = function() {
 
 var TestCallMethodWithByteParameter = function() {
 
-	Log("TEST: TestCallMethodWithByteParameter");
+	__log("TEST: TestCallMethodWithByteParameter");
 	
 	var b = java.lang.Byte.valueOf(byte(123));
 	
@@ -996,7 +996,7 @@ var TestCallMethodWithByteParameter = function() {
 
 var TestCallMethodWithFloatParameter = function() {
 
-	Log("TEST: TestCallMethodWithFloatParameter");
+	__log("TEST: TestCallMethodWithFloatParameter");
 	
 	var d = new com.tns.tests.DummyClass();
 	
@@ -1007,7 +1007,7 @@ var TestCallMethodWithFloatParameter = function() {
 
 var TestCanCallStaticMethodThroughBaseClass = function() {
 
-	Log("TEST: TestCanCallStaticMethodThroughBaseClass");
+	__log("TEST: TestCanCallStaticMethodThroughBaseClass");
 	
 	var name = com.tns.tests.MyClassDerived.getName();
 
@@ -1016,7 +1016,7 @@ var TestCanCallStaticMethodThroughBaseClass = function() {
 
 var TestUseFieldThatIsArray = function() {
 
-	Log("TEST: TestUseFieldThatIsArray");
+	__log("TEST: TestUseFieldThatIsArray");
 	
 	var d = new com.tns.tests.DummyClass();
 	
@@ -1043,7 +1043,7 @@ var TestUseFieldThatIsArray = function() {
 
 var TestCanAssignArrayToField = function() {
 
-	Log("TEST: TestCanAssignArrayToField");
+	__log("TEST: TestCanAssignArrayToField");
 	
 	var d = new com.tns.tests.DummyClass();
 	
@@ -1060,7 +1060,7 @@ var TestCanAssignArrayToField = function() {
 
 var TestCallMethodThatReturnsLong = function() {
 
-	Log("TEST: TestCallMethodThatReturnsLong");
+	__log("TEST: TestCallMethodThatReturnsLong");
 	
 	var n = java.lang.Long.parseLong("9007199254740991"); // 9007199254740991 = 2^53-1
 
@@ -1082,7 +1082,7 @@ var TestCallMethodThatReturnsLong = function() {
 
 var TestCallMethodWithLongParameter = function() {
 
-	Log("TEST: TestCallMethodWithLongParameter");
+	__log("TEST: TestCallMethodWithLongParameter");
 	
 	var d = new com.tns.tests.DummyClass();
 	
@@ -1101,7 +1101,7 @@ var TestCallMethodWithLongParameter = function() {
 
 var TestCallMethodWithLongCastArgument = function() {
 
-	Log("TEST: TestCallMethodWithLongCastArgument");
+	__log("TEST: TestCallMethodWithLongCastArgument");
 	
 	var d = new com.tns.tests.DummyClass();
 	
@@ -1120,7 +1120,7 @@ var TestCallMethodWithLongCastArgument = function() {
 
 var TestCallToStringOfNativeScriptLongObject = function() {
 
-	Log("TEST: TestCallToStringOfNativeScriptLongObject");
+	__log("TEST: TestCallToStringOfNativeScriptLongObject");
 	
 	var n = java.lang.Long.parseLong("9007199254740992"); // 9007199254740992 = 2^53
 	
@@ -1131,7 +1131,7 @@ var TestCallToStringOfNativeScriptLongObject = function() {
 
 var TestCallMethodWithLongParameterWithNumberObject = function() {
 
-	Log("TEST: TestCallMethodWithLongParameterWithNumberObject");
+	__log("TEST: TestCallMethodWithLongParameterWithNumberObject");
 	
 	var d = new com.tns.tests.DummyClass();
 	
@@ -1141,7 +1141,7 @@ var TestCallMethodWithLongParameterWithNumberObject = function() {
 
 var TestCallMethodWithMinAndMaxLongValues = function() {
 
-	Log("TEST: TestCallMethodWithMinAndMaxLongValues");
+	__log("TEST: TestCallMethodWithMinAndMaxLongValues");
 	
 	var d = new com.tns.tests.DummyClass();
 	
@@ -1156,7 +1156,7 @@ var TestCallMethodWithMinAndMaxLongValues = function() {
 
 var TestCallMethodWithByteParameter = function() {
 
-	Log("TEST: TestCallMethodWithByteParameter");
+	__log("TEST: TestCallMethodWithByteParameter");
 	
 	var d = new com.tns.tests.DummyClass();
 	
@@ -1175,7 +1175,7 @@ var TestCallMethodWithByteParameter = function() {
 
 var TestCallMethodWithShortParameter = function() {
 
-	Log("TEST: TestCallMethodWithShortParameter");
+	__log("TEST: TestCallMethodWithShortParameter");
 	
 	var d = new com.tns.tests.DummyClass();
 	
@@ -1194,7 +1194,7 @@ var TestCallMethodWithShortParameter = function() {
 
 var TestCallMethodWithBooleanParameter = function() {
 
-	Log("TEST: TestCallMethodWithBooleanParameter");
+	__log("TEST: TestCallMethodWithBooleanParameter");
 	
 	var d = new com.tns.tests.DummyClass();
 	
@@ -1213,7 +1213,7 @@ var TestCallMethodWithBooleanParameter = function() {
 
 var TestThrowJavaScriptExceptionWhenCannotResolveJavaMethod = function() {
 
-	Log("TEST: TestThrowJavaScriptExceptionWhenCannotResolveJavaMethod");
+	__log("TEST: TestThrowJavaScriptExceptionWhenCannotResolveJavaMethod");
 	
 	var exceptionCaught = false;
 	
@@ -1233,7 +1233,7 @@ var TestThrowJavaScriptExceptionWhenCannotResolveJavaMethod = function() {
 
 var TestThrowJavaScriptExceptionWhenCannotResolveJavaConstructor = function() {
 
-	Log("TEST: TestThrowJavaScriptExceptionWhenCannotResolveJavaConstructor");
+	__log("TEST: TestThrowJavaScriptExceptionWhenCannotResolveJavaConstructor");
 	
 	var exceptionCaught = false;
 	
@@ -1251,7 +1251,7 @@ var TestThrowJavaScriptExceptionWhenCannotResolveJavaConstructor = function() {
 
 var TestThrowJavaScriptExceptionWhenSetArrayRefElementWithNakedJavaScriptObject = function() {
 
-	Log("TEST: TestThrowJavaScriptExceptionWhenSetArrayRefElementWithNakedJavaScriptObject");
+	__log("TEST: TestThrowJavaScriptExceptionWhenSetArrayRefElementWithNakedJavaScriptObject");
 	
 	var arr = java.lang.reflect.Array.newInstance(java.lang.Object.class, 10);
 	
@@ -1278,7 +1278,7 @@ var TestThrowJavaScriptExceptionWhenSetArrayRefElementWithNakedJavaScriptObject 
 
 var TestThrowJavaScriptExceptionWhenSetArrayRefElementWithJavaScriptPrimitive = function() {
 
-	Log("TEST: TestThrowJavaScriptExceptionWhenSetArrayRefElementWithJavaScriptPrimitive");
+	__log("TEST: TestThrowJavaScriptExceptionWhenSetArrayRefElementWithJavaScriptPrimitive");
 	
 	var arr = java.lang.reflect.Array.newInstance(java.lang.Object.class, 10);
 	
@@ -1305,7 +1305,7 @@ var TestThrowJavaScriptExceptionWhenSetArrayRefElementWithJavaScriptPrimitive = 
 
 var TestThrowJavaScriptExceptionWhenCreateJavaObjectWithNakedJavaScriptObject = function() {
 
-	Log("TEST: TestThrowJavaScriptExceptionWhenCreateJavaObjectWithNakedJavaScriptObject");
+	__log("TEST: TestThrowJavaScriptExceptionWhenCreateJavaObjectWithNakedJavaScriptObject");
 	
 	var exceptionCaught = false;
 
@@ -1323,7 +1323,7 @@ var TestThrowJavaScriptExceptionWhenCreateJavaObjectWithNakedJavaScriptObject = 
 
 var TestThrowJavaScriptExceptionWhenCallJavaMethodWithNakedJavaScriptObject = function() {
 
-	Log("TEST: TestThrowJavaScriptExceptionWhenCallJavaMethodWithNakedJavaScriptObject");
+	__log("TEST: TestThrowJavaScriptExceptionWhenCallJavaMethodWithNakedJavaScriptObject");
 	
 	var exceptionCaught = false;
 	
@@ -1343,7 +1343,7 @@ var TestThrowJavaScriptExceptionWhenCallJavaMethodWithNakedJavaScriptObject = fu
 
 var TestThrowJavaScriptExceptionWhenCallJavaMethodWithJavaScriptPrimitiveWhenJavaRefIsExpected = function() {
 
-	Log("TEST: TestThrowJavaScriptExceptionWhenCallJavaMethodWithJavaScriptPrimitiveWhenJavaRefIsExpected");
+	__log("TEST: TestThrowJavaScriptExceptionWhenCallJavaMethodWithJavaScriptPrimitiveWhenJavaRefIsExpected");
 	
 	var exceptionCaught = false;
 	
@@ -1363,7 +1363,7 @@ var TestThrowJavaScriptExceptionWhenCallJavaMethodWithJavaScriptPrimitiveWhenJav
 
 var TestThrowJavaScriptExceptionWhenOverideMethodImplementationIsDeleted = function() {
 
-	Log("TEST: TestThrowJavaScriptExceptionWhenOverideMethodImplementationIsDeleted");
+	__log("TEST: TestThrowJavaScriptExceptionWhenOverideMethodImplementationIsDeleted");
 	
 	var exceptionCaught = false;
 	
@@ -1382,7 +1382,7 @@ var TestThrowJavaScriptExceptionWhenOverideMethodImplementationIsDeleted = funct
 	
 	try
 	{
-		Log("btn=" + btn.triggerEcho("12345"));
+		__log("btn=" + btn.triggerEcho("12345"));
 	}
 	catch (e)
 	{
@@ -1395,7 +1395,7 @@ var TestThrowJavaScriptExceptionWhenOverideMethodImplementationIsDeleted = funct
 
 	try
 	{
-		Log("btn=" + btn.triggerEchoAsObject("123"));
+		__log("btn=" + btn.triggerEchoAsObject("123"));
 	}
 	catch (e)
 	{
@@ -1410,7 +1410,7 @@ var TestThrowJavaScriptExceptionWhenOverideMethodImplementationIsDeleted = funct
 
 var TestThrowJavaScriptExceptionWhenOverideMethodImplementationIsOverwritten = function() {
 
-	Log("TEST: TestThrowJavaScriptExceptionWhenOverideMethodImplementationIsOverwritten");
+	__log("TEST: TestThrowJavaScriptExceptionWhenOverideMethodImplementationIsOverwritten");
 	
 	var exceptionCaught = false;
 	
@@ -1427,7 +1427,7 @@ var TestThrowJavaScriptExceptionWhenOverideMethodImplementationIsOverwritten = f
 	
 	try
 	{
-		Log("btn=" + btn.triggerEcho("123"));
+		__log("btn=" + btn.triggerEcho("123"));
 	}
 	catch (e)
 	{
@@ -1440,7 +1440,7 @@ var TestThrowJavaScriptExceptionWhenOverideMethodImplementationIsOverwritten = f
 
 	try
 	{
-		Log("btn=" + btn.triggerEchoAsObject("123"));
+		__log("btn=" + btn.triggerEchoAsObject("123"));
 	}
 	catch (e)
 	{
@@ -1452,7 +1452,7 @@ var TestThrowJavaScriptExceptionWhenOverideMethodImplementationIsOverwritten = f
 
 var TestThrowJavaScriptExceptionWhenPartiallyImplementedInterfaceIsUsed = function() {
 
-	Log("TEST: TestThrowJavaScriptExceptionWhenPartiallyImplementedInterfaceIsUsed");
+	__log("TEST: TestThrowJavaScriptExceptionWhenPartiallyImplementedInterfaceIsUsed");
 	
 	var methodCalled = false;
 	var exceptionCaught = false;
@@ -1505,7 +1505,7 @@ var TestThrowJavaScriptExceptionWhenPartiallyImplementedInterfaceIsUsed = functi
 
 var TestThrowJavaScriptExceptionWhenImplementationObjectIsUsedToExtendMoreThanOneClass = function() {
 
-	Log("TEST: TestThrowJavaScriptExceptionWhenImplementationObjectIsUsedToExtendMoreThanOneClass");
+	__log("TEST: TestThrowJavaScriptExceptionWhenImplementationObjectIsUsedToExtendMoreThanOneClass");
 	
 	var implObj = {}
 	
@@ -1519,7 +1519,7 @@ var TestThrowJavaScriptExceptionWhenImplementationObjectIsUsedToExtendMoreThanOn
 	}
 	catch (e)
 	{
-		Log("TEST: TestThrowJavaScriptExceptionWhenImplementationObjectIsUsedToExtendMoreThanOneClass exception:" + e);
+		__log("TEST: TestThrowJavaScriptExceptionWhenImplementationObjectIsUsedToExtendMoreThanOneClass exception:" + e);
 		exceptionCaught = true;
 	}
 	
@@ -1528,7 +1528,7 @@ var TestThrowJavaScriptExceptionWhenImplementationObjectIsUsedToExtendMoreThanOn
 
 var TestThrowJavaScriptExceptionWhenPassBooleanArgumentWhereNotExpected = function() {
 
-	Log("TEST: TestThrowJavaScriptExceptionWhenPassBooleanArgumentWhereNotExpected");
+	__log("TEST: TestThrowJavaScriptExceptionWhenPassBooleanArgumentWhereNotExpected");
 	
 	var d = new com.tns.tests.DummyClass();
 	
@@ -1540,7 +1540,7 @@ var TestThrowJavaScriptExceptionWhenPassBooleanArgumentWhereNotExpected = functi
 	}
 	catch (e)
 	{
-		Log("e=" + e);
+		__log("e=" + e);
 		exceptionCaught = true;
 	}
 	
@@ -1554,7 +1554,7 @@ var TestThrowJavaScriptExceptionWhenPassBooleanArgumentWhereNotExpected = functi
 	}
 	catch (e)
 	{
-		Log("e=" + e);
+		__log("e=" + e);
 		exceptionCaught = true;
 	}
 	
@@ -1563,7 +1563,7 @@ var TestThrowJavaScriptExceptionWhenPassBooleanArgumentWhereNotExpected = functi
 
 var TestThrowJavaScriptExceptionWhenPassNumberArgumentWhereNotExpected = function() {
 
-	Log("TEST: TestThrowJavaScriptExceptionWhenPassNumberArgumentWhereNotExpected");
+	__log("TEST: TestThrowJavaScriptExceptionWhenPassNumberArgumentWhereNotExpected");
 	
 	var d = new com.tns.tests.DummyClass();
 	
@@ -1575,7 +1575,7 @@ var TestThrowJavaScriptExceptionWhenPassNumberArgumentWhereNotExpected = functio
 	}
 	catch (e)
 	{
-		Log("e=" + e);
+		__log("e=" + e);
 		exceptionCaught = true;
 	}
 	
@@ -1584,7 +1584,7 @@ var TestThrowJavaScriptExceptionWhenPassNumberArgumentWhereNotExpected = functio
 
 var TestCallProctedMethodDefinedAsAbstractAndThenOverwritten = function() {
 
-	Log("TEST: TestCallProctedMethodDefinedAsAbstractAndThenOverwritten");
+	__log("TEST: TestCallProctedMethodDefinedAsAbstractAndThenOverwritten");
 
 	var C = com.tns.tests.AbsClassImpl.extend("C1520", {
 		echoString: function(s) {
@@ -1601,7 +1601,7 @@ var TestCallProctedMethodDefinedAsAbstractAndThenOverwritten = function() {
 
 var TestCharSequenceReturnValueIsTreatedAsStringWhenItIsString = function() {
 
-	Log("TEST: TestCharSequenceReturnValueIsTreatedAsStringWhenItIsString");
+	__log("TEST: TestCharSequenceReturnValueIsTreatedAsStringWhenItIsString");
 
 	var d = new com.tns.tests.DummyClass();
 	
@@ -1613,7 +1613,7 @@ var TestCharSequenceReturnValueIsTreatedAsStringWhenItIsString = function() {
 
 var TestObjectReturnValueIsTreatedAsStringWhenItIsString = function() {
 	
-	Log("TEST: TestObjectReturnValueIsTreatedAsStringWhenItIsString");
+	__log("TEST: TestObjectReturnValueIsTreatedAsStringWhenItIsString");
 
 	var d = new com.tns.tests.DummyClass();
 	
@@ -1624,7 +1624,7 @@ var TestObjectReturnValueIsTreatedAsStringWhenItIsString = function() {
 
 var TestCanFindImplementationObjectWhenCreateExtendedObjectFromJava = function() {
 
-	Log("TEST: TestCanFindImplementationObjectWhenCreateExtendedObjectFromJava");
+	__log("TEST: TestCanFindImplementationObjectWhenCreateExtendedObjectFromJava");
 
 	var O = java.lang.Object.extend("O1560", {});
 	
@@ -1637,7 +1637,7 @@ var TestCanFindImplementationObjectWhenCreateExtendedObjectFromJava = function()
 
 var TestCanCallMethodThatReturnsArrayOfInterfaces = function() {
 
-	Log("TEST: TestCanCallMethodThatReturnsArrayOfInterfaces");
+	__log("TEST: TestCanCallMethodThatReturnsArrayOfInterfaces");
 
 	var arr = java.lang.reflect.Array.newInstance(android.view.View.OnClickListener.class, 1);
 	
@@ -1652,7 +1652,7 @@ var TestCanCallMethodThatReturnsArrayOfInterfaces = function() {
 
 var TestCanParseSignatureWithTypesThatContainsCapitalLettersForPrimitiveTypes = function() {
 
-	Log("TEST: TestCanParseSignatureWithTypesThatContainsCapitalLettersForPrimitiveTypes");
+	__log("TEST: TestCanParseSignatureWithTypesThatContainsCapitalLettersForPrimitiveTypes");
 
 	var formats = java.lang.reflect.Array.newInstance(java.text.NumberFormat.class, 2);
 	formats[0] = java.text.NumberFormat.getInstance();
@@ -1666,7 +1666,7 @@ var TestCanParseSignatureWithTypesThatContainsCapitalLettersForPrimitiveTypes = 
 }
 
 var TestCanCallToStringOnClassProxy = function() {
-	Log("TEST: TestCanCallToStringOnClassProxy");
+	__log("TEST: TestCanCallToStringOnClassProxy");
 
 	var view = android.view.View;
 	var s = view.toString();
@@ -1675,7 +1675,7 @@ var TestCanCallToStringOnClassProxy = function() {
 }
 
 var When_accessing_class_property_on_a_extended_class_it_should_return_the_extended_class = function() {
-	Log("TEST: When_accessing_class_property_on_a_extended_class_it_should_return_the_extended_class");
+	__log("TEST: When_accessing_class_property_on_a_extended_class_it_should_return_the_extended_class");
 	
 	var MyButton = com.tns.tests.Button1.extend("MyButton1615", {
 		toString : function() {
@@ -1694,14 +1694,14 @@ var When_accessing_class_property_on_a_extended_class_it_should_return_the_exten
 }
 
 var When_using_global_in_a_module_global_should_be_defined = function() {
-	Log("TEST: When_using_global_in_a_module_global_should_be_defined");
+	__log("TEST: When_using_global_in_a_module_global_should_be_defined");
 	
 	var module = require("../modules/module");
 	module.accessGlobalObject();
 }
 
 var When_using_package_json_should_load_module = function() {
-	Log("TEST: When_using_package_json_should_load_module");
+	__log("TEST: When_using_package_json_should_load_module");
 	
 	var module2 = require("../module2");
 	var value456 = module2.value456;
@@ -1710,14 +1710,14 @@ var When_using_package_json_should_load_module = function() {
 }
 
 var When_require_bcl_module_it_should_be_loaded = function() {
-	Log("TEST: When_require_bcl_module_it_should_be_loaded");
+	__log("TEST: When_require_bcl_module_it_should_be_loaded");
 	
 	var module = require("bclmodule");
 	module.getModuleName();
 }
 
 var When_require_a_module_it_should_be_loaded = function() {
-	Log("TEST: When_require_a_module_it_should_be_loaded");
+	__log("TEST: When_require_a_module_it_should_be_loaded");
 	
 	var module = require("./testModules/testmodule");
 	var moduleName = module.getModuleName();
@@ -1727,7 +1727,7 @@ var When_require_a_module_it_should_be_loaded = function() {
 
 
 var When_require_a_bcl_module_in_a_dir_it_should_be_loaded = function() {
-	Log("TEST: When_require_a_bcl_module_in_a_dir_it_should_be_loaded");
+	__log("TEST: When_require_a_bcl_module_in_a_dir_it_should_be_loaded");
 	
 	var module = require("tests/testModules/testBclModule");
 	var moduleName = module.getModuleName();
@@ -1736,7 +1736,7 @@ var When_require_a_bcl_module_in_a_dir_it_should_be_loaded = function() {
 }
 
 var When_require_a_module_that_is_a_directory_name_it_should_load_the_index_js_inside_it = function() {
-	Log("TEST: When_require_a_module_that_is_a_directory_name_it_should_load_the_index_js_inside_it");
+	__log("TEST: When_require_a_module_that_is_a_directory_name_it_should_load_the_index_js_inside_it");
 	
 	var module = require("./testModules/someDirModule");
 	var moduleName = module.getModuleName();
@@ -1745,7 +1745,7 @@ var When_require_a_module_that_is_a_directory_name_it_should_load_the_index_js_i
 }
 
 var When_require_a_bcl_module_that_is_a_directory_name_it_should_load_the_index_js_inside_it = function() {
-	Log("TEST: When_require_a_bcl_module_that_is_a_directory_name_it_should_load_the_index_js_inside_it");
+	__log("TEST: When_require_a_bcl_module_that_is_a_directory_name_it_should_load_the_index_js_inside_it");
 	
 	var module = require("tests/testModules/someBclDirModule");
 	var moduleName = module.getModuleName();
@@ -1754,7 +1754,7 @@ var When_require_a_bcl_module_that_is_a_directory_name_it_should_load_the_index_
 }
 
 var When_require_a_bcl_module_that_is_a_directory_name_it_should_load_the_package_json_inside_it = function() {
-	Log("TEST: When_require_a_bcl_module_that_is_a_directory_name_it_should_load_the_package_json_inside_it");
+	__log("TEST: When_require_a_bcl_module_that_is_a_directory_name_it_should_load_the_package_json_inside_it");
 	
 	var module = require("tests/testModules/someModule");
 	var value123 = module.value123;

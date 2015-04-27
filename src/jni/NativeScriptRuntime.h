@@ -61,9 +61,7 @@ namespace tns
 
 		static void DumpReferenceTablesMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-		static void WaitForDebuggerMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
-
-		static void FailMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void ExitMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 		static void OverridesWeakCallback(v8::Isolate* isolate, v8::Persistent<v8::Object>* target, void* arg);
 

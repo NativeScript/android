@@ -6,7 +6,7 @@ var Assert = function(condition, failMessage) {
 
 var TestCallWithStringArgumentWhenThereIsStringOverload = function() {
 
-	Log("TEST: TestCallWithStringArgumentWhenThereIsStringOverload");
+	__log("TEST: TestCallWithStringArgumentWhenThereIsStringOverload");
 	
 	var i = new com.tns.tests.InheritanceChainResolutionTest();
 	
@@ -17,7 +17,7 @@ var TestCallWithStringArgumentWhenThereIsStringOverload = function() {
 
 var TestCallWithStringArgumentWhenThereIsNoStringOverload = function() {
 
-	Log("TEST: TestCallWithStringArgumentWhenThereIsNoStringOverload");
+	__log("TEST: TestCallWithStringArgumentWhenThereIsNoStringOverload");
 	
 	var i = new com.tns.tests.InheritanceChainResolutionTest();
 	

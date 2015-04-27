@@ -7,7 +7,7 @@ var Assert = function(condition, failMessage) {
 
 (function When_creating_a_typescript_instance_with_constructor_property_it_should_support_this() {
 	
-	Log("TEST: When_creating_a_typescript_instance_with_constructor_property_it_should_support_this");
+	__log("TEST: When_creating_a_typescript_instance_with_constructor_property_it_should_support_this");
 	var NativeViewGroup = (function (_super) {
 	    __extends(NativeViewGroup, _super);
 	    function NativeViewGroup(view) {
@@ -58,7 +58,7 @@ var Assert = function(condition, failMessage) {
 
 (function When_creating_a_typescript_instance_it_should_support_overriden_members() {
 	
-	Log("TEST: When_creating_a_typescript_instance_it_should_support_overriden_members");
+	__log("TEST: When_creating_a_typescript_instance_it_should_support_overriden_members");
 	
 	var initCalled = false;
     var MyButton1 = (function (_super) {
@@ -89,7 +89,7 @@ var Assert = function(condition, failMessage) {
 
 (function When_creating_a_typescript_instance_it_should_support_calling_super_members_from_overriden_members() {
 	
-	Log("TEST: When_creating_a_typescript_instance_it_should_support_calling_super_members_from_overriden_members");
+	__log("TEST: When_creating_a_typescript_instance_it_should_support_calling_super_members_from_overriden_members");
 	
 	
 	 var MyButton2 = (function (_super) {
@@ -119,14 +119,14 @@ var Assert = function(condition, failMessage) {
 
 (function When_creating_a_pure_typescript_inheritance_chain_it_should_work() {
 	
-	Log("TEST: When_creating_a_pure_typescript_inheritance_chain_it_should_work");
+	__log("TEST: When_creating_a_pure_typescript_inheritance_chain_it_should_work");
 	
 	var Animal = (function () {
 	    function Animal(name) {
 	        this.name = name;
 	    }
 	    Animal.prototype.move = function (meters) {
-	        Log(this.name + " moved " + meters + "m.");
+	    	__log(this.name + " moved " + meters + "m.");
 	    };
 	    return Animal;
 	})();
@@ -137,7 +137,7 @@ var Assert = function(condition, failMessage) {
 	        _super.call(this, name);
 	    }
 	    Snake.prototype.move = function () {
-	        Log("Slithering...");
+	    	__log("Slithering...");
 	        _super.prototype.move.call(this, 5);
 	    };
 	    return Snake;
@@ -149,7 +149,7 @@ var Assert = function(condition, failMessage) {
 	        _super.call(this, name);
 	    }
 	    Horse.prototype.move = function () {
-	        Log("Galloping...");
+	    	__log("Galloping...");
 	        _super.prototype.move.call(this, 45);
 	    };
 	    return Horse;
@@ -177,7 +177,7 @@ var Assert = function(condition, failMessage) {
 
 (function When_creating_a_typescript_instance_it_should_be_a_valid_nativescript_instance() {
 	
-	Log("TEST: When_creating_a_typescript_instance_it_should_be_a_valid_nativescript_instance");
+	__log("TEST: When_creating_a_typescript_instance_it_should_be_a_valid_nativescript_instance");
 	
 	 var MyButton3 = (function (_super) {
 	        __extends(MyButton3, _super);
@@ -204,7 +204,7 @@ var Assert = function(condition, failMessage) {
 
 (function When_creating_a_typescript_instance_with_arguments_it_should_be_a_valid_nativescript_instance() {
 	
-	Log("TEST: When_creating_a_typescript_instance_it_should_be_a_valid_nativescript_instance");
+	__log("TEST: When_creating_a_typescript_instance_it_should_be_a_valid_nativescript_instance");
 	
 	var MyButtonWithArgs = (function (_super) {
 	    __extends(MyButtonWithArgs, _super);
@@ -217,7 +217,7 @@ var Assert = function(condition, failMessage) {
 	    };
 
 	    MyButtonWithArgs.prototype.onClick = function () {
-	      Log("MyButton onClick called");
+	    	__log("MyButton onClick called");
 	    };
 	    
 	    MyButtonWithArgs.prototype.superToString = function () {
@@ -239,7 +239,7 @@ var Assert = function(condition, failMessage) {
 
 (function When_creating_a_typescript_instance_it_should_support_member_access() {
 	
-	Log("TEST: When_creating_a_typescript_instance_it_should_support_member_access");
+	__log("TEST: When_creating_a_typescript_instance_it_should_support_member_access");
 	
 	 var MyButton4 = (function (_super) {
 	        __extends(MyButton4, _super);
@@ -272,7 +272,7 @@ var Assert = function(condition, failMessage) {
 
 (function When_creating_a_typescript_instance_it_should_support_calling_super_members_from_super_prototype() {
 	
-	Log("TEST: When_creating_a_typescript_instance_it_should_support_calling_super_members_from_super_prototype");
+	__log("TEST: When_creating_a_typescript_instance_it_should_support_calling_super_members_from_super_prototype");
 	
 	 var MyButton5 = (function (_super) {
 	        __extends(MyButton5, _super);
@@ -300,7 +300,7 @@ var Assert = function(condition, failMessage) {
 
 (function When_extending_an_already_extended_object_it_should_throw_an_error() {
 	
-	Log("TEST: When_extending_an_already_extended_object_it_should_throw_an_error");
+	__log("TEST: When_extending_an_already_extended_object_it_should_throw_an_error");
 	
 	var errorThrown = false;
 	try	{
@@ -342,7 +342,7 @@ var Assert = function(condition, failMessage) {
 
 (function When_accessing_a_static_field_on_a_typescript_instance_it_should_work() {
 	
-	Log("TEST: When_accessing_a_static_field_on_a_typescript_instance_it_should_work");
+	__log("TEST: When_accessing_a_static_field_on_a_typescript_instance_it_should_work");
 	
 	 var MyButton7 = (function (_super) {
 	        __extends(MyButton7, _super);
@@ -374,7 +374,7 @@ var Assert = function(condition, failMessage) {
 
 (function When_calling_a_static_method_on_a_typescript_instance_it_should_work() {
 	
-	Log("TEST: When_calling_a_static_method_on_a_typescript_instance_it_should_work");
+	__log("TEST: When_calling_a_static_method_on_a_typescript_instance_it_should_work");
 
 	
 	 var MyButton8 = (function (_super) {
@@ -388,7 +388,7 @@ var Assert = function(condition, failMessage) {
 	        };
 
 	        MyButton8.prototype.onClick = function () {
-	          Log("MyButton onClick called");
+	        	__log("MyButton onClick called");
 	        };
 	        
 	        MyButton8.prototype.superToString = function () {
@@ -506,7 +506,7 @@ var Assert = function(condition, failMessage) {
 
 (function When_creating_a_typescript_instance_and_anonymous_interfaces_in_its_ctor_it_should_work() {
 	
-	Log("TEST: When_creating_a_typescript_instance_and_anonymous_interfaces_in_its_ctor_it_should_work");
+	__log("TEST: When_creating_a_typescript_instance_and_anonymous_interfaces_in_its_ctor_it_should_work");
 	
     var MyButton9 = (function (_super) {
         __extends(MyButton9, _super);

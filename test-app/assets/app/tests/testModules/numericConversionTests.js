@@ -10,7 +10,7 @@ var Assert = function(condition, failMessage) {
 
 var TestCreateInstanceWithConstructorResolutionWithNumberLiteral = function() {
 
-	Log("TEST: TestCreateInstanceWithConstructorResolutionWithNumberLiteral");
+	__log("TEST: TestCreateInstanceWithConstructorResolutionWithNumberLiteral");
 	
 	var n = new com.tns.tests.NumericConversionTest(123);
 	
@@ -21,7 +21,7 @@ var TestCreateInstanceWithConstructorResolutionWithNumberLiteral = function() {
 
 var TestCreateInstanceWithConstructorResolutionWithCastFunctions = function() {
 
-	Log("TEST: TestCreateInstanceWithConstructorResolutionWithCastFunctions");
+	__log("TEST: TestCreateInstanceWithConstructorResolutionWithCastFunctions");
 	
 	var n1 = new com.tns.tests.NumericConversionTest(byte(123));
 	var s1 = n1.getInit();
@@ -38,7 +38,7 @@ var TestCreateInstanceWithConstructorResolutionWithCastFunctions = function() {
 
 var TestCreateInstanceWithConstructorResolutionWithValuesFromJavaCalls = function() {
 
-	Log("TEST: TestCreateInstanceWithConstructorResolutionWithValuesFromJavaCalls");
+	__log("TEST: TestCreateInstanceWithConstructorResolutionWithValuesFromJavaCalls");
 	
 	var b = java.lang.Byte.parseByte("123");
 	var n1 = new com.tns.tests.NumericConversionTest(b);
@@ -53,7 +53,7 @@ var TestCreateInstanceWithConstructorResolutionWithValuesFromJavaCalls = functio
 
 var TestCreateInstanceWithConstructorResolutionWithPromotingValueUp = function() {
 
-	Log("TEST: TestCreateInstanceWithConstructorResolutionWithPromotingValueUp");
+	__log("TEST: TestCreateInstanceWithConstructorResolutionWithPromotingValueUp");
 	
 	var n = new com.tns.tests.NumericConversionTest(null, short(1));
 	var s = n.getInit();
@@ -62,7 +62,7 @@ var TestCreateInstanceWithConstructorResolutionWithPromotingValueUp = function()
 
 var TestCreateInstanceWithConstructorResolutionWithPromotingValueDown = function() {
 
-	Log("TEST: TestCreateInstanceWithConstructorResolutionWithPromotingValueDown");
+	__log("TEST: TestCreateInstanceWithConstructorResolutionWithPromotingValueDown");
 	
 	var n = new com.tns.tests.NumericConversionTest(null, null, long(1));
 	var s = n.getInit();
@@ -71,7 +71,7 @@ var TestCreateInstanceWithConstructorResolutionWithPromotingValueDown = function
 
 var TestCallMethodWithResolutionWithPromotingValueUp = function() {
 
-	Log("TEST: TestCallMethodWithResolutionWithPromotingValueUp");
+	__log("TEST: TestCallMethodWithResolutionWithPromotingValueUp");
 	
 	var n = new com.tns.tests.NumericConversionTest();
 	var s = n.method1(byte(1));
@@ -80,7 +80,7 @@ var TestCallMethodWithResolutionWithPromotingValueUp = function() {
 
 var TestCallMethodWithResolutionWithPromotingValueDown = function() {
 
-	Log("TEST: TestCallMethodWithResolutionWithPromotingValueDown");
+	__log("TEST: TestCallMethodWithResolutionWithPromotingValueDown");
 	
 	var n = new com.tns.tests.NumericConversionTest();
 	var s = n.method1(1);
@@ -93,7 +93,7 @@ var TestCallMethodWithResolutionWithPromotingValueDown = function() {
 
 var TestLongCastToFloatConversionWhenThereIsDoubleOverload = function() {
 
-	Log("TEST: TestLongCastToFloatConversionWhenThereIsDoubleOverload");
+	__log("TEST: TestLongCastToFloatConversionWhenThereIsDoubleOverload");
 	
 	var n = new com.tns.tests.NumericConversionTest();
 	var s = n.method2(long(65536 + 2));
@@ -102,7 +102,7 @@ var TestLongCastToFloatConversionWhenThereIsDoubleOverload = function() {
 
 var TestByteCastToFloatConversionWhenThereIsDoubleOverload = function() {
 
-	Log("TEST: TestByteCastToFloatConversionWhenThereIsDoubleOverload");
+	__log("TEST: TestByteCastToFloatConversionWhenThereIsDoubleOverload");
 	
 	var n = new com.tns.tests.NumericConversionTest();
 	var s = n.method2(byte(65536 + 2));
@@ -111,7 +111,7 @@ var TestByteCastToFloatConversionWhenThereIsDoubleOverload = function() {
 
 var TestShortCastToFloatConversionWhenThereIsDoubleOverload = function() {
 
-	Log("TEST: TestShortCastToFloatConversionWhenThereIsDoubleOverload");
+	__log("TEST: TestShortCastToFloatConversionWhenThereIsDoubleOverload");
 	
 	var n = new com.tns.tests.NumericConversionTest();
 	var s = n.method2(short(65536 + 2));
@@ -120,7 +120,7 @@ var TestShortCastToFloatConversionWhenThereIsDoubleOverload = function() {
 
 var TestDoubleCastWhenThereIsDoubleOverload = function() {
 
-	Log("TEST: TestDoubleCastWhenThereIsDoubleOverload");
+	__log("TEST: TestDoubleCastWhenThereIsDoubleOverload");
 	
 	var n = new com.tns.tests.NumericConversionTest();
 	var s = n.method2(double(65536 + 2));
@@ -129,7 +129,7 @@ var TestDoubleCastWhenThereIsDoubleOverload = function() {
 
 var TestNumberExpressionToFloatConversionWhenThereIsDoubleOverload = function() {
 
-	Log("TEST: TestNumberExpressionToFloatConversionWhenThereIsDoubleOverload");
+	__log("TEST: TestNumberExpressionToFloatConversionWhenThereIsDoubleOverload");
 	
 	var n = new com.tns.tests.NumericConversionTest();
 	var s = n.method2(65536 + 2);
@@ -138,7 +138,7 @@ var TestNumberExpressionToFloatConversionWhenThereIsDoubleOverload = function() 
 
 var TestDoubleCastToLongConversionWhenThereIsShortOverload = function() {
 
-	Log("TEST: TestDoubleCastToLongConversionWhenThereIsShortOverload");
+	__log("TEST: TestDoubleCastToLongConversionWhenThereIsShortOverload");
 	
 	var n = new com.tns.tests.NumericConversionTest();
 	var s = n.method3(double(65536 + 2));
@@ -147,7 +147,7 @@ var TestDoubleCastToLongConversionWhenThereIsShortOverload = function() {
 
 var TestFloatCastToLongConversionWhenThereIsShortOverload = function() {
 
-	Log("TEST: TestFloatCastToLongConversionWhenThereIsShortOverload");
+	__log("TEST: TestFloatCastToLongConversionWhenThereIsShortOverload");
 	
 	var n = new com.tns.tests.NumericConversionTest();
 	var s = n.method3(float(65536 + 2));
@@ -156,7 +156,7 @@ var TestFloatCastToLongConversionWhenThereIsShortOverload = function() {
 
 var TestFloatCastToShortConversionWhenThereIsObjectOverload = function() {
 
-	Log("TEST: TestFloatCastToShortConversionWhenThereIsObjectOverload");
+	__log("TEST: TestFloatCastToShortConversionWhenThereIsObjectOverload");
 	
 	var n = new com.tns.tests.NumericConversionTest();
 	var s = n.method4(float(65536 + 2));
@@ -165,7 +165,7 @@ var TestFloatCastToShortConversionWhenThereIsObjectOverload = function() {
 
 var TestByteCastToShortConversionWhenThereIsObjectOverload = function() {
 
-	Log("TEST: TestByteCastToShortConversionWhenThereIsObjectOverload");
+	__log("TEST: TestByteCastToShortConversionWhenThereIsObjectOverload");
 	
 	var n = new com.tns.tests.NumericConversionTest();
 	var s = n.method4(byte(65536 + 2));
@@ -174,7 +174,7 @@ var TestByteCastToShortConversionWhenThereIsObjectOverload = function() {
 
 var TestResolveMethodWithByteCast = function() {
 
-	Log("TEST: TestResolveMethodWithByteCast");
+	__log("TEST: TestResolveMethodWithByteCast");
 	
 	var n = new com.tns.tests.NumericConversionTest();
 	var s = n.method5(byte(65536 + 123));
@@ -183,7 +183,7 @@ var TestResolveMethodWithByteCast = function() {
 
 var TestResolveMethodWithShortCast = function() {
 
-	Log("TEST: TestResolveMethodWithShortCast");
+	__log("TEST: TestResolveMethodWithShortCast");
 	
 	var n = new com.tns.tests.NumericConversionTest();
 	var s = n.method5(short(65536 + 1234));
@@ -192,7 +192,7 @@ var TestResolveMethodWithShortCast = function() {
 
 var TestResolveMethodWithoutCastFunction = function() {
 
-	Log("TEST: TestResolveMethodWithoutCastFunction");
+	__log("TEST: TestResolveMethodWithoutCastFunction");
 	
 	var n = new com.tns.tests.NumericConversionTest();
 	var s = n.method5(123456);
@@ -201,7 +201,7 @@ var TestResolveMethodWithoutCastFunction = function() {
 
 var TestResolveMethodWithLongCast = function() {
 
-	Log("TEST: TestResolveMethodWithLongCast");
+	__log("TEST: TestResolveMethodWithLongCast");
 	
 	var n = new com.tns.tests.NumericConversionTest();
 	var s = n.method5(long("123456789012"));
@@ -210,7 +210,7 @@ var TestResolveMethodWithLongCast = function() {
 
 var TestResolveMethodWithFloatCast = function() {
 
-	Log("TEST: TestResolveMethodWithFloatCast");
+	__log("TEST: TestResolveMethodWithFloatCast");
 	
 	var n = new com.tns.tests.NumericConversionTest();
 	var s = n.method5(float(1.23));
@@ -219,7 +219,7 @@ var TestResolveMethodWithFloatCast = function() {
 
 var TestResolveMethodWithDoubleCast = function() {
 
-	Log("TEST: TestResolveMethodWithDoubleCast");
+	__log("TEST: TestResolveMethodWithDoubleCast");
 	
 	var n = new com.tns.tests.NumericConversionTest();
 	var s = n.method5(double(1));
@@ -228,7 +228,7 @@ var TestResolveMethodWithDoubleCast = function() {
 
 var TestResolveIntMethodWithNumberObjectWithIntArgument = function() {
 
-	Log("TEST: TestResolveIntMethodWithNumberObjectWithIntArgument");
+	__log("TEST: TestResolveIntMethodWithNumberObjectWithIntArgument");
 	
 	var n = new com.tns.tests.NumericConversionTest();
 	var s = n.method5(new Number(1));
@@ -237,7 +237,7 @@ var TestResolveIntMethodWithNumberObjectWithIntArgument = function() {
 
 var TestResolveIntMethodWithNumberObjectWithDoubleArgument = function() {
 
-	Log("TEST: TestResolveIntMethodWithNumberObjectWithDoubleArgument");
+	__log("TEST: TestResolveIntMethodWithNumberObjectWithDoubleArgument");
 	
 	var n = new com.tns.tests.NumericConversionTest();
 	var s = n.method5(new Number(1.23));

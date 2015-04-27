@@ -6,7 +6,7 @@ var Assert = function(condition, failMessage) {
 
 var TestConstructorOverrideForBuiltinType = function(context) {
 
-	Log("TEST: TestConstructorOverrideForBuiltinType");
+	__log("TEST: TestConstructorOverrideForBuiltinType");
 	
 	var ctorCalled = false;
 	var isConstructor = false;
@@ -26,7 +26,7 @@ var TestConstructorOverrideForBuiltinType = function(context) {
 
 var TestConstructorOverrideForBuiltinTypeWithInitMethod = function(context) {
 
-	Log("TEST: TestConstructorOverrideForBuiltinTypeWithInitMethod");
+	__log("TEST: TestConstructorOverrideForBuiltinTypeWithInitMethod");
 	
 	var initInvocationCount = 0;
 
@@ -38,7 +38,7 @@ var TestConstructorOverrideForBuiltinTypeWithInitMethod = function(context) {
 	
 	var datePicker = new MyDatePicker(context);
 	
-	Log("datePicker=" + datePicker);
+	__log("datePicker=" + datePicker);
 	
 	var count1 = initInvocationCount;
 	
@@ -53,7 +53,7 @@ var TestConstructorOverrideForBuiltinTypeWithInitMethod = function(context) {
 
 var TestBuiltinNestedClassCreation = function(context) {
 	
-	Log("TEST: TestBuiltinNestedClassCreation");
+	__log("TEST: TestBuiltinNestedClassCreation");
 	
 	var loader = new android.content.Loader(context);
 	
@@ -65,13 +65,13 @@ var TestBuiltinNestedClassCreation = function(context) {
 
 var TestPublicWindowManagerImplWithoutMetadata = function(context) {
 
-	Log("TEST: TestPublicWindowManagerImplWithoutMetadata");
+	__log("TEST: TestPublicWindowManagerImplWithoutMetadata");
 	
 	var windowManagerImpl = context.getSystemService(android.content.Context.WINDOW_SERVICE);
 	
 	var display = windowManagerImpl.getDefaultDisplay();
 	
-	//Log("display.isValid=" + display.isValid());
+	//__log("display.isValid=" + display.isValid());
 	
 	var displayInfo = display.toString();
 	
@@ -80,7 +80,7 @@ var TestPublicWindowManagerImplWithoutMetadata = function(context) {
 
 var TestUsingClassFromAndroidSupportLibrary = function(context) {
 
-	Log("TEST: TestUsingClassFromAndroidSupportLibrary");
+	__log("TEST: TestUsingClassFromAndroidSupportLibrary");
 
 	var layout = new android.support.v4.widget.DrawerLayout(context);
 	
@@ -89,7 +89,7 @@ var TestUsingClassFromAndroidSupportLibrary = function(context) {
 
 var TestCanPassCharSequenceArray = function(context) {
 	
-	Log("TEST: TestCanPassCharSequenceArray");
+	__log("TEST: TestCanPassCharSequenceArray");
 	
 	var alert = new android.app.AlertDialog.Builder(context);
     

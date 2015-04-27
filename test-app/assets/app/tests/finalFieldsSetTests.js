@@ -13,7 +13,7 @@ var When_a_java_final_field_is_set_exception_is_thrown = function() {
 	}
 	catch (e)
 	{
-		Log("Don't try to SET a final field " + e);
+		__log("Don't try to SET a final field " + e);
 		exceptionCaught = true;
 	}
 	

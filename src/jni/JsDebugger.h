@@ -25,6 +25,8 @@ namespace tns
 
 		static void SendCommand(uint16_t *cmd, int length);
 
+		static void DebugBreakCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
+
 	private:
 		JsDebugger();
 
@@ -33,6 +35,7 @@ namespace tns
 		static std::string s_packageName;
 		static jclass s_JsDebuggerClass;
 		static jmethodID s_EnqueueMessage;
+		static jmethodID s_EnableAgent;
 		static v8::Isolate *s_isolate;
 
 		static const int INVALID_PORT = -1;

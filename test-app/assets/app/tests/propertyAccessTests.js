@@ -6,7 +6,7 @@ var Assert = function(condition, failMessage) {
 
 var TestAccessPropertyGetterStartingWithLowerLetter = function() {
 
-	Log("TEST: TestAccessPropertyStartingWithLowerLetter");
+	__log("TEST: TestAccessPropertyStartingWithLowerLetter");
 	
 	var dummyClass = com.tns.tests.DummyClass.class;
 	
@@ -22,7 +22,7 @@ var TestAccessPropertyGetterStartingWithLowerLetter = function() {
 
 var TestAccessPropertySetterStartingWithLowerLetter = function() {
 
-	Log("TEST: TestAccessPropertySetterStartingWithLowerLetter");
+	__log("TEST: TestAccessPropertySetterStartingWithLowerLetter");
 	
 	var dummy = new com.tns.tests.DummyClass();
 	
@@ -39,7 +39,7 @@ var TestAccessPropertySetterStartingWithLowerLetter = function() {
 
 var TestAccessNonCamelCasePropertyWithoutGetter = function() {
 
-	Log("TEST: TestAccessNonCamelCasePropertyWithoutGetter");
+	__log("TEST: TestAccessNonCamelCasePropertyWithoutGetter");
 	
 	var d = new com.tns.tests.DummyClass("test");
 	
@@ -52,7 +52,7 @@ var TestAccessNonCamelCasePropertyWithoutGetter = function() {
 
 var TestAccessNonCamelCasePropertyWithoutSetter = function() {
 
-	Log("TEST: TestAccessNonCamelCasePropertyWithoutSetter");
+	__log("TEST: TestAccessNonCamelCasePropertyWithoutSetter");
 	
 	var dummy = new com.tns.tests.DummyClass();
 	

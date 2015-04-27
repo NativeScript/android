@@ -688,11 +688,6 @@ void NativeScriptRuntime::DumpReferenceTablesMethodCallback(const v8::FunctionCa
 	}
 }
 
-void NativeScriptRuntime::WaitForDebuggerMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
-{
-	// TODO:
-}
-
 void NativeScriptRuntime::EnableVerboseLoggingMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
 	JEnv env;
@@ -705,7 +700,7 @@ void NativeScriptRuntime::DisableVerboseLoggingMethodCallback(const v8::Function
 	env.CallStaticVoidMethod(PlatformClass, DISABLE_VERBOSE_LOGGING_METHOD_ID);
 }
 
-void NativeScriptRuntime::FailMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
+void NativeScriptRuntime::ExitMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
 	auto msg = ConvertToString(args[0].As<String>());
 	ASSERT_MESSAGE(false, "%s", msg.c_str());

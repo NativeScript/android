@@ -15,7 +15,7 @@ var When_naming_extension_class_user_should_give_valid_name = function() {
 	catch(e)
 	{
 		exceptionCaught = true;
-		Log("Validation is wrong");
+		__log("Validation is wrong");
 	}
 	
 	Assert(exceptionCaught === false, "FAILED: When_naming_extension_class_user_should_give_valid_name.");
@@ -30,7 +30,7 @@ var When_naming_extension_contains_invalid_symbols_should_throw_exception = func
 	}
 	catch(e)
 	{
-		Log('message: ' + e.message);
+		__log('message: ' + e.message);
 		exceptionCaught = true;
 	}
 	

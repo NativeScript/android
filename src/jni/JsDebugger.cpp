@@ -21,6 +21,9 @@ void JsDebugger::Init(v8::Isolate *isolate, const string& packageName)
 
 	s_EnqueueMessage = env.GetStaticMethodID(s_JsDebuggerClass, "enqueueMessage", "(Ljava/lang/String;)V");
 	assert(s_EnqueueMessage != nullptr);
+
+	s_EnableAgent = env.GetStaticMethodID(s_JsDebuggerClass, "enableAgent", "(Ljava/lang/String;IZ)V");
+	assert(s_EnqueueMessage != nullptr);
 }
 
 string JsDebugger::GetPackageName()
@@ -82,8 +85,27 @@ void JsDebugger::SendCommand(uint16_t *cmd, int length)
 	v8::Debug::SendCommand(isolate, cmd, length, nullptr);
 }
 
+void JsDebugger::DebugBreakCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
+{
+	JEnv env;
+	JniLocalRef packageName(env.NewStringUTF(s_packageName.c_str()));
+
+	jint port = 8181;
+	if ((args.Length() > 0) && args[0]->IsInt32())
+	{
+		port = args[0]->Int32Value();
+	}
+	jboolean jniFalse = JNI_FALSE;
+
+	env.CallStaticVoidMethod(s_JsDebuggerClass, s_EnableAgent, (jstring)packageName, port, jniFalse);
+
+	DebugBreak();
+}
+
+
 v8::Isolate* JsDebugger::s_isolate = nullptr;
 string JsDebugger::s_packageName = "";
 jclass JsDebugger::s_JsDebuggerClass = nullptr;
 jmethodID JsDebugger::s_EnqueueMessage = nullptr;
+jmethodID JsDebugger::s_EnableAgent = nullptr;
 

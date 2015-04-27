@@ -1,7 +1,7 @@
 global.__onUncaughtError = function(error){
 	if(error.nativeException){
-		Log("err.message: " + error.message);
-		Log("err.stackTrace: " + error.stackTrace);
+		__log("err.message: " + error.message);
+		__log("err.stackTrace: " + error.stackTrace);
 		// false == do not continue execution
 		return false;
 	}
