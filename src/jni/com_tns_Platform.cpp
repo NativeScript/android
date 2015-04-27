@@ -113,6 +113,8 @@ void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring pa
 
 	auto globalTemplate = ObjectTemplate::New();
 
+	const auto readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
+
 	globalTemplate->Set(ConvertToV8String("__startNDKProfiler"), FunctionTemplate::New(isolate, Profiler::StartNDKProfilerCallback));
 	globalTemplate->Set(ConvertToV8String("__stopNDKProfiler"), FunctionTemplate::New(isolate, Profiler::StopNDKProfilerCallback));
 	globalTemplate->Set(ConvertToV8String("__startCPUProfiler"), FunctionTemplate::New(isolate, Profiler::StartCPUProfilerCallback));
@@ -143,10 +145,10 @@ void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring pa
 	auto appTemplate = ObjectTemplate::New();
 	appTemplate->Set(ConvertToV8String("init"), FunctionTemplate::New(isolate, AppInitCallback));
 	auto appInstance = appTemplate->NewInstance();
-	global->Set(ConvertToV8String("app"), appInstance);
+	global->ForceSet(ConvertToV8String("app"), appInstance, readOnlyFlags);
 
-	global->Set(ConvertToV8String("global"), global);
-	global->Set(ConvertToV8String("__global"), global);
+	global->ForceSet(ConvertToV8String("global"), global, readOnlyFlags);
+	global->ForceSet(ConvertToV8String("__global"), global, readOnlyFlags);
 
 	ArgConverter::Init(g_jvm);
 
