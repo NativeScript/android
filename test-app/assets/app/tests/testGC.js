@@ -149,7 +149,7 @@ function test5() {
 	function indref4helper() {	
 		var _class1 = new com.tns.tests.Class1();
 		
-		Log("indref4helper _class1=" + _class1);
+		__log("indref4helper _class1=" + _class1);
 	
 		Object.defineProperty(this, "class1", {
 			get: function() {
@@ -183,7 +183,7 @@ function test5() {
 
 function testAccessingStringFieldWontLeak() {
 
-	Log("TEST: testAccessingStringFieldWontLeak");
+	__log("TEST: testAccessingStringFieldWontLeak");
 
 	var dummy = new com.tns.tests.DummyClass();
 	

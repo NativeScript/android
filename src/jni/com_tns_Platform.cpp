@@ -99,11 +99,6 @@ void PrepareExtendFunction(Isolate *isolate, jstring filesPath)
 	DEBUG_WRITE("Executed prepareExtend.js script");
 }
 
-void PrintHashCallback(const FunctionCallbackInfo<Value>& args)
-{
-	DEBUG_WRITE("%s, hashid=%d", ConvertToString(args[0]->ToString()).c_str(), args[1].As<Object>()->GetIdentityHash());
-}
-
 void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring packageName)
 {
 	const char v8flags[] = "--expose_gc";
@@ -120,16 +115,14 @@ void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring pa
 	globalTemplate->Set(ConvertToV8String("__startCPUProfiler"), FunctionTemplate::New(isolate, Profiler::StartCPUProfilerCallback));
 	globalTemplate->Set(ConvertToV8String("__stopCPUProfiler"), FunctionTemplate::New(isolate, Profiler::StopCPUProfilerCallback));
 	globalTemplate->Set(ConvertToV8String("__heapSnapshot"), FunctionTemplate::New(isolate, Profiler::HeapSnapshotMethodCallback));
-	globalTemplate->Set(ConvertToV8String("Log"), FunctionTemplate::New(isolate, NativeScriptRuntime::LogMethodCallback));
-	globalTemplate->Set(ConvertToV8String("dumpReferenceTables"), FunctionTemplate::New(isolate, NativeScriptRuntime::DumpReferenceTablesMethodCallback));
-	globalTemplate->Set(ConvertToV8String("waitForDebugger"), FunctionTemplate::New(isolate, NativeScriptRuntime::WaitForDebuggerMethodCallback));
-	globalTemplate->Set(ConvertToV8String("enableVerboseLogging"), FunctionTemplate::New(isolate, NativeScriptRuntime::EnableVerboseLoggingMethodCallback));
-	globalTemplate->Set(ConvertToV8String("disableVerboseLogging"), FunctionTemplate::New(isolate, NativeScriptRuntime::DisableVerboseLoggingMethodCallback));
-	globalTemplate->Set(ConvertToV8String("fail"), FunctionTemplate::New(isolate, NativeScriptRuntime::FailMethodCallback));
+	globalTemplate->Set(ConvertToV8String("__log"), FunctionTemplate::New(isolate, NativeScriptRuntime::LogMethodCallback));
+	globalTemplate->Set(ConvertToV8String("__dumpReferenceTables"), FunctionTemplate::New(isolate, NativeScriptRuntime::DumpReferenceTablesMethodCallback));
+	globalTemplate->Set(ConvertToV8String("__debugbreak"), FunctionTemplate::New(isolate, JsDebugger::DebugBreakCallback));
+	globalTemplate->Set(ConvertToV8String("__enableVerboseLogging"), FunctionTemplate::New(isolate, NativeScriptRuntime::EnableVerboseLoggingMethodCallback));
+	globalTemplate->Set(ConvertToV8String("__disableVerboseLogging"), FunctionTemplate::New(isolate, NativeScriptRuntime::DisableVerboseLoggingMethodCallback));
+	globalTemplate->Set(ConvertToV8String("__exit"), FunctionTemplate::New(isolate, NativeScriptRuntime::ExitMethodCallback));
 	globalTemplate->Set(ConvertToV8String("require"), FunctionTemplate::New(isolate, NativeScriptRuntime::RequireCallback));
 	globalTemplate->Set(ConvertToV8String("WeakRef"), FunctionTemplate::New(isolate, WeakRef::ConstructorCallback));
-	//
-	globalTemplate->Set(ConvertToV8String("printhash"), FunctionTemplate::New(isolate, PrintHashCallback));
 
 	SimpleProfiler::Init(isolate, globalTemplate);
 

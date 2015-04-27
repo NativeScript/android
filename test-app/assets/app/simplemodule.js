@@ -4,9 +4,9 @@ exports.myLog = function(s)
 {
 	if (arguments.length == 1)
 	{
-		Log("1+1=" + summer.add(1, 1))
+		__log("1+1=" + summer.add(1, 1))
 		
-		Log("global is working" + global)
+		__log("global is working" + global)
 	}
-	Log(s);
+	__log(s);
 }

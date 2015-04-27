@@ -6,7 +6,7 @@ var Assert = function(condition, failMessage) {
 
 var TestThrowJSExceptionThroughJavaAndCatchInJS = function() {
 
-	Log("TEST: TestThrowJSExceptionThroughJavaAndCatchInJS");
+	__log("TEST: TestThrowJSExceptionThroughJavaAndCatchInJS");
 	
 	var exceptionThrown = false;
 	var exceptionCaught = false;
@@ -31,7 +31,7 @@ var TestThrowJSExceptionThroughJavaAndCatchInJS = function() {
 	{
 		exceptionCaught = true;
 		sameExObject = e === ex;
-		Log("e=" + e);
+		__log("e=" + e);
 	}
 
 	Assert(exceptionThrown === true, "TestThrowJSExceptionThroughJavaAndCatchInJS FAILED: Exception should be thrown");
@@ -41,7 +41,7 @@ var TestThrowJSExceptionThroughJavaAndCatchInJS = function() {
 
 var TestThrowJavaExceptionFromJsThroughJavaAndCatchInJS = function() {
 
-	Log("TEST: TestThrowJavaExceptionFromJsThroughJavaAndCatchInJS");
+	__log("TEST: TestThrowJavaExceptionFromJsThroughJavaAndCatchInJS");
 	
 	var exceptionThrown = false;
 	var exceptionCaught = false;
@@ -81,7 +81,7 @@ var TestThrowJavaExceptionFromJsThroughJavaAndCatchInJS = function() {
 
 var TestThrowJSExceptionAndCatchInJava = function() {
 
-	Log("TEST: TestThrowJSExceptionAndCatchInJava");
+	__log("TEST: TestThrowJSExceptionAndCatchInJava");
 	
 	var exceptionThrown = false;
 	var exceptionCaught = true;
@@ -111,7 +111,7 @@ var TestThrowJSExceptionAndCatchInJava = function() {
 
 var TestThrowJavaExceptionFromJsAndCatchInJava = function() {
 
-	Log("TEST: TestThrowJavaExceptionFromJsAndCatchInJava");
+	__log("TEST: TestThrowJavaExceptionFromJsAndCatchInJava");
 	
 	var exceptionThrown = false;
 	var exceptionCaught = true;
@@ -143,7 +143,7 @@ var TestThrowJavaExceptionFromJsAndCatchInJava = function() {
 
 var TestMethodThatThrowsException = function() {
 	
-	Log("TEST: TestMethodThatThrowsException");
+	__log("TEST: TestMethodThatThrowsException");
 	
 	var exceptionCaught = false;
 	
@@ -163,7 +163,7 @@ var TestMethodThatThrowsException = function() {
 
 var TestErrorObjectContainsJavaNativeException = function() {
 	
-	Log("TEST: TestErrorObjectContainsJavaNativeException");
+	__log("TEST: TestErrorObjectContainsJavaNativeException");
 	
 	var nativeException = undefined;
 	
@@ -178,7 +178,7 @@ var TestErrorObjectContainsJavaNativeException = function() {
 		var nativeException = e.nativeException;
 	}
 
-	Log("nativeException=" + nativeException);
+	__log("nativeException=" + nativeException);
 	
 	Assert(nativeException != undefined, "TestErrorObjectContainsJavaNativeException FAILED: Error object does not contain Java native exception");
 	
@@ -189,7 +189,7 @@ var TestErrorObjectContainsJavaNativeException = function() {
 
 var TestConstructorThatThrowsException = function() {
 	
-	Log("TEST: TestConstructorThatThrowsException");
+	__log("TEST: TestConstructorThatThrowsException");
 	
 	var exceptionCaught = false;
 	
@@ -207,7 +207,7 @@ var TestConstructorThatThrowsException = function() {
 
 var TestArrayElementGetAccessThatThrowsException = function() {
 
-	Log("TEST: TestArrayElementGetAccessThatThrowsException");
+	__log("TEST: TestArrayElementGetAccessThatThrowsException");
 	
 	var exceptionCaught = false;
 
@@ -235,7 +235,7 @@ var TestArrayElementGetAccessThatThrowsException = function() {
 
 var TestArrayElementSetAccessThatThrowsException = function() {
 
-	Log("TEST: TestArrayElementSetAccessThatThrowsException");
+	__log("TEST: TestArrayElementSetAccessThatThrowsException");
 	
 	var exceptionCaught = false;
 

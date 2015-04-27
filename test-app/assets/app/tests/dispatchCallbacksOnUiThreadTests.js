@@ -6,7 +6,7 @@ var Assert = function(condition, failMessage) {
 
 var TestProcessDataCallbackShouldBeExecutedOnUiThread = function() {
 
-	Log("TEST: TestProcessDataCallbackShouldBeExecutedOnUiThread"); 
+	__log("TEST: TestProcessDataCallbackShouldBeExecutedOnUiThread"); 
 
 	var D = com.tns.tests.DispatchAsyncOpOnUIThreadTest.extend("DispatchAsyncOpOnUIThreadTest", {
 		processData: function(index, data) {
