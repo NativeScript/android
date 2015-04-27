@@ -26,12 +26,12 @@ import android.util.Log;
 import android.util.SparseArray;
 
 import com.tns.bindings.ProxyGenerator;
-import com.tns.internal.DefaultEtractPolicy;
+import com.tns.internal.DefaultExtractPolicy;
 import com.tns.internal.ExtractPolicy;
 
 public class Platform
 {
-	private static native void initNativeScript(String filesPath, int appJavaObjectId, boolean verboseLoggingEnabled, String packageName,  int debuggerPort);
+	private static native void initNativeScript(String filesPath, int appJavaObjectId, boolean verboseLoggingEnabled, String packageName);
 
 	private static native void runNativeScript(String appModuleName, String appContent);
 
@@ -112,15 +112,18 @@ public class Platform
 
 		AssetExtractor.extractAssets(context, extractPolicy);
 		Require.init(context);
+		Platform.initNativeScript(Require.getApplicationFilesPath(), appJavaObjectId, IsLogEnabled, context.getPackageName());
 		int debuggerPort = jsDebugger.getDebuggerPortFromEnvironment();
-		Platform.initNativeScript(Require.getApplicationFilesPath(), appJavaObjectId, IsLogEnabled, context.getPackageName(), debuggerPort);
 		
 		//
-		Date d = new Date();
-		int pid = android.os.Process.myPid();
-		File f = new File("/proc/" + pid);
-		Date lastModDate = new Date(f.lastModified());
-		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "init time=" + (d.getTime() - lastModDate.getTime()));
+		if (IsLogEnabled)
+		{
+			Date d = new Date();
+			int pid = android.os.Process.myPid();
+			File f = new File("/proc/" + pid);
+			Date lastModDate = new Date(f.lastModified());
+			Log.d(DEFAULT_LOG_TAG, "init time=" + (d.getTime() - lastModDate.getTime()));
+		}
 		//
 		
 		return appJavaObjectId;
@@ -179,7 +182,7 @@ public class Platform
 	{
 		if (policy == null)
 		{
-			policy = new DefaultEtractPolicy();
+			policy = new DefaultExtractPolicy();
 		}
 		
 		extractPolicy = policy;
@@ -205,13 +208,8 @@ public class Platform
 		return ctorId;
 	}
 
-	public static Object createInstance(String name, String className, Object[] args, String[] methodOverrides, int objectId, int constructorId) throws InstantiationException, IllegalAccessException, ClassNotFoundException, NoSuchMethodException, IllegalArgumentException, InvocationTargetException, IOException
+	private static Object createInstance(Object[] args, String[] methodOverrides, int objectId, int constructorId) throws InstantiationException, IllegalAccessException, ClassNotFoundException, NoSuchMethodException, IllegalArgumentException, InvocationTargetException, IOException
 	{
-		if (IsLogEnabled)
-		{
-			Log.d(DEFAULT_LOG_TAG, "Creating instance for ctorId:" + constructorId + " className:" + className + " methodOverrides: " + Arrays.toString(methodOverrides));
-		}
-		
 		Constructor<?> ctor = ctorCache.get(constructorId);
 		boolean success = MethodResolver.convertConstructorArgs(ctor, args);
 

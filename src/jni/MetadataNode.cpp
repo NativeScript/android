@@ -5,6 +5,7 @@
 #include "V8GlobalHelpers.h"
 #include "V8StringConstants.h"
 #include "ExceptionUtil.h"
+#include "SimpleProfiler.h"
 #include <sstream>
 #include <cctype>
 #include <assert.h>
@@ -328,6 +329,8 @@ Handle<Function> MetadataNode::SetMembers(Isolate *isolate, Handle<FunctionTempl
 
 Handle<Function> MetadataNode::SetMembersFromStaticMetadata(Isolate *isolate, Handle<FunctionTemplate>& ctorFuncTemplate, Handle<ObjectTemplate>& prototypeTemplate, MetadataTreeNode *treeNode)
 {
+	SET_PROFILER_FRAME();
+
 	Handle<Function> ctorFunction;
 
 	uint8_t *curPtr = s_metadataReader.GetValueData() + treeNode->offsetValue + 1;
@@ -422,8 +425,7 @@ Handle<Function> MetadataNode::SetMembersFromStaticMetadata(Isolate *isolate, Ha
 
 Handle<Function> MetadataNode::SetMembersFromRuntimeMetadata(Isolate *isolate, Handle<FunctionTemplate>& ctorFuncTemplate, Handle<ObjectTemplate>& prototypeTemplate, MetadataTreeNode *treeNode)
 {
-	DEBUG_WRITE("SetMembersFromRuntimeMetadata");
-
+	SET_PROFILER_FRAME();
 
 	assert(treeNode->metadata != nullptr);
 
@@ -563,6 +565,8 @@ void MetadataNode::SetInnnerTypes(Isolate *isolate, Handle<Function>& ctorFuncti
 
 Handle<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate *isolate, MetadataTreeNode *treeNode)
 {
+	SET_PROFILER_FRAME();
+
 	Handle<FunctionTemplate> ctorFuncTemplate;
 	auto itFound = s_ctorFuncCache.find(treeNode);
 	if (itFound != s_ctorFuncCache.end())
@@ -666,6 +670,8 @@ void MetadataNode::SetPackageMetadata(Isolate *isolate, Handle<Object> value, Me
 
 void MetadataNode::ExtendedClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
+	SET_PROFILER_FRAME();
+
 	assert(info.IsConstructCall());
 
 	auto isolate = info.GetIsolate();
@@ -689,6 +695,8 @@ void MetadataNode::ExtendedClassConstructorCallback(const v8::FunctionCallbackIn
 
 void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
+	SET_PROFILER_FRAME();
+
 	auto thiz = info.This();
 	auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value());
 
@@ -743,6 +751,8 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
 
 void MetadataNode::ClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
+	SET_PROFILER_FRAME();
+
 	auto thiz = info.This();
 	auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value());
 
@@ -760,6 +770,8 @@ void MetadataNode::ClassConstructorCallback(const v8::FunctionCallbackInfo<v8::V
 
 void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
+	SET_PROFILER_FRAME();
+
 	auto e = info.Data().As<External>();
 
 	auto callbackData = reinterpret_cast<MethodCallbackData*>(e->Value());
@@ -1039,6 +1051,8 @@ MetadataNode::ExtendedClassCacheData MetadataNode::GetCachedExtendedClassData(Is
 
 void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
+	SET_PROFILER_FRAME();
+
 	Handle<Object> implementationObject;
 	Handle<String> extendName;
 	string extendLocation;

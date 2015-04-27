@@ -17,14 +17,12 @@ public class Require
 	private static String ModulesFilesPath;
 	private static String NativeScriptModulesFilesPath;
 	private static boolean initialized = false;
-	//private static final String ModuleContent = "(function(){\n var module = {}; module.exports = arguments[0];" + "var exports = module.exports; var __dirname = \"%s\"; var __filename = \"%s\";" + "function require(moduleName){ return global.require(moduleName, __filename); }" + "module.filename = __filename; this.__extends = global.__extends; \n %s \n return module.exports; \n})";
 	private static final String ModuleContent_Part1 = "(function(){\n var module = {}; module.exports = arguments[0];" + "var exports = module.exports; var __dirname = \"";
 	private static final String ModuleContent_Part2 = "\"; var __filename = \"";
 	private static final String ModuleContent_Part3 = "\";" + "function require(moduleName){ return __global.require(moduleName, __filename); }" + "module.filename = __filename; this.__extends = __global.__extends; \n";
-	private static final String ModuleContent_Part4 ="\n return module.exports; \n})";
+	private static final String ModuleContent_Part4 = "\n return module.exports; \n})";
 	private static final StringBuffer ModuleContent = new StringBuffer(65536);
-	private static HashMap<String, String> modulePathCache = new HashMap<String, String>();
-	
+
 	public static void init(Context context)
 	{
 		if (initialized)
@@ -36,15 +34,16 @@ public class Require
 
 		ApplicationFilesPath = context.getApplicationContext().getFilesDir().getPath();
 		ModulesFilesPath = "/app/";
-		
+
 		NativeScriptModulesFilesPath = "/app/tns_modules/";
-		
+
 		// Support previous tns_modules location for now
-		// NOTE: This functionality is temporary and is to be deleted within several months
+		// NOTE: This functionality is temporary and is to be deleted within
+		// several months
 		File file = new File(ApplicationFilesPath + NativeScriptModulesFilesPath);
-		if(!file.exists())
+		if (!file.exists())
 		{
-			NativeScriptModulesFilesPath = "/tns_modules/"; 
+			NativeScriptModulesFilesPath = "/tns_modules/";
 		}
 
 		initialized = true;
@@ -58,25 +57,25 @@ public class Require
 	public static String[] bootstrapApp()
 	{
 		// Bootstrap logic flows like:
-		// 	1. Check for package.json -> `main` field
-		// 	2. Check for index.js
-		// 	3. Check for bootstrap.js
-		
+		// 1. Check for package.json -> `main` field
+		// 2. Check for index.js
+		// 3. Check for bootstrap.js
+
 		File bootstrapFile = findModuleFile("./", "");
-		if(!bootstrapFile.exists())
+		if (!bootstrapFile.exists())
 		{
 			bootstrapFile = findModuleFile("./bootstrap", "");
 		}
-		
-		if(!bootstrapFile.exists())
+
+		if (!bootstrapFile.exists())
 		{
 			Platform.APP_FAIL("Application entry point file not found. Please specify either package.json with main field, index.js or bootstrap.js!");
 		}
-		
+
 		String[] bootstrapInfo = new String[2];
-		bootstrapInfo[0] = bootstrapFile.getName();
+		bootstrapInfo[0] = bootstrapFile.getAbsolutePath();
 		bootstrapInfo[1] = getModuleContent(bootstrapFile.getPath());
-		
+
 		return bootstrapInfo;
 	}
 
@@ -113,8 +112,8 @@ public class Require
 			ModuleContent.append(ModuleContent_Part3);
 			ModuleContent.append(moduleFileContent);
 			ModuleContent.append(ModuleContent_Part4);
-			String content = ModuleContent.toString(); 
-			return content;  
+			String content = ModuleContent.toString();
+			return content;
 		}
 		catch (IOException e)
 		{
@@ -124,16 +123,9 @@ public class Require
 			return "";
 		}
 	}
-	
+
 	public static String getModulePath(String moduleName, String callingModuleName)
 	{
-		String cachedPath = modulePathCache.get(moduleName);
-		if (cachedPath != null)
-		{
-			return cachedPath;
-		}
-		
-		
 		// This method is called my the NativeScriptRuntime.cpp RequireCallback
 		// method.
 		// The currentModuleName is the fully-qualified path of the previously
@@ -164,8 +156,7 @@ public class Require
 			}
 			else
 			{
-				String result = file.getPath();
-				modulePathCache.put(moduleName, result);
+				String result = file.getAbsolutePath();
 				return result;
 			}
 		}
@@ -194,7 +185,7 @@ public class Require
 
 	private static File findModuleFile(String moduleName, String currentDirectory)
 	{
-		
+
 		File directory = null;
 		File jsFile = null;
 		boolean isJSFile = moduleName.endsWith(".js");

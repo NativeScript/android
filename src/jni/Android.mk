@@ -3,22 +3,47 @@ LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 LOCAL_MODULE    := v8_base
 ifeq ($(TARGET_ARCH_ABI),armeabi-v7a)
-    LOCAL_SRC_FILES := libs/arm/libv8_base.arm.a
+    LOCAL_SRC_FILES := libs/arm/libv8_base.a
 else ifeq ($(TARGET_ARCH_ABI),armeabi)
-    LOCAL_SRC_FILES := libs/arm/libv8_base.arm.a
+    LOCAL_SRC_FILES := libs/arm/libv8_base.a
 else ifeq ($(TARGET_ARCH_ABI),x86)
-    LOCAL_SRC_FILES := libs/x86/libv8_base.ia32.a
+    LOCAL_SRC_FILES := libs/x86/libv8_base.a
 endif
 include $(PREBUILT_STATIC_LIBRARY)
 
 include $(CLEAR_VARS)
+LOCAL_MODULE    := v8_libplatform
+ifeq ($(TARGET_ARCH_ABI),armeabi-v7a)
+    LOCAL_SRC_FILES := libs/arm/libv8_libplatform.a
+else ifeq ($(TARGET_ARCH_ABI),armeabi)
+    LOCAL_SRC_FILES := libs/arm/libv8_libplatform.a
+else ifeq ($(TARGET_ARCH_ABI),x86)
+    LOCAL_SRC_FILES := libs/x86/libv8_libplatform.a
+endif
+include $(PREBUILT_STATIC_LIBRARY)
+
+
+include $(CLEAR_VARS)
+LOCAL_MODULE    := v8_libbase
+ifeq ($(TARGET_ARCH_ABI),armeabi-v7a)
+    LOCAL_SRC_FILES := libs/arm/libv8_libbase.a
+else ifeq ($(TARGET_ARCH_ABI),armeabi)
+    LOCAL_SRC_FILES := libs/arm/libv8_libbase.a
+else ifeq ($(TARGET_ARCH_ABI),x86)
+    LOCAL_SRC_FILES := libs/x86/libv8_libbase.a
+endif
+include $(PREBUILT_STATIC_LIBRARY)
+
+
+
+include $(CLEAR_VARS)
 LOCAL_MODULE    := v8_nosnapshot
 ifeq ($(TARGET_ARCH_ABI),armeabi-v7a)
-    LOCAL_SRC_FILES := libs/arm/libv8_nosnapshot.arm.a
+    LOCAL_SRC_FILES := libs/arm/libv8_nosnapshot.a
 else ifeq ($(TARGET_ARCH_ABI),armeabi)
-    LOCAL_SRC_FILES := libs/arm/libv8_nosnapshot.arm.a
+    LOCAL_SRC_FILES := libs/arm/libv8_nosnapshot.a
 else ifeq ($(TARGET_ARCH_ABI),x86)
-    LOCAL_SRC_FILES := libs/x86/libv8_nosnapshot.ia32.a
+    LOCAL_SRC_FILES := libs/x86/libv8_nosnapshot.a
 endif
 include $(PREBUILT_STATIC_LIBRARY)
 
@@ -47,14 +72,14 @@ LOCAL_SRC_FILES := com_tns_Platform.cpp com_tns_JsDebugger.cpp com_tns_AssetExtr
 					FieldAccessor.cpp ArrayElementAccessor.cpp \
 					ExceptionUtil.cpp Util.cpp Logger.cpp Profiler.cpp \
 					ObjectManager.cpp NumericCasts.cpp WeakRef.cpp \
-					MetadataMethodInfo.cpp
+					MetadataMethodInfo.cpp SimpleProfiler.cpp
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/include
 LOCAL_LDLIBS    := -llog -landroid -lz
 ifeq ($(TARGET_ARCH_ABI),armeabi-v7a)
-LOCAL_STATIC_LIBRARIES := v8_base v8_nosnapshot zip android-ndk-profiler
+LOCAL_STATIC_LIBRARIES := v8_base v8_libbase v8_libplatform v8_nosnapshot zip android-ndk-profiler
 #LOCAL_CFLAGS += -pg -DNDK_PROFILER_ENABLED
 else
-LOCAL_STATIC_LIBRARIES := v8_base v8_nosnapshot zip
+LOCAL_STATIC_LIBRARIES := v8_base v8_libbase v8_libplatform v8_nosnapshot zip
 endif
 include $(BUILD_SHARED_LIBRARY)
 
