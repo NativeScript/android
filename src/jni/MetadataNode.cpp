@@ -37,8 +37,8 @@ void MetadataNode::SubscribeCallbacks(ObjectManager *objectManager,
 	s_getArrayLength = getArrayLengthCallback;
 
 	auto isolate = Isolate::GetCurrent();
-	auto key = Symbol::New(isolate, ConvertToV8String("tns::MetadataKey"));
-	s_metadataKey = new Persistent<Symbol>(isolate, key);
+	auto key = ConvertToV8String("tns::MetadataKey");
+	s_metadataKey = new Persistent<String>(isolate, key);
 }
 
 
@@ -635,8 +635,8 @@ void MetadataNode::SetTypeMetadata(Isolate *isolate, Handle<Function> value, Typ
 MetadataNode* MetadataNode::GetInstanceMetadata(Isolate *isolate, const Handle<Object>& value)
 {
 	MetadataNode *node = nullptr;
-	auto key = Local<Symbol>::New(isolate, *s_metadataKey);
-	auto ext = value->Get(key);
+	auto key = Local<String>::New(isolate, *s_metadataKey);
+	auto ext = value->GetHiddenValue(key);
 	if (!ext.IsEmpty())
 	{
 		node = reinterpret_cast<MetadataNode*>(ext.As<External>()->Value());
@@ -646,8 +646,8 @@ MetadataNode* MetadataNode::GetInstanceMetadata(Isolate *isolate, const Handle<O
 
 void MetadataNode::SetInstanceMetadata(Isolate *isolate, Handle<Object> value, MetadataNode *node)
 {
-	auto key = Local<Symbol>::New(isolate, *s_metadataKey);
-	value->Set(key, External::New(isolate, node));
+	auto key = Local<String>::New(isolate, *s_metadataKey);
+	value->SetHiddenValue(key, External::New(isolate, node));
 }
 
 MetadataNode* MetadataNode::GetPackageMetadata(Isolate *isolate, const Handle<Object>& value)
@@ -1280,6 +1280,6 @@ string MetadataNode::TNS_PREFIX = "com/tns/gen/";
 MetadataReader MetadataNode::s_metadataReader;
 ObjectManager* MetadataNode::s_objectManager = nullptr;
 
-Persistent<Symbol>* MetadataNode::s_metadataKey = nullptr;
+Persistent<String>* MetadataNode::s_metadataKey = nullptr;
 map<MetadataTreeNode*, Persistent<FunctionTemplate>*> MetadataNode::s_ctorFuncCache;
 map<string, MetadataNode::ExtendedClassCacheData> MetadataNode::s_extendedCtorFuncCache;

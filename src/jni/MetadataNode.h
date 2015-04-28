@@ -259,7 +259,7 @@ namespace tns
 
 		static MetadataReader s_metadataReader;
 
-		static v8::Persistent<v8::Symbol> *s_metadataKey;
+		static v8::Persistent<v8::String> *s_metadataKey;
 
 		static ObjectManager *s_objectManager;
 
