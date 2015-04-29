@@ -1,10 +1,26 @@
-Android Runtime Changelog
-==============================
+# Android Runtime Changelog
 
-0.10.0 (2015, April 17)
-==
+## 1.0.0 (2015, April 29)
+
+### New
+
+* Updated the V8 version to 4.1.0.27.
+* Re-implemented debugger support (no more spontaneous dead locks).
 
 ### Fixed
+
+* An issue with the error reporting routine.
+
+### Breaking Changes
+
+* Renamed global functions:
+	* `__log` (was `Log`)
+	* `__debugbreak` (was `waitForDebugger`)
+	* `__enableVerboseLogging` (was `enableVerboseLogging`)
+	* `__disableVerboseLogging` (was `disableVerboseLogging`)
+	* `__exit` (was `fail`)
+
+## 0.10.0 (2015, April 17)
 
 ### New
 
