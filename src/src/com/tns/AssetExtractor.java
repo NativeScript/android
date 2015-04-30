@@ -32,7 +32,7 @@ public class AssetExtractor
 		}
 		else if (extractPolicy.shouldExtract(context))
 		{
-			String appRoot = context.getFilesDir().getPath() + "/";
+			String appRoot = context.getFilesDir().getPath() + File.separator;
 			String apkPath = context.getPackageCodePath();
 
 			boolean forceOverwrite = extractPolicy.forceOverwrite();
