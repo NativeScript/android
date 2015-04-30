@@ -28,7 +28,7 @@ public class DefaultExtractPolicy implements ExtractPolicy
 		{
 			String assetsThumbFilePath = context.getFilesDir().getPath() + File.separatorChar + ASSETS_THUMB_FILENAME;
 			String oldAssetsThumb = getCachedAssetsThumb(assetsThumbFilePath);
-			if (oldAssetsThumb == null || !assetsThumb.equals(assetsThumbFilePath))
+			if (oldAssetsThumb == null || !assetsThumb.equals(oldAssetsThumb))
 			{
 				saveNewAssetsThumb(assetsThumb, assetsThumbFilePath);
 				return true;
