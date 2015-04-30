@@ -50,7 +50,7 @@ public class JsDebugger
 	
 	private static final String portEnvOutputFile = "envDebug.out";
 
-	private static final String DEBUG_BRAKE_FILENAME = "debugbrake";
+	private static final String DEBUG_BRAKE_FILENAME = "debugbreak";
 
 	private static int currentPort = INVALID_PORT;
 
