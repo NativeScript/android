@@ -21,7 +21,7 @@ module.exports = function(grunt) {
 
     grunt.initConfig({
 		wait: {
-			forDelay: {
+			timeToRunTests: {
 				options: {
 					delay: 20000
 				}
@@ -40,15 +40,15 @@ module.exports = function(grunt) {
             }
         },
         exec: {
-			createTestAppBuildFile: {
+			createBuildXml: {
 				cmd: "android update project --path ."
 			},
 			runAntCleanRelease: {
 				cmd: "ant release"
 			},
 			installApkOnDevice: {
-				cmd: "adb install -r NativeScriptActivity-release.apk",
-				cwd: "./bin"
+				cmd: "node ./tasks/deploy-apk.js ./bin/NativeScriptActivity-release.apk",
+				cwd: "."
 			},
 			startInstalledApk: {
 				cmd: "adb shell am start -n com.tns.android_runtime_testapp/com.tns.NativeScriptActivity -a android.intent.action.MAIN -c android.intent.category.LAUNCHER",
@@ -71,11 +71,11 @@ module.exports = function(grunt) {
     grunt.registerTask("default", [
                             "clean:build",
                             "mkdir:build",
-							"exec:createTestAppBuildFile",
-							"exec:runAntCleanRelease",
+							"exec:createBuildXml",
+							"exec:runAntCleanRelease", 
                             "exec:installApkOnDevice",
                             "exec:startInstalledApk",
-							"wait:forDelay",
+							"wait:timeToRunTests",
 							"exec:copyResultToDist"
                         ]);
 
