@@ -4,33 +4,26 @@ module.exports = function(grunt) {
 
     var pathModule = require("path");
 
-    var args = {
-        buildVersion: grunt.option("build-version") || "0.0.1",
-        commitVersion: grunt.option("commit-version") || process.env.GIT_COMMIT || ""
-    };
-
     var localCfg = {
         rootDir: ".",
         outDir: "./dist",
-        commitVersion: args.commitVersion,
     };
-
-    localCfg.jniDir = pathModule.join(localCfg.rootDir, "/jni"),
-    localCfg.runtimeVersionHFile = pathModule.join(localCfg.rootDir, "/jni/Version.h"),
-    localCfg.applicationMkFile = pathModule.join(localCfg.rootDir, "/jni/Application.mk"),
 
     grunt.initConfig({
 		wait: {
 			timeToRunTests: {
 				options: {
-					delay: 20000
+					delay: 180000
 				}
 			}
 		},
         clean: {
             build: {
                 src: [localCfg.outDir]
-            }
+            },
+			metadata: {
+				src: "./assets/metadata/*"
+			}
         },
         mkdir: {
             build: {
@@ -43,7 +36,7 @@ module.exports = function(grunt) {
 			createBuildXml: {
 				cmd: "android update project --path ."
 			},
-			runAntCleanRelease: {
+			runAntRelease: {
 				cmd: "ant release"
 			},
 			installApkOnDevice: {
@@ -58,7 +51,20 @@ module.exports = function(grunt) {
 				cmd: "adb pull /sdcard/android_unit_test_results.xml",
 				cwd: localCfg.outDir
 			}
-        }
+        },
+		copy: {
+			//these .so files need to be in the src/libs folder because the test-app refers them 
+			//later if we want to separate the tests from the build, these files can be taken from k:distributions ... stable/android-runtime/ ...
+			generatedLibraries: {
+				expand: true,
+				cwd: "../src/dist/libs/",
+				src: [
+					"**/armeabi-v7a/*",
+					"**/x86/*"
+				],
+				dest: "../src/libs/"
+			}
+		}
     });
 
     grunt.loadNpmTasks("grunt-contrib-clean");
@@ -71,8 +77,13 @@ module.exports = function(grunt) {
     grunt.registerTask("default", [
                             "clean:build",
                             "mkdir:build",
+							"copy:generatedLibraries",
 							"exec:createBuildXml",
-							"exec:runAntCleanRelease", 
+							
+							//currently runAntRelease step includes an ant custom build step which generates latest greatest metadata
+							//currently we generate metadata using the target sdk declared in the AndroidManifest file and if the sdk is missing the build will fail
+							"exec:runAntRelease", 
+							
                             "exec:installApkOnDevice",
                             "exec:startInstalledApk",
 							"wait:timeToRunTests",
