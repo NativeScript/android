@@ -1,23 +1,41 @@
-function TestSecondaryCallbackInvokationWithObjectParamsShouldWork()
-{
-	var u = new com.tns.tests.UseCallbackTest(123);
+describe("Tests for memmory managment", function () {
 	
-	u.setDataCallback(new com.tns.tests.UseCallbackTest.DataCallback("DataCallback_5", {
-		onData: function(data, delay) {
-			android.util.Log.i("TNS.TESTS", "data=" + data.getData());
-		}
-	}));
+	var myCustomEquality = function(first, second) {
+		return first == second;
+	};
 	
-	u.setCleanCallback(new com.tns.tests.UseCallbackTest.CleanCallback("CleanCallback11", {
-		onClean: function(delay) {
-			gc();
-			java.lang.System.gc();
-		}
-	}));
+	beforeEach(function() {
+		jasmine.addCustomEqualityTester(myCustomEquality);
+	});
+	
+	it("TestSecondaryCallbackInvokationWithObjectParamsShouldWork", function () {
+		
+		var u = new com.tns.tests.UseCallbackTest(123);
+		
+		u.setDataCallback(new com.tns.tests.UseCallbackTest.DataCallback("DataCallback_5", {
+			onData: function(data, delay) {
+				if("inner spec: ", function () {
+					android.util.Log.i("TNS.TESTS", "data=" + data.getData());
+					expect(data).not.toEqual(undefined);
+					expect(delay).not.toEqual(undefined);	
+				});
+			}
+		}));
+		
+		u.setCleanCallback(new com.tns.tests.UseCallbackTest.CleanCallback("CleanCallback11", {
+			onClean: function(delay) {
+				if("inner spec: ", function () {
+					expect(delay).not.toEqual(undefined);
+					gc();
+					java.lang.System.gc();
+				});
+			}
+		}));
 
-	u.enqueDataCallback(0);
-	u.enqueDataCallback(10 * 1000);
-	u.enqueCleanCallback(0);
-}
-
-TestSecondaryCallbackInvokationWithObjectParamsShouldWork();
+		u.enqueDataCallback(0);
+		u.enqueDataCallback(10 * 1000);
+		u.enqueCleanCallback(0);
+		expect(true).toBe(true);
+		expect(true).toEqual(true);
+	});
+});

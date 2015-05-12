@@ -195,7 +195,19 @@ module.exports = function(grunt) {
             },
             runMetadataGenerator: {
                 cmd: "./node_modules/.bin/generate-metadata " + localCfg.libsDir + " ./dist/framework/assets/metadata"
-            }
+            },
+			runTests: {
+				cmd: "npm install && grunt --verbose",
+                cwd: "./test-app"
+			},
+			antCleanBindingGenerator: {
+				cmd: "ant clean",
+				cwd: "./binding-generator/Generator/"
+			},
+			antCleanRunTime: {
+				cmd: "ant clean",
+				cwd: "./src/"
+			},
         }
     });
 
@@ -206,7 +218,7 @@ module.exports = function(grunt) {
     grunt.loadNpmTasks("grunt-replace");
 
     grunt.registerTask("generateRuntime", [
-                            "exec:generateRuntime"
+				"exec:generateRuntime"
             ]);
 
     grunt.registerTask("generateMetadata", [
@@ -230,6 +242,12 @@ module.exports = function(grunt) {
             return [];
         }
     })());
+	
+	grunt.registerTask("test", [
+				"exec:antCleanBindingGenerator",
+				"exec:antCleanRunTime",
+				"exec:runTests"
+            ]);
 
     grunt.registerTask("default", [
                             "clean:build",
