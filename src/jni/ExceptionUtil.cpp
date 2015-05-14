@@ -241,7 +241,7 @@ string ExceptionUtil::GetErrorStackTrace(const Handle<StackTrace>& stackTrace)
 	return ss.str();
 }
 
-bool ExceptionUtil::ThrowExceptionToJava(TryCatch& tc, const string& prependMessage)
+void ExceptionUtil::ThrowExceptionToJava(TryCatch& tc, const string& prependMessage)
 {
 	Isolate *isolate = Isolate::GetCurrent();
 	auto ex = tc.Exception();

@@ -671,7 +671,7 @@ void NativeScriptRuntime::LogMethodCallback(const v8::FunctionCallbackInfo<v8::V
 	ASSERT_MESSAGE(args[0]->IsString(), "Log should be called with string parameter");
 
 	String::Utf8Value message(args[0]->ToString());
-	DEBUG_WRITE(*message);
+	DEBUG_WRITE("%s", *message);
 }
 
 void NativeScriptRuntime::DumpReferenceTablesMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -925,7 +925,7 @@ void NativeScriptRuntime::BuildMetadata(JEnv& env, jstring filesPath)
 	long millis1 = (time1.tv_sec * 1000) + (time1.tv_usec / 1000);
 	long millis2 = (time2.tv_sec * 1000) + (time2.tv_usec / 1000);
 
-	__android_log_print(ANDROID_LOG_DEBUG, "TNS.Native", "time=%d", (millis2 - millis1));
+	__android_log_print(ANDROID_LOG_DEBUG, "TNS.Native", "time=%ld", (millis2 - millis1));
 
 	MetadataNode::BuildMetadata(lenNodes, reinterpret_cast<uint8_t*>(nodes), lenNames, reinterpret_cast<uint8_t*>(names), lenValues, reinterpret_cast<uint8_t*>(values));
 

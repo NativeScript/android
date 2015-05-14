@@ -348,7 +348,7 @@ extern "C" jobject Java_com_tns_Platform_callJSMethodNative(JNIEnv *_env, jobjec
 	string exceptionMessage = ss.str();
 	if (ExceptionUtil::GetInstance()->HandleTryCatch(tc, exceptionMessage))
 	{
-		DEBUG_WRITE(exceptionMessage.c_str());
+		DEBUG_WRITE("%s", exceptionMessage.c_str());
 	}
 
 	jobject javaObject = ConvertJsValueToJavaObject(env, jsResult);
