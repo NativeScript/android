@@ -94,7 +94,7 @@ jchar ArgConverter::ObjectToChar(jobject object)
 	JniLocalRef argClass(env.GetObjectClass(object));
 
 	//TODO: Lubo: cache this methodId on startup
-	jmethodID methodID = env.GetMethodID(argClass, "characterValue", "()C");
+	jmethodID methodID = env.GetMethodID(argClass, "charValue", "()C");
 
 	return env.CallCharMethod(object, methodID);
 }
