@@ -39,6 +39,46 @@ void ArgConverter::Init(JavaVM *jvm)
 	JniLocalRef encoding(env.NewStringUTF("UTF-8"));
 	UTF_8_ENCODING = (jstring)env.NewGlobalRef(encoding);
 	assert(UTF_8_ENCODING != nullptr);
+
+	auto charClass = env.FindClass("java/lang/Character");
+	assert(charClass != nullptr);
+	CHAR_VALUE_METHOD_ID = env.GetMethodID(charClass, "charValue", "()C");
+	assert(CHAR_VALUE_METHOD_ID != nullptr);
+
+	auto booleanClass = env.FindClass("java/lang/Boolean");
+	assert(booleanClass != nullptr);
+	BOOLEAN_VALUE_METHOD_ID = env.GetMethodID(booleanClass, "booleanValue", "()Z");
+	assert(BOOLEAN_VALUE_METHOD_ID != nullptr);
+
+	auto byteClass = env.FindClass("java/lang/Byte");
+	assert(byteClass != nullptr);
+	BYTE_VALUE_METHOD_ID = env.GetMethodID(byteClass, "byteValue", "()B");
+	assert(BYTE_VALUE_METHOD_ID != nullptr);
+
+	auto shortClass = env.FindClass("java/lang/Short");
+	assert(shortClass != nullptr);
+	SHORT_VALUE_METHOD_ID = env.GetMethodID(shortClass, "shortValue", "()S");
+	assert(SHORT_VALUE_METHOD_ID != nullptr);
+
+	auto integerClass = env.FindClass("java/lang/Integer");
+	assert(integerClass != nullptr);
+	INT_VALUE_METHOD_ID = env.GetMethodID(integerClass, "intValue", "()I");
+	assert(INT_VALUE_METHOD_ID != nullptr);
+
+	auto longClass = env.FindClass("java/lang/Long");
+	assert(longClass != nullptr);
+	LONG_VALUE_METHOD_ID = env.GetMethodID(longClass, "longValue", "()J");
+	assert(LONG_VALUE_METHOD_ID != nullptr);
+
+	auto floatClass = env.FindClass("java/lang/Float");
+	assert(floatClass != nullptr);
+	FLOAT_VALUE_METHOD_ID = env.GetMethodID(floatClass, "floatValue", "()F");
+	assert(FLOAT_VALUE_METHOD_ID != nullptr);
+
+	auto doubleClass = env.FindClass("java/lang/Double");
+	assert(doubleClass != nullptr);
+	DOUBLE_VALUE_METHOD_ID = env.GetMethodID(doubleClass, "doubleValue", "()D");
+	assert(DOUBLE_VALUE_METHOD_ID != nullptr);
 }
 
 void ArgConverter::NativeScriptLongValueOfFunctionCallback(const v8::FunctionCallbackInfo<Value>& args)
@@ -67,36 +107,21 @@ jlong ArgConverter::ObjectToLong(jobject object)
 {
 	JEnv env;
 
-	JniLocalRef argClass(env.GetObjectClass(object));
-
-	//TODO: Lubo: cache this methodId on startup
-	jmethodID methodID = env.GetMethodID(argClass, "longValue", "()J");
-
-	return env.CallLongMethod(object, methodID);
+	return env.CallLongMethod(object, LONG_VALUE_METHOD_ID);
 }
 
 jboolean ArgConverter::ObjectToBoolean(jobject object)
 {
 	JEnv env;
 
-	JniLocalRef argClass(env.GetObjectClass(object));
-
-	//TODO: Lubo: cache this methodId on startup
-	jmethodID methodID = env.GetMethodID(argClass, "booleanValue", "()Z");
-
-	return env.CallBooleanMethod(object, methodID);
+	return env.CallBooleanMethod(object, BOOLEAN_VALUE_METHOD_ID);
 }
 
 jchar ArgConverter::ObjectToChar(jobject object)
 {
 	JEnv env;
 
-	JniLocalRef argClass(env.GetObjectClass(object));
-
-	//TODO: Lubo: cache this methodId on startup
-	jmethodID methodID = env.GetMethodID(argClass, "charValue", "()C");
-
-	return env.CallCharMethod(object, methodID);
+	return env.CallCharMethod(object, CHAR_VALUE_METHOD_ID);
 }
 
 
@@ -104,36 +129,21 @@ jbyte ArgConverter::ObjectToByte(jobject object)
 {
 	JEnv env;
 
-	JniLocalRef argClass(env.GetObjectClass(object));
-
-	//TODO: Lubo: cache this methodId on startup
-	jmethodID methodID = env.GetMethodID(argClass, "byteValue", "()B");
-
-	return env.CallByteMethod(object, methodID);
+	return env.CallByteMethod(object, BYTE_VALUE_METHOD_ID);
 }
 
 jshort ArgConverter::ObjectToShort(jobject object)
 {
 	JEnv env;
 
-	JniLocalRef argClass(env.GetObjectClass(object));
-
-	//TODO: Lubo: cache this methodId on startup
-	jmethodID methodID = env.GetMethodID(argClass, "shortValue", "()S");
-
-	return env.CallShortMethod(object, methodID);
+	return env.CallShortMethod(object, SHORT_VALUE_METHOD_ID);
 }
 
 jint ArgConverter::ObjectToInt(jobject object)
 {
 	JEnv env;
 
-	JniLocalRef argClass(env.GetObjectClass(object));
-
-	//TODO: Lubo: cache this methodId on startup
-	jmethodID methodID = env.GetMethodID(argClass, "intValue", "()I");
-
-	return env.CallIntMethod(object, methodID);
+	return env.CallIntMethod(object, INT_VALUE_METHOD_ID);
 }
 
 
@@ -141,24 +151,14 @@ jfloat ArgConverter::ObjectToFloat(jobject object)
 {
 	JEnv env;
 
-	JniLocalRef argClass(env.GetObjectClass(object));
-
-	//TODO: Lubo: cache this methodId on startup
-	jmethodID methodID = env.GetMethodID(argClass, "floatValue", "()F");
-
-	return env.CallFloatMethod(object, methodID);
+	return env.CallFloatMethod(object, FLOAT_VALUE_METHOD_ID);
 }
 
 jdouble ArgConverter::ObjectToDouble(jobject object)
 {
 	JEnv env;
 
-	JniLocalRef argClass(env.GetObjectClass(object));
-
-	//TODO: Lubo: cache this methodId on startup
-	jmethodID methodID = env.GetMethodID(argClass, "doubleValue", "()D");
-
-	return env.CallDoubleMethod(object, methodID);
+	return env.CallDoubleMethod(object, DOUBLE_VALUE_METHOD_ID);
 }
 
 
@@ -347,4 +347,12 @@ Persistent<Function>* ArgConverter::NATIVESCRIPT_NUMERA_CTOR_FUNC = nullptr;
 Persistent<NumberObject>* ArgConverter::NAN_NUMBER_OBJECT = nullptr;
 jclass ArgConverter::STRING_CLASS = nullptr;
 jmethodID ArgConverter::GET_BYTES_METHOD_ID = nullptr;
+jmethodID ArgConverter::CHAR_VALUE_METHOD_ID = nullptr;
+jmethodID ArgConverter::BOOLEAN_VALUE_METHOD_ID = nullptr;
+jmethodID ArgConverter::BYTE_VALUE_METHOD_ID = nullptr;
+jmethodID ArgConverter::SHORT_VALUE_METHOD_ID = nullptr;
+jmethodID ArgConverter::INT_VALUE_METHOD_ID = nullptr;
+jmethodID ArgConverter::LONG_VALUE_METHOD_ID = nullptr;
+jmethodID ArgConverter::FLOAT_VALUE_METHOD_ID = nullptr;
+jmethodID ArgConverter::DOUBLE_VALUE_METHOD_ID = nullptr;
 jstring ArgConverter::UTF_8_ENCODING = nullptr;

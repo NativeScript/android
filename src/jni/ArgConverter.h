@@ -82,6 +82,14 @@ namespace tns
 		static jclass STRING_CLASS;
 
 		static jmethodID GET_BYTES_METHOD_ID;
+		static jmethodID CHAR_VALUE_METHOD_ID;
+		static jmethodID BOOLEAN_VALUE_METHOD_ID;
+		static jmethodID BYTE_VALUE_METHOD_ID;
+		static jmethodID SHORT_VALUE_METHOD_ID;
+		static jmethodID INT_VALUE_METHOD_ID;
+		static jmethodID LONG_VALUE_METHOD_ID;
+		static jmethodID FLOAT_VALUE_METHOD_ID;
+		static jmethodID DOUBLE_VALUE_METHOD_ID;
 
 		static jstring UTF_8_ENCODING;
 	};
