@@ -100,6 +100,38 @@ describe("Tests ", function () {
 		expect(shouldBeTrue).toBe(true);
 	});
 	
+	
+	it("When_extending_a_class_with_method_overloads_by_argument_type", function () {
+		
+		__log("TEST: Creating MyButton");
+		var MyButton = com.tns.tests.Button1.extend({
+			method2 : function(arg1) {
+			  	return arg1.toString();	
+			}
+		});
+		
+		var button1 = new MyButton();
+		
+		var callWithInt = button1.getClass().getMethod("callMethod2WithInt", []);
+		var callWithByte = button1.getClass().getMethod("callMethod2WithByte", []);
+		
+		
+		
+		__log("TEST: Calling MyButton method2 with int");
+		var intResult = callWithInt.invoke(button1, []);
+		expect(intResult).toBe("1");
+		//var intResult = button1.callMethod2WithInt();
+		__log("TEST: intResult = " + intResult);
+		
+		__log("TEST: Calling MyButton method2 with byte");
+		//var byteResult = button1.callMethod2WithByte();
+		var byteResult = callWithByte.invoke(button1, []);
+		__log("TEST: byteResult = " + byteResult);
+		
+		expect(byteResult).toBe("5");
+	});
+	
+	
 	it("When_implementing_an_interface_with_new_the_overrides_should_work", function () {
 		
 		__log("TEST: When_implementing_an_interface_with_new__the_overrides_should_work");
