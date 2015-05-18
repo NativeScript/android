@@ -18,9 +18,9 @@ describe("Tests primitive type conversion", function () {
 		    }
 		});
 
-		com.tns.tests.CharConversionTest.printWithChar(logger, 'x');
+		com.tns.tests.CharConversionTest.printWithChar(logger, char('x'));
 		
-		expect(logged).toBe(char('x'));
+		expect(logged).toBe('x');
 	});
 	
 
