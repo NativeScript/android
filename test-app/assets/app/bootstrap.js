@@ -1,3 +1,25 @@
+//
+//
+////var CrasherLogger = com.tns.tests.CharConversionTest.Logger.extend({
+////    print: function(value) {
+////        __log('type=' + (typeof value) + ' value=' + value);
+////    }
+////});
+//
+//var crasherLogger = new com.tns.tests.CharConversionTest.Logger({
+//    print: function(value) {
+//        __log('type=' + (typeof value) + ' value=' + value);
+//    }
+//});
+//
+//
+////com.tns.tests.CharConversionTest.crash(new CrasherLogger());
+//com.tns.tests.CharConversionTest.printWithChar(crasherLogger, 'z');
+//
+//
+//__exit("SUCCESS");
+
+
 global.__onUncaughtError = function(error){
 	if(error.nativeException){
 		__log("err.message: " + error.message);

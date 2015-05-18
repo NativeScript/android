@@ -3,6 +3,7 @@ __disableVerboseLogging();
 require("./tests/testWeakRef"); 
 require("./tests/tests"); 
 require("./tests/testsForRuntimeBindingGenerator");
+require("./tests/testPrimitiveTypeConversion");
 require("./tests/numericConversionTests"); 
 require("./tests/inheritanceChainResolutionTest"); 
 require("./tests/exceptionHandlingTests");
@@ -15,6 +16,7 @@ require("./tests/testIfAbleToRunExternalFile");
 require("./tests/finalFieldsSetTests");
 require("./tests/extendedClassesTests");
 require("./tests/extendClassNameTests");
+
 
 var MainActivity = (function (_super) {
     __extends(MainActivity, _super);
