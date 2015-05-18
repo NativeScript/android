@@ -20,6 +20,22 @@ public class TargetObject
 		Log.d("Proxy.Tester", "methodWithStringArg: " + a);
 	}
 	
+	public void methodWithOverload(int a)
+	{
+		Log.d("Proxy.Tester", "methodWithOverload: " + a);
+	}
+	
+	public void methodWithOverload(byte a)
+	{
+		Log.d("Proxy.Tester", "methodWithOverload: " + a);
+	}
+	
+	public void methodWithOverload()
+	{
+		arg = null;
+		Log.d("Proxy.Tester", "methodWithOverload no args");
+	}
+	
 	public void methodWithIntArg(int a)
 	{
 		arg = a;

@@ -189,6 +189,66 @@ public class RuntimeTests extends AndroidTestCase
 		return proxy;
 	}
 	
+	public void test_When_generating_proxy_on_overloaded_method() throws Throwable
+	{
+		dump.generateProxy(aw, TargetObject.class, new String[] {"methodWithOverload"}, 0);
+		aw.visitEnd();
+		byte[] generatedBytes = aw.toByteArray();
+		
+		
+		File proxyFile = saveProxy(generatedBytes);
+		final Object resultNoArg = new Object();
+		class ImplementationObject extends TargetObject
+		{
+			@Override
+			public void methodWithOverload(int o)
+			{
+				arg = o;
+				overrideCalled = true;
+			}
+			
+			@Override
+			public void methodWithOverload(byte o)
+			{
+				arg = o;
+				overrideCalled = true;
+			}
+			
+			@Override
+			public void methodWithOverload()
+			{
+				arg = resultNoArg;
+				overrideCalled = true;
+			}
+		}
+		
+		ImplementationObject implementationObject = new ImplementationObject();
+		TargetObject proxy = loadProxy(proxyFile, implementationObject);
+		((NativeScriptHashCodeProvider)proxy).setNativeScriptOverride("methodWithOverload");
+		implementationObject.arg = null;
+		implementationObject.overrideCalled = false;
+		
+		proxy.methodWithOverload((int)6);
+		assertTrue("Override should be called with int", implementationObject.overrideCalled == true);
+		assertTrue("Override should be called with int 6", implementationObject.arg instanceof Integer);
+		assertEquals(6, implementationObject.arg); 
+
+		implementationObject.arg = null;
+		implementationObject.overrideCalled = false;
+		proxy.methodWithOverload((byte)8);
+		assertTrue("Override should be called with byte", implementationObject.overrideCalled == true);
+		assertTrue("Override should be called with byte 8", implementationObject.arg instanceof Byte);
+		assertEquals(8, (byte)implementationObject.arg);
+		
+		implementationObject.arg = null;
+		implementationObject.overrideCalled = false;
+		proxy.methodWithOverload();
+		assertTrue("Override should be called with no args", implementationObject.overrideCalled == true);
+		assertTrue("Override should be called with no args", implementationObject.arg instanceof Object);
+		assertEquals(resultNoArg, implementationObject.arg);
+	}
+	
+	
 	public void test_When_generating_proxy_on_method_with_object_argument() throws Throwable
 	{
 		dump.generateProxy(aw, TargetObject.class);

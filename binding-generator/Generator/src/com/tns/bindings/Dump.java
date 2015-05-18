@@ -25,7 +25,9 @@ public class Dump
 	static final String initInstanceMethodName = "initInstance";
 
 	static final StringBuffer methodDescriptorBuilder = new StringBuffer();
-	 /**
+	
+	
+	/**
 	 * Returns the dex descriptor corresponding to the given method.
 	 * 
 	 * @param m
@@ -37,6 +39,24 @@ public class Dump
         Class<?>[] parameters = method.getParameterTypes();
         methodDescriptorBuilder.setLength(0);
         getDexDescriptor(methodDescriptorBuilder, method.getReturnType());
+        for (int i = 0; i < parameters.length; ++i)
+        {
+            getDexDescriptor(methodDescriptorBuilder, parameters[i]);
+        }
+        return methodDescriptorBuilder.toString();
+    }
+	 
+	 /**
+	 * Returns the dex descriptor corresponding to the given method.
+	 * 
+	 * @param m
+	 *            a {@link Method Method} object.
+	 * @return the descriptor of the given method.
+	 */
+	 public String getMethodOverloadDescriptor(final Method method) 
+	 {
+        Class<?>[] parameters = method.getParameterTypes();
+        methodDescriptorBuilder.setLength(0);
         for (int i = 0; i < parameters.length; ++i)
         {
             getDexDescriptor(methodDescriptorBuilder, parameters[i]);
@@ -233,6 +253,8 @@ public class Dump
 		{
 			Method method = methods[i];
 			String methodName = method.getName();
+			String methodOverLoadDescriptor = getMethodOverloadDescriptor(method);
+			methodName +=  "_" + methodOverLoadDescriptor;
 			if (!result.containsKey(methodName))
 			{
 				result.put(methodName, method);
@@ -583,7 +605,6 @@ public class Dump
 			mv.visitOperationInsn(org.ow2.asmdex.Opcodes.INSN_OR_INT_LIT8, 0, 0, 0, bitCounter);
 			mv.visitOperationInsn(org.ow2.asmdex.Opcodes.INSN_INT_TO_BYTE, 0, 0, 0, 0);
 			mv.visitFieldInsn(org.ow2.asmdex.Opcodes.INSN_IPUT_BYTE, tnsClassSignature, fieldName, "B", 0, thisRegister); //classSignature should be"Ldummy;"
-			mv.visitJumpInsn(org.ow2.asmdex.Opcodes.INSN_GOTO, returnLabel, 0, 0); //jump to return
 			mv.visitLabel(skipMethod);
 
 			bitCounter *= 2;
