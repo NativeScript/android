@@ -484,7 +484,11 @@ getJasmineRequireObj().Env = function(j$) {
       return catchExceptions;
     };
 
-    var maximumSpecCallbackDepth = 20;
+    /*
+      set maximumSpecCallbackDepth to a large number in order to execute tests in very large batches,
+      e.g. it looks like tests are executed synchronously; this guarantees that test order is preserved. 
+   	*/
+    var maximumSpecCallbackDepth = 20000;
     var currentSpecCallbackDepth = 0;
 
     function clearStack(fn) {
