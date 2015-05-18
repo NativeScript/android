@@ -20,7 +20,7 @@ describe("Tests primitive type conversion", function () {
 
 		com.tns.tests.CharConversionTest.printWithChar(logger, 'x');
 		
-		expect(logged).toBe('a');
+		expect(logged).toBe('x');
 	});
 	
 
