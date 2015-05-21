@@ -203,6 +203,7 @@ extern "C" void Java_com_tns_Platform_runNativeScript(JNIEnv *_env, jobject obj,
 	auto cmd = ConvertToV8String(code);
 
 	env.ReleaseStringUTFChars(appCode, code);
+	env.DeleteLocalRef(appCode);
 
 	DEBUG_WRITE("Compiling script");
 

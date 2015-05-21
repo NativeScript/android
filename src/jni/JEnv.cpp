@@ -393,6 +393,9 @@ void JEnv::ReleaseStringUTFChars(jstring str, const char* utf)
 	m_env->ReleaseStringUTFChars(str, utf);
 }
 
+void JEnv::DeleteLocalRef(jstring str) {
+	m_env->DeleteLocalRef(str);
+}
 
 jint JEnv::Throw(jthrowable obj)
 {

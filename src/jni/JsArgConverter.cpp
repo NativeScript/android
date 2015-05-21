@@ -417,6 +417,7 @@ bool JsArgConverter::ConvertJavaScriptArray(JEnv& env, const Handle<Array>& jsAr
 				const char* singleChar = env.GetStringUTFChars(s, nullptr);
 				jchar value = *singleChar;
 				env.ReleaseStringUTFChars(s, singleChar);
+				env.DeleteLocalRef(s);
 				env.SetCharArrayRegion((jcharArray)arr, i, 1, &value);
 			}
 			break;

@@ -56,6 +56,7 @@ Handle<Value> ArrayElementAccessor::GetArrayElement(const Handle<Object>& array,
 		const char* singleChar = env.GetStringUTFChars(s, &isCopy);
 		value = CheckForArrayAccessException(env, elementSignature, singleChar);
 		env.ReleaseStringUTFChars(s, singleChar);
+		env.DeleteLocalRef(s);
 	}
 	else if (elementSignature == "S")
 	{
@@ -133,6 +134,7 @@ void ArrayElementAccessor::SetArrayElement(const Handle<Object>& array, uint32_t
 		const char* singleChar = env.GetStringUTFChars(s, &isCopy);
 		jchar charElementValue = *singleChar;
 		env.ReleaseStringUTFChars(s, singleChar);
+		env.DeleteLocalRef(s);
 		jcharArray charArr = reinterpret_cast<jcharArray>(arr);
 		env.SetCharArrayRegion(charArr, index, 1, &charElementValue);
 	}
