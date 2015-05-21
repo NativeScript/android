@@ -553,16 +553,7 @@ jobject NativeScriptRuntime::CreateJavaInstance(int objectID, const std::string&
 
 	if (argConverter.IsValid())
 	{
-		jobjectArray methodOverrides;
-		if (hasImplementationObject)
-		{
-			methodOverrides = GetMethodOverrides(env, implementationObject);
-		}
-		else
-		{
-			Handle<Object> emptyObject;
-			methodOverrides = GetMethodOverrides(env, emptyObject);
-		}
+		jobjectArray methodOverrides = GetMethodOverrides(env, implementationObject);
 
 		jobjectArray javaArgs = argConverter.ToJavaArray();
 
