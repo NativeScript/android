@@ -544,12 +544,8 @@ jobject NativeScriptRuntime::CreateJavaInstance(int objectID, const std::string&
 
 	JEnv env;
 	auto& args = argWrapper.args;
-	bool hasImplementationObject = !implementationObject.IsEmpty();
 
-	bool hasImplementationObjectInArgs = isInterface;
-
-	JsArgToArrayConverter argConverter(args, hasImplementationObjectInArgs, argWrapper.outerThis);
-
+	JsArgToArrayConverter argConverter(args, isInterface, argWrapper.outerThis);
 
 	if (argConverter.IsValid())
 	{
