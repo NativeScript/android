@@ -238,6 +238,7 @@ std::string ArgConverter::jstringToString(jstring value)
 	const char* chars = env.GetStringUTFChars(value, &f);
 	string s(chars);
 	env.ReleaseStringUTFChars(value, chars);
+	env.DeleteLocalRef(value);
 
 	return s;
 }
@@ -251,6 +252,7 @@ Handle<String> ArgConverter::jcharToV8String(jchar value)
 	const char* resP = env.GetStringUTFChars(str, &bol);
 	auto v8String = ConvertToV8String(resP, 1);
 	env.ReleaseStringUTFChars(str, resP);
+	env.DeleteLocalRef(str);
 	return v8String;
 }
 
@@ -268,7 +270,7 @@ Local<String> ArgConverter::jstringToV8String(jstring value)
 	jbyte *data = env.GetByteArrayElements(arr, nullptr);
 	auto v8String = ConvertToV8String((const char *)data, length);
 	env.ReleaseByteArrayElements(arr, data, JNI_ABORT);
-
+	env.DeleteLocalRef(arr);
 	return v8String;
 }
 

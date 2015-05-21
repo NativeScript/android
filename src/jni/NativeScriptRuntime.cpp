@@ -312,6 +312,7 @@ void NativeScriptRuntime::CallJavaMethod(const Handle<Object>& caller, const str
 			jboolean bol = true;
 			const char* resP = env.GetStringUTFChars(str, &bol);
 			env.ReleaseStringUTFChars(str, resP);
+			env.DeleteLocalRef(str);
 			args.GetReturnValue().Set(ConvertToV8String(resP, 1));
 			break;
 		}
@@ -858,6 +859,7 @@ vector<string> NativeScriptRuntime::GetTypeMetadata(const string& name, int inde
 		const char *pc = env.GetStringUTFChars(s, nullptr);
 		result.push_back(string(pc));
 		env.ReleaseStringUTFChars(s, pc);
+		env.DeleteLocalRef(s);
 	}
 
 	return result;
