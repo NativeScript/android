@@ -119,7 +119,6 @@ namespace tns
 
 		const char* GetStringUTFChars(jstring str, jboolean* isCopy);
 		void ReleaseStringUTFChars(jstring str, const char* utf);
-		void DeleteLocalRef(jobject obj);
 
 		jint Throw(jthrowable obj);
 		jboolean ExceptionCheck();
