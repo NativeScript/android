@@ -1,13 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project name="custom_logic_for_metadata_generation" default="-post-compile">
     
-    <condition property="version1.7">
+    <condition property="supportedJavaVersion">
       <or>
        <equals arg1="1.7" arg2="${ant.java.version}"/>
+       <equals arg1="1.8" arg2="${ant.java.version}"/>
       </or>
     </condition>
     
-    <fail message="Java 1.7 required. Check if the JAVA_HOME environment variable points to JDK 1.7" unless="version1.7"/>
+    <fail message="Java 1.7 or newer is required. Check if the JAVA_HOME environment variable points to JDK 1.7 or newer" unless="supportedJavaVersion"/>
    
     <property name="path_to_metadata" value="./assets/metadata"/>
     <property name="ns.project.lib" value="../../lib/Android" />
