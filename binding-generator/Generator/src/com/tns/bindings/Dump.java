@@ -475,7 +475,7 @@ public class Dump
 		generateInitializedBlock(mv, thisRegister, classSignature, tnsClassSignature);
 		if (hasOverridenCtor)
 		{
-			generateCtorOverridenBlock(mv, thisRegister, classSignature, tnsClassSignature);
+			generateCtorOverridenBlock(mv, thisRegister, ctor, classSignature, tnsClassSignature);
 		}
 		generateReturnVoid(mv);
 	}
@@ -486,17 +486,13 @@ public class Dump
 		mv.visitEnd();
 	}
 
-	private void generateCtorOverridenBlock(MethodVisitor mv, int thisRegister, String classSignature, String tnsClassSignature)
+	private void generateCtorOverridenBlock(MethodVisitor mv, int thisRegister, Constructor<?> ctor, String classSignature, String tnsClassSignature)
 	{
-		mv.visitFieldInsn(org.ow2.asmdex.Opcodes.INSN_IGET_BOOLEAN, tnsClassSignature, "__ctorOverridden", "Z", 1, thisRegister);
-		Label label = new Label();
-		mv.visitJumpInsn(org.ow2.asmdex.Opcodes.INSN_IF_EQZ, label, 1, 0);
-		mv.visitVarInsn(org.ow2.asmdex.Opcodes.INSN_CONST_4, 0, 0); //put null in register 0 //support creation of params array for callJSMethod invokation 
+		int argCount = generateArrayForCallJsArguments(mv, ctor.getParameterTypes(), thisRegister, classSignature, tnsClassSignature);
 		mv.visitStringInsn(org.ow2.asmdex.Opcodes.INSN_CONST_STRING, 1, "init"); //put "init" in register 1
 		mv.visitVarInsn(org.ow2.asmdex.Opcodes.INSN_CONST_4, 2, 1); //put true to register 2 == isConstructor argument
 		mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, LCOM_TNS_PLATFORM, "callJSMethod", callJsMethodSignatureCtor, new int[]
 		{ 3, 1, 2, 0 }); //invoke callJSMethod(this, "init", true, params)
-		mv.visitLabel(label);
 	}
 
 	private void generateInitializedBlock(MethodVisitor mv, int thisRegister, String classSignature, String tnsClassSignature)
@@ -653,7 +649,7 @@ public class Dump
 	private void generateCallOverrideBlock(MethodVisitor mv, Method method, int thisRegister, String classSignature, String tnsClassSignature, String methodDexSignature, int fieldBit)
 	{
 		//call the override
-		int argCount = generateArrayForCallJsArguments(mv, method, thisRegister, classSignature, tnsClassSignature, methodDexSignature);
+		int argCount = generateArrayForCallJsArguments(mv, method.getParameterTypes() , thisRegister, classSignature, tnsClassSignature);
 		mv.visitStringInsn(org.ow2.asmdex.Opcodes.INSN_CONST_STRING, 1, method.getName());
 		mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, platformClass, callJSMethodName, callJsMethodSignatureMethod, new int[] { thisRegister, 1, 0 });
 		
@@ -704,54 +700,11 @@ public class Dump
 		return Arrays.copyOf(argsForSuper, argsForSuperIndex);
 	}
 	
-	private int[] generateArgsArray(int thisRegister, int argCount, Method method)
-	{
-		Class<?>[] paramTypes = method.getParameterTypes();
-		int argumentsCount = paramTypes.length;
-		int[] argsForSuper = new int[1 + argumentsCount*2]; //thisRegister + argCount * 2 since it long and double take 2 registers
-
-		int argsForSuperIndex = 0;
-		argsForSuper[argsForSuperIndex] = thisRegister;
-		argsForSuperIndex++;
-		
-		int arrayIndex = 0;
-		while (arrayIndex < argumentsCount)
-		{
-			Class<?> paramType = paramTypes[arrayIndex];
-			if (paramType.isPrimitive())
-			{
-				if (paramType == Integer.TYPE || paramType == Character.TYPE || paramType == Byte.TYPE || paramType == Short.TYPE || 
-						paramType == Boolean.TYPE || paramType == Float.TYPE)
-				{
-					argsForSuper[argsForSuperIndex] = thisRegister + arrayIndex + 1;
-					argsForSuperIndex++;
-				}
-				else if (paramType == Long.TYPE ||  paramType == Double.TYPE)
-				{
-					argsForSuper[argsForSuperIndex] = thisRegister + arrayIndex + 1;
-					argsForSuperIndex++;
-					argsForSuper[argsForSuperIndex] = thisRegister + arrayIndex + 2;
-					argsForSuperIndex++;
-				}
-			}
-			else
-			{
-				argsForSuper[argsForSuperIndex] = thisRegister + arrayIndex + 1;
-				argsForSuperIndex++;
-			}
-
-			arrayIndex++;
-		}
-		
-		return Arrays.copyOf(argsForSuper, argsForSuperIndex);
-	}
-
 	/**
 	 * 	Creates new Object[] or null value (when no arguments) and puts it in register 0  
 	 */
-	private int generateArrayForCallJsArguments(MethodVisitor mv, Method method, int thisRegister, String classSignature, String tnsClassSignature, String methodDexSignature)
+	private int generateArrayForCallJsArguments(MethodVisitor mv, Class<?>[] paramTypes, int thisRegister, String classSignature, String tnsClassSignature)
 	{
-		Class<?>[] paramTypes = method.getParameterTypes();
 		int argumentsCount = paramTypes.length;
 		
 		if (argumentsCount == 0)
@@ -1024,19 +977,12 @@ public class Dump
 
 	private void generateFields(ClassVisitor cv)
 	{
-		generateCtorOverridenField(cv);
 		generateInitializedField(cv);
 	}
 
 	private void generateInitializedField(ClassVisitor cv)
 	{
 		FieldVisitor fv = cv.visitField(org.ow2.asmdex.Opcodes.ACC_PRIVATE, "__initialized", "Z", null, null);
-		fv.visitEnd();
-	}
-
-	private void generateCtorOverridenField(ClassVisitor cv)
-	{
-		FieldVisitor fv = cv.visitField(org.ow2.asmdex.Opcodes.ACC_PRIVATE, "__ctorOverridden", "Z", null, null);
 		fv.visitEnd();
 	}
 
