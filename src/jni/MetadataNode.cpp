@@ -58,10 +58,10 @@ MetadataNode::MetadataNode(MetadataTreeNode *treeNode) :
 	if (!m_isArray && isInterface)
 	{
 		bool isPrefix;
-		TNS_PREFIX = s_metadataReader.ReadInterfaceImplementationTypeName(m_treeNode, isPrefix);
+		auto impTypeName = s_metadataReader.ReadInterfaceImplementationTypeName(m_treeNode, isPrefix);
 		m_implType = isPrefix
-					? (TNS_PREFIX + m_name)
-					: TNS_PREFIX;
+					? (impTypeName + m_name)
+					: impTypeName;
 	}
 }
 
@@ -1262,7 +1262,7 @@ void MetadataNode::CreateTopLevelNamespaces(const Handle<Object>& global)
 }
 
 
-string MetadataNode::TNS_PREFIX;
+string MetadataNode::TNS_PREFIX = "com/tns/gen/";
 std::map<std::string, MetadataNode*> MetadataNode::s_name2NodeCache;
 std::map<std::string, MetadataTreeNode*> MetadataNode::s_name2TreeNodeCache;
 std::map<MetadataTreeNode*, MetadataNode*> MetadataNode::s_treeNode2NodeCache;
