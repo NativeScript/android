@@ -283,15 +283,6 @@ public class Platform
 			methodOverrides = createJSInstance(instance, args);
 		}
 
-		if (instance instanceof NativeScriptHashCodeProvider)
-		{
-			NativeScriptHashCodeProvider obj = (NativeScriptHashCodeProvider) instance;
-			for (String name: methodOverrides)
-			{
-				obj.setNativeScriptOverride(name);
-			}
-		}
-
 		int objectId = Platform.currentObjectId;
 
 		if (objectId != -1)
