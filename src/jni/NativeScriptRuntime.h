@@ -104,7 +104,7 @@ namespace tns
 	private:
 		NativeScriptRuntime() {}
 
-		static int GetCachedConstructorId(JEnv& env, const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& name, const std::string& className, jobjectArray javaArgs, jobjectArray methodOverrides);
+		static int GetCachedConstructorId(JEnv& env, const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& name, const std::string& className, jobjectArray javaArgs, const v8::Handle<v8::Object>& implementationObject);
 
 		static v8::Handle<v8::Object> FindClass(const std::string& className);
 

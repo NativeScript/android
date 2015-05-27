@@ -37,7 +37,7 @@ public class Platform
 
 	private static native Object callJSMethodNative(int javaObjectID, String methodName, boolean isConstructor, Object... packagedArgs) throws NativeScriptException;
 
-	private static native String[] createJSInstanceNative(Object javaObject, int javaObjectID, String canonicalName, boolean createActivity, Object[] packagedCreationArgs);
+	private static native void createJSInstanceNative(Object javaObject, int javaObjectID, String canonicalName, boolean createActivity, Object[] packagedCreationArgs);
 
 	private static native int generateNewObjectId();
 
@@ -67,7 +67,6 @@ public class Platform
 	private final static Object keyNotFoundObject = new Object();
 	public final static String ApplicationAssetsPath = "app/";
 	private static Object[] empty = new Object[0];
-	private static String[] methodOverrides;
 	private static int currentObjectId = -1;
 	
 	private static ExtractPolicy extractPolicy;
@@ -208,7 +207,7 @@ public class Platform
 		return ctorId;
 	}
 
-	private static Object createInstance(Object[] args, String[] methodOverrides, int objectId, int constructorId) throws InstantiationException, IllegalAccessException, ClassNotFoundException, NoSuchMethodException, IllegalArgumentException, InvocationTargetException, IOException
+	private static Object createInstance(Object[] args, int objectId, int constructorId) throws InstantiationException, IllegalAccessException, ClassNotFoundException, NoSuchMethodException, IllegalArgumentException, InvocationTargetException, IOException
 	{
 		Constructor<?> ctor = ctorCache.get(constructorId);
 		boolean success = MethodResolver.convertConstructorArgs(ctor, args);
@@ -237,14 +236,12 @@ public class Platform
 		try
 		{
 			Platform.currentObjectId = objectId;
-			Platform.methodOverrides = methodOverrides;
 			instance = ctor.newInstance(args);
 
 			makeInstanceStrong(instance, objectId);
 		}
 		finally
 		{
-			Platform.methodOverrides = null;
 			Platform.currentObjectId = -1;
 		}
 		
@@ -276,24 +273,19 @@ public class Platform
 
 	public static void initInstance(Object instance, Object... args)
 	{
-		String[] methodOverrides = Platform.methodOverrides;
-
-		if (methodOverrides == null)
-		{
-			methodOverrides = createJSInstance(instance, args);
-		}
-
 		int objectId = Platform.currentObjectId;
 
 		if (objectId != -1)
 		{
 			makeInstanceStrong(instance, objectId);
-
-			Platform.currentObjectId = -1;
+		}
+		else
+		{
+			createJSInstance(instance, args);
 		}
 	}
 
-	private static String[] createJSInstance(Object instance, Object... args)
+	private static void createJSInstance(Object instance, Object... args)
 	{
 		int javaObjectID = generateNewObjectId();
 
@@ -309,18 +301,9 @@ public class Platform
 			className = instance.getClass().getSuperclass().getName();
 		}
 				
-		String[] methodOverrides = createJSInstanceNative(instance, javaObjectID, className, createActivity, packagedArgs);
+		createJSInstanceNative(instance, javaObjectID, className, createActivity, packagedArgs);
 
-		if (IsLogEnabled)
-		{
-			Log.d(DEFAULT_LOG_TAG, "JSInstance for " + instance.getClass().toString() + " created with overrides");
-			for (Object methodOverride : methodOverrides)
-			{
-				Log.d(DEFAULT_LOG_TAG, methodOverride.toString());
-			}
-		}
-
-		return methodOverrides;
+		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "JSInstance for " + instance.getClass().toString() + " created with overrides");
 	}
 	
 	private static String[] getTypeMetadata(String className, int index) throws ClassNotFoundException
