@@ -12,6 +12,8 @@ import android.util.Log;
 
 public class Dump
 {
+	public static final char CLASS_NAME_LOCATION_SEPARATOR = '_';
+	
 	private static final String callJsMethodSignatureCtor = "Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;Z[Ljava/lang/Object;";
 	private static final String callJsMethodSignatureMethod = "Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;[Ljava/lang/Object;";
 	private static final String LCOM_TNS = "Lcom/tns/gen/";
@@ -228,7 +230,7 @@ public class Dump
 		//String methodSignature = org.objectweb.asm.Type.getMethodDescriptor(Object.class.getMethods()[0]);
 		String tnsClassSignature = LCOM_TNS + 
 				classSignature.substring(1, classSignature.length() - 1).replace("$", "_")
-				+ "-" + proxyName + ";";
+				+ CLASS_NAME_LOCATION_SEPARATOR + proxyName + ";";
 		
 		ClassVisitor cv = generateClass(aw, classTo, classSignature, tnsClassSignature);
 		Method[] methods = getSupportedMethods(classTo, methodOverrides);

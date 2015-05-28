@@ -734,7 +734,7 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
 	SetInstanceMetadata(info.GetIsolate(), implementationObject, node);
 
 	//@@@ Refactor
-	auto fullName = className + "-" + extendNameAndLocation;
+	auto fullName = className + Constants::CLASS_NAME_LOCATION_SEPARATOR + extendNameAndLocation;
 	thiz->SetHiddenValue(ConvertToV8String("implClassName"), ConvertToV8String(fullName));
 	//
 
@@ -1073,7 +1073,7 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 	DEBUG_WRITE("ExtendsCallMethodHandler: called with %s", ConvertToString(extendName).c_str());
 
 	auto extendNameAndLocation = extendLocation + ConvertToString(extendName);
-	auto fullClassName = node->m_name + '-' + extendNameAndLocation; //ConvertToString(extendName);
+	auto fullClassName = node->m_name + Constants::CLASS_NAME_LOCATION_SEPARATOR + extendNameAndLocation; //ConvertToString(extendName);
 	auto fullExtendedName = TNS_PREFIX + fullClassName;
 	DEBUG_WRITE("ExtendsCallMethodHandler: extend full name %s", fullClassName.c_str());
 
@@ -1162,8 +1162,8 @@ bool MetadataNode::GetExtendLocation(string& extendLocation)
 			}
 
 			string srcFileName = ConvertToString(scriptName);
-			std::replace(srcFileName.begin(), srcFileName.end(), '/', '-');
-			std::replace(srcFileName.begin(), srcFileName.end(), '.', '-');
+			std::replace(srcFileName.begin(), srcFileName.end(), '/', '_');
+			std::replace(srcFileName.begin(), srcFileName.end(), '.', '_');
 			int lineNumber = frame->GetLineNumber();
 			if (lineNumber < 0)
 			{
@@ -1186,7 +1186,7 @@ bool MetadataNode::GetExtendLocation(string& extendLocation)
 			}
 
 
-			extendLocationStream << "f" << srcFileName.c_str() << "-l" << lineNumber << "-c" << column << "--";
+			extendLocationStream << "f" << srcFileName.c_str() << "_l" << lineNumber << "_c" << column << "__";
 			//DEBUG_WRITE("EXTEND_LOCATION %s", extendLocationStream.str().c_str());
 		}
 	}

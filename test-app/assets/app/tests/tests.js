@@ -394,7 +394,7 @@ describe("Tests ", function () {
 		var button1 = new MyButton();
 		var button1Label = button1.toString();
 		
-		expect(button1Label.indexOf("com.tns.tests.Button1-")).not.toEqual(-1);
+		expect(button1Label.indexOf("com.tns.tests.Button1_")).not.toEqual(-1);
 		expect(button1Label.indexOf("MyButton")).not.toEqual(-1);
 		expect(button1Label.indexOf("success")).not.toEqual(-1);
 		

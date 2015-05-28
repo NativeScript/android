@@ -27,6 +27,7 @@ import android.util.Log;
 public class DexFactory
 {
 	private static final String SECONDARY_DEX_FOLDER_NAME = "code_cache" + File.separator + "secondary-dexes";
+	private static final char CLASS_NAME_LOCATION_SEPARATOR = '_';
 
 	private String dexPath;
 	private String odexPath;
@@ -75,7 +76,7 @@ public class DexFactory
 			return NativeScriptActivity.class;
 		}
 		
-		String fullClassName = className.replace("$", "_") + "-" + name;
+		String fullClassName = className.replace("$", "_") + CLASS_NAME_LOCATION_SEPARATOR + name;
 		Class<?> existingClass = this.injectedDexClasses.get(fullClassName); 
 		if(existingClass != null)
 		{
@@ -83,7 +84,7 @@ public class DexFactory
 		}
 
 		String classToProxy = this.getClassToProxyName(className);
-		String dexFilePath = classToProxy + "-" + name;
+		String dexFilePath = classToProxy + CLASS_NAME_LOCATION_SEPARATOR + name;
 		File dexFile = this.getDexFile(dexFilePath);
 		
 		if (dexFile == null)
@@ -136,6 +137,7 @@ public class DexFactory
 	public Class<?> findClass(String className) throws ClassNotFoundException
 	{
 		String canonicalName = className.replace('/', '.');
+		Log.d("TNS_NATIVE", canonicalName);
 		Class<?> existingClass = this.injectedDexClasses.get(canonicalName);
 		if(existingClass != null)
 		{
