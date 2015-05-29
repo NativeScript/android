@@ -47,7 +47,7 @@ public class NativeScriptActivity extends android.app.Activity
 			args[0] = param_0;
 			args[1] = param_1;
 			args[2] = param_2;
-			return (boolean)com.tns.Platform.callJSMethod(this, "bindService", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "bindService", args);
 		}
 		else
 		{
@@ -61,7 +61,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (int)com.tns.Platform.callJSMethod(this, "checkCallingOrSelfPermission", args);
+			return (Integer)com.tns.Platform.callJSMethod(this, "checkCallingOrSelfPermission", args);
 		}
 		else
 		{
@@ -76,7 +76,7 @@ public class NativeScriptActivity extends android.app.Activity
 			Object[] args = new Object[2];
 			args[0] = param_0;
 			args[1] = param_1;
-			return (int)com.tns.Platform.callJSMethod(this, "checkCallingOrSelfUriPermission", args);
+			return (Integer)com.tns.Platform.callJSMethod(this, "checkCallingOrSelfUriPermission", args);
 		}
 		else
 		{
@@ -90,7 +90,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (int)com.tns.Platform.callJSMethod(this, "checkCallingPermission", args);
+			return (Integer)com.tns.Platform.callJSMethod(this, "checkCallingPermission", args);
 		}
 		else
 		{
@@ -105,7 +105,7 @@ public class NativeScriptActivity extends android.app.Activity
 			Object[] args = new Object[2];
 			args[0] = param_0;
 			args[1] = param_1;
-			return (int)com.tns.Platform.callJSMethod(this, "checkCallingUriPermission", args);
+			return (Integer)com.tns.Platform.callJSMethod(this, "checkCallingUriPermission", args);
 		}
 		else
 		{
@@ -121,7 +121,7 @@ public class NativeScriptActivity extends android.app.Activity
 			args[0] = param_0;
 			args[1] = param_1;
 			args[2] = param_2;
-			return (int)com.tns.Platform.callJSMethod(this, "checkPermission", args);
+			return (Integer)com.tns.Platform.callJSMethod(this, "checkPermission", args);
 		}
 		else
 		{
@@ -138,7 +138,7 @@ public class NativeScriptActivity extends android.app.Activity
 			args[1] = param_1;
 			args[2] = param_2;
 			args[3] = param_3;
-			return (int)com.tns.Platform.callJSMethod(this, "checkUriPermission", args);
+			return (Integer)com.tns.Platform.callJSMethod(this, "checkUriPermission", args);
 		}
 		else
 		{
@@ -157,7 +157,7 @@ public class NativeScriptActivity extends android.app.Activity
 			args[3] = param_3;
 			args[4] = param_4;
 			args[5] = param_5;
-			return (int)com.tns.Platform.callJSMethod(this, "checkUriPermission", args);
+			return (Integer)com.tns.Platform.callJSMethod(this, "checkUriPermission", args);
 		}
 		else
 		{
@@ -282,7 +282,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (boolean)com.tns.Platform.callJSMethod(this, "deleteDatabase", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "deleteDatabase", args);
 		}
 		else
 		{
@@ -296,7 +296,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (boolean)com.tns.Platform.callJSMethod(this, "deleteFile", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "deleteFile", args);
 		}
 		else
 		{
@@ -310,7 +310,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (boolean)com.tns.Platform.callJSMethod(this, "dispatchGenericMotionEvent", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "dispatchGenericMotionEvent", args);
 		}
 		else
 		{
@@ -324,7 +324,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (boolean)com.tns.Platform.callJSMethod(this, "dispatchKeyEvent", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "dispatchKeyEvent", args);
 		}
 		else
 		{
@@ -338,7 +338,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (boolean)com.tns.Platform.callJSMethod(this, "dispatchKeyShortcutEvent", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "dispatchKeyShortcutEvent", args);
 		}
 		else
 		{
@@ -352,7 +352,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (boolean)com.tns.Platform.callJSMethod(this, "dispatchPopulateAccessibilityEvent", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "dispatchPopulateAccessibilityEvent", args);
 		}
 		else
 		{
@@ -366,7 +366,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (boolean)com.tns.Platform.callJSMethod(this, "dispatchTouchEvent", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "dispatchTouchEvent", args);
 		}
 		else
 		{
@@ -380,7 +380,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (boolean)com.tns.Platform.callJSMethod(this, "dispatchTrackballEvent", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "dispatchTrackballEvent", args);
 		}
 		else
 		{
@@ -528,7 +528,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (boolean)com.tns.Platform.callJSMethod(this, "equals", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "equals", args);
 		}
 		else
 		{
@@ -741,7 +741,7 @@ public class NativeScriptActivity extends android.app.Activity
 		if (__ho48)
 		{
 			Object[] args = null;
-			return (int)com.tns.Platform.callJSMethod(this, "getChangingConfigurations", args);
+			return (Integer)com.tns.Platform.callJSMethod(this, "getChangingConfigurations", args);
 		}
 		else
 		{
@@ -1085,7 +1085,7 @@ public class NativeScriptActivity extends android.app.Activity
 		if (__ho74)
 		{
 			Object[] args = null;
-			return (int)com.tns.Platform.callJSMethod(this, "getRequestedOrientation", args);
+			return (Integer)com.tns.Platform.callJSMethod(this, "getRequestedOrientation", args);
 		}
 		else
 		{
@@ -1140,7 +1140,7 @@ public class NativeScriptActivity extends android.app.Activity
 		if (__ho78)
 		{
 			Object[] args = null;
-			return (int)com.tns.Platform.callJSMethod(this, "getTaskId", args);
+			return (Integer)com.tns.Platform.callJSMethod(this, "getTaskId", args);
 		}
 		else
 		{
@@ -1179,7 +1179,7 @@ public class NativeScriptActivity extends android.app.Activity
 		if (__ho81)
 		{
 			Object[] args = null;
-			return (int)com.tns.Platform.callJSMethod(this, "getWallpaperDesiredMinimumHeight", args);
+			return (Integer)com.tns.Platform.callJSMethod(this, "getWallpaperDesiredMinimumHeight", args);
 		}
 		else
 		{
@@ -1192,7 +1192,7 @@ public class NativeScriptActivity extends android.app.Activity
 		if (__ho82)
 		{
 			Object[] args = null;
-			return (int)com.tns.Platform.callJSMethod(this, "getWallpaperDesiredMinimumWidth", args);
+			return (Integer)com.tns.Platform.callJSMethod(this, "getWallpaperDesiredMinimumWidth", args);
 		}
 		else
 		{
@@ -1247,7 +1247,7 @@ public class NativeScriptActivity extends android.app.Activity
 		if (__ho86)
 		{
 			Object[] args = null;
-			return (boolean)com.tns.Platform.callJSMethod(this, "hasWindowFocus", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "hasWindowFocus", args);
 		}
 		else
 		{
@@ -1260,7 +1260,7 @@ public class NativeScriptActivity extends android.app.Activity
 		if (__ho87)
 		{
 			Object[] args = null;
-			return (int)com.tns.Platform.callJSMethod(this, "hashCode", args);
+			return (Integer)com.tns.Platform.callJSMethod(this, "hashCode", args);
 		}
 		else
 		{
@@ -1286,7 +1286,7 @@ public class NativeScriptActivity extends android.app.Activity
 		if (__ho89)
 		{
 			Object[] args = null;
-			return (boolean)com.tns.Platform.callJSMethod(this, "isChangingConfigurations", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "isChangingConfigurations", args);
 		}
 		else
 		{
@@ -1299,7 +1299,7 @@ public class NativeScriptActivity extends android.app.Activity
 		if (__ho90)
 		{
 			Object[] args = null;
-			return (boolean)com.tns.Platform.callJSMethod(this, "isDestroyed", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "isDestroyed", args);
 		}
 		else
 		{
@@ -1312,7 +1312,7 @@ public class NativeScriptActivity extends android.app.Activity
 		if (__ho91)
 		{
 			Object[] args = null;
-			return (boolean)com.tns.Platform.callJSMethod(this, "isFinishing", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "isFinishing", args);
 		}
 		else
 		{
@@ -1325,7 +1325,7 @@ public class NativeScriptActivity extends android.app.Activity
 		if (__ho92)
 		{
 			Object[] args = null;
-			return (boolean)com.tns.Platform.callJSMethod(this, "isRestricted", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "isRestricted", args);
 		}
 		else
 		{
@@ -1338,7 +1338,7 @@ public class NativeScriptActivity extends android.app.Activity
 		if (__ho93)
 		{
 			Object[] args = null;
-			return (boolean)com.tns.Platform.callJSMethod(this, "isTaskRoot", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "isTaskRoot", args);
 		}
 		else
 		{
@@ -1352,7 +1352,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (boolean)com.tns.Platform.callJSMethod(this, "moveTaskToBack", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "moveTaskToBack", args);
 		}
 		else
 		{
@@ -1366,7 +1366,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (boolean)com.tns.Platform.callJSMethod(this, "navigateUpTo", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "navigateUpTo", args);
 		}
 		else
 		{
@@ -1381,7 +1381,7 @@ public class NativeScriptActivity extends android.app.Activity
 			Object[] args = new Object[2];
 			args[0] = param_0;
 			args[1] = param_1;
-			return (boolean)com.tns.Platform.callJSMethod(this, "navigateUpToFromChild", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "navigateUpToFromChild", args);
 		}
 		else
 		{
@@ -1537,7 +1537,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (boolean)com.tns.Platform.callJSMethod(this, "onContextItemSelected", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onContextItemSelected", args);
 		}
 		else
 		{
@@ -1658,7 +1658,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (boolean)com.tns.Platform.callJSMethod(this, "onCreateOptionsMenu", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onCreateOptionsMenu", args);
 		}
 		else
 		{
@@ -1673,7 +1673,7 @@ public class NativeScriptActivity extends android.app.Activity
 			Object[] args = new Object[2];
 			args[0] = param_0;
 			args[1] = param_1;
-			return (boolean)com.tns.Platform.callJSMethod(this, "onCreatePanelMenu", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onCreatePanelMenu", args);
 		}
 		else
 		{
@@ -1702,7 +1702,7 @@ public class NativeScriptActivity extends android.app.Activity
 			Object[] args = new Object[2];
 			args[0] = param_0;
 			args[1] = param_1;
-			return (boolean)com.tns.Platform.callJSMethod(this, "onCreateThumbnail", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onCreateThumbnail", args);
 		}
 		else
 		{
@@ -1776,7 +1776,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (boolean)com.tns.Platform.callJSMethod(this, "onGenericMotionEvent", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onGenericMotionEvent", args);
 		}
 		else
 		{
@@ -1791,7 +1791,7 @@ public class NativeScriptActivity extends android.app.Activity
 			Object[] args = new Object[2];
 			args[0] = param_0;
 			args[1] = param_1;
-			return (boolean)com.tns.Platform.callJSMethod(this, "onKeyDown", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onKeyDown", args);
 		}
 		else
 		{
@@ -1806,7 +1806,7 @@ public class NativeScriptActivity extends android.app.Activity
 			Object[] args = new Object[2];
 			args[0] = param_0;
 			args[1] = param_1;
-			return (boolean)com.tns.Platform.callJSMethod(this, "onKeyLongPress", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onKeyLongPress", args);
 		}
 		else
 		{
@@ -1822,7 +1822,7 @@ public class NativeScriptActivity extends android.app.Activity
 			args[0] = param_0;
 			args[1] = param_1;
 			args[2] = param_2;
-			return (boolean)com.tns.Platform.callJSMethod(this, "onKeyMultiple", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onKeyMultiple", args);
 		}
 		else
 		{
@@ -1837,7 +1837,7 @@ public class NativeScriptActivity extends android.app.Activity
 			Object[] args = new Object[2];
 			args[0] = param_0;
 			args[1] = param_1;
-			return (boolean)com.tns.Platform.callJSMethod(this, "onKeyShortcut", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onKeyShortcut", args);
 		}
 		else
 		{
@@ -1852,7 +1852,7 @@ public class NativeScriptActivity extends android.app.Activity
 			Object[] args = new Object[2];
 			args[0] = param_0;
 			args[1] = param_1;
-			return (boolean)com.tns.Platform.callJSMethod(this, "onKeyUp", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onKeyUp", args);
 		}
 		else
 		{
@@ -1880,7 +1880,7 @@ public class NativeScriptActivity extends android.app.Activity
 			Object[] args = new Object[2];
 			args[0] = param_0;
 			args[1] = param_1;
-			return (boolean)com.tns.Platform.callJSMethod(this, "onMenuItemSelected", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onMenuItemSelected", args);
 		}
 		else
 		{
@@ -1895,7 +1895,7 @@ public class NativeScriptActivity extends android.app.Activity
 			Object[] args = new Object[2];
 			args[0] = param_0;
 			args[1] = param_1;
-			return (boolean)com.tns.Platform.callJSMethod(this, "onMenuOpened", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onMenuOpened", args);
 		}
 		else
 		{
@@ -1908,7 +1908,7 @@ public class NativeScriptActivity extends android.app.Activity
 		if (__ho130)
 		{
 			Object[] args = null;
-			return (boolean)com.tns.Platform.callJSMethod(this, "onNavigateUp", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onNavigateUp", args);
 		}
 		else
 		{
@@ -1922,7 +1922,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (boolean)com.tns.Platform.callJSMethod(this, "onNavigateUpFromChild", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onNavigateUpFromChild", args);
 		}
 		else
 		{
@@ -1950,7 +1950,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (boolean)com.tns.Platform.callJSMethod(this, "onOptionsItemSelected", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onOptionsItemSelected", args);
 		}
 		else
 		{
@@ -2078,7 +2078,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (boolean)com.tns.Platform.callJSMethod(this, "onPrepareOptionsMenu", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onPrepareOptionsMenu", args);
 		}
 		else
 		{
@@ -2094,7 +2094,7 @@ public class NativeScriptActivity extends android.app.Activity
 			args[0] = param_0;
 			args[1] = param_1;
 			args[2] = param_2;
-			return (boolean)com.tns.Platform.callJSMethod(this, "onPreparePanel", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onPreparePanel", args);
 		}
 		else
 		{
@@ -2174,7 +2174,7 @@ public class NativeScriptActivity extends android.app.Activity
 		if (__ho148)
 		{
 			Object[] args = null;
-			return (boolean)com.tns.Platform.callJSMethod(this, "onSearchRequested", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onSearchRequested", args);
 		}
 		else
 		{
@@ -2229,7 +2229,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (boolean)com.tns.Platform.callJSMethod(this, "onTouchEvent", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onTouchEvent", args);
 		}
 		else
 		{
@@ -2243,7 +2243,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (boolean)com.tns.Platform.callJSMethod(this, "onTrackballEvent", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onTrackballEvent", args);
 		}
 		else
 		{
@@ -2940,7 +2940,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (boolean)com.tns.Platform.callJSMethod(this, "shouldUpRecreateTask", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "shouldUpRecreateTask", args);
 		}
 		else
 		{
@@ -3124,7 +3124,7 @@ public class NativeScriptActivity extends android.app.Activity
 			Object[] args = new Object[2];
 			args[0] = param_0;
 			args[1] = param_1;
-			return (boolean)com.tns.Platform.callJSMethod(this, "startActivityIfNeeded", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "startActivityIfNeeded", args);
 		}
 		else
 		{
@@ -3140,7 +3140,7 @@ public class NativeScriptActivity extends android.app.Activity
 			args[0] = param_0;
 			args[1] = param_1;
 			args[2] = param_2;
-			return (boolean)com.tns.Platform.callJSMethod(this, "startActivityIfNeeded", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "startActivityIfNeeded", args);
 		}
 		else
 		{
@@ -3156,7 +3156,7 @@ public class NativeScriptActivity extends android.app.Activity
 			args[0] = param_0;
 			args[1] = param_1;
 			args[2] = param_2;
-			return (boolean)com.tns.Platform.callJSMethod(this, "startInstrumentation", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "startInstrumentation", args);
 		}
 		else
 		{
@@ -3301,7 +3301,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (boolean)com.tns.Platform.callJSMethod(this, "startNextMatchingActivity", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "startNextMatchingActivity", args);
 		}
 		else
 		{
@@ -3316,7 +3316,7 @@ public class NativeScriptActivity extends android.app.Activity
 			Object[] args = new Object[2];
 			args[0] = param_0;
 			args[1] = param_1;
-			return (boolean)com.tns.Platform.callJSMethod(this, "startNextMatchingActivity", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "startNextMatchingActivity", args);
 		}
 		else
 		{
@@ -3375,7 +3375,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (boolean)com.tns.Platform.callJSMethod(this, "stopService", args);
+			return (Boolean)com.tns.Platform.callJSMethod(this, "stopService", args);
 		}
 		else
 		{
