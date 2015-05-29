@@ -179,9 +179,9 @@ Handle<Array> ArgConverter::ConvertJavaArgsToJsArgs(jobjectArray args)
 	int jArrayIndex = 0;
 	for (int i = 0; i < argc; i++)
 	{
-		jobject argTypeIDObj = env.GetObjectArrayElement(args, jArrayIndex++);
-		jobject arg = env.GetObjectArrayElement(args, jArrayIndex++);
-		jobject argJavaClassPath = env.GetObjectArrayElement(args, jArrayIndex++);
+		JniLocalRef argTypeIDObj(env.GetObjectArrayElement(args, jArrayIndex++));
+		JniLocalRef arg(env.GetObjectArrayElement(args, jArrayIndex++));
+		JniLocalRef argJavaClassPath(env.GetObjectArrayElement(args, jArrayIndex++));
 
 		jint length;
 		jint argTypeID = ObjectToInt(argTypeIDObj);
@@ -246,7 +246,7 @@ Handle<String> ArgConverter::jcharToV8String(jchar value)
 {
 	JEnv env;
 
-	jstring str = env.NewString(&value, 1);
+	JniLocalRef str(env.NewString(&value, 1));
 	jboolean bol = true;
 	const char* resP = env.GetStringUTFChars(str, &bol);
 	auto v8String = ConvertToV8String(resP, 1);

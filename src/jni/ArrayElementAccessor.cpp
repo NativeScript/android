@@ -52,7 +52,7 @@ Handle<Value> ArrayElementAccessor::GetArrayElement(const Handle<Object>& array,
 		jcharArray charArr = reinterpret_cast<jcharArray>(arr);
 		jchar charArrValue;
 		env.GetCharArrayRegion(charArr, startIndex, length, &charArrValue);
-		jstring s = env.NewString(&charArrValue, 1);
+		JniLocalRef s(env.NewString(&charArrValue, 1));
 		const char* singleChar = env.GetStringUTFChars(s, &isCopy);
 		value = CheckForArrayAccessException(env, elementSignature, singleChar);
 		env.ReleaseStringUTFChars(s, singleChar);
@@ -129,7 +129,7 @@ void ArrayElementAccessor::SetArrayElement(const Handle<Object>& array, uint32_t
 	else if (elementSignature == "C")
 	{
 		String::Utf8Value utf8(value->ToString());
-		jstring s = env.NewString((jchar*) *utf8, 1);
+		JniLocalRef s(env.NewString((jchar*) *utf8, 1));
 		const char* singleChar = env.GetStringUTFChars(s, &isCopy);
 		jchar charElementValue = *singleChar;
 		env.ReleaseStringUTFChars(s, singleChar);

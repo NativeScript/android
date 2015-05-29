@@ -106,7 +106,7 @@ Handle<Value> FieldAccessor::GetJavaField(const Handle<Object>& target, FieldCal
 					result = env.GetCharField(targetJavaObject, fieldId);
 				}
 
-				jstring str = env.NewString(&result, 1);
+				JniLocalRef str(env.NewString(&result, 1));
 				jboolean bol = true;
 				const char* resP = env.GetStringUTFChars(str, &bol);
 				env.ReleaseStringUTFChars(str, resP);
