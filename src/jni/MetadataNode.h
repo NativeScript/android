@@ -86,6 +86,8 @@ namespace tns
 
 		static void BuildMetadata(uint32_t nodesLength, uint8_t *nodeData, uint32_t nameLength, uint8_t *nameData, uint32_t valueLength, uint8_t *valueData);
 
+		static void InjectPrototype(v8::Handle<v8::Object>& target, v8::Handle<v8::Object>& implementationObject);
+
 
 	private:
 		struct MethodCallbackData

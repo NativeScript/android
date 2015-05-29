@@ -18,16 +18,12 @@ require("./tests/extendedClassesTests");
 require("./tests/extendClassNameTests");
 
 
-var MainActivity = (function (_super) {
-    __extends(MainActivity, _super);
-    function MainActivity() {
-    }
-    
-    MainActivity.prototype.onCreate = function () {
+var MainActivity = {
+    onCreate: function (bundle) {
     	__log("onCreate from js");
     	var k = this.toString();
     	__log("this.toString " + k);
-    	_super.prototype.onCreate.call(this, null);
+    	this.super.onCreate(bundle);
     	//this.super.onCreate(null);
 
     	require("./tests/testsWithContext").run(this);
@@ -50,13 +46,13 @@ var MainActivity = (function (_super) {
     			__log("onClick called");  
     			button.setText("Hit that sucker one more time " + ++counter);
     		}}));
-    };
-    return MainActivity;
-})(com.tns.NativeScriptActivity); 
+    }
+}; 
 
 app.init({
 	
-	getActivity: function(intent) {
+	getActivity: function(activity) {
+		var intent = activity.getIntent();
 		__log("intent=" + intent)
 		if (intent.getAction() == android.content.Intent.ACTION_MAIN) {
 			return MainActivity;

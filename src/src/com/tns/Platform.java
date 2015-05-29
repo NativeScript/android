@@ -37,7 +37,7 @@ public class Platform
 
 	private static native Object callJSMethodNative(int javaObjectID, String methodName, boolean isConstructor, Object... packagedArgs) throws NativeScriptException;
 
-	private static native void createJSInstanceNative(Object javaObject, int javaObjectID, String canonicalName, boolean createActivity, Object[] packagedCreationArgs);
+	private static native void createJSInstanceNative(Object javaObject, int javaObjectID, String canonicalName);
 
 	private static native int generateNewObjectId();
 
@@ -66,7 +66,6 @@ public class Platform
 	
 	private final static Object keyNotFoundObject = new Object();
 	public final static String ApplicationAssetsPath = "app/";
-	private static Object[] empty = new Object[0];
 	private static int currentObjectId = -1;
 	
 	private static ExtractPolicy extractPolicy;
@@ -268,11 +267,6 @@ public class Platform
 	// one since it is not needed after bindings recompile.
 	public static void initInstance(Object instance)
 	{
-		initInstance(instance, empty);
-	}
-
-	public static void initInstance(Object instance, Object... args)
-	{
 		int objectId = Platform.currentObjectId;
 
 		if (objectId != -1)
@@ -281,27 +275,19 @@ public class Platform
 		}
 		else
 		{
-			createJSInstance(instance, args);
+			createJSInstance(instance);
 		}
 	}
 
-	private static void createJSInstance(Object instance, Object... args)
+	private static void createJSInstance(Object instance)
 	{
 		int javaObjectID = generateNewObjectId();
 
 		makeInstanceStrong(instance, javaObjectID);
 
-		Object[] packagedArgs = packageArgs(args);
-
 		String className = instance.getClass().getName();
-		boolean isGeneratedProxy = instance instanceof NativeScriptHashCodeProvider;
-		boolean createActivity = instance instanceof Activity;
-		if (isGeneratedProxy && !createActivity)
-		{
-			className = instance.getClass().getSuperclass().getName();
-		}
 				
-		createJSInstanceNative(instance, javaObjectID, className, createActivity, packagedArgs);
+		createJSInstanceNative(instance, javaObjectID, className);
 
 		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "JSInstance for " + instance.getClass().toString() + " created with overrides");
 	}
@@ -451,16 +437,6 @@ public class Platform
 		}
 	};
 
-	public static int makeClassInstanceOfTypeStrong(String classPath) throws InstantiationException, IllegalAccessException, ClassNotFoundException, NoSuchMethodException, IllegalArgumentException, InvocationTargetException
-	{
-		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "Making Class<?> instance of " + classPath + " strong");
-		Class<?> clazz = Class.forName(classPath.replace('/', '.'));
-		int key = generateNewObjectId();
-		makeInstanceStrong(clazz, key);
-		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "Class<?> of " + classPath + " made strong id:" + key);
-		return key;
-	}
-	
 	private static void makeInstanceStrong(Object instance, int objectId)
 	{
 		if (instance == null)
@@ -634,7 +610,7 @@ public class Platform
 	// (typeid, javaObjectID, canonicalName)
 	// if javaObject has no javaObjecID meaning javascript object does not
 	// exists for this object we assign one.
-	private static Object[] packageArgs(Object... args)
+	static Object[] packageArgs(Object... args)
 	{
 		int len = (args != null) ? (args.length * 3) : 0;
 		Object[] packagedArgs = new Object[len];

@@ -341,7 +341,7 @@ extern "C" jobject Java_com_tns_Platform_callJSMethodNative(JNIEnv *_env, jobjec
 
 	string method_name = ArgConverter::jstringToString(methodName);
 
-	auto jsResult = NativeScriptRuntime::CallJSMethod(env, jsObject, methodName, packagedArgs, tc);
+	auto jsResult = NativeScriptRuntime::CallJSMethod(env, jsObject, method_name, packagedArgs, tc);
 
 	stringstream ss;
 	ss << "Calling js method " << method_name << " failed";
@@ -355,7 +355,7 @@ extern "C" jobject Java_com_tns_Platform_callJSMethodNative(JNIEnv *_env, jobjec
 	return javaObject;
 }
 
-extern "C" jobjectArray Java_com_tns_Platform_createJSInstanceNative(JNIEnv *_env, jobject obj, jobject javaObject, jint javaObjectID, jstring className, jboolean createActivity, jobjectArray packagedCreationArgs)
+extern "C" void Java_com_tns_Platform_createJSInstanceNative(JNIEnv *_env, jobject obj, jobject javaObject, jint javaObjectID, jstring className)
 {
 	SET_PROFILER_FRAME();
 
@@ -375,139 +375,31 @@ extern "C" jobjectArray Java_com_tns_Platform_createJSInstanceNative(JNIEnv *_en
 	Handle<Object> jsInstance;
 	Handle<Object> implementationObject;
 
-	bool isActivity = createActivity == JNI_TRUE;
-
-	if (isActivity)
+	auto proxyClassName = g_objectManager->GetClassName(javaObject);
+	//
+	if (proxyClassName == "com/tns/NativeScriptActivity")
 	{
-		auto appInstance = g_objectManager->GetJsObjectByJavaObject(AppJavaObjectID);
-		if (appInstance.IsEmpty())
-		{
-			ExceptionUtil::GetInstance()->ThrowExceptionToJava(tc, "NativeScript application not initialized correctly. Missing the global app object initialization.");
-			return nullptr;
-		}
-
-		string createActivityMethodName = "getActivity";
-		auto createActivityFunction = appInstance->Get(ConvertToV8String(createActivityMethodName.c_str()));
-
-		if (createActivityFunction.IsEmpty() || !createActivityFunction->IsFunction())
-		{
-			ExceptionUtil::GetInstance()->ThrowExceptionToJava(tc, "NativeScript application not initialized correctly. No function 'createActivity' found on the application object.");
-			return nullptr;
-		}
-
-		JniLocalRef jMethodName(env.NewStringUTF(createActivityMethodName.c_str()));
-		TryCatch tc;
-		auto jsResult = NativeScriptRuntime::CallJSMethod(env, appInstance, jMethodName, packagedCreationArgs, tc);
-		jsInstance = jsResult.As<Object>();
-		if (jsInstance.IsEmpty() || jsInstance->IsNull() || jsInstance->IsUndefined())
-		{
-			ExceptionUtil::GetInstance()->ThrowExceptionToJava(tc, "NativeScript application not initialized correctly. getActivity method returned invalid value.");
-			return nullptr;
-		}
-
-//@@@
-//		auto node = MetadataNode::GetNodeFromHandle(jsInstance);
-//		string nodeName = node->GetName();
-//
-//		if (nodeName != jniName)
-//		{
-//			ExceptionUtil::GetInstance()->ThrowExceptionToJava(tc, "NativeScript application not initialized correctly. createActivity returned wrong type.");
-//			return nullptr;
-//		}
+		return;
 	}
-	else
+	//
+	DEBUG_WRITE("createJSInstanceNative class %s", proxyClassName.c_str());
+	jsInstance = MetadataNode::CreateExtendedJSWrapper(isolate, proxyClassName);
+	if (jsInstance.IsEmpty())
 	{
-		auto proxyClassName = g_objectManager->GetClassName(javaObject);
-		DEBUG_WRITE("createJSInstanceNative class %s", proxyClassName.c_str());
-		jsInstance = MetadataNode::CreateExtendedJSWrapper(isolate, proxyClassName);
-		if (jsInstance.IsEmpty())
-		{
-			ExceptionUtil::GetInstance()->ThrowExceptionToJava(tc, "NativeScript application not initialized correctly. Cannot create extended JS wrapper.");
-			return nullptr;
-		}
+		ExceptionUtil::GetInstance()->ThrowExceptionToJava(tc, "NativeScript application not initialized correctly. Cannot create extended JS wrapper.");
+		return;
 	}
 
 	implementationObject = MetadataNode::GetImplementationObject(jsInstance);
 	if (implementationObject.IsEmpty())
 	{
 		NativeScriptRuntime::APP_FAIL("createJSInstanceNative: implementationObject is empty");
-		return nullptr;
+		return;
 	}
 	DEBUG_WRITE("createJSInstanceNative: implementationObject :%d", implementationObject->GetIdentityHash());
 
-	bool createTypeScriptActivity = isActivity && jsInstance->HasOwnProperty(V8StringConstants::GetIsPrototypeImplementationObject());
-
-	if (isActivity && !createTypeScriptActivity)
-	{
-		DEBUG_WRITE("createJSInstanceNative: creating js activity with classProxy: %d", jsInstance->GetIdentityHash());
-	}
-
-	if (createTypeScriptActivity)
-	{
-		DEBUG_WRITE("createJSInstanceNative: creating typescript activity with classProxy: %d", jsInstance->GetIdentityHash());
-
-		auto node = MetadataNode::GetNodeFromHandle(jsInstance);
-
-		//call extends function on the prototype which must the be Parent function
-		auto parent = jsInstance->GetPrototype().As<Function>();
-		auto extendsFunc = parent->Get(String::NewFromUtf8(isolate, "__activityExtend")).As<Function>();
-		ASSERT_MESSAGE(!extendsFunc.IsEmpty(), "__activityExtend support function not found on activity parent");
-
-
-		Handle<Value> arguments[3];
-		arguments[0] = parent;
-		arguments[1] = jsInstance.As<Function>()->GetName();
-		arguments[2] = implementationObject;
-		auto extended =  extendsFunc->Call(parent, 3, arguments).As<Function>();
-		ASSERT_MESSAGE(!extended.IsEmpty(), "extend result is not an function");
-
-		extended->SetHiddenValue(ConvertToV8String("t::TypescriptActivity::DonNotRegisterInstance"), Boolean::New(isolate, true));
-		auto extendedObject = extended->CallAsConstructor(0, nullptr).As<Object>();
-		DEBUG_WRITE("createJSInstanceNative: typescript activity extendedObject's prototype : %d", extendedObject->GetPrototype().As<Object>()->GetIdentityHash());
-
-
-		extendedObject->SetPrototype(implementationObject);
-		//@@@
-		//extendedObject->SetHiddenValue(ConvertToV8String(MetadataNode::METADATA_NODE_KEY_NAME), External::New(isolate, node));
-
-		bool success = extendedObject->SetHiddenValue(ConvertToV8String("t::ActivityImplementationObject"), implementationObject);
-		ASSERT_MESSAGE(success == true, "Setting up the typescript activity implementation object failed");
-
-		//This will cause the Link to link the extendedObject not the empty object instance. This is on par with all typescript objects created through JS
-		jsInstance = extendedObject;
-		g_objectManager->Unlink(jsInstance);
-	}
-
-//@@@
 	jclass clazz = env.FindClass(jniName);
 	g_objectManager->Link(jsInstance, javaObjectID, clazz);
-
-	vector<jstring> methods;
-
-	auto propNames = implementationObject->GetOwnPropertyNames();
-	auto propsLen = propNames->Length();
-	for (auto i = 0; i < propsLen; i++)
-	{
-		auto name = propNames->Get(i).As<String>();
-		auto method = implementationObject->Get(name);
-
-		if (method->IsFunction())
-		{
-			String::Utf8Value stringValue(name);
-			jstring value = env.NewStringUTF(*stringValue);
-
-			methods.push_back(value);
-		}
-	}
-
-	jclass stringClass = env.FindClass("java/lang/String");
-	jobjectArray methodOverrides = env.NewObjectArray(methods.size(), stringClass, nullptr);
-	for (int i = 0; i < methods.size(); i++)
-	{
-		env.SetObjectArrayElement(methodOverrides, i, methods[i]);
-	}
-
-	return methodOverrides;
 }
 
 extern "C" jint Java_com_tns_Platform_generateNewObjectId(JNIEnv *env, jobject obj)

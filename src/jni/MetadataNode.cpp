@@ -1261,6 +1261,15 @@ void MetadataNode::CreateTopLevelNamespaces(const Handle<Object>& global)
 	}
 }
 
+void MetadataNode::InjectPrototype(Handle<Object>& target, Handle<Object>& implementationObject)
+{
+	auto isolate = Isolate::GetCurrent();
+
+	implementationObject->SetAccessor(ConvertToV8String("super"), SuperAccessorGetterCallback, nullptr, implementationObject);
+	implementationObject->SetPrototype(target->GetPrototype());
+	target->SetPrototype(implementationObject);
+}
+
 
 string MetadataNode::TNS_PREFIX = "com/tns/gen/";
 std::map<std::string, MetadataNode*> MetadataNode::s_name2NodeCache;
