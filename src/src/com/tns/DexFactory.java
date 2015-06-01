@@ -42,11 +42,11 @@ public class DexFactory
 
 		ApplicationInfo applicationInfo = this.context.getApplicationInfo();
 		this.dexPath = applicationInfo.dataDir + File.separator + SECONDARY_DEX_FOLDER_NAME + File.separator;
-		this.odexPath = applicationInfo.dataDir + File.separator + SECONDARY_DEX_FOLDER_NAME + File.separator + "odex" + File.separator;
+		this.odexPath = this.dexPath + "odex" + File.separator;
 		this.proxyGenerator = new ProxyGenerator(dexPath);
 		ProxyGenerator.IsLogEnabled = Platform.IsLogEnabled;
 		
-		File odexDir = new File(dexPath + File.separator + "odex" + File.separator);
+		File odexDir = new File(this.odexPath);
 		odexDir.mkdirs();
 		
 		this.updateDexThumbAndPurgeCache();
