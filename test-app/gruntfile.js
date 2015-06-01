@@ -7,6 +7,7 @@ module.exports = function(grunt) {
     var localCfg = {
         rootDir: ".",
         outDir: "./dist",
+		binDir: "./bin/*"
     };
 
     grunt.initConfig({
@@ -23,6 +24,9 @@ module.exports = function(grunt) {
             },
 			metadata: {
 				src: "./assets/metadata/*"
+			},
+			binDir: {
+				src: [localCfg.binDir]
 			}
         },
         mkdir: {
@@ -77,6 +81,7 @@ module.exports = function(grunt) {
     grunt.registerTask("default", [
                             "clean:build",
                             "mkdir:build",
+							"clean:binDir",
 							"copy:generatedLibraries",
 							"exec:createBuildXml",
 							
