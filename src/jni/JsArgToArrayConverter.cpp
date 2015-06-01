@@ -293,8 +293,8 @@ bool JsArgToArrayConverter::ConvertArg(const Handle<Value>& arg, int index)
 			jchar value = '\0';
 			if (hidden->IsString())
 			{
-				string value = ConvertToString(hidden->ToString());
-				value = (jchar)value[0];
+				string str = ConvertToString(hidden->ToString());
+				value = (jchar)str[0];
 			}
 
 			jclass clazz = env.FindClass("java/lang/Character");

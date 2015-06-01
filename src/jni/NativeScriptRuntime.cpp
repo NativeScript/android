@@ -297,8 +297,8 @@ void NativeScriptRuntime::CallJavaMethod(const Handle<Object>& caller, const str
 			JniLocalRef str(env.NewString(&result, 1));
 			jboolean bol = true;
 			const char* resP = env.GetStringUTFChars(str, &bol);
-			env.ReleaseStringUTFChars(str, resP);
 			args.GetReturnValue().Set(ConvertToV8String(resP, 1));
+			env.ReleaseStringUTFChars(str, resP);
 			break;
 		}
 		case 'S': //short

@@ -109,8 +109,8 @@ Handle<Value> FieldAccessor::GetJavaField(const Handle<Object>& target, FieldCal
 				JniLocalRef str(env.NewString(&result, 1));
 				jboolean bol = true;
 				const char* resP = env.GetStringUTFChars(str, &bol);
-				env.ReleaseStringUTFChars(str, resP);
 				fieldResult = handleScope.Escape(ConvertToV8String(resP, 1));
+				env.ReleaseStringUTFChars(str, resP);
 				break;
 			}
 			case 'S': //short

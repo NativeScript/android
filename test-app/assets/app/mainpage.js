@@ -16,6 +16,7 @@ require("./tests/testIfAbleToRunExternalFile");
 require("./tests/finalFieldsSetTests");
 require("./tests/extendedClassesTests");
 require("./tests/extendClassNameTests");
+require("./tests/testJniReferenceLeak");
 
 
 var MainActivity = {
@@ -54,11 +55,14 @@ app.init({
 	getActivity: function(activity) {
 		var intent = activity.getIntent();
 		__log("intent=" + intent)
-		if (intent.getAction() == android.content.Intent.ACTION_MAIN) {
+		var action = intent.getAction();
+		__log("action=" + action)
+		return MainActivity;
+		if (action == android.content.Intent.ACTION_MAIN) {
 			return MainActivity;
 		}
 		else {
-			fail("Unknown action");
+			__exit("Unknown action");
 		}
 	},
 	
