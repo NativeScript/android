@@ -110,6 +110,7 @@ Handle<Value> FieldAccessor::GetJavaField(const Handle<Object>& target, FieldCal
 				jboolean bol = true;
 				const char* resP = env.GetStringUTFChars(str, &bol);
 				env.ReleaseStringUTFChars(str, resP);
+				env.DeleteLocalRef(str);
 				fieldResult = handleScope.Escape(ConvertToV8String(resP, 1));
 				break;
 			}

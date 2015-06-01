@@ -393,7 +393,6 @@ void JEnv::ReleaseStringUTFChars(jstring str, const char* utf)
 	m_env->ReleaseStringUTFChars(str, utf);
 }
 
-
 jint JEnv::Throw(jthrowable obj)
 {
 	return m_env->Throw(obj);

@@ -89,6 +89,7 @@ void ExceptionUtil::GetExceptionMessage(JEnv& env, jthrowable exception, string&
 		}
 
 		env.ReleaseStringUTFChars(msg, msgStr);
+		env.DeleteLocalRef(msg);
 	}
 
 	for (jsize i = 0; i < framesLength; i++)
@@ -102,6 +103,7 @@ void ExceptionUtil::GetExceptionMessage(JEnv& env, jthrowable exception, string&
 		errMsg.append(msgStr);
 
 		env.ReleaseStringUTFChars(msg, msgStr);
+		env.DeleteLocalRef(msg);
 	}
 
 	if (nullptr != (jobjectArray) frames)
