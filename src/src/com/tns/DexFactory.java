@@ -46,8 +46,18 @@ public class DexFactory
 		this.proxyGenerator = new ProxyGenerator(dexPath);
 		ProxyGenerator.IsLogEnabled = Platform.IsLogEnabled;
 		
-		File odexDir = new File(this.odexPath);
-		odexDir.mkdirs();
+		File dexDir = new File(dexPath);
+		
+		if (!dexDir.exists())
+		{
+			dexDir.mkdirs();
+		}
+		
+		File odexDir = new File(odexPath);
+		if (!odexDir.exists())
+		{
+			odexDir.mkdir();
+		}
 		
 		this.updateDexThumbAndPurgeCache();
 		this.proxyGenerator.setProxyThumb(this.dexThumb);
@@ -296,9 +306,15 @@ public class DexFactory
 	
 	private void purgeDexesByThumb(String cachedDexThumb, File pathToPurge)
 	{
-	    if (!pathToPurge.isDirectory())
+		if (!pathToPurge.exists())
+		{
+			return;
+		}
+		
+		if (!pathToPurge.isDirectory())
 	    {
-	    	throw new RuntimeException("Purge path not a directory");
+			Log.e(Platform.DEFAULT_LOG_TAG, "Purge proxies path not a directory. Path: " + pathToPurge);
+			throw new RuntimeException("Purge path not a directory");
 	    }
 	    
         String[] children = pathToPurge.list();
