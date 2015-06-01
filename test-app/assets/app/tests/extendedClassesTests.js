@@ -1,7 +1,7 @@
 describe("Tests extended classes ", function () {
 
 	it("Instance_with_no_extension_shouldnt_use_previously_defined_implementation_object", function () {
-		var MyButton = new com.tns.tests.Button1.extend({
+		var MyButton = com.tns.tests.Button1.extend({
 			toString: function () {
 				return "overriden toString method of chronometer instance";
 			},
@@ -24,7 +24,7 @@ describe("Tests extended classes ", function () {
 	
 	it("Instance_with_extension_shouldnt_use_previously_defined_implementation_object", function () {
 		
-		var MyButton = new com.tns.tests.Button1.extend({
+		var MyButton = com.tns.tests.Button1.extend({
 			toString: function () {
 				return "overriden toString method of button instance";
 			},
@@ -37,7 +37,7 @@ describe("Tests extended classes ", function () {
 		var labelgetIMAGE_ID_PROP = button.getIMAGE_ID_PROP();
 		//
 		
-		var MyButton1 = new com.tns.tests.Button1.extend({
+		var MyButton1 = com.tns.tests.Button1.extend({
 			toString: function () {
 				return "overriden toString method of button1 instance ";
 			},
@@ -59,7 +59,7 @@ describe("Tests extended classes ", function () {
 		var labelgetIMAGE_ID_PROP1 = button1.getIMAGE_ID_PROP();
 		
 		//
-		var MyButton = new com.tns.tests.Button1.extend({
+		var MyButton = com.tns.tests.Button1.extend({
 			getIMAGE_ID_PROP: function () {
 				return "overriden getIMAGE_ID_PROP method on button";
 			}

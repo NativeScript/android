@@ -1051,6 +1051,13 @@ MetadataNode::ExtendedClassCacheData MetadataNode::GetCachedExtendedClassData(Is
 
 void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
+	if (info.IsConstructCall())
+	{
+		string exMsg("Cannot call 'extend' as constructor");
+		ExceptionUtil::GetInstance()->ThrowExceptionToJs(exMsg);
+		return;
+	}
+
 	SET_PROFILER_FRAME();
 
 	Handle<Object> implementationObject;

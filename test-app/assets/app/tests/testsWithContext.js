@@ -18,7 +18,7 @@ exports.run = function(cntxt)
 			var ctorCalled = false;
 			var isConstructor = false;
 
-			var MyButton = new android.widget.Button.extend({
+			var MyButton = android.widget.Button.extend({
 				init : function() {
 					ctorCalled = true;
 					isConstructor = arguments[arguments.length - 1];

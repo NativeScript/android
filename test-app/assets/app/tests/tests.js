@@ -40,7 +40,7 @@ describe("Tests ", function () {
 		button1.setLabel("first button");
 		
 		__log("TEST: Creating MyButton2 class");
-		var MyButton2 = new com.tns.tests.Button1.extend("MyButton", {
+		var MyButton2 = com.tns.tests.Button1.extend("MyButton", {
 			toString : function() {
 		  		return "button2";	
 		}});
@@ -79,7 +79,7 @@ describe("Tests ", function () {
 		button1.setLabel("first button");
 		
 		__log("TEST: Creating MyButton2 class");
-		var MyButton2 = new com.tns.tests.Button1.extend({
+		var MyButton2 = com.tns.tests.Button1.extend({
 			toString : function() {
 		  		return "button2";	
 		}});
@@ -136,7 +136,7 @@ describe("Tests ", function () {
 		
 		__log("TEST: When_implementing_an_interface_with_new__the_overrides_should_work");
 		
-		var MyButton = new com.tns.tests.Button1.extend("MyButton60", {
+		var MyButton = com.tns.tests.Button1.extend("MyButton60", {
 			toString : function() {
 			  	return "button1";	
 			} 
@@ -158,7 +158,7 @@ describe("Tests ", function () {
 		
 		__log("TEST: When_calling_instanceof_on_field_result_it_should_work");
 		
-		var MyButton = new com.tns.tests.Button1.extend("MyButton81", {
+		var MyButton = com.tns.tests.Button1.extend("MyButton81", {
 			toString : function() {
 			  	return "button1";	
 			},
@@ -176,7 +176,7 @@ describe("Tests ", function () {
 		
 		__log("TEST: When_calling_instanceof_on_method_result_it_should_work");
 		
-		var MyButton = new com.tns.tests.Button1.extend("MyButton98", {
+		var MyButton = com.tns.tests.Button1.extend("MyButton98", {
 			toString : function() {
 			  	return "button1";	
 			},
@@ -196,7 +196,7 @@ describe("Tests ", function () {
 		
 		var isInstanceOf;
 		
-		var MyButton = new com.tns.tests.Button1.extend("MyButton115", {
+		var MyButton = com.tns.tests.Button1.extend("MyButton115", {
 			toString : function() {
 			  	return "button1";	
 			},
@@ -453,7 +453,7 @@ describe("Tests ", function () {
 		
 		__log("TEST: When_implementing_an_interface_with_new__the_overrides_should_work");
 		
-		var MyButton = new com.tns.tests.Button1.extend({
+		var MyButton = com.tns.tests.Button1.extend({
 			toString : function() {
 			  	return "button1";	
 			} 
@@ -477,7 +477,7 @@ describe("Tests ", function () {
 		
 		__log("TEST: When_a_java_method_returns_object_that_needs_js_instance__it_should_create_the_instance");
 		
-		var MyButton = new com.tns.tests.Button1.extend("MyButton381", {
+		var MyButton = com.tns.tests.Button1.extend("MyButton381", {
 			toString : function() {
 			  	return "button1";	
 			}
@@ -501,7 +501,7 @@ describe("Tests ", function () {
 
 		__log("TEST: When_a_java_method_returns_object_that_needs_js_instance__it_should_create_the_instance_according_to_the_actual_return_type");
 		
-		var Button = new com.tns.tests.Button1.extend("MyButton397", {
+		var Button = com.tns.tests.Button1.extend("MyButton397", {
 			toString : function() {
 			  	return "button1";	
 			}
@@ -518,7 +518,7 @@ describe("Tests ", function () {
 		
 		__log("TEST: When_a_java_field_returns_object_that_needs_js_instance__it_should_create_the_instance_according_to_the_actual_return_type");
 		
-		var Button = new com.tns.tests.Button1.extend("MyButton413", {
+		var Button = com.tns.tests.Button1.extend("MyButton413", {
 			toString : function() {
 			  	return "button1";	
 			}
@@ -536,7 +536,7 @@ describe("Tests ", function () {
 		__log("TEST: When_a_java_argument_is_passed_to_js_that_needs_js_instance__it_should_create_the_instance_according_to_the_actual_return_type");
 		
 		var name = "";
-		var Button = new com.tns.tests.Button1.extend("MyButton418", {
+		var Button = com.tns.tests.Button1.extend("MyButton418", {
 			toString : function() {
 			  	return "button1";	
 			},
@@ -557,7 +557,7 @@ describe("Tests ", function () {
 		
 		__log("TEST: When_a_java_object_is_returned_from_indexer_that_needs_js_instance__it_should_create_the_instance_according_to_the_actual_return_type");
 		
-		var Button = new com.tns.tests.Button1.extend("MyButton450", {
+		var Button = com.tns.tests.Button1.extend("MyButton450", {
 			toString : function() {
 			  	return "button1";	
 			}
@@ -686,7 +686,7 @@ describe("Tests ", function () {
 		var ctorCalled = false;
 		var isConstructor = false;
 
-		var MyButton = new com.tns.tests.Button1.extend("MyButton574", {
+		var MyButton = com.tns.tests.Button1.extend("MyButton574", {
 			init : function() {
 				ctorCalled = true;
 				isConstructor = arguments[arguments.length - 1];
@@ -1568,7 +1568,7 @@ describe("Tests ", function () {
 		
 		var exceptionCaught = false;
 		
-		var Button1 = new com.tns.tests.Button1.extend("Button1", implObj);
+		var Button1 = com.tns.tests.Button1.extend("Button1", implObj);
 		
 	    try
 		{
