@@ -50,7 +50,7 @@ public class JsDebugger
 	
 	private static final String portEnvOutputFile = "envDebug.out";
 
-	private static final String DEBUG_BRAKE_FILENAME = "debugbreak";
+	private static final String DEBUG_BREAK_FILENAME = "debugbreak";
 
 	private static int currentPort = INVALID_PORT;
 
@@ -346,7 +346,7 @@ public class JsDebugger
 				w = null;
 			}
 			
-			if (shouldDebugBrake(context))
+			if (shouldDebugBreak(context))
 			{
 				try
 				{
@@ -538,31 +538,31 @@ public class JsDebugger
 	}
 	
 	
-	public static Boolean shouldDebugBrakeFlag = null;
+	public static Boolean shouldDebugBreakFlag = null;
 	
-	public static boolean shouldDebugBrake(Context context)
+	public static boolean shouldDebugBreak(Context context)
 	{
-		if (shouldDebugBrakeFlag != null)
+		if (shouldDebugBreakFlag != null)
 		{
-			return shouldDebugBrakeFlag;
+			return shouldDebugBreakFlag;
 		}
 		
 		if (!shouldEnableDebugging(context))
 		{
-			shouldDebugBrakeFlag = false;
+			shouldDebugBreakFlag = false;
 			return false;
 		}
 		
 		String appRoot = context.getFilesDir().getPath() + File.separator;
-		File debugBrakeFile = new File(appRoot, DEBUG_BRAKE_FILENAME);
-		if (debugBrakeFile.exists())
+		File debugBreakFile = new File(appRoot, DEBUG_BREAK_FILENAME);
+		if (debugBreakFile.exists())
 		{
-			debugBrakeFile.delete();
-			shouldDebugBrakeFlag = true;
+			debugBreakFile.delete();
+			shouldDebugBreakFlag = true;
 			return true;
 		}
 		
-		shouldDebugBrakeFlag = false;
+		shouldDebugBreakFlag = false;
 		return false;
 	}
 }

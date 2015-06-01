@@ -127,11 +127,6 @@ public class Platform
 		return appJavaObjectId;
 	}
 	
-	static void installSecondaryDexes(Context context)
-	{
-		com.tns.multidex.MultiDex.install(context);
-	}
-	
 	public static void enableVerboseLogging()
 	{
 		IsLogEnabled = true;
