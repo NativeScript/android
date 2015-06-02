@@ -69,6 +69,8 @@ namespace tns
 
 		static void RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
+		static void RequireClearCacheCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
+
 		static void CreateGlobalCastFunctions(const v8::Handle<v8::ObjectTemplate>& globalTemplate);
 
 		static std::vector<std::string> GetTypeMetadata(const std::string& name, int index);

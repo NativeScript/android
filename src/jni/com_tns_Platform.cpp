@@ -122,6 +122,7 @@ void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring pa
 	globalTemplate->Set(ConvertToV8String("__disableVerboseLogging"), FunctionTemplate::New(isolate, NativeScriptRuntime::DisableVerboseLoggingMethodCallback));
 	globalTemplate->Set(ConvertToV8String("__exit"), FunctionTemplate::New(isolate, NativeScriptRuntime::ExitMethodCallback));
 	globalTemplate->Set(ConvertToV8String("require"), FunctionTemplate::New(isolate, NativeScriptRuntime::RequireCallback));
+	globalTemplate->Set(ConvertToV8String("__clearRequireCachedItem"), FunctionTemplate::New(isolate, NativeScriptRuntime::RequireClearCacheCallback));
 	globalTemplate->Set(ConvertToV8String("WeakRef"), FunctionTemplate::New(isolate, WeakRef::ConstructorCallback));
 
 	SimpleProfiler::Init(isolate, globalTemplate);

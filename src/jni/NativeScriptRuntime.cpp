@@ -698,6 +698,21 @@ void NativeScriptRuntime::CreateGlobalCastFunctions(const Handle<ObjectTemplate>
 	castFunctions.CreateGlobalCastFunctions(globalTemplate);
 }
 
+void NativeScriptRuntime::RequireClearCacheCallback(const v8::FunctionCallbackInfo<v8::Value> &args)
+{
+	SET_PROFILER_FRAME();
+	ASSERT_MESSAGE(args.Length() == 1, "__clearRequireCachedItem should be called with one parameters");
+	ASSERT_MESSAGE(!args[0]->IsUndefined() && !args[0]->IsNull(), "require called with undefined moduleName parameter");
+	ASSERT_MESSAGE(args[0]->IsString(), "__clearRequireCachedItem should be called with string parameter");
+
+	string modulePath = ConvertToString(args[0].As<String>());
+	JEnv env;
+
+	auto it = loadedModules.find(modulePath);
+	if (it != loadedModules.end()) {
+		loadedModules.erase(modulePath);
+	}
+}
 
 void NativeScriptRuntime::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
@@ -739,6 +754,7 @@ void NativeScriptRuntime::RequireCallback(const v8::FunctionCallbackInfo<v8::Val
 		return;
 	}
 
+
 	auto it = loadedModules.find(modulePath);
 
 	Handle<Object> moduleObj;
@@ -746,6 +762,7 @@ void NativeScriptRuntime::RequireCallback(const v8::FunctionCallbackInfo<v8::Val
 
 	if (it == loadedModules.end())
 	{
+
 		Local<Value> exportObj = Object::New(isolate);
 		auto tmpExportObj = new Persistent<Object>(isolate, exportObj.As<Object>());
 		loadedModules.insert(make_pair(modulePath, tmpExportObj));
