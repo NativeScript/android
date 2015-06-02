@@ -265,7 +265,7 @@ void ExceptionUtil::ThrowExceptionToJava(TryCatch& tc, const string& prependMess
 	if (tc.CanContinue())
 	{
 		jweak javaThrowable = nullptr;
-		if (ex->IsObject())
+		if (!ex.IsEmpty() && ex->IsObject())
 		{
 			javaThrowable = TryGetJavaThrowableObject(env, ex->ToObject());
 		}
