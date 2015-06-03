@@ -208,7 +208,7 @@ public class Async
 				options.screenWidth = metrics.widthPixels;
 				options.screenHeight = metrics.heightPixels;
 			}
-			new HttpRequestTask(callback, context).execute(options);
+			new HttpRequestTask(callback, context).executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, options);
 		}
 
 		static class HttpRequestTask extends AsyncTask<RequestOptions, Void, RequestResult>
