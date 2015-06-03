@@ -565,7 +565,7 @@ jobject NativeScriptRuntime::CreateJavaInstance(int objectID, const std::string&
 int NativeScriptRuntime::GetCachedConstructorId(JEnv& env, const FunctionCallbackInfo<Value>& args, const string& name, const string& className, jobjectArray javaArgs, const Handle<Object>& implementationObject)
 {
 	int ctorId = -1;
-	string fullClassName = className + '-' + name;
+	string fullClassName = className + Constants::CLASS_NAME_LOCATION_SEPARATOR + name;
 	string encodedCtorArgs = MethodCache::EncodeSignature(fullClassName, "<init>", args, false);
 	auto itFound = s_constructorCache.find(encodedCtorArgs);
 

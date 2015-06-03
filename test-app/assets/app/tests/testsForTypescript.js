@@ -112,8 +112,9 @@ describe("Tests typescript", function () {
 		
 	    var button = new MyButton2();
 	    var button1Label = button.superToString();
-	  	expect(button1Label.indexOf("com.tns.tests.Button1-")).not.toEqual(-1);
-	  	expect(button1Label.indexOf("-MyButton2")).not.toEqual(-1);
+	    
+	  	expect(button1Label.indexOf("com.tns.tests.Button1_")).not.toEqual(-1);
+	  	expect(button1Label.indexOf("_MyButton2")).not.toEqual(-1);
 	});
 	
 	it("When_creating_a_pure_typescript_inheritance_chain_it_should_work", function () {
@@ -289,8 +290,8 @@ describe("Tests typescript", function () {
 	      
 	    var button = new MyButton5();
 	    var button1Label = button.toString();
-	  	expect(button1Label.indexOf("com.tns.tests.Button1-")).not.toEqual(-1);
-		expect(button1Label.indexOf("-MyButton5")).not.toEqual(-1);
+	  	expect(button1Label.indexOf("com.tns.tests.Button1_")).not.toEqual(-1);
+		expect(button1Label.indexOf("_MyButton5")).not.toEqual(-1);
 	});
 	
 	it("When_extending_an_already_extended_object_it_should_throw_an_error", function () {
