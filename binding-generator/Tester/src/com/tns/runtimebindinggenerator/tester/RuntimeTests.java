@@ -40,8 +40,8 @@ public class RuntimeTests extends AndroidTestCase
 	private ApplicationWriter aw;
 	private Dump dump;
 	private File optimizedDexOutputPath;
+	public static final char CLASS_NAME_LOCATION_SEPARATOR = '_';
 
-	
 	public RuntimeTests()
 	{
 	}
@@ -120,7 +120,7 @@ public class RuntimeTests extends AndroidTestCase
 		Platform.implementationObject = implementationObject;	
 		
 		DexClassLoader dexClassLoader = new DexClassLoader(proxyFile.getAbsolutePath(), optimizedDexOutputPath.getAbsolutePath(), null, getContext().getClassLoader());
-		Class<?> clazz = dexClassLoader.loadClass("com.tns.gen.com.proxy.TargetObject-0");
+		Class<?> clazz = dexClassLoader.loadClass("com.tns.gen.com.proxy.TargetObject"+ CLASS_NAME_LOCATION_SEPARATOR + "0");
 		assertNotNull("Error loading proxy class com.tns.gen.com.proxy.TargetObject", clazz);
 		
 		Constructor<?> ctor = clazz.getConstructor();
@@ -133,7 +133,7 @@ public class RuntimeTests extends AndroidTestCase
 		Platform.implementationObject = (Object)implementationObject;	
 		
 		DexClassLoader dexClassLoader = new DexClassLoader(proxyFile.getAbsolutePath(), optimizedDexOutputPath.getAbsolutePath(), null, getContext().getClassLoader());
-		Class<?> clazz = dexClassLoader.loadClass("com.tns.gen." + implementationObject.getClass().getSuperclass().getCanonicalName() + "-0");
+		Class<?> clazz = dexClassLoader.loadClass("com.tns.gen." + implementationObject.getClass().getSuperclass().getCanonicalName() + CLASS_NAME_LOCATION_SEPARATOR + "0");
 		assertNotNull("Error loading proxy class com.tns.gen.com.proxy.Button1", clazz);
 		
 		Constructor<?> ctor = clazz.getConstructor();
@@ -144,7 +144,7 @@ public class RuntimeTests extends AndroidTestCase
 	private <T> T loadAnyProxyByClass(File proxyFile, Class<?> proxyClass) throws Exception
 	{
 		DexClassLoader dexClassLoader = new DexClassLoader(proxyFile.getAbsolutePath(), optimizedDexOutputPath.getAbsolutePath(), null, getContext().getClassLoader());
-		Class<?> clazz = dexClassLoader.loadClass("com.tns.gen." + proxyClass.getName().replace('$', '_') + "-0");
+		Class<?> clazz = dexClassLoader.loadClass("com.tns.gen." + proxyClass.getName().replace('$', '_')  + CLASS_NAME_LOCATION_SEPARATOR + "0");
 		assertNotNull("Error loading proxy class com.tns.gen.com.proxy.Button1", clazz);
 		
 		if (!proxyClass.getName().contains("ViewGroup"))
@@ -168,7 +168,7 @@ public class RuntimeTests extends AndroidTestCase
 		Platform.implementationObject = implementationObject;	
 		
 		DexClassLoader dexClassLoader = new DexClassLoader(proxyFile.getAbsolutePath(), optimizedDexOutputPath.getAbsolutePath(), null, getContext().getClassLoader());
-		Class<?> clazz = dexClassLoader.loadClass("com.tns.gen.com.proxy.Button1-0");
+		Class<?> clazz = dexClassLoader.loadClass("com.tns.gen.com.proxy.Button1" + CLASS_NAME_LOCATION_SEPARATOR + "0");
 		assertNotNull("Error loading proxy class com.tns.gen.com.proxy.Button1", clazz);
 		
 		Constructor<?> ctor = clazz.getConstructor();
@@ -181,7 +181,7 @@ public class RuntimeTests extends AndroidTestCase
 		Platform.implementationObject = implementationObject;	
 		
 		DexClassLoader dexClassLoader = new DexClassLoader(proxyFile.getAbsolutePath(), optimizedDexOutputPath.getAbsolutePath(), null, getContext().getClassLoader());
-		Class<?> clazz = dexClassLoader.loadClass("com.tns.gen.com.proxy.TargetObject_TargetInterface-0");
+		Class<?> clazz = dexClassLoader.loadClass("com.tns.gen.com.proxy.TargetObject_TargetInterface" + CLASS_NAME_LOCATION_SEPARATOR + "0");
 		assertNotNull("Error loading proxy class com.tns.gen.com.proxy.TargetObject", clazz);
 		
 		Constructor<?> ctor = clazz.getConstructor();
