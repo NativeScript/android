@@ -352,14 +352,15 @@ public class JsDebugger
 		
 		if (shouldDebugBreakFlag)
 		{
-			
-			try
 			{
-				Thread.sleep(3 * 1000);
-			}
-			catch (InterruptedException e1)
-			{
-				e1.printStackTrace();
+				try
+				{
+					Thread.sleep(3 * 1000);
+				}
+				catch (InterruptedException e1)
+				{
+					e1.printStackTrace();
+				}
 			}
 		}
 
@@ -556,7 +557,34 @@ public class JsDebugger
 		{
 			debugBreakFile.delete();
 		}
+	}
+	
+	
+	public static Boolean shouldDebugBreakFlag = null;
+	
+	public static boolean shouldDebugBreak(Context context)
+	{
+		if (shouldDebugBreakFlag != null)
+		{
+			return shouldDebugBreakFlag;
+		}
 		
-		return shouldDebugBreakFlag;
+		if (!shouldEnableDebugging(context))
+		{
+			shouldDebugBreakFlag = false;
+			return false;
+		}
+		
+		String appRoot = context.getFilesDir().getPath() + File.separator;
+		File debugBreakFile = new File(appRoot, DEBUG_BREAK_FILENAME);
+		if (debugBreakFile.exists())
+		{
+			debugBreakFile.delete();
+			shouldDebugBreakFlag = true;
+			return true;
+		}
+		
+		shouldDebugBreakFlag = false;
+		return false;
 	}
 }

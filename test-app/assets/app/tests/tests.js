@@ -1410,8 +1410,6 @@ describe("Tests ", function () {
 	
 		expect(exceptionCaught).toBe(true);
 	});
-	Assert(exceptionCaught === true, "TestThrowJavaScriptExceptionWhenOverideMethodImplementationIsDeleted FAILED (1): No exception is thrown");
->>>>>>> rename global functions
 	
 	it("TestThrowJavaScriptExceptionWhenCallJavaMethodWithJavaScriptPrimitiveWhenJavaRefIsExpected", function () {
 		

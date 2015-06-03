@@ -208,7 +208,7 @@ public class DexFactory
 		{
 			throw new InvalidClassException("Can't generate proxy of proxy");
 		}
-
+		
 		return classToProxy;
 	}
 
