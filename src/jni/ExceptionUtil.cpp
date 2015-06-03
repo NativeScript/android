@@ -241,7 +241,7 @@ string ExceptionUtil::GetErrorStackTrace(const Handle<StackTrace>& stackTrace)
 	return ss.str();
 }
 
-bool ExceptionUtil::ThrowExceptionToJava(TryCatch& tc, const string& prependMessage)
+void ExceptionUtil::ThrowExceptionToJava(TryCatch& tc, const string& prependMessage)
 {
 	Isolate *isolate = Isolate::GetCurrent();
 	auto ex = tc.Exception();
@@ -265,7 +265,7 @@ bool ExceptionUtil::ThrowExceptionToJava(TryCatch& tc, const string& prependMess
 	if (tc.CanContinue())
 	{
 		jweak javaThrowable = nullptr;
-		if (ex->IsObject())
+		if (!ex.IsEmpty() && ex->IsObject())
 		{
 			javaThrowable = TryGetJavaThrowableObject(env, ex->ToObject());
 		}

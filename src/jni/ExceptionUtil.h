@@ -16,7 +16,7 @@ namespace tns
 
 		bool CheckForJavaException(JEnv& env);
 
-		bool ThrowExceptionToJava(v8::TryCatch& tc, const std::string& prependMessage = "");
+		void ThrowExceptionToJava(v8::TryCatch& tc, const std::string& prependMessage = "");
 
 		void ThrowExceptionToJs(const std::string& exceptionMessage);
 

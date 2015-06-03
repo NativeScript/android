@@ -33,8 +33,6 @@ namespace tns
 
 		static bool RegisterInstance(const v8::Handle<v8::Object>& jsObject, const std::string& name, const std::string& className, const ArgsWrapper& argWrapper, const v8::Handle<v8::Object>& implementationObject, bool isInterface);
 
-		static void MakeClassInstanceOfTypeStrong(const std::string& className, const v8::Handle<v8::Object>& classObj);
-
 		//
 
 		static v8::Handle<v8::Value> GetArrayElement(const v8::Handle<v8::Object>& array, uint32_t index, const std::string& arraySignature);
@@ -45,7 +43,7 @@ namespace tns
 
 		static void CallJavaMethod(const v8::Handle<v8::Object>& caller, const std::string& className, const std::string& methodName, MetadataEntry *entry, bool isStatic, bool isSuper, const v8::FunctionCallbackInfo<v8::Value>& args);
 
-		static v8::Handle<v8::Value> CallJSMethod(JNIEnv *_env, const v8::Handle<v8::Object>& jsObject, jstring methodName, jobjectArray args, v8::TryCatch& tc);
+		static v8::Handle<v8::Value> CallJSMethod(JNIEnv *_env, const v8::Handle<v8::Object>& jsObject, const std::string& methodName, jobjectArray args, v8::TryCatch& tc);
 
 		//
 
@@ -104,7 +102,7 @@ namespace tns
 	private:
 		NativeScriptRuntime() {}
 
-		static int GetCachedConstructorId(JEnv& env, const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& name, const std::string& className, jobjectArray javaArgs, jobjectArray methodOverrides);
+		static int GetCachedConstructorId(JEnv& env, const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& name, const std::string& className, jobjectArray javaArgs, const v8::Handle<v8::Object>& implementationObject);
 
 		static v8::Handle<v8::Object> FindClass(const std::string& className);
 
@@ -117,8 +115,6 @@ namespace tns
 		static std::string GetReturnType(const std::string& methodSignature);
 
 		static JavaVM *jvm;
-
-		static jmethodID MAKE_CLASS_INSTANCE_OF_TYPE_STRONG;
 
 		static jmethodID CREATE_INSTANCE_METHOD_ID;
 

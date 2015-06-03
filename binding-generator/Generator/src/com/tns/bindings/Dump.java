@@ -12,6 +12,8 @@ import android.util.Log;
 
 public class Dump
 {
+	public static final char CLASS_NAME_LOCATION_SEPARATOR = '_';
+	
 	private static final String callJsMethodSignatureCtor = "Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;Z[Ljava/lang/Object;";
 	private static final String callJsMethodSignatureMethod = "Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;[Ljava/lang/Object;";
 	private static final String LCOM_TNS = "Lcom/tns/gen/";
@@ -25,7 +27,9 @@ public class Dump
 	static final String initInstanceMethodName = "initInstance";
 
 	static final StringBuffer methodDescriptorBuilder = new StringBuffer();
-	 /**
+	
+	
+	/**
 	 * Returns the dex descriptor corresponding to the given method.
 	 * 
 	 * @param m
@@ -37,6 +41,24 @@ public class Dump
         Class<?>[] parameters = method.getParameterTypes();
         methodDescriptorBuilder.setLength(0);
         getDexDescriptor(methodDescriptorBuilder, method.getReturnType());
+        for (int i = 0; i < parameters.length; ++i)
+        {
+            getDexDescriptor(methodDescriptorBuilder, parameters[i]);
+        }
+        return methodDescriptorBuilder.toString();
+    }
+	 
+	 /**
+	 * Returns the dex descriptor corresponding to the given method.
+	 * 
+	 * @param m
+	 *            a {@link Method Method} object.
+	 * @return the descriptor of the given method.
+	 */
+	 public String getMethodOverloadDescriptor(final Method method) 
+	 {
+        Class<?>[] parameters = method.getParameterTypes();
+        methodDescriptorBuilder.setLength(0);
         for (int i = 0; i < parameters.length; ++i)
         {
             getDexDescriptor(methodDescriptorBuilder, parameters[i]);
@@ -208,20 +230,20 @@ public class Dump
 		//String methodSignature = org.objectweb.asm.Type.getMethodDescriptor(Object.class.getMethods()[0]);
 		String tnsClassSignature = LCOM_TNS + 
 				classSignature.substring(1, classSignature.length() - 1).replace("$", "_")
-				+ "-" + proxyName + ";";
+				+ CLASS_NAME_LOCATION_SEPARATOR + proxyName + ";";
 		
 		ClassVisitor cv = generateClass(aw, classTo, classSignature, tnsClassSignature);
 		Method[] methods = getSupportedMethods(classTo, methodOverrides);
 		
 		methods = groupMethodsByName(methods);
 		
-		int overridenFieldsCount = (int)Math.ceil(methods.length / 6.0);// + ((methods.length / 8) % 8 != 0 ? 1 : 0);
-		String[] fieldNames = generateOverrideFields(cv, overridenFieldsCount);
+		generateFields(cv);
 		
 		Constructor<?>[] ctors = classTo.getConstructors();
-		generateCtors(cv, classTo, ctors, classSignature, tnsClassSignature);
-		
-		generateMethods(cv, classTo, methods, classSignature, tnsClassSignature, fieldNames);
+
+		boolean hasOverridenCtor = ((methodOverrides != null) && methodOverrides.contains("init"));
+		generateCtors(cv, classTo, ctors, classSignature, tnsClassSignature, hasOverridenCtor);
+		generateMethods(cv, classTo, methods, classSignature, tnsClassSignature);
 		
 		cv.visitEnd();
 	}
@@ -233,6 +255,8 @@ public class Dump
 		{
 			Method method = methods[i];
 			String methodName = method.getName();
+			String methodOverLoadDescriptor = getMethodOverloadDescriptor(method);
+			methodName +=  "_" + methodOverLoadDescriptor;
 			if (!result.containsKey(methodName))
 			{
 				result.put(methodName, method);
@@ -397,13 +421,13 @@ public class Dump
 		return result;
 	}
 
-	private void generateCtors(ClassVisitor cv, Class<?> classTo, Constructor<?>[] ctors, String classSignature, String tnsClassSignature)
+	private void generateCtors(ClassVisitor cv, Class<?> classTo, Constructor<?>[] ctors, String classSignature, String tnsClassSignature, boolean hasOverridenCtor)
 	{
 		if (classTo.isInterface())
 		{
 			try
 			{
-				generateCtor(cv, classTo, Object.class.getConstructor(), classSignature, tnsClassSignature);
+				generateCtor(cv, classTo, Object.class.getConstructor(), classSignature, tnsClassSignature, false);
 			}
 			catch (NoSuchMethodException e)
 			{
@@ -415,13 +439,13 @@ public class Dump
 		{
 			for (Constructor<?> ctor : ctors)
 			{
-				generateCtor(cv, classTo, ctor, classSignature, tnsClassSignature);
+				generateCtor(cv, classTo, ctor, classSignature, tnsClassSignature, hasOverridenCtor);
 			}
 		}
 	}
 	
 	
-	private void generateCtor(ClassVisitor cv, Class<?> classTo, Constructor<?> ctor, String classSignature, String tnsClassSignature)
+	private void generateCtor(ClassVisitor cv, Class<?> classTo, Constructor<?> ctor, String classSignature, String tnsClassSignature, boolean hasOverridenCtor)
 	{
 		//TODO: handle generic and vararg ctors if needed
 		String ctorSignature = getDexConstructorDescriptor(ctor);
@@ -451,7 +475,10 @@ public class Dump
 		}
 		
 		generateInitializedBlock(mv, thisRegister, classSignature, tnsClassSignature);
-		generateCtorOverridenBlock(mv, thisRegister, classSignature, tnsClassSignature);
+		if (hasOverridenCtor)
+		{
+			generateCtorOverridenBlock(mv, thisRegister, ctor, classSignature, tnsClassSignature);
+		}
 		generateReturnVoid(mv);
 	}
 	
@@ -461,17 +488,13 @@ public class Dump
 		mv.visitEnd();
 	}
 
-	private void generateCtorOverridenBlock(MethodVisitor mv, int thisRegister, String classSignature, String tnsClassSignature)
+	private void generateCtorOverridenBlock(MethodVisitor mv, int thisRegister, Constructor<?> ctor, String classSignature, String tnsClassSignature)
 	{
-		mv.visitFieldInsn(org.ow2.asmdex.Opcodes.INSN_IGET_BOOLEAN, tnsClassSignature, "__ctorOverridden", "Z", 1, thisRegister);
-		Label label = new Label();
-		mv.visitJumpInsn(org.ow2.asmdex.Opcodes.INSN_IF_EQZ, label, 1, 0);
-		mv.visitVarInsn(org.ow2.asmdex.Opcodes.INSN_CONST_4, 0, 0); //put null in register 0 //support creation of params array for callJSMethod invokation 
+		int argCount = generateArrayForCallJsArguments(mv, ctor.getParameterTypes(), thisRegister, classSignature, tnsClassSignature);
 		mv.visitStringInsn(org.ow2.asmdex.Opcodes.INSN_CONST_STRING, 1, "init"); //put "init" in register 1
 		mv.visitVarInsn(org.ow2.asmdex.Opcodes.INSN_CONST_4, 2, 1); //put true to register 2 == isConstructor argument
 		mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, LCOM_TNS_PLATFORM, "callJSMethod", callJsMethodSignatureCtor, new int[]
 		{ 3, 1, 2, 0 }); //invoke callJSMethod(this, "init", true, params)
-		mv.visitLabel(label);
 	}
 
 	private void generateInitializedBlock(MethodVisitor mv, int thisRegister, String classSignature, String tnsClassSignature)
@@ -485,7 +508,7 @@ public class Dump
 		mv.visitLabel(label);
 	}
 	
-	private void generateMethods(ClassVisitor cv, Class<?> classTo, Method[] methods, String classSignature, String tnsClassSignature, String[] fieldNames)
+	private void generateMethods(ClassVisitor cv, Class<?> classTo, Method[] methods, String classSignature, String tnsClassSignature)
 	{
 		//for (Method method : methods)
 		int fieldNameCounter = 0;
@@ -500,13 +523,11 @@ public class Dump
 			
 			Method sourceMethod = methods[i];
 			
-			String fieldName = fieldNames[fieldNameCounter];
-			generateMethod(cv, classTo, sourceMethod, i, classSignature, tnsClassSignature, fieldName, bitCounter);
+			generateMethod(cv, classTo, sourceMethod, i, classSignature, tnsClassSignature, bitCounter);
 			
 			bitCounter *= 2;
 		}
 		
-		generateSetNativeOverrides(cv, classTo, methods, classSignature, tnsClassSignature, fieldNames);
 		generateEqualsSuper(cv);
 		generateHashCodeSuper(cv);
 	}
@@ -533,69 +554,7 @@ public class Dump
 		mv.visitEnd(); 
 	}
 
-	private void generateSetNativeOverrides(ClassVisitor cv, Class<?> classTo, Method[] methods, String classSignature, String tnsClassSignature, String[] fieldNames)
-	{
-		int locaVarsCount = 0;
-		int thisRegister = locaVarsCount + 1;
-		
-		MethodVisitor mv = cv.visitMethod(org.ow2.asmdex.Opcodes.ACC_PUBLIC, "setNativeScriptOverride", "VLjava/lang/String;", null, null);
-		mv.visitCode();
-		mv.visitMaxs(3, 0);
-		if (classTo.isInterface())
-		{
-			mv.visitInsn(org.ow2.asmdex.Opcodes.INSN_RETURN_VOID);
-			mv.visitEnd(); 
-			return;
-		}
-		
-		//check if "init" and set __ctorOverriden
-		mv.visitStringInsn(org.ow2.asmdex.Opcodes.INSN_CONST_STRING, 0, "init");
-		mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_VIRTUAL, "Ljava/lang/String;", "equals", "ZLjava/lang/Object;", new int[] { 2, 0 });
-		mv.visitIntInsn(org.ow2.asmdex.Opcodes.INSN_MOVE_RESULT, 0);
-		Label skipCtorOverridenLabel = new Label();
-		mv.visitJumpInsn(org.ow2.asmdex.Opcodes.INSN_IF_EQZ, skipCtorOverridenLabel, 0, 0);
-		mv.visitVarInsn(org.ow2.asmdex.Opcodes.INSN_CONST_4, 0, 1);
-		mv.visitFieldInsn(org.ow2.asmdex.Opcodes.INSN_IPUT_BOOLEAN, tnsClassSignature, "__ctorOverridden", "Z", 0, thisRegister);
-		Label returnLabel = new Label();
-		mv.visitLabel(skipCtorOverridenLabel); 
-		
-		int fieldNameCounter = 0;
-		int bitCounter = 1;
-		for (int i = 0; i < methods.length; i++)
-		{
-			if (bitCounter == 128)
-			{
-				bitCounter = 1;
-				fieldNameCounter++;
-			}
-			
-			Method sourceMethod = methods[i];
-			String fieldName = fieldNames[fieldNameCounter];
-			
-			
-			//generate bit set for method
-			mv.visitStringInsn(org.ow2.asmdex.Opcodes.INSN_CONST_STRING, 0, sourceMethod.getName());
-			mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_VIRTUAL, "Ljava/lang/String;", "equals", "ZLjava/lang/Object;", new int[] { 2, 0 });
-			mv.visitIntInsn(org.ow2.asmdex.Opcodes.INSN_MOVE_RESULT, 0);
-			Label skipMethod = new Label();
-			mv.visitJumpInsn(org.ow2.asmdex.Opcodes.INSN_IF_EQZ, skipMethod, 0, 0);
-			mv.visitFieldInsn(org.ow2.asmdex.Opcodes.INSN_IGET_BYTE, tnsClassSignature, fieldName, "B", 0, thisRegister);
-			mv.visitOperationInsn(org.ow2.asmdex.Opcodes.INSN_OR_INT_LIT8, 0, 0, 0, bitCounter);
-			mv.visitOperationInsn(org.ow2.asmdex.Opcodes.INSN_INT_TO_BYTE, 0, 0, 0, 0);
-			mv.visitFieldInsn(org.ow2.asmdex.Opcodes.INSN_IPUT_BYTE, tnsClassSignature, fieldName, "B", 0, thisRegister); //classSignature should be"Ldummy;"
-			mv.visitJumpInsn(org.ow2.asmdex.Opcodes.INSN_GOTO, returnLabel, 0, 0); //jump to return
-			mv.visitLabel(skipMethod);
-
-			bitCounter *= 2;
-		}
-		
-		mv.visitJumpInsn(org.ow2.asmdex.Opcodes.INSN_GOTO, returnLabel, 0, 0); //jump to return if the last method is not overriden
-		mv.visitLabel(returnLabel);
-		mv.visitInsn(org.ow2.asmdex.Opcodes.INSN_RETURN_VOID);
-		mv.visitEnd();
-	}
-
-	private void generateMethod(ClassVisitor cv, Class<?> classTo, Method method, int methodNumber, String classSignature, String tnsClassSignature, String fieldName, int fieldBit)
+	private void generateMethod(ClassVisitor cv, Class<?> classTo, Method method, int methodNumber, String classSignature, String tnsClassSignature, int fieldBit)
 	{
 		if (ProxyGenerator.IsLogEnabled) Log.d("TNS.Rungime.Proxy.Generator", "generatingMethod " + method.getName());
 		
@@ -615,12 +574,8 @@ public class Dump
 		if (!classTo.isInterface())
 		{
 			generateInitializedBlock(mv, thisRegister, classSignature, tnsClassSignature);
-			generateFieldOverrideCheckBlock(mv, method, thisRegister, classSignature, tnsClassSignature, methodDexSignature, fieldName, fieldBit);
 		}
-		else
-		{
-			generateCallOverrideBlock(mv, method, thisRegister, classSignature, tnsClassSignature, methodDexSignature, fieldName, fieldBit);
-		}
+		generateCallOverrideBlock(mv, method, thisRegister, classSignature, tnsClassSignature, methodDexSignature, fieldBit);
 
 		mv.visitEnd();
 	}
@@ -693,43 +648,10 @@ public class Dump
 		return thisRegister;
 	}
 
-	private void generateFieldOverrideCheckBlock(MethodVisitor mv, Method method, int thisRegister, String classSignature, String tnsClassSignature, String methodDexSignature, String fieldName, int fieldBit)
-	{
-		//String methodSignature = org.objectweb.asm.Type.getMethodDescriptor(method);
-		
-		mv.visitFieldInsn(org.ow2.asmdex.Opcodes.INSN_IGET_BYTE, tnsClassSignature, fieldName, "B", 1, thisRegister);
-		mv.visitOperationInsn(org.ow2.asmdex.Opcodes.INSN_AND_INT_LIT8, 1, 1, 0, fieldBit);
-		Label callSuperLabel = new Label();
-		
-		//goto "call super implementation" if Less or equal to zero
-		mv.visitJumpInsn(org.ow2.asmdex.Opcodes.INSN_IF_LEZ, callSuperLabel, 1, 0);
-		
-		//call the override
-		int argCount = generateArrayForCallJsArguments(mv, method, thisRegister, classSignature, tnsClassSignature, methodDexSignature);
-		mv.visitStringInsn(org.ow2.asmdex.Opcodes.INSN_CONST_STRING, 1, method.getName());
-		mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, platformClass, callJSMethodName, callJsMethodSignatureMethod, new int[] { thisRegister, 1, 0 });
-		
-		//Label returnLabel = new Label();
-		//mv.visitLabel(returnLabel);
-		generateReturnFromObject(mv, method.getReturnType(), thisRegister, 1);
-		
-		//call super implementation
-		
-		//TODO: pass the arguments to the super call
-		mv.visitLabel(callSuperLabel);
-		int[] args = generateArgsArray(thisRegister, argCount, method);
-		mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_SUPER_RANGE, classSignature, method.getName(), methodDexSignature, args);
-		generateReturn(mv, method.getReturnType(), thisRegister, 1);
-		//mv.visitIntInsn(org.ow2.asmdex.Opcodes.INSN_MOVE_RESULT_OBJECT, 1);
-		
-		//goto return
-		//mv.visitJumpInsn(org.ow2.asmdex.Opcodes.INSN_GOTO, returnLabel, 0, 0);
- 	}
-	
-	private void generateCallOverrideBlock(MethodVisitor mv, Method method, int thisRegister, String classSignature, String tnsClassSignature, String methodDexSignature, String fieldName, int fieldBit)
+	private void generateCallOverrideBlock(MethodVisitor mv, Method method, int thisRegister, String classSignature, String tnsClassSignature, String methodDexSignature, int fieldBit)
 	{
 		//call the override
-		int argCount = generateArrayForCallJsArguments(mv, method, thisRegister, classSignature, tnsClassSignature, methodDexSignature);
+		int argCount = generateArrayForCallJsArguments(mv, method.getParameterTypes() , thisRegister, classSignature, tnsClassSignature);
 		mv.visitStringInsn(org.ow2.asmdex.Opcodes.INSN_CONST_STRING, 1, method.getName());
 		mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, platformClass, callJSMethodName, callJsMethodSignatureMethod, new int[] { thisRegister, 1, 0 });
 		
@@ -780,54 +702,11 @@ public class Dump
 		return Arrays.copyOf(argsForSuper, argsForSuperIndex);
 	}
 	
-	private int[] generateArgsArray(int thisRegister, int argCount, Method method)
-	{
-		Class<?>[] paramTypes = method.getParameterTypes();
-		int argumentsCount = paramTypes.length;
-		int[] argsForSuper = new int[1 + argumentsCount*2]; //thisRegister + argCount * 2 since it long and double take 2 registers
-
-		int argsForSuperIndex = 0;
-		argsForSuper[argsForSuperIndex] = thisRegister;
-		argsForSuperIndex++;
-		
-		int arrayIndex = 0;
-		while (arrayIndex < argumentsCount)
-		{
-			Class<?> paramType = paramTypes[arrayIndex];
-			if (paramType.isPrimitive())
-			{
-				if (paramType == Integer.TYPE || paramType == Character.TYPE || paramType == Byte.TYPE || paramType == Short.TYPE || 
-						paramType == Boolean.TYPE || paramType == Float.TYPE)
-				{
-					argsForSuper[argsForSuperIndex] = thisRegister + arrayIndex + 1;
-					argsForSuperIndex++;
-				}
-				else if (paramType == Long.TYPE ||  paramType == Double.TYPE)
-				{
-					argsForSuper[argsForSuperIndex] = thisRegister + arrayIndex + 1;
-					argsForSuperIndex++;
-					argsForSuper[argsForSuperIndex] = thisRegister + arrayIndex + 2;
-					argsForSuperIndex++;
-				}
-			}
-			else
-			{
-				argsForSuper[argsForSuperIndex] = thisRegister + arrayIndex + 1;
-				argsForSuperIndex++;
-			}
-
-			arrayIndex++;
-		}
-		
-		return Arrays.copyOf(argsForSuper, argsForSuperIndex);
-	}
-
 	/**
 	 * 	Creates new Object[] or null value (when no arguments) and puts it in register 0  
 	 */
-	private int generateArrayForCallJsArguments(MethodVisitor mv, Method method, int thisRegister, String classSignature, String tnsClassSignature, String methodDexSignature)
+	private int generateArrayForCallJsArguments(MethodVisitor mv, Class<?>[] paramTypes, int thisRegister, String classSignature, String tnsClassSignature)
 	{
-		Class<?>[] paramTypes = method.getParameterTypes();
 		int argumentsCount = paramTypes.length;
 		
 		if (argumentsCount == 0)
@@ -1098,35 +977,14 @@ public class Dump
 		}
 	}
 
-	private String[] generateOverrideFields(ClassVisitor cv, int count)
+	private void generateFields(ClassVisitor cv)
 	{
-		String[] fieldNames = new String[count];
-		generateCtorOverridenField(cv);
 		generateInitializedField(cv);
-		for (int i = 0; i < count; i++)
-		{
-			fieldNames[i] = "__ho" + i;
-			generateOverridenField(cv, fieldNames[i]);
-		}
-		
-		return fieldNames;
-	}
-
-	private void generateOverridenField(ClassVisitor cv, String fieldName)
-	{
-		FieldVisitor fv = cv.visitField(org.ow2.asmdex.Opcodes.ACC_PRIVATE, fieldName, "B", null, null);
-		fv.visitEnd();
 	}
 
 	private void generateInitializedField(ClassVisitor cv)
 	{
 		FieldVisitor fv = cv.visitField(org.ow2.asmdex.Opcodes.ACC_PRIVATE, "__initialized", "Z", null, null);
-		fv.visitEnd();
-	}
-
-	private void generateCtorOverridenField(ClassVisitor cv)
-	{
-		FieldVisitor fv = cv.visitField(org.ow2.asmdex.Opcodes.ACC_PRIVATE, "__ctorOverridden", "Z", null, null);
 		fv.visitEnd();
 	}
 

@@ -196,6 +196,26 @@ public class Button1 extends ButtonBase
 	{
 		Log.d(logTag, "method1(byte): " + value);
 	}
+	
+	public String method2(int value)
+	{
+		return "int=" + value;
+	}
+	
+	public String callMethod2WithInt()
+	{
+		return method2((int)1);
+	}
+	
+	public String callMethod2WithByte()
+	{
+		return method2((byte)5);
+	}
+
+	public String method2(byte value)
+	{
+		return "byte=" + value;
+	}
 
 	public String getIMAGE_ID_PROP()
 	{

@@ -53,7 +53,7 @@ public class ProxyGenerator
 		aw.visitEnd();
 		byte[] generatedBytes = aw.toByteArray();
 		
-		String proxyFileName = classToProxy.getName().replace('$', '_') + "-" + proxyName;
+		String proxyFileName = classToProxy.getName().replace('$', '_') + Dump.CLASS_NAME_LOCATION_SEPARATOR + proxyName;
 		if (proxyThumb != null)
 		{
 			proxyFileName += "-" + proxyThumb;

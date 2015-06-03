@@ -47,8 +47,10 @@ public class JsDebugger
 	private static final int INVALID_PORT = -1;
 
 	private static final String portEnvInputFile = "envDebug.in";
-
+	
 	private static final String portEnvOutputFile = "envDebug.out";
+
+	private static final String DEBUG_BREAK_FILENAME = "debugbreak";
 
 	private static int currentPort = INVALID_PORT;
 
@@ -343,14 +345,17 @@ public class JsDebugger
 				}
 				w = null;
 			}
-
-			try
+			
+			if (shouldDebugBreak(context))
 			{
-				Thread.sleep(3 * 1000);
-			}
-			catch (InterruptedException e1)
-			{
-				e1.printStackTrace();
+				try
+				{
+					Thread.sleep(3 * 1000);
+				}
+				catch (InterruptedException e1)
+				{
+					e1.printStackTrace();
+				}
 			}
 
 			File envInFile = new File(baseDir, portEnvInputFile);
@@ -514,6 +519,7 @@ public class JsDebugger
 		}, new IntentFilter(getDebuggerPortAction));
 	}
 
+
 	public static boolean shouldEnableDebugging(Context context)
 	{
 		int flags;
@@ -526,7 +532,37 @@ public class JsDebugger
 			flags = 0;
 			e.printStackTrace();
 		}
+
 		boolean shouldEnableDebugging = ((flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0);
 		return shouldEnableDebugging;
+	}
+	
+	
+	public static Boolean shouldDebugBreakFlag = null;
+	
+	public static boolean shouldDebugBreak(Context context)
+	{
+		if (shouldDebugBreakFlag != null)
+		{
+			return shouldDebugBreakFlag;
+		}
+		
+		if (!shouldEnableDebugging(context))
+		{
+			shouldDebugBreakFlag = false;
+			return false;
+		}
+		
+		String appRoot = context.getFilesDir().getPath() + File.separator;
+		File debugBreakFile = new File(appRoot, DEBUG_BREAK_FILENAME);
+		if (debugBreakFile.exists())
+		{
+			debugBreakFile.delete();
+			shouldDebugBreakFlag = true;
+			return true;
+		}
+		
+		shouldDebugBreakFlag = false;
+		return false;
 	}
 }

@@ -41,10 +41,7 @@ void NativeScriptRuntime::Init(JavaVM *jvm, ObjectManager *objectManager)
 	RequireClass = env.FindClass("com/tns/Require");
 	assert(RequireClass != nullptr);
 
-	MAKE_CLASS_INSTANCE_OF_TYPE_STRONG = env.GetStaticMethodID(PlatformClass, "makeClassInstanceOfTypeStrong", "(Ljava/lang/String;)I");
-	assert(MAKE_CLASS_INSTANCE_OF_TYPE_STRONG != nullptr);
-
-	CREATE_INSTANCE_METHOD_ID = env.GetStaticMethodID(PlatformClass, "createInstance", "([Ljava/lang/Object;[Ljava/lang/String;II)Ljava/lang/Object;");
+	CREATE_INSTANCE_METHOD_ID = env.GetStaticMethodID(PlatformClass, "createInstance", "([Ljava/lang/Object;II)Ljava/lang/Object;");
 	assert(CREATE_INSTANCE_METHOD_ID != nullptr);
 
 	CACHE_CONSTRUCTOR_METHOD_ID = env.GetStaticMethodID(PlatformClass, "cacheConstructor", "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;[Ljava/lang/String;)I");
@@ -124,17 +121,6 @@ bool NativeScriptRuntime::RegisterInstance(const Handle<Object>& jsObject, const
 	}
 
 	return success;
-}
-
-void NativeScriptRuntime::MakeClassInstanceOfTypeStrong(const string& className, const Handle<Object>& classObj)
-{
-	JEnv env;
-
-	JniLocalRef param(env.NewStringUTF(className.c_str()));
-	jint javaObjectID = env.CallStaticIntMethod(PlatformClass, MAKE_CLASS_INSTANCE_OF_TYPE_STRONG, (jstring)param);
-
-	jclass clazz = env.FindClass(className);
-	objectManager->Link(classObj, javaObjectID, clazz);
 }
 
 Handle<Value> NativeScriptRuntime::GetArrayElement(const Handle<Object>& array, uint32_t index, const string& arraySignature)
@@ -311,8 +297,8 @@ void NativeScriptRuntime::CallJavaMethod(const Handle<Object>& caller, const str
 			JniLocalRef str(env.NewString(&result, 1));
 			jboolean bol = true;
 			const char* resP = env.GetStringUTFChars(str, &bol);
-			env.ReleaseStringUTFChars(str, resP);
 			args.GetReturnValue().Set(ConvertToV8String(resP, 1));
+			env.ReleaseStringUTFChars(str, resP);
 			break;
 		}
 		case 'S': //short
@@ -544,34 +530,18 @@ jobject NativeScriptRuntime::CreateJavaInstance(int objectID, const std::string&
 
 	JEnv env;
 	auto& args = argWrapper.args;
-	bool hasImplementationObject = !implementationObject.IsEmpty();
 
-	bool hasImplementationObjectInArgs = isInterface;
-
-	JsArgToArrayConverter argConverter(args, hasImplementationObjectInArgs, argWrapper.outerThis);
-
+	JsArgToArrayConverter argConverter(args, isInterface, argWrapper.outerThis);
 
 	if (argConverter.IsValid())
 	{
-		jobjectArray methodOverrides;
-		if (hasImplementationObject)
-		{
-			methodOverrides = GetMethodOverrides(env, implementationObject);
-		}
-		else
-		{
-			Handle<Object> emptyObject;
-			methodOverrides = GetMethodOverrides(env, emptyObject);
-		}
-
 		jobjectArray javaArgs = argConverter.ToJavaArray();
 
-		int ctorId = GetCachedConstructorId(env, args, name, className, javaArgs, methodOverrides);
+		int ctorId = GetCachedConstructorId(env, args, name, className, javaArgs, implementationObject);
 
 		jobject obj = env.CallStaticObjectMethod(PlatformClass,
 				CREATE_INSTANCE_METHOD_ID,
 				javaArgs,
-				methodOverrides,
 				(jint) objectID,
 				ctorId);
 
@@ -592,10 +562,10 @@ jobject NativeScriptRuntime::CreateJavaInstance(int objectID, const std::string&
 	return instance;
 }
 
-int NativeScriptRuntime::GetCachedConstructorId(JEnv& env, const FunctionCallbackInfo<Value>& args, const string& name, const string& className, jobjectArray javaArgs, jobjectArray methodOverrides)
+int NativeScriptRuntime::GetCachedConstructorId(JEnv& env, const FunctionCallbackInfo<Value>& args, const string& name, const string& className, jobjectArray javaArgs, const Handle<Object>& implementationObject)
 {
 	int ctorId = -1;
-	string fullClassName = className + '-' + name;
+	string fullClassName = className + Constants::CLASS_NAME_LOCATION_SEPARATOR + name;
 	string encodedCtorArgs = MethodCache::EncodeSignature(fullClassName, "<init>", args, false);
 	auto itFound = s_constructorCache.find(encodedCtorArgs);
 
@@ -608,6 +578,7 @@ int NativeScriptRuntime::GetCachedConstructorId(JEnv& env, const FunctionCallbac
 	{
 		JniLocalRef javaName(env.NewStringUTF(name.c_str()));
 		JniLocalRef javaClassName(env.NewStringUTF(className.c_str()));
+		jobjectArray methodOverrides = GetMethodOverrides(env, implementationObject);
 
 		jint id = env.CallStaticIntMethod(PlatformClass, CACHE_CONSTRUCTOR_METHOD_ID, (jstring)javaName, (jstring)javaClassName, javaArgs, methodOverrides);
 
@@ -671,7 +642,7 @@ void NativeScriptRuntime::LogMethodCallback(const v8::FunctionCallbackInfo<v8::V
 	ASSERT_MESSAGE(args[0]->IsString(), "Log should be called with string parameter");
 
 	String::Utf8Value message(args[0]->ToString());
-	DEBUG_WRITE(*message);
+	DEBUG_WRITE("%s", *message);
 }
 
 void NativeScriptRuntime::DumpReferenceTablesMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -925,7 +896,7 @@ void NativeScriptRuntime::BuildMetadata(JEnv& env, jstring filesPath)
 	long millis1 = (time1.tv_sec * 1000) + (time1.tv_usec / 1000);
 	long millis2 = (time2.tv_sec * 1000) + (time2.tv_usec / 1000);
 
-	__android_log_print(ANDROID_LOG_DEBUG, "TNS.Native", "time=%d", (millis2 - millis1));
+	__android_log_print(ANDROID_LOG_DEBUG, "TNS.Native", "time=%ld", (millis2 - millis1));
 
 	MetadataNode::BuildMetadata(lenNodes, reinterpret_cast<uint8_t*>(nodes), lenNames, reinterpret_cast<uint8_t*>(names), lenValues, reinterpret_cast<uint8_t*>(values));
 
@@ -940,7 +911,7 @@ void NativeScriptRuntime::CreateTopLevelNamespaces(const Handle<Object>& global)
 	MetadataNode::CreateTopLevelNamespaces(global);
 }
 
-Handle<Value> NativeScriptRuntime::CallJSMethod(JNIEnv *_env, const Handle<Object>& jsObject, jstring methodName, jobjectArray args, TryCatch& tc)
+Handle<Value> NativeScriptRuntime::CallJSMethod(JNIEnv *_env, const Handle<Object>& jsObject, const string& methodName, jobjectArray args, TryCatch& tc)
 {
 	SET_PROFILER_FRAME();
 
@@ -951,18 +922,13 @@ Handle<Value> NativeScriptRuntime::CallJSMethod(JNIEnv *_env, const Handle<Objec
 
 	auto exceptionUtil = ExceptionUtil::GetInstance();
 
-	auto jsMethodName = ArgConverter::jstringToV8String(methodName);
-
 	//auto method = MetadataNode::GetPropertyFromImplementationObject(jsObject, jsMethodName);
-	string name2 = ConvertToString(jsMethodName);
-	auto method = jsObject->Get(ConvertToV8String(name2));
+	auto method = jsObject->Get(ConvertToV8String(methodName));
 
 	if (method.IsEmpty() || method->IsUndefined())
 	{
-		string name = ConvertToString(jsMethodName);
-
 		stringstream ss;
-		ss << "Cannot find method '" << name << "' implementation";
+		ss << "Cannot find method '" << methodName << "' implementation";
 
 		ExceptionUtil::GetInstance()->ThrowExceptionToJs(ss.str());
 
@@ -970,10 +936,8 @@ Handle<Value> NativeScriptRuntime::CallJSMethod(JNIEnv *_env, const Handle<Objec
 	}
 	else if (!method->IsFunction())
 	{
-		string name = ConvertToString(jsMethodName);
-
 		stringstream ss;
-		ss << "Property '" << name << "' is not a function";
+		ss << "Property '" << methodName << "' is not a function";
 
 		ExceptionUtil::GetInstance()->ThrowExceptionToJs(ss.str());
 
@@ -1054,7 +1018,6 @@ JavaVM* NativeScriptRuntime::jvm = nullptr;
 jclass NativeScriptRuntime::PlatformClass = nullptr;
 jclass NativeScriptRuntime::RequireClass = nullptr;
 jclass NativeScriptRuntime::JAVA_LANG_STRING = nullptr;
-jmethodID NativeScriptRuntime::MAKE_CLASS_INSTANCE_OF_TYPE_STRONG = nullptr;
 jmethodID NativeScriptRuntime::CREATE_INSTANCE_METHOD_ID = nullptr;
 jmethodID NativeScriptRuntime::CACHE_CONSTRUCTOR_METHOD_ID = nullptr;
 jmethodID NativeScriptRuntime::APP_FAIL_METHOD_ID = nullptr;

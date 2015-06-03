@@ -58,7 +58,7 @@ MetadataNode::MetadataNode(MetadataTreeNode *treeNode) :
 	if (!m_isArray && isInterface)
 	{
 		bool isPrefix;
-		string impTypeName = s_metadataReader.ReadInterfaceImplementationTypeName(m_treeNode, isPrefix);
+		auto impTypeName = s_metadataReader.ReadInterfaceImplementationTypeName(m_treeNode, isPrefix);
 		m_implType = isPrefix
 					? (impTypeName + m_name)
 					: impTypeName;
@@ -734,7 +734,7 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
 	SetInstanceMetadata(info.GetIsolate(), implementationObject, node);
 
 	//@@@ Refactor
-	auto fullName = className + "-" + extendNameAndLocation;
+	auto fullName = className + Constants::CLASS_NAME_LOCATION_SEPARATOR + extendNameAndLocation;
 	thiz->SetHiddenValue(ConvertToV8String("implClassName"), ConvertToV8String(fullName));
 	//
 
@@ -1051,6 +1051,13 @@ MetadataNode::ExtendedClassCacheData MetadataNode::GetCachedExtendedClassData(Is
 
 void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
+	if (info.IsConstructCall())
+	{
+		string exMsg("Cannot call 'extend' as constructor");
+		ExceptionUtil::GetInstance()->ThrowExceptionToJs(exMsg);
+		return;
+	}
+
 	SET_PROFILER_FRAME();
 
 	Handle<Object> implementationObject;
@@ -1066,7 +1073,7 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 	DEBUG_WRITE("ExtendsCallMethodHandler: called with %s", ConvertToString(extendName).c_str());
 
 	auto extendNameAndLocation = extendLocation + ConvertToString(extendName);
-	auto fullClassName = node->m_name + '-' + extendNameAndLocation; //ConvertToString(extendName);
+	auto fullClassName = node->m_name + Constants::CLASS_NAME_LOCATION_SEPARATOR + extendNameAndLocation; //ConvertToString(extendName);
 	auto fullExtendedName = TNS_PREFIX + fullClassName;
 	DEBUG_WRITE("ExtendsCallMethodHandler: extend full name %s", fullClassName.c_str());
 
@@ -1155,8 +1162,8 @@ bool MetadataNode::GetExtendLocation(string& extendLocation)
 			}
 
 			string srcFileName = ConvertToString(scriptName);
-			std::replace(srcFileName.begin(), srcFileName.end(), '/', '-');
-			std::replace(srcFileName.begin(), srcFileName.end(), '.', '-');
+			std::replace(srcFileName.begin(), srcFileName.end(), '/', '_');
+			std::replace(srcFileName.begin(), srcFileName.end(), '.', '_');
 			int lineNumber = frame->GetLineNumber();
 			if (lineNumber < 0)
 			{
@@ -1179,7 +1186,7 @@ bool MetadataNode::GetExtendLocation(string& extendLocation)
 			}
 
 
-			extendLocationStream << "f" << srcFileName.c_str() << "-l" << lineNumber << "-c" << column << "--";
+			extendLocationStream << "f" << srcFileName.c_str() << "_l" << lineNumber << "_c" << column << "__";
 			//DEBUG_WRITE("EXTEND_LOCATION %s", extendLocationStream.str().c_str());
 		}
 	}
@@ -1261,8 +1268,17 @@ void MetadataNode::CreateTopLevelNamespaces(const Handle<Object>& global)
 	}
 }
 
+void MetadataNode::InjectPrototype(Handle<Object>& target, Handle<Object>& implementationObject)
+{
+	auto isolate = Isolate::GetCurrent();
+
+	implementationObject->SetAccessor(ConvertToV8String("super"), SuperAccessorGetterCallback, nullptr, implementationObject);
+	implementationObject->SetPrototype(target->GetPrototype());
+	target->SetPrototype(implementationObject);
+}
 
 
+string MetadataNode::TNS_PREFIX = "com/tns/gen/";
 std::map<std::string, MetadataNode*> MetadataNode::s_name2NodeCache;
 std::map<std::string, MetadataTreeNode*> MetadataNode::s_name2TreeNodeCache;
 std::map<MetadataTreeNode*, MetadataNode*> MetadataNode::s_treeNode2NodeCache;
@@ -1276,7 +1292,6 @@ RegisterInstanceCallback MetadataNode::s_registerInstance = nullptr;
 GetTypeMetadataCallback MetadataNode::s_getTypeMetadata = nullptr;
 FindClassCallback MetadataNode::s_findClass = nullptr;
 GetArrayLengthCallback MetadataNode::s_getArrayLength = nullptr;
-string MetadataNode::TNS_PREFIX = "com/tns/gen/";
 MetadataReader MetadataNode::s_metadataReader;
 ObjectManager* MetadataNode::s_objectManager = nullptr;
 

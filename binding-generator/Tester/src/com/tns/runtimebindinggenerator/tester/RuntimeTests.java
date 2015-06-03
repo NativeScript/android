@@ -40,8 +40,8 @@ public class RuntimeTests extends AndroidTestCase
 	private ApplicationWriter aw;
 	private Dump dump;
 	private File optimizedDexOutputPath;
+	public static final char CLASS_NAME_LOCATION_SEPARATOR = '_';
 
-	
 	public RuntimeTests()
 	{
 	}
@@ -120,7 +120,7 @@ public class RuntimeTests extends AndroidTestCase
 		Platform.implementationObject = implementationObject;	
 		
 		DexClassLoader dexClassLoader = new DexClassLoader(proxyFile.getAbsolutePath(), optimizedDexOutputPath.getAbsolutePath(), null, getContext().getClassLoader());
-		Class<?> clazz = dexClassLoader.loadClass("com.tns.gen.com.proxy.TargetObject-0");
+		Class<?> clazz = dexClassLoader.loadClass("com.tns.gen.com.proxy.TargetObject"+ CLASS_NAME_LOCATION_SEPARATOR + "0");
 		assertNotNull("Error loading proxy class com.tns.gen.com.proxy.TargetObject", clazz);
 		
 		Constructor<?> ctor = clazz.getConstructor();
@@ -133,7 +133,7 @@ public class RuntimeTests extends AndroidTestCase
 		Platform.implementationObject = (Object)implementationObject;	
 		
 		DexClassLoader dexClassLoader = new DexClassLoader(proxyFile.getAbsolutePath(), optimizedDexOutputPath.getAbsolutePath(), null, getContext().getClassLoader());
-		Class<?> clazz = dexClassLoader.loadClass("com.tns.gen." + implementationObject.getClass().getSuperclass().getCanonicalName() + "-0");
+		Class<?> clazz = dexClassLoader.loadClass("com.tns.gen." + implementationObject.getClass().getSuperclass().getCanonicalName() + CLASS_NAME_LOCATION_SEPARATOR + "0");
 		assertNotNull("Error loading proxy class com.tns.gen.com.proxy.Button1", clazz);
 		
 		Constructor<?> ctor = clazz.getConstructor();
@@ -144,7 +144,7 @@ public class RuntimeTests extends AndroidTestCase
 	private <T> T loadAnyProxyByClass(File proxyFile, Class<?> proxyClass) throws Exception
 	{
 		DexClassLoader dexClassLoader = new DexClassLoader(proxyFile.getAbsolutePath(), optimizedDexOutputPath.getAbsolutePath(), null, getContext().getClassLoader());
-		Class<?> clazz = dexClassLoader.loadClass("com.tns.gen." + proxyClass.getName().replace('$', '_') + "-0");
+		Class<?> clazz = dexClassLoader.loadClass("com.tns.gen." + proxyClass.getName().replace('$', '_')  + CLASS_NAME_LOCATION_SEPARATOR + "0");
 		assertNotNull("Error loading proxy class com.tns.gen.com.proxy.Button1", clazz);
 		
 		if (!proxyClass.getName().contains("ViewGroup"))
@@ -168,7 +168,7 @@ public class RuntimeTests extends AndroidTestCase
 		Platform.implementationObject = implementationObject;	
 		
 		DexClassLoader dexClassLoader = new DexClassLoader(proxyFile.getAbsolutePath(), optimizedDexOutputPath.getAbsolutePath(), null, getContext().getClassLoader());
-		Class<?> clazz = dexClassLoader.loadClass("com.tns.gen.com.proxy.Button1-0");
+		Class<?> clazz = dexClassLoader.loadClass("com.tns.gen.com.proxy.Button1" + CLASS_NAME_LOCATION_SEPARATOR + "0");
 		assertNotNull("Error loading proxy class com.tns.gen.com.proxy.Button1", clazz);
 		
 		Constructor<?> ctor = clazz.getConstructor();
@@ -181,13 +181,72 @@ public class RuntimeTests extends AndroidTestCase
 		Platform.implementationObject = implementationObject;	
 		
 		DexClassLoader dexClassLoader = new DexClassLoader(proxyFile.getAbsolutePath(), optimizedDexOutputPath.getAbsolutePath(), null, getContext().getClassLoader());
-		Class<?> clazz = dexClassLoader.loadClass("com.tns.gen.com.proxy.TargetObject_TargetInterface-0");
+		Class<?> clazz = dexClassLoader.loadClass("com.tns.gen.com.proxy.TargetObject_TargetInterface" + CLASS_NAME_LOCATION_SEPARATOR + "0");
 		assertNotNull("Error loading proxy class com.tns.gen.com.proxy.TargetObject", clazz);
 		
 		Constructor<?> ctor = clazz.getConstructor();
 		TargetObject.TargetInterface proxy = (TargetObject.TargetInterface)ctor.newInstance(); //this cast should succeed
 		return proxy;
 	}
+	
+	public void test_When_generating_proxy_on_overloaded_method() throws Throwable
+	{
+		dump.generateProxy(aw, TargetObject.class, new String[] {"methodWithOverload"}, 0);
+		aw.visitEnd();
+		byte[] generatedBytes = aw.toByteArray();
+		
+		
+		File proxyFile = saveProxy(generatedBytes);
+		final Object resultNoArg = new Object();
+		class ImplementationObject extends TargetObject
+		{
+			@Override
+			public void methodWithOverload(int o)
+			{
+				arg = o;
+				overrideCalled = true;
+			}
+			
+			@Override
+			public void methodWithOverload(byte o)
+			{
+				arg = o;
+				overrideCalled = true;
+			}
+			
+			@Override
+			public void methodWithOverload()
+			{
+				arg = resultNoArg;
+				overrideCalled = true;
+			}
+		}
+		
+		ImplementationObject implementationObject = new ImplementationObject();
+		TargetObject proxy = loadProxy(proxyFile, implementationObject);
+		implementationObject.arg = null;
+		implementationObject.overrideCalled = false;
+		
+		proxy.methodWithOverload((int)6);
+		assertTrue("Override should be called with int", implementationObject.overrideCalled == true);
+		assertTrue("Override should be called with int 6", implementationObject.arg instanceof Integer);
+		assertEquals(6, implementationObject.arg); 
+
+		implementationObject.arg = null;
+		implementationObject.overrideCalled = false;
+		proxy.methodWithOverload((byte)8);
+		assertTrue("Override should be called with byte", implementationObject.overrideCalled == true);
+		assertTrue("Override should be called with byte 8", implementationObject.arg instanceof Byte);
+		assertEquals(8, (byte)implementationObject.arg);
+		
+		implementationObject.arg = null;
+		implementationObject.overrideCalled = false;
+		proxy.methodWithOverload();
+		assertTrue("Override should be called with no args", implementationObject.overrideCalled == true);
+		assertTrue("Override should be called with no args", implementationObject.arg instanceof Object);
+		assertEquals(resultNoArg, implementationObject.arg);
+	}
+	
 	
 	public void test_When_generating_proxy_on_method_with_object_argument() throws Throwable
 	{
@@ -209,11 +268,6 @@ public class RuntimeTests extends AndroidTestCase
 		ImplementationObject implementationObject = new ImplementationObject();
 		TargetObject proxy = loadProxy(proxyFile, implementationObject);
 		
-		proxy.methodWithObjectArg(new Object());
-		assertTrue("Override should NOT be called", implementationObject.overrideCalled == false);
-		
-		((NativeScriptHashCodeProvider)proxy).setNativeScriptOverride("methodWithObjectArg"); //this cast should succeed
-
 		proxy.methodWithObjectArg(new Object());
 		assertTrue("Override should be called", implementationObject.overrideCalled == true);
 	}
@@ -239,12 +293,6 @@ public class RuntimeTests extends AndroidTestCase
 		ImplementationObject implementationObject = new ImplementationObject();
 		TargetObject proxy = loadProxy(proxyFile, implementationObject);
 		
-		proxy.methodWithStringArg("not overriden");
-		assertTrue("Override should NOT be called", implementationObject.overrideCalled == false);
-		assertEquals("not overriden", proxy.arg);
-		
-		((NativeScriptHashCodeProvider)proxy).setNativeScriptOverride("methodWithStringArg"); //this cast should succeed
-
 		proxy.methodWithStringArg("overriden");
 		assertTrue("Override should be called", implementationObject.overrideCalled == true);
 		assertEquals("overriden", implementationObject.arg);
@@ -271,12 +319,6 @@ public class RuntimeTests extends AndroidTestCase
 		ImplementationObject implementationObject = new ImplementationObject();
 		TargetObject proxy = loadProxy(proxyFile, implementationObject);
 		
-		proxy.methodWithIntArg(5);
-		assertTrue("Override should NOT be called", implementationObject.overrideCalled == false);
-		assertEquals(5, proxy.arg); //asserting against the proxy instance. Override should not be called but proxy instance should be
-		
-		((NativeScriptHashCodeProvider)proxy).setNativeScriptOverride("methodWithIntArg"); //this cast should succeed
-
 		proxy.methodWithIntArg(6);
 		assertTrue("Override should be called", implementationObject.overrideCalled == true);
 		assertEquals(6, implementationObject.arg); //asserting against the implementation instance. Override should be called and implementation instance is updated
@@ -304,12 +346,6 @@ public class RuntimeTests extends AndroidTestCase
 		TargetObject proxy = loadProxy(proxyFile, implementationObject);
 		
 		proxy.methodWithBooleanArg(true);
-		assertTrue("Override should NOT be called", implementationObject.overrideCalled == false);
-		assertEquals(true, proxy.arg); //asserting against the proxy instance. Override should not be called but proxy instance should be
-		
-		((NativeScriptHashCodeProvider)proxy).setNativeScriptOverride("methodWithBooleanArg"); //this cast should succeed
-
-		proxy.methodWithBooleanArg(true);
 		assertTrue("Override should be called", implementationObject.overrideCalled == true);
 		assertEquals(true, implementationObject.arg); //asserting against the implementation instance. Override should be called and implementation instance is updated
 	}
@@ -335,12 +371,6 @@ public class RuntimeTests extends AndroidTestCase
 		ImplementationObject implementationObject = new ImplementationObject();
 		TargetObject proxy = loadProxy(proxyFile, implementationObject);
 		
-		proxy.methodWithCharArg('x');
-		assertTrue("Override should NOT be called", implementationObject.overrideCalled == false);
-		assertEquals('x', proxy.arg); //asserting against the proxy instance. Override should not be called but proxy instance should be
-		
-		((NativeScriptHashCodeProvider)proxy).setNativeScriptOverride("methodWithCharArg"); //this cast should succeed
-
 		proxy.methodWithCharArg('b');
 		assertTrue("Override should be called", implementationObject.overrideCalled == true);
 		assertEquals('b', implementationObject.arg); //asserting against the implementation instance. Override should be called and implementation instance is updated
@@ -367,12 +397,6 @@ public class RuntimeTests extends AndroidTestCase
 		ImplementationObject implementationObject = new ImplementationObject();
 		TargetObject proxy = loadProxy(proxyFile, implementationObject);
 		
-		proxy.methodWithLongArg(6L);
-		assertTrue("Override should NOT be called", implementationObject.overrideCalled == false);
-		assertEquals(6L, proxy.arg); //asserting against the proxy instance. Override should not be called but proxy instance should be
-		
-		((NativeScriptHashCodeProvider)proxy).setNativeScriptOverride("methodWithLongArg"); //this cast should succeed
-
 		proxy.methodWithLongArg(7L);
 		assertTrue("Override should be called", implementationObject.overrideCalled == true);
 		assertEquals(7L, implementationObject.arg); //asserting against the implementation instance. Override should be called and implementation instance is updated
@@ -399,12 +423,6 @@ public class RuntimeTests extends AndroidTestCase
 		ImplementationObject implementationObject = new ImplementationObject();
 		TargetObject proxy = loadProxy(proxyFile, implementationObject);
 		
-		proxy.methodWithDoubleArg(4.0);
-		assertTrue("Override should NOT be called", implementationObject.overrideCalled == false);
-		assertEquals(4.0, proxy.arg); //asserting against the proxy instance. Override should not be called but proxy instance should be
-		
-		((NativeScriptHashCodeProvider)proxy).setNativeScriptOverride("methodWithDoubleArg"); //this cast should succeed
-
 		proxy.methodWithDoubleArg(5.0);
 		assertTrue("Override should be called", implementationObject.overrideCalled == true);
 		assertEquals(5.0, implementationObject.arg); //asserting against the implementation instance. Override should be called and implementation instance is updated
@@ -431,12 +449,6 @@ public class RuntimeTests extends AndroidTestCase
 		ImplementationObject implementationObject = new ImplementationObject();
 		TargetObject proxy = loadProxy(proxyFile, implementationObject);
 		
-		proxy.methodWithFloatArg((float)33.0);
-		assertTrue("Override should NOT be called", implementationObject.overrideCalled == false);
-		assertEquals((float)33.0, proxy.arg); //asserting against the proxy instance. Override should not be called but proxy instance should be
-		
-		((NativeScriptHashCodeProvider)proxy).setNativeScriptOverride("methodWithFloatArg"); //this cast should succeed
-
 		proxy.methodWithFloatArg((float)44.0);
 		assertTrue("Override should be called", implementationObject.overrideCalled == true);
 		assertEquals((float)44.0, implementationObject.arg); //asserting against the implementation instance. Override should be called and implementation instance is updated
@@ -463,12 +475,6 @@ public class RuntimeTests extends AndroidTestCase
 		ImplementationObject implementationObject = new ImplementationObject();
 		TargetObject proxy = loadProxy(proxyFile, implementationObject);
 		
-		proxy.methodWithByteArg((byte)154);
-		assertTrue("Override should NOT be called", implementationObject.overrideCalled == false);
-		assertEquals((byte)154, proxy.arg); //asserting against the proxy instance. Override should not be called but proxy instance should be
-		
-		((NativeScriptHashCodeProvider)proxy).setNativeScriptOverride("methodWithByteArg"); //this cast should succeed
-
 		proxy.methodWithByteArg((byte)164);
 		assertTrue("Override should be called", implementationObject.overrideCalled == true);
 		assertEquals((byte)164, implementationObject.arg); //asserting against the implementation instance. Override should be called and implementation instance is updated
@@ -495,13 +501,6 @@ public class RuntimeTests extends AndroidTestCase
 		ImplementationObject implementationObject = new ImplementationObject();
 		TargetObject proxy = loadProxy(proxyFile, implementationObject);
 		
-		proxy.methodWithByteArrayArg(new byte[] { (byte)141 });
-		assertTrue("Override should NOT be called", implementationObject.overrideCalled == false);
-		
-		assertEquals((byte)141, ((byte[])proxy.arg)[0]); //asserting against the proxy instance. Override should not be called but proxy instance should be
-		
-		((NativeScriptHashCodeProvider)proxy).setNativeScriptOverride("methodWithByteArrayArg"); //this cast should succeed
-
 		proxy.methodWithByteArrayArg(new byte[] { (byte)111 });
 		assertTrue("Override should be called", implementationObject.overrideCalled == true);
 		assertEquals((byte)111, ((byte[]) implementationObject.arg)[0]); //asserting against the implementation instance. Override should be called and implementation instance is updated
@@ -532,15 +531,7 @@ public class RuntimeTests extends AndroidTestCase
 		
 		Object first = new Object();
 		Object second = new Object();
-		proxy.methodWithLongAndDoubleArgs(first, 334534L, second, 345.345);
-		assertTrue("Override should NOT be called", implementationObject.overrideCalled == false);
-		assertEquals(first, proxy.arg0);
-		assertEquals(334534L, proxy.arg1);
-		assertEquals(second, proxy.arg2);
-		assertEquals(345.345, proxy.arg3);
 		
-		((NativeScriptHashCodeProvider)proxy).setNativeScriptOverride("methodWithLongAndDoubleArgs"); //this cast should succeed
-
 		proxy.methodWithLongAndDoubleArgs(first, 11222L, second, 346.3456);
 		assertTrue("Override should be called", implementationObject.overrideCalled == true);
 		assertEquals(first, implementationObject.arg0);
@@ -577,14 +568,7 @@ public class RuntimeTests extends AndroidTestCase
 		ImplementationObject implementationObject = new ImplementationObject();
 		TargetObject proxy = loadProxy(proxyFile, implementationObject);
 		
-		byte result = proxy.methodReturningByte((byte)154);
-		assertTrue("Override should NOT be called", implementationObject.overrideCalled == false);
-		assertEquals((byte)154, proxy.arg);
-		assertEquals((byte)154, result);
-		
-		((NativeScriptHashCodeProvider)proxy).setNativeScriptOverride("methodReturningByte"); //this cast should succeed
-
-		result = proxy.methodReturningByte((byte)164);
+		byte result = proxy.methodReturningByte((byte)164);
 		assertTrue("Override should be called", implementationObject.overrideCalled == true);
 		assertEquals((byte)167, implementationObject.arg);
 		assertEquals((byte)168, result);
@@ -612,14 +596,7 @@ public class RuntimeTests extends AndroidTestCase
 		ImplementationObject implementationObject = new ImplementationObject();
 		TargetObject proxy = loadProxy(proxyFile, implementationObject);
 		
-		char result = proxy.methodReturningChar('j');
-		assertTrue("Override should NOT be called", implementationObject.overrideCalled == false);
-		assertEquals('j', proxy.arg);
-		assertEquals('j', result);
-		
-		((NativeScriptHashCodeProvider)proxy).setNativeScriptOverride("methodReturningChar"); //this cast should succeed
-
-		result = proxy.methodReturningChar('b');
+		char result = proxy.methodReturningChar('b');
 		assertTrue("Override should be called", implementationObject.overrideCalled == true);
 		assertEquals('v', implementationObject.arg);
 		assertEquals('c', result);
@@ -647,14 +624,7 @@ public class RuntimeTests extends AndroidTestCase
 		ImplementationObject implementationObject = new ImplementationObject();
 		TargetObject proxy = loadProxy(proxyFile, implementationObject);
 		
-		short result = proxy.methodReturningShort((short)154);
-		assertTrue("Override should NOT be called", implementationObject.overrideCalled == false);
-		assertEquals((short)154, proxy.arg);
-		assertEquals((short)154, result);
-		
-		((NativeScriptHashCodeProvider)proxy).setNativeScriptOverride("methodReturningShort"); //this cast should succeed
-
-		result = proxy.methodReturningShort((short)164);
+		short result = proxy.methodReturningShort((short)164);
 		assertTrue("Override should be called", implementationObject.overrideCalled == true);
 		assertEquals((short)167, implementationObject.arg);
 		assertEquals((short)168, result);
@@ -682,14 +652,7 @@ public class RuntimeTests extends AndroidTestCase
 		ImplementationObject implementationObject = new ImplementationObject();
 		TargetObject proxy = loadProxy(proxyFile, implementationObject);
 		
-		int result = proxy.methodReturningInt((int)154);
-		assertTrue("Override should NOT be called", implementationObject.overrideCalled == false);
-		assertEquals((int)154, proxy.arg);
-		assertEquals((int)154, result);
-		
-		((NativeScriptHashCodeProvider)proxy).setNativeScriptOverride("methodReturningInt"); //this cast should succeed
-
-		result = proxy.methodReturningInt((int)164);
+		int result = proxy.methodReturningInt((int)164);
 		assertTrue("Override should be called", implementationObject.overrideCalled == true);
 		assertEquals((int)167, implementationObject.arg);
 		assertEquals((int)168, result);
@@ -717,14 +680,7 @@ public class RuntimeTests extends AndroidTestCase
 		ImplementationObject implementationObject = new ImplementationObject();
 		TargetObject proxy = loadProxy(proxyFile, implementationObject);
 		
-		float result = proxy.methodReturningFloat((float)154);
-		assertTrue("Override should NOT be called", implementationObject.overrideCalled == false);
-		assertEquals((float)154, proxy.arg);
-		assertEquals((float)154, result);
-		
-		((NativeScriptHashCodeProvider)proxy).setNativeScriptOverride("methodReturningFloat"); //this cast should succeed
-
-		result = proxy.methodReturningFloat((float)164);
+		float result = proxy.methodReturningFloat((float)164);
 		assertTrue("Override should be called", implementationObject.overrideCalled == true);
 		assertEquals((float)167, implementationObject.arg);
 		assertEquals((float)168, result);
@@ -752,14 +708,7 @@ public class RuntimeTests extends AndroidTestCase
 		ImplementationObject implementationObject = new ImplementationObject();
 		TargetObject proxy = loadProxy(proxyFile, implementationObject);
 		
-		double result = proxy.methodReturningDouble((double)154);
-		assertTrue("Override should NOT be called", implementationObject.overrideCalled == false);
-		assertEquals((double)154, proxy.arg);
-		assertEquals((double)154, result);
-		
-		((NativeScriptHashCodeProvider)proxy).setNativeScriptOverride("methodReturningDouble"); //this cast should succeed
-
-		result = proxy.methodReturningDouble((float)164);
+		double result = proxy.methodReturningDouble((float)164);
 		assertTrue("Override should be called", implementationObject.overrideCalled == true);
 		assertEquals((double)167, implementationObject.arg);
 		assertEquals((double)168, result);
@@ -787,14 +736,7 @@ public class RuntimeTests extends AndroidTestCase
 		ImplementationObject implementationObject = new ImplementationObject();
 		TargetObject proxy = loadProxy(proxyFile, implementationObject);
 		
-		long result = proxy.methodReturningLong((long)154);
-		assertTrue("Override should NOT be called", implementationObject.overrideCalled == false);
-		assertEquals((long)154, proxy.arg);
-		assertEquals((long)154, result);
-		
-		((NativeScriptHashCodeProvider)proxy).setNativeScriptOverride("methodReturningLong"); //this cast should succeed
-
-		result = proxy.methodReturningLong((long)164);
+		long result = proxy.methodReturningLong((long)164);
 		assertTrue("Override should be called", implementationObject.overrideCalled == true);
 		assertEquals((long)167, implementationObject.arg);
 		assertEquals((long)168, result);
@@ -822,14 +764,7 @@ public class RuntimeTests extends AndroidTestCase
 		ImplementationObject implementationObject = new ImplementationObject();
 		TargetObject proxy = loadProxy(proxyFile, implementationObject);
 		
-		String result = proxy.methodReturningString("return string");
-		assertTrue("Override should NOT be called", implementationObject.overrideCalled == false);
-		assertEquals("return string", proxy.arg);
-		assertEquals("return string", result);
-		
-		((NativeScriptHashCodeProvider)proxy).setNativeScriptOverride("methodReturningString"); //this cast should succeed
-
-		result = proxy.methodReturningString("override string");
+		String result = proxy.methodReturningString("override string");
 		assertTrue("Override should be called", implementationObject.overrideCalled == true);
 		assertEquals("override string indeed", implementationObject.arg);
 		assertEquals("override string indeed", result);
@@ -857,16 +792,8 @@ public class RuntimeTests extends AndroidTestCase
 		ImplementationObject implementationObject = new ImplementationObject();
 		TargetObject proxy = loadProxy(proxyFile, implementationObject);
 		
-		Object first = new Object();
-		Object result = proxy.methodReturningObject(first);
-		assertTrue("Override should NOT be called", implementationObject.overrideCalled == false);
-		assertEquals(first, proxy.arg);
-		assertEquals(first, result);
-		
-		((NativeScriptHashCodeProvider)proxy).setNativeScriptOverride("methodReturningObject"); //this cast should succeed
-
 		Object second = new Object();
-		result = proxy.methodReturningObject(second);
+		Object result = proxy.methodReturningObject(second);
 		assertTrue("Override should be called", implementationObject.overrideCalled == true);
 		assertEquals(second, implementationObject.arg);
 		assertEquals(overrideResult, result);
@@ -1038,66 +965,23 @@ public class RuntimeTests extends AndroidTestCase
 		TargetObject proxy = loadProxy(proxyFile, implementationObject);
 		
 		Object param0 = new Object(); 
-		int param1 = 42; 
-		Integer param2 = 43;
-		char param3 = 'p';
-		Character param4 = 'j';
-		byte param5 = 3;
-		Byte param6 = 4;
-		short param7 = 60;
-		Short param8 = 61;
+		int param1 = 43; 
+		Integer param2 = 44;
+		char param3 = 'a';
+		Character param4 = 'c';
+		byte param5 = 4;
+		Byte param6 = 5;
+		short param7 = 61;
+		Short param8 = 62;
 		boolean param9 = true;
 		Boolean param10 = true;
-		long param11 = 123456L;
-		Long param12 = 1234567L;
-		float param13 = 45.0F;
-		Float param14 = 46.0F;
-		double param15 = 456.45;
-		Double param16 = 456.47;
-		String param17 = "the string";
-		
-		
-		proxy.methodWithAllTypesOfArgs(param0, param1, param2, param3, param4, param5, param6, param7, param8, param9, param10, param11, param12, param13, param14, param15, param16, param17);
-		assertTrue("Override should NOT be called", implementationObject.overrideCalled == false);
-		assertEquals(param0, proxy.arg0);
-		assertEquals(param1, proxy.arg1);
-		assertEquals(param2, proxy.arg2);
-		assertEquals(param3, proxy.arg3);
-		assertEquals(param4, proxy.arg4);
-		assertEquals(param5, proxy.arg5);
-		assertEquals(param6, proxy.arg6);
-		assertEquals(param7, proxy.arg7);
-		assertEquals(param8, proxy.arg8);
-		assertEquals(param9, proxy.arg9);
-		assertEquals(param10, proxy.arg10);
-		assertEquals(param11, proxy.arg11);
-		assertEquals(param12, proxy.arg12);
-		assertEquals(param13, proxy.arg13);
-		assertEquals(param14, proxy.arg14);
-		assertEquals(param15, proxy.arg15);
-		assertEquals(param16, proxy.arg16);
-		assertEquals(param17, proxy.arg17);
-		
-		((NativeScriptHashCodeProvider)proxy).setNativeScriptOverride("methodWithAllTypesOfArgs"); //this cast should succeed
-
-		param0 = new Object(); 
-		param1 = 43; 
-		param2 = 44;
-		param3 = 'a';
-		param4 = 'c';
-		param5 = 4;
-		param6 = 5;
-		param7 = 61;
-		param8 = 62;
-		param9 = true;
-		param10 = true;
-		param11 = 1123456L;
-		param12 = 11234567L;
-		param13 = 46.0F;
-		param14 = 47.0F;
-		param15 = 1456.45;
-		param16 = 1456.47;
-		param17 = "overriden string";
+		long param11 = 1123456L;
+		Long param12 = 11234567L;
+		float param13 = 46.0F;
+		Float param14 = 47.0F;
+		double param15 = 1456.45;
+		Double param16 = 1456.47;
+		String param17 = "overriden string";
 		
 		proxy.methodWithAllTypesOfArgs(param0, param1, param2, param3, param4, param5, param6, param7, param8, param9, param10, param11, param12, param13, param14, param15, param16, param17);
 		assertTrue("Override should be called", implementationObject.overrideCalled == true);
@@ -1161,7 +1045,7 @@ public class RuntimeTests extends AndroidTestCase
 			Dump dump = new Dump();
 			Class<?> classForName = Class.forName(clazz);
 			//Log.d("Binding.Gen.Test", "Generating Class " +  classForName.getName());
-			dump.generateProxy(aw, classForName);
+			dump.generateProxy(aw, classForName, new String[0], 0);
 			aw.visitEnd();
 			byte[] generatedBytes = aw.toByteArray();
 			File proxyFile = saveProxy(classForName.getName().replace('$', '_'), generatedBytes);

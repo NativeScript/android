@@ -62,7 +62,7 @@ include $(PREBUILT_STATIC_LIBRARY)
 include $(CLEAR_VARS)
 LOCAL_CPPFLAGS += -std=c++11
 LOCAL_MODULE    := NativeScript
-LOCAL_SRC_FILES := com_tns_Platform.cpp com_tns_JsDebugger.cpp com_tns_AssetExtractor.cpp \
+LOCAL_SRC_FILES := com_tns_Platform.cpp com_tns_JsDebugger.cpp com_tns_AssetExtractor.cpp com_tns_NativeScriptActity.cpp \
 					JEnv.cpp DirectBuffer.cpp \
 					JsDebugger.cpp \
 					NativeScriptRuntime.cpp MetadataNode.cpp MetadataTreeNode.cpp MetadataReader.cpp \

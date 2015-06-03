@@ -14,5 +14,6 @@ var tnsExtends = this.__extends;
 module.exports = { 
 	accessGlobalObject: function(s) {
 		__log("global is working " + global);
+		return true;
 	}
 }

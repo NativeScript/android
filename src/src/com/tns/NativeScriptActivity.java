@@ -1,3290 +1,3922 @@
 package com.tns;
 
-import android.util.Log;
-
-public class NativeScriptActivity extends android.app.Activity implements com.tns.NativeScriptHashCodeProvider {
-	public NativeScriptActivity() {
-		super();
-		if (__ctorOverridden) {
-			java.lang.Object[] params = null;
-			com.tns.Platform.callJSMethod(this, "init", true, params);
-		}
+public class NativeScriptActivity extends android.app.Activity
+{
+	private final int objectId;
+	
+	public NativeScriptActivity()
+	{
+		com.tns.Platform.initInstance(this);
+		objectId = com.tns.Platform.getorCreateJavaObjectID(this);
 	}
 
-	public void addContentView(android.view.View param_0, android.view.ViewGroup.LayoutParams param_1) {
-		if ((__ho0 & (1 << 0)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			com.tns.Platform.callJSMethod(this, "addContentView", params);
-		} else {
+	public void addContentView(android.view.View param_0, android.view.ViewGroup.LayoutParams param_1)
+	{
+		if (__ho0)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			com.tns.Platform.callJSMethod(this, "addContentView", args);
+		}
+		else
+		{
 			super.addContentView(param_0, param_1);
 		}
 	}
 
-	public void applyOverrideConfiguration(android.content.res.Configuration param_0) {
-		if ((__ho0 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "applyOverrideConfiguration", params);
-		} else {
+	public void applyOverrideConfiguration(android.content.res.Configuration param_0)
+	{
+		if (__ho1)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "applyOverrideConfiguration", args);
+		}
+		else
+		{
 			super.applyOverrideConfiguration(param_0);
 		}
 	}
 
-	protected void attachBaseContext(android.content.Context param_0) {
-		if ((__ho0 & (1 << 2)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "attachBaseContext", params);
-		} else {
-			super.attachBaseContext(param_0);
+	public boolean bindService(android.content.Intent param_0, android.content.ServiceConnection param_1, int param_2)
+	{
+		if (__ho2)
+		{
+			Object[] args = new Object[3];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "bindService", args);
 		}
-	}
-
-	public boolean bindService(android.content.Intent param_0, android.content.ServiceConnection param_1, int param_2) {
-		if ((__ho0 & (1 << 3)) > 0) { 
-			java.lang.Object[] params = new Object[3];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "bindService", params);
-		} else {
+		else
+		{
 			return super.bindService(param_0, param_1, param_2);
 		}
 	}
 
-	public int checkCallingOrSelfPermission(java.lang.String param_0) {
-		if ((__ho0 & (1 << 4)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (Integer)com.tns.Platform.callJSMethod(this, "checkCallingOrSelfPermission", params);
-		} else {
+	public int checkCallingOrSelfPermission(java.lang.String param_0)
+	{
+		if (__ho3)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (Integer)com.tns.Platform.callJSMethod(this, "checkCallingOrSelfPermission", args);
+		}
+		else
+		{
 			return super.checkCallingOrSelfPermission(param_0);
 		}
 	}
 
-	public int checkCallingOrSelfUriPermission(android.net.Uri param_0, int param_1) {
-		if ((__ho0 & (1 << 5)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			return (Integer)com.tns.Platform.callJSMethod(this, "checkCallingOrSelfUriPermission", params);
-		} else {
+	public int checkCallingOrSelfUriPermission(android.net.Uri param_0, int param_1)
+	{
+		if (__ho4)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			return (Integer)com.tns.Platform.callJSMethod(this, "checkCallingOrSelfUriPermission", args);
+		}
+		else
+		{
 			return super.checkCallingOrSelfUriPermission(param_0, param_1);
 		}
 	}
 
-	public int checkCallingPermission(java.lang.String param_0) {
-		if ((__ho0 & (1 << 6)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (Integer)com.tns.Platform.callJSMethod(this, "checkCallingPermission", params);
-		} else {
+	public int checkCallingPermission(java.lang.String param_0)
+	{
+		if (__ho5)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (Integer)com.tns.Platform.callJSMethod(this, "checkCallingPermission", args);
+		}
+		else
+		{
 			return super.checkCallingPermission(param_0);
 		}
 	}
 
-	public int checkCallingUriPermission(android.net.Uri param_0, int param_1) {
-		if ((__ho0 & (1 << 7)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			return (Integer)com.tns.Platform.callJSMethod(this, "checkCallingUriPermission", params);
-		} else {
+	public int checkCallingUriPermission(android.net.Uri param_0, int param_1)
+	{
+		if (__ho6)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			return (Integer)com.tns.Platform.callJSMethod(this, "checkCallingUriPermission", args);
+		}
+		else
+		{
 			return super.checkCallingUriPermission(param_0, param_1);
 		}
 	}
 
-	public int checkPermission(java.lang.String param_0, int param_1, int param_2) {
-		if ((__ho1 & (1 << 0)) > 0) { 
-			java.lang.Object[] params = new Object[3];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			return (Integer)com.tns.Platform.callJSMethod(this, "checkPermission", params);
-		} else {
+	public int checkPermission(java.lang.String param_0, int param_1, int param_2)
+	{
+		if (__ho7)
+		{
+			Object[] args = new Object[3];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			return (Integer)com.tns.Platform.callJSMethod(this, "checkPermission", args);
+		}
+		else
+		{
 			return super.checkPermission(param_0, param_1, param_2);
 		}
 	}
 
-	public int checkUriPermission(android.net.Uri param_0, int param_1, int param_2, int param_3) {
-		
-		if ((__ho1 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = new Object[4];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			params[3] = param_3;
-			return (Integer)com.tns.Platform.callJSMethod(this, "checkUriPermission", params);
-		} else {
+	public int checkUriPermission(android.net.Uri param_0, int param_1, int param_2, int param_3)
+	{
+		if (__ho8)
+		{
+			Object[] args = new Object[4];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			args[3] = param_3;
+			return (Integer)com.tns.Platform.callJSMethod(this, "checkUriPermission", args);
+		}
+		else
+		{
 			return super.checkUriPermission(param_0, param_1, param_2, param_3);
 		}
 	}
 
-	public int checkUriPermission(android.net.Uri param_0, java.lang.String param_1, java.lang.String param_2, int param_3, int param_4, int param_5) {
-		
-		if ((__ho1 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = new Object[6];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			params[3] = param_3;
-			params[4] = param_4;
-			params[5] = param_5;
-			return (Integer)com.tns.Platform.callJSMethod(this, "checkUriPermission", params);
-		} else {
+	public int checkUriPermission(android.net.Uri param_0, java.lang.String param_1, java.lang.String param_2, int param_3, int param_4, int param_5)
+	{
+		if (__ho8)
+		{
+			Object[] args = new Object[6];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			args[3] = param_3;
+			args[4] = param_4;
+			args[5] = param_5;
+			return (Integer)com.tns.Platform.callJSMethod(this, "checkUriPermission", args);
+		}
+		else
+		{
 			return super.checkUriPermission(param_0, param_1, param_2, param_3, param_4, param_5);
 		}
 	}
 
-	public void clearWallpaper() throws java.io.IOException {
-		
-		if ((__ho1 & (1 << 2)) > 0) { 
-			java.lang.Object[] params = null;
-			com.tns.Platform.callJSMethod(this, "clearWallpaper", params);
-		} else {
+	public void clearWallpaper() throws java.io.IOException
+	{
+		if (__ho9)
+		{
+			Object[] args = null;
+			com.tns.Platform.callJSMethod(this, "clearWallpaper", args);
+		}
+		else
+		{
 			super.clearWallpaper();
 		}
 	}
 
-	protected java.lang.Object clone() throws java.lang.CloneNotSupportedException {
-		
-		if ((__ho1 & (1 << 3)) > 0) { 
-			java.lang.Object[] params = null;
-			return (java.lang.Object)com.tns.Platform.callJSMethod(this, "clone", params);
-		} else {
-			return super.clone();
+	public void closeContextMenu()
+	{
+		if (__ho10)
+		{
+			Object[] args = null;
+			com.tns.Platform.callJSMethod(this, "closeContextMenu", args);
 		}
-	}
-
-	public void closeContextMenu() {
-		
-		if ((__ho1 & (1 << 4)) > 0) { 
-			java.lang.Object[] params = null;
-			com.tns.Platform.callJSMethod(this, "closeContextMenu", params);
-		} else {
+		else
+		{
 			super.closeContextMenu();
 		}
 	}
 
-	public void closeOptionsMenu() {
-		
-		if ((__ho1 & (1 << 5)) > 0) { 
-			java.lang.Object[] params = null;
-			com.tns.Platform.callJSMethod(this, "closeOptionsMenu", params);
-		} else {
+	public void closeOptionsMenu()
+	{
+		if (__ho11)
+		{
+			Object[] args = null;
+			com.tns.Platform.callJSMethod(this, "closeOptionsMenu", args);
+		}
+		else
+		{
 			super.closeOptionsMenu();
 		}
 	}
 
-	public android.content.Context createConfigurationContext(android.content.res.Configuration param_0) {
-		
-		if ((__ho1 & (1 << 6)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (android.content.Context)com.tns.Platform.callJSMethod(this, "createConfigurationContext", params);
-		} else {
+	public android.content.Context createConfigurationContext(android.content.res.Configuration param_0)
+	{
+		if (__ho12)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (android.content.Context)com.tns.Platform.callJSMethod(this, "createConfigurationContext", args);
+		}
+		else
+		{
 			return super.createConfigurationContext(param_0);
 		}
 	}
 
-	public android.content.Context createDisplayContext(android.view.Display param_0) {
-		
-		if ((__ho1 & (1 << 7)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (android.content.Context)com.tns.Platform.callJSMethod(this, "createDisplayContext", params);
-		} else {
+	public android.content.Context createDisplayContext(android.view.Display param_0)
+	{
+		if (__ho13)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (android.content.Context)com.tns.Platform.callJSMethod(this, "createDisplayContext", args);
+		}
+		else
+		{
 			return super.createDisplayContext(param_0);
 		}
 	}
 
-	public android.content.Context createPackageContext(java.lang.String param_0, int param_1) throws android.content.pm.PackageManager.NameNotFoundException {
-		
-		if ((__ho2 & (1 << 0)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			return (android.content.Context)com.tns.Platform.callJSMethod(this, "createPackageContext", params);
-		} else {
+	public android.content.Context createPackageContext(java.lang.String param_0, int param_1) throws android.content.pm.PackageManager.NameNotFoundException
+	{
+		if (__ho14)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			return (android.content.Context)com.tns.Platform.callJSMethod(this, "createPackageContext", args);
+		}
+		else
+		{
 			return super.createPackageContext(param_0, param_1);
 		}
 	}
 
-	public android.app.PendingIntent createPendingResult(int param_0, android.content.Intent param_1, int param_2) {
-		
-		if ((__ho2 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = new Object[3];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			return (android.app.PendingIntent)com.tns.Platform.callJSMethod(this, "createPendingResult", params);
-		} else {
+	public android.app.PendingIntent createPendingResult(int param_0, android.content.Intent param_1, int param_2)
+	{
+		if (__ho15)
+		{
+			Object[] args = new Object[3];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			return (android.app.PendingIntent)com.tns.Platform.callJSMethod(this, "createPendingResult", args);
+		}
+		else
+		{
 			return super.createPendingResult(param_0, param_1, param_2);
 		}
 	}
 
-	public java.lang.String[] databaseList() {
-		
-		if ((__ho2 & (1 << 2)) > 0) { 
-			java.lang.Object[] params = null;
-			return (java.lang.String[])com.tns.Platform.callJSMethod(this, "databaseList", params);
-		} else {
+	public java.lang.String[] databaseList()
+	{
+		if (__ho16)
+		{
+			Object[] args = null;
+			return (java.lang.String[])com.tns.Platform.callJSMethod(this, "databaseList", args);
+		}
+		else
+		{
 			return super.databaseList();
 		}
 	}
 
-	public boolean deleteDatabase(java.lang.String param_0) {
-		
-		if ((__ho2 & (1 << 3)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "deleteDatabase", params);
-		} else {
+	public boolean deleteDatabase(java.lang.String param_0)
+	{
+		if (__ho17)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "deleteDatabase", args);
+		}
+		else
+		{
 			return super.deleteDatabase(param_0);
 		}
 	}
 
-	public boolean deleteFile(java.lang.String param_0) {
-		
-		if ((__ho2 & (1 << 4)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "deleteFile", params);
-		} else {
+	public boolean deleteFile(java.lang.String param_0)
+	{
+		if (__ho18)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "deleteFile", args);
+		}
+		else
+		{
 			return super.deleteFile(param_0);
 		}
 	}
 
-	public boolean dispatchGenericMotionEvent(android.view.MotionEvent param_0) {
-		
-		if ((__ho2 & (1 << 5)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "dispatchGenericMotionEvent", params);
-		} else {
+	public boolean dispatchGenericMotionEvent(android.view.MotionEvent param_0)
+	{
+		if (__ho19)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "dispatchGenericMotionEvent", args);
+		}
+		else
+		{
 			return super.dispatchGenericMotionEvent(param_0);
 		}
 	}
 
-	public boolean dispatchKeyEvent(android.view.KeyEvent param_0) {
-		
-		if ((__ho2 & (1 << 6)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "dispatchKeyEvent", params);
-		} else {
+	public boolean dispatchKeyEvent(android.view.KeyEvent param_0)
+	{
+		if (__ho20)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "dispatchKeyEvent", args);
+		}
+		else
+		{
 			return super.dispatchKeyEvent(param_0);
 		}
 	}
 
-	public boolean dispatchKeyShortcutEvent(android.view.KeyEvent param_0) {
-		
-		if ((__ho2 & (1 << 7)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "dispatchKeyShortcutEvent", params);
-		} else {
+	public boolean dispatchKeyShortcutEvent(android.view.KeyEvent param_0)
+	{
+		if (__ho21)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "dispatchKeyShortcutEvent", args);
+		}
+		else
+		{
 			return super.dispatchKeyShortcutEvent(param_0);
 		}
 	}
 
-	public boolean dispatchPopulateAccessibilityEvent(android.view.accessibility.AccessibilityEvent param_0) {
-		
-		if ((__ho3 & (1 << 0)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "dispatchPopulateAccessibilityEvent", params);
-		} else {
+	public boolean dispatchPopulateAccessibilityEvent(android.view.accessibility.AccessibilityEvent param_0)
+	{
+		if (__ho22)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "dispatchPopulateAccessibilityEvent", args);
+		}
+		else
+		{
 			return super.dispatchPopulateAccessibilityEvent(param_0);
 		}
 	}
 
-	public boolean dispatchTouchEvent(android.view.MotionEvent param_0) {
-		
-		if ((__ho3 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "dispatchTouchEvent", params);
-		} else {
+	public boolean dispatchTouchEvent(android.view.MotionEvent param_0)
+	{
+		if (__ho23)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "dispatchTouchEvent", args);
+		}
+		else
+		{
 			return super.dispatchTouchEvent(param_0);
 		}
 	}
 
-	public boolean dispatchTrackballEvent(android.view.MotionEvent param_0) {
-		
-		if ((__ho3 & (1 << 2)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "dispatchTrackballEvent", params);
-		} else {
+	public boolean dispatchTrackballEvent(android.view.MotionEvent param_0)
+	{
+		if (__ho24)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "dispatchTrackballEvent", args);
+		}
+		else
+		{
 			return super.dispatchTrackballEvent(param_0);
 		}
 	}
 
-	public void dump(java.lang.String param_0, java.io.FileDescriptor param_1, java.io.PrintWriter param_2, java.lang.String[] param_3) {
-		
-		if ((__ho3 & (1 << 3)) > 0) { 
-			java.lang.Object[] params = new Object[4];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			params[3] = param_3;
-			com.tns.Platform.callJSMethod(this, "dump", params);
-		} else {
+	public void dump(java.lang.String param_0, java.io.FileDescriptor param_1, java.io.PrintWriter param_2, java.lang.String[] param_3)
+	{
+		if (__ho25)
+		{
+			Object[] args = new Object[4];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			args[3] = param_3;
+			com.tns.Platform.callJSMethod(this, "dump", args);
+		}
+		else
+		{
 			super.dump(param_0, param_1, param_2, param_3);
 		}
 	}
 
-	public void enforceCallingOrSelfPermission(java.lang.String param_0, java.lang.String param_1) {
-		
-		if ((__ho3 & (1 << 4)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			com.tns.Platform.callJSMethod(this, "enforceCallingOrSelfPermission", params);
-		} else {
+	public void enforceCallingOrSelfPermission(java.lang.String param_0, java.lang.String param_1)
+	{
+		if (__ho26)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			com.tns.Platform.callJSMethod(this, "enforceCallingOrSelfPermission", args);
+		}
+		else
+		{
 			super.enforceCallingOrSelfPermission(param_0, param_1);
 		}
 	}
 
-	public void enforceCallingOrSelfUriPermission(android.net.Uri param_0, int param_1, java.lang.String param_2) {
-		
-		if ((__ho3 & (1 << 5)) > 0) { 
-			java.lang.Object[] params = new Object[3];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			com.tns.Platform.callJSMethod(this, "enforceCallingOrSelfUriPermission", params);
-		} else {
+	public void enforceCallingOrSelfUriPermission(android.net.Uri param_0, int param_1, java.lang.String param_2)
+	{
+		if (__ho27)
+		{
+			Object[] args = new Object[3];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			com.tns.Platform.callJSMethod(this, "enforceCallingOrSelfUriPermission", args);
+		}
+		else
+		{
 			super.enforceCallingOrSelfUriPermission(param_0, param_1, param_2);
 		}
 	}
 
-	public void enforceCallingPermission(java.lang.String param_0, java.lang.String param_1) {
-		
-		if ((__ho3 & (1 << 6)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			com.tns.Platform.callJSMethod(this, "enforceCallingPermission", params);
-		} else {
+	public void enforceCallingPermission(java.lang.String param_0, java.lang.String param_1)
+	{
+		if (__ho28)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			com.tns.Platform.callJSMethod(this, "enforceCallingPermission", args);
+		}
+		else
+		{
 			super.enforceCallingPermission(param_0, param_1);
 		}
 	}
 
-	public void enforceCallingUriPermission(android.net.Uri param_0, int param_1, java.lang.String param_2) {
-		
-		if ((__ho3 & (1 << 7)) > 0) { 
-			java.lang.Object[] params = new Object[3];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			com.tns.Platform.callJSMethod(this, "enforceCallingUriPermission", params);
-		} else {
+	public void enforceCallingUriPermission(android.net.Uri param_0, int param_1, java.lang.String param_2)
+	{
+		if (__ho29)
+		{
+			Object[] args = new Object[3];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			com.tns.Platform.callJSMethod(this, "enforceCallingUriPermission", args);
+		}
+		else
+		{
 			super.enforceCallingUriPermission(param_0, param_1, param_2);
 		}
 	}
 
-	public void enforcePermission(java.lang.String param_0, int param_1, int param_2, java.lang.String param_3) {
-		
-		if ((__ho4 & (1 << 0)) > 0) { 
-			java.lang.Object[] params = new Object[4];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			params[3] = param_3;
-			com.tns.Platform.callJSMethod(this, "enforcePermission", params);
-		} else {
+	public void enforcePermission(java.lang.String param_0, int param_1, int param_2, java.lang.String param_3)
+	{
+		if (__ho30)
+		{
+			Object[] args = new Object[4];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			args[3] = param_3;
+			com.tns.Platform.callJSMethod(this, "enforcePermission", args);
+		}
+		else
+		{
 			super.enforcePermission(param_0, param_1, param_2, param_3);
 		}
 	}
 
-	public void enforceUriPermission(android.net.Uri param_0, int param_1, int param_2, int param_3, java.lang.String param_4) {
-		
-		if ((__ho4 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = new Object[5];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			params[3] = param_3;
-			params[4] = param_4;
-			com.tns.Platform.callJSMethod(this, "enforceUriPermission", params);
-		} else {
-			super.enforceUriPermission(param_0, param_1, param_2, param_3, param_4);
+	public void enforceUriPermission(android.net.Uri param_0, java.lang.String param_1, java.lang.String param_2, int param_3, int param_4, int param_5, java.lang.String param_6)
+	{
+		if (__ho31)
+		{
+			Object[] args = new Object[7];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			args[3] = param_3;
+			args[4] = param_4;
+			args[5] = param_5;
+			args[6] = param_6;
+			com.tns.Platform.callJSMethod(this, "enforceUriPermission", args);
 		}
-	}
-
-	public void enforceUriPermission(android.net.Uri param_0, java.lang.String param_1, java.lang.String param_2, int param_3, int param_4, int param_5, java.lang.String param_6) {
-		
-		if ((__ho4 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = new Object[7];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			params[3] = param_3;
-			params[4] = param_4;
-			params[5] = param_5;
-			params[6] = param_6;
-			com.tns.Platform.callJSMethod(this, "enforceUriPermission", params);
-		} else {
+		else
+		{
 			super.enforceUriPermission(param_0, param_1, param_2, param_3, param_4, param_5, param_6);
 		}
 	}
 
-	public boolean equals(java.lang.Object param_0) {
-		
-		if ((__ho4 & (1 << 2)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "equals", params);
-		} else {
+	public void enforceUriPermission(android.net.Uri param_0, int param_1, int param_2, int param_3, java.lang.String param_4)
+	{
+		if (__ho31)
+		{
+			Object[] args = new Object[5];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			args[3] = param_3;
+			args[4] = param_4;
+			com.tns.Platform.callJSMethod(this, "enforceUriPermission", args);
+		}
+		else
+		{
+			super.enforceUriPermission(param_0, param_1, param_2, param_3, param_4);
+		}
+	}
+
+	public boolean equals(java.lang.Object param_0)
+	{
+		if (__ho32)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "equals", args);
+		}
+		else
+		{
 			return super.equals(param_0);
 		}
 	}
 
-	public java.lang.String[] fileList() {
-		
-		if ((__ho4 & (1 << 3)) > 0) { 
-			java.lang.Object[] params = null;
-			return (java.lang.String[])com.tns.Platform.callJSMethod(this, "fileList", params);
-		} else {
+	public java.lang.String[] fileList()
+	{
+		if (__ho33)
+		{
+			Object[] args = null;
+			return (java.lang.String[])com.tns.Platform.callJSMethod(this, "fileList", args);
+		}
+		else
+		{
 			return super.fileList();
 		}
 	}
 
-	protected void finalize() throws java.lang.Throwable {
-		
-		if ((__ho4 & (1 << 4)) > 0) { 
-			java.lang.Object[] params = null;
-			com.tns.Platform.callJSMethod(this, "finalize", params);
-		} else {
-			super.finalize();
+	public android.view.View findViewById(int param_0)
+	{
+		if (__ho34)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (android.view.View)com.tns.Platform.callJSMethod(this, "findViewById", args);
 		}
-	}
-
-	public android.view.View findViewById(int param_0) {
-		
-		if ((__ho4 & (1 << 5)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (android.view.View)com.tns.Platform.callJSMethod(this, "findViewById", params);
-		} else {
+		else
+		{
 			return super.findViewById(param_0);
 		}
 	}
 
-	public void finish() {
-		
-		if ((__ho4 & (1 << 6)) > 0) { 
-			java.lang.Object[] params = null;
-			com.tns.Platform.callJSMethod(this, "finish", params);
-		} else {
+	public void finish()
+	{
+		if (__ho35)
+		{
+			Object[] args = null;
+			com.tns.Platform.callJSMethod(this, "finish", args);
+		}
+		else
+		{
 			super.finish();
 		}
 	}
 
-	public void finishActivity(int param_0) {
-		
-		if ((__ho4 & (1 << 7)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "finishActivity", params);
-		} else {
+	public void finishActivity(int param_0)
+	{
+		if (__ho36)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "finishActivity", args);
+		}
+		else
+		{
 			super.finishActivity(param_0);
 		}
 	}
 
-	public void finishActivityFromChild(android.app.Activity param_0, int param_1) {
-	
-		if ((__ho5 & (1 << 0)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			com.tns.Platform.callJSMethod(this, "finishActivityFromChild", params);
-		} else {
+	public void finishActivityFromChild(android.app.Activity param_0, int param_1)
+	{
+		if (__ho37)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			com.tns.Platform.callJSMethod(this, "finishActivityFromChild", args);
+		}
+		else
+		{
 			super.finishActivityFromChild(param_0, param_1);
 		}
 	}
 
-	public void finishAffinity() {
-		
-		if ((__ho5 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = null;
-			com.tns.Platform.callJSMethod(this, "finishAffinity", params);
-		} else {
+	public void finishAffinity()
+	{
+		if (__ho38)
+		{
+			Object[] args = null;
+			com.tns.Platform.callJSMethod(this, "finishAffinity", args);
+		}
+		else
+		{
 			super.finishAffinity();
 		}
 	}
 
-	public void finishFromChild(android.app.Activity param_0) {
-		
-		if ((__ho5 & (1 << 2)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "finishFromChild", params);
-		} else {
+	public void finishFromChild(android.app.Activity param_0)
+	{
+		if (__ho39)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "finishFromChild", args);
+		}
+		else
+		{
 			super.finishFromChild(param_0);
 		}
 	}
 
-	public android.app.ActionBar getActionBar() {
-		
-		if ((__ho5 & (1 << 3)) > 0) { 
-			java.lang.Object[] params = null;
-			return (android.app.ActionBar)com.tns.Platform.callJSMethod(this, "getActionBar", params);
-		} else {
+	public android.app.ActionBar getActionBar()
+	{
+		if (__ho40)
+		{
+			Object[] args = null;
+			return (android.app.ActionBar)com.tns.Platform.callJSMethod(this, "getActionBar", args);
+		}
+		else
+		{
 			return super.getActionBar();
 		}
 	}
 
-	public android.content.Context getApplicationContext() {
-		
-		if ((__ho5 & (1 << 4)) > 0) { 
-			java.lang.Object[] params = null;
-			return (android.content.Context)com.tns.Platform.callJSMethod(this, "getApplicationContext", params);
-		} else {
+	public android.content.Context getApplicationContext()
+	{
+		if (__ho41)
+		{
+			Object[] args = null;
+			return (android.content.Context)com.tns.Platform.callJSMethod(this, "getApplicationContext", args);
+		}
+		else
+		{
 			return super.getApplicationContext();
 		}
 	}
 
-	public android.content.pm.ApplicationInfo getApplicationInfo() {
-		if ((__ho5 & (1 << 5)) > 0) { 
-			java.lang.Object[] params = null;
-			return (android.content.pm.ApplicationInfo)com.tns.Platform.callJSMethod(this, "getApplicationInfo", params);
-		} else {
+	public android.content.pm.ApplicationInfo getApplicationInfo()
+	{
+		if (__ho42)
+		{
+			Object[] args = null;
+			return (android.content.pm.ApplicationInfo)com.tns.Platform.callJSMethod(this, "getApplicationInfo", args);
+		}
+		else
+		{
 			return super.getApplicationInfo();
 		}
 	}
 
-	public android.content.res.AssetManager getAssets() {
-		
-		if ((__ho5 & (1 << 6)) > 0) { 
-			java.lang.Object[] params = null;
-			return (android.content.res.AssetManager)com.tns.Platform.callJSMethod(this, "getAssets", params);
-		} else {
+	public android.content.res.AssetManager getAssets()
+	{
+		if (__ho43)
+		{
+			Object[] args = null;
+			return (android.content.res.AssetManager)com.tns.Platform.callJSMethod(this, "getAssets", args);
+		}
+		else
+		{
 			return super.getAssets();
 		}
 	}
 
-	public android.content.Context getBaseContext() {
-		if ((__ho5 & (1 << 7)) > 0) { 
-			java.lang.Object[] params = null;
-			return (android.content.Context)com.tns.Platform.callJSMethod(this, "getBaseContext", params);
-		} else {
+	public android.content.Context getBaseContext()
+	{
+		if (__ho44)
+		{
+			Object[] args = null;
+			return (android.content.Context)com.tns.Platform.callJSMethod(this, "getBaseContext", args);
+		}
+		else
+		{
 			return super.getBaseContext();
 		}
 	}
 
-	public java.io.File getCacheDir() {
-	
-		if ((__ho6 & (1 << 0)) > 0) { 
-			java.lang.Object[] params = null;
-			return (java.io.File)com.tns.Platform.callJSMethod(this, "getCacheDir", params);
-		} else {
+	public java.io.File getCacheDir()
+	{
+		if (__ho45)
+		{
+			Object[] args = null;
+			return (java.io.File)com.tns.Platform.callJSMethod(this, "getCacheDir", args);
+		}
+		else
+		{
 			return super.getCacheDir();
 		}
 	}
 
-	public android.content.ComponentName getCallingActivity() {
-		
-		if ((__ho6 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = null;
-			return (android.content.ComponentName)com.tns.Platform.callJSMethod(this, "getCallingActivity", params);
-		} else {
+	public android.content.ComponentName getCallingActivity()
+	{
+		if (__ho46)
+		{
+			Object[] args = null;
+			return (android.content.ComponentName)com.tns.Platform.callJSMethod(this, "getCallingActivity", args);
+		}
+		else
+		{
 			return super.getCallingActivity();
 		}
 	}
 
-	public java.lang.String getCallingPackage() {
-		
-		if ((__ho6 & (1 << 2)) > 0) { 
-			java.lang.Object[] params = null;
-			return (java.lang.String)com.tns.Platform.callJSMethod(this, "getCallingPackage", params);
-		} else {
+	public java.lang.String getCallingPackage()
+	{
+		if (__ho47)
+		{
+			Object[] args = null;
+			return (java.lang.String)com.tns.Platform.callJSMethod(this, "getCallingPackage", args);
+		}
+		else
+		{
 			return super.getCallingPackage();
 		}
 	}
 
-	public int getChangingConfigurations() {
-		
-		if ((__ho6 & (1 << 3)) > 0) { 
-			java.lang.Object[] params = null;
-			return (Integer)com.tns.Platform.callJSMethod(this, "getChangingConfigurations", params);
-		} else {
+	public int getChangingConfigurations()
+	{
+		if (__ho48)
+		{
+			Object[] args = null;
+			return (Integer)com.tns.Platform.callJSMethod(this, "getChangingConfigurations", args);
+		}
+		else
+		{
 			return super.getChangingConfigurations();
 		}
 	}
 
-	public java.lang.ClassLoader getClassLoader() {
-		
-		if ((__ho6 & (1 << 4)) > 0) { 
-			java.lang.Object[] params = null;
-			return (java.lang.ClassLoader)com.tns.Platform.callJSMethod(this, "getClassLoader", params);
-		} else {
+	public java.lang.ClassLoader getClassLoader()
+	{
+		if (__ho49)
+		{
+			Object[] args = null;
+			return (java.lang.ClassLoader)com.tns.Platform.callJSMethod(this, "getClassLoader", args);
+		}
+		else
+		{
 			return super.getClassLoader();
 		}
 	}
 
-	public android.content.ComponentName getComponentName() {
-		
-		if ((__ho6 & (1 << 5)) > 0) { 
-			java.lang.Object[] params = null;
-			return (android.content.ComponentName)com.tns.Platform.callJSMethod(this, "getComponentName", params);
-		} else {
+	public android.content.ComponentName getComponentName()
+	{
+		if (__ho50)
+		{
+			Object[] args = null;
+			return (android.content.ComponentName)com.tns.Platform.callJSMethod(this, "getComponentName", args);
+		}
+		else
+		{
 			return super.getComponentName();
 		}
 	}
 
-	public android.content.ContentResolver getContentResolver() {
-		
-		if ((__ho6 & (1 << 6)) > 0) { 
-			java.lang.Object[] params = null;
-			return (android.content.ContentResolver)com.tns.Platform.callJSMethod(this, "getContentResolver", params);
-		} else {
+	public android.content.ContentResolver getContentResolver()
+	{
+		if (__ho51)
+		{
+			Object[] args = null;
+			return (android.content.ContentResolver)com.tns.Platform.callJSMethod(this, "getContentResolver", args);
+		}
+		else
+		{
 			return super.getContentResolver();
 		}
 	}
 
-	public android.view.View getCurrentFocus() {
-		
-		if ((__ho6 & (1 << 7)) > 0) { 
-			java.lang.Object[] params = null;
-			return (android.view.View)com.tns.Platform.callJSMethod(this, "getCurrentFocus", params);
-		} else {
+	public android.view.View getCurrentFocus()
+	{
+		if (__ho52)
+		{
+			Object[] args = null;
+			return (android.view.View)com.tns.Platform.callJSMethod(this, "getCurrentFocus", args);
+		}
+		else
+		{
 			return super.getCurrentFocus();
 		}
 	}
 
-	public java.io.File getDatabasePath(java.lang.String param_0) {
-		
-		if ((__ho7 & (1 << 0)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (java.io.File)com.tns.Platform.callJSMethod(this, "getDatabasePath", params);
-		} else {
+	public java.io.File getDatabasePath(java.lang.String param_0)
+	{
+		if (__ho53)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (java.io.File)com.tns.Platform.callJSMethod(this, "getDatabasePath", args);
+		}
+		else
+		{
 			return super.getDatabasePath(param_0);
 		}
 	}
 
-	public java.io.File getDir(java.lang.String param_0, int param_1) {
-		
-		if ((__ho7 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			return (java.io.File)com.tns.Platform.callJSMethod(this, "getDir", params);
-		} else {
+	public java.io.File getDir(java.lang.String param_0, int param_1)
+	{
+		if (__ho54)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			return (java.io.File)com.tns.Platform.callJSMethod(this, "getDir", args);
+		}
+		else
+		{
 			return super.getDir(param_0, param_1);
 		}
 	}
 
-	public java.io.File getExternalCacheDir() {
-		
-		if ((__ho7 & (1 << 2)) > 0) { 
-			java.lang.Object[] params = null;
-			return (java.io.File)com.tns.Platform.callJSMethod(this, "getExternalCacheDir", params);
-		} else {
+	public java.io.File getExternalCacheDir()
+	{
+		if (__ho55)
+		{
+			Object[] args = null;
+			return (java.io.File)com.tns.Platform.callJSMethod(this, "getExternalCacheDir", args);
+		}
+		else
+		{
 			return super.getExternalCacheDir();
 		}
 	}
 
-	public java.io.File getExternalFilesDir(java.lang.String param_0) {
-		
-		if ((__ho7 & (1 << 3)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (java.io.File)com.tns.Platform.callJSMethod(this, "getExternalFilesDir", params);
-		} else {
+	public java.io.File getExternalFilesDir(java.lang.String param_0)
+	{
+		if (__ho56)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (java.io.File)com.tns.Platform.callJSMethod(this, "getExternalFilesDir", args);
+		}
+		else
+		{
 			return super.getExternalFilesDir(param_0);
 		}
 	}
 
-	public java.io.File getFileStreamPath(java.lang.String param_0) {
-		
-		if ((__ho7 & (1 << 4)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (java.io.File)com.tns.Platform.callJSMethod(this, "getFileStreamPath", params);
-		} else {
+	public java.io.File getFileStreamPath(java.lang.String param_0)
+	{
+		if (__ho57)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (java.io.File)com.tns.Platform.callJSMethod(this, "getFileStreamPath", args);
+		}
+		else
+		{
 			return super.getFileStreamPath(param_0);
 		}
 	}
 
-	public java.io.File getFilesDir() {
-		
-		if ((__ho7 & (1 << 5)) > 0) { 
-			java.lang.Object[] params = null;
-			return (java.io.File)com.tns.Platform.callJSMethod(this, "getFilesDir", params);
-		} else {
+	public java.io.File getFilesDir()
+	{
+		if (__ho58)
+		{
+			Object[] args = null;
+			return (java.io.File)com.tns.Platform.callJSMethod(this, "getFilesDir", args);
+		}
+		else
+		{
 			return super.getFilesDir();
 		}
 	}
 
-	public android.app.FragmentManager getFragmentManager() {
-		
-		if ((__ho7 & (1 << 6)) > 0) { 
-			java.lang.Object[] params = null;
-			return (android.app.FragmentManager)com.tns.Platform.callJSMethod(this, "getFragmentManager", params);
-		} else {
+	public android.app.FragmentManager getFragmentManager()
+	{
+		if (__ho59)
+		{
+			Object[] args = null;
+			return (android.app.FragmentManager)com.tns.Platform.callJSMethod(this, "getFragmentManager", args);
+		}
+		else
+		{
 			return super.getFragmentManager();
 		}
 	}
 
-	public android.content.Intent getIntent() {
-		
-		if ((__ho7 & (1 << 7)) > 0) { 
-			java.lang.Object[] params = null;
-			return (android.content.Intent)com.tns.Platform.callJSMethod(this, "getIntent", params);
-		} else {
+	public android.content.Intent getIntent()
+	{
+		if (__ho60)
+		{
+			Object[] args = null;
+			return (android.content.Intent)com.tns.Platform.callJSMethod(this, "getIntent", args);
+		}
+		else
+		{
 			return super.getIntent();
 		}
 	}
 
-	public java.lang.Object getLastNonConfigurationInstance() {
-		
-		if ((__ho8 & (1 << 0)) > 0) { 
-			java.lang.Object[] params = null;
-			return (java.lang.Object)com.tns.Platform.callJSMethod(this, "getLastNonConfigurationInstance", params);
-		} else {
+	public java.lang.Object getLastNonConfigurationInstance()
+	{
+		if (__ho61)
+		{
+			Object[] args = null;
+			return (java.lang.Object)com.tns.Platform.callJSMethod(this, "getLastNonConfigurationInstance", args);
+		}
+		else
+		{
 			return super.getLastNonConfigurationInstance();
 		}
 	}
 
-	public android.view.LayoutInflater getLayoutInflater() {
-		
-		if ((__ho8 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = null;
-			return (android.view.LayoutInflater)com.tns.Platform.callJSMethod(this, "getLayoutInflater", params);
-		} else {
+	public android.view.LayoutInflater getLayoutInflater()
+	{
+		if (__ho62)
+		{
+			Object[] args = null;
+			return (android.view.LayoutInflater)com.tns.Platform.callJSMethod(this, "getLayoutInflater", args);
+		}
+		else
+		{
 			return super.getLayoutInflater();
 		}
 	}
 
-	public android.app.LoaderManager getLoaderManager() {
-		
-		if ((__ho8 & (1 << 2)) > 0) { 
-			java.lang.Object[] params = null;
-			return (android.app.LoaderManager)com.tns.Platform.callJSMethod(this, "getLoaderManager", params);
-		} else {
+	public android.app.LoaderManager getLoaderManager()
+	{
+		if (__ho63)
+		{
+			Object[] args = null;
+			return (android.app.LoaderManager)com.tns.Platform.callJSMethod(this, "getLoaderManager", args);
+		}
+		else
+		{
 			return super.getLoaderManager();
 		}
 	}
 
-	public java.lang.String getLocalClassName() {
-		
-		if ((__ho8 & (1 << 3)) > 0) { 
-			java.lang.Object[] params = null;
-			return (java.lang.String)com.tns.Platform.callJSMethod(this, "getLocalClassName", params);
-		} else {
+	public java.lang.String getLocalClassName()
+	{
+		if (__ho64)
+		{
+			Object[] args = null;
+			return (java.lang.String)com.tns.Platform.callJSMethod(this, "getLocalClassName", args);
+		}
+		else
+		{
 			return super.getLocalClassName();
 		}
 	}
 
-	public android.os.Looper getMainLooper() {
-		
-		if ((__ho8 & (1 << 4)) > 0) { 
-			java.lang.Object[] params = null;
-			return (android.os.Looper)com.tns.Platform.callJSMethod(this, "getMainLooper", params);
-		} else {
+	public android.os.Looper getMainLooper()
+	{
+		if (__ho65)
+		{
+			Object[] args = null;
+			return (android.os.Looper)com.tns.Platform.callJSMethod(this, "getMainLooper", args);
+		}
+		else
+		{
 			return super.getMainLooper();
 		}
 	}
 
-	public android.view.MenuInflater getMenuInflater() {
-		
-		if ((__ho8 & (1 << 5)) > 0) { 
-			java.lang.Object[] params = null;
-			return (android.view.MenuInflater)com.tns.Platform.callJSMethod(this, "getMenuInflater", params);
-		} else {
+	public android.view.MenuInflater getMenuInflater()
+	{
+		if (__ho66)
+		{
+			Object[] args = null;
+			return (android.view.MenuInflater)com.tns.Platform.callJSMethod(this, "getMenuInflater", args);
+		}
+		else
+		{
 			return super.getMenuInflater();
 		}
 	}
 
-	public java.io.File getObbDir() {
-		
-		if ((__ho8 & (1 << 6)) > 0) { 
-			java.lang.Object[] params = null;
-			return (java.io.File)com.tns.Platform.callJSMethod(this, "getObbDir", params);
-		} else {
+	public java.io.File getObbDir()
+	{
+		if (__ho67)
+		{
+			Object[] args = null;
+			return (java.io.File)com.tns.Platform.callJSMethod(this, "getObbDir", args);
+		}
+		else
+		{
 			return super.getObbDir();
 		}
 	}
 
-	public java.lang.String getPackageCodePath() {
-		
-		if ((__ho8 & (1 << 7)) > 0) { 
-			java.lang.Object[] params = null;
-			return (java.lang.String)com.tns.Platform.callJSMethod(this, "getPackageCodePath", params);
-		} else {
+	public java.lang.String getPackageCodePath()
+	{
+		if (__ho68)
+		{
+			Object[] args = null;
+			return (java.lang.String)com.tns.Platform.callJSMethod(this, "getPackageCodePath", args);
+		}
+		else
+		{
 			return super.getPackageCodePath();
 		}
 	}
 
-	public android.content.pm.PackageManager getPackageManager() {
-		
-		if ((__ho9 & (1 << 0)) > 0) { 
-			java.lang.Object[] params = null;
-			return (android.content.pm.PackageManager)com.tns.Platform.callJSMethod(this, "getPackageManager", params);
-		} else {
+	public android.content.pm.PackageManager getPackageManager()
+	{
+		if (__ho69)
+		{
+			Object[] args = null;
+			return (android.content.pm.PackageManager)com.tns.Platform.callJSMethod(this, "getPackageManager", args);
+		}
+		else
+		{
 			return super.getPackageManager();
 		}
 	}
 
-	public java.lang.String getPackageName() {
-		
-		if ((__ho9 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = null;
-			return (java.lang.String)com.tns.Platform.callJSMethod(this, "getPackageName", params);
-		} else {
+	public java.lang.String getPackageName()
+	{
+		if (__ho70)
+		{
+			Object[] args = null;
+			return (java.lang.String)com.tns.Platform.callJSMethod(this, "getPackageName", args);
+		}
+		else
+		{
 			return super.getPackageName();
 		}
 	}
 
-	public java.lang.String getPackageResourcePath() {
-		
-		if ((__ho9 & (1 << 2)) > 0) { 
-			java.lang.Object[] params = null;
-			return (java.lang.String)com.tns.Platform.callJSMethod(this, "getPackageResourcePath", params);
-		} else {
+	public java.lang.String getPackageResourcePath()
+	{
+		if (__ho71)
+		{
+			Object[] args = null;
+			return (java.lang.String)com.tns.Platform.callJSMethod(this, "getPackageResourcePath", args);
+		}
+		else
+		{
 			return super.getPackageResourcePath();
 		}
 	}
 
-	public android.content.Intent getParentActivityIntent() {
-		
-		if ((__ho9 & (1 << 3)) > 0) { 
-			java.lang.Object[] params = null;
-			return (android.content.Intent)com.tns.Platform.callJSMethod(this, "getParentActivityIntent", params);
-		} else {
+	public android.content.Intent getParentActivityIntent()
+	{
+		if (__ho72)
+		{
+			Object[] args = null;
+			return (android.content.Intent)com.tns.Platform.callJSMethod(this, "getParentActivityIntent", args);
+		}
+		else
+		{
 			return super.getParentActivityIntent();
 		}
 	}
 
-	public android.content.SharedPreferences getPreferences(int param_0) {
-		
-		if ((__ho9 & (1 << 4)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (android.content.SharedPreferences)com.tns.Platform.callJSMethod(this, "getPreferences", params);
-		} else {
+	public android.content.SharedPreferences getPreferences(int param_0)
+	{
+		if (__ho73)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (android.content.SharedPreferences)com.tns.Platform.callJSMethod(this, "getPreferences", args);
+		}
+		else
+		{
 			return super.getPreferences(param_0);
 		}
 	}
 
-	public int getRequestedOrientation() {
-		
-		if ((__ho9 & (1 << 5)) > 0) { 
-			java.lang.Object[] params = null;
-			return (Integer)com.tns.Platform.callJSMethod(this, "getRequestedOrientation", params);
-		} else {
+	public int getRequestedOrientation()
+	{
+		if (__ho74)
+		{
+			Object[] args = null;
+			return (Integer)com.tns.Platform.callJSMethod(this, "getRequestedOrientation", args);
+		}
+		else
+		{
 			return super.getRequestedOrientation();
 		}
 	}
 
-	public android.content.res.Resources getResources() {
-		if ((__ho9 & (1 << 6)) > 0) { 
-			java.lang.Object[] params = null;
-			return (android.content.res.Resources)com.tns.Platform.callJSMethod(this, "getResources", params);
-		} else {
+	public android.content.res.Resources getResources()
+	{
+		if (__ho75)
+		{
+			Object[] args = null;
+			return (android.content.res.Resources)com.tns.Platform.callJSMethod(this, "getResources", args);
+		}
+		else
+		{
 			return super.getResources();
 		}
 	}
 
-	public android.content.SharedPreferences getSharedPreferences(java.lang.String param_0, int param_1) {
-		
-		if ((__ho9 & (1 << 7)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			return (android.content.SharedPreferences)com.tns.Platform.callJSMethod(this, "getSharedPreferences", params);
-		} else {
+	public android.content.SharedPreferences getSharedPreferences(java.lang.String param_0, int param_1)
+	{
+		if (__ho76)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			return (android.content.SharedPreferences)com.tns.Platform.callJSMethod(this, "getSharedPreferences", args);
+		}
+		else
+		{
 			return super.getSharedPreferences(param_0, param_1);
 		}
 	}
 
-	public java.lang.Object getSystemService(java.lang.String param_0) {
-		if ((__ho10 & (1 << 0)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (java.lang.Object)com.tns.Platform.callJSMethod(this, "getSystemService", params);
-		} else {
+	public java.lang.Object getSystemService(java.lang.String param_0)
+	{
+		if (__ho77)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (java.lang.Object)com.tns.Platform.callJSMethod(this, "getSystemService", args);
+		}
+		else
+		{
 			return super.getSystemService(param_0);
 		}
 	}
 
-	public int getTaskId() {
-		
-		if ((__ho10 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = null;
-			return (Integer)com.tns.Platform.callJSMethod(this, "getTaskId", params);
-		} else {
+	public int getTaskId()
+	{
+		if (__ho78)
+		{
+			Object[] args = null;
+			return (Integer)com.tns.Platform.callJSMethod(this, "getTaskId", args);
+		}
+		else
+		{
 			return super.getTaskId();
 		}
 	}
 
-	public android.content.res.Resources.Theme getTheme() {
-		
-		if ((__ho10 & (1 << 2)) > 0) { 
-			java.lang.Object[] params = null;
-			return (android.content.res.Resources.Theme)com.tns.Platform.callJSMethod(this, "getTheme", params);
-		} else {
+	public android.content.res.Resources.Theme getTheme()
+	{
+		if (__ho79)
+		{
+			Object[] args = null;
+			return (android.content.res.Resources.Theme)com.tns.Platform.callJSMethod(this, "getTheme", args);
+		}
+		else
+		{
 			return super.getTheme();
 		}
 	}
 
-	public android.graphics.drawable.Drawable getWallpaper() {
-		
-		if ((__ho10 & (1 << 3)) > 0) { 
-			java.lang.Object[] params = null;
-			return (android.graphics.drawable.Drawable)com.tns.Platform.callJSMethod(this, "getWallpaper", params);
-		} else {
+	public android.graphics.drawable.Drawable getWallpaper()
+	{
+		if (__ho80)
+		{
+			Object[] args = null;
+			return (android.graphics.drawable.Drawable)com.tns.Platform.callJSMethod(this, "getWallpaper", args);
+		}
+		else
+		{
 			return super.getWallpaper();
 		}
 	}
 
-	public int getWallpaperDesiredMinimumHeight() {
-		
-		if ((__ho10 & (1 << 4)) > 0) { 
-			java.lang.Object[] params = null;
-			return (Integer)com.tns.Platform.callJSMethod(this, "getWallpaperDesiredMinimumHeight", params);
-		} else {
+	public int getWallpaperDesiredMinimumHeight()
+	{
+		if (__ho81)
+		{
+			Object[] args = null;
+			return (Integer)com.tns.Platform.callJSMethod(this, "getWallpaperDesiredMinimumHeight", args);
+		}
+		else
+		{
 			return super.getWallpaperDesiredMinimumHeight();
 		}
 	}
 
-	public int getWallpaperDesiredMinimumWidth() {
-		
-		if ((__ho10 & (1 << 5)) > 0) { 
-			java.lang.Object[] params = null;
-			return (Integer)com.tns.Platform.callJSMethod(this, "getWallpaperDesiredMinimumWidth", params);
-		} else {
+	public int getWallpaperDesiredMinimumWidth()
+	{
+		if (__ho82)
+		{
+			Object[] args = null;
+			return (Integer)com.tns.Platform.callJSMethod(this, "getWallpaperDesiredMinimumWidth", args);
+		}
+		else
+		{
 			return super.getWallpaperDesiredMinimumWidth();
 		}
 	}
 
-	public android.view.Window getWindow() {
-		
-		if ((__ho10 & (1 << 6)) > 0) { 
-			java.lang.Object[] params = null;
-			return (android.view.Window)com.tns.Platform.callJSMethod(this, "getWindow", params);
-		} else {
+	public android.view.Window getWindow()
+	{
+		if (__ho83)
+		{
+			Object[] args = null;
+			return (android.view.Window)com.tns.Platform.callJSMethod(this, "getWindow", args);
+		}
+		else
+		{
 			return super.getWindow();
 		}
 	}
 
-	public android.view.WindowManager getWindowManager() {
-		
-		if ((__ho10 & (1 << 7)) > 0) { 
-			java.lang.Object[] params = null;
-			return (android.view.WindowManager)com.tns.Platform.callJSMethod(this, "getWindowManager", params);
-		} else {
+	public android.view.WindowManager getWindowManager()
+	{
+		if (__ho84)
+		{
+			Object[] args = null;
+			return (android.view.WindowManager)com.tns.Platform.callJSMethod(this, "getWindowManager", args);
+		}
+		else
+		{
 			return super.getWindowManager();
 		}
 	}
 
-	public void grantUriPermission(java.lang.String param_0, android.net.Uri param_1, int param_2) {
-		
-		if ((__ho11 & (1 << 0)) > 0) { 
-			java.lang.Object[] params = new Object[3];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			com.tns.Platform.callJSMethod(this, "grantUriPermission", params);
-		} else {
+	public void grantUriPermission(java.lang.String param_0, android.net.Uri param_1, int param_2)
+	{
+		if (__ho85)
+		{
+			Object[] args = new Object[3];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			com.tns.Platform.callJSMethod(this, "grantUriPermission", args);
+		}
+		else
+		{
 			super.grantUriPermission(param_0, param_1, param_2);
 		}
 	}
 
-	public boolean hasWindowFocus() {
-		
-		if ((__ho11 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = null;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "hasWindowFocus", params);
-		} else {
+	public boolean hasWindowFocus()
+	{
+		if (__ho86)
+		{
+			Object[] args = null;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "hasWindowFocus", args);
+		}
+		else
+		{
 			return super.hasWindowFocus();
 		}
 	}
 
-	public int hashCode() {
-		
-		if ((__ho11 & (1 << 2)) > 0) { 
-			java.lang.Object[] params = null;
-			return (Integer)com.tns.Platform.callJSMethod(this, "hashCode", params);
-		} else {
+	public int hashCode()
+	{
+		if (__ho87)
+		{
+			Object[] args = null;
+			return (Integer)com.tns.Platform.callJSMethod(this, "hashCode", args);
+		}
+		else
+		{
 			return super.hashCode();
 		}
 	}
 
-	public void invalidateOptionsMenu() {
-		
-		if ((__ho11 & (1 << 3)) > 0) { 
-			java.lang.Object[] params = null;
-			com.tns.Platform.callJSMethod(this, "invalidateOptionsMenu", params);
-		} else {
+	public void invalidateOptionsMenu()
+	{
+		if (__ho88)
+		{
+			Object[] args = null;
+			com.tns.Platform.callJSMethod(this, "invalidateOptionsMenu", args);
+		}
+		else
+		{
 			super.invalidateOptionsMenu();
 		}
 	}
 
-	public boolean isChangingConfigurations() {
-		
-		if ((__ho11 & (1 << 4)) > 0) { 
-			java.lang.Object[] params = null;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "isChangingConfigurations", params);
-		} else {
+	public boolean isChangingConfigurations()
+	{
+		if (__ho89)
+		{
+			Object[] args = null;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "isChangingConfigurations", args);
+		}
+		else
+		{
 			return super.isChangingConfigurations();
 		}
 	}
 
-	public boolean isDestroyed() {
-		
-		if ((__ho11 & (1 << 5)) > 0) { 
-			java.lang.Object[] params = null;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "isDestroyed", params);
-		} else {
+	public boolean isDestroyed()
+	{
+		if (__ho90)
+		{
+			Object[] args = null;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "isDestroyed", args);
+		}
+		else
+		{
 			return super.isDestroyed();
 		}
 	}
 
-	public boolean isFinishing() {
-		
-		if ((__ho11 & (1 << 6)) > 0) { 
-			java.lang.Object[] params = null;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "isFinishing", params);
-		} else {
+	public boolean isFinishing()
+	{
+		if (__ho91)
+		{
+			Object[] args = null;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "isFinishing", args);
+		}
+		else
+		{
 			return super.isFinishing();
 		}
 	}
 
-	public boolean isRestricted() {
-		
-		if ((__ho11 & (1 << 7)) > 0) { 
-			java.lang.Object[] params = null;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "isRestricted", params);
-		} else {
+	public boolean isRestricted()
+	{
+		if (__ho92)
+		{
+			Object[] args = null;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "isRestricted", args);
+		}
+		else
+		{
 			return super.isRestricted();
 		}
 	}
 
-	public boolean isTaskRoot() {
-		
-		if ((__ho12 & (1 << 0)) > 0) { 
-			java.lang.Object[] params = null;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "isTaskRoot", params);
-		} else {
+	public boolean isTaskRoot()
+	{
+		if (__ho93)
+		{
+			Object[] args = null;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "isTaskRoot", args);
+		}
+		else
+		{
 			return super.isTaskRoot();
 		}
 	}
 
-	public boolean moveTaskToBack(boolean param_0) {
-		
-		if ((__ho12 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "moveTaskToBack", params);
-		} else {
+	public boolean moveTaskToBack(boolean param_0)
+	{
+		if (__ho94)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "moveTaskToBack", args);
+		}
+		else
+		{
 			return super.moveTaskToBack(param_0);
 		}
 	}
 
-	public boolean navigateUpTo(android.content.Intent param_0) {
-		
-		if ((__ho12 & (1 << 2)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "navigateUpTo", params);
-		} else {
+	public boolean navigateUpTo(android.content.Intent param_0)
+	{
+		if (__ho95)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "navigateUpTo", args);
+		}
+		else
+		{
 			return super.navigateUpTo(param_0);
 		}
 	}
 
-	public boolean navigateUpToFromChild(android.app.Activity param_0, android.content.Intent param_1) {
-		
-		if ((__ho12 & (1 << 3)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "navigateUpToFromChild", params);
-		} else {
+	public boolean navigateUpToFromChild(android.app.Activity param_0, android.content.Intent param_1)
+	{
+		if (__ho96)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "navigateUpToFromChild", args);
+		}
+		else
+		{
 			return super.navigateUpToFromChild(param_0, param_1);
 		}
 	}
 
-	public void onActionModeFinished(android.view.ActionMode param_0) {
-		
-		if ((__ho12 & (1 << 4)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "onActionModeFinished", params);
-		} else {
+	public void onActionModeFinished(android.view.ActionMode param_0)
+	{
+		if (__ho97)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "onActionModeFinished", args);
+		}
+		else
+		{
 			super.onActionModeFinished(param_0);
 		}
 	}
 
-	public void onActionModeStarted(android.view.ActionMode param_0) {
-		
-		if ((__ho12 & (1 << 5)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "onActionModeStarted", params);
-		} else {
+	public void onActionModeStarted(android.view.ActionMode param_0)
+	{
+		if (__ho98)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "onActionModeStarted", args);
+		}
+		else
+		{
 			super.onActionModeStarted(param_0);
 		}
 	}
 
-	protected void onActivityResult(int param_0, int param_1, android.content.Intent param_2) {
-		
-		if ((__ho12 & (1 << 6)) > 0) { 
-			java.lang.Object[] params = new Object[3];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			com.tns.Platform.callJSMethod(this, "onActivityResult", params);
-		} else {
+	protected void onActivityResult(int param_0, int param_1, android.content.Intent param_2)
+	{
+		if (__ho99)
+		{
+			Object[] args = new Object[3];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			com.tns.Platform.callJSMethod(this, "onActivityResult", args);
+		}
+		else
+		{
 			super.onActivityResult(param_0, param_1, param_2);
 		}
 	}
 
-	protected void onApplyThemeResource(android.content.res.Resources.Theme param_0, int param_1, boolean param_2) {
-		if ((__ho12 & (1 << 7)) > 0) { 
-			java.lang.Object[] params = new Object[3];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			com.tns.Platform.callJSMethod(this, "onApplyThemeResource", params);
-		} else {
+	protected void onApplyThemeResource(android.content.res.Resources.Theme param_0, int param_1, boolean param_2)
+	{
+		if (__ho100)
+		{
+			Object[] args = new Object[3];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			com.tns.Platform.callJSMethod(this, "onApplyThemeResource", args);
+		}
+		else
+		{
 			super.onApplyThemeResource(param_0, param_1, param_2);
 		}
 	}
 
-	public void onAttachFragment(android.app.Fragment param_0) {
-		
-		if ((__ho13 & (1 << 0)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "onAttachFragment", params);
-		} else {
+	public void onAttachFragment(android.app.Fragment param_0)
+	{
+		if (__ho101)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "onAttachFragment", args);
+		}
+		else
+		{
 			super.onAttachFragment(param_0);
 		}
 	}
 
-	public void onAttachedToWindow() {
-		
-		if ((__ho13 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = null;
-			com.tns.Platform.callJSMethod(this, "onAttachedToWindow", params);
-		} else {
+	public void onAttachedToWindow()
+	{
+		if (__ho102)
+		{
+			Object[] args = null;
+			com.tns.Platform.callJSMethod(this, "onAttachedToWindow", args);
+		}
+		else
+		{
 			super.onAttachedToWindow();
 		}
 	}
 
-	public void onBackPressed() {
-		
-		if ((__ho13 & (1 << 2)) > 0) { 
-			java.lang.Object[] params = null;
-			com.tns.Platform.callJSMethod(this, "onBackPressed", params);
-		} else {
+	public void onBackPressed()
+	{
+		if (__ho103)
+		{
+			Object[] args = null;
+			com.tns.Platform.callJSMethod(this, "onBackPressed", args);
+		}
+		else
+		{
 			super.onBackPressed();
 		}
 	}
 
-	protected void onChildTitleChanged(android.app.Activity param_0, java.lang.CharSequence param_1) {
-		
-		if ((__ho13 & (1 << 3)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			com.tns.Platform.callJSMethod(this, "onChildTitleChanged", params);
-		} else {
+	protected void onChildTitleChanged(android.app.Activity param_0, java.lang.CharSequence param_1)
+	{
+		if (__ho104)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			com.tns.Platform.callJSMethod(this, "onChildTitleChanged", args);
+		}
+		else
+		{
 			super.onChildTitleChanged(param_0, param_1);
 		}
 	}
 
-	public void onConfigurationChanged(android.content.res.Configuration param_0) {
-		
-		if ((__ho13 & (1 << 4)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "onConfigurationChanged", params);
-		} else {
+	public void onConfigurationChanged(android.content.res.Configuration param_0)
+	{
+		if (__ho105)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "onConfigurationChanged", args);
+		}
+		else
+		{
 			super.onConfigurationChanged(param_0);
 		}
 	}
 
-	public void onContentChanged() {
-		
-		if ((__ho13 & (1 << 5)) > 0) { 
-			java.lang.Object[] params = null;
-			com.tns.Platform.callJSMethod(this, "onContentChanged", params);
-		} else {
+	public void onContentChanged()
+	{
+		if (__ho106)
+		{
+			Object[] args = null;
+			com.tns.Platform.callJSMethod(this, "onContentChanged", args);
+		}
+		else
+		{
 			super.onContentChanged();
 		}
 	}
 
-	public boolean onContextItemSelected(android.view.MenuItem param_0) {
-		
-		if ((__ho13 & (1 << 6)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onContextItemSelected", params);
-		} else {
+	public boolean onContextItemSelected(android.view.MenuItem param_0)
+	{
+		if (__ho107)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onContextItemSelected", args);
+		}
+		else
+		{
 			return super.onContextItemSelected(param_0);
 		}
 	}
 
-	public void onContextMenuClosed(android.view.Menu param_0) {
-		
-		if ((__ho13 & (1 << 7)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "onContextMenuClosed", params);
-		} else {
+	public void onContextMenuClosed(android.view.Menu param_0)
+	{
+		if (__ho108)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "onContextMenuClosed", args);
+		}
+		else
+		{
 			super.onContextMenuClosed(param_0);
 		}
 	}
+	
+	private native String[] getMethodOverrides(int objectId, Object[] packagesArgs);
 
-	protected void onCreate(android.os.Bundle param_0) {
-		if(ErrorReport.HasApplicationCreateError)
+	protected void onCreate(android.os.Bundle param_0)
+	{
+		Object[] packagesArgs = Platform.packageArgs(this);
+		String[] methodOverrides = getMethodOverrides(objectId, packagesArgs);
+		setMethodOverrides(methodOverrides);
+		
+		if (__ho109)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "onCreate", args);
+			android.util.Log.d(com.tns.Platform.DEFAULT_LOG_TAG, "NativeScriptActivity.onCreate called");
+		}
+		else
 		{
 			super.onCreate(param_0);
-			this.finish();
-			return;
 		}
-		
-		if (!__initialized) {
-			__initialized = true;
-			
-			Log.d(Platform.DEFAULT_LOG_TAG, "Creating Activity with intent: " + super.getIntent().toString() + " action:" + super.getIntent().getAction());
-			
-			if (BuildConfig.DEBUG && super.getIntent().getAction() == null)
-			{
-				super.getIntent().setAction(android.content.Intent.ACTION_MAIN);
-			}
-			com.tns.Platform.initInstance(this, super.getIntent());
-		}
-		if ((__ho14 & (1 << 0)) > 0) { 
-			boolean isErrorReport = ErrorReport.hasIntent(this.getIntent());
-			if (isErrorReport)
-			{
-				super.onCreate(param_0);
-				new ErrorReport(this).buildUI();
-			}
-			else
-			{
-				java.lang.Object[] params = new Object[1];
-				params[0] = param_0;
-				com.tns.Platform.callJSMethod(this, "onCreate", params);
-			}
-		} else {
-			super.onCreate(param_0);
-		}
-		
 	}
 
-	public void onCreateContextMenu(android.view.ContextMenu param_0, android.view.View param_1, android.view.ContextMenu.ContextMenuInfo param_2) {
-		
-		if ((__ho14 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = new Object[3];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			com.tns.Platform.callJSMethod(this, "onCreateContextMenu", params);
-		} else {
+	public void onCreateContextMenu(android.view.ContextMenu param_0, android.view.View param_1, android.view.ContextMenu.ContextMenuInfo param_2)
+	{
+		if (__ho110)
+		{
+			Object[] args = new Object[3];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			com.tns.Platform.callJSMethod(this, "onCreateContextMenu", args);
+		}
+		else
+		{
 			super.onCreateContextMenu(param_0, param_1, param_2);
 		}
 	}
 
-	public java.lang.CharSequence onCreateDescription() {
-		
-		if ((__ho14 & (1 << 2)) > 0) { 
-			java.lang.Object[] params = null;
-			return (java.lang.CharSequence)com.tns.Platform.callJSMethod(this, "onCreateDescription", params);
-		} else {
+	public java.lang.CharSequence onCreateDescription()
+	{
+		if (__ho111)
+		{
+			Object[] args = null;
+			return (java.lang.CharSequence)com.tns.Platform.callJSMethod(this, "onCreateDescription", args);
+		}
+		else
+		{
 			return super.onCreateDescription();
 		}
 	}
 
-	protected android.app.Dialog onCreateDialog(int param_0) {
-		
-		if ((__ho14 & (1 << 3)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (android.app.Dialog)com.tns.Platform.callJSMethod(this, "onCreateDialog", params);
-		} else {
-			return super.onCreateDialog(param_0);
+	protected android.app.Dialog onCreateDialog(int param_0, android.os.Bundle param_1)
+	{
+		if (__ho112)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			return (android.app.Dialog)com.tns.Platform.callJSMethod(this, "onCreateDialog", args);
 		}
-	}
-
-	protected android.app.Dialog onCreateDialog(int param_0, android.os.Bundle param_1) {
-		
-		if ((__ho14 & (1 << 3)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			return (android.app.Dialog)com.tns.Platform.callJSMethod(this, "onCreateDialog", params);
-		} else {
+		else
+		{
 			return super.onCreateDialog(param_0, param_1);
 		}
 	}
 
-	public void onCreateNavigateUpTaskStack(android.app.TaskStackBuilder param_0) {
-		
-		if ((__ho14 & (1 << 4)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "onCreateNavigateUpTaskStack", params);
-		} else {
+	protected android.app.Dialog onCreateDialog(int param_0)
+	{
+		if (__ho112)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (android.app.Dialog)com.tns.Platform.callJSMethod(this, "onCreateDialog", args);
+		}
+		else
+		{
+			return super.onCreateDialog(param_0);
+		}
+	}
+
+	public void onCreateNavigateUpTaskStack(android.app.TaskStackBuilder param_0)
+	{
+		if (__ho113)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "onCreateNavigateUpTaskStack", args);
+		}
+		else
+		{
 			super.onCreateNavigateUpTaskStack(param_0);
 		}
 	}
 
-	public boolean onCreateOptionsMenu(android.view.Menu param_0) {
-		
-		if ((__ho14 & (1 << 5)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onCreateOptionsMenu", params);
-		} else {
+	public boolean onCreateOptionsMenu(android.view.Menu param_0)
+	{
+		if (__ho114)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onCreateOptionsMenu", args);
+		}
+		else
+		{
 			return super.onCreateOptionsMenu(param_0);
 		}
 	}
 
-	public boolean onCreatePanelMenu(int param_0, android.view.Menu param_1) {
-		
-		if ((__ho14 & (1 << 6)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onCreatePanelMenu", params);
-		} else {
+	public boolean onCreatePanelMenu(int param_0, android.view.Menu param_1)
+	{
+		if (__ho115)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onCreatePanelMenu", args);
+		}
+		else
+		{
 			return super.onCreatePanelMenu(param_0, param_1);
 		}
 	}
 
-	public android.view.View onCreatePanelView(int param_0) {
-		
-		if ((__ho14 & (1 << 7)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (android.view.View)com.tns.Platform.callJSMethod(this, "onCreatePanelView", params);
-		} else {
+	public android.view.View onCreatePanelView(int param_0)
+	{
+		if (__ho116)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (android.view.View)com.tns.Platform.callJSMethod(this, "onCreatePanelView", args);
+		}
+		else
+		{
 			return super.onCreatePanelView(param_0);
 		}
 	}
 
-	public boolean onCreateThumbnail(android.graphics.Bitmap param_0, android.graphics.Canvas param_1) {
-		
-		if ((__ho15 & (1 << 0)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onCreateThumbnail", params);
-		} else {
+	public boolean onCreateThumbnail(android.graphics.Bitmap param_0, android.graphics.Canvas param_1)
+	{
+		if (__ho117)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onCreateThumbnail", args);
+		}
+		else
+		{
 			return super.onCreateThumbnail(param_0, param_1);
 		}
 	}
 
-	public android.view.View onCreateView(java.lang.String param_0, android.content.Context param_1, android.util.AttributeSet param_2) {
-		
-		if ((__ho15 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = new Object[3];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			return (android.view.View)com.tns.Platform.callJSMethod(this, "onCreateView", params);
-		} else {
+	public android.view.View onCreateView(java.lang.String param_0, android.content.Context param_1, android.util.AttributeSet param_2)
+	{
+		if (__ho118)
+		{
+			Object[] args = new Object[3];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			return (android.view.View)com.tns.Platform.callJSMethod(this, "onCreateView", args);
+		}
+		else
+		{
 			return super.onCreateView(param_0, param_1, param_2);
 		}
 	}
 
-	public android.view.View onCreateView(android.view.View param_0, java.lang.String param_1, android.content.Context param_2, android.util.AttributeSet param_3) {
-		
-		if ((__ho15 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = new Object[4];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			params[3] = param_3;
-			return (android.view.View)com.tns.Platform.callJSMethod(this, "onCreateView", params);
-		} else {
+	public android.view.View onCreateView(android.view.View param_0, java.lang.String param_1, android.content.Context param_2, android.util.AttributeSet param_3)
+	{
+		if (__ho118)
+		{
+			Object[] args = new Object[4];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			args[3] = param_3;
+			return (android.view.View)com.tns.Platform.callJSMethod(this, "onCreateView", args);
+		}
+		else
+		{
 			return super.onCreateView(param_0, param_1, param_2, param_3);
 		}
 	}
 
-	protected void onDestroy() {
-		
-		if ((__ho15 & (1 << 2)) > 0) { 
-			java.lang.Object[] params = null;
-			com.tns.Platform.callJSMethod(this, "onDestroy", params);
-		} else {
+	protected void onDestroy()
+	{
+		if (__ho119)
+		{
+			Object[] args = null;
+			com.tns.Platform.callJSMethod(this, "onDestroy", args);
+		}
+		else
+		{
 			super.onDestroy();
 		}
+		// TODO: remove from com.tns.Platform.strongInstances
 	}
 
-	public void onDetachedFromWindow() {
-		
-		if ((__ho15 & (1 << 3)) > 0) { 
-			java.lang.Object[] params = null;
-			com.tns.Platform.callJSMethod(this, "onDetachedFromWindow", params);
-		} else {
+	public void onDetachedFromWindow()
+	{
+		if (__ho120)
+		{
+			Object[] args = null;
+			com.tns.Platform.callJSMethod(this, "onDetachedFromWindow", args);
+		}
+		else
+		{
 			super.onDetachedFromWindow();
 		}
 	}
 
-	public boolean onGenericMotionEvent(android.view.MotionEvent param_0) {
-		
-		if ((__ho15 & (1 << 4)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onGenericMotionEvent", params);
-		} else {
+	public boolean onGenericMotionEvent(android.view.MotionEvent param_0)
+	{
+		if (__ho121)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onGenericMotionEvent", args);
+		}
+		else
+		{
 			return super.onGenericMotionEvent(param_0);
 		}
 	}
 
-	public boolean onKeyDown(int param_0, android.view.KeyEvent param_1) {
-		
-		if ((__ho15 & (1 << 5)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onKeyDown", params);
-		} else {
+	public boolean onKeyDown(int param_0, android.view.KeyEvent param_1)
+	{
+		if (__ho122)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onKeyDown", args);
+		}
+		else
+		{
 			return super.onKeyDown(param_0, param_1);
 		}
 	}
 
-	public boolean onKeyLongPress(int param_0, android.view.KeyEvent param_1) {
-		
-		if ((__ho15 & (1 << 6)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onKeyLongPress", params);
-		} else {
+	public boolean onKeyLongPress(int param_0, android.view.KeyEvent param_1)
+	{
+		if (__ho123)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onKeyLongPress", args);
+		}
+		else
+		{
 			return super.onKeyLongPress(param_0, param_1);
 		}
 	}
 
-	public boolean onKeyMultiple(int param_0, int param_1, android.view.KeyEvent param_2) {
-		
-		if ((__ho15 & (1 << 7)) > 0) { 
-			java.lang.Object[] params = new Object[3];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onKeyMultiple", params);
-		} else {
+	public boolean onKeyMultiple(int param_0, int param_1, android.view.KeyEvent param_2)
+	{
+		if (__ho124)
+		{
+			Object[] args = new Object[3];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onKeyMultiple", args);
+		}
+		else
+		{
 			return super.onKeyMultiple(param_0, param_1, param_2);
 		}
 	}
 
-	public boolean onKeyShortcut(int param_0, android.view.KeyEvent param_1) {
-		
-		if ((__ho16 & (1 << 0)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onKeyShortcut", params);
-		} else {
+	public boolean onKeyShortcut(int param_0, android.view.KeyEvent param_1)
+	{
+		if (__ho125)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onKeyShortcut", args);
+		}
+		else
+		{
 			return super.onKeyShortcut(param_0, param_1);
 		}
 	}
 
-	public boolean onKeyUp(int param_0, android.view.KeyEvent param_1) {
-		
-		if ((__ho16 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onKeyUp", params);
-		} else {
+	public boolean onKeyUp(int param_0, android.view.KeyEvent param_1)
+	{
+		if (__ho126)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onKeyUp", args);
+		}
+		else
+		{
 			return super.onKeyUp(param_0, param_1);
 		}
 	}
 
-	public void onLowMemory() {
-		
-		if ((__ho16 & (1 << 2)) > 0) { 
-			java.lang.Object[] params = null;
-			com.tns.Platform.callJSMethod(this, "onLowMemory", params);
-		} else {
+	public void onLowMemory()
+	{
+		if (__ho127)
+		{
+			Object[] args = null;
+			com.tns.Platform.callJSMethod(this, "onLowMemory", args);
+		}
+		else
+		{
 			super.onLowMemory();
 		}
 	}
 
-	public boolean onMenuItemSelected(int param_0, android.view.MenuItem param_1) {
-		
-		if ((__ho16 & (1 << 3)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onMenuItemSelected", params);
-		} else {
+	public boolean onMenuItemSelected(int param_0, android.view.MenuItem param_1)
+	{
+		if (__ho128)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onMenuItemSelected", args);
+		}
+		else
+		{
 			return super.onMenuItemSelected(param_0, param_1);
 		}
 	}
 
-	public boolean onMenuOpened(int param_0, android.view.Menu param_1) {
-		
-		if ((__ho16 & (1 << 4)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onMenuOpened", params);
-		} else {
+	public boolean onMenuOpened(int param_0, android.view.Menu param_1)
+	{
+		if (__ho129)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onMenuOpened", args);
+		}
+		else
+		{
 			return super.onMenuOpened(param_0, param_1);
 		}
 	}
 
-	public boolean onNavigateUp() {
-		
-		if ((__ho16 & (1 << 5)) > 0) { 
-			java.lang.Object[] params = null;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onNavigateUp", params);
-		} else {
+	public boolean onNavigateUp()
+	{
+		if (__ho130)
+		{
+			Object[] args = null;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onNavigateUp", args);
+		}
+		else
+		{
 			return super.onNavigateUp();
 		}
 	}
 
-	public boolean onNavigateUpFromChild(android.app.Activity param_0) {
-		
-		if ((__ho16 & (1 << 6)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onNavigateUpFromChild", params);
-		} else {
+	public boolean onNavigateUpFromChild(android.app.Activity param_0)
+	{
+		if (__ho131)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onNavigateUpFromChild", args);
+		}
+		else
+		{
 			return super.onNavigateUpFromChild(param_0);
 		}
 	}
 
-	protected void onNewIntent(android.content.Intent param_0) {
-		
-		if ((__ho16 & (1 << 7)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "onNewIntent", params);
-		} else {
+	protected void onNewIntent(android.content.Intent param_0)
+	{
+		if (__ho132)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "onNewIntent", args);
+		}
+		else
+		{
 			super.onNewIntent(param_0);
 		}
 	}
 
-	public boolean onOptionsItemSelected(android.view.MenuItem param_0) {
-		
-		if ((__ho17 & (1 << 0)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onOptionsItemSelected", params);
-		} else {
+	public boolean onOptionsItemSelected(android.view.MenuItem param_0)
+	{
+		if (__ho133)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onOptionsItemSelected", args);
+		}
+		else
+		{
 			return super.onOptionsItemSelected(param_0);
 		}
 	}
 
-	public void onOptionsMenuClosed(android.view.Menu param_0) {
-		
-		if ((__ho17 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "onOptionsMenuClosed", params);
-		} else {
+	public void onOptionsMenuClosed(android.view.Menu param_0)
+	{
+		if (__ho134)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "onOptionsMenuClosed", args);
+		}
+		else
+		{
 			super.onOptionsMenuClosed(param_0);
 		}
 	}
 
-	public void onPanelClosed(int param_0, android.view.Menu param_1) {
-		
-		if ((__ho17 & (1 << 2)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			com.tns.Platform.callJSMethod(this, "onPanelClosed", params);
-		} else {
+	public void onPanelClosed(int param_0, android.view.Menu param_1)
+	{
+		if (__ho135)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			com.tns.Platform.callJSMethod(this, "onPanelClosed", args);
+		}
+		else
+		{
 			super.onPanelClosed(param_0, param_1);
 		}
 	}
 
-	protected void onPause() {
-		
-		if ((__ho17 & (1 << 3)) > 0) { 
-			java.lang.Object[] params = null;
-			com.tns.Platform.callJSMethod(this, "onPause", params);
-		} else {
+	protected void onPause()
+	{
+		if (__ho136)
+		{
+			Object[] args = null;
+			com.tns.Platform.callJSMethod(this, "onPause", args);
+		}
+		else
+		{
 			super.onPause();
 		}
 	}
 
-	protected void onPostCreate(android.os.Bundle param_0) {
-		
-		if ((__ho17 & (1 << 4)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "onPostCreate", params);
-		} else {
+	protected void onPostCreate(android.os.Bundle param_0)
+	{
+		if (__ho137)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "onPostCreate", args);
+		}
+		else
+		{
 			super.onPostCreate(param_0);
 		}
 	}
 
-	protected void onPostResume() {
-		
-		if ((__ho17 & (1 << 5)) > 0) { 
-			java.lang.Object[] params = null;
-			com.tns.Platform.callJSMethod(this, "onPostResume", params);
-		} else {
+	protected void onPostResume()
+	{
+		if (__ho138)
+		{
+			Object[] args = null;
+			com.tns.Platform.callJSMethod(this, "onPostResume", args);
+		}
+		else
+		{
 			super.onPostResume();
 		}
 	}
 
-	protected void onPrepareDialog(int param_0, android.app.Dialog param_1, android.os.Bundle param_2) {
-		
-		if ((__ho17 & (1 << 6)) > 0) { 
-			java.lang.Object[] params = new Object[3];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			com.tns.Platform.callJSMethod(this, "onPrepareDialog", params);
-		} else {
-			super.onPrepareDialog(param_0, param_1, param_2);
+	protected void onPrepareDialog(int param_0, android.app.Dialog param_1)
+	{
+		if (__ho139)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			com.tns.Platform.callJSMethod(this, "onPrepareDialog", args);
 		}
-	}
-
-	protected void onPrepareDialog(int param_0, android.app.Dialog param_1) {
-		
-		if ((__ho17 & (1 << 6)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			com.tns.Platform.callJSMethod(this, "onPrepareDialog", params);
-		} else {
+		else
+		{
 			super.onPrepareDialog(param_0, param_1);
 		}
 	}
 
-	public void onPrepareNavigateUpTaskStack(android.app.TaskStackBuilder param_0) {
-		
-		if ((__ho17 & (1 << 7)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "onPrepareNavigateUpTaskStack", params);
-		} else {
+	protected void onPrepareDialog(int param_0, android.app.Dialog param_1, android.os.Bundle param_2)
+	{
+		if (__ho139)
+		{
+			Object[] args = new Object[3];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			com.tns.Platform.callJSMethod(this, "onPrepareDialog", args);
+		}
+		else
+		{
+			super.onPrepareDialog(param_0, param_1, param_2);
+		}
+	}
+
+	public void onPrepareNavigateUpTaskStack(android.app.TaskStackBuilder param_0)
+	{
+		if (__ho140)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "onPrepareNavigateUpTaskStack", args);
+		}
+		else
+		{
 			super.onPrepareNavigateUpTaskStack(param_0);
 		}
 	}
 
-	public boolean onPrepareOptionsMenu(android.view.Menu param_0) {
-		
-		if ((__ho18 & (1 << 0)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onPrepareOptionsMenu", params);
-		} else {
+	public boolean onPrepareOptionsMenu(android.view.Menu param_0)
+	{
+		if (__ho141)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onPrepareOptionsMenu", args);
+		}
+		else
+		{
 			return super.onPrepareOptionsMenu(param_0);
 		}
 	}
 
-	public boolean onPreparePanel(int param_0, android.view.View param_1, android.view.Menu param_2) {
-		
-		if ((__ho18 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = new Object[3];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onPreparePanel", params);
-		} else {
+	public boolean onPreparePanel(int param_0, android.view.View param_1, android.view.Menu param_2)
+	{
+		if (__ho142)
+		{
+			Object[] args = new Object[3];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onPreparePanel", args);
+		}
+		else
+		{
 			return super.onPreparePanel(param_0, param_1, param_2);
 		}
 	}
 
-	protected void onRestart() {
-		
-		if ((__ho18 & (1 << 2)) > 0) { 
-			java.lang.Object[] params = null;
-			com.tns.Platform.callJSMethod(this, "onRestart", params);
-		} else {
+	protected void onRestart()
+	{
+		if (__ho143)
+		{
+			Object[] args = null;
+			com.tns.Platform.callJSMethod(this, "onRestart", args);
+		}
+		else
+		{
 			super.onRestart();
 		}
 	}
 
-	protected void onRestoreInstanceState(android.os.Bundle param_0) {
-		
-		if ((__ho18 & (1 << 3)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "onRestoreInstanceState", params);
-		} else {
+	protected void onRestoreInstanceState(android.os.Bundle param_0)
+	{
+		if (__ho144)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "onRestoreInstanceState", args);
+		}
+		else
+		{
 			super.onRestoreInstanceState(param_0);
 		}
 	}
 
-	protected void onResume() {
-		
-		if ((__ho18 & (1 << 4)) > 0) { 
-			java.lang.Object[] params = null;
-			com.tns.Platform.callJSMethod(this, "onResume", params);
-		} else {
+	protected void onResume()
+	{
+		if (__ho145)
+		{
+			Object[] args = null;
+			com.tns.Platform.callJSMethod(this, "onResume", args);
+		}
+		else
+		{
 			super.onResume();
 		}
 	}
 
-	public java.lang.Object onRetainNonConfigurationInstance() {
-		
-		if ((__ho18 & (1 << 5)) > 0) { 
-			java.lang.Object[] params = null;
-			return (java.lang.Object)com.tns.Platform.callJSMethod(this, "onRetainNonConfigurationInstance", params);
-		} else {
+	public java.lang.Object onRetainNonConfigurationInstance()
+	{
+		if (__ho146)
+		{
+			Object[] args = null;
+			return (java.lang.Object)com.tns.Platform.callJSMethod(this, "onRetainNonConfigurationInstance", args);
+		}
+		else
+		{
 			return super.onRetainNonConfigurationInstance();
 		}
 	}
 
-	protected void onSaveInstanceState(android.os.Bundle param_0) {
-		
-		if ((__ho18 & (1 << 6)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "onSaveInstanceState", params);
-		} else {
+	protected void onSaveInstanceState(android.os.Bundle param_0)
+	{
+		if (__ho147)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "onSaveInstanceState", args);
+		}
+		else
+		{
 			super.onSaveInstanceState(param_0);
 		}
 	}
 
-	public boolean onSearchRequested() {
-		
-		if ((__ho18 & (1 << 7)) > 0) { 
-			java.lang.Object[] params = null;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onSearchRequested", params);
-		} else {
+	public boolean onSearchRequested()
+	{
+		if (__ho148)
+		{
+			Object[] args = null;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onSearchRequested", args);
+		}
+		else
+		{
 			return super.onSearchRequested();
 		}
 	}
 
-	protected void onStart() {
-		
-		if ((__ho19 & (1 << 0)) > 0) { 
-			java.lang.Object[] params = null;
-			com.tns.Platform.callJSMethod(this, "onStart", params);
-		} else {
+	protected void onStart()
+	{
+		if (__ho149)
+		{
+			Object[] args = null;
+			com.tns.Platform.callJSMethod(this, "onStart", args);
+		}
+		else
+		{
 			super.onStart();
 		}
 	}
 
-	protected void onStop() {
-		
-		if ((__ho19 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = null;
-			com.tns.Platform.callJSMethod(this, "onStop", params);
-		} else {
+	protected void onStop()
+	{
+		if (__ho150)
+		{
+			Object[] args = null;
+			com.tns.Platform.callJSMethod(this, "onStop", args);
+		}
+		else
+		{
 			super.onStop();
 		}
 	}
 
-	protected void onTitleChanged(java.lang.CharSequence param_0, int param_1) {
-		
-		if ((__ho19 & (1 << 2)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			com.tns.Platform.callJSMethod(this, "onTitleChanged", params);
-		} else {
+	protected void onTitleChanged(java.lang.CharSequence param_0, int param_1)
+	{
+		if (__ho151)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			com.tns.Platform.callJSMethod(this, "onTitleChanged", args);
+		}
+		else
+		{
 			super.onTitleChanged(param_0, param_1);
 		}
 	}
 
-	public boolean onTouchEvent(android.view.MotionEvent param_0) {
-		
-		if ((__ho19 & (1 << 3)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onTouchEvent", params);
-		} else {
+	public boolean onTouchEvent(android.view.MotionEvent param_0)
+	{
+		if (__ho152)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onTouchEvent", args);
+		}
+		else
+		{
 			return super.onTouchEvent(param_0);
 		}
 	}
 
-	public boolean onTrackballEvent(android.view.MotionEvent param_0) {
-		
-		if ((__ho19 & (1 << 4)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onTrackballEvent", params);
-		} else {
+	public boolean onTrackballEvent(android.view.MotionEvent param_0)
+	{
+		if (__ho153)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "onTrackballEvent", args);
+		}
+		else
+		{
 			return super.onTrackballEvent(param_0);
 		}
 	}
 
-	public void onTrimMemory(int param_0) {
-		
-		if ((__ho19 & (1 << 5)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "onTrimMemory", params);
-		} else {
+	public void onTrimMemory(int param_0)
+	{
+		if (__ho154)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "onTrimMemory", args);
+		}
+		else
+		{
 			super.onTrimMemory(param_0);
 		}
 	}
 
-	public void onUserInteraction() {
-		
-		if ((__ho19 & (1 << 6)) > 0) { 
-			java.lang.Object[] params = null;
-			com.tns.Platform.callJSMethod(this, "onUserInteraction", params);
-		} else {
+	public void onUserInteraction()
+	{
+		if (__ho155)
+		{
+			Object[] args = null;
+			com.tns.Platform.callJSMethod(this, "onUserInteraction", args);
+		}
+		else
+		{
 			super.onUserInteraction();
 		}
 	}
 
-	protected void onUserLeaveHint() {
-		
-		if ((__ho19 & (1 << 7)) > 0) { 
-			java.lang.Object[] params = null;
-			com.tns.Platform.callJSMethod(this, "onUserLeaveHint", params);
-		} else {
+	protected void onUserLeaveHint()
+	{
+		if (__ho156)
+		{
+			Object[] args = null;
+			com.tns.Platform.callJSMethod(this, "onUserLeaveHint", args);
+		}
+		else
+		{
 			super.onUserLeaveHint();
 		}
 	}
 
-	public void onWindowAttributesChanged(android.view.WindowManager.LayoutParams param_0) {
-		
-		if ((__ho20 & (1 << 0)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "onWindowAttributesChanged", params);
-		} else {
+	public void onWindowAttributesChanged(android.view.WindowManager.LayoutParams param_0)
+	{
+		if (__ho157)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "onWindowAttributesChanged", args);
+		}
+		else
+		{
 			super.onWindowAttributesChanged(param_0);
 		}
 	}
 
-	public void onWindowFocusChanged(boolean param_0) {
-		
-		if ((__ho20 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "onWindowFocusChanged", params);
-		} else {
+	public void onWindowFocusChanged(boolean param_0)
+	{
+		if (__ho158)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "onWindowFocusChanged", args);
+		}
+		else
+		{
 			super.onWindowFocusChanged(param_0);
 		}
 	}
 
-	public android.view.ActionMode onWindowStartingActionMode(android.view.ActionMode.Callback param_0) {
-		
-		if ((__ho20 & (1 << 2)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (android.view.ActionMode)com.tns.Platform.callJSMethod(this, "onWindowStartingActionMode", params);
-		} else {
+	public android.view.ActionMode onWindowStartingActionMode(android.view.ActionMode.Callback param_0)
+	{
+		if (__ho159)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (android.view.ActionMode)com.tns.Platform.callJSMethod(this, "onWindowStartingActionMode", args);
+		}
+		else
+		{
 			return super.onWindowStartingActionMode(param_0);
 		}
 	}
 
-	public void openContextMenu(android.view.View param_0) {
-		
-		if ((__ho20 & (1 << 3)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "openContextMenu", params);
-		} else {
+	public void openContextMenu(android.view.View param_0)
+	{
+		if (__ho160)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "openContextMenu", args);
+		}
+		else
+		{
 			super.openContextMenu(param_0);
 		}
 	}
 
-	public java.io.FileInputStream openFileInput(java.lang.String param_0) throws java.io.FileNotFoundException {
-		
-		if ((__ho20 & (1 << 4)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (java.io.FileInputStream)com.tns.Platform.callJSMethod(this, "openFileInput", params);
-		} else {
+	public java.io.FileInputStream openFileInput(java.lang.String param_0) throws java.io.FileNotFoundException
+	{
+		if (__ho161)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (java.io.FileInputStream)com.tns.Platform.callJSMethod(this, "openFileInput", args);
+		}
+		else
+		{
 			return super.openFileInput(param_0);
 		}
 	}
 
-	public java.io.FileOutputStream openFileOutput(java.lang.String param_0, int param_1) throws java.io.FileNotFoundException {
-		
-		if ((__ho20 & (1 << 5)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			return (java.io.FileOutputStream)com.tns.Platform.callJSMethod(this, "openFileOutput", params);
-		} else {
+	public java.io.FileOutputStream openFileOutput(java.lang.String param_0, int param_1) throws java.io.FileNotFoundException
+	{
+		if (__ho162)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			return (java.io.FileOutputStream)com.tns.Platform.callJSMethod(this, "openFileOutput", args);
+		}
+		else
+		{
 			return super.openFileOutput(param_0, param_1);
 		}
 	}
 
-	public void openOptionsMenu() {
-		
-		if ((__ho20 & (1 << 6)) > 0) { 
-			java.lang.Object[] params = null;
-			com.tns.Platform.callJSMethod(this, "openOptionsMenu", params);
-		} else {
+	public void openOptionsMenu()
+	{
+		if (__ho163)
+		{
+			Object[] args = null;
+			com.tns.Platform.callJSMethod(this, "openOptionsMenu", args);
+		}
+		else
+		{
 			super.openOptionsMenu();
 		}
 	}
 
-	public android.database.sqlite.SQLiteDatabase openOrCreateDatabase(java.lang.String param_0, int param_1, android.database.sqlite.SQLiteDatabase.CursorFactory param_2, android.database.DatabaseErrorHandler param_3) {
-		
-		if ((__ho20 & (1 << 7)) > 0) { 
-			java.lang.Object[] params = new Object[4];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			params[3] = param_3;
-			return (android.database.sqlite.SQLiteDatabase)com.tns.Platform.callJSMethod(this, "openOrCreateDatabase", params);
-		} else {
+	public android.database.sqlite.SQLiteDatabase openOrCreateDatabase(java.lang.String param_0, int param_1, android.database.sqlite.SQLiteDatabase.CursorFactory param_2, android.database.DatabaseErrorHandler param_3)
+	{
+		if (__ho164)
+		{
+			Object[] args = new Object[4];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			args[3] = param_3;
+			return (android.database.sqlite.SQLiteDatabase)com.tns.Platform.callJSMethod(this, "openOrCreateDatabase", args);
+		}
+		else
+		{
 			return super.openOrCreateDatabase(param_0, param_1, param_2, param_3);
 		}
 	}
 
-	public android.database.sqlite.SQLiteDatabase openOrCreateDatabase(java.lang.String param_0, int param_1, android.database.sqlite.SQLiteDatabase.CursorFactory param_2) {
-		
-		if ((__ho20 & (1 << 7)) > 0) { 
-			java.lang.Object[] params = new Object[3];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			return (android.database.sqlite.SQLiteDatabase)com.tns.Platform.callJSMethod(this, "openOrCreateDatabase", params);
-		} else {
+	public android.database.sqlite.SQLiteDatabase openOrCreateDatabase(java.lang.String param_0, int param_1, android.database.sqlite.SQLiteDatabase.CursorFactory param_2)
+	{
+		if (__ho164)
+		{
+			Object[] args = new Object[3];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			return (android.database.sqlite.SQLiteDatabase)com.tns.Platform.callJSMethod(this, "openOrCreateDatabase", args);
+		}
+		else
+		{
 			return super.openOrCreateDatabase(param_0, param_1, param_2);
 		}
 	}
 
-	public void overridePendingTransition(int param_0, int param_1) {
-		
-		if ((__ho21 & (1 << 0)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			com.tns.Platform.callJSMethod(this, "overridePendingTransition", params);
-		} else {
+	public void overridePendingTransition(int param_0, int param_1)
+	{
+		if (__ho165)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			com.tns.Platform.callJSMethod(this, "overridePendingTransition", args);
+		}
+		else
+		{
 			super.overridePendingTransition(param_0, param_1);
 		}
 	}
 
-	public android.graphics.drawable.Drawable peekWallpaper() {
-		
-		if ((__ho21 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = null;
-			return (android.graphics.drawable.Drawable)com.tns.Platform.callJSMethod(this, "peekWallpaper", params);
-		} else {
+	public android.graphics.drawable.Drawable peekWallpaper()
+	{
+		if (__ho166)
+		{
+			Object[] args = null;
+			return (android.graphics.drawable.Drawable)com.tns.Platform.callJSMethod(this, "peekWallpaper", args);
+		}
+		else
+		{
 			return super.peekWallpaper();
 		}
 	}
 
-	public void recreate() {
-		
-		if ((__ho21 & (1 << 2)) > 0) { 
-			java.lang.Object[] params = null;
-			com.tns.Platform.callJSMethod(this, "recreate", params);
-		} else {
+	public void recreate()
+	{
+		if (__ho167)
+		{
+			Object[] args = null;
+			com.tns.Platform.callJSMethod(this, "recreate", args);
+		}
+		else
+		{
 			super.recreate();
 		}
 	}
 
-	public void registerComponentCallbacks(android.content.ComponentCallbacks param_0) {
-		
-		if ((__ho21 & (1 << 3)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "registerComponentCallbacks", params);
-		} else {
+	public void registerComponentCallbacks(android.content.ComponentCallbacks param_0)
+	{
+		if (__ho168)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "registerComponentCallbacks", args);
+		}
+		else
+		{
 			super.registerComponentCallbacks(param_0);
 		}
 	}
 
-	public void registerForContextMenu(android.view.View param_0) {
-		
-		if ((__ho21 & (1 << 4)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "registerForContextMenu", params);
-		} else {
+	public void registerForContextMenu(android.view.View param_0)
+	{
+		if (__ho169)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "registerForContextMenu", args);
+		}
+		else
+		{
 			super.registerForContextMenu(param_0);
 		}
 	}
 
-	public android.content.Intent registerReceiver(android.content.BroadcastReceiver param_0, android.content.IntentFilter param_1, java.lang.String param_2, android.os.Handler param_3) {
-		
-		if ((__ho21 & (1 << 5)) > 0) { 
-			java.lang.Object[] params = new Object[4];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			params[3] = param_3;
-			return (android.content.Intent)com.tns.Platform.callJSMethod(this, "registerReceiver", params);
-		} else {
+	public android.content.Intent registerReceiver(android.content.BroadcastReceiver param_0, android.content.IntentFilter param_1, java.lang.String param_2, android.os.Handler param_3)
+	{
+		if (__ho170)
+		{
+			Object[] args = new Object[4];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			args[3] = param_3;
+			return (android.content.Intent)com.tns.Platform.callJSMethod(this, "registerReceiver", args);
+		}
+		else
+		{
 			return super.registerReceiver(param_0, param_1, param_2, param_3);
 		}
 	}
 
-	public android.content.Intent registerReceiver(android.content.BroadcastReceiver param_0, android.content.IntentFilter param_1) {
-		
-		if ((__ho21 & (1 << 5)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			return (android.content.Intent)com.tns.Platform.callJSMethod(this, "registerReceiver", params);
-		} else {
+	public android.content.Intent registerReceiver(android.content.BroadcastReceiver param_0, android.content.IntentFilter param_1)
+	{
+		if (__ho170)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			return (android.content.Intent)com.tns.Platform.callJSMethod(this, "registerReceiver", args);
+		}
+		else
+		{
 			return super.registerReceiver(param_0, param_1);
 		}
 	}
 
-	public void removeStickyBroadcast(android.content.Intent param_0) {
-		
-		if ((__ho21 & (1 << 6)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "removeStickyBroadcast", params);
-		} else {
+	public void removeStickyBroadcast(android.content.Intent param_0)
+	{
+		if (__ho171)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "removeStickyBroadcast", args);
+		}
+		else
+		{
 			super.removeStickyBroadcast(param_0);
 		}
 	}
 
-	public void removeStickyBroadcastAsUser(android.content.Intent param_0, android.os.UserHandle param_1) {
-		
-		if ((__ho21 & (1 << 7)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			com.tns.Platform.callJSMethod(this, "removeStickyBroadcastAsUser", params);
-		} else {
+	public void removeStickyBroadcastAsUser(android.content.Intent param_0, android.os.UserHandle param_1)
+	{
+		if (__ho172)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			com.tns.Platform.callJSMethod(this, "removeStickyBroadcastAsUser", args);
+		}
+		else
+		{
 			super.removeStickyBroadcastAsUser(param_0, param_1);
 		}
 	}
 
-	public void revokeUriPermission(android.net.Uri param_0, int param_1) {
-		
-		if ((__ho22 & (1 << 0)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			com.tns.Platform.callJSMethod(this, "revokeUriPermission", params);
-		} else {
+	public void revokeUriPermission(android.net.Uri param_0, int param_1)
+	{
+		if (__ho173)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			com.tns.Platform.callJSMethod(this, "revokeUriPermission", args);
+		}
+		else
+		{
 			super.revokeUriPermission(param_0, param_1);
 		}
 	}
 
-	public void sendBroadcast(android.content.Intent param_0, java.lang.String param_1) {
-		
-		if ((__ho22 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			com.tns.Platform.callJSMethod(this, "sendBroadcast", params);
-		} else {
+	public void sendBroadcast(android.content.Intent param_0, java.lang.String param_1)
+	{
+		if (__ho174)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			com.tns.Platform.callJSMethod(this, "sendBroadcast", args);
+		}
+		else
+		{
 			super.sendBroadcast(param_0, param_1);
 		}
 	}
 
-	public void sendBroadcast(android.content.Intent param_0) {
-		
-		if ((__ho22 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "sendBroadcast", params);
-		} else {
+	public void sendBroadcast(android.content.Intent param_0)
+	{
+		if (__ho174)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "sendBroadcast", args);
+		}
+		else
+		{
 			super.sendBroadcast(param_0);
 		}
 	}
 
-	public void sendBroadcastAsUser(android.content.Intent param_0, android.os.UserHandle param_1) {
-		
-		if ((__ho22 & (1 << 2)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			com.tns.Platform.callJSMethod(this, "sendBroadcastAsUser", params);
-		} else {
+	public void sendBroadcastAsUser(android.content.Intent param_0, android.os.UserHandle param_1)
+	{
+		if (__ho175)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			com.tns.Platform.callJSMethod(this, "sendBroadcastAsUser", args);
+		}
+		else
+		{
 			super.sendBroadcastAsUser(param_0, param_1);
 		}
 	}
 
-	public void sendBroadcastAsUser(android.content.Intent param_0, android.os.UserHandle param_1, java.lang.String param_2) {
-		
-		if ((__ho22 & (1 << 2)) > 0) { 
-			java.lang.Object[] params = new Object[3];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			com.tns.Platform.callJSMethod(this, "sendBroadcastAsUser", params);
-		} else {
+	public void sendBroadcastAsUser(android.content.Intent param_0, android.os.UserHandle param_1, java.lang.String param_2)
+	{
+		if (__ho175)
+		{
+			Object[] args = new Object[3];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			com.tns.Platform.callJSMethod(this, "sendBroadcastAsUser", args);
+		}
+		else
+		{
 			super.sendBroadcastAsUser(param_0, param_1, param_2);
 		}
 	}
 
-	public void sendOrderedBroadcast(android.content.Intent param_0, java.lang.String param_1) {
-		
-		if ((__ho22 & (1 << 3)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			com.tns.Platform.callJSMethod(this, "sendOrderedBroadcast", params);
-		} else {
-			super.sendOrderedBroadcast(param_0, param_1);
+	public void sendOrderedBroadcast(android.content.Intent param_0, java.lang.String param_1, android.content.BroadcastReceiver param_2, android.os.Handler param_3, int param_4, java.lang.String param_5, android.os.Bundle param_6)
+	{
+		if (__ho176)
+		{
+			Object[] args = new Object[7];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			args[3] = param_3;
+			args[4] = param_4;
+			args[5] = param_5;
+			args[6] = param_6;
+			com.tns.Platform.callJSMethod(this, "sendOrderedBroadcast", args);
 		}
-	}
-
-	public void sendOrderedBroadcast(android.content.Intent param_0, java.lang.String param_1, android.content.BroadcastReceiver param_2, android.os.Handler param_3, int param_4, java.lang.String param_5, android.os.Bundle param_6) {
-		
-		if ((__ho22 & (1 << 3)) > 0) { 
-			java.lang.Object[] params = new Object[7];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			params[3] = param_3;
-			params[4] = param_4;
-			params[5] = param_5;
-			params[6] = param_6;
-			com.tns.Platform.callJSMethod(this, "sendOrderedBroadcast", params);
-		} else {
+		else
+		{
 			super.sendOrderedBroadcast(param_0, param_1, param_2, param_3, param_4, param_5, param_6);
 		}
 	}
 
-	public void sendOrderedBroadcastAsUser(android.content.Intent param_0, android.os.UserHandle param_1, java.lang.String param_2, android.content.BroadcastReceiver param_3, android.os.Handler param_4, int param_5, java.lang.String param_6, android.os.Bundle param_7) {
-		
-		if ((__ho22 & (1 << 4)) > 0) { 
-			java.lang.Object[] params = new Object[8];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			params[3] = param_3;
-			params[4] = param_4;
-			params[5] = param_5;
-			params[6] = param_6;
-			params[7] = param_7;
-			com.tns.Platform.callJSMethod(this, "sendOrderedBroadcastAsUser", params);
-		} else {
+	public void sendOrderedBroadcast(android.content.Intent param_0, java.lang.String param_1)
+	{
+		if (__ho176)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			com.tns.Platform.callJSMethod(this, "sendOrderedBroadcast", args);
+		}
+		else
+		{
+			super.sendOrderedBroadcast(param_0, param_1);
+		}
+	}
+
+	public void sendOrderedBroadcastAsUser(android.content.Intent param_0, android.os.UserHandle param_1, java.lang.String param_2, android.content.BroadcastReceiver param_3, android.os.Handler param_4, int param_5, java.lang.String param_6, android.os.Bundle param_7)
+	{
+		if (__ho177)
+		{
+			Object[] args = new Object[8];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			args[3] = param_3;
+			args[4] = param_4;
+			args[5] = param_5;
+			args[6] = param_6;
+			args[7] = param_7;
+			com.tns.Platform.callJSMethod(this, "sendOrderedBroadcastAsUser", args);
+		}
+		else
+		{
 			super.sendOrderedBroadcastAsUser(param_0, param_1, param_2, param_3, param_4, param_5, param_6, param_7);
 		}
 	}
 
-	public void sendStickyBroadcast(android.content.Intent param_0) {
-		
-		if ((__ho22 & (1 << 5)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "sendStickyBroadcast", params);
-		} else {
+	public void sendStickyBroadcast(android.content.Intent param_0)
+	{
+		if (__ho178)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "sendStickyBroadcast", args);
+		}
+		else
+		{
 			super.sendStickyBroadcast(param_0);
 		}
 	}
 
-	public void sendStickyBroadcastAsUser(android.content.Intent param_0, android.os.UserHandle param_1) {
-		
-		if ((__ho22 & (1 << 6)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			com.tns.Platform.callJSMethod(this, "sendStickyBroadcastAsUser", params);
-		} else {
+	public void sendStickyBroadcastAsUser(android.content.Intent param_0, android.os.UserHandle param_1)
+	{
+		if (__ho179)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			com.tns.Platform.callJSMethod(this, "sendStickyBroadcastAsUser", args);
+		}
+		else
+		{
 			super.sendStickyBroadcastAsUser(param_0, param_1);
 		}
 	}
 
-	public void sendStickyOrderedBroadcast(android.content.Intent param_0, android.content.BroadcastReceiver param_1, android.os.Handler param_2, int param_3, java.lang.String param_4, android.os.Bundle param_5) {
-		
-		if ((__ho22 & (1 << 7)) > 0) { 
-			java.lang.Object[] params = new Object[6];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			params[3] = param_3;
-			params[4] = param_4;
-			params[5] = param_5;
-			com.tns.Platform.callJSMethod(this, "sendStickyOrderedBroadcast", params);
-		} else {
+	public void sendStickyOrderedBroadcast(android.content.Intent param_0, android.content.BroadcastReceiver param_1, android.os.Handler param_2, int param_3, java.lang.String param_4, android.os.Bundle param_5)
+	{
+		if (__ho180)
+		{
+			Object[] args = new Object[6];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			args[3] = param_3;
+			args[4] = param_4;
+			args[5] = param_5;
+			com.tns.Platform.callJSMethod(this, "sendStickyOrderedBroadcast", args);
+		}
+		else
+		{
 			super.sendStickyOrderedBroadcast(param_0, param_1, param_2, param_3, param_4, param_5);
 		}
 	}
 
-	public void sendStickyOrderedBroadcastAsUser(android.content.Intent param_0, android.os.UserHandle param_1, android.content.BroadcastReceiver param_2, android.os.Handler param_3, int param_4, java.lang.String param_5, android.os.Bundle param_6) {
-		
-		if ((__ho23 & (1 << 0)) > 0) { 
-			java.lang.Object[] params = new Object[7];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			params[3] = param_3;
-			params[4] = param_4;
-			params[5] = param_5;
-			params[6] = param_6;
-			com.tns.Platform.callJSMethod(this, "sendStickyOrderedBroadcastAsUser", params);
-		} else {
+	public void sendStickyOrderedBroadcastAsUser(android.content.Intent param_0, android.os.UserHandle param_1, android.content.BroadcastReceiver param_2, android.os.Handler param_3, int param_4, java.lang.String param_5, android.os.Bundle param_6)
+	{
+		if (__ho181)
+		{
+			Object[] args = new Object[7];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			args[3] = param_3;
+			args[4] = param_4;
+			args[5] = param_5;
+			args[6] = param_6;
+			com.tns.Platform.callJSMethod(this, "sendStickyOrderedBroadcastAsUser", args);
+		}
+		else
+		{
 			super.sendStickyOrderedBroadcastAsUser(param_0, param_1, param_2, param_3, param_4, param_5, param_6);
 		}
 	}
 
-	public void setContentView(android.view.View param_0) {
-		
-		if ((__ho23 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "setContentView", params);
-		} else {
+	public void setContentView(int param_0)
+	{
+		if (__ho182)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "setContentView", args);
+		}
+		else
+		{
 			super.setContentView(param_0);
 		}
 	}
 
-	public void setContentView(android.view.View param_0, android.view.ViewGroup.LayoutParams param_1) {
-		
-		if ((__ho23 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			com.tns.Platform.callJSMethod(this, "setContentView", params);
-		} else {
+	public void setContentView(android.view.View param_0, android.view.ViewGroup.LayoutParams param_1)
+	{
+		if (__ho182)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			com.tns.Platform.callJSMethod(this, "setContentView", args);
+		}
+		else
+		{
 			super.setContentView(param_0, param_1);
 		}
 	}
 
-	public void setContentView(int param_0) {
-		
-		if ((__ho23 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "setContentView", params);
-		} else {
+	public void setContentView(android.view.View param_0)
+	{
+		if (__ho182)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "setContentView", args);
+		}
+		else
+		{
 			super.setContentView(param_0);
 		}
 	}
 
-	public void setFinishOnTouchOutside(boolean param_0) {
-		
-		if ((__ho23 & (1 << 2)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "setFinishOnTouchOutside", params);
-		} else {
+	public void setFinishOnTouchOutside(boolean param_0)
+	{
+		if (__ho183)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "setFinishOnTouchOutside", args);
+		}
+		else
+		{
 			super.setFinishOnTouchOutside(param_0);
 		}
 	}
 
-	public void setIntent(android.content.Intent param_0) {
-		
-		if ((__ho23 & (1 << 3)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "setIntent", params);
-		} else {
+	public void setIntent(android.content.Intent param_0)
+	{
+		if (__ho184)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "setIntent", args);
+		}
+		else
+		{
 			super.setIntent(param_0);
 		}
 	}
 
-	public void setRequestedOrientation(int param_0) {
-		
-		if ((__ho23 & (1 << 4)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "setRequestedOrientation", params);
-		} else {
+	public void setRequestedOrientation(int param_0)
+	{
+		if (__ho185)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "setRequestedOrientation", args);
+		}
+		else
+		{
 			super.setRequestedOrientation(param_0);
 		}
 	}
 
-	public void setTheme(int param_0) {
-		if ((__ho23 & (1 << 5)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "setTheme", params);
-		} else {
+	public void setTheme(int param_0)
+	{
+		if (__ho186)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "setTheme", args);
+		}
+		else
+		{
 			super.setTheme(param_0);
 		}
 	}
 
-	public void setTitle(java.lang.CharSequence param_0) {
-		
-		if ((__ho23 & (1 << 6)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "setTitle", params);
-		} else {
+	public void setTitle(java.lang.CharSequence param_0)
+	{
+		if (__ho187)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "setTitle", args);
+		}
+		else
+		{
 			super.setTitle(param_0);
 		}
 	}
 
-	public void setTitle(int param_0) {
-		
-		if ((__ho23 & (1 << 6)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "setTitle", params);
-		} else {
+	public void setTitle(int param_0)
+	{
+		if (__ho187)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "setTitle", args);
+		}
+		else
+		{
 			super.setTitle(param_0);
 		}
 	}
 
-	public void setTitleColor(int param_0) {
-		
-		if ((__ho23 & (1 << 7)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "setTitleColor", params);
-		} else {
+	public void setTitleColor(int param_0)
+	{
+		if (__ho188)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "setTitleColor", args);
+		}
+		else
+		{
 			super.setTitleColor(param_0);
 		}
 	}
 
-	public void setVisible(boolean param_0) {
-		
-		if ((__ho24 & (1 << 0)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "setVisible", params);
-		} else {
+	public void setVisible(boolean param_0)
+	{
+		if (__ho189)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "setVisible", args);
+		}
+		else
+		{
 			super.setVisible(param_0);
 		}
 	}
 
-	public void setWallpaper(android.graphics.Bitmap param_0) throws java.io.IOException {
-		
-		if ((__ho24 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "setWallpaper", params);
-		} else {
+	public void setWallpaper(java.io.InputStream param_0) throws java.io.IOException
+	{
+		if (__ho190)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "setWallpaper", args);
+		}
+		else
+		{
 			super.setWallpaper(param_0);
 		}
 	}
 
-	public void setWallpaper(java.io.InputStream param_0) throws java.io.IOException {
-		
-		if ((__ho24 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "setWallpaper", params);
-		} else {
+	public void setWallpaper(android.graphics.Bitmap param_0) throws java.io.IOException
+	{
+		if (__ho190)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "setWallpaper", args);
+		}
+		else
+		{
 			super.setWallpaper(param_0);
 		}
 	}
 
-	public boolean shouldUpRecreateTask(android.content.Intent param_0) {
-		
-		if ((__ho24 & (1 << 2)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "shouldUpRecreateTask", params);
-		} else {
+	public boolean shouldUpRecreateTask(android.content.Intent param_0)
+	{
+		if (__ho191)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "shouldUpRecreateTask", args);
+		}
+		else
+		{
 			return super.shouldUpRecreateTask(param_0);
 		}
 	}
 
-	public android.view.ActionMode startActionMode(android.view.ActionMode.Callback param_0) {
-		
-		if ((__ho24 & (1 << 3)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (android.view.ActionMode)com.tns.Platform.callJSMethod(this, "startActionMode", params);
-		} else {
+	public android.view.ActionMode startActionMode(android.view.ActionMode.Callback param_0)
+	{
+		if (__ho192)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (android.view.ActionMode)com.tns.Platform.callJSMethod(this, "startActionMode", args);
+		}
+		else
+		{
 			return super.startActionMode(param_0);
 		}
 	}
 
-	public void startActivities(android.content.Intent[] param_0, android.os.Bundle param_1) {
-		
-		if ((__ho24 & (1 << 4)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			com.tns.Platform.callJSMethod(this, "startActivities", params);
-		} else {
+	public void startActivities(android.content.Intent[] param_0, android.os.Bundle param_1)
+	{
+		if (__ho193)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			com.tns.Platform.callJSMethod(this, "startActivities", args);
+		}
+		else
+		{
 			super.startActivities(param_0, param_1);
 		}
 	}
 
-	public void startActivities(android.content.Intent[] param_0) {
-		
-		if ((__ho24 & (1 << 4)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "startActivities", params);
-		} else {
+	public void startActivities(android.content.Intent[] param_0)
+	{
+		if (__ho193)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "startActivities", args);
+		}
+		else
+		{
 			super.startActivities(param_0);
 		}
 	}
 
-	public void startActivity(android.content.Intent param_0) {
-		
-		if ((__ho24 & (1 << 5)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "startActivity", params);
-		} else {
-			super.startActivity(param_0);
+	public void startActivity(android.content.Intent param_0, android.os.Bundle param_1)
+	{
+		if (__ho194)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			com.tns.Platform.callJSMethod(this, "startActivity", args);
 		}
-	}
-
-	public void startActivity(android.content.Intent param_0, android.os.Bundle param_1) {
-		
-		if ((__ho24 & (1 << 5)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			com.tns.Platform.callJSMethod(this, "startActivity", params);
-		} else {
+		else
+		{
 			super.startActivity(param_0, param_1);
 		}
 	}
 
-	public void startActivityForResult(android.content.Intent param_0, int param_1, android.os.Bundle param_2) {
-		
-		if ((__ho24 & (1 << 6)) > 0) { 
-			java.lang.Object[] params = new Object[3];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			com.tns.Platform.callJSMethod(this, "startActivityForResult", params);
-		} else {
-			super.startActivityForResult(param_0, param_1, param_2);
+	public void startActivity(android.content.Intent param_0)
+	{
+		if (__ho194)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "startActivity", args);
+		}
+		else
+		{
+			super.startActivity(param_0);
 		}
 	}
 
-	public void startActivityForResult(android.content.Intent param_0, int param_1) {
-		
-		if ((__ho24 & (1 << 6)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			com.tns.Platform.callJSMethod(this, "startActivityForResult", params);
-		} else {
+	public void startActivityForResult(android.content.Intent param_0, int param_1)
+	{
+		if (__ho195)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			com.tns.Platform.callJSMethod(this, "startActivityForResult", args);
+		}
+		else
+		{
 			super.startActivityForResult(param_0, param_1);
 		}
 	}
 
-	public void startActivityFromChild(android.app.Activity param_0, android.content.Intent param_1, int param_2) {
-		
-		if ((__ho24 & (1 << 7)) > 0) { 
-			java.lang.Object[] params = new Object[3];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			com.tns.Platform.callJSMethod(this, "startActivityFromChild", params);
-		} else {
-			super.startActivityFromChild(param_0, param_1, param_2);
+	public void startActivityForResult(android.content.Intent param_0, int param_1, android.os.Bundle param_2)
+	{
+		if (__ho195)
+		{
+			Object[] args = new Object[3];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			com.tns.Platform.callJSMethod(this, "startActivityForResult", args);
+		}
+		else
+		{
+			super.startActivityForResult(param_0, param_1, param_2);
 		}
 	}
 
-	public void startActivityFromChild(android.app.Activity param_0, android.content.Intent param_1, int param_2, android.os.Bundle param_3) {
-		
-		if ((__ho24 & (1 << 7)) > 0) { 
-			java.lang.Object[] params = new Object[4];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			params[3] = param_3;
-			com.tns.Platform.callJSMethod(this, "startActivityFromChild", params);
-		} else {
+	public void startActivityFromChild(android.app.Activity param_0, android.content.Intent param_1, int param_2, android.os.Bundle param_3)
+	{
+		if (__ho196)
+		{
+			Object[] args = new Object[4];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			args[3] = param_3;
+			com.tns.Platform.callJSMethod(this, "startActivityFromChild", args);
+		}
+		else
+		{
 			super.startActivityFromChild(param_0, param_1, param_2, param_3);
 		}
 	}
 
-	public void startActivityFromFragment(android.app.Fragment param_0, android.content.Intent param_1, int param_2) {
-		
-		if ((__ho25 & (1 << 0)) > 0) { 
-			java.lang.Object[] params = new Object[3];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			com.tns.Platform.callJSMethod(this, "startActivityFromFragment", params);
-		} else {
+	public void startActivityFromChild(android.app.Activity param_0, android.content.Intent param_1, int param_2)
+	{
+		if (__ho196)
+		{
+			Object[] args = new Object[3];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			com.tns.Platform.callJSMethod(this, "startActivityFromChild", args);
+		}
+		else
+		{
+			super.startActivityFromChild(param_0, param_1, param_2);
+		}
+	}
+
+	public void startActivityFromFragment(android.app.Fragment param_0, android.content.Intent param_1, int param_2)
+	{
+		if (__ho197)
+		{
+			Object[] args = new Object[3];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			com.tns.Platform.callJSMethod(this, "startActivityFromFragment", args);
+		}
+		else
+		{
 			super.startActivityFromFragment(param_0, param_1, param_2);
 		}
 	}
 
-	public void startActivityFromFragment(android.app.Fragment param_0, android.content.Intent param_1, int param_2, android.os.Bundle param_3) {
-		
-		if ((__ho25 & (1 << 0)) > 0) { 
-			java.lang.Object[] params = new Object[4];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			params[3] = param_3;
-			com.tns.Platform.callJSMethod(this, "startActivityFromFragment", params);
-		} else {
+	public void startActivityFromFragment(android.app.Fragment param_0, android.content.Intent param_1, int param_2, android.os.Bundle param_3)
+	{
+		if (__ho197)
+		{
+			Object[] args = new Object[4];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			args[3] = param_3;
+			com.tns.Platform.callJSMethod(this, "startActivityFromFragment", args);
+		}
+		else
+		{
 			super.startActivityFromFragment(param_0, param_1, param_2, param_3);
 		}
 	}
 
-	public boolean startActivityIfNeeded(android.content.Intent param_0, int param_1) {
-		
-		if ((__ho25 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "startActivityIfNeeded", params);
-		} else {
+	public boolean startActivityIfNeeded(android.content.Intent param_0, int param_1)
+	{
+		if (__ho198)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "startActivityIfNeeded", args);
+		}
+		else
+		{
 			return super.startActivityIfNeeded(param_0, param_1);
 		}
 	}
 
-	public boolean startActivityIfNeeded(android.content.Intent param_0, int param_1, android.os.Bundle param_2) {
-		
-		if ((__ho25 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = new Object[3];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "startActivityIfNeeded", params);
-		} else {
+	public boolean startActivityIfNeeded(android.content.Intent param_0, int param_1, android.os.Bundle param_2)
+	{
+		if (__ho198)
+		{
+			Object[] args = new Object[3];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "startActivityIfNeeded", args);
+		}
+		else
+		{
 			return super.startActivityIfNeeded(param_0, param_1, param_2);
 		}
 	}
 
-	public boolean startInstrumentation(android.content.ComponentName param_0, java.lang.String param_1, android.os.Bundle param_2) {
-		
-		if ((__ho25 & (1 << 2)) > 0) { 
-			java.lang.Object[] params = new Object[3];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "startInstrumentation", params);
-		} else {
+	public boolean startInstrumentation(android.content.ComponentName param_0, java.lang.String param_1, android.os.Bundle param_2)
+	{
+		if (__ho199)
+		{
+			Object[] args = new Object[3];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "startInstrumentation", args);
+		}
+		else
+		{
 			return super.startInstrumentation(param_0, param_1, param_2);
 		}
 	}
 
-	public void startIntentSender(android.content.IntentSender param_0, android.content.Intent param_1, int param_2, int param_3, int param_4) throws android.content.IntentSender.SendIntentException {
-		
-		if ((__ho25 & (1 << 3)) > 0) { 
-			java.lang.Object[] params = new Object[5];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			params[3] = param_3;
-			params[4] = param_4;
-			com.tns.Platform.callJSMethod(this, "startIntentSender", params);
-		} else {
-			super.startIntentSender(param_0, param_1, param_2, param_3, param_4);
+	public void startIntentSender(android.content.IntentSender param_0, android.content.Intent param_1, int param_2, int param_3, int param_4, android.os.Bundle param_5) throws android.content.IntentSender.SendIntentException
+	{
+		if (__ho200)
+		{
+			Object[] args = new Object[6];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			args[3] = param_3;
+			args[4] = param_4;
+			args[5] = param_5;
+			com.tns.Platform.callJSMethod(this, "startIntentSender", args);
 		}
-	}
-
-	public void startIntentSender(android.content.IntentSender param_0, android.content.Intent param_1, int param_2, int param_3, int param_4, android.os.Bundle param_5) throws android.content.IntentSender.SendIntentException {
-		
-		if ((__ho25 & (1 << 3)) > 0) { 
-			java.lang.Object[] params = new Object[6];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			params[3] = param_3;
-			params[4] = param_4;
-			params[5] = param_5;
-			com.tns.Platform.callJSMethod(this, "startIntentSender", params);
-		} else {
+		else
+		{
 			super.startIntentSender(param_0, param_1, param_2, param_3, param_4, param_5);
 		}
 	}
 
-	public void startIntentSenderForResult(android.content.IntentSender param_0, int param_1, android.content.Intent param_2, int param_3, int param_4, int param_5, android.os.Bundle param_6) throws android.content.IntentSender.SendIntentException {
-		
-		if ((__ho25 & (1 << 4)) > 0) { 
-			java.lang.Object[] params = new Object[7];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			params[3] = param_3;
-			params[4] = param_4;
-			params[5] = param_5;
-			params[6] = param_6;
-			com.tns.Platform.callJSMethod(this, "startIntentSenderForResult", params);
-		} else {
+	public void startIntentSender(android.content.IntentSender param_0, android.content.Intent param_1, int param_2, int param_3, int param_4) throws android.content.IntentSender.SendIntentException
+	{
+		if (__ho200)
+		{
+			Object[] args = new Object[5];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			args[3] = param_3;
+			args[4] = param_4;
+			com.tns.Platform.callJSMethod(this, "startIntentSender", args);
+		}
+		else
+		{
+			super.startIntentSender(param_0, param_1, param_2, param_3, param_4);
+		}
+	}
+
+	public void startIntentSenderForResult(android.content.IntentSender param_0, int param_1, android.content.Intent param_2, int param_3, int param_4, int param_5, android.os.Bundle param_6) throws android.content.IntentSender.SendIntentException
+	{
+		if (__ho201)
+		{
+			Object[] args = new Object[7];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			args[3] = param_3;
+			args[4] = param_4;
+			args[5] = param_5;
+			args[6] = param_6;
+			com.tns.Platform.callJSMethod(this, "startIntentSenderForResult", args);
+		}
+		else
+		{
 			super.startIntentSenderForResult(param_0, param_1, param_2, param_3, param_4, param_5, param_6);
 		}
 	}
 
-	public void startIntentSenderForResult(android.content.IntentSender param_0, int param_1, android.content.Intent param_2, int param_3, int param_4, int param_5) throws android.content.IntentSender.SendIntentException {
-		
-		if ((__ho25 & (1 << 4)) > 0) { 
-			java.lang.Object[] params = new Object[6];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			params[3] = param_3;
-			params[4] = param_4;
-			params[5] = param_5;
-			com.tns.Platform.callJSMethod(this, "startIntentSenderForResult", params);
-		} else {
+	public void startIntentSenderForResult(android.content.IntentSender param_0, int param_1, android.content.Intent param_2, int param_3, int param_4, int param_5) throws android.content.IntentSender.SendIntentException
+	{
+		if (__ho201)
+		{
+			Object[] args = new Object[6];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			args[3] = param_3;
+			args[4] = param_4;
+			args[5] = param_5;
+			com.tns.Platform.callJSMethod(this, "startIntentSenderForResult", args);
+		}
+		else
+		{
 			super.startIntentSenderForResult(param_0, param_1, param_2, param_3, param_4, param_5);
 		}
 	}
 
-	public void startIntentSenderFromChild(android.app.Activity param_0, android.content.IntentSender param_1, int param_2, android.content.Intent param_3, int param_4, int param_5, int param_6) throws android.content.IntentSender.SendIntentException {
-		
-		if ((__ho25 & (1 << 5)) > 0) { 
-			java.lang.Object[] params = new Object[7];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			params[3] = param_3;
-			params[4] = param_4;
-			params[5] = param_5;
-			params[6] = param_6;
-			com.tns.Platform.callJSMethod(this, "startIntentSenderFromChild", params);
-		} else {
-			super.startIntentSenderFromChild(param_0, param_1, param_2, param_3, param_4, param_5, param_6);
+	public void startIntentSenderFromChild(android.app.Activity param_0, android.content.IntentSender param_1, int param_2, android.content.Intent param_3, int param_4, int param_5, int param_6, android.os.Bundle param_7) throws android.content.IntentSender.SendIntentException
+	{
+		if (__ho202)
+		{
+			Object[] args = new Object[8];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			args[3] = param_3;
+			args[4] = param_4;
+			args[5] = param_5;
+			args[6] = param_6;
+			args[7] = param_7;
+			com.tns.Platform.callJSMethod(this, "startIntentSenderFromChild", args);
 		}
-	}
-
-	public void startIntentSenderFromChild(android.app.Activity param_0, android.content.IntentSender param_1, int param_2, android.content.Intent param_3, int param_4, int param_5, int param_6, android.os.Bundle param_7) throws android.content.IntentSender.SendIntentException {
-		
-		if ((__ho25 & (1 << 5)) > 0) { 
-			java.lang.Object[] params = new Object[8];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			params[3] = param_3;
-			params[4] = param_4;
-			params[5] = param_5;
-			params[6] = param_6;
-			params[7] = param_7;
-			com.tns.Platform.callJSMethod(this, "startIntentSenderFromChild", params);
-		} else {
+		else
+		{
 			super.startIntentSenderFromChild(param_0, param_1, param_2, param_3, param_4, param_5, param_6, param_7);
 		}
 	}
 
-	public void startManagingCursor(android.database.Cursor param_0) {
-		
-		if ((__ho25 & (1 << 6)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "startManagingCursor", params);
-		} else {
+	public void startIntentSenderFromChild(android.app.Activity param_0, android.content.IntentSender param_1, int param_2, android.content.Intent param_3, int param_4, int param_5, int param_6) throws android.content.IntentSender.SendIntentException
+	{
+		if (__ho202)
+		{
+			Object[] args = new Object[7];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			args[3] = param_3;
+			args[4] = param_4;
+			args[5] = param_5;
+			args[6] = param_6;
+			com.tns.Platform.callJSMethod(this, "startIntentSenderFromChild", args);
+		}
+		else
+		{
+			super.startIntentSenderFromChild(param_0, param_1, param_2, param_3, param_4, param_5, param_6);
+		}
+	}
+
+	public void startManagingCursor(android.database.Cursor param_0)
+	{
+		if (__ho203)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "startManagingCursor", args);
+		}
+		else
+		{
 			super.startManagingCursor(param_0);
 		}
 	}
 
-	public boolean startNextMatchingActivity(android.content.Intent param_0) {
-		
-		if ((__ho25 & (1 << 7)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "startNextMatchingActivity", params);
-		} else {
+	public boolean startNextMatchingActivity(android.content.Intent param_0)
+	{
+		if (__ho204)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "startNextMatchingActivity", args);
+		}
+		else
+		{
 			return super.startNextMatchingActivity(param_0);
 		}
 	}
 
-	public boolean startNextMatchingActivity(android.content.Intent param_0, android.os.Bundle param_1) {
-		
-		if ((__ho25 & (1 << 7)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "startNextMatchingActivity", params);
-		} else {
+	public boolean startNextMatchingActivity(android.content.Intent param_0, android.os.Bundle param_1)
+	{
+		if (__ho204)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "startNextMatchingActivity", args);
+		}
+		else
+		{
 			return super.startNextMatchingActivity(param_0, param_1);
 		}
 	}
 
-	public void startSearch(java.lang.String param_0, boolean param_1, android.os.Bundle param_2, boolean param_3) {
-		
-		if ((__ho26 & (1 << 0)) > 0) { 
-			java.lang.Object[] params = new Object[4];
-			params[0] = param_0;
-			params[1] = param_1;
-			params[2] = param_2;
-			params[3] = param_3;
-			com.tns.Platform.callJSMethod(this, "startSearch", params);
-		} else {
+	public void startSearch(java.lang.String param_0, boolean param_1, android.os.Bundle param_2, boolean param_3)
+	{
+		if (__ho205)
+		{
+			Object[] args = new Object[4];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			args[3] = param_3;
+			com.tns.Platform.callJSMethod(this, "startSearch", args);
+		}
+		else
+		{
 			super.startSearch(param_0, param_1, param_2, param_3);
 		}
 	}
 
-	public android.content.ComponentName startService(android.content.Intent param_0) {
-		
-		if ((__ho26 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (android.content.ComponentName)com.tns.Platform.callJSMethod(this, "startService", params);
-		} else {
+	public android.content.ComponentName startService(android.content.Intent param_0)
+	{
+		if (__ho206)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (android.content.ComponentName)com.tns.Platform.callJSMethod(this, "startService", args);
+		}
+		else
+		{
 			return super.startService(param_0);
 		}
 	}
 
-	public void stopManagingCursor(android.database.Cursor param_0) {
-		
-		if ((__ho26 & (1 << 2)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "stopManagingCursor", params);
-		} else {
+	public void stopManagingCursor(android.database.Cursor param_0)
+	{
+		if (__ho207)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "stopManagingCursor", args);
+		}
+		else
+		{
 			super.stopManagingCursor(param_0);
 		}
 	}
 
-	public boolean stopService(android.content.Intent param_0) {
-		
-		if ((__ho26 & (1 << 3)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "stopService", params);
-		} else {
+	public boolean stopService(android.content.Intent param_0)
+	{
+		if (__ho208)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (Boolean)com.tns.Platform.callJSMethod(this, "stopService", args);
+		}
+		else
+		{
 			return super.stopService(param_0);
 		}
 	}
 
-	public void takeKeyEvents(boolean param_0) {
-		
-		if ((__ho26 & (1 << 4)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "takeKeyEvents", params);
-		} else {
+	public void takeKeyEvents(boolean param_0)
+	{
+		if (__ho209)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "takeKeyEvents", args);
+		}
+		else
+		{
 			super.takeKeyEvents(param_0);
 		}
 	}
 
-	public java.lang.String toString() {
-		
-		if ((__ho26 & (1 << 5)) > 0) { 
-			java.lang.Object[] params = null;
-			return (java.lang.String)com.tns.Platform.callJSMethod(this, "toString", params);
-		} else {
+	public java.lang.String toString()
+	{
+		if (__ho210)
+		{
+			Object[] args = null;
+			return (java.lang.String)com.tns.Platform.callJSMethod(this, "toString", args);
+		}
+		else
+		{
 			return super.toString();
 		}
 	}
 
-	public void triggerSearch(java.lang.String param_0, android.os.Bundle param_1) {
-		
-		if ((__ho26 & (1 << 6)) > 0) { 
-			java.lang.Object[] params = new Object[2];
-			params[0] = param_0;
-			params[1] = param_1;
-			com.tns.Platform.callJSMethod(this, "triggerSearch", params);
-		} else {
+	public void triggerSearch(java.lang.String param_0, android.os.Bundle param_1)
+	{
+		if (__ho211)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			com.tns.Platform.callJSMethod(this, "triggerSearch", args);
+		}
+		else
+		{
 			super.triggerSearch(param_0, param_1);
 		}
 	}
 
-	public void unbindService(android.content.ServiceConnection param_0) {
-		
-		if ((__ho26 & (1 << 7)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "unbindService", params);
-		} else {
+	public void unbindService(android.content.ServiceConnection param_0)
+	{
+		if (__ho212)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "unbindService", args);
+		}
+		else
+		{
 			super.unbindService(param_0);
 		}
 	}
 
-	public void unregisterComponentCallbacks(android.content.ComponentCallbacks param_0) {
-		
-		if ((__ho27 & (1 << 0)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "unregisterComponentCallbacks", params);
-		} else {
+	public void unregisterComponentCallbacks(android.content.ComponentCallbacks param_0)
+	{
+		if (__ho213)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "unregisterComponentCallbacks", args);
+		}
+		else
+		{
 			super.unregisterComponentCallbacks(param_0);
 		}
 	}
 
-	public void unregisterForContextMenu(android.view.View param_0) {
-		
-		if ((__ho27 & (1 << 1)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "unregisterForContextMenu", params);
-		} else {
+	public void unregisterForContextMenu(android.view.View param_0)
+	{
+		if (__ho214)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "unregisterForContextMenu", args);
+		}
+		else
+		{
 			super.unregisterForContextMenu(param_0);
 		}
 	}
 
-	public void unregisterReceiver(android.content.BroadcastReceiver param_0) {
-		
-		if ((__ho27 & (1 << 2)) > 0) { 
-			java.lang.Object[] params = new Object[1];
-			params[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "unregisterReceiver", params);
-		} else {
+	public void unregisterReceiver(android.content.BroadcastReceiver param_0)
+	{
+		if (__ho215)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "unregisterReceiver", args);
+		}
+		else
+		{
 			super.unregisterReceiver(param_0);
 		}
 	}
 
-	public boolean equals__super(java.lang.Object other) {
-		return super.equals(other);
-	}
-	public int hashCode__super() {
-		return super.hashCode();
-	}
-	public void setNativeScriptOverrides(java.lang.String[] overrides) {
-		for (java.lang.String name: overrides) {
-			setNativeScriptOverride(name);
+	private void setMethodOverrides(String[] methodOverrides)
+	{
+		for (String m: methodOverrides)
+		{
+			if (m.equals("onChildTitleChanged")) __ho104= true;
+			if (m.equals("getChangingConfigurations")) __ho48= true;
+			if (m.equals("getObbDir")) __ho67= true;
+			if (m.equals("onSearchRequested")) __ho148= true;
+			if (m.equals("navigateUpToFromChild")) __ho96= true;
+			if (m.equals("deleteDatabase")) __ho17= true;
+			if (m.equals("checkPermission")) __ho7= true;
+			if (m.equals("enforceUriPermission")) __ho31= true;
+			if (m.equals("startActivityFromFragment")) __ho197= true;
+			if (m.equals("databaseList")) __ho16= true;
+			if (m.equals("dispatchGenericMotionEvent")) __ho19= true;
+			if (m.equals("getFilesDir")) __ho58= true;
+			if (m.equals("sendStickyOrderedBroadcastAsUser")) __ho181= true;
+			if (m.equals("fileList")) __ho33= true;
+			if (m.equals("getWallpaper")) __ho80= true;
+			if (m.equals("onBackPressed")) __ho103= true;
+			if (m.equals("onRestart")) __ho143= true;
+			if (m.equals("shouldUpRecreateTask")) __ho191= true;
+			if (m.equals("finishAffinity")) __ho38= true;
+			if (m.equals("setIntent")) __ho184= true;
+			if (m.equals("unregisterComponentCallbacks")) __ho213= true;
+			if (m.equals("dispatchPopulateAccessibilityEvent")) __ho22= true;
+			if (m.equals("getLoaderManager")) __ho63= true;
+			if (m.equals("startIntentSender")) __ho200= true;
+			if (m.equals("openOrCreateDatabase")) __ho164= true;
+			if (m.equals("getFileStreamPath")) __ho57= true;
+			if (m.equals("closeOptionsMenu")) __ho11= true;
+			if (m.equals("getWallpaperDesiredMinimumHeight")) __ho81= true;
+			if (m.equals("getCallingActivity")) __ho46= true;
+			if (m.equals("openOptionsMenu")) __ho163= true;
+			if (m.equals("onWindowAttributesChanged")) __ho157= true;
+			if (m.equals("invalidateOptionsMenu")) __ho88= true;
+			if (m.equals("onCreateNavigateUpTaskStack")) __ho113= true;
+			if (m.equals("removeStickyBroadcast")) __ho171= true;
+			if (m.equals("dispatchKeyEvent")) __ho20= true;
+			if (m.equals("getCurrentFocus")) __ho52= true;
+			if (m.equals("peekWallpaper")) __ho166= true;
+			if (m.equals("createConfigurationContext")) __ho12= true;
+			if (m.equals("getApplicationContext")) __ho41= true;
+			if (m.equals("sendStickyBroadcast")) __ho178= true;
+			if (m.equals("getResources")) __ho75= true;
+			if (m.equals("onOptionsMenuClosed")) __ho134= true;
+			if (m.equals("getSharedPreferences")) __ho76= true;
+			if (m.equals("setFinishOnTouchOutside")) __ho183= true;
+			if (m.equals("onAttachedToWindow")) __ho102= true;
+			if (m.equals("getWallpaperDesiredMinimumWidth")) __ho82= true;
+			if (m.equals("startInstrumentation")) __ho199= true;
+			if (m.equals("onPrepareOptionsMenu")) __ho141= true;
+			if (m.equals("getComponentName")) __ho50= true;
+			if (m.equals("sendStickyBroadcastAsUser")) __ho179= true;
+			if (m.equals("setWallpaper")) __ho190= true;
+			if (m.equals("stopManagingCursor")) __ho207= true;
+			if (m.equals("getParentActivityIntent")) __ho72= true;
+			if (m.equals("onTrimMemory")) __ho154= true;
+			if (m.equals("onActionModeFinished")) __ho97= true;
+			if (m.equals("recreate")) __ho167= true;
+			if (m.equals("sendStickyOrderedBroadcast")) __ho180= true;
+			if (m.equals("onCreateDialog")) __ho112= true;
+			if (m.equals("startActivityForResult")) __ho195= true;
+			if (m.equals("onTitleChanged")) __ho151= true;
+			if (m.equals("getActionBar")) __ho40= true;
+			if (m.equals("onCreatePanelView")) __ho116= true;
+			if (m.equals("onNewIntent")) __ho132= true;
+			if (m.equals("onKeyMultiple")) __ho124= true;
+			if (m.equals("toString")) __ho210= true;
+			if (m.equals("applyOverrideConfiguration")) __ho1= true;
+			if (m.equals("getFragmentManager")) __ho59= true;
+			if (m.equals("onPanelClosed")) __ho135= true;
+			if (m.equals("createDisplayContext")) __ho13= true;
+			if (m.equals("onKeyShortcut")) __ho125= true;
+			if (m.equals("dispatchTrackballEvent")) __ho24= true;
+			if (m.equals("addContentView")) __ho0= true;
+			if (m.equals("onActivityResult")) __ho99= true;
+			if (m.equals("openFileInput")) __ho161= true;
+			if (m.equals("getRequestedOrientation")) __ho74= true;
+			if (m.equals("getWindowManager")) __ho84= true;
+			if (m.equals("triggerSearch")) __ho211= true;
+			if (m.equals("finish")) __ho35= true;
+			if (m.equals("dispatchKeyShortcutEvent")) __ho21= true;
+			if (m.equals("setVisible")) __ho189= true;
+			if (m.equals("isDestroyed")) __ho90= true;
+			if (m.equals("setTitle")) __ho187= true;
+			if (m.equals("startActivities")) __ho193= true;
+			if (m.equals("onKeyLongPress")) __ho123= true;
+			if (m.equals("onGenericMotionEvent")) __ho121= true;
+			if (m.equals("getMenuInflater")) __ho66= true;
+			if (m.equals("isChangingConfigurations")) __ho89= true;
+			if (m.equals("getPackageName")) __ho70= true;
+			if (m.equals("setRequestedOrientation")) __ho185= true;
+			if (m.equals("enforceCallingUriPermission")) __ho29= true;
+			if (m.equals("getLocalClassName")) __ho64= true;
+			if (m.equals("getWindow")) __ho83= true;
+			if (m.equals("onRestoreInstanceState")) __ho144= true;
+			if (m.equals("checkCallingOrSelfUriPermission")) __ho4= true;
+			if (m.equals("setTitleColor")) __ho188= true;
+			if (m.equals("getClassLoader")) __ho49= true;
+			if (m.equals("closeContextMenu")) __ho10= true;
+			if (m.equals("createPackageContext")) __ho14= true;
+			if (m.equals("openFileOutput")) __ho162= true;
+			if (m.equals("moveTaskToBack")) __ho94= true;
+			if (m.equals("dispatchTouchEvent")) __ho23= true;
+			if (m.equals("onActionModeStarted")) __ho98= true;
+			if (m.equals("onPostCreate")) __ho137= true;
+			if (m.equals("hashCode")) __ho87= true;
+			if (m.equals("getMainLooper")) __ho65= true;
+			if (m.equals("getDir")) __ho54= true;
+			if (m.equals("deleteFile")) __ho18= true;
+			if (m.equals("getTaskId")) __ho78= true;
+			if (m.equals("navigateUpTo")) __ho95= true;
+			if (m.equals("revokeUriPermission")) __ho173= true;
+			if (m.equals("finishActivity")) __ho36= true;
+			if (m.equals("finishFromChild")) __ho39= true;
+			if (m.equals("takeKeyEvents")) __ho209= true;
+			if (m.equals("overridePendingTransition")) __ho165= true;
+			if (m.equals("checkCallingPermission")) __ho5= true;
+			if (m.equals("enforceCallingPermission")) __ho28= true;
+			if (m.equals("unregisterForContextMenu")) __ho214= true;
+			if (m.equals("findViewById")) __ho34= true;
+			if (m.equals("onNavigateUp")) __ho130= true;
+			if (m.equals("enforceCallingOrSelfPermission")) __ho26= true;
+			if (m.equals("removeStickyBroadcastAsUser")) __ho172= true;
+			if (m.equals("onNavigateUpFromChild")) __ho131= true;
+			if (m.equals("isTaskRoot")) __ho93= true;
+			if (m.equals("getContentResolver")) __ho51= true;
+			if (m.equals("getPackageResourcePath")) __ho71= true;
+			if (m.equals("isFinishing")) __ho91= true;
+			if (m.equals("getIntent")) __ho60= true;
+			if (m.equals("onStop")) __ho150= true;
+			if (m.equals("onWindowStartingActionMode")) __ho159= true;
+			if (m.equals("enforceCallingOrSelfUriPermission")) __ho27= true;
+			if (m.equals("getDatabasePath")) __ho53= true;
+			if (m.equals("startActivityIfNeeded")) __ho198= true;
+			if (m.equals("getCacheDir")) __ho45= true;
+			if (m.equals("getTheme")) __ho79= true;
+			if (m.equals("checkCallingOrSelfPermission")) __ho3= true;
+			if (m.equals("setTheme")) __ho186= true;
+			if (m.equals("sendOrderedBroadcastAsUser")) __ho177= true;
+			if (m.equals("onCreatePanelMenu")) __ho115= true;
+			if (m.equals("onPostResume")) __ho138= true;
+			if (m.equals("bindService")) __ho2= true;
+			if (m.equals("isRestricted")) __ho92= true;
+			if (m.equals("onPreparePanel")) __ho142= true;
+			if (m.equals("checkCallingUriPermission")) __ho6= true;
+			if (m.equals("getSystemService")) __ho77= true;
+			if (m.equals("startSearch")) __ho205= true;
+			if (m.equals("getPackageCodePath")) __ho68= true;
+			if (m.equals("onContextItemSelected")) __ho107= true;
+			if (m.equals("onApplyThemeResource")) __ho100= true;
+			if (m.equals("onPause")) __ho136= true;
+			if (m.equals("finishActivityFromChild")) __ho37= true;
+			if (m.equals("startActivity")) __ho194= true;
+			if (m.equals("getLayoutInflater")) __ho62= true;
+			if (m.equals("startActionMode")) __ho192= true;
+			if (m.equals("grantUriPermission")) __ho85= true;
+			if (m.equals("onRetainNonConfigurationInstance")) __ho146= true;
+			if (m.equals("getAssets")) __ho43= true;
+			if (m.equals("onDestroy")) __ho119= true;
+			if (m.equals("onKeyUp")) __ho126= true;
+			if (m.equals("onMenuOpened")) __ho129= true;
+			if (m.equals("getExternalFilesDir")) __ho56= true;
+			if (m.equals("startManagingCursor")) __ho203= true;
+			if (m.equals("onPrepareDialog")) __ho139= true;
+			if (m.equals("openContextMenu")) __ho160= true;
+			if (m.equals("getCallingPackage")) __ho47= true;
+			if (m.equals("equals")) __ho32= true;
+			if (m.equals("onAttachFragment")) __ho101= true;
+			if (m.equals("hasWindowFocus")) __ho86= true;
+			if (m.equals("onSaveInstanceState")) __ho147= true;
+			if (m.equals("onCreateOptionsMenu")) __ho114= true;
+			if (m.equals("registerComponentCallbacks")) __ho168= true;
+			if (m.equals("sendOrderedBroadcast")) __ho176= true;
+			if (m.equals("sendBroadcastAsUser")) __ho175= true;
+			if (m.equals("getExternalCacheDir")) __ho55= true;
+			if (m.equals("startIntentSenderForResult")) __ho201= true;
+			if (m.equals("onLowMemory")) __ho127= true;
+			if (m.equals("onOptionsItemSelected")) __ho133= true;
+			if (m.equals("onCreateThumbnail")) __ho117= true;
+			if (m.equals("onStart")) __ho149= true;
+			if (m.equals("startNextMatchingActivity")) __ho204= true;
+			if (m.equals("onUserInteraction")) __ho155= true;
+			if (m.equals("onTrackballEvent")) __ho153= true;
+			if (m.equals("onTouchEvent")) __ho152= true;
+			if (m.equals("onUserLeaveHint")) __ho156= true;
+			if (m.equals("onResume")) __ho145= true;
+			if (m.equals("getPreferences")) __ho73= true;
+			if (m.equals("startService")) __ho206= true;
+			if (m.equals("onContextMenuClosed")) __ho108= true;
+			if (m.equals("registerReceiver")) __ho170= true;
+			if (m.equals("getPackageManager")) __ho69= true;
+			if (m.equals("onCreateView")) __ho118= true;
+			if (m.equals("onConfigurationChanged")) __ho105= true;
+			if (m.equals("onContentChanged")) __ho106= true;
+			if (m.equals("onCreateContextMenu")) __ho110= true;
+			if (m.equals("onPrepareNavigateUpTaskStack")) __ho140= true;
+			if (m.equals("getLastNonConfigurationInstance")) __ho61= true;
+			if (m.equals("onKeyDown")) __ho122= true;
+			if (m.equals("sendBroadcast")) __ho174= true;
+			if (m.equals("unbindService")) __ho212= true;
+			if (m.equals("createPendingResult")) __ho15= true;
+			if (m.equals("getBaseContext")) __ho44= true;
+			if (m.equals("registerForContextMenu")) __ho169= true;
+			if (m.equals("enforcePermission")) __ho30= true;
+			if (m.equals("checkUriPermission")) __ho8= true;
+			if (m.equals("dump")) __ho25= true;
+			if (m.equals("startIntentSenderFromChild")) __ho202= true;
+			if (m.equals("onCreate")) __ho109= true;
+			if (m.equals("clearWallpaper")) __ho9= true;
+			if (m.equals("onWindowFocusChanged")) __ho158= true;
+			if (m.equals("startActivityFromChild")) __ho196= true;
+			if (m.equals("onMenuItemSelected")) __ho128= true;
+			if (m.equals("onCreateDescription")) __ho111= true;
+			if (m.equals("getApplicationInfo")) __ho42= true;
+			if (m.equals("setContentView")) __ho182= true;
+			if (m.equals("unregisterReceiver")) __ho215= true;
+			if (m.equals("stopService")) __ho208= true;
+			if (m.equals("onDetachedFromWindow")) __ho120= true;
 		}
 	}
-	
-	@Override
-	public void setNativeScriptOverride(String name)
-	{
-			if (name.equals("init")) {
-				__ctorOverridden = true;
-			}
-			if (name.equals("addContentView")) {
-				__ho0 |= (1 << 0);
-			} else if (name.equals("applyOverrideConfiguration")) {
-				__ho0 |= (1 << 1);
-			} else if (name.equals("attachBaseContext")) {
-				__ho0 |= (1 << 2);
-			} else if (name.equals("bindService")) {
-				__ho0 |= (1 << 3);
-			} else if (name.equals("checkCallingOrSelfPermission")) {
-				__ho0 |= (1 << 4);
-			} else if (name.equals("checkCallingOrSelfUriPermission")) {
-				__ho0 |= (1 << 5);
-			} else if (name.equals("checkCallingPermission")) {
-				__ho0 |= (1 << 6);
-			} else if (name.equals("checkCallingUriPermission")) {
-				__ho0 |= (1 << 7);
-			} else if (name.equals("checkPermission")) {
-				__ho1 |= (1 << 0);
-			} else if (name.equals("checkUriPermission")) {
-				__ho1 |= (1 << 1);
-			} else if (name.equals("clearWallpaper")) {
-				__ho1 |= (1 << 2);
-			} else if (name.equals("clone")) {
-				__ho1 |= (1 << 3);
-			} else if (name.equals("closeContextMenu")) {
-				__ho1 |= (1 << 4);
-			} else if (name.equals("closeOptionsMenu")) {
-				__ho1 |= (1 << 5);
-			} else if (name.equals("createConfigurationContext")) {
-				__ho1 |= (1 << 6);
-			} else if (name.equals("createDisplayContext")) {
-				__ho1 |= (1 << 7);
-			} else if (name.equals("createPackageContext")) {
-				__ho2 |= (1 << 0);
-			} else if (name.equals("createPendingResult")) {
-				__ho2 |= (1 << 1);
-			} else if (name.equals("databaseList")) {
-				__ho2 |= (1 << 2);
-			} else if (name.equals("deleteDatabase")) {
-				__ho2 |= (1 << 3);
-			} else if (name.equals("deleteFile")) {
-				__ho2 |= (1 << 4);
-			} else if (name.equals("dispatchGenericMotionEvent")) {
-				__ho2 |= (1 << 5);
-			} else if (name.equals("dispatchKeyEvent")) {
-				__ho2 |= (1 << 6);
-			} else if (name.equals("dispatchKeyShortcutEvent")) {
-				__ho2 |= (1 << 7);
-			} else if (name.equals("dispatchPopulateAccessibilityEvent")) {
-				__ho3 |= (1 << 0);
-			} else if (name.equals("dispatchTouchEvent")) {
-				__ho3 |= (1 << 1);
-			} else if (name.equals("dispatchTrackballEvent")) {
-				__ho3 |= (1 << 2);
-			} else if (name.equals("dump")) {
-				__ho3 |= (1 << 3);
-			} else if (name.equals("enforceCallingOrSelfPermission")) {
-				__ho3 |= (1 << 4);
-			} else if (name.equals("enforceCallingOrSelfUriPermission")) {
-				__ho3 |= (1 << 5);
-			} else if (name.equals("enforceCallingPermission")) {
-				__ho3 |= (1 << 6);
-			} else if (name.equals("enforceCallingUriPermission")) {
-				__ho3 |= (1 << 7);
-			} else if (name.equals("enforcePermission")) {
-				__ho4 |= (1 << 0);
-			} else if (name.equals("enforceUriPermission")) {
-				__ho4 |= (1 << 1);
-			} else if (name.equals("equals")) {
-				__ho4 |= (1 << 2);
-			} else if (name.equals("fileList")) {
-				__ho4 |= (1 << 3);
-			} else if (name.equals("finalize")) {
-				__ho4 |= (1 << 4);
-			} else if (name.equals("findViewById")) {
-				__ho4 |= (1 << 5);
-			} else if (name.equals("finish")) {
-				__ho4 |= (1 << 6);
-			} else if (name.equals("finishActivity")) {
-				__ho4 |= (1 << 7);
-			} else if (name.equals("finishActivityFromChild")) {
-				__ho5 |= (1 << 0);
-			} else if (name.equals("finishAffinity")) {
-				__ho5 |= (1 << 1);
-			} else if (name.equals("finishFromChild")) {
-				__ho5 |= (1 << 2);
-			} else if (name.equals("getActionBar")) {
-				__ho5 |= (1 << 3);
-			} else if (name.equals("getApplicationContext")) {
-				__ho5 |= (1 << 4);
-			} else if (name.equals("getApplicationInfo")) {
-				__ho5 |= (1 << 5);
-			} else if (name.equals("getAssets")) {
-				__ho5 |= (1 << 6);
-			} else if (name.equals("getBaseContext")) {
-				__ho5 |= (1 << 7);
-			} else if (name.equals("getCacheDir")) {
-				__ho6 |= (1 << 0);
-			} else if (name.equals("getCallingActivity")) {
-				__ho6 |= (1 << 1);
-			} else if (name.equals("getCallingPackage")) {
-				__ho6 |= (1 << 2);
-			} else if (name.equals("getChangingConfigurations")) {
-				__ho6 |= (1 << 3);
-			} else if (name.equals("getClassLoader")) {
-				__ho6 |= (1 << 4);
-			} else if (name.equals("getComponentName")) {
-				__ho6 |= (1 << 5);
-			} else if (name.equals("getContentResolver")) {
-				__ho6 |= (1 << 6);
-			} else if (name.equals("getCurrentFocus")) {
-				__ho6 |= (1 << 7);
-			} else if (name.equals("getDatabasePath")) {
-				__ho7 |= (1 << 0);
-			} else if (name.equals("getDir")) {
-				__ho7 |= (1 << 1);
-			} else if (name.equals("getExternalCacheDir")) {
-				__ho7 |= (1 << 2);
-			} else if (name.equals("getExternalFilesDir")) {
-				__ho7 |= (1 << 3);
-			} else if (name.equals("getFileStreamPath")) {
-				__ho7 |= (1 << 4);
-			} else if (name.equals("getFilesDir")) {
-				__ho7 |= (1 << 5);
-			} else if (name.equals("getFragmentManager")) {
-				__ho7 |= (1 << 6);
-			} else if (name.equals("getIntent")) {
-				__ho7 |= (1 << 7);
-			} else if (name.equals("getLastNonConfigurationInstance")) {
-				__ho8 |= (1 << 0);
-			} else if (name.equals("getLayoutInflater")) {
-				__ho8 |= (1 << 1);
-			} else if (name.equals("getLoaderManager")) {
-				__ho8 |= (1 << 2);
-			} else if (name.equals("getLocalClassName")) {
-				__ho8 |= (1 << 3);
-			} else if (name.equals("getMainLooper")) {
-				__ho8 |= (1 << 4);
-			} else if (name.equals("getMenuInflater")) {
-				__ho8 |= (1 << 5);
-			} else if (name.equals("getObbDir")) {
-				__ho8 |= (1 << 6);
-			} else if (name.equals("getPackageCodePath")) {
-				__ho8 |= (1 << 7);
-			} else if (name.equals("getPackageManager")) {
-				__ho9 |= (1 << 0);
-			} else if (name.equals("getPackageName")) {
-				__ho9 |= (1 << 1);
-			} else if (name.equals("getPackageResourcePath")) {
-				__ho9 |= (1 << 2);
-			} else if (name.equals("getParentActivityIntent")) {
-				__ho9 |= (1 << 3);
-			} else if (name.equals("getPreferences")) {
-				__ho9 |= (1 << 4);
-			} else if (name.equals("getRequestedOrientation")) {
-				__ho9 |= (1 << 5);
-			} else if (name.equals("getResources")) {
-				__ho9 |= (1 << 6);
-			} else if (name.equals("getSharedPreferences")) {
-				__ho9 |= (1 << 7);
-			} else if (name.equals("getSystemService")) {
-				__ho10 |= (1 << 0);
-			} else if (name.equals("getTaskId")) {
-				__ho10 |= (1 << 1);
-			} else if (name.equals("getTheme")) {
-				__ho10 |= (1 << 2);
-			} else if (name.equals("getWallpaper")) {
-				__ho10 |= (1 << 3);
-			} else if (name.equals("getWallpaperDesiredMinimumHeight")) {
-				__ho10 |= (1 << 4);
-			} else if (name.equals("getWallpaperDesiredMinimumWidth")) {
-				__ho10 |= (1 << 5);
-			} else if (name.equals("getWindow")) {
-				__ho10 |= (1 << 6);
-			} else if (name.equals("getWindowManager")) {
-				__ho10 |= (1 << 7);
-			} else if (name.equals("grantUriPermission")) {
-				__ho11 |= (1 << 0);
-			} else if (name.equals("hasWindowFocus")) {
-				__ho11 |= (1 << 1);
-			} else if (name.equals("hashCode")) {
-				__ho11 |= (1 << 2);
-			} else if (name.equals("invalidateOptionsMenu")) {
-				__ho11 |= (1 << 3);
-			} else if (name.equals("isChangingConfigurations")) {
-				__ho11 |= (1 << 4);
-			} else if (name.equals("isDestroyed")) {
-				__ho11 |= (1 << 5);
-			} else if (name.equals("isFinishing")) {
-				__ho11 |= (1 << 6);
-			} else if (name.equals("isRestricted")) {
-				__ho11 |= (1 << 7);
-			} else if (name.equals("isTaskRoot")) {
-				__ho12 |= (1 << 0);
-			} else if (name.equals("moveTaskToBack")) {
-				__ho12 |= (1 << 1);
-			} else if (name.equals("navigateUpTo")) {
-				__ho12 |= (1 << 2);
-			} else if (name.equals("navigateUpToFromChild")) {
-				__ho12 |= (1 << 3);
-			} else if (name.equals("onActionModeFinished")) {
-				__ho12 |= (1 << 4);
-			} else if (name.equals("onActionModeStarted")) {
-				__ho12 |= (1 << 5);
-			} else if (name.equals("onActivityResult")) {
-				__ho12 |= (1 << 6);
-			} else if (name.equals("onApplyThemeResource")) {
-				__ho12 |= (1 << 7);
-			} else if (name.equals("onAttachFragment")) {
-				__ho13 |= (1 << 0);
-			} else if (name.equals("onAttachedToWindow")) {
-				__ho13 |= (1 << 1);
-			} else if (name.equals("onBackPressed")) {
-				__ho13 |= (1 << 2);
-			} else if (name.equals("onChildTitleChanged")) {
-				__ho13 |= (1 << 3);
-			} else if (name.equals("onConfigurationChanged")) {
-				__ho13 |= (1 << 4);
-			} else if (name.equals("onContentChanged")) {
-				__ho13 |= (1 << 5);
-			} else if (name.equals("onContextItemSelected")) {
-				__ho13 |= (1 << 6);
-			} else if (name.equals("onContextMenuClosed")) {
-				__ho13 |= (1 << 7);
-			} else if (name.equals("onCreate")) {
-				__ho14 |= (1 << 0);
-			} else if (name.equals("onCreateContextMenu")) {
-				__ho14 |= (1 << 1);
-			} else if (name.equals("onCreateDescription")) {
-				__ho14 |= (1 << 2);
-			} else if (name.equals("onCreateDialog")) {
-				__ho14 |= (1 << 3);
-			} else if (name.equals("onCreateNavigateUpTaskStack")) {
-				__ho14 |= (1 << 4);
-			} else if (name.equals("onCreateOptionsMenu")) {
-				__ho14 |= (1 << 5);
-			} else if (name.equals("onCreatePanelMenu")) {
-				__ho14 |= (1 << 6);
-			} else if (name.equals("onCreatePanelView")) {
-				__ho14 |= (1 << 7);
-			} else if (name.equals("onCreateThumbnail")) {
-				__ho15 |= (1 << 0);
-			} else if (name.equals("onCreateView")) {
-				__ho15 |= (1 << 1);
-			} else if (name.equals("onDestroy")) {
-				__ho15 |= (1 << 2);
-			} else if (name.equals("onDetachedFromWindow")) {
-				__ho15 |= (1 << 3);
-			} else if (name.equals("onGenericMotionEvent")) {
-				__ho15 |= (1 << 4);
-			} else if (name.equals("onKeyDown")) {
-				__ho15 |= (1 << 5);
-			} else if (name.equals("onKeyLongPress")) {
-				__ho15 |= (1 << 6);
-			} else if (name.equals("onKeyMultiple")) {
-				__ho15 |= (1 << 7);
-			} else if (name.equals("onKeyShortcut")) {
-				__ho16 |= (1 << 0);
-			} else if (name.equals("onKeyUp")) {
-				__ho16 |= (1 << 1);
-			} else if (name.equals("onLowMemory")) {
-				__ho16 |= (1 << 2);
-			} else if (name.equals("onMenuItemSelected")) {
-				__ho16 |= (1 << 3);
-			} else if (name.equals("onMenuOpened")) {
-				__ho16 |= (1 << 4);
-			} else if (name.equals("onNavigateUp")) {
-				__ho16 |= (1 << 5);
-			} else if (name.equals("onNavigateUpFromChild")) {
-				__ho16 |= (1 << 6);
-			} else if (name.equals("onNewIntent")) {
-				__ho16 |= (1 << 7);
-			} else if (name.equals("onOptionsItemSelected")) {
-				__ho17 |= (1 << 0);
-			} else if (name.equals("onOptionsMenuClosed")) {
-				__ho17 |= (1 << 1);
-			} else if (name.equals("onPanelClosed")) {
-				__ho17 |= (1 << 2);
-			} else if (name.equals("onPause")) {
-				__ho17 |= (1 << 3);
-			} else if (name.equals("onPostCreate")) {
-				__ho17 |= (1 << 4);
-			} else if (name.equals("onPostResume")) {
-				__ho17 |= (1 << 5);
-			} else if (name.equals("onPrepareDialog")) {
-				__ho17 |= (1 << 6);
-			} else if (name.equals("onPrepareNavigateUpTaskStack")) {
-				__ho17 |= (1 << 7);
-			} else if (name.equals("onPrepareOptionsMenu")) {
-				__ho18 |= (1 << 0);
-			} else if (name.equals("onPreparePanel")) {
-				__ho18 |= (1 << 1);
-			} else if (name.equals("onRestart")) {
-				__ho18 |= (1 << 2);
-			} else if (name.equals("onRestoreInstanceState")) {
-				__ho18 |= (1 << 3);
-			} else if (name.equals("onResume")) {
-				__ho18 |= (1 << 4);
-			} else if (name.equals("onRetainNonConfigurationInstance")) {
-				__ho18 |= (1 << 5);
-			} else if (name.equals("onSaveInstanceState")) {
-				__ho18 |= (1 << 6);
-			} else if (name.equals("onSearchRequested")) {
-				__ho18 |= (1 << 7);
-			} else if (name.equals("onStart")) {
-				__ho19 |= (1 << 0);
-			} else if (name.equals("onStop")) {
-				__ho19 |= (1 << 1);
-			} else if (name.equals("onTitleChanged")) {
-				__ho19 |= (1 << 2);
-			} else if (name.equals("onTouchEvent")) {
-				__ho19 |= (1 << 3);
-			} else if (name.equals("onTrackballEvent")) {
-				__ho19 |= (1 << 4);
-			} else if (name.equals("onTrimMemory")) {
-				__ho19 |= (1 << 5);
-			} else if (name.equals("onUserInteraction")) {
-				__ho19 |= (1 << 6);
-			} else if (name.equals("onUserLeaveHint")) {
-				__ho19 |= (1 << 7);
-			} else if (name.equals("onWindowAttributesChanged")) {
-				__ho20 |= (1 << 0);
-			} else if (name.equals("onWindowFocusChanged")) {
-				__ho20 |= (1 << 1);
-			} else if (name.equals("onWindowStartingActionMode")) {
-				__ho20 |= (1 << 2);
-			} else if (name.equals("openContextMenu")) {
-				__ho20 |= (1 << 3);
-			} else if (name.equals("openFileInput")) {
-				__ho20 |= (1 << 4);
-			} else if (name.equals("openFileOutput")) {
-				__ho20 |= (1 << 5);
-			} else if (name.equals("openOptionsMenu")) {
-				__ho20 |= (1 << 6);
-			} else if (name.equals("openOrCreateDatabase")) {
-				__ho20 |= (1 << 7);
-			} else if (name.equals("overridePendingTransition")) {
-				__ho21 |= (1 << 0);
-			} else if (name.equals("peekWallpaper")) {
-				__ho21 |= (1 << 1);
-			} else if (name.equals("recreate")) {
-				__ho21 |= (1 << 2);
-			} else if (name.equals("registerComponentCallbacks")) {
-				__ho21 |= (1 << 3);
-			} else if (name.equals("registerForContextMenu")) {
-				__ho21 |= (1 << 4);
-			} else if (name.equals("registerReceiver")) {
-				__ho21 |= (1 << 5);
-			} else if (name.equals("removeStickyBroadcast")) {
-				__ho21 |= (1 << 6);
-			} else if (name.equals("removeStickyBroadcastAsUser")) {
-				__ho21 |= (1 << 7);
-			} else if (name.equals("revokeUriPermission")) {
-				__ho22 |= (1 << 0);
-			} else if (name.equals("sendBroadcast")) {
-				__ho22 |= (1 << 1);
-			} else if (name.equals("sendBroadcastAsUser")) {
-				__ho22 |= (1 << 2);
-			} else if (name.equals("sendOrderedBroadcast")) {
-				__ho22 |= (1 << 3);
-			} else if (name.equals("sendOrderedBroadcastAsUser")) {
-				__ho22 |= (1 << 4);
-			} else if (name.equals("sendStickyBroadcast")) {
-				__ho22 |= (1 << 5);
-			} else if (name.equals("sendStickyBroadcastAsUser")) {
-				__ho22 |= (1 << 6);
-			} else if (name.equals("sendStickyOrderedBroadcast")) {
-				__ho22 |= (1 << 7);
-			} else if (name.equals("sendStickyOrderedBroadcastAsUser")) {
-				__ho23 |= (1 << 0);
-			} else if (name.equals("setContentView")) {
-				__ho23 |= (1 << 1);
-			} else if (name.equals("setFinishOnTouchOutside")) {
-				__ho23 |= (1 << 2);
-			} else if (name.equals("setIntent")) {
-				__ho23 |= (1 << 3);
-			} else if (name.equals("setRequestedOrientation")) {
-				__ho23 |= (1 << 4);
-			} else if (name.equals("setTheme")) {
-				__ho23 |= (1 << 5);
-			} else if (name.equals("setTitle")) {
-				__ho23 |= (1 << 6);
-			} else if (name.equals("setTitleColor")) {
-				__ho23 |= (1 << 7);
-			} else if (name.equals("setVisible")) {
-				__ho24 |= (1 << 0);
-			} else if (name.equals("setWallpaper")) {
-				__ho24 |= (1 << 1);
-			} else if (name.equals("shouldUpRecreateTask")) {
-				__ho24 |= (1 << 2);
-			} else if (name.equals("startActionMode")) {
-				__ho24 |= (1 << 3);
-			} else if (name.equals("startActivities")) {
-				__ho24 |= (1 << 4);
-			} else if (name.equals("startActivity")) {
-				__ho24 |= (1 << 5);
-			} else if (name.equals("startActivityForResult")) {
-				__ho24 |= (1 << 6);
-			} else if (name.equals("startActivityFromChild")) {
-				__ho24 |= (1 << 7);
-			} else if (name.equals("startActivityFromFragment")) {
-				__ho25 |= (1 << 0);
-			} else if (name.equals("startActivityIfNeeded")) {
-				__ho25 |= (1 << 1);
-			} else if (name.equals("startInstrumentation")) {
-				__ho25 |= (1 << 2);
-			} else if (name.equals("startIntentSender")) {
-				__ho25 |= (1 << 3);
-			} else if (name.equals("startIntentSenderForResult")) {
-				__ho25 |= (1 << 4);
-			} else if (name.equals("startIntentSenderFromChild")) {
-				__ho25 |= (1 << 5);
-			} else if (name.equals("startManagingCursor")) {
-				__ho25 |= (1 << 6);
-			} else if (name.equals("startNextMatchingActivity")) {
-				__ho25 |= (1 << 7);
-			} else if (name.equals("startSearch")) {
-				__ho26 |= (1 << 0);
-			} else if (name.equals("startService")) {
-				__ho26 |= (1 << 1);
-			} else if (name.equals("stopManagingCursor")) {
-				__ho26 |= (1 << 2);
-			} else if (name.equals("stopService")) {
-				__ho26 |= (1 << 3);
-			} else if (name.equals("takeKeyEvents")) {
-				__ho26 |= (1 << 4);
-			} else if (name.equals("toString")) {
-				__ho26 |= (1 << 5);
-			} else if (name.equals("triggerSearch")) {
-				__ho26 |= (1 << 6);
-			} else if (name.equals("unbindService")) {
-				__ho26 |= (1 << 7);
-			} else if (name.equals("unregisterComponentCallbacks")) {
-				__ho27 |= (1 << 0);
-			} else if (name.equals("unregisterForContextMenu")) {
-				__ho27 |= (1 << 1);
-			} else if (name.equals("unregisterReceiver")) {
-				__ho27 |= (1 << 2);
-			}
-		
-	}
-	private boolean __initialized;
-	private boolean __ctorOverridden;
-	private byte __ho0;
-	private byte __ho1;
-	private byte __ho2;
-	private byte __ho3;
-	private byte __ho4;
-	private byte __ho5;
-	private byte __ho6;
-	private byte __ho7;
-	private byte __ho8;
-	private byte __ho9;
-	private byte __ho10;
-	private byte __ho11;
-	private byte __ho12;
-	private byte __ho13;
-	private byte __ho14;
-	private byte __ho15;
-	private byte __ho16;
-	private byte __ho17;
-	private byte __ho18;
-	private byte __ho19;
-	private byte __ho20;
-	private byte __ho21;
-	private byte __ho22;
-	private byte __ho23;
-	private byte __ho24;
-	private byte __ho25;
-	private byte __ho26;
-	private byte __ho27;
-	private byte __ho28;
+	private boolean __ho0;
+	private boolean __ho1;
+	private boolean __ho2;
+	private boolean __ho3;
+	private boolean __ho4;
+	private boolean __ho5;
+	private boolean __ho6;
+	private boolean __ho7;
+	private boolean __ho8;
+	private boolean __ho9;
+	private boolean __ho10;
+	private boolean __ho11;
+	private boolean __ho12;
+	private boolean __ho13;
+	private boolean __ho14;
+	private boolean __ho15;
+	private boolean __ho16;
+	private boolean __ho17;
+	private boolean __ho18;
+	private boolean __ho19;
+	private boolean __ho20;
+	private boolean __ho21;
+	private boolean __ho22;
+	private boolean __ho23;
+	private boolean __ho24;
+	private boolean __ho25;
+	private boolean __ho26;
+	private boolean __ho27;
+	private boolean __ho28;
+	private boolean __ho29;
+	private boolean __ho30;
+	private boolean __ho31;
+	private boolean __ho32;
+	private boolean __ho33;
+	private boolean __ho34;
+	private boolean __ho35;
+	private boolean __ho36;
+	private boolean __ho37;
+	private boolean __ho38;
+	private boolean __ho39;
+	private boolean __ho40;
+	private boolean __ho41;
+	private boolean __ho42;
+	private boolean __ho43;
+	private boolean __ho44;
+	private boolean __ho45;
+	private boolean __ho46;
+	private boolean __ho47;
+	private boolean __ho48;
+	private boolean __ho49;
+	private boolean __ho50;
+	private boolean __ho51;
+	private boolean __ho52;
+	private boolean __ho53;
+	private boolean __ho54;
+	private boolean __ho55;
+	private boolean __ho56;
+	private boolean __ho57;
+	private boolean __ho58;
+	private boolean __ho59;
+	private boolean __ho60;
+	private boolean __ho61;
+	private boolean __ho62;
+	private boolean __ho63;
+	private boolean __ho64;
+	private boolean __ho65;
+	private boolean __ho66;
+	private boolean __ho67;
+	private boolean __ho68;
+	private boolean __ho69;
+	private boolean __ho70;
+	private boolean __ho71;
+	private boolean __ho72;
+	private boolean __ho73;
+	private boolean __ho74;
+	private boolean __ho75;
+	private boolean __ho76;
+	private boolean __ho77;
+	private boolean __ho78;
+	private boolean __ho79;
+	private boolean __ho80;
+	private boolean __ho81;
+	private boolean __ho82;
+	private boolean __ho83;
+	private boolean __ho84;
+	private boolean __ho85;
+	private boolean __ho86;
+	private boolean __ho87;
+	private boolean __ho88;
+	private boolean __ho89;
+	private boolean __ho90;
+	private boolean __ho91;
+	private boolean __ho92;
+	private boolean __ho93;
+	private boolean __ho94;
+	private boolean __ho95;
+	private boolean __ho96;
+	private boolean __ho97;
+	private boolean __ho98;
+	private boolean __ho99;
+	private boolean __ho100;
+	private boolean __ho101;
+	private boolean __ho102;
+	private boolean __ho103;
+	private boolean __ho104;
+	private boolean __ho105;
+	private boolean __ho106;
+	private boolean __ho107;
+	private boolean __ho108;
+	private boolean __ho109;
+	private boolean __ho110;
+	private boolean __ho111;
+	private boolean __ho112;
+	private boolean __ho113;
+	private boolean __ho114;
+	private boolean __ho115;
+	private boolean __ho116;
+	private boolean __ho117;
+	private boolean __ho118;
+	private boolean __ho119;
+	private boolean __ho120;
+	private boolean __ho121;
+	private boolean __ho122;
+	private boolean __ho123;
+	private boolean __ho124;
+	private boolean __ho125;
+	private boolean __ho126;
+	private boolean __ho127;
+	private boolean __ho128;
+	private boolean __ho129;
+	private boolean __ho130;
+	private boolean __ho131;
+	private boolean __ho132;
+	private boolean __ho133;
+	private boolean __ho134;
+	private boolean __ho135;
+	private boolean __ho136;
+	private boolean __ho137;
+	private boolean __ho138;
+	private boolean __ho139;
+	private boolean __ho140;
+	private boolean __ho141;
+	private boolean __ho142;
+	private boolean __ho143;
+	private boolean __ho144;
+	private boolean __ho145;
+	private boolean __ho146;
+	private boolean __ho147;
+	private boolean __ho148;
+	private boolean __ho149;
+	private boolean __ho150;
+	private boolean __ho151;
+	private boolean __ho152;
+	private boolean __ho153;
+	private boolean __ho154;
+	private boolean __ho155;
+	private boolean __ho156;
+	private boolean __ho157;
+	private boolean __ho158;
+	private boolean __ho159;
+	private boolean __ho160;
+	private boolean __ho161;
+	private boolean __ho162;
+	private boolean __ho163;
+	private boolean __ho164;
+	private boolean __ho165;
+	private boolean __ho166;
+	private boolean __ho167;
+	private boolean __ho168;
+	private boolean __ho169;
+	private boolean __ho170;
+	private boolean __ho171;
+	private boolean __ho172;
+	private boolean __ho173;
+	private boolean __ho174;
+	private boolean __ho175;
+	private boolean __ho176;
+	private boolean __ho177;
+	private boolean __ho178;
+	private boolean __ho179;
+	private boolean __ho180;
+	private boolean __ho181;
+	private boolean __ho182;
+	private boolean __ho183;
+	private boolean __ho184;
+	private boolean __ho185;
+	private boolean __ho186;
+	private boolean __ho187;
+	private boolean __ho188;
+	private boolean __ho189;
+	private boolean __ho190;
+	private boolean __ho191;
+	private boolean __ho192;
+	private boolean __ho193;
+	private boolean __ho194;
+	private boolean __ho195;
+	private boolean __ho196;
+	private boolean __ho197;
+	private boolean __ho198;
+	private boolean __ho199;
+	private boolean __ho200;
+	private boolean __ho201;
+	private boolean __ho202;
+	private boolean __ho203;
+	private boolean __ho204;
+	private boolean __ho205;
+	private boolean __ho206;
+	private boolean __ho207;
+	private boolean __ho208;
+	private boolean __ho209;
+	private boolean __ho210;
+	private boolean __ho211;
+	private boolean __ho212;
+	private boolean __ho213;
+	private boolean __ho214;
+	private boolean __ho215;
 }
