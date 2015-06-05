@@ -351,8 +351,8 @@ public class JsDebugger
 		if (logger.isEnabled()) logger.write("shouldDebugBreakFlag=" + shouldDebugBreakFlag);
 		
 		if (shouldDebugBreakFlag)
-		{
 			{
+				
 				try
 				{
 					Thread.sleep(3 * 1000);
@@ -575,8 +575,8 @@ public class JsDebugger
 			return false;
 		}
 		
-		String appRoot = context.getFilesDir().getPath() + File.separator;
-		File debugBreakFile = new File(appRoot, DEBUG_BREAK_FILENAME);
+		File baseDir = context.getExternalFilesDir(null);
+		File debugBreakFile = new File(baseDir, DEBUG_BREAK_FILENAME);
 		if (debugBreakFile.exists())
 		{
 			debugBreakFile.delete();
