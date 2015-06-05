@@ -313,7 +313,7 @@ public class JsDebugger
 
 	int getDebuggerPortFromEnvironment()
 	{
-		Log.d(Platform.DEFAULT_LOG_TAG, "getDebuggerPortFromEnvironment");
+		if (Platform.IsLogEnabled) Log.d(Platform.DEFAULT_LOG_TAG, "getDebuggerPortFromEnvironment");
 		int port = INVALID_PORT;
 		
 		boolean shouldEnableDebuggingFlag = shouldEnableDebugging(context);
