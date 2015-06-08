@@ -318,11 +318,16 @@ public class JsDebugger
 		
 		boolean shouldEnableDebuggingFlag = shouldEnableDebugging(context);
 		
-		if (Platform.IsLogEnabled) Log.d(Platform.DEFAULT_LOG_TAG, "getDebuggerPortFromEnvironment:: shouldEnableDebuggingFlag=" + shouldEnableDebuggingFlag);		
+		if (Platform.IsLogEnabled)
+		{
+			Log.d(Platform.DEFAULT_LOG_TAG, "getDebuggerPortFromEnvironment:: shouldEnableDebuggingFlag=" + shouldEnableDebuggingFlag);		
+		}
 
 		if (shouldEnableDebuggingFlag)
 		{
-			File baseDir = context.getExternalFilesDir(null);
+			String appRoot = context.getFilesDir().getPath() + File.separator;
+			File baseDir = new File(appRoot);
+			
 			File envOutFile = new File(baseDir, portEnvOutputFile);
 			OutputStreamWriter w = null;
 			try
@@ -353,7 +358,10 @@ public class JsDebugger
 			
 			boolean shouldDebugBreakFlag = shouldDebugBreak(context); 
 			
-			if (Platform.IsLogEnabled) Log.d(Platform.DEFAULT_LOG_TAG, "shouldDebugBreakFlag=" + shouldDebugBreakFlag);
+			if (Platform.IsLogEnabled)
+			{
+				Log.d(Platform.DEFAULT_LOG_TAG, "shouldDebugBreakFlag=" + shouldDebugBreakFlag);
+			}
 			
 			if (shouldDebugBreakFlag)
 			{
@@ -372,7 +380,10 @@ public class JsDebugger
 			
 			boolean envInFileFlag = envInFile.exists();
 			
-			if (Platform.IsLogEnabled) Log.d(Platform.DEFAULT_LOG_TAG, "envInFileFlag=" + envInFileFlag);
+			if (Platform.IsLogEnabled)
+			{
+				Log.d(Platform.DEFAULT_LOG_TAG, "envInFileFlag=" + envInFileFlag);
+			}
 			
 			if (envInFileFlag)
 			{
@@ -436,7 +447,10 @@ public class JsDebugger
 			}
 		}
 		
-		Log.d(Platform.DEFAULT_LOG_TAG, "port=" + port);
+		if (Platform.IsLogEnabled)
+		{
+			Log.d(Platform.DEFAULT_LOG_TAG, "Debug port=" + port);
+		}
 		
 		return port;
 	}
@@ -571,8 +585,8 @@ public class JsDebugger
 			return false;
 		}
 		
-		File baseDir = context.getExternalFilesDir(null);
-		File debugBreakFile = new File(baseDir, DEBUG_BREAK_FILENAME);
+		String appRoot = context.getFilesDir().getPath() + File.separator;
+		File debugBreakFile = new File(appRoot, DEBUG_BREAK_FILENAME);
 		if (debugBreakFile.exists())
 		{
 			debugBreakFile.delete();
