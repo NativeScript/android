@@ -111,7 +111,9 @@ public class Async
 			    }
 			}
 			
+			public ByteArrayOutputStream raw;
 			public ArrayList<KeyValuePair> headers = new ArrayList<KeyValuePair>();
+			public int statusCode;
 			public String responseAsString;
 			public Bitmap responseAsImage;
 			public Exception error;
@@ -136,12 +138,12 @@ public class Async
 
 			public void readResponseStream(HttpURLConnection connection, Stack<Closeable> openedStreams, RequestOptions options) throws IOException
 			{
-				int statusCode = connection.getResponseCode();
+				this.statusCode = connection.getResponseCode();
 
 				int contentLength = connection.getContentLength();
 				
 				InputStream inStream;
-				if (statusCode >= 400)
+				if (this.statusCode >= 400)
 				{
 					inStream = connection.getErrorStream();
 				}
@@ -163,6 +165,8 @@ public class Async
 				{
 					responseStream.write(buff, 0, read);
 				}
+				
+				this.raw = responseStream;
 				buff = null;
 				
 				// make the byte array conversion here, not in the JavaScript
