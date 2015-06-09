@@ -46,7 +46,7 @@ public class JsDebugger
 
 	private static final int INVALID_PORT = -1;
 
-	private static final String BASE_DEBUG_FILES_DIR = "/data/local/tmp/";
+	private String baseDebugFilesDir;
 	
 	private static final String portEnvInputFile = "envDebug.in";
 	
@@ -66,6 +66,7 @@ public class JsDebugger
 	public JsDebugger(Context context)
 	{
 		this.context = context;
+		baseDebugFilesDir = context.getFilesDir().getPath() + File.separator;
 	}
 
 	private static ServerSocket serverSocket;
@@ -315,8 +316,12 @@ public class JsDebugger
 
 	int getDebuggerPortFromEnvironment()
 	{
-		if (Platform.IsLogEnabled) Log.d(Platform.DEFAULT_LOG_TAG, "getDebuggerPortFromEnvironment");
-		int port = INVALID_PORT;
+		if (Platform.IsLogEnabled)
+		{
+			Log.d(Platform.DEFAULT_LOG_TAG, "getDebuggerPortFromEnvironment");
+		}
+		
+		int	port = INVALID_PORT;
 		
 		boolean shouldEnableDebuggingFlag = shouldEnableDebugging(context);
 		
@@ -327,10 +332,7 @@ public class JsDebugger
 
 		if (shouldEnableDebuggingFlag)
 		{
-			//String appRoot = context.getFilesDir().getPath() + File.separator;
-			File baseDir = new File(BASE_DEBUG_FILES_DIR);
-			
-			File envOutFile = new File(baseDir, context.getPackageName() + "-" + portEnvOutputFile);
+			File envOutFile = new File(baseDebugFilesDir, portEnvOutputFile);
 			OutputStreamWriter w = null;
 			try
 			{
@@ -378,7 +380,7 @@ public class JsDebugger
 				}
 			}
 
-			File envInFile = new File(baseDir, context.getPackageName() + "-" + portEnvInputFile);
+			File envInFile = new File(baseDebugFilesDir, portEnvInputFile);
 			
 			boolean envInFileFlag = envInFile.exists();
 			
@@ -574,7 +576,7 @@ public class JsDebugger
 	
 	public static Boolean shouldDebugBreakFlag = null;
 	
-	public static boolean shouldDebugBreak(Context context)
+	public boolean shouldDebugBreak(Context context)
 	{
 		if (shouldDebugBreakFlag != null)
 		{
@@ -587,7 +589,7 @@ public class JsDebugger
 			return false;
 		}
 		
-		File debugBreakFile = new File(BASE_DEBUG_FILES_DIR, context.getPackageName() + "-" + DEBUG_BREAK_FILENAME);
+		File debugBreakFile = new File(baseDebugFilesDir, DEBUG_BREAK_FILENAME);
 		if (debugBreakFile.exists())
 		{
 			debugBreakFile.delete();
