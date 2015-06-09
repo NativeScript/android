@@ -46,6 +46,8 @@ public class JsDebugger
 
 	private static final int INVALID_PORT = -1;
 
+	private static final String BASE_DEBUG_FILES_DIR = "/data/local/tmp/";
+	
 	private static final String portEnvInputFile = "envDebug.in";
 	
 	private static final String portEnvOutputFile = "envDebug.out";
@@ -325,10 +327,10 @@ public class JsDebugger
 
 		if (shouldEnableDebuggingFlag)
 		{
-			String appRoot = context.getFilesDir().getPath() + File.separator;
-			File baseDir = new File(appRoot);
+			//String appRoot = context.getFilesDir().getPath() + File.separator;
+			File baseDir = new File(BASE_DEBUG_FILES_DIR);
 			
-			File envOutFile = new File(baseDir, portEnvOutputFile);
+			File envOutFile = new File(baseDir, context.getPackageName() + "-" + portEnvOutputFile);
 			OutputStreamWriter w = null;
 			try
 			{
@@ -376,7 +378,7 @@ public class JsDebugger
 				}
 			}
 
-			File envInFile = new File(baseDir, portEnvInputFile);
+			File envInFile = new File(baseDir, context.getPackageName() + "-" + portEnvInputFile);
 			
 			boolean envInFileFlag = envInFile.exists();
 			
@@ -585,8 +587,7 @@ public class JsDebugger
 			return false;
 		}
 		
-		String appRoot = context.getFilesDir().getPath() + File.separator;
-		File debugBreakFile = new File(appRoot, DEBUG_BREAK_FILENAME);
+		File debugBreakFile = new File(BASE_DEBUG_FILES_DIR, context.getPackageName() + "-" + DEBUG_BREAK_FILENAME);
 		if (debugBreakFile.exists())
 		{
 			debugBreakFile.delete();
