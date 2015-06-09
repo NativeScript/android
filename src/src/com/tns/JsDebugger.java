@@ -46,6 +46,8 @@ public class JsDebugger
 
 	private static final int INVALID_PORT = -1;
 
+	private String baseDebugFilesDir;
+	
 	private static final String portEnvInputFile = "envDebug.in";
 	
 	private static final String portEnvOutputFile = "envDebug.out";
@@ -64,6 +66,7 @@ public class JsDebugger
 	public JsDebugger(Context context)
 	{
 		this.context = context;
+		baseDebugFilesDir = context.getFilesDir().getPath() + File.separator;
 	}
 
 	private static ServerSocket serverSocket;
@@ -313,17 +316,23 @@ public class JsDebugger
 
 	int getDebuggerPortFromEnvironment()
 	{
-		if (Platform.IsLogEnabled) Log.d(Platform.DEFAULT_LOG_TAG, "getDebuggerPortFromEnvironment");
-		int port = INVALID_PORT;
+		if (Platform.IsLogEnabled)
+		{
+			Log.d(Platform.DEFAULT_LOG_TAG, "getDebuggerPortFromEnvironment");
+		}
+		
+		int	port = INVALID_PORT;
 		
 		boolean shouldEnableDebuggingFlag = shouldEnableDebugging(context);
 		
-		if (Platform.IsLogEnabled) Log.d(Platform.DEFAULT_LOG_TAG, "getDebuggerPortFromEnvironment:: shouldEnableDebuggingFlag=" + shouldEnableDebuggingFlag);		
+		if (Platform.IsLogEnabled)
+		{
+			Log.d(Platform.DEFAULT_LOG_TAG, "getDebuggerPortFromEnvironment:: shouldEnableDebuggingFlag=" + shouldEnableDebuggingFlag);		
+		}
 
 		if (shouldEnableDebuggingFlag)
 		{
-			File baseDir = context.getExternalFilesDir(null);
-			File envOutFile = new File(baseDir, portEnvOutputFile);
+			File envOutFile = new File(baseDebugFilesDir, portEnvOutputFile);
 			OutputStreamWriter w = null;
 			try
 			{
@@ -353,7 +362,10 @@ public class JsDebugger
 			
 			boolean shouldDebugBreakFlag = shouldDebugBreak(context); 
 			
-			if (Platform.IsLogEnabled) Log.d(Platform.DEFAULT_LOG_TAG, "shouldDebugBreakFlag=" + shouldDebugBreakFlag);
+			if (Platform.IsLogEnabled)
+			{
+				Log.d(Platform.DEFAULT_LOG_TAG, "shouldDebugBreakFlag=" + shouldDebugBreakFlag);
+			}
 			
 			if (shouldDebugBreakFlag)
 			{
@@ -368,11 +380,14 @@ public class JsDebugger
 				}
 			}
 
-			File envInFile = new File(baseDir, portEnvInputFile);
+			File envInFile = new File(baseDebugFilesDir, portEnvInputFile);
 			
 			boolean envInFileFlag = envInFile.exists();
 			
-			if (Platform.IsLogEnabled) Log.d(Platform.DEFAULT_LOG_TAG, "envInFileFlag=" + envInFileFlag);
+			if (Platform.IsLogEnabled)
+			{
+				Log.d(Platform.DEFAULT_LOG_TAG, "envInFileFlag=" + envInFileFlag);
+			}
 			
 			if (envInFileFlag)
 			{
@@ -436,7 +451,10 @@ public class JsDebugger
 			}
 		}
 		
-		Log.d(Platform.DEFAULT_LOG_TAG, "port=" + port);
+		if (Platform.IsLogEnabled)
+		{
+			Log.d(Platform.DEFAULT_LOG_TAG, "Debug port=" + port);
+		}
 		
 		return port;
 	}
@@ -558,7 +576,7 @@ public class JsDebugger
 	
 	public static Boolean shouldDebugBreakFlag = null;
 	
-	public static boolean shouldDebugBreak(Context context)
+	public boolean shouldDebugBreak(Context context)
 	{
 		if (shouldDebugBreakFlag != null)
 		{
@@ -571,8 +589,7 @@ public class JsDebugger
 			return false;
 		}
 		
-		File baseDir = context.getExternalFilesDir(null);
-		File debugBreakFile = new File(baseDir, DEBUG_BREAK_FILENAME);
+		File debugBreakFile = new File(baseDebugFilesDir, DEBUG_BREAK_FILENAME);
 		if (debugBreakFile.exists())
 		{
 			debugBreakFile.delete();
