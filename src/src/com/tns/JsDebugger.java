@@ -611,6 +611,11 @@ public class JsDebugger
 		}
 		
 		File debugBreakFile = new File(baseDebugFilesDir, DEBUG_BREAK_FILENAME);
+		if (Platform.IsLogEnabled || LOGGING_ENABLED)
+		{
+			Log.d(Platform.DEFAULT_LOG_TAG, "shouldDebugBreak: Looking for debugbreak file at: " + debugBreakFile.getAbsolutePath());
+		}
+		
 		if (debugBreakFile.exists())
 		{
 			if (Platform.IsLogEnabled || LOGGING_ENABLED)
