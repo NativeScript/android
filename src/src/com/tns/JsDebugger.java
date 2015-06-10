@@ -512,12 +512,13 @@ public class JsDebugger
 						String packageName = bundle.getString("packageName", context.getPackageName());
 						boolean waitForDebugger = bundle.getBoolean("waitForDebugger", false);
 						JsDebugger.enableAgent(packageName, port, waitForDebugger);
-						int resultCode = port;
-						this.setResultCode(resultCode);
+						currentPort = port;
+						this.setResultCode(currentPort);
 					}
 					else
 					{
 						JsDebugger.disableAgent();
+						currentPort = INVALID_PORT;
 					}
 				}
 			}
