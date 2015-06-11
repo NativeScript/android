@@ -1,5 +1,19 @@
 # Android Runtime Changelog
 
+## 1.1.0 (2015, June 10)
+
+### New
+
+* Implemented [#58](https://github.com/NativeScript/android-runtime/issues/60) to remove the 3-seconds initial timeout for Debug builds.
+* Implemented [#118](https://github.com/NativeScript/android-runtime/issues/118) to replace the MultiDex library with DexClassLoader.
+
+### Fixed
+
+* [#63](https://github.com/NativeScript/android-runtime/issues/63). An issue which prevented users to extend overloaded methods.
+* [#64](https://github.com/NativeScript/android-runtime/issues/64). A JNI Crash when calling JS method with char.
+* [#113](https://github.com/NativeScript/android-runtime/issues/113). Fixes the extend routine for an Activity.
+* [#114](https://github.com/NativeScript/android-runtime/issues/114). Removes the redundant setNativeScriptOverrides method.
+
 ## 1.0.0 (2015, April 29)
 
 ### New
