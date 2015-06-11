@@ -812,7 +812,7 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
 	// TODO: refactor this
 	if (isSuper && (className == "com/tns/NativeScriptActivity"))
 	{
-		className = "android/app/Activity";
+		className = "android/support/v7/app/AppCompatActivity";
 	}
 
 	if ((methodName == V8StringConstants::VALUE_OF) && (argLength == 0))

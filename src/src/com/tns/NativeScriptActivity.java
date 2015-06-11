@@ -1,6 +1,6 @@
 package com.tns;
 
-public class NativeScriptActivity extends android.app.Activity
+public class NativeScriptActivity extends android.support.v7.app.AppCompatActivity
 {
 	private final int objectId;
 	
@@ -47,7 +47,7 @@ public class NativeScriptActivity extends android.app.Activity
 			args[0] = param_0;
 			args[1] = param_1;
 			args[2] = param_2;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "bindService", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "bindService", args);
 		}
 		else
 		{
@@ -61,7 +61,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (Integer)com.tns.Platform.callJSMethod(this, "checkCallingOrSelfPermission", args);
+			return (int)com.tns.Platform.callJSMethod(this, "checkCallingOrSelfPermission", args);
 		}
 		else
 		{
@@ -76,7 +76,7 @@ public class NativeScriptActivity extends android.app.Activity
 			Object[] args = new Object[2];
 			args[0] = param_0;
 			args[1] = param_1;
-			return (Integer)com.tns.Platform.callJSMethod(this, "checkCallingOrSelfUriPermission", args);
+			return (int)com.tns.Platform.callJSMethod(this, "checkCallingOrSelfUriPermission", args);
 		}
 		else
 		{
@@ -90,7 +90,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (Integer)com.tns.Platform.callJSMethod(this, "checkCallingPermission", args);
+			return (int)com.tns.Platform.callJSMethod(this, "checkCallingPermission", args);
 		}
 		else
 		{
@@ -105,7 +105,7 @@ public class NativeScriptActivity extends android.app.Activity
 			Object[] args = new Object[2];
 			args[0] = param_0;
 			args[1] = param_1;
-			return (Integer)com.tns.Platform.callJSMethod(this, "checkCallingUriPermission", args);
+			return (int)com.tns.Platform.callJSMethod(this, "checkCallingUriPermission", args);
 		}
 		else
 		{
@@ -121,28 +121,11 @@ public class NativeScriptActivity extends android.app.Activity
 			args[0] = param_0;
 			args[1] = param_1;
 			args[2] = param_2;
-			return (Integer)com.tns.Platform.callJSMethod(this, "checkPermission", args);
+			return (int)com.tns.Platform.callJSMethod(this, "checkPermission", args);
 		}
 		else
 		{
 			return super.checkPermission(param_0, param_1, param_2);
-		}
-	}
-
-	public int checkUriPermission(android.net.Uri param_0, int param_1, int param_2, int param_3)
-	{
-		if (__ho8)
-		{
-			Object[] args = new Object[4];
-			args[0] = param_0;
-			args[1] = param_1;
-			args[2] = param_2;
-			args[3] = param_3;
-			return (Integer)com.tns.Platform.callJSMethod(this, "checkUriPermission", args);
-		}
-		else
-		{
-			return super.checkUriPermission(param_0, param_1, param_2, param_3);
 		}
 	}
 
@@ -157,11 +140,28 @@ public class NativeScriptActivity extends android.app.Activity
 			args[3] = param_3;
 			args[4] = param_4;
 			args[5] = param_5;
-			return (Integer)com.tns.Platform.callJSMethod(this, "checkUriPermission", args);
+			return (int)com.tns.Platform.callJSMethod(this, "checkUriPermission", args);
 		}
 		else
 		{
 			return super.checkUriPermission(param_0, param_1, param_2, param_3, param_4, param_5);
+		}
+	}
+
+	public int checkUriPermission(android.net.Uri param_0, int param_1, int param_2, int param_3)
+	{
+		if (__ho8)
+		{
+			Object[] args = new Object[4];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			args[3] = param_3;
+			return (int)com.tns.Platform.callJSMethod(this, "checkUriPermission", args);
+		}
+		else
+		{
+			return super.checkUriPermission(param_0, param_1, param_2, param_3);
 		}
 	}
 
@@ -282,7 +282,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "deleteDatabase", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "deleteDatabase", args);
 		}
 		else
 		{
@@ -296,7 +296,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "deleteFile", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "deleteFile", args);
 		}
 		else
 		{
@@ -310,7 +310,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "dispatchGenericMotionEvent", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "dispatchGenericMotionEvent", args);
 		}
 		else
 		{
@@ -324,7 +324,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "dispatchKeyEvent", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "dispatchKeyEvent", args);
 		}
 		else
 		{
@@ -338,7 +338,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "dispatchKeyShortcutEvent", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "dispatchKeyShortcutEvent", args);
 		}
 		else
 		{
@@ -352,7 +352,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "dispatchPopulateAccessibilityEvent", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "dispatchPopulateAccessibilityEvent", args);
 		}
 		else
 		{
@@ -366,7 +366,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "dispatchTouchEvent", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "dispatchTouchEvent", args);
 		}
 		else
 		{
@@ -380,7 +380,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "dispatchTrackballEvent", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "dispatchTrackballEvent", args);
 		}
 		else
 		{
@@ -528,7 +528,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "equals", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "equals", args);
 		}
 		else
 		{
@@ -741,7 +741,7 @@ public class NativeScriptActivity extends android.app.Activity
 		if (__ho48)
 		{
 			Object[] args = null;
-			return (Integer)com.tns.Platform.callJSMethod(this, "getChangingConfigurations", args);
+			return (int)com.tns.Platform.callJSMethod(this, "getChangingConfigurations", args);
 		}
 		else
 		{
@@ -815,9 +815,22 @@ public class NativeScriptActivity extends android.app.Activity
 		}
 	}
 
-	public java.io.File getDir(java.lang.String param_0, int param_1)
+	public android.support.v7.app.AppCompatDelegate getDelegate()
 	{
 		if (__ho54)
+		{
+			Object[] args = null;
+			return (android.support.v7.app.AppCompatDelegate)com.tns.Platform.callJSMethod(this, "getDelegate", args);
+		}
+		else
+		{
+			return super.getDelegate();
+		}
+	}
+
+	public java.io.File getDir(java.lang.String param_0, int param_1)
+	{
+		if (__ho55)
 		{
 			Object[] args = new Object[2];
 			args[0] = param_0;
@@ -830,9 +843,22 @@ public class NativeScriptActivity extends android.app.Activity
 		}
 	}
 
+	public android.support.v7.app.ActionBarDrawerToggle.Delegate getDrawerToggleDelegate()
+	{
+		if (__ho56)
+		{
+			Object[] args = null;
+			return (android.support.v7.app.ActionBarDrawerToggle.Delegate)com.tns.Platform.callJSMethod(this, "getDrawerToggleDelegate", args);
+		}
+		else
+		{
+			return super.getDrawerToggleDelegate();
+		}
+	}
+
 	public java.io.File getExternalCacheDir()
 	{
-		if (__ho55)
+		if (__ho57)
 		{
 			Object[] args = null;
 			return (java.io.File)com.tns.Platform.callJSMethod(this, "getExternalCacheDir", args);
@@ -845,7 +871,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public java.io.File getExternalFilesDir(java.lang.String param_0)
 	{
-		if (__ho56)
+		if (__ho58)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -859,7 +885,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public java.io.File getFileStreamPath(java.lang.String param_0)
 	{
-		if (__ho57)
+		if (__ho59)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -873,7 +899,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public java.io.File getFilesDir()
 	{
-		if (__ho58)
+		if (__ho60)
 		{
 			Object[] args = null;
 			return (java.io.File)com.tns.Platform.callJSMethod(this, "getFilesDir", args);
@@ -886,7 +912,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public android.app.FragmentManager getFragmentManager()
 	{
-		if (__ho59)
+		if (__ho61)
 		{
 			Object[] args = null;
 			return (android.app.FragmentManager)com.tns.Platform.callJSMethod(this, "getFragmentManager", args);
@@ -899,7 +925,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public android.content.Intent getIntent()
 	{
-		if (__ho60)
+		if (__ho62)
 		{
 			Object[] args = null;
 			return (android.content.Intent)com.tns.Platform.callJSMethod(this, "getIntent", args);
@@ -910,9 +936,22 @@ public class NativeScriptActivity extends android.app.Activity
 		}
 	}
 
+	public java.lang.Object getLastCustomNonConfigurationInstance()
+	{
+		if (__ho63)
+		{
+			Object[] args = null;
+			return (java.lang.Object)com.tns.Platform.callJSMethod(this, "getLastCustomNonConfigurationInstance", args);
+		}
+		else
+		{
+			return super.getLastCustomNonConfigurationInstance();
+		}
+	}
+
 	public java.lang.Object getLastNonConfigurationInstance()
 	{
-		if (__ho61)
+		if (__ho64)
 		{
 			Object[] args = null;
 			return (java.lang.Object)com.tns.Platform.callJSMethod(this, "getLastNonConfigurationInstance", args);
@@ -925,7 +964,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public android.view.LayoutInflater getLayoutInflater()
 	{
-		if (__ho62)
+		if (__ho65)
 		{
 			Object[] args = null;
 			return (android.view.LayoutInflater)com.tns.Platform.callJSMethod(this, "getLayoutInflater", args);
@@ -938,7 +977,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public android.app.LoaderManager getLoaderManager()
 	{
-		if (__ho63)
+		if (__ho66)
 		{
 			Object[] args = null;
 			return (android.app.LoaderManager)com.tns.Platform.callJSMethod(this, "getLoaderManager", args);
@@ -951,7 +990,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public java.lang.String getLocalClassName()
 	{
-		if (__ho64)
+		if (__ho67)
 		{
 			Object[] args = null;
 			return (java.lang.String)com.tns.Platform.callJSMethod(this, "getLocalClassName", args);
@@ -964,7 +1003,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public android.os.Looper getMainLooper()
 	{
-		if (__ho65)
+		if (__ho68)
 		{
 			Object[] args = null;
 			return (android.os.Looper)com.tns.Platform.callJSMethod(this, "getMainLooper", args);
@@ -977,7 +1016,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public android.view.MenuInflater getMenuInflater()
 	{
-		if (__ho66)
+		if (__ho69)
 		{
 			Object[] args = null;
 			return (android.view.MenuInflater)com.tns.Platform.callJSMethod(this, "getMenuInflater", args);
@@ -990,7 +1029,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public java.io.File getObbDir()
 	{
-		if (__ho67)
+		if (__ho70)
 		{
 			Object[] args = null;
 			return (java.io.File)com.tns.Platform.callJSMethod(this, "getObbDir", args);
@@ -1003,7 +1042,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public java.lang.String getPackageCodePath()
 	{
-		if (__ho68)
+		if (__ho71)
 		{
 			Object[] args = null;
 			return (java.lang.String)com.tns.Platform.callJSMethod(this, "getPackageCodePath", args);
@@ -1016,7 +1055,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public android.content.pm.PackageManager getPackageManager()
 	{
-		if (__ho69)
+		if (__ho72)
 		{
 			Object[] args = null;
 			return (android.content.pm.PackageManager)com.tns.Platform.callJSMethod(this, "getPackageManager", args);
@@ -1029,7 +1068,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public java.lang.String getPackageName()
 	{
-		if (__ho70)
+		if (__ho73)
 		{
 			Object[] args = null;
 			return (java.lang.String)com.tns.Platform.callJSMethod(this, "getPackageName", args);
@@ -1042,7 +1081,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public java.lang.String getPackageResourcePath()
 	{
-		if (__ho71)
+		if (__ho74)
 		{
 			Object[] args = null;
 			return (java.lang.String)com.tns.Platform.callJSMethod(this, "getPackageResourcePath", args);
@@ -1055,7 +1094,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public android.content.Intent getParentActivityIntent()
 	{
-		if (__ho72)
+		if (__ho75)
 		{
 			Object[] args = null;
 			return (android.content.Intent)com.tns.Platform.callJSMethod(this, "getParentActivityIntent", args);
@@ -1068,7 +1107,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public android.content.SharedPreferences getPreferences(int param_0)
 	{
-		if (__ho73)
+		if (__ho76)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -1082,10 +1121,10 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public int getRequestedOrientation()
 	{
-		if (__ho74)
+		if (__ho77)
 		{
 			Object[] args = null;
-			return (Integer)com.tns.Platform.callJSMethod(this, "getRequestedOrientation", args);
+			return (int)com.tns.Platform.callJSMethod(this, "getRequestedOrientation", args);
 		}
 		else
 		{
@@ -1095,7 +1134,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public android.content.res.Resources getResources()
 	{
-		if (__ho75)
+		if (__ho78)
 		{
 			Object[] args = null;
 			return (android.content.res.Resources)com.tns.Platform.callJSMethod(this, "getResources", args);
@@ -1108,7 +1147,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public android.content.SharedPreferences getSharedPreferences(java.lang.String param_0, int param_1)
 	{
-		if (__ho76)
+		if (__ho79)
 		{
 			Object[] args = new Object[2];
 			args[0] = param_0;
@@ -1121,9 +1160,61 @@ public class NativeScriptActivity extends android.app.Activity
 		}
 	}
 
+	public android.support.v7.app.ActionBar getSupportActionBar()
+	{
+		if (__ho80)
+		{
+			Object[] args = null;
+			return (android.support.v7.app.ActionBar)com.tns.Platform.callJSMethod(this, "getSupportActionBar", args);
+		}
+		else
+		{
+			return super.getSupportActionBar();
+		}
+	}
+
+	public android.support.v4.app.FragmentManager getSupportFragmentManager()
+	{
+		if (__ho81)
+		{
+			Object[] args = null;
+			return (android.support.v4.app.FragmentManager)com.tns.Platform.callJSMethod(this, "getSupportFragmentManager", args);
+		}
+		else
+		{
+			return super.getSupportFragmentManager();
+		}
+	}
+
+	public android.support.v4.app.LoaderManager getSupportLoaderManager()
+	{
+		if (__ho82)
+		{
+			Object[] args = null;
+			return (android.support.v4.app.LoaderManager)com.tns.Platform.callJSMethod(this, "getSupportLoaderManager", args);
+		}
+		else
+		{
+			return super.getSupportLoaderManager();
+		}
+	}
+
+	public android.content.Intent getSupportParentActivityIntent()
+	{
+		if (__ho83)
+		{
+			Object[] args = null;
+			return (android.content.Intent)com.tns.Platform.callJSMethod(this, "getSupportParentActivityIntent", args);
+		}
+		else
+		{
+			return super.getSupportParentActivityIntent();
+		}
+	}
+
 	public java.lang.Object getSystemService(java.lang.String param_0)
 	{
-		if (__ho77)
+		if (__ho84)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -1137,10 +1228,10 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public int getTaskId()
 	{
-		if (__ho78)
+		if (__ho85)
 		{
 			Object[] args = null;
-			return (Integer)com.tns.Platform.callJSMethod(this, "getTaskId", args);
+			return (int)com.tns.Platform.callJSMethod(this, "getTaskId", args);
 		}
 		else
 		{
@@ -1150,7 +1241,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public android.content.res.Resources.Theme getTheme()
 	{
-		if (__ho79)
+		if (__ho86)
 		{
 			Object[] args = null;
 			return (android.content.res.Resources.Theme)com.tns.Platform.callJSMethod(this, "getTheme", args);
@@ -1163,7 +1254,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public android.graphics.drawable.Drawable getWallpaper()
 	{
-		if (__ho80)
+		if (__ho87)
 		{
 			Object[] args = null;
 			return (android.graphics.drawable.Drawable)com.tns.Platform.callJSMethod(this, "getWallpaper", args);
@@ -1176,10 +1267,10 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public int getWallpaperDesiredMinimumHeight()
 	{
-		if (__ho81)
+		if (__ho88)
 		{
 			Object[] args = null;
-			return (Integer)com.tns.Platform.callJSMethod(this, "getWallpaperDesiredMinimumHeight", args);
+			return (int)com.tns.Platform.callJSMethod(this, "getWallpaperDesiredMinimumHeight", args);
 		}
 		else
 		{
@@ -1189,10 +1280,10 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public int getWallpaperDesiredMinimumWidth()
 	{
-		if (__ho82)
+		if (__ho89)
 		{
 			Object[] args = null;
-			return (Integer)com.tns.Platform.callJSMethod(this, "getWallpaperDesiredMinimumWidth", args);
+			return (int)com.tns.Platform.callJSMethod(this, "getWallpaperDesiredMinimumWidth", args);
 		}
 		else
 		{
@@ -1202,7 +1293,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public android.view.Window getWindow()
 	{
-		if (__ho83)
+		if (__ho90)
 		{
 			Object[] args = null;
 			return (android.view.Window)com.tns.Platform.callJSMethod(this, "getWindow", args);
@@ -1215,7 +1306,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public android.view.WindowManager getWindowManager()
 	{
-		if (__ho84)
+		if (__ho91)
 		{
 			Object[] args = null;
 			return (android.view.WindowManager)com.tns.Platform.callJSMethod(this, "getWindowManager", args);
@@ -1228,7 +1319,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public void grantUriPermission(java.lang.String param_0, android.net.Uri param_1, int param_2)
 	{
-		if (__ho85)
+		if (__ho92)
 		{
 			Object[] args = new Object[3];
 			args[0] = param_0;
@@ -1244,10 +1335,10 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public boolean hasWindowFocus()
 	{
-		if (__ho86)
+		if (__ho93)
 		{
 			Object[] args = null;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "hasWindowFocus", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "hasWindowFocus", args);
 		}
 		else
 		{
@@ -1257,10 +1348,10 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public int hashCode()
 	{
-		if (__ho87)
+		if (__ho94)
 		{
 			Object[] args = null;
-			return (Integer)com.tns.Platform.callJSMethod(this, "hashCode", args);
+			return (int)com.tns.Platform.callJSMethod(this, "hashCode", args);
 		}
 		else
 		{
@@ -1270,7 +1361,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public void invalidateOptionsMenu()
 	{
-		if (__ho88)
+		if (__ho95)
 		{
 			Object[] args = null;
 			com.tns.Platform.callJSMethod(this, "invalidateOptionsMenu", args);
@@ -1283,10 +1374,10 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public boolean isChangingConfigurations()
 	{
-		if (__ho89)
+		if (__ho96)
 		{
 			Object[] args = null;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "isChangingConfigurations", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "isChangingConfigurations", args);
 		}
 		else
 		{
@@ -1296,10 +1387,10 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public boolean isDestroyed()
 	{
-		if (__ho90)
+		if (__ho97)
 		{
 			Object[] args = null;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "isDestroyed", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "isDestroyed", args);
 		}
 		else
 		{
@@ -1309,10 +1400,10 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public boolean isFinishing()
 	{
-		if (__ho91)
+		if (__ho98)
 		{
 			Object[] args = null;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "isFinishing", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "isFinishing", args);
 		}
 		else
 		{
@@ -1322,10 +1413,10 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public boolean isRestricted()
 	{
-		if (__ho92)
+		if (__ho99)
 		{
 			Object[] args = null;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "isRestricted", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "isRestricted", args);
 		}
 		else
 		{
@@ -1335,10 +1426,10 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public boolean isTaskRoot()
 	{
-		if (__ho93)
+		if (__ho100)
 		{
 			Object[] args = null;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "isTaskRoot", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "isTaskRoot", args);
 		}
 		else
 		{
@@ -1348,11 +1439,11 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public boolean moveTaskToBack(boolean param_0)
 	{
-		if (__ho94)
+		if (__ho101)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "moveTaskToBack", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "moveTaskToBack", args);
 		}
 		else
 		{
@@ -1362,11 +1453,11 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public boolean navigateUpTo(android.content.Intent param_0)
 	{
-		if (__ho95)
+		if (__ho102)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "navigateUpTo", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "navigateUpTo", args);
 		}
 		else
 		{
@@ -1376,12 +1467,12 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public boolean navigateUpToFromChild(android.app.Activity param_0, android.content.Intent param_1)
 	{
-		if (__ho96)
+		if (__ho103)
 		{
 			Object[] args = new Object[2];
 			args[0] = param_0;
 			args[1] = param_1;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "navigateUpToFromChild", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "navigateUpToFromChild", args);
 		}
 		else
 		{
@@ -1391,7 +1482,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public void onActionModeFinished(android.view.ActionMode param_0)
 	{
-		if (__ho97)
+		if (__ho104)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -1405,7 +1496,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public void onActionModeStarted(android.view.ActionMode param_0)
 	{
-		if (__ho98)
+		if (__ho105)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -1417,41 +1508,23 @@ public class NativeScriptActivity extends android.app.Activity
 		}
 	}
 
-	protected void onActivityResult(int param_0, int param_1, android.content.Intent param_2)
+	public void onAttachFragment(android.support.v4.app.Fragment param_0)
 	{
-		if (__ho99)
+		if (__ho106)
 		{
-			Object[] args = new Object[3];
+			Object[] args = new Object[1];
 			args[0] = param_0;
-			args[1] = param_1;
-			args[2] = param_2;
-			com.tns.Platform.callJSMethod(this, "onActivityResult", args);
+			com.tns.Platform.callJSMethod(this, "onAttachFragment", args);
 		}
 		else
 		{
-			super.onActivityResult(param_0, param_1, param_2);
-		}
-	}
-
-	protected void onApplyThemeResource(android.content.res.Resources.Theme param_0, int param_1, boolean param_2)
-	{
-		if (__ho100)
-		{
-			Object[] args = new Object[3];
-			args[0] = param_0;
-			args[1] = param_1;
-			args[2] = param_2;
-			com.tns.Platform.callJSMethod(this, "onApplyThemeResource", args);
-		}
-		else
-		{
-			super.onApplyThemeResource(param_0, param_1, param_2);
+			super.onAttachFragment(param_0);
 		}
 	}
 
 	public void onAttachFragment(android.app.Fragment param_0)
 	{
-		if (__ho101)
+		if (__ho106)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -1465,7 +1538,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public void onAttachedToWindow()
 	{
-		if (__ho102)
+		if (__ho107)
 		{
 			Object[] args = null;
 			com.tns.Platform.callJSMethod(this, "onAttachedToWindow", args);
@@ -1478,7 +1551,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public void onBackPressed()
 	{
-		if (__ho103)
+		if (__ho108)
 		{
 			Object[] args = null;
 			com.tns.Platform.callJSMethod(this, "onBackPressed", args);
@@ -1489,24 +1562,9 @@ public class NativeScriptActivity extends android.app.Activity
 		}
 	}
 
-	protected void onChildTitleChanged(android.app.Activity param_0, java.lang.CharSequence param_1)
-	{
-		if (__ho104)
-		{
-			Object[] args = new Object[2];
-			args[0] = param_0;
-			args[1] = param_1;
-			com.tns.Platform.callJSMethod(this, "onChildTitleChanged", args);
-		}
-		else
-		{
-			super.onChildTitleChanged(param_0, param_1);
-		}
-	}
-
 	public void onConfigurationChanged(android.content.res.Configuration param_0)
 	{
-		if (__ho105)
+		if (__ho109)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -1520,7 +1578,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public void onContentChanged()
 	{
-		if (__ho106)
+		if (__ho110)
 		{
 			Object[] args = null;
 			com.tns.Platform.callJSMethod(this, "onContentChanged", args);
@@ -1533,11 +1591,11 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public boolean onContextItemSelected(android.view.MenuItem param_0)
 	{
-		if (__ho107)
+		if (__ho111)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onContextItemSelected", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "onContextItemSelected", args);
 		}
 		else
 		{
@@ -1547,7 +1605,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public void onContextMenuClosed(android.view.Menu param_0)
 	{
-		if (__ho108)
+		if (__ho112)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -1558,7 +1616,7 @@ public class NativeScriptActivity extends android.app.Activity
 			super.onContextMenuClosed(param_0);
 		}
 	}
-	
+
 	private native String[] getMethodOverrides(int objectId, Object[] packagesArgs);
 
 	protected void onCreate(android.os.Bundle param_0)
@@ -1567,7 +1625,7 @@ public class NativeScriptActivity extends android.app.Activity
 		String[] methodOverrides = getMethodOverrides(objectId, packagesArgs);
 		setMethodOverrides(methodOverrides);
 		
-		if (__ho109)
+		if (__ho113)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -1582,7 +1640,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public void onCreateContextMenu(android.view.ContextMenu param_0, android.view.View param_1, android.view.ContextMenu.ContextMenuInfo param_2)
 	{
-		if (__ho110)
+		if (__ho114)
 		{
 			Object[] args = new Object[3];
 			args[0] = param_0;
@@ -1598,7 +1656,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public java.lang.CharSequence onCreateDescription()
 	{
-		if (__ho111)
+		if (__ho115)
 		{
 			Object[] args = null;
 			return (java.lang.CharSequence)com.tns.Platform.callJSMethod(this, "onCreateDescription", args);
@@ -1609,38 +1667,9 @@ public class NativeScriptActivity extends android.app.Activity
 		}
 	}
 
-	protected android.app.Dialog onCreateDialog(int param_0, android.os.Bundle param_1)
-	{
-		if (__ho112)
-		{
-			Object[] args = new Object[2];
-			args[0] = param_0;
-			args[1] = param_1;
-			return (android.app.Dialog)com.tns.Platform.callJSMethod(this, "onCreateDialog", args);
-		}
-		else
-		{
-			return super.onCreateDialog(param_0, param_1);
-		}
-	}
-
-	protected android.app.Dialog onCreateDialog(int param_0)
-	{
-		if (__ho112)
-		{
-			Object[] args = new Object[1];
-			args[0] = param_0;
-			return (android.app.Dialog)com.tns.Platform.callJSMethod(this, "onCreateDialog", args);
-		}
-		else
-		{
-			return super.onCreateDialog(param_0);
-		}
-	}
-
 	public void onCreateNavigateUpTaskStack(android.app.TaskStackBuilder param_0)
 	{
-		if (__ho113)
+		if (__ho116)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -1654,11 +1683,11 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public boolean onCreateOptionsMenu(android.view.Menu param_0)
 	{
-		if (__ho114)
+		if (__ho117)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onCreateOptionsMenu", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "onCreateOptionsMenu", args);
 		}
 		else
 		{
@@ -1668,12 +1697,12 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public boolean onCreatePanelMenu(int param_0, android.view.Menu param_1)
 	{
-		if (__ho115)
+		if (__ho118)
 		{
 			Object[] args = new Object[2];
 			args[0] = param_0;
 			args[1] = param_1;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onCreatePanelMenu", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "onCreatePanelMenu", args);
 		}
 		else
 		{
@@ -1683,7 +1712,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public android.view.View onCreatePanelView(int param_0)
 	{
-		if (__ho116)
+		if (__ho119)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -1695,14 +1724,28 @@ public class NativeScriptActivity extends android.app.Activity
 		}
 	}
 
+	public void onCreateSupportNavigateUpTaskStack(android.support.v4.app.TaskStackBuilder param_0)
+	{
+		if (__ho120)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "onCreateSupportNavigateUpTaskStack", args);
+		}
+		else
+		{
+			super.onCreateSupportNavigateUpTaskStack(param_0);
+		}
+	}
+
 	public boolean onCreateThumbnail(android.graphics.Bitmap param_0, android.graphics.Canvas param_1)
 	{
-		if (__ho117)
+		if (__ho121)
 		{
 			Object[] args = new Object[2];
 			args[0] = param_0;
 			args[1] = param_1;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onCreateThumbnail", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "onCreateThumbnail", args);
 		}
 		else
 		{
@@ -1712,7 +1755,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public android.view.View onCreateView(java.lang.String param_0, android.content.Context param_1, android.util.AttributeSet param_2)
 	{
-		if (__ho118)
+		if (__ho122)
 		{
 			Object[] args = new Object[3];
 			args[0] = param_0;
@@ -1728,7 +1771,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public android.view.View onCreateView(android.view.View param_0, java.lang.String param_1, android.content.Context param_2, android.util.AttributeSet param_3)
 	{
-		if (__ho118)
+		if (__ho122)
 		{
 			Object[] args = new Object[4];
 			args[0] = param_0;
@@ -1745,7 +1788,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	protected void onDestroy()
 	{
-		if (__ho119)
+		if (__ho123)
 		{
 			Object[] args = null;
 			com.tns.Platform.callJSMethod(this, "onDestroy", args);
@@ -1754,12 +1797,11 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			super.onDestroy();
 		}
-		// TODO: remove from com.tns.Platform.strongInstances
 	}
 
 	public void onDetachedFromWindow()
 	{
-		if (__ho120)
+		if (__ho124)
 		{
 			Object[] args = null;
 			com.tns.Platform.callJSMethod(this, "onDetachedFromWindow", args);
@@ -1772,11 +1814,11 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public boolean onGenericMotionEvent(android.view.MotionEvent param_0)
 	{
-		if (__ho121)
+		if (__ho125)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onGenericMotionEvent", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "onGenericMotionEvent", args);
 		}
 		else
 		{
@@ -1786,12 +1828,12 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public boolean onKeyDown(int param_0, android.view.KeyEvent param_1)
 	{
-		if (__ho122)
+		if (__ho126)
 		{
 			Object[] args = new Object[2];
 			args[0] = param_0;
 			args[1] = param_1;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onKeyDown", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "onKeyDown", args);
 		}
 		else
 		{
@@ -1801,12 +1843,12 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public boolean onKeyLongPress(int param_0, android.view.KeyEvent param_1)
 	{
-		if (__ho123)
+		if (__ho127)
 		{
 			Object[] args = new Object[2];
 			args[0] = param_0;
 			args[1] = param_1;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onKeyLongPress", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "onKeyLongPress", args);
 		}
 		else
 		{
@@ -1816,13 +1858,13 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public boolean onKeyMultiple(int param_0, int param_1, android.view.KeyEvent param_2)
 	{
-		if (__ho124)
+		if (__ho128)
 		{
 			Object[] args = new Object[3];
 			args[0] = param_0;
 			args[1] = param_1;
 			args[2] = param_2;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onKeyMultiple", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "onKeyMultiple", args);
 		}
 		else
 		{
@@ -1832,12 +1874,12 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public boolean onKeyShortcut(int param_0, android.view.KeyEvent param_1)
 	{
-		if (__ho125)
+		if (__ho129)
 		{
 			Object[] args = new Object[2];
 			args[0] = param_0;
 			args[1] = param_1;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onKeyShortcut", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "onKeyShortcut", args);
 		}
 		else
 		{
@@ -1847,12 +1889,12 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public boolean onKeyUp(int param_0, android.view.KeyEvent param_1)
 	{
-		if (__ho126)
+		if (__ho130)
 		{
 			Object[] args = new Object[2];
 			args[0] = param_0;
 			args[1] = param_1;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onKeyUp", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "onKeyUp", args);
 		}
 		else
 		{
@@ -1862,7 +1904,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public void onLowMemory()
 	{
-		if (__ho127)
+		if (__ho131)
 		{
 			Object[] args = null;
 			com.tns.Platform.callJSMethod(this, "onLowMemory", args);
@@ -1873,29 +1915,14 @@ public class NativeScriptActivity extends android.app.Activity
 		}
 	}
 
-	public boolean onMenuItemSelected(int param_0, android.view.MenuItem param_1)
-	{
-		if (__ho128)
-		{
-			Object[] args = new Object[2];
-			args[0] = param_0;
-			args[1] = param_1;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onMenuItemSelected", args);
-		}
-		else
-		{
-			return super.onMenuItemSelected(param_0, param_1);
-		}
-	}
-
 	public boolean onMenuOpened(int param_0, android.view.Menu param_1)
 	{
-		if (__ho129)
+		if (__ho132)
 		{
 			Object[] args = new Object[2];
 			args[0] = param_0;
 			args[1] = param_1;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onMenuOpened", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "onMenuOpened", args);
 		}
 		else
 		{
@@ -1905,10 +1932,10 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public boolean onNavigateUp()
 	{
-		if (__ho130)
+		if (__ho133)
 		{
 			Object[] args = null;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onNavigateUp", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "onNavigateUp", args);
 		}
 		else
 		{
@@ -1918,11 +1945,11 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public boolean onNavigateUpFromChild(android.app.Activity param_0)
 	{
-		if (__ho131)
+		if (__ho134)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onNavigateUpFromChild", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "onNavigateUpFromChild", args);
 		}
 		else
 		{
@@ -1930,27 +1957,13 @@ public class NativeScriptActivity extends android.app.Activity
 		}
 	}
 
-	protected void onNewIntent(android.content.Intent param_0)
-	{
-		if (__ho132)
-		{
-			Object[] args = new Object[1];
-			args[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "onNewIntent", args);
-		}
-		else
-		{
-			super.onNewIntent(param_0);
-		}
-	}
-
 	public boolean onOptionsItemSelected(android.view.MenuItem param_0)
 	{
-		if (__ho133)
+		if (__ho135)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onOptionsItemSelected", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "onOptionsItemSelected", args);
 		}
 		else
 		{
@@ -1960,7 +1973,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public void onOptionsMenuClosed(android.view.Menu param_0)
 	{
-		if (__ho134)
+		if (__ho136)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -1974,7 +1987,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public void onPanelClosed(int param_0, android.view.Menu param_1)
 	{
-		if (__ho135)
+		if (__ho137)
 		{
 			Object[] args = new Object[2];
 			args[0] = param_0;
@@ -1987,22 +2000,9 @@ public class NativeScriptActivity extends android.app.Activity
 		}
 	}
 
-	protected void onPause()
-	{
-		if (__ho136)
-		{
-			Object[] args = null;
-			com.tns.Platform.callJSMethod(this, "onPause", args);
-		}
-		else
-		{
-			super.onPause();
-		}
-	}
-
 	protected void onPostCreate(android.os.Bundle param_0)
 	{
-		if (__ho137)
+		if (__ho138)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -2016,7 +2016,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	protected void onPostResume()
 	{
-		if (__ho138)
+		if (__ho139)
 		{
 			Object[] args = null;
 			com.tns.Platform.callJSMethod(this, "onPostResume", args);
@@ -2024,37 +2024,6 @@ public class NativeScriptActivity extends android.app.Activity
 		else
 		{
 			super.onPostResume();
-		}
-	}
-
-	protected void onPrepareDialog(int param_0, android.app.Dialog param_1)
-	{
-		if (__ho139)
-		{
-			Object[] args = new Object[2];
-			args[0] = param_0;
-			args[1] = param_1;
-			com.tns.Platform.callJSMethod(this, "onPrepareDialog", args);
-		}
-		else
-		{
-			super.onPrepareDialog(param_0, param_1);
-		}
-	}
-
-	protected void onPrepareDialog(int param_0, android.app.Dialog param_1, android.os.Bundle param_2)
-	{
-		if (__ho139)
-		{
-			Object[] args = new Object[3];
-			args[0] = param_0;
-			args[1] = param_1;
-			args[2] = param_2;
-			com.tns.Platform.callJSMethod(this, "onPrepareDialog", args);
-		}
-		else
-		{
-			super.onPrepareDialog(param_0, param_1, param_2);
 		}
 	}
 
@@ -2078,7 +2047,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onPrepareOptionsMenu", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "onPrepareOptionsMenu", args);
 		}
 		else
 		{
@@ -2094,7 +2063,7 @@ public class NativeScriptActivity extends android.app.Activity
 			args[0] = param_0;
 			args[1] = param_1;
 			args[2] = param_2;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onPreparePanel", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "onPreparePanel", args);
 		}
 		else
 		{
@@ -2102,79 +2071,39 @@ public class NativeScriptActivity extends android.app.Activity
 		}
 	}
 
-	protected void onRestart()
+	public void onPrepareSupportNavigateUpTaskStack(android.support.v4.app.TaskStackBuilder param_0)
 	{
 		if (__ho143)
 		{
-			Object[] args = null;
-			com.tns.Platform.callJSMethod(this, "onRestart", args);
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "onPrepareSupportNavigateUpTaskStack", args);
 		}
 		else
 		{
-			super.onRestart();
+			super.onPrepareSupportNavigateUpTaskStack(param_0);
 		}
 	}
 
-	protected void onRestoreInstanceState(android.os.Bundle param_0)
+	public java.lang.Object onRetainCustomNonConfigurationInstance()
 	{
 		if (__ho144)
 		{
-			Object[] args = new Object[1];
-			args[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "onRestoreInstanceState", args);
-		}
-		else
-		{
-			super.onRestoreInstanceState(param_0);
-		}
-	}
-
-	protected void onResume()
-	{
-		if (__ho145)
-		{
 			Object[] args = null;
-			com.tns.Platform.callJSMethod(this, "onResume", args);
+			return (java.lang.Object)com.tns.Platform.callJSMethod(this, "onRetainCustomNonConfigurationInstance", args);
 		}
 		else
 		{
-			super.onResume();
-		}
-	}
-
-	public java.lang.Object onRetainNonConfigurationInstance()
-	{
-		if (__ho146)
-		{
-			Object[] args = null;
-			return (java.lang.Object)com.tns.Platform.callJSMethod(this, "onRetainNonConfigurationInstance", args);
-		}
-		else
-		{
-			return super.onRetainNonConfigurationInstance();
-		}
-	}
-
-	protected void onSaveInstanceState(android.os.Bundle param_0)
-	{
-		if (__ho147)
-		{
-			Object[] args = new Object[1];
-			args[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "onSaveInstanceState", args);
-		}
-		else
-		{
-			super.onSaveInstanceState(param_0);
+			return super.onRetainCustomNonConfigurationInstance();
 		}
 	}
 
 	public boolean onSearchRequested()
 	{
-		if (__ho148)
+		if (__ho145)
 		{
 			Object[] args = null;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onSearchRequested", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "onSearchRequested", args);
 		}
 		else
 		{
@@ -2182,22 +2111,9 @@ public class NativeScriptActivity extends android.app.Activity
 		}
 	}
 
-	protected void onStart()
-	{
-		if (__ho149)
-		{
-			Object[] args = null;
-			com.tns.Platform.callJSMethod(this, "onStart", args);
-		}
-		else
-		{
-			super.onStart();
-		}
-	}
-
 	protected void onStop()
 	{
-		if (__ho150)
+		if (__ho146)
 		{
 			Object[] args = null;
 			com.tns.Platform.callJSMethod(this, "onStop", args);
@@ -2205,6 +2121,60 @@ public class NativeScriptActivity extends android.app.Activity
 		else
 		{
 			super.onStop();
+		}
+	}
+
+	public void onSupportActionModeFinished(android.support.v7.view.ActionMode param_0)
+	{
+		if (__ho147)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "onSupportActionModeFinished", args);
+		}
+		else
+		{
+			super.onSupportActionModeFinished(param_0);
+		}
+	}
+
+	public void onSupportActionModeStarted(android.support.v7.view.ActionMode param_0)
+	{
+		if (__ho148)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "onSupportActionModeStarted", args);
+		}
+		else
+		{
+			super.onSupportActionModeStarted(param_0);
+		}
+	}
+
+	public void onSupportContentChanged()
+	{
+		if (__ho149)
+		{
+			Object[] args = null;
+			com.tns.Platform.callJSMethod(this, "onSupportContentChanged", args);
+		}
+		else
+		{
+			super.onSupportContentChanged();
+		}
+	}
+
+	public boolean onSupportNavigateUp()
+	{
+		if (__ho150)
+		{
+			Object[] args = null;
+			return (boolean)com.tns.Platform.callJSMethod(this, "onSupportNavigateUp", args);
+		}
+		else
+		{
+			return super.onSupportNavigateUp();
 		}
 	}
 
@@ -2229,7 +2199,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onTouchEvent", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "onTouchEvent", args);
 		}
 		else
 		{
@@ -2243,7 +2213,7 @@ public class NativeScriptActivity extends android.app.Activity
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "onTrackballEvent", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "onTrackballEvent", args);
 		}
 		else
 		{
@@ -2278,22 +2248,9 @@ public class NativeScriptActivity extends android.app.Activity
 		}
 	}
 
-	protected void onUserLeaveHint()
-	{
-		if (__ho156)
-		{
-			Object[] args = null;
-			com.tns.Platform.callJSMethod(this, "onUserLeaveHint", args);
-		}
-		else
-		{
-			super.onUserLeaveHint();
-		}
-	}
-
 	public void onWindowAttributesChanged(android.view.WindowManager.LayoutParams param_0)
 	{
-		if (__ho157)
+		if (__ho156)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -2307,7 +2264,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public void onWindowFocusChanged(boolean param_0)
 	{
-		if (__ho158)
+		if (__ho157)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -2321,7 +2278,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public android.view.ActionMode onWindowStartingActionMode(android.view.ActionMode.Callback param_0)
 	{
-		if (__ho159)
+		if (__ho158)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -2330,6 +2287,20 @@ public class NativeScriptActivity extends android.app.Activity
 		else
 		{
 			return super.onWindowStartingActionMode(param_0);
+		}
+	}
+
+	public android.support.v7.view.ActionMode onWindowStartingSupportActionMode(android.support.v7.view.ActionMode.Callback param_0)
+	{
+		if (__ho159)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (android.support.v7.view.ActionMode)com.tns.Platform.callJSMethod(this, "onWindowStartingSupportActionMode", args);
+		}
+		else
+		{
+			return super.onWindowStartingSupportActionMode(param_0);
 		}
 	}
 
@@ -2389,6 +2360,22 @@ public class NativeScriptActivity extends android.app.Activity
 		}
 	}
 
+	public android.database.sqlite.SQLiteDatabase openOrCreateDatabase(java.lang.String param_0, int param_1, android.database.sqlite.SQLiteDatabase.CursorFactory param_2)
+	{
+		if (__ho164)
+		{
+			Object[] args = new Object[3];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			return (android.database.sqlite.SQLiteDatabase)com.tns.Platform.callJSMethod(this, "openOrCreateDatabase", args);
+		}
+		else
+		{
+			return super.openOrCreateDatabase(param_0, param_1, param_2);
+		}
+	}
+
 	public android.database.sqlite.SQLiteDatabase openOrCreateDatabase(java.lang.String param_0, int param_1, android.database.sqlite.SQLiteDatabase.CursorFactory param_2, android.database.DatabaseErrorHandler param_3)
 	{
 		if (__ho164)
@@ -2403,22 +2390,6 @@ public class NativeScriptActivity extends android.app.Activity
 		else
 		{
 			return super.openOrCreateDatabase(param_0, param_1, param_2, param_3);
-		}
-	}
-
-	public android.database.sqlite.SQLiteDatabase openOrCreateDatabase(java.lang.String param_0, int param_1, android.database.sqlite.SQLiteDatabase.CursorFactory param_2)
-	{
-		if (__ho164)
-		{
-			Object[] args = new Object[3];
-			args[0] = param_0;
-			args[1] = param_1;
-			args[2] = param_2;
-			return (android.database.sqlite.SQLiteDatabase)com.tns.Platform.callJSMethod(this, "openOrCreateDatabase", args);
-		}
-		else
-		{
-			return super.openOrCreateDatabase(param_0, param_1, param_2);
 		}
 	}
 
@@ -2491,6 +2462,21 @@ public class NativeScriptActivity extends android.app.Activity
 		}
 	}
 
+	public android.content.Intent registerReceiver(android.content.BroadcastReceiver param_0, android.content.IntentFilter param_1)
+	{
+		if (__ho170)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			return (android.content.Intent)com.tns.Platform.callJSMethod(this, "registerReceiver", args);
+		}
+		else
+		{
+			return super.registerReceiver(param_0, param_1);
+		}
+	}
+
 	public android.content.Intent registerReceiver(android.content.BroadcastReceiver param_0, android.content.IntentFilter param_1, java.lang.String param_2, android.os.Handler param_3)
 	{
 		if (__ho170)
@@ -2505,21 +2491,6 @@ public class NativeScriptActivity extends android.app.Activity
 		else
 		{
 			return super.registerReceiver(param_0, param_1, param_2, param_3);
-		}
-	}
-
-	public android.content.Intent registerReceiver(android.content.BroadcastReceiver param_0, android.content.IntentFilter param_1)
-	{
-		if (__ho170)
-		{
-			Object[] args = new Object[2];
-			args[0] = param_0;
-			args[1] = param_1;
-			return (android.content.Intent)com.tns.Platform.callJSMethod(this, "registerReceiver", args);
-		}
-		else
-		{
-			return super.registerReceiver(param_0, param_1);
 		}
 	}
 
@@ -2596,6 +2567,22 @@ public class NativeScriptActivity extends android.app.Activity
 		}
 	}
 
+	public void sendBroadcastAsUser(android.content.Intent param_0, android.os.UserHandle param_1, java.lang.String param_2)
+	{
+		if (__ho175)
+		{
+			Object[] args = new Object[3];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			com.tns.Platform.callJSMethod(this, "sendBroadcastAsUser", args);
+		}
+		else
+		{
+			super.sendBroadcastAsUser(param_0, param_1, param_2);
+		}
+	}
+
 	public void sendBroadcastAsUser(android.content.Intent param_0, android.os.UserHandle param_1)
 	{
 		if (__ho175)
@@ -2611,19 +2598,18 @@ public class NativeScriptActivity extends android.app.Activity
 		}
 	}
 
-	public void sendBroadcastAsUser(android.content.Intent param_0, android.os.UserHandle param_1, java.lang.String param_2)
+	public void sendOrderedBroadcast(android.content.Intent param_0, java.lang.String param_1)
 	{
-		if (__ho175)
+		if (__ho176)
 		{
-			Object[] args = new Object[3];
+			Object[] args = new Object[2];
 			args[0] = param_0;
 			args[1] = param_1;
-			args[2] = param_2;
-			com.tns.Platform.callJSMethod(this, "sendBroadcastAsUser", args);
+			com.tns.Platform.callJSMethod(this, "sendOrderedBroadcast", args);
 		}
 		else
 		{
-			super.sendBroadcastAsUser(param_0, param_1, param_2);
+			super.sendOrderedBroadcast(param_0, param_1);
 		}
 	}
 
@@ -2644,21 +2630,6 @@ public class NativeScriptActivity extends android.app.Activity
 		else
 		{
 			super.sendOrderedBroadcast(param_0, param_1, param_2, param_3, param_4, param_5, param_6);
-		}
-	}
-
-	public void sendOrderedBroadcast(android.content.Intent param_0, java.lang.String param_1)
-	{
-		if (__ho176)
-		{
-			Object[] args = new Object[2];
-			args[0] = param_0;
-			args[1] = param_1;
-			com.tns.Platform.callJSMethod(this, "sendOrderedBroadcast", args);
-		}
-		else
-		{
-			super.sendOrderedBroadcast(param_0, param_1);
 		}
 	}
 
@@ -2751,20 +2722,6 @@ public class NativeScriptActivity extends android.app.Activity
 		}
 	}
 
-	public void setContentView(int param_0)
-	{
-		if (__ho182)
-		{
-			Object[] args = new Object[1];
-			args[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "setContentView", args);
-		}
-		else
-		{
-			super.setContentView(param_0);
-		}
-	}
-
 	public void setContentView(android.view.View param_0, android.view.ViewGroup.LayoutParams param_1)
 	{
 		if (__ho182)
@@ -2777,6 +2734,20 @@ public class NativeScriptActivity extends android.app.Activity
 		else
 		{
 			super.setContentView(param_0, param_1);
+		}
+	}
+
+	public void setContentView(int param_0)
+	{
+		if (__ho182)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "setContentView", args);
+		}
+		else
+		{
+			super.setContentView(param_0);
 		}
 	}
 
@@ -2794,9 +2765,37 @@ public class NativeScriptActivity extends android.app.Activity
 		}
 	}
 
-	public void setFinishOnTouchOutside(boolean param_0)
+	public void setEnterSharedElementCallback(android.support.v4.app.SharedElementCallback param_0)
 	{
 		if (__ho183)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "setEnterSharedElementCallback", args);
+		}
+		else
+		{
+			super.setEnterSharedElementCallback(param_0);
+		}
+	}
+
+	public void setExitSharedElementCallback(android.support.v4.app.SharedElementCallback param_0)
+	{
+		if (__ho184)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "setExitSharedElementCallback", args);
+		}
+		else
+		{
+			super.setExitSharedElementCallback(param_0);
+		}
+	}
+
+	public void setFinishOnTouchOutside(boolean param_0)
+	{
+		if (__ho185)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -2810,7 +2809,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public void setIntent(android.content.Intent param_0)
 	{
-		if (__ho184)
+		if (__ho186)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -2824,7 +2823,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public void setRequestedOrientation(int param_0)
 	{
-		if (__ho185)
+		if (__ho187)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -2836,9 +2835,79 @@ public class NativeScriptActivity extends android.app.Activity
 		}
 	}
 
+	public void setSupportActionBar(android.support.v7.widget.Toolbar param_0)
+	{
+		if (__ho188)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "setSupportActionBar", args);
+		}
+		else
+		{
+			super.setSupportActionBar(param_0);
+		}
+	}
+
+	public void setSupportProgress(int param_0)
+	{
+		if (__ho189)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "setSupportProgress", args);
+		}
+		else
+		{
+			super.setSupportProgress(param_0);
+		}
+	}
+
+	public void setSupportProgressBarIndeterminate(boolean param_0)
+	{
+		if (__ho190)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "setSupportProgressBarIndeterminate", args);
+		}
+		else
+		{
+			super.setSupportProgressBarIndeterminate(param_0);
+		}
+	}
+
+	public void setSupportProgressBarIndeterminateVisibility(boolean param_0)
+	{
+		if (__ho191)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "setSupportProgressBarIndeterminateVisibility", args);
+		}
+		else
+		{
+			super.setSupportProgressBarIndeterminateVisibility(param_0);
+		}
+	}
+
+	public void setSupportProgressBarVisibility(boolean param_0)
+	{
+		if (__ho192)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "setSupportProgressBarVisibility", args);
+		}
+		else
+		{
+			super.setSupportProgressBarVisibility(param_0);
+		}
+	}
+
 	public void setTheme(int param_0)
 	{
-		if (__ho186)
+		if (__ho193)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -2852,7 +2921,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public void setTitle(java.lang.CharSequence param_0)
 	{
-		if (__ho187)
+		if (__ho194)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -2866,7 +2935,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public void setTitle(int param_0)
 	{
-		if (__ho187)
+		if (__ho194)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -2880,7 +2949,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public void setTitleColor(int param_0)
 	{
-		if (__ho188)
+		if (__ho195)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -2894,7 +2963,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public void setVisible(boolean param_0)
 	{
-		if (__ho189)
+		if (__ho196)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -2906,9 +2975,9 @@ public class NativeScriptActivity extends android.app.Activity
 		}
 	}
 
-	public void setWallpaper(java.io.InputStream param_0) throws java.io.IOException
+	public void setWallpaper(android.graphics.Bitmap param_0) throws java.io.IOException
 	{
-		if (__ho190)
+		if (__ho197)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -2920,9 +2989,9 @@ public class NativeScriptActivity extends android.app.Activity
 		}
 	}
 
-	public void setWallpaper(android.graphics.Bitmap param_0) throws java.io.IOException
+	public void setWallpaper(java.io.InputStream param_0) throws java.io.IOException
 	{
-		if (__ho190)
+		if (__ho197)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -2936,11 +3005,11 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public boolean shouldUpRecreateTask(android.content.Intent param_0)
 	{
-		if (__ho191)
+		if (__ho198)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "shouldUpRecreateTask", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "shouldUpRecreateTask", args);
 		}
 		else
 		{
@@ -2950,7 +3019,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public android.view.ActionMode startActionMode(android.view.ActionMode.Callback param_0)
 	{
-		if (__ho192)
+		if (__ho199)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -2964,7 +3033,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public void startActivities(android.content.Intent[] param_0, android.os.Bundle param_1)
 	{
-		if (__ho193)
+		if (__ho200)
 		{
 			Object[] args = new Object[2];
 			args[0] = param_0;
@@ -2979,7 +3048,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public void startActivities(android.content.Intent[] param_0)
 	{
-		if (__ho193)
+		if (__ho200)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -2991,9 +3060,23 @@ public class NativeScriptActivity extends android.app.Activity
 		}
 	}
 
+	public void startActivity(android.content.Intent param_0)
+	{
+		if (__ho201)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "startActivity", args);
+		}
+		else
+		{
+			super.startActivity(param_0);
+		}
+	}
+
 	public void startActivity(android.content.Intent param_0, android.os.Bundle param_1)
 	{
-		if (__ho194)
+		if (__ho201)
 		{
 			Object[] args = new Object[2];
 			args[0] = param_0;
@@ -3006,23 +3089,9 @@ public class NativeScriptActivity extends android.app.Activity
 		}
 	}
 
-	public void startActivity(android.content.Intent param_0)
-	{
-		if (__ho194)
-		{
-			Object[] args = new Object[1];
-			args[0] = param_0;
-			com.tns.Platform.callJSMethod(this, "startActivity", args);
-		}
-		else
-		{
-			super.startActivity(param_0);
-		}
-	}
-
 	public void startActivityForResult(android.content.Intent param_0, int param_1)
 	{
-		if (__ho195)
+		if (__ho202)
 		{
 			Object[] args = new Object[2];
 			args[0] = param_0;
@@ -3037,7 +3106,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public void startActivityForResult(android.content.Intent param_0, int param_1, android.os.Bundle param_2)
 	{
-		if (__ho195)
+		if (__ho202)
 		{
 			Object[] args = new Object[3];
 			args[0] = param_0;
@@ -3051,9 +3120,25 @@ public class NativeScriptActivity extends android.app.Activity
 		}
 	}
 
+	public void startActivityFromChild(android.app.Activity param_0, android.content.Intent param_1, int param_2)
+	{
+		if (__ho203)
+		{
+			Object[] args = new Object[3];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			com.tns.Platform.callJSMethod(this, "startActivityFromChild", args);
+		}
+		else
+		{
+			super.startActivityFromChild(param_0, param_1, param_2);
+		}
+	}
+
 	public void startActivityFromChild(android.app.Activity param_0, android.content.Intent param_1, int param_2, android.os.Bundle param_3)
 	{
-		if (__ho196)
+		if (__ho203)
 		{
 			Object[] args = new Object[4];
 			args[0] = param_0;
@@ -3068,25 +3153,9 @@ public class NativeScriptActivity extends android.app.Activity
 		}
 	}
 
-	public void startActivityFromChild(android.app.Activity param_0, android.content.Intent param_1, int param_2)
+	public void startActivityFromFragment(android.support.v4.app.Fragment param_0, android.content.Intent param_1, int param_2)
 	{
-		if (__ho196)
-		{
-			Object[] args = new Object[3];
-			args[0] = param_0;
-			args[1] = param_1;
-			args[2] = param_2;
-			com.tns.Platform.callJSMethod(this, "startActivityFromChild", args);
-		}
-		else
-		{
-			super.startActivityFromChild(param_0, param_1, param_2);
-		}
-	}
-
-	public void startActivityFromFragment(android.app.Fragment param_0, android.content.Intent param_1, int param_2)
-	{
-		if (__ho197)
+		if (__ho204)
 		{
 			Object[] args = new Object[3];
 			args[0] = param_0;
@@ -3102,7 +3171,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public void startActivityFromFragment(android.app.Fragment param_0, android.content.Intent param_1, int param_2, android.os.Bundle param_3)
 	{
-		if (__ho197)
+		if (__ho204)
 		{
 			Object[] args = new Object[4];
 			args[0] = param_0;
@@ -3117,30 +3186,31 @@ public class NativeScriptActivity extends android.app.Activity
 		}
 	}
 
-	public boolean startActivityIfNeeded(android.content.Intent param_0, int param_1)
+	public void startActivityFromFragment(android.app.Fragment param_0, android.content.Intent param_1, int param_2)
 	{
-		if (__ho198)
-		{
-			Object[] args = new Object[2];
-			args[0] = param_0;
-			args[1] = param_1;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "startActivityIfNeeded", args);
-		}
-		else
-		{
-			return super.startActivityIfNeeded(param_0, param_1);
-		}
-	}
-
-	public boolean startActivityIfNeeded(android.content.Intent param_0, int param_1, android.os.Bundle param_2)
-	{
-		if (__ho198)
+		if (__ho204)
 		{
 			Object[] args = new Object[3];
 			args[0] = param_0;
 			args[1] = param_1;
 			args[2] = param_2;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "startActivityIfNeeded", args);
+			com.tns.Platform.callJSMethod(this, "startActivityFromFragment", args);
+		}
+		else
+		{
+			super.startActivityFromFragment(param_0, param_1, param_2);
+		}
+	}
+
+	public boolean startActivityIfNeeded(android.content.Intent param_0, int param_1, android.os.Bundle param_2)
+	{
+		if (__ho205)
+		{
+			Object[] args = new Object[3];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			return (boolean)com.tns.Platform.callJSMethod(this, "startActivityIfNeeded", args);
 		}
 		else
 		{
@@ -3148,15 +3218,30 @@ public class NativeScriptActivity extends android.app.Activity
 		}
 	}
 
+	public boolean startActivityIfNeeded(android.content.Intent param_0, int param_1)
+	{
+		if (__ho205)
+		{
+			Object[] args = new Object[2];
+			args[0] = param_0;
+			args[1] = param_1;
+			return (boolean)com.tns.Platform.callJSMethod(this, "startActivityIfNeeded", args);
+		}
+		else
+		{
+			return super.startActivityIfNeeded(param_0, param_1);
+		}
+	}
+
 	public boolean startInstrumentation(android.content.ComponentName param_0, java.lang.String param_1, android.os.Bundle param_2)
 	{
-		if (__ho199)
+		if (__ho206)
 		{
 			Object[] args = new Object[3];
 			args[0] = param_0;
 			args[1] = param_1;
 			args[2] = param_2;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "startInstrumentation", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "startInstrumentation", args);
 		}
 		else
 		{
@@ -3166,7 +3251,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public void startIntentSender(android.content.IntentSender param_0, android.content.Intent param_1, int param_2, int param_3, int param_4, android.os.Bundle param_5) throws android.content.IntentSender.SendIntentException
 	{
-		if (__ho200)
+		if (__ho207)
 		{
 			Object[] args = new Object[6];
 			args[0] = param_0;
@@ -3185,7 +3270,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public void startIntentSender(android.content.IntentSender param_0, android.content.Intent param_1, int param_2, int param_3, int param_4) throws android.content.IntentSender.SendIntentException
 	{
-		if (__ho200)
+		if (__ho207)
 		{
 			Object[] args = new Object[5];
 			args[0] = param_0;
@@ -3203,7 +3288,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public void startIntentSenderForResult(android.content.IntentSender param_0, int param_1, android.content.Intent param_2, int param_3, int param_4, int param_5, android.os.Bundle param_6) throws android.content.IntentSender.SendIntentException
 	{
-		if (__ho201)
+		if (__ho208)
 		{
 			Object[] args = new Object[7];
 			args[0] = param_0;
@@ -3223,7 +3308,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public void startIntentSenderForResult(android.content.IntentSender param_0, int param_1, android.content.Intent param_2, int param_3, int param_4, int param_5) throws android.content.IntentSender.SendIntentException
 	{
-		if (__ho201)
+		if (__ho208)
 		{
 			Object[] args = new Object[6];
 			args[0] = param_0;
@@ -3240,9 +3325,29 @@ public class NativeScriptActivity extends android.app.Activity
 		}
 	}
 
+	public void startIntentSenderFromChild(android.app.Activity param_0, android.content.IntentSender param_1, int param_2, android.content.Intent param_3, int param_4, int param_5, int param_6) throws android.content.IntentSender.SendIntentException
+	{
+		if (__ho209)
+		{
+			Object[] args = new Object[7];
+			args[0] = param_0;
+			args[1] = param_1;
+			args[2] = param_2;
+			args[3] = param_3;
+			args[4] = param_4;
+			args[5] = param_5;
+			args[6] = param_6;
+			com.tns.Platform.callJSMethod(this, "startIntentSenderFromChild", args);
+		}
+		else
+		{
+			super.startIntentSenderFromChild(param_0, param_1, param_2, param_3, param_4, param_5, param_6);
+		}
+	}
+
 	public void startIntentSenderFromChild(android.app.Activity param_0, android.content.IntentSender param_1, int param_2, android.content.Intent param_3, int param_4, int param_5, int param_6, android.os.Bundle param_7) throws android.content.IntentSender.SendIntentException
 	{
-		if (__ho202)
+		if (__ho209)
 		{
 			Object[] args = new Object[8];
 			args[0] = param_0;
@@ -3261,29 +3366,9 @@ public class NativeScriptActivity extends android.app.Activity
 		}
 	}
 
-	public void startIntentSenderFromChild(android.app.Activity param_0, android.content.IntentSender param_1, int param_2, android.content.Intent param_3, int param_4, int param_5, int param_6) throws android.content.IntentSender.SendIntentException
-	{
-		if (__ho202)
-		{
-			Object[] args = new Object[7];
-			args[0] = param_0;
-			args[1] = param_1;
-			args[2] = param_2;
-			args[3] = param_3;
-			args[4] = param_4;
-			args[5] = param_5;
-			args[6] = param_6;
-			com.tns.Platform.callJSMethod(this, "startIntentSenderFromChild", args);
-		}
-		else
-		{
-			super.startIntentSenderFromChild(param_0, param_1, param_2, param_3, param_4, param_5, param_6);
-		}
-	}
-
 	public void startManagingCursor(android.database.Cursor param_0)
 	{
-		if (__ho203)
+		if (__ho210)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -3295,28 +3380,14 @@ public class NativeScriptActivity extends android.app.Activity
 		}
 	}
 
-	public boolean startNextMatchingActivity(android.content.Intent param_0)
-	{
-		if (__ho204)
-		{
-			Object[] args = new Object[1];
-			args[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "startNextMatchingActivity", args);
-		}
-		else
-		{
-			return super.startNextMatchingActivity(param_0);
-		}
-	}
-
 	public boolean startNextMatchingActivity(android.content.Intent param_0, android.os.Bundle param_1)
 	{
-		if (__ho204)
+		if (__ho211)
 		{
 			Object[] args = new Object[2];
 			args[0] = param_0;
 			args[1] = param_1;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "startNextMatchingActivity", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "startNextMatchingActivity", args);
 		}
 		else
 		{
@@ -3324,9 +3395,23 @@ public class NativeScriptActivity extends android.app.Activity
 		}
 	}
 
+	public boolean startNextMatchingActivity(android.content.Intent param_0)
+	{
+		if (__ho211)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (boolean)com.tns.Platform.callJSMethod(this, "startNextMatchingActivity", args);
+		}
+		else
+		{
+			return super.startNextMatchingActivity(param_0);
+		}
+	}
+
 	public void startSearch(java.lang.String param_0, boolean param_1, android.os.Bundle param_2, boolean param_3)
 	{
-		if (__ho205)
+		if (__ho212)
 		{
 			Object[] args = new Object[4];
 			args[0] = param_0;
@@ -3343,7 +3428,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public android.content.ComponentName startService(android.content.Intent param_0)
 	{
-		if (__ho206)
+		if (__ho213)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -3355,9 +3440,23 @@ public class NativeScriptActivity extends android.app.Activity
 		}
 	}
 
+	public android.support.v7.view.ActionMode startSupportActionMode(android.support.v7.view.ActionMode.Callback param_0)
+	{
+		if (__ho214)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (android.support.v7.view.ActionMode)com.tns.Platform.callJSMethod(this, "startSupportActionMode", args);
+		}
+		else
+		{
+			return super.startSupportActionMode(param_0);
+		}
+	}
+
 	public void stopManagingCursor(android.database.Cursor param_0)
 	{
-		if (__ho207)
+		if (__ho215)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -3371,11 +3470,11 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public boolean stopService(android.content.Intent param_0)
 	{
-		if (__ho208)
+		if (__ho216)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
-			return (Boolean)com.tns.Platform.callJSMethod(this, "stopService", args);
+			return (boolean)com.tns.Platform.callJSMethod(this, "stopService", args);
 		}
 		else
 		{
@@ -3383,9 +3482,103 @@ public class NativeScriptActivity extends android.app.Activity
 		}
 	}
 
+	public void supportFinishAfterTransition()
+	{
+		if (__ho217)
+		{
+			Object[] args = null;
+			com.tns.Platform.callJSMethod(this, "supportFinishAfterTransition", args);
+		}
+		else
+		{
+			super.supportFinishAfterTransition();
+		}
+	}
+
+	public void supportInvalidateOptionsMenu()
+	{
+		if (__ho218)
+		{
+			Object[] args = null;
+			com.tns.Platform.callJSMethod(this, "supportInvalidateOptionsMenu", args);
+		}
+		else
+		{
+			super.supportInvalidateOptionsMenu();
+		}
+	}
+
+	public void supportNavigateUpTo(android.content.Intent param_0)
+	{
+		if (__ho219)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			com.tns.Platform.callJSMethod(this, "supportNavigateUpTo", args);
+		}
+		else
+		{
+			super.supportNavigateUpTo(param_0);
+		}
+	}
+
+	public void supportPostponeEnterTransition()
+	{
+		if (__ho220)
+		{
+			Object[] args = null;
+			com.tns.Platform.callJSMethod(this, "supportPostponeEnterTransition", args);
+		}
+		else
+		{
+			super.supportPostponeEnterTransition();
+		}
+	}
+
+	public boolean supportRequestWindowFeature(int param_0)
+	{
+		if (__ho221)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (boolean)com.tns.Platform.callJSMethod(this, "supportRequestWindowFeature", args);
+		}
+		else
+		{
+			return super.supportRequestWindowFeature(param_0);
+		}
+	}
+
+	public boolean supportShouldUpRecreateTask(android.content.Intent param_0)
+	{
+		if (__ho222)
+		{
+			Object[] args = new Object[1];
+			args[0] = param_0;
+			return (boolean)com.tns.Platform.callJSMethod(this, "supportShouldUpRecreateTask", args);
+		}
+		else
+		{
+			return super.supportShouldUpRecreateTask(param_0);
+		}
+	}
+
+	public void supportStartPostponedEnterTransition()
+	{
+		if (__ho223)
+		{
+			Object[] args = null;
+			com.tns.Platform.callJSMethod(this, "supportStartPostponedEnterTransition", args);
+		}
+		else
+		{
+			super.supportStartPostponedEnterTransition();
+		}
+	}
+
 	public void takeKeyEvents(boolean param_0)
 	{
-		if (__ho209)
+		if (__ho224)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -3399,7 +3592,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public java.lang.String toString()
 	{
-		if (__ho210)
+		if (__ho225)
 		{
 			Object[] args = null;
 			return (java.lang.String)com.tns.Platform.callJSMethod(this, "toString", args);
@@ -3412,7 +3605,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public void triggerSearch(java.lang.String param_0, android.os.Bundle param_1)
 	{
-		if (__ho211)
+		if (__ho226)
 		{
 			Object[] args = new Object[2];
 			args[0] = param_0;
@@ -3427,7 +3620,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public void unbindService(android.content.ServiceConnection param_0)
 	{
-		if (__ho212)
+		if (__ho227)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -3441,7 +3634,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public void unregisterComponentCallbacks(android.content.ComponentCallbacks param_0)
 	{
-		if (__ho213)
+		if (__ho228)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -3455,7 +3648,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public void unregisterForContextMenu(android.view.View param_0)
 	{
-		if (__ho214)
+		if (__ho229)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -3469,7 +3662,7 @@ public class NativeScriptActivity extends android.app.Activity
 
 	public void unregisterReceiver(android.content.BroadcastReceiver param_0)
 	{
-		if (__ho215)
+		if (__ho230)
 		{
 			Object[] args = new Object[1];
 			args[0] = param_0;
@@ -3485,222 +3678,237 @@ public class NativeScriptActivity extends android.app.Activity
 	{
 		for (String m: methodOverrides)
 		{
-			if (m.equals("onChildTitleChanged")) __ho104= true;
 			if (m.equals("getChangingConfigurations")) __ho48= true;
-			if (m.equals("getObbDir")) __ho67= true;
-			if (m.equals("onSearchRequested")) __ho148= true;
-			if (m.equals("navigateUpToFromChild")) __ho96= true;
+			if (m.equals("getObbDir")) __ho70= true;
+			if (m.equals("onSearchRequested")) __ho145= true;
+			if (m.equals("navigateUpToFromChild")) __ho103= true;
 			if (m.equals("deleteDatabase")) __ho17= true;
+			if (m.equals("getSupportActionBar")) __ho80= true;
+			if (m.equals("supportPostponeEnterTransition")) __ho220= true;
 			if (m.equals("checkPermission")) __ho7= true;
 			if (m.equals("enforceUriPermission")) __ho31= true;
-			if (m.equals("startActivityFromFragment")) __ho197= true;
+			if (m.equals("startActivityFromFragment")) __ho204= true;
 			if (m.equals("databaseList")) __ho16= true;
 			if (m.equals("dispatchGenericMotionEvent")) __ho19= true;
-			if (m.equals("getFilesDir")) __ho58= true;
+			if (m.equals("getFilesDir")) __ho60= true;
 			if (m.equals("sendStickyOrderedBroadcastAsUser")) __ho181= true;
 			if (m.equals("fileList")) __ho33= true;
-			if (m.equals("getWallpaper")) __ho80= true;
-			if (m.equals("onBackPressed")) __ho103= true;
-			if (m.equals("onRestart")) __ho143= true;
-			if (m.equals("shouldUpRecreateTask")) __ho191= true;
+			if (m.equals("onRetainCustomNonConfigurationInstance")) __ho144= true;
+			if (m.equals("onSupportActionModeStarted")) __ho148= true;
+			if (m.equals("getWallpaper")) __ho87= true;
+			if (m.equals("onBackPressed")) __ho108= true;
+			if (m.equals("shouldUpRecreateTask")) __ho198= true;
 			if (m.equals("finishAffinity")) __ho38= true;
-			if (m.equals("setIntent")) __ho184= true;
-			if (m.equals("unregisterComponentCallbacks")) __ho213= true;
+			if (m.equals("onPrepareSupportNavigateUpTaskStack")) __ho143= true;
+			if (m.equals("setIntent")) __ho186= true;
+			if (m.equals("unregisterComponentCallbacks")) __ho228= true;
 			if (m.equals("dispatchPopulateAccessibilityEvent")) __ho22= true;
-			if (m.equals("getLoaderManager")) __ho63= true;
-			if (m.equals("startIntentSender")) __ho200= true;
+			if (m.equals("getLoaderManager")) __ho66= true;
+			if (m.equals("startIntentSender")) __ho207= true;
 			if (m.equals("openOrCreateDatabase")) __ho164= true;
-			if (m.equals("getFileStreamPath")) __ho57= true;
+			if (m.equals("getFileStreamPath")) __ho59= true;
 			if (m.equals("closeOptionsMenu")) __ho11= true;
-			if (m.equals("getWallpaperDesiredMinimumHeight")) __ho81= true;
+			if (m.equals("getLastCustomNonConfigurationInstance")) __ho63= true;
+			if (m.equals("getWallpaperDesiredMinimumHeight")) __ho88= true;
 			if (m.equals("getCallingActivity")) __ho46= true;
 			if (m.equals("openOptionsMenu")) __ho163= true;
-			if (m.equals("onWindowAttributesChanged")) __ho157= true;
-			if (m.equals("invalidateOptionsMenu")) __ho88= true;
-			if (m.equals("onCreateNavigateUpTaskStack")) __ho113= true;
+			if (m.equals("onWindowAttributesChanged")) __ho156= true;
+			if (m.equals("invalidateOptionsMenu")) __ho95= true;
+			if (m.equals("onCreateNavigateUpTaskStack")) __ho116= true;
 			if (m.equals("removeStickyBroadcast")) __ho171= true;
 			if (m.equals("dispatchKeyEvent")) __ho20= true;
 			if (m.equals("getCurrentFocus")) __ho52= true;
 			if (m.equals("peekWallpaper")) __ho166= true;
 			if (m.equals("createConfigurationContext")) __ho12= true;
+			if (m.equals("getDelegate")) __ho54= true;
+			if (m.equals("onSupportNavigateUp")) __ho150= true;
 			if (m.equals("getApplicationContext")) __ho41= true;
 			if (m.equals("sendStickyBroadcast")) __ho178= true;
-			if (m.equals("getResources")) __ho75= true;
-			if (m.equals("onOptionsMenuClosed")) __ho134= true;
-			if (m.equals("getSharedPreferences")) __ho76= true;
-			if (m.equals("setFinishOnTouchOutside")) __ho183= true;
-			if (m.equals("onAttachedToWindow")) __ho102= true;
-			if (m.equals("getWallpaperDesiredMinimumWidth")) __ho82= true;
-			if (m.equals("startInstrumentation")) __ho199= true;
+			if (m.equals("getResources")) __ho78= true;
+			if (m.equals("onOptionsMenuClosed")) __ho136= true;
+			if (m.equals("getSharedPreferences")) __ho79= true;
+			if (m.equals("setFinishOnTouchOutside")) __ho185= true;
+			if (m.equals("onAttachedToWindow")) __ho107= true;
+			if (m.equals("getWallpaperDesiredMinimumWidth")) __ho89= true;
+			if (m.equals("startInstrumentation")) __ho206= true;
 			if (m.equals("onPrepareOptionsMenu")) __ho141= true;
+			if (m.equals("onSupportContentChanged")) __ho149= true;
 			if (m.equals("getComponentName")) __ho50= true;
+			if (m.equals("onSupportActionModeFinished")) __ho147= true;
 			if (m.equals("sendStickyBroadcastAsUser")) __ho179= true;
-			if (m.equals("setWallpaper")) __ho190= true;
-			if (m.equals("stopManagingCursor")) __ho207= true;
-			if (m.equals("getParentActivityIntent")) __ho72= true;
+			if (m.equals("setWallpaper")) __ho197= true;
+			if (m.equals("stopManagingCursor")) __ho215= true;
+			if (m.equals("getParentActivityIntent")) __ho75= true;
 			if (m.equals("onTrimMemory")) __ho154= true;
-			if (m.equals("onActionModeFinished")) __ho97= true;
+			if (m.equals("onActionModeFinished")) __ho104= true;
+			if (m.equals("supportFinishAfterTransition")) __ho217= true;
 			if (m.equals("recreate")) __ho167= true;
 			if (m.equals("sendStickyOrderedBroadcast")) __ho180= true;
-			if (m.equals("onCreateDialog")) __ho112= true;
-			if (m.equals("startActivityForResult")) __ho195= true;
+			if (m.equals("startActivityForResult")) __ho202= true;
 			if (m.equals("onTitleChanged")) __ho151= true;
 			if (m.equals("getActionBar")) __ho40= true;
-			if (m.equals("onCreatePanelView")) __ho116= true;
-			if (m.equals("onNewIntent")) __ho132= true;
-			if (m.equals("onKeyMultiple")) __ho124= true;
-			if (m.equals("toString")) __ho210= true;
+			if (m.equals("onCreatePanelView")) __ho119= true;
+			if (m.equals("onKeyMultiple")) __ho128= true;
+			if (m.equals("toString")) __ho225= true;
 			if (m.equals("applyOverrideConfiguration")) __ho1= true;
-			if (m.equals("getFragmentManager")) __ho59= true;
-			if (m.equals("onPanelClosed")) __ho135= true;
+			if (m.equals("getFragmentManager")) __ho61= true;
+			if (m.equals("onPanelClosed")) __ho137= true;
 			if (m.equals("createDisplayContext")) __ho13= true;
-			if (m.equals("onKeyShortcut")) __ho125= true;
+			if (m.equals("getSupportLoaderManager")) __ho82= true;
+			if (m.equals("onKeyShortcut")) __ho129= true;
 			if (m.equals("dispatchTrackballEvent")) __ho24= true;
 			if (m.equals("addContentView")) __ho0= true;
-			if (m.equals("onActivityResult")) __ho99= true;
 			if (m.equals("openFileInput")) __ho161= true;
-			if (m.equals("getRequestedOrientation")) __ho74= true;
-			if (m.equals("getWindowManager")) __ho84= true;
-			if (m.equals("triggerSearch")) __ho211= true;
+			if (m.equals("getRequestedOrientation")) __ho77= true;
+			if (m.equals("getWindowManager")) __ho91= true;
+			if (m.equals("triggerSearch")) __ho226= true;
 			if (m.equals("finish")) __ho35= true;
 			if (m.equals("dispatchKeyShortcutEvent")) __ho21= true;
-			if (m.equals("setVisible")) __ho189= true;
-			if (m.equals("isDestroyed")) __ho90= true;
-			if (m.equals("setTitle")) __ho187= true;
-			if (m.equals("startActivities")) __ho193= true;
-			if (m.equals("onKeyLongPress")) __ho123= true;
-			if (m.equals("onGenericMotionEvent")) __ho121= true;
-			if (m.equals("getMenuInflater")) __ho66= true;
-			if (m.equals("isChangingConfigurations")) __ho89= true;
-			if (m.equals("getPackageName")) __ho70= true;
-			if (m.equals("setRequestedOrientation")) __ho185= true;
+			if (m.equals("setVisible")) __ho196= true;
+			if (m.equals("isDestroyed")) __ho97= true;
+			if (m.equals("setTitle")) __ho194= true;
+			if (m.equals("startActivities")) __ho200= true;
+			if (m.equals("onKeyLongPress")) __ho127= true;
+			if (m.equals("onGenericMotionEvent")) __ho125= true;
+			if (m.equals("getMenuInflater")) __ho69= true;
+			if (m.equals("isChangingConfigurations")) __ho96= true;
+			if (m.equals("getPackageName")) __ho73= true;
+			if (m.equals("setRequestedOrientation")) __ho187= true;
 			if (m.equals("enforceCallingUriPermission")) __ho29= true;
-			if (m.equals("getLocalClassName")) __ho64= true;
-			if (m.equals("getWindow")) __ho83= true;
-			if (m.equals("onRestoreInstanceState")) __ho144= true;
+			if (m.equals("setEnterSharedElementCallback")) __ho183= true;
+			if (m.equals("getLocalClassName")) __ho67= true;
+			if (m.equals("getWindow")) __ho90= true;
+			if (m.equals("supportStartPostponedEnterTransition")) __ho223= true;
 			if (m.equals("checkCallingOrSelfUriPermission")) __ho4= true;
-			if (m.equals("setTitleColor")) __ho188= true;
+			if (m.equals("setTitleColor")) __ho195= true;
 			if (m.equals("getClassLoader")) __ho49= true;
 			if (m.equals("closeContextMenu")) __ho10= true;
 			if (m.equals("createPackageContext")) __ho14= true;
 			if (m.equals("openFileOutput")) __ho162= true;
-			if (m.equals("moveTaskToBack")) __ho94= true;
+			if (m.equals("moveTaskToBack")) __ho101= true;
 			if (m.equals("dispatchTouchEvent")) __ho23= true;
-			if (m.equals("onActionModeStarted")) __ho98= true;
-			if (m.equals("onPostCreate")) __ho137= true;
-			if (m.equals("hashCode")) __ho87= true;
-			if (m.equals("getMainLooper")) __ho65= true;
-			if (m.equals("getDir")) __ho54= true;
+			if (m.equals("onActionModeStarted")) __ho105= true;
+			if (m.equals("onPostCreate")) __ho138= true;
+			if (m.equals("hashCode")) __ho94= true;
+			if (m.equals("getMainLooper")) __ho68= true;
+			if (m.equals("getDir")) __ho55= true;
 			if (m.equals("deleteFile")) __ho18= true;
-			if (m.equals("getTaskId")) __ho78= true;
-			if (m.equals("navigateUpTo")) __ho95= true;
+			if (m.equals("getDrawerToggleDelegate")) __ho56= true;
+			if (m.equals("getTaskId")) __ho85= true;
+			if (m.equals("navigateUpTo")) __ho102= true;
 			if (m.equals("revokeUriPermission")) __ho173= true;
 			if (m.equals("finishActivity")) __ho36= true;
 			if (m.equals("finishFromChild")) __ho39= true;
-			if (m.equals("takeKeyEvents")) __ho209= true;
+			if (m.equals("onWindowStartingSupportActionMode")) __ho159= true;
+			if (m.equals("takeKeyEvents")) __ho224= true;
 			if (m.equals("overridePendingTransition")) __ho165= true;
 			if (m.equals("checkCallingPermission")) __ho5= true;
 			if (m.equals("enforceCallingPermission")) __ho28= true;
-			if (m.equals("unregisterForContextMenu")) __ho214= true;
+			if (m.equals("unregisterForContextMenu")) __ho229= true;
 			if (m.equals("findViewById")) __ho34= true;
-			if (m.equals("onNavigateUp")) __ho130= true;
+			if (m.equals("onNavigateUp")) __ho133= true;
 			if (m.equals("enforceCallingOrSelfPermission")) __ho26= true;
 			if (m.equals("removeStickyBroadcastAsUser")) __ho172= true;
-			if (m.equals("onNavigateUpFromChild")) __ho131= true;
-			if (m.equals("isTaskRoot")) __ho93= true;
+			if (m.equals("setSupportProgressBarIndeterminate")) __ho190= true;
+			if (m.equals("supportInvalidateOptionsMenu")) __ho218= true;
+			if (m.equals("onNavigateUpFromChild")) __ho134= true;
+			if (m.equals("isTaskRoot")) __ho100= true;
 			if (m.equals("getContentResolver")) __ho51= true;
-			if (m.equals("getPackageResourcePath")) __ho71= true;
-			if (m.equals("isFinishing")) __ho91= true;
-			if (m.equals("getIntent")) __ho60= true;
-			if (m.equals("onStop")) __ho150= true;
-			if (m.equals("onWindowStartingActionMode")) __ho159= true;
+			if (m.equals("setSupportActionBar")) __ho188= true;
+			if (m.equals("getPackageResourcePath")) __ho74= true;
+			if (m.equals("isFinishing")) __ho98= true;
+			if (m.equals("getIntent")) __ho62= true;
+			if (m.equals("setSupportProgress")) __ho189= true;
+			if (m.equals("onStop")) __ho146= true;
+			if (m.equals("onWindowStartingActionMode")) __ho158= true;
 			if (m.equals("enforceCallingOrSelfUriPermission")) __ho27= true;
 			if (m.equals("getDatabasePath")) __ho53= true;
-			if (m.equals("startActivityIfNeeded")) __ho198= true;
+			if (m.equals("startActivityIfNeeded")) __ho205= true;
 			if (m.equals("getCacheDir")) __ho45= true;
-			if (m.equals("getTheme")) __ho79= true;
+			if (m.equals("getTheme")) __ho86= true;
+			if (m.equals("supportShouldUpRecreateTask")) __ho222= true;
+			if (m.equals("supportNavigateUpTo")) __ho219= true;
 			if (m.equals("checkCallingOrSelfPermission")) __ho3= true;
-			if (m.equals("setTheme")) __ho186= true;
+			if (m.equals("supportRequestWindowFeature")) __ho221= true;
+			if (m.equals("setExitSharedElementCallback")) __ho184= true;
+			if (m.equals("setTheme")) __ho193= true;
 			if (m.equals("sendOrderedBroadcastAsUser")) __ho177= true;
-			if (m.equals("onCreatePanelMenu")) __ho115= true;
-			if (m.equals("onPostResume")) __ho138= true;
+			if (m.equals("onCreatePanelMenu")) __ho118= true;
+			if (m.equals("onPostResume")) __ho139= true;
 			if (m.equals("bindService")) __ho2= true;
-			if (m.equals("isRestricted")) __ho92= true;
+			if (m.equals("isRestricted")) __ho99= true;
 			if (m.equals("onPreparePanel")) __ho142= true;
 			if (m.equals("checkCallingUriPermission")) __ho6= true;
-			if (m.equals("getSystemService")) __ho77= true;
-			if (m.equals("startSearch")) __ho205= true;
-			if (m.equals("getPackageCodePath")) __ho68= true;
-			if (m.equals("onContextItemSelected")) __ho107= true;
-			if (m.equals("onApplyThemeResource")) __ho100= true;
-			if (m.equals("onPause")) __ho136= true;
+			if (m.equals("getSystemService")) __ho84= true;
+			if (m.equals("startSearch")) __ho212= true;
+			if (m.equals("getPackageCodePath")) __ho71= true;
+			if (m.equals("onContextItemSelected")) __ho111= true;
 			if (m.equals("finishActivityFromChild")) __ho37= true;
-			if (m.equals("startActivity")) __ho194= true;
-			if (m.equals("getLayoutInflater")) __ho62= true;
-			if (m.equals("startActionMode")) __ho192= true;
-			if (m.equals("grantUriPermission")) __ho85= true;
-			if (m.equals("onRetainNonConfigurationInstance")) __ho146= true;
+			if (m.equals("startActivity")) __ho201= true;
+			if (m.equals("getLayoutInflater")) __ho65= true;
+			if (m.equals("startActionMode")) __ho199= true;
+			if (m.equals("grantUriPermission")) __ho92= true;
 			if (m.equals("getAssets")) __ho43= true;
-			if (m.equals("onDestroy")) __ho119= true;
-			if (m.equals("onKeyUp")) __ho126= true;
-			if (m.equals("onMenuOpened")) __ho129= true;
-			if (m.equals("getExternalFilesDir")) __ho56= true;
-			if (m.equals("startManagingCursor")) __ho203= true;
-			if (m.equals("onPrepareDialog")) __ho139= true;
+			if (m.equals("onDestroy")) __ho123= true;
+			if (m.equals("onKeyUp")) __ho130= true;
+			if (m.equals("onMenuOpened")) __ho132= true;
+			if (m.equals("getExternalFilesDir")) __ho58= true;
+			if (m.equals("startManagingCursor")) __ho210= true;
 			if (m.equals("openContextMenu")) __ho160= true;
 			if (m.equals("getCallingPackage")) __ho47= true;
 			if (m.equals("equals")) __ho32= true;
-			if (m.equals("onAttachFragment")) __ho101= true;
-			if (m.equals("hasWindowFocus")) __ho86= true;
-			if (m.equals("onSaveInstanceState")) __ho147= true;
-			if (m.equals("onCreateOptionsMenu")) __ho114= true;
+			if (m.equals("onAttachFragment")) __ho106= true;
+			if (m.equals("hasWindowFocus")) __ho93= true;
+			if (m.equals("onCreateOptionsMenu")) __ho117= true;
 			if (m.equals("registerComponentCallbacks")) __ho168= true;
 			if (m.equals("sendOrderedBroadcast")) __ho176= true;
 			if (m.equals("sendBroadcastAsUser")) __ho175= true;
-			if (m.equals("getExternalCacheDir")) __ho55= true;
-			if (m.equals("startIntentSenderForResult")) __ho201= true;
-			if (m.equals("onLowMemory")) __ho127= true;
-			if (m.equals("onOptionsItemSelected")) __ho133= true;
-			if (m.equals("onCreateThumbnail")) __ho117= true;
-			if (m.equals("onStart")) __ho149= true;
-			if (m.equals("startNextMatchingActivity")) __ho204= true;
+			if (m.equals("getExternalCacheDir")) __ho57= true;
+			if (m.equals("startIntentSenderForResult")) __ho208= true;
+			if (m.equals("onLowMemory")) __ho131= true;
+			if (m.equals("onOptionsItemSelected")) __ho135= true;
+			if (m.equals("onCreateThumbnail")) __ho121= true;
+			if (m.equals("startNextMatchingActivity")) __ho211= true;
+			if (m.equals("getSupportParentActivityIntent")) __ho83= true;
 			if (m.equals("onUserInteraction")) __ho155= true;
 			if (m.equals("onTrackballEvent")) __ho153= true;
 			if (m.equals("onTouchEvent")) __ho152= true;
-			if (m.equals("onUserLeaveHint")) __ho156= true;
-			if (m.equals("onResume")) __ho145= true;
-			if (m.equals("getPreferences")) __ho73= true;
-			if (m.equals("startService")) __ho206= true;
-			if (m.equals("onContextMenuClosed")) __ho108= true;
+			if (m.equals("getSupportFragmentManager")) __ho81= true;
+			if (m.equals("onCreateSupportNavigateUpTaskStack")) __ho120= true;
+			if (m.equals("getPreferences")) __ho76= true;
+			if (m.equals("startService")) __ho213= true;
+			if (m.equals("onContextMenuClosed")) __ho112= true;
 			if (m.equals("registerReceiver")) __ho170= true;
-			if (m.equals("getPackageManager")) __ho69= true;
-			if (m.equals("onCreateView")) __ho118= true;
-			if (m.equals("onConfigurationChanged")) __ho105= true;
-			if (m.equals("onContentChanged")) __ho106= true;
-			if (m.equals("onCreateContextMenu")) __ho110= true;
+			if (m.equals("getPackageManager")) __ho72= true;
+			if (m.equals("onCreateView")) __ho122= true;
+			if (m.equals("onConfigurationChanged")) __ho109= true;
+			if (m.equals("onContentChanged")) __ho110= true;
+			if (m.equals("onCreateContextMenu")) __ho114= true;
 			if (m.equals("onPrepareNavigateUpTaskStack")) __ho140= true;
-			if (m.equals("getLastNonConfigurationInstance")) __ho61= true;
-			if (m.equals("onKeyDown")) __ho122= true;
+			if (m.equals("getLastNonConfigurationInstance")) __ho64= true;
+			if (m.equals("onKeyDown")) __ho126= true;
 			if (m.equals("sendBroadcast")) __ho174= true;
-			if (m.equals("unbindService")) __ho212= true;
+			if (m.equals("unbindService")) __ho227= true;
+			if (m.equals("startSupportActionMode")) __ho214= true;
 			if (m.equals("createPendingResult")) __ho15= true;
 			if (m.equals("getBaseContext")) __ho44= true;
 			if (m.equals("registerForContextMenu")) __ho169= true;
 			if (m.equals("enforcePermission")) __ho30= true;
 			if (m.equals("checkUriPermission")) __ho8= true;
 			if (m.equals("dump")) __ho25= true;
-			if (m.equals("startIntentSenderFromChild")) __ho202= true;
-			if (m.equals("onCreate")) __ho109= true;
+			if (m.equals("setSupportProgressBarVisibility")) __ho192= true;
+			if (m.equals("startIntentSenderFromChild")) __ho209= true;
+			if (m.equals("onCreate")) __ho113= true;
 			if (m.equals("clearWallpaper")) __ho9= true;
-			if (m.equals("onWindowFocusChanged")) __ho158= true;
-			if (m.equals("startActivityFromChild")) __ho196= true;
-			if (m.equals("onMenuItemSelected")) __ho128= true;
-			if (m.equals("onCreateDescription")) __ho111= true;
+			if (m.equals("onWindowFocusChanged")) __ho157= true;
+			if (m.equals("startActivityFromChild")) __ho203= true;
+			if (m.equals("onCreateDescription")) __ho115= true;
 			if (m.equals("getApplicationInfo")) __ho42= true;
 			if (m.equals("setContentView")) __ho182= true;
-			if (m.equals("unregisterReceiver")) __ho215= true;
-			if (m.equals("stopService")) __ho208= true;
-			if (m.equals("onDetachedFromWindow")) __ho120= true;
+			if (m.equals("setSupportProgressBarIndeterminateVisibility")) __ho191= true;
+			if (m.equals("unregisterReceiver")) __ho230= true;
+			if (m.equals("stopService")) __ho216= true;
+			if (m.equals("onDetachedFromWindow")) __ho124= true;
 		}
 	}
 	private boolean __ho0;
@@ -3919,4 +4127,19 @@ public class NativeScriptActivity extends android.app.Activity
 	private boolean __ho213;
 	private boolean __ho214;
 	private boolean __ho215;
+	private boolean __ho216;
+	private boolean __ho217;
+	private boolean __ho218;
+	private boolean __ho219;
+	private boolean __ho220;
+	private boolean __ho221;
+	private boolean __ho222;
+	private boolean __ho223;
+	private boolean __ho224;
+	private boolean __ho225;
+	private boolean __ho226;
+	private boolean __ho227;
+	private boolean __ho228;
+	private boolean __ho229;
+	private boolean __ho230;
 }
