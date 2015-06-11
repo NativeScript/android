@@ -499,7 +499,9 @@ void MetadataNode::InnerClassConstructorCallback(const v8::FunctionCallbackInfo<
 	SetInstanceMetadata(info.GetIsolate(), thiz, data->node);
 
 	ArgsWrapper argWrapper(info, ArgType::Class, outerThis);
-	bool success = s_registerInstance(thiz, extendName, className, argWrapper, outerThis, false);
+
+	string fullClassName = CreateFullClassName(className, extendName);
+	bool success = s_registerInstance(thiz, fullClassName, argWrapper, outerThis, false);
 
 	assert(success);
 }
@@ -687,7 +689,9 @@ void MetadataNode::ExtendedClassConstructorCallback(const v8::FunctionCallbackIn
 	thiz->SetHiddenValue(ConvertToV8String("t::implObj"), implementationObject);
 
 	ArgsWrapper argWrapper(info, ArgType::Class, Handle<Object>());
-	bool success = s_registerInstance(thiz, extendName, className, argWrapper, implementationObject, false);
+
+	string fullClassName = CreateFullClassName(className, extendName);
+	bool success = s_registerInstance(thiz, fullClassName, argWrapper, implementationObject, false);
 
 	assert(success);
 }
@@ -734,8 +738,8 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
 	SetInstanceMetadata(info.GetIsolate(), implementationObject, node);
 
 	//@@@ Refactor
-	auto fullName = className + Constants::CLASS_NAME_LOCATION_SEPARATOR + extendNameAndLocation;
-	thiz->SetHiddenValue(ConvertToV8String("implClassName"), ConvertToV8String(fullName));
+	string fullClassName = CreateFullClassName(className, extendNameAndLocation);
+	thiz->SetHiddenValue(ConvertToV8String("implClassName"), ConvertToV8String(fullClassName));
 	//
 
 	implementationObject->SetPrototype(thiz->GetPrototype());
@@ -744,7 +748,7 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
 
 	ArgsWrapper argWrapper(info, ArgType::Interface, Handle<Object>());
 
-	auto success = s_registerInstance(thiz, extendNameAndLocation, className, argWrapper, implementationObject, true);
+	auto success = s_registerInstance(thiz, fullClassName, argWrapper, implementationObject, true);
 
 	assert(success);
 }
@@ -763,7 +767,9 @@ void MetadataNode::ClassConstructorCallback(const v8::FunctionCallbackInfo<v8::V
 	SetInstanceMetadata(info.GetIsolate(), thiz, node);
 
 	ArgsWrapper argWrapper(info, ArgType::Class, outerThis);
-	bool success = s_registerInstance(thiz, extendName, className, argWrapper, outerThis, false);
+
+	string fullClassName = CreateFullClassName(className, extendName);
+	bool success = s_registerInstance(thiz, fullClassName, argWrapper, outerThis, false);
 
 	//assert(success);
 }
@@ -1050,10 +1056,10 @@ MetadataNode::ExtendedClassCacheData MetadataNode::GetCachedExtendedClassData(Is
 }
 
 string MetadataNode::CreateFullClassName(const std::string& className, const std::string& extendNameAndLocation = "") {
-	string fullClassName = className;
+	string fullClassName = className +  Constants::CLASS_NAME_LOCATION_SEPARATOR;
 
 	if(!extendNameAndLocation.empty()) {
-		fullClassName += Constants::CLASS_NAME_LOCATION_SEPARATOR + extendNameAndLocation;
+		fullClassName += extendNameAndLocation;
 	}
 
 	return fullClassName;
