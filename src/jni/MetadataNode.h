@@ -219,6 +219,7 @@ namespace tns
 		void SetInnnerTypes(v8::Isolate *isolate, v8::Handle<v8::Function>& ctorFunction, MetadataTreeNode *treeNode);
 
 
+		static std::string CreateFullClassName(const std::string& className, const std::string& extendNameAndLocation);
 		static void MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 		static void InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 		static void ClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);

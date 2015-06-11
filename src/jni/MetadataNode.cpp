@@ -1049,6 +1049,16 @@ MetadataNode::ExtendedClassCacheData MetadataNode::GetCachedExtendedClassData(Is
 	return cacheData;
 }
 
+string MetadataNode::CreateFullClassName(const std::string& className, const std::string& extendNameAndLocation = "") {
+	string fullClassName = className;
+
+	if(!extendNameAndLocation.empty()) {
+		fullClassName += Constants::CLASS_NAME_LOCATION_SEPARATOR + extendNameAndLocation;
+	}
+
+	return fullClassName;
+}
+
 void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
 	if (info.IsConstructCall())
@@ -1073,7 +1083,8 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 	DEBUG_WRITE("ExtendsCallMethodHandler: called with %s", ConvertToString(extendName).c_str());
 
 	auto extendNameAndLocation = extendLocation + ConvertToString(extendName);
-	auto fullClassName = node->m_name + Constants::CLASS_NAME_LOCATION_SEPARATOR + extendNameAndLocation; //ConvertToString(extendName);
+	auto fullClassName = CreateFullClassName(node->m_name, extendNameAndLocation);
+//			node->m_name + Constants::CLASS_NAME_LOCATION_SEPARATOR + extendNameAndLocation; //ConvertToString(extendName);
 	auto fullExtendedName = TNS_PREFIX + fullClassName;
 	DEBUG_WRITE("ExtendsCallMethodHandler: extend full name %s", fullClassName.c_str());
 
@@ -1115,7 +1126,7 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 	extendFunc->Set(prototypeName, implementationObject);
 	extendFunc->SetPrototype(baseClassCtorFunc);
 	SetClassAccessor(extendFunc);
-	SetTypeMetadata(isolate, extendFunc, new TypeMetadata(TNS_PREFIX + fullClassName));
+	SetTypeMetadata(isolate, extendFunc, new TypeMetadata(fullExtendedName));
 	info.GetReturnValue().Set(extendFunc);
 
 	s_name2NodeCache.insert(make_pair(fullExtendedName, node));
