@@ -2,6 +2,7 @@ package com.tns;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 
 import org.json.JSONException;
@@ -22,6 +23,8 @@ public class Require
 	private static final String ModuleContent_Part3 = "\";" + "function require(moduleName){ return __global.require(moduleName, __filename); }" + "module.filename = __filename; this.__extends = __global.__extends; \n";
 	private static final String ModuleContent_Part4 = "\n return module.exports; \n})";
 	private static final StringBuffer ModuleContent = new StringBuffer(65536);
+	
+	private static ArrayList<String> s_cacheDirsWithJson;
 
 	public static void init(Context context)
 	{
@@ -29,6 +32,8 @@ public class Require
 		{
 			return;
 		}
+		
+		s_cacheDirsWithJson = new ArrayList<String>();
 
 		RootPackageDir = context.getApplicationInfo().dataDir;
 
@@ -216,20 +221,28 @@ public class Require
 		}
 
 		if (!jsFile.exists() && directory.exists() && directory.isDirectory())
-		{
+		{	
 			// we are pointing to a directory, search for package.json or
 			// index.js
 			File packageFile = new File(directory.getPath() + "/package.json");
+
+			if(s_cacheDirsWithJson.contains(directory.getPath())) {
+				try
+				{
+					return getJsFileFromJson(directory, jsFile, packageFile);
+				}
+				catch (Exception e)
+				{
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+			
 			if (packageFile.exists())
 			{
 				try
 				{
-					JSONObject object = FileSystem.readJSONFile(packageFile);
-					if (object != null)
-					{
-						String mainFile = object.getString("main");
-						jsFile = new File(directory.getPath(), mainFile);
-					}
+					jsFile = getJsFileFromJson(directory, jsFile, packageFile);
 				}
 				catch (IOException e)
 				{
@@ -248,6 +261,18 @@ public class Require
 			}
 		}
 
+		return jsFile;
+	}
+
+	private static File getJsFileFromJson(File directory, File jsFile, File packageFile) throws IOException, JSONException
+	{
+		JSONObject object = FileSystem.readJSONFile(packageFile);
+		if (object != null)
+		{
+			String mainFile = object.getString("main");
+			jsFile = new File(directory.getPath(), mainFile);
+			s_cacheDirsWithJson.add(directory.getPath());
+		}
 		return jsFile;
 	}
 }
