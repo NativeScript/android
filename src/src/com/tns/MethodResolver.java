@@ -202,8 +202,11 @@ class MethodResolver
 		}
 	}
 	
-	static Constructor<?> resolveConstructor(String name, String className, Object[] args, DexFactory dexFactory, String[] methodOverrides) throws ClassNotFoundException, IOException
+	static Constructor<?> resolveConstructor(String fullClassName, Object[] args, DexFactory dexFactory, String[] methodOverrides) throws ClassNotFoundException, IOException
 	{
+		int classExtendSeparatorIndex = fullClassName.indexOf('_');
+		String className = fullClassName.substring(0, classExtendSeparatorIndex);
+		String name = fullClassName.substring(classExtendSeparatorIndex + 1);
 		String cannonicalClassName = className.replace('/', '.');
 		
 		Class<?> clazz = null;

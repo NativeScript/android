@@ -187,9 +187,9 @@ public class Platform
 		runNativeScript(bootstrapInfo[0], bootstrapInfo[1]);
 	}
 
-	private static int cacheConstructor(String name, String className, Object[] args, String[] methodOverrides) throws ClassNotFoundException, IOException
+	private static int cacheConstructor(String fullClassName, Object[] args, String[] methodOverrides) throws ClassNotFoundException, IOException
 	{
-		Constructor<?> ctor = MethodResolver.resolveConstructor(name, className, args, dexFactory, methodOverrides);
+		Constructor<?> ctor = MethodResolver.resolveConstructor(fullClassName, args, dexFactory, methodOverrides);
 
 		
 		//TODO: Lubo: Not thread safe already.
