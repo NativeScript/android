@@ -200,10 +200,8 @@ class MethodResolver
 		}
 	}
 	
-	static Constructor<?> resolveConstructor(String fullClassName, Object[] args, DexFactory dexFactory, String[] methodOverrides) throws ClassNotFoundException, IOException
+	static Constructor<?> resolveConstructor(Class<?> clazz, Object[] args) throws ClassNotFoundException, IOException
 	{
-		Class<?> clazz = ClassResolver.resolveClass(fullClassName, dexFactory, methodOverrides);
-
 		Constructor<?>[] constructors = clazz.getConstructors();
 
 		if (constructors.length == 1)

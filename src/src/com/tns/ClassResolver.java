@@ -14,7 +14,6 @@ class ClassResolver
 {
 	public static Class<?> resolveClass(String fullClassName, DexFactory dexFactory, String[] methodOverrides) throws ClassNotFoundException, IOException
 	{
-		//resolving class
 		int classExtendSeparatorIndex = fullClassName.indexOf('_');
 		String className = fullClassName.substring(0, classExtendSeparatorIndex);
 		String name = fullClassName.substring(classExtendSeparatorIndex + 1);
@@ -24,6 +23,7 @@ class ClassResolver
 		boolean isBindingClass = cannonicalClassName.startsWith("com.tns.gen") &&
 				!cannonicalClassName.startsWith("com.tns.tests.");
 
+		//if binding generate proxy or load pregenerated
 		if (isBindingClass)
 		{
 			if (name == null || name == "")
@@ -38,7 +38,7 @@ class ClassResolver
 		{
 			clazz = Class.forName(cannonicalClassName);
 		}
-		// done resolving class
+		
 		return clazz;
 	}
 }

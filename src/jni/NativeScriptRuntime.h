@@ -29,7 +29,7 @@ namespace tns
 
 		static v8::Handle<v8::Object> CreateJSWrapper(jint javaObjectID, const std::string& typeName);
 
-		static jobject CreateJavaInstance(int objectID, const std::string& fullClassName, const ArgsWrapper& argWrapper, const v8::Handle<v8::Object>& implementationObject, bool isInterface);
+		static jobject CreateJavaInstance(int objectID, const std::string& fullClassName, const ArgsWrapper& argWrapper, jclass javaClass, bool isInterface);
 
 		static bool RegisterInstance(const v8::Handle<v8::Object>& jsObject, const std::string& fullClassName, const ArgsWrapper& argWrapper, const v8::Handle<v8::Object>& implementationObject, bool isInterface);
 
@@ -103,7 +103,7 @@ namespace tns
 	private:
 		NativeScriptRuntime() {}
 
-		static int GetCachedConstructorId(JEnv& env, const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& fullClassName, jobjectArray javaArgs, const v8::Handle<v8::Object>& implementationObject);
+		static int GetCachedConstructorId(JEnv& env, const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& fullClassName, jobjectArray javaArgs, jclass javaClass);
 
 		static v8::Handle<v8::Object> FindClass(const std::string& className);
 

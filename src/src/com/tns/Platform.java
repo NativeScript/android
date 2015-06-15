@@ -190,11 +190,10 @@ public class Platform
 		return javaClass;
 	}
 
-	private static int cacheConstructor(String fullClassName, Object[] args, String[] methodOverrides) throws ClassNotFoundException, IOException
+	private static int cacheConstructor(Class<?> clazz, Object[] args) throws ClassNotFoundException, IOException
 	{
-		Constructor<?> ctor = MethodResolver.resolveConstructor(fullClassName, args, dexFactory, methodOverrides);
+		Constructor<?> ctor = MethodResolver.resolveConstructor(clazz, args);
 
-		
 		//TODO: Lubo: Not thread safe already.
 		//TODO: Lubo: Does not check for existing items
 		int ctorId = ctorCache.size();
