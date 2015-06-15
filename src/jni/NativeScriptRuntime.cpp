@@ -42,6 +42,9 @@ void NativeScriptRuntime::Init(JavaVM *jvm, ObjectManager *objectManager)
 	RequireClass = env.FindClass("com/tns/Require");
 	assert(RequireClass != nullptr);
 
+	RESOLVE_CLASS_METHOD_ID = env.GetStaticMethodID(PlatformClass, "resolveClass", "(Ljava/lang/String;[Ljava/lang/String;)Ljava/lang/Class;");
+	assert(RESOLVE_CLASS_METHOD_ID != nullptr);
+
 	CREATE_INSTANCE_METHOD_ID = env.GetStaticMethodID(PlatformClass, "createInstance", "([Ljava/lang/Object;II)Ljava/lang/Object;");
 	assert(CREATE_INSTANCE_METHOD_ID != nullptr);
 
@@ -94,9 +97,12 @@ bool NativeScriptRuntime::RegisterInstance(const Handle<Object>& jsObject, const
 
 	DEBUG_WRITE("RegisterInstance called for '%s'", fullClassName.c_str());
 
+	JEnv env;
+	//resolve class
+	JniLocalRef javaClass(ResolveClass(fullClassName, implementationObject));
+
 	int javaObjectID = objectManager->GenerateNewObjectID();
 
-	JEnv env;
 	DEBUG_WRITE("RegisterInstance: Linking new instance");
 	objectManager->Link(jsObject, javaObjectID, nullptr);
 
@@ -117,6 +123,18 @@ bool NativeScriptRuntime::RegisterInstance(const Handle<Object>& jsObject, const
 	}
 
 	return success;
+}
+
+jclass NativeScriptRuntime::ResolveClass(const std::string& fullClassname, const Handle<Object>& implementationObject) {
+
+	JEnv env;
+	//get method overrides from implementation object
+	JniLocalRef javaFullClassName(env.NewStringUTF(fullClassname.c_str()));
+	jobjectArray methodOverrides = GetMethodOverrides(env, implementationObject);
+
+	JniLocalRef generatedJavaClass((jclass)env.CallStaticObjectMethod(PlatformClass, RESOLVE_CLASS_METHOD_ID, (jstring)javaFullClassName, methodOverrides));
+
+	return generatedJavaClass;
 }
 
 Handle<Value> NativeScriptRuntime::GetArrayElement(const Handle<Object>& array, uint32_t index, const string& arraySignature)
@@ -1014,6 +1032,7 @@ JavaVM* NativeScriptRuntime::jvm = nullptr;
 jclass NativeScriptRuntime::PlatformClass = nullptr;
 jclass NativeScriptRuntime::RequireClass = nullptr;
 jclass NativeScriptRuntime::JAVA_LANG_STRING = nullptr;
+jmethodID NativeScriptRuntime::RESOLVE_CLASS_METHOD_ID = nullptr;
 jmethodID NativeScriptRuntime::CREATE_INSTANCE_METHOD_ID = nullptr;
 jmethodID NativeScriptRuntime::CACHE_CONSTRUCTOR_METHOD_ID = nullptr;
 jmethodID NativeScriptRuntime::APP_FAIL_METHOD_ID = nullptr;

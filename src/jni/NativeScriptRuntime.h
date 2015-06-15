@@ -33,6 +33,7 @@ namespace tns
 
 		static bool RegisterInstance(const v8::Handle<v8::Object>& jsObject, const std::string& fullClassName, const ArgsWrapper& argWrapper, const v8::Handle<v8::Object>& implementationObject, bool isInterface);
 
+		static jclass ResolveClass(const std::string& fullClassname, const v8::Handle<v8::Object>& implementationObject);
 		//
 
 		static v8::Handle<v8::Value> GetArrayElement(const v8::Handle<v8::Object>& array, uint32_t index, const std::string& arraySignature);
@@ -115,6 +116,8 @@ namespace tns
 		static std::string GetReturnType(const std::string& methodSignature);
 
 		static JavaVM *jvm;
+
+		static jmethodID RESOLVE_CLASS_METHOD_ID;
 
 		static jmethodID CREATE_INSTANCE_METHOD_ID;
 
