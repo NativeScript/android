@@ -1,11 +1,5 @@
 package com.tns.tests;
 
-import java.lang.reflect.Array;
-
-import com.tns.NativeScriptException;
-import com.tns.Platform;
-
-import android.content.Context;
 import android.util.Log;
 import android.view.View.OnClickListener;
 

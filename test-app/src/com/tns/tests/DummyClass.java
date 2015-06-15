@@ -2,8 +2,6 @@ package com.tns.tests;
 
 import android.util.Log;
 
-import com.tns.NativeScriptHashCodeProvider;
-
 public class DummyClass
 {
 	private static class DummyClassImpl extends DummyClass

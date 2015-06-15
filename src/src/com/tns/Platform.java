@@ -17,7 +17,6 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 
-import android.app.Activity;
 import android.content.Context;
 import android.content.res.AssetManager;
 import android.os.Handler;
