@@ -31,8 +31,6 @@
 
 package org.ow2.asmdex.lowLevelUtils;
 
-import java.util.Queue;
-
 import org.ow2.asmdex.Opcodes;
 import org.ow2.asmdex.instruction.DebugInstruction;
 import org.ow2.asmdex.instruction.DebugInstructionStartLocal;

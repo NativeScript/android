@@ -1,7 +1,5 @@
 package com.tns.tests;
 
-import com.tns.NativeScriptHashCodeProvider;
-
 public class DispatchAsyncOpOnUIThreadTest
 {
 	

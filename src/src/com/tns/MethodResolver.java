@@ -10,8 +10,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 
-import android.util.Log;
-
 class MethodResolver
 {
 	private static Map<String, String> primitiveTypesSignature = new HashMap<String, String>();

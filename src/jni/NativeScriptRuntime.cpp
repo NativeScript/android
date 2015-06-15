@@ -709,12 +709,12 @@ void NativeScriptRuntime::RequireCallback(const v8::FunctionCallbackInfo<v8::Val
 	ASSERT_MESSAGE(args[1]->IsString(), "require should be called with string parameter");
 
 	string moduleName = ConvertToString(args[0].As<String>());
-	string callingModuleName = ConvertToString(args[1].As<String>());
+	string callingModuleDirName = ConvertToString(args[1].As<String>());
 
 	JEnv env;
 	JniLocalRef jsModulename(env.NewStringUTF(moduleName.c_str()));
-	JniLocalRef jsCallingModuleName(env.NewStringUTF(callingModuleName.c_str()));
-	JniLocalRef jsModulePath(env.CallStaticObjectMethod(RequireClass, GET_MODULE_PATH_METHOD_ID, (jstring) jsModulename, (jstring) jsCallingModuleName));
+	JniLocalRef jsCallingModuleDirName(env.NewStringUTF(callingModuleDirName.c_str()));
+	JniLocalRef jsModulePath(env.CallStaticObjectMethod(RequireClass, GET_MODULE_PATH_METHOD_ID, (jstring) jsModulename, (jstring) jsCallingModuleDirName));
 
 	auto isolate = Isolate::GetCurrent();
 
