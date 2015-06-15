@@ -242,6 +242,7 @@ public class Require
 				}
 			}
 			else {
+				// do not check whether this path is external for the application - it is already checked
 				checkForExternalPath = false;
 				jsFile = new File(cachedPath);
 			}
