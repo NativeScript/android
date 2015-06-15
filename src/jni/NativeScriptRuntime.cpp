@@ -109,8 +109,8 @@ bool NativeScriptRuntime::RegisterInstance(const Handle<Object>& jsObject, const
 	if (success)
 	{
 		DEBUG_WRITE("RegisterInstance: Updating linked instance with its real class");
-		string instanceClassName = objectManager->GetClassName(instance);
-		jclass instanceClass = env.FindClass(instanceClassName);
+//		string instanceClassName = objectManager->GetClassName(instance);
+		jclass instanceClass = env.FindClass(fullClassName);
 		objectManager->SetJavaClass(jsObject, instanceClass);
 	}
 	else
