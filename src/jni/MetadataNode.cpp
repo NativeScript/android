@@ -1090,7 +1090,6 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 
 	auto extendNameAndLocation = extendLocation + ConvertToString(extendName);
 	auto fullClassName = CreateFullClassName(node->m_name, extendNameAndLocation);
-//			node->m_name + Constants::CLASS_NAME_LOCATION_SEPARATOR + extendNameAndLocation; //ConvertToString(extendName);
 	auto fullExtendedName = TNS_PREFIX + fullClassName;
 	DEBUG_WRITE("ExtendsCallMethodHandler: extend full name %s", fullClassName.c_str());
 
@@ -1103,14 +1102,13 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 		return;
 	}
 
-
 	auto implementationObjectPropertyName = V8StringConstants::GetClassImplementationObject();
 	//reuse validation - checks that implementationObject is not reused for different classes
 	auto implementationObjectProperty = implementationObject->GetHiddenValue(implementationObjectPropertyName).As<String>();
 	if (implementationObjectProperty.IsEmpty())
 	{
 		//mark the implementationObject as such and set a pointer to it's class node inside it for reuse validation later
-		implementationObject->SetHiddenValue(implementationObjectPropertyName, String::NewFromUtf8(isolate, fullClassName.c_str()));
+		implementationObject->SetHiddenValue(implementationObjectPropertyName, String::NewFromUtf8(isolate, fullExtendedName.c_str()));
 	}
 	else
 	{
@@ -1137,7 +1135,7 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 
 	s_name2NodeCache.insert(make_pair(fullExtendedName, node));
 
-	ExtendedClassCacheData cacheData(extendFunc, fullClassName, node);
+	ExtendedClassCacheData cacheData(extendFunc, fullExtendedName, node);
 	s_extendedCtorFuncCache.insert(make_pair(fullExtendedName, cacheData));
 }
 
