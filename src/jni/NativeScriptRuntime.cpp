@@ -78,7 +78,8 @@ void NativeScriptRuntime::Init(JavaVM *jvm, ObjectManager *objectManager)
 									NativeScriptRuntime::RegisterInstance,
 									NativeScriptRuntime::GetTypeMetadata,
 									NativeScriptRuntime::FindClass,
-									NativeScriptRuntime::GetArrayLength);
+									NativeScriptRuntime::GetArrayLength,
+									NativeScriptRuntime::ResolveClass);
 
 	NativeScriptRuntime::objectManager = objectManager;
 

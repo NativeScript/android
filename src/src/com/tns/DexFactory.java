@@ -78,6 +78,17 @@ public class DexFactory
 		}
 		
 		String fullClassName = className.replace("$", "_") + CLASS_NAME_LOCATION_SEPARATOR + name;
+		
+//		ClassLoader cl = context.getClassLoader();
+//		try {
+//			Class<?> pregeneratedClass = cl.loadClass(className.replace("$", "_"));
+//			
+//			return pregeneratedClass;
+//		}
+//		catch (Exception e) {
+//			e.printStackTrace();
+//		}
+		
 		Class<?> existingClass = this.injectedDexClasses.get(fullClassName); 
 		if(existingClass != null)
 		{

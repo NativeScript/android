@@ -6,6 +6,7 @@
 #include "V8StringConstants.h"
 #include "ExceptionUtil.h"
 #include "SimpleProfiler.h"
+#include "JniLocalRef.h"
 #include <sstream>
 #include <cctype>
 #include <assert.h>
@@ -23,7 +24,8 @@ void MetadataNode::SubscribeCallbacks(ObjectManager *objectManager,
 									RegisterInstanceCallback registerInstanceCallback,
 									GetTypeMetadataCallback getTypeMetadataCallback,
 									FindClassCallback findClassCallback,
-									GetArrayLengthCallback getArrayLengthCallback)
+									GetArrayLengthCallback getArrayLengthCallback,
+									ResolveClassCallback resolveClassCallback)
 {
 	s_objectManager = objectManager;
 	s_getJavaField = getJavaFieldCallback;
@@ -35,6 +37,7 @@ void MetadataNode::SubscribeCallbacks(ObjectManager *objectManager,
 	s_getTypeMetadata = getTypeMetadataCallback;
 	s_findClass = findClassCallback;
 	s_getArrayLength = getArrayLengthCallback;
+	s_resolveClass = resolveClassCallback;
 
 	auto isolate = Isolate::GetCurrent();
 	auto key = ConvertToV8String("tns::MetadataKey");
@@ -690,7 +693,7 @@ void MetadataNode::ExtendedClassConstructorCallback(const v8::FunctionCallbackIn
 
 	ArgsWrapper argWrapper(info, ArgType::Class, Handle<Object>());
 
-	string fullClassName = CreateFullClassName(className, extendName);
+	string fullClassName = CreateFullClassName(className, extendName);//extData->fullClassName;//
 	bool success = s_registerInstance(thiz, fullClassName, argWrapper, implementationObject, false);
 
 	assert(success);
@@ -1044,8 +1047,8 @@ bool MetadataNode::ValidateExtendArguments(const FunctionCallbackInfo<Value>& in
 
 MetadataNode::ExtendedClassCacheData MetadataNode::GetCachedExtendedClassData(Isolate *isolate, const string& proxyClassName)
 {
-	ExtendedClassCacheData cacheData;
 
+	ExtendedClassCacheData cacheData;
 	auto itFound = s_extendedCtorFuncCache.find(proxyClassName);
 	if (itFound != s_extendedCtorFuncCache.end())
 	{
@@ -1088,8 +1091,18 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 
 	DEBUG_WRITE("ExtendsCallMethodHandler: called with %s", ConvertToString(extendName).c_str());
 
-	auto extendNameAndLocation = extendLocation + ConvertToString(extendName);
+	string extendNameAndLocation = extendLocation + ConvertToString(extendName);
 	auto fullClassName = CreateFullClassName(node->m_name, extendNameAndLocation);
+
+
+	//
+	JniLocalRef generatedClass(s_resolveClass(fullClassName, implementationObject));
+	std::string generatedFullClassName = s_objectManager->GetClassName((jclass)generatedClass);
+	if(generatedFullClassName.find("com/tns/tests") == std::string::npos) {
+		fullClassName = generatedFullClassName;
+	}
+	//
+
 	auto fullExtendedName = TNS_PREFIX + fullClassName;
 	DEBUG_WRITE("ExtendsCallMethodHandler: extend full name %s", fullClassName.c_str());
 
@@ -1121,7 +1134,7 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 
 	auto baseClassCtorFunc = node->GetConstructorFunction(isolate);
 
-	auto extendData = External::New(isolate, new ExtendedClassData(node, extendNameAndLocation, implementationObject));
+	auto extendData = External::New(isolate, new ExtendedClassData(node, extendNameAndLocation, implementationObject, fullExtendedName));
 	auto extendFuncTemplate = FunctionTemplate::New(isolate, ExtendedClassConstructorCallback, extendData);
 	auto extendFunc = extendFuncTemplate->GetFunction();
 	auto prototypeName = ConvertToV8String("prototype");
@@ -1307,6 +1320,7 @@ RegisterInstanceCallback MetadataNode::s_registerInstance = nullptr;
 GetTypeMetadataCallback MetadataNode::s_getTypeMetadata = nullptr;
 FindClassCallback MetadataNode::s_findClass = nullptr;
 GetArrayLengthCallback MetadataNode::s_getArrayLength = nullptr;
+ResolveClassCallback MetadataNode::s_resolveClass = nullptr;
 MetadataReader MetadataNode::s_metadataReader;
 ObjectManager* MetadataNode::s_objectManager = nullptr;
 
