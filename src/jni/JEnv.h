@@ -120,6 +120,10 @@ namespace tns
 		const char* GetStringUTFChars(jstring str, jboolean* isCopy);
 		void ReleaseStringUTFChars(jstring str, const char* utf);
 
+		const int GetStringLength(jstring str);
+		const int GetStringUTFLength(jstring str);
+		void GetStringUTFRegion(jstring str, jsize start, jsize len, char *buf);
+
 		jint Throw(jthrowable obj);
 		jboolean ExceptionCheck();
 		jthrowable ExceptionOccurred();

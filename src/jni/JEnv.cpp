@@ -393,6 +393,20 @@ void JEnv::ReleaseStringUTFChars(jstring str, const char* utf)
 	m_env->ReleaseStringUTFChars(str, utf);
 }
 
+const int JEnv::GetStringLength(jstring str)
+{
+	return m_env->GetStringLength(str);
+}
+
+const int JEnv::GetStringUTFLength(jstring str)
+{
+	return m_env->GetStringUTFLength(str);
+}
+
+void JEnv::GetStringUTFRegion(jstring str, jsize start, jsize len, char *buf) {
+	m_env->GetStringUTFRegion(str, start, len, buf);
+}
+
 
 jint JEnv::Throw(jthrowable obj)
 {

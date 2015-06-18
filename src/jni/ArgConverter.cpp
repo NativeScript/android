@@ -229,8 +229,16 @@ Handle<Array> ArgConverter::ConvertJavaArgsToJsArgs(jobjectArray args)
 
 std::string ArgConverter::jstringToString(jstring value)
 {
-	if (value == nullptr)
+	if (value == nullptr) {
 		return string();
+	}
+
+	jsize utfLength;
+	bool readInBuffer = ReadJStringInBuffer(value, utfLength);
+	if(readInBuffer) {
+		string s(charBuffer, utfLength);
+		return s;
+	}
 
 	JEnv env;
 
@@ -242,6 +250,45 @@ std::string ArgConverter::jstringToString(jstring value)
 	return s;
 }
 
+Local<String> ArgConverter::jstringToV8String(jstring value)
+{
+	if	(value == nullptr)
+	{
+		return Handle<String>();
+	}
+
+	jsize utfLength;
+	bool readInBuffer = ReadJStringInBuffer(value, utfLength);
+	if(readInBuffer) {
+		return ConvertToV8String(charBuffer, utfLength);
+	}
+
+	JEnv env;
+	const char* chars = env.GetStringUTFChars(value, NULL);
+	auto v8String = ConvertToV8String(charBuffer, utfLength);
+	env.ReleaseStringUTFChars(value, chars);
+
+	return v8String;
+}
+
+bool ArgConverter::ReadJStringInBuffer(jstring value, jsize& utfLength) {
+	if (value == nullptr) {
+		return false;
+	}
+
+	JEnv env;
+	utfLength = env.GetStringUTFLength(value);
+	if(utfLength > BUFFER_SIZE) {
+		return false;
+	}
+
+	jsize strLength = env.GetStringLength(value);
+	// use existing buffer to prevent extensive memory allocation
+	env.GetStringUTFRegion(value, (jsize)0, strLength, charBuffer);
+
+	return true;
+}
+
 Handle<String> ArgConverter::jcharToV8String(jchar value)
 {
 	JEnv env;
@@ -251,24 +298,6 @@ Handle<String> ArgConverter::jcharToV8String(jchar value)
 	const char* resP = env.GetStringUTFChars(str, &bol);
 	auto v8String = ConvertToV8String(resP, 1);
 	env.ReleaseStringUTFChars(str, resP);
-	return v8String;
-}
-
-Local<String> ArgConverter::jstringToV8String(jstring value)
-{
-	if	(value == nullptr)
-	{
-		return Handle<String>();
-	}
-
-	JEnv env;
-
-	JniLocalRef arr(env.CallObjectMethod(value, GET_BYTES_METHOD_ID, UTF_8_ENCODING));
-	int length = env.GetArrayLength(arr);
-	jbyte *data = env.GetByteArrayElements(arr, nullptr);
-	auto v8String = ConvertToV8String((const char *)data, length);
-	env.ReleaseByteArrayElements(arr, data, JNI_ABORT);
-
 	return v8String;
 }
 
@@ -356,3 +385,4 @@ jmethodID ArgConverter::LONG_VALUE_METHOD_ID = nullptr;
 jmethodID ArgConverter::FLOAT_VALUE_METHOD_ID = nullptr;
 jmethodID ArgConverter::DOUBLE_VALUE_METHOD_ID = nullptr;
 jstring ArgConverter::UTF_8_ENCODING = nullptr;
+char *ArgConverter::charBuffer = new char[ArgConverter::BUFFER_SIZE];

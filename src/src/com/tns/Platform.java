@@ -2,7 +2,6 @@ package com.tns;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.lang.ref.WeakReference;
@@ -18,7 +17,6 @@ import java.util.Date;
 import java.util.HashMap;
 
 import android.content.Context;
-import android.content.res.AssetManager;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
@@ -660,40 +658,6 @@ public class Platform
 		return res;
 	}
 	
-	private static HashMap<String, String> map = null;
-	
-	private static String readMetadata(String name) throws Exception
-	{
-		if (map == null)
-		{
-			InputStream inputStream = NativeScriptContext.getAssets().open("metadata/metadata.txt", AssetManager.ACCESS_STREAMING);
-			String mappings = FileSystem.readAll(inputStream);
-			inputStream.close();
-			
-			String[] lines = mappings.split(System.getProperty("line.separator"));
-			
-			HashMap<String, String> tmpMap = new HashMap<String, String>();
-			
-			for (String s: lines)
-			{
-				String[] parts = s.split(" ");
-				tmpMap.put(parts[0], parts[1]);
-			}
-			
-			map = tmpMap;
-		}
-		
-		String assetName = map.get(name);
-		
-		InputStream inputStream = NativeScriptContext.getAssets().open("metadata/" + assetName, AssetManager.ACCESS_STREAMING);
-		String metadata = FileSystem.readAll(inputStream);
-		inputStream.close();
-		
-		return metadata;
-	}
-
-	
-
 	public static boolean isJavaThrowable(Object obj)
 	{
 		boolean isJavaThrowable = false;

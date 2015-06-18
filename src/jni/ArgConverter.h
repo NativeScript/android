@@ -35,6 +35,8 @@ namespace tns
 
 		static JavaVM *jvm;
 
+		static bool ReadJStringInBuffer(jstring value, jsize& utfLength);
+
 		static jlong ObjectToLong(jobject object);
 
 		static jboolean ObjectToBoolean(jobject object);
@@ -92,6 +94,9 @@ namespace tns
 		static jmethodID DOUBLE_VALUE_METHOD_ID;
 
 		static jstring UTF_8_ENCODING;
+
+		static char *charBuffer;
+		static const int BUFFER_SIZE = 1024 * 1024; // 1MB size. TODO: Do we need a larger buffer?
 	};
 }
 
