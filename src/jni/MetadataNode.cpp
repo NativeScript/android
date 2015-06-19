@@ -1093,10 +1093,10 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 	DEBUG_WRITE("ExtendsCallMethodHandler: called with %s", ConvertToString(extendName).c_str());
 
 	string extendNameAndLocation = extendLocation + ConvertToString(extendName);
-	auto fullClassName = CreateFullClassName(node->m_name, extendNameAndLocation);
+	auto fullClassName = TNS_PREFIX + CreateFullClassName(node->m_name, extendNameAndLocation);
 
-	//
-	JniLocalRef generatedClass(s_resolveClass(TNS_PREFIX + fullClassName, implementationObject));
+	JniLocalRef generatedClass(s_resolveClass(fullClassName, implementationObject));
+
 	std::string generatedFullClassName = s_objectManager->GetClassName((jclass)generatedClass);
 	if(generatedFullClassName.find("com/tns/tests") == std::string::npos) {
 		fullClassName = generatedFullClassName;

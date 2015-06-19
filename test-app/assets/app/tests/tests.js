@@ -602,7 +602,7 @@ describe("Tests ", function () {
 		
 		var dir = __dirname;
 		
-		var expectedDirname = "/data/data/com.tns.android_runtime_testapp/files/app/tests";
+		var expectedDirname = "/data/data/com.tns.android_runtime_testapp/files/app/tests/";
 		
 		expect(dir).toBe(expectedDirname);
 	});

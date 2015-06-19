@@ -104,10 +104,6 @@ bool NativeScriptRuntime::RegisterInstance(const Handle<Object>& jsObject, const
 
 	JniLocalRef javaClass(ResolveClass(fullClassName, implementationObject));
 
-	if(env.ExceptionCheck() == JNI_TRUE) {
-		int a = 5;
-	}
-
 	int javaObjectID = objectManager->GenerateNewObjectID();
 
 	DEBUG_WRITE("RegisterInstance: Linking new instance");

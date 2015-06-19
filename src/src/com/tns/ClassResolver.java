@@ -16,12 +16,12 @@ class ClassResolver
 	{
 		String cannonicalClassName = fullClassName.replace('/', '.');
 		String name = null;
-		String className = fullClassName;
+		String className = cannonicalClassName;
 		
-		int classExtendSeparatorIndex = fullClassName.indexOf('_');
+		int classExtendSeparatorIndex = cannonicalClassName.indexOf('_');
 		if(classExtendSeparatorIndex != -1) {
-			className = fullClassName.substring(0, classExtendSeparatorIndex);
-			name = fullClassName.substring(classExtendSeparatorIndex + 1);
+			className = cannonicalClassName.substring(0, classExtendSeparatorIndex);
+			name = cannonicalClassName.substring(classExtendSeparatorIndex + 1);
 		}
 		
 		Class<?> clazz = null;
@@ -41,7 +41,7 @@ class ClassResolver
 
 		if (clazz == null)
 		{
-			clazz = dexFactory.findClass(className);
+			clazz = Class.forName(className);
 		}
 		
 		return clazz;

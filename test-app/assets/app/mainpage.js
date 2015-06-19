@@ -1,23 +1,22 @@
-//__disableVerboseLogging();
-__enableVerboseLogging();
+__disableVerboseLogging();
 
-//require("./tests/testWeakRef"); 
-//require("./tests/tests"); 
-//require("./tests/testsForRuntimeBindingGenerator");
-//require("./tests/testPrimitiveTypeConversion");
-//require("./tests/numericConversionTests"); 
-//require("./tests/inheritanceChainResolutionTest"); 
-//require("./tests/exceptionHandlingTests");
-//require("./tests/dispatchCallbacksOnUiThreadTests");
-//require("./tests/stringConversionTests");
-//require("./tests/testsForTypescript"); 
-//require("./tests/testGC");
-//require("./tests/testsMemoryManagement");
-//require("./tests/testIfAbleToRunExternalFile");
-//require("./tests/finalFieldsSetTests");
-//require("./tests/extendedClassesTests");
-//require("./tests/extendClassNameTests");
-//require("./tests/testJniReferenceLeak");
+require("./tests/testWeakRef"); 
+require("./tests/tests"); 
+require("./tests/testsForRuntimeBindingGenerator");
+require("./tests/testPrimitiveTypeConversion");
+require("./tests/numericConversionTests"); 
+require("./tests/inheritanceChainResolutionTest"); 
+require("./tests/exceptionHandlingTests");
+require("./tests/dispatchCallbacksOnUiThreadTests");
+require("./tests/stringConversionTests");
+require("./tests/testsForTypescript"); 
+require("./tests/testGC");
+require("./tests/testsMemoryManagement");
+require("./tests/testIfAbleToRunExternalFile");
+require("./tests/finalFieldsSetTests");
+require("./tests/extendedClassesTests");
+require("./tests/extendClassNameTests");
+require("./tests/testJniReferenceLeak");
 
 var MainActivity = {
     onCreate: function (bundle) {
@@ -27,28 +26,9 @@ var MainActivity = {
     	this.super.onCreate(bundle);
     	//this.super.onCreate(null);
 
-//    	require("./tests/testsWithContext").run(this);
-//    	execute(); //run jasmine
+    	require("./tests/testsWithContext").run(this);
+    	execute(); //run jasmine
     	
-    	//
-		__log("TEST: TestConstructorOverrideForBuiltinType");
-		
-		var ctorCalled = false;
-		var isConstructor = false;
-
-		var MyButton = android.widget.Button.extend({
-			init : function() {
-				ctorCalled = true;
-				isConstructor = arguments[arguments.length - 1];
-			}
-		});
-		
-		var btn = new MyButton(this);
-		
-		__log("-----> should be true: " + ctorCalled);
-		__log("-----> should be true: " + isConstructor);
-    	//
-
     	var layout = new android.widget.LinearLayout(this);
     	layout.setOrientation(1);
     	this.setContentView(layout);

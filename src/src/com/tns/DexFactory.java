@@ -86,7 +86,6 @@ public class DexFactory
 			return pregeneratedClass;
 		}
 		catch (Exception e) {
-			e.printStackTrace();
 		}
 		
 		Class<?> existingClass = this.injectedDexClasses.get(fullClassName); 
