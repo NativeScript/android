@@ -685,7 +685,7 @@ void MetadataNode::ExtendedClassConstructorCallback(const v8::FunctionCallbackIn
 
 	auto implementationObject = Local<Object>::New(isolate, *extData->implementationObject);
 	const auto& extendName = extData->extendedName;
-	auto className = TNS_PREFIX + extData->node->m_name;
+//	auto className = TNS_PREFIX + extData->node->m_name;
 
 	SetInstanceMetadata(isolate, thiz, extData->node);
 	thiz->SetHiddenValue(ConvertToV8String("implClassName"), ConvertToV8String(extendName));
@@ -693,7 +693,8 @@ void MetadataNode::ExtendedClassConstructorCallback(const v8::FunctionCallbackIn
 
 	ArgsWrapper argWrapper(info, ArgType::Class, Handle<Object>());
 
-	string fullClassName = CreateFullClassName(className, extendName);//extData->fullClassName;//
+//	string fullClassName = CreateFullClassName(className, extendName);
+	string fullClassName = extData->fullClassName;
 	bool success = s_registerInstance(thiz, fullClassName, argWrapper, implementationObject, false);
 
 	assert(success);
@@ -1094,16 +1095,15 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 	string extendNameAndLocation = extendLocation + ConvertToString(extendName);
 	auto fullClassName = CreateFullClassName(node->m_name, extendNameAndLocation);
 
-
 	//
-	JniLocalRef generatedClass(s_resolveClass(fullClassName, implementationObject));
+	JniLocalRef generatedClass(s_resolveClass(TNS_PREFIX + fullClassName, implementationObject));
 	std::string generatedFullClassName = s_objectManager->GetClassName((jclass)generatedClass);
 	if(generatedFullClassName.find("com/tns/tests") == std::string::npos) {
 		fullClassName = generatedFullClassName;
 	}
 	//
 
-	auto fullExtendedName = TNS_PREFIX + fullClassName;
+	auto fullExtendedName = fullClassName;
 	DEBUG_WRITE("ExtendsCallMethodHandler: extend full name %s", fullClassName.c_str());
 
 	auto isolate = info.GetIsolate();

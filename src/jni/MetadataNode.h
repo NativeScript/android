@@ -120,8 +120,9 @@ namespace tns
 
 			MetadataNode *node;
 			std::string extendedName;
-			std::string fullClassName;
 			v8::Persistent<v8::Object> *implementationObject;
+
+			std::string fullClassName;
 		};
 
 		struct ExtendedClassCacheData

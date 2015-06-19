@@ -101,7 +101,12 @@ bool NativeScriptRuntime::RegisterInstance(const Handle<Object>& jsObject, const
 	JEnv env;
 	//resolve class
 	JniLocalRef generatedclass;
+
 	JniLocalRef javaClass(ResolveClass(fullClassName, implementationObject));
+
+	if(env.ExceptionCheck() == JNI_TRUE) {
+		int a = 5;
+	}
 
 	int javaObjectID = objectManager->GenerateNewObjectID();
 
@@ -133,10 +138,12 @@ jclass NativeScriptRuntime::ResolveClass(const std::string& fullClassname, const
 
 	//get needed arguments in order to load binding
 	JniLocalRef javaFullClassName(env.NewStringUTF(fullClassname.c_str()));
+
 	jobjectArray methodOverrides = GetMethodOverrides(env, implementationObject);
 
+
 	//create or load generated binding (java class)
-	jclass generatedJavaClass = (jclass)env.CallStaticObjectMethod(PlatformClass, RESOLVE_CLASS_METHOD_ID, (jstring)javaFullClassName, methodOverrides);
+	jclass generatedJavaClass = (jclass)env.CallStaticObjectMethod(PlatformClass, RESOLVE_CLASS_METHOD_ID,  (jstring)javaFullClassName, methodOverrides);
 
 	//TODO: plamen5kov: check: may memory leak here (use jniLocalRef somehow)
 	return generatedJavaClass;
@@ -540,6 +547,7 @@ string NativeScriptRuntime::GetReturnType(const string& methodSignature)
 	return jniReturnType;
 }
 
+
 jobject NativeScriptRuntime::CreateJavaInstance(int objectID, const std::string& fullClassName, const ArgsWrapper& argWrapper, jclass javaClass, bool isInterface)
 {
 	SET_PROFILER_FRAME();
@@ -551,7 +559,6 @@ jobject NativeScriptRuntime::CreateJavaInstance(int objectID, const std::string&
 	auto& args = argWrapper.args;
 
 	JsArgToArrayConverter argConverter(args, isInterface, argWrapper.outerThis);
-
 	if (argConverter.IsValid())
 	{
 		jobjectArray javaArgs = argConverter.ToJavaArray();
@@ -569,7 +576,7 @@ jobject NativeScriptRuntime::CreateJavaInstance(int objectID, const std::string&
 		if (!exceptionFound)
 		{
 			instance = obj;
-			objectManager->UpdateCache(objectID, obj);
+//			objectManager->UpdateCache(objectID, obj);
 		}
 	}
 	else

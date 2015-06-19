@@ -14,10 +14,15 @@ class ClassResolver
 {
 	public static Class<?> resolveClass(String fullClassName, DexFactory dexFactory, String[] methodOverrides) throws ClassNotFoundException, IOException
 	{
+		String cannonicalClassName = fullClassName.replace('/', '.');
+		String name = null;
+		String className = fullClassName;
+		
 		int classExtendSeparatorIndex = fullClassName.indexOf('_');
-		String className = fullClassName.substring(0, classExtendSeparatorIndex);
-		String name = fullClassName.substring(classExtendSeparatorIndex + 1);
-		String cannonicalClassName = className.replace('/', '.');
+		if(classExtendSeparatorIndex != -1) {
+			className = fullClassName.substring(0, classExtendSeparatorIndex);
+			name = fullClassName.substring(classExtendSeparatorIndex + 1);
+		}
 		
 		Class<?> clazz = null;
 		boolean isBindingClass = cannonicalClassName.startsWith("com.tns.gen") &&
@@ -31,12 +36,12 @@ class ClassResolver
 				name = "0";
 			}
 			
-			clazz = dexFactory.resolveClass(name, cannonicalClassName, methodOverrides);
+			clazz = dexFactory.resolveClass(name, className, methodOverrides);
 		}
 
 		if (clazz == null)
 		{
-			clazz = Class.forName(cannonicalClassName);
+			clazz = dexFactory.findClass(className);
 		}
 		
 		return clazz;
