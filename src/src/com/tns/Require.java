@@ -205,6 +205,7 @@ public class Require
 			// We are pointing to a directory, check for already resolved file
 			String folderPath = directory.getAbsolutePath();
 			String cachedPath = folderAsModuleCache.get(folderPath);
+			boolean found = false;
 			
 			if(cachedPath == null) {
 				// Search for package.json or index.js
@@ -218,6 +219,7 @@ public class Require
 						{
 							String mainFile = object.getString("main");
 							jsFile = new File(directory.getAbsolutePath(), mainFile);
+							found = true;
 						}
 					}
 					catch (IOException e)
@@ -230,11 +232,13 @@ public class Require
 						jsFile = null;
 					}
 				}
-				else
+				if (!found)
 				{
 					// search for index.js
 					jsFile = new File(directory.getPath() + "/index.js");
 				}
+				
+				// TODO: search for <folderName>.js ?
 				
 				if(jsFile != null) {
 					// cache the main file for later use
