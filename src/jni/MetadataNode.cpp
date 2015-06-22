@@ -402,7 +402,7 @@ Handle<Function> MetadataNode::SetMembersFromStaticMetadata(Isolate *isolate, Ha
 		callbackData->candidates.push_back(entry);
 	}
 
-	auto extendFuncName = ConvertToV8String(V8StringConstants::EXTEND);
+	auto extendFuncName = V8StringConstants::GetExtend();
 	auto extendFuncTemplate = FunctionTemplate::New(isolate, ExtendCallMethodHandler, External::New(isolate, this));
 	ctorFunction->Set(extendFuncName, extendFuncTemplate->GetFunction());
 
