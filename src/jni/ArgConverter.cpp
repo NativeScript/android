@@ -5,6 +5,7 @@
 #include "V8GlobalHelpers.h"
 #include "V8StringConstants.h"
 #include "NativeScriptAssert.h"
+#include "JNIPrimitiveType.h"
 #include <assert.h>
 #include <sstream>
 #include <cstdlib>
@@ -27,58 +28,6 @@ void ArgConverter::Init(JavaVM *jvm)
 
 	auto nanObject = Number::New(isolate, numeric_limits<double>::quiet_NaN()).As<NumberObject>();
 	NAN_NUMBER_OBJECT = new Persistent<NumberObject>(isolate, nanObject);
-
-	JEnv env;
-
-	STRING_CLASS = env.FindClass("java/lang/String");
-	assert(STRING_CLASS != nullptr);
-
-	GET_BYTES_METHOD_ID = env.GetMethodID(STRING_CLASS, "getBytes", "(Ljava/lang/String;)[B");
-	assert(GET_BYTES_METHOD_ID != nullptr);
-
-	JniLocalRef encoding(env.NewStringUTF("UTF-8"));
-	UTF_8_ENCODING = (jstring)env.NewGlobalRef(encoding);
-	assert(UTF_8_ENCODING != nullptr);
-
-	auto charClass = env.FindClass("java/lang/Character");
-	assert(charClass != nullptr);
-	CHAR_VALUE_METHOD_ID = env.GetMethodID(charClass, "charValue", "()C");
-	assert(CHAR_VALUE_METHOD_ID != nullptr);
-
-	auto booleanClass = env.FindClass("java/lang/Boolean");
-	assert(booleanClass != nullptr);
-	BOOLEAN_VALUE_METHOD_ID = env.GetMethodID(booleanClass, "booleanValue", "()Z");
-	assert(BOOLEAN_VALUE_METHOD_ID != nullptr);
-
-	auto byteClass = env.FindClass("java/lang/Byte");
-	assert(byteClass != nullptr);
-	BYTE_VALUE_METHOD_ID = env.GetMethodID(byteClass, "byteValue", "()B");
-	assert(BYTE_VALUE_METHOD_ID != nullptr);
-
-	auto shortClass = env.FindClass("java/lang/Short");
-	assert(shortClass != nullptr);
-	SHORT_VALUE_METHOD_ID = env.GetMethodID(shortClass, "shortValue", "()S");
-	assert(SHORT_VALUE_METHOD_ID != nullptr);
-
-	auto integerClass = env.FindClass("java/lang/Integer");
-	assert(integerClass != nullptr);
-	INT_VALUE_METHOD_ID = env.GetMethodID(integerClass, "intValue", "()I");
-	assert(INT_VALUE_METHOD_ID != nullptr);
-
-	auto longClass = env.FindClass("java/lang/Long");
-	assert(longClass != nullptr);
-	LONG_VALUE_METHOD_ID = env.GetMethodID(longClass, "longValue", "()J");
-	assert(LONG_VALUE_METHOD_ID != nullptr);
-
-	auto floatClass = env.FindClass("java/lang/Float");
-	assert(floatClass != nullptr);
-	FLOAT_VALUE_METHOD_ID = env.GetMethodID(floatClass, "floatValue", "()F");
-	assert(FLOAT_VALUE_METHOD_ID != nullptr);
-
-	auto doubleClass = env.FindClass("java/lang/Double");
-	assert(doubleClass != nullptr);
-	DOUBLE_VALUE_METHOD_ID = env.GetMethodID(doubleClass, "doubleValue", "()D");
-	assert(DOUBLE_VALUE_METHOD_ID != nullptr);
 }
 
 void ArgConverter::NativeScriptLongValueOfFunctionCallback(const v8::FunctionCallbackInfo<Value>& args)
@@ -100,65 +49,6 @@ void ArgConverter::NativeScriptLongFunctionCallback(const v8::FunctionCallbackIn
 	args.This()->Set(V8StringConstants::GetValue(), args[0]);
 
 	args.This()->SetPrototype(Local<NumberObject>::New(Isolate::GetCurrent(), *NAN_NUMBER_OBJECT));
-}
-
-
-jlong ArgConverter::ObjectToLong(jobject object)
-{
-	JEnv env;
-
-	return env.CallLongMethod(object, LONG_VALUE_METHOD_ID);
-}
-
-jboolean ArgConverter::ObjectToBoolean(jobject object)
-{
-	JEnv env;
-
-	return env.CallBooleanMethod(object, BOOLEAN_VALUE_METHOD_ID);
-}
-
-jchar ArgConverter::ObjectToChar(jobject object)
-{
-	JEnv env;
-
-	return env.CallCharMethod(object, CHAR_VALUE_METHOD_ID);
-}
-
-
-jbyte ArgConverter::ObjectToByte(jobject object)
-{
-	JEnv env;
-
-	return env.CallByteMethod(object, BYTE_VALUE_METHOD_ID);
-}
-
-jshort ArgConverter::ObjectToShort(jobject object)
-{
-	JEnv env;
-
-	return env.CallShortMethod(object, SHORT_VALUE_METHOD_ID);
-}
-
-jint ArgConverter::ObjectToInt(jobject object)
-{
-	JEnv env;
-
-	return env.CallIntMethod(object, INT_VALUE_METHOD_ID);
-}
-
-
-jfloat ArgConverter::ObjectToFloat(jobject object)
-{
-	JEnv env;
-
-	return env.CallFloatMethod(object, FLOAT_VALUE_METHOD_ID);
-}
-
-jdouble ArgConverter::ObjectToDouble(jobject object)
-{
-	JEnv env;
-
-	return env.CallDoubleMethod(object, DOUBLE_VALUE_METHOD_ID);
 }
 
 
@@ -184,30 +74,44 @@ Handle<Array> ArgConverter::ConvertJavaArgsToJsArgs(jobjectArray args)
 		JniLocalRef argJavaClassPath(env.GetObjectArrayElement(args, jArrayIndex++));
 
 		jint length;
-		jint argTypeID = ObjectToInt(argTypeIDObj);
+		jint argTypeID = JNIPrimitiveType::IntValue(env, argTypeIDObj);
 
 		Handle<Value> jsArg;
 		Handle<String> v8String;
 		switch (argTypeID)
 		{
-			case TypeID_Boolean : jsArg = Boolean::New(isolate, ObjectToBoolean(arg)); break;
+			case TypeID_Boolean :
+				jsArg = Boolean::New(isolate, JNIPrimitiveType::BooleanValue(env, arg));
+				break;
 			case TypeID_Char:
-				v8String = jcharToV8String(ObjectToChar(arg));
+				v8String = jcharToV8String(JNIPrimitiveType::CharValue(env, arg));
 				jsArg = v8String;
 				break;
-			case TypeID_Byte: jsArg = Number::New(isolate, ObjectToByte(arg)); break;
-			case TypeID_Short: jsArg = Number::New(isolate, ObjectToShort(arg)); break;
-			case TypeID_Int: jsArg = Number::New(isolate, ObjectToInt(arg)); break;
-			case TypeID_Long: jsArg = Number::New(isolate, ObjectToLong(arg)); break;
-			case TypeID_Float: jsArg = Number::New(isolate, ObjectToFloat(arg)); break;
-			case TypeID_Double: jsArg = Number::New(isolate, ObjectToDouble(arg)); break;
+			case TypeID_Byte:
+				jsArg = Number::New(isolate, JNIPrimitiveType::ByteValue(env, arg));
+				break;
+			case TypeID_Short:
+				jsArg = Number::New(isolate, JNIPrimitiveType::ShortValue(env, arg));
+				break;
+			case TypeID_Int:
+				jsArg = Number::New(isolate, JNIPrimitiveType::IntValue(env, arg));
+				break;
+			case TypeID_Long:
+				jsArg = Number::New(isolate, JNIPrimitiveType::LongValue(env, arg));
+				break;
+			case TypeID_Float:
+				jsArg = Number::New(isolate, JNIPrimitiveType::FloatValue(env, arg));
+				break;
+			case TypeID_Double:
+				jsArg = Number::New(isolate, JNIPrimitiveType::DoubleValue(env, arg));
+				break;
 			case TypeID_String:
-				v8String = jstringToV8String(ObjectToString(arg));
+				v8String = jstringToV8String((jstring)arg);
 				jsArg = v8String;
 				break;
 			case TypeID_JsObject:
 			{
-				jint javaObjectID = ObjectToInt(arg);
+				jint javaObjectID = JNIPrimitiveType::IntValue(env, arg);
 				jsArg = ObjectManager::GetJsObjectByJavaObjectStatic(javaObjectID);
 
 				if (jsArg.IsEmpty())
@@ -218,7 +122,9 @@ Handle<Array> ArgConverter::ConvertJavaArgsToJsArgs(jobjectArray args)
 				}
 				break;
 			}
-			case TypeID_Null: jsArg = Null(isolate); break;
+			case TypeID_Null:
+				jsArg = Null(isolate);
+				break;
 		}
 
 		arr->Set(i, jsArg);
@@ -374,15 +280,4 @@ bool ArgConverter::TryConvertToJavaLong(const Handle<Value>& value, jlong& javaL
 JavaVM* ArgConverter::jvm = nullptr;
 Persistent<Function>* ArgConverter::NATIVESCRIPT_NUMERA_CTOR_FUNC = nullptr;
 Persistent<NumberObject>* ArgConverter::NAN_NUMBER_OBJECT = nullptr;
-jclass ArgConverter::STRING_CLASS = nullptr;
-jmethodID ArgConverter::GET_BYTES_METHOD_ID = nullptr;
-jmethodID ArgConverter::CHAR_VALUE_METHOD_ID = nullptr;
-jmethodID ArgConverter::BOOLEAN_VALUE_METHOD_ID = nullptr;
-jmethodID ArgConverter::BYTE_VALUE_METHOD_ID = nullptr;
-jmethodID ArgConverter::SHORT_VALUE_METHOD_ID = nullptr;
-jmethodID ArgConverter::INT_VALUE_METHOD_ID = nullptr;
-jmethodID ArgConverter::LONG_VALUE_METHOD_ID = nullptr;
-jmethodID ArgConverter::FLOAT_VALUE_METHOD_ID = nullptr;
-jmethodID ArgConverter::DOUBLE_VALUE_METHOD_ID = nullptr;
-jstring ArgConverter::UTF_8_ENCODING = nullptr;
 char *ArgConverter::charBuffer = new char[ArgConverter::BUFFER_SIZE];

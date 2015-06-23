@@ -58,12 +58,6 @@ namespace tns
 		jobject *m_argsAsObject;
 
 		jobjectArray m_arr;
-
-		static jclass STRING_CLASS;
-
-		static jmethodID STRING_CTOR;
-
-		static jstring UTF_8_ENCODING;
 	};
 }
 

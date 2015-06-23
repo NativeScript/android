@@ -78,25 +78,10 @@ namespace tns
 		static const long long JS_LONG_LIMIT = ((long long)1) << 53;
 
 		static v8::Persistent<v8::Function> *NATIVESCRIPT_NUMERA_CTOR_FUNC;
-
 		static v8::Persistent<v8::NumberObject> *NAN_NUMBER_OBJECT;
 
-		static jclass STRING_CLASS;
-
-		static jmethodID GET_BYTES_METHOD_ID;
-		static jmethodID CHAR_VALUE_METHOD_ID;
-		static jmethodID BOOLEAN_VALUE_METHOD_ID;
-		static jmethodID BYTE_VALUE_METHOD_ID;
-		static jmethodID SHORT_VALUE_METHOD_ID;
-		static jmethodID INT_VALUE_METHOD_ID;
-		static jmethodID LONG_VALUE_METHOD_ID;
-		static jmethodID FLOAT_VALUE_METHOD_ID;
-		static jmethodID DOUBLE_VALUE_METHOD_ID;
-
-		static jstring UTF_8_ENCODING;
-
 		static char *charBuffer;
-		static const int BUFFER_SIZE = 1024 * 1024; // 1MB size. TODO: Do we need a larger buffer?
+		static const int BUFFER_SIZE = 1024 * 1024; // 1MB size. TODO: Do we need a larger/smaller buffer?
 	};
 }
 
