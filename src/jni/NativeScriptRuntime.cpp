@@ -98,11 +98,30 @@ bool NativeScriptRuntime::RegisterInstance(const Handle<Object>& jsObject, const
 
 	DEBUG_WRITE("RegisterInstance called for '%s'", fullClassName.c_str());
 
+	if(fullClassName == "java/lang/Object_") {
+		int a = 5;
+	}
 	JEnv env;
-	//resolve class
-	JniLocalRef generatedclass;
 
-	JniLocalRef javaClass(ResolveClass(fullClassName, implementationObject));
+	//resolve class
+	jclass temp = nullptr;
+//	bool classIsResolved = false;
+//	if (!implementationObject.IsEmpty())
+//	{
+//		Local < Value > val = implementationObject->GetHiddenValue(ConvertToV8String(fullClassName));
+//		if (!val.IsEmpty())
+//		{
+//			void* voidPointerToVal = val.As<External>()->Value();
+//			temp = reinterpret_cast<jclass>(voidPointerToVal);
+//			classIsResolved = true;
+//		}
+//	}
+//	if(!classIsResolved) {
+		temp = ResolveClass(fullClassName, implementationObject);
+//	}
+
+	JniLocalRef javaClass (temp);
+//	std::string gfcn = objectManager->GetClassName(genClass);
 
 	int javaObjectID = objectManager->GenerateNewObjectID();
 

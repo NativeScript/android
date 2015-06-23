@@ -697,15 +697,6 @@ void MetadataNode::ExtendedClassConstructorCallback(const v8::FunctionCallbackIn
 //	string fullClassName = CreateFullClassName(className, extendName);
 	string fullClassName = extData->fullClassName;
 
-	//TODO: plamen5kov: find how to fix (problem when retrieving class from implementation object)
-//	Local<Value> val = implementationObject->GetHiddenValue(ConvertToV8String(fullClassName));
-//	Handle<External> externalVal = val.As<External>();
-//	void* voidStartVal = externalVal->Value();
-//	jclass ss = reinterpret_cast<jclass>(voidStartVal);
-//	std::string gfcn = s_objectManager->GetClassName(ss);
-	//
-
-
 	bool success = s_registerInstance(thiz, fullClassName, argWrapper, implementationObject, false);
 
 	assert(success);
@@ -757,8 +748,11 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
 	thiz->SetHiddenValue(ConvertToV8String("implClassName"), ConvertToV8String(fullClassName));
 	//
 
-	JniLocalRef generatedClass(s_resolveClass(fullClassName, implementationObject));
-	implementationObject->SetHiddenValue(ConvertToV8String(fullClassName), External::New(Isolate::GetCurrent(), generatedClass));
+	//
+	JEnv env;
+	jclass generatedClass = s_resolveClass(fullClassName, implementationObject);
+	void* voidPntrToGeneratedClass = reinterpret_cast<void*>(generatedClass);
+	implementationObject->SetHiddenValue(ConvertToV8String(fullClassName), External::New(Isolate::GetCurrent(), voidPntrToGeneratedClass));
 
 	implementationObject->SetPrototype(thiz->GetPrototype());
 	thiz->SetPrototype(implementationObject);
@@ -1110,7 +1104,9 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 	auto fullClassName = TNS_PREFIX + CreateFullClassName(node->m_name, extendNameAndLocation);
 
 	//
-	JniLocalRef generatedClass(s_resolveClass(fullClassName, implementationObject));
+	JEnv env;
+
+	jclass generatedClass = s_resolveClass(fullClassName, implementationObject);
 	std::string generatedFullClassName = s_objectManager->GetClassName((jclass)generatedClass);
 
 	if(generatedFullClassName.find("com/tns/tests") == std::string::npos) {
@@ -1138,8 +1134,10 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 		//mark the implementationObject as such and set a pointer to it's class node inside it for reuse validation later
 		implementationObject->SetHiddenValue(implementationObjectPropertyName, String::NewFromUtf8(isolate, fullExtendedName.c_str()));
 
-		//TODO: plamen5kov: attach resolved class to implementation object so callbacks can use it
-//		implementationObject->SetHiddenValue(ConvertToV8String(fullExtendedName), External::New(isolate, generatedClass));
+		//TODO: plamen5kov: check: possible memory leak
+//		Local<External> handleToGeneratedClass =  External::New(Isolate::GetCurrent(), generatedClass);
+//		auto persistentGeneratedClass = new Persistent<External>(Isolate::GetCurrent(), handleToGeneratedClass.As<External>());
+		implementationObject->SetHiddenValue(ConvertToV8String(fullExtendedName), External::New(Isolate::GetCurrent(), generatedClass));
 	}
 	else
 	{
