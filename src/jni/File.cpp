@@ -32,31 +32,22 @@ namespace tns
 	{
 		FILE *file = fopen(filePath.c_str(), "rb");
 		fseek(file, 0, SEEK_END);
-		int len = ftell(file);
 
-		if(charLength)
-		{
-			charLength = len;
-		}
-
-		bool exceedBuffer = len > BUFFER_SIZE;
-		if(isNew)
-		{
-			isNew = exceedBuffer;
-		}
+		charLength = ftell(file);
+		isNew = charLength > BUFFER_SIZE;
 
 		rewind(file);
 
-		if(exceedBuffer)
+		if(isNew)
 		{
-			char* newBuffer = new char[len];
-			fread(newBuffer, 1, len, file);
+			char* newBuffer = new char[charLength];
+			fread(newBuffer, 1, charLength, file);
 			fclose(file);
 
 			return newBuffer;
 		}
 
-		fread(Buffer, 1, len, file);
+		fread(Buffer, 1, charLength, file);
 		fclose(file);
 
 		return Buffer;
