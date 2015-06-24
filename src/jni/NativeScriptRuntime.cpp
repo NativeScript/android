@@ -20,6 +20,7 @@
 #include "MethodCache.h"
 #include "JsDebugger.h"
 #include "SimpleProfiler.h"
+#include "Require.h"
 
 using namespace v8;
 using namespace std;
@@ -52,9 +53,6 @@ void NativeScriptRuntime::Init(JavaVM *jvm, ObjectManager *objectManager)
 
 	APP_FAIL_METHOD_ID = env.GetStaticMethodID(PlatformClass, "APP_FAIL", "(Ljava/lang/String;)V");
 	assert(APP_FAIL_METHOD_ID != nullptr);
-
-	GET_MODULE_CONTENT_METHOD_ID = env.GetStaticMethodID(RequireClass, "getModuleContent", "(Ljava/lang/String;)Ljava/lang/String;");
-	assert(GET_MODULE_CONTENT_METHOD_ID != nullptr);
 
 	GET_MODULE_PATH_METHOD_ID = env.GetStaticMethodID(RequireClass, "getModulePath", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
 	assert(GET_MODULE_PATH_METHOD_ID != nullptr);
@@ -749,10 +747,9 @@ void NativeScriptRuntime::RequireCallback(const v8::FunctionCallbackInfo<v8::Val
 		auto tmpExportObj = new Persistent<Object>(isolate, exportObj.As<Object>());
 		loadedModules.insert(make_pair(modulePath, tmpExportObj));
 
-		JniLocalRef moduleContent(env.CallStaticObjectMethod(RequireClass, GET_MODULE_CONTENT_METHOD_ID, (jstring) jsModulePath));
 		TryCatch tc;
+		auto scriptText = Require::LoadModule(modulePath);
 
-		auto scriptText = ArgConverter::jstringToV8String(moduleContent);
 		DEBUG_WRITE("Compiling script (module %s)", moduleName.c_str());
 		auto script = Script::Compile(scriptText, args[0].As<String>());
 		DEBUG_WRITE("Compiled script (module %s)", moduleName.c_str());
@@ -1020,7 +1017,6 @@ jclass NativeScriptRuntime::JAVA_LANG_STRING = nullptr;
 jmethodID NativeScriptRuntime::CREATE_INSTANCE_METHOD_ID = nullptr;
 jmethodID NativeScriptRuntime::CACHE_CONSTRUCTOR_METHOD_ID = nullptr;
 jmethodID NativeScriptRuntime::APP_FAIL_METHOD_ID = nullptr;
-jmethodID NativeScriptRuntime::GET_MODULE_CONTENT_METHOD_ID = nullptr;
 jmethodID NativeScriptRuntime::GET_MODULE_PATH_METHOD_ID = nullptr;
 jmethodID NativeScriptRuntime::GET_TYPE_METADATA = nullptr;
 jmethodID NativeScriptRuntime::ENABLE_VERBOSE_LOGGING_METHOD_ID = nullptr;

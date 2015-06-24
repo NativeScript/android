@@ -155,7 +155,6 @@ namespace tns
 	    void ReleaseByteArrayElements(jbyteArray array, jbyte* elems, jint mode);
 
 
-
 	    void GetBooleanArrayRegion(jbooleanArray array, jsize start, jsize len, jboolean* buf);
 	    void GetByteArrayRegion(jbyteArray array, jsize start, jsize len, jbyte* buf);
 	    void GetCharArrayRegion(jcharArray array, jsize start, jsize len, jchar* buf);

@@ -69,7 +69,7 @@ namespace tns
 		static v8::Persistent<v8::NumberObject> *NAN_NUMBER_OBJECT;
 
 		static char *charBuffer;
-		static const int BUFFER_SIZE = 1024 * 1024; // 1MB size. TODO: Do we need a larger/smaller buffer?
+		static const int BUFFER_SIZE = 1024 * 64; // 64KB size. TODO: Do we need a larger/smaller buffer?
 	};
 }
 

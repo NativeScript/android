@@ -122,8 +122,6 @@ namespace tns
 
 		static jmethodID APP_FAIL_METHOD_ID;
 
-		static jmethodID GET_MODULE_CONTENT_METHOD_ID;
-
 		static jmethodID GET_MODULE_PATH_METHOD_ID;
 
 		static jmethodID GET_TYPE_METADATA;

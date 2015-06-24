@@ -171,7 +171,7 @@ Local<String> ArgConverter::jstringToV8String(jstring value)
 
 	JEnv env;
 	const char* chars = env.GetStringUTFChars(value, NULL);
-	auto v8String = ConvertToV8String(charBuffer, utfLength);
+	auto v8String = ConvertToV8String(chars, utfLength);
 	env.ReleaseStringUTFChars(value, chars);
 
 	return v8String;
@@ -280,4 +280,4 @@ bool ArgConverter::TryConvertToJavaLong(const Handle<Value>& value, jlong& javaL
 JavaVM* ArgConverter::jvm = nullptr;
 Persistent<Function>* ArgConverter::NATIVESCRIPT_NUMERA_CTOR_FUNC = nullptr;
 Persistent<NumberObject>* ArgConverter::NAN_NUMBER_OBJECT = nullptr;
-char *ArgConverter::charBuffer = new char[ArgConverter::BUFFER_SIZE];
+char* ArgConverter::charBuffer = new char[ArgConverter::BUFFER_SIZE];

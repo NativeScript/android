@@ -18,6 +18,7 @@
 #include "NativeScriptAssert.h"
 #include "JsDebugger.h"
 #include "SimpleProfiler.h"
+#include "File.h"
 #include <sstream>
 #include <android/log.h>
 #include <assert.h>
@@ -63,21 +64,18 @@ void PrepareExtendFunction(Isolate *isolate, jstring filesPath)
 	string fullPath = ArgConverter::jstringToString(filesPath);
 	fullPath.append("/internal/prepareExtend.js");
 
-	FILE *f = fopen(fullPath.c_str(), "rb");
-	assert(f != nullptr);
-	fseek(f, 0, SEEK_END);
-	int len = ftell(f);
-	char *content = new char[len];
-	rewind(f);
-	fread(content, 1, len, f);
-	fclose(f);
-
-	string s(content, len);
-	delete[] content;
+	int length;
+	bool isNew;
+	const char* content = File::ReadText(fullPath, length, isNew);
 
 	TryCatch tc;
+	auto cmd = ConvertToV8String(content, length);
 
-	auto cmd = ConvertToV8String(s);
+	if(isNew)
+	{
+		delete[] content;
+	}
+
 	auto origin = ConvertToV8String(fullPath);
 	DEBUG_WRITE("Compiling prepareExtend.js script");
 

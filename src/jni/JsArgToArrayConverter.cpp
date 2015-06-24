@@ -166,6 +166,8 @@ bool JsArgToArrayConverter::ConvertArg(const Handle<Value>& arg, int index)
 		env.SetByteArrayRegion((jbyteArray)strData, 0, strLength, (jbyte*)*stringValue);
 		JniLocalRef stringObject(env.NewObject(STRING_CLASS, STRING_CTOR, (jbyteArray)strData, UTF_8_ENCODING));
 		SetConvertedObject(env, index, stringObject);
+
+		success = true;
 	}
 	else if (arg->IsObject())
 	{
