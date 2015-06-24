@@ -5,7 +5,7 @@
 #include "V8GlobalHelpers.h"
 #include "V8StringConstants.h"
 #include "NativeScriptAssert.h"
-#include "JNIPrimitiveType.h"
+#include "JType.h"
 #include <assert.h>
 #include <sstream>
 #include <cstdlib>
@@ -74,44 +74,44 @@ Handle<Array> ArgConverter::ConvertJavaArgsToJsArgs(jobjectArray args)
 		JniLocalRef argJavaClassPath(env.GetObjectArrayElement(args, jArrayIndex++));
 
 		jint length;
-		jint argTypeID = JNIPrimitiveType::IntValue(env, argTypeIDObj);
+		Type argTypeID = (Type)JType::IntValue(env, argTypeIDObj);
 
 		Handle<Value> jsArg;
 		Handle<String> v8String;
 		switch (argTypeID)
 		{
-			case TypeID_Boolean :
-				jsArg = Boolean::New(isolate, JNIPrimitiveType::BooleanValue(env, arg));
+			case Type::Boolean:
+				jsArg = Boolean::New(isolate, JType::BooleanValue(env, arg));
 				break;
-			case TypeID_Char:
-				v8String = jcharToV8String(JNIPrimitiveType::CharValue(env, arg));
+			case Type::Char:
+				v8String = jcharToV8String(JType::CharValue(env, arg));
 				jsArg = v8String;
 				break;
-			case TypeID_Byte:
-				jsArg = Number::New(isolate, JNIPrimitiveType::ByteValue(env, arg));
+			case Type::Byte:
+				jsArg = Number::New(isolate, JType::ByteValue(env, arg));
 				break;
-			case TypeID_Short:
-				jsArg = Number::New(isolate, JNIPrimitiveType::ShortValue(env, arg));
+			case Type::Short:
+				jsArg = Number::New(isolate, JType::ShortValue(env, arg));
 				break;
-			case TypeID_Int:
-				jsArg = Number::New(isolate, JNIPrimitiveType::IntValue(env, arg));
+			case Type::Int:
+				jsArg = Number::New(isolate, JType::IntValue(env, arg));
 				break;
-			case TypeID_Long:
-				jsArg = Number::New(isolate, JNIPrimitiveType::LongValue(env, arg));
+			case Type::Long:
+				jsArg = Number::New(isolate, JType::LongValue(env, arg));
 				break;
-			case TypeID_Float:
-				jsArg = Number::New(isolate, JNIPrimitiveType::FloatValue(env, arg));
+			case Type::Float:
+				jsArg = Number::New(isolate, JType::FloatValue(env, arg));
 				break;
-			case TypeID_Double:
-				jsArg = Number::New(isolate, JNIPrimitiveType::DoubleValue(env, arg));
+			case Type::Double:
+				jsArg = Number::New(isolate, JType::DoubleValue(env, arg));
 				break;
-			case TypeID_String:
+			case Type::String:
 				v8String = jstringToV8String((jstring)arg);
 				jsArg = v8String;
 				break;
-			case TypeID_JsObject:
+			case Type::JsObject:
 			{
-				jint javaObjectID = JNIPrimitiveType::IntValue(env, arg);
+				jint javaObjectID = JType::IntValue(env, arg);
 				jsArg = ObjectManager::GetJsObjectByJavaObjectStatic(javaObjectID);
 
 				if (jsArg.IsEmpty())
@@ -122,7 +122,7 @@ Handle<Array> ArgConverter::ConvertJavaArgsToJsArgs(jobjectArray args)
 				}
 				break;
 			}
-			case TypeID_Null:
+			case Type::Null:
 				jsArg = Null(isolate);
 				break;
 		}

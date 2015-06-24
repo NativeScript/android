@@ -63,18 +63,6 @@ namespace tns
 
 		static void NativeScriptLongToStringFunctionCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-		static const int TypeID_Boolean = 0;
-		static const int TypeID_Char = 1;
-		static const int TypeID_Byte = 2;
-		static const int TypeID_Short = 3;
-		static const int TypeID_Int = 4;
-		static const int TypeID_Long = 5;
-		static const int TypeID_Float = 6;
-		static const int TypeID_Double = 7;
-		static const int TypeID_String = 8;
-		static const int TypeID_JsObject = 9;
-		static const int TypeID_Null = 10;
-
 		static const long long JS_LONG_LIMIT = ((long long)1) << 53;
 
 		static v8::Persistent<v8::Function> *NATIVESCRIPT_NUMERA_CTOR_FUNC;

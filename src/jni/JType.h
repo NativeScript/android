@@ -5,18 +5,21 @@
 
 namespace tns
 {
-	enum class PrimitiveType
+	enum class Type : int
 	{
-		Byte,
-		Char,
 		Boolean,
+		Char,
+		Byte,
 		Short,
 		Int,
 		Long,
 		Float,
-		Double
+		Double,
+		String,
+		JsObject,
+		Null
 	};
-	class JNIPrimitiveType
+	class JType
 	{
 	public:
 		static jobject NewByte(JEnv env, jbyte value);
@@ -38,25 +41,25 @@ namespace tns
 		static jdouble DoubleValue(JEnv env, jobject value);
 
 	private:
-		JNIPrimitiveType()
+		JType()
 		{
 		}
 
-		void Init(JEnv env, PrimitiveType type);
-		static void EnsureInstance(JEnv env, JNIPrimitiveType **instance, PrimitiveType type);
+		void Init(JEnv env, Type type);
+		static void EnsureInstance(JEnv env, JType **instance, Type type);
 
 		jclass clazz;
 		jmethodID ctor;
 		jmethodID value;
 
-		static JNIPrimitiveType* Byte;
-		static JNIPrimitiveType* Char;
-		static JNIPrimitiveType* Boolean;
-		static JNIPrimitiveType* Short;
-		static JNIPrimitiveType* Int;
-		static JNIPrimitiveType* Long;
-		static JNIPrimitiveType* Float;
-		static JNIPrimitiveType* Double;
+		static JType* Byte;
+		static JType* Char;
+		static JType* Boolean;
+		static JType* Short;
+		static JType* Int;
+		static JType* Long;
+		static JType* Float;
+		static JType* Double;
 	};
 }
 
