@@ -104,23 +104,23 @@ bool NativeScriptRuntime::RegisterInstance(const Handle<Object>& jsObject, const
 	JEnv env;
 
 	//resolve class
-	jclass temp = nullptr;
-//	bool classIsResolved = false;
-//	if (!implementationObject.IsEmpty())
-//	{
-//		Local < Value > val = implementationObject->GetHiddenValue(ConvertToV8String(fullClassName));
-//		if (!val.IsEmpty())
-//		{
-//			void* voidPointerToVal = val.As<External>()->Value();
-//			temp = reinterpret_cast<jclass>(voidPointerToVal);
-//			classIsResolved = true;
-//		}
-//	}
-//	if(!classIsResolved) {
-		temp = ResolveClass(fullClassName, implementationObject);
-//	}
+	jclass javaClass = nullptr;
+	bool classIsResolved = false;
+	if (!implementationObject.IsEmpty())
+	{
+		Local < Value > val = implementationObject->GetHiddenValue(ConvertToV8String(fullClassName));
+		if (!val.IsEmpty())
+		{
+			void* voidPointerToVal = val.As<External>()->Value();
+			javaClass = reinterpret_cast<jclass>(voidPointerToVal);
+			classIsResolved = true;
+		}
+	}
+	if(!classIsResolved) {
+		javaClass = ResolveClass(fullClassName, implementationObject);
+	}
 
-	JniLocalRef javaClass (temp);
+//	JniLocalRef javaClass (temp);
 //	std::string gfcn = objectManager->GetClassName(genClass);
 
 	int javaObjectID = objectManager->GenerateNewObjectID();
@@ -152,16 +152,14 @@ jclass NativeScriptRuntime::ResolveClass(const std::string& fullClassname, const
 	JEnv env;
 
 	//get needed arguments in order to load binding
-	JniLocalRef javaFullClassName(env.NewStringUTF(fullClassname.c_str()));
+	jstring javaFullClassName = env.NewStringUTF(fullClassname.c_str());
 
 	jobjectArray methodOverrides = GetMethodOverrides(env, implementationObject);
 
-
 	//create or load generated binding (java class)
-	jclass generatedJavaClass = (jclass)env.CallStaticObjectMethod(PlatformClass, RESOLVE_CLASS_METHOD_ID,  (jstring)javaFullClassName, methodOverrides);
+	jclass generatedClass = (jclass)env.CallStaticObjectMethod(PlatformClass, RESOLVE_CLASS_METHOD_ID,  javaFullClassName, methodOverrides);
 
-	//TODO: plamen5kov: check: may memory leak here (use jniLocalRef somehow)
-	return generatedJavaClass;
+	return generatedClass;
 }
 
 Handle<Value> NativeScriptRuntime::GetArrayElement(const Handle<Object>& array, uint32_t index, const string& arraySignature)

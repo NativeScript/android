@@ -750,7 +750,9 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
 
 	//
 	JEnv env;
-	jclass generatedClass = s_resolveClass(fullClassName, implementationObject);
+	JniLocalRef genClass(s_resolveClass(fullClassName, implementationObject));
+	jclass generatedClass = reinterpret_cast<jclass>(env.NewGlobalRef(genClass));
+
 	void* voidPntrToGeneratedClass = reinterpret_cast<void*>(generatedClass);
 	implementationObject->SetHiddenValue(ConvertToV8String(fullClassName), External::New(Isolate::GetCurrent(), voidPntrToGeneratedClass));
 
@@ -1106,8 +1108,9 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 	//
 	JEnv env;
 
-	jclass generatedClass = s_resolveClass(fullClassName, implementationObject);
-	std::string generatedFullClassName = s_objectManager->GetClassName((jclass)generatedClass);
+	JniLocalRef genClass(s_resolveClass(fullClassName, implementationObject));
+	jclass generatedClass = reinterpret_cast<jclass>(env.NewGlobalRef(genClass));
+	std::string generatedFullClassName = s_objectManager->GetClassName(generatedClass);
 
 	if(generatedFullClassName.find("com/tns/tests") == std::string::npos) {
 		fullClassName = generatedFullClassName;
@@ -1137,6 +1140,7 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 		//TODO: plamen5kov: check: possible memory leak
 //		Local<External> handleToGeneratedClass =  External::New(Isolate::GetCurrent(), generatedClass);
 //		auto persistentGeneratedClass = new Persistent<External>(Isolate::GetCurrent(), handleToGeneratedClass.As<External>());
+
 		implementationObject->SetHiddenValue(ConvertToV8String(fullExtendedName), External::New(Isolate::GetCurrent(), generatedClass));
 	}
 	else
