@@ -160,10 +160,12 @@ bool JsArgToArrayConverter::ConvertArg(const Handle<Value>& arg, int index)
 		}
 
 		String::Utf8Value stringValue(argAsString);
-		JniLocalRef stringObject(env.NewStringUTF((const char*)*stringValue));
-		SetConvertedObject(env, index, stringObject);
+		int strLength = stringValue.length();
 
-		success = true;
+		JniLocalRef strData(env.NewByteArray(strLength));
+		env.SetByteArrayRegion((jbyteArray)strData, 0, strLength, (jbyte*)*stringValue);
+		JniLocalRef stringObject(env.NewObject(STRING_CLASS, STRING_CTOR, (jbyteArray)strData, UTF_8_ENCODING));
+		SetConvertedObject(env, index, stringObject);
 	}
 	else if (arg->IsObject())
 	{
@@ -379,10 +381,24 @@ JsArgToArrayConverter::~JsArgToArrayConverter()
 		delete[] m_argsAsObject;
 	}
 }
-
-void JsArgToArrayConverter::Init(JavaVM *jvm)
+void JsArgToArrayConverter::Init(JavaVM *jvm)
 {
 	m_jvm = jvm;
+
+	JEnv env;
+
+	STRING_CLASS = env.FindClass("java/lang/String");
+	assert(STRING_CLASS != nullptr);
+
+	STRING_CTOR = env.GetMethodID(STRING_CLASS, "<init>", "([BLjava/lang/String;)V");
+	assert(STRING_CTOR != 0);
+
+	JniLocalRef encoding(env.NewStringUTF("UTF-8"));
+	UTF_8_ENCODING = (jstring)env.NewGlobalRef(encoding);
+	assert(UTF_8_ENCODING != nullptr);
 }
 
 JavaVM* JsArgToArrayConverter::m_jvm = nullptr;
+jclass JsArgToArrayConverter::STRING_CLASS = nullptr;
+jmethodID JsArgToArrayConverter::STRING_CTOR = nullptr;
+jstring JsArgToArrayConverter::UTF_8_ENCODING = nullptr;;

@@ -363,7 +363,11 @@ bool JsArgConverter::ConvertJavaScriptString(JEnv& env, const Handle<Value>& jsV
 	}
 
 	String::Utf8Value stringValue(argAsString);
-	JniLocalRef stringObject(env.NewStringUTF((const char*)*stringValue));
+	int strLength = stringValue.length();
+
+	JniLocalRef strData(env.NewByteArray(strLength));
+	env.SetByteArrayRegion(strData, 0, strLength, (jbyte*)*stringValue);
+	JniLocalRef stringObject(env.NewObject(STRING_CLASS, STRING_CTOR, (jbyteArray)strData, UTF_8_ENCODING));
 	SetConvertedObject(env, index, stringObject);
 
 	return success;

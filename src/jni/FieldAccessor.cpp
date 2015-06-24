@@ -339,6 +339,7 @@ void FieldAccessor::SetJavaField(const Handle<Object>& target, const Handle<Valu
 				{
 					env.SetCharField(targetJavaObject, fieldId, chars[0]);
 				}
+				env.ReleaseStringUTFChars(value, chars);
 				break;
 			}
 			case 'S': //short
