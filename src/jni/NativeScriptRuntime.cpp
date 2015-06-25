@@ -104,7 +104,7 @@ bool NativeScriptRuntime::RegisterInstance(const Handle<Object>& jsObject, const
 	JEnv env;
 
 	//resolve class
-	jclass javaClass = nullptr;
+	jclass generatedJavaClass = nullptr;
 	bool classIsResolved = false;
 	if (!implementationObject.IsEmpty())
 	{
@@ -112,23 +112,21 @@ bool NativeScriptRuntime::RegisterInstance(const Handle<Object>& jsObject, const
 		if (!val.IsEmpty())
 		{
 			void* voidPointerToVal = val.As<External>()->Value();
-			javaClass = reinterpret_cast<jclass>(voidPointerToVal);
+			generatedJavaClass = reinterpret_cast<jclass>(voidPointerToVal);
 			classIsResolved = true;
 		}
 	}
 	if(!classIsResolved) {
-		javaClass = ResolveClass(fullClassName, implementationObject);
+		generatedJavaClass = ResolveClass(fullClassName, implementationObject);
 	}
-
-//	JniLocalRef javaClass (temp);
-//	std::string gfcn = objectManager->GetClassName(genClass);
 
 	int javaObjectID = objectManager->GenerateNewObjectID();
 
 	DEBUG_WRITE("RegisterInstance: Linking new instance");
 	objectManager->Link(jsObject, javaObjectID, nullptr);
 
-	jobject instance = CreateJavaInstance(javaObjectID, fullClassName, argWrapper, javaClass, isInterface);
+	jobject instance = CreateJavaInstance(javaObjectID, fullClassName, argWrapper, generatedJavaClass, isInterface);
+
 	JniLocalRef localInstance(instance);
 	success = !localInstance.IsNull();
 
@@ -152,14 +150,15 @@ jclass NativeScriptRuntime::ResolveClass(const std::string& fullClassname, const
 	JEnv env;
 
 	//get needed arguments in order to load binding
-	jstring javaFullClassName = env.NewStringUTF(fullClassname.c_str());
+	JniLocalRef javaFullClassName(env.NewStringUTF(fullClassname.c_str()));
 
 	jobjectArray methodOverrides = GetMethodOverrides(env, implementationObject);
 
 	//create or load generated binding (java class)
-	jclass generatedClass = (jclass)env.CallStaticObjectMethod(PlatformClass, RESOLVE_CLASS_METHOD_ID,  javaFullClassName, methodOverrides);
+	JniLocalRef generatedClass(env.CallStaticObjectMethod(PlatformClass, RESOLVE_CLASS_METHOD_ID,  (jstring)javaFullClassName, methodOverrides));
+	jclass globalRefToGeneratedClass = reinterpret_cast<jclass>(env.NewGlobalRef(generatedClass));
 
-	return generatedClass;
+	return globalRefToGeneratedClass;
 }
 
 Handle<Value> NativeScriptRuntime::GetArrayElement(const Handle<Object>& array, uint32_t index, const string& arraySignature)

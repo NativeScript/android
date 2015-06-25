@@ -748,13 +748,8 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
 	thiz->SetHiddenValue(ConvertToV8String("implClassName"), ConvertToV8String(fullClassName));
 	//
 
-	//
-	JEnv env;
-	JniLocalRef genClass(s_resolveClass(fullClassName, implementationObject));
-	jclass generatedClass = reinterpret_cast<jclass>(env.NewGlobalRef(genClass));
-
-	void* voidPntrToGeneratedClass = reinterpret_cast<void*>(generatedClass);
-	implementationObject->SetHiddenValue(ConvertToV8String(fullClassName), External::New(Isolate::GetCurrent(), voidPntrToGeneratedClass));
+	jclass generatedClass = s_resolveClass(fullClassName, implementationObject);
+	implementationObject->SetHiddenValue(ConvertToV8String(fullClassName), External::New(Isolate::GetCurrent(), generatedClass));//
 
 	implementationObject->SetPrototype(thiz->GetPrototype());
 	thiz->SetPrototype(implementationObject);
@@ -1108,8 +1103,7 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 	//
 	JEnv env;
 
-	JniLocalRef genClass(s_resolveClass(fullClassName, implementationObject));
-	jclass generatedClass = reinterpret_cast<jclass>(env.NewGlobalRef(genClass));
+	jclass generatedClass = s_resolveClass(fullClassName, implementationObject); //resolve class returns GlobalRef
 	std::string generatedFullClassName = s_objectManager->GetClassName(generatedClass);
 
 	if(generatedFullClassName.find("com/tns/tests") == std::string::npos) {
