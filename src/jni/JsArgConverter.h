@@ -26,8 +26,6 @@ namespace tns
 
 		Error GetError() const;
 
-		static void Init(JavaVM *jvm);
-
 		struct Error
 		{
 			Error() : index(-1), msg(std::string())
@@ -54,8 +52,6 @@ namespace tns
 		template<typename T>
 		bool ConvertFromCastFunctionObject(T value, int index);
 
-		static JavaVM *m_jvm;
-
 		int m_argsLen;
 
 		bool m_isValid;
@@ -69,12 +65,6 @@ namespace tns
 		std::vector<int> m_storedObjects;
 
 		Error m_error;
-
-		static jclass STRING_CLASS;
-
-		static jmethodID STRING_CTOR;
-
-		static jstring UTF_8_ENCODING;
 	};
 }
 

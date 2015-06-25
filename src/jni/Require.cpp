@@ -21,10 +21,11 @@ namespace tns
 		string content = File::ReadText(path);
 
 		auto separatorIndex = path.find_last_of("/");
-		string dirName = path.substr(0, separatorIndex + 1);
+		string dirName = path.substr(0, separatorIndex);
 
 		// TODO: Use statically allocated buffer for better performance
 		string result(MODULE_PART_1);
+		result.reserve(content.length() + 1024);
 		result += dirName;
 		result += MODULE_PART_2;
 		result += path;

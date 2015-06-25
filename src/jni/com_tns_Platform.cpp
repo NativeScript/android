@@ -49,8 +49,6 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved)
 	g_jvm = vm;
 
 	JEnv::Init(g_jvm);
-	JsArgConverter::Init(g_jvm);
-	JsArgToArrayConverter::Init(g_jvm);
 
 	g_objectManager = new ObjectManager();
 
