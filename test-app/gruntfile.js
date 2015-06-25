@@ -14,7 +14,7 @@ module.exports = function(grunt) {
 		wait: {
 			timeToRunTests: {
 				options: {
-					delay: 180000
+					delay: 300000
 				}
 			}
 		},
@@ -37,6 +37,9 @@ module.exports = function(grunt) {
             }
         },
         exec: {
+			deletePreviousResultXml: {
+				cmd: "adb shell rm /sdcard/android_unit_test_results.xml"
+			},
 			createBuildXml: {
 				cmd: "android update project --path ."
 			},
@@ -82,6 +85,7 @@ module.exports = function(grunt) {
                             "clean:build",
                             "mkdir:build",
 							"clean:binDir",
+							"exec:deletePreviousResultXml",
 							"copy:generatedLibraries",
 							"exec:createBuildXml",
 							
