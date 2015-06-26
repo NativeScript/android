@@ -54,6 +54,10 @@ module.exports = function(grunt) {
 				cmd: "adb shell am start -n com.tns.android_runtime_testapp/com.tns.NativeScriptActivity -a android.intent.action.MAIN -c android.intent.category.LAUNCHER",
 				cwd: "./bin"
 			},
+			waitForUnitTestResultFile: {
+				cmd: "node ./try_to_find_test_result_file.js",
+				cwd: "."
+			},
 			copyResultToDist: {
 				cmd: "adb pull /sdcard/android_unit_test_results.xml",
 				cwd: localCfg.outDir
@@ -85,7 +89,6 @@ module.exports = function(grunt) {
                             "clean:build",
                             "mkdir:build",
 							"clean:binDir",
-							"exec:deletePreviousResultXml",
 							"copy:generatedLibraries",
 							"exec:createBuildXml",
 							
@@ -94,8 +97,10 @@ module.exports = function(grunt) {
 							"exec:runAntRelease", 
 							
                             "exec:installApkOnDevice",
+							"exec:deletePreviousResultXml",
                             "exec:startInstalledApk",
-							"wait:timeToRunTests",
+							// "wait:timeToRunTests",
+							"exec:waitForUnitTestResultFile",
 							"exec:copyResultToDist"
                         ]);
 
