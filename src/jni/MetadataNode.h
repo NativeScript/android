@@ -45,6 +45,8 @@ namespace tns
 
 	typedef int (*GetArrayLengthCallback)(const v8::Handle<v8::Object>& classObj);
 
+	typedef jclass (*ResolveClassCallback)(const std::string& fullClassname, const v8::Handle<v8::Object>& implementationObject);
+
 	typedef v8::Handle<v8::Object> (*FindClassCallback)(const std::string& className);
 
 	class MetadataNode
@@ -59,7 +61,8 @@ namespace tns
 										RegisterInstanceCallback registerInstanceCallback,
 										GetTypeMetadataCallback getTypeMetadataCallback,
 										FindClassCallback findClassCallback,
-										GetArrayLengthCallback getArrayLengthCallback);
+										GetArrayLengthCallback getArrayLengthCallback,
+										ResolveClassCallback resolveClassCallback);
 
 
 		static void BuildMetadata(uint8_t *nodes, int nodesLength, uint8_t *names, uint8_t *values);
@@ -109,8 +112,8 @@ namespace tns
 
 		struct ExtendedClassData
 		{
-			ExtendedClassData(MetadataNode *_node, const std::string& _extendedName, const v8::Handle<v8::Object>& _implementationObject)
-				: node(_node), extendedName(_extendedName)
+			ExtendedClassData(MetadataNode *_node, const std::string& _extendedName, const v8::Handle<v8::Object>& _implementationObject, std::string _fullClassName)
+				: node(_node), extendedName(_extendedName), fullClassName(_fullClassName)
 			{
 				implementationObject = new v8::Persistent<v8::Object>(v8::Isolate::GetCurrent(), _implementationObject);
 			}
@@ -118,6 +121,8 @@ namespace tns
 			MetadataNode *node;
 			std::string extendedName;
 			v8::Persistent<v8::Object> *implementationObject;
+
+			std::string fullClassName;
 		};
 
 		struct ExtendedClassCacheData
@@ -259,6 +264,7 @@ namespace tns
 		static GetTypeMetadataCallback s_getTypeMetadata;
 		static FindClassCallback s_findClass;
 		static GetArrayLengthCallback s_getArrayLength;
+		static ResolveClassCallback s_resolveClass;
 
 		static MetadataReader s_metadataReader;
 

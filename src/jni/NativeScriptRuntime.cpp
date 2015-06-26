@@ -42,10 +42,13 @@ void NativeScriptRuntime::Init(JavaVM *jvm, ObjectManager *objectManager)
 	RequireClass = env.FindClass("com/tns/Require");
 	assert(RequireClass != nullptr);
 
+	RESOLVE_CLASS_METHOD_ID = env.GetStaticMethodID(PlatformClass, "resolveClass", "(Ljava/lang/String;[Ljava/lang/String;)Ljava/lang/Class;");
+	assert(RESOLVE_CLASS_METHOD_ID != nullptr);
+
 	CREATE_INSTANCE_METHOD_ID = env.GetStaticMethodID(PlatformClass, "createInstance", "([Ljava/lang/Object;II)Ljava/lang/Object;");
 	assert(CREATE_INSTANCE_METHOD_ID != nullptr);
 
-	CACHE_CONSTRUCTOR_METHOD_ID = env.GetStaticMethodID(PlatformClass, "cacheConstructor", "(Ljava/lang/String;[Ljava/lang/Object;[Ljava/lang/String;)I");
+	CACHE_CONSTRUCTOR_METHOD_ID = env.GetStaticMethodID(PlatformClass, "cacheConstructor", "(Ljava/lang/Class;[Ljava/lang/Object;)I");
 	assert(CACHE_CONSTRUCTOR_METHOD_ID != nullptr);
 
 	GET_TYPE_METADATA = env.GetStaticMethodID(PlatformClass, "getTypeMetadata", "(Ljava/lang/String;I)[Ljava/lang/String;");
@@ -75,7 +78,8 @@ void NativeScriptRuntime::Init(JavaVM *jvm, ObjectManager *objectManager)
 									NativeScriptRuntime::RegisterInstance,
 									NativeScriptRuntime::GetTypeMetadata,
 									NativeScriptRuntime::FindClass,
-									NativeScriptRuntime::GetArrayLength);
+									NativeScriptRuntime::GetArrayLength,
+									NativeScriptRuntime::ResolveClass);
 
 	NativeScriptRuntime::objectManager = objectManager;
 
@@ -94,20 +98,41 @@ bool NativeScriptRuntime::RegisterInstance(const Handle<Object>& jsObject, const
 
 	DEBUG_WRITE("RegisterInstance called for '%s'", fullClassName.c_str());
 
+	if(fullClassName == "java/lang/Object_") {
+		int a = 5;
+	}
+	JEnv env;
+
+	// get class from implementation object if you can
+	jclass generatedJavaClass = nullptr;
+	bool classIsResolved = false;
+	if (!implementationObject.IsEmpty())
+	{
+		Local < Value > val = implementationObject->GetHiddenValue(ConvertToV8String(fullClassName));
+		if (!val.IsEmpty())
+		{
+			void* voidPointerToVal = val.As<External>()->Value();
+			generatedJavaClass = reinterpret_cast<jclass>(voidPointerToVal);
+			classIsResolved = true;
+		}
+	}
+	if(!classIsResolved) {
+		generatedJavaClass = ResolveClass(fullClassName, implementationObject);
+	}
+
 	int javaObjectID = objectManager->GenerateNewObjectID();
 
-	JEnv env;
 	DEBUG_WRITE("RegisterInstance: Linking new instance");
 	objectManager->Link(jsObject, javaObjectID, nullptr);
 
-	jobject instance = CreateJavaInstance(javaObjectID, fullClassName, argWrapper, implementationObject, isInterface);
+	jobject instance = CreateJavaInstance(javaObjectID, fullClassName, argWrapper, generatedJavaClass, isInterface);
+
 	JniLocalRef localInstance(instance);
 	success = !localInstance.IsNull();
 
 	if (success)
 	{
 		DEBUG_WRITE("RegisterInstance: Updating linked instance with its real class");
-//		string instanceClassName = objectManager->GetClassName(instance);
 		jclass instanceClass = env.FindClass(fullClassName);
 		objectManager->SetJavaClass(jsObject, instanceClass);
 	}
@@ -117,6 +142,22 @@ bool NativeScriptRuntime::RegisterInstance(const Handle<Object>& jsObject, const
 	}
 
 	return success;
+}
+
+jclass NativeScriptRuntime::ResolveClass(const std::string& fullClassname, const Handle<Object>& implementationObject) {
+
+	JEnv env;
+
+	//get needed arguments in order to load binding
+	JniLocalRef javaFullClassName(env.NewStringUTF(fullClassname.c_str()));
+
+	jobjectArray methodOverrides = GetMethodOverrides(env, implementationObject);
+
+	//create or load generated binding (java class)
+	JniLocalRef generatedClass(env.CallStaticObjectMethod(PlatformClass, RESOLVE_CLASS_METHOD_ID,  (jstring)javaFullClassName, methodOverrides));
+	jclass globalRefToGeneratedClass = reinterpret_cast<jclass>(env.NewGlobalRef(generatedClass));
+
+	return globalRefToGeneratedClass;
 }
 
 Handle<Value> NativeScriptRuntime::GetArrayElement(const Handle<Object>& array, uint32_t index, const string& arraySignature)
@@ -517,7 +558,8 @@ string NativeScriptRuntime::GetReturnType(const string& methodSignature)
 	return jniReturnType;
 }
 
-jobject NativeScriptRuntime::CreateJavaInstance(int objectID, const std::string& fullClassName, const ArgsWrapper& argWrapper, const Handle<Object>& implementationObject, bool isInterface)
+
+jobject NativeScriptRuntime::CreateJavaInstance(int objectID, const std::string& fullClassName, const ArgsWrapper& argWrapper, jclass javaClass, bool isInterface)
 {
 	SET_PROFILER_FRAME();
 
@@ -528,12 +570,11 @@ jobject NativeScriptRuntime::CreateJavaInstance(int objectID, const std::string&
 	auto& args = argWrapper.args;
 
 	JsArgToArrayConverter argConverter(args, isInterface, argWrapper.outerThis);
-
 	if (argConverter.IsValid())
 	{
 		jobjectArray javaArgs = argConverter.ToJavaArray();
 
-		int ctorId = GetCachedConstructorId(env, args, fullClassName, javaArgs, implementationObject);
+		int ctorId = GetCachedConstructorId(env, args, fullClassName, javaArgs, javaClass);
 
 		jobject obj = env.CallStaticObjectMethod(PlatformClass,
 				CREATE_INSTANCE_METHOD_ID,
@@ -546,7 +587,6 @@ jobject NativeScriptRuntime::CreateJavaInstance(int objectID, const std::string&
 		if (!exceptionFound)
 		{
 			instance = obj;
-			objectManager->UpdateCache(objectID, obj);
 		}
 	}
 	else
@@ -558,10 +598,9 @@ jobject NativeScriptRuntime::CreateJavaInstance(int objectID, const std::string&
 	return instance;
 }
 
-int NativeScriptRuntime::GetCachedConstructorId(JEnv& env, const FunctionCallbackInfo<Value>& args, const string& fullClassName, jobjectArray javaArgs, const Handle<Object>& implementationObject)
+int NativeScriptRuntime::GetCachedConstructorId(JEnv& env, const FunctionCallbackInfo<Value>& args, const string& fullClassName, jobjectArray javaArgs, jclass javaClass)
 {
 	int ctorId = -1;
-//	string fullClassName = className + Constants::CLASS_NAME_LOCATION_SEPARATOR + name;
 	string encodedCtorArgs = MethodCache::EncodeSignature(fullClassName, "<init>", args, false);
 	auto itFound = s_constructorCache.find(encodedCtorArgs);
 
@@ -572,12 +611,7 @@ int NativeScriptRuntime::GetCachedConstructorId(JEnv& env, const FunctionCallbac
 	}
 	else
 	{
-//		JniLocalRef javaName(env.NewStringUTF(name.c_str()));
-//		JniLocalRef javaClassName(env.NewStringUTF(className.c_str()));
-		JniLocalRef javaFullClassName(env.NewStringUTF(fullClassName.c_str()));
-		jobjectArray methodOverrides = GetMethodOverrides(env, implementationObject);
-
-		jint id = env.CallStaticIntMethod(PlatformClass, CACHE_CONSTRUCTOR_METHOD_ID, (jstring)javaFullClassName, javaArgs, methodOverrides);
+		jint id = env.CallStaticIntMethod(PlatformClass, CACHE_CONSTRUCTOR_METHOD_ID, javaClass, javaArgs);
 
 		if (env.ExceptionCheck() == JNI_FALSE)
 		{
@@ -1014,6 +1048,7 @@ JavaVM* NativeScriptRuntime::jvm = nullptr;
 jclass NativeScriptRuntime::PlatformClass = nullptr;
 jclass NativeScriptRuntime::RequireClass = nullptr;
 jclass NativeScriptRuntime::JAVA_LANG_STRING = nullptr;
+jmethodID NativeScriptRuntime::RESOLVE_CLASS_METHOD_ID = nullptr;
 jmethodID NativeScriptRuntime::CREATE_INSTANCE_METHOD_ID = nullptr;
 jmethodID NativeScriptRuntime::CACHE_CONSTRUCTOR_METHOD_ID = nullptr;
 jmethodID NativeScriptRuntime::APP_FAIL_METHOD_ID = nullptr;

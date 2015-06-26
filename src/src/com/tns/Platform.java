@@ -183,12 +183,17 @@ public class Platform
 		String[] bootstrapInfo = Require.bootstrapApp();
 		runNativeScript(bootstrapInfo[0], bootstrapInfo[1]);
 	}
-
-	private static int cacheConstructor(String fullClassName, Object[] args, String[] methodOverrides) throws ClassNotFoundException, IOException
-	{
-		Constructor<?> ctor = MethodResolver.resolveConstructor(fullClassName, args, dexFactory, methodOverrides);
-
+	
+	private static Class<?> resolveClass(String fullClassName, String[] methodOverrides) throws ClassNotFoundException, IOException{
+		Class<?> javaClass = ClassResolver.resolveClass(fullClassName, dexFactory, methodOverrides);
 		
+		return javaClass;
+	}
+
+	private static int cacheConstructor(Class<?> clazz, Object[] args) throws ClassNotFoundException, IOException
+	{
+		Constructor<?> ctor = MethodResolver.resolveConstructor(clazz, args);
+
 		//TODO: Lubo: Not thread safe already.
 		//TODO: Lubo: Does not check for existing items
 		int ctorId = ctorCache.size();

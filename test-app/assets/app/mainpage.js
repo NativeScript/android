@@ -18,7 +18,6 @@ require("./tests/extendedClassesTests");
 require("./tests/extendClassNameTests");
 require("./tests/testJniReferenceLeak");
 
-
 var MainActivity = {
     onCreate: function (bundle) {
     	__log("onCreate from js");
@@ -29,7 +28,7 @@ var MainActivity = {
 
     	require("./tests/testsWithContext").run(this);
     	execute(); //run jasmine
-
+    	
     	var layout = new android.widget.LinearLayout(this);
     	layout.setOrientation(1);
     	this.setContentView(layout);
