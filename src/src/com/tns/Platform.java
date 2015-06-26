@@ -150,7 +150,8 @@ public class Platform
 				public void uncaughtException(Thread thread, Throwable ex)
 				{
 					String content = ErrorReport.getErrorMessage(ex);
-					passUncaughtExceptionToJsNative(ex, content);
+					// TODO: passUncaughtExceptionToJsNative fails due to V8's invalid state - examine this!!!
+					// passUncaughtExceptionToJsNative(ex, content);
 
 					if (IsLogEnabled) Log.e(DEFAULT_LOG_TAG, "Uncaught Exception Message=" + ex.getMessage());
 
