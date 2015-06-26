@@ -1100,18 +1100,15 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 	string extendNameAndLocation = extendLocation + ConvertToString(extendName);
 	auto fullClassName = TNS_PREFIX + CreateFullClassName(node->m_name, extendNameAndLocation);
 
+
 	//
 	JEnv env;
-
+	//resolve class (pre-generated or generated runtime from dex generator)
 	jclass generatedClass = s_resolveClass(fullClassName, implementationObject); //resolve class returns GlobalRef
 	std::string generatedFullClassName = s_objectManager->GetClassName(generatedClass);
-
-	if(generatedFullClassName.find("com/tns/tests") == std::string::npos) {
-		fullClassName = generatedFullClassName;
-	}
 	//
 
-	auto fullExtendedName = fullClassName;
+	auto fullExtendedName = generatedFullClassName;
 	DEBUG_WRITE("ExtendsCallMethodHandler: extend full name %s", fullClassName.c_str());
 
 	auto isolate = info.GetIsolate();
@@ -1131,10 +1128,7 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 		//mark the implementationObject as such and set a pointer to it's class node inside it for reuse validation later
 		implementationObject->SetHiddenValue(implementationObjectPropertyName, String::NewFromUtf8(isolate, fullExtendedName.c_str()));
 
-		//TODO: plamen5kov: check: possible memory leak
-//		Local<External> handleToGeneratedClass =  External::New(Isolate::GetCurrent(), generatedClass);
-//		auto persistentGeneratedClass = new Persistent<External>(Isolate::GetCurrent(), handleToGeneratedClass.As<External>());
-
+		//append resolved class to implementation object
 		implementationObject->SetHiddenValue(ConvertToV8String(fullExtendedName), External::New(Isolate::GetCurrent(), generatedClass));
 	}
 	else

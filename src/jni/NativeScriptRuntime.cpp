@@ -103,7 +103,7 @@ bool NativeScriptRuntime::RegisterInstance(const Handle<Object>& jsObject, const
 	}
 	JEnv env;
 
-	//resolve class
+	// get class from implementation object if you can
 	jclass generatedJavaClass = nullptr;
 	bool classIsResolved = false;
 	if (!implementationObject.IsEmpty())
@@ -133,7 +133,6 @@ bool NativeScriptRuntime::RegisterInstance(const Handle<Object>& jsObject, const
 	if (success)
 	{
 		DEBUG_WRITE("RegisterInstance: Updating linked instance with its real class");
-//		string instanceClassName = objectManager->GetClassName(instance);
 		jclass instanceClass = env.FindClass(fullClassName);
 		objectManager->SetJavaClass(jsObject, instanceClass);
 	}
@@ -588,7 +587,6 @@ jobject NativeScriptRuntime::CreateJavaInstance(int objectID, const std::string&
 		if (!exceptionFound)
 		{
 			instance = obj;
-//			objectManager->UpdateCache(objectID, obj);
 		}
 	}
 	else
@@ -603,7 +601,6 @@ jobject NativeScriptRuntime::CreateJavaInstance(int objectID, const std::string&
 int NativeScriptRuntime::GetCachedConstructorId(JEnv& env, const FunctionCallbackInfo<Value>& args, const string& fullClassName, jobjectArray javaArgs, jclass javaClass)
 {
 	int ctorId = -1;
-//	string fullClassName = className + Constants::CLASS_NAME_LOCATION_SEPARATOR + name;
 	string encodedCtorArgs = MethodCache::EncodeSignature(fullClassName, "<init>", args, false);
 	auto itFound = s_constructorCache.find(encodedCtorArgs);
 
@@ -614,11 +611,6 @@ int NativeScriptRuntime::GetCachedConstructorId(JEnv& env, const FunctionCallbac
 	}
 	else
 	{
-//		JniLocalRef javaName(env.NewStringUTF(name.c_str()));
-//		JniLocalRef javaClassName(env.NewStringUTF(className.c_str()));
-//		JniLocalRef javaFullClassName(env.NewStringUTF(fullClassName.c_str()));
-//		jobjectArray methodOverrides = GetMethodOverrides(env, implementationObject);
-
 		jint id = env.CallStaticIntMethod(PlatformClass, CACHE_CONSTRUCTOR_METHOD_ID, javaClass, javaArgs);
 
 		if (env.ExceptionCheck() == JNI_FALSE)
