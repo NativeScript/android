@@ -50,7 +50,7 @@ namespace tns
 
 		jclass clazz;
 		jmethodID ctor;
-		jmethodID value;
+		jfieldID valueField;
 
 		static JType* Byte;
 		static JType* Char;
