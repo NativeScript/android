@@ -135,8 +135,6 @@ namespace tns
 
 		void JSObjectWeakCallback(v8::Isolate *isolate, ObjectWeakCallbackState *callbackState);
 
-		std::string JniClassPathToCanonicalName(const std::string& jniClassPath);
-
 		bool HasImplObject(v8::Isolate *isolate, const v8::Local<v8::Object>& obj);
 
 		void MarkReachableObjects(v8::Isolate *isolate, const v8::Local<v8::Object>& obj);
