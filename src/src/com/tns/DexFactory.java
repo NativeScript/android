@@ -18,7 +18,6 @@ import java.util.zip.ZipOutputStream;
 import com.tns.bindings.ProxyGenerator;
 
 import dalvik.system.DexClassLoader;
-import dalvik.system.DexFile;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
@@ -123,6 +122,7 @@ public class DexFactory
 		String jarFilePath = dexFile.getPath().replace(".dex", ".jar");
 		File jarFile = new File(jarFilePath);
 		
+		Class<?> result;
 		if(!jarFile.exists())
 		{
 			FileOutputStream jarFileStream = new FileOutputStream(jarFile);
@@ -136,23 +136,11 @@ public class DexFactory
 		    out.write(dexData);
 		    out.closeEntry();
 		    out.close();
+		    
 		}
 		
-		Class<?> result = null;
-		DexFile df = null;
-		try {
-			// use DexFile instead of DexClassLoader to allow class loading within the default class loader
-			// Note: According to the official documentation, DexFile should not be directly used.
-			// However, this is the only viable way to get our dynamic classes loaded within the system class loader
-			df = DexFile.loadDex(jarFilePath, this.odexPath + fullClassName, 0);
-			result = df.loadClass(fullClassName, this.context.getClassLoader());
-		}
-		catch (IOException e) {
-			e.printStackTrace();
-			// fall back to DexClassLoader
-			DexClassLoader dexClassLoader = new DexClassLoader(jarFilePath, this.odexPath, null, this.context.getClassLoader());
-			result = dexClassLoader.loadClass(fullClassName);
-		}
+		DexClassLoader dexClassLoader = new DexClassLoader(jarFilePath, this.odexPath, null, this.context.getClassLoader());
+		result = dexClassLoader.loadClass(fullClassName);
 		
 		this.injectedDexClasses.put(fullClassName, result);
 			
@@ -162,10 +150,7 @@ public class DexFactory
 	public Class<?> findClass(String className) throws ClassNotFoundException
 	{
 		String canonicalName = className.replace('/', '.');
-		if(Platform.IsLogEnabled) {
-			Log.d("TNS_NATIVE", canonicalName);
-		}
-		
+		Log.d("TNS_NATIVE", canonicalName);
 		Class<?> existingClass = this.injectedDexClasses.get(canonicalName);
 		if(existingClass != null)
 		{
@@ -364,7 +349,8 @@ public class DexFactory
             		continue;
             	}
             	
-                if (!purgeCandidate.delete())
+                boolean b = purgeCandidate.delete();
+                if (b == false)
                 {
                     Log.e(Platform.DEFAULT_LOG_TAG, "Error purging cached proxy file: " + purgeCandidate.getAbsolutePath());
                 }
