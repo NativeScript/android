@@ -856,6 +856,8 @@ void MetadataNode::ArrayIndexedPropertySetterCallback(uint32_t index, Local<Valu
 	auto node = GetNodeFromHandle(info.This());
 
 	s_setArrayElement(info.This(), index, node->m_name, value);
+
+	info.GetReturnValue().Set(value);
 }
 
 Handle<Object> MetadataNode::GetImplementationObject(const Handle<Object>& object)
