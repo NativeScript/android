@@ -81,9 +81,9 @@ module.exports = function(grunt) {
                 }
             },
             jarJavaRuntimeToDist: {
-+                src: "./bin/NativeScriptRuntime.jar",
-+                dest: "./dist/libs/nativescript.jar"
-+            }
+                src: "./bin/NativeScriptRuntime.jar",
+                dest: "./dist/libs/nativescript.jar"
+            }
         },
         replace: {
             ndk_configuration: {
