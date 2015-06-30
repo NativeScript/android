@@ -194,7 +194,7 @@ module.exports = function(grunt) {
                 cmd: "npm install " + localCfg.metadataGenPath
             },
             runMetadataGenerator: {
-                cmd: "./node_modules/.bin/generate-metadata " + localCfg.libsDir + " ./dist/framework/assets/metadata"
+                cmd: pathModule.normalize("./node_modules/.bin/generate-metadata") + " " + localCfg.libsDir + " ./dist/framework/assets/metadata"
             },
 			runTests: {
 				cmd: "npm install && grunt --verbose",
