@@ -575,24 +575,24 @@ public class Platform
 
 	// sends args in pairs (typeID, value, null) except for objects where its
 	// (typeid, javaObjectID, javaJNIClassPath)
-	public static Object callJSMethod(Object javaObject, String methodName, Object... args) throws NativeScriptException
+	public static Object callJSMethod(Object javaObject, String methodName, Class<?> retType, Object... args) throws NativeScriptException
 	{
-		return callJSMethod(javaObject, methodName, false /* isConstructor */, args);
+		return callJSMethod(javaObject, methodName, retType, false /* isConstructor */, args);
 	}
 	
-	public static Object callJSMethodWithDelay(Object javaObject, String methodName, long delay, Object... args) throws NativeScriptException
+	public static Object callJSMethodWithDelay(Object javaObject, String methodName, Class<?> retType, long delay, Object... args) throws NativeScriptException
 	{
-		return callJSMethod(javaObject, methodName, false /* isConstructor */, delay, args); 
+		return callJSMethod(javaObject, methodName, retType, false /* isConstructor */, delay, args); 
 	}
 	
-	public static Object callJSMethod(Object javaObject, String methodName, boolean isConstructor, Object... args) throws NativeScriptException
+	public static Object callJSMethod(Object javaObject, String methodName, Class<?> retType, boolean isConstructor, Object... args) throws NativeScriptException
 	{
-		Object ret = callJSMethod(javaObject, methodName, isConstructor, 0, args);
+		Object ret = callJSMethod(javaObject, methodName, retType, isConstructor, 0, args);
 		
 		return ret;
 	}
 
-	public static Object callJSMethod(Object javaObject, String methodName, boolean isConstructor, long delay, Object... args) throws NativeScriptException
+	public static Object callJSMethod(Object javaObject, String methodName, Class<?> retType, boolean isConstructor, long delay, Object... args) throws NativeScriptException
 	{
 		Integer javaObjectID = getJavaObjectID(javaObject);
 		if (javaObjectID == null)
