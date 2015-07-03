@@ -79,6 +79,10 @@ module.exports = function(grunt) {
                         return updatedContent;
                     }
                 }
+            },
+            jarJavaRuntimeToDist: {
+                src: "./bin/NativeScriptRuntime.jar",
+                dest: "./dist/libs/nativescript.jar"
             }
         },
         replace: {
@@ -130,9 +134,6 @@ module.exports = function(grunt) {
                 //cmd: "jar cfm ../../" + "/dist/libs/nativescript.jar ../../manifest.mf com",
                 cmd: "jar umf ./manifest.mf ./bin/NativeScriptRuntime.jar"
                 //,cwd: pathModule.join(localCfg.rootDir, "/bin/classes")
-            },
-            jarJavaRuntimeCopyToDist: {
-                cmd: "cp ./bin/NativeScriptRuntime.jar ./dist/libs/nativescript.jar"
             }
         }
     });
@@ -156,7 +157,7 @@ module.exports = function(grunt) {
                             "exec:ensureOriginalManifestFile",
                             "copy:updateManifestFile",
                             "exec:jarJavaRuntime",
-                            "exec:jarJavaRuntimeCopyToDist",
+                            "copy:jarJavaRuntimeToDist",
                             "exec:ensureOriginalManifestFile"
                         ]);
 
