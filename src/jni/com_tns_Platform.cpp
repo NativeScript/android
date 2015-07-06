@@ -179,27 +179,13 @@ extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj
 	NativeScriptRuntime::APP_FILES_DIR = ArgConverter::jstringToString(filesPath);
 }
 
-extern "C" void Java_com_tns_Platform_runNativeScript(JNIEnv *_env, jobject obj, jstring appModuleName, jstring appCode)
+extern "C" void Java_com_tns_Platform_runNativeScript(JNIEnv *_env, jobject obj, jstring appModuleName)
 {
 	JEnv env(_env);
-
 	auto isolate = g_isolate;
 	Isolate::Scope isolate_scope(isolate);
 
-
 	HandleScope handleScope(isolate);
-	auto context = Local<Context>::New(isolate, *PrimaryContext);
-
-	jstring retval;
-	jboolean isCopy;
-
-	/*
-	 * To compile script we need CODE, SCRIPT_NAME, TC (so we know if an error pops up during processing)
-	 * */
-	//get code and convert it to v8String then release the jstring (because we copied it and don't need it anymore)
-	const char* code = env.GetStringUTFChars(appCode, &isCopy);
-	auto cmd = ConvertToV8String(code);
-	env.ReleaseStringUTFChars(appCode, code);
 
 	Handle<Object> moduleObject;
 	string modulePath = ArgConverter::jstringToString(appModuleName);
