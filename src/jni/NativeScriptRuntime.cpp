@@ -26,7 +26,6 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
-// init
 void NativeScriptRuntime::Init(JavaVM *jvm, ObjectManager *objectManager)
 {
 	NativeScriptRuntime::jvm = jvm;
@@ -735,6 +734,103 @@ void NativeScriptRuntime::CreateGlobalCastFunctions(const Handle<ObjectTemplate>
 }
 
 
+void NativeScriptRuntime::CompileAndRun(string modulePath, bool& hasError, Handle<Object>& moduleObj, bool isBootstrapCall)
+{
+	auto isolate = Isolate::GetCurrent();
+
+	Local < Value > exportObj = Object::New(isolate);
+	auto tmpExportObj = new Persistent<Object>(isolate, exportObj.As<Object>());
+	loadedModules.insert(make_pair(modulePath, tmpExportObj));
+
+	TryCatch tc;
+
+	auto scriptText = Require::LoadModule(modulePath);
+
+	DEBUG_WRITE("Compiling script (module %s)", modulePath.c_str());
+	Local < String > fullRequiredModulePath = ConvertToV8String(modulePath);
+	auto script = Script::Compile(scriptText, fullRequiredModulePath);
+	DEBUG_WRITE("Compiled script (module %s)", modulePath.c_str());
+
+	if (ExceptionUtil::GetInstance()->HandleTryCatch(tc, "Script " + modulePath + " contains compilation errors!"))
+	{
+		loadedModules.erase(modulePath);
+		tmpExportObj->Reset();
+		delete tmpExportObj;
+		hasError = true;
+	}
+	else if (script.IsEmpty())
+	{
+		//think about more descriptive message -> [script_name] was empty
+		DEBUG_WRITE("%s was empty", modulePath.c_str());
+	}
+	else
+	{
+		DEBUG_WRITE("Running script (module %s)", modulePath.c_str());
+
+		TryCatch tcRequire;
+
+		Local < Function > f = script->Run().As<Function>();
+		if (ExceptionUtil::GetInstance()->HandleTryCatch(tc))
+		{
+			DEBUG_WRITE("Exception was handled in java code");
+		}
+
+		//this is done so the initial bootstrap function is persistent (and to keep old logic)
+		if(isBootstrapCall) {
+			auto persistentAppModule = new Persistent<Object>(isolate, f);
+		}
+
+		auto result = f->Call(Object::New(isolate), 1, &exportObj);
+		if(ExceptionUtil::GetInstance()->HandleTryCatch(tc))
+		{
+			DEBUG_WRITE("Exception was handled in java code");
+		}
+		else
+		{
+			moduleObj = result.As<Object>();
+		}
+
+		// introducing isBootstrapCall in order to save the flow as it was (latter on we can think about including the following code for the bootstrap (initial) call
+		if(!isBootstrapCall) {
+			DEBUG_WRITE("After Running script (module %s)", modulePath.c_str());
+
+			if (ExceptionUtil::GetInstance()->HandleTryCatch(tcRequire))
+			{
+				loadedModules.erase(modulePath);
+				tmpExportObj->Reset();
+				delete tmpExportObj;
+				hasError = true;
+				tcRequire.ReThrow();
+			}
+			else
+			{
+				if (moduleObj.IsEmpty())
+				{
+					auto objectTemplate = ObjectTemplate::New();
+					moduleObj = objectTemplate->NewInstance();
+				}
+
+				DEBUG_WRITE("Script completed (module %s)", modulePath.c_str());
+
+				if (!moduleObj->StrictEquals(exportObj))
+				{
+					loadedModules.erase(modulePath);
+					tmpExportObj->Reset();
+					delete tmpExportObj;
+
+					auto persistentModuleObject = new Persistent<Object>(isolate, moduleObj.As<Object>());
+
+					loadedModules.insert(make_pair(modulePath, persistentModuleObject));
+				}
+			}
+		}
+	}
+	if (tc.HasCaught())
+	{
+		tc.ReThrow();
+	}
+}
+
 void NativeScriptRuntime::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
 	SET_PROFILER_FRAME();
@@ -782,67 +878,7 @@ void NativeScriptRuntime::RequireCallback(const v8::FunctionCallbackInfo<v8::Val
 
 	if (it == loadedModules.end())
 	{
-		Local<Value> exportObj = Object::New(isolate);
-		auto tmpExportObj = new Persistent<Object>(isolate, exportObj.As<Object>());
-		loadedModules.insert(make_pair(modulePath, tmpExportObj));
-
-		TryCatch tc;
-		auto scriptText = Require::LoadModule(modulePath);
-
-		DEBUG_WRITE("Compiling script (module %s)", moduleName.c_str());
-		auto script = Script::Compile(scriptText, args[0].As<String>());
-		DEBUG_WRITE("Compiled script (module %s)", moduleName.c_str());
-
-		if(ExceptionUtil::GetInstance()->HandleTryCatch(tc)){
-			loadedModules.erase(modulePath);
-			tmpExportObj->Reset();
-			delete tmpExportObj;
-			hasError = true;
-		}
-		else {
-			DEBUG_WRITE("Running script (module %s)", moduleName.c_str());
-
-			TryCatch tcRequire;
-
-			Local<Function> f = script->Run().As<Function>();
-			auto result = f->Call(Object::New(isolate), 1, &exportObj);
-
-			moduleObj = result.As<Object>();
-
-			DEBUG_WRITE("After Running script (module %s)", moduleName.c_str());
-
-			if(ExceptionUtil::GetInstance()->HandleTryCatch(tcRequire)){
-				loadedModules.erase(modulePath);
-				tmpExportObj->Reset();
-				delete tmpExportObj;
-				hasError = true;
-				tcRequire.ReThrow();
-			}
-			else {
-				if (moduleObj.IsEmpty())
-				{
-					auto objectTemplate = ObjectTemplate::New();
-					moduleObj = objectTemplate->NewInstance();
-				}
-
-				DEBUG_WRITE("Script completed (module %s)", moduleName.c_str());
-
-				if (!moduleObj->StrictEquals(exportObj))
-				{
-					loadedModules.erase(modulePath);
-					tmpExportObj->Reset();
-					delete tmpExportObj;
-
-					auto persistentModuleObject = new Persistent<Object>(isolate, moduleObj.As<Object>());
-
-					loadedModules.insert(make_pair(modulePath, persistentModuleObject));
-				}
-			}
-		}
-		if (tc.HasCaught())
-		{
-			tc.ReThrow();
-		}
+		CompileAndRun(modulePath, hasError, moduleObj, false/*is bootstrap call*/);
 	}
 	else
 	{

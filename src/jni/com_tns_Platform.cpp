@@ -186,7 +186,6 @@ extern "C" void Java_com_tns_Platform_runNativeScript(JNIEnv *_env, jobject obj,
 	auto isolate = g_isolate;
 	Isolate::Scope isolate_scope(isolate);
 
-	TryCatch tc;
 
 	HandleScope handleScope(isolate);
 	auto context = Local<Context>::New(isolate, *PrimaryContext);
@@ -194,61 +193,26 @@ extern "C" void Java_com_tns_Platform_runNativeScript(JNIEnv *_env, jobject obj,
 	jstring retval;
 	jboolean isCopy;
 
+	/*
+	 * To compile script we need CODE, SCRIPT_NAME, TC (so we know if an error pops up during processing)
+	 * */
+	//get code and convert it to v8String then release the jstring (because we copied it and don't need it anymore)
 	const char* code = env.GetStringUTFChars(appCode, &isCopy);
-
 	auto cmd = ConvertToV8String(code);
-
 	env.ReleaseStringUTFChars(appCode, code);
 
-	DEBUG_WRITE("Compiling script");
+	Handle<Object> moduleObject;
+	string modulePath = ArgConverter::jstringToString(appModuleName);
+	bool hasError = false;
 
-	auto moduleName = ArgConverter::jstringToV8String(appModuleName);
+	NativeScriptRuntime::CompileAndRun(modulePath, hasError, moduleObject, true /*is bootstrap call*/);
 
-	auto script = Script::Compile(cmd, moduleName);
-
-	DEBUG_WRITE("Compile script");
-
-	if (ExceptionUtil::GetInstance()->HandleTryCatch(tc, "Bootstrap script has error(s)."))
-	{
-		DEBUG_WRITE("Exception was handled in java code");
-	}
-	else if (script.IsEmpty())
-	{
-		DEBUG_WRITE("Bootstrap was empty");
-	}
-	else
-	{
-		DEBUG_WRITE("Running script");
-
-		auto appModuleObj = script->Run();
-		if (ExceptionUtil::GetInstance()->HandleTryCatch(tc))
-		{
-			DEBUG_WRITE("Exception was handled in java code");
-		}
-		else if (!appModuleObj.IsEmpty() && appModuleObj->IsFunction())
-		{
-			auto moduleFunc = appModuleObj.As<Function>();
-			Handle<Value> exportsObj = Object::New(isolate);
-			auto thiz = Object::New(isolate);
-			auto res = moduleFunc->Call(thiz, 1, &exportsObj);
-
-			if(ExceptionUtil::GetInstance()->HandleTryCatch(tc))
-			{
-				DEBUG_WRITE("Exception was handled in java code");
-			}
-			else
-			{
-				// TODO: Why do we need this line?
-				auto persistentAppModuleObject = new Persistent<Object>(Isolate::GetCurrent(), appModuleObj.As<Object>());
-			}
-		}
-		else
-		{
-			ExceptionUtil::GetInstance()->ThrowExceptionToJava(tc, "Error running NativeScript bootstrap code.");
-		}
-	}
-
-	//NativeScriptRuntime::loadedModules.insert(make_pair(appModuleName, persistentAppModuleObject));
+	/*
+	 * moduleObject (export module) can be set to js variable but currently we start the script implicitly without returning the moduleObject (just calling it)
+	 *
+	 * we can do something like
+	 * var appModule = require("app"); //but currently we call the appModule only once Platform.run() and no one else has access to it
+	 */
 
 	//DEBUG_WRITE("Forcing V8 garbage collection");
 	//while (!V8::IdleNotification());
