@@ -10,6 +10,8 @@ public:
 
 	const static char CLASS_NAME_LOCATION_SEPARATOR = '_';
 
+	static std::string APP_ROOT_FOLDER_PATH;
+
 private:
 	Constants() {}
 };

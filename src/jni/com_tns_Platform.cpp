@@ -38,6 +38,7 @@ int count = 0;
 Context::Scope *context_scope = nullptr;
 bool tns::LogEnabled = true;
 Isolate *g_isolate = nullptr;
+std::string Constants::APP_ROOT_FOLDER_PATH = "";
 
 ObjectManager *g_objectManager = nullptr;
 
@@ -177,6 +178,7 @@ extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj
 	PrepareV8Runtime(isolate, env, filesPath, packageName);
 
 	NativeScriptRuntime::APP_FILES_DIR = ArgConverter::jstringToString(filesPath);
+	Constants::APP_ROOT_FOLDER_PATH = NativeScriptRuntime::APP_FILES_DIR + "/app/";
 }
 
 extern "C" void Java_com_tns_Platform_runNativeScript(JNIEnv *_env, jobject obj, jstring appModuleName)
