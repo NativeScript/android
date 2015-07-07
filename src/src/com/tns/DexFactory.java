@@ -82,7 +82,7 @@ public class DexFactory
 		//try to get pre-generated binding classes
 		ClassLoader cl = context.getClassLoader();
 		try {
-			Class<?> pregeneratedClass = cl.loadClass(className.replace("$", "_"));
+			Class<?> pregeneratedClass = cl.loadClass(fullClassName);
 			
 			return pregeneratedClass;
 		}
