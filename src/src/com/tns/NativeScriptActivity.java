@@ -2123,6 +2123,19 @@ public class NativeScriptActivity extends android.support.v7.app.AppCompatActivi
 			super.onStop();
 		}
 	}
+	
+	protected void onStart()
+	{
+		if (__ho231)
+		{
+			Object[] args = null;
+			com.tns.Platform.callJSMethod(this, "onStart", args);
+		}
+		else
+		{
+			super.onStart();
+		}
+	}
 
 	public void onSupportActionModeFinished(android.support.v7.view.ActionMode param_0)
 	{
@@ -3820,6 +3833,7 @@ public class NativeScriptActivity extends android.support.v7.app.AppCompatActivi
 			if (m.equals("getIntent")) __ho62= true;
 			if (m.equals("setSupportProgress")) __ho189= true;
 			if (m.equals("onStop")) __ho146= true;
+			if (m.equals("onStart")) __ho231= true;
 			if (m.equals("onWindowStartingActionMode")) __ho158= true;
 			if (m.equals("enforceCallingOrSelfUriPermission")) __ho27= true;
 			if (m.equals("getDatabasePath")) __ho53= true;
@@ -4142,4 +4156,5 @@ public class NativeScriptActivity extends android.support.v7.app.AppCompatActivi
 	private boolean __ho228;
 	private boolean __ho229;
 	private boolean __ho230;
+	private boolean __ho231;
 }
