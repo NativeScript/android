@@ -79,7 +79,7 @@
 	
 	
     <!-- PASS JARS TO METADATA GENERATOR -->
-    <target name="generate_metadata_from_given_jars" depends="create_project_lib, copy_default_sdk, replace_default_sdk_if_possible, copy_project_jars, delete_old_metadata">
+    <target name="generate_metadata_from_given_jars" depends="create_project_lib, copy_android_jar, copy_project_jars, delete_old_metadata">
         
 	    <java jar="${ns.resources}/metadata-generator.jar"
 			     fork="true"
@@ -92,7 +92,7 @@
 			
 		</java>
 		
-		<echo message=" --------- created new metadata and moved it to assets/metadata" />
+		<echo message="Created new metadata and moved it to assets/metadata" />
 		
     </target>
         
