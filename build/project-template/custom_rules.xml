@@ -50,7 +50,7 @@
   <echo level="info">Using android.jar from ${project.target.android.jar}</echo>	
   
   <target name="copy_android_jar">
-    <copy file="${project.target.android.jar}" todir="${ns.project.lib}" preservelastmodified="true"/>
+    <copy file="${project.target.android.jar}" todir="${ns.project.lib}" preservelastmodified="true" overwrite="true"/>
   </target>
   
 	
