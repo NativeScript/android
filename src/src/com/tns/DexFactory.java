@@ -87,7 +87,10 @@ public class DexFactory
 			return pregeneratedClass;
 		}
 		catch (Exception e) {
-			e.printStackTrace();
+			// class is not loaded (pre-generated), continue with the runtime dex generation
+			if(Platform.IsLogEnabled){
+				e.printStackTrace();
+			}
 		}
 		//
 		

@@ -393,6 +393,15 @@ void JEnv::ReleaseStringUTFChars(jstring str, const char* utf)
 	m_env->ReleaseStringUTFChars(str, utf);
 }
 
+const jchar* JEnv::GetStringChars(jstring str, jboolean* isCopy)
+{
+	return m_env->GetStringChars(str, isCopy);
+}
+void JEnv::ReleaseStringChars(jstring str, const jchar* chars)
+{
+	m_env->ReleaseStringChars(str, chars);
+}
+
 const int JEnv::GetStringLength(jstring str)
 {
 	return m_env->GetStringLength(str);

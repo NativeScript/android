@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.net.CookieHandler;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -20,6 +21,8 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.AsyncTask;
 import android.util.DisplayMetrics;
+
+import java.net.CookieManager;
 
 public class Async
 {
@@ -37,6 +40,7 @@ public class Async
 	{
 		private static final String DeleteMethod = "DELETE";
 		private static final String GetMethod = "GET";
+		private static CookieManager cookieManager;
 		
 		public static class KeyValuePair
 		{
@@ -229,6 +233,12 @@ public class Async
 				options.screenWidth = metrics.widthPixels;
 				options.screenHeight = metrics.heightPixels;
 			}
+			
+			if(cookieManager == null) {
+				cookieManager = new CookieManager();
+				CookieHandler.setDefault(cookieManager);
+			}
+			
 			new HttpRequestTask(callback, context).executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, options);
 		}
 
