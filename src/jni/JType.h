@@ -1,7 +1,7 @@
 #ifndef JNIPRIMITIVETYPE_H_
 #define JNIPRIMITIVETYPE_H_
 
-#include "JEnv.h";
+#include "JEnv.h"
 
 namespace tns
 {
