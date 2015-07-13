@@ -201,6 +201,11 @@ void NativeScriptRuntime::CallJavaMethod(const Handle<Object>& caller, const str
 		if (entry->memberId == nullptr)
 		{
 			entry->clazz = env.FindClass(className);
+			if (entry->clazz == nullptr)
+			{
+				DEBUG_WRITE("Cannot resolve class=%s while calling method %s", className.c_str(), methodName.c_str());
+			}
+
 			entry->memberId = isStatic
 								? env.GetStaticMethodID(entry->clazz, methodName, entry->sig)
 								: env.GetMethodID(entry->clazz, methodName, entry->sig);
