@@ -1066,11 +1066,13 @@ MetadataNode::ExtendedClassCacheData MetadataNode::GetCachedExtendedClassData(Is
 	return cacheData;
 }
 
-string MetadataNode::CreateFullClassName(const std::string& className, const std::string& extendNameAndLocation = "") {
-	string fullClassName = className +  Constants::CLASS_NAME_LOCATION_SEPARATOR;
+string MetadataNode::CreateFullClassName(const std::string& className, const std::string& extendNameAndLocation = "")
+{
+	string fullClassName = className;
 
-	if(!extendNameAndLocation.empty()) {
-		fullClassName += extendNameAndLocation;
+	if(!extendNameAndLocation.empty())
+	{
+		fullClassName += Constants::CLASS_NAME_LOCATION_SEPARATOR + extendNameAndLocation;
 	}
 
 	return fullClassName;
