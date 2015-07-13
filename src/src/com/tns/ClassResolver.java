@@ -18,7 +18,7 @@ class ClassResolver
 		String name = null;
 		String className = cannonicalClassName;
 
-		int classExtendSeparatorIndex = cannonicalClassName.indexOf('_');
+		int classExtendSeparatorIndex = cannonicalClassName.indexOf("_f");
 		if (classExtendSeparatorIndex != -1)
 		{
 			className = cannonicalClassName.substring(0, classExtendSeparatorIndex);
