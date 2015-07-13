@@ -81,16 +81,13 @@ public class DexFactory
 		
 		//try to get pre-generated binding classes
 		ClassLoader cl = context.getClassLoader();
-		try {
+		try
+		{
 			Class<?> pregeneratedClass = cl.loadClass(fullClassName);
-			
 			return pregeneratedClass;
 		}
-		catch (Exception e) {
-			// class is not loaded (pre-generated), continue with the runtime dex generation
-			if(Platform.IsLogEnabled){
-				e.printStackTrace();
-			}
+		catch (Exception e)
+		{
 		}
 		//
 		
