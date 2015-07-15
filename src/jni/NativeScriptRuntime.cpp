@@ -203,7 +203,16 @@ void NativeScriptRuntime::CallJavaMethod(const Handle<Object>& caller, const str
 			entry->clazz = env.FindClass(className);
 			if (entry->clazz == nullptr)
 			{
-				DEBUG_WRITE("Cannot resolve class=%s while calling method %s", className.c_str(), methodName.c_str());
+				MetadataNode* callerNode = MetadataNode::GetNodeFromHandle(caller);
+				const string callerClassName = callerNode->GetName();
+
+				DEBUG_WRITE("Cannot resolve class: %s while calling method: %s callerNode: %s", className.c_str(), methodName.c_str(), callerNode->GetName().c_str());
+				entry->clazz = env.FindClass(callerClassName);
+				if (entry->clazz == nullptr)
+				{
+					ASSERT_FAIL("Cannot resolve caller's class name: %s", callerClassName.c_str());
+					APP_FAIL("Cannot resolve caller's class name");
+				}
 			}
 
 			entry->memberId = isStatic
