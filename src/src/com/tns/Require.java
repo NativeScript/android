@@ -17,11 +17,6 @@ public class Require
 	private static String ModulesFilesPath;
 	private static String NativeScriptModulesFilesPath;
 	private static boolean initialized = false;
-	private static final String ModuleContent_Part1 = "(function(){\n var module = {}; module.exports = arguments[0];" + "var exports = module.exports; var __dirname = \"";
-	private static final String ModuleContent_Part2 = "\"; var __filename = \"";
-	private static final String ModuleContent_Part3 = "\";" + "function require(moduleName){ return __global.require(moduleName, __dirname); }" + "module.filename = __filename; this.__extends = __global.__extends; \n";
-	private static final String ModuleContent_Part4 = "\n return module.exports; \n})";
-	private static final StringBuffer ModuleContent = new StringBuffer(65536);
 	
 	// cache the already resolved absolute paths to folder modules to prevent JSON parsing each time
 	private static final HashMap<String, String> folderAsModuleCache = new HashMap<String, String>();
@@ -58,7 +53,7 @@ public class Require
 		return ApplicationFilesPath;
 	}
 
-	public static String[] bootstrapApp()
+	public static String bootstrapApp()
 	{
 		// Bootstrap logic flows like:
 		// 1. Check for package.json -> `main` field
@@ -76,56 +71,9 @@ public class Require
 			Platform.APP_FAIL("Application entry point file not found. Please specify either package.json with main field, index.js or bootstrap.js!");
 		}
 
-		String[] bootstrapInfo = new String[2];
-		bootstrapInfo[0] = bootstrapFile.getAbsolutePath();
-		bootstrapInfo[1] = getModuleContent(bootstrapFile.getPath());
+		String modulePath = bootstrapFile.getAbsolutePath();
 
-		return bootstrapInfo;
-	}
-
-	public static String getModuleContent(String modulePath)
-	{
-		File file = new File(modulePath);
-		if (file == null || !file.exists())
-		{
-			// Return empty content.
-			// This case will be handled by the NativeScriptRuntime.cpp and a JS
-			// exception will be raised.
-			return "";
-		}
-
-		if (Platform.IsLogEnabled)
-		{
-			Log.d(Platform.DEFAULT_LOG_TAG, "Loading module from files " + file.getPath());
-		}
-
-		try
-		{
-			String moduleFileContent = FileSystem.readText(file);
-			// IMPORTANT: Update MODULE_LINES_OFFSET in NativeScript.h
-			// if you change the number of new lines that exists before the
-			// moduleFileContent for correct error reporting.
-			// We are inserting local require function in the scope of the
-			// module to pass the __fileName (calling file) variable in the
-			// global.require request.
-			ModuleContent.setLength(0);
-			ModuleContent.append(ModuleContent_Part1);
-			ModuleContent.append(file.getParent() + File.separator);
-			ModuleContent.append(ModuleContent_Part2);
-			ModuleContent.append(modulePath);
-			ModuleContent.append(ModuleContent_Part3);
-			ModuleContent.append(moduleFileContent);
-			ModuleContent.append(ModuleContent_Part4);
-			String content = ModuleContent.toString();
-			return content;
-		}
-		catch (IOException e)
-		{
-			// Return empty content.
-			// This case will be handled by the NativeScriptRuntime.cpp and a JS
-			// exception will be raised.
-			return "";
-		}
+		return modulePath;
 	}
 
 	public static String getModulePath(String moduleName, String callingDirName)

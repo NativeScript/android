@@ -1201,12 +1201,19 @@ bool MetadataNode::GetExtendLocation(string& extendLocation)
 			}
 
 			string srcFileName = ConvertToString(scriptName);
-			std::replace(srcFileName.begin(), srcFileName.end(), '/', '_');
-			std::replace(srcFileName.begin(), srcFileName.end(), '.', '_');
+
+			string hardcodedPathToSkip = Constants::APP_ROOT_FOLDER_PATH;
+
+			int startIndex = hardcodedPathToSkip.length();
+			int strToTakeLen = (srcFileName.length() - startIndex - 3); // 3 refers to .js at the end of file name
+			string fullPathToFile = srcFileName.substr(startIndex, strToTakeLen);
+
+			std::replace(fullPathToFile.begin(), fullPathToFile.end(), '/', '_');
+			std::replace(fullPathToFile.begin(), fullPathToFile.end(), '.', '_');
 			int lineNumber = frame->GetLineNumber();
 			if (lineNumber < 0)
 			{
-				extendLocationStream << srcFileName.c_str() << " unkown line number";
+				extendLocationStream << fullPathToFile.c_str() << " unkown line number";
 				extendLocation = extendLocationStream.str();
 				return false;
 			}
@@ -1219,13 +1226,13 @@ bool MetadataNode::GetExtendLocation(string& extendLocation)
 			int column = frame->GetColumn();
 			if (column < 0)
 			{
-				extendLocationStream << srcFileName.c_str() << " line:" << lineNumber << " unkown column number";
+				extendLocationStream << fullPathToFile.c_str() << " line:" << lineNumber << " unkown column number";
 				extendLocation = extendLocationStream.str();
 				return false;
 			}
 
 
-			extendLocationStream << "f" << srcFileName.c_str() << "_l" << lineNumber << "_c" << column << "__";
+			extendLocationStream << "f" << fullPathToFile.c_str() << "_l" << lineNumber << "_c" << column << "__";
 			//DEBUG_WRITE("EXTEND_LOCATION %s", extendLocationStream.str().c_str());
 		}
 	}

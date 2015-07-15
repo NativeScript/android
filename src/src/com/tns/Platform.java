@@ -30,7 +30,7 @@ public class Platform
 {
 	private static native void initNativeScript(String filesPath, int appJavaObjectId, boolean verboseLoggingEnabled, String packageName);
 
-	private static native void runNativeScript(String appModuleName, String appContent);
+	private static native void runNativeScript(String appModuleName);
 
 	private static native Object callJSMethodNative(int javaObjectID, String methodName, boolean isConstructor, Object... packagedArgs) throws NativeScriptException;
 
@@ -181,8 +181,8 @@ public class Platform
 
 	public static void run()
 	{
-		String[] bootstrapInfo = Require.bootstrapApp();
-		runNativeScript(bootstrapInfo[0], bootstrapInfo[1]);
+		String bootstrapPath = Require.bootstrapApp();
+		runNativeScript(bootstrapPath);
 	}
 	
 	private static Class<?> resolveClass(String fullClassName, String[] methodOverrides) throws ClassNotFoundException, IOException{
