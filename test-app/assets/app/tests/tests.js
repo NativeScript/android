@@ -905,6 +905,18 @@ describe("Tests ", function () {
 		expect(name).toEqual("dummy");
 	});
 	
+	it("TestSetFloatInstanceField", function () {
+		
+		__log("TEST: TestSetFloatInstanceField");
+		
+		var lParams = new android.widget.LinearLayout.LayoutParams(android.widget.LinearLayout.LayoutParams.MATCH_PARENT, android.widget.LinearLayout.LayoutParams.MATCH_PARENT);
+		lParams.weight = 1;
+		
+		var value = lParams.weight;
+		
+		expect(value).toEqual(1);
+	});
+	
 	it("TestCallMethodOnAnObjectPassedAsParameterInOverriddenMethodAsAnObjectWithoutMetadata", function () {
 		
 		__log("TEST: TestCallMethodOnAnObjectPassedAsParameterInOverriddenMethodAsAnObjectWithoutMetadata");
