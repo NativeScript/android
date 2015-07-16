@@ -212,7 +212,6 @@ void NativeScriptRuntime::CallJavaMethod(const Handle<Object>& caller, const str
 				if (clazz == nullptr)
 				{
 					ASSERT_FAIL("Cannot resolve caller's class name: %s", callerClassName.c_str());
-					APP_FAIL("Cannot resolve caller's class name");
 					return;
 				}
 
@@ -225,9 +224,13 @@ void NativeScriptRuntime::CallJavaMethod(const Handle<Object>& caller, const str
 				entry->memberId = isStatic ?
 									env.GetStaticMethodID(entry->clazz, methodName, entry->sig) :
 									env.GetMethodID(entry->clazz, methodName, entry->sig);
+
+				if (entry->memberId == nullptr)
+				{
+					ASSERT_FAIL("Cannot resolve a method %s on class: %s", methodName.c_str(), className.c_str());
+					return;
+				}
 			}
-
-
 		}
 
 		if (entry->clazz != nullptr)
@@ -237,51 +240,9 @@ void NativeScriptRuntime::CallJavaMethod(const Handle<Object>& caller, const str
 		}
 
 		sig = entry->sig;
-
-
-//		if (entry->memberId == nullptr)
-//		{
-//			entry->clazz = env.FindClass(className);
-//			if (entry->clazz == nullptr)
-//			{
-//				MetadataNode* callerNode = MetadataNode::GetNodeFromHandle(caller);
-//				const string callerClassName = callerNode->GetName();
-//
-//				DEBUG_WRITE("Cannot resolve class: %s while calling method: %s callerClassName: %s", className.c_str(), methodName.c_str(), callerClassName.c_str());
-//				clazz = env.FindClass(callerClassName);
-//				if (clazz == nullptr)
-//				{
-//					ASSERT_FAIL("Cannot resolve caller's class name: %s", callerClassName.c_str());
-//					APP_FAIL("Cannot resolve caller's class name");
-//					return;
-//				}
-//			}
-//			else
-//			{
-//				clazz = entry->clazz;
-//			}
-//
-//			entry->memberId = isStatic ?
-//					env.GetStaticMethodID(clazz, methodName, entry->sig) :
-//					env.GetMethodID(clazz, methodName, entry->sig);
-//		}
-//
-//		if (entry->clazz != nullptr)
-//		{
-//			clazz = entry->clazz;
-//		}
-//
-//		mid = reinterpret_cast<jmethodID>(entry->memberId);
-//		sig = entry->sig;
 	}
 	else
 	{
-		//nameri pravilnia klass koito e definiral tova ime za tekustata platforma
-		//spesti resolvemethod call ako clasa s ime className go niama i tarsi napravo ot object na dolu koi e definiral tozi method i
-		//vikai resolve na nego
-		//sled tova zapazi v entrito na metoda koi e iskinskia className. to realno parametara classname idva nai veroiatno ot entrito
-		//prosto mu smeni imeto
-
 		DEBUG_WRITE("Resolving method: %s.%s on className %s", className.c_str(), methodName.c_str(), className.c_str());
 		auto mi = MethodCache::ResolveMethodSignature(className, methodName, args, isStatic);
 		if (mi.mid == nullptr)
