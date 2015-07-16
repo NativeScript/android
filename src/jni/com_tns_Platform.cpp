@@ -252,7 +252,7 @@ jobject ConvertJsValueToJavaObject(JEnv& env, const Handle<Value>& value)
 	return javaResult;
 }
 
-extern "C" jobject Java_com_tns_Platform_callJSMethodNative(JNIEnv *_env, jobject obj, jint javaObjectID, jstring methodName, jboolean isConstructor, jobjectArray packagedArgs)
+extern "C" jobject Java_com_tns_Platform_callJSMethodNative(JNIEnv *_env, jobject obj, jint javaObjectID, jstring methodName, jboolean isConstructor, jclass retType, jobjectArray packagedArgs)
 {
 	SET_PROFILER_FRAME();
 
@@ -261,6 +261,9 @@ extern "C" jobject Java_com_tns_Platform_callJSMethodNative(JNIEnv *_env, jobjec
 
 	JEnv env(_env);
 	TryCatch tc;
+
+	//TODO: plamen5kov: this is only for testing if the retType is passed correctly
+	string retTypeClassName = g_objectManager->GetClassName(retType);
 
 	DEBUG_WRITE("CallJSMethodNative called javaObjectID=%d", javaObjectID);
 

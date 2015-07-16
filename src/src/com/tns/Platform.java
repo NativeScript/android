@@ -603,7 +603,7 @@ public class Platform
 
 		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "Platform.CallJSMethod: calling js method " + methodName + " with javaObjectID " + javaObjectID + " type=" + ((javaObject != null) ? javaObject.getClass().getName() : "null"));
 
-		Object result = dispatchCallJSMethodNative(javaObjectID, methodName, isConstructor, delay, args);
+		Object result = dispatchCallJSMethodNative(javaObjectID, methodName, isConstructor, delay, retType, args);
 
 		return result;
 	}
@@ -709,12 +709,12 @@ public class Platform
 		return arr;
 	}
 
-	private static Object dispatchCallJSMethodNative(final int javaObjectID, final String methodName, boolean isConstructor, final Object[] args) throws NativeScriptException
+	private static Object dispatchCallJSMethodNative(final int javaObjectID, final String methodName, boolean isConstructor, Class<?> retType, final Object[] args) throws NativeScriptException
 	{
-		return dispatchCallJSMethodNative(javaObjectID, methodName, isConstructor, 0, args);
+		return dispatchCallJSMethodNative(javaObjectID, methodName, isConstructor, 0, retType, args);
 	}
 
-	private static Object dispatchCallJSMethodNative(final int javaObjectID, final String methodName, boolean isConstructor, long delay, final Object[] args) throws NativeScriptException
+	private static Object dispatchCallJSMethodNative(final int javaObjectID, final String methodName, boolean isConstructor, long delay, Class<?> retType, final Object[] args) throws NativeScriptException
 	{
 		Object ret = null;
 		boolean isMainThread = mainThread.equals(Thread.currentThread());
