@@ -198,6 +198,7 @@ void NativeScriptRuntime::CallJavaMethod(const Handle<Object>& caller, const str
 	if ((entry != nullptr) && entry->isResolved)
 	{
 		isStatic = entry->isStatic;
+
 		if (entry->memberId == nullptr)
 		{
 			entry->clazz = env.FindClass(className);
@@ -206,31 +207,97 @@ void NativeScriptRuntime::CallJavaMethod(const Handle<Object>& caller, const str
 				MetadataNode* callerNode = MetadataNode::GetNodeFromHandle(caller);
 				const string callerClassName = callerNode->GetName();
 
-				DEBUG_WRITE("Cannot resolve class: %s while calling method: %s callerNode: %s", className.c_str(), methodName.c_str(), callerNode->GetName().c_str());
-				entry->clazz = env.FindClass(callerClassName);
-				if (entry->clazz == nullptr)
+				DEBUG_WRITE("Cannot resolve class: %s while calling method: %s callerClassName: %s", className.c_str(), methodName.c_str(), callerClassName.c_str());
+				clazz = env.FindClass(callerClassName);
+				if (clazz == nullptr)
 				{
 					ASSERT_FAIL("Cannot resolve caller's class name: %s", callerClassName.c_str());
 					APP_FAIL("Cannot resolve caller's class name");
+					return;
 				}
+
+				mid = isStatic ?
+						env.GetStaticMethodID(clazz, methodName, entry->sig) :
+						env.GetMethodID(clazz, methodName, entry->sig);
+			}
+			else
+			{
+				entry->memberId = isStatic ?
+									env.GetStaticMethodID(entry->clazz, methodName, entry->sig) :
+									env.GetMethodID(entry->clazz, methodName, entry->sig);
 			}
 
-			entry->memberId = isStatic
-								? env.GetStaticMethodID(entry->clazz, methodName, entry->sig)
-								: env.GetMethodID(entry->clazz, methodName, entry->sig);
+
 		}
-		clazz = entry->clazz;
-		mid = reinterpret_cast<jmethodID>(entry->memberId);
+
+		if (entry->clazz != nullptr)
+		{
+			clazz = entry->clazz;
+			mid = reinterpret_cast<jmethodID>(entry->memberId);
+		}
+
 		sig = entry->sig;
+
+
+//		if (entry->memberId == nullptr)
+//		{
+//			entry->clazz = env.FindClass(className);
+//			if (entry->clazz == nullptr)
+//			{
+//				MetadataNode* callerNode = MetadataNode::GetNodeFromHandle(caller);
+//				const string callerClassName = callerNode->GetName();
+//
+//				DEBUG_WRITE("Cannot resolve class: %s while calling method: %s callerClassName: %s", className.c_str(), methodName.c_str(), callerClassName.c_str());
+//				clazz = env.FindClass(callerClassName);
+//				if (clazz == nullptr)
+//				{
+//					ASSERT_FAIL("Cannot resolve caller's class name: %s", callerClassName.c_str());
+//					APP_FAIL("Cannot resolve caller's class name");
+//					return;
+//				}
+//			}
+//			else
+//			{
+//				clazz = entry->clazz;
+//			}
+//
+//			entry->memberId = isStatic ?
+//					env.GetStaticMethodID(clazz, methodName, entry->sig) :
+//					env.GetMethodID(clazz, methodName, entry->sig);
+//		}
+//
+//		if (entry->clazz != nullptr)
+//		{
+//			clazz = entry->clazz;
+//		}
+//
+//		mid = reinterpret_cast<jmethodID>(entry->memberId);
+//		sig = entry->sig;
 	}
 	else
 	{
+		//nameri pravilnia klass koito e definiral tova ime za tekustata platforma
+		//spesti resolvemethod call ako clasa s ime className go niama i tarsi napravo ot object na dolu koi e definiral tozi method i
+		//vikai resolve na nego
+		//sled tova zapazi v entrito na metoda koi e iskinskia className. to realno parametara classname idva nai veroiatno ot entrito
+		//prosto mu smeni imeto
+
+		DEBUG_WRITE("Resolving method: %s.%s on className %s", className.c_str(), methodName.c_str(), className.c_str());
 		auto mi = MethodCache::ResolveMethodSignature(className, methodName, args, isStatic);
 		if (mi.mid == nullptr)
 		{
-			DEBUG_WRITE("Cannot resolve class=%s, method=%s, isStatic=%d, isSuper=%d", className.c_str(), methodName.c_str(), isStatic, isSuper);
-			return;
+			MetadataNode* callerNode = MetadataNode::GetNodeFromHandle(caller);
+			const string callerClassName = callerNode->GetName();
+			DEBUG_WRITE("Resolving method on callers class: %s.%s on className %s", callerClassName.c_str(), methodName.c_str(), className.c_str());
+			mi = MethodCache::ResolveMethodSignature(callerClassName, methodName, args, isStatic);
+			if (mi.mid == nullptr)
+			{
+				ASSERT_FAIL("Cannot resolve class=%s, method=%s, isStatic=%d, isSuper=%d, callerClass=%s", className.c_str(), methodName.c_str(), isStatic, isSuper, callerClassName.c_str());
+				APP_FAIL("Cannot resolve class");
+				return;
+			}
 		}
+
 		clazz = mi.clazz;
 		mid = mi.mid;
 		sig = mi.signature;
