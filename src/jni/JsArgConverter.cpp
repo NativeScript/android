@@ -430,7 +430,7 @@ bool JsArgConverter::ConvertJavaScriptArray(JEnv& env, const Handle<Array>& jsAr
 			for (int i=0; i<arrLength; i++)
 			{
 				auto v = jsArr->Get(i);
-				JsArgToArrayConverter c(v, false);
+				JsArgToArrayConverter c(v, false, 10/*null*/); //TODO: plamen5kov: fix hardcoded value
 				jobject o = c.GetConvertedArg();
 				env.SetObjectArrayElement((jobjectArray)arr, i, o);
 			}

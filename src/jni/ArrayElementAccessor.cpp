@@ -182,7 +182,7 @@ void ArrayElementAccessor::SetArrayElement(const Handle<Object>& array, uint32_t
 		{
 			auto object = value.As<Object>();
 
-			JsArgToArrayConverter argConverter(value, false);
+			JsArgToArrayConverter argConverter(value, false, 10/*null*/);
 			if (argConverter.IsValid())
 			{
 				jobjectArray objArr = reinterpret_cast<jobjectArray>(arr);

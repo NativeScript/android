@@ -37,7 +37,7 @@ public class Platform
 
 	private static native void runNativeScript(String appModuleName);
 
-	private static native Object callJSMethodNative(int javaObjectID, String methodName, boolean isConstructor, Object... packagedArgs) throws NativeScriptException;
+	private static native Object callJSMethodNative(int javaObjectID, String methodName, int retType, boolean isConstructor, Object... packagedArgs) throws NativeScriptException;
 
 	private static native void createJSInstanceNative(Object javaObject, int javaObjectID, String canonicalName);
 
@@ -716,6 +716,7 @@ public class Platform
 
 	private static Object dispatchCallJSMethodNative(final int javaObjectID, final String methodName, boolean isConstructor, long delay, Class<?> retType, final Object[] args) throws NativeScriptException
 	{
+		final int returnType = TypeIDs.GetObjectTypeId(retType);
 		Object ret = null;
 		boolean isMainThread = mainThread.equals(Thread.currentThread());
 		
@@ -724,7 +725,7 @@ public class Platform
 		if (isMainThread)
 		{
 			Object[] packagedArgs = packageArgs(tmpArgs);
-			ret = callJSMethodNative(javaObjectID, methodName, isConstructor, packagedArgs);
+			ret = callJSMethodNative(javaObjectID, methodName, returnType, isConstructor, packagedArgs);
 		}
 		else
 		{
@@ -743,7 +744,7 @@ public class Platform
 						try
 						{
 							final Object[] packagedArgs = packageArgs(tmpArgs);
-							arr[0] = callJSMethodNative(javaObjectID, methodName, isCtor, packagedArgs);
+							arr[0] = callJSMethodNative(javaObjectID, methodName, returnType, isCtor, packagedArgs);
 						}
 						finally
 						{
