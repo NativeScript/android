@@ -17,6 +17,7 @@ global.__JUnitSaveResults = function (unitTestResults) {
 	var unitTestFileName = 'android_unit_test_results.xml';
 	try {
         var javaFile = new java.io.File(pathToSdcard, unitTestFileName);
+        
         var stream = new java.io.FileOutputStream(javaFile);
         var actualEncoding = 'UTF-8';
         var writer = new java.io.OutputStreamWriter(stream, actualEncoding);

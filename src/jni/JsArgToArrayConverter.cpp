@@ -148,24 +148,7 @@ bool JsArgToArrayConverter::ConvertArg(const Handle<Value>& arg, int index)
 	}
 	else if (arg->IsString() || arg->IsStringObject())
 	{
-		Handle<String> argAsString;
-		if (arg->IsStringObject())
-		{
-			auto stringObject = *reinterpret_cast<v8::Handle<StringObject>*>(const_cast<v8::Handle<Value>*>(&arg));
-			argAsString = stringObject->ValueOf();
-		}
-		else
-		{
-			argAsString = arg->ToString();
-		}
-
-		String::Utf8Value stringValue(argAsString);
-//		int strLength = stringValue.length();
-//
-//		JniLocalRef strData(env.NewByteArray(strLength));
-//		env.SetByteArrayRegion((jbyteArray)strData, 0, strLength, (jbyte*)*stringValue);
-//		JniLocalRef stringObject(env.NewObject(STRING_CLASS, STRING_CTOR, (jbyteArray)strData, UTF_8_ENCODING));
-		JniLocalRef stringObject(env.NewStringUTF((const char*)*stringValue));
+		JniLocalRef stringObject(ConvertToJavaString(arg));
 		SetConvertedObject(env, index, stringObject);
 
 		success = true;

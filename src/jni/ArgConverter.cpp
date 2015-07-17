@@ -45,7 +45,7 @@ void ArgConverter::NativeScriptLongFunctionCallback(const v8::FunctionCallbackIn
 {
 	auto isolate = Isolate::GetCurrent();
 	args.This()->SetHiddenValue(V8StringConstants::GetJavaLong(), Boolean::New(isolate, true));
-	args.This()->SetHiddenValue(ConvertToV8String(V8StringConstants::MARKED_AS_LONG), args[0]);
+	args.This()->SetHiddenValue(V8StringConstants::GetMarkedAsLong(), args[0]);
 	args.This()->Set(V8StringConstants::GetValue(), args[0]);
 
 	args.This()->SetPrototype(Local<NumberObject>::New(Isolate::GetCurrent(), *NAN_NUMBER_OBJECT));
@@ -163,16 +163,11 @@ Local<String> ArgConverter::jstringToV8String(jstring value)
 		return Handle<String>();
 	}
 
-	jsize utfLength;
-	bool readInBuffer = ReadJStringInBuffer(value, utfLength);
-	if(readInBuffer) {
-		return ConvertToV8String(charBuffer, utfLength);
-	}
-
 	JEnv env;
-	const char* chars = env.GetStringUTFChars(value, NULL);
-	auto v8String = ConvertToV8String(chars, utfLength);
-	env.ReleaseStringUTFChars(value, chars);
+	auto chars = env.GetStringChars(value, NULL);
+	auto length = env.GetStringLength(value);
+	auto v8String = ConvertToV8String(chars, length);
+	env.ReleaseStringChars(value, chars);
 
 	return v8String;
 }
@@ -197,13 +192,7 @@ bool ArgConverter::ReadJStringInBuffer(jstring value, jsize& utfLength) {
 
 Handle<String> ArgConverter::jcharToV8String(jchar value)
 {
-	JEnv env;
-
-	JniLocalRef str(env.NewString(&value, 1));
-	jboolean bol = true;
-	const char* resP = env.GetStringUTFChars(str, &bol);
-	auto v8String = ConvertToV8String(resP, 1);
-	env.ReleaseStringUTFChars(str, resP);
+	auto v8String = ConvertToV8String(&value, 1);
 	return v8String;
 }
 

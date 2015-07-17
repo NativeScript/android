@@ -330,24 +330,7 @@ bool JsArgConverter::ConvertJavaScriptBoolean(JEnv& env, const Handle<Value>& js
 
 bool JsArgConverter::ConvertJavaScriptString(JEnv& env, const Handle<Value>& jsValue, int index)
 {
-	Handle<String> argAsString;
-	if (jsValue->IsStringObject())
-	{
-		auto stringObject = Handle<StringObject>::Cast(jsValue);
-		argAsString = stringObject->ValueOf();
-	}
-	else
-	{
-		argAsString = jsValue->ToString();
-	}
-
-	String::Utf8Value stringValue(argAsString);
-//	int strLength = stringValue.length();
-//
-//	JniLocalRef strData(env.NewByteArray(strLength));
-//	env.SetByteArrayRegion(strData, 0, strLength, (jbyte*)*stringValue);
-//	JniLocalRef stringObject(env.NewObject(STRING_CLASS, STRING_CTOR, (jbyteArray)strData, UTF_8_ENCODING));
-	JniLocalRef stringObject(env.NewStringUTF((const char*)*stringValue));
+	JniLocalRef stringObject(ConvertToJavaString(jsValue));
 	SetConvertedObject(env, index, stringObject);
 
 	return true;
