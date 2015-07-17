@@ -5,7 +5,7 @@ var sys = require('sys'),
 	
 	isTimeToExit = false,
 	
-	processTimeout = 30 * 60 * 1000, // 30 minutes timeout
+	processTimeout = 11 * 60 * 1000, // 30 minutes timeout
 	searchInterval = 10000;
 	
 
