@@ -1,7 +1,8 @@
 __disableVerboseLogging();
 
 require("./tests/testWeakRef"); 
-require("./tests/tests"); 
+require("./tests/tests");
+require("./tests/testArrays");
 require("./tests/testsForRuntimeBindingGenerator");
 require("./tests/testPrimitiveTypeConversion");
 require("./tests/numericConversionTests"); 
