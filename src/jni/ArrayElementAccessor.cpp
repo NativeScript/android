@@ -96,6 +96,7 @@ Handle<Value> ArrayElementAccessor::GetArrayElement(const Handle<Object>& array,
 	{
 		jobject result = env.GetObjectArrayElement(reinterpret_cast<jobjectArray>(arr), index);
 		value = CheckForArrayAccessException(env, elementSignature, &result);
+		env.DeleteLocalRef(result);
 	}
 
 	return handleScope.Escape(value);
