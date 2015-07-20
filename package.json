@@ -1,7 +1,7 @@
 {
   "name": "tns-android",
   "description": "NativeScript Runtime for Android",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "files": [
     "**/*.*"
   ],
