@@ -126,7 +126,18 @@ bool JsArgToArrayConverter::ConvertArg(const Handle<Value>& arg, int index)
 		}
 		else
 		{
-			JniLocalRef javaObject(JType::NewDouble(env, (jdouble)d));
+			float f = (float)d;
+			bool isFloat = (f == d);
+
+			jobject obj;
+			if(isFloat && (f <= FLT_MAX) && (f > FLT_MIN) && (returnType == Type::Float)) {
+				obj = JType::NewFloat(env, (jfloat)d);
+			}
+			else {/*isDouble*/
+				obj = JType::NewFloat(env, (jdouble)d);
+			}
+
+			JniLocalRef javaObject(obj);
 			SetConvertedObject(env, index, javaObject);
 
 			success = true;
