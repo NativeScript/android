@@ -110,7 +110,7 @@ bool JsArgToArrayConverter::ConvertArg(const Handle<Value>& arg, int index)
 		if (isInteger)
 		{
 			jobject obj;
-			if ((INT_MIN <= i) && (i < INT_MAX) && (returnType == Type::Int))
+			if ((INT_MIN <= i) && (i <= INT_MAX) && (returnType == Type::Int))
 			{
 				obj = JType::NewInt(env, (jint)d);
 			}
@@ -130,11 +130,11 @@ bool JsArgToArrayConverter::ConvertArg(const Handle<Value>& arg, int index)
 			bool isFloat = (f == d);
 
 			jobject obj;
-			if(isFloat && (f <= FLT_MAX) && (f > FLT_MIN) && (returnType == Type::Float)) {
+			if(isFloat && (FLT_MIN <= f) && (f <= FLT_MAX) && (returnType == Type::Float)) {
 				obj = JType::NewFloat(env, (jfloat)d);
 			}
 			else {/*isDouble*/
-				obj = JType::NewFloat(env, (jdouble)d);
+				obj = JType::NewDouble(env, (jdouble)d);
 			}
 
 			JniLocalRef javaObject(obj);

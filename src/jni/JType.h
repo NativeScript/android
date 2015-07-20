@@ -6,19 +6,19 @@
 namespace tns
 {
 	enum class Type : int
-		{
-			Boolean,
-			Char,
-			Byte,
-			Short,
-			Int,
-			Long,
-			Float,
-			Double,
-			String,
-			JsObject,
-			Null
-		};
+	{
+		Boolean,
+		Char,
+		Byte,
+		Short,
+		Int,
+		Long,
+		Float,
+		Double,
+		String,
+		JsObject,
+		Null
+	};
 
 	class JType
 	{
