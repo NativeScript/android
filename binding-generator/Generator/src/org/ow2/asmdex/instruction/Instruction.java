@@ -31,9 +31,6 @@
 
 package org.ow2.asmdex.instruction;
 
-import java.util.LinkedList;
-import java.util.Queue;
-
 import org.ow2.asmdex.lowLevelUtils.ByteVector;
 import org.ow2.asmdex.structureWriter.ConstantPool;
 

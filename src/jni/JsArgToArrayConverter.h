@@ -29,8 +29,6 @@ namespace tns
 
 		Error GetError() const;
 
-		static void Init(JavaVM *jvm);
-
 		struct Error
 		{
 			Error() : index(-1), msg(std::string())
@@ -45,8 +43,6 @@ namespace tns
 
 		void SetConvertedObject(JEnv& env, int index, jobject obj, bool isGlobalRef = false);
 
-		static JavaVM *m_jvm;
-
 		int m_argsLen;
 
 		bool m_isValid;
@@ -58,12 +54,6 @@ namespace tns
 		jobject *m_argsAsObject;
 
 		jobjectArray m_arr;
-
-		static jclass STRING_CLASS;
-
-		static jmethodID STRING_CTOR;
-
-		static jstring UTF_8_ENCODING;
 	};
 }
 

@@ -40,25 +40,6 @@ JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value>& args, bool
 	}
 }
 
-
-void JsArgConverter::Init(JavaVM *jvm)
-{
-	m_jvm = jvm;
-
-	JEnv env;
-
-	STRING_CLASS = env.FindClass("java/lang/String");
-	assert(STRING_CLASS != nullptr);
-
-	STRING_CTOR = env.GetMethodID(STRING_CLASS, "<init>", "([BLjava/lang/String;)V");
-	assert(STRING_CTOR != nullptr);
-
-	JniLocalRef encoding(env.NewStringUTF("UTF-8"));
-	UTF_8_ENCODING = (jstring)env.NewGlobalRef(encoding);
-	assert(UTF_8_ENCODING != nullptr);
-}
-
-
 bool JsArgConverter::ConvertArg(const Handle<Value>& arg, int index)
 {
 	JEnv env;
@@ -349,28 +330,10 @@ bool JsArgConverter::ConvertJavaScriptBoolean(JEnv& env, const Handle<Value>& js
 
 bool JsArgConverter::ConvertJavaScriptString(JEnv& env, const Handle<Value>& jsValue, int index)
 {
-	bool success = true;
-
-	Handle<String> argAsString;
-	if (jsValue->IsStringObject())
-	{
-		auto stringObject = Handle<StringObject>::Cast(jsValue);
-		argAsString = stringObject->ValueOf();
-	}
-	else
-	{
-		argAsString = jsValue->ToString();
-	}
-
-	String::Utf8Value stringValue(argAsString);
-	int strLength = stringValue.length();
-
-	JniLocalRef strData(env.NewByteArray(strLength));
-	env.SetByteArrayRegion(strData, 0, strLength, (jbyte*)*stringValue);
-	JniLocalRef stringObject(env.NewObject(STRING_CLASS, STRING_CTOR, (jbyteArray)strData, UTF_8_ENCODING));
+	JniLocalRef stringObject(ConvertToJavaString(jsValue));
 	SetConvertedObject(env, index, stringObject);
 
-	return success;
+	return true;
 }
 
 bool JsArgConverter::ConvertJavaScriptArray(JEnv& env, const Handle<Array>& jsArr, int index)
@@ -571,8 +534,3 @@ JsArgConverter::~JsArgConverter()
 		delete[] m_args;
 	}
 }
-
-JavaVM* JsArgConverter::m_jvm = nullptr;
-jclass JsArgConverter::STRING_CLASS = nullptr;
-jmethodID JsArgConverter::STRING_CTOR = nullptr;
-jstring JsArgConverter::UTF_8_ENCODING = nullptr;

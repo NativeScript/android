@@ -1,12 +1,17 @@
 #ifndef V8GLOBALHELPERS_H_
 #define V8GLOBALHELPERS_H_
 
+#include "jni.h"
 #include "v8.h"
 #include <string>
 
 namespace tns
 {
 	std::string ConvertToString(const v8::Handle<v8::String>& s);
+
+	jstring ConvertToJavaString(const v8::Handle<v8::Value>& jsValue);
+
+	v8::Local<v8::String> ConvertToV8String(const jchar* data, int length);
 
 	v8::Local<v8::String> ConvertToV8String(const std::string& s);
 

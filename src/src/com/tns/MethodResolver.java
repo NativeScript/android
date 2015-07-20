@@ -10,8 +10,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 
-import android.util.Log;
-
 class MethodResolver
 {
 	private static Map<String, String> primitiveTypesSignature = new HashMap<String, String>();
@@ -202,29 +200,8 @@ class MethodResolver
 		}
 	}
 	
-	static Constructor<?> resolveConstructor(String name, String className, Object[] args, DexFactory dexFactory, String[] methodOverrides) throws ClassNotFoundException, IOException
+	static Constructor<?> resolveConstructor(Class<?> clazz, Object[] args) throws ClassNotFoundException, IOException
 	{
-		String cannonicalClassName = className.replace('/', '.');
-		
-		Class<?> clazz = null;
-		boolean isBindingClass = cannonicalClassName.startsWith("com.tns.gen") &&
-				!cannonicalClassName.startsWith("com.tns.tests.");
-
-		if (isBindingClass)
-		{
-			if (name == null || name == "")
-			{
-				name = "0";
-			}
-			
-			clazz = dexFactory.resolveClass(name, cannonicalClassName, methodOverrides);
-		}
-
-		if (clazz == null)
-		{
-			clazz = Class.forName(cannonicalClassName);
-		}
-
 		Constructor<?>[] constructors = clazz.getConstructors();
 
 		if (constructors.length == 1)

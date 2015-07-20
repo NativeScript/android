@@ -17,11 +17,10 @@ public class Require
 	private static String ModulesFilesPath;
 	private static String NativeScriptModulesFilesPath;
 	private static boolean initialized = false;
-	private static final String ModuleContent_Part1 = "(function(){\n var module = {}; module.exports = arguments[0];" + "var exports = module.exports; var __dirname = \"";
-	private static final String ModuleContent_Part2 = "\"; var __filename = \"";
-	private static final String ModuleContent_Part3 = "\";" + "function require(moduleName){ return __global.require(moduleName, __filename); }" + "module.filename = __filename; this.__extends = __global.__extends; \n";
-	private static final String ModuleContent_Part4 = "\n return module.exports; \n})";
-	private static final StringBuffer ModuleContent = new StringBuffer(65536);
+	
+	// cache the already resolved absolute paths to folder modules to prevent JSON parsing each time
+	private static final HashMap<String, String> folderAsModuleCache = new HashMap<String, String>();
+	private static boolean checkForExternalPath = false;
 
 	public static void init(Context context)
 	{
@@ -54,7 +53,7 @@ public class Require
 		return ApplicationFilesPath;
 	}
 
-	public static String[] bootstrapApp()
+	public static String bootstrapApp()
 	{
 		// Bootstrap logic flows like:
 		// 1. Check for package.json -> `main` field
@@ -72,97 +71,32 @@ public class Require
 			Platform.APP_FAIL("Application entry point file not found. Please specify either package.json with main field, index.js or bootstrap.js!");
 		}
 
-		String[] bootstrapInfo = new String[2];
-		bootstrapInfo[0] = bootstrapFile.getAbsolutePath();
-		bootstrapInfo[1] = getModuleContent(bootstrapFile.getPath());
+		String modulePath = bootstrapFile.getAbsolutePath();
 
-		return bootstrapInfo;
+		return modulePath;
 	}
 
-	public static String getModuleContent(String modulePath)
+	public static String getModulePath(String moduleName, String callingDirName)
 	{
-		File file = new File(modulePath);
-		if (file == null || !file.exists())
-		{
-			// Return empty content.
-			// This case will be handled by the NativeScriptRuntime.cpp and a JS
-			// exception will be raised.
-			return "";
-		}
-
-		if (Platform.IsLogEnabled)
-		{
-			Log.d(Platform.DEFAULT_LOG_TAG, "Loading module from files " + file.getPath());
-		}
-
-		try
-		{
-			String moduleFileContent = FileSystem.readText(file);
-			// IMPORTANT: Update MODULE_LINES_OFFSET in NativeScript.h
-			// if you change the number of new lines that exists before the
-			// moduleFileContent for correct error reporting.
-			// We are inserting local require function in the scope of the
-			// module to pass the __fileName (calling file) variable in the
-			// global.require request.
-			ModuleContent.setLength(0);
-			ModuleContent.append(ModuleContent_Part1);
-			ModuleContent.append(file.getParent());
-			ModuleContent.append(ModuleContent_Part2);
-			ModuleContent.append(modulePath);
-			ModuleContent.append(ModuleContent_Part3);
-			ModuleContent.append(moduleFileContent);
-			ModuleContent.append(ModuleContent_Part4);
-			String content = ModuleContent.toString();
-			return content;
-		}
-		catch (IOException e)
-		{
-			// Return empty content.
-			// This case will be handled by the NativeScriptRuntime.cpp and a JS
-			// exception will be raised.
-			return "";
-		}
-	}
-
-	public static String getModulePath(String moduleName, String callingModuleName)
-	{
-		// This method is called my the NativeScriptRuntime.cpp RequireCallback
-		// method.
-		// The currentModuleName is the fully-qualified path of the previously
-		// loaded module (if any)
-		String currentDirectory = null;
-
-		if (callingModuleName != null && !callingModuleName.isEmpty())
-		{
-			File currentModule = new File(callingModuleName);
-			if (currentModule.exists())
-			{
-				String parentDirectory = currentModule.getParent();
-				if (parentDirectory != null)
-				{
-					currentDirectory = parentDirectory + "/";
-				}
-			}
-		}
-
-		File file = findModuleFile(moduleName, currentDirectory);
+		// This method is called my the NativeScriptRuntime.cpp RequireCallback method.
+		// The currentModuleDir is the directory path of the calling module.
+		checkForExternalPath = true;
+		File file = findModuleFile(moduleName, callingDirName);
 
 		if (file != null && file.exists())
 		{
 			File projectRootDir = new File(RootPackageDir);
-			if (isFileExternal(file, projectRootDir))
+			if (checkForExternalPath && isFileExternal(file, projectRootDir))
 			{
 				return "EXTERNAL_FILE_ERROR";
 			}
 			else
 			{
-				String result = file.getAbsolutePath();
-				return result;
+				return file.getAbsolutePath();
 			}
 		}
 
-		// empty path will be handled by the NativeScriptRuntime.cpp and a JS
-		// error will be thrown
+		// empty path will be handled by the NativeScriptRuntime.cpp and a JS error will be thrown
 		return "";
 	}
 
@@ -185,7 +119,6 @@ public class Require
 
 	private static File findModuleFile(String moduleName, String currentDirectory)
 	{
-
 		File directory = null;
 		File jsFile = null;
 		boolean isJSFile = moduleName.endsWith(".js");
@@ -206,7 +139,7 @@ public class Require
 			// same or up directory
 			String resolvedPath = FileSystem.resolveRelativePath(moduleName, currentDirectory);
 			directory = new File(resolvedPath);
-			jsFile = isJSFile ? new File(directory.getPath()) : new File(directory.getPath() + ".js");
+			jsFile = isJSFile ? new File(directory.getAbsolutePath()) : new File(directory.getAbsolutePath() + ".js");
 		}
 		else
 		{
@@ -217,34 +150,53 @@ public class Require
 
 		if (!jsFile.exists() && directory.exists() && directory.isDirectory())
 		{
-			// we are pointing to a directory, search for package.json or
-			// index.js
-			File packageFile = new File(directory.getPath() + "/package.json");
-			if (packageFile.exists())
-			{
-				try
+			// We are pointing to a directory, check for already resolved file
+			String folderPath = directory.getAbsolutePath();
+			String cachedPath = folderAsModuleCache.get(folderPath);
+			boolean found = false;
+			
+			if(cachedPath == null) {
+				// Search for package.json or index.js
+				File packageFile = new File(directory.getPath() + "/package.json");
+				if (packageFile.exists())
 				{
-					JSONObject object = FileSystem.readJSONFile(packageFile);
-					if (object != null)
+					try
 					{
-						String mainFile = object.getString("main");
-						jsFile = new File(directory.getPath(), mainFile);
+						JSONObject object = FileSystem.readJSONFile(packageFile);
+						if (object != null)
+						{
+							String mainFile = object.getString("main");
+							jsFile = new File(directory.getAbsolutePath(), mainFile);
+							found = true;
+						}
+					}
+					catch (IOException e)
+					{
+						// json read failed
+						jsFile = null;
+					}
+					catch (JSONException e)
+					{
+						jsFile = null;
 					}
 				}
-				catch (IOException e)
+				if (!found)
 				{
-					// json read failed
-					jsFile = null;
+					// search for index.js
+					jsFile = new File(directory.getPath() + "/index.js");
 				}
-				catch (JSONException e)
-				{
-					jsFile = null;
+				
+				// TODO: search for <folderName>.js ?
+				
+				if(jsFile != null) {
+					// cache the main file for later use
+					folderAsModuleCache.put(folderPath, jsFile.getAbsolutePath());
 				}
 			}
-			else
-			{
-				// search for index.js
-				jsFile = new File(directory.getPath() + "/index.js");
+			else {
+				// do not check whether this path is external for the application - it is already checked
+				checkForExternalPath = false;
+				jsFile = new File(cachedPath);
 			}
 		}
 

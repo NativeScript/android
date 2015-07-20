@@ -2,7 +2,6 @@ package com.tns;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.lang.ref.WeakReference;
@@ -17,9 +16,7 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 
-import android.app.Activity;
 import android.content.Context;
-import android.content.res.AssetManager;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
@@ -33,7 +30,7 @@ public class Platform
 {
 	private static native void initNativeScript(String filesPath, int appJavaObjectId, boolean verboseLoggingEnabled, String packageName);
 
-	private static native void runNativeScript(String appModuleName, String appContent);
+	private static native void runNativeScript(String appModuleName);
 
 	private static native Object callJSMethodNative(int javaObjectID, String methodName, boolean isConstructor, Object... packagedArgs) throws NativeScriptException;
 
@@ -153,7 +150,8 @@ public class Platform
 				public void uncaughtException(Thread thread, Throwable ex)
 				{
 					String content = ErrorReport.getErrorMessage(ex);
-					passUncaughtExceptionToJsNative(ex, content);
+					// TODO: passUncaughtExceptionToJsNative fails due to V8's invalid state - examine this!!!
+					// passUncaughtExceptionToJsNative(ex, content);
 
 					if (IsLogEnabled) Log.e(DEFAULT_LOG_TAG, "Uncaught Exception Message=" + ex.getMessage());
 
@@ -183,15 +181,20 @@ public class Platform
 
 	public static void run()
 	{
-		String[] bootstrapInfo = Require.bootstrapApp();
-		runNativeScript(bootstrapInfo[0], bootstrapInfo[1]);
+		String bootstrapPath = Require.bootstrapApp();
+		runNativeScript(bootstrapPath);
+	}
+	
+	private static Class<?> resolveClass(String fullClassName, String[] methodOverrides) throws ClassNotFoundException, IOException{
+		Class<?> javaClass = ClassResolver.resolveClass(fullClassName, dexFactory, methodOverrides);
+		
+		return javaClass;
 	}
 
-	private static int cacheConstructor(String name, String className, Object[] args, String[] methodOverrides) throws ClassNotFoundException, IOException
+	private static int cacheConstructor(Class<?> clazz, Object[] args) throws ClassNotFoundException, IOException
 	{
-		Constructor<?> ctor = MethodResolver.resolveConstructor(name, className, args, dexFactory, methodOverrides);
+		Constructor<?> ctor = MethodResolver.resolveConstructor(clazz, args);
 
-		
 		//TODO: Lubo: Not thread safe already.
 		//TODO: Lubo: Does not check for existing items
 		int ctorId = ctorCache.size();
@@ -661,40 +664,6 @@ public class Platform
 		return res;
 	}
 	
-	private static HashMap<String, String> map = null;
-	
-	private static String readMetadata(String name) throws Exception
-	{
-		if (map == null)
-		{
-			InputStream inputStream = NativeScriptContext.getAssets().open("metadata/metadata.txt", AssetManager.ACCESS_STREAMING);
-			String mappings = FileSystem.readAll(inputStream);
-			inputStream.close();
-			
-			String[] lines = mappings.split(System.getProperty("line.separator"));
-			
-			HashMap<String, String> tmpMap = new HashMap<String, String>();
-			
-			for (String s: lines)
-			{
-				String[] parts = s.split(" ");
-				tmpMap.put(parts[0], parts[1]);
-			}
-			
-			map = tmpMap;
-		}
-		
-		String assetName = map.get(name);
-		
-		InputStream inputStream = NativeScriptContext.getAssets().open("metadata/" + assetName, AssetManager.ACCESS_STREAMING);
-		String metadata = FileSystem.readAll(inputStream);
-		inputStream.close();
-		
-		return metadata;
-	}
-
-	
-
 	public static boolean isJavaThrowable(Object obj)
 	{
 		boolean isJavaThrowable = false;

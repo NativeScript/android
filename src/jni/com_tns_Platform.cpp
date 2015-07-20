@@ -18,6 +18,7 @@
 #include "NativeScriptAssert.h"
 #include "JsDebugger.h"
 #include "SimpleProfiler.h"
+#include "File.h"
 #include <sstream>
 #include <android/log.h>
 #include <assert.h>
@@ -37,6 +38,7 @@ int count = 0;
 Context::Scope *context_scope = nullptr;
 bool tns::LogEnabled = true;
 Isolate *g_isolate = nullptr;
+std::string Constants::APP_ROOT_FOLDER_PATH = "";
 
 ObjectManager *g_objectManager = nullptr;
 
@@ -48,8 +50,6 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved)
 	g_jvm = vm;
 
 	JEnv::Init(g_jvm);
-	JsArgConverter::Init(g_jvm);
-	JsArgToArrayConverter::Init(g_jvm);
 
 	g_objectManager = new ObjectManager();
 
@@ -63,21 +63,18 @@ void PrepareExtendFunction(Isolate *isolate, jstring filesPath)
 	string fullPath = ArgConverter::jstringToString(filesPath);
 	fullPath.append("/internal/prepareExtend.js");
 
-	FILE *f = fopen(fullPath.c_str(), "rb");
-	assert(f != nullptr);
-	fseek(f, 0, SEEK_END);
-	int len = ftell(f);
-	char *content = new char[len];
-	rewind(f);
-	fread(content, 1, len, f);
-	fclose(f);
-
-	string s(content, len);
-	delete[] content;
+	int length;
+	bool isNew;
+	const char* content = File::ReadText(fullPath, length, isNew);
 
 	TryCatch tc;
+	auto cmd = ConvertToV8String(content, length);
 
-	auto cmd = ConvertToV8String(s);
+	if(isNew)
+	{
+		delete[] content;
+	}
+
 	auto origin = ConvertToV8String(fullPath);
 	DEBUG_WRITE("Compiling prepareExtend.js script");
 
@@ -181,78 +178,29 @@ extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj
 	PrepareV8Runtime(isolate, env, filesPath, packageName);
 
 	NativeScriptRuntime::APP_FILES_DIR = ArgConverter::jstringToString(filesPath);
+	Constants::APP_ROOT_FOLDER_PATH = NativeScriptRuntime::APP_FILES_DIR + "/app/";
 }
 
-extern "C" void Java_com_tns_Platform_runNativeScript(JNIEnv *_env, jobject obj, jstring appModuleName, jstring appCode)
+extern "C" void Java_com_tns_Platform_runNativeScript(JNIEnv *_env, jobject obj, jstring appModuleName)
 {
 	JEnv env(_env);
-
 	auto isolate = g_isolate;
 	Isolate::Scope isolate_scope(isolate);
 
-	TryCatch tc;
-
 	HandleScope handleScope(isolate);
-	auto context = Local<Context>::New(isolate, *PrimaryContext);
 
-	jstring retval;
-	jboolean isCopy;
+	Handle<Object> moduleObject;
+	string modulePath = ArgConverter::jstringToString(appModuleName);
+	bool hasError = false;
 
-	const char* code = env.GetStringUTFChars(appCode, &isCopy);
+	NativeScriptRuntime::CompileAndRun(modulePath, hasError, moduleObject, true /*is bootstrap call*/);
 
-	auto cmd = ConvertToV8String(code);
-
-	env.ReleaseStringUTFChars(appCode, code);
-
-	DEBUG_WRITE("Compiling script");
-
-	auto moduleName = ArgConverter::jstringToV8String(appModuleName);
-
-	auto script = Script::Compile(cmd, moduleName);
-
-	DEBUG_WRITE("Compile script");
-
-	if (ExceptionUtil::GetInstance()->HandleTryCatch(tc, "Bootstrap script has error(s)."))
-	{
-		DEBUG_WRITE("Exception was handled in java code");
-	}
-	else if (script.IsEmpty())
-	{
-		DEBUG_WRITE("Bootstrap was empty");
-	}
-	else
-	{
-		DEBUG_WRITE("Running script");
-
-		auto appModuleObj = script->Run();
-		if (ExceptionUtil::GetInstance()->HandleTryCatch(tc))
-		{
-			DEBUG_WRITE("Exception was handled in java code");
-		}
-		else if (!appModuleObj.IsEmpty() && appModuleObj->IsFunction())
-		{
-			auto moduleFunc = appModuleObj.As<Function>();
-			Handle<Value> exportsObj = Object::New(isolate);
-			auto thiz = Object::New(isolate);
-			auto res = moduleFunc->Call(thiz, 1, &exportsObj);
-
-			if(ExceptionUtil::GetInstance()->HandleTryCatch(tc))
-			{
-				DEBUG_WRITE("Exception was handled in java code");
-			}
-			else
-			{
-				// TODO: Why do we need this line?
-				auto persistentAppModuleObject = new Persistent<Object>(Isolate::GetCurrent(), appModuleObj.As<Object>());
-			}
-		}
-		else
-		{
-			ExceptionUtil::GetInstance()->ThrowExceptionToJava(tc, "Error running NativeScript bootstrap code.");
-		}
-	}
-
-	//NativeScriptRuntime::loadedModules.insert(make_pair(appModuleName, persistentAppModuleObject));
+	/*
+	 * moduleObject (export module) can be set to js variable but currently we start the script implicitly without returning the moduleObject (just calling it)
+	 *
+	 * we can do something like
+	 * var appModule = require("app"); //but currently we call the appModule only once Platform.run() and no one else has access to it
+	 */
 
 	//DEBUG_WRITE("Forcing V8 garbage collection");
 	//while (!V8::IdleNotification());

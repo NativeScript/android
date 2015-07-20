@@ -112,7 +112,11 @@ public class StringConversionTest
 			
 			inputStream.read(data);
 			
-			str = new String(data, "UTF-8");
+			str = android.util.Base64.encodeToString(data, android.util.Base64.DEFAULT);
+			
+			// This is not correct - the raw image data is NOT UTF-8 string
+			// TODO: Discuss
+			//str = new String(data, "UTF-8");
 		}
 		finally
 		{

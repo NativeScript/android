@@ -72,7 +72,7 @@ LOCAL_SRC_FILES := com_tns_Platform.cpp com_tns_JsDebugger.cpp com_tns_AssetExtr
 					FieldAccessor.cpp ArrayElementAccessor.cpp \
 					ExceptionUtil.cpp Util.cpp Logger.cpp Profiler.cpp \
 					ObjectManager.cpp NumericCasts.cpp WeakRef.cpp \
-					MetadataMethodInfo.cpp SimpleProfiler.cpp
+					MetadataMethodInfo.cpp SimpleProfiler.cpp JType.cpp File.cpp Require.cpp
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/include
 LOCAL_LDLIBS    := -llog -landroid -lz
 ifeq ($(TARGET_ARCH_ABI),armeabi-v7a)

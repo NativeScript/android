@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.net.CookieHandler;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -20,6 +21,8 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.AsyncTask;
 import android.util.DisplayMetrics;
+
+import java.net.CookieManager;
 
 public class Async
 {
@@ -37,6 +40,7 @@ public class Async
 	{
 		private static final String DeleteMethod = "DELETE";
 		private static final String GetMethod = "GET";
+		private static CookieManager cookieManager;
 		
 		public static class KeyValuePair
 		{
@@ -92,6 +96,25 @@ public class Async
 
 		public static class RequestResult
 		{
+			public static final class ByteArrayOutputStream2 extends java.io.ByteArrayOutputStream 
+			{
+			    public ByteArrayOutputStream2()
+			    {
+			    	super(); 
+			    }
+			    
+			    public ByteArrayOutputStream2(int size) 
+			    { 
+			    	super(size); 
+			    }
+
+			    /** Returns the internal buffer of this ByteArrayOutputStream, without copying. */
+			    public synchronized byte[] buf()
+			    {
+			        return this.buf;
+			    }
+			}
+			
 			public ByteArrayOutputStream raw;
 			public ArrayList<KeyValuePair> headers = new ArrayList<KeyValuePair>();
 			public int statusCode;
@@ -121,6 +144,8 @@ public class Async
 			{
 				this.statusCode = connection.getResponseCode();
 
+				int contentLength = connection.getContentLength();
+				
 				InputStream inStream;
 				if (this.statusCode >= 400)
 				{
@@ -131,36 +156,36 @@ public class Async
 					inStream = connection.getInputStream();
 				}
 				openedStreams.push(inStream);
-
-				BufferedInputStream buffer = new java.io.BufferedInputStream(inStream);
+				
+				BufferedInputStream buffer = new java.io.BufferedInputStream(inStream, 4096);
 				openedStreams.push(buffer);
 
-				ByteArrayOutputStream responseStream = new java.io.ByteArrayOutputStream();
+				ByteArrayOutputStream2 responseStream = contentLength != -1 ? new ByteArrayOutputStream2(contentLength) : new ByteArrayOutputStream2();
 				openedStreams.push(responseStream);
 
-				int readByte = -1;
-				while ((readByte = buffer.read()) != -1)
+				byte[] buff = new byte[4096];
+				int read = -1;
+				while ((read = buffer.read(buff, 0, buff.length)) != -1)
 				{
-					responseStream.write(readByte);
+					responseStream.write(buff, 0, read);
 				}
-
+				
 				this.raw = responseStream;
-
+				buff = null;
+				
 				// make the byte array conversion here, not in the JavaScript
 				// world for better performance
 				// since we do not have some explicit way to determine whether
-				// the content-type is image,
-				// we will do it the dumb way :)
+				// the content-type is image
 				try
 				{
 					// TODO: Generally this approach will not work for very
 					// large files
 					BitmapFactory.Options bitmapOptions = new BitmapFactory.Options();
 					bitmapOptions.inJustDecodeBounds = true;
-					byte[] bytes = this.raw.toByteArray();
-
+					
 					// check the size of the bitmap first
-					BitmapFactory.decodeByteArray(bytes, 0, bytes.length, bitmapOptions);
+					BitmapFactory.decodeByteArray(responseStream.buf(), 0, responseStream.size(), bitmapOptions);
 					if (bitmapOptions.outWidth > 0 && bitmapOptions.outHeight > 0)
 					{
 						int scale = 1;
@@ -182,7 +207,7 @@ public class Async
 
 						bitmapOptions.inJustDecodeBounds = false;
 						bitmapOptions.inSampleSize = scale;
-						this.responseAsImage = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, bitmapOptions);
+						this.responseAsImage = BitmapFactory.decodeByteArray(responseStream.buf(), 0, responseStream.size(), bitmapOptions);
 					}
 				}
 				catch (Exception e)
@@ -194,7 +219,7 @@ public class Async
 				if (this.responseAsImage == null)
 				{
 					// convert to string
-					this.responseAsString = this.raw.toString();
+					this.responseAsString = responseStream.toString();
 				}
 			}
 		}
@@ -208,6 +233,12 @@ public class Async
 				options.screenWidth = metrics.widthPixels;
 				options.screenHeight = metrics.heightPixels;
 			}
+			
+			if(cookieManager == null) {
+				cookieManager = new CookieManager();
+				CookieHandler.setDefault(cookieManager);
+			}
+			
 			new HttpRequestTask(callback, context).executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, options);
 		}
 

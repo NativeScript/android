@@ -10,6 +10,7 @@
 #include "V8GlobalHelpers.h"
 #include "V8StringConstants.h"
 #include "JavaObjectArrayCache.h"
+#include "JType.h"
 
 using namespace v8;
 using namespace std;
@@ -93,9 +94,7 @@ bool JsArgToArrayConverter::ConvertArg(const Handle<Value>& arg, int index)
 	else if (arg->IsInt32())
 	{
 		jint value = arg->Int32Value();
-		jclass clazz = env.FindClass("java/lang/Integer");
-		jmethodID ctor = env.GetMethodID(clazz, "<init>", "(I)V");
-		JniLocalRef javaObject(env.NewObject(clazz, ctor, value));
+		JniLocalRef javaObject(JType::NewInt(env, value));
 		SetConvertedObject(env, index, javaObject);
 
 		success = true;
@@ -108,31 +107,24 @@ bool JsArgToArrayConverter::ConvertArg(const Handle<Value>& arg, int index)
 
 		if (isInteger)
 		{
-			string className;
-			string initSignature;
+			jobject obj;
 			if ((INT_MIN <= i) && (i < INT_MAX))
 			{
-				className = "java/lang/Integer";
-				initSignature = "(I)V";
+				obj = JType::NewInt(env, (jint)d);
 			}
 			else
 			{
-				className = "java/lang/Long";
-				initSignature = "(J)V";
+				obj = JType::NewLong(env, (jlong)d);
 			}
 
-			jclass clazz = env.FindClass(className);
-			jmethodID ctor = env.GetMethodID(clazz, "<init>", initSignature.c_str());
-			JniLocalRef javaObject(env.NewObject(clazz, ctor, (jint)d));
+			JniLocalRef javaObject(obj);
 			SetConvertedObject(env, index, javaObject);
 
 			success = true;
 		}
 		else
 		{
-			jclass clazz = env.FindClass("java/lang/Double");
-			jmethodID ctor = env.GetMethodID(clazz, "<init>", "(D)V");
-			JniLocalRef javaObject(env.NewObject(clazz, ctor, (jdouble)d));
+			JniLocalRef javaObject(JType::NewDouble(env, (jdouble)d));
 			SetConvertedObject(env, index, javaObject);
 
 			success = true;
@@ -141,43 +133,22 @@ bool JsArgToArrayConverter::ConvertArg(const Handle<Value>& arg, int index)
 	else if (arg->IsBoolean())
 	{
 		jboolean value = arg->BooleanValue();
-		jclass clazz = env.FindClass("java/lang/Boolean");
-		jmethodID ctor = env.GetMethodID(clazz, "<init>", "(Z)V");
-		JniLocalRef javaObject(env.NewObject(clazz, ctor, value));
+		JniLocalRef javaObject(JType::NewBoolean(env, value));
 		SetConvertedObject(env, index, javaObject);
-
 		success = true;
 	}
 	else if (arg->IsBooleanObject())
 	{
 		auto boolObj = Handle<BooleanObject>::Cast(arg);
 		jboolean value = boolObj->BooleanValue() ? JNI_TRUE : JNI_FALSE;
-		jclass clazz = env.FindClass("java/lang/Boolean");
-		jmethodID ctor = env.GetMethodID(clazz, "<init>", "(Z)V");
-		JniLocalRef javaObject(env.NewObject(clazz, ctor, value));
+		JniLocalRef javaObject(JType::NewBoolean(env, value));
 		SetConvertedObject(env, index, javaObject);
 
 		success = true;
 	}
 	else if (arg->IsString() || arg->IsStringObject())
 	{
-		Handle<String> argAsString;
-		if (arg->IsStringObject())
-		{
-			auto stringObject = *reinterpret_cast<v8::Handle<StringObject>*>(const_cast<v8::Handle<Value>*>(&arg));
-			argAsString = stringObject->ValueOf();
-		}
-		else
-		{
-			argAsString = arg->ToString();
-		}
-
-		String::Utf8Value stringValue(argAsString);
-		int strLength = stringValue.length();
-
-		JniLocalRef strData(env.NewByteArray(strLength));
-		env.SetByteArrayRegion((jbyteArray)strData, 0, strLength, (jbyte*)*stringValue);
-		JniLocalRef stringObject(env.NewObject(STRING_CLASS, STRING_CTOR, (jbyteArray)strData, UTF_8_ENCODING));
+		JniLocalRef stringObject(ConvertToJavaString(arg));
 		SetConvertedObject(env, index, stringObject);
 
 		success = true;
@@ -200,9 +171,7 @@ bool JsArgToArrayConverter::ConvertArg(const Handle<Value>& arg, int index)
 				value = hidden->ToInt32()->Int32Value();
 			}
 
-			jclass clazz = env.FindClass("java/lang/Long");
-			jmethodID ctor = env.GetMethodID(clazz, "<init>", "(J)V");
-			JniLocalRef javaObject(env.NewObject(clazz, ctor, value));
+			JniLocalRef javaObject(JType::NewLong(env, value));
 			SetConvertedObject(env, index, javaObject);
 			return true;
 		}
@@ -223,9 +192,7 @@ bool JsArgToArrayConverter::ConvertArg(const Handle<Value>& arg, int index)
 				value = (jbyte)byteArg;
 			}
 
-			jclass clazz = env.FindClass("java/lang/Byte");
-			jmethodID ctor = env.GetMethodID(clazz, "<init>", "(B)V");
-			JniLocalRef javaObject(env.NewObject(clazz, ctor, value));
+			JniLocalRef javaObject(JType::NewByte(env, value));
 			SetConvertedObject(env, index, javaObject);
 			return true;
 		}
@@ -246,9 +213,7 @@ bool JsArgToArrayConverter::ConvertArg(const Handle<Value>& arg, int index)
 				value = (jshort)shortArg;
 			}
 
-			jclass clazz = env.FindClass("java/lang/Short");
-			jmethodID ctor = env.GetMethodID(clazz, "<init>", "(S)V");
-			JniLocalRef javaObject(env.NewObject(clazz, ctor, value));
+			JniLocalRef javaObject(JType::NewShort(env, value));
 			SetConvertedObject(env, index, javaObject);
 			return true;
 		}
@@ -263,9 +228,7 @@ bool JsArgToArrayConverter::ConvertArg(const Handle<Value>& arg, int index)
 				value = (jdouble)doubleArg;
 			}
 
-			jclass clazz = env.FindClass("java/lang/Double");
-			jmethodID ctor = env.GetMethodID(clazz, "<init>", "(D)V");
-			JniLocalRef javaObject(env.NewObject(clazz, ctor, value));
+			JniLocalRef javaObject(JType::NewDouble(env, value));
 			SetConvertedObject(env, index, javaObject);
 			return true;
 		}
@@ -280,9 +243,7 @@ bool JsArgToArrayConverter::ConvertArg(const Handle<Value>& arg, int index)
 				value = (jfloat)floatArg;
 			}
 
-			jclass clazz = env.FindClass("java/lang/Float");
-			jmethodID ctor = env.GetMethodID(clazz, "<init>", "(F)V");
-			JniLocalRef javaObject(env.NewObject(clazz, ctor, value));
+			JniLocalRef javaObject(JType::NewFloat(env, value));
 			SetConvertedObject(env, index, javaObject);
 			return true;
 		}
@@ -297,9 +258,7 @@ bool JsArgToArrayConverter::ConvertArg(const Handle<Value>& arg, int index)
 				value = (jchar)str[0];
 			}
 
-			jclass clazz = env.FindClass("java/lang/Character");
-			jmethodID ctor = env.GetMethodID(clazz, "<init>", "(C)V");
-			JniLocalRef javaObject(env.NewObject(clazz, ctor, value));
+			JniLocalRef javaObject(JType::NewChar(env, value));
 			SetConvertedObject(env, index, javaObject);
 			return true;
 		}
@@ -408,25 +367,3 @@ JsArgToArrayConverter::~JsArgToArrayConverter()
 		delete[] m_argsAsObject;
 	}
 }
-
-void JsArgToArrayConverter::Init(JavaVM *jvm)
-{
-	m_jvm = jvm;
-
-	JEnv env;
-
-	STRING_CLASS = env.FindClass("java/lang/String");
-	assert(STRING_CLASS != nullptr);
-
-	STRING_CTOR = env.GetMethodID(STRING_CLASS, "<init>", "([BLjava/lang/String;)V");
-	assert(STRING_CTOR != 0);
-
-	JniLocalRef encoding(env.NewStringUTF("UTF-8"));
-	UTF_8_ENCODING = (jstring)env.NewGlobalRef(encoding);
-	assert(UTF_8_ENCODING != nullptr);
-}
-
-JavaVM* JsArgToArrayConverter::m_jvm = nullptr;
-jclass JsArgToArrayConverter::STRING_CLASS = nullptr;
-jmethodID JsArgToArrayConverter::STRING_CTOR = nullptr;
-jstring JsArgToArrayConverter::UTF_8_ENCODING = nullptr;

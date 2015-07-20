@@ -30,7 +30,7 @@ namespace tns {
 	public:
 			static v8::Local<v8::String> GetClassImplementationObject();
 			static v8::Local<v8::String> GetDebugName();
-			static v8::Local<v8::String> GetExtends();
+			static v8::Local<v8::String> GetExtend();
 			static v8::Local<v8::String> GetIsPrototypeImplementationObject();
 			static v8::Local<v8::String> GetNativeException();
 			static v8::Local<v8::String> GetStackTrace();
@@ -54,7 +54,6 @@ namespace tns {
 
 			static const std::string CLASS_IMPLEMENTATION_OBJECT;
 			static const std::string DEBUG_NAME;
-			static const std::string EXTENDS;
 			static const std::string EXTEND;
 			static const std::string IS_PROTOTYPE_IMPLEMENTATION_OBJECT;
 			static const std::string NATIVE_EXCEPTION;
@@ -78,6 +77,30 @@ namespace tns {
 			static const std::string UNCAUGHT_ERROR;
 	private:
 			V8StringConstants() {};
+
+			static v8::Persistent<v8::String> *CLASS_IMPLEMENTATION_OBJECT_PERSISTENT;
+			static v8::Persistent<v8::String> *DEBUG_NAME_PERSISTENT;
+			static v8::Persistent<v8::String> *EXTEND_PERSISTENT;
+			static v8::Persistent<v8::String> *IS_PROTOTYPE_IMPLEMENTATION_OBJECT_PERSISTENT;
+			static v8::Persistent<v8::String> *NATIVE_EXCEPTION_PERSISTENT;
+			static v8::Persistent<v8::String> *STACK_TRACE_PERSISTENT;
+			static v8::Persistent<v8::String> *LONG_NUMBER_PERSISTENT;
+			static v8::Persistent<v8::String> *PROTOTYPE_PERSISTENT;
+			static v8::Persistent<v8::String> *SUPER_PERSISTENT;
+			static v8::Persistent<v8::String> *T_SUPER_PERSISTENT;
+			static v8::Persistent<v8::String> *TARGET_PERSISTENT;
+			static v8::Persistent<v8::String> *TO_STRING_PERSISTENT;
+			static v8::Persistent<v8::String> *HIDDEN_JS_INSTANCE_PERSISTENT;
+			static v8::Persistent<v8::String> *JAVA_LONG_PERSISTENT;
+			static v8::Persistent<v8::String> *MARKED_AS_BYTE_PERSISTENT;
+			static v8::Persistent<v8::String> *MARKED_AS_CHAR_PERSISTENT;
+			static v8::Persistent<v8::String> *MARKED_AS_DOUBLE_PERSISTENT;
+			static v8::Persistent<v8::String> *MARKED_AS_FLOAT_PERSISTENT;
+			static v8::Persistent<v8::String> *MARKED_AS_LONG_PERSISTENT;
+			static v8::Persistent<v8::String> *MARKED_AS_SHORT_PERSISTENT;
+			static v8::Persistent<v8::String> *VALUE_OF_PERSISTENT;
+			static v8::Persistent<v8::String> *VALUE_PERSISTENT;
+			static v8::Persistent<v8::String> *UNCAUGHT_ERROR_PERSISTENT;
 	};
 }
 

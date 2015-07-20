@@ -18,6 +18,7 @@ import java.util.zip.ZipOutputStream;
 import com.tns.bindings.ProxyGenerator;
 
 import dalvik.system.DexClassLoader;
+import dalvik.system.DexFile;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
@@ -36,7 +37,7 @@ public class DexFactory
 
 	private ProxyGenerator proxyGenerator;
 	private HashMap<String, Class<?>> injectedDexClasses = new HashMap<String, Class<?>>();
-	
+
 	public DexFactory(Context context)
 	{
 		this.context = context;
@@ -46,20 +47,20 @@ public class DexFactory
 		this.odexPath = this.dexPath + "odex" + File.separator;
 		this.proxyGenerator = new ProxyGenerator(dexPath);
 		ProxyGenerator.IsLogEnabled = Platform.IsLogEnabled;
-		
+
 		File dexDir = new File(dexPath);
-		
+
 		if (!dexDir.exists())
 		{
 			dexDir.mkdirs();
 		}
-		
+
 		File odexDir = new File(odexPath);
 		if (!odexDir.exists())
 		{
 			odexDir.mkdir();
 		}
-		
+
 		this.updateDexThumbAndPurgeCache();
 		this.proxyGenerator.setProxyThumb(this.dexThumb);
 	}
@@ -70,15 +71,28 @@ public class DexFactory
 
 	public Class<?> resolveClass(String name, String className, String[] methodOverrides) throws ClassNotFoundException, IOException
 	{
-		if(className.contains("NativeScriptActivity"))
+		if (className.contains("NativeScriptActivity"))
 		{
 			// Do not extend NativeScriptActivity - it is already extended
 			return NativeScriptActivity.class;
 		}
-		
+
 		String fullClassName = className.replace("$", "_") + CLASS_NAME_LOCATION_SEPARATOR + name;
-		Class<?> existingClass = this.injectedDexClasses.get(fullClassName); 
-		if(existingClass != null)
+
+		// try to get pre-generated binding classes
+		ClassLoader cl = context.getClassLoader();
+		try {
+			Class<?> pregeneratedClass = cl.loadClass(fullClassName.replace("-", "_"));
+			
+			return pregeneratedClass;
+		}
+		catch (Exception e)
+		{
+		}
+		//
+
+		Class<?> existingClass = this.injectedDexClasses.get(fullClassName);
+		if (existingClass != null)
 		{
 			return existingClass;
 		}
@@ -87,6 +101,7 @@ public class DexFactory
 		String dexFilePath = classToProxy + CLASS_NAME_LOCATION_SEPARATOR + name;
 		File dexFile = this.getDexFile(dexFilePath);
 		
+		//generate dex file
 		if (dexFile == null)
 		{
 			long startGenTime = System.nanoTime();
@@ -94,7 +109,7 @@ public class DexFactory
 			{
 				Log.d(Platform.DEFAULT_LOG_TAG, "generating proxy in place");
 			}
-			
+
 			dexFilePath = this.generateDex(name, classToProxy, methodOverrides);
 			dexFile = new File(dexFilePath);
 			long stopGenTime = System.nanoTime();
@@ -105,41 +120,64 @@ public class DexFactory
 				Log.d(Platform.DEFAULT_LOG_TAG, "TotalGenTime:  " + totalGenTime / 1000000.0 + "ms");
 			}
 		}
-		
+
+		//creates jar file from already generated dex file
 		String jarFilePath = dexFile.getPath().replace(".dex", ".jar");
 		File jarFile = new File(jarFilePath);
-		
-		Class<?> result;
-		if(!jarFile.exists())
+
+		if (!jarFile.exists())
 		{
 			FileOutputStream jarFileStream = new FileOutputStream(jarFile);
-			
 			ZipOutputStream out = new ZipOutputStream(jarFileStream);
+			
 		    out.putNextEntry(new ZipEntry("classes.dex"));
 		    byte[] dexData = new byte[(int)dexFile.length()];
 		    FileInputStream fi = new FileInputStream(dexFile);
 		    fi.read(dexData, 0, dexData.length);
 		    fi.close();
+		    
 		    out.write(dexData);
 		    out.closeEntry();
 		    out.close();
-		    
 		}
+		//
 		
-		DexClassLoader dexClassLoader = new DexClassLoader(jarFilePath, this.odexPath, null, this.context.getClassLoader());
-		result = dexClassLoader.loadClass(fullClassName);
-		
+		Class<?> result = null;
+		DexFile df = null;
+		try
+		{
+			// use DexFile instead of DexClassLoader to allow class loading
+			// within the default class loader
+			// Note: According to the official documentation, DexFile should not
+			// be directly used.
+			// However, this is the only viable way to get our dynamic classes
+			// loaded within the system class loader
+			df = DexFile.loadDex(jarFilePath, this.odexPath + fullClassName, 0);
+			result = df.loadClass(fullClassName, this.context.getClassLoader());
+		}
+		catch (IOException e)
+		{
+			e.printStackTrace();
+			// fall back to DexClassLoader
+			DexClassLoader dexClassLoader = new DexClassLoader(jarFilePath, this.odexPath, null, this.context.getClassLoader());
+			result = dexClassLoader.loadClass(fullClassName);
+		}
+
 		this.injectedDexClasses.put(fullClassName, result);
-			
+
 		return result;
 	}
-	
+
 	public Class<?> findClass(String className) throws ClassNotFoundException
 	{
 		String canonicalName = className.replace('/', '.');
-		Log.d("TNS_NATIVE", canonicalName);
+		if (Platform.IsLogEnabled)
+		{
+			Log.d("TNS_NATIVE", canonicalName);
+		}
+
 		Class<?> existingClass = this.injectedDexClasses.get(canonicalName);
-		if(existingClass != null)
+		if (existingClass != null)
 		{
 			return existingClass;
 		}
@@ -164,7 +202,7 @@ public class DexFactory
 		}
 		return sbStr.toString();
 	}
-	
+
 	private String getClassToProxyName(String className) throws InvalidClassException
 	{
 		String classToProxy = className;
@@ -178,19 +216,19 @@ public class DexFactory
 		{
 			throw new InvalidClassException("Can't generate proxy of proxy");
 		}
-		
+
 		return classToProxy;
 	}
 
 	private File getDexFile(String className) throws InvalidClassException
 	{
 		String classToProxyFile = className.replace("$", "_");
-		
+
 		if (this.dexThumb != null)
 		{
 			classToProxyFile += "-" + this.dexThumb;
 		}
-		
+
 		String dexFilePath = dexPath + classToProxyFile + ".dex";
 		File dexFile = new File(dexFilePath);
 		if (dexFile.exists())
@@ -226,7 +264,7 @@ public class DexFactory
 
 		return proxyGenerator.generateProxy(proxyName, classToProxy, methodOverridesSet);
 	}
-	
+
 	private void updateDexThumbAndPurgeCache()
 	{
 		this.dexThumb = this.generateDexThumb();
@@ -234,14 +272,14 @@ public class DexFactory
 		{
 			throw new RuntimeException("Error generating proxy thumb 1");
 		}
-		
+
 		File dexDir = new File(this.dexPath);
 		String oldDexThumb = this.getCachedProxyThumb(dexDir);
-		if (this.dexThumb.equals(oldDexThumb)) 
+		if (this.dexThumb.equals(oldDexThumb))
 		{
 			return;
 		}
-		
+
 		if (oldDexThumb != null)
 		{
 			this.purgeDexesByThumb(oldDexThumb, dexDir);
@@ -249,11 +287,11 @@ public class DexFactory
 		}
 		else
 		{
-			//purge all dex files if no thumb file is found
+			// purge all dex files if no thumb file is found
 			this.purgeDexesByThumb(null, dexDir);
 			this.purgeDexesByThumb(null, new File(odexPath));
 		}
-		
+
 		this.saveNewDexThumb(this.dexThumb, dexDir);
 	}
 
@@ -302,49 +340,48 @@ public class DexFactory
 			Log.e(Platform.DEFAULT_LOG_TAG, "Error while getting current proxy thumb");
 			e.printStackTrace();
 		}
-		
+
 		return null;
 	}
-	
+
 	private void purgeDexesByThumb(String cachedDexThumb, File pathToPurge)
 	{
 		if (!pathToPurge.exists())
 		{
 			return;
 		}
-		
+
 		if (!pathToPurge.isDirectory())
-	    {
+		{
 			Log.e(Platform.DEFAULT_LOG_TAG, "Purge proxies path not a directory. Path: " + pathToPurge);
 			throw new RuntimeException("Purge path not a directory");
-	    }
-	    
-        String[] children = pathToPurge.list();
-        
-        for (int i = 0; i < children.length; i++)
-        {
-        	String filename = children[i];
-        	File purgeCandidate = new File(pathToPurge, filename);
-            if (purgeCandidate.isDirectory())
-            {
-            	this.purgeDexesByThumb(cachedDexThumb, purgeCandidate);
-            }
-            else
-            {
-            	if (cachedDexThumb != null && !filename.contains(cachedDexThumb))
-            	{
-            		continue;
-            	}
-            	
-                boolean b = purgeCandidate.delete();
-                if (b == false)
-                {
-                    Log.e(Platform.DEFAULT_LOG_TAG, "Error purging cached proxy file: " + purgeCandidate.getAbsolutePath());
-                }
-            }
-        }
+		}
+
+		String[] children = pathToPurge.list();
+
+		for (int i = 0; i < children.length; i++)
+		{
+			String filename = children[i];
+			File purgeCandidate = new File(pathToPurge, filename);
+			if (purgeCandidate.isDirectory())
+			{
+				this.purgeDexesByThumb(cachedDexThumb, purgeCandidate);
+			}
+			else
+			{
+				if (cachedDexThumb != null && !filename.contains(cachedDexThumb))
+				{
+					continue;
+				}
+
+				if (!purgeCandidate.delete())
+				{
+					Log.e(Platform.DEFAULT_LOG_TAG, "Error purging cached proxy file: " + purgeCandidate.getAbsolutePath());
+				}
+			}
+		}
 	}
-	
+
 	private String getCachedProxyThumb(File proxyDir)
 	{
 		try
@@ -370,7 +407,7 @@ public class DexFactory
 			Log.e(Platform.DEFAULT_LOG_TAG, "Error while getting current proxy thumb");
 			e.printStackTrace();
 		}
-		
+
 		return null;
 	}
 }

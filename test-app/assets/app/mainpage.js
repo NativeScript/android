@@ -1,7 +1,8 @@
 __disableVerboseLogging();
 
 require("./tests/testWeakRef"); 
-require("./tests/tests"); 
+require("./tests/tests");
+require("./tests/testArrays");
 require("./tests/testsForRuntimeBindingGenerator");
 require("./tests/testPrimitiveTypeConversion");
 require("./tests/numericConversionTests"); 
@@ -18,7 +19,6 @@ require("./tests/extendedClassesTests");
 require("./tests/extendClassNameTests");
 require("./tests/testJniReferenceLeak");
 
-
 var MainActivity = {
     onCreate: function (bundle) {
     	__log("onCreate from js");
@@ -29,7 +29,7 @@ var MainActivity = {
 
     	require("./tests/testsWithContext").run(this);
     	execute(); //run jasmine
-
+    	
     	var layout = new android.widget.LinearLayout(this);
     	layout.setOrientation(1);
     	this.setContentView(layout);

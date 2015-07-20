@@ -29,10 +29,11 @@ namespace tns
 
 		static v8::Handle<v8::Object> CreateJSWrapper(jint javaObjectID, const std::string& typeName);
 
-		static jobject CreateJavaInstance(int objectID, const std::string& name, const std::string& className, const ArgsWrapper& argWrapper, const v8::Handle<v8::Object>& implementationObject, bool isInterface);
+		static jobject CreateJavaInstance(int objectID, const std::string& fullClassName, const ArgsWrapper& argWrapper, jclass javaClass, bool isInterface);
 
-		static bool RegisterInstance(const v8::Handle<v8::Object>& jsObject, const std::string& name, const std::string& className, const ArgsWrapper& argWrapper, const v8::Handle<v8::Object>& implementationObject, bool isInterface);
+		static bool RegisterInstance(const v8::Handle<v8::Object>& jsObject, const std::string& fullClassName, const ArgsWrapper& argWrapper, const v8::Handle<v8::Object>& implementationObject, bool isInterface);
 
+		static jclass ResolveClass(const std::string& fullClassname, const v8::Handle<v8::Object>& implementationObject);
 		//
 
 		static v8::Handle<v8::Value> GetArrayElement(const v8::Handle<v8::Object>& array, uint32_t index, const std::string& arraySignature);
@@ -87,6 +88,8 @@ namespace tns
 
 		static void CreateTopLevelNamespaces(const v8::Handle<v8::Object>& global);
 
+		static void CompileAndRun(std::string modulePath, bool& hasError, v8::Handle<v8::Object>& moduleObj, bool isBootstrapCall);
+
 		static MetadataTreeNode *metadataRoot;
 
 		static jclass PlatformClass;
@@ -102,7 +105,7 @@ namespace tns
 	private:
 		NativeScriptRuntime() {}
 
-		static int GetCachedConstructorId(JEnv& env, const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& name, const std::string& className, jobjectArray javaArgs, const v8::Handle<v8::Object>& implementationObject);
+		static int GetCachedConstructorId(JEnv& env, const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& fullClassName, jobjectArray javaArgs, jclass javaClass);
 
 		static v8::Handle<v8::Object> FindClass(const std::string& className);
 
@@ -116,13 +119,13 @@ namespace tns
 
 		static JavaVM *jvm;
 
+		static jmethodID RESOLVE_CLASS_METHOD_ID;
+
 		static jmethodID CREATE_INSTANCE_METHOD_ID;
 
 		static jmethodID CACHE_CONSTRUCTOR_METHOD_ID;
 
 		static jmethodID APP_FAIL_METHOD_ID;
-
-		static jmethodID GET_MODULE_CONTENT_METHOD_ID;
 
 		static jmethodID GET_MODULE_PATH_METHOD_ID;
 

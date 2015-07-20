@@ -339,6 +339,7 @@ void FieldAccessor::SetJavaField(const Handle<Object>& target, const Handle<Valu
 				{
 					env.SetCharField(targetJavaObject, fieldId, chars[0]);
 				}
+				env.ReleaseStringUTFChars(value, chars);
 				break;
 			}
 			case 'S': //short
@@ -370,7 +371,7 @@ void FieldAccessor::SetJavaField(const Handle<Object>& target, const Handle<Valu
 			}
 			case 'J': //long
 			{
-				jlong longValue = (jlong) ArgConverter::ConvertToJavaLong(value);
+				jlong longValue = static_cast<jlong>(ArgConverter::ConvertToJavaLong(value));
 				if (isStatic)
 				{
 					env.SetStaticLongField(clazz, fieldId, longValue);
@@ -385,11 +386,11 @@ void FieldAccessor::SetJavaField(const Handle<Object>& target, const Handle<Valu
 			{
 				if (isStatic)
 				{
-					env.SetStaticFloatField(clazz, fieldId, (jfloat) value->NumberValue());
+					env.SetStaticFloatField(clazz, fieldId, static_cast<jfloat>(value->NumberValue()));
 				}
 				else
 				{
-					env.SetLongField(targetJavaObject, fieldId, (jfloat) value->NumberValue());
+					env.SetFloatField(targetJavaObject, fieldId, static_cast<jfloat>(value->NumberValue()));
 				}
 				break;
 			}
@@ -397,11 +398,11 @@ void FieldAccessor::SetJavaField(const Handle<Object>& target, const Handle<Valu
 			{
 				if (isStatic)
 				{
-					env.SetStaticFloatField(clazz, fieldId, value->NumberValue());
+					env.SetStaticDoubleField(clazz, fieldId, value->NumberValue());
 				}
 				else
 				{
-					env.SetLongField(targetJavaObject, fieldId, value->NumberValue());
+					env.SetDoubleField(targetJavaObject, fieldId, value->NumberValue());
 				}
 				break;
 			}

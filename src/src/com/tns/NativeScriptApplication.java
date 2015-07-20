@@ -750,7 +750,9 @@ public class NativeScriptApplication extends android.app.Application implements 
 		catch (ClassNotFoundException e)
 		{
 			appBuilderCallbackClass = null;
-			Log.d(logTag, "prepareAppBuilderCallbackImpl error: " + e.getMessage());
+			if(Platform.IsLogEnabled) {
+				Log.d(logTag, "prepareAppBuilderCallbackImpl error: " + e.getMessage());
+			}
 		}	
 		
 		if (appBuilderCallbackClass != null)
@@ -762,12 +764,16 @@ public class NativeScriptApplication extends android.app.Application implements 
 			catch (InstantiationException e)
 			{
 				appBuilderCallbackImpl = null;
-				Log.d(logTag, "prepareAppBuilderCallbackImpl error: " + e.getMessage());
+				if(Platform.IsLogEnabled) {
+					Log.d(logTag, "prepareAppBuilderCallbackImpl error: " + e.getMessage());
+				}
 			}
 			catch (IllegalAccessException e)
 			{
 				appBuilderCallbackImpl = null;
-				Log.d(logTag, "prepareAppBuilderCallbackImpl error: " + e.getMessage());
+				if(Platform.IsLogEnabled) {
+					Log.d(logTag, "prepareAppBuilderCallbackImpl error: " + e.getMessage());
+				}
 			}
 		}
 

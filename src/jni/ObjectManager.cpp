@@ -340,37 +340,6 @@ void ObjectManager::JSObjectWeakCallback(Isolate *isolate, ObjectWeakCallbackSta
 	po->SetWeak(callbackState, JSObjectWeakCallbackStatic);
 }
 
-string ObjectManager::JniClassPathToCanonicalName(const string& jniClassPath)
-{
-	std::string canonicalName;
-
-	const char prefix = jniClassPath[0];
-
-	std::string rest;
-	int lastIndex;
-
-	switch (prefix)
-	{
-		case 'L':
-			canonicalName = jniClassPath.substr(1, jniClassPath.size() - 2);
-			break;
-
-		case '[':
-			canonicalName = jniClassPath;
-			lastIndex = canonicalName.find_last_of("[");
-			rest = canonicalName.substr(lastIndex + 1);
-			canonicalName = canonicalName.substr(0, lastIndex + 1);
-			canonicalName.append(JniClassPathToCanonicalName(rest));
-			break;
-
-		default:
-			// TODO:
-			canonicalName = jniClassPath;
-			break;
-	}
-	return canonicalName;
-}
-
 int ObjectManager::GenerateNewObjectID()
 {
 	const int one = 1;

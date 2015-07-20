@@ -95,14 +95,20 @@ public class FileSystem
 	}
 	
 	public static String resolveRelativePath(String path, String currentDirectory){
-		try{
-			URI uri = new URI(currentDirectory);
-			String resolvedPath = uri.resolve(path).getPath();
-			
-			return resolvedPath;
+		File temp = new File(currentDirectory, path);
+		try
+		{
+			return temp.getCanonicalPath();
 		}
-		catch(URISyntaxException e){
-			return null;
+		catch (IOException e)
+		{
+			try{
+				URI uri = new URI(currentDirectory);
+				return uri.resolve(path).getPath();
+			}
+			catch(URISyntaxException e1){
+				return null;
+			}
 		}
 	}
 }
