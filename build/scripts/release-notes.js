@@ -131,9 +131,16 @@ function createReleaseNotes(milestone) {
                     return l.name == "T:Feature";
                 }).length > 0;
             });
+            
+             var performance = issues.filter(function (i) {
+                return i.labels.filter(function (l) {
+                    return l.name == "T:Performance";
+                }).length > 0;
+            });
 
             console.log(" - " + bugs.length + " fixed (e.g. T:Bug)");
             console.log(" - " + features.length + " new (e.g. T:Feature");
+            console.log(" - " + performance.length + " performance (e.g. T:Performance");
 
             var md = "";
 
@@ -141,6 +148,7 @@ function createReleaseNotes(milestone) {
 
             printSection("What's New", features);
             printSection("Bug Fixes", bugs);
+            printSection("Performance", performance);
 
             function printSection(title, issues) {
                 if (issues.length > 0) {
