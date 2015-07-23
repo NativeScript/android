@@ -240,12 +240,10 @@ public class Dump
 				result = Long.class;
 			}
 		}
-//		else if (c.isArray())
-//		{
-//			
-//			//buf.append('[');
-//			//c = c.getComponentType();
-//		}
+		else if (c.isArray())
+		{
+			result = Object.class; 
+		}
 		else
 		{
 			result = c;
