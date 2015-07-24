@@ -591,6 +591,11 @@ public class Platform
 		
 		return ret;
 	}
+	
+	public static Object callJSMethod(Object javaObject, String methodName, boolean isConstructor,  Object... args) throws NativeScriptException
+	{
+		return callJSMethod(javaObject, methodName, void.class, isConstructor, 0, args);
+	}
 
 	public static Object callJSMethod(Object javaObject, String methodName, Class<?> retType, boolean isConstructor, long delay, Object... args) throws NativeScriptException
 	{
