@@ -1,9 +1,42 @@
 module.exports = function(grunt) {
 
+
+    if (process.env.ANDROID_HOME === "" || process.env.ANDROID_HOME === undefined)
+    {
+        grunt.fail.fatal("Set ANDROID_HOME to point to the correct Android SDK location\n");
+    }
+    
+    if (process.env.GIT_COMMIT === "" || process.env.GIT_COMMIT === undefined)
+    {
+        grunt.log.error("The GIT_COMMIT is not set. This NativeScript Android Runtime will not be tagged with the git commit it is build from\n");
+    }
+    
+    //if (process.env.JAVA_HOME === "" || process.env.GIT_COMMIT === undefined)
+    //{
+    //    grunt.fail.fatal("The JAVA_HOME is not set. Set the JAVA_HOME to JDK7 or JDK8");
+    //}
+    
+    //if (process.env.JAVA_HOME.indexof("jdk1.7") === -1 && process.env.JAVA_HOME.indexof("jdk1.8") === -1)
+    //{
+    //    grunt.fail.fatal("The JAVA_HOME is set to unsupported jdk version. Set the JAVA_HOME to JDK7 or JDK8 directory");
+    //}
+    
+    
     var pathModule = require("path");
 
     var outDir = "./dist";
     var rootDir = ".";
+    
+    if (process.platform === "win32")
+    {
+        var destinationPackageJsonFileName = rootDir + "/src/package.json"
+        var sourcePackageJsonFileName = rootDir + "/package.json";
+        grunt.log.error("This is windows machine. Coping " + sourcePackageJsonFileName + " to " + destinationPackageJsonFileName + " \n");
+        //delete package.json dummy file in src dir
+        grunt.file.delete(destinationPackageJsonFileName);
+        //copy package.json over to the src dir
+        grunt.file.copy(sourcePackageJsonFileName, destinationPackageJsonFileName);
+    }
 
     var args = {
         metadataGen: grunt.option("metadataGen") || "../android-metadata-generator/dist/tns-android-metadata-generator-0.0.1.tgz",
@@ -60,7 +93,7 @@ module.exports = function(grunt) {
     };
 
     localCfg.packageVersion = getPackageVersion(localCfg.packageJsonFilePath);
-
+    
     grunt.initConfig({
         pkg: grunt.file.readJSON(rootDir + "/package.json"),
         clean: {
@@ -194,7 +227,7 @@ module.exports = function(grunt) {
                 cmd: "npm install " + localCfg.metadataGenPath
             },
             runMetadataGenerator: {
-                cmd: pathModule.normalize("./node_modules/.bin/generate-metadata") + " " + localCfg.libsDir + " ./dist/framework/assets/metadata"
+                cmd: pathModule.normalize("\"node_modules/.bin/generate-metadatajs\"") + " " + localCfg.libsDir + " ./dist/framework/assets/metadata"
             },
 			runTests: {
 				cmd: "npm install && grunt --verbose",

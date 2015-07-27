@@ -132,7 +132,7 @@ module.exports = function(grunt) {
             },
             jarJavaRuntime: {
                 //cmd: "jar cfm ../../" + "/dist/libs/nativescript.jar ../../manifest.mf com",
-                cmd: "jar umf ./manifest.mf ./bin/NativeScriptRuntime.jar"
+                cmd: "\"" + process.env.JAVA_HOME + "/bin/jar\""  + " umf ./manifest.mf ./bin/NativeScriptRuntime.jar"
                 //,cwd: pathModule.join(localCfg.rootDir, "/bin/classes")
             }
         }
