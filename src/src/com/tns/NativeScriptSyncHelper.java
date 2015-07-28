@@ -2,17 +2,9 @@ package com.tns;
 
 import java.io.File;
 import java.io.FileFilter;
-import java.io.FileReader;
 import java.io.IOException;
-import java.util.Arrays;
 
-import com.tns.BuildConfig;
-
-import android.R.plurals;
 import android.content.Context;
-import android.os.Build;
-import android.os.Debug;
-import android.provider.ContactsContract.Directory;
 import android.util.Log;
 
 public class NativeScriptSyncHelper
@@ -63,15 +55,12 @@ public class NativeScriptSyncHelper
 	{
 		try
 		{
+			//this removes only the app directory from the device to preserver any existing files in /files directory on the device
 			String targetPath = context.getFilesDir().getAbsolutePath();
-			
 			StringBuilder builder = new StringBuilder();
 			builder.append("echo \"Syncing files:\n\"");
 			builder.append("du -a \"" + sourceDir.getAbsolutePath() + "\" && "); //list files to sync in logcat
 			builder.append("rm -Rf \"" + targetPath + "/app\" && "); //remove app dir
-			builder.append("rm -Rf \"" + targetPath + "/tns_modules\" && "); //remove tns_modules dir
-			builder.append("rm -Rf \"" + targetPath + "/metadata\" && "); //remove metadata dir
-			builder.append("rm -Rf \"" + targetPath + "/internal\" && "); //remove internal dir
 			builder.append(String.format("cp -Rf \"%s/*\" \"%s/\" && ", sourceDir.getAbsolutePath(), targetPath)); //copy all sync files
 			builder.append("rm -Rf \"" + sourceDir.getAbsolutePath() + "\""); //remove all source dir files
 			
