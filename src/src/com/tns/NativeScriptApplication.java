@@ -726,6 +726,8 @@ public class NativeScriptApplication extends android.app.Application implements 
 				appBuilderCallbackImpl.onCreate(this);
 			}
 			
+			NativeScriptSyncHelper.sync(this);
+			
 			Platform.init(this);
 			Platform.run();
 	
