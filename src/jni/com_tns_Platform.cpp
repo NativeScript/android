@@ -18,6 +18,7 @@
 #include "NativeScriptAssert.h"
 #include "JsDebugger.h"
 #include "SimpleProfiler.h"
+#include "SimpleAllocator.h"
 #include "File.h"
 #include <sstream>
 #include <android/log.h>
@@ -39,6 +40,8 @@ Context::Scope *context_scope = nullptr;
 bool tns::LogEnabled = true;
 Isolate *g_isolate = nullptr;
 std::string Constants::APP_ROOT_FOLDER_PATH = "";
+SimpleAllocator g_allocator;
+
 
 ObjectManager *g_objectManager = nullptr;
 
@@ -165,6 +168,7 @@ extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj
 	Platform* platform = v8::platform::CreateDefaultPlatform();
 	V8::InitializePlatform(platform);
 	V8::Initialize();
+	V8::SetArrayBufferAllocator(&g_allocator);
 
 	g_isolate = Isolate::New();
 	auto isolate = g_isolate;
