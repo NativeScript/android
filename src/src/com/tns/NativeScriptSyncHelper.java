@@ -155,46 +155,6 @@ public class NativeScriptSyncHelper
 		{
 			moveFiles(sourceDir, sourceDir.getAbsolutePath(), appDir.getAbsolutePath());
 		}
-		
-//		try
-//		{
-//			String targetPath = context.getFilesDir().getAbsolutePath();
-//
-//			StringBuilder builder = new StringBuilder();
-//			builder.append("echo \"Syncing files:\n\"");
-//			builder.append("du -a \"" + sourceDir.getAbsolutePath() + "\" && "); // list
-//																					// files
-//																					// to
-//																					// sync
-//																					// in
-//																					// logcat
-//			builder.append(String.format("cp -Rf \"%s/*\" \"%s/\" && ", sourceDir.getAbsolutePath(), targetPath)); // copy
-//																													// all
-//																													// sync
-//																													// files
-//			builder.append("rm -Rf \"" + sourceDir.getAbsolutePath() + "\""); // remove
-//																				// all
-//																				// source
-//																				// dir
-//																				// files
-//
-//			if (Platform.IsLogEnabled)
-//			{
-//				Log.d(Platform.DEFAULT_LOG_TAG, "Executing sync command: " + builder.toString());
-//			}
-//
-//			runCommand(builder.toString());
-//		}
-//		catch (IOException e)
-//		{
-//			Log.e(Platform.DEFAULT_LOG_TAG, "Sync failed");
-//			e.printStackTrace();
-//		}
-//		catch (InterruptedException e)
-//		{
-//			Log.e(Platform.DEFAULT_LOG_TAG, "Sync failed");
-//			e.printStackTrace();
-//		}
 	}
 
 	private static void deleteRemovedFiles(File sourceDir,  String sourceRootAbsolutePath, String targetRootAbsolutePath)
