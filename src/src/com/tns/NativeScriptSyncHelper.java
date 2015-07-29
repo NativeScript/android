@@ -197,61 +197,42 @@ public class NativeScriptSyncHelper
 //		}
 	}
 
-	private static void executeRemovedSync(final Context context, final File sourceDir)
+	private static void deleteRemovedFiles(File sourceDir,  String sourceRootAbsolutePath, String targetRootAbsolutePath)
 	{
-		final String targetPath = context.getFilesDir().getAbsolutePath();
-		final String removedSyncPath = SYNC_ROOT_SOURCE_DIR + context.getPackageName() + REMOVED_SYNC_SOURCE_DIR;
-
-		sourceDir.listFiles(new FileFilter()
+		File[] files = sourceDir.listFiles();
+		
+		if (files != null)
 		{
-			@Override
-			public boolean accept(File pathname)
+			for (int i = 0; i < files.length; i++)
 			{
-				if (pathname.isFile())
+				File file = files[i];
+				if (file.isFile())
 				{
-					String filePathToRemove = pathname.getAbsolutePath().replace(removedSyncPath, targetPath);
 					if (Platform.IsLogEnabled)
 					{
-						Log.d(Platform.DEFAULT_LOG_TAG, "Sync removing file: " + filePathToRemove);
+						Log.d(Platform.DEFAULT_LOG_TAG, "Syncing removed file: " + file.getAbsolutePath().toString());
 					}
-
-					File fileToRemove = new File(filePathToRemove);
-					fileToRemove.delete();
-					pathname.delete();
+					
+					String targetFilePath = file.getAbsolutePath().replace(sourceRootAbsolutePath, targetRootAbsolutePath);
+					File targetFile = new File(targetFilePath);
+					targetFile.delete();
 				}
-
-				return false;
+				else
+				{
+					deleteRemovedFiles(file, sourceRootAbsolutePath, targetRootAbsolutePath);
+				}
 			}
-		});
+		}
+		
+		if (sourceDir.exists())
+		{
+			sourceDir.delete();
+		}
 	}
-
-	private static String runCommand(String command) throws IOException, InterruptedException
+	
+	private static void executeRemovedSync(final Context context, final File sourceDir)
 	{
-		StringBuilder out = new StringBuilder();
-		Process process;
-
-		process = Runtime.getRuntime().exec(command);
-
-		process.wait(60000);
-
-		BufferedReader stdOutReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-		BufferedReader stdErrReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
-
-		String line;
-		while ((line = stdOutReader.readLine()) != null)
-		{
-			out.append(line);
-		}
-
-		while ((line = stdErrReader.readLine()) != null)
-		{
-			out.append(line);
-		}
-
-		stdOutReader.close();
-		stdErrReader.close();
-		process.destroy();
-
-		return out.toString();
+		String appPath = context.getFilesDir().getAbsolutePath() + "/app";
+		deleteRemovedFiles(sourceDir, sourceDir.getAbsolutePath(), appPath);
 	}
 }
