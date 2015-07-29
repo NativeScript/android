@@ -148,45 +148,53 @@ public class NativeScriptSyncHelper
 
 	private static void executePartialSync(Context context, File sourceDir)
 	{
-		try
+		String appPath = context.getFilesDir().getAbsolutePath() + "/app";
+		final File appDir = new File(appPath);
+		
+		if (appDir.exists())
 		{
-			String targetPath = context.getFilesDir().getAbsolutePath();
-
-			StringBuilder builder = new StringBuilder();
-			builder.append("echo \"Syncing files:\n\"");
-			builder.append("du -a \"" + sourceDir.getAbsolutePath() + "\" && "); // list
-																					// files
-																					// to
-																					// sync
-																					// in
-																					// logcat
-			builder.append(String.format("cp -Rf \"%s/*\" \"%s/\" && ", sourceDir.getAbsolutePath(), targetPath)); // copy
-																													// all
-																													// sync
-																													// files
-			builder.append("rm -Rf \"" + sourceDir.getAbsolutePath() + "\""); // remove
-																				// all
-																				// source
-																				// dir
-																				// files
-
-			if (Platform.IsLogEnabled)
-			{
-				Log.d(Platform.DEFAULT_LOG_TAG, "Executing sync command: " + builder.toString());
-			}
-
-			runCommand(builder.toString());
+			moveFiles(sourceDir, sourceDir.getAbsolutePath(), appDir.getAbsolutePath());
 		}
-		catch (IOException e)
-		{
-			Log.e(Platform.DEFAULT_LOG_TAG, "Sync failed");
-			e.printStackTrace();
-		}
-		catch (InterruptedException e)
-		{
-			Log.e(Platform.DEFAULT_LOG_TAG, "Sync failed");
-			e.printStackTrace();
-		}
+		
+//		try
+//		{
+//			String targetPath = context.getFilesDir().getAbsolutePath();
+//
+//			StringBuilder builder = new StringBuilder();
+//			builder.append("echo \"Syncing files:\n\"");
+//			builder.append("du -a \"" + sourceDir.getAbsolutePath() + "\" && "); // list
+//																					// files
+//																					// to
+//																					// sync
+//																					// in
+//																					// logcat
+//			builder.append(String.format("cp -Rf \"%s/*\" \"%s/\" && ", sourceDir.getAbsolutePath(), targetPath)); // copy
+//																													// all
+//																													// sync
+//																													// files
+//			builder.append("rm -Rf \"" + sourceDir.getAbsolutePath() + "\""); // remove
+//																				// all
+//																				// source
+//																				// dir
+//																				// files
+//
+//			if (Platform.IsLogEnabled)
+//			{
+//				Log.d(Platform.DEFAULT_LOG_TAG, "Executing sync command: " + builder.toString());
+//			}
+//
+//			runCommand(builder.toString());
+//		}
+//		catch (IOException e)
+//		{
+//			Log.e(Platform.DEFAULT_LOG_TAG, "Sync failed");
+//			e.printStackTrace();
+//		}
+//		catch (InterruptedException e)
+//		{
+//			Log.e(Platform.DEFAULT_LOG_TAG, "Sync failed");
+//			e.printStackTrace();
+//		}
 	}
 
 	private static void executeRemovedSync(final Context context, final File sourceDir)
