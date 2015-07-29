@@ -54,25 +54,6 @@ public class NativeScriptSyncHelper
 		}
 	}
 	
-//	private static void deleteDir(File directory, FileFilter deleteFilesFilter)
-//	{
-//		File[] subDirectories = directory.listFiles(deleteFilesFilter);
-//		if (subDirectories != null)
-//		{
-//			for (int i = 0; i < subDirectories.length; i++)
-//			{
-//				File subDir = subDirectories[i];
-//				deleteDir(subDir, deleteFilesFilter);
-//			}
-//		}
-//		
-//		boolean success = directory.delete();
-//		if (!success && directory.exists())
-//		{
-//			Log.e(Platform.DEFAULT_LOG_TAG, "Syncing: directory not deleted: " + directory.getAbsolutePath().toString());
-//		}
-//	}
-	
 	final static FileFilter deletingFilesFilter = new FileFilter()
 	{
 		@Override
@@ -91,7 +72,8 @@ public class NativeScriptSyncHelper
 			return false;
 		}
 	};
-	private static void deleteDir1(File directory)
+	
+	private static void deleteDir(File directory)
 	{
 		File[] subDirectories = directory.listFiles(deletingFilesFilter);
 		if (subDirectories != null)
@@ -99,7 +81,7 @@ public class NativeScriptSyncHelper
 			for (int i = 0; i < subDirectories.length; i++)
 			{
 				File subDir = subDirectories[i];
-				deleteDir1(subDir);
+				deleteDir(subDir);
 			}
 		}
 		
@@ -159,75 +141,9 @@ public class NativeScriptSyncHelper
 		
 		if (appDir.exists())
 		{
-			deleteDir1(appDir);
-		
-
-//		deleteDir(appDir, new FileFilter()
-//		{
-//			@Override
-//			public boolean accept(File pathname)
-//			{
-//				if (pathname.isDirectory())
-//				{
-//					return true;
-//				}
-//				
-//				boolean success = pathname.delete();
-//				if (!success)
-//				{
-//					Log.e(Platform.DEFAULT_LOG_TAG, "Syncing: file not deleted: " + pathname.getAbsolutePath().toString());
-//				}
-//				
-//				return false;
-//			}
-//		});
-		
-		
-		
-
-//		for (int i = 0; i < directories.size(); i++)
-//		{
-//			boolean success = directories.get(i).delete();
-//			if (!success)
-//			{
-//				Log.e(Platform.DEFAULT_LOG_TAG, "Syncing: directory not deleted: " + directories.get(i).getAbsolutePath().toString());
-//			}
-//		}
-
+			deleteDir(appDir);
 			moveFiles(sourceDir, sourceDir.getAbsolutePath(), appDir.getAbsolutePath());
 		}
-
-		// StringBuilder builder = new StringBuilder();
-		// builder.append("echo \"Syncing files:\n\"");
-		// builder.append("du -a \"" + sourceDir.getAbsolutePath() + "\" && ");
-		// // list
-		// // files
-		// // to
-		// // sync
-		// // in
-		// // logcat
-		// builder.append("rm -Rf \"" + targetPath + "/app\" && "); // remove
-		// // app
-		// // dir
-		// builder.append(String.format("cp -Rf \"%s/*\" \"%s/\" && ",
-		// sourceDir.getAbsolutePath(), targetPath)); // copy
-		// // all
-		// // sync
-		// // files
-		// builder.append("rm -Rf \"" + sourceDir.getAbsolutePath() + "\""); //
-		// remove
-		// // all
-		// // source
-		// // dir
-		// // files
-
-		// if (Platform.IsLogEnabled)
-		// {
-		// Log.d(Platform.DEFAULT_LOG_TAG, "Executing full sync command: " +
-		// builder.toString());
-		// }
-
-		// runCommand(builder.toString());
 	}
 
 	private static void executePartialSync(Context context, File sourceDir)
@@ -330,40 +246,4 @@ public class NativeScriptSyncHelper
 
 		return out.toString();
 	}
-
-	// public static void copyFileStream(InputStream inputStream,
-	// FileOutputStream outputStream) throws IOException {
-	// byte[] buffer = new byte[1024 * 10];
-	// int bytesRead;
-	// while ((bytesRead = inputStream.read(buffer)) != -1) {
-	// outputStream.write(buffer, 0, bytesRead);
-	// }
-	// }
-	//
-	// public static void copyFile(String sourcePath, String outputPath)
-	// throws IOException {
-	// FileInputStream inputFileStream = new FileInputStream(sourcePath);
-	// FileUtil.extractFile(inputFileStream, true, outputPath);
-	// }
-	//
-	// public static void extractFile(InputStream inputFileStream, boolean
-	// closeInputStream, String outputPath) throws IOException {
-	// FileOutputStream outputFileStream = null;
-	// try {
-	// outputFileStream = new FileOutputStream(outputPath);
-	//
-	// FileUtil.copyFileStream(inputFileStream, outputFileStream);
-	// } finally {
-	// try {
-	// if (closeInputStream && inputFileStream != null) {
-	// inputFileStream.close();
-	// }
-	// if (outputFileStream != null) {
-	// outputFileStream.close();
-	// }
-	// } catch (IOException e) {
-	// e.printStackTrace();
-	// }
-	// }
-	// }
 }
