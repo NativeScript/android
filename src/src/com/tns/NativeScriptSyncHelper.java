@@ -198,6 +198,7 @@ public class NativeScriptSyncHelper
 					String targetFilePath = file.getAbsolutePath().replace(sourceRootAbsolutePath, targetRootAbsolutePath);
 					File targetFile = new File(targetFilePath);
 					targetFile.delete();
+					file.delete();
 				}
 				else
 				{
