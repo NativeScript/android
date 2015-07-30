@@ -9,6 +9,8 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 
 import android.content.Context;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager.NameNotFoundException;
 import android.util.Log;
 
 public class NativeScriptSyncHelper
@@ -20,37 +22,57 @@ public class NativeScriptSyncHelper
 
 	public static void sync(Context context)
 	{
-		if (BuildConfig.DEBUG)
+		int flags;
+		boolean shouldExecuteSync = false;
+		try
 		{
-			String syncPath = SYNC_ROOT_SOURCE_DIR + context.getPackageName() + SYNC_SOURCE_DIR;
-			String fullSyncPath = SYNC_ROOT_SOURCE_DIR + context.getPackageName() + FULL_SYNC_SOURCE_DIR;
-			String removedSyncPath = SYNC_ROOT_SOURCE_DIR + context.getPackageName() + REMOVED_SYNC_SOURCE_DIR;
-
+			flags = context.getPackageManager().getPackageInfo(context.getPackageName(), 0).applicationInfo.flags;
+			shouldExecuteSync = ((flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0);
+		}
+		catch (NameNotFoundException e)
+		{
+			e.printStackTrace();
+			return;
+		}
+		
+		if (!shouldExecuteSync)
+		{
 			if (Platform.IsLogEnabled)
 			{
-				Log.d(Platform.DEFAULT_LOG_TAG, "syncPath: " + syncPath);
-				Log.d(Platform.DEFAULT_LOG_TAG, "fullSyncPath: " + fullSyncPath);
-				Log.d(Platform.DEFAULT_LOG_TAG, "removedSyncPath: " + removedSyncPath);
+				Log.d(Platform.DEFAULT_LOG_TAG, "Sync is not enabled.");
 			}
+			return;
+		}
+		
+		String syncPath = SYNC_ROOT_SOURCE_DIR + context.getPackageName() + SYNC_SOURCE_DIR;
+		String fullSyncPath = SYNC_ROOT_SOURCE_DIR + context.getPackageName() + FULL_SYNC_SOURCE_DIR;
+		String removedSyncPath = SYNC_ROOT_SOURCE_DIR + context.getPackageName() + REMOVED_SYNC_SOURCE_DIR;
 
-			File fullSyncDir = new File(fullSyncPath);
-			if (fullSyncDir.exists())
-			{
-				executeFullSync(context, fullSyncDir);
-				return;
-			}
+		if (Platform.IsLogEnabled)
+		{
+			Log.d(Platform.DEFAULT_LOG_TAG, "Sync is enabled:");
+			Log.d(Platform.DEFAULT_LOG_TAG, "Sync path              : " + syncPath);
+			Log.d(Platform.DEFAULT_LOG_TAG, "Full sync path         : " + fullSyncPath);
+			Log.d(Platform.DEFAULT_LOG_TAG, "Removed files sync path: " + removedSyncPath);
+		}
 
-			File syncDir = new File(syncPath);
-			if (syncDir.exists())
-			{
-				executePartialSync(context, syncDir);
-			}
+		File fullSyncDir = new File(fullSyncPath);
+		if (fullSyncDir.exists())
+		{
+			executeFullSync(context, fullSyncDir);
+			return;
+		}
 
-			File removedSyncDir = new File(removedSyncPath);
-			if (removedSyncDir.exists())
-			{
-				executeRemovedSync(context, removedSyncDir);
-			}
+		File syncDir = new File(syncPath);
+		if (syncDir.exists())
+		{
+			executePartialSync(context, syncDir);
+		}
+
+		File removedSyncDir = new File(removedSyncPath);
+		if (removedSyncDir.exists())
+		{
+			executeRemovedSync(context, removedSyncDir);
 		}
 	}
 	
