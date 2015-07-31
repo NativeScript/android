@@ -31,7 +31,7 @@ JsArgToArrayConverter::JsArgToArrayConverter(const v8::Handle<Value>& arg, bool 
 
 
 JsArgToArrayConverter::JsArgToArrayConverter(const v8::FunctionCallbackInfo<Value>& args, bool hasImplementationObject, const Handle<Object>& outerThis) :
-		m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error())
+		m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()), m_return_type(static_cast<int>(Type::Null))
 {
 	auto isInnerClass = !outerThis.IsEmpty();
 	if (isInnerClass)
@@ -93,7 +93,7 @@ bool JsArgToArrayConverter::ConvertArg(const Handle<Value>& arg, int index)
 		s << "Cannot convert empty JavaScript object";
 		success = false;
 	}
-	else if (arg->IsInt32() && (returnType == Type::Int))
+	else if (arg->IsInt32() && (returnType == Type::Int || returnType == Type::Null))
 	{
 		jint value = arg->Int32Value();
 		JniLocalRef javaObject(JType::NewInt(env, value));
@@ -110,7 +110,7 @@ bool JsArgToArrayConverter::ConvertArg(const Handle<Value>& arg, int index)
 		if (isInteger)
 		{
 			jobject obj;
-			if ((INT_MIN <= i) && (i <= INT_MAX) && (returnType == Type::Int))
+			if ((INT_MIN <= i) && (i <= INT_MAX) && (returnType == Type::Int || returnType == Type::Null))
 			{
 				obj = JType::NewInt(env, (jint)d);
 			}
