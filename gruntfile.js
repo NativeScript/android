@@ -1,5 +1,9 @@
 module.exports = function(grunt) {
 
+    if (process.env.JAVA_HOME === "" || process.env.JAVA_HOME === undefined)
+    {
+        grunt.fail.fatal("Set JAVA_HOME to point to the correct Jdk location\n");
+    }
 
     if (process.env.ANDROID_HOME === "" || process.env.ANDROID_HOME === undefined)
     {
@@ -10,25 +14,40 @@ module.exports = function(grunt) {
     {
         grunt.log.error("The GIT_COMMIT is not set. This NativeScript Android Runtime will not be tagged with the git commit it is build from\n");
     }
+
+    if (!grunt.option("metadataGenSrc") && !grunt.file.exists("../android-metadata-generator"))
+    {
+        grunt.fail.fatal("../android-metadata-generator directory not found and no metadataGenSrc option specified. Clone the android-metadata-generator repo first.\n");
+    }
     
-    grunt.util.spawn({ cmd: "ndk-build --version" }, 
+    grunt.util.spawn({ cmd: "ndk-build" , args: ["--version"] }, 
     	function doneFunction(error, result, code) 
     	{
-    		if (error)
-        {
-            grunt.fail.fatal("ndk-build command not found. Set the PATH variable to include the path to Android NDK directory. \n");
-        }
+    		if (code !== 0)
+            {
+                grunt.fail.fatal("ndk-build command not found. Set the PATH variable to include the path to Android NDK directory.\nError: " + result.stdout  + "\n" + result.stderr + " \nCode:" + code);
+            }
     	}
     );
     
-    grunt.util.spawn({ cmd: "android -h" }, 
+    grunt.util.spawn({ cmd: "android", args: ["-h"] }, 
     	function doneFunction(error, result, code) 
     	{
-    		if (error)
-        {
-            grunt.fail.fatal("android command not found. Set the PATH variable to include the path to Android SDK directory. \n");
-        }
+    		if (code !== 1) //1 is ok result for android tool
+            {
+                grunt.fail.fatal("android command not found. Set the PATH variable to include the path to Android SDK Tools directory.\nError: " + result.stdout  + "\n" + result.stderr + " \nCode:" + code);
+            }
     	}
+    );
+
+    grunt.util.spawn({ cmd: "ant", args: ["--version"] }, 
+        function doneFunction(error, result, code) 
+        {
+            if (code !== 1) //1 is ok result for ant
+            {
+                grunt.fail.fatal("Apache ant command not found. Set the PATH variable to include the path to Ant bin directory.\nError: " + result.stdout  + "\n" + result.stderr + " \nCode:" + code);
+            }
+        }
     );
     
     var pathModule = require("path");
