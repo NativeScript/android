@@ -11,16 +11,25 @@ module.exports = function(grunt) {
         grunt.log.error("The GIT_COMMIT is not set. This NativeScript Android Runtime will not be tagged with the git commit it is build from\n");
     }
     
-    //if (process.env.JAVA_HOME === "" || process.env.GIT_COMMIT === undefined)
-    //{
-    //    grunt.fail.fatal("The JAVA_HOME is not set. Set the JAVA_HOME to JDK7 or JDK8");
-    //}
+    grunt.util.spawn({ cmd: "ndk-build --version" }, 
+    	function doneFunction(error, result, code) 
+    	{
+    		if (error)
+        {
+            grunt.fail.fatal("ndk-build command not found. Set the PATH variable to include the path to Android NDK directory. \n");
+        }
+    	}
+    );
     
-    //if (process.env.JAVA_HOME.indexof("jdk1.7") === -1 && process.env.JAVA_HOME.indexof("jdk1.8") === -1)
-    //{
-    //    grunt.fail.fatal("The JAVA_HOME is set to unsupported jdk version. Set the JAVA_HOME to JDK7 or JDK8 directory");
-    //}
-    
+    grunt.util.spawn({ cmd: "android -h" }, 
+    	function doneFunction(error, result, code) 
+    	{
+    		if (error)
+        {
+            grunt.fail.fatal("android command not found. Set the PATH variable to include the path to Android SDK directory. \n");
+        }
+    	}
+    );
     
     var pathModule = require("path");
 
