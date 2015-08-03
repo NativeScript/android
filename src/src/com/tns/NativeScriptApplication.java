@@ -969,7 +969,8 @@ public class NativeScriptApplication extends android.app.Application implements 
 
 	public void onCreate()
 	{
-
+		Platform.initLogging(this);
+		
 		boolean showErrorIntent = hasErrorIntent();
 		if (!showErrorIntent)
 		{

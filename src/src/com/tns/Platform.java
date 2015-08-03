@@ -1,7 +1,10 @@
 package com.tns;
 
+import java.io.BufferedReader;
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.lang.ref.WeakReference;
@@ -17,6 +20,8 @@ import java.util.Date;
 import java.util.HashMap;
 
 import android.content.Context;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager.NameNotFoundException;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
@@ -800,5 +805,72 @@ public class Platform
     	Class<?> clazz = dexFactory.findClass(className);
 		return clazz;
     }
+    
+    public static void initLogging(Context context)
+    {
+    	int flags;
+		boolean verboseLogging = false;
+		try
+		{
+			flags = context.getPackageManager().getPackageInfo(context.getPackageName(), 0).applicationInfo.flags;
+			verboseLogging = ((flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0);
+		}
+		catch (NameNotFoundException e)
+		{
+			e.printStackTrace();
+			return;
+		}
+		
+		if (!verboseLogging)
+		{
+			return;
+		}
+		
+    	String verboseLoggingProp = readSystemProperty("nativescript.verbose.logging");
+    	if (verboseLoggingProp.equals("true") || verboseLoggingProp.equals("TRUE") ||
+    		verboseLoggingProp.equals("yes") || verboseLoggingProp.equals("YES") ||
+    		verboseLoggingProp.equals("enabled") || verboseLoggingProp.equals("ENABLED"))
+    	{
+    		Platform.IsLogEnabled = true;
+    	}
+    }
+    
+    
+	private static String readSystemProperty(String name)
+	{
+		InputStreamReader in = null;
+		BufferedReader reader = null;
+		try
+		{
+			Process proc = Runtime.getRuntime().exec(new String[] { "/system/bin/getprop", name });
+			in = new InputStreamReader(proc.getInputStream());
+			reader = new BufferedReader(in);
+			return reader.readLine();
+		}
+		catch (IOException e)
+		{
+			return null;
+		}
+		finally
+		{
+			silentClose(in);
+			silentClose(reader);
+		}
+	}
+
+	public static void silentClose(Closeable closeable)
+	{
+		if (closeable == null)
+		{
+			return;
+		}
+		try
+		{
+			closeable.close();
+		}
+		catch (IOException ignored)
+		{
+		}
+	}
 
 }
