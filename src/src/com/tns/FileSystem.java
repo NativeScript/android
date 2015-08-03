@@ -16,6 +16,8 @@ import org.json.JSONObject;
 
 public class FileSystem
 {
+	private static final String appRootPrefix = "~/";
+	
 	public static String readAll(InputStream inputStream) throws IOException
 	{
 		StringBuilder text;
@@ -95,7 +97,17 @@ public class FileSystem
 	}
 	
 	public static String resolveRelativePath(String path, String currentDirectory){
-		File temp = new File(currentDirectory, path);
+		String baseDir;
+		if (path.startsWith(appRootPrefix))
+		{
+			baseDir = new File(Platform.getApplicationContext().getFilesDir(), "app").getAbsolutePath();
+			path = path.substring(appRootPrefix.length());
+		}
+		else
+		{
+			baseDir = currentDirectory;
+		}
+		File temp = new File(baseDir, path);
 		try
 		{
 			return temp.getCanonicalPath();
@@ -103,7 +115,7 @@ public class FileSystem
 		catch (IOException e)
 		{
 			try{
-				URI uri = new URI(currentDirectory);
+				URI uri = new URI(baseDir);
 				return uri.resolve(path).getPath();
 			}
 			catch(URISyntaxException e1){

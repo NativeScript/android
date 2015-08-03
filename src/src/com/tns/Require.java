@@ -116,7 +116,7 @@ public class Require
 
 		return true;
 	}
-
+	
 	private static File findModuleFile(String moduleName, String currentDirectory)
 	{
 		File directory = null;
@@ -134,7 +134,7 @@ public class Require
 			directory = new File(moduleName);
 			jsFile = isJSFile ? new File(moduleName) : new File(moduleName + ".js");
 		}
-		else if (moduleName.startsWith("./") || moduleName.startsWith("../"))
+		else if (moduleName.startsWith("./") || moduleName.startsWith("../") || moduleName.startsWith("~/"))
 		{
 			// same or up directory
 			String resolvedPath = FileSystem.resolveRelativePath(moduleName, currentDirectory);

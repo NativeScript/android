@@ -1803,6 +1803,17 @@ describe("Tests ", function () {
 		expect(moduleName).toEqual("testModule");
 	});
 	
+	it("When_require_a_module_via_app_root_syntax_it_should_be_loaded", function () {
+		
+		__log("TEST: When_require_a_module_via_app_root_syntax_it_should_be_loaded");
+		
+		var mymodule = require("~/modules/mymodule");
+		var value = mymodule.echo(12345)
+		
+		expect(value).toBe(12345);
+	});
+
+	
 	it("When_require_a_bcl_module_in_a_dir_it_should_be_loaded", function () {
 		
 		__log("TEST: When_require_a_bcl_module_in_a_dir_it_should_be_loaded");
