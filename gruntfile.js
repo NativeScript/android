@@ -20,6 +20,11 @@ module.exports = function(grunt) {
         grunt.fail.fatal("../android-metadata-generator directory not found and no metadataGenSrc option specified. Clone the android-metadata-generator repo first.\n");
     }
     
+    if (!grunt.option("metadataGen") && !grunt.file.exists("../android-metadata-generator/dist/tns-android-metadata-generator-0.0.1.tgz"))
+    {
+        grunt.fail.fatal("android-metadata-generator build output not found and no metadataGen option specified. Build android-metadata-generator first.\n");
+    }
+    
     grunt.util.spawn({ cmd: "ndk-build" , args: ["--version"] }, 
     	function doneFunction(error, result, code) 
     	{
@@ -33,7 +38,10 @@ module.exports = function(grunt) {
     grunt.util.spawn({ cmd: "android", args: ["-h"] }, 
     	function doneFunction(error, result, code) 
     	{
-    		if (code !== 1) //1 is ok result for android tool
+    		var successResult = process.platform === "win32" ? 0 : 1;
+    		
+    		
+    		if (code !== successResult) //1 is ok result for android tool
             {
                 grunt.fail.fatal("android command not found. Set the PATH variable to include the path to Android SDK Tools directory.\nError: " + result.stdout  + "\n" + result.stderr + " \nCode:" + code);
             }
@@ -43,7 +51,8 @@ module.exports = function(grunt) {
     grunt.util.spawn({ cmd: "ant", args: ["--version"] }, 
         function doneFunction(error, result, code) 
         {
-            if (code !== 1) //1 is ok result for ant
+            var successResult = 1;
+            if (code !== successResult) //1 is ok result for ant
             {
                 grunt.fail.fatal("Apache ant command not found. Set the PATH variable to include the path to Ant bin directory.\nError: " + result.stdout  + "\n" + result.stderr + " \nCode:" + code);
             }
@@ -245,7 +254,7 @@ module.exports = function(grunt) {
             },
             generateRuntime: {
                 cmd: "npm install && grunt --verbose",
-                cwd: "./src"
+                cwd: pathModule.normalize("./src")
             },
             buildMetadataGenerator: {
                 cmd: "npm install && grunt --verbose",
