@@ -4,6 +4,9 @@ import java.io.BufferedReader;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileFilter;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
@@ -19,21 +22,14 @@ public class NativeScriptSyncHelper
 	private static final String SYNC_SOURCE_DIR = "/sync/";
 	private static final String FULL_SYNC_SOURCE_DIR = "/fullsync/";
 	private static final String REMOVED_SYNC_SOURCE_DIR = "/removedsync/";
+	private static final String SYNC_THUMB_FILE = "syncThumb";
+	private static final String COMMAND_FULL_SYNC = "fullsync";
+	private static final String COMMAND_SYNC = "sync";
+	private static final String COMMAND_SYNC_WITH_REMOVED = "sync-with-removed";
 
 	public static void sync(Context context)
 	{
-		int flags;
-		boolean shouldExecuteSync = false;
-		try
-		{
-			flags = context.getPackageManager().getPackageInfo(context.getPackageName(), 0).applicationInfo.flags;
-			shouldExecuteSync = ((flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0);
-		}
-		catch (NameNotFoundException e)
-		{
-			e.printStackTrace();
-			return;
-		}
+		boolean shouldExecuteSync = getShouldExecuteSync(context);
 		
 		if (!shouldExecuteSync)
 		{
@@ -43,11 +39,33 @@ public class NativeScriptSyncHelper
 			}
 			return;
 		}
+
+//		String syncThumbFilePath = SYNC_ROOT_SOURCE_DIR + context.getPackageName() + SYNC_THUMB_FILE;
+//		String syncData = getSyncThumb(syncThumbFilePath);
+//		if (syncData == null)
+//		{
+//			return;
+//		}
+//		
+//		String[] syncCommandAndThumb = syncData.split("");
+//		String syncCommand = syncCommandAndThumb[0];
+//		String syncThumb = syncCommandAndThumb[1];
+//		if (syncThumb == null)
+//		{
+//			return;
+//		}
+//		
+//		String oldSyncThumbFilePath = context.getFilesDir() + "syncThumb";
+//		String oldSyncThumb = getSyncThumb(oldSyncThumbFilePath);
+//		if (oldSyncThumb.equalsIgnoreCase(syncThumb))
+//		{
+//			return;
+//		}
 		
 		String syncPath = SYNC_ROOT_SOURCE_DIR + context.getPackageName() + SYNC_SOURCE_DIR;
 		String fullSyncPath = SYNC_ROOT_SOURCE_DIR + context.getPackageName() + FULL_SYNC_SOURCE_DIR;
 		String removedSyncPath = SYNC_ROOT_SOURCE_DIR + context.getPackageName() + REMOVED_SYNC_SOURCE_DIR;
-
+		
 		if (Platform.IsLogEnabled)
 		{
 			Log.d(Platform.DEFAULT_LOG_TAG, "Sync is enabled:");
@@ -55,7 +73,8 @@ public class NativeScriptSyncHelper
 			Log.d(Platform.DEFAULT_LOG_TAG, "Full sync path         : " + fullSyncPath);
 			Log.d(Platform.DEFAULT_LOG_TAG, "Removed files sync path: " + removedSyncPath);
 		}
-
+		
+		
 		File fullSyncDir = new File(fullSyncPath);
 		if (fullSyncDir.exists())
 		{
@@ -74,6 +93,24 @@ public class NativeScriptSyncHelper
 		{
 			executeRemovedSync(context, removedSyncDir);
 		}
+	}
+
+	private static boolean getShouldExecuteSync(Context context)
+	{
+		int flags;
+		boolean shouldExecuteSync = false;
+		try
+		{
+			flags = context.getPackageManager().getPackageInfo(context.getPackageName(), 0).applicationInfo.flags;
+			shouldExecuteSync = ((flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0);
+		}
+		catch (NameNotFoundException e)
+		{
+			e.printStackTrace();
+			return false;
+		}
+		
+		return shouldExecuteSync;
 	}
 	
 	final static FileFilter deletingFilesFilter = new FileFilter()
@@ -139,18 +176,17 @@ public class NativeScriptSyncHelper
 						targetParent.mkdirs();
 					}
 					
-					file.renameTo(targetFileDir);
+				    boolean success = copyFile(file.getAbsolutePath(), targetFilePath);
+					if (!success)
+					{
+						Log.e(Platform.DEFAULT_LOG_TAG, "Sync failed: " + file.getAbsolutePath().toString());
+					}
 				}
 				else
 				{
 					moveFiles(file, sourceRootAbsolutePath, targetRootAbsolutePath);
 				}
 			}
-		}
-		
-		if (sourceDir.exists())
-		{
-			sourceDir.delete();
 		}
 	}
 	
@@ -198,18 +234,12 @@ public class NativeScriptSyncHelper
 					String targetFilePath = file.getAbsolutePath().replace(sourceRootAbsolutePath, targetRootAbsolutePath);
 					File targetFile = new File(targetFilePath);
 					targetFile.delete();
-					file.delete();
 				}
 				else
 				{
 					deleteRemovedFiles(file, sourceRootAbsolutePath, targetRootAbsolutePath);
 				}
 			}
-		}
-		
-		if (sourceDir.exists())
-		{
-			sourceDir.delete();
 		}
 	}
 	
@@ -218,4 +248,86 @@ public class NativeScriptSyncHelper
 		String appPath = context.getFilesDir().getAbsolutePath() + "/app";
 		deleteRemovedFiles(sourceDir, sourceDir.getAbsolutePath(), appPath);
 	}
+	
+	private static boolean copyFile(String sourceFile, String destinationFile)
+	{
+		FileInputStream fis = null;
+		FileOutputStream fos = null;
+
+		try
+		{
+			fis = new FileInputStream(sourceFile);
+			fos = new FileOutputStream(destinationFile, false);
+
+			byte[] buffer = new byte[4096];
+			int read = 0;
+
+			while ((read = fis.read(buffer)) != -1)
+			{
+				fos.write(buffer, 0, read);
+			}
+		}
+		catch (FileNotFoundException e)
+		{
+			Log.e(Platform.DEFAULT_LOG_TAG, "Error copying file " + sourceFile);
+			e.printStackTrace();
+			return false;
+		}
+		catch (IOException e)
+		{
+			Log.e(Platform.DEFAULT_LOG_TAG, "Error copying file " + sourceFile);
+		    e.printStackTrace();
+		    return false;
+		}
+		finally
+		{
+			try
+			{
+				if (fis != null)
+				{
+					fis.close();
+				}
+				if (fos != null)
+				{
+					fos.close();
+				}
+			}
+			catch (IOException e)
+			{
+			}
+		}
+		
+		return true;
+	}
+	
+//	private static String getSyncThumb(String syncThumbFilePath)
+//	{
+//		try
+//		{
+//			File syncThumbFile = new File(syncThumbFilePath);
+//			if (syncThumbFile.exists())
+//			{
+//				return null;
+//			}
+//				
+//			FileInputStream in = new FileInputStream(syncThumbFile);
+//			BufferedReader reader = new BufferedReader(new InputStreamReader(in));
+//			String syncThumb = reader.readLine();
+//			reader.close();
+//			in.close();
+//			return syncThumb;
+//		}
+//		catch (FileNotFoundException e)
+//		{
+//			Log.e(Platform.DEFAULT_LOG_TAG, "Error while reading sync command");
+//			e.printStackTrace();
+//		}
+//		catch (IOException e)
+//		{
+//			Log.e(Platform.DEFAULT_LOG_TAG, "Error while reading sync command");
+//			e.printStackTrace();
+//		}
+//
+//		return null;
+//	}
 }
