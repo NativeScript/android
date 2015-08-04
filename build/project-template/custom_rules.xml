@@ -12,6 +12,7 @@
    
     <property name="path_to_metadata" value="./assets/metadata"/>
     <property name="ns.project.lib" value="../../lib/Android" />
+    <property name="widjets.jar.path" value="../../platforms/android/libs/widgets.jar" />
     
     <!-- these two properties are passed from cli -->
     <property name="ns.resources" value=""/>
@@ -41,7 +42,6 @@
           bootClassPathOut="project.target.class.path"
           targetApiOut="project.target.apilevel"
           minSdkVersionOut="project.minSdkVersion" />
-	
   <condition property="android.jar.present" value="${project.target.android.jar}">
     <isset property="project.target.android.jar" />
   </condition>
@@ -49,6 +49,20 @@
   
   <echo level="info">Using android.jar from ${project.target.android.jar}</echo>	
   
+  <target name="copy_android_jar">
+    <copy file="${project.target.android.jar}" todir="${ns.project.lib}" preservelastmodified="true"  overwrite="true"/>
+  </target>
+  
+   <target name="copy_widgets_jar">
+    <copy file="${widjets.jar.path}" todir="${ns.project.lib}" overwrite="true"/>
+          androidJarFileOut="project.target.android.jar"
+          androidAidlFileOut="project.target.framework.aidl"
+          bootClassPathOut="project.target.class.path"
+          targetApiOut="project.target.apilevel"
+          minSdkVersionOut="project.minSdkVersion" />
+    <isset property="project.target.android.jar" />
+  </condition>
+  <fail unless="android.jar.present" message="android.jar is not set. Setup the sdk directory for this project or update project.properties with the correct target version" />
   <target name="copy_android_jar">
     <copy file="${project.target.android.jar}" todir="${ns.project.lib}" preservelastmodified="true"  overwrite="true"/>
   </target>
@@ -79,7 +93,7 @@
 	
 	
     <!-- PASS JARS TO METADATA GENERATOR -->
-    <target name="generate_metadata_from_given_jars" depends="create_project_lib, copy_android_jar, copy_project_jars, delete_old_metadata">
+    <target name="generate_metadata_from_given_jars" depends="create_project_lib, copy_android_jar, copy_widgets_jar, copy_project_jars, delete_old_metadata">
         
 	    <java jar="${ns.resources}/metadata-generator.jar"
 			     fork="true"

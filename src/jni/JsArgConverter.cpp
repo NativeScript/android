@@ -445,6 +445,11 @@ bool JsArgConverter::ConvertJavaScriptArray(JEnv& env, const Handle<Array>& jsAr
 		SetConvertedObject(env, index, arr);
 	}
 
+	if (arr != nullptr)
+	{
+		env.DeleteLocalRef(arr);
+	}
+
 	return success;
 }
 

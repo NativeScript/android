@@ -1,5 +1,33 @@
 # Android Runtime Changelog
 
+1.2.0
+==
+
+## What's New
+
+ - [Support http cookies in build-in http client (#159)](https://github.com/NativeScript/android-runtime/issues/159)
+ - [Implement support for CLI live sync feature (#137)](https://github.com/NativeScript/android-runtime/issues/137)
+ - [Rethink 0 day support for new android versions (#86)](https://github.com/NativeScript/android-runtime/issues/86)
+
+## Bug Fixes
+
+ - [Fix ErrorActivity not displayed on uncaught exceptions (#158)](https://github.com/NativeScript/android-runtime/issues/158)
+ - [Fix JNI memory leak when resolving classes in metadata reader (#157)](https://github.com/NativeScript/android-runtime/issues/157)
+ - [Application crash with JNI ERROR (app bug): local reference table overflow (max=512) (#149)](https://github.com/NativeScript/android-runtime/issues/149)
+ - [Cannot set float field (#148)](https://github.com/NativeScript/android-runtime/issues/148)
+ - [IndexedPropertySetter not called (#127)](https://github.com/NativeScript/android-runtime/issues/127)
+ - [Fix GetDbgPort intent (#117)](https://github.com/NativeScript/android-runtime/issues/117)
+ - [Recreating an Activity with fragments on same process crashes the runtime (#96)](https://github.com/NativeScript/android-runtime/issues/96)
+ - [Grunt tasks fail on Windows (#61)](https://github.com/NativeScript/android-runtime/issues/61)
+
+## Performance
+
+ - [Optimize Strings marshaling between Java and V8 (#160)](https://github.com/NativeScript/android-runtime/issues/160)
+ - [Improve required module loading (#156)](https://github.com/NativeScript/android-runtime/issues/156)
+ - [Improve JNI String marshalling (#126)](https://github.com/NativeScript/android-runtime/issues/126)
+ - [Cache folder-as-module resolved path (#121)](https://github.com/NativeScript/android-runtime/issues/121) 
+
+
 ## 1.1.0 (2015, June 10)
 
 ### New
