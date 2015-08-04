@@ -42,6 +42,7 @@
           bootClassPathOut="project.target.class.path"
           targetApiOut="project.target.apilevel"
           minSdkVersionOut="project.minSdkVersion" />
+	
   <condition property="android.jar.present" value="${project.target.android.jar}">
     <isset property="project.target.android.jar" />
   </condition>
@@ -55,16 +56,6 @@
   
    <target name="copy_widgets_jar">
     <copy file="${widjets.jar.path}" todir="${ns.project.lib}" overwrite="true"/>
-          androidJarFileOut="project.target.android.jar"
-          androidAidlFileOut="project.target.framework.aidl"
-          bootClassPathOut="project.target.class.path"
-          targetApiOut="project.target.apilevel"
-          minSdkVersionOut="project.minSdkVersion" />
-    <isset property="project.target.android.jar" />
-  </condition>
-  <fail unless="android.jar.present" message="android.jar is not set. Setup the sdk directory for this project or update project.properties with the correct target version" />
-  <target name="copy_android_jar">
-    <copy file="${project.target.android.jar}" todir="${ns.project.lib}" preservelastmodified="true"  overwrite="true"/>
   </target>
   
 	
