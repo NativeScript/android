@@ -12,6 +12,7 @@
    
     <property name="path_to_metadata" value="./assets/metadata"/>
     <property name="ns.project.lib" value="../../lib/Android" />
+    <property name="widjets.jar.path" value="../../platforms/android/libs/widgets.jar" />
     
     <!-- these two properties are passed from cli -->
     <property name="ns.resources" value=""/>
@@ -53,6 +54,10 @@
     <copy file="${project.target.android.jar}" todir="${ns.project.lib}" preservelastmodified="true"  overwrite="true"/>
   </target>
   
+   <target name="copy_widgets_jar">
+    <copy file="${widjets.jar.path}" todir="${ns.project.lib}" overwrite="true"/>
+  </target>
+  
 	
 	<target name="copy_project_jars">
 	
@@ -79,7 +84,7 @@
 	
 	
     <!-- PASS JARS TO METADATA GENERATOR -->
-    <target name="generate_metadata_from_given_jars" depends="create_project_lib, copy_android_jar, copy_project_jars, delete_old_metadata">
+    <target name="generate_metadata_from_given_jars" depends="create_project_lib, copy_android_jar, copy_widgets_jar, copy_project_jars, delete_old_metadata">
         
 	    <java jar="${ns.resources}/metadata-generator.jar"
 			     fork="true"
