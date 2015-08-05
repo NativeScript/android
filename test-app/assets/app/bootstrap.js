@@ -1,6 +1,3 @@
-var n = new com.tns.tests.NumericConversionTest();
-var s = n.method5(123456);
-
 global.__onUncaughtError = function(error){
 	if(error.nativeException){
 		__log("err.message: " + error.message);

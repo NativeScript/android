@@ -1,23 +1,23 @@
-//__disableVerboseLogging();
-//
-//require("./tests/testWeakRef"); 
-//require("./tests/tests");
-//require("./tests/testArrays");
-//require("./tests/testsForRuntimeBindingGenerator");
-//require("./tests/testPrimitiveTypeConversion");
-//require("./tests/numericConversionTests"); 
-//require("./tests/inheritanceChainResolutionTest"); 
-//require("./tests/exceptionHandlingTests");
-//require("./tests/dispatchCallbacksOnUiThreadTests");
-//require("./tests/stringConversionTests");
-//require("./tests/testsForTypescript"); 
-//require("./tests/testGC");
-//require("./tests/testsMemoryManagement");
-//require("./tests/testIfAbleToRunExternalFile");
-//require("./tests/finalFieldsSetTests");
-//require("./tests/extendedClassesTests");
-//require("./tests/extendClassNameTests");
-//require("./tests/testJniReferenceLeak");
+__disableVerboseLogging();
+
+require("./tests/testWeakRef"); 
+require("./tests/tests");
+require("./tests/testArrays");
+require("./tests/testsForRuntimeBindingGenerator");
+require("./tests/testPrimitiveTypeConversion");
+require("./tests/numericConversionTests"); 
+require("./tests/inheritanceChainResolutionTest"); 
+require("./tests/exceptionHandlingTests");
+require("./tests/dispatchCallbacksOnUiThreadTests");
+require("./tests/stringConversionTests");
+require("./tests/testsForTypescript"); 
+require("./tests/testGC");
+require("./tests/testsMemoryManagement");
+require("./tests/testIfAbleToRunExternalFile");
+require("./tests/finalFieldsSetTests");
+require("./tests/extendedClassesTests");
+require("./tests/extendClassNameTests");
+require("./tests/testJniReferenceLeak");
 
 var MainActivity = {
     onCreate: function (bundle) {
@@ -27,8 +27,8 @@ var MainActivity = {
     	this.super.onCreate(bundle);
     	//this.super.onCreate(null);
 
-//    	require("./tests/testsWithContext").run(this);
-//    	execute(); //run jasmine
+    	require("./tests/testsWithContext").run(this);
+    	execute(); //run jasmine
     	
     	var layout = new android.widget.LinearLayout(this);
     	layout.setOrientation(1);
