@@ -110,11 +110,15 @@ bool JsArgToArrayConverter::ConvertArg(const Handle<Value>& arg, int index)
 		if (isInteger)
 		{
 			jobject obj;
+
+			//if returnType is long it will cast to long
+			//if there is no return type specified it will cast to int
+			//because default return type is null (ref type)
 			if ((INT_MIN <= i) && (i <= INT_MAX) && (returnType == Type::Int || returnType == Type::Null))
 			{
 				obj = JType::NewInt(env, (jint)d);
 			}
-			else
+			else /*isLong*/
 			{
 				obj = JType::NewLong(env, (jlong)d);
 			}
@@ -130,7 +134,10 @@ bool JsArgToArrayConverter::ConvertArg(const Handle<Value>& arg, int index)
 			bool isFloat = (f == d);
 
 			jobject obj;
-			if(isFloat && (FLT_MIN <= f) && (f <= FLT_MAX) && (returnType == Type::Float)) {
+			//if returnType is double it will cast to double
+			//if there is no return type specified it will cast to float
+			//because default return type is null (ref type)
+			if(isFloat && (FLT_MIN <= f) && (f <= FLT_MAX) && (returnType == Type::Float || returnType == Type::Null)) {
 				obj = JType::NewFloat(env, (jfloat)d);
 			}
 			else {/*isDouble*/
