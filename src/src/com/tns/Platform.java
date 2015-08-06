@@ -723,6 +723,7 @@ public class Platform
 	{
 		final int returnType = TypeIDs.GetObjectTypeId(retType);
 		Object ret = null;
+		
 		boolean isMainThread = mainThread.equals(Thread.currentThread());
 		
 		final Object[] tmpArgs = extendConstructorArgs(methodName, isConstructor, args);

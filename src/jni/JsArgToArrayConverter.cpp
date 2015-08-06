@@ -130,14 +130,12 @@ bool JsArgToArrayConverter::ConvertArg(const Handle<Value>& arg, int index)
 		}
 		else
 		{
-			float f = (float)d;
-			bool isFloat = (f == d);
-
 			jobject obj;
+
 			//if returnType is double it will cast to double
 			//if there is no return type specified it will cast to float
 			//because default return type is null (ref type)
-			if(isFloat && (FLT_MIN <= f) && (f <= FLT_MAX) && (returnType == Type::Float || returnType == Type::Null)) {
+			if((FLT_MIN <= d) && (d <= FLT_MAX) && (returnType == Type::Float || returnType == Type::Null)) {
 				obj = JType::NewFloat(env, (jfloat)d);
 			}
 			else {/*isDouble*/

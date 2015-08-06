@@ -797,6 +797,7 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
 	auto methodName = candidates.front().name;
 
 	int argLength = info.Length();
+
 	int count = 0;
 	MetadataEntry *entry = nullptr;
 	for (auto& c: candidates)

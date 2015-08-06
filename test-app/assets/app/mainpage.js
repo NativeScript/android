@@ -21,7 +21,7 @@ require("./tests/testJniReferenceLeak");
 
 var MainActivity = {
     onCreate: function (bundle) {
-    	__log("onCreate from js");
+    	__log("-----------> onCreate from js");
     	var k = this.toString();
     	__log("this.toString " + k);
     	this.super.onCreate(bundle);
