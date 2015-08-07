@@ -56,7 +56,6 @@ extern "C" jobjectArray Java_com_tns_NativeScriptActivity_getMethodOverrides(JNI
 		return nullptr;
 	}
 
-	//TODO: plamen5kov: fix hardcoded 10(stands for null)
 	auto jsResult = NativeScriptRuntime::CallJSMethod(env, appInstance, createActivityMethodName, packagedArgs, tc);
 	auto jsInstance = jsResult.As<Object>();
 	if (jsInstance.IsEmpty() || jsInstance->IsNull() || jsInstance->IsUndefined())
