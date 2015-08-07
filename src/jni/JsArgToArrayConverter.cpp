@@ -16,8 +16,8 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
-JsArgToArrayConverter::JsArgToArrayConverter(const v8::Handle<Value>& arg, bool isImplementationObject) :
-		m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error())
+JsArgToArrayConverter::JsArgToArrayConverter(const v8::Handle<Value>& arg, bool isImplementationObject, int classReturnType) :
+		m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()), m_return_type(classReturnType)
 {
 	if (!isImplementationObject)
 	{
@@ -31,7 +31,7 @@ JsArgToArrayConverter::JsArgToArrayConverter(const v8::Handle<Value>& arg, bool 
 
 
 JsArgToArrayConverter::JsArgToArrayConverter(const v8::FunctionCallbackInfo<Value>& args, bool hasImplementationObject, const Handle<Object>& outerThis) :
-		m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error())
+		m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()), m_return_type(static_cast<int>(Type::Null))
 {
 	auto isInnerClass = !outerThis.IsEmpty();
 	if (isInnerClass)
@@ -86,12 +86,14 @@ bool JsArgToArrayConverter::ConvertArg(const Handle<Value>& arg, int index)
 
 	JEnv env;
 
+	Type returnType = JType::getClassType(m_return_type);
+
 	if (arg.IsEmpty())
 	{
 		s << "Cannot convert empty JavaScript object";
 		success = false;
 	}
-	else if (arg->IsInt32())
+	else if (arg->IsInt32() && (returnType == Type::Int || returnType == Type::Null))
 	{
 		jint value = arg->Int32Value();
 		JniLocalRef javaObject(JType::NewInt(env, value));
@@ -108,11 +110,15 @@ bool JsArgToArrayConverter::ConvertArg(const Handle<Value>& arg, int index)
 		if (isInteger)
 		{
 			jobject obj;
-			if ((INT_MIN <= i) && (i < INT_MAX))
+
+			//if returnType is long it will cast to long
+			//if there is no return type specified it will cast to int
+			//because default return type is null (ref type)
+			if ((INT_MIN <= i) && (i <= INT_MAX) && (returnType == Type::Int || returnType == Type::Null))
 			{
 				obj = JType::NewInt(env, (jint)d);
 			}
-			else
+			else /*isLong*/
 			{
 				obj = JType::NewLong(env, (jlong)d);
 			}
@@ -124,7 +130,19 @@ bool JsArgToArrayConverter::ConvertArg(const Handle<Value>& arg, int index)
 		}
 		else
 		{
-			JniLocalRef javaObject(JType::NewDouble(env, (jdouble)d));
+			jobject obj;
+
+			//if returnType is double it will cast to double
+			//if there is no return type specified it will cast to float
+			//because default return type is null (ref type)
+			if((FLT_MIN <= d) && (d <= FLT_MAX) && (returnType == Type::Float || returnType == Type::Null)) {
+				obj = JType::NewFloat(env, (jfloat)d);
+			}
+			else {/*isDouble*/
+				obj = JType::NewDouble(env, (jdouble)d);
+			}
+
+			JniLocalRef javaObject(obj);
 			SetConvertedObject(env, index, javaObject);
 
 			success = true;

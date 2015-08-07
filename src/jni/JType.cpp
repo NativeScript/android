@@ -3,6 +3,11 @@
 
 namespace tns
 {
+	Type JType::getClassType(int retType) {
+		Type classReturnType = static_cast<Type>(retType);
+		return classReturnType;
+	}
+
 	jobject JType::NewByte(JEnv env, jbyte value)
 	{
 		EnsureInstance(env, &Byte, Type::Byte);

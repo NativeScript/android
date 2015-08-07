@@ -7,6 +7,7 @@
 #include "JniLocalRef.h"
 #include "JniSignatureParser.h"
 #include "JsArgToArrayConverter.h"
+#include "JType.h"
 #include "Util.h"
 #include "V8GlobalHelpers.h"
 #include "V8StringConstants.h"
@@ -430,7 +431,7 @@ bool JsArgConverter::ConvertJavaScriptArray(JEnv& env, const Handle<Array>& jsAr
 			for (int i=0; i<arrLength; i++)
 			{
 				auto v = jsArr->Get(i);
-				JsArgToArrayConverter c(v, false);
+				JsArgToArrayConverter c(v, false, (int)Type::Null);
 				jobject o = c.GetConvertedArg();
 				env.SetObjectArrayElement((jobjectArray)arr, i, o);
 			}

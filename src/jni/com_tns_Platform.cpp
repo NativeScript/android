@@ -239,9 +239,9 @@ void AppInitCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 	ExceptionUtil::GetInstance()->CheckForJavaException(env);
 }
 
-jobject ConvertJsValueToJavaObject(JEnv& env, const Handle<Value>& value)
+jobject ConvertJsValueToJavaObject(JEnv& env, const Handle<Value>& value, int classReturnType)
 {
-	JsArgToArrayConverter argConverter(value, false);
+	JsArgToArrayConverter argConverter(value, false/*is implementation object*/, classReturnType);
 	jobject jr = argConverter.GetConvertedArg();
 	jobject javaResult = nullptr;
 	if (jr != nullptr)
@@ -252,7 +252,7 @@ jobject ConvertJsValueToJavaObject(JEnv& env, const Handle<Value>& value)
 	return javaResult;
 }
 
-extern "C" jobject Java_com_tns_Platform_callJSMethodNative(JNIEnv *_env, jobject obj, jint javaObjectID, jstring methodName, jboolean isConstructor, jobjectArray packagedArgs)
+extern "C" jobject Java_com_tns_Platform_callJSMethodNative(JNIEnv *_env, jobject obj, jint javaObjectID, jstring methodName, jint retType, jboolean isConstructor, jobjectArray packagedArgs)
 {
 	SET_PROFILER_FRAME();
 
@@ -299,7 +299,8 @@ extern "C" jobject Java_com_tns_Platform_callJSMethodNative(JNIEnv *_env, jobjec
 		DEBUG_WRITE("%s", exceptionMessage.c_str());
 	}
 
-	jobject javaObject = ConvertJsValueToJavaObject(env, jsResult);
+	int classReturnType = retType;
+	jobject javaObject = ConvertJsValueToJavaObject(env, jsResult, classReturnType);
 	return javaObject;
 }
 
