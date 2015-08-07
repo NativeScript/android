@@ -1,0 +1,79 @@
+buildscript {
+    repositories {
+        jcenter()
+    }
+
+    dependencies {
+        classpath 'com.android.tools.build:gradle:1.3.0'
+    }
+}
+
+apply plugin: 'com.android.application'
+
+android {
+	compileSdkVersion 22
+    buildToolsVersion "22.0.1"
+	
+	defaultConfig {
+		minSdkVersion 17
+		targetSdkVersion 22
+	}
+	
+	sourceSets.main {
+        jniLibs.srcDir 'libs/jni'
+    }
+}
+
+repositories {
+    jcenter()
+}
+
+dependencies {
+    compile 'com.android.support:support-v4:22.2.0'
+    compile 'com.android.support:appcompat-v7:22.2.0'
+	compile fileTree(dir: 'libs', include: ['*.jar'])
+}
+
+task collectAllJars(type: Copy) {
+	def explodedAarDir = project.buildDir.getAbsolutePath() + "/intermediates/exploded-aar/"
+	def sdkPath = android.sdkDirectory.getAbsolutePath();
+	def androidJar = sdkPath + "/platforms/" + android.compileSdkVersion + "/android.jar"	
+
+	from configurations.compile
+	from explodedAarDir
+	from androidJar
+	include '**/*.jar'
+	includeEmptyDirs = false
+	into "metadata/libs"
+}
+
+task buildMetadata(type: JavaExec) {
+	outputs.upToDateWhen {		
+		!collectAllJars.didWork
+	}
+
+	main '-jar'
+	def str = new LinkedList <String> ();
+	str.add('build-tools/metadata-generator.jar')
+	str.add('metadata/libs')
+	str.add('metadata/output')
+
+	args str.toArray()
+}
+
+task copyMetadata(type: Copy) {
+	outputs.upToDateWhen {
+		!buildMetadata.didWork
+	}
+
+	from 'metadata/output'
+	into "src/main/assets/metadata"
+}
+
+collectAllJars.dependsOn(build)
+buildMetadata.dependsOn(collectAllJars)
+copyMetadata.dependsOn(buildMetadata)
+
+task full {
+    dependsOn copyMetadata
+}
