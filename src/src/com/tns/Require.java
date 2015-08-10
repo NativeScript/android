@@ -2,6 +2,8 @@ package com.tns;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.HashMap;
 
 import org.json.JSONException;
@@ -28,10 +30,17 @@ public class Require
 		{
 			return;
 		}
-
-		RootPackageDir = context.getApplicationInfo().dataDir;
-
-		ApplicationFilesPath = context.getApplicationContext().getFilesDir().getPath();
+		
+		try
+		{
+			RootPackageDir = new File(context.getApplicationInfo().dataDir).getCanonicalPath();
+			ApplicationFilesPath = context.getApplicationContext().getFilesDir().getCanonicalPath();
+		}
+		catch (IOException e)
+		{
+			e.printStackTrace();
+		}
+		
 		ModulesFilesPath = "/app/";
 
 		NativeScriptModulesFilesPath = "/app/tns_modules/";
@@ -80,43 +89,43 @@ public class Require
 	{
 		// This method is called my the NativeScriptRuntime.cpp RequireCallback method.
 		// The currentModuleDir is the directory path of the calling module.
-//		checkForExternalPath = true;
+		checkForExternalPath = true;
 		File file = findModuleFile(moduleName, callingDirName);
 
 		if (file != null && file.exists())
 		{
 			File projectRootDir = new File(RootPackageDir);
-//			if (checkForExternalPath && isFileExternal(file, projectRootDir))
-//			{
-//				return "EXTERNAL_FILE_ERROR";
-//			}
-//			else
-//			{
+			if (checkForExternalPath && isFileExternal(file, projectRootDir))
+			{
+				return "EXTERNAL_FILE_ERROR";
+			}
+			else
+			{
 				return file.getAbsolutePath();
-//			}
+			}
 		}
 
 		// empty path will be handled by the NativeScriptRuntime.cpp and a JS error will be thrown
 		return "";
 	}
 
-//	private static boolean isFileExternal(File source, File target)
-//	{
-//		File currentParentDir = source.getParentFile();
-//
-//		while (currentParentDir != null)
-//		{
-//			if (currentParentDir.equals(target))
-//			{
-//				return false;
-//			}
-//
-//			currentParentDir = currentParentDir.getParentFile();
-//		}
-//
-//		return true;
-//	}
+	private static boolean isFileExternal(File source, File target)
+	{
+		File currentParentDir = source.getParentFile();
 
+		while (currentParentDir != null)
+		{
+			if (currentParentDir.equals(target))
+			{
+				return false;
+			}
+
+			currentParentDir = currentParentDir.getParentFile();
+		}
+
+		return true;
+	}
+	
 	private static File findModuleFile(String moduleName, String currentDirectory)
 	{
 		File directory = null;
