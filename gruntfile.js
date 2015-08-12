@@ -15,7 +15,7 @@ module.exports = function(grunt) {
         grunt.log.error("The GIT_COMMIT is not set. This NativeScript Android Runtime will not be tagged with the git commit it is build from\n");
     }
 
-    if (!grunt.option("metadataGenSrc") && !grunt.file.exists("../android-metadata-generator"))
+    if (grunt.option("devmode") === true && !grunt.option("metadataGenSrc") && !grunt.file.exists("../android-metadata-generator"))
     {
         grunt.fail.fatal("../android-metadata-generator directory not found and no metadataGenSrc option specified. Clone the android-metadata-generator repo first.\n");
     }
