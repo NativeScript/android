@@ -22,7 +22,6 @@ module.exports = function(grunt) {
     
     if (!grunt.option("metadataGen") && !grunt.file.exists("../android-metadata-generator/dist/tns-android-metadata-generator-0.0.1.tgz"))
     {
-    	grunt.log.error("metadataGen: " + grunt.option("metadataGen"));
         grunt.fail.fatal("android-metadata-generator build output not found and no metadataGen option specified. Build android-metadata-generator first.\n");
     }
     
