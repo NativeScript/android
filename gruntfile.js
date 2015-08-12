@@ -1,9 +1,79 @@
 module.exports = function(grunt) {
 
+    if (process.env.JAVA_HOME === "" || process.env.JAVA_HOME === undefined)
+    {
+        grunt.fail.fatal("Set JAVA_HOME to point to the correct Jdk location\n");
+    }
+
+    if (process.env.ANDROID_HOME === "" || process.env.ANDROID_HOME === undefined)
+    {
+        grunt.fail.fatal("Set ANDROID_HOME to point to the correct Android SDK location\n");
+    }
+    
+    if (process.env.GIT_COMMIT === "" || process.env.GIT_COMMIT === undefined)
+    {
+        grunt.log.error("The GIT_COMMIT is not set. This NativeScript Android Runtime will not be tagged with the git commit it is build from\n");
+    }
+
+    if (!grunt.option("metadataGenSrc") && !grunt.file.exists("../android-metadata-generator"))
+    {
+        grunt.fail.fatal("../android-metadata-generator directory not found and no metadataGenSrc option specified. Clone the android-metadata-generator repo first.\n");
+    }
+    
+    if (!grunt.option("metadataGen") && !grunt.file.exists("../android-metadata-generator/dist/tns-android-metadata-generator-0.0.1.tgz"))
+    {
+        grunt.fail.fatal("android-metadata-generator build output not found and no metadataGen option specified. Build android-metadata-generator first.\n");
+    }
+    
+    grunt.util.spawn({ cmd: "ndk-build" , args: ["--version"] }, 
+    	function doneFunction(error, result, code) 
+    	{
+    		if (code !== 0)
+            {
+                grunt.fail.fatal("ndk-build command not found. Set the PATH variable to include the path to Android NDK directory.\nError: " + result.stdout  + "\n" + result.stderr + " \nCode:" + code);
+            }
+    	}
+    );
+    
+    grunt.util.spawn({ cmd: "android", args: ["-h"] }, 
+    	function doneFunction(error, result, code) 
+    	{
+    		var successResult = process.platform === "win32" ? 0 : 1;
+    		
+    		
+    		if (code !== successResult) //1 is ok result for android tool
+            {
+                grunt.fail.fatal("android command not found. Set the PATH variable to include the path to Android SDK Tools directory.\nError: " + result.stdout  + "\n" + result.stderr + " \nCode:" + code);
+            }
+    	}
+    );
+
+    grunt.util.spawn({ cmd: "ant", args: ["--version"] }, 
+        function doneFunction(error, result, code) 
+        {
+            var successResult = 1;
+            if (code !== successResult) //1 is ok result for ant
+            {
+                grunt.fail.fatal("Apache ant command not found. Set the PATH variable to include the path to Ant bin directory.\nError: " + result.stdout  + "\n" + result.stderr + " \nCode:" + code);
+            }
+        }
+    );
+    
     var pathModule = require("path");
 
     var outDir = "./dist";
     var rootDir = ".";
+    
+    if (process.platform === "win32")
+    {
+        var destinationPackageJsonFileName = rootDir + "/src/package.json"
+        var sourcePackageJsonFileName = rootDir + "/package.json";
+        grunt.log.error("This is windows machine. Coping " + sourcePackageJsonFileName + " to " + destinationPackageJsonFileName + " \n");
+        //delete package.json dummy file in src dir
+        grunt.file.delete(destinationPackageJsonFileName);
+        //copy package.json over to the src dir
+        grunt.file.copy(sourcePackageJsonFileName, destinationPackageJsonFileName);
+    }
 
     var args = {
         metadataGen: grunt.option("metadataGen") || "../android-metadata-generator/dist/tns-android-metadata-generator-0.0.1.tgz",
@@ -60,7 +130,7 @@ module.exports = function(grunt) {
     };
 
     localCfg.packageVersion = getPackageVersion(localCfg.packageJsonFilePath);
-
+    
     grunt.initConfig({
         pkg: grunt.file.readJSON(rootDir + "/package.json"),
         clean: {
@@ -184,7 +254,7 @@ module.exports = function(grunt) {
             },
             generateRuntime: {
                 cmd: "npm install && grunt --verbose",
-                cwd: "./src"
+                cwd: pathModule.normalize("./src")
             },
             buildMetadataGenerator: {
                 cmd: "npm install && grunt --verbose",
@@ -194,7 +264,7 @@ module.exports = function(grunt) {
                 cmd: "npm install " + localCfg.metadataGenPath
             },
             runMetadataGenerator: {
-                cmd: pathModule.normalize("./node_modules/.bin/generate-metadata") + " " + localCfg.libsDir + " ./dist/framework/assets/metadata"
+                cmd: pathModule.normalize("\"node_modules/.bin/generate-metadatajs\"") + " " + localCfg.libsDir + " ./dist/framework/assets/metadata"
             },
 			runTests: {
 				cmd: "npm install && grunt --verbose",

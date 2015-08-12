@@ -3,7 +3,15 @@
     name="android-runtime-custom-rules"
     default="help" >
 
+
+    <condition property="supportedJavaVersion">
+      <or>
+       <equals arg1="1.7" arg2="${ant.java.version}"/>
+       <equals arg1="1.8" arg2="${ant.java.version}"/>
+      </or>
+    </condition>
     
+    <fail message="Java 1.7 or newer is required. Check if the JAVA_HOME environment variable points to JDK 1.7 or newer" unless="supportedJavaVersion"/>
     
     
     <!--Generating executable jar-->
