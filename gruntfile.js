@@ -20,9 +20,7 @@ module.exports = function(grunt) {
         grunt.fail.fatal("../android-metadata-generator directory not found and no metadataGenSrc option specified. Clone the android-metadata-generator repo first.\n");
     }
     
-    var check = grunt.option("metadataGen") || undefined;
-    
-    if (!check && !grunt.file.exists("../android-metadata-generator/dist/tns-android-metadata-generator-0.0.1.tgz"))
+    if (grunt.option("metadataGen") && !grunt.file.exists("../android-metadata-generator/dist/tns-android-metadata-generator-0.0.1.tgz"))
     {
     	grunt.log.error("metadataGen: " + grunt.option("metadataGen"));
         grunt.fail.fatal("android-metadata-generator build output not found and no metadataGen option specified. Build android-metadata-generator first.\n");
