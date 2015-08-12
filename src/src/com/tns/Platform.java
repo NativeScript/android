@@ -21,6 +21,7 @@ import java.util.HashMap;
 
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.os.Handler;
 import android.os.Looper;
@@ -30,6 +31,7 @@ import android.util.SparseArray;
 import com.tns.bindings.ProxyGenerator;
 import com.tns.internal.DefaultExtractPolicy;
 import com.tns.internal.ExtractPolicy;
+import com.tns.internal.Plugin;
 
 public class Platform
 {
@@ -110,7 +112,11 @@ public class Platform
 		makeInstanceStrong(context, appJavaObjectId);
 		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "Initialized app instance id:" + appJavaObjectId);
 
-		AssetExtractor.extractAssets(context, extractPolicy);
+		boolean skipAssetExtraction = runPlugin(context);
+		if (!skipAssetExtraction)
+		{
+			AssetExtractor.extractAssets(context, extractPolicy);
+		}
 		Require.init(context);
 		Platform.initNativeScript(Require.getApplicationFilesPath(), appJavaObjectId, IsLogEnabled, context.getPackageName());
 		int debuggerPort = jsDebugger.getDebuggerPortFromEnvironment();
@@ -878,6 +884,33 @@ public class Platform
 		catch (IOException ignored)
 		{
 		}
+	}
+	
+	private static boolean runPlugin(Context context)
+	{
+		boolean success = false;
+		String pluginClassName;
+		try
+		{
+			ApplicationInfo ai = context.getPackageManager().getApplicationInfo(context.getPackageName(), PackageManager.GET_META_DATA);
+			pluginClassName = ai.metaData.getString("com.tns.internal.Plugin");
+		}
+		catch (Exception e)
+		{
+			pluginClassName = "org.nativescript.livesync.LiveSyncPlugin";
+			e.printStackTrace();
+		}
+		try
+		{
+			Class<?> liveSyncPluginClass = Class.forName(pluginClassName);
+			Plugin p = (Plugin)liveSyncPluginClass.newInstance();
+			success = p.execute(context);
+		}
+		catch (Exception e)
+		{
+			e.printStackTrace();
+		}
+		return success;
 	}
 
 }

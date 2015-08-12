@@ -1,5 +1,5 @@
 <resources>
 
     <string name="app_name">testapp</string>
-
+	<string name="Telerik_LiveSync_CustomUrlSchemePrefix">nativescript:</string>
 </resources>
