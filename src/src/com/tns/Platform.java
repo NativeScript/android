@@ -160,16 +160,11 @@ public class Platform
 				@Override
 				public void uncaughtException(Thread thread, Throwable ex)
 				{
-					String content = ErrorReport.getErrorMessage(ex);
-					// TODO: passUncaughtExceptionToJsNative fails due to V8's invalid state - examine this!!!
-					// passUncaughtExceptionToJsNative(ex, content);
-
-					if (IsLogEnabled) Log.e(DEFAULT_LOG_TAG, "Uncaught Exception Message=" + ex.getMessage());
-
-					//start error activity
-					boolean errorActivityHasStarted = ErrorReport.startActivity(NativeScriptContext, ex);
+					String errorMessage = ErrorReport.getErrorMessage(ex);
 					
-					if(!errorActivityHasStarted && defaultHandler != null) //if we are in release mode
+					if (IsLogEnabled) Log.e(DEFAULT_LOG_TAG, "Uncaught Exception Message=" + errorMessage);
+
+					if(!ErrorReport.startActivity(NativeScriptContext, errorMessage) && defaultHandler != null) //if we are in release mode
 					{
 						defaultHandler.uncaughtException(thread, ex);	
 					}
@@ -178,6 +173,32 @@ public class Platform
 		}
 		
 		Thread.setDefaultUncaughtExceptionHandler(handler); 
+	}
+	
+	public static void APP_FAIL(Throwable ex, String message)
+	{
+		// TODO: allow app to handle fail message report here. For example
+		// integrate google app reports
+		// Log.d(DEFAULT_LOG_TAG, message);
+		// System.exit(-1);
+		
+		if (ex == null) {
+			ex = new NativeScriptException(message);
+		}
+		
+		// TODO: We need to know whether to fail the app fast here - e.g. System.exit or just raise an exception
+		try {
+			UncheckedThrow.Throw(ex);
+		} catch (NativeScriptException e) {
+			if(e == ex){
+				// exception is not caught by user code, go to the JavaScript side to raise the __uncaughtError handler
+				// TODO: We may want to allow JS code to mark the exception as Handled
+				passUncaughtExceptionToJsNative(e, ErrorReport.getErrorMessage(e));
+			}
+			
+			// re-throw the exception to crash the current thread
+			UncheckedThrow.Throw(e);
+		}
 	}
 	
 	static void setExtractPolicy(ExtractPolicy policy)
@@ -609,7 +630,7 @@ public class Platform
 		if (javaObjectID == null)
 		{
 			if (IsLogEnabled) Log.e(DEFAULT_LOG_TAG, "Platform.CallJSMethod: calling js method " + methodName + " with javaObjectID " + javaObjectID + " type=" + ((javaObject != null) ? javaObject.getClass().getName() : "null"));
-			APP_FAIL("Application failed");
+			APP_FAIL(null, "Application failed");
 		}
 
 		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "Platform.CallJSMethod: calling js method " + methodName + " with javaObjectID " + javaObjectID + " type=" + ((javaObject != null) ? javaObject.getClass().getName() : "null"));
@@ -654,17 +675,6 @@ public class Platform
 		}
 
 		return packagedArgs;
-	}
-
-	public static void APP_FAIL(String message)
-	{
-		// TODO: allow app to handle fail message report here. For example
-		// integrate google app reports
-		// Log.d(DEFAULT_LOG_TAG, message);
-		// System.exit(-1);
-		
-		// throw an exception to enter the Thread.setDefaultUncaughtExceptionHandler
-		throw new NativeScriptException(message);
 	}
 
 	public static String resolveMethodOverload(String className, String methodName, Object[] args) throws Exception

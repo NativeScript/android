@@ -243,6 +243,11 @@ string ExceptionUtil::GetErrorStackTrace(const Handle<StackTrace>& stackTrace)
 
 void ExceptionUtil::ThrowExceptionToJava(TryCatch& tc, const string& prependMessage)
 {
+	if(!tc.HasCaught()) {
+		NativeScriptRuntime::APP_FAIL(nullptr, prependMessage.c_str());
+		return;
+	}
+
 	Isolate *isolate = Isolate::GetCurrent();
 	auto ex = tc.Exception();
 
@@ -262,39 +267,29 @@ void ExceptionUtil::ThrowExceptionToJava(TryCatch& tc, const string& prependMess
 
 	JEnv env;
 	env.ExceptionClear();
-	if (tc.CanContinue())
-	{
-		jweak javaThrowable = nullptr;
-		if (!ex.IsEmpty() && ex->IsObject())
-		{
-			javaThrowable = TryGetJavaThrowableObject(env, ex->ToObject());
-		}
 
-		if (javaThrowable != nullptr) //exception is object
-		{
-			jint ret = env.Throw(reinterpret_cast<jthrowable>(javaThrowable));
-
-			DEBUG_WRITE("Error: Throw (1)=%d", (int)ret);
-		}
-		else //if exception is not object
-		{
-			//make it an object
-			jclass nativeScriptExceptionClass = env.FindClass("com/tns/NativeScriptException");
-			jmethodID ctor = env.GetMethodID(nativeScriptExceptionClass, "<init>", "(Ljava/lang/String;J)V");
-			jstring errMessage = env.NewStringUTF(loggedMessage.c_str());
-			auto pv = new Persistent<Value>(isolate, ex);
-			jobject exObject = env.NewObject(nativeScriptExceptionClass, ctor, errMessage, (jlong)pv);
-
-			//throw it
-			jint ret = env.Throw((jthrowable)exObject);
-
-			DEBUG_WRITE("Error: Throw (2)=%d", (int)ret);
-		}
+	if(!tc.CanContinue()) {
+		NativeScriptRuntime::APP_FAIL(nullptr, loggedMessage.c_str());
+		return;
 	}
-	else
+
+	jweak javaThrowable = nullptr;
+	if (!ex.IsEmpty() && ex->IsObject())
 	{
-		NativeScriptRuntime::APP_FAIL(loggedMessage.c_str());
+		javaThrowable = TryGetJavaThrowableObject(env, ex->ToObject());
 	}
+
+	if (javaThrowable == nullptr)
+	{
+		//make it an object
+		jclass nativeScriptExceptionClass = env.FindClass("com/tns/NativeScriptException");
+		jmethodID ctor = env.GetMethodID(nativeScriptExceptionClass, "<init>", "(Ljava/lang/String;J)V");
+		jstring errMessage = env.NewStringUTF(loggedMessage.c_str());
+		auto pv = new Persistent<Value>(isolate, ex);
+		javaThrowable = env.NewObject(nativeScriptExceptionClass, ctor, errMessage, (jlong)pv);
+	}
+
+	NativeScriptRuntime::APP_FAIL(reinterpret_cast<jthrowable>(javaThrowable), loggedMessage.c_str());
 }
 
 void ExceptionUtil::ThrowExceptionToJs(const string& exceptionMessage)
