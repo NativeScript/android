@@ -1,6 +1,7 @@
 /.metadata/
 node_modules/
 dist/
+.gradle
 
 local.properties
 

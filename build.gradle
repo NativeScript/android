@@ -1,0 +1,125 @@
+def distFolder = "$rootDir/dist"
+def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
+def localMetadataGen = "../android-metadata-generator/dist/tns-android-metadata-generator-0.0.1.tgz"
+def distDir = "$rootDir/dist"
+
+task checkEnvironmentVariables {
+	if ("$System.env.JAVA_HOME" == "" || "$System.env.JAVA_HOME" == "null") {
+        throw new GradleException("Set JAVA_HOME to point to the correct Jdk location\n");
+    }
+	if ("$System.env.ANDROID_HOME" == "" || "$System.env.ANDROID_HOME" == "null") {
+        throw new GradleException("Set ANDROID_HOME to point to the correct Android SDK location\n");
+    }
+	if ("$System.env.GIT_COMMIT" == "null") {
+        logger.warn("Warning: The GIT_COMMIT is not set. This NativeScript Android Runtime will not be tagged with the git commit it is build from\n");
+    }
+	if(project.hasProperty("devmode") == true && !project.hasProperty("metadataGenSrc") && !file("../android-metadata-generator").exists()) {
+		throw new GradleException("../android-metadata-generator directory not found and no metadataGenSrc option specified. Clone the android-metadata-generator repo first.\n");
+	}
+	if(project.hasProperty("metadataGen") && !file("../android-metadata-generator/dist/tns-android-metadata-generator-0.0.1.tgz").exists()) {
+		throw new GradleException("android-metadata-generator build output not found and no metadataGen option specified. Build android-metadata-generator first.\n");
+	}
+}
+
+task checkAndroidCommand(type:Exec) {		
+	//on windows:
+	commandLine "cmd", "/c"
+	
+	args "android", "-h"
+	
+	ignoreExitValue = true
+	
+	doLast {
+		def successResult = isWinOs ? 0 : 1
+		
+		if (execResult.exitValue != successResult) {//1 is ok result for android tool
+            throw new GradleException("\n--> 'android' command not found. Set the PATH variable to include the path to Android SDK Tools directory.\n\nError: " + errorOutput + "\nexitValue: " + execResult.exitValue)
+        }
+	}
+}
+
+task ndkBuild (type: Exec) {
+	commandLine "cmd", "/c"
+	
+	args "ndk-build", "--version"
+	
+	ignoreExitValue = true
+	doLast {
+		if(execResult.exitValue != 0) {
+			throw new GradleException("\n--> 'ndk-build' command not found. Set the PATH variable to include the path to Android NDK directory.\n\nError: " + errorOutput + "\nexitValue: " + execResult.exitValue)
+		}
+	}
+}
+
+task cleanDistDir (type: Delete) {
+	delete distFolder
+}
+
+task createDistDir {
+	doLast {
+		def distF = new File(distDir)
+		distF.mkdirs()
+	}
+}
+
+task copyPackageJsonToSubfolder (type: Copy) {
+	//if linux not necessary
+	if(isWinOs) {
+		def sourcePackageJsonFileName = "$rootDir/package.json";
+		def destinationPackageJsonFileName = "$rootDir/src";
+		
+		logger.warn("Warning: This is windows machine. Coping " + sourcePackageJsonFileName + " to " + destinationPackageJsonFileName + " \n");
+		
+		from sourcePackageJsonFileName
+		into destinationPackageJsonFileName
+	}
+}
+
+task copyGradleTemplate (type: Copy) {
+	from "$rootDir/build/project-template-gradle"
+	into "$rootDir/dist/framework"
+}
+
+task copyInternalFolder (type: Copy) {
+	from "$rootDir/src/assets/internal"
+	into "$rootDir/dist/framework/src/main/assets/internal"
+}
+
+task copyPackageJson (type: Copy) {
+	from "$rootDir/package.json"
+	into "$rootDir/dist"
+}
+
+
+//check env vars 1
+
+//clean build 1
+//mkdir build 1
+//copy template project "build/project-template-gradle" to "dist/framework" 1
+//copy internal folder "src/assets/internalFolder" to "dist .... wherever" 1
+//copy package.json "./package.json" to "dist/ ... wherever" 1
+
+// generate runtime
+
+createDistDir.dependsOn(cleanDistDir)
+copyGradleTemplate.dependsOn(createDistDir)
+copyInternalFolder.dependsOn(copyGradleTemplate)
+copyPackageJson.dependsOn(copyInternalFolder)
+
+task buildRuntime {
+	dependsOn copyPackageJson
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
