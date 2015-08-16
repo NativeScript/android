@@ -46,6 +46,10 @@ public class JsDebugger
 
 	private static final int INVALID_PORT = -1;
 
+	private String baseDebugFilesDir;
+	
+	private static final boolean LOGGING_ENABLED = true;
+	
 	private static final String portEnvInputFile = "envDebug.in";
 	
 	private static final String portEnvOutputFile = "envDebug.out";
@@ -64,6 +68,7 @@ public class JsDebugger
 	public JsDebugger(Context context)
 	{
 		this.context = context;
+		baseDebugFilesDir = context.getFilesDir().getPath() + File.separator;
 	}
 
 	private static ServerSocket serverSocket;
@@ -313,23 +318,34 @@ public class JsDebugger
 
 	int getDebuggerPortFromEnvironment()
 	{
-		if (Platform.IsLogEnabled) Log.d(Platform.DEFAULT_LOG_TAG, "getDebuggerPortFromEnvironment");
-		int port = INVALID_PORT;
+		if (Platform.IsLogEnabled || LOGGING_ENABLED)
+		{
+			Log.d(Platform.DEFAULT_LOG_TAG, "getDebuggerPortFromEnvironment");
+		}
+		
+		int	port = INVALID_PORT;
 		
 		boolean shouldEnableDebuggingFlag = shouldEnableDebugging(context);
 		
-		if (Platform.IsLogEnabled) Log.d(Platform.DEFAULT_LOG_TAG, "getDebuggerPortFromEnvironment:: shouldEnableDebuggingFlag=" + shouldEnableDebuggingFlag);		
+		if (Platform.IsLogEnabled || LOGGING_ENABLED)
+		{
+			Log.d(Platform.DEFAULT_LOG_TAG, "getDebuggerPortFromEnvironment: shouldEnableDebuggingFlag: " + shouldEnableDebuggingFlag);		
+		}
 
 		if (shouldEnableDebuggingFlag)
 		{
-			File baseDir = context.getExternalFilesDir(null);
-			File envOutFile = new File(baseDir, portEnvOutputFile);
+			File envOutFile = new File(baseDebugFilesDir, portEnvOutputFile);
 			OutputStreamWriter w = null;
 			try
 			{
 				w = new OutputStreamWriter(new FileOutputStream(envOutFile, false));
 				String currentPID = "PID=" + android.os.Process.myPid() + "\n";
 				w.write(currentPID);
+				
+				if (Platform.IsLogEnabled || LOGGING_ENABLED)
+				{
+					Log.d(Platform.DEFAULT_LOG_TAG, "getDebuggerPortFromEnvironment: writting PID: " + currentPID + " to envOutFile: " + envOutFile.getAbsolutePath());		
+				}
 			}
 			catch (IOException e1)
 			{
@@ -353,11 +369,13 @@ public class JsDebugger
 			
 			boolean shouldDebugBreakFlag = shouldDebugBreak(context); 
 			
-			if (Platform.IsLogEnabled) Log.d(Platform.DEFAULT_LOG_TAG, "shouldDebugBreakFlag=" + shouldDebugBreakFlag);
+			if (Platform.IsLogEnabled || LOGGING_ENABLED)
+			{
+				Log.d(Platform.DEFAULT_LOG_TAG, "shouldDebugBreakFlag=" + shouldDebugBreakFlag);
+			}
 			
 			if (shouldDebugBreakFlag)
 			{
-				
 				try
 				{
 					Thread.sleep(3 * 1000);
@@ -368,11 +386,14 @@ public class JsDebugger
 				}
 			}
 
-			File envInFile = new File(baseDir, portEnvInputFile);
+			File envInFile = new File(baseDebugFilesDir, portEnvInputFile);
 			
 			boolean envInFileFlag = envInFile.exists();
 			
-			if (Platform.IsLogEnabled) Log.d(Platform.DEFAULT_LOG_TAG, "envInFileFlag=" + envInFileFlag);
+			if (Platform.IsLogEnabled || LOGGING_ENABLED)
+			{
+				Log.d(Platform.DEFAULT_LOG_TAG, "envInFile exists: " + envInFileFlag);
+			}
 			
 			if (envInFileFlag)
 			{
@@ -396,6 +417,12 @@ public class JsDebugger
 					String strLocalPort = "PORT=" + localPort + "\n";
 					w.write(strLocalPort);
 					port = currentPort = localPort;
+					
+					if (Platform.IsLogEnabled || LOGGING_ENABLED)
+					{
+						Log.d(Platform.DEFAULT_LOG_TAG, "Debugger enabled on port: " + port);
+					}
+					
 					//
 					enable();
 					debugBreak();
@@ -436,7 +463,10 @@ public class JsDebugger
 			}
 		}
 		
-		Log.d(Platform.DEFAULT_LOG_TAG, "port=" + port);
+		if (Platform.IsLogEnabled || LOGGING_ENABLED)
+		{
+			Log.d(Platform.DEFAULT_LOG_TAG, "Debug port=" + port);
+		}
 		
 		return port;
 	}
@@ -553,13 +583,18 @@ public class JsDebugger
 		}
 
 		boolean shouldEnableDebugging = ((flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0);
+		
+		if (Platform.IsLogEnabled || LOGGING_ENABLED)
+		{
+			Log.d(Platform.DEFAULT_LOG_TAG, "shouldEnableDebugging: " + shouldEnableDebugging);
+		}
 		return shouldEnableDebugging;
 	}
 	
 	
 	public static Boolean shouldDebugBreakFlag = null;
 	
-	public static boolean shouldDebugBreak(Context context)
+	public boolean shouldDebugBreak(Context context)
 	{
 		if (shouldDebugBreakFlag != null)
 		{
@@ -568,19 +603,35 @@ public class JsDebugger
 		
 		if (!shouldEnableDebugging(context))
 		{
+			if (Platform.IsLogEnabled || LOGGING_ENABLED)
+			{
+				Log.d(Platform.DEFAULT_LOG_TAG, "shouldDebugBreak false. Debugging not enabled");
+			}
 			shouldDebugBreakFlag = false;
 			return false;
 		}
 		
-		File baseDir = context.getExternalFilesDir(null);
-		File debugBreakFile = new File(baseDir, DEBUG_BREAK_FILENAME);
+		File debugBreakFile = new File(baseDebugFilesDir, DEBUG_BREAK_FILENAME);
+		if (Platform.IsLogEnabled || LOGGING_ENABLED)
+		{
+			Log.d(Platform.DEFAULT_LOG_TAG, "shouldDebugBreak: Looking for debugbreak file at: " + debugBreakFile.getAbsolutePath());
+		}
+		
 		if (debugBreakFile.exists())
 		{
+			if (Platform.IsLogEnabled || LOGGING_ENABLED)
+			{
+				Log.d(Platform.DEFAULT_LOG_TAG, "shouldDebugBreak: Debug-brk file found. Debugger should break");
+			}
 			debugBreakFile.delete();
 			shouldDebugBreakFlag = true;
 			return true;
 		}
 		
+		if (Platform.IsLogEnabled || LOGGING_ENABLED)
+		{
+			Log.d(Platform.DEFAULT_LOG_TAG, "shouldDebugBreak: Debugger should not break");
+		}
 		shouldDebugBreakFlag = false;
 		return false;
 	}
