@@ -1,4 +1,3 @@
-def distFolder = "$rootDir/dist"
 def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
 def localMetadataGen = "../android-metadata-generator/dist/tns-android-metadata-generator-0.0.1.tgz"
 def distDir = "$rootDir/dist"
@@ -39,7 +38,9 @@ task checkAndroidCommand(type:Exec) {
 }
 
 task ndkBuild (type: Exec) {
-	commandLine "cmd", "/c"
+	if(isWinOs) {
+		commandLine "cmd", "/c"
+	}
 	
 	args "ndk-build", "--version"
 	
@@ -52,7 +53,7 @@ task ndkBuild (type: Exec) {
 }
 
 task cleanDistDir (type: Delete) {
-	delete distFolder
+	delete distDir
 }
 
 task createDistDir {
