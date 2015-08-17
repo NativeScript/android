@@ -91,6 +91,28 @@ task copyPackageJson (type: Copy) {
 	into "$rootDir/dist"
 }
 
+task generateRuntime (type: Exec) {
+	workingDir "$rootDir/src"
+	if(isWinOs) {
+		commandLine "cmd", "/c"
+	}
+	
+	args "gradle", "buildRuntime"
+}
+
+task copyGeneratedRuntime (type: Copy) {
+	from "$rootDir/src/dist"
+	into "$rootDir/dist/framework"
+}
+
+task packFramework (type: Exec) {
+	workingDir "$rootDir/dist"
+	if(isWinOs) {
+		commandLine "cmd", "/c"
+	}
+	
+	args "npm", "pack"
+}
 
 //check env vars 1
 
@@ -106,9 +128,12 @@ createDistDir.dependsOn(cleanDistDir)
 copyGradleTemplate.dependsOn(createDistDir)
 copyInternalFolder.dependsOn(copyGradleTemplate)
 copyPackageJson.dependsOn(copyInternalFolder)
+generateRuntime.dependsOn(copyPackageJson)
+copyGeneratedRuntime.dependsOn(generateRuntime)
+packFramework.dependsOn(copyGeneratedRuntime)
 
-task buildRuntime {
-	dependsOn copyPackageJson
+task packRuntime {
+	dependsOn packFramework
 }
 
 
