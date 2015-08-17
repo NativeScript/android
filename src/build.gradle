@@ -13,7 +13,7 @@ buildscript {
     }
 }
 
-apply plugin: 'com.android.application'
+apply plugin: 'com.android.library'
 
 android {
 	compileSdkVersion 22
@@ -27,10 +27,9 @@ android {
     }
 	
 	sourceSets {
-		main {
-			java.srcDir "src"
-			manifest.srcFile "$rootDir/AndroidManifest.xml"
-		}
+		main.manifest.srcFile "./AndroidManifest.xml"
+		main.java.srcDir "src"
+		// main.output.classesDir = "$rootDir/build/classes"
 	}
 	
 	//TODO: remove this and fix related problems later
@@ -39,17 +38,22 @@ android {
 	}
 }
 
-sourceSets {
-	main.output.classesDir = "$rootDir/build/classes"
-}
+// sourceSets {
+	// main.java.srcDir "src"
+	// main.output.classesDir = "$rootDir/build/classes"
+// }
 
 repositories {
     jcenter()
 }
 
 dependencies {
-    compile 'com.android.support:support-v4:22.2.0'
+	def sdkPath = android.sdkDirectory.getAbsolutePath();
+	def androidJar = sdkPath + "/platforms/" + android.compileSdkVersion + "/android.jar"	
+    
+	compile 'com.android.support:support-v4:22.2.0'
     compile 'com.android.support:appcompat-v7:22.2.0'
+	compile files(androidJar)
 	compile fileTree(dir: 'libs', include: ['*.jar'])
 	compile files(pathToBindingGeneratorJar)
 }
@@ -110,7 +114,7 @@ task generateBindingGeneratorClasses (type: Exec ) {
 		commandLine "cmd", "/c"
 	}
 
-	args "gradle", "build"
+	args "gradle", "build", "-PoutClassesDir=$rootDir/build/intermediates/classes/debug"
 }
 
 
@@ -126,9 +130,10 @@ copyCppRuntime.dependsOn(setNdkConfigToRelease)
 cleanCppRuntime.dependsOn(copyCppRuntime)
 revertNdkConfiguration.dependsOn(cleanCppRuntime) //rever to debug after build
 
-compileJava.dependsOn(revertNdkConfiguration)
+// compileJava.dependsOn(revertNdkConfiguration)
 // jar.dependsOn(compileJava)
-build.dependsOn(compileJava)
+// build.dependsOn(compileJava)
+build.dependsOn(revertNdkConfiguration)
 
 task buildRuntime {
 	dependsOn build

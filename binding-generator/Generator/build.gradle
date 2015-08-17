@@ -20,6 +20,8 @@ sourceSets {
             srcDir 'src'
         }
     }
+	def isOutClassesDirSet = project.hasProperty("outClassesDir")
+	main.output.classesDir = isOutClassesDirSet ? outClassesDir : "$rootDir/build/classesss"
 }
 
 
