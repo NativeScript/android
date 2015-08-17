@@ -1,4 +1,5 @@
 Specify filepatterns you want git to ignore.
+/Generator/build
 
 Example:
 #ignore thumbnails created by windows
