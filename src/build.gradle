@@ -58,6 +58,14 @@ dependencies {
 	compile files(pathToBindingGeneratorJar)
 }
 
+task cleanLibsFolder {	
+	def dirName = "$rootDir/libs" 
+    file( dirName ).list().each{
+        f -> 
+            delete "${dirName}/${f}"
+    }
+}
+
 task cleanJavaBin (type: Delete) {
 	delete "$rootDir/bin"
 }
@@ -90,7 +98,7 @@ task copyCppRuntime {
 	doLast {
 		copy {
 			from "$rootDir/libs"
-			into "$rootDir/dist/libs"
+			into "$rootDir/dist/libs/jni"
 		}
 	}	
 }
@@ -117,16 +125,25 @@ task generateBindingGeneratorClasses (type: Exec ) {
 	args "gradle", "build", "-PoutClassesDir=$rootDir/build/intermediates/classes/debug"
 }
 
+task copyRuntime (type: Copy) {
+	from "$rootDir/build/intermediates/bundles/debug/classes.jar"
+	into "$rootDir/dist/libs"
+	rename "classes.jar", "nativescript.jar"
+}
+
 
 //clean
-cleanJavaBin.dependsOn(cleanDistDir)
+cleanDistDir.dependsOn(clean)
+cleanLibsFolder.dependsOn(cleanDistDir)
+cleanJavaBin.dependsOn(cleanLibsFolder)
 createDistDir.dependsOn(cleanJavaBin)
 
+generateBindingGeneratorClasses.dependsOn(createDistDir)
 preBuild.dependsOn(generateBindingGeneratorClasses) //generateBindingGeneratorClasses needs to be done before it is needed as a dependency for compilation
 
 setNdkConfigToRelease.dependsOn(generateBindingGeneratorClasses) //set to release and build
-// buildCppRuntime.dependsOn(setNdkConfigToRelease)
-copyCppRuntime.dependsOn(setNdkConfigToRelease)
+buildCppRuntime.dependsOn(setNdkConfigToRelease)
+copyCppRuntime.dependsOn(buildCppRuntime)
 cleanCppRuntime.dependsOn(copyCppRuntime)
 revertNdkConfiguration.dependsOn(cleanCppRuntime) //rever to debug after build
 
@@ -134,7 +151,9 @@ revertNdkConfiguration.dependsOn(cleanCppRuntime) //rever to debug after build
 // jar.dependsOn(compileJava)
 // build.dependsOn(compileJava)
 build.dependsOn(revertNdkConfiguration)
+copyRuntime.dependsOn(build)
+
 
 task buildRuntime {
-	dependsOn build
+	dependsOn copyRuntime
 }
