@@ -4,11 +4,11 @@ buildscript {
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle:1.3.0'
+        classpath "com.android.tools.build:gradle:1.3.0"
     }
 }
 
-apply plugin: 'com.android.application'
+apply plugin: "com.android.application"
 
 android {
 	compileSdkVersion 22
@@ -20,7 +20,7 @@ android {
 	}
 	
 	sourceSets.main {
-        jniLibs.srcDir 'libs/jni'
+        jniLibs.srcDir "libs/jni"
     }
 }
 
@@ -29,9 +29,9 @@ repositories {
 }
 
 dependencies {
-    compile 'com.android.support:support-v4:22.2.0'
-    compile 'com.android.support:appcompat-v7:22.2.0'
-	compile fileTree(dir: 'libs', include: ['*.jar'])
+    compile "com.android.support:support-v4:22.2.0"
+    compile "com.android.support:appcompat-v7:22.2.0"
+	compile fileTree(dir: 'libs', include: ["*.jar"])
 }
 
 task collectAllJars(type: Copy) {
@@ -47,6 +47,11 @@ task collectAllJars(type: Copy) {
 	into "metadata/libs"
 }
 
+task ensureMetadataOutDir {
+	def outputDir = file("$rootDir/metadata/output")
+	outputDir.mkdirs()
+}
+
 task buildMetadata(type: JavaExec) {
 	outputs.upToDateWhen {		
 		!collectAllJars.didWork
@@ -54,9 +59,9 @@ task buildMetadata(type: JavaExec) {
 
 	main '-jar'
 	def str = new LinkedList <String> ();
-	str.add('build-tools/metadata-generator.jar')
-	str.add('metadata/libs')
-	str.add('metadata/output')
+	str.add("build-tools/metadata-generator.jar")
+	str.add("metadata/libs")
+	str.add("metadata/output")
 
 	args str.toArray()
 }
@@ -66,14 +71,18 @@ task copyMetadata(type: Copy) {
 		!buildMetadata.didWork
 	}
 
-	from 'metadata/output'
+	from "metadata/output"
 	into "src/main/assets/metadata"
 }
 
-collectAllJars.dependsOn(build)
-buildMetadata.dependsOn(collectAllJars)
+preBuild.dependsOn(collectAllJars)
+
+//metadata generator needs to have output folder or it blows up
+ensureMetadataOutDir.dependsOn(preBuild) 
+
+buildMetadata.dependsOn(build)
 copyMetadata.dependsOn(buildMetadata)
 
-task full {
+task buildapk {
     dependsOn copyMetadata
 }
