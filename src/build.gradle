@@ -1,3 +1,11 @@
+/*
+*	This gradle script builds the android runtime hence the command: "gradle buildar"
+*	It builds the C++ part of the runtime with the ndk-build command, which is currently impossible to do with the android plugin for gradle
+*	The script also builds the nativescript.jar file containing the binding generator and the rest of the android runtime
+*
+*	How to run script and build android runtime run: "gradle buildar"
+*/
+
 def distDir = "$rootDir/dist"
 def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
 def pathToAndroidSdkPlatforms = "$System.env.ANDROID_HOME" + "/platforms"
@@ -13,8 +21,9 @@ buildscript {
     }
 }
 
-apply plugin: 'com.android.library'
+apply plugin: 'com.android.library' //com.android.application for applications (build process is different)
 
+//configuration of the android plugin for gradle
 android {
 	compileSdkVersion 22
     buildToolsVersion "22.0.1"
@@ -27,9 +36,9 @@ android {
     }
 	
 	sourceSets {
+		//manifest is necessary to generate a BuildConfig.java file necessary for build
 		main.manifest.srcFile "./AndroidManifest.xml"
-		main.java.srcDir "src"
-		// main.output.classesDir = "$rootDir/build/classes"
+		main.java.srcDir "src" 
 	}
 	
 	//TODO: remove this and fix related problems later
@@ -37,11 +46,6 @@ android {
 		abortOnError false
 	}
 }
-
-// sourceSets {
-	// main.java.srcDir "src"
-	// main.output.classesDir = "$rootDir/build/classes"
-// }
 
 repositories {
     jcenter()
@@ -54,10 +58,10 @@ dependencies {
 	compile 'com.android.support:support-v4:22.2.0'
     compile 'com.android.support:appcompat-v7:22.2.0'
 	compile files(androidJar)
-	compile fileTree(dir: 'libs', include: ['*.jar'])
 	compile files(pathToBindingGeneratorJar)
 }
 
+//this way we clean only content of folder without deleting the folder
 task cleanLibsFolder {	
 	def dirName = "$rootDir/libs" 
     file( dirName ).list().each{
@@ -115,8 +119,8 @@ task revertNdkConfiguration (type: Exec) {
 	args "git", "checkout", "--", "./jni/Application.mk"
 }
 
-task generateBindingGeneratorClasses (type: Exec ) {
-	workingDir "../binding-generator/Generator"
+task generateBindingGeneratorClasses (type: Exec ) {	
+	workingDir "../binding-generator/Generator" 
 
 	if(isWinOs) {
 		commandLine "cmd", "/c"
@@ -138,22 +142,20 @@ cleanLibsFolder.dependsOn(cleanDistDir)
 cleanJavaBin.dependsOn(cleanLibsFolder)
 createDistDir.dependsOn(cleanJavaBin)
 
+//generateBindingGeneratorClasses needs to be done before it is needed as a dependency for compilation (before build starts and dependencies are resolved)
 generateBindingGeneratorClasses.dependsOn(createDistDir)
-preBuild.dependsOn(generateBindingGeneratorClasses) //generateBindingGeneratorClasses needs to be done before it is needed as a dependency for compilation
+preBuild.dependsOn(generateBindingGeneratorClasses) 
 
 setNdkConfigToRelease.dependsOn(generateBindingGeneratorClasses) //set to release and build
 buildCppRuntime.dependsOn(setNdkConfigToRelease)
 copyCppRuntime.dependsOn(buildCppRuntime)
 cleanCppRuntime.dependsOn(copyCppRuntime)
-revertNdkConfiguration.dependsOn(cleanCppRuntime) //rever to debug after build
+revertNdkConfiguration.dependsOn(cleanCppRuntime) //revert to debug after build
 
-// compileJava.dependsOn(revertNdkConfiguration)
-// jar.dependsOn(compileJava)
-// build.dependsOn(compileJava)
-build.dependsOn(revertNdkConfiguration)
+//we need build command to resolve dependencies without manually calling every step
+build.dependsOn(revertNdkConfiguration) 
 copyRuntime.dependsOn(build)
 
-
-task buildRuntime {
+task buildar {
 	dependsOn copyRuntime
 }

@@ -105,8 +105,31 @@ task copyGeneratedRuntime (type: Copy) {
 	into "$rootDir/dist/framework"
 }
 
+task generateMetadataGeneratorJar (type: Exec) {
+	workingDir "$rootDir/android-metadata-generator"
+	
+	if(isWinOs) {
+		commandLine "cmd", "/c"
+	}
+		
+	args "gradle", "jarmg"
+}
+
+task copyGeneratedMetadataGeneratorJar {
+	doLast {
+		delete "$rootDir/dist/framework/build-tools"
+		
+		copy {
+			from "$rootDir/android-metadata-generator/dist"
+			into "$rootDir/dist/framework/build-tools"
+			rename "android-metadata-generator.jar", "metadata-generator.jar"
+		}
+	}
+}
+
 task packFramework (type: Exec) {
 	workingDir "$rootDir/dist"
+	
 	if(isWinOs) {
 		commandLine "cmd", "/c"
 	}
@@ -114,25 +137,25 @@ task packFramework (type: Exec) {
 	args "npm", "pack"
 }
 
-//check env vars 1
-
-//clean build 1
-//mkdir build 1
-//copy template project "build/project-template-gradle" to "dist/framework" 1
-//copy internal folder "src/assets/internalFolder" to "dist .... wherever" 1
-//copy package.json "./package.json" to "dist/ ... wherever" 1
-
-// generate runtime
-
+//clean and set up dirs
 createDistDir.dependsOn(cleanDistDir)
+
+//copy framework structure
 copyGradleTemplate.dependsOn(createDistDir)
 copyInternalFolder.dependsOn(copyGradleTemplate)
 copyPackageJson.dependsOn(copyInternalFolder)
+
+//generate runtime and copy into framework structure
 generateRuntime.dependsOn(copyPackageJson)
 copyGeneratedRuntime.dependsOn(generateRuntime)
-packFramework.dependsOn(copyGeneratedRuntime)
 
-task packRuntime {
+//generate metadata generator and copy into framework structure
+generateMetadataGeneratorJar.dependsOn(copyGeneratedRuntime)
+copyGeneratedMetadataGeneratorJar.dependsOn(generateMetadataGeneratorJar)
+
+//pack runtime
+packFramework.dependsOn(copyGeneratedMetadataGeneratorJar)
+task packar {
 	dependsOn packFramework
 }
 

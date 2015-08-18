@@ -1,10 +1,12 @@
-// /* 
-// *	Compiles binding generator 
-// *	to run:
-// *			gradle build
-// */
+/* 
+*	Compiles binding generator 
+*	to run: "gradle build"
+*	optionaly you can run the command with an additional parameter and set the build output folder like so: 
+*	"gradle build -PoutClassesDir=[path_to_output_folder]" as it is done in the gradle file building the android runtime
+*/
 apply plugin: "java"
 
+//workaround because there is a problem when the binding generator is compiled with java 1.7/1.8
 sourceCompatibility = 1.6
 targetCompatibility = 1.6
 
