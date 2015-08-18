@@ -122,11 +122,11 @@ task generateBindingGeneratorClasses (type: Exec ) {
 		commandLine "cmd", "/c"
 	}
 
-	args "gradle", "build", "-PoutClassesDir=$rootDir/build/intermediates/classes/debug"
+	args "gradle", "build", "-PoutClassesDir=$rootDir/build/intermediates/classes/release"
 }
 
 task copyRuntime (type: Copy) {
-	from "$rootDir/build/intermediates/bundles/debug/classes.jar"
+	from "$rootDir/build/intermediates/bundles/release/classes.jar"
 	into "$rootDir/dist/libs"
 	rename "classes.jar", "nativescript.jar"
 }
