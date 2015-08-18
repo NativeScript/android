@@ -287,12 +287,18 @@ public class DexFactory
 		}
 		else
 		{
-			// purge all dex files if no thumb file is found
-			this.purgeDexesByThumb(null, dexDir);
-			this.purgeDexesByThumb(null, new File(odexPath));
+			// purge all dex files if no thumb file is found. This is crucial for CLI livesync
+			purgeAllProxies();
 		}
 
 		this.saveNewDexThumb(this.dexThumb, dexDir);
+	}
+
+	public void purgeAllProxies()
+	{
+		File dexDir = new File(this.dexPath);
+		this.purgeDexesByThumb(null, dexDir);
+		this.purgeDexesByThumb(null, new File(odexPath));
 	}
 
 	private void saveNewDexThumb(String newDexThumb, File dexDir)

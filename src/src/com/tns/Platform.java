@@ -912,5 +912,15 @@ public class Platform
 		}
 		return success;
 	}
+	
+	public static void purgeAllProxies()
+	{
+		if (dexFactory == null)
+		{
+			return;
+		}
+		
+		dexFactory.purgeAllProxies();
+	}
 
 }
