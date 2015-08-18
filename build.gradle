@@ -97,7 +97,7 @@ task generateRuntime (type: Exec) {
 		commandLine "cmd", "/c"
 	}
 	
-	args "gradle", "buildRuntime"
+	args "gradle", "buildar"
 }
 
 task copyGeneratedRuntime (type: Copy) {
