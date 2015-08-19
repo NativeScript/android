@@ -12,10 +12,6 @@ public class NativeScriptApplication extends android.app.Application implements 
 	public static class ActivityLifecycleCallbacks implements android.app.Application.ActivityLifecycleCallbacks, com.tns.NativeScriptHashCodeProvider {
 
 		public void onActivityCreated(android.app.Activity param_0, android.os.Bundle param_1) {
-			if(ErrorReport.HasApplicationCreateError)
-			{
-				return;
-			}
 			java.lang.Object[] params = new Object[2];
 			params[0] = param_0;
 			params[1] = param_1;
@@ -23,11 +19,6 @@ public class NativeScriptApplication extends android.app.Application implements 
 		}
 
 		public void onActivityDestroyed(android.app.Activity param_0) {
-			if(ErrorReport.HasApplicationCreateError)
-			{
-				return;
-			}
-			
 			java.lang.Object[] params = new Object[1];
 			params[0] = param_0;
 			com.tns.Platform.callJSMethod(this, "onActivityDestroyed", void.class, params);

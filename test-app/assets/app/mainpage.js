@@ -58,12 +58,6 @@ app.init({
 		var action = intent.getAction();
 		__log("action=" + action)
 		return MainActivity;
-		if (action == android.content.Intent.ACTION_MAIN) {
-			return MainActivity;
-		}
-		else {
-			__exit("Unknown action");
-		}
 	},
 	
 	
