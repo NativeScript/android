@@ -97,6 +97,10 @@ public class Require
 			File projectRootDir = new File(RootPackageDir);
 			if (checkForExternalPath && isFileExternal(file, projectRootDir))
 			{
+				if (Platform.IsLogEnabled)
+				{
+					Log.e(Platform.DEFAULT_LOG_TAG, "Module " + moduleName + " is on external path");
+				}
 				return "EXTERNAL_FILE_ERROR";
 			}
 			else
@@ -106,6 +110,10 @@ public class Require
 		}
 
 		// empty path will be handled by the NativeScriptRuntime.cpp and a JS error will be thrown
+		if (Platform.IsLogEnabled)
+		{
+			Log.e(Platform.DEFAULT_LOG_TAG, "Module " + moduleName + " not found. required from directory " + callingDirName);
+		}
 		return "";
 	}
 
