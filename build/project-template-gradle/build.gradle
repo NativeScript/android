@@ -1,8 +1,8 @@
 /*
 *	Script builds apk in release or debug mode
 *	To run: 
-*			gradle assembleRelease -Prelease
-*			gradle assembleDebug
+*			gradle buildapk -Prelease (release mode)
+*			gradle buildapk (debug mode -> default)
 */
 
 buildscript {
@@ -140,9 +140,17 @@ task cleanLocalAarFiles(type: Delete) {
 // 7. Build metadata
 // 8. Copy metadata
 
+
 addAarDependencies.dependsOn(copyAarDependencies)
 preBuild.dependsOn(addAarDependencies)
-cleanLocalAarFiles.dependsOn(build)
+
+if(project.hasProperty("release")) {
+	cleanLocalAarFiles.dependsOn(assembleRelease)
+}
+else {
+	cleanLocalAarFiles.dependsOn(assembleDebug)
+}
+
 collectAllJars.dependsOn(cleanLocalAarFiles)
 ensureMetadataOutDir.dependsOn(collectAllJars)
 buildMetadata.dependsOn(ensureMetadataOutDir)
