@@ -94,8 +94,13 @@ task setNdkConfigToRelease {
 }
 
 task buildCppRuntime (type: Exec) {
-	commandLine "cmd", "/c"
-	args "ndk-build"
+
+	if(isWinOs) {
+		commandLine "cmd", "/c", "ndk-build"
+	}
+	else {
+		commandLine "ndk-build"
+	}	
 }
 
 task copyCppRuntime {
@@ -113,20 +118,22 @@ task cleanCppRuntime (type: Delete){
 
 task revertNdkConfiguration (type: Exec) {
 	if(isWinOs) {
-		commandLine "cmd", "/c"
+		commandLine "cmd", "/c", "git", "checkout", "--", "./jni/Application.mk"
 	}
-	
-	args "git", "checkout", "--", "./jni/Application.mk"
+	else {
+		commandLine "git", "checkout", "--", "./jni/Application.mk"
+	}
 }
 
 task generateBindingGeneratorClasses (type: Exec ) {	
 	workingDir "../binding-generator/Generator" 
 
 	if(isWinOs) {
-		commandLine "cmd", "/c"
+		commandLine "cmd", "/c", "gradle", "build", "-PoutClassesDir=$rootDir/build/intermediates/classes/release"
 	}
-
-	args "gradle", "build", "-PoutClassesDir=$rootDir/build/intermediates/classes/release"
+	else {
+		commandLine "gradle", "build", "-PoutClassesDir=$rootDir/build/intermediates/classes/release"
+	}
 }
 
 task copyRuntime (type: Copy) {

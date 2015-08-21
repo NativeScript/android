@@ -21,10 +21,13 @@ task checkEnvironmentVariables {
 }
 
 task checkAndroidCommand(type:Exec) {		
-	//on windows:
-	commandLine "cmd", "/c"
 	
-	args "android", "-h"
+	if(isWinOs) {
+		commandLine "cmd", "/c", "android", "-h"
+	}
+	else {
+		commandLine "android", "-h"
+	}
 	
 	ignoreExitValue = true
 	
@@ -39,10 +42,11 @@ task checkAndroidCommand(type:Exec) {
 
 task ndkBuild (type: Exec) {
 	if(isWinOs) {
-		commandLine "cmd", "/c"
+		commandLine "cmd", "/c", "ndk-build", "--version"
 	}
-	
-	args "ndk-build", "--version"
+	else {
+		commandLine "ndk-build", "--version"
+	}
 	
 	ignoreExitValue = true
 	doLast {
@@ -94,10 +98,11 @@ task copyPackageJson (type: Copy) {
 task generateRuntime (type: Exec) {
 	workingDir "$rootDir/src"
 	if(isWinOs) {
-		commandLine "cmd", "/c"
+		commandLine "cmd", "/c" , "gradle", "buildar"
 	}
-	
-	args "gradle", "buildar"
+	else {
+		commandLine "gradle", "buildar"
+	}
 }
 
 task copyGeneratedRuntime (type: Copy) {
@@ -109,10 +114,11 @@ task generateMetadataGeneratorJar (type: Exec) {
 	workingDir "$rootDir/android-metadata-generator"
 	
 	if(isWinOs) {
-		commandLine "cmd", "/c"
+		commandLine "cmd", "/c", "gradle", "jarmg"
 	}
-		
-	args "gradle", "jarmg"
+	else {
+		commandLine "gradle", "jarmg"
+	}
 }
 
 task copyGeneratedMetadataGeneratorJar {
@@ -131,10 +137,11 @@ task packFramework (type: Exec) {
 	workingDir "$rootDir/dist"
 	
 	if(isWinOs) {
-		commandLine "cmd", "/c"
+		commandLine "cmd", "/c", "npm", "pack"
 	}
-	
-	args "npm", "pack"
+	else {
+		commandLine "npm", "pack"
+	}
 }
 
 //clean and set up dirs
