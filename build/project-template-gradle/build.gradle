@@ -147,5 +147,7 @@ collectAllJars.dependsOn(cleanLocalAarFiles)
 ensureMetadataOutDir.dependsOn(collectAllJars)
 buildMetadata.dependsOn(ensureMetadataOutDir)
 copyMetadata.dependsOn(buildMetadata)
-preBuild.dependsOn(copyMetadata)
+
+task buildapk {
+	dependsOn copyMetadata
 }
