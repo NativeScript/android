@@ -1,3 +1,10 @@
+/*
+*	Script builds apk in release or debug mode
+*	To run: 
+*			gradle assembleRelease -Prelease
+*			gradle assembleDebug
+*/
+
 buildscript {
     repositories {
         jcenter()
@@ -21,6 +28,22 @@ android {
 	
 	sourceSets.main {
         jniLibs.srcDir "libs/jni"
+    }
+	
+	signingConfigs {
+        release {
+            if(project.hasProperty("release")) {
+				storeFile file(System.console().readLine("\n\$ Enter keystore path: "))
+				storePassword new String(System.console().readPassword("\n\$ Enter keystore password: "))
+				keyAlias System.console().readLine("\n\$ Enter key alias: ")
+				keyPassword new String(System.console().readPassword("\n\$ Enter key password: "))
+			}
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+        }
     }
 }
 
@@ -75,14 +98,8 @@ task copyMetadata(type: Copy) {
 	into "src/main/assets/metadata"
 }
 
-preBuild.dependsOn(collectAllJars)
-
 //metadata generator needs to have output folder or it blows up
-ensureMetadataOutDir.dependsOn(preBuild) 
-
-buildMetadata.dependsOn(build)
+ensureMetadataOutDir.dependsOn(collectAllJars)
+buildMetadata.dependsOn(ensureMetadataOutDir)
 copyMetadata.dependsOn(buildMetadata)
-
-task buildapk {
-    dependsOn copyMetadata
-}
+preBuild.dependsOn(copyMetadata)
