@@ -49,12 +49,40 @@ android {
 
 repositories {
     jcenter()
+    // used for local *.AAR files
+    flatDir {
+    	dirs 'libs/aar'
+	}
 }
+
+def nodeModulesDir = "../../node_modules/"
 
 dependencies {
     compile "com.android.support:support-v4:22.2.0"
     compile "com.android.support:appcompat-v7:22.2.0"
-	compile fileTree(dir: 'libs', include: ["*.jar"])
+
+    // take all jars within the libs dir
+	compile fileTree(dir: "libs", include: ["**/*.jar"])
+
+	// take all jars within the node_modules dir
+	compile fileTree(dir: nodeModulesDir, include: ["**/*.jar"])
+}
+
+task copyAarDependencies(type: Copy) {
+	// we need to copy all dependencies into a flat dir, as pointed by the repositories setup
+	from fileTree(dir: nodeModulesDir, include: ["**/*.aar"]).files
+	into "libs/aar"
+}
+
+task addAarDependencies {
+	// manually traverse all the locally copied AAR files and add them to the dependency list
+	FileTree tree = fileTree(dir: "libs/aar", include: ["**/*.aar"])
+	tree.each { File file ->
+		// remove the extension of the file (.aar)
+		def length = file.name.length() - 4
+		def fileName = file.name[0..<length]
+		project.dependencies.add("compile", [name: fileName, ext: "aar"])
+	}
 }
 
 task collectAllJars(type: Copy) {
@@ -98,8 +126,26 @@ task copyMetadata(type: Copy) {
 	into "src/main/assets/metadata"
 }
 
-//metadata generator needs to have output folder or it blows up
+task cleanLocalAarFiles(type: Delete) {
+	delete fileTree(dir: "libs/aar", include: ["*.aar"])
+}
+
+// prepare task chain
+// 1. Copy *.aar dependencies
+// 2. Add *.aar dependencies
+// 3. Build
+// 4. Clean libs/aar folder
+// 5. Ensure metadata out directory
+// 6. Collect all jars
+// 7. Build metadata
+// 8. Copy metadata
+
+addAarDependencies.dependsOn(copyAarDependencies)
+preBuild.dependsOn(addAarDependencies)
+cleanLocalAarFiles.dependsOn(build)
+collectAllJars.dependsOn(cleanLocalAarFiles)
 ensureMetadataOutDir.dependsOn(collectAllJars)
 buildMetadata.dependsOn(ensureMetadataOutDir)
 copyMetadata.dependsOn(buildMetadata)
 preBuild.dependsOn(copyMetadata)
+}
