@@ -63,7 +63,7 @@ include $(CLEAR_VARS)
 LOCAL_CPPFLAGS += -std=c++11
 LOCAL_MODULE    := NativeScript
 LOCAL_SRC_FILES := com_tns_Platform.cpp com_tns_JsDebugger.cpp com_tns_AssetExtractor.cpp com_tns_NativeScriptActity.cpp \
-					JEnv.cpp DirectBuffer.cpp \
+					JEnv.cpp DirectBuffer.cpp SimpleAllocator.cpp \
 					JsDebugger.cpp \
 					NativeScriptRuntime.cpp MetadataNode.cpp MetadataTreeNode.cpp MetadataReader.cpp \
 					MethodCache.cpp JavaObjectArrayCache.cpp \
