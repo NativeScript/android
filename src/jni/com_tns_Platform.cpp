@@ -18,6 +18,7 @@
 #include "NativeScriptAssert.h"
 #include "JsDebugger.h"
 #include "SimpleProfiler.h"
+#include "SimpleAllocator.h"
 #include "File.h"
 #include <sstream>
 #include <android/log.h>
@@ -41,6 +42,7 @@ Isolate *g_isolate = nullptr;
 std::string Constants::APP_ROOT_FOLDER_PATH = "";
 
 ObjectManager *g_objectManager = nullptr;
+SimpleAllocator g_allocator;
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved)
 {
@@ -166,7 +168,9 @@ extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj
 	V8::InitializePlatform(platform);
 	V8::Initialize();
 
-	g_isolate = Isolate::New();
+	Isolate::CreateParams create_params;
+	create_params.array_buffer_allocator = &g_allocator;
+	g_isolate = Isolate::New(create_params);
 	auto isolate = g_isolate;
 	Isolate::Scope isolate_scope(isolate);
 	HandleScope handleScope(isolate);

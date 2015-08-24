@@ -267,7 +267,16 @@ bool JsArgConverter::ConvertJavaScriptNumber(JEnv& env, const Handle<Value>& jsV
 			break;
 
 		case 'J': // long
-			value.j = (jlong) jsValue->IntegerValue();
+			// TODO: refactor the whole method
+			if (jsValue->IsNumberObject())
+			{
+				auto numObj = Local<NumberObject>::Cast(jsValue);
+				value.j = (jlong) numObj->ValueOf();
+			}
+			else
+			{
+				value.j = (jlong) jsValue->IntegerValue();
+			}
 			break;
 
 		case 'F': // float
