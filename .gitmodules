@@ -1,0 +1,4 @@
+[submodule "android-metadata-generator"]
+	path = android-metadata-generator
+	url = https://github.com/NativeScript/android-metadata-generator.git
+	branch = master

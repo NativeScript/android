@@ -1,0 +1,30 @@
+/* 
+*	Compiles binding generator 
+*	to run: "gradle build"
+*	optionaly you can run the command with an additional parameter and set the build output folder like so: 
+*	"gradle build -PoutClassesDir=[path_to_output_folder]" as it is done in the gradle file building the android runtime
+*/
+apply plugin: "java"
+
+//workaround because there is a problem when the binding generator is compiled with java 1.7/1.8
+sourceCompatibility = 1.6
+targetCompatibility = 1.6
+
+def pathToAndroidSdkPlatforms = "$System.env.ANDROID_HOME" + "/platforms"
+
+dependencies {
+	compile files(pathToAndroidSdkPlatforms + "/android-22/android.jar")
+}
+
+sourceSets {
+    main {
+        java {
+            srcDir 'src'
+        }
+    }
+	def isOutClassesDirSet = project.hasProperty("outClassesDir")
+	main.output.classesDir = isOutClassesDirSet ? outClassesDir : "$rootDir/build/classesss"
+}
+
+
+
