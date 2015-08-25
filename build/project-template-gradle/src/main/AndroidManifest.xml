@@ -11,8 +11,7 @@
         android:xlargeScreens="true"/>
 	
    <uses-sdk
-        android:minSdkVersion="17"
-        android:targetSdkVersion="__APILEVEL__" />
+        android:minSdkVersion="17"/>
     
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>

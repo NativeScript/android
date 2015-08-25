@@ -3,6 +3,9 @@
 *	To run: 
 *			gradle buildapk -Prelease (release mode)
 *			gradle buildapk (debug mode -> default)
+* 	Options:
+*			-Prelease
+*			-PtargetSdk=[target_sdk] (default is 22)
 */
 
 buildscript {
@@ -17,13 +20,23 @@ buildscript {
 
 apply plugin: "com.android.application"
 
+def computeTargetSdkVersion() {
+	if(project.hasProperty("targetSdk")) {
+	
+		return targetSdk
+	}
+	else {
+		return 22
+	}
+}
+
 android {
 	compileSdkVersion 22
     buildToolsVersion "22.0.1"
 	
 	defaultConfig {
 		minSdkVersion 17
-		targetSdkVersion 22
+		targetSdkVersion computeTargetSdkVersion()
 	}
 	
 	sourceSets.main {
