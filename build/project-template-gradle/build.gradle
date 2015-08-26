@@ -146,8 +146,10 @@ task copyMetadata(type: Copy) {
 		!buildMetadata.didWork
 	}
 
-	from "metadata/output"
-	into "src/main/assets/metadata"
+	doLast {
+		from "metadata/output"
+		into "src/main/assets/metadata"
+	}
 }
 
 task cleanLocalAarFiles(type: Delete) {
