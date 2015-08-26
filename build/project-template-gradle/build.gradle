@@ -69,6 +69,11 @@ android {
             signingConfig signingConfigs.release
         }
     }
+	
+	applicationVariants.all { variant ->
+		def tsk = variant.mergeAssets
+		tsk.dependsOn(copyMetadata)
+	}
 }
 
 repositories {
@@ -146,10 +151,8 @@ task copyMetadata(type: Copy) {
 		!buildMetadata.didWork
 	}
 
-	doLast {
-		from "metadata/output"
-		into "src/main/assets/metadata"
-	}
+	from "metadata/output"
+	into "src/main/assets/metadata"
 }
 
 task cleanLocalAarFiles(type: Delete) {
@@ -174,9 +177,6 @@ collectAllJars.dependsOn(cleanLocalAarFiles)
 ensureMetadataOutDir.dependsOn(collectAllJars)
 buildMetadata.dependsOn(ensureMetadataOutDir)
 copyMetadata.dependsOn(buildMetadata)
-
-assembleRelease.dependsOn(copyMetadata)
-assembleDebug.dependsOn(copyMetadata)
 
 task buildapk {
 	if(project.hasProperty("release")) {
