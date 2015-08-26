@@ -6,6 +6,11 @@
 * 	Options:
 *			-Prelease
 *			-PtargetSdk=[target_sdk] (default is 22)
+*
+*			-PksPath=[path_to_keystore_file]
+*			-PksPassword=[password_for_keystore_file]
+*			-Palias=[alias_to_use_from_keystore_file]
+*			-Ppassword=[password_for_alias]
 */
 
 buildscript {
@@ -46,10 +51,16 @@ android {
 	signingConfigs {
         release {
             if(project.hasProperty("release")) {
-				storeFile file(System.console().readLine("\n\$ Enter keystore path: "))
-				storePassword new String(System.console().readPassword("\n\$ Enter keystore password: "))
-				keyAlias System.console().readLine("\n\$ Enter key alias: ")
-				keyPassword new String(System.console().readPassword("\n\$ Enter key password: "))
+				if(project.hasProperty("ksPath") &&
+					project.hasProperty("ksPassword") &&
+					project.hasProperty("alias") &&
+					project.hasProperty("password"))
+				{
+					storeFile file(ksPath)
+					storePassword ksPassword
+					keyAlias alias
+					keyPassword password
+				}
 			}
         }
     }
@@ -157,18 +168,19 @@ task cleanLocalAarFiles(type: Delete) {
 addAarDependencies.dependsOn(copyAarDependencies)
 preBuild.dependsOn(addAarDependencies)
 
-if(project.hasProperty("release")) {
-	cleanLocalAarFiles.dependsOn(assembleRelease)
-}
-else {
-	cleanLocalAarFiles.dependsOn(assembleDebug)
-}
-
 collectAllJars.dependsOn(cleanLocalAarFiles)
 ensureMetadataOutDir.dependsOn(collectAllJars)
 buildMetadata.dependsOn(ensureMetadataOutDir)
 copyMetadata.dependsOn(buildMetadata)
 
+assembleRelease.dependsOn(copyMetadata)
+assembleDebug.dependsOn(copyMetadata)
+
 task buildapk {
-	dependsOn copyMetadata
+	if(project.hasProperty("release")) {
+		dependsOn assembleRelease
+	}
+	else {
+		dependsOn assembleDebug
+	}
 }
