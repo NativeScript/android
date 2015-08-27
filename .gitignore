@@ -2,6 +2,7 @@
 node_modules/
 dist/
 .gradle
+/test-app/build
 
 local.properties
 
