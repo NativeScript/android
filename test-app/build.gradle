@@ -1,3 +1,5 @@
+def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
+
 buildscript {
     repositories {
         jcenter()
@@ -130,7 +132,6 @@ task copyMetadata(type: Copy) {
 	into "$rootDir/assets/metadata"
 }
 
-
 cleanLibs.dependsOn(clean)
 copyLibNativescriptLibrary.dependsOn(cleanLibs)
 preBuild.dependsOn(copyLibNativescriptLibrary)
@@ -147,4 +148,77 @@ task buildapk {
 	else {
 		dependsOn assembleDebug
 	}
+}
+
+///// install apk
+task installApk (type: Exec) {
+	println "---- attempting to install buit apk"
+	
+	if(isWinOs) {
+		commandLine "cmd", "/c", "node", "$rootDir/tasks/deploy-apk.js", "$rootDir/build/outputs/apk/test-app-debug.apk"
+	}
+	else {
+		commandLine "node", "$rootDir/tasks/deploy-apk.js", "$rootDir/build/outputs/apk/test-app-debug.apk"
+	}
+}
+
+task deletePreviousResultXml (type: Exec) {
+	println "---- removing previous android_unit_test_results.xml"
+	
+	if(isWinOs) {
+		commandLine "cmd", "/c", "adb", "shell", "rm", "/sdcard/android_unit_test_results.xml"
+	}
+	else {
+		commandLine "adb", "shell", "rm", "/sdcard/android_unit_test_results.xml"
+	}
+}
+
+task startInstalledApk (type: Exec) {
+	println "---- starting installed apk"
+	
+	if(isWinOs) {
+		commandLine "cmd", "/c", "adb", "shell", "am", "start", "-n", "com.tns.android_runtime_testapp/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
+	}
+	else {
+		commandLine "adb", "shell", "am", "start", "-n", "com.tns.android_runtime_testapp/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
+	}
+}
+
+task waitForUnitTestResultFile (type: Exec) {	
+	println "---- waiting for tests to finish..."
+	
+	if(isWinOs) {
+		commandLine "cmd", "/c", "node", "$rootDir/tasks/try_to_find_test_result_file.js"
+	}
+	else {
+		commandLine "node", "$rootDir/tasks/try_to_find_test_result_file.js"
+	}
+}
+
+task createDistFolder {
+	def distDir = file("$rootDir/dist")
+	distDir.mkdirs()
+}
+
+task copyResultToDist (type: Exec) {
+	println "---- copying result to dist"
+	workingDir "$rootDir/dist/"
+	
+	if(isWinOs) {
+		commandLine "cmd", "/c", "adb", "pull", "/sdcard/android_unit_test_results.xml"
+	}
+	else {
+		commandLine "adb", "pull", "/sdcard/android_unit_test_results.xml"
+	}
+}
+
+installApk.dependsOn(buildapk)
+deletePreviousResultXml.dependsOn(installApk)
+startInstalledApk.dependsOn(deletePreviousResultXml)
+waitForUnitTestResultFile.dependsOn(startInstalledApk)
+createDistFolder.dependsOn(waitForUnitTestResultFile)
+copyResultToDist.dependsOn(createDistFolder)
+
+task runtest {
+	dependsOn copyResultToDist
 }
