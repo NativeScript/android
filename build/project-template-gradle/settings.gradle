@@ -1,0 +1,1 @@
+rootProject.name = "__PROJECT_NAME__"
