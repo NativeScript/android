@@ -95,6 +95,11 @@ dependencies {
 
 	// take all jars within the node_modules dir
 	compile fileTree(dir: nodeModulesDir, include: ["**/*.jar"])
+	
+	//when gradle has aar support this will be preferred instead of addAarDependencies
+	// compile files("$rootDir/libs/aar") {
+        // builtBy 'copyAarDependencies'
+    // }
 }
 
 task copyAarDependencies(type: Copy) {
@@ -103,7 +108,7 @@ task copyAarDependencies(type: Copy) {
 	into "libs/aar"
 }
 
-task addAarDependencies {
+task addAarDependencies <</*doLast*/ {
 	// manually traverse all the locally copied AAR files and add them to the dependency list
 	FileTree tree = fileTree(dir: "libs/aar", include: ["**/*.aar"])
 	tree.each { File file ->
@@ -169,16 +174,19 @@ task cleanLocalAarFiles(type: Delete) {
 // 7. Build metadata
 // 8. Copy metadata
 
-
-addAarDependencies.dependsOn(copyAarDependencies)
-preBuild.dependsOn(addAarDependencies)
-
 collectAllJars.dependsOn(cleanLocalAarFiles)
 ensureMetadataOutDir.dependsOn(collectAllJars)
 buildMetadata.dependsOn(ensureMetadataOutDir)
 copyMetadata.dependsOn(buildMetadata)
 
 task buildapk {
+	
+	//this way copy arr dependencies and addArrDependencies are executed before configuration
+	println "execute: copyAarDependencies, addAarDependencies before configuration"
+	tasks.copyAarDependencies.execute()
+	tasks.addAarDependencies.execute()
+	//
+	
 	if(project.hasProperty("release")) {
 		dependsOn assembleRelease
 	}
