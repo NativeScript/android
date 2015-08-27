@@ -83,6 +83,7 @@ JSInstanceInfo* ObjectManager::GetJSInstanceInfo(const Handle<Object>& object)
 	{
 		//Typescript object layout has an object instance as child of the actual registered instance. checking for that
 		auto prototypeObject = object->GetPrototype().As<Object>();
+
 		if (!prototypeObject.IsEmpty() && prototypeObject->IsObject())
 		{
 			DEBUG_WRITE("GetJSInstanceInfo: need to check prototype :%d", prototypeObject->GetIdentityHash());
@@ -326,8 +327,6 @@ void ObjectManager::JSObjectWeakCallback(Isolate *isolate, ObjectWeakCallbackSta
 				m_implObjStrong.push_back(PersistentObjectIdPair(po, javaObjectID));
 				jsInstanceInfo->IsJavaObjectWeak = true;
 			}
-
-			MarkReachableObjects(isolate, obj);
 		}
 		else
 		{
@@ -572,6 +571,20 @@ void ObjectManager::OnGcStarted(GCType type, GCCallbackFlags flags)
 void ObjectManager::OnGcFinished(GCType type, GCCallbackFlags flags)
 {
 	assert(!m_markedForGC.empty());
+
+	auto isolate = Isolate::GetCurrent();
+	for (auto it = m_implObjWeak.begin(); it != m_implObjWeak.end(); ++it)
+	{
+		auto po = it->po;
+		auto obj = Local<Object>::New(isolate, *po);
+		MarkReachableObjects(isolate, obj);
+	}
+	for (auto it = m_implObjStrong.begin(); it != m_implObjStrong.end(); ++it)
+	{
+		auto po = it->po;
+		auto obj = Local<Object>::New(isolate, *po);
+		MarkReachableObjects(isolate, obj);
+	}
 
 	ReleaseRegularObjects();
 
