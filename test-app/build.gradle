@@ -10,19 +10,60 @@ buildscript {
 
 apply plugin: "com.android.application"
 
+
+def computeTargetSdkVersion() {
+	if(project.hasProperty("targetSdk")) {
+	
+		return targetSdk
+	}
+	else {
+		return 22
+	}
+}
+
 android {
 	compileSdkVersion 22
     buildToolsVersion "22.0.1"
 	
 	defaultConfig {
-        minSdkVersion 19
-        targetSdkVersion 22
+		minSdkVersion 17
+		targetSdkVersion computeTargetSdkVersion()
+	}
+	
+	sourceSets.main {
+		//manifest is necessary to generate a BuildConfig.java file necessary for build
+		manifest.srcFile "./AndroidManifest.xml"
+		java.srcDir "src"
+		res.srcDir "res"
+		assets.srcDir "assets"
+        jniLibs.srcDir "libs/jni"
     }
 	
-	sourceSets {
-		//manifest is necessary to generate a BuildConfig.java file necessary for build
-		main.manifest.srcFile "./AndroidManifest.xml"
-		main.java.srcDir "src" 
+	signingConfigs {
+        release {
+            if(project.hasProperty("release")) {
+				if(project.hasProperty("ksPath") &&
+					project.hasProperty("ksPassword") &&
+					project.hasProperty("alias") &&
+					project.hasProperty("password"))
+				{
+					storeFile file(ksPath)
+					storePassword ksPassword
+					keyAlias alias
+					keyPassword password
+				}
+			}
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+        }
+    }
+	
+	applicationVariants.all { variant ->
+		def tsk = variant.mergeAssets
+		tsk.dependsOn(copyMetadata)
 	}
 }
 
@@ -33,8 +74,77 @@ repositories {
 dependencies {
 	def sdkPath = android.sdkDirectory.getAbsolutePath();
 	def androidJar = sdkPath + "/platforms/" + android.compileSdkVersion + "/android.jar"	
+	def nativescriptJar = "../dist/framework/libs/nativescript.jar"
     
 	compile 'com.android.support:support-v4:22.2.0'
+	compile files(nativescriptJar)
     // compile 'com.android.support:appcompat-v7:22.2.0'
-	compile files(androidJar)
+	// compile files(androidJar)
+}
+
+task cleanLibs (type: Delete) {
+	delete "$rootDir/libs"
+}
+
+task copyLibNativescriptLibrary (type: Copy) {
+	from "../dist/framework/libs"
+	into "$rootDir/libs"
+}
+
+task collectAllJars(type: Copy) {
+	def sdkPath = android.sdkDirectory.getAbsolutePath();
+	def androidJar = sdkPath + "/platforms/" + android.compileSdkVersion + "/android.jar"	
+
+	from configurations.compile
+	from androidJar
+	include "**/*.jar"
+	includeEmptyDirs = false
+	into "$rootDir/metadata/libs"
+}
+
+task ensureMetadataOutDir {
+	def outputDir = file("$rootDir/metadata/output")
+	outputDir.mkdirs()
+}
+
+task buildMetadata(type: JavaExec) {
+	outputs.upToDateWhen {		
+		!collectAllJars.didWork
+	}
+
+	main '-jar'
+	def str = new LinkedList <String> ();
+	str.add("../dist/framework/build-tools/metadata-generator.jar")
+	str.add("metadata/libs")
+	str.add("metadata/output")
+
+	args str.toArray()
+}
+
+task copyMetadata(type: Copy) {
+	outputs.upToDateWhen {
+		!buildMetadata.didWork
+	}
+
+	from "metadata/output"
+	into "$rootDir/assets/metadata"
+}
+
+
+cleanLibs.dependsOn(clean)
+copyLibNativescriptLibrary.dependsOn(cleanLibs)
+preBuild.dependsOn(copyLibNativescriptLibrary)
+
+ensureMetadataOutDir.dependsOn(collectAllJars)
+buildMetadata.dependsOn(ensureMetadataOutDir)
+copyMetadata.dependsOn(buildMetadata)
+
+task buildapk {
+	
+	if(project.hasProperty("release")) {
+		dependsOn assembleRelease
+	}
+	else {
+		dependsOn assembleDebug
+	}
 }
