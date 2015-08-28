@@ -1,6 +1,11 @@
+import groovy.json.JsonSlurper //used to parse package.json
+
 def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
 def localMetadataGen = "../android-metadata-generator/dist/tns-android-metadata-generator-0.0.1.tgz"
 def distDir = "$rootDir/dist"
+def pVersion = "no package version was provided by build.gradle build"
+def arVersion = "no commit sha was provided by build.gradle build"
+def commitVersionFile = "commit.txt"
 
 task checkEnvironmentVariables {
 	if ("$System.env.JAVA_HOME" == "" || "$System.env.JAVA_HOME" == "null") {
@@ -9,9 +14,9 @@ task checkEnvironmentVariables {
 	if ("$System.env.ANDROID_HOME" == "" || "$System.env.ANDROID_HOME" == "null") {
         throw new GradleException("Set ANDROID_HOME to point to the correct Android SDK location\n");
     }
-	if ("$System.env.GIT_COMMIT" == "null") {
-        logger.warn("Warning: The GIT_COMMIT is not set. This NativeScript Android Runtime will not be tagged with the git commit it is build from\n");
-    }
+	// if ("$System.env.GIT_COMMIT" == "null") {
+        // logger.warn("Warning: The GIT_COMMIT is not set. This NativeScript Android Runtime will not be tagged with the git commit it is build from\n");
+    // }
 	if(project.hasProperty("devmode") == true && !project.hasProperty("metadataGenSrc") && !file("../android-metadata-generator").exists()) {
 		throw new GradleException("../android-metadata-generator directory not found and no metadataGenSrc option specified. Clone the android-metadata-generator repo first.\n");
 	}
@@ -67,18 +72,18 @@ task createDistDir {
 	}
 }
 
-task copyPackageJsonToSubfolder (type: Copy) {
+// task copyPackageJsonToSubfolder (type: Copy) {
 	//if linux not necessary
-	if(isWinOs) {
-		def sourcePackageJsonFileName = "$rootDir/package.json";
-		def destinationPackageJsonFileName = "$rootDir/src";
+	// if(isWinOs) {
+		// def sourcePackageJsonFileName = "$rootDir/package.json";
+		// def destinationPackageJsonFileName = "$rootDir/src";
 		
-		logger.warn("Warning: This is windows machine. Coping " + sourcePackageJsonFileName + " to " + destinationPackageJsonFileName + " \n");
+		// logger.warn("Warning: This is windows machine. Coping " + sourcePackageJsonFileName + " to " + destinationPackageJsonFileName + " \n");
 		
-		from sourcePackageJsonFileName
-		into destinationPackageJsonFileName
-	}
-}
+		// from sourcePackageJsonFileName
+		// into destinationPackageJsonFileName
+	// }
+// }
 
 task copyLatestWidgetsJar (type: Copy) {
 	from widgetsPath //passed by jenkins
@@ -100,13 +105,46 @@ task copyPackageJson (type: Copy) {
 	into "$rootDir/dist"
 }
 
-task generateRuntime (type: Exec) {
-	workingDir "$rootDir/src"
+task getPackageVersion {
+	String content = new File("$rootDir/package.json").getText("UTF-8")
+	def jsonSlurper = new JsonSlurper()
+	def packageJsonMap = jsonSlurper.parseText(content)
+	
+	pVersion = packageJsonMap.version
+}
+
+task createCommitFile {
+	def commitFile = new File(commitVersionFile)
+	commitFile.createNewFile()
+}
+
+task getCommitVersion (type: Exec) {
 	if(isWinOs) {
-		commandLine "cmd", "/c" , "gradle", "buildar"
+		commandLine "cmd", "/c" , "git", "rev-parse", "HEAD", ">", commitVersionFile
 	}
 	else {
-		commandLine "gradle", "buildar"
+		commandLine "git", "rev-parse", "HEAD", ">", commitVersionFile
+	}
+}
+
+task setCommitVersionFromFile {
+	String content = new File("$rootDir/${commitVersionFile}").getText("UTF-8")
+	arVersion = content
+}
+
+task deleteCommitFile (type: Delete) {
+	delete "$rootDir/$commitVersionFile"
+}
+
+task generateRuntime (type: Exec) {
+	workingDir "$rootDir/src"
+	
+	//command gradle buildar -PpackageVersion=[from_package.json] -PgitCommitVersion=[from_some_sys_variable]
+	if(isWinOs) {
+		commandLine "cmd", "/c" , "gradle", "buildar", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"
+	}
+	else {
+		commandLine "gradle", "buildar", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"
 	}
 }
 
@@ -158,8 +196,14 @@ copyGradleTemplate.dependsOn(copyLatestWidgetsJar)
 copyInternalFolder.dependsOn(copyGradleTemplate)
 copyPackageJson.dependsOn(copyInternalFolder)
 
+//get version from package json
+getPackageVersion.dependsOn(copyPackageJson)
+getCommitVersion.dependsOn(getPackageVersion)
+setCommitVersionFromFile.dependsOn(getCommitVersion)
+deleteCommitFile.dependsOn(setCommitVersionFromFile)
+
 //generate runtime and copy into framework structure
-generateRuntime.dependsOn(copyPackageJson)
+generateRuntime.dependsOn(deleteCommitFile)
 copyGeneratedRuntime.dependsOn(generateRuntime)
 
 //generate metadata generator and copy into framework structure
@@ -169,6 +213,7 @@ copyGeneratedMetadataGeneratorJar.dependsOn(generateMetadataGeneratorJar)
 //pack runtime
 packFramework.dependsOn(copyGeneratedMetadataGeneratorJar)
 task packar {
+	tasks.createCommitFile.execute()
 	dependsOn packFramework
 }
 

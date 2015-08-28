@@ -136,12 +136,48 @@ task generateBindingGeneratorClasses (type: Exec ) {
 	}
 }
 
+task setPackageVersion {
+	def mkFile = file("$rootDir/jni/Version.h")
+	
+	String contents = new File("$rootDir/jni/Version.h").getText("UTF-8")
+	
+	def runtimeVersion = "no package version was provided by build.gradle build"
+	if(project.hasProperty("packageVersion")) {
+		runtimeVersion = packageVersion
+	}
+	
+	contents = contents.replaceAll( /RUNTIME_VERSION_PLACEHOLDER/, runtimeVersion)
+	new File("$rootDir/jni/Version.h").write(contents, "UTF-8")
+}
+
+task setRuntimeCommit {
+	def mkFile = file("$rootDir/jni/Version.h")
+	
+	String contents = new File("$rootDir/jni/Version.h").getText("UTF-8")
+	
+	def commitVersion = "no commit sha was provided by build.gradle build"
+	if(project.hasProperty("gitCommitVersion")) {
+		commitVersion = gitCommitVersion
+	}
+	
+	contents = contents.replaceAll( /RUNTIME_COMMIT_SHA_PLACEHOLDER/, commitVersion)
+	new File("$rootDir/jni/Version.h").write(contents, "UTF-8")
+}
+
+task revertVersionFile (type: Exec) {
+	if(isWinOs) {
+		commandLine "cmd", "/c", "git", "checkout", "--", "./jni/Version.h"
+	}
+	else {
+		commandLine "git", "checkout", "--", "./jni/Version.h"
+	}
+}
+
 task copyRuntime (type: Copy) {
 	from "$rootDir/build/intermediates/bundles/release/classes.jar"
 	into "$rootDir/dist/libs"
 	rename "classes.jar", "nativescript.jar"
 }
-
 
 //clean
 cleanDistDir.dependsOn(clean)
@@ -153,14 +189,21 @@ createDistDir.dependsOn(cleanJavaBin)
 generateBindingGeneratorClasses.dependsOn(createDistDir)
 preBuild.dependsOn(generateBindingGeneratorClasses) 
 
-setNdkConfigToRelease.dependsOn(generateBindingGeneratorClasses) //set to release and build
+//set correct version and commit hash in version.h file
+setPackageVersion.dependsOn(preBuild)
+setRuntimeCommit.dependsOn(setPackageVersion)
+setNdkConfigToRelease.dependsOn(setRuntimeCommit) //set to release and build
+
 buildCppRuntime.dependsOn(setNdkConfigToRelease)
 copyCppRuntime.dependsOn(buildCppRuntime)
 cleanCppRuntime.dependsOn(copyCppRuntime)
-revertNdkConfiguration.dependsOn(cleanCppRuntime) //revert to debug after build
+
+//revert changed files after  build
+revertNdkConfiguration.dependsOn(cleanCppRuntime)
+revertVersionFile.dependsOn(revertNdkConfiguration)
 
 //we need build command to resolve dependencies without manually calling every step
-build.dependsOn(revertNdkConfiguration) 
+build.dependsOn(revertVersionFile) 
 copyRuntime.dependsOn(build)
 
 task buildar {
