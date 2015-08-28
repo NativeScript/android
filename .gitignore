@@ -2,6 +2,9 @@
 node_modules/
 dist/
 .gradle
+/test-app/build
+/test-app/libs
+/test-app/metadata
 
 local.properties
 

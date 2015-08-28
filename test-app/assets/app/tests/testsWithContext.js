@@ -84,15 +84,6 @@ exports.run = function(cntxt)
 			expect(displayInfo.length).toBeGreaterThan(0);
 		});
 		
-		it("TestUsingClassFromAndroidSupportLibrary", function () {
-			
-			__log("TEST: TestUsingClassFromAndroidSupportLibrary");
-
-			var layout = new android.support.v4.widget.DrawerLayout(context);
-			
-			expect(layout).not.toEqual(null);
-		});
-		
 		it("TestCanPassCharSequenceArray", function () {
 			
 			__log("TEST: TestCanPassCharSequenceArray");
