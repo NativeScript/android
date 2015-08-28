@@ -147,13 +147,6 @@ task buildapk {
 
 ///// install apk
 
-task copySupportLibraryV4 (type: Copy) {
-	def sdkPath = android.sdkDirectory.getAbsolutePath();
-	
-	from "${sdkPath}/extras/android/support/v4/android-support-v4.jar"
-	into "$rootDir/metadata/libs"
-}
-
 task runJarProject (type: Exec) {
 	println "---- jar project so metadata can be made for it"
 	
@@ -237,9 +230,6 @@ copyResultToDist.dependsOn(waitForUnitTestResultFile)
 deleteRootLevelResult.dependsOn(copyResultToDist)
 
 task runtest {
-	//not sure if necessary for tests to run (only one test blows up and it just checks if v4 support lib is available)
-	tasks.copySupportLibraryV4.execute() 
-	
 	tasks.runJarProject.execute()
 	
 	dependsOn deleteRootLevelResult
