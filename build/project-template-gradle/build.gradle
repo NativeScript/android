@@ -25,9 +25,17 @@ buildscript {
 
 apply plugin: "com.android.application"
 
+def compiteCompileSdkVersion () {
+	if(project.hasProperty("compileSdk")) {
+		return compileSdk
+	}
+	else {
+		return 22
+	}
+}
+
 def computeTargetSdkVersion() {
 	if(project.hasProperty("targetSdk")) {
-	
 		return targetSdk
 	}
 	else {
@@ -36,7 +44,7 @@ def computeTargetSdkVersion() {
 }
 
 android {
-	compileSdkVersion 22
+	compileSdkVersion compiteCompileSdkVersion()
     buildToolsVersion "22.0.1"
 	
 	defaultConfig {
