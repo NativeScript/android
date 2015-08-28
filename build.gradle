@@ -80,6 +80,11 @@ task copyPackageJsonToSubfolder (type: Copy) {
 	}
 }
 
+task copyLatestWidgetsJar (type: Copy) {
+	from widgetsPath //passed by jenkins
+	into "$rootDir/build/project-template-gradle/libs"
+}
+
 task copyGradleTemplate (type: Copy) {
 	from "$rootDir/build/project-template-gradle"
 	into "$rootDir/dist/framework"
@@ -148,7 +153,8 @@ task packFramework (type: Exec) {
 createDistDir.dependsOn(cleanDistDir)
 
 //copy framework structure
-copyGradleTemplate.dependsOn(createDistDir)
+copyLatestWidgetsJar.dependsOn(createDistDir)
+copyGradleTemplate.dependsOn(copyLatestWidgetsJar)
 copyInternalFolder.dependsOn(copyGradleTemplate)
 copyPackageJson.dependsOn(copyInternalFolder)
 
