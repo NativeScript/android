@@ -12,7 +12,6 @@ buildscript {
 
 apply plugin: "com.android.application"
 
-
 def computeTargetSdkVersion() {
 	if(project.hasProperty("targetSdk")) {
 	
@@ -74,14 +73,10 @@ repositories {
 }
 
 dependencies {
-	def sdkPath = android.sdkDirectory.getAbsolutePath();
-	def androidJar = sdkPath + "/platforms/" + android.compileSdkVersion + "/android.jar"	
 	def nativescriptJar = "../dist/framework/libs/nativescript.jar"
     
 	compile 'com.android.support:support-v4:22.2.0'
 	compile files(nativescriptJar)
-    // compile 'com.android.support:appcompat-v7:22.2.0'
-	// compile files(androidJar)
 }
 
 task cleanLibs (type: Delete) {
@@ -151,6 +146,29 @@ task buildapk {
 }
 
 ///// install apk
+
+task copySupportLibraryV4 (type: Copy) {
+	def sdkPath = android.sdkDirectory.getAbsolutePath();
+	
+	from "${sdkPath}/extras/android/support/v4/android-support-v4.jar"
+	into "$rootDir/metadata/libs"
+}
+
+task runJarProject (type: Exec) {
+	println "---- jar project so metadata can be made for it"
+	
+	if(isWinOs) {
+		commandLine "cmd", "/c", "gradle", "-b", "jarProject.gradle", "jarReleaseClasses", "copyJaredProject"
+	}
+	else {
+		commandLine "gradle", "-b", "jarProject.gradle", "jarReleaseClasses", "copyJaredProject"
+	}
+}
+
+task deleteDist (type: Delete) {
+	delete "$rootDir/dist"
+}
+
 task installApk (type: Exec) {
 	println "---- attempting to install buit apk"
 	
@@ -185,7 +203,7 @@ task startInstalledApk (type: Exec) {
 }
 
 task waitForUnitTestResultFile (type: Exec) {	
-	println "---- waiting for tests to finish..."
+	println "---- waiting for tests to finish and get file..."
 	
 	if(isWinOs) {
 		commandLine "cmd", "/c", "node", "$rootDir/tasks/try_to_find_test_result_file.js"
@@ -200,25 +218,29 @@ task createDistFolder {
 	distDir.mkdirs()
 }
 
-task copyResultToDist (type: Exec) {
-	println "---- copying result to dist"
-	workingDir "$rootDir/dist/"
-	
-	if(isWinOs) {
-		commandLine "cmd", "/c", "adb", "pull", "/sdcard/android_unit_test_results.xml"
-	}
-	else {
-		commandLine "adb", "pull", "/sdcard/android_unit_test_results.xml"
-	}
+task copyResultToDist (type: Copy) {
+	from "$rootDir/android_unit_test_results.xml"
+	into "$rootDir/dist"
 }
 
-installApk.dependsOn(buildapk)
+task deleteRootLevelResult (type: Delete) {
+	delete "$rootDir/android_unit_test_results.xml"
+}
+
+deleteDist.dependsOn(buildapk)
+installApk.dependsOn(deleteDist)
 deletePreviousResultXml.dependsOn(installApk)
 startInstalledApk.dependsOn(deletePreviousResultXml)
-waitForUnitTestResultFile.dependsOn(startInstalledApk)
-createDistFolder.dependsOn(waitForUnitTestResultFile)
-copyResultToDist.dependsOn(createDistFolder)
+createDistFolder.dependsOn(startInstalledApk)
+waitForUnitTestResultFile.dependsOn(createDistFolder)
+copyResultToDist.dependsOn(waitForUnitTestResultFile)
+deleteRootLevelResult.dependsOn(copyResultToDist)
 
 task runtest {
-	dependsOn copyResultToDist
+	//not sure if necessary for tests to run (only one test blows up and it just checks if v4 support lib is available)
+	tasks.copySupportLibraryV4.execute() 
+	
+	tasks.runJarProject.execute()
+	
+	dependsOn deleteRootLevelResult
 }
