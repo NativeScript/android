@@ -113,11 +113,6 @@ task getPackageVersion {
 	pVersion = packageJsonMap.version
 }
 
-task createCommitFile {
-	def commitFile = new File(commitVersionFile)
-	commitFile.createNewFile()
-}
-
 task getCommitVersion (type: Exec) {
 	if(isWinOs) {
 		commandLine "cmd", "/c" , "git", "rev-parse", "HEAD"
@@ -130,8 +125,10 @@ task getCommitVersion (type: Exec) {
 }
 
 task setCommitVersionFromFile {
-	String content = new File("$rootDir/${commitVersionFile}").getText("UTF-8")
-	arVersion = content
+	doFirst {
+		String content = new File(commitVersionFile).getText("UTF-8")
+		arVersion = content.trim()
+	}
 }
 
 task deleteCommitFile (type: Delete) {
@@ -139,14 +136,16 @@ task deleteCommitFile (type: Delete) {
 }
 
 task generateRuntime (type: Exec) {
-	workingDir "$rootDir/src"
-	
-	//command gradle buildar -PpackageVersion=[from_package.json] -PgitCommitVersion=[from_some_sys_variable]
-	if(isWinOs) {
-		commandLine "cmd", "/c" , "gradle", "buildar", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"
-	}
-	else {
-		commandLine "gradle", "buildar", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"
+	doFirst{
+		workingDir "$rootDir/src"
+		
+		//command gradle buildar -PpackageVersion=[from_package.json] -PgitCommitVersion=[from_some_sys_variable]
+		if(isWinOs) {
+			commandLine "cmd", "/c" , "gradle", "buildar", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"
+		}
+		else {
+			commandLine "gradle", "buildar", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"
+		}
 	}
 }
 
@@ -215,7 +214,6 @@ copyGeneratedMetadataGeneratorJar.dependsOn(generateMetadataGeneratorJar)
 //pack runtime
 packFramework.dependsOn(copyGeneratedMetadataGeneratorJar)
 task packar {
-	tasks.createCommitFile.execute()
 	dependsOn packFramework
 }
 
