@@ -120,11 +120,13 @@ task createCommitFile {
 
 task getCommitVersion (type: Exec) {
 	if(isWinOs) {
-		commandLine "cmd", "/c" , "git", "rev-parse", "HEAD", ">", commitVersionFile
+		commandLine "cmd", "/c" , "git", "rev-parse", "HEAD"
 	}
 	else {
-		commandLine "git", "rev-parse", "HEAD", ">", commitVersionFile
+		commandLine "git", "rev-parse", "HEAD"
 	}
+	
+	standardOutput = new FileOutputStream(commitVersionFile)
 }
 
 task setCommitVersionFromFile {
