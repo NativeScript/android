@@ -98,19 +98,44 @@ public class Platform
 		errorActivityClass = clazz;
 	}
 	
-	public static int init(File rootDir, File appDir, File debuggerSetupDir, ClassLoader classLoader, File dexDir, String dexThumb) throws RuntimeException
+	public static int init(File runtimeLibsDir, File rootDir, File appDir, File debuggerSetupDir, ClassLoader classLoader, File dexDir, String dexThumb) throws RuntimeException
 	{
-		return init(null, rootDir, appDir, debuggerSetupDir, classLoader, dexDir, dexThumb);
+		return init(null, runtimeLibsDir, rootDir, appDir, debuggerSetupDir, classLoader, dexDir, dexThumb);
 	}
 	
-	public static int init(Context context, File rootDir, File appDir, File debuggerSetupDir, ClassLoader classLoader, File dexDir, String dexThumb) throws RuntimeException
+	public static int init(Context context, File runtimeLibsDir, File rootDir, File appDir, File debuggerSetupDir, ClassLoader classLoader, File dexDir, String dexThumb) throws RuntimeException
 	{
 		if (initialized)
 		{
 			throw new RuntimeException("NativeScriptApplication already initialized");
 		}
 		initialized = true;
-
+		
+		if (runtimeLibsDir == null)
+		{
+			System.loadLibrary("NativeScript");
+		}
+		else
+		{
+			String arch = System.getProperty("os.arch");
+			String lcArch = arch.toLowerCase();
+			String archDir;
+			if (lcArch.startsWith("arm"))
+			{
+				archDir = "arm";
+			}
+			else if (lcArch.startsWith("i686"))
+			{
+				archDir = "x86";
+			}
+			else
+			{
+				// TODO: add arm64, x64
+				throw new RuntimeException("Unsupported arch=" + arch);
+			}
+			System.load(new File(runtimeLibsDir, "lib/" + archDir + "/libNativeScript.so").getAbsolutePath());
+		}
+		
 		mainThread = Thread.currentThread();
 
 		Platform.dexFactory = new DexFactory(classLoader, dexDir, dexThumb);

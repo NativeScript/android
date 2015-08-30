@@ -73,7 +73,6 @@ public class NativeScriptApplication extends android.app.Application implements 
 	}
 
 	static {
-		System.loadLibrary("NativeScript");
 		if (BuildConfig.DEBUG) {
 			android.os.Debug.waitForDebugger();
 		}
@@ -727,7 +726,7 @@ public class NativeScriptApplication extends android.app.Application implements 
 			ClassLoader classLoader = this.getClassLoader();
 			File dexDir = new File(rootDir, "code_cache/secondary-dexes");
 			String dexThumb = Platform.getDexThumb(this);
-			Platform.init(this, rootDir, appDir, debuggerSetupDir, classLoader, dexDir, dexThumb);
+			Platform.init(this, null, rootDir, appDir, debuggerSetupDir, classLoader, dexDir, dexThumb);
 			Platform.run();
 	
 			onCreateInternal();
