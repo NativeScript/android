@@ -70,7 +70,7 @@ public class Require
 
 		if (!bootstrapFile.exists())
 		{
-			Platform.APP_FAIL(null, "Application entry point file not found. Please specify either package.json with main field, index.js or bootstrap.js!");
+			Platform.appFail(null, "Application entry point file not found. Please specify either package.json with main field, index.js or bootstrap.js!");
 		}
 
 		String modulePath = bootstrapFile.getAbsolutePath();

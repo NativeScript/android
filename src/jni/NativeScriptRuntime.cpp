@@ -53,7 +53,7 @@ void NativeScriptRuntime::Init(JavaVM *jvm, ObjectManager *objectManager)
 	GET_TYPE_METADATA = env.GetStaticMethodID(PlatformClass, "getTypeMetadata", "(Ljava/lang/String;I)[Ljava/lang/String;");
 	assert(GET_TYPE_METADATA != nullptr);
 
-	APP_FAIL_METHOD_ID = env.GetStaticMethodID(PlatformClass, "APP_FAIL", "(Ljava/lang/Throwable;Ljava/lang/String;)V");
+	APP_FAIL_METHOD_ID = env.GetStaticMethodID(PlatformClass, "appFail", "(Ljava/lang/Throwable;Ljava/lang/String;)V");
 	assert(APP_FAIL_METHOD_ID != nullptr);
 
 	GET_MODULE_PATH_METHOD_ID = env.GetStaticMethodID(RequireClass, "getModulePath", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
@@ -773,7 +773,7 @@ void NativeScriptRuntime::ExitMethodCallback(const v8::FunctionCallbackInfo<v8::
 	exit(-1);
 }
 
-void NativeScriptRuntime::APP_FAIL(jthrowable throwable, const char *message)
+void NativeScriptRuntime::AppFail(jthrowable throwable, const char *message)
 {
 	//ASSERT_FAIL(message);
 

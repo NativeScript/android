@@ -357,7 +357,6 @@ void ObjectManager::ReleaseJSInstance(Persistent<Object> *po, JSInstanceInfo *js
 	if (it == idToObject.end())
 	{
 		ASSERT_FAIL("js object with id:%d not found", javaObjectID);
-		APP_FAIL("ReleaseJSInstance failed");
 	}
 
 	assert(po == it->second);

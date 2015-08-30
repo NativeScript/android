@@ -218,7 +218,7 @@ public class Platform
 		Thread.setDefaultUncaughtExceptionHandler(handler); 
 	}
 	
-	public static void APP_FAIL(Throwable ex, String message)
+	public static void appFail(Throwable ex, String message)
 	{
 		// TODO: allow app to handle fail message report here. For example
 		// integrate google app reports
@@ -673,7 +673,7 @@ public class Platform
 		if (javaObjectID == null)
 		{
 			if (IsLogEnabled) Log.e(DEFAULT_LOG_TAG, "Platform.CallJSMethod: calling js method " + methodName + " with javaObjectID " + javaObjectID + " type=" + ((javaObject != null) ? javaObject.getClass().getName() : "null"));
-			APP_FAIL(null, "Application failed");
+			appFail(null, "Application failed");
 		}
 
 		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "Platform.CallJSMethod: calling js method " + methodName + " with javaObjectID " + javaObjectID + " type=" + ((javaObject != null) ? javaObject.getClass().getName() : "null"));

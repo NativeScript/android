@@ -66,7 +66,7 @@ namespace tns
 
 		static v8::Handle<v8::Object> GetImplementationObjectFromArg(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-		static void APP_FAIL(jthrowable throwable, const char *message);
+		static void AppFail(jthrowable throwable, const char *message);
 
 		static void RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 

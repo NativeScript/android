@@ -346,7 +346,7 @@ extern "C" void Java_com_tns_Platform_createJSInstanceNative(JNIEnv *_env, jobje
 	implementationObject = MetadataNode::GetImplementationObject(jsInstance);
 	if (implementationObject.IsEmpty())
 	{
-		NativeScriptRuntime::APP_FAIL(nullptr, "createJSInstanceNative: implementationObject is empty");
+		NativeScriptRuntime::AppFail(nullptr, "createJSInstanceNative: implementationObject is empty");
 		return;
 	}
 	DEBUG_WRITE("createJSInstanceNative: implementationObject :%d", implementationObject->GetIdentityHash());

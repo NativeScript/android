@@ -244,7 +244,7 @@ string ExceptionUtil::GetErrorStackTrace(const Handle<StackTrace>& stackTrace)
 void ExceptionUtil::ThrowExceptionToJava(TryCatch& tc, const string& prependMessage)
 {
 	if(!tc.HasCaught()) {
-		NativeScriptRuntime::APP_FAIL(nullptr, prependMessage.c_str());
+		NativeScriptRuntime::AppFail(nullptr, prependMessage.c_str());
 		return;
 	}
 
@@ -269,7 +269,7 @@ void ExceptionUtil::ThrowExceptionToJava(TryCatch& tc, const string& prependMess
 	env.ExceptionClear();
 
 	if(!tc.CanContinue()) {
-		NativeScriptRuntime::APP_FAIL(nullptr, loggedMessage.c_str());
+		NativeScriptRuntime::AppFail(nullptr, loggedMessage.c_str());
 		return;
 	}
 
@@ -289,7 +289,7 @@ void ExceptionUtil::ThrowExceptionToJava(TryCatch& tc, const string& prependMess
 		javaThrowable = env.NewObject(nativeScriptExceptionClass, ctor, errMessage, (jlong)pv);
 	}
 
-	NativeScriptRuntime::APP_FAIL(reinterpret_cast<jthrowable>(javaThrowable), loggedMessage.c_str());
+	NativeScriptRuntime::AppFail(reinterpret_cast<jthrowable>(javaThrowable), loggedMessage.c_str());
 }
 
 void ExceptionUtil::ThrowExceptionToJs(const string& exceptionMessage)
