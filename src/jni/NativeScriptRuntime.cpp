@@ -282,10 +282,6 @@ void NativeScriptRuntime::CallJavaMethod(const Handle<Object>& caller, const str
 	}
 
 
-
-
-
-
 	if (!isStatic)
 	{
 		DEBUG_WRITE("CallJavaMethod called %s.%s. Instance id: %d, isSuper=%d", className.c_str(), methodName.c_str(), caller.IsEmpty() ? -42 : caller->GetIdentityHash(), isSuper);
@@ -295,7 +291,7 @@ void NativeScriptRuntime::CallJavaMethod(const Handle<Object>& caller, const str
 		DEBUG_WRITE("CallJavaMethod called %s.%s. static method", className.c_str(), methodName.c_str());
 	}
 
-	JsArgConverter argConverter(args, false, sig);
+	JsArgConverter argConverter(args, false, sig, entry);
 
 	if (!argConverter.IsValid())
 	{

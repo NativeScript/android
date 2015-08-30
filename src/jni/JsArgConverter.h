@@ -6,13 +6,14 @@
 #include <vector>
 #include "JEnv.h"
 #include "v8.h"
+#include "MetadataEntry.h"
 
 namespace tns
 {
 	class JsArgConverter
 	{
 	public:
-		JsArgConverter(const v8::FunctionCallbackInfo<v8::Value>& args, bool hasImplementationObject, const std::string& methodSignature);
+		JsArgConverter(const v8::FunctionCallbackInfo<v8::Value>& args, bool hasImplementationObject, const std::string& methodSignature, MetadataEntry *entry);
 
 		~JsArgConverter();
 
@@ -60,7 +61,8 @@ namespace tns
 
 		std::string m_methodSignature;
 
-		std::vector<std::string> m_tokens;
+		std::vector<std::string> *m_tokens;
+		std::vector<std::string> m_tokens2;
 
 		std::vector<int> m_storedObjects;
 

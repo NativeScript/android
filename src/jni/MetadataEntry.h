@@ -38,6 +38,7 @@ namespace tns
 		bool isResolved;
 		void *memberId;
 		jclass clazz;
+		std::vector<std::string> parsedSig;
 	};
 }
 

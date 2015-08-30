@@ -16,8 +16,8 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
-JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value>& args, bool hasImplementationObject, const string& methodSignature) :
-		m_args(nullptr), m_methodSignature(methodSignature), m_isValid(true), m_error(Error())
+JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value>& args, bool hasImplementationObject, const string& methodSignature, MetadataEntry *entry) :
+		m_args(nullptr), m_methodSignature(methodSignature), m_isValid(true), m_error(Error()), m_tokens(nullptr)
 {
 	m_argsLen = !hasImplementationObject ? args.Length() : args.Length() - 1;
 
@@ -26,8 +26,21 @@ JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value>& args, bool
 		m_args = new jvalue[m_argsLen];
 		memset(m_args, 0, m_argsLen * sizeof(jvalue));
 
-		JniSignatureParser parser(m_methodSignature);
-		m_tokens = parser.Parse();
+		if (entry->isResolved)
+		{
+			if (entry->parsedSig.empty())
+			{
+				JniSignatureParser parser(m_methodSignature);
+				entry->parsedSig = parser.Parse();
+			}
+			m_tokens = &entry->parsedSig;
+		}
+		else
+		{
+			JniSignatureParser parser(m_methodSignature);
+			m_tokens2 = parser.Parse();
+			m_tokens = &m_tokens2;
+		}
 
 		for (int i = 0; i < m_argsLen; i++)
 		{
@@ -46,9 +59,10 @@ bool JsArgConverter::ConvertArg(const Handle<Value>& arg, int index)
 	JEnv env;
 
 	bool success = false;
-	stringstream s;
 
-	string typeSignature = m_tokens[index];
+	char buff[1024];
+
+	const auto& typeSignature = m_tokens->at(index);
 
 	if (arg.IsEmpty())
 	{
@@ -65,7 +79,7 @@ bool JsArgConverter::ConvertArg(const Handle<Value>& arg, int index)
 
 		if (!success)
 		{
-			s << "Cannot convert array to " << typeSignature << " at index " << index;
+			sprintf(buff, "Cannot convert array to %s at index %d", typeSignature.c_str(), index);
 		}
 	}
 	else if (arg->IsNumber() || arg->IsNumberObject())
@@ -74,7 +88,7 @@ bool JsArgConverter::ConvertArg(const Handle<Value>& arg, int index)
 
 		if (!success)
 		{
-			s << "Cannot convert number to " << typeSignature << " at index " << index;
+			sprintf(buff, "Cannot convert number to %s at index %d", typeSignature.c_str(), index);
 		}
 	}
 	else if (arg->IsBoolean() || arg->IsBooleanObject())
@@ -83,7 +97,7 @@ bool JsArgConverter::ConvertArg(const Handle<Value>& arg, int index)
 
 		if (!success)
 		{
-			s << "Cannot convert boolean to " << typeSignature << " at index " << index;
+			sprintf(buff, "Cannot convert boolean to %s at index %d", typeSignature.c_str(), index);
 		}
 	}
 	else if (arg->IsString() || arg->IsStringObject())
@@ -92,7 +106,7 @@ bool JsArgConverter::ConvertArg(const Handle<Value>& arg, int index)
 
 		if (!success)
 		{
-			s << "Cannot convert string to " << typeSignature << " at index " << index;
+			sprintf(buff, "Cannot convert string to %s at index %d", typeSignature.c_str(), index);
 		}
 	}
 	else if (arg->IsObject())
@@ -202,7 +216,7 @@ bool JsArgConverter::ConvertArg(const Handle<Value>& arg, int index)
 
 		if (!success)
 		{
-			s << "Cannot convert object to " << typeSignature << " at index " << index;
+			sprintf(buff, "Cannot convert object to %s at index %d", typeSignature.c_str(), index);
 		}
 	}
 	else if (arg->IsUndefined() || arg->IsNull())
@@ -219,7 +233,7 @@ bool JsArgConverter::ConvertArg(const Handle<Value>& arg, int index)
 	if (!success)
 	{
 		m_error.index = index;
-		m_error.msg = s.str();
+		m_error.msg = string(buff);
 	}
 
 	return success;
@@ -248,7 +262,7 @@ bool JsArgConverter::ConvertJavaScriptNumber(JEnv& env, const Handle<Value>& jsV
 
 	jvalue value =  { 0 };
 
-	string typeSignature = m_tokens[index];
+	const auto& typeSignature = m_tokens->at(index);
 
 	const char typePrefix = typeSignature[0];
 
@@ -304,7 +318,7 @@ bool JsArgConverter::ConvertJavaScriptBoolean(JEnv& env, const Handle<Value>& js
 {
 	bool success;
 
-	string typeSignature = m_tokens[index];
+	const auto& typeSignature = m_tokens->at(index);
 
 	if (typeSignature == "Z")
 	{
@@ -354,7 +368,7 @@ bool JsArgConverter::ConvertJavaScriptArray(JEnv& env, const Handle<Array>& jsAr
 
 	jsize arrLength = jsArr->Length();
 
-	string arraySignature = m_tokens[index];
+	const auto& arraySignature = m_tokens->at(index);
 
 	string elementType = arraySignature.substr(1);
 
@@ -469,7 +483,7 @@ bool JsArgConverter::ConvertFromCastFunctionObject(T value, int index)
 {
 	bool success = false;
 
-	string typeSignature = m_tokens[index];
+	const auto& typeSignature = m_tokens->at(index);
 
 	const char typeSignaturePrefix = typeSignature[0];
 
