@@ -1,3 +1,4 @@
 {
-	"main": "boot.js"
+	"main": "boot.js",
+	"jsoptions": "--expose_gc"
 }

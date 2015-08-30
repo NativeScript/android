@@ -19,6 +19,9 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
@@ -36,7 +39,7 @@ import com.tns.internal.Plugin;
 
 public class Platform
 {
-	private static native void initNativeScript(String filesPath, int appJavaObjectId, boolean verboseLoggingEnabled, String packageName);
+	private static native void initNativeScript(String filesPath, int appJavaObjectId, boolean verboseLoggingEnabled, String packageName, String jsOptions);
 
 	private static native void runNativeScript(String appModuleName);
 
@@ -152,7 +155,8 @@ public class Platform
 			AssetExtractor.extractAssets(context, extractPolicy);
 		}
 		Require.init(rootDir, appDir);
-		Platform.initNativeScript(Require.getApplicationFilesPath(), appJavaObjectId, IsLogEnabled, context.getPackageName());
+		String jsOptions = readJsOptions(appDir);
+		Platform.initNativeScript(Require.getApplicationFilesPath(), appJavaObjectId, IsLogEnabled, context.getPackageName(), jsOptions);
 		
 		if (debuggerSetupDir != null)
 		{
@@ -1005,5 +1009,31 @@ public class Platform
 		}
 
 		return null;
+	}
+	
+	private static String readJsOptions(File appDir)
+	{
+		String options = null;
+		
+		File packageInfo = new File (appDir, "/app/package.json");
+		
+		if (packageInfo.exists())
+		{
+			JSONObject object;
+			try
+			{
+				object = FileSystem.readJSONFile(packageInfo);
+				if (object != null)
+				{
+					options = object.getString("jsoptions");
+				}
+			}
+			catch (Exception e)
+			{
+				e.printStackTrace();
+			}
+		}
+		
+		return options;
 	}
 }
