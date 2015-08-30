@@ -57,7 +57,7 @@ public class AppBuilderCallbackTestImpl implements AppBuilderCallback
 	@Override
 	public boolean shouldEnableDebugging(android.content.Context context)
 	{
-		boolean shouldEnableDebugging = JsDebugger.shouldEnableDebugging(context);
+		boolean shouldEnableDebugging = Platform.isDebuggableApp(context);
 		return shouldEnableDebugging;
 	}
 

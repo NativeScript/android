@@ -21,6 +21,7 @@ import java.util.HashMap;
 
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.os.Handler;
@@ -54,6 +55,8 @@ public class Platform
 	private static native void passUncaughtExceptionToJsNative(Throwable ex, String stackTrace);
 	
 	private static Context NativeScriptContext;
+	
+	private static boolean initialized;
 	
 	private static final HashMap<String, Class<?>> classCache = new HashMap<String, Class<?>>();
 
@@ -95,16 +98,22 @@ public class Platform
 		errorActivityClass = clazz;
 	}
 	
-	public static int init(Context context) throws RuntimeException
+	public static int init(File rootDir, File appDir, File debuggerSetupDir, ClassLoader classLoader, File dexDir, String dexThumb) throws RuntimeException
 	{
-		jsDebugger = new JsDebugger(context);
-		mainThread = Thread.currentThread();
-		if (NativeScriptContext != null)
+		return init(null, rootDir, appDir, debuggerSetupDir, classLoader, dexDir, dexThumb);
+	}
+	
+	public static int init(Context context, File rootDir, File appDir, File debuggerSetupDir, ClassLoader classLoader, File dexDir, String dexThumb) throws RuntimeException
+	{
+		if (initialized)
 		{
 			throw new RuntimeException("NativeScriptApplication already initialized");
 		}
+		initialized = true;
 
-		Platform.dexFactory = new DexFactory(context);
+		mainThread = Thread.currentThread();
+
+		Platform.dexFactory = new DexFactory(classLoader, dexDir, dexThumb);
 		NativeScriptContext = context;
 
 		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "Initializing NativeScript JAVA");
@@ -117,9 +126,14 @@ public class Platform
 		{
 			AssetExtractor.extractAssets(context, extractPolicy);
 		}
-		Require.init(context);
+		Require.init(rootDir, appDir);
 		Platform.initNativeScript(Require.getApplicationFilesPath(), appJavaObjectId, IsLogEnabled, context.getPackageName());
-		int debuggerPort = jsDebugger.getDebuggerPortFromEnvironment();
+		
+		if (debuggerSetupDir != null)
+		{
+			jsDebugger = new JsDebugger(debuggerSetupDir);
+			int debuggerPort = jsDebugger.getDebuggerPortFromEnvironment();
+		}
 		
 		//
 		if (IsLogEnabled)
@@ -932,5 +946,39 @@ public class Platform
 		
 		dexFactory.purgeAllProxies();
 	}
+	
+	public static boolean isDebuggableApp(Context context)
+	{
+		int flags;
+		try
+		{
+			flags = context.getPackageManager().getPackageInfo(context.getPackageName(), 0).applicationInfo.flags;
+		}
+		catch (NameNotFoundException e)
+		{
+			flags = 0;
+			e.printStackTrace();
+		}
 
+		boolean isDebuggableApp = ((flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0);
+		return isDebuggableApp;
+	}
+	
+	public static String getDexThumb(Context context)
+	{
+		try
+		{
+			PackageInfo packageInfo = context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
+			int code = packageInfo.versionCode;
+			long updateTime = packageInfo.lastUpdateTime;
+			return String.valueOf(updateTime) + "-" + String.valueOf(code);
+		}
+		catch (PackageManager.NameNotFoundException e)
+		{
+			Log.e(Platform.DEFAULT_LOG_TAG, "Error while getting current proxy thumb");
+			e.printStackTrace();
+		}
+
+		return null;
+	}
 }

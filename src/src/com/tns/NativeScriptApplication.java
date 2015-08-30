@@ -718,8 +718,16 @@ public class NativeScriptApplication extends android.app.Application implements 
 			}
 			
 			NativeScriptSyncHelper.sync(this);
-			
-			Platform.init(this);
+
+			File rootDir = new File(this.getApplicationInfo().dataDir);
+			File appDir = this.getFilesDir();
+			File debuggerSetupDir = Platform.isDebuggableApp(this)
+										? getExternalFilesDir(null)
+										: null;
+			ClassLoader classLoader = this.getClassLoader();
+			File dexDir = new File(rootDir, "code_cache/secondary-dexes");
+			String dexThumb = Platform.getDexThumb(this);
+			Platform.init(this, rootDir, appDir, debuggerSetupDir, classLoader, dexDir, dexThumb);
 			Platform.run();
 	
 			onCreateInternal();
@@ -782,7 +790,7 @@ public class NativeScriptApplication extends android.app.Application implements 
 		
 		boolean shouldEnableDebugging = (appBuilderCallbackImpl != null)
 				? appBuilderCallbackImpl.shouldEnableDebugging(this)
-				: JsDebugger.shouldEnableDebugging(this);
+				: Platform.isDebuggableApp(this);
 				
 		if (shouldEnableDebugging)
 		{
