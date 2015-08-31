@@ -90,6 +90,18 @@ task copyLatestWidgetsJar (type: Copy) {
 	into "$rootDir/build/project-template-gradle/libs"
 }
 
+//when repository is not private
+// task cloneSBgeneratorInTemplate (type: Exec) {
+	// workingDir "$rootDir/build/project-template-gradle/build-tools"
+
+	// if(isWinOs) {
+		// commandLine "cmd", "/c" , "git", "clone", "https://github.com/NativeScript/android-static-binding-generator.git"
+	// }
+	// else {
+		// commandLine "git", "clone", "https://github.com/NativeScript/android-static-binding-generator.git"
+	// }
+// }
+
 task copyGradleTemplate (type: Copy) {
 	from "$rootDir/build/project-template-gradle"
 	into "$rootDir/dist/framework"
@@ -156,8 +168,7 @@ task generateMetadataGeneratorJar (type: Exec) {
 
 task copyGeneratedMetadataGeneratorJar {
 	doLast {
-		delete "$rootDir/dist/framework/build-tools"
-		
+	
 		copy {
 			from "$rootDir/android-metadata-generator/dist"
 			into "$rootDir/dist/framework/build-tools"
@@ -180,9 +191,11 @@ task packFramework (type: Exec) {
 //clean and set up dirs
 createDistDir.dependsOn(cleanDistDir)
 
+
 //copy framework structure
 copyLatestWidgetsJar.dependsOn(createDistDir)
-copyGradleTemplate.dependsOn(copyLatestWidgetsJar)
+cloneSBgeneratorInTemplate.dependsOn(copyLatestWidgetsJar)
+copyGradleTemplate.dependsOn(cloneSBgeneratorInTemplate)
 copyInternalFolder.dependsOn(copyGradleTemplate)
 copyPackageJson.dependsOn(copyInternalFolder)
 

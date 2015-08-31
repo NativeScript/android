@@ -11,7 +11,11 @@
 *			-PksPassword=[password_for_keystore_file]
 *			-Palias=[alias_to_use_from_keystore_file]
 *			-Ppassword=[password_for_alias]
+*
+*			-PrunSBGenerator
 */
+
+def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
 
 buildscript {
     repositories {
@@ -80,7 +84,13 @@ android {
 	
 	applicationVariants.all { variant ->
 		def tsk = variant.mergeAssets
-		tsk.dependsOn(copyMetadata)
+		if(project.hasProperty("runSBGenerator")) {
+			runBindingGenerator.dependsOn(copyMetadata)
+			tsk.dependsOn(runBindingGenerator)
+		}
+		else {
+			tsk.dependsOn(copyMetadata)
+		}
 	}
 }
 
@@ -130,14 +140,37 @@ task addAarDependencies <</*doLast*/ {
 task collectAllJars(type: Copy) {
 	def explodedAarDir = project.buildDir.getAbsolutePath() + "/intermediates/exploded-aar/"
 	def sdkPath = android.sdkDirectory.getAbsolutePath();
-	def androidJar = sdkPath + "/platforms/" + android.compileSdkVersion + "/android.jar"	
+	def androidJar = sdkPath + "/platforms/" + android.compileSdkVersion + "/android.jar"
+	def outDir = "$rootDir/metadata/libs"
 
+	// in the explodedAarDir we can hove jars with the same name that will be copied in the same place
+	// in order to prevent overriding behaviour of copy command when it encounters files with the same name
+	// we ensure the ambiguous files have different names when arriving at destination folder
+	doFirst {
+		def ft = fileTree(explodedAarDir)
+		def count = 0;
+		
+		ft.each { currentFile ->
+			def currentFileName = currentFile.getName()
+			
+			//if file is a jar rename it on copy
+			if(currentFileName =~ /.+\.jar/) {
+				def newName = "ambiguous_jar_" + count++ + ".jar"
+				copy {
+					from currentFile
+					into outDir
+					rename currentFileName, newName
+				}
+			}
+		}
+	}
+		
 	from configurations.compile
-	from explodedAarDir
 	from androidJar
 	include '**/*.jar'
 	includeEmptyDirs = false
-	into "metadata/libs"
+	
+	into outDir
 }
 
 task ensureMetadataOutDir {
@@ -166,6 +199,20 @@ task copyMetadata(type: Copy) {
 
 	from "metadata/output"
 	into "src/main/assets/metadata"
+}
+
+task runBindingGenerator (type: Exec) {
+	String jarsDir = "-PjarsDir=$rootDir/metadata/libs" //re-make to use intermediates folder
+	String jsCodeToParse = "-PjsCodeDir=$rootDir/src/main/assets/app"
+	String outDir = "-PoutDir=../../src/main/java"
+	
+	workingDir "$rootDir/build-tools/android-static-binding-generator"
+	if(isWinOs) {
+		commandLine "cmd", "/c", "gradle", "generatebindings", jarsDir, jsCodeToParse, outDir
+	}
+	else {
+		commandLine "gradle", "generatebindings", jarsDir, jsCodeToParse, outDir
+	}
 }
 
 task cleanLocalAarFiles(type: Delete) {
