@@ -194,8 +194,8 @@ createDistDir.dependsOn(cleanDistDir)
 
 //copy framework structure
 copyLatestWidgetsJar.dependsOn(createDistDir)
-cloneSBgeneratorInTemplate.dependsOn(copyLatestWidgetsJar)
-copyGradleTemplate.dependsOn(cloneSBgeneratorInTemplate)
+// cloneSBgeneratorInTemplate.dependsOn(copyLatestWidgetsJar)
+copyGradleTemplate.dependsOn(copyLatestWidgetsJar)
 copyInternalFolder.dependsOn(copyGradleTemplate)
 copyPackageJson.dependsOn(copyInternalFolder)
 
