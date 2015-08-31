@@ -14,9 +14,9 @@ task checkEnvironmentVariables {
 	if ("$System.env.ANDROID_HOME" == "" || "$System.env.ANDROID_HOME" == "null") {
         throw new GradleException("Set ANDROID_HOME to point to the correct Android SDK location\n");
     }
-	// if ("$System.env.GIT_COMMIT" == "null") {
-        // logger.warn("Warning: The GIT_COMMIT is not set. This NativeScript Android Runtime will not be tagged with the git commit it is build from\n");
-    // }
+	if ("$System.env.GIT_COMMIT" == "null") {
+        logger.warn("Warning: The GIT_COMMIT is not set. This NativeScript Android Runtime will not be tagged with the git commit it is build from\n");
+    }
 	if(project.hasProperty("devmode") == true && !project.hasProperty("metadataGenSrc") && !file("../android-metadata-generator").exists()) {
 		throw new GradleException("../android-metadata-generator directory not found and no metadataGenSrc option specified. Clone the android-metadata-generator repo first.\n");
 	}
@@ -113,20 +113,9 @@ task getPackageVersion {
 	pVersion = packageJsonMap.version
 }
 
-task getCommitVersion (type: Exec) {
-	if(isWinOs) {
-		commandLine "cmd", "/c" , "git", "rev-parse", "HEAD"
-	}
-	else {
-		commandLine "git", "rev-parse", "HEAD"
-	}
-	
-	standardOutput = new FileOutputStream(commitVersionFile)
-}
-
-task setCommitVersionFromFile {
-	doFirst {
-		String content = new File(commitVersionFile).getText("UTF-8")
+task getCommitVersion {
+	if("$System.env.GIT_COMMIT" != "null") {		
+		String content = "$System.env.GIT_COMMIT"
 		arVersion = content.trim()
 	}
 }
@@ -200,8 +189,7 @@ copyPackageJson.dependsOn(copyInternalFolder)
 //get version from package json
 getPackageVersion.dependsOn(copyPackageJson)
 getCommitVersion.dependsOn(getPackageVersion)
-setCommitVersionFromFile.dependsOn(getCommitVersion)
-deleteCommitFile.dependsOn(setCommitVersionFromFile)
+deleteCommitFile.dependsOn(getCommitVersion)
 
 //generate runtime and copy into framework structure
 generateRuntime.dependsOn(deleteCommitFile)
