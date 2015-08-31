@@ -1013,7 +1013,7 @@ public class Platform
 	
 	private static String readJsOptions(File appDir)
 	{
-		String options = null;
+		String options = "--expose_gc";
 		
 		File packageInfo = new File (appDir, "/app/package.json");
 		
@@ -1025,7 +1025,11 @@ public class Platform
 				object = FileSystem.readJSONFile(packageInfo);
 				if (object != null)
 				{
-					options = object.getString("jsoptions");
+					String opt = object.getString("jsoptions");
+					if (opt != null)
+					{
+						options = opt;
+					}
 				}
 			}
 			catch (Exception e)
