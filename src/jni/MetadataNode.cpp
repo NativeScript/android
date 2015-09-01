@@ -834,33 +834,28 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
 
 	MetadataEntry *entry = nullptr;
 
-	vector<MetadataEntry> *candidates = nullptr;
-	string *className = nullptr;
-	string *methodName = nullptr;
+	string className;
+	const auto& first = callbackData->candidates.front();
+	const auto& methodName = first.name;
 
 	while ((callbackData != nullptr) && (entry == nullptr))
 	{
-		candidates = &callbackData->candidates;
+		auto& candidates = callbackData->candidates;
 
-		className = &callbackData->node->m_name;
-		if (methodName == nullptr)
-		{
-			methodName = &candidates->front().name;
-		}
+		className = callbackData->node->m_name;
 
-		int count = 0;
-		auto& candidates2 = *candidates;
-		for (auto& c: candidates2)
+		auto found = false;
+		for (auto& c: candidates)
 		{
-			if (c.paramCount == argLength)
+			found = c.paramCount == argLength;
+			if (found)
 			{
-				if (++count > 1)
-					break;
 				entry = &c;
+				break;
 			}
 		}
 
-		if (count == 0)
+		if (!found)
 		{
 			callbackData = callbackData->parent;
 		}
@@ -869,7 +864,6 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
 	auto thiz = info.This();
 
 	auto isSuper = false;
-	const auto& first = candidates->front();
 	if (!first.isStatic)
 	{
 		auto extededClassName = thiz->GetHiddenValue(ConvertToV8String("implClassName"));
@@ -882,18 +876,18 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
 	}
 
 //	// TODO: refactor this
-	if (isSuper && (*className == "com/tns/NativeScriptActivity"))
+	if (isSuper && (className == "com/tns/NativeScriptActivity"))
 	{
-		*className = "android/app/Activity";
+		className = "android/app/Activity";
 	}
 
-	if ((*methodName == V8StringConstants::VALUE_OF) && (argLength == 0))
+	if ((methodName == V8StringConstants::VALUE_OF) && (argLength == 0))
 	{
 		info.GetReturnValue().Set(thiz);
 	}
 	else
 	{
-		s_callJavaMethod(thiz, *className, *methodName, entry, first.isStatic, isSuper, info);
+		s_callJavaMethod(thiz, className, methodName, entry, first.isStatic, isSuper, info);
 	}
 }
 
