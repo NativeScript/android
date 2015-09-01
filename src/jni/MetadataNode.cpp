@@ -843,7 +843,10 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
 		candidates = &callbackData->candidates;
 
 		className = &callbackData->node->m_name;
-		methodName = &candidates->front().name;
+		if (methodName == nullptr)
+		{
+			methodName = &candidates->front().name;
+		}
 
 		int count = 0;
 		auto& candidates2 = *candidates;
@@ -862,8 +865,6 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
 			callbackData = callbackData->parent;
 		}
 	}
-
-	assert(callbackData != nullptr);
 
 	auto thiz = info.This();
 

@@ -101,7 +101,7 @@ namespace tns
 			}
 
 			MethodCallbackData(MetadataNode *_node)
-				: node(_node), isSuper(false)
+				: node(_node), parent(nullptr), isSuper(false)
 			{
 			}
 
