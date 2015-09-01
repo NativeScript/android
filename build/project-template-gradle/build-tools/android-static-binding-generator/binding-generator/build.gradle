@@ -1,0 +1,14 @@
+/*
+*	This script generates a jar used to generate bindings for a nativescript project
+*	to run: 
+*			gradle clean jar
+*/
+
+apply plugin: "java"
+
+jar {
+    manifest {
+        attributes("Manifest-Version": "1.0",
+                   "Main-Class": "com.extend.generator.ExtendClassGenerator")
+    }
+}
