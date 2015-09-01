@@ -859,7 +859,6 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
 
 		if (count == 0)
 		{
-			int x = 1;
 			callbackData = callbackData->parent;
 		}
 	}

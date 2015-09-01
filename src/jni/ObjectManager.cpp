@@ -572,16 +572,14 @@ void ObjectManager::OnGcFinished(GCType type, GCCallbackFlags flags)
 	assert(!m_markedForGC.empty());
 
 	auto isolate = Isolate::GetCurrent();
-	for (auto it = m_implObjWeak.begin(); it != m_implObjWeak.end(); ++it)
+	for (auto weakObj: m_implObjWeak)
 	{
-		auto po = it->po;
-		auto obj = Local<Object>::New(isolate, *po);
+		auto obj = Local<Object>::New(isolate, *weakObj.po);
 		MarkReachableObjects(isolate, obj);
 	}
-	for (auto it = m_implObjStrong.begin(); it != m_implObjStrong.end(); ++it)
+	for (auto strongObj: m_implObjStrong)
 	{
-		auto po = it->po;
-		auto obj = Local<Object>::New(isolate, *po);
+		auto obj = Local<Object>::New(isolate, *strongObj.po);
 		MarkReachableObjects(isolate, obj);
 	}
 
