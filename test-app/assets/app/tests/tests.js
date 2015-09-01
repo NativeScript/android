@@ -1842,4 +1842,15 @@ describe("Tests ", function () {
 		
 		expect(value123).toBe(123);
 	});
+	
+	it("When_call_overloaded_base_method_it_should_call_base_method", function () {
+		
+		__log("TEST: When_call_overloaded_base_method_it_should_call_base_method");
+		
+		var d = new com.tns.tests.DerivedClass();
+
+		var value = d.sum(1, 2);
+		
+		expect(value).toBe(3);
+	});
 });
