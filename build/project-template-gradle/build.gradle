@@ -143,24 +143,19 @@ task collectAllJars(type: Copy) {
 	def androidJar = sdkPath + "/platforms/" + android.compileSdkVersion + "/android.jar"
 	def outDir = "$rootDir/metadata/libs"
 
-	// in the explodedAarDir we can hove jars with the same name that will be copied in the same place
-	// in order to prevent overriding behaviour of copy command when it encounters files with the same name
-	// we ensure the ambiguous files have different names when arriving at destination folder
+	// copies all jars in metadata/libs dir and makes sure all copied jars have different names
+	// this is necessary because static binding generator cannot process jars in nested folders
 	doFirst {
-		def ft = fileTree(explodedAarDir)
+		def ft = fileTree(dir: explodedAarDir, include: "**/*.jar")
 		def count = 0;
 		
-		ft.each { currentFile ->
-			def currentFileName = currentFile.getName()
-			
-			//if file is a jar rename it on copy
-			if(currentFileName =~ /.+\.jar/) {
-				def newName = "ambiguous_jar_" + count++ + ".jar"
-				copy {
-					from currentFile
-					into outDir
-					rename currentFileName, newName
-				}
+		ft.each { currentJarFile ->
+			//rename jar on copy
+			def newName = "ambiguous_jar_" + count++ + ".jar"
+			copy {
+				from currentJarFile
+				into outDir
+				rename currentJarFile.getName(), newName
 			}
 		}
 	}
