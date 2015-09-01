@@ -73,10 +73,9 @@ repositories {
 }
 
 dependencies {
-	def nativescriptJar = "../dist/framework/libs/nativescript.jar"
-    
+	def nativescriptJarPath = "$rootDir/libs/nativescript.jar"
 	compile 'com.android.support:support-v4:22.2.0'
-	compile files(nativescriptJar)
+	compile files(nativescriptJarPath)
 }
 
 task cleanLibs (type: Delete) {
@@ -89,14 +88,32 @@ task copyLibNativescriptLibrary (type: Copy) {
 }
 
 task collectAllJars(type: Copy) {
+	def explodedAarDir = project.buildDir.getAbsolutePath() + "/intermediates/exploded-aar/"
 	def sdkPath = android.sdkDirectory.getAbsolutePath();
-	def androidJar = sdkPath + "/platforms/" + android.compileSdkVersion + "/android.jar"	
+	def androidJar = sdkPath + "/platforms/" + android.compileSdkVersion + "/android.jar"
+	def outDir = "$rootDir/metadata/libs"
 
+	doFirst {
+		def ft = fileTree(dir: explodedAarDir, include: "**/*.jar")
+		def count = 0;
+		
+		ft.each { currentFile ->
+			
+			def newName = "ambiguous_jar_" + count++ + ".jar"
+			copy {
+				from currentFile
+				into outDir
+				rename currentFile.getName(), newName
+			}
+		}
+	}
+		
 	from configurations.compile
 	from androidJar
-	include "**/*.jar"
+	include '**/*.jar'
 	includeEmptyDirs = false
-	into "$rootDir/metadata/libs"
+	
+	into outDir
 }
 
 task ensureMetadataOutDir {
@@ -135,6 +152,19 @@ ensureMetadataOutDir.dependsOn(collectAllJars)
 buildMetadata.dependsOn(ensureMetadataOutDir)
 copyMetadata.dependsOn(buildMetadata)
 
+//to be compatible with eclipse
+task copyJarsToLib (type: Copy) {
+	from ("$rootDir/metadata/libs")
+	into "$rootDir/libs"
+	
+	include "ambiguous_jar_0.jar"
+	include "ambiguous_jar_1.jar"
+}
+
+task deleteNativescriptJar (type: Delete) {
+	delete "$rootDir/libs/nativescript.jar"
+}
+
 task buildapk {
 	
 	if(project.hasProperty("release")) {
@@ -144,6 +174,10 @@ task buildapk {
 		dependsOn assembleDebug
 	}
 }
+
+copyJarsToLib.dependsOn(deleteNativescriptJar)
+buildapk.dependsOn(copyJarsToLib)
+
 
 ///// install apk
 
