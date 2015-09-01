@@ -233,7 +233,10 @@ task cleanLocalAarFiles(type: Delete) {
 // 7. Build metadata
 // 8. Copy metadata
 
-cleanLocalAarFiles.dependsOn(deleteJavaDir)
+if(!project.hasProperty("runSBGenerator")) {
+	cleanLocalAarFiles.dependsOn(deleteJavaDir)
+}
+
 collectAllJars.dependsOn(cleanLocalAarFiles)
 ensureMetadataOutDir.dependsOn(collectAllJars)
 buildMetadata.dependsOn(ensureMetadataOutDir)
