@@ -26,7 +26,7 @@ JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value>& args, bool
 		m_args = new jvalue[m_argsLen];
 		memset(m_args, 0, m_argsLen * sizeof(jvalue));
 
-		if (entry->isResolved)
+		if ((entry != nullptr) && (entry->isResolved))
 		{
 			if (entry->parsedSig.empty())
 			{

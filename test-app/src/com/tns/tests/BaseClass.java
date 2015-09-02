@@ -6,4 +6,14 @@ public class BaseClass
 	{
 		return x + y;
 	}
+	
+	public int mul(int x, int y)
+	{
+		return x * y;
+	}
+
+	public static int multiply(int x, int y)
+	{
+		return x * y;
+	}
 }

@@ -2,6 +2,7 @@ __disableVerboseLogging();
 
 require("./tests/testWeakRef"); 
 require("./tests/tests");
+require("./tests/testMethodResolution");
 require("./tests/testArrays");
 require("./tests/testsForRuntimeBindingGenerator");
 require("./tests/testPrimitiveTypeConversion");
