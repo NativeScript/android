@@ -68,6 +68,8 @@ android {
 	}
 }
 
+def sdkPath = android.sdkDirectory.getAbsolutePath();
+
 repositories {
     jcenter()
 }
@@ -89,7 +91,6 @@ task copyLibNativescriptLibrary (type: Copy) {
 
 task collectAllJars(type: Copy) {
 	def explodedAarDir = project.buildDir.getAbsolutePath() + "/intermediates/exploded-aar/"
-	def sdkPath = android.sdkDirectory.getAbsolutePath();
 	def androidJar = sdkPath + "/platforms/" + android.compileSdkVersion + "/android.jar"
 	def outDir = "$rootDir/metadata/libs"
 
@@ -152,19 +153,6 @@ ensureMetadataOutDir.dependsOn(collectAllJars)
 buildMetadata.dependsOn(ensureMetadataOutDir)
 copyMetadata.dependsOn(buildMetadata)
 
-//to be compatible with eclipse
-task copyJarsToLib (type: Copy) {
-	from ("$rootDir/metadata/libs")
-	into "$rootDir/libs"
-	
-	include "ambiguous_jar_0.jar"
-	include "ambiguous_jar_1.jar"
-}
-
-task deleteNativescriptJar (type: Delete) {
-	delete "$rootDir/libs/nativescript.jar"
-}
-
 task buildapk {
 	
 	if(project.hasProperty("release")) {
@@ -175,8 +163,28 @@ task buildapk {
 	}
 }
 
-copyJarsToLib.dependsOn(deleteNativescriptJar)
-buildapk.dependsOn(copyJarsToLib)
+//to be compatible with eclipse
+task deleteLibsDir (type: Delete) {
+	delete "$rootDir/libs"
+}
+
+task copySupportLibraryToLibs (type: Copy) {
+	from "$sdkPath/extras/android/support/v4/android-support-v4.jar"
+	into "$rootDir/libs"
+}
+
+task checkoutAssetsFolder (type: Exec) {
+	if(isWinOs) {
+		commandLine "cmd", "/c", "git", "checkout", "$rootDir/assets/metadata"
+	}
+	else {
+		commandLine "git", "checkout", "$rootDir/assets/metadata"
+	}
+}
+
+copySupportLibraryToLibs.dependsOn(deleteLibsDir)
+checkoutAssetsFolder.dependsOn(copySupportLibraryToLibs)
+buildapk.dependsOn(checkoutAssetsFolder)
 
 
 ///// install apk
