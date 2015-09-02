@@ -6,6 +6,7 @@
 * 	Options:
 *			-Prelease
 *			-PtargetSdk=[target_sdk] (default is 22)
+*			-PbuildToolsVersion=[build_tools_version] (default is 22.0.1)
 *
 *			-PksPath=[path_to_keystore_file]
 *			-PksPassword=[password_for_keystore_file]
@@ -47,9 +48,18 @@ def computeTargetSdkVersion() {
 	}
 }
 
+def computeBuildToolsVersion() {
+	if(project.hasProperty("buildToolsVersion")) {
+		return buildToolsVersion
+	}
+	else {
+		return "22.0.1"
+	}
+}
+
 android {
 	compileSdkVersion compiteCompileSdkVersion()
-    buildToolsVersion "22.0.1"
+    buildToolsVersion computeBuildToolsVersion()
 	
 	defaultConfig {
 		minSdkVersion 17
