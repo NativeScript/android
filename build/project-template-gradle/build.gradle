@@ -7,6 +7,7 @@
 *			-Prelease
 *			-PtargetSdk=[target_sdk] (default is 22)
 *			-PbuildToolsVersion=[build_tools_version] (default is 22.0.1)
+*			-PsupportVersion=[support_version] (default (22.2.0)
 *
 *			-PksPath=[path_to_keystore_file]
 *			-PksPassword=[password_for_keystore_file]
@@ -115,8 +116,13 @@ repositories {
 def nodeModulesDir = "../../node_modules/"
 
 dependencies {
-    compile "com.android.support:support-v4:22.2.0"
-    compile "com.android.support:appcompat-v7:22.2.0"
+	def suppotVer = "22.2.0";
+	if(project.hasProperty("supportVersion")) {
+		suppotVer = supportVersion
+	}
+	
+    compile "com.android.support:support-v4:$suppotVer"
+    compile "com.android.support:appcompat-v7:$suppotVer"
 
     // take all jars within the libs dir
 	compile fileTree(dir: "libs", include: ["**/*.jar"])
