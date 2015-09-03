@@ -8,6 +8,7 @@
 *			-PtargetSdk=[target_sdk] (default is 22)
 *			-PbuildToolsVersion=[build_tools_version] (default is 22.0.1)
 *			-PsupportVersion=[support_version] (default (22.2.0)
+*			-PcompileSdk=[compile_sdk_version] (default 22)
 *
 *			-PksPath=[path_to_keystore_file]
 *			-PksPassword=[password_for_keystore_file]
