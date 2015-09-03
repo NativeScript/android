@@ -158,6 +158,7 @@ std::string ArgConverter::jstringToString(jstring value)
 
 Local<String> ArgConverter::jstringToV8String(jstring value)
 {
+	DEBUG_WRITE(">>>>>>>>>>>>>>>>jstringToV8String");
 	if	(value == nullptr)
 	{
 		return Handle<String>();

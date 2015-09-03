@@ -32,12 +32,12 @@ JEnv::JEnv(JNIEnv *jniEnv)
 
 JEnv::~JEnv()
 {
-	pid_t pid = getpid();
-	pid_t tid = gettid();
-
-	if (pid != tid)
+	if (m_detach)
 	{
-		if (m_detach)
+		pid_t pid = getpid();
+		pid_t tid = gettid();
+
+		if (pid != tid)
 		{
 			JNIEnv *env = nullptr;
 			jint ret = s_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);

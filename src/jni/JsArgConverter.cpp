@@ -17,15 +17,12 @@ using namespace std;
 using namespace tns;
 
 JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value>& args, bool hasImplementationObject, const string& methodSignature, MetadataEntry *entry) :
-		m_args(nullptr), m_methodSignature(methodSignature), m_isValid(true), m_error(Error()), m_tokens(nullptr)
+		m_env(JEnv()), m_methodSignature(methodSignature), m_isValid(true), m_error(Error()), m_tokens(nullptr)
 {
 	m_argsLen = !hasImplementationObject ? args.Length() : args.Length() - 1;
 
 	if (m_argsLen > 0)
 	{
-		m_args = new jvalue[m_argsLen];
-		memset(m_args, 0, m_argsLen * sizeof(jvalue));
-
 		if ((entry != nullptr) && (entry->isResolved))
 		{
 			if (entry->parsedSig.empty())
@@ -56,8 +53,6 @@ JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value>& args, bool
 
 bool JsArgConverter::ConvertArg(const Handle<Value>& arg, int index)
 {
-	JEnv env;
-
 	bool success = false;
 
 	char buff[1024];
@@ -66,7 +61,7 @@ bool JsArgConverter::ConvertArg(const Handle<Value>& arg, int index)
 
 	if (arg.IsEmpty())
 	{
-		SetConvertedObject(env, index, nullptr);
+		SetConvertedObject(index, nullptr);
 		success = false;
 	}
 	else if (arg->IsArray())
@@ -75,7 +70,7 @@ bool JsArgConverter::ConvertArg(const Handle<Value>& arg, int index)
 
 		auto jsArr = Handle<Array>::Cast(arg);
 
-		success = ConvertJavaScriptArray(env, jsArr, index);
+		success = ConvertJavaScriptArray(jsArr, index);
 
 		if (!success)
 		{
@@ -84,7 +79,7 @@ bool JsArgConverter::ConvertArg(const Handle<Value>& arg, int index)
 	}
 	else if (arg->IsNumber() || arg->IsNumberObject())
 	{
-		success = ConvertJavaScriptNumber(env, arg, index);
+		success = ConvertJavaScriptNumber(arg, index);
 
 		if (!success)
 		{
@@ -93,7 +88,7 @@ bool JsArgConverter::ConvertArg(const Handle<Value>& arg, int index)
 	}
 	else if (arg->IsBoolean() || arg->IsBooleanObject())
 	{
-		success = ConvertJavaScriptBoolean(env, arg, index);
+		success = ConvertJavaScriptBoolean(arg, index);
 
 		if (!success)
 		{
@@ -102,7 +97,7 @@ bool JsArgConverter::ConvertArg(const Handle<Value>& arg, int index)
 	}
 	else if (arg->IsString() || arg->IsStringObject())
 	{
-		success = ConvertJavaScriptString(env, arg, index);
+		success = ConvertJavaScriptString(arg, index);
 
 		if (!success)
 		{
@@ -211,7 +206,7 @@ bool JsArgConverter::ConvertArg(const Handle<Value>& arg, int index)
 		}
 
 		jweak obj = ObjectManager::GetJavaObjectByJsObjectStatic(jsObject);
-		SetConvertedObject(env, index, obj, true);
+		SetConvertedObject(index, obj, true);
 		success = obj != nullptr;
 
 		if (!success)
@@ -221,12 +216,12 @@ bool JsArgConverter::ConvertArg(const Handle<Value>& arg, int index)
 	}
 	else if (arg->IsUndefined() || arg->IsNull())
 	{
-		SetConvertedObject(env, index, nullptr);
+		SetConvertedObject(index, nullptr);
 		success = true;
 	}
 	else
 	{
-		SetConvertedObject(env, index, nullptr);
+		SetConvertedObject(index, nullptr);
 		success = false;
 	}
 
@@ -239,7 +234,7 @@ bool JsArgConverter::ConvertArg(const Handle<Value>& arg, int index)
 	return success;
 }
 
-void JsArgConverter::SetConvertedObject(JEnv& env, int index, jobject obj, bool isGlobalRef)
+void JsArgConverter::SetConvertedObject(int index, jobject obj, bool isGlobalRef)
 {
 	if (obj == nullptr)
 	{
@@ -252,11 +247,11 @@ void JsArgConverter::SetConvertedObject(JEnv& env, int index, jobject obj, bool 
 	else
 	{
 		m_storedObjects.push_back(index);
-		m_args[index].l = env.NewLocalRef(obj);
+		m_args[index].l = m_env.NewLocalRef(obj);
 	}
 }
 
-bool JsArgConverter::ConvertJavaScriptNumber(JEnv& env, const Handle<Value>& jsValue, int index)
+bool JsArgConverter::ConvertJavaScriptNumber(const Handle<Value>& jsValue, int index)
 {
 	bool success = true;
 
@@ -314,7 +309,7 @@ bool JsArgConverter::ConvertJavaScriptNumber(JEnv& env, const Handle<Value>& jsV
 	return success;
 }
 
-bool JsArgConverter::ConvertJavaScriptBoolean(JEnv& env, const Handle<Value>& jsValue, int index)
+bool JsArgConverter::ConvertJavaScriptBoolean(const Handle<Value>& jsValue, int index)
 {
 	bool success;
 
@@ -352,15 +347,15 @@ bool JsArgConverter::ConvertJavaScriptBoolean(JEnv& env, const Handle<Value>& js
 	return success;
 }
 
-bool JsArgConverter::ConvertJavaScriptString(JEnv& env, const Handle<Value>& jsValue, int index)
+bool JsArgConverter::ConvertJavaScriptString(const Handle<Value>& jsValue, int index)
 {
 	JniLocalRef stringObject(ConvertToJavaString(jsValue));
-	SetConvertedObject(env, index, stringObject);
+	SetConvertedObject(index, stringObject);
 
 	return true;
 }
 
-bool JsArgConverter::ConvertJavaScriptArray(JEnv& env, const Handle<Array>& jsArr, int index)
+bool JsArgConverter::ConvertJavaScriptArray(const Handle<Array>& jsArr, int index)
 {
 	bool success = true;
 
@@ -380,83 +375,83 @@ bool JsArgConverter::ConvertJavaScriptArray(JEnv& env, const Handle<Array>& jsAr
 	switch (elementTypePrefix)
 	{
 		case 'Z':
-			arr = env.NewBooleanArray(arrLength);
+			arr = m_env.NewBooleanArray(arrLength);
 			for (jsize i=0; i<arrLength; i++)
 			{
 				jboolean value = jsArr->Get(i)->BooleanValue();
-				env.SetBooleanArrayRegion((jbooleanArray)arr, i, 1, &value);
+				m_env.SetBooleanArrayRegion((jbooleanArray)arr, i, 1, &value);
 			}
 			break;
 		case 'B':
-			arr = env.NewByteArray(arrLength);
+			arr = m_env.NewByteArray(arrLength);
 			for (jsize i=0; i<arrLength; i++)
 			{
 				jbyte value = jsArr->Get(i)->Int32Value();
-				env.SetByteArrayRegion((jbyteArray)arr, i, 1, &value);
+				m_env.SetByteArrayRegion((jbyteArray)arr, i, 1, &value);
 			}
 			break;
 		case 'C':
-			arr = env.NewCharArray(arrLength);
+			arr = m_env.NewCharArray(arrLength);
 			for (jsize i=0; i<arrLength; i++)
 			{
 				String::Utf8Value utf8(jsArr->Get(i)->ToString());
-				JniLocalRef s(env.NewString((jchar*) *utf8, 1));
-				const char* singleChar = env.GetStringUTFChars(s, nullptr);
+				JniLocalRef s(m_env.NewString((jchar*) *utf8, 1));
+				const char* singleChar = m_env.GetStringUTFChars(s, nullptr);
 				jchar value = *singleChar;
-				env.ReleaseStringUTFChars(s, singleChar);
-				env.SetCharArrayRegion((jcharArray)arr, i, 1, &value);
+				m_env.ReleaseStringUTFChars(s, singleChar);
+				m_env.SetCharArrayRegion((jcharArray)arr, i, 1, &value);
 			}
 			break;
 		case 'S':
-			arr = env.NewShortArray(arrLength);
+			arr = m_env.NewShortArray(arrLength);
 			for (jsize i=0; i<arrLength; i++)
 			{
 				jshort value = jsArr->Get(i)->Int32Value();
-				env.SetShortArrayRegion((jshortArray)arr, i, 1, &value);
+				m_env.SetShortArrayRegion((jshortArray)arr, i, 1, &value);
 			}
 			break;
 		case 'I':
-			arr = env.NewIntArray(arrLength);
+			arr = m_env.NewIntArray(arrLength);
 			for (jsize i=0; i<arrLength; i++)
 			{
 				jint value = jsArr->Get(i)->Int32Value();
-				env.SetIntArrayRegion((jintArray)arr, i, 1, &value);
+				m_env.SetIntArrayRegion((jintArray)arr, i, 1, &value);
 			}
 			break;
 		case 'J':
-			arr = env.NewLongArray(arrLength);
+			arr = m_env.NewLongArray(arrLength);
 			for (jsize i=0; i<arrLength; i++)
 			{
 				jlong value = jsArr->Get(i)->Int32Value();
-				env.SetLongArrayRegion((jlongArray)arr, i, 1, &value);
+				m_env.SetLongArrayRegion((jlongArray)arr, i, 1, &value);
 			}
 			break;
 		case 'F':
-			arr = env.NewFloatArray(arrLength);
+			arr = m_env.NewFloatArray(arrLength);
 			for (jsize i=0; i<arrLength; i++)
 			{
 				jfloat value = jsArr->Get(i)->NumberValue();
-				env.SetFloatArrayRegion((jfloatArray)arr, i, 1, &value);
+				m_env.SetFloatArrayRegion((jfloatArray)arr, i, 1, &value);
 			}
 			break;
 		case 'D':
-			arr = env.NewDoubleArray(arrLength);
+			arr = m_env.NewDoubleArray(arrLength);
 			for (jsize i=0; i<arrLength; i++)
 			{
 				jdouble value = jsArr->Get(i)->NumberValue();
-				env.SetDoubleArrayRegion((jdoubleArray)arr, i, 1, &value);
+				m_env.SetDoubleArrayRegion((jdoubleArray)arr, i, 1, &value);
 			}
 			break;
 		case 'L':
 			strippedClassName = elementType.substr(1, elementType.length() - 2);
-			elementClass = env.FindClass(strippedClassName);
-			arr = env.NewObjectArray(arrLength, elementClass, nullptr);
+			elementClass = m_env.FindClass(strippedClassName);
+			arr = m_env.NewObjectArray(arrLength, elementClass, nullptr);
 			for (int i=0; i<arrLength; i++)
 			{
 				auto v = jsArr->Get(i);
 				JsArgToArrayConverter c(v, false, (int)Type::Null);
 				jobject o = c.GetConvertedArg();
-				env.SetObjectArrayElement((jobjectArray)arr, i, o);
+				m_env.SetObjectArrayElement((jobjectArray)arr, i, o);
 			}
 			break;
 		default:
@@ -466,12 +461,12 @@ bool JsArgConverter::ConvertJavaScriptArray(JEnv& env, const Handle<Array>& jsAr
 
 	if (success)
 	{
-		SetConvertedObject(env, index, arr);
+		SetConvertedObject(index, arr);
 	}
 
 	if (arr != nullptr)
 	{
-		env.DeleteLocalRef(arr);
+		m_env.DeleteLocalRef(arr);
 	}
 
 	return success;
@@ -537,7 +532,7 @@ bool JsArgConverter::IsValid() const
 	return m_isValid;
 }
 
-jvalue* JsArgConverter::ToArgs() const
+jvalue* JsArgConverter::ToArgs()
 {
 	return m_args;
 }
@@ -559,7 +554,5 @@ JsArgConverter::~JsArgConverter()
 			int index = m_storedObjects[i];
 			env.DeleteLocalRef(m_args[index].l);
 		}
-
-		delete[] m_args;
 	}
 }

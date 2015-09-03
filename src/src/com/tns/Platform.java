@@ -951,7 +951,7 @@ public class Platform
 		catch (Exception e)
 		{
 			pluginClassName = "org.nativescript.livesync.LiveSyncPlugin";
-			e.printStackTrace();
+			if (IsLogEnabled) e.printStackTrace();
 		}
 		try
 		{
@@ -961,7 +961,7 @@ public class Platform
 		}
 		catch (Exception e)
 		{
-			e.printStackTrace();
+			if (IsLogEnabled) e.printStackTrace();
 		}
 		return success;
 	}
@@ -1034,7 +1034,7 @@ public class Platform
 			}
 			catch (Exception e)
 			{
-				e.printStackTrace();
+				if (IsLogEnabled) e.printStackTrace();
 			}
 		}
 		

@@ -68,17 +68,7 @@ void NativeScriptRuntime::Init(JavaVM *jvm, ObjectManager *objectManager)
 	GET_CHANGE_IN_BYTES_OF_USED_MEMORY_METHOD_ID = env.GetStaticMethodID(PlatformClass, "getChangeInBytesOfUsedMemory", "()J");
 	assert(GET_CHANGE_IN_BYTES_OF_USED_MEMORY_METHOD_ID != nullptr);
 
-	MetadataNode::SubscribeCallbacks(objectManager,
-									NativeScriptRuntime::GetJavaField,
-									NativeScriptRuntime::SetJavaField,
-									NativeScriptRuntime::GetArrayElement,
-									NativeScriptRuntime::SetArrayElement,
-									NativeScriptRuntime::CallJavaMethod,
-									NativeScriptRuntime::RegisterInstance,
-									NativeScriptRuntime::GetTypeMetadata,
-									NativeScriptRuntime::FindClass,
-									NativeScriptRuntime::GetArrayLength,
-									NativeScriptRuntime::ResolveClass);
+	MetadataNode::Init(objectManager);
 
 	NativeScriptRuntime::objectManager = objectManager;
 
@@ -585,7 +575,9 @@ void NativeScriptRuntime::CallJavaMethod(const Handle<Object>& caller, const str
 		}
 	}
 
-	if (!ExceptionUtil::GetInstance()->CheckForJavaException(env))
+	static uint32_t adjustMemCount = 0;
+
+	if (!ExceptionUtil::GetInstance()->CheckForJavaException(env) && ((++adjustMemCount % 2) == 0))
 	{
 		AdjustAmountOfExternalAllocatedMemory(env, isolate);
 	}

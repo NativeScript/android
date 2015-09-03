@@ -31,38 +31,10 @@
 
 namespace tns
 {
-	typedef void (*SetJavaFieldCallback)(const v8::Handle<v8::Object>& target, const v8::Handle<v8::Value>& value, FieldCallbackData *fieldData);
-
-	typedef v8::Handle<v8::Value> (*GetJavaFieldCallback)(const v8::Handle<v8::Object>& caller, FieldCallbackData *fieldData);
-
-	typedef v8::Handle<v8::Value> (*GetArrayElementCallback)(const v8::Handle<v8::Object>& array, uint32_t index, const std::string& arraySignature);
-
-	typedef void (*SetArrayElementCallback)(const v8::Handle<v8::Object>& array, uint32_t index, const std::string& arraySignature, v8::Handle<v8::Value>& value);
-
-	typedef void (*CallJavaMethodCallback)(const v8::Handle<v8::Object>& caller, const std::string& className, const std::string& methodName, MetadataEntry *entry, bool isStatic, bool isSuper, const v8::FunctionCallbackInfo<v8::Value>& args);
-
-	typedef bool (*RegisterInstanceCallback)(const v8::Handle<v8::Object>& jsObject, const std::string& fullClassName, const ArgsWrapper& argWrapper, const v8::Handle<v8::Object>& implementationObject, bool isInterface);
-
-	typedef int (*GetArrayLengthCallback)(const v8::Handle<v8::Object>& classObj);
-
-	typedef jclass (*ResolveClassCallback)(const std::string& fullClassname, const v8::Handle<v8::Object>& implementationObject);
-
-	typedef v8::Handle<v8::Object> (*FindClassCallback)(const std::string& className);
-
 	class MetadataNode
 	{
 	public:
-		static void SubscribeCallbacks(ObjectManager *objectManager,
-										GetJavaFieldCallback getJavaFieldCallback,
-										SetJavaFieldCallback setJavaFieldCallback,
-										GetArrayElementCallback getArrayElementCallback,
-										SetArrayElementCallback setArrayElementCallback,
-										CallJavaMethodCallback callJavaMethodCallback,
-										RegisterInstanceCallback registerInstanceCallback,
-										GetTypeMetadataCallback getTypeMetadataCallback,
-										FindClassCallback findClassCallback,
-										GetArrayLengthCallback getArrayLengthCallback,
-										ResolveClassCallback resolveClassCallback);
+		static void Init(ObjectManager *objectManager);
 
 
 		static void BuildMetadata(uint8_t *nodes, int nodesLength, uint8_t *names, uint8_t *values);
@@ -257,16 +229,6 @@ namespace tns
 		static bool IsValidExtendName(const v8::Handle<v8::String>& name);
 		static bool GetExtendLocation(std::string& extendLocation);
 		static ExtendedClassCacheData GetCachedExtendedClassData(v8::Isolate *isolate, const std::string& proxyClassName);
-		static GetJavaFieldCallback s_getJavaField;
-		static SetJavaFieldCallback s_setJavaField;
-		static GetArrayElementCallback s_getArrayElement;
-		static SetArrayElementCallback s_setArrayElement;
-		static CallJavaMethodCallback s_callJavaMethod;
-		static RegisterInstanceCallback s_registerInstance;
-		static GetTypeMetadataCallback s_getTypeMetadata;
-		static FindClassCallback s_findClass;
-		static GetArrayLengthCallback s_getArrayLength;
-		static ResolveClassCallback s_resolveClass;
 
 		static MetadataReader s_metadataReader;
 
