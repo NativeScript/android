@@ -245,6 +245,8 @@ task cleanLocalAarFiles(type: Delete) {
 // 7. Build metadata
 // 8. Copy metadata
 
+preBuild.dependsOn(clean)
+
 if(!project.hasProperty("runSBGenerator")) {
 	cleanLocalAarFiles.dependsOn(deleteJavaDir)
 }
