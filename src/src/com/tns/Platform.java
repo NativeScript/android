@@ -154,7 +154,14 @@ public class Platform
 		{
 			AssetExtractor.extractAssets(context, extractPolicy);
 		}
-		Require.init(rootDir, appDir);
+		try
+		{
+			Require.init(rootDir, appDir);
+		}
+		catch (IOException ex)
+		{
+			throw new RuntimeException("Fail to initialize Require class", ex);
+		}
 		String jsOptions = readJsOptions(appDir);
 		Platform.initNativeScript(Require.getApplicationFilesPath(), appJavaObjectId, IsLogEnabled, context.getPackageName(), jsOptions);
 		

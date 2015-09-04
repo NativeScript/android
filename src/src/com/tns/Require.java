@@ -24,15 +24,15 @@ public class Require
 	private static final HashMap<String, String> folderAsModuleCache = new HashMap<String, String>();
 	private static boolean checkForExternalPath = false;
 
-	public static void init(File rootPackageDir, File applicationFilesDir)
+	public static void init(File rootPackageDir, File applicationFilesDir) throws IOException
 	{
 		if (initialized)
 		{
 			return;
 		}
 		
-		RootPackageDir = rootPackageDir.getAbsolutePath();
-		ApplicationFilesPath = applicationFilesDir.getAbsolutePath();
+		RootPackageDir = rootPackageDir.getCanonicalPath();
+		ApplicationFilesPath = applicationFilesDir.getCanonicalPath();
 		
 		ModulesFilesPath = "/app/";
 
