@@ -19,9 +19,11 @@ void JsDebugger::Init(v8::Isolate *isolate, const string& packageName)
 	s_JsDebuggerClass = env.FindClass("com/tns/JsDebugger");
 	assert(s_JsDebuggerClass != nullptr);
 
+	//what is enqueue message used for
 	s_EnqueueMessage = env.GetStaticMethodID(s_JsDebuggerClass, "enqueueMessage", "(Ljava/lang/String;)V");
 	assert(s_EnqueueMessage != nullptr);
 
+	//enableAgent.start(.stop) what is it used for ?
 	s_EnableAgent = env.GetStaticMethodID(s_JsDebuggerClass, "enableAgent", "(Ljava/lang/String;IZ)V");
 	assert(s_EnqueueMessage != nullptr);
 }
@@ -31,6 +33,10 @@ string JsDebugger::GetPackageName()
 	return s_packageName;
 }
 
+/* *
+ * private method that takes debug message as json from v8
+ * after it gets the message the message handler passes it to enqueueMessage method in java
+ */
 void JsDebugger::MyMessageHandler(const v8::Debug::Message& message)
 {
 	auto json = message.GetJSON();
@@ -42,6 +48,9 @@ void JsDebugger::MyMessageHandler(const v8::Debug::Message& message)
 	env.CallStaticVoidMethod(s_JsDebuggerClass, s_EnqueueMessage, (jstring)s);
 }
 
+/* *
+ * sets who will handle the messages when they start comming from v8
+ */
 void JsDebugger::Enable()
 {
 	auto isolate = s_isolate;
@@ -51,6 +60,9 @@ void JsDebugger::Enable()
 	v8::Debug::SetMessageHandler(MyMessageHandler);
 }
 
+/* *
+ * the message that come from v8 will not be handled anymore
+ */
 void JsDebugger::Disable()
 {
 	auto isolate = s_isolate;
@@ -60,6 +72,10 @@ void JsDebugger::Disable()
 	v8::Debug::SetMessageHandler(nullptr);
 }
 
+/* *
+ * schedule a debugger break to happen when JavaScript code is run in the given isolate
+ * (cli command: tns debug android --debug-brk) ?
+ */
 void JsDebugger::DebugBreak()
 {
 	auto isolate = s_isolate;
