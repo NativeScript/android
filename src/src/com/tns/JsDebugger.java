@@ -510,7 +510,7 @@ public class JsDebugger
 						int port = bundle.getInt("debuggerPort", INVALID_PORT);
 						if (port == INVALID_PORT)
 						{
-							port = getAvailablePort();
+							port = currentPort;
 						}
 						String packageName = bundle.getString("packageName", context.getPackageName());
 						boolean waitForDebugger = bundle.getBoolean("waitForDebugger", false);
