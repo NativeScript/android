@@ -6,7 +6,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
-import java.lang.Thread.UncaughtExceptionHandler;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -19,7 +18,6 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 
-import org.json.JSONException;
 import org.json.JSONObject;
 
 import android.content.Context;
@@ -33,7 +31,6 @@ import android.util.Log;
 import android.util.SparseArray;
 
 import com.tns.bindings.ProxyGenerator;
-import com.tns.internal.DefaultExtractPolicy;
 import com.tns.internal.ExtractPolicy;
 import com.tns.internal.Plugin;
 
@@ -56,8 +53,6 @@ public class Platform
 	private static native void adjustAmountOfExternalAllocatedMemoryNative(long changeInBytes);
 	
 	private static native void passUncaughtExceptionToJsNative(Throwable ex, String stackTrace);
-	
-	private static Context NativeScriptContext;
 	
 	private static boolean initialized;
 	
@@ -101,12 +96,12 @@ public class Platform
 		errorActivityClass = clazz;
 	}
 	
-	public static int init(File runtimeLibsDir, File rootDir, File appDir, File debuggerSetupDir, ClassLoader classLoader, File dexDir, String dexThumb) throws RuntimeException
+	public static int init(String appName, File runtimeLibPath, File rootDir, File appDir, File debuggerSetupDir, ClassLoader classLoader, File dexDir, String dexThumb) throws RuntimeException
 	{
-		return init(null, runtimeLibsDir, rootDir, appDir, debuggerSetupDir, classLoader, dexDir, dexThumb);
+		return init(null, appName, runtimeLibPath, rootDir, appDir, debuggerSetupDir, classLoader, dexDir, dexThumb);
 	}
 	
-	public static int init(Context context, File runtimeLibsDir, File rootDir, File appDir, File debuggerSetupDir, ClassLoader classLoader, File dexDir, String dexThumb) throws RuntimeException
+	public static int init(Object application, String appName, File runtimeLibPath, File rootDir, File appDir, File debuggerSetupDir, ClassLoader classLoader, File dexDir, String dexThumb) throws RuntimeException
 	{
 		if (initialized)
 		{
@@ -114,46 +109,21 @@ public class Platform
 		}
 		initialized = true;
 		
-		if (runtimeLibsDir == null)
-		{
-			System.loadLibrary("NativeScript");
-		}
-		else
-		{
-			String arch = System.getProperty("os.arch");
-			String lcArch = arch.toLowerCase();
-			String archDir;
-			if (lcArch.startsWith("arm"))
-			{
-				archDir = "arm";
-			}
-			else if (lcArch.startsWith("i686"))
-			{
-				archDir = "x86";
-			}
-			else
-			{
-				// TODO: add arm64, x64
-				throw new RuntimeException("Unsupported arch=" + arch);
-			}
-			System.load(new File(runtimeLibsDir, "lib/" + archDir + "/libNativeScript.so").getAbsolutePath());
-		}
+		loadLibrary(runtimeLibPath, "NativeScript");
 		
 		mainThread = Thread.currentThread();
 
 		Platform.dexFactory = new DexFactory(classLoader, dexDir, dexThumb);
-		NativeScriptContext = context;
 
-		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "Initializing NativeScript JAVA");
-		int appJavaObjectId = generateNewObjectId();
-		makeInstanceStrong(context, appJavaObjectId);
-		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "Initialized app instance id:" + appJavaObjectId);
-
-		boolean skipAssetExtraction = runPlugin(context);
-		if (!skipAssetExtraction)
+		int appJavaObjectId = -1;
+		if (application != null)
 		{
-			AssetExtractor.extractAssets(context, extractPolicy);
+			if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "Initializing NativeScript JAVA");
+			appJavaObjectId = generateNewObjectId();
+			makeInstanceStrong(application, appJavaObjectId);
+			if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "Initialized app instance id:" + appJavaObjectId);
 		}
+
 		try
 		{
 			Require.init(rootDir, appDir);
@@ -163,7 +133,7 @@ public class Platform
 			throw new RuntimeException("Fail to initialize Require class", ex);
 		}
 		String jsOptions = readJsOptions(appDir);
-		Platform.initNativeScript(Require.getApplicationFilesPath(), appJavaObjectId, IsLogEnabled, context.getPackageName(), jsOptions);
+		Platform.initNativeScript(Require.getApplicationFilesPath(), appJavaObjectId, IsLogEnabled, appName, jsOptions);
 		
 		if (debuggerSetupDir != null)
 		{
@@ -185,6 +155,38 @@ public class Platform
 		return appJavaObjectId;
 	}
 	
+	static void loadLibrary(File runtimeLibPath, String libName)
+	{
+		if (runtimeLibPath == null)
+		{
+			System.loadLibrary(libName);
+		}
+		else if (runtimeLibPath.isDirectory())
+		{
+			String arch = System.getProperty("os.arch");
+			String lcArch = arch.toLowerCase();
+			String archDir;
+			if (lcArch.startsWith("arm"))
+			{
+				archDir = "arm";
+			}
+			else if (lcArch.startsWith("i686"))
+			{
+				archDir = "x86";
+			}
+			else
+			{
+				// TODO: add arm64, x64
+				throw new RuntimeException("Unsupported arch=" + arch);
+			}
+			System.load(new File(runtimeLibPath, "lib/" + archDir + "/" + libName +  ".so").getAbsolutePath());
+		}
+		else
+		{
+			System.load(runtimeLibPath.getAbsolutePath());
+		}
+	}
+	
 	public static void enableVerboseLogging()
 	{
 		IsLogEnabled = true;
@@ -199,32 +201,6 @@ public class Platform
 		disableVerboseLoggingNative();
 	}
 
-	static void setDefaultUncaughtExceptionHandler(Thread.UncaughtExceptionHandler handler)
-	{
-		final UncaughtExceptionHandler defaultHandler = Thread.getDefaultUncaughtExceptionHandler();
-		
-		if (handler == null)
-		{
-			handler = new UncaughtExceptionHandler()
-			{
-				@Override
-				public void uncaughtException(Thread thread, Throwable ex)
-				{
-					String errorMessage = ErrorReport.getErrorMessage(ex);
-					
-					if (IsLogEnabled) Log.e(DEFAULT_LOG_TAG, "Uncaught Exception Message=" + errorMessage);
-
-					if(!ErrorReport.startActivity(NativeScriptContext, errorMessage) && defaultHandler != null) //if we are in release mode
-					{
-						defaultHandler.uncaughtException(thread, ex);	
-					}
-				}
-			};
-		}
-		
-		Thread.setDefaultUncaughtExceptionHandler(handler); 
-	}
-	
 	public static void appFail(Throwable ex, String message)
 	{
 		// TODO: allow app to handle fail message report here. For example
@@ -251,16 +227,6 @@ public class Platform
 		}
 	}
 	
-	static void setExtractPolicy(ExtractPolicy policy)
-	{
-		if (policy == null)
-		{
-			policy = new DefaultExtractPolicy();
-		}
-		
-		extractPolicy = policy;
-	}
-
 	public static void run()
 	{
 		String bootstrapPath = Require.bootstrapApp();
@@ -862,11 +828,6 @@ public class Platform
 		return ret;
 	}
 	
-	public static Context getApplicationContext()
-	{
-		return NativeScriptContext;
-	}
-	
 	private static Class<?> getCachedClass(String className)
 	{
 		Class<?> clazz = classCache.get(className);
@@ -946,7 +907,7 @@ public class Platform
 		}
 	}
 	
-	private static boolean runPlugin(Context context)
+	static boolean runPlugin(Context context)
 	{
 		boolean success = false;
 		String pluginClassName;

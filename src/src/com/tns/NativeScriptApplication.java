@@ -6,6 +6,7 @@ import android.app.Application;
 import android.util.Log;
 
 import com.tns.internal.AppBuilderCallback;
+import com.tns.internal.DefaultExtractPolicy;
 import com.tns.internal.ExtractPolicy;
 
 public class NativeScriptApplication extends android.app.Application implements com.tns.NativeScriptHashCodeProvider {
@@ -711,6 +712,16 @@ public class NativeScriptApplication extends android.app.Application implements 
 			
 			prepareAppBuilderCallbackImpl();
 			
+			// TODO: refactor
+			ExtractPolicy extractPolicy = (appBuilderCallbackImpl != null)
+					? appBuilderCallbackImpl.getExtractPolicy()
+					: new DefaultExtractPolicy();
+			boolean skipAssetExtraction = Platform.runPlugin(this);
+			if (!skipAssetExtraction)
+			{
+				new AssetExtractor(null).extractAssets(this, extractPolicy);
+			}
+			
 			if (appBuilderCallbackImpl != null)
 			{
 				appBuilderCallbackImpl.onCreate(this);
@@ -718,6 +729,7 @@ public class NativeScriptApplication extends android.app.Application implements 
 			
 			NativeScriptSyncHelper.sync(this);
 
+			String appName = this.getPackageName();
 			File rootDir = new File(this.getApplicationInfo().dataDir);
 			File appDir = this.getFilesDir();
 			File debuggerSetupDir = Platform.isDebuggableApp(this)
@@ -726,7 +738,7 @@ public class NativeScriptApplication extends android.app.Application implements 
 			ClassLoader classLoader = this.getClassLoader();
 			File dexDir = new File(rootDir, "code_cache/secondary-dexes");
 			String dexThumb = Platform.getDexThumb(this);
-			Platform.init(this, null, rootDir, appDir, debuggerSetupDir, classLoader, dexDir, dexThumb);
+			Platform.init(this, appName, null, rootDir, appDir, debuggerSetupDir, classLoader, dexDir, dexThumb);
 			Platform.run();
 	
 			onCreateInternal();
@@ -779,13 +791,9 @@ public class NativeScriptApplication extends android.app.Application implements 
 
 		Thread.UncaughtExceptionHandler exHandler = (appBuilderCallbackImpl != null)
 				? appBuilderCallbackImpl.getDefaultUncaughtExceptionHandler()
-				: null;
+				: new NativeScriptUncaughtExceptionHandler(this);
 
-		Platform.setDefaultUncaughtExceptionHandler(exHandler);
-		
-		ExtractPolicy policy = (appBuilderCallbackImpl != null)
-				? appBuilderCallbackImpl.getExtractPolicy()
-				: null;
+		Thread.setDefaultUncaughtExceptionHandler(exHandler);
 		
 		boolean shouldEnableDebugging = (appBuilderCallbackImpl != null)
 				? appBuilderCallbackImpl.shouldEnableDebugging(this)
@@ -796,8 +804,6 @@ public class NativeScriptApplication extends android.app.Application implements 
 			JsDebugger.registerEnableDisableDebuggerReceiver(this);
 			JsDebugger.registerGetDebuggerPortReceiver(this);
 		}
-				
-		Platform.setExtractPolicy(policy);
 	}
 
 	public void onLowMemory() {
