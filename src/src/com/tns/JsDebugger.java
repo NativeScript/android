@@ -520,8 +520,8 @@ public class JsDebugger
 					}
 					else
 					{
-						JsDebugger.disableAgent();
-						currentPort = INVALID_PORT;
+						// keep socket on the same port when we disable
+						JsDebugger.disableAgent(); 
 					}
 				}
 			}
