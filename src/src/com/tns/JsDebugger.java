@@ -94,10 +94,12 @@ public class JsDebugger
 			}
 		}
 
+		//when someone runs our server we do:
 		public void run()
 		{
 			try
 			{
+				//open server port to run on
 				serverSocket = new ServerSocket(this.port);
 				running = true;
 			}
@@ -107,15 +109,19 @@ public class JsDebugger
 				e.printStackTrace();
 			}
 
+			//start listening and responding through that socket
 			while (running)
 			{
 				try
 				{
+					//wait for someone to connect to port and if he does ... open a socket
 					Socket socket = serverSocket.accept();
 
+					//out (send messages to node inspector)
 					this.responseWorker = new ResponseWorker(socket);
 					new Thread(this.responseWorker).start();
 
+					//in (recieve messages from node inspector)
 					commThread = new ListenerWorker(socket.getInputStream());
 					new Thread(commThread).start();
 				}
@@ -504,7 +510,7 @@ public class JsDebugger
 						int port = bundle.getInt("debuggerPort", INVALID_PORT);
 						if (port == INVALID_PORT)
 						{
-							port = getAvailablePort();
+							port = currentPort;
 						}
 						String packageName = bundle.getString("packageName", context.getPackageName());
 						boolean waitForDebugger = bundle.getBoolean("waitForDebugger", false);
@@ -514,8 +520,8 @@ public class JsDebugger
 					}
 					else
 					{
-						JsDebugger.disableAgent();
-						currentPort = INVALID_PORT;
+						// keep socket on the same port when we disable
+						JsDebugger.disableAgent(); 
 					}
 				}
 			}

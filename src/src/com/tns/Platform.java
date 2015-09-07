@@ -138,6 +138,7 @@ public class Platform
 		if (debuggerSetupDir != null)
 		{
 			jsDebugger = new JsDebugger(debuggerSetupDir);
+											//also runs javaServerThread with resolved port
 			int debuggerPort = jsDebugger.getDebuggerPortFromEnvironment();
 		}
 		
