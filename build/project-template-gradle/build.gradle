@@ -1,0 +1,273 @@
+/*
+*	Script builds apk in release or debug mode
+*	To run: 
+*			gradle buildapk -Prelease (release mode)
+*			gradle buildapk (debug mode -> default)
+* 	Options:
+*			-Prelease
+*			-PtargetSdk=[target_sdk] (default is 22)
+*			-PbuildToolsVersion=[build_tools_version] (default is 22.0.1)
+*			-PsupportVersion=[support_version] (default (22.2.0)
+*			-PcompileSdk=[compile_sdk_version] (default 22)
+*
+*			-PksPath=[path_to_keystore_file]
+*			-PksPassword=[password_for_keystore_file]
+*			-Palias=[alias_to_use_from_keystore_file]
+*			-Ppassword=[password_for_alias]
+*
+*			-PrunSBGenerator
+*/
+
+def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
+
+buildscript {
+    repositories {
+        jcenter()
+    }
+
+    dependencies {
+        classpath "com.android.tools.build:gradle:1.3.0"
+    }
+}
+
+apply plugin: "com.android.application"
+
+def compiteCompileSdkVersion () {
+	if(project.hasProperty("compileSdk")) {
+		return compileSdk
+	}
+	else {
+		return 22
+	}
+}
+
+def computeTargetSdkVersion() {
+	if(project.hasProperty("targetSdk")) {
+		return targetSdk
+	}
+	else {
+		return 22
+	}
+}
+
+def computeBuildToolsVersion() {
+	if(project.hasProperty("buildToolsVersion")) {
+		return buildToolsVersion
+	}
+	else {
+		return "22.0.1"
+	}
+}
+
+android {
+	compileSdkVersion compiteCompileSdkVersion()
+    buildToolsVersion computeBuildToolsVersion()
+	
+	defaultConfig {
+		minSdkVersion 17
+		targetSdkVersion computeTargetSdkVersion()
+	}
+	
+	sourceSets.main {
+        jniLibs.srcDir "libs/jni"
+    }
+	
+	signingConfigs {
+        release {
+            if(project.hasProperty("release")) {
+				if(project.hasProperty("ksPath") &&
+					project.hasProperty("ksPassword") &&
+					project.hasProperty("alias") &&
+					project.hasProperty("password"))
+				{
+					storeFile file(ksPath)
+					storePassword ksPassword
+					keyAlias alias
+					keyPassword password
+				}
+			}
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+        }
+    }
+	
+	applicationVariants.all { variant ->
+		def tsk = variant.mergeAssets
+		if(project.hasProperty("runSBGenerator")) {
+			runBindingGenerator.dependsOn(copyMetadata)
+			tsk.dependsOn(runBindingGenerator)
+		}
+		else {
+			tsk.dependsOn(copyMetadata)
+		}
+	}
+}
+
+repositories {
+    jcenter()
+    // used for local *.AAR files
+    flatDir {
+    	dirs 'libs/aar'
+	}
+}
+
+def nodeModulesDir = "../../node_modules/"
+
+dependencies {
+	def suppotVer = "22.2.0";
+	if(project.hasProperty("supportVersion")) {
+		suppotVer = supportVersion
+	}
+	
+    compile "com.android.support:support-v4:$suppotVer"
+    compile "com.android.support:appcompat-v7:$suppotVer"
+
+    // take all jars within the libs dir
+	compile fileTree(dir: "libs", include: ["**/*.jar"])
+
+	// take all jars within the node_modules dir
+	compile fileTree(dir: nodeModulesDir, include: ["**/*.jar"])
+	
+	//when gradle has aar support this will be preferred instead of addAarDependencies
+	// compile files("$rootDir/libs/aar") {
+        // builtBy 'copyAarDependencies'
+    // }
+}
+
+task copyAarDependencies(type: Copy) {
+	// we need to copy all dependencies into a flat dir, as pointed by the repositories setup
+	from fileTree(dir: nodeModulesDir, include: ["**/*.aar"]).files
+	into "libs/aar"
+}
+
+task addAarDependencies <</*doLast*/ {
+	// manually traverse all the locally copied AAR files and add them to the dependency list
+	FileTree tree = fileTree(dir: "libs/aar", include: ["**/*.aar"])
+	tree.each { File file ->
+		// remove the extension of the file (.aar)
+		def length = file.name.length() - 4
+		def fileName = file.name[0..<length]
+		project.dependencies.add("compile", [name: fileName, ext: "aar"])
+	}
+}
+
+task collectAllJars(type: Copy) {
+	def explodedAarDir = project.buildDir.getAbsolutePath() + "/intermediates/exploded-aar/"
+	def sdkPath = android.sdkDirectory.getAbsolutePath();
+	def androidJar = sdkPath + "/platforms/" + android.compileSdkVersion + "/android.jar"
+	def outDir = "$rootDir/metadata/libs"
+
+	// copies all jars in metadata/libs dir and makes sure all copied jars have different names
+	// this is necessary because static binding generator cannot process jars in nested folders
+	doFirst {
+		def ft = fileTree(dir: explodedAarDir, include: "**/*.jar")
+		def count = 0;
+		
+		ft.each { currentJarFile ->
+			//rename jar on copy
+			def newName = "ambiguous_jar_" + count++ + ".jar"
+			copy {
+				from currentJarFile
+				into outDir
+				rename currentJarFile.getName(), newName
+			}
+		}
+	}
+		
+	from configurations.compile
+	from androidJar
+	include '**/*.jar'
+	includeEmptyDirs = false
+	
+	into outDir
+}
+
+task ensureMetadataOutDir {
+	def outputDir = file("$rootDir/metadata/output")
+	outputDir.mkdirs()
+}
+
+task buildMetadata(type: JavaExec) {
+	outputs.upToDateWhen {		
+		!collectAllJars.didWork
+	}
+
+	main '-jar'
+	def str = new LinkedList <String> ();
+	str.add("build-tools/metadata-generator.jar")
+	str.add("metadata/libs")
+	str.add("metadata/output")
+
+	args str.toArray()
+}
+
+task copyMetadata(type: Copy) {
+	outputs.upToDateWhen {
+		!buildMetadata.didWork
+	}
+
+	from "metadata/output"
+	into "src/main/assets/metadata"
+}
+
+task runBindingGenerator (type: Exec) {
+	String jarsDir = "-PjarsDir=$rootDir/metadata/libs" //re-make to use intermediates folder
+	String jsCodeToParse = "-PjsCodeDir=$rootDir/src/main/assets/app"
+	String outDir = "-PoutDir=../../src/main/java"
+	
+	workingDir "$rootDir/build-tools/android-static-binding-generator"
+	if(isWinOs) {
+		commandLine "cmd", "/c", "gradle", "generatebindings", jarsDir, jsCodeToParse, outDir
+	}
+	else {
+		commandLine "gradle", "generatebindings", jarsDir, jsCodeToParse, outDir
+	}
+}
+
+task deleteJavaDir (type: Delete) {
+	delete "$rootDir/src/main/java"
+}
+
+task cleanLocalAarFiles(type: Delete) {
+	delete fileTree(dir: "libs/aar", include: ["*.aar"])
+}
+
+// prepare task chain
+// 1. Copy *.aar dependencies
+// 2. Add *.aar dependencies
+// 3. Build
+// 4. Clean libs/aar folder
+// 5. Ensure metadata out directory
+// 6. Collect all jars
+// 7. Build metadata
+// 8. Copy metadata
+
+preBuild.dependsOn(clean)
+
+if(!project.hasProperty("runSBGenerator")) {
+	cleanLocalAarFiles.dependsOn(deleteJavaDir)
+}
+
+collectAllJars.dependsOn(cleanLocalAarFiles)
+ensureMetadataOutDir.dependsOn(collectAllJars)
+buildMetadata.dependsOn(ensureMetadataOutDir)
+copyMetadata.dependsOn(buildMetadata)
+
+task buildapk {
+	
+	//this way copy arr dependencies and addArrDependencies are executed before configuration
+	println "execute: copyAarDependencies, addAarDependencies before configuration"
+	tasks.copyAarDependencies.execute()
+	tasks.addAarDependencies.execute()
+	//
+	
+	if(project.hasProperty("release")) {
+		dependsOn assembleRelease
+	}
+	else {
+		dependsOn assembleDebug
+	}
+}

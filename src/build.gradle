@@ -1,0 +1,211 @@
+/*
+*	This gradle script builds the android runtime hence the command: "gradle buildar"
+*	It builds the C++ part of the runtime with the ndk-build command, which is currently impossible to do with the android plugin for gradle
+*	The script also builds the nativescript.jar file containing the binding generator and the rest of the android runtime
+*
+*	How to run script and build android runtime run: "gradle buildar"
+*/
+
+def distDir = "$rootDir/dist"
+def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
+def pathToAndroidSdkPlatforms = "$System.env.ANDROID_HOME" + "/platforms"
+def pathToBindingGeneratorJar = "../binding-generator/Generator/build/libs/Generator.jar"
+
+buildscript {
+    repositories {
+        jcenter()
+    }
+
+    dependencies {
+        classpath 'com.android.tools.build:gradle:1.3.0'
+    }
+}
+
+apply plugin: 'com.android.library' //com.android.application for applications (build process is different)
+
+//configuration of the android plugin for gradle
+android {
+	compileSdkVersion 22
+    buildToolsVersion "22.0.1"
+	
+	defaultConfig {
+        minSdkVersion 19
+        targetSdkVersion 22
+        versionCode 1
+        versionName "1.0"
+    }
+	
+	sourceSets {
+		//manifest is necessary to generate a BuildConfig.java file necessary for build
+		main.manifest.srcFile "./AndroidManifest.xml"
+		main.java.srcDir "src" 
+	}
+	
+	//TODO: remove this and fix related problems later
+	lintOptions {
+		abortOnError false
+	}
+}
+
+repositories {
+    jcenter()
+}
+
+dependencies {
+	def sdkPath = android.sdkDirectory.getAbsolutePath();
+	def androidJar = sdkPath + "/platforms/" + android.compileSdkVersion + "/android.jar"	
+    
+	compile 'com.android.support:support-v4:22.2.0'
+    compile 'com.android.support:appcompat-v7:22.2.0'
+	compile files(androidJar)
+	compile files(pathToBindingGeneratorJar)
+}
+
+//this way we clean only content of folder without deleting the folder
+task cleanLibsFolder {	
+	def dirName = "$rootDir/libs" 
+    file( dirName ).list().each{
+        f -> 
+            delete "${dirName}/${f}"
+    }
+}
+
+task cleanJavaBin (type: Delete) {
+	delete "$rootDir/bin"
+}
+
+task cleanDistDir (type: Delete) {
+	delete distDir
+}
+
+task createDistDir {
+	doLast {
+		def distF = new File(distDir)
+		distF.mkdirs()
+	}
+}
+
+task setNdkConfigToRelease {
+	def mkFile = file("$rootDir/jni/Application.mk")
+	
+	String contents = new File("$rootDir/jni/Application.mk").getText("UTF-8")
+	contents = contents.replaceAll( /APP_OPTIM\s*?\:=\s*?debug/, "APP_OPTIM := release")
+	new File("$rootDir/jni/Application.mk").write(contents, "UTF-8")
+}
+
+task buildCppRuntime (type: Exec) {
+
+	if(isWinOs) {
+		commandLine "cmd", "/c", "ndk-build"
+	}
+	else {
+		commandLine "ndk-build"
+	}	
+}
+
+task copyCppRuntime {
+	doLast {
+		copy {
+			from "$rootDir/libs"
+			into "$rootDir/dist/libs/jni"
+		}
+	}	
+}
+
+task cleanCppRuntime (type: Delete){
+	delete "$rootDir/libs/armeabi-v7a", "$rootDir/libs/x86"
+}
+
+task revertNdkConfiguration (type: Exec) {
+	if(isWinOs) {
+		commandLine "cmd", "/c", "git", "checkout", "--", "./jni/Application.mk"
+	}
+	else {
+		commandLine "git", "checkout", "--", "./jni/Application.mk"
+	}
+}
+
+task generateBindingGeneratorClasses (type: Exec ) {	
+	workingDir "../binding-generator/Generator" 
+
+	if(isWinOs) {
+		commandLine "cmd", "/c", "gradle", "build", "-PoutClassesDir=$rootDir/build/intermediates/classes/release"
+	}
+	else {
+		commandLine "gradle", "build", "-PoutClassesDir=$rootDir/build/intermediates/classes/release"
+	}
+}
+
+task setPackageVersion {
+	def mkFile = file("$rootDir/jni/Version.h")
+	
+	String contents = new File("$rootDir/jni/Version.h").getText("UTF-8")
+	
+	def runtimeVersion = "no package version was provided by build.gradle build"
+	if(project.hasProperty("packageVersion")) {
+		runtimeVersion = packageVersion
+	}
+	
+	contents = contents.replaceAll( /RUNTIME_VERSION_PLACEHOLDER/, runtimeVersion)
+	new File("$rootDir/jni/Version.h").write(contents, "UTF-8")
+}
+
+task setRuntimeCommit {
+	def mkFile = file("$rootDir/jni/Version.h")
+	
+	String contents = new File("$rootDir/jni/Version.h").getText("UTF-8")
+	
+	def commitVersion = "no commit sha was provided by build.gradle build"
+	if(project.hasProperty("gitCommitVersion")) {
+		commitVersion = gitCommitVersion
+	}
+	
+	contents = contents.replaceAll( /RUNTIME_COMMIT_SHA_PLACEHOLDER/, commitVersion)
+	new File("$rootDir/jni/Version.h").write(contents, "UTF-8")
+}
+
+task revertVersionFile (type: Exec) {
+	if(isWinOs) {
+		commandLine "cmd", "/c", "git", "checkout", "--", "./jni/Version.h"
+	}
+	else {
+		commandLine "git", "checkout", "--", "./jni/Version.h"
+	}
+}
+
+task copyRuntime (type: Copy) {
+	from "$rootDir/build/intermediates/bundles/release/classes.jar"
+	into "$rootDir/dist/libs"
+	rename "classes.jar", "nativescript.jar"
+}
+
+//clean
+cleanDistDir.dependsOn(clean)
+cleanLibsFolder.dependsOn(cleanDistDir)
+cleanJavaBin.dependsOn(cleanLibsFolder)
+createDistDir.dependsOn(cleanJavaBin)
+
+//generateBindingGeneratorClasses needs to be done before it is needed as a dependency for compilation (before build starts and dependencies are resolved)
+generateBindingGeneratorClasses.dependsOn(createDistDir)
+preBuild.dependsOn(generateBindingGeneratorClasses) 
+
+//set correct version and commit hash in version.h file
+setPackageVersion.dependsOn(preBuild)
+setRuntimeCommit.dependsOn(setPackageVersion)
+setNdkConfigToRelease.dependsOn(setRuntimeCommit) //set to release and build
+
+buildCppRuntime.dependsOn(setNdkConfigToRelease)
+copyCppRuntime.dependsOn(buildCppRuntime)
+cleanCppRuntime.dependsOn(copyCppRuntime)
+
+//revert changed files after  build
+revertNdkConfiguration.dependsOn(cleanCppRuntime)
+revertVersionFile.dependsOn(revertNdkConfiguration)
+
+//we need build command to resolve dependencies without manually calling every step
+build.dependsOn(revertVersionFile) 
+copyRuntime.dependsOn(build)
+
+task buildar {
+	dependsOn copyRuntime
+}

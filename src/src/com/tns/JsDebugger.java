@@ -40,8 +40,6 @@ public class JsDebugger
 
 	private static native void sendCommand(byte[] command, int length);
 
-	private final Context context;
-
 	private static final Handler mainThreadHandler = new Handler(Looper.getMainLooper());
 
 	private static final int INVALID_PORT = -1;
@@ -56,14 +54,13 @@ public class JsDebugger
 
 	private static LinkedBlockingQueue<String> dbgMessages = new LinkedBlockingQueue<String>();
 
-	private static void enqueueMessage(String message)
-	{
-		dbgMessages.add(message);
-	}
+	private final File debuggerSetupDirectory;
+	
+	private Boolean shouldDebugBreakFlag = null;
 
-	public JsDebugger(Context context)
+	public JsDebugger(File debuggerSetupDirectory)
 	{
-		this.context = context;
+		this.debuggerSetupDirectory = debuggerSetupDirectory;
 	}
 
 	private static ServerSocket serverSocket;
@@ -97,10 +94,12 @@ public class JsDebugger
 			}
 		}
 
+		//when someone runs our server we do:
 		public void run()
 		{
 			try
 			{
+				//open server port to run on
 				serverSocket = new ServerSocket(this.port);
 				running = true;
 			}
@@ -110,15 +109,19 @@ public class JsDebugger
 				e.printStackTrace();
 			}
 
+			//start listening and responding through that socket
 			while (running)
 			{
 				try
 				{
+					//wait for someone to connect to port and if he does ... open a socket
 					Socket socket = serverSocket.accept();
 
+					//out (send messages to node inspector)
 					this.responseWorker = new ResponseWorker(socket);
 					new Thread(this.responseWorker).start();
 
+					//in (recieve messages from node inspector)
 					commThread = new ListenerWorker(socket.getInputStream());
 					new Thread(commThread).start();
 				}
@@ -316,20 +319,85 @@ public class JsDebugger
 		if (Platform.IsLogEnabled) Log.d(Platform.DEFAULT_LOG_TAG, "getDebuggerPortFromEnvironment");
 		int port = INVALID_PORT;
 		
-		boolean shouldEnableDebuggingFlag = shouldEnableDebugging(context);
-		
-		if (Platform.IsLogEnabled) Log.d(Platform.DEFAULT_LOG_TAG, "getDebuggerPortFromEnvironment:: shouldEnableDebuggingFlag=" + shouldEnableDebuggingFlag);		
-
-		if (shouldEnableDebuggingFlag)
+		File envOutFile = new File(debuggerSetupDirectory, portEnvOutputFile);
+		OutputStreamWriter w = null;
+		try
 		{
-			File baseDir = context.getExternalFilesDir(null);
-			File envOutFile = new File(baseDir, portEnvOutputFile);
-			OutputStreamWriter w = null;
+			w = new OutputStreamWriter(new FileOutputStream(envOutFile, false));
+			String currentPID = "PID=" + android.os.Process.myPid() + "\n";
+			w.write(currentPID);
+		}
+		catch (IOException e1)
+		{
+			e1.printStackTrace();
+		}
+		finally
+		{
+			if (w != null)
+			{
+				try
+				{
+					w.close();
+				}
+				catch (IOException e)
+				{
+					e.printStackTrace();
+				}
+			}
+			w = null;
+		}
+		
+		boolean shouldDebugBreakFlag = shouldDebugBreak(); 
+		
+		if (Platform.IsLogEnabled) Log.d(Platform.DEFAULT_LOG_TAG, "shouldDebugBreakFlag=" + shouldDebugBreakFlag);
+		
+		if (shouldDebugBreakFlag)
+		{
+			
 			try
 			{
-				w = new OutputStreamWriter(new FileOutputStream(envOutFile, false));
-				String currentPID = "PID=" + android.os.Process.myPid() + "\n";
-				w.write(currentPID);
+				Thread.sleep(3 * 1000);
+			}
+			catch (InterruptedException e1)
+			{
+				e1.printStackTrace();
+			}
+		}
+
+		File envInFile = new File(debuggerSetupDirectory, portEnvInputFile);
+		
+		boolean envInFileFlag = envInFile.exists();
+		
+		if (Platform.IsLogEnabled) Log.d(Platform.DEFAULT_LOG_TAG, "envInFileFlag=" + envInFileFlag);
+		
+		if (envInFileFlag)
+		{
+			BufferedReader reader = null;
+			try
+			{
+				reader = new BufferedReader(new FileReader(envInFile));
+				String line = reader.readLine();
+				int requestedPort;
+				try
+				{
+					requestedPort = Integer.parseInt(line);
+				}
+				catch (NumberFormatException e)
+				{
+					requestedPort = INVALID_PORT;
+				}
+
+				w = new OutputStreamWriter(new FileOutputStream(envOutFile, true));
+				int localPort = (requestedPort != INVALID_PORT) ? requestedPort : getAvailablePort();
+				String strLocalPort = "PORT=" + localPort + "\n";
+				w.write(strLocalPort);
+				port = currentPort = localPort;
+				//
+				enable();
+				debugBreak();
+				serverThread = new ServerThread(port);
+				javaServerThread = new Thread(serverThread);
+				javaServerThread.start();
 			}
 			catch (IOException e1)
 			{
@@ -337,6 +405,17 @@ public class JsDebugger
 			}
 			finally
 			{
+				if (reader != null)
+				{
+					try
+					{
+						reader.close();
+					}
+					catch (IOException e)
+					{
+						e.printStackTrace();
+					}
+				}
 				if (w != null)
 				{
 					try
@@ -348,91 +427,7 @@ public class JsDebugger
 						e.printStackTrace();
 					}
 				}
-				w = null;
-			}
-			
-			boolean shouldDebugBreakFlag = shouldDebugBreak(context); 
-			
-			if (Platform.IsLogEnabled) Log.d(Platform.DEFAULT_LOG_TAG, "shouldDebugBreakFlag=" + shouldDebugBreakFlag);
-			
-			if (shouldDebugBreakFlag)
-			{
-				
-				try
-				{
-					Thread.sleep(3 * 1000);
-				}
-				catch (InterruptedException e1)
-				{
-					e1.printStackTrace();
-				}
-			}
-
-			File envInFile = new File(baseDir, portEnvInputFile);
-			
-			boolean envInFileFlag = envInFile.exists();
-			
-			if (Platform.IsLogEnabled) Log.d(Platform.DEFAULT_LOG_TAG, "envInFileFlag=" + envInFileFlag);
-			
-			if (envInFileFlag)
-			{
-				BufferedReader reader = null;
-				try
-				{
-					reader = new BufferedReader(new FileReader(envInFile));
-					String line = reader.readLine();
-					int requestedPort;
-					try
-					{
-						requestedPort = Integer.parseInt(line);
-					}
-					catch (NumberFormatException e)
-					{
-						requestedPort = INVALID_PORT;
-					}
-
-					w = new OutputStreamWriter(new FileOutputStream(envOutFile, true));
-					int localPort = (requestedPort != INVALID_PORT) ? requestedPort : getAvailablePort();
-					String strLocalPort = "PORT=" + localPort + "\n";
-					w.write(strLocalPort);
-					port = currentPort = localPort;
-					//
-					enable();
-					debugBreak();
-					serverThread = new ServerThread(port);
-					javaServerThread = new Thread(serverThread);
-					javaServerThread.start();
-				}
-				catch (IOException e1)
-				{
-					e1.printStackTrace();
-				}
-				finally
-				{
-					if (reader != null)
-					{
-						try
-						{
-							reader.close();
-						}
-						catch (IOException e)
-						{
-							e.printStackTrace();
-						}
-					}
-					if (w != null)
-					{
-						try
-						{
-							w.close();
-						}
-						catch (IOException e)
-						{
-							e.printStackTrace();
-						}
-					}
-					envInFile.delete();
-				}
+				envInFile.delete();
 			}
 		}
 		
@@ -469,7 +464,14 @@ public class JsDebugger
 		}
 		return port;
 	}
+	
+	@RuntimeCallable
+	private static void enqueueMessage(String message)
+	{
+		dbgMessages.add(message);
+	}
 
+	@RuntimeCallable
 	private static void enableAgent(String packageName, int port, boolean waitForConnection)
 	{
 		enable();
@@ -481,6 +483,7 @@ public class JsDebugger
 		javaServerThread.start();
 	}
 
+	@RuntimeCallable
 	private static void disableAgent()
 	{
 		disable();
@@ -507,7 +510,10 @@ public class JsDebugger
 						int port = bundle.getInt("debuggerPort", INVALID_PORT);
 						if (port == INVALID_PORT)
 						{
-							port = getAvailablePort();
+							if(currentPort == INVALID_PORT) {
+								currentPort = getAvailablePort();
+							}
+							port = currentPort;
 						}
 						String packageName = bundle.getString("packageName", context.getPackageName());
 						boolean waitForDebugger = bundle.getBoolean("waitForDebugger", false);
@@ -517,8 +523,8 @@ public class JsDebugger
 					}
 					else
 					{
-						JsDebugger.disableAgent();
-						currentPort = INVALID_PORT;
+						// keep socket on the same port when we disable
+						JsDebugger.disableAgent(); 
 					}
 				}
 			}
@@ -538,50 +544,22 @@ public class JsDebugger
 		}, new IntentFilter(getDebuggerPortAction));
 	}
 
-
-	public static boolean shouldEnableDebugging(Context context)
-	{
-		int flags;
-		try
-		{
-			flags = context.getPackageManager().getPackageInfo(context.getPackageName(), 0).applicationInfo.flags;
-		}
-		catch (NameNotFoundException e)
-		{
-			flags = 0;
-			e.printStackTrace();
-		}
-
-		boolean shouldEnableDebugging = ((flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0);
-		return shouldEnableDebugging;
-	}
-	
-	
-	public static Boolean shouldDebugBreakFlag = null;
-	
-	public static boolean shouldDebugBreak(Context context)
+	private boolean shouldDebugBreak()
 	{
 		if (shouldDebugBreakFlag != null)
 		{
 			return shouldDebugBreakFlag;
 		}
 		
-		if (!shouldEnableDebugging(context))
-		{
-			shouldDebugBreakFlag = false;
-			return false;
-		}
+		File debugBreakFile = new File(debuggerSetupDirectory, DEBUG_BREAK_FILENAME);
 		
-		File baseDir = context.getExternalFilesDir(null);
-		File debugBreakFile = new File(baseDir, DEBUG_BREAK_FILENAME);
-		if (debugBreakFile.exists())
+		shouldDebugBreakFlag = debugBreakFile.exists();
+		
+		if (shouldDebugBreakFlag)
 		{
 			debugBreakFile.delete();
-			shouldDebugBreakFlag = true;
-			return true;
 		}
 		
-		shouldDebugBreakFlag = false;
-		return false;
+		return shouldDebugBreakFlag;
 	}
 }

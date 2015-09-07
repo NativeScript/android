@@ -86,7 +86,7 @@ public class StringConversionTest
 	{
 		String str = null;
 		
-		Context context = Platform.getApplicationContext();
+		Context context = com.tns.NativeScriptApplication.getInstance();
 		
 		InputStream inputStream = null;
 		try

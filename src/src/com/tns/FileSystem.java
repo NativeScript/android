@@ -14,6 +14,8 @@ import java.net.URISyntaxException;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import android.util.Log;
+
 public class FileSystem
 {
 	public static String readAll(InputStream inputStream) throws IOException
@@ -94,7 +96,8 @@ public class FileSystem
 		return new JSONObject(content);
 	}
 	
-	public static String resolveRelativePath(String path, String currentDirectory){
+	public static String resolveRelativePath(String path, String currentDirectory)
+	{
 		File temp = new File(currentDirectory, path);
 		try
 		{
@@ -102,7 +105,8 @@ public class FileSystem
 		}
 		catch (IOException e)
 		{
-			try{
+			try
+			{
 				URI uri = new URI(currentDirectory);
 				return uri.resolve(path).getPath();
 			}

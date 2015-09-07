@@ -23,24 +23,26 @@ import android.widget.TextView;
 class ErrorReport
 {
 	public static final String ERROR_FILE_NAME = "hasError";
-	static boolean HasApplicationCreateError = false;
+	private final Activity activity;
+	
+	private final static String EXTRA_NATIVESCRIPT_ERROR_REPORT = "NativeScriptErrorMessage";
+	private final static String EXTRA_ERROR_REPORT_MSG = "msg";
+	private final static int EXTRA_ERROR_REPORT_VALUE = 1;
 	
 	public ErrorReport(Activity activity)
 	{
 		this.activity = activity;
 	}
 	
-	static boolean startActivity(final Context context, Throwable ex)
+	static boolean startActivity(final Context context, String errorMessage)
 	{
-		String errorDetailedMessage = getErrorMessage(ex);
-		final String errMsg = errorDetailedMessage;
-		
-		final Intent intent = getIntent(context, errMsg);		
-		
+		final Intent intent = getIntent(context);
 		if(intent == null)
 		{
 			return false; //(if in release mode) don't do anything
 		}
+		
+		intent.putExtra(EXTRA_ERROR_REPORT_MSG, errorMessage);
 		
 		CreateErrorFile(context);
 		
@@ -105,12 +107,12 @@ class ErrorReport
 		return content;
 	}
 	
-	static Intent getIntent(Context context, String errorMessage)
+	static Intent getIntent(Context context)
 	{
 		Class<?> errorActivityClass = Platform.getErrorActivityClass(); //can be null or can be provided beforehand
 				
 		//if in debug and errorActivityClass is not provided use ErrorReportActivity class
-		if(errorActivityClass == null && JsDebugger.shouldEnableDebugging(context)){
+		if(errorActivityClass == null && Platform.isDebuggableApp(context)){
 			errorActivityClass = ErrorReportActivity.class;
 		}
 
@@ -124,7 +126,6 @@ class ErrorReport
 		
 		intent.putExtra(EXTRA_NATIVESCRIPT_ERROR_REPORT, EXTRA_ERROR_REPORT_VALUE);
 		intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
-		intent.putExtra(EXTRA_ERROR_REPORT_MSG, errorMessage);
 		
 		return intent;
 	}
@@ -191,10 +192,4 @@ class ErrorReport
 			Log.d(Platform.DEFAULT_LOG_TAG, e.getMessage());
 		}
 	}
-	
-	private final Activity activity;
-	
-	private final static String EXTRA_NATIVESCRIPT_ERROR_REPORT = "NativeScriptErrorMessage";
-	private final static String EXTRA_ERROR_REPORT_MSG = "msg";
-	private final static int EXTRA_ERROR_REPORT_VALUE = 1;
 }

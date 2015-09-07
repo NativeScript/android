@@ -40,6 +40,8 @@ namespace tns
 
 		static void SetArrayElement(const v8::Handle<v8::Object>& array, uint32_t index, const std::string& arraySignature, v8::Handle<v8::Value>& value);
 
+		static int GetArrayLength(const v8::Handle<v8::Object>& arr);
+
 		//
 
 		static void CallJavaMethod(const v8::Handle<v8::Object>& caller, const std::string& className, const std::string& methodName, MetadataEntry *entry, bool isStatic, bool isSuper, const v8::FunctionCallbackInfo<v8::Value>& args);
@@ -66,7 +68,7 @@ namespace tns
 
 		static v8::Handle<v8::Object> GetImplementationObjectFromArg(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-		static void APP_FAIL(const char *message);
+		static void AppFail(jthrowable throwable, const char *message);
 
 		static void RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
@@ -90,6 +92,8 @@ namespace tns
 
 		static void CompileAndRun(std::string modulePath, bool& hasError, v8::Handle<v8::Object>& moduleObj, bool isBootstrapCall);
 
+		static v8::Handle<v8::Object> FindClass(const std::string& className);
+
 		static MetadataTreeNode *metadataRoot;
 
 		static jclass PlatformClass;
@@ -106,10 +110,6 @@ namespace tns
 		NativeScriptRuntime() {}
 
 		static int GetCachedConstructorId(JEnv& env, const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& fullClassName, jobjectArray javaArgs, jclass javaClass);
-
-		static v8::Handle<v8::Object> FindClass(const std::string& className);
-
-		static int GetArrayLength(const v8::Handle<v8::Object>& arr);
 
 		static int64_t AdjustAmountOfExternalAllocatedMemory(JEnv& env, v8::Isolate *isolate);
 

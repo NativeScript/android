@@ -5,6 +5,7 @@
 #include "Util.h"
 #include "V8GlobalHelpers.h"
 #include "NativeScriptAssert.h"
+#include "JType.h"
 #include <assert.h>
 
 using namespace v8;
@@ -182,7 +183,7 @@ void ArrayElementAccessor::SetArrayElement(const Handle<Object>& array, uint32_t
 		{
 			auto object = value.As<Object>();
 
-			JsArgToArrayConverter argConverter(value, false);
+			JsArgToArrayConverter argConverter(value, false, (int)Type::Null);
 			if (argConverter.IsValid())
 			{
 				jobjectArray objArr = reinterpret_cast<jobjectArray>(arr);

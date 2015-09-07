@@ -15,7 +15,7 @@ public class Dump
 	public static final char CLASS_NAME_LOCATION_SEPARATOR = '_';
 	
 	private static final String callJsMethodSignatureCtor = "Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;Z[Ljava/lang/Object;";
-	private static final String callJsMethodSignatureMethod = "Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;[Ljava/lang/Object;";
+	private static final String callJsMethodSignatureMethod = "Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/Class;[Ljava/lang/Object;";
 	private static final String LCOM_TNS = "Lcom/tns/gen/";
 	private static final String LCOM_TNS_PLATFORM = "Lcom/tns/Platform;";
 	static final String preferenceActivityJniSignature = "Lcom/tns/android/preference/PreferenceActivity;";
@@ -85,48 +85,74 @@ public class Dump
 	    return methodDescriptorBuilder.toString();
 	}
 
-    private void getDexDescriptor(final StringBuffer buf, final Class<?> c) {
-        Class<?> d = c;
-        while (true) {
-            if (d.isPrimitive()) {
-                char car;
-                if (d == Integer.TYPE) {
-                    car = 'I';
-                } else if (d == Void.TYPE) {
-                    car = 'V';
-                } else if (d == Boolean.TYPE) {
-                    car = 'Z';
-                } else if (d == Byte.TYPE) {
-                    car = 'B';
-                } else if (d == Character.TYPE) {
-                    car = 'C';
-                } else if (d == Short.TYPE) {
-                    car = 'S';
-                } else if (d == Double.TYPE) {
-                    car = 'D';
-                } else if (d == Float.TYPE) {
-                    car = 'F';
-                } else /* if (d == Long.TYPE) */{
-                    car = 'J';
-                }
-                buf.append(car);
-                return;
-            } else if (d.isArray()) {
-                buf.append('[');
-                d = d.getComponentType();
-            } else {
-                buf.append('L');
-                String name = d.getName();
-                int len = name.length();
-                for (int i = 0; i < len; ++i) {
-                    char car = name.charAt(i);
-                    buf.append(car == '.' ? '/' : car);
-                }
-                buf.append(';');
-                return;
-            }
-        }
-    }
+	private void getDexDescriptor(final StringBuffer buf, final Class<?> c)
+	{
+		Class<?> d = c;
+		while (true)
+		{
+			if (d.isPrimitive())
+			{
+				char car;
+				if (d == Integer.TYPE)
+				{
+					car = 'I';
+				}
+				else if (d == Void.TYPE)
+				{
+					car = 'V';
+				}
+				else if (d == Boolean.TYPE)
+				{
+					car = 'Z';
+				}
+				else if (d == Byte.TYPE)
+				{
+					car = 'B';
+				}
+				else if (d == Character.TYPE)
+				{
+					car = 'C';
+				}
+				else if (d == Short.TYPE)
+				{
+					car = 'S';
+				}
+				else if (d == Double.TYPE)
+				{
+					car = 'D';
+				}
+				else if (d == Float.TYPE)
+				{
+					car = 'F';
+				}
+				else
+				/* if (d == Long.TYPE) */{
+					car = 'J';
+				}
+				buf.append(car);
+				return;
+			}
+			else if (d.isArray())
+			{
+				buf.append('[');
+				d = d.getComponentType();
+			}
+			else
+			{
+				buf.append('L');
+				String name = d.getName().replace('.', '/');
+				buf.append(name);
+//				int len = name.length();
+//				for (int i = 0; i < len; ++i)
+//				{
+//					char car = name.charAt(i);
+//					buf.append(car == '.' ? '/' : car);
+//				}
+				buf.append(';');
+				return;
+			}
+		}
+	}
     
     /**
      * Returns the descriptor corresponding to the given Java type.
@@ -148,50 +174,148 @@ public class Dump
      *            the string buffer to which the descriptor must be appended.
      * @param c
      *            the class whose descriptor must be computed.
-     */
-    private static void getAsmDescriptor(final StringBuffer buf, final Class<?> c) {
-        Class<?> d = c;
-        while (true) {
-            if (d.isPrimitive()) {
-                char car;
-                if (d == Integer.TYPE) {
-                    car = 'I';
-                } else if (d == Void.TYPE) {
-                    car = 'V';
-                } else if (d == Boolean.TYPE) {
-                    car = 'Z';
-                } else if (d == Byte.TYPE) {
-                    car = 'B';
-                } else if (d == Character.TYPE) {
-                    car = 'C';
-                } else if (d == Short.TYPE) {
-                    car = 'S';
-                } else if (d == Double.TYPE) {
-                    car = 'D';
-                } else if (d == Float.TYPE) {
-                    car = 'F';
-                } else /* if (d == Long.TYPE) */{
-                    car = 'J';
-                }
-                buf.append(car);
-                return;
-            } else if (d.isArray()) {
-                buf.append('[');
-                d = d.getComponentType();
-            } else {
-                buf.append('L');
-                String name = d.getName();
-                int len = name.length();
-                for (int i = 0; i < len; ++i) {
-                    char car = name.charAt(i);
-                    buf.append(car == '.' ? '/' : car);
-                }
-                buf.append(';');
-                return;
-            }
-        }
-    } 
+    */
+	private static void getAsmDescriptor(final StringBuffer buf, final Class<?> c)
+	{
+		Class<?> d = c;
+		while (true)
+		{
+			if (d.isPrimitive())
+			{
+				char car;
+				if (d == Integer.TYPE)
+				{
+					car = 'I';
+				}
+				else if (d == Void.TYPE)
+				{
+					car = 'V';
+				}
+				else if (d == Boolean.TYPE)
+				{
+					car = 'Z';
+				}
+				else if (d == Byte.TYPE)
+				{
+					car = 'B';
+				}
+				else if (d == Character.TYPE)
+				{
+					car = 'C';
+				}
+				else if (d == Short.TYPE)
+				{
+					car = 'S';
+				}
+				else if (d == Double.TYPE)
+				{
+					car = 'D';
+				}
+				else if (d == Float.TYPE)
+				{
+					car = 'F';
+				}
+				else
+				/* if (d == Long.TYPE) */{
+					car = 'J';
+				}
+				buf.append(car);
+				return;
+			}
+			else if (d.isArray())
+			{
+				buf.append('[');
+				d = d.getComponentType();
+			}
+			else
+			{
+				buf.append('L');
+				String name = d.getName().replace('.', '/');
+				buf.append(name);
+//				int len = name.length();
+//				for (int i = 0; i < len; ++i)
+//				{
+//					char car = name.charAt(i);
+//					buf.append(car == '.' ? '/' : car);
+//				}
+				buf.append(';');
+				return;
+			}
+		}
+	}
  
+    /**
+     * Returns the Class  signature of the Type normalized if it is a primitive 
+    */
+	private static String getClassSignatureOfType(final Class<?> c)
+	{
+		final StringBuffer buf = new StringBuffer();
+		Class<?> result;
+		
+		if (c.isPrimitive())
+		{
+			if (c == Integer.TYPE)
+			{
+				result = Integer.class;
+			}
+			else if (c == Void.TYPE)
+			{
+				result = Void.class;
+			}
+			else if (c == Boolean.TYPE)
+			{
+				result = Boolean.class;
+			}
+			else if (c == Byte.TYPE)
+			{
+				result = Byte.class;
+			}
+			else if (c == Character.TYPE)
+			{
+				result = Character.class;
+			}
+			else if (c == Short.TYPE)
+			{
+				result = Short.class;
+			}
+			else if (c == Double.TYPE)
+			{
+				result = Double.class;
+			}
+			else if (c == Float.TYPE)
+			{
+				result = Float.class;
+			}
+			else
+				/* if (c == Long.TYPE) */
+			{
+				result = Long.class;
+			}
+		}
+		else if (c.isArray())
+		{
+			result = Object.class; 
+		}
+		else
+		{
+			result = c;
+		}
+		
+		buf.append('L');
+		String name = result.getName().replace('.', '/');
+		
+//		int len = name.length();
+//		for (int i = 0; i < len; ++i)
+//		{
+//			char car = name.charAt(i);
+//			buf.append(car == '.' ? '/' : car);
+//		}
+		buf.append(name);
+		buf.append(';');
+		
+		return buf.toString();
+	}
+    
     public void generateProxy(ApplicationWriter aw, String proxyName, Class<?> classTo, String[] methodOverrides, int ignored)
     {
     	HashSet<String> methodOverridesSet = new HashSet<String>();
@@ -653,7 +777,19 @@ public class Dump
 		//call the override
 		int argCount = generateArrayForCallJsArguments(mv, method.getParameterTypes() , thisRegister, classSignature, tnsClassSignature);
 		mv.visitStringInsn(org.ow2.asmdex.Opcodes.INSN_CONST_STRING, 1, method.getName());
-		mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, platformClass, callJSMethodName, callJsMethodSignatureMethod, new int[] { thisRegister, 1, 0 });
+		
+		Class<?> returnType = method.getReturnType();
+		if (returnType.isPrimitive())
+		{
+			//mv.visitFieldInsn(INSN_SGET_OBJECT, "Ljava/lang/Long;", "TYPE", "Ljava/lang/Class;", 2, 0);
+			mv.visitFieldInsn(org.ow2.asmdex.Opcodes.INSN_SGET_OBJECT, getClassSignatureOfType(returnType), "TYPE", "Ljava/lang/Class;", 2, 0); 
+		}
+		else
+		{
+ 			mv.visitTypeInsn(org.ow2.asmdex.Opcodes.INSN_CONST_CLASS, 2, 0, 0, getClassSignatureOfType(returnType)); 
+		}
+		
+		mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, platformClass, callJSMethodName, callJsMethodSignatureMethod, new int[] { thisRegister, 1, 2, 0 });
 		
 		//Label returnLabel = new Label();
 		//mv.visitLabel(returnLabel);

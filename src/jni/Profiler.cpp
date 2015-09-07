@@ -244,7 +244,7 @@ void Profiler::HeapSnapshotMethodCallback(const v8::FunctionCallbackInfo<v8::Val
 
 	Isolate* isolate = Isolate::GetCurrent();
 
-	const HeapSnapshot* snap = isolate->GetHeapProfiler()->TakeHeapSnapshot(String::Empty(isolate));
+	const HeapSnapshot* snap = isolate->GetHeapProfiler()->TakeHeapSnapshot();
 
 	FileOutputStream stream(fp);
 	snap->Serialize(&stream, HeapSnapshot::kJSON);

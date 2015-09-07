@@ -23,6 +23,11 @@ public class Platform
 	{
 		return callJSMethod(javaObject, methodName, false /* isConstructor */, args);
 	}
+	
+	public static Object callJSMethod(Object javaObject, String methodName, Class<?> returnTypeClass, Object... args) throws Exception
+	{
+		return callJSMethod(javaObject, methodName, false /* isConstructor */, args);
+	}
 
 	public static Object callJSMethod(Object javaObject, String methodName, boolean isConstructor, Object... args) throws Exception
 	{

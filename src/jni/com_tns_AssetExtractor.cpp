@@ -12,11 +12,26 @@ using namespace tns;
 
 void mkdir_rec(const char *dir);
 
+std::string jstringToString(JNIEnv *env, jstring value)
+{
+	if (value == nullptr) {
+		return std::string();
+	}
+
+	jboolean f = false;
+	const char* chars = env->GetStringUTFChars(value, &f);
+	std::string s(chars);
+	env->ReleaseStringUTFChars(value, chars);
+
+	return s;
+}
+
+
 extern "C" void Java_com_tns_AssetExtractor_extractAssets(JNIEnv *env, jobject obj, jstring apk, jstring outputDir, jboolean _forceOverwrite)
 {
 	auto forceOverwrite = JNI_TRUE == _forceOverwrite;
-	auto strApk = ArgConverter::jstringToString(apk);
-	auto baseDir = ArgConverter::jstringToString(outputDir);
+	auto strApk = jstringToString(env, apk);
+	auto baseDir = jstringToString(env, outputDir);
 	int err = 0;
 	auto z = zip_open(strApk.c_str(), 0, &err);
 	assert(z != nullptr);
@@ -72,10 +87,6 @@ extern "C" void Java_com_tns_AssetExtractor_extractAssets(JNIEnv *env, jobject o
 				t.modtime = sb.mtime;
 				ret = utime(assetFullname.c_str(), &t);
 				zip_fclose(zf);
-			}
-			else
-			{
-				DEBUG_WRITE("skip asset %s", assetFullname.c_str());
 			}
 		}
 	}

@@ -10,9 +10,14 @@ import android.util.Log;
 
 public class AssetExtractor
 {
-	private static native void extractAssets(String apkPath, String outputDir, boolean checkForNewerFiles);
+	public AssetExtractor(File libPath)
+	{
+		Platform.loadLibrary(libPath, "AssetExtractor");
+	}
+	
+	private native void extractAssets(String apkPath, String outputDir, boolean checkForNewerFiles);
 
-	public static void extractAssets(Context context, ExtractPolicy extractPolicy)
+	public void extractAssets(Context context, ExtractPolicy extractPolicy)
 	{
 		FileExtractor extractor = extractPolicy.extractor();
 		if (extractor != null)

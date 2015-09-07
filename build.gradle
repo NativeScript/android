@@ -1,0 +1,233 @@
+import groovy.json.JsonSlurper //used to parse package.json
+
+def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
+def localMetadataGen = "../android-metadata-generator/dist/tns-android-metadata-generator-0.0.1.tgz"
+def distDir = "$rootDir/dist"
+def pVersion = "no package version was provided by build.gradle build"
+def arVersion = "no commit sha was provided by build.gradle build"
+def commitVersionFile = "commit.txt"
+
+task checkEnvironmentVariables {
+	if ("$System.env.JAVA_HOME" == "" || "$System.env.JAVA_HOME" == "null") {
+        throw new GradleException("Set JAVA_HOME to point to the correct Jdk location\n");
+    }
+	if ("$System.env.ANDROID_HOME" == "" || "$System.env.ANDROID_HOME" == "null") {
+        throw new GradleException("Set ANDROID_HOME to point to the correct Android SDK location\n");
+    }
+	if ("$System.env.GIT_COMMIT" == "null") {
+        logger.warn("Warning: The GIT_COMMIT is not set. This NativeScript Android Runtime will not be tagged with the git commit it is build from\n");
+    }
+	if(project.hasProperty("devmode") == true && !project.hasProperty("metadataGenSrc") && !file("../android-metadata-generator").exists()) {
+		throw new GradleException("../android-metadata-generator directory not found and no metadataGenSrc option specified. Clone the android-metadata-generator repo first.\n");
+	}
+	if(project.hasProperty("metadataGen") && !file("../android-metadata-generator/dist/tns-android-metadata-generator-0.0.1.tgz").exists()) {
+		throw new GradleException("android-metadata-generator build output not found and no metadataGen option specified. Build android-metadata-generator first.\n");
+	}
+}
+
+task checkAndroidCommand(type:Exec) {		
+	
+	if(isWinOs) {
+		commandLine "cmd", "/c", "android", "-h"
+	}
+	else {
+		commandLine "android", "-h"
+	}
+	
+	ignoreExitValue = true
+	
+	doLast {
+		def successResult = isWinOs ? 0 : 1
+		
+		if (execResult.exitValue != successResult) {//1 is ok result for android tool
+            throw new GradleException("\n--> 'android' command not found. Set the PATH variable to include the path to Android SDK Tools directory.\n\nError: " + errorOutput + "\nexitValue: " + execResult.exitValue)
+        }
+	}
+}
+
+task ndkBuild (type: Exec) {
+	if(isWinOs) {
+		commandLine "cmd", "/c", "ndk-build", "--version"
+	}
+	else {
+		commandLine "ndk-build", "--version"
+	}
+	
+	ignoreExitValue = true
+	doLast {
+		if(execResult.exitValue != 0) {
+			throw new GradleException("\n--> 'ndk-build' command not found. Set the PATH variable to include the path to Android NDK directory.\n\nError: " + errorOutput + "\nexitValue: " + execResult.exitValue)
+		}
+	}
+}
+
+task cleanDistDir (type: Delete) {
+	delete distDir
+}
+
+task createDistDir {
+	doLast {
+		def distF = new File(distDir)
+		distF.mkdirs()
+	}
+}
+
+// task copyPackageJsonToSubfolder (type: Copy) {
+	//if linux not necessary
+	// if(isWinOs) {
+		// def sourcePackageJsonFileName = "$rootDir/package.json";
+		// def destinationPackageJsonFileName = "$rootDir/src";
+		
+		// logger.warn("Warning: This is windows machine. Coping " + sourcePackageJsonFileName + " to " + destinationPackageJsonFileName + " \n");
+		
+		// from sourcePackageJsonFileName
+		// into destinationPackageJsonFileName
+	// }
+// }
+
+task copyLatestWidgetsJar (type: Copy) {
+	from widgetsPath //passed by jenkins
+	into "$rootDir/build/project-template-gradle/libs"
+}
+
+//when repository is not private
+// task cloneSBgeneratorInTemplate (type: Exec) {
+	// workingDir "$rootDir/build/project-template-gradle/build-tools"
+
+	// if(isWinOs) {
+		// commandLine "cmd", "/c" , "git", "clone", "https://github.com/NativeScript/android-static-binding-generator.git"
+	// }
+	// else {
+		// commandLine "git", "clone", "https://github.com/NativeScript/android-static-binding-generator.git"
+	// }
+// }
+
+task copyGradleTemplate (type: Copy) {
+	from "$rootDir/build/project-template-gradle"
+	into "$rootDir/dist/framework"
+}
+
+task copyInternalFolder (type: Copy) {
+	from "$rootDir/src/assets/internal"
+	into "$rootDir/dist/framework/src/main/assets/internal"
+}
+
+task copyPackageJson (type: Copy) {
+	from "$rootDir/package.json"
+	into "$rootDir/dist"
+}
+
+task getPackageVersion {
+	String content = new File("$rootDir/package.json").getText("UTF-8")
+	def jsonSlurper = new JsonSlurper()
+	def packageJsonMap = jsonSlurper.parseText(content)
+	
+	pVersion = packageJsonMap.version
+}
+
+task getCommitVersion {
+	if("$System.env.GIT_COMMIT" != "null") {		
+		String content = "$System.env.GIT_COMMIT"
+		arVersion = content.trim()
+	}
+}
+
+task deleteCommitFile (type: Delete) {
+	delete "$rootDir/$commitVersionFile"
+}
+
+task generateRuntime (type: Exec) {
+	doFirst{
+		workingDir "$rootDir/src"
+		
+		//command gradle buildar -PpackageVersion=[from_package.json] -PgitCommitVersion=[from_some_sys_variable]
+		if(isWinOs) {
+			commandLine "cmd", "/c" , "gradle", "buildar", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"
+		}
+		else {
+			commandLine "gradle", "buildar", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"
+		}
+	}
+}
+
+task copyGeneratedRuntime (type: Copy) {
+	from "$rootDir/src/dist"
+	into "$rootDir/dist/framework"
+}
+
+task generateMetadataGeneratorJar (type: Exec) {
+	workingDir "$rootDir/android-metadata-generator"
+	
+	if(isWinOs) {
+		commandLine "cmd", "/c", "gradle", "jarmg"
+	}
+	else {
+		commandLine "gradle", "jarmg"
+	}
+}
+
+task copyGeneratedMetadataGeneratorJar {
+	doLast {
+	
+		copy {
+			from "$rootDir/android-metadata-generator/dist"
+			into "$rootDir/dist/framework/build-tools"
+			rename "android-metadata-generator.jar", "metadata-generator.jar"
+		}
+	}
+}
+
+task packFramework (type: Exec) {
+	workingDir "$rootDir/dist"
+	
+	if(isWinOs) {
+		commandLine "cmd", "/c", "npm", "pack"
+	}
+	else {
+		commandLine "npm", "pack"
+	}
+}
+
+//clean and set up dirs
+createDistDir.dependsOn(cleanDistDir)
+
+
+//copy framework structure
+copyLatestWidgetsJar.dependsOn(createDistDir)
+// cloneSBgeneratorInTemplate.dependsOn(copyLatestWidgetsJar)
+copyGradleTemplate.dependsOn(copyLatestWidgetsJar)
+copyInternalFolder.dependsOn(copyGradleTemplate)
+copyPackageJson.dependsOn(copyInternalFolder)
+
+//get version from package json
+getPackageVersion.dependsOn(copyPackageJson)
+getCommitVersion.dependsOn(getPackageVersion)
+deleteCommitFile.dependsOn(getCommitVersion)
+
+//generate runtime and copy into framework structure
+generateRuntime.dependsOn(deleteCommitFile)
+copyGeneratedRuntime.dependsOn(generateRuntime)
+
+//generate metadata generator and copy into framework structure
+generateMetadataGeneratorJar.dependsOn(copyGeneratedRuntime)
+copyGeneratedMetadataGeneratorJar.dependsOn(generateMetadataGeneratorJar)
+
+//pack runtime
+packFramework.dependsOn(copyGeneratedMetadataGeneratorJar)
+task packar {
+	dependsOn packFramework
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+

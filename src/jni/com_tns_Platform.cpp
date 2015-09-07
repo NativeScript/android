@@ -18,6 +18,7 @@
 #include "NativeScriptAssert.h"
 #include "JsDebugger.h"
 #include "SimpleProfiler.h"
+#include "SimpleAllocator.h"
 #include "File.h"
 #include <sstream>
 #include <android/log.h>
@@ -41,6 +42,7 @@ Isolate *g_isolate = nullptr;
 std::string Constants::APP_ROOT_FOLDER_PATH = "";
 
 ObjectManager *g_objectManager = nullptr;
+SimpleAllocator g_allocator;
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved)
 {
@@ -96,10 +98,10 @@ void PrepareExtendFunction(Isolate *isolate, jstring filesPath)
 	DEBUG_WRITE("Executed prepareExtend.js script");
 }
 
-void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring packageName)
+void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring packageName, jstring jsoptions)
 {
-	const char v8flags[] = "--expose_gc";
-	V8::SetFlagsFromString(v8flags, sizeof(v8flags) - 1);
+	string v8flags = ArgConverter::jstringToString(jsoptions);
+	V8::SetFlagsFromString(v8flags.c_str(), v8flags.size());
 	V8::SetCaptureStackTraceForUncaughtExceptions(true, 100, StackTrace::kOverview);
 	V8::AddMessageListener(ExceptionUtil::OnUncaughtError);
 
@@ -155,7 +157,7 @@ void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring pa
 	NativeScriptRuntime::CreateTopLevelNamespaces(global);
 }
 
-extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj, jstring filesPath, jint appJavaObjectId, jboolean verboseLoggingEnabled, jstring packageName)
+extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj, jstring filesPath, jint appJavaObjectId, jboolean verboseLoggingEnabled, jstring packageName, jstring jsoptions)
 {
 	AppJavaObjectID = appJavaObjectId;
 	tns::LogEnabled = verboseLoggingEnabled;
@@ -166,7 +168,9 @@ extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj
 	V8::InitializePlatform(platform);
 	V8::Initialize();
 
-	g_isolate = Isolate::New();
+	Isolate::CreateParams create_params;
+	create_params.array_buffer_allocator = &g_allocator;
+	g_isolate = Isolate::New(create_params);
 	auto isolate = g_isolate;
 	Isolate::Scope isolate_scope(isolate);
 	HandleScope handleScope(isolate);
@@ -175,7 +179,7 @@ extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj
 	ExceptionUtil::GetInstance()->Init(g_jvm, g_objectManager);
 
 	JEnv env(_env);
-	PrepareV8Runtime(isolate, env, filesPath, packageName);
+	PrepareV8Runtime(isolate, env, filesPath, packageName, jsoptions);
 
 	NativeScriptRuntime::APP_FILES_DIR = ArgConverter::jstringToString(filesPath);
 	Constants::APP_ROOT_FOLDER_PATH = NativeScriptRuntime::APP_FILES_DIR + "/app/";
@@ -239,9 +243,9 @@ void AppInitCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 	ExceptionUtil::GetInstance()->CheckForJavaException(env);
 }
 
-jobject ConvertJsValueToJavaObject(JEnv& env, const Handle<Value>& value)
+jobject ConvertJsValueToJavaObject(JEnv& env, const Handle<Value>& value, int classReturnType)
 {
-	JsArgToArrayConverter argConverter(value, false);
+	JsArgToArrayConverter argConverter(value, false/*is implementation object*/, classReturnType);
 	jobject jr = argConverter.GetConvertedArg();
 	jobject javaResult = nullptr;
 	if (jr != nullptr)
@@ -252,7 +256,7 @@ jobject ConvertJsValueToJavaObject(JEnv& env, const Handle<Value>& value)
 	return javaResult;
 }
 
-extern "C" jobject Java_com_tns_Platform_callJSMethodNative(JNIEnv *_env, jobject obj, jint javaObjectID, jstring methodName, jboolean isConstructor, jobjectArray packagedArgs)
+extern "C" jobject Java_com_tns_Platform_callJSMethodNative(JNIEnv *_env, jobject obj, jint javaObjectID, jstring methodName, jint retType, jboolean isConstructor, jobjectArray packagedArgs)
 {
 	SET_PROFILER_FRAME();
 
@@ -299,7 +303,8 @@ extern "C" jobject Java_com_tns_Platform_callJSMethodNative(JNIEnv *_env, jobjec
 		DEBUG_WRITE("%s", exceptionMessage.c_str());
 	}
 
-	jobject javaObject = ConvertJsValueToJavaObject(env, jsResult);
+	int classReturnType = retType;
+	jobject javaObject = ConvertJsValueToJavaObject(env, jsResult, classReturnType);
 	return javaObject;
 }
 
@@ -341,7 +346,7 @@ extern "C" void Java_com_tns_Platform_createJSInstanceNative(JNIEnv *_env, jobje
 	implementationObject = MetadataNode::GetImplementationObject(jsInstance);
 	if (implementationObject.IsEmpty())
 	{
-		NativeScriptRuntime::APP_FAIL("createJSInstanceNative: implementationObject is empty");
+		NativeScriptRuntime::AppFail(nullptr, "createJSInstanceNative: implementationObject is empty");
 		return;
 	}
 	DEBUG_WRITE("createJSInstanceNative: implementationObject :%d", implementationObject->GetIdentityHash());

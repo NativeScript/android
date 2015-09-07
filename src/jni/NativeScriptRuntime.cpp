@@ -53,7 +53,7 @@ void NativeScriptRuntime::Init(JavaVM *jvm, ObjectManager *objectManager)
 	GET_TYPE_METADATA = env.GetStaticMethodID(PlatformClass, "getTypeMetadata", "(Ljava/lang/String;I)[Ljava/lang/String;");
 	assert(GET_TYPE_METADATA != nullptr);
 
-	APP_FAIL_METHOD_ID = env.GetStaticMethodID(PlatformClass, "APP_FAIL", "(Ljava/lang/String;)V");
+	APP_FAIL_METHOD_ID = env.GetStaticMethodID(PlatformClass, "appFail", "(Ljava/lang/Throwable;Ljava/lang/String;)V");
 	assert(APP_FAIL_METHOD_ID != nullptr);
 
 	GET_MODULE_PATH_METHOD_ID = env.GetStaticMethodID(RequireClass, "getModulePath", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
@@ -68,17 +68,7 @@ void NativeScriptRuntime::Init(JavaVM *jvm, ObjectManager *objectManager)
 	GET_CHANGE_IN_BYTES_OF_USED_MEMORY_METHOD_ID = env.GetStaticMethodID(PlatformClass, "getChangeInBytesOfUsedMemory", "()J");
 	assert(GET_CHANGE_IN_BYTES_OF_USED_MEMORY_METHOD_ID != nullptr);
 
-	MetadataNode::SubscribeCallbacks(objectManager,
-									NativeScriptRuntime::GetJavaField,
-									NativeScriptRuntime::SetJavaField,
-									NativeScriptRuntime::GetArrayElement,
-									NativeScriptRuntime::SetArrayElement,
-									NativeScriptRuntime::CallJavaMethod,
-									NativeScriptRuntime::RegisterInstance,
-									NativeScriptRuntime::GetTypeMetadata,
-									NativeScriptRuntime::FindClass,
-									NativeScriptRuntime::GetArrayLength,
-									NativeScriptRuntime::ResolveClass);
+	MetadataNode::Init(objectManager);
 
 	NativeScriptRuntime::objectManager = objectManager;
 
@@ -282,10 +272,6 @@ void NativeScriptRuntime::CallJavaMethod(const Handle<Object>& caller, const str
 	}
 
 
-
-
-
-
 	if (!isStatic)
 	{
 		DEBUG_WRITE("CallJavaMethod called %s.%s. Instance id: %d, isSuper=%d", className.c_str(), methodName.c_str(), caller.IsEmpty() ? -42 : caller->GetIdentityHash(), isSuper);
@@ -295,7 +281,7 @@ void NativeScriptRuntime::CallJavaMethod(const Handle<Object>& caller, const str
 		DEBUG_WRITE("CallJavaMethod called %s.%s. static method", className.c_str(), methodName.c_str());
 	}
 
-	JsArgConverter argConverter(args, false, sig);
+	JsArgConverter argConverter(args, false, sig, entry);
 
 	if (!argConverter.IsValid())
 	{
@@ -589,7 +575,9 @@ void NativeScriptRuntime::CallJavaMethod(const Handle<Object>& caller, const str
 		}
 	}
 
-	if (!ExceptionUtil::GetInstance()->CheckForJavaException(env))
+	static uint32_t adjustMemCount = 0;
+
+	if (!ExceptionUtil::GetInstance()->CheckForJavaException(env) && ((++adjustMemCount % 2) == 0))
 	{
 		AdjustAmountOfExternalAllocatedMemory(env, isolate);
 	}
@@ -773,13 +761,13 @@ void NativeScriptRuntime::ExitMethodCallback(const v8::FunctionCallbackInfo<v8::
 	exit(-1);
 }
 
-void NativeScriptRuntime::APP_FAIL(const char *message)
+void NativeScriptRuntime::AppFail(jthrowable throwable, const char *message)
 {
 	//ASSERT_FAIL(message);
 
 	JEnv env;
 	jstring msg = env.NewStringUTF(message);
-	env.CallStaticVoidMethod(PlatformClass, APP_FAIL_METHOD_ID, msg);
+	env.CallStaticVoidMethod(PlatformClass, APP_FAIL_METHOD_ID, throwable, msg);
 }
 
 
@@ -813,9 +801,6 @@ void NativeScriptRuntime::CompileAndRun(string modulePath, bool& hasError, Handl
 
 	if (ExceptionUtil::GetInstance()->HandleTryCatch(tc, "Script " + modulePath + " contains compilation errors!"))
 	{
-		loadedModules.erase(modulePath);
-		tmpExportObj->Reset();
-		delete tmpExportObj;
 		hasError = true;
 	}
 	else if (script.IsEmpty())
@@ -827,43 +812,21 @@ void NativeScriptRuntime::CompileAndRun(string modulePath, bool& hasError, Handl
 	{
 		DEBUG_WRITE("Running script (module %s)", modulePath.c_str());
 
-		TryCatch tcRequire;
-
 		Local < Function > f = script->Run().As<Function>();
-		if (ExceptionUtil::GetInstance()->HandleTryCatch(tc))
+		if (ExceptionUtil::GetInstance()->HandleTryCatch(tc, "Error running script " + modulePath))
 		{
-			DEBUG_WRITE("Exception was handled in java code");
-		}
-
-		//this is done so the initial bootstrap function is persistent (and to keep old logic)
-		if(isBootstrapCall) {
-			auto persistentAppModule = new Persistent<Object>(isolate, f);
-		}
-
-		auto result = f->Call(Object::New(isolate), 1, &exportObj);
-		if(ExceptionUtil::GetInstance()->HandleTryCatch(tc))
-		{
-			DEBUG_WRITE("Exception was handled in java code");
+			hasError = true;
 		}
 		else
 		{
-			moduleObj = result.As<Object>();
-		}
-
-		// introducing isBootstrapCall in order to save the flow as it was (latter on we can think about including the following code for the bootstrap (initial) call
-		if(!isBootstrapCall) {
-			DEBUG_WRITE("After Running script (module %s)", modulePath.c_str());
-
-			if (ExceptionUtil::GetInstance()->HandleTryCatch(tcRequire))
+			auto result = f->Call(Object::New(isolate), 1, &exportObj);
+			if(ExceptionUtil::GetInstance()->HandleTryCatch(tc, "Error calling module function "))
 			{
-				loadedModules.erase(modulePath);
-				tmpExportObj->Reset();
-				delete tmpExportObj;
 				hasError = true;
-				tcRequire.ReThrow();
 			}
 			else
 			{
+				moduleObj = result.As<Object>();
 				if (moduleObj.IsEmpty())
 				{
 					auto objectTemplate = ObjectTemplate::New();
@@ -885,8 +848,14 @@ void NativeScriptRuntime::CompileAndRun(string modulePath, bool& hasError, Handl
 			}
 		}
 	}
-	if (tc.HasCaught())
+
+	if(hasError)
 	{
+		loadedModules.erase(modulePath);
+		tmpExportObj->Reset();
+		delete tmpExportObj;
+
+		// this handles recursive require calls
 		tc.ReThrow();
 	}
 }

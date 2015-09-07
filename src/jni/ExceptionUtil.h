@@ -26,7 +26,7 @@ namespace tns
 		 * Inspects a TryCatch block for pending exceptions.
 		 * If an exception exists there are two execution paths:
 		 *  - The flow may continue. In this case a check for nested TryCatch blocks will be made and if such exist the error will be re-thrown.
-		 *  - The flow may not continue. In this case a call the NativeScriptRuntime::APP_FAIL will be made. This will go to Java where the Java VM will be shut down.
+		 *  - The flow may not continue. In this case a call the NativeScriptRuntime::AppFail will be made. This will go to Java where the Java VM will be shut down.
 		 */
 		bool HandleTryCatch(v8::TryCatch& tc, const std::string& prependMessage = "");
 
@@ -34,7 +34,7 @@ namespace tns
 		 * Provides an entry point to handle states considered invalid for the NativeScript runtime.
 		 * There are two invalid states:
 		 *  - A state which does not break the whole runtime. In this case a JavaScript error will be raised.
-		 *  - A state which breaks the runtime flow. In this case a call the NativeScriptRuntime::APP_FAIL will be made. This will go to Java where the Java VM will be shut down.
+		 *  - A state which breaks the runtime flow. In this case a call the NativeScriptRuntime::AppFail will be made. This will go to Java where the Java VM will be shut down.
 		 */
 		void HandleInvalidState(const std::string& message);
 

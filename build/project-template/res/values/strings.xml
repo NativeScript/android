@@ -2,4 +2,5 @@
 <resources>
     <string name="app_name">__NAME__</string>
     <string name="title_activity_kimera">__TITLE_ACTIVITY__</string>
+    <string name="Telerik_LiveSync_CustomUrlSchemePrefix" translatable="false">nativescript:</string>
 </resources>

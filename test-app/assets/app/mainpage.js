@@ -2,6 +2,7 @@ __disableVerboseLogging();
 
 require("./tests/testWeakRef"); 
 require("./tests/tests");
+require("./tests/testMethodResolution");
 require("./tests/testArrays");
 require("./tests/testsForRuntimeBindingGenerator");
 require("./tests/testPrimitiveTypeConversion");
@@ -21,7 +22,7 @@ require("./tests/testJniReferenceLeak");
 
 var MainActivity = {
     onCreate: function (bundle) {
-    	__log("onCreate from js");
+    	__log("-----------> onCreate from js");
     	var k = this.toString();
     	__log("this.toString " + k);
     	this.super.onCreate(bundle);
@@ -58,12 +59,6 @@ app.init({
 		var action = intent.getAction();
 		__log("action=" + action)
 		return MainActivity;
-		if (action == android.content.Intent.ACTION_MAIN) {
-			return MainActivity;
-		}
-		else {
-			__exit("Unknown action");
-		}
 	},
 	
 	

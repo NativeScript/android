@@ -31,38 +31,10 @@
 
 namespace tns
 {
-	typedef void (*SetJavaFieldCallback)(const v8::Handle<v8::Object>& target, const v8::Handle<v8::Value>& value, FieldCallbackData *fieldData);
-
-	typedef v8::Handle<v8::Value> (*GetJavaFieldCallback)(const v8::Handle<v8::Object>& caller, FieldCallbackData *fieldData);
-
-	typedef v8::Handle<v8::Value> (*GetArrayElementCallback)(const v8::Handle<v8::Object>& array, uint32_t index, const std::string& arraySignature);
-
-	typedef void (*SetArrayElementCallback)(const v8::Handle<v8::Object>& array, uint32_t index, const std::string& arraySignature, v8::Handle<v8::Value>& value);
-
-	typedef void (*CallJavaMethodCallback)(const v8::Handle<v8::Object>& caller, const std::string& className, const std::string& methodName, MetadataEntry *entry, bool isStatic, bool isSuper, const v8::FunctionCallbackInfo<v8::Value>& args);
-
-	typedef bool (*RegisterInstanceCallback)(const v8::Handle<v8::Object>& jsObject, const std::string& fullClassName, const ArgsWrapper& argWrapper, const v8::Handle<v8::Object>& implementationObject, bool isInterface);
-
-	typedef int (*GetArrayLengthCallback)(const v8::Handle<v8::Object>& classObj);
-
-	typedef jclass (*ResolveClassCallback)(const std::string& fullClassname, const v8::Handle<v8::Object>& implementationObject);
-
-	typedef v8::Handle<v8::Object> (*FindClassCallback)(const std::string& className);
-
 	class MetadataNode
 	{
 	public:
-		static void SubscribeCallbacks(ObjectManager *objectManager,
-										GetJavaFieldCallback getJavaFieldCallback,
-										SetJavaFieldCallback setJavaFieldCallback,
-										GetArrayElementCallback getArrayElementCallback,
-										SetArrayElementCallback setArrayElementCallback,
-										CallJavaMethodCallback callJavaMethodCallback,
-										RegisterInstanceCallback registerInstanceCallback,
-										GetTypeMetadataCallback getTypeMetadataCallback,
-										FindClassCallback findClassCallback,
-										GetArrayLengthCallback getArrayLengthCallback,
-										ResolveClassCallback resolveClassCallback);
+		static void Init(ObjectManager *objectManager);
 
 
 		static void BuildMetadata(uint8_t *nodes, int nodesLength, uint8_t *names, uint8_t *values);
@@ -96,17 +68,18 @@ namespace tns
 		struct MethodCallbackData
 		{
 			MethodCallbackData()
-				: node(nullptr), isSuper(false)
+				: node(nullptr), parent(nullptr), isSuper(false)
 			{
 			}
 
 			MethodCallbackData(MetadataNode *_node)
-				: node(_node), isSuper(false)
+				: node(_node), parent(nullptr), isSuper(false)
 			{
 			}
 
 			std::vector<MetadataEntry> candidates;
 			MetadataNode *node;
+			MethodCallbackData *parent;
 			bool isSuper;
 		};
 
@@ -217,10 +190,11 @@ namespace tns
 
 		v8::Handle<v8::Function> GetConstructorFunction(v8::Isolate *isolate);
 		v8::Handle<v8::FunctionTemplate> GetConstructorFunctionTemplate(v8::Isolate *isolate, MetadataTreeNode *treeNode);
+		v8::Handle<v8::FunctionTemplate> GetConstructorFunctionTemplate(v8::Isolate *isolate, MetadataTreeNode *treeNode, std::vector<MethodCallbackData*>& instanceMethodsCallbackData);
 
-		v8::Handle<v8::Function> SetMembers(v8::Isolate *isolate, v8::Handle<v8::FunctionTemplate>& ctorFuncTemplate, v8::Handle<v8::ObjectTemplate>& prototypeTemplate, MetadataTreeNode *treeNode);
-		v8::Handle<v8::Function> SetMembersFromStaticMetadata(v8::Isolate *isolate, v8::Handle<v8::FunctionTemplate>& ctorFuncTemplate, v8::Handle<v8::ObjectTemplate>& prototypeTemplate, MetadataTreeNode *treeNode);
-		v8::Handle<v8::Function> SetMembersFromRuntimeMetadata(v8::Isolate *isolate, v8::Handle<v8::FunctionTemplate>& ctorFuncTemplate, v8::Handle<v8::ObjectTemplate>& prototypeTemplate, MetadataTreeNode *treeNode);
+		v8::Handle<v8::Function> SetMembers(v8::Isolate *isolate, v8::Handle<v8::FunctionTemplate>& ctorFuncTemplate, v8::Handle<v8::ObjectTemplate>& prototypeTemplate, std::vector<MethodCallbackData*>& instanceMethodsCallbackData, const std::vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode);
+		v8::Handle<v8::Function> SetMembersFromStaticMetadata(v8::Isolate *isolate, v8::Handle<v8::FunctionTemplate>& ctorFuncTemplate, v8::Handle<v8::ObjectTemplate>& prototypeTemplate, std::vector<MethodCallbackData*>& instanceMethodsCallbackData, const std::vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode);
+		v8::Handle<v8::Function> SetMembersFromRuntimeMetadata(v8::Isolate *isolate, v8::Handle<v8::FunctionTemplate>& ctorFuncTemplate, v8::Handle<v8::ObjectTemplate>& prototypeTemplate, std::vector<MethodCallbackData*>& instanceMethodsCallbackData, const std::vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode);
 		void SetInnnerTypes(v8::Isolate *isolate, v8::Handle<v8::Function>& ctorFunction, MetadataTreeNode *treeNode);
 
 
@@ -255,16 +229,6 @@ namespace tns
 		static bool IsValidExtendName(const v8::Handle<v8::String>& name);
 		static bool GetExtendLocation(std::string& extendLocation);
 		static ExtendedClassCacheData GetCachedExtendedClassData(v8::Isolate *isolate, const std::string& proxyClassName);
-		static GetJavaFieldCallback s_getJavaField;
-		static SetJavaFieldCallback s_setJavaField;
-		static GetArrayElementCallback s_getArrayElement;
-		static SetArrayElementCallback s_setArrayElement;
-		static CallJavaMethodCallback s_callJavaMethod;
-		static RegisterInstanceCallback s_registerInstance;
-		static GetTypeMetadataCallback s_getTypeMetadata;
-		static FindClassCallback s_findClass;
-		static GetArrayLengthCallback s_getArrayLength;
-		static ResolveClassCallback s_resolveClass;
 
 		static MetadataReader s_metadataReader;
 
@@ -272,7 +236,18 @@ namespace tns
 
 		static ObjectManager *s_objectManager;
 
-		static std::map<MetadataTreeNode*, v8::Persistent<v8::FunctionTemplate>*> s_ctorFuncCache;
+		struct CtorCacheItem
+		{
+			CtorCacheItem(v8::Persistent<v8::FunctionTemplate>* _ft, std::vector<MethodCallbackData*> _instanceMethodCallbacks)
+				: ft(_ft), instanceMethodCallbacks(_instanceMethodCallbacks)
+			{
+			}
+
+			v8::Persistent<v8::FunctionTemplate>* ft;
+			std::vector<MethodCallbackData*> instanceMethodCallbacks;
+		};
+
+		static std::map<MetadataTreeNode*, CtorCacheItem> s_ctorFuncCache;
 
 
 		static std::map<std::string, MetadataNode::ExtendedClassCacheData> s_extendedCtorFuncCache;

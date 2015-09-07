@@ -1,0 +1,1 @@
+node traverse_files.js D:\work\Extend_Class_Generator\_interface_name_generator\out\interface-names.txt .\test_app AST.txt

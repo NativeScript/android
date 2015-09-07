@@ -20,7 +20,6 @@ namespace tns
 	#define ASSERT(cond) ((cond)?(void)0:__android_log_assert("##cond", "TNS.Native", ""))
 	#define ASSERT_MESSAGE(cond, fmt, args...) ((cond)?(void)0:__android_log_assert("##cond", "TNS.Native", fmt, ##args))
 	#define ASSERT_FAIL(fmt, args...) (__android_log_assert(fmt, "TNS.Native", fmt, ##args))
-	void APP_FAIL(const char *message);
 }
 
 #endif /* NATIVESCRIPTASSERT_H_ */

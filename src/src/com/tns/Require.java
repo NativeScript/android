@@ -2,6 +2,8 @@ package com.tns;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.HashMap;
 
 import org.json.JSONException;
@@ -22,16 +24,16 @@ public class Require
 	private static final HashMap<String, String> folderAsModuleCache = new HashMap<String, String>();
 	private static boolean checkForExternalPath = false;
 
-	public static void init(Context context)
+	public static void init(File rootPackageDir, File applicationFilesDir) throws IOException
 	{
 		if (initialized)
 		{
 			return;
 		}
-
-		RootPackageDir = context.getApplicationInfo().dataDir;
-
-		ApplicationFilesPath = context.getApplicationContext().getFilesDir().getPath();
+		
+		RootPackageDir = rootPackageDir.getCanonicalPath();
+		ApplicationFilesPath = applicationFilesDir.getCanonicalPath();
+		
 		ModulesFilesPath = "/app/";
 
 		NativeScriptModulesFilesPath = "/app/tns_modules/";
@@ -68,7 +70,7 @@ public class Require
 
 		if (!bootstrapFile.exists())
 		{
-			Platform.APP_FAIL("Application entry point file not found. Please specify either package.json with main field, index.js or bootstrap.js!");
+			Platform.appFail(null, "Application entry point file not found. Please specify either package.json with main field, index.js or bootstrap.js!");
 		}
 
 		String modulePath = bootstrapFile.getAbsolutePath();
@@ -88,6 +90,10 @@ public class Require
 			File projectRootDir = new File(RootPackageDir);
 			if (checkForExternalPath && isFileExternal(file, projectRootDir))
 			{
+				if (Platform.IsLogEnabled)
+				{
+					Log.e(Platform.DEFAULT_LOG_TAG, "Module " + moduleName + " is on external path");
+				}
 				return "EXTERNAL_FILE_ERROR";
 			}
 			else
@@ -97,6 +103,10 @@ public class Require
 		}
 
 		// empty path will be handled by the NativeScriptRuntime.cpp and a JS error will be thrown
+		if (Platform.IsLogEnabled)
+		{
+			Log.e(Platform.DEFAULT_LOG_TAG, "Module " + moduleName + " not found. required from directory " + callingDirName);
+		}
 		return "";
 	}
 
@@ -116,7 +126,7 @@ public class Require
 
 		return true;
 	}
-
+	
 	private static File findModuleFile(String moduleName, String currentDirectory)
 	{
 		File directory = null;

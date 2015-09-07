@@ -29,7 +29,7 @@ public class TypeIDs
 		{
 			return TypeIDs.Null;
 		}
-		else if (object instanceof Integer)
+		else if (object instanceof Integer || object.toString() == int.class.getName())
 		{
 			return TypeIDs.Int;
 		}
@@ -37,27 +37,27 @@ public class TypeIDs
 		{
 			return TypeIDs.Boolean;
 		}
-		else if (object instanceof Character)
+		else if (object instanceof Character || object.toString() == char.class.getName())
 		{
 			return TypeIDs.Char;
 		}
-		else if (object instanceof Byte)
+		else if (object instanceof Byte || object.toString() == byte.class.getName())
 		{
 			return TypeIDs.Byte;
 		}
-		else if (object instanceof Short)
+		else if (object instanceof Short || object.toString() == short.class.getName())
 		{
 			return TypeIDs.Short;
 		}
-		else if (object instanceof Long)
+		else if (object instanceof Long || object.toString() == long.class.getName())
 		{
 			return TypeIDs.Long;
 		}
-		else if (object instanceof Float)
+		else if (object instanceof Float || object.toString() == float.class.getName())
 		{
 			return TypeIDs.Float;
 		}
-		else if (object instanceof Double)
+		else if (object instanceof Double || object.toString() == double.class.getName())
 		{
 			return TypeIDs.Double;
 		}

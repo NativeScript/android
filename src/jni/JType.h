@@ -19,6 +19,7 @@ namespace tns
 		JsObject,
 		Null
 	};
+
 	class JType
 	{
 	public:
@@ -39,6 +40,8 @@ namespace tns
 		static jlong LongValue(JEnv env, jobject value);
 		static jfloat FloatValue(JEnv env, jobject value);
 		static jdouble DoubleValue(JEnv env, jobject value);
+
+		static Type getClassType(int retType);
 
 	private:
 		JType()
