@@ -510,6 +510,9 @@ public class JsDebugger
 						int port = bundle.getInt("debuggerPort", INVALID_PORT);
 						if (port == INVALID_PORT)
 						{
+							if(currentPort == INVALID_PORT) {
+								currentPort = getAvailablePort();
+							}
 							port = currentPort;
 						}
 						String packageName = bundle.getString("packageName", context.getPackageName());
