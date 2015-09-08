@@ -17,6 +17,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 
 import org.json.JSONObject;
 
@@ -57,6 +58,8 @@ public class Platform
 	private static boolean initialized;
 	
 	private static final HashMap<String, Class<?>> classCache = new HashMap<String, Class<?>>();
+	
+	private static final HashSet<ClassLoader> classLoaderCache = new HashSet<ClassLoader>();
 
 	private static final SparseArray<Object> strongInstances = new SparseArray<Object>();
 	
@@ -339,13 +342,33 @@ public class Platform
 		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "JSInstance for " + instance.getClass().toString() + " created with overrides");
 	}
 	
+	@RuntimeCallable
 	private static String[] getTypeMetadata(String className, int index) throws ClassNotFoundException
 	{
 		Class<?> clazz = classCache.get(className);
 		
 		if (clazz == null)
 		{
-			clazz = Class.forName(className);
+			for (ClassLoader classLoader: classLoaderCache)
+			{
+				try
+				{
+					clazz = classLoader.loadClass(className);
+					if (clazz != null)
+					{
+						classCache.put(className, clazz);
+						break;
+					}
+				}
+				catch (Exception e1)
+				{
+					if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, ">>loader=" + classLoader.toString() + " " + e1.getMessage());
+				}
+			}
+			if (clazz == null)
+			{
+				clazz = Class.forName(className);
+			}
 		}
 		
 		String[] result = getTypeMetadata(clazz, index);
@@ -500,6 +523,11 @@ public class Platform
 		if (!classCache.containsKey(className))
 		{
 			classCache.put(className, clazz);
+			ClassLoader clazzloader = clazz.getClassLoader();
+			if (!classLoaderCache.contains(clazzloader))
+			{
+				classLoaderCache.add(clazzloader);
+			}
 		}
 
 		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "MakeInstanceStrong (" + key + ", " + instance.getClass().toString() + ")");
