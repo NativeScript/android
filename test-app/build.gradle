@@ -201,21 +201,26 @@ task runJarProject (type: Exec) {
 }
 
 task deleteDist (type: Delete) {
-	delete "$rootDir/dist"
+	doFirst {
+		delete "$rootDir/dist"
+	}
 }
 
 task installApk (type: Exec) {
-	println "---- attempting to install buit apk"
-	
-	if(isWinOs) {
-		commandLine "cmd", "/c", "node", "$rootDir/tasks/deploy-apk.js", "$rootDir/build/outputs/apk/test-app-debug.apk"
-	}
-	else {
-		commandLine "node", "$rootDir/tasks/deploy-apk.js", "$rootDir/build/outputs/apk/test-app-debug.apk"
+	doFirst {
+		println "---- attempting to install buit apk"
+		
+		if(isWinOs) {
+			commandLine "cmd", "/c", "node", "$rootDir/tasks/deploy-apk.js", "$rootDir/build/outputs/apk/test-app-debug.apk"
+		}
+		else {
+			commandLine "node", "$rootDir/tasks/deploy-apk.js", "$rootDir/build/outputs/apk/test-app-debug.apk"
+		}
 	}
 }
 
 task deletePreviousResultXml (type: Exec) {
+	
 	println "---- removing previous android_unit_test_results.xml"
 	
 	if(isWinOs) {
@@ -227,35 +232,42 @@ task deletePreviousResultXml (type: Exec) {
 }
 
 task startInstalledApk (type: Exec) {
-	println "---- starting installed apk"
-	
-	if(isWinOs) {
-		commandLine "cmd", "/c", "adb", "shell", "am", "start", "-n", "com.tns.android_runtime_testapp/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
-	}
-	else {
-		commandLine "adb", "shell", "am", "start", "-n", "com.tns.android_runtime_testapp/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
-	}
-}
-
-task waitForUnitTestResultFile (type: Exec) {	
-	println "---- waiting for tests to finish and get file..."
-	
-	if(isWinOs) {
-		commandLine "cmd", "/c", "node", "$rootDir/tasks/try_to_find_test_result_file.js"
-	}
-	else {
-		commandLine "node", "$rootDir/tasks/try_to_find_test_result_file.js"
+	doFirst {
+		println "---- starting installed apk"
+		
+		if(isWinOs) {
+			commandLine "cmd", "/c", "adb", "shell", "am", "start", "-n", "com.tns.android_runtime_testapp/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
+		}
+		else {
+			commandLine "adb", "shell", "am", "start", "-n", "com.tns.android_runtime_testapp/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
+		}
 	}
 }
 
 task createDistFolder {
-	def distDir = file("$rootDir/dist")
-	distDir.mkdirs()
+	doLast {
+		def distDir = file("$rootDir/dist")
+		distDir.mkdirs()
+	}
 }
 
-task copyResultToDist (type: Copy) {
+task waitForUnitTestResultFile (type: Exec) {	
+	doFirst {
+		println "---- waiting for tests to finish and get file..."
+		
+		if(isWinOs) {
+			commandLine "cmd", "/c", "node", "$rootDir/tasks/try_to_find_test_result_file.js"
+		}
+		else {
+			commandLine "node", "$rootDir/tasks/try_to_find_test_result_file.js"
+		}
+	}
+}
+
+task copyResultToDist (type: Copy) {	
 	from "$rootDir/android_unit_test_results.xml"
 	into "$rootDir/dist"
+	
 }
 
 task deleteRootLevelResult (type: Delete) {
@@ -263,9 +275,9 @@ task deleteRootLevelResult (type: Delete) {
 }
 
 deleteDist.dependsOn(buildapk)
-installApk.dependsOn(deleteDist)
-deletePreviousResultXml.dependsOn(installApk)
-startInstalledApk.dependsOn(deletePreviousResultXml)
+deletePreviousResultXml.dependsOn(deleteDist)
+installApk.dependsOn(deletePreviousResultXml)
+startInstalledApk.dependsOn(installApk)
 createDistFolder.dependsOn(startInstalledApk)
 waitForUnitTestResultFile.dependsOn(createDistFolder)
 copyResultToDist.dependsOn(waitForUnitTestResultFile)
