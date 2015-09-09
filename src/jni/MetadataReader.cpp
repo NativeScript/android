@@ -408,8 +408,9 @@ MetadataTreeNode* MetadataReader::GetOrCreateTreeNodeByName(const string& classN
 		vector<MetadataTreeNode*>& children = *treeNode->children;
 		for (auto childNode: children)
 		{
-			assert(childNode->offsetValue >= ARRAY_OFFSET);
-			uint32_t childNodeId = childNode->offsetValue - ARRAY_OFFSET;
+			uint32_t childNodeId = (childNode->offsetValue >= ARRAY_OFFSET)
+									? (childNode->offsetValue - ARRAY_OFFSET)
+									: GetNodeId(childNode);
 
 			if (childNodeId == forwardedNodeId)
 			{
