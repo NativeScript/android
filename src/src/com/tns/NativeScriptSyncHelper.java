@@ -79,20 +79,34 @@ public class NativeScriptSyncHelper
 		if (fullSyncDir.exists())
 		{
 			executeFullSync(context, fullSyncDir);
+			deleteRecursive(fullSyncDir);
 			return;
 		}
 
 		File syncDir = new File(syncPath);
 		if (syncDir.exists())
 		{
-			executePartialSync(context, syncDir);
+			executePartialSync(context, syncDir);			
+			deleteRecursive(syncDir);
 		}
 
 		File removedSyncDir = new File(removedSyncPath);
 		if (removedSyncDir.exists())
 		{
 			executeRemovedSync(context, removedSyncDir);
+			deleteRecursive(removedSyncDir);
 		}
+	}
+	
+	private static void deleteRecursive(File fileOrDirectory) {
+		
+		if (fileOrDirectory.isDirectory()){
+			for (File child : fileOrDirectory.listFiles()){
+				deleteRecursive(child);
+			}
+		}
+
+	    fileOrDirectory.delete();
 	}
 
 	private static boolean getShouldExecuteSync(Context context)
