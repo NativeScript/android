@@ -110,7 +110,6 @@ public class Platform
 		{
 			throw new RuntimeException("NativeScriptApplication already initialized");
 		}
-		initialized = true;
 		
 		loadLibrary(runtimeLibPath, "NativeScript");
 		
@@ -155,7 +154,8 @@ public class Platform
 			Log.d(DEFAULT_LOG_TAG, "init time=" + (d.getTime() - lastModDate.getTime()));
 		}
 		//
-		
+
+		initialized = true;
 		return appJavaObjectId;
 	}
 	
@@ -223,7 +223,11 @@ public class Platform
 			if(e == ex){
 				// exception is not caught by user code, go to the JavaScript side to raise the __uncaughtError handler
 				// TODO: We may want to allow JS code to mark the exception as Handled
-				passUncaughtExceptionToJsNative(e, ErrorReport.getErrorMessage(e));
+				
+				//don't throw exception to v8 if v8 is not initialized yet
+				if(!initialized) {
+					passUncaughtExceptionToJsNative(e, ErrorReport.getErrorMessage(e));	
+				}
 			}
 			
 			// re-throw the exception to crash the current thread
