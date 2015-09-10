@@ -125,6 +125,11 @@ public class Async
 			public void getHeaders(HttpURLConnection connection)
 			{
 				Map<String, List<String>> headers = connection.getHeaderFields();
+				if(headers == null) 
+				{
+					// no headers, this may happen if there is no internet connection currently available
+					return;
+				}
 
 				int size = headers.size();
 				if (size == 0)
