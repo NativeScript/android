@@ -490,7 +490,10 @@ void ObjectManager::MarkReachableObjects(Isolate *isolate, const Local<Object>& 
 			s.push(proto);
 		}
 
-		auto propNames = NativeScriptExtension::GetPropertyKeys(isolate, o);
+		auto context = isolate->GetCurrentContext();
+		bool success = false;
+		auto propNames = NativeScriptExtension::GetPropertyKeys(isolate, context, o, success);
+		assert(success);
 		int len = propNames->Length();
 		for (int i = 0; i < len; i++)
 		{
