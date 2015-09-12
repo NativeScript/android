@@ -4,7 +4,7 @@
 using namespace v8;
 using namespace std;
 
-string tns::ConvertToString(const v8::Handle<String>& s)
+string tns::ConvertToString(const v8::Local<String>& s)
 {
 	if (s.IsEmpty())
 	{
@@ -17,12 +17,12 @@ string tns::ConvertToString(const v8::Handle<String>& s)
 	}
 }
 
-jstring tns::ConvertToJavaString(const Handle<Value>& value)
+jstring tns::ConvertToJavaString(const Local<Value>& value)
 {
-	Handle<String> valueAsString;
+	Local<String> valueAsString;
 	if (value->IsStringObject())
 	{
-		auto stringObject = Handle<StringObject>::Cast(value);
+		auto stringObject = Local<StringObject>::Cast(value);
 		valueAsString = stringObject->ValueOf();
 	}
 	else
@@ -53,13 +53,13 @@ Local<String> tns::ConvertToV8String(const char *data, int length)
 	return String::NewFromUtf8(isolate, (const char *)data, String::kNormalString, length);
 }
 
-Local<Value> tns::V8GetHiddenValue(const Handle<Object>& obj, const string& propName)
+Local<Value> tns::V8GetHiddenValue(const Local<Object>& obj, const string& propName)
 {
 	auto s = tns::ConvertToV8String(propName);
 	return obj->GetHiddenValue(s);
 }
 
-bool tns::V8SetHiddenValue(const Handle<Object>& obj, const string& propName, const Handle<Value>& value)
+bool tns::V8SetHiddenValue(const Local<Object>& obj, const string& propName, const Local<Value>& value)
 {
 	auto s = tns::ConvertToV8String(propName);
 	return obj->SetHiddenValue(s, value);

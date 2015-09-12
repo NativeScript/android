@@ -25,9 +25,9 @@ namespace tns
 	private:
 		Profiler();
 
-		static void StartCPUProfiler(v8::Isolate *isolate, const v8::Handle<v8::String>& name);
+		static void StartCPUProfiler(v8::Isolate *isolate, const v8::Local<v8::String>& name);
 
-		static bool StopCPUProfiler(v8::Isolate *isolate, const v8::Handle<v8::String>& name);
+		static bool StopCPUProfiler(v8::Isolate *isolate, const v8::Local<v8::String>& name);
 
 		static void StartNDKProfiler();
 

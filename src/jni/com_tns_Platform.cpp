@@ -193,7 +193,7 @@ extern "C" void Java_com_tns_Platform_runNativeScript(JNIEnv *_env, jobject obj,
 
 	HandleScope handleScope(isolate);
 
-	Handle<Object> moduleObject;
+	Local<Object> moduleObject;
 	string modulePath = ArgConverter::jstringToString(appModuleName);
 	bool hasError = false;
 
@@ -243,7 +243,7 @@ void AppInitCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 	ExceptionUtil::GetInstance()->CheckForJavaException(env);
 }
 
-jobject ConvertJsValueToJavaObject(JEnv& env, const Handle<Value>& value, int classReturnType)
+jobject ConvertJsValueToJavaObject(JEnv& env, const Local<Value>& value, int classReturnType)
 {
 	JsArgToArrayConverter argConverter(value, false/*is implementation object*/, classReturnType);
 	jobject jr = argConverter.GetConvertedArg();
@@ -325,8 +325,8 @@ extern "C" void Java_com_tns_Platform_createJSInstanceNative(JNIEnv *_env, jobje
 
 	string existingClassName = ArgConverter::jstringToString(className);
 	string jniName = Util::ConvertFromCanonicalToJniName(existingClassName);
-	Handle<Object> jsInstance;
-	Handle<Object> implementationObject;
+	Local<Object> jsInstance;
+	Local<Object> implementationObject;
 
 	auto proxyClassName = g_objectManager->GetClassName(javaObject);
 	//

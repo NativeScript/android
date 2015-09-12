@@ -38,15 +38,15 @@ namespace tns
 
 	private:
 
-		bool ConvertArg(const v8::Handle<v8::Value>& arg, int index);
+		bool ConvertArg(const v8::Local<v8::Value>& arg, int index);
 
-		bool ConvertJavaScriptArray(const v8::Handle<v8::Array>& jsArr, int index);
+		bool ConvertJavaScriptArray(const v8::Local<v8::Array>& jsArr, int index);
 
-		bool ConvertJavaScriptNumber(const v8::Handle<v8::Value>& jsValue, int index);
+		bool ConvertJavaScriptNumber(const v8::Local<v8::Value>& jsValue, int index);
 
-		bool ConvertJavaScriptBoolean(const v8::Handle<v8::Value>& jsValue, int index);
+		bool ConvertJavaScriptBoolean(const v8::Local<v8::Value>& jsValue, int index);
 
-		bool ConvertJavaScriptString(const v8::Handle<v8::Value>& jsValue, int index);
+		bool ConvertJavaScriptString(const v8::Local<v8::Value>& jsValue, int index);
 
 		void SetConvertedObject(int index, jobject obj, bool isGlobalRef = false);
 

@@ -93,7 +93,7 @@ string MethodCache::EncodeSignature(const string& className, const string& metho
 }
 
 
-string MethodCache::GetType(const v8::Handle<v8::Value>& value)
+string MethodCache::GetType(const v8::Local<v8::Value>& value)
 {
 	string type;
 

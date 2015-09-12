@@ -7,9 +7,9 @@
 
 namespace tns
 {
-	std::string ConvertToString(const v8::Handle<v8::String>& s);
+	std::string ConvertToString(const v8::Local<v8::String>& s);
 
-	jstring ConvertToJavaString(const v8::Handle<v8::Value>& jsValue);
+	jstring ConvertToJavaString(const v8::Local<v8::Value>& jsValue);
 
 	v8::Local<v8::String> ConvertToV8String(const jchar* data, int length);
 
@@ -17,9 +17,9 @@ namespace tns
 
 	v8::Local<v8::String> ConvertToV8String(const char *data, int length);
 
-	v8::Local<v8::Value> V8GetHiddenValue(const v8::Handle<v8::Object>& obj, const std::string& propName);
+	v8::Local<v8::Value> V8GetHiddenValue(const v8::Local<v8::Object>& obj, const std::string& propName);
 
-	bool V8SetHiddenValue(const v8::Handle<v8::Object>& obj, const std::string& propName, const v8::Handle<v8::Value>& value);
+	bool V8SetHiddenValue(const v8::Local<v8::Object>& obj, const std::string& propName, const v8::Local<v8::Value>& value);
 }
 
 

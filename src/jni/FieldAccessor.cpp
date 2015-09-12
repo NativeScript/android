@@ -16,14 +16,14 @@ void FieldAccessor::Init(JavaVM *jvm, ObjectManager *objectManager)
 	this->objectManager = objectManager;
 }
 
-Handle<Value> FieldAccessor::GetJavaField(const Handle<Object>& target, FieldCallbackData *fieldData)
+Local<Value> FieldAccessor::GetJavaField(const Local<Object>& target, FieldCallbackData *fieldData)
 {
 	JEnv env;
 
 	auto isolate = Isolate::GetCurrent();
 	EscapableHandleScope handleScope(isolate);
 
-	Handle<Value> fieldResult;
+	Local<Value> fieldResult;
 
 	jweak targetJavaObject;
 
@@ -246,7 +246,7 @@ Handle<Value> FieldAccessor::GetJavaField(const Handle<Object>& target, FieldCal
 	return fieldResult;
 }
 
-void FieldAccessor::SetJavaField(const Handle<Object>& target, const Handle<Value>& value, FieldCallbackData *fieldData)
+void FieldAccessor::SetJavaField(const Local<Object>& target, const Local<Value>& value, FieldCallbackData *fieldData)
 {
 	JEnv env;
 
@@ -434,7 +434,7 @@ void FieldAccessor::SetJavaField(const Handle<Object>& target, const Handle<Valu
 		}
 		else
 		{
-			Local<Object> objectWithHiddenID = value->ToObject();
+			auto objectWithHiddenID = value->ToObject();
 			jweak javaObject = objectManager->GetJavaObjectByJsObject(objectWithHiddenID);
 
 			if (isStatic)

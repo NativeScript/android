@@ -8,7 +8,7 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
-void NumericCasts::CreateGlobalCastFunctions(const Handle<ObjectTemplate>& globalTemplate)
+void NumericCasts::CreateGlobalCastFunctions(const Local<ObjectTemplate>& globalTemplate)
 {
 	auto isolate = Isolate::GetCurrent();
 	auto ext = External::New(isolate, this);
@@ -84,7 +84,7 @@ void NumericCasts::MarkAsLongCallback(const v8::FunctionCallbackInfo<Value>& arg
 
 	auto isolate = Isolate::GetCurrent();
 
-	Handle<Value> value;
+	Local<Value> value;
 	if (args[0]->IsInt32())
 	{
 		value = args[0]->ToInt32();
@@ -114,7 +114,7 @@ void NumericCasts::MarkAsByteCallback(const v8::FunctionCallbackInfo<Value>& arg
 
 	auto isolate = Isolate::GetCurrent();
 
-	Handle<Value> value;
+	Local<Value> value;
 	if (args[0]->IsInt32())
 	{
 		value = args[0]->ToInt32();
@@ -144,7 +144,7 @@ void NumericCasts::MarkAsShortCallback(const v8::FunctionCallbackInfo<Value>& ar
 
 	auto isolate = Isolate::GetCurrent();
 
-	Handle<Value> value;
+	Local<Value> value;
 	if (args[0]->IsInt32())
 	{
 		value = args[0]->ToInt32();
@@ -232,7 +232,7 @@ void NumericCasts::MarkAsDoubleCallback(const v8::FunctionCallbackInfo<Value>& a
 	}
 }
 
-Persistent<Object>* NumericCasts::MarkJsObject(const Handle<Object>& object, const string& mark, const Handle<Value>& value)
+Persistent<Object>* NumericCasts::MarkJsObject(const Local<Object>& object, const string& mark, const Local<Value>& value)
 {
 	auto isolate = Isolate::GetCurrent();
 

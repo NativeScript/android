@@ -33,7 +33,7 @@ namespace tns
 	private:
 		MethodCache() {}
 
-		static std::string GetType(const v8::Handle<v8::Value>& value);
+		static std::string GetType(const v8::Local<v8::Value>& value);
 
 		static std::string ResolveJavaMethod(const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& className, const std::string& methodName);
 

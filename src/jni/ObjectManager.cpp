@@ -50,12 +50,12 @@ void ObjectManager::SetGCHooks()
 	V8::AddGCEpilogueCallback(ObjectManager::OnGcFinishedStatic, kGCTypeAll);
 }
 
-jweak ObjectManager::GetJavaObjectByJsObjectStatic(const Handle<Object>& object)
+jweak ObjectManager::GetJavaObjectByJsObjectStatic(const Local<Object>& object)
 {
 	return ObjectManager::instance->GetJavaObjectByJsObject(object);
 }
 
-jweak ObjectManager::GetJavaObjectByJsObject(const Handle<Object>& object)
+jweak ObjectManager::GetJavaObjectByJsObject(const Local<Object>& object)
 {
 	jweak javaObject = nullptr;
 
@@ -69,7 +69,7 @@ jweak ObjectManager::GetJavaObjectByJsObject(const Handle<Object>& object)
 	return javaObject;
 }
 
-JSInstanceInfo* ObjectManager::GetJSInstanceInfo(const Handle<Object>& object)
+JSInstanceInfo* ObjectManager::GetJSInstanceInfo(const Local<Object>& object)
 {
 	DEBUG_WRITE("ObjectManager::GetJSInstanceInfo: called");
 	JSInstanceInfo *jsInstanceInfo = nullptr;
@@ -120,7 +120,7 @@ void ObjectManager::UpdateCache(int objectID, jobject obj)
 	m_cache.update(objectID, obj);
 }
 
-jclass ObjectManager::GetJavaClass(const Handle<Object>& instance)
+jclass ObjectManager::GetJavaClass(const Local<Object>& instance)
 {
 	DEBUG_WRITE("GetClass called");
 
@@ -130,7 +130,7 @@ jclass ObjectManager::GetJavaClass(const Handle<Object>& instance)
 	return clazz;
 }
 
-void ObjectManager::SetJavaClass(const Handle<Object>& instance, jclass clazz)
+void ObjectManager::SetJavaClass(const Local<Object>& instance, jclass clazz)
 {
 	DEBUG_WRITE("SetClass called");
 
@@ -148,7 +148,7 @@ int ObjectManager::GetOrCreateObjectId(jobject object)
 	return javaObjectID;
 }
 
-Handle<Object> ObjectManager::GetJsObjectByJavaObjectStatic(int javaObjectID)
+Local<Object> ObjectManager::GetJsObjectByJavaObjectStatic(int javaObjectID)
 {
 	return ObjectManager::instance->GetJsObjectByJavaObject(javaObjectID);
 }
@@ -170,17 +170,17 @@ Local<Object> ObjectManager::GetJsObjectByJavaObject(int javaObjectID)
 	return handleScope.Escape(localObject);
 }
 
-Handle<Object> ObjectManager::CreateJSWrapperStatic(jint javaObjectID, const string& typeName)
+Local<Object> ObjectManager::CreateJSWrapperStatic(jint javaObjectID, const string& typeName)
 {
 	return ObjectManager::instance->CreateJSWrapper(javaObjectID, typeName);
 }
 
-Handle<Object> ObjectManager::CreateJSWrapper(jint javaObjectID, const string& typeName)
+Local<Object> ObjectManager::CreateJSWrapper(jint javaObjectID, const string& typeName)
 {
 	return CreateJSWrapperHelper(javaObjectID, typeName, nullptr);
 }
 
-Handle<Object> ObjectManager::CreateJSWrapper(jint javaObjectID, const string& typeName, jobject instance)
+Local<Object> ObjectManager::CreateJSWrapper(jint javaObjectID, const string& typeName, jobject instance)
 {
 	JEnv env;
 
@@ -189,7 +189,7 @@ Handle<Object> ObjectManager::CreateJSWrapper(jint javaObjectID, const string& t
 	return CreateJSWrapperHelper(javaObjectID, typeName, clazz);
 }
 
-Handle<Object> ObjectManager::CreateJSWrapperHelper(jint javaObjectID, const string& typeName, jclass clazz)
+Local<Object> ObjectManager::CreateJSWrapperHelper(jint javaObjectID, const string& typeName, jclass clazz)
 {
 	auto isolate = Isolate::GetCurrent();
 
@@ -206,7 +206,7 @@ Handle<Object> ObjectManager::CreateJSWrapperHelper(jint javaObjectID, const str
 }
 
 
-void ObjectManager::Link(const Handle<Object>& object, uint32_t javaObjectID, jclass clazz)
+void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID, jclass clazz)
 {
 	auto isolate = Isolate::GetCurrent();
 
@@ -233,15 +233,15 @@ void ObjectManager::Link(const Handle<Object>& object, uint32_t javaObjectID, jc
 	idToObject.insert(make_pair(javaObjectID, objectHandle));
 }
 
-bool ObjectManager::Unlink(Handle<Object>& object)
+bool ObjectManager::Unlink(Local<Object>& object)
 {
 	auto hiddenString = V8StringConstants::GetHiddenJSInstance();
 	auto found = !object->GetHiddenValue(hiddenString).IsEmpty();
-	object->SetHiddenValue(hiddenString, Handle<Value>());
+	object->SetHiddenValue(hiddenString, Local<Value>());
 	return found;
 }
 
-bool ObjectManager::CloneLink(const Handle<Object>& src, const Handle<Object>& dest)
+bool ObjectManager::CloneLink(const Local<Object>& src, const Local<Object>& dest)
 {
 	auto jsInfo = GetJSInstanceInfo(src);
 
@@ -505,8 +505,8 @@ void ObjectManager::MarkReachableObjects(Isolate *isolate, const Local<Object>& 
 				bool isPropDescriptor = o->HasRealNamedCallbackProperty(name);
 				if (isPropDescriptor)
 				{
-					Handle<Value> getter;
-					Handle<Value> setter;
+					Local<Value> getter;
+					Local<Value> setter;
 					NativeScriptExtension::GetAssessorPair(isolate, o, name, getter, setter);
 
 					if (!getter.IsEmpty() && getter->IsFunction())

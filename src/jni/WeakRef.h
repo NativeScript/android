@@ -24,9 +24,9 @@ namespace tns
 			v8::Persistent<v8::Object> *holder;
 		};
 
-		static v8::Handle<v8::Function> GetClearFunction(v8::Isolate *isolate);
+		static v8::Local<v8::Function> GetClearFunction(v8::Isolate *isolate);
 
-		static v8::Handle<v8::Function> GetGetterFunction(v8::Isolate *isolate);
+		static v8::Local<v8::Function> GetGetterFunction(v8::Isolate *isolate);
 
 		static void ClearCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 

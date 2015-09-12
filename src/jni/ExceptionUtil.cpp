@@ -133,13 +133,13 @@ bool ExceptionUtil::HandleTryCatch(TryCatch& tc, const string& prependMessage){
 	return true;
 }
 
-void ExceptionUtil::OnUncaughtError(Handle<Message> message, Handle<Value> error){
+void ExceptionUtil::OnUncaughtError(Local<Message> message, Local<Value> error){
 	auto errorMessage = instance->PrintErrorMessage(message, error);
 
 	Isolate *isolate = Isolate::GetCurrent();
 	HandleScope scope(isolate);
 
-	Handle<Object> errorObject;
+	Local<Object> errorObject;
 	if(error->IsObject()){
 		errorObject = error.As<Object>();
 		errorObject->Set(ConvertToV8String("message"), ConvertToV8String(errorMessage));
@@ -158,7 +158,7 @@ void ExceptionUtil::OnUncaughtError(Handle<Message> message, Handle<Value> error
 //		}
 }
 
-void ExceptionUtil::CallJsFuncWithErr(Handle<Value> errObj)
+void ExceptionUtil::CallJsFuncWithErr(Local<Value> errObj)
 {
 	//create handle scope
 	Isolate *isolate = Isolate::GetCurrent();
@@ -180,7 +180,7 @@ void ExceptionUtil::CallJsFuncWithErr(Handle<Value> errObj)
 	}
 }
 
-string ExceptionUtil::GetErrorMessage(const Handle<Message>& message, const Handle<Value>& error){
+string ExceptionUtil::GetErrorMessage(const Local<Message>& message, const Local<Value>& error){
 	stringstream ss;
 
 	auto str = error->ToDetailString();
@@ -199,7 +199,7 @@ string ExceptionUtil::GetErrorMessage(const Handle<Message>& message, const Hand
 	return ss.str();
 }
 
-string ExceptionUtil::PrintErrorMessage(const Handle<Message>& message, const Handle<Value>& error){
+string ExceptionUtil::PrintErrorMessage(const Local<Message>& message, const Local<Value>& error){
 	string errorMessage = GetErrorMessage(message, error);
 
 	// split the message by new lines to workaround the LogCat's maximum characters in a single message
@@ -213,7 +213,7 @@ string ExceptionUtil::PrintErrorMessage(const Handle<Message>& message, const Ha
 	return errorMessage;
 }
 
-string ExceptionUtil::GetErrorStackTrace(const Handle<StackTrace>& stackTrace)
+string ExceptionUtil::GetErrorStackTrace(const Local<StackTrace>& stackTrace)
 {
 	stringstream ss;
 
@@ -316,7 +316,7 @@ bool ExceptionUtil::CheckForJavaException(JEnv& env)
 		{
 			jfieldID fieldID = env.GetFieldID(env.GetObjectClass(exc), "jsValueAddress", "J");
 			jlong addr = env.GetLongField(exc, fieldID);
-			Handle<Value> v;
+			Local<Value> v;
 			if (addr != 0)
 			{
 				auto pv = (Persistent<Value> *) addr;
@@ -355,7 +355,7 @@ bool ExceptionUtil::CheckForJavaException(JEnv& env)
 	return exceptionOccurred;
 }
 
-jweak ExceptionUtil::TryGetJavaThrowableObject(JEnv& env, const Handle<v8::Object>& jsObj)
+jweak ExceptionUtil::TryGetJavaThrowableObject(JEnv& env, const Local<v8::Object>& jsObj)
 {
 	jweak javaThrowableObject = nullptr;
 

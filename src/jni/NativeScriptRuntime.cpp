@@ -81,7 +81,7 @@ void NativeScriptRuntime::Init(JavaVM *jvm, ObjectManager *objectManager)
 	MethodCache::Init();
 }
 
-bool NativeScriptRuntime::RegisterInstance(const Handle<Object>& jsObject, const std::string& fullClassName, const ArgsWrapper& argWrapper, const Handle<Object>& implementationObject, bool isInterface)
+bool NativeScriptRuntime::RegisterInstance(const Local<Object>& jsObject, const std::string& fullClassName, const ArgsWrapper& argWrapper, const Local<Object>& implementationObject, bool isInterface)
 {
 	bool success;
 
@@ -133,7 +133,7 @@ bool NativeScriptRuntime::RegisterInstance(const Handle<Object>& jsObject, const
 	return success;
 }
 
-jclass NativeScriptRuntime::ResolveClass(const std::string& fullClassname, const Handle<Object>& implementationObject) {
+jclass NativeScriptRuntime::ResolveClass(const std::string& fullClassname, const Local<Object>& implementationObject) {
 
 	JEnv env;
 
@@ -149,12 +149,12 @@ jclass NativeScriptRuntime::ResolveClass(const std::string& fullClassname, const
 	return globalRefToGeneratedClass;
 }
 
-Handle<Value> NativeScriptRuntime::GetArrayElement(const Handle<Object>& array, uint32_t index, const string& arraySignature)
+Local<Value> NativeScriptRuntime::GetArrayElement(const Local<Object>& array, uint32_t index, const string& arraySignature)
 {
 	return arrayElementAccessor.GetArrayElement(array, index, arraySignature);
 }
 
-void NativeScriptRuntime::SetArrayElement(const Handle<Object>& array, uint32_t index, const string& arraySignature, Handle<Value>& value)
+void NativeScriptRuntime::SetArrayElement(const Local<Object>& array, uint32_t index, const string& arraySignature, Local<Value>& value)
 {
 	JEnv env;
 
@@ -163,18 +163,18 @@ void NativeScriptRuntime::SetArrayElement(const Handle<Object>& array, uint32_t 
 	ExceptionUtil::GetInstance()->CheckForJavaException(env);
 }
 
-Handle<Value> NativeScriptRuntime::GetJavaField(const Handle<Object>& caller, FieldCallbackData *fieldData)
+Local<Value> NativeScriptRuntime::GetJavaField(const Local<Object>& caller, FieldCallbackData *fieldData)
 {
 	return fieldAccessor.GetJavaField(caller, fieldData);
 }
 
-void NativeScriptRuntime::SetJavaField(const Handle<Object>& target, const Handle<Value>& value, FieldCallbackData *fieldData)
+void NativeScriptRuntime::SetJavaField(const Local<Object>& target, const Local<Value>& value, FieldCallbackData *fieldData)
 {
 	fieldAccessor.SetJavaField(target, value, fieldData);
 }
 
 
-void NativeScriptRuntime::CallJavaMethod(const Handle<Object>& caller, const string& className, const string& methodName, MetadataEntry *entry, bool isStatic, bool isSuper, const v8::FunctionCallbackInfo<v8::Value>& args)
+void NativeScriptRuntime::CallJavaMethod(const Local<Object>& caller, const string& className, const string& methodName, MetadataEntry *entry, bool isStatic, bool isSuper, const v8::FunctionCallbackInfo<v8::Value>& args)
 {
 	SET_PROFILER_FRAME();
 
@@ -535,7 +535,7 @@ void NativeScriptRuntime::CallJavaMethod(const Handle<Object>& caller, const str
 					{
 						isString = env.IsInstanceOf(result, JAVA_LANG_STRING);
 
-						Handle<Value> objectResult;
+						Local<Value> objectResult;
 						if (isString)
 						{
 							objectResult = ArgConverter::jstringToV8String((jstring)result);
@@ -595,7 +595,7 @@ int64_t NativeScriptRuntime::AdjustAmountOfExternalAllocatedMemory(JEnv& env, Is
 }
 
 
-Handle<Object> NativeScriptRuntime::CreateJSWrapper(jint javaObjectID, const string& typeName)
+Local<Object> NativeScriptRuntime::CreateJSWrapper(jint javaObjectID, const string& typeName)
 {
 	return objectManager->CreateJSWrapper(javaObjectID, typeName);
 }
@@ -678,7 +678,7 @@ int NativeScriptRuntime::GetCachedConstructorId(JEnv& env, const FunctionCallbac
 
 
 //delete the returned local reference after use
-jobjectArray NativeScriptRuntime::GetMethodOverrides(JEnv& env, const Handle<Object>& implementationObject)
+jobjectArray NativeScriptRuntime::GetMethodOverrides(JEnv& env, const Local<Object>& implementationObject)
 {
 	if (implementationObject.IsEmpty())
 	{
@@ -776,13 +776,13 @@ void NativeScriptRuntime::AddApplicationModule(const string& appName, v8::Persis
 	loadedModules.insert(make_pair(appName, applicationModule));
 }
 
-void NativeScriptRuntime::CreateGlobalCastFunctions(const Handle<ObjectTemplate>& globalTemplate)
+void NativeScriptRuntime::CreateGlobalCastFunctions(const Local<ObjectTemplate>& globalTemplate)
 {
 	castFunctions.CreateGlobalCastFunctions(globalTemplate);
 }
 
 
-void NativeScriptRuntime::CompileAndRun(string modulePath, bool& hasError, Handle<Object>& moduleObj, bool isBootstrapCall)
+void NativeScriptRuntime::CompileAndRun(string modulePath, bool& hasError, Local<Object>& moduleObj, bool isBootstrapCall)
 {
 	auto isolate = Isolate::GetCurrent();
 
@@ -902,7 +902,7 @@ void NativeScriptRuntime::RequireCallback(const v8::FunctionCallbackInfo<v8::Val
 
 	auto it = loadedModules.find(modulePath);
 
-	Handle<Object> moduleObj;
+	Local<Object> moduleObj;
 	bool hasError = false;
 
 	if (it == loadedModules.end())
@@ -1006,17 +1006,17 @@ void NativeScriptRuntime::BuildMetadata(JEnv& env, jstring filesPath)
 }
 
 
-void NativeScriptRuntime::CreateTopLevelNamespaces(const Handle<Object>& global)
+void NativeScriptRuntime::CreateTopLevelNamespaces(const Local<Object>& global)
 {
 	MetadataNode::CreateTopLevelNamespaces(global);
 }
 
-Handle<Value> NativeScriptRuntime::CallJSMethod(JNIEnv *_env, const Handle<Object>& jsObject, const string& methodName, jobjectArray args, TryCatch& tc)
+Local<Value> NativeScriptRuntime::CallJSMethod(JNIEnv *_env, const Local<Object>& jsObject, const string& methodName, jobjectArray args, TryCatch& tc)
 {
 	SET_PROFILER_FRAME();
 
 	JEnv env(_env);
-	Handle<Value> result;
+	Local<Value> result;
 
 	auto isolate = Isolate::GetCurrent();
 
@@ -1051,7 +1051,7 @@ Handle<Value> NativeScriptRuntime::CallJSMethod(JNIEnv *_env, const Handle<Objec
 		auto jsArgs = ArgConverter::ConvertJavaArgsToJsArgs(args);
 		int argc = jsArgs->Length();
 
-		Handle<Value> arguments[argc];
+		Local<Value> arguments[argc];
 		for (int i = 0; i < argc; i++)
 		{
 			arguments[i] = jsArgs->Get(i);
@@ -1078,9 +1078,9 @@ Handle<Value> NativeScriptRuntime::CallJSMethod(JNIEnv *_env, const Handle<Objec
 	return result;
 }
 
-Handle<Object> NativeScriptRuntime::FindClass(const string& className)
+Local<Object> NativeScriptRuntime::FindClass(const string& className)
 {
-	Handle<Object> clazz;
+	Local<Object> clazz;
 	JEnv env;
 
 	jmethodID mid = env.GetStaticMethodID(PlatformClass, "findClass", "(Ljava/lang/String;)Ljava/lang/Class;");
@@ -1102,7 +1102,7 @@ Handle<Object> NativeScriptRuntime::FindClass(const string& className)
 	return clazz;
 }
 
-int NativeScriptRuntime::GetArrayLength(const Handle<Object>& arr)
+int NativeScriptRuntime::GetArrayLength(const Local<Object>& arr)
 {
 	JEnv env;
 

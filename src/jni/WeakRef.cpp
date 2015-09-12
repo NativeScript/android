@@ -128,7 +128,7 @@ void WeakRef::GettertCallback(const FunctionCallbackInfo<Value>& args)
 	}
 }
 
-Handle<Function> WeakRef::GetGetterFunction(Isolate *isolate)
+Local<Function> WeakRef::GetGetterFunction(Isolate *isolate)
 {
 	if (s_poGetterFunc != nullptr)
 	{
@@ -136,13 +136,13 @@ Handle<Function> WeakRef::GetGetterFunction(Isolate *isolate)
 	}
 	else
 	{
-		Handle<Function> getterFunc = FunctionTemplate::New(isolate, GettertCallback)->GetFunction();
+		Local<Function> getterFunc = FunctionTemplate::New(isolate, GettertCallback)->GetFunction();
 		s_poGetterFunc = new Persistent<Function>(isolate, getterFunc);
 		return getterFunc;
 	}
 }
 
-Handle<Function> WeakRef::GetClearFunction(Isolate *isolate)
+Local<Function> WeakRef::GetClearFunction(Isolate *isolate)
 {
 	if (s_poClearFunc != nullptr)
 	{
@@ -150,7 +150,7 @@ Handle<Function> WeakRef::GetClearFunction(Isolate *isolate)
 	}
 	else
 	{
-		Handle<Function> clearFunc = FunctionTemplate::New(isolate, ClearCallback)->GetFunction();
+		Local<Function> clearFunc = FunctionTemplate::New(isolate, ClearCallback)->GetFunction();
 		s_poClearFunc = new Persistent<Function>(isolate, clearFunc);
 		return clearFunc;
 	}

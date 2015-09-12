@@ -57,14 +57,14 @@ jstring ArgConverter::ObjectToString(jobject object)
 	return (jstring)object;
 }
 
-Handle<Array> ArgConverter::ConvertJavaArgsToJsArgs(jobjectArray args)
+Local<Array> ArgConverter::ConvertJavaArgsToJsArgs(jobjectArray args)
 {
 	JEnv env;
 
 	auto isolate = Isolate::GetCurrent();
 
 	int argc = env.GetArrayLength(args) / 3;
-	Handle<Array> arr(Array::New(isolate, argc));
+	Local<Array> arr(Array::New(isolate, argc));
 
 	int jArrayIndex = 0;
 	for (int i = 0; i < argc; i++)
@@ -76,8 +76,8 @@ Handle<Array> ArgConverter::ConvertJavaArgsToJsArgs(jobjectArray args)
 		jint length;
 		Type argTypeID = (Type)JType::IntValue(env, argTypeIDObj);
 
-		Handle<Value> jsArg;
-		Handle<String> v8String;
+		Local<Value> jsArg;
+		Local<String> v8String;
 		switch (argTypeID)
 		{
 			case Type::Boolean:
@@ -160,7 +160,7 @@ Local<String> ArgConverter::jstringToV8String(jstring value)
 {
 	if	(value == nullptr)
 	{
-		return Handle<String>();
+		return Local<String>();
 	}
 
 	JEnv env;
@@ -190,7 +190,7 @@ bool ArgConverter::ReadJStringInBuffer(jstring value, jsize& utfLength) {
 	return true;
 }
 
-Handle<String> ArgConverter::jcharToV8String(jchar value)
+Local<String> ArgConverter::jcharToV8String(jchar value)
 {
 	auto v8String = ConvertToV8String(&value, 1);
 	return v8String;
@@ -211,7 +211,7 @@ Local<Value> ArgConverter::ConvertFromJavaLong(jlong value)
 	{
 		char strNumber[24];
 		sprintf(strNumber, "%lld", longValue);
-		Handle<Value> strValue = ConvertToV8String(strNumber);
+		Local<Value> strValue = ConvertToV8String(strNumber);
 		convertedValue = Local<Function>::New(isolate, *NATIVESCRIPT_NUMERA_CTOR_FUNC)->CallAsConstructor(1, &strValue);
 	}
 
@@ -219,11 +219,11 @@ Local<Value> ArgConverter::ConvertFromJavaLong(jlong value)
 }
 
 
-int64_t ArgConverter::ConvertToJavaLong(const Handle<Value>& value)
+int64_t ArgConverter::ConvertToJavaLong(const Local<Value>& value)
 {
 	assert(!value.IsEmpty());
 
-	auto obj = Handle<Object>::Cast(value);
+	auto obj = Local<Object>::Cast(value);
 
 	assert(!obj.IsEmpty());
 
@@ -238,7 +238,7 @@ int64_t ArgConverter::ConvertToJavaLong(const Handle<Value>& value)
 	return longValue;
 }
 
-bool ArgConverter::TryConvertToJavaLong(const Handle<Value>& value, jlong& javaLong)
+bool ArgConverter::TryConvertToJavaLong(const Local<Value>& value, jlong& javaLong)
 {
 	bool success = false;
 
@@ -251,7 +251,7 @@ bool ArgConverter::TryConvertToJavaLong(const Handle<Value>& value, jlong& javaL
 		}
 		else if (value->IsObject())
 		{
-			auto obj = Handle<Object>::Cast(value);
+			auto obj = Local<Object>::Cast(value);
 			auto isJavaLongValue = obj->GetHiddenValue(V8StringConstants::GetJavaLong());
 			if (!isJavaLongValue.IsEmpty() && isJavaLongValue->BooleanValue())
 			{

@@ -19,13 +19,13 @@ namespace tns
 	public:
 		static void Init(JavaVM *jvm);
 
-		static v8::Handle<v8::Array> ConvertJavaArgsToJsArgs(jobjectArray args);
+		static v8::Local<v8::Array> ConvertJavaArgsToJsArgs(jobjectArray args);
 
 		static v8::Local<v8::Value> ConvertFromJavaLong(jlong value);
 
-		static int64_t ConvertToJavaLong(const v8::Handle<v8::Value>& value);
+		static int64_t ConvertToJavaLong(const v8::Local<v8::Value>& value);
 
-		static bool TryConvertToJavaLong(const v8::Handle<v8::Value>& value, jlong& javaLong);
+		static bool TryConvertToJavaLong(const v8::Local<v8::Value>& value, jlong& javaLong);
 
 		static v8::Local<v8::String> jstringToV8String(jstring value);
 
@@ -55,7 +55,7 @@ namespace tns
 
 		static jstring ObjectToString(jobject object);
 
-		static v8::Handle<v8::String> jcharToV8String(jchar value);
+		static v8::Local<v8::String> jcharToV8String(jchar value);
 
 		static void NativeScriptLongFunctionCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
