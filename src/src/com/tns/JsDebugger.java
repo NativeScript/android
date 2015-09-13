@@ -57,9 +57,12 @@ public class JsDebugger
 	private final File debuggerSetupDirectory;
 	
 	private Boolean shouldDebugBreakFlag = null;
+	
+	private final Logger logger;
 
-	public JsDebugger(File debuggerSetupDirectory)
+	public JsDebugger(Logger logger, File debuggerSetupDirectory)
 	{
+		this.logger = logger;
 		this.debuggerSetupDirectory = debuggerSetupDirectory;
 	}
 
@@ -316,7 +319,7 @@ public class JsDebugger
 
 	int getDebuggerPortFromEnvironment()
 	{
-		if (Platform.IsLogEnabled) Log.d(Platform.DEFAULT_LOG_TAG, "getDebuggerPortFromEnvironment");
+		if (logger.isEnabled()) logger.write("getDebuggerPortFromEnvironment");
 		int port = INVALID_PORT;
 		
 		File envOutFile = new File(debuggerSetupDirectory, portEnvOutputFile);
@@ -349,7 +352,7 @@ public class JsDebugger
 		
 		boolean shouldDebugBreakFlag = shouldDebugBreak(); 
 		
-		if (Platform.IsLogEnabled) Log.d(Platform.DEFAULT_LOG_TAG, "shouldDebugBreakFlag=" + shouldDebugBreakFlag);
+		if (logger.isEnabled()) logger.write("shouldDebugBreakFlag=" + shouldDebugBreakFlag);
 		
 		if (shouldDebugBreakFlag)
 		{
@@ -368,7 +371,7 @@ public class JsDebugger
 		
 		boolean envInFileFlag = envInFile.exists();
 		
-		if (Platform.IsLogEnabled) Log.d(Platform.DEFAULT_LOG_TAG, "envInFileFlag=" + envInFileFlag);
+		if (logger.isEnabled()) logger.write("envInFileFlag=" + envInFileFlag);
 		
 		if (envInFileFlag)
 		{
@@ -431,7 +434,7 @@ public class JsDebugger
 			}
 		}
 		
-		Log.d(Platform.DEFAULT_LOG_TAG, "port=" + port);
+		logger.write("port=" + port);
 		
 		return port;
 	}

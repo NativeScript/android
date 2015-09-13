@@ -29,6 +29,7 @@ public class DexFactory
 {
 	private static final char CLASS_NAME_LOCATION_SEPARATOR = '_';
 
+	private final Logger logger;
 	private final File dexDir;
 	private final File odexDir;
 	private final String dexThumb;
@@ -37,15 +38,16 @@ public class DexFactory
 	private ProxyGenerator proxyGenerator;
 	private HashMap<String, Class<?>> injectedDexClasses = new HashMap<String, Class<?>>();
 
-	public DexFactory(ClassLoader classLoader, File dexBaseDir, String dexThumb)
+	public DexFactory(Logger logger, ClassLoader classLoader, File dexBaseDir, String dexThumb)
 	{
+		this.logger = logger;
 		this.classLoader = classLoader;
 		this.dexDir = dexBaseDir;
 		this.dexThumb = dexThumb;
 		
 		this.odexDir = new File(this.dexDir, "odex");
 		this.proxyGenerator = new ProxyGenerator(this.dexDir.getAbsolutePath());
-		ProxyGenerator.IsLogEnabled = Platform.IsLogEnabled;
+		ProxyGenerator.IsLogEnabled = logger.isEnabled();
 
 		if (!dexDir.exists())
 		{
@@ -100,19 +102,19 @@ public class DexFactory
 		if (dexFile == null)
 		{
 			long startGenTime = System.nanoTime();
-			if (Platform.IsLogEnabled)
+			if (logger.isEnabled())
 			{
-				Log.d(Platform.DEFAULT_LOG_TAG, "generating proxy in place");
+				logger.write("generating proxy in place");
 			}
 
 			dexFilePath = this.generateDex(name, classToProxy, methodOverrides);
 			dexFile = new File(dexFilePath);
 			long stopGenTime = System.nanoTime();
 			totalGenTime += stopGenTime - startGenTime;
-			if (Platform.IsLogEnabled)
+			if (logger.isEnabled())
 			{
-				Log.d(Platform.DEFAULT_LOG_TAG, "Finished inplace gen took: " + (stopGenTime - startGenTime) / 1000000.0 + "ms");
-				Log.d(Platform.DEFAULT_LOG_TAG, "TotalGenTime:  " + totalGenTime / 1000000.0 + "ms");
+				logger.write("Finished inplace gen took: " + (stopGenTime - startGenTime) / 1000000.0 + "ms");
+				logger.write("TotalGenTime:  " + totalGenTime / 1000000.0 + "ms");
 			}
 		}
 
@@ -166,9 +168,9 @@ public class DexFactory
 	public Class<?> findClass(String className) throws ClassNotFoundException
 	{
 		String canonicalName = className.replace('/', '.');
-		if (Platform.IsLogEnabled)
+		if (logger.isEnabled())
 		{
-			Log.d("TNS_NATIVE", canonicalName);
+			logger.write(canonicalName);
 		}
 
 		Class<?> existingClass = this.injectedDexClasses.get(canonicalName);
@@ -228,16 +230,16 @@ public class DexFactory
 		File dexFile = new File(dexFilePath);
 		if (dexFile.exists())
 		{
-			if (Platform.IsLogEnabled)
+			if (logger.isEnabled())
 			{
-				Log.d(Platform.DEFAULT_LOG_TAG, "Looking for proxy file: " + dexFilePath + " Result: proxy file Found. ClassName: " + className);
+				logger.write("Looking for proxy file: " + dexFilePath + " Result: proxy file Found. ClassName: " + className);
 			}
 			return dexFile;
 		}
 
-		if (Platform.IsLogEnabled)
+		if (logger.isEnabled())
 		{
-			Log.d(Platform.DEFAULT_LOG_TAG, "Looking for proxy file: " + dexFilePath + " Result: NOT Found. Proxy Gen needed. ClassName: " + className);
+			logger.write("Looking for proxy file: " + dexFilePath + " Result: NOT Found. Proxy Gen needed. ClassName: " + className);
 		}
 		return null;
 	}
@@ -314,12 +316,12 @@ public class DexFactory
 		}
 		catch (FileNotFoundException e)
 		{
-			Log.e(Platform.DEFAULT_LOG_TAG, "Error while writting current proxy thumb");
+			logger.write("Error while writting current proxy thumb");
 			e.printStackTrace();
 		}
 		catch (IOException e)
 		{
-			Log.e(Platform.DEFAULT_LOG_TAG, "Error while writting current proxy thumb");
+			logger.write("Error while writting current proxy thumb");
 			e.printStackTrace();
 		}
 	}
@@ -333,7 +335,7 @@ public class DexFactory
 
 		if (!pathToPurge.isDirectory())
 		{
-			Log.e(Platform.DEFAULT_LOG_TAG, "Purge proxies path not a directory. Path: " + pathToPurge);
+			logger.write("Purge proxies path not a directory. Path: " + pathToPurge);
 			throw new RuntimeException("Purge path not a directory");
 		}
 
@@ -356,7 +358,7 @@ public class DexFactory
 
 				if (!purgeCandidate.delete())
 				{
-					Log.e(Platform.DEFAULT_LOG_TAG, "Error purging cached proxy file: " + purgeCandidate.getAbsolutePath());
+					logger.write("Error purging cached proxy file: " + purgeCandidate.getAbsolutePath());
 				}
 			}
 		}
@@ -379,12 +381,12 @@ public class DexFactory
 		}
 		catch (FileNotFoundException e)
 		{
-			Log.e(Platform.DEFAULT_LOG_TAG, "Error while getting current proxy thumb");
+			logger.write("Error while getting current proxy thumb");
 			e.printStackTrace();
 		}
 		catch (IOException e)
 		{
-			Log.e(Platform.DEFAULT_LOG_TAG, "Error while getting current proxy thumb");
+			logger.write("Error while getting current proxy thumb");
 			e.printStackTrace();
 		}
 

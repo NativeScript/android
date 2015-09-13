@@ -44,9 +44,16 @@ class ErrorReport
 		
 		intent.putExtra(EXTRA_ERROR_REPORT_MSG, errorMessage);
 		
-		CreateErrorFile(context);
+		createErrorFile(context);
 		
-		startPendingErrorActivity(context, intent);
+		try
+		{
+			startPendingErrorActivity(context, intent);
+		}
+		catch (CanceledException e)
+		{
+			Log.d("ErrorReport", "Couldn't send pending intent! Exception: " + e.getMessage());
+		}
 
 		killProcess(context);	
 		
@@ -64,18 +71,11 @@ class ErrorReport
 		android.os.Process.killProcess(android.os.Process.myPid());
 	}
 	
-	static void startPendingErrorActivity(Context context, Intent intent)
+	static void startPendingErrorActivity(Context context, Intent intent) throws CanceledException
 	{
 		PendingIntent pendingIntent = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_CANCEL_CURRENT);
 		
-		try
-		{
-			pendingIntent.send(context, 0, intent);
-		}
-		catch (CanceledException e)
-		{
-			if (Platform.IsLogEnabled) Log.e(Platform.DEFAULT_LOG_TAG, "Couldn't send pending intent! Exception: " + e.getMessage());
-		}
+		pendingIntent.send(context, 0, intent);
 	}
 	
 	static String getErrorMessage(Throwable ex)
@@ -112,7 +112,7 @@ class ErrorReport
 		Class<?> errorActivityClass = Platform.getErrorActivityClass(); //can be null or can be provided beforehand
 				
 		//if in debug and errorActivityClass is not provided use ErrorReportActivity class
-		if(errorActivityClass == null && Platform.isDebuggableApp(context)){
+		if(errorActivityClass == null && Util.isDebuggableApp(context)){
 			errorActivityClass = ErrorReportActivity.class;
 		}
 
@@ -180,7 +180,7 @@ class ErrorReport
 		layout.addView(btnClose);
 	}
 	
-	private static void CreateErrorFile(final Context context)
+	private static void createErrorFile(final Context context)
 	{
 		try
 		{
@@ -189,7 +189,7 @@ class ErrorReport
 		}
 		catch (IOException e)
 		{
-			Log.d(Platform.DEFAULT_LOG_TAG, e.getMessage());
+			Log.d("ErrorReport", e.getMessage());
 		}
 	}
 }

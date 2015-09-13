@@ -2,6 +2,7 @@ package com.tns.internal;
 
 import com.tns.JsDebugger;
 import com.tns.Platform;
+import com.tns.Util;
 
 import android.util.Log;
 import android.content.res.Configuration;
@@ -57,9 +58,9 @@ public class AppBuilderCallbackTestImpl implements AppBuilderCallback
 	@Override
 	public boolean shouldEnableDebugging(android.content.Context context)
 	{
-		boolean shouldEnableDebugging = Platform.isDebuggableApp(context);
+		boolean shouldEnableDebugging = Util.isDebuggableApp(context);
 		return shouldEnableDebugging;
 	}
 
-	private final String logTag = Platform.DEFAULT_LOG_TAG;
+	private final String logTag = "AppBuilderCallbackTestImpl";
 }

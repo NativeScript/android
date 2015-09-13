@@ -26,16 +26,20 @@ public class NativeScriptSyncHelper
 	private static final String COMMAND_FULL_SYNC = "fullsync";
 	private static final String COMMAND_SYNC = "sync";
 	private static final String COMMAND_SYNC_WITH_REMOVED = "sync-with-removed";
+	
+	private static Logger logger;
 
-	public static void sync(Context context)
+	public static void sync(Logger logger, Context context)
 	{
+		NativeScriptSyncHelper.logger = logger;
+		
 		boolean shouldExecuteSync = getShouldExecuteSync(context);
 		
 		if (!shouldExecuteSync)
 		{
-			if (Platform.IsLogEnabled)
+			if (logger.isEnabled())
 			{
-				Log.d(Platform.DEFAULT_LOG_TAG, "Sync is not enabled.");
+				logger.write("Sync is not enabled.");
 			}
 			return;
 		}
@@ -66,12 +70,12 @@ public class NativeScriptSyncHelper
 		String fullSyncPath = SYNC_ROOT_SOURCE_DIR + context.getPackageName() + FULL_SYNC_SOURCE_DIR;
 		String removedSyncPath = SYNC_ROOT_SOURCE_DIR + context.getPackageName() + REMOVED_SYNC_SOURCE_DIR;
 		
-		if (Platform.IsLogEnabled)
+		if (logger.isEnabled())
 		{
-			Log.d(Platform.DEFAULT_LOG_TAG, "Sync is enabled:");
-			Log.d(Platform.DEFAULT_LOG_TAG, "Sync path              : " + syncPath);
-			Log.d(Platform.DEFAULT_LOG_TAG, "Full sync path         : " + fullSyncPath);
-			Log.d(Platform.DEFAULT_LOG_TAG, "Removed files sync path: " + removedSyncPath);
+			logger.write("Sync is enabled:");
+			logger.write("Sync path              : " + syncPath);
+			logger.write("Full sync path         : " + fullSyncPath);
+			logger.write("Removed files sync path: " + removedSyncPath);
 		}
 		
 		
@@ -140,7 +144,7 @@ public class NativeScriptSyncHelper
 			boolean success = pathname.delete();
 			if (!success)
 			{
-				Log.e(Platform.DEFAULT_LOG_TAG, "Syncing: file not deleted: " + pathname.getAbsolutePath().toString());
+				logger.write("Syncing: file not deleted: " + pathname.getAbsolutePath().toString());
 			}
 			return false;
 		}
@@ -161,7 +165,7 @@ public class NativeScriptSyncHelper
 		boolean success = directory.delete();
 		if (!success && directory.exists())
 		{
-			Log.e(Platform.DEFAULT_LOG_TAG, "Syncing: directory not deleted: " + directory.getAbsolutePath().toString());
+			logger.write("Syncing: directory not deleted: " + directory.getAbsolutePath().toString());
 		}
 	}
 	
@@ -176,9 +180,9 @@ public class NativeScriptSyncHelper
 				File file = files[i];
 				if (file.isFile())
 				{
-					if (Platform.IsLogEnabled)
+					if (logger.isEnabled())
 					{
-						Log.d(Platform.DEFAULT_LOG_TAG, "Syncing: " + file.getAbsolutePath().toString());
+						logger.write("Syncing: " + file.getAbsolutePath().toString());
 					}
 					
 					String targetFilePath = file.getAbsolutePath().replace(sourceRootAbsolutePath, targetRootAbsolutePath);
@@ -193,7 +197,7 @@ public class NativeScriptSyncHelper
 				    boolean success = copyFile(file.getAbsolutePath(), targetFilePath);
 					if (!success)
 					{
-						Log.e(Platform.DEFAULT_LOG_TAG, "Sync failed: " + file.getAbsolutePath().toString());
+						logger.write("Sync failed: " + file.getAbsolutePath().toString());
 					}
 				}
 				else
@@ -240,9 +244,9 @@ public class NativeScriptSyncHelper
 				File file = files[i];
 				if (file.isFile())
 				{
-					if (Platform.IsLogEnabled)
+					if (logger.isEnabled())
 					{
-						Log.d(Platform.DEFAULT_LOG_TAG, "Syncing removed file: " + file.getAbsolutePath().toString());
+						logger.write("Syncing removed file: " + file.getAbsolutePath().toString());
 					}
 					
 					String targetFilePath = file.getAbsolutePath().replace(sourceRootAbsolutePath, targetRootAbsolutePath);
@@ -283,13 +287,13 @@ public class NativeScriptSyncHelper
 		}
 		catch (FileNotFoundException e)
 		{
-			Log.e(Platform.DEFAULT_LOG_TAG, "Error copying file " + sourceFile);
+			logger.write("Error copying file " + sourceFile);
 			e.printStackTrace();
 			return false;
 		}
 		catch (IOException e)
 		{
-			Log.e(Platform.DEFAULT_LOG_TAG, "Error copying file " + sourceFile);
+			logger.write("Error copying file " + sourceFile);
 		    e.printStackTrace();
 		    return false;
 		}

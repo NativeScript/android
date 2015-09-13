@@ -14,6 +14,7 @@ import android.util.Log;
 
 public class Require
 {
+	private static Logger logger;
 	private static String RootPackageDir;
 	private static String ApplicationFilesPath;
 	private static String ModulesFilesPath;
@@ -24,8 +25,9 @@ public class Require
 	private static final HashMap<String, String> folderAsModuleCache = new HashMap<String, String>();
 	private static boolean checkForExternalPath = false;
 
-	public static void init(File rootPackageDir, File applicationFilesDir) throws IOException
+	public static void init(Logger logger, File rootPackageDir, File applicationFilesDir) throws IOException
 	{
+		Require.logger = logger; 
 		if (initialized)
 		{
 			return;
@@ -90,9 +92,9 @@ public class Require
 			File projectRootDir = new File(RootPackageDir);
 			if (checkForExternalPath && isFileExternal(file, projectRootDir))
 			{
-				if (Platform.IsLogEnabled)
+				if (logger.isEnabled())
 				{
-					Log.e(Platform.DEFAULT_LOG_TAG, "Module " + moduleName + " is on external path");
+					logger.write("Module " + moduleName + " is on external path");
 				}
 				return "EXTERNAL_FILE_ERROR";
 			}
@@ -103,9 +105,9 @@ public class Require
 		}
 
 		// empty path will be handled by the NativeScriptRuntime.cpp and a JS error will be thrown
-		if (Platform.IsLogEnabled)
+		if (logger.isEnabled())
 		{
-			Log.e(Platform.DEFAULT_LOG_TAG, "Module " + moduleName + " not found. required from directory " + callingDirName);
+			logger.write("Module " + moduleName + " not found. required from directory " + callingDirName);
 		}
 		return "";
 	}

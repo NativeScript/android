@@ -6,12 +6,14 @@ import com.tns.internal.ExtractPolicy;
 import com.tns.internal.FileExtractor;
 
 import android.content.Context;
-import android.util.Log;
 
 public class AssetExtractor
 {
-	public AssetExtractor(File libPath)
+	private final Logger logger;
+	
+	public AssetExtractor(File libPath, Logger logger)
 	{
+		this.logger = logger;
 		Platform.loadLibrary(libPath, "AssetExtractor");
 	}
 	
@@ -23,9 +25,9 @@ public class AssetExtractor
 		if (extractor != null)
 		{
 			boolean success = extractor.extract(context);
-			if (Platform.IsLogEnabled)
+			if (logger.isEnabled())
 			{
-				Log.d(Platform.DEFAULT_LOG_TAG, "extract returned " + success);
+				logger.write("extract returned " + success);
 			}
 		}
 		else if (extractPolicy.shouldExtract(context))

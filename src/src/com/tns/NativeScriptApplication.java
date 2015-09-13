@@ -3,6 +3,7 @@ package com.tns;
 import java.io.File;
 
 import android.app.Application;
+import android.content.pm.PackageManager.NameNotFoundException;
 import android.util.Log;
 
 import com.tns.internal.AppBuilderCallback;
@@ -697,7 +698,7 @@ public class NativeScriptApplication extends android.app.Application implements 
 		}
 		catch (Exception e)
 		{
-			Log.d(Platform.DEFAULT_LOG_TAG, e.getMessage());
+			Log.d(logTag, e.getMessage());
 		}
 		
 		return hasErrorIntent;
@@ -705,21 +706,23 @@ public class NativeScriptApplication extends android.app.Application implements 
 	
 	public void onCreate() {
 		
+		Logger logger = new LogcatLogger(BuildConfig.DEBUG);
+		
 		boolean showErrorIntent = hasErrorIntent();
 		if (!showErrorIntent)
 		{
 			appInstance = this;
 			
-			prepareAppBuilderCallbackImpl();
+			prepareAppBuilderCallbackImpl(logger);
 			
 			// TODO: refactor
 			ExtractPolicy extractPolicy = (appBuilderCallbackImpl != null)
 					? appBuilderCallbackImpl.getExtractPolicy()
-					: new DefaultExtractPolicy();
-			boolean skipAssetExtraction = Platform.runPlugin(this);
+					: new DefaultExtractPolicy(logger);
+			boolean skipAssetExtraction = Util.runPlugin(logger, this);
 			if (!skipAssetExtraction)
 			{
-				new AssetExtractor(null).extractAssets(this, extractPolicy);
+				new AssetExtractor(null, logger).extractAssets(this, extractPolicy);
 			}
 			
 			if (appBuilderCallbackImpl != null)
@@ -727,25 +730,34 @@ public class NativeScriptApplication extends android.app.Application implements 
 				appBuilderCallbackImpl.onCreate(this);
 			}
 			
-			NativeScriptSyncHelper.sync(this);
+			NativeScriptSyncHelper.sync(logger, this);
 
 			String appName = this.getPackageName();
 			File rootDir = new File(this.getApplicationInfo().dataDir);
 			File appDir = this.getFilesDir();
-			File debuggerSetupDir = Platform.isDebuggableApp(this)
+			File debuggerSetupDir = Util.isDebuggableApp(this)
 										? getExternalFilesDir(null)
 										: null;
 			ClassLoader classLoader = this.getClassLoader();
 			File dexDir = new File(rootDir, "code_cache/secondary-dexes");
-			String dexThumb = Platform.getDexThumb(this);
-			Platform.init(this, appName, null, rootDir, appDir, debuggerSetupDir, classLoader, dexDir, dexThumb);
+			String dexThumb = null;
+			try
+			{
+				dexThumb = Util.getDexThumb(this);
+			}
+			catch (NameNotFoundException e)
+			{
+				if (logger.isEnabled()) logger.write("Error while getting current proxy thumb");
+				e.printStackTrace();
+			}
+			Platform.init(this, logger, appName, null, rootDir, appDir, debuggerSetupDir, classLoader, dexDir, dexThumb);
 			Platform.run();
 	
 			onCreateInternal();
 		}
 	}
 	
-	private void prepareAppBuilderCallbackImpl()
+	private void prepareAppBuilderCallbackImpl(Logger logger)
 	{
 		Class<?> appBuilderCallbackClass = null;
 		
@@ -762,8 +774,9 @@ public class NativeScriptApplication extends android.app.Application implements 
 		catch (ClassNotFoundException e)
 		{
 			appBuilderCallbackClass = null;
-			if(Platform.IsLogEnabled) {
-				Log.d(logTag, "prepareAppBuilderCallbackImpl error: " + e.getMessage());
+			if (logger.isEnabled())
+			{
+				logger.write(logTag, "prepareAppBuilderCallbackImpl error: " + e.getMessage());
 			}
 		}	
 		
@@ -776,28 +789,30 @@ public class NativeScriptApplication extends android.app.Application implements 
 			catch (InstantiationException e)
 			{
 				appBuilderCallbackImpl = null;
-				if(Platform.IsLogEnabled) {
-					Log.d(logTag, "prepareAppBuilderCallbackImpl error: " + e.getMessage());
+				if (logger.isEnabled())
+				{
+					logger.write(logTag, "prepareAppBuilderCallbackImpl error: " + e.getMessage());
 				}
 			}
 			catch (IllegalAccessException e)
 			{
 				appBuilderCallbackImpl = null;
-				if(Platform.IsLogEnabled) {
-					Log.d(logTag, "prepareAppBuilderCallbackImpl error: " + e.getMessage());
+				if (logger.isEnabled())
+				{
+					logger.write(logTag, "prepareAppBuilderCallbackImpl error: " + e.getMessage());
 				}
 			}
 		}
 
 		Thread.UncaughtExceptionHandler exHandler = (appBuilderCallbackImpl != null)
 				? appBuilderCallbackImpl.getDefaultUncaughtExceptionHandler()
-				: new NativeScriptUncaughtExceptionHandler(this);
+				: new NativeScriptUncaughtExceptionHandler(logger, this);
 
 		Thread.setDefaultUncaughtExceptionHandler(exHandler);
 		
 		boolean shouldEnableDebugging = (appBuilderCallbackImpl != null)
 				? appBuilderCallbackImpl.shouldEnableDebugging(this)
-				: Platform.isDebuggableApp(this);
+				: Util.isDebuggableApp(this);
 				
 		if (shouldEnableDebugging)
 		{
@@ -1520,5 +1535,5 @@ public class NativeScriptApplication extends android.app.Application implements 
 	
 	private AppBuilderCallback appBuilderCallbackImpl;
 	
-	private final String logTag = Platform.DEFAULT_LOG_TAG;
+	private final String logTag = "NativeScriptApplication";
 }

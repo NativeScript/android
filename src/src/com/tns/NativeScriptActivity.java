@@ -1572,7 +1572,7 @@ public class NativeScriptActivity extends android.app.Activity
 			Object[] args = new Object[1];
 			args[0] = param_0;
 			com.tns.Platform.callJSMethod(this, "onCreate", void.class, args);
-			android.util.Log.d(com.tns.Platform.DEFAULT_LOG_TAG, "NativeScriptActivity.onCreate called");
+			android.util.Log.d("NativeScriptActivity", "NativeScriptActivity.onCreate called");
 		}
 		else
 		{
