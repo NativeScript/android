@@ -484,79 +484,51 @@ void NativeScriptRuntime::CallJavaMethod(const Local<Object>& caller, const stri
 		case '[':
 		case 'L':
 		{
-			bool isString = returnType == "Ljava/lang/String;";
-
 			jobject result = nullptr;
 			bool exceptionOccurred;
 
-			if (isString)
+			if (isStatic)
 			{
-				if (isStatic)
-				{
-					result = env.CallStaticObjectMethodA(clazz, mid, javaArgs);
-				}
-				else if (isSuper)
-				{
-					result = env.CallNonvirtualObjectMethodA(callerJavaObject, clazz, mid, javaArgs);
-				}
-				else
-				{
-					result = env.CallObjectMethodA(callerJavaObject, mid, javaArgs);
-				}
-
-				exceptionOccurred = env.ExceptionCheck() == JNI_TRUE;
-
-				if (!exceptionOccurred)
-				{
-					auto resultV8String = ArgConverter::jstringToV8String((jstring) result);
-					args.GetReturnValue().Set(resultV8String);
-				}
+				result = env.CallStaticObjectMethodA(clazz, mid, javaArgs);
+			}
+			else if (isSuper)
+			{
+				result = env.CallNonvirtualObjectMethodA(callerJavaObject, clazz, mid, javaArgs);
 			}
 			else
 			{
-				if (isStatic)
-				{
-					result = env.CallStaticObjectMethodA(clazz, mid, javaArgs);
-				}
-				else if (isSuper)
-				{
-					result = env.CallNonvirtualObjectMethodA(callerJavaObject, clazz, mid, javaArgs);
-				}
-				else
-				{
-					result = env.CallObjectMethodA(callerJavaObject, mid, javaArgs);
-				}
+				result = env.CallObjectMethodA(callerJavaObject, mid, javaArgs);
+			}
 
-				exceptionOccurred = env.ExceptionCheck() == JNI_TRUE;
+			exceptionOccurred = env.ExceptionCheck() == JNI_TRUE;
 
-				if (!exceptionOccurred)
+			if (!exceptionOccurred)
+			{
+				if (result != nullptr)
 				{
-					if (result != nullptr)
+					auto isString = (returnType == "Ljava/lang/String;") || env.IsInstanceOf(result, JAVA_LANG_STRING);
+
+					Local<Value> objectResult;
+					if (isString)
 					{
-						isString = env.IsInstanceOf(result, JAVA_LANG_STRING);
-
-						Local<Value> objectResult;
-						if (isString)
-						{
-							objectResult = ArgConverter::jstringToV8String((jstring)result);
-						}
-						else
-						{
-							jint javaObjectID = objectManager->GetOrCreateObjectId(result);
-							objectResult = objectManager->GetJsObjectByJavaObject(javaObjectID);
-
-							if (objectResult.IsEmpty())
-							{
-								objectResult = objectManager->CreateJSWrapper(javaObjectID, returnType, result);
-							}
-						}
-
-						args.GetReturnValue().Set(objectResult);
+						objectResult = ArgConverter::jstringToV8String((jstring)result);
 					}
 					else
 					{
-						args.GetReturnValue().Set(Null(isolate));
+						jint javaObjectID = objectManager->GetOrCreateObjectId(result);
+						objectResult = objectManager->GetJsObjectByJavaObject(javaObjectID);
+
+						if (objectResult.IsEmpty())
+						{
+							objectResult = objectManager->CreateJSWrapper(javaObjectID, returnType, result);
+						}
 					}
+
+					args.GetReturnValue().Set(objectResult);
+				}
+				else
+				{
+					args.GetReturnValue().Set(Null(isolate));
 				}
 			}
 
