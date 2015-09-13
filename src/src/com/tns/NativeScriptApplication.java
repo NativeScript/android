@@ -708,7 +708,7 @@ public class NativeScriptApplication extends android.app.Application implements 
 	
 	public void onCreate() {
 		
-		Logger logger = new LogcatLogger(BuildConfig.DEBUG);
+		Logger logger = new LogcatLogger(BuildConfig.DEBUG, this);
 		
 		boolean showErrorIntent = hasErrorIntent();
 		if (!showErrorIntent)

@@ -1,10 +1,5 @@
 package com.tns;
 
-import java.io.BufferedReader;
-import java.io.Closeable;
-import java.io.IOException;
-import java.io.InputStreamReader;
-
 import com.tns.internal.Plugin;
 
 import android.content.Context;
@@ -12,7 +7,6 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
-import android.util.Log;
 
 public final class Util
 {
@@ -43,73 +37,6 @@ public final class Util
 
 		boolean isDebuggableApp = ((flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0);
 		return isDebuggableApp;
-	}
-
-    public static void initLogging(Logger logger, Context context)
-    {
-    	int flags;
-		boolean verboseLogging = false;
-		try
-		{
-			flags = context.getPackageManager().getPackageInfo(context.getPackageName(), 0).applicationInfo.flags;
-			verboseLogging = ((flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0);
-		}
-		catch (NameNotFoundException e)
-		{
-			e.printStackTrace();
-			return;
-		}
-		
-		if (!verboseLogging)
-		{
-			return;
-		}
-		
-    	String verboseLoggingProp = readSystemProperty("nativescript.verbose.logging");
-    	if (verboseLoggingProp.equals("true") || verboseLoggingProp.equals("TRUE") ||
-    		verboseLoggingProp.equals("yes") || verboseLoggingProp.equals("YES") ||
-    		verboseLoggingProp.equals("enabled") || verboseLoggingProp.equals("ENABLED"))
-    	{
-    		logger.setEnabled(true);
-    	}
-    }
-    
-    
-	private static String readSystemProperty(String name)
-	{
-		InputStreamReader in = null;
-		BufferedReader reader = null;
-		try
-		{
-			Process proc = Runtime.getRuntime().exec(new String[] { "/system/bin/getprop", name });
-			in = new InputStreamReader(proc.getInputStream());
-			reader = new BufferedReader(in);
-			return reader.readLine();
-		}
-		catch (IOException e)
-		{
-			return null;
-		}
-		finally
-		{
-			silentClose(in);
-			silentClose(reader);
-		}
-	}
-	
-	public static void silentClose(Closeable closeable)
-	{
-		if (closeable == null)
-		{
-			return;
-		}
-		try
-		{
-			closeable.close();
-		}
-		catch (IOException ignored)
-		{
-		}
 	}
 	
 	static boolean runPlugin(Logger logger, Context context)
