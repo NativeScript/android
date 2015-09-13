@@ -21,12 +21,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.pm.ApplicationInfo;
-import android.content.pm.PackageManager.NameNotFoundException;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
-import android.util.Log;
 
 public class JsDebugger
 {
@@ -40,7 +35,7 @@ public class JsDebugger
 
 	private static native void sendCommand(byte[] command, int length);
 
-	private static final Handler mainThreadHandler = new Handler(Looper.getMainLooper());
+	private static ThreadScheduler threadScheduler;
 
 	private static final int INVALID_PORT = -1;
 
@@ -60,9 +55,10 @@ public class JsDebugger
 	
 	private final Logger logger;
 
-	public JsDebugger(Logger logger, File debuggerSetupDirectory)
+	public JsDebugger(Logger logger, ThreadScheduler threadScheduler, File debuggerSetupDirectory)
 	{
 		this.logger = logger;
+		JsDebugger.threadScheduler = threadScheduler;
 		this.debuggerSetupDirectory = debuggerSetupDirectory;
 	}
 
@@ -210,7 +206,7 @@ public class JsDebugger
 								int cmdLength = cmdBytes.length;
 								sendCommand(cmdBytes, cmdLength);
 
-								boolean success = mainThreadHandler.post(dispatchProcessDebugMessages);
+								boolean success = JsDebugger.threadScheduler.post(dispatchProcessDebugMessages);
 								assert success;
 							}
 							catch (UnsupportedEncodingException e)
