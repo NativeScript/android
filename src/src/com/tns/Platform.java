@@ -18,8 +18,6 @@ import java.util.HashSet;
 
 import org.json.JSONObject;
 
-import android.os.Handler;
-import android.os.Looper;
 import android.util.SparseArray;
 
 import com.tns.bindings.ProxyGenerator;
@@ -67,13 +65,15 @@ public class Platform
 	
 	private static ExtractPolicy extractPolicy;
 
-	private static Thread mainThread;
+	private static Thread workThread;
 
 	private static long lastUsedMemory = 0;
 	
 	private static ArrayList<Constructor<?>> ctorCache = new ArrayList<Constructor<?>>();
 	
 	private static Logger logger;
+	
+	private static ThreadScheduler threadScheduler;
 
 	private static JsDebugger jsDebugger;
 	
@@ -97,24 +97,26 @@ public class Platform
 		errorActivityClass = clazz;
 	}
 	
-	public static int init(Logger logger, String appName, File runtimeLibPath, File rootDir, File appDir, File debuggerSetupDir, ClassLoader classLoader, File dexDir, String dexThumb) throws RuntimeException
+	public static int init(ThreadScheduler threadScheduler, Logger logger, String appName, File runtimeLibPath, File rootDir, File appDir, File debuggerSetupDir, ClassLoader classLoader, File dexDir, String dexThumb) throws RuntimeException
 	{
-		return init(null, logger, appName, runtimeLibPath, rootDir, appDir, debuggerSetupDir, classLoader, dexDir, dexThumb);
+		return init(null, threadScheduler, logger, appName, runtimeLibPath, rootDir, appDir, debuggerSetupDir, classLoader, dexDir, dexThumb);
 	}
 	
-	public static int init(Object application, Logger logger, String appName, File runtimeLibPath, File rootDir, File appDir, File debuggerSetupDir, ClassLoader classLoader, File dexDir, String dexThumb) throws RuntimeException
+	public static int init(Object application, ThreadScheduler threadScheduler, Logger logger, String appName, File runtimeLibPath, File rootDir, File appDir, File debuggerSetupDir, ClassLoader classLoader, File dexDir, String dexThumb) throws RuntimeException
 	{
 		if (initialized)
 		{
 			throw new RuntimeException("NativeScriptApplication already initialized");
 		}
 		
+		workThread = Thread.currentThread();
+		
+		Platform.threadScheduler = threadScheduler;
+		
 		Platform.logger = logger;
 		
 		loadLibrary(runtimeLibPath, "NativeScript");
 		
-		mainThread = Thread.currentThread();
-
 		Platform.dexFactory = new DexFactory(logger, classLoader, dexDir, dexThumb);
 
 		int appJavaObjectId = -1;
@@ -794,19 +796,17 @@ public class Platform
 		final int returnType = TypeIDs.GetObjectTypeId(retType);
 		Object ret = null;
 		
-		boolean isMainThread = mainThread.equals(Thread.currentThread());
+		boolean isWorkThread = workThread.equals(Thread.currentThread());
 		
 		final Object[] tmpArgs = extendConstructorArgs(methodName, isConstructor, args);
 
-		if (isMainThread)
+		if (isWorkThread)
 		{
 			Object[] packagedArgs = packageArgs(tmpArgs);
 			ret = callJSMethodNative(javaObjectID, methodName, returnType, isConstructor, packagedArgs);
 		}
 		else
 		{
-			Handler mainThreadHandler = new Handler(Looper.getMainLooper());
-
 			final Object[] arr = new Object[2];
 			
 			final boolean isCtor = isConstructor; 
@@ -840,7 +840,7 @@ public class Platform
 				catch (InterruptedException e) {}
 			}
 
-			boolean success = mainThreadHandler.post(r);
+			boolean success = threadScheduler.post(r);
 
 			if (success)
 			{

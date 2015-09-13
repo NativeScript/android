@@ -4,6 +4,8 @@ import java.io.File;
 
 import android.app.Application;
 import android.content.pm.PackageManager.NameNotFoundException;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
 import com.tns.internal.AppBuilderCallback;
@@ -750,7 +752,8 @@ public class NativeScriptApplication extends android.app.Application implements 
 				if (logger.isEnabled()) logger.write("Error while getting current proxy thumb");
 				e.printStackTrace();
 			}
-			Platform.init(this, logger, appName, null, rootDir, appDir, debuggerSetupDir, classLoader, dexDir, dexThumb);
+			ThreadScheduler mainThreadScheduler = new  MainThreadScheduler(new Handler(Looper.getMainLooper()));
+			Platform.init(this, mainThreadScheduler, logger, appName, null, rootDir, appDir, debuggerSetupDir, classLoader, dexDir, dexThumb);
 			Platform.run();
 	
 			onCreateInternal();
