@@ -12,7 +12,7 @@ import org.json.JSONObject;
 import android.content.Context;
 import android.util.Log;
 
-public class Require
+class Require
 {
 	private static Logger logger;
 	private static String RootPackageDir;
@@ -52,12 +52,12 @@ public class Require
 		initialized = true;
 	}
 
-	public static String getApplicationFilesPath()
+	static String getApplicationFilesPath()
 	{
 		return ApplicationFilesPath;
 	}
 
-	public static String bootstrapApp()
+	static String bootstrapApp()
 	{
 		// Bootstrap logic flows like:
 		// 1. Check for package.json -> `main` field
@@ -80,7 +80,8 @@ public class Require
 		return modulePath;
 	}
 
-	public static String getModulePath(String moduleName, String callingDirName)
+	@RuntimeCallable
+	private static String getModulePath(String moduleName, String callingDirName)
 	{
 		// This method is called my the NativeScriptRuntime.cpp RequireCallback method.
 		// The currentModuleDir is the directory path of the calling module.

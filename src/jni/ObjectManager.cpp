@@ -25,7 +25,7 @@ ObjectManager::ObjectManager()
 	GET_JAVAOBJECT_BY_ID_METHOD_ID = env.GetStaticMethodID(PlatformClass, "getJavaObjectByID", "(I)Ljava/lang/Object;");
 	assert(GET_JAVAOBJECT_BY_ID_METHOD_ID != nullptr);
 
-	GET_OR_CREATE_JAVA_OBJECT_ID_METHOD_ID = env.GetStaticMethodID(PlatformClass, "getorCreateJavaObjectID", "(Ljava/lang/Object;)I");
+	GET_OR_CREATE_JAVA_OBJECT_ID_METHOD_ID = env.GetStaticMethodID(PlatformClass, "getOrCreateJavaObjectID", "(Ljava/lang/Object;)I");
 	assert(GET_OR_CREATE_JAVA_OBJECT_ID_METHOD_ID != nullptr);
 
 	MAKE_INSTANCE_WEAK_BATCH_METHOD_ID = env.GetStaticMethodID(PlatformClass, "makeInstanceWeak", "(Ljava/nio/ByteBuffer;IZ)V");

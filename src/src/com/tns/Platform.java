@@ -63,7 +63,6 @@ public class Platform
 	private static Class<?> errorActivityClass;
 	
 	private final static Object keyNotFoundObject = new Object();
-	public final static String ApplicationAssetsPath = "app/";
 	private static int currentObjectId = -1;
 	
 	private static ExtractPolicy extractPolicy;
@@ -80,11 +79,21 @@ public class Platform
 	
 	private static DexFactory dexFactory;
 	
-	public static Class<?> getErrorActivityClass(){
+	private final static Comparator<Method> methodComparator = new Comparator<Method>()
+	{
+		public int compare(Method lhs, Method rhs)
+		{
+			return lhs.getName().compareTo(rhs.getName());
+		}
+	};
+
+	public static Class<?> getErrorActivityClass()
+	{
 		return errorActivityClass;
 	}
 	
-	public static void setErrorActivityClass(Class<?> clazz){
+	public static void setErrorActivityClass(Class<?> clazz)
+	{
 		errorActivityClass = clazz;
 	}
 	
@@ -182,6 +191,7 @@ public class Platform
 		}
 	}
 	
+	@RuntimeCallable
 	public static void enableVerboseLogging()
 	{
 		logger.setEnabled(true);
@@ -189,6 +199,7 @@ public class Platform
 		enableVerboseLoggingNative();
 	}
 
+	@RuntimeCallable
 	public static void disableVerboseLogging()
 	{
 		logger.setEnabled(false);
@@ -196,7 +207,8 @@ public class Platform
 		disableVerboseLoggingNative();
 	}
 
-	public static void appFail(Throwable ex, String message)
+	@RuntimeCallable
+	static void appFail(Throwable ex, String message)
 	{
 		// TODO: allow app to handle fail message report here. For example
 		// integrate google app reports
@@ -232,12 +244,14 @@ public class Platform
 		runNativeScript(bootstrapPath);
 	}
 	
+	@RuntimeCallable
 	private static Class<?> resolveClass(String fullClassName, String[] methodOverrides) throws ClassNotFoundException, IOException{
 		Class<?> javaClass = ClassResolver.resolveClass(fullClassName, dexFactory, methodOverrides);
 		
 		return javaClass;
 	}
 
+	@RuntimeCallable
 	private static int cacheConstructor(Class<?> clazz, Object[] args) throws ClassNotFoundException, IOException
 	{
 		Constructor<?> ctor = MethodResolver.resolveConstructor(clazz, args);
@@ -251,6 +265,7 @@ public class Platform
 		return ctorId;
 	}
 
+	@RuntimeCallable
 	private static Object createInstance(Object[] args, int objectId, int constructorId) throws InstantiationException, IllegalAccessException, ClassNotFoundException, NoSuchMethodException, IllegalArgumentException, InvocationTargetException, IOException
 	{
 		Constructor<?> ctor = ctorCache.get(constructorId);
@@ -294,6 +309,7 @@ public class Platform
 		return instance;
 	}
 	
+	@RuntimeCallable
 	private static long getChangeInBytesOfUsedMemory()
 	{
 		long usedMemory = runtime.totalMemory() - runtime.freeMemory();
@@ -494,14 +510,7 @@ public class Platform
 		return ret;
 	}
 	
-	private final static Comparator<Method> methodComparator = new Comparator<Method>()
-	{
-		public int compare(Method lhs, Method rhs)
-		{
-			return lhs.getName().compareTo(rhs.getName());
-		}
-	};
-
+	@RuntimeCallable
 	private static void makeInstanceStrong(Object instance, int objectId)
 	{
 		if (instance == null)
@@ -542,6 +551,7 @@ public class Platform
 		strongJavaObjectToID.remove(instance);
 	}
 	
+	@RuntimeCallable
 	private static void makeInstanceWeak(ByteBuffer buff, int length, boolean keepAsWeak)
 	{
 		buff.position(0);
@@ -552,6 +562,7 @@ public class Platform
 		}
 	}
 	
+	@RuntimeCallable
 	private static void checkWeakObjectAreAlive(ByteBuffer input, ByteBuffer output, int length)
 	{
 		input.position(0);
@@ -587,7 +598,8 @@ public class Platform
 		}
 	}
 	
-	public static Object getJavaObjectByID(int javaObjectID) throws Exception
+	@RuntimeCallable
+	private static Object getJavaObjectByID(int javaObjectID) throws Exception
 	{
 		if (logger.isEnabled()) logger.write("Platform.getJavaObjectByID:" + javaObjectID);
 
@@ -625,7 +637,8 @@ public class Platform
 		return id;
 	}
 
-	public static int getorCreateJavaObjectID(Object obj)
+	@RuntimeCallable
+	public static int getOrCreateJavaObjectID(Object obj)
 	{
 		Integer result = getJavaObjectID(obj);
 
@@ -703,7 +716,7 @@ public class Platform
 				if (typeId == TypeIDs.JsObject)
 				{
 					javaClassPath = value.getClass().getName();
-					value = getorCreateJavaObjectID(value);
+					value = getOrCreateJavaObjectID(value);
 				}
 
 				packagedArgs[jsArgsIndex++] = typeId;
@@ -717,7 +730,8 @@ public class Platform
 		return packagedArgs;
 	}
 
-	public static String resolveMethodOverload(String className, String methodName, Object[] args) throws Exception
+	@RuntimeCallable
+	private static String resolveMethodOverload(String className, String methodName, Object[] args) throws Exception
 	{
 		if (logger.isEnabled()) logger.write("resolveMethodOverload: Resolving method " + methodName + " on class " + className);
 		String res = MethodResolver.resolveMethodOverload(classCache, className, methodName, args);
@@ -730,7 +744,7 @@ public class Platform
 		return res;
 	}
 	
-	public static boolean isJavaThrowable(Object obj)
+	private static boolean isJavaThrowable(Object obj)
 	{
 		boolean isJavaThrowable = false;
 
@@ -852,13 +866,15 @@ public class Platform
 		return ret;
 	}
 	
+	@RuntimeCallable
 	private static Class<?> getCachedClass(String className)
 	{
 		Class<?> clazz = classCache.get(className);
 		return clazz;
 	}
 
-    private static Class<?> findClass(String className) throws ClassNotFoundException
+	@RuntimeCallable
+	private static Class<?> findClass(String className) throws ClassNotFoundException
     {
     	Class<?> clazz = dexFactory.findClass(className);
 		return clazz;

@@ -7,7 +7,7 @@ public class NativeScriptActivity extends android.app.Activity
 	public NativeScriptActivity()
 	{
 		com.tns.Platform.initInstance(this);
-		objectId = com.tns.Platform.getorCreateJavaObjectID(this);
+		objectId = com.tns.Platform.getOrCreateJavaObjectID(this);
 	}
 	
 	public void addContentView(android.view.View param_0, android.view.ViewGroup.LayoutParams param_1)
