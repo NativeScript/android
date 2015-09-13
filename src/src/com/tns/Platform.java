@@ -65,8 +65,6 @@ public class Platform
 	
 	private static ExtractPolicy extractPolicy;
 
-	private static Thread workThread;
-
 	private static long lastUsedMemory = 0;
 	
 	private static ArrayList<Constructor<?>> ctorCache = new ArrayList<Constructor<?>>();
@@ -108,8 +106,6 @@ public class Platform
 		{
 			throw new RuntimeException("NativeScriptApplication already initialized");
 		}
-		
-		workThread = Thread.currentThread();
 		
 		Platform.threadScheduler = threadScheduler;
 		
@@ -796,7 +792,7 @@ public class Platform
 		final int returnType = TypeIDs.GetObjectTypeId(retType);
 		Object ret = null;
 		
-		boolean isWorkThread = workThread.equals(Thread.currentThread());
+		boolean isWorkThread = threadScheduler.getThread().equals(Thread.currentThread());
 		
 		final Object[] tmpArgs = extendConstructorArgs(methodName, isConstructor, args);
 

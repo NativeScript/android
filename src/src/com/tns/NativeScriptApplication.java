@@ -752,8 +752,8 @@ public class NativeScriptApplication extends android.app.Application implements 
 				if (logger.isEnabled()) logger.write("Error while getting current proxy thumb");
 				e.printStackTrace();
 			}
-			ThreadScheduler mainThreadScheduler = new  MainThreadScheduler(new Handler(Looper.getMainLooper()));
-			Platform.init(this, mainThreadScheduler, logger, appName, null, rootDir, appDir, debuggerSetupDir, classLoader, dexDir, dexThumb);
+			ThreadScheduler workThreadScheduler = new WorkThreadScheduler(new Handler(Looper.getMainLooper()));
+			Platform.init(this, workThreadScheduler, logger, appName, null, rootDir, appDir, debuggerSetupDir, classLoader, dexDir, dexThumb);
 			Platform.run();
 	
 			onCreateInternal();
