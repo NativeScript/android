@@ -106,8 +106,7 @@ Local<Array> ArgConverter::ConvertJavaArgsToJsArgs(jobjectArray args)
 				jsArg = Number::New(isolate, JType::DoubleValue(env, arg));
 				break;
 			case Type::String:
-				v8String = jstringToV8String((jstring)arg);
-				jsArg = v8String;
+				jsArg = jstringToV8String((jstring)arg);
 				break;
 			case Type::JsObject:
 			{
@@ -156,11 +155,11 @@ std::string ArgConverter::jstringToString(jstring value)
 	return s;
 }
 
-Local<String> ArgConverter::jstringToV8String(jstring value)
+Local<Value> ArgConverter::jstringToV8String(jstring value)
 {
 	if	(value == nullptr)
 	{
-		return Local<String>();
+		return Null(Isolate::GetCurrent());
 	}
 
 	JEnv env;

@@ -420,8 +420,12 @@ void FieldAccessor::SetJavaField(const Local<Object>& target, const Local<Value>
 		if (isString)
 		{
 			//TODO: validate valie is a string;
-			String::Utf8Value stringValue(value->ToString());
-			JniLocalRef value(env.NewStringUTF(*stringValue));
+			jstring result = nullptr;
+			if(!value->IsNull()) {
+				String::Utf8Value stringValue(value);
+				result = env.NewStringUTF(*stringValue);
+			}
+			JniLocalRef value(result);
 
 			if (isStatic)
 			{
