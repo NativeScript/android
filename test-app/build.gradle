@@ -224,10 +224,10 @@ task deletePreviousResultXml (type: Exec) {
 	println "---- removing previous android_unit_test_results.xml"
 	
 	if(isWinOs) {
-		commandLine "cmd", "/c", "adb", "shell", "rm", "/sdcard/android_unit_test_results.xml"
+		commandLine "cmd", "/c", "adb", "shell", "rm", "-rf", "/sdcard/android_unit_test_results.xml"
 	}
 	else {
-		commandLine "adb", "shell", "rm", "/sdcard/android_unit_test_results.xml"
+		commandLine "adb", "shell", "rm", "-rf", "/sdcard/android_unit_test_results.xml"
 	}
 }
 
