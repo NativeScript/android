@@ -412,8 +412,7 @@ void FieldAccessor::SetJavaField(const Local<Object>& target, const Local<Value>
 			if (isString)
 			{
 				//TODO: validate valie is a string;
-				String::Utf8Value stringValue(value);
-				result = env.NewStringUTF(*stringValue);
+				result = ConvertToJavaString(value);
 			}
 			else
 			{
