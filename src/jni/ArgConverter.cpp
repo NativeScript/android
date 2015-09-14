@@ -77,15 +77,13 @@ Local<Array> ArgConverter::ConvertJavaArgsToJsArgs(jobjectArray args)
 		Type argTypeID = (Type)JType::IntValue(env, argTypeIDObj);
 
 		Local<Value> jsArg;
-		Local<String> v8String;
 		switch (argTypeID)
 		{
 			case Type::Boolean:
 				jsArg = Boolean::New(isolate, JType::BooleanValue(env, arg));
 				break;
 			case Type::Char:
-				v8String = jcharToV8String(JType::CharValue(env, arg));
-				jsArg = v8String;
+				jsArg =jcharToV8String(JType::CharValue(env, arg));
 				break;
 			case Type::Byte:
 				jsArg = Number::New(isolate, JType::ByteValue(env, arg));
