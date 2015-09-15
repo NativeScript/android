@@ -1,3 +1,35 @@
+1.3.0
+==
+
+## What's New
+
+ - [Expose public API for NativeScript Companion App for deleting old *.dex files (#187)](https://github.com/NativeScript/android-runtime/issues/187)
+ - [Add support for AppBuilder LiveSync (#186)](https://github.com/NativeScript/android-runtime/issues/186)
+ - [Create a new template project for Gradle build (#182)](https://github.com/NativeScript/android-runtime/issues/182)
+ - [Support ~ path syntax in require (#177)](https://github.com/NativeScript/android-runtime/issues/177)
+ - [Enable using the Google Design library (and alike) with "library add" command (#140)](https://github.com/NativeScript/android-runtime/issues/140)
+ - [Implement support for CLI live sync feature (#137)](https://github.com/NativeScript/android-runtime/issues/137)
+ - [Ahead-of-time generation of binding proxies (#103)](https://github.com/NativeScript/android-runtime/issues/103)
+ - [Use pool of arrays for marshalling (#33)](https://github.com/NativeScript/android-runtime/issues/33)
+
+## Bug Fixes
+
+ - [Run after LiveSync starts the last synced app on the device/emulator (#214)](https://github.com/NativeScript/android-runtime/issues/214)
+ - [Cannot load module with relative path on Android 6 (#206)](https://github.com/NativeScript/android-runtime/issues/206)
+ - [App crashes when call overloaded method of a base class (#203)](https://github.com/NativeScript/android-runtime/issues/203)
+ - [Fix file is external to application error on Android M (#185)](https://github.com/NativeScript/android-runtime/issues/185)
+ - [App crash during GC (#184)](https://github.com/NativeScript/android-runtime/issues/184)
+ - [JNI reference leaks when passing JavaScript arrays (#167)](https://github.com/NativeScript/android-runtime/issues/167)
+ - [ArrayBuffer broken (#164)](https://github.com/NativeScript/android-runtime/issues/164)
+ - [ClassCastException when tries to convert numeric return value of overridden methods (#139)](https://github.com/NativeScript/android-runtime/issues/139)
+ - [Allow debugger reconnects (#136)](https://github.com/NativeScript/android-runtime/issues/136)
+ - [__onUncaughtError is not called. (#108)](https://github.com/NativeScript/android-runtime/issues/108)
+
+## Performance
+
+ - [Cache parsed method signature (#181)](https://github.com/NativeScript/android-runtime/issues/181)
+ - [Use pool of arrays for marshalling (#33)](https://github.com/NativeScript/android-runtime/issues/33)
+
 # Android Runtime Changelog
 
 1.2.1
