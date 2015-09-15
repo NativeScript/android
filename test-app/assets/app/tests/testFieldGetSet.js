@@ -14,4 +14,14 @@ describe("Tests final fields set", function () {
 		
 		expect(exceptionCaught).toBe(true);
 	});
+	
+	it("When setting a field with null it should return null object", function () {
+		
+		var dc = new com.tns.tests.DummyClass();
+		
+		dc.nameField = null;
+		var s = dc.nameField;
+		
+		expect(s).toBe(null);
+	});
 });

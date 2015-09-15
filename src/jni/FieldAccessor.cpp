@@ -194,36 +194,26 @@ Local<Value> FieldAccessor::GetJavaField(const Local<Object>& target, FieldCallb
 	}
 	else
 	{
-		bool isString = fieldTypeName == "java/lang/String";
+		jobject result;
 
-		if (isString)
+		if (isStatic)
 		{
-			JniLocalRef result;
-			if (isStatic)
-			{
-				result = env.GetStaticObjectField(clazz, fieldId);
-			}
-			else
-			{
-				result = env.GetObjectField(targetJavaObject, fieldId);
-			}
-
-			auto resultV8String = ArgConverter::jstringToV8String(result);
-			fieldResult = handleScope.Escape(resultV8String);
+			result = env.GetStaticObjectField(clazz, fieldId);
 		}
 		else
 		{
-			jobject result;
-			if (isStatic)
+			result = env.GetObjectField(targetJavaObject, fieldId);
+		}
+
+		if(result != nullptr) {
+
+			bool isString = fieldTypeName == "java/lang/String";
+			if (isString)
 			{
-				result = env.GetStaticObjectField(clazz, fieldId);
+				auto resultV8Value = ArgConverter::jstringToV8String((jstring)result);
+				fieldResult = handleScope.Escape(resultV8Value);
 			}
 			else
-			{
-				result = env.GetObjectField(targetJavaObject, fieldId);
-			}
-
-			if (result != nullptr)
 			{
 				int javaObjectID = objectManager->GetOrCreateObjectId(result);
 				auto objectResult = objectManager->GetJsObjectByJavaObject(javaObjectID);
@@ -233,14 +223,13 @@ Local<Value> FieldAccessor::GetJavaField(const Local<Object>& target, FieldCallb
 					objectResult = objectManager->CreateJSWrapper(javaObjectID, fieldTypeName, result);
 				}
 
-				env.DeleteLocalRef(result);
-
 				fieldResult = handleScope.Escape(objectResult);
 			}
-			else
-			{
-				fieldResult = Null(isolate);
-			}
+			env.DeleteLocalRef(result);
+		}
+		else
+		{
+			fieldResult = handleScope.Escape(Null(isolate));
 		}
 	}
 	return fieldResult;
@@ -417,34 +406,33 @@ void FieldAccessor::SetJavaField(const Local<Object>& target, const Local<Value>
 	else
 	{
 		bool isString = fieldTypeName == "java/lang/String";
-		if (isString)
-		{
-			//TODO: validate valie is a string;
-			String::Utf8Value stringValue(value->ToString());
-			JniLocalRef value(env.NewStringUTF(*stringValue));
+		jobject result = nullptr;
 
-			if (isStatic)
+		if(!value->IsNull()) {
+			if (isString)
 			{
-				env.SetStaticObjectField(clazz, fieldId, value);
+				//TODO: validate valie is a string;
+				result = ConvertToJavaString(value);
 			}
 			else
 			{
-				env.SetObjectField(targetJavaObject, fieldId, value);
+				auto objectWithHiddenID = value->ToObject();
+				result =objectManager->GetJavaObjectByJsObject(objectWithHiddenID);
 			}
+		}
+
+		if (isStatic)
+		{
+			env.SetStaticObjectField(clazz, fieldId, result);
 		}
 		else
 		{
-			auto objectWithHiddenID = value->ToObject();
-			jweak javaObject = objectManager->GetJavaObjectByJsObject(objectWithHiddenID);
+			env.SetObjectField(targetJavaObject, fieldId, result);
+		}
 
-			if (isStatic)
-			{
-				env.SetStaticObjectField(clazz, fieldId, javaObject);
-			}
-			else
-			{
-				env.SetObjectField(targetJavaObject, fieldId, javaObject);
-			}
+		if (isString)
+		{
+			env.DeleteLocalRef(result);
 		}
 	}
 }
