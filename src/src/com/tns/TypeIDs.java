@@ -29,7 +29,7 @@ public class TypeIDs
 			{
 				return TypeIDs.Int;
 			}
-			else if (object instanceof Boolean)
+			else if (object instanceof Boolean || clazz.equals(boolean.class))
 			{
 				return TypeIDs.Boolean;
 			}
