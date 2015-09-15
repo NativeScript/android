@@ -25,3 +25,29 @@ The source in this repo is organized in Eclipse projects, using the ADT plugin. 
 * Download and install [Gradle](https://gradle.org/) (min version 2.3) Set path to gradle.
 * Download Android Support Repository through the Android SDK Manager (needed by gradle)
 * Download Build Tools 22 through the Android SDK Manager.
+
+# How to build
+
+* Get the widgets jar, either from [here](/build/project-template-gradle/libs/widgets.jar) or you can build it yourself from [android-widgets repo](https://github.com/NativeScript/android-widgets)
+* Copy the android-widgets.jar in the root directory of the runtime.
+* Run command 
+```Shell
+gradle packar -PwidgetsPath=./android-widgets.jar
+```
+or
+```Shell
+gradle packar -PwidgetsPath=./widgets.jar
+```
+depending on the jar you use.
+* The result of the build will be in the dist folder.
+
+# How to run tests
+
+* Go to subfolder test-app
+* Start an emulator or connect a device.
+
+  ``Note: Keep in mind the device or emulator needs to have an sdcard mounted.``
+* Run command
+```Shell
+gradle runtest
+```
