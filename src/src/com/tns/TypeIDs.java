@@ -16,62 +16,55 @@ public class TypeIDs
 	public static int JsObject = 9;
 	public static int Null = 10;
 
-	// TODO: handle array types
-
-	// public static int IntArray = 10;
-	// public static int CharArray = 10;
-	// public static int ByteArray = 10;
-	// public static int ByteArray = 10;
-
 	public static int GetObjectTypeId(Object object)
 	{
 		if (object == null)
 		{
 			return TypeIDs.Null;
 		}
-		else if (object instanceof Integer || object.toString() == int.class.getName())
+		else 
 		{
-			return TypeIDs.Int;
-		}
-		else if (object instanceof Boolean)
-		{
-			return TypeIDs.Boolean;
-		}
-		else if (object instanceof Character || object.toString() == char.class.getName())
-		{
-			return TypeIDs.Char;
-		}
-		else if (object instanceof Byte || object.toString() == byte.class.getName())
-		{
-			return TypeIDs.Byte;
-		}
-		else if (object instanceof Short || object.toString() == short.class.getName())
-		{
-			return TypeIDs.Short;
-		}
-		else if (object instanceof Long || object.toString() == long.class.getName())
-		{
-			return TypeIDs.Long;
-		}
-		else if (object instanceof Float || object.toString() == float.class.getName())
-		{
-			return TypeIDs.Float;
-		}
-		else if (object instanceof Double || object.toString() == double.class.getName())
-		{
-			return TypeIDs.Double;
-		}
-		else if (object instanceof String)
-		{
-			return TypeIDs.string;
-		}
-		// else if (object instanceof int[])
-		// {
-		// return TypeIDs.Array;
-		// }
-		else
-		{
-			return TypeIDs.JsObject;
+			Class<?> clazz = object.getClass();
+			if (object instanceof Integer || clazz.equals(int.class))
+			{
+				return TypeIDs.Int;
+			}
+			else if (object instanceof Boolean)
+			{
+				return TypeIDs.Boolean;
+			}
+			else if (object instanceof Character || clazz.equals(char.class))
+			{
+				return TypeIDs.Char;
+			}
+			else if (object instanceof Byte || clazz.equals(byte.class))
+			{
+				return TypeIDs.Byte;
+			}
+			else if (object instanceof Short || clazz.equals(short.class))
+			{
+				return TypeIDs.Short;
+			}
+			else if (object instanceof Long || clazz.equals(long.class))
+			{
+				return TypeIDs.Long;
+			}
+			else if (object instanceof Float || clazz.equals(float.class))
+			{
+				return TypeIDs.Float;
+			}
+			else if (object instanceof Double || clazz.equals(double.class))
+			{
+				return TypeIDs.Double;
+			}
+			else if (object instanceof String)
+			{
+				return TypeIDs.string;
+			}
+			else
+			{
+				return TypeIDs.JsObject;
+			}
 		}
 	}
 }
