@@ -150,6 +150,8 @@ namespace tns
 		static ObjectManager *objectManager;
 
 		static std::map<std::string, int> s_constructorCache;
+
+		static std::map<std::string, jclass> s_classCache;
 	};
 }
 

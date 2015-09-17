@@ -97,7 +97,7 @@ bool NativeScriptRuntime::RegisterInstance(const Local<Object>& jsObject, const 
 	bool classIsResolved = false;
 	if (!implementationObject.IsEmpty())
 	{
-		Local < Value > val = implementationObject->GetHiddenValue(ConvertToV8String(fullClassName));
+		auto val = implementationObject->GetHiddenValue(ConvertToV8String(fullClassName));
 		if (!val.IsEmpty())
 		{
 			void* voidPointerToVal = val.As<External>()->Value();
@@ -135,16 +135,29 @@ bool NativeScriptRuntime::RegisterInstance(const Local<Object>& jsObject, const 
 
 jclass NativeScriptRuntime::ResolveClass(const std::string& fullClassname, const Local<Object>& implementationObject) {
 
-	JEnv env;
+	auto itFound = s_classCache.find(fullClassname);
 
-	//get needed arguments in order to load binding
-	JniLocalRef javaFullClassName(env.NewStringUTF(fullClassname.c_str()));
+	jclass globalRefToGeneratedClass;
 
-	jobjectArray methodOverrides = GetMethodOverrides(env, implementationObject);
+	if (itFound != s_classCache.end())
+	{
+		globalRefToGeneratedClass = itFound->second;
+	}
+	else
+	{
+		JEnv env;
 
-	//create or load generated binding (java class)
-	JniLocalRef generatedClass(env.CallStaticObjectMethod(PlatformClass, RESOLVE_CLASS_METHOD_ID,  (jstring)javaFullClassName, methodOverrides));
-	jclass globalRefToGeneratedClass = reinterpret_cast<jclass>(env.NewGlobalRef(generatedClass));
+		//get needed arguments in order to load binding
+		JniLocalRef javaFullClassName(env.NewStringUTF(fullClassname.c_str()));
+
+		jobjectArray methodOverrides = GetMethodOverrides(env, implementationObject);
+
+		//create or load generated binding (java class)
+		JniLocalRef generatedClass(env.CallStaticObjectMethod(PlatformClass, RESOLVE_CLASS_METHOD_ID,  (jstring)javaFullClassName, methodOverrides));
+		globalRefToGeneratedClass = reinterpret_cast<jclass>(env.NewGlobalRef(generatedClass));
+
+		s_classCache.insert(make_pair(fullClassname, globalRefToGeneratedClass));
+	}
 
 	return globalRefToGeneratedClass;
 }
@@ -1107,3 +1120,4 @@ ArrayElementAccessor NativeScriptRuntime::arrayElementAccessor;
 FieldAccessor NativeScriptRuntime::fieldAccessor;
 string NativeScriptRuntime::APP_FILES_DIR;
 map<string, int> NativeScriptRuntime::s_constructorCache;
+map<std::string, jclass> NativeScriptRuntime::s_classCache;
