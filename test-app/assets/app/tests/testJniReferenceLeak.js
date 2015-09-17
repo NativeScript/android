@@ -94,6 +94,18 @@ describe("Tests JNI reference leak", function () {
 		
 		expect(n).toBe(N);
 	});
-
+	
+	it("test_if_global_reference_leaks_when_interface_implementation_is_created", function () {
+		
+		var n = 0;
+		var N = 100 * 1000;
+		
+		for (; n<N; n++)
+		{
+			var r = new java.lang.Runnable({ run: function(){} });
+		}
+		
+		expect(n).toBe(N);
+	});
 
 });
