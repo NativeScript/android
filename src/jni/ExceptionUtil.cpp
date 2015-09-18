@@ -359,11 +359,10 @@ jweak ExceptionUtil::TryGetJavaThrowableObject(JEnv& env, const Local<v8::Object
 {
 	jweak javaThrowableObject = nullptr;
 
-	auto jsInstanceInfo = jsObj->GetHiddenValue(ConvertToV8String("t::HiddenJSInstanceInfo"));
-	if (!jsInstanceInfo.IsEmpty())
-	{
-		jweak javaObj = objectManager->GetJavaObjectByJsObject(jsObj);
+	jweak javaObj = objectManager->GetJavaObjectByJsObject(jsObj);
 
+	if (javaObj != nullptr)
+	{
 		jboolean ret = env.CallStaticBooleanMethod(PlatformClass, IS_JAVA_THROWABLE_METHOD_ID, javaObj);
 
 		if (ret == JNI_TRUE)

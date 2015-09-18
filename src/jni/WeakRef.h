@@ -3,13 +3,14 @@
 
 #include "v8.h"
 #include <set>
+#include "ObjectManager.h"
 
 namespace tns
 {
 	class WeakRef
 	{
 	public:
-		static void ConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
+		static void Init(v8::Isolate *isolate, v8::Local<v8::ObjectTemplate>& globalObjectTemplate, ObjectManager *objectManager);
 
 	private:
 		WeakRef();
@@ -23,6 +24,8 @@ namespace tns
 			v8::Persistent<v8::Object> *target;
 			v8::Persistent<v8::Object> *holder;
 		};
+
+		static void ConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 		static v8::Local<v8::Function> GetClearFunction(v8::Isolate *isolate);
 
@@ -39,6 +42,8 @@ namespace tns
 		static v8::Persistent<v8::Function> *s_poClearFunc;
 
 		static v8::Persistent<v8::Function> *s_poGetterFunc;
+
+		static ObjectManager *s_objectManager;
 	};
 }
 

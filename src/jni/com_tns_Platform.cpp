@@ -121,7 +121,8 @@ void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring pa
 	globalTemplate->Set(ConvertToV8String("__disableVerboseLogging"), FunctionTemplate::New(isolate, NativeScriptRuntime::DisableVerboseLoggingMethodCallback));
 	globalTemplate->Set(ConvertToV8String("__exit"), FunctionTemplate::New(isolate, NativeScriptRuntime::ExitMethodCallback));
 	globalTemplate->Set(ConvertToV8String("require"), FunctionTemplate::New(isolate, NativeScriptRuntime::RequireCallback));
-	globalTemplate->Set(ConvertToV8String("WeakRef"), FunctionTemplate::New(isolate, WeakRef::ConstructorCallback));
+
+	WeakRef::Init(isolate, globalTemplate, g_objectManager);
 
 	SimpleProfiler::Init(isolate, globalTemplate);
 
@@ -131,6 +132,8 @@ void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring pa
 	PrimaryContext = new Persistent<Context>(isolate, context);
 
 	context_scope = new Context::Scope(context);
+
+	g_objectManager->Init(isolate);
 
 	auto global = context->Global();
 
@@ -175,7 +178,6 @@ extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj
 	Isolate::Scope isolate_scope(isolate);
 	HandleScope handleScope(isolate);
 
-	g_objectManager->SetGCHooks();
 	ExceptionUtil::GetInstance()->Init(g_jvm, g_objectManager);
 
 	JEnv env(_env);

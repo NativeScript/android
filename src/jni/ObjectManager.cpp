@@ -43,10 +43,14 @@ ObjectManager::ObjectManager()
 	ObjectManager::instance = this;
 }
 
-void ObjectManager::SetGCHooks()
+void ObjectManager::Init(Isolate *isolate)
 {
-	V8::AddGCPrologueCallback(ObjectManager::OnGcStartedStatic, kGCTypeAll);
+	auto jsWrapperFuncTemplate = FunctionTemplate::New(isolate, JSWrapperConstructorCallback);
+	jsWrapperFuncTemplate->InstanceTemplate()->SetInternalFieldCount(static_cast<int>(MetadataNodeKeys::END));
+	auto jsWrapperFunc = jsWrapperFuncTemplate->GetFunction();
+	s_poJsWrapperFunc = new Persistent<Function>(isolate, jsWrapperFunc);
 
+	V8::AddGCPrologueCallback(ObjectManager::OnGcStartedStatic, kGCTypeAll);
 	V8::AddGCEpilogueCallback(ObjectManager::OnGcFinishedStatic, kGCTypeAll);
 }
 
@@ -74,27 +78,37 @@ JSInstanceInfo* ObjectManager::GetJSInstanceInfo(const Local<Object>& object)
 	DEBUG_WRITE("ObjectManager::GetJSInstanceInfo: called");
 	JSInstanceInfo *jsInstanceInfo = nullptr;
 
-	Isolate* isolate = Isolate::GetCurrent();
+	auto isolate = Isolate::GetCurrent();
 	HandleScope handleScope(isolate);
 
-	auto v8HiddenJS = V8StringConstants::GetHiddenJSInstance();
-	auto hiddenValue = object->GetHiddenValue(v8HiddenJS);
-	if (hiddenValue.IsEmpty())
+	int internalFieldCound = NativeScriptExtension::GetInternalFieldCount(object);
+	const int count = static_cast<int>(MetadataNodeKeys::END);
+	const int jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
+	if (internalFieldCound == count)
 	{
-		//Typescript object layout has an object instance as child of the actual registered instance. checking for that
-		auto prototypeObject = object->GetPrototype().As<Object>();
-
-		if (!prototypeObject.IsEmpty() && prototypeObject->IsObject())
+		auto jsInfo = object->GetInternalField(jsInfoIdx);
+		if (jsInfo->IsUndefined())
 		{
-			DEBUG_WRITE("GetJSInstanceInfo: need to check prototype :%d", prototypeObject->GetIdentityHash());
-			hiddenValue = prototypeObject->GetHiddenValue(v8HiddenJS);
-		}
-	}
+			//Typescript object layout has an object instance as child of the actual registered instance. checking for that
+			auto prototypeObject = object->GetPrototype().As<Object>();
 
-	if (!hiddenValue.IsEmpty())
-	{
-		auto external = hiddenValue.As<External>();
-		jsInstanceInfo = static_cast<JSInstanceInfo*>(external->Value());
+			if (!prototypeObject.IsEmpty() && prototypeObject->IsObject())
+			{
+				DEBUG_WRITE("GetJSInstanceInfo: need to check prototype :%d", prototypeObject->GetIdentityHash());
+				internalFieldCound = NativeScriptExtension::GetInternalFieldCount(prototypeObject);
+				if (internalFieldCound == count)
+				{
+					jsInfo = prototypeObject->GetInternalField(jsInfoIdx);
+				}
+			}
+		}
+
+		if (!jsInfo.IsEmpty())
+		{
+			assert(jsInfo->IsExternal());
+			auto external = jsInfo.As<External>();
+			jsInstanceInfo = static_cast<JSInstanceInfo*>(external->Value());
+		}
 	}
 
 	return jsInstanceInfo;
@@ -222,23 +236,14 @@ void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID, jcl
 	auto state = new ObjectWeakCallbackState(this, jsInstanceInfo, objectHandle);
 	objectHandle->SetWeak(state, JSObjectWeakCallbackStatic);
 
-	auto hiddenString = V8StringConstants::GetHiddenJSInstance();
+	auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
+	bool alreadyLinked = !object->GetInternalField(jsInfoIdx)->IsUndefined();
+	//ASSERT_MESSAGE(alreadyLinked, "object should not have been linked before");
 
-	bool alreadyLinked = !object->GetHiddenValue(hiddenString).IsEmpty();
-	ASSERT_MESSAGE(!alreadyLinked, "object should not have been linked before");
-
-	auto hiddenValue = External::New(isolate, jsInstanceInfo);
-	object->SetHiddenValue(hiddenString, hiddenValue);
+	auto jsInfo = External::New(isolate, jsInstanceInfo);
+	object->SetInternalField(jsInfoIdx, jsInfo);
 
 	idToObject.insert(make_pair(javaObjectID, objectHandle));
-}
-
-bool ObjectManager::Unlink(Local<Object>& object)
-{
-	auto hiddenString = V8StringConstants::GetHiddenJSInstance();
-	auto found = !object->GetHiddenValue(hiddenString).IsEmpty();
-	object->SetHiddenValue(hiddenString, Local<Value>());
-	return found;
 }
 
 bool ObjectManager::CloneLink(const Local<Object>& src, const Local<Object>& dest)
@@ -249,9 +254,9 @@ bool ObjectManager::CloneLink(const Local<Object>& src, const Local<Object>& des
 
 	if (success)
 	{
-		auto hiddenString = V8StringConstants::GetHiddenJSInstance();
-		auto hiddenValue = External::New(Isolate::GetCurrent(), jsInfo);
-		dest->SetHiddenValue(hiddenString, hiddenValue);
+		auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
+		auto jsInfo = src->GetInternalField(jsInfoIdx);
+		dest->SetInternalField(jsInfoIdx, jsInfo);
 	}
 
 	return success;
@@ -738,5 +743,18 @@ void ObjectManager::DeleteWeakGlobalRefCallback(const jweak& object, void *state
 	env.DeleteWeakGlobalRef(object);
 }
 
+Local<Object> ObjectManager::GetEmptyObject(Isolate *isolate)
+{
+	auto emptyObjCtorFunc = Local<Function>::New(isolate, *s_poJsWrapperFunc);
+	auto val = emptyObjCtorFunc->CallAsConstructor(0, nullptr);
+	assert(val->IsObject());
+	auto obj = val.As<Object>();
+	return obj;
+}
+
+void ObjectManager::JSWrapperConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info)
+{
+}
 
 ObjectManager* ObjectManager::instance = nullptr;
+Persistent<Function>* ObjectManager::s_poJsWrapperFunc = nullptr;

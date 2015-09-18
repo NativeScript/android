@@ -21,7 +21,7 @@ namespace tns
 	public:
 		ObjectManager();
 
-		void SetGCHooks();
+		void Init(v8::Isolate *isolate);
 
 		static jweak GetJavaObjectByJsObjectStatic(const v8::Local<v8::Object>& object);
 
@@ -48,8 +48,6 @@ namespace tns
 
 		void Link(const v8::Local<v8::Object>& object, uint32_t javaObjectID, jclass clazz);
 
-		bool Unlink(v8::Local<v8::Object>& object);
-
 		bool CloneLink(const v8::Local<v8::Object>& src, const v8::Local<v8::Object>& dest);
 
 		std::string GetClassName(jobject javaObject);
@@ -57,6 +55,15 @@ namespace tns
 		std::string GetClassName(jclass clazz);
 
 		int GenerateNewObjectID();
+
+		v8::Local<v8::Object> GetEmptyObject(v8::Isolate *isolate);
+
+		enum class MetadataNodeKeys
+		{
+				JsInfo,
+				CallSuper,
+				END
+		};
 
 	private:
 		struct ObjectWeakCallbackState
@@ -153,6 +160,8 @@ namespace tns
 
 		static void DeleteWeakGlobalRefCallback(const jweak& object, void *state);
 
+		static void JSWrapperConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
+
 		int m_numberOfGC;
 
 		std::stack<GarbageCollectionInfo> m_markedForGC;
@@ -190,6 +199,8 @@ namespace tns
 		jmethodID CHECK_WEAK_OBJECTS_ARE_ALIVE_METHOD_ID;
 
 		static ObjectManager *instance;
+
+		static v8::Persistent<v8::Function>* s_poJsWrapperFunc;
 	};
 }
 
