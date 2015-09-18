@@ -94,6 +94,66 @@ void MetadataReader::FillEntryWithMethodInfo(MethodInfo& mi, MetadataEntry& entr
 	assert(sigLength > 0);
 	entry.paramCount = sigLength - 1;
 	entry.sig = mi.GetSignature();
+	FillReturnType(entry);
+}
+
+string MetadataReader::ParseReturnType(const string& signature)
+{
+	int idx = signature.find(')');
+	auto returnType = signature.substr(idx + 1);
+	return returnType;
+}
+
+MethodReturnType MetadataReader::GetReturnType(const string& returnType)
+{
+	MethodReturnType retType;
+	char retTypePrefix = returnType[0];
+	switch (retTypePrefix)
+	{
+		case 'V':
+			retType = MethodReturnType::Void;
+			break;
+		case 'B':
+			retType = MethodReturnType::Byte;
+			break;
+		case 'S':
+			retType = MethodReturnType::Short;
+			break;
+		case 'I':
+			retType = MethodReturnType::Int;
+			break;
+		case 'J':
+			retType = MethodReturnType::Long;
+			break;
+		case 'F':
+			retType = MethodReturnType::Float;
+			break;
+		case 'D':
+			retType = MethodReturnType::Double;
+			break;
+		case 'C':
+			retType = MethodReturnType::Char;
+			break;
+		case 'Z':
+			retType = MethodReturnType::Boolean;
+			break;
+		case '[':
+		case 'L':
+			retType = (returnType == "Ljava/lang/String;")
+						? MethodReturnType::String
+						: MethodReturnType::Object;
+			break;
+		default:
+			assert(false);
+			break;
+	}
+	return retType;
+}
+
+void MetadataReader::FillReturnType(MetadataEntry& entry)
+{
+	entry.returnType = ParseReturnType(entry.sig);
+	entry.retType = GetReturnType(entry.returnType);
 }
 
 MetadataEntry MetadataReader::ReadInstanceFieldEntry(uint8_t **data)

@@ -453,6 +453,7 @@ Local<Function> MetadataNode::SetMembersFromRuntimeMetadata(Isolate *isolate, Lo
 		MetadataEntry entry;
 		entry.name = name;
 		entry.sig = signature;
+		MetadataReader::FillReturnType(entry);
 		entry.paramCount = paramCount;
 		entry.isStatic = false;
 
@@ -813,7 +814,7 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
 
 	MetadataEntry *entry = nullptr;
 
-	string className;
+	string *className;
 	const auto& first = callbackData->candidates.front();
 	const auto& methodName = first.name;
 
@@ -821,7 +822,7 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
 	{
 		auto& candidates = callbackData->candidates;
 
-		className = callbackData->node->m_name;
+		className = &callbackData->node->m_name;
 
 		auto found = false;
 		for (auto& c: candidates)
@@ -850,9 +851,10 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
 	}
 
 //	// TODO: refactor this
-	if (isSuper && (className == "com/tns/NativeScriptActivity"))
+	if (isSuper && (*className == "com/tns/NativeScriptActivity"))
 	{
-		className = "android/app/Activity";
+		string activityBaseClassName("android/app/Activity");
+		className = &activityBaseClassName;
 	}
 
 	if ((argLength == 0) && (methodName == V8StringConstants::VALUE_OF))
@@ -861,7 +863,7 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
 	}
 	else
 	{
-		NativeScriptRuntime::CallJavaMethod(thiz, className, methodName, entry, first.isStatic, isSuper, info);
+		NativeScriptRuntime::CallJavaMethod(thiz, *className, methodName, entry, first.isStatic, isSuper, info);
 	}
 }
 

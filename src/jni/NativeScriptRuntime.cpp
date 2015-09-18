@@ -195,7 +195,10 @@ void NativeScriptRuntime::CallJavaMethod(const Local<Object>& caller, const stri
 
 	jclass clazz;
 	jmethodID mid;
-	string sig;
+	string *sig = nullptr;
+	string *returnType = nullptr;
+	auto retType = MethodReturnType::Unknown;
+	MethodCache::CacheMethodInfo mi;
 
 	if ((entry != nullptr) && entry->isResolved)
 	{
@@ -217,11 +220,11 @@ void NativeScriptRuntime::CallJavaMethod(const Local<Object>& caller, const stri
 					return;
 				}
 
-				mid = isStatic ?
+				entry->memberId = isStatic ?
 						env.GetStaticMethodID(clazz, methodName, entry->sig) :
 						env.GetMethodID(clazz, methodName, entry->sig);
 
-				if (mid == nullptr)
+				if (entry->memberId == nullptr)
 				{
 					DEBUG_WRITE("Cannot resolve a method %s on caller class: %s", methodName.c_str(), callerClassName.c_str());
 					return;
@@ -248,12 +251,13 @@ void NativeScriptRuntime::CallJavaMethod(const Local<Object>& caller, const stri
 			mid = reinterpret_cast<jmethodID>(entry->memberId);
 		}
 
-		sig = entry->sig;
+		sig = &entry->sig;
+		returnType = &entry->returnType;
+		retType = entry->retType;
 	}
 	else
 	{
 		DEBUG_WRITE("Resolving method: %s on className %s", methodName.c_str(), className.c_str());
-		MethodCache::CacheMethodInfo mi;
 
 		clazz = env.FindClass(className);
 		if (clazz != nullptr)
@@ -278,10 +282,11 @@ void NativeScriptRuntime::CallJavaMethod(const Local<Object>& caller, const stri
 			}
 		}
 
-
 		clazz = mi.clazz;
 		mid = mi.mid;
-		sig = mi.signature;
+		sig = &mi.signature;
+		returnType = &mi.returnType;
+		retType = mi.retType;
 	}
 
 
@@ -294,7 +299,7 @@ void NativeScriptRuntime::CallJavaMethod(const Local<Object>& caller, const stri
 		DEBUG_WRITE("CallJavaMethod called %s.%s. static method", className.c_str(), methodName.c_str());
 	}
 
-	JsArgConverter argConverter(args, false, sig, entry);
+	JsArgConverter argConverter(args, false, *sig, entry);
 
 	if (!argConverter.IsValid())
 	{
@@ -322,11 +327,9 @@ void NativeScriptRuntime::CallJavaMethod(const Local<Object>& caller, const stri
 		}
 	}
 
-	auto returnType = GetReturnType(sig);
-
-	switch (returnType[0])
+	switch (retType)
 	{
-		case 'V': //void
+		case MethodReturnType::Void:
 		{
 			if (isStatic)
 			{
@@ -342,7 +345,7 @@ void NativeScriptRuntime::CallJavaMethod(const Local<Object>& caller, const stri
 			}
 			break;
 		}
-		case 'Z': //bool
+		case MethodReturnType::Boolean:
 		{
 			jboolean result;
 			if (isStatic)
@@ -360,7 +363,7 @@ void NativeScriptRuntime::CallJavaMethod(const Local<Object>& caller, const stri
 			args.GetReturnValue().Set(result != 0 ? True(isolate) : False(isolate));
 			break;
 		}
-		case 'B': //byte
+		case MethodReturnType::Byte:
 		{
 			jbyte result;
 			if (isStatic)
@@ -378,7 +381,7 @@ void NativeScriptRuntime::CallJavaMethod(const Local<Object>& caller, const stri
 			args.GetReturnValue().Set(result);
 			break;
 		}
-		case 'C': //char
+		case MethodReturnType::Char:
 		{
 			jchar result;
 			if (isStatic)
@@ -401,7 +404,7 @@ void NativeScriptRuntime::CallJavaMethod(const Local<Object>& caller, const stri
 			env.ReleaseStringUTFChars(str, resP);
 			break;
 		}
-		case 'S': //short
+		case MethodReturnType::Short:
 		{
 			jshort result;
 			if (isStatic)
@@ -419,7 +422,7 @@ void NativeScriptRuntime::CallJavaMethod(const Local<Object>& caller, const stri
 			args.GetReturnValue().Set(result);
 			break;
 		}
-		case 'I': //int
+		case MethodReturnType::Int:
 		{
 			jint result;
 			if (isStatic)
@@ -438,7 +441,7 @@ void NativeScriptRuntime::CallJavaMethod(const Local<Object>& caller, const stri
 			break;
 
 		}
-		case 'J': //long
+		case MethodReturnType::Long:
 		{
 			jlong result;
 			if (isStatic)
@@ -457,7 +460,7 @@ void NativeScriptRuntime::CallJavaMethod(const Local<Object>& caller, const stri
 			args.GetReturnValue().Set(jsLong);
 			break;
 		}
-		case 'F': //float
+		case MethodReturnType::Float:
 		{
 			jfloat result;
 			if (isStatic)
@@ -475,7 +478,7 @@ void NativeScriptRuntime::CallJavaMethod(const Local<Object>& caller, const stri
 			args.GetReturnValue().Set((double) result); //TODO: handle float value here correctly.
 			break;
 		}
-		case 'D': //double
+		case MethodReturnType::Double:
 		{
 			jdouble result;
 			if (isStatic)
@@ -492,10 +495,8 @@ void NativeScriptRuntime::CallJavaMethod(const Local<Object>& caller, const stri
 			}
 			args.GetReturnValue().Set(result);
 			break;
-
 		}
-		case '[':
-		case 'L':
+		case MethodReturnType::String:
 		{
 			jobject result = nullptr;
 			bool exceptionOccurred;
@@ -519,7 +520,42 @@ void NativeScriptRuntime::CallJavaMethod(const Local<Object>& caller, const stri
 			{
 				if (result != nullptr)
 				{
-					auto isString = (returnType == "Ljava/lang/String;") || env.IsInstanceOf(result, JAVA_LANG_STRING);
+					auto objectResult = ArgConverter::jstringToV8String(static_cast<jstring>(result));
+					args.GetReturnValue().Set(objectResult);
+					env.DeleteLocalRef(result);
+				}
+				else
+				{
+					args.GetReturnValue().Set(Null(isolate));
+				}
+			}
+			break;
+		}
+		case MethodReturnType::Object:
+		{
+			jobject result = nullptr;
+			bool exceptionOccurred;
+
+			if (isStatic)
+			{
+				result = env.CallStaticObjectMethodA(clazz, mid, javaArgs);
+			}
+			else if (isSuper)
+			{
+				result = env.CallNonvirtualObjectMethodA(callerJavaObject, clazz, mid, javaArgs);
+			}
+			else
+			{
+				result = env.CallObjectMethodA(callerJavaObject, mid, javaArgs);
+			}
+
+			exceptionOccurred = env.ExceptionCheck() == JNI_TRUE;
+
+			if (!exceptionOccurred)
+			{
+				if (result != nullptr)
+				{
+					auto isString = env.IsInstanceOf(result, JAVA_LANG_STRING);
 
 					Local<Value> objectResult;
 					if (isString)
@@ -533,29 +569,23 @@ void NativeScriptRuntime::CallJavaMethod(const Local<Object>& caller, const stri
 
 						if (objectResult.IsEmpty())
 						{
-							objectResult = objectManager->CreateJSWrapper(javaObjectID, returnType, result);
+							objectResult = objectManager->CreateJSWrapper(javaObjectID, *returnType, result);
 						}
 					}
 
 					args.GetReturnValue().Set(objectResult);
+					env.DeleteLocalRef(result);
 				}
 				else
 				{
 					args.GetReturnValue().Set(Null(isolate));
 				}
 			}
-
-			if (!exceptionOccurred)
-			{
-				env.DeleteLocalRef(result);
-			}
-
 			break;
 		}
 		default:
 		{
-			// TODO:
-			ASSERT_FAIL("Unknown return type");
+			assert(false);
 			break;
 		}
 	}
@@ -583,16 +613,6 @@ int64_t NativeScriptRuntime::AdjustAmountOfExternalAllocatedMemory(JEnv& env, Is
 Local<Object> NativeScriptRuntime::CreateJSWrapper(jint javaObjectID, const string& typeName)
 {
 	return objectManager->CreateJSWrapper(javaObjectID, typeName);
-}
-
-
-string NativeScriptRuntime::GetReturnType(const string& methodSignature)
-{
-	int idx = methodSignature.find(')'); //TODO: throw error if not found
-
-	string jniReturnType = methodSignature.substr(idx + 1);
-
-	return jniReturnType;
 }
 
 

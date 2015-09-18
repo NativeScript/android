@@ -115,8 +115,6 @@ namespace tns
 
 		static v8::Persistent<v8::Object>* MarkJsObject(const v8::Local<v8::Object>& object, std::string mark, const v8::Local<v8::Value>& value);
 
-		static std::string GetReturnType(const std::string& methodSignature);
-
 		static JavaVM *jvm;
 
 		static jmethodID RESOLVE_CLASS_METHOD_ID;

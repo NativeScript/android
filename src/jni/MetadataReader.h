@@ -61,6 +61,12 @@ namespace tns
 
 		bool IsNodeTypePackage(uint8_t type);
 
+		static void FillReturnType(MetadataEntry& entry);
+
+		static std::string ParseReturnType(const std::string& signature);
+
+		static MethodReturnType GetReturnType(const std::string& returnType);
+
 	private:
 
 		static const uint32_t ARRAY_OFFSET = 1000000000;
