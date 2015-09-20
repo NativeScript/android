@@ -28,6 +28,8 @@ public class Platform
 	private static native void initNativeScript(String filesPath, int appJavaObjectId, boolean verboseLoggingEnabled, String packageName, String jsOptions);
 
 	private static native void runNativeScript(String appModuleName);
+	
+	private static native Object runScript(String filePath) throws NativeScriptException;
 
 	private static native Object callJSMethodNative(int javaObjectID, String methodName, int retType, boolean isConstructor, Object... packagedArgs) throws NativeScriptException;
 
@@ -241,6 +243,19 @@ public class Platform
 	{
 		String bootstrapPath = Require.bootstrapApp();
 		runNativeScript(bootstrapPath);
+	}
+	
+	public static Object runScript(File jsFile) throws NativeScriptException
+	{
+		Object result = null;
+		
+		if (jsFile.exists() && jsFile.isFile())
+		{
+			String filePath = jsFile.getAbsolutePath();
+			result = runScript(filePath);
+		}
+		
+		return result;
 	}
 	
 	@RuntimeCallable

@@ -787,11 +787,11 @@ void NativeScriptRuntime::CreateGlobalCastFunctions(const Local<ObjectTemplate>&
 }
 
 
-void NativeScriptRuntime::CompileAndRun(string modulePath, bool& hasError, Local<Object>& moduleObj, bool isBootstrapCall)
+void NativeScriptRuntime::CompileAndRun(string modulePath, bool& hasError, Local<Object>& moduleObj)
 {
 	auto isolate = Isolate::GetCurrent();
 
-	Local < Value > exportObj = Object::New(isolate);
+	Local<Value> exportObj = Object::New(isolate);
 	auto tmpExportObj = new Persistent<Object>(isolate, exportObj.As<Object>());
 	loadedModules.insert(make_pair(modulePath, tmpExportObj));
 
@@ -800,7 +800,7 @@ void NativeScriptRuntime::CompileAndRun(string modulePath, bool& hasError, Local
 	auto scriptText = Require::LoadModule(modulePath);
 
 	DEBUG_WRITE("Compiling script (module %s)", modulePath.c_str());
-	Local < String > fullRequiredModulePath = ConvertToV8String(modulePath);
+	auto fullRequiredModulePath = ConvertToV8String(modulePath);
 	auto script = Script::Compile(scriptText, fullRequiredModulePath);
 	DEBUG_WRITE("Compiled script (module %s)", modulePath.c_str());
 
@@ -817,7 +817,7 @@ void NativeScriptRuntime::CompileAndRun(string modulePath, bool& hasError, Local
 	{
 		DEBUG_WRITE("Running script (module %s)", modulePath.c_str());
 
-		Local < Function > f = script->Run().As<Function>();
+		auto f = script->Run().As<Function>();
 		if (ExceptionUtil::GetInstance()->HandleTryCatch(tc, "Error running script " + modulePath))
 		{
 			hasError = true;
@@ -912,7 +912,7 @@ void NativeScriptRuntime::RequireCallback(const v8::FunctionCallbackInfo<v8::Val
 
 	if (it == loadedModules.end())
 	{
-		CompileAndRun(modulePath, hasError, moduleObj, false/*is bootstrap call*/);
+		CompileAndRun(modulePath, hasError, moduleObj);
 	}
 	else
 	{

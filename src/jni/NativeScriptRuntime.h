@@ -90,7 +90,7 @@ namespace tns
 
 		static void CreateTopLevelNamespaces(const v8::Local<v8::Object>& global);
 
-		static void CompileAndRun(std::string modulePath, bool& hasError, v8::Local<v8::Object>& moduleObj, bool isBootstrapCall);
+		static void CompileAndRun(std::string modulePath, bool& hasError, v8::Local<v8::Object>& moduleObj);
 
 		static v8::Local<v8::Object> FindClass(const std::string& className);
 
