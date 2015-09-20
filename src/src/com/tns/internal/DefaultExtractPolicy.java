@@ -13,10 +13,8 @@ import java.io.OutputStreamWriter;
 import android.content.Context;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
-import android.util.Log;
 
 import com.tns.Logger;
-import com.tns.Platform;
 
 public class DefaultExtractPolicy implements ExtractPolicy
 {

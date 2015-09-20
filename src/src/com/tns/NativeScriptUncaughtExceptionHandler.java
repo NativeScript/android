@@ -3,7 +3,6 @@ package com.tns;
 import java.lang.Thread.UncaughtExceptionHandler;
 
 import android.content.Context;
-import android.util.Log;
 
 public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHandler 
 {

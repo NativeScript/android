@@ -19,11 +19,6 @@ import com.tns.bindings.ProxyGenerator;
 
 import dalvik.system.DexClassLoader;
 import dalvik.system.DexFile;
-import android.content.Context;
-import android.content.pm.ApplicationInfo;
-import android.content.pm.PackageInfo;
-import android.content.pm.PackageManager;
-import android.util.Log;
 
 public class DexFactory
 {

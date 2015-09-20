@@ -430,8 +430,6 @@ public class JsDebugger
 			}
 		}
 		
-		logger.write("port=" + port);
-		
 		return port;
 	}
 

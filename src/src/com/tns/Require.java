@@ -2,15 +2,11 @@ package com.tns;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.HashMap;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import android.content.Context;
-import android.util.Log;
 
 class Require
 {

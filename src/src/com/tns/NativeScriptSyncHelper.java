@@ -1,20 +1,15 @@
 package com.tns;
 
-import java.io.BufferedReader;
-import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.util.ArrayList;
 
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager.NameNotFoundException;
-import android.util.Log;
 
 public class NativeScriptSyncHelper
 {
@@ -22,10 +17,6 @@ public class NativeScriptSyncHelper
 	private static final String SYNC_SOURCE_DIR = "/sync/";
 	private static final String FULL_SYNC_SOURCE_DIR = "/fullsync/";
 	private static final String REMOVED_SYNC_SOURCE_DIR = "/removedsync/";
-	private static final String SYNC_THUMB_FILE = "syncThumb";
-	private static final String COMMAND_FULL_SYNC = "fullsync";
-	private static final String COMMAND_SYNC = "sync";
-	private static final String COMMAND_SYNC_WITH_REMOVED = "sync-with-removed";
 	
 	private static Logger logger;
 
@@ -44,28 +35,6 @@ public class NativeScriptSyncHelper
 			return;
 		}
 
-//		String syncThumbFilePath = SYNC_ROOT_SOURCE_DIR + context.getPackageName() + SYNC_THUMB_FILE;
-//		String syncData = getSyncThumb(syncThumbFilePath);
-//		if (syncData == null)
-//		{
-//			return;
-//		}
-//		
-//		String[] syncCommandAndThumb = syncData.split("");
-//		String syncCommand = syncCommandAndThumb[0];
-//		String syncThumb = syncCommandAndThumb[1];
-//		if (syncThumb == null)
-//		{
-//			return;
-//		}
-//		
-//		String oldSyncThumbFilePath = context.getFilesDir() + "syncThumb";
-//		String oldSyncThumb = getSyncThumb(oldSyncThumbFilePath);
-//		if (oldSyncThumb.equalsIgnoreCase(syncThumb))
-//		{
-//			return;
-//		}
-		
 		String syncPath = SYNC_ROOT_SOURCE_DIR + context.getPackageName() + SYNC_SOURCE_DIR;
 		String fullSyncPath = SYNC_ROOT_SOURCE_DIR + context.getPackageName() + FULL_SYNC_SOURCE_DIR;
 		String removedSyncPath = SYNC_ROOT_SOURCE_DIR + context.getPackageName() + REMOVED_SYNC_SOURCE_DIR;

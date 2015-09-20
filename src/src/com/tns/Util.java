@@ -7,6 +7,7 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
+import android.os.Bundle;
 
 public final class Util
 {
@@ -42,15 +43,18 @@ public final class Util
 	static boolean runPlugin(Logger logger, Context context)
 	{
 		boolean success = false;
-		String pluginClassName;
+		String pluginClassName = "org.nativescript.livesync.LiveSyncPlugin";
 		try
 		{
 			ApplicationInfo ai = context.getPackageManager().getApplicationInfo(context.getPackageName(), PackageManager.GET_META_DATA);
-			pluginClassName = ai.metaData.getString("com.tns.internal.Plugin");
+			Bundle metadataBundle = ai.metaData;
+			if (metadataBundle != null)
+			{
+				pluginClassName = metadataBundle.getString("com.tns.internal.Plugin");
+			}
 		}
 		catch (Exception e)
 		{
-			pluginClassName = "org.nativescript.livesync.LiveSyncPlugin";
 			if (logger.isEnabled()) e.printStackTrace();
 		}
 		try

@@ -74,9 +74,9 @@ public class NativeScriptWeakHashMap<K, V> extends NativeScriptAbstractMap<K, V>
 
 		Entry<K, V> next;
 
-		interface Type<R, K, V>
+		interface Type<RET, K, V>
 		{
-			R get(Map.Entry<K, V> entry);
+			RET get(Map.Entry<K, V> entry);
 		}
 
 		Entry(K key, V object, ReferenceQueue<K> queue)
@@ -129,7 +129,7 @@ public class NativeScriptWeakHashMap<K, V> extends NativeScriptAbstractMap<K, V>
 		}
 	}
 
-	class HashIterator<R> implements Iterator<R>
+	class HashIterator<RET> implements Iterator<RET>
 	{
 		private int position = 0, expectedModCount;
 
@@ -137,9 +137,9 @@ public class NativeScriptWeakHashMap<K, V> extends NativeScriptAbstractMap<K, V>
 
 		private K nextKey;
 
-		final Entry.Type<R, K, V> type;
+		final Entry.Type<RET, K, V> type;
 
-		HashIterator(Entry.Type<R, K, V> type)
+		HashIterator(Entry.Type<RET, K, V> type)
 		{
 			this.type = type;
 			expectedModCount = modCount;
@@ -177,7 +177,7 @@ public class NativeScriptWeakHashMap<K, V> extends NativeScriptAbstractMap<K, V>
 			}
 		}
 
-		public R next()
+		public RET next()
 		{
 			if (expectedModCount == modCount)
 			{
@@ -185,7 +185,7 @@ public class NativeScriptWeakHashMap<K, V> extends NativeScriptAbstractMap<K, V>
 				{
 					currentEntry = nextEntry;
 					nextEntry = currentEntry.next;
-					R result = type.get(currentEntry);
+					RET result = type.get(currentEntry);
 					// free the key
 					nextKey = null;
 					return result;

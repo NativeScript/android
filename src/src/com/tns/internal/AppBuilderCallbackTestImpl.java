@@ -1,7 +1,5 @@
 package com.tns.internal;
 
-import com.tns.JsDebugger;
-import com.tns.Platform;
 import com.tns.Util;
 
 import android.util.Log;
