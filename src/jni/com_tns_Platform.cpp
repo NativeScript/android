@@ -156,7 +156,7 @@ void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring pa
 	Profiler::Init(pckName);
 	JsDebugger::Init(isolate, pckName);
 
-	PrepareExtendFunction(isolate, filesPath);
+	//PrepareExtendFunction(isolate, filesPath);
 
 	NativeScriptRuntime::BuildMetadata(env, filesPath);
 

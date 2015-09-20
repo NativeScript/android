@@ -754,6 +754,7 @@ public class NativeScriptApplication extends android.app.Application implements 
 			}
 			ThreadScheduler workThreadScheduler = new WorkThreadScheduler(new Handler(Looper.getMainLooper()));
 			Platform.init(this, workThreadScheduler, logger, appName, null, rootDir, appDir, debuggerSetupDir, classLoader, dexDir, dexThumb);
+			Platform.runScript(new File(appDir, "internal/prepareExtend.js"));
 			Platform.run();
 	
 			onCreateInternal();
