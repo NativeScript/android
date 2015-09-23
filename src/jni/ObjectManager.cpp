@@ -103,9 +103,8 @@ JSInstanceInfo* ObjectManager::GetJSInstanceInfo(const Local<Object>& object)
 			}
 		}
 
-		if (!jsInfo.IsEmpty())
+		if (!jsInfo.IsEmpty() && jsInfo->IsExternal())
 		{
-			assert(jsInfo->IsExternal());
 			auto external = jsInfo.As<External>();
 			jsInstanceInfo = static_cast<JSInstanceInfo*>(external->Value());
 		}

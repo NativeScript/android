@@ -206,8 +206,8 @@ void NativeScriptRuntime::CallJavaMethod(const Local<Object>& caller, const stri
 
 		if (entry->memberId == nullptr)
 		{
-			entry->clazz = env.FindClass(className);
-			if (entry->clazz == nullptr)
+			clazz = env.FindClass(className);
+			if (clazz == nullptr)
 			{
 				MetadataNode* callerNode = MetadataNode::GetNodeFromHandle(caller);
 				const string callerClassName = callerNode->GetName();
@@ -229,13 +229,12 @@ void NativeScriptRuntime::CallJavaMethod(const Local<Object>& caller, const stri
 					DEBUG_WRITE("Cannot resolve a method %s on caller class: %s", methodName.c_str(), callerClassName.c_str());
 					return;
 				}
-
 			}
 			else
 			{
 				entry->memberId = isStatic ?
-									env.GetStaticMethodID(entry->clazz, methodName, entry->sig) :
-									env.GetMethodID(entry->clazz, methodName, entry->sig);
+									env.GetStaticMethodID(clazz, methodName, entry->sig) :
+									env.GetMethodID(clazz, methodName, entry->sig);
 
 				if (entry->memberId == nullptr)
 				{
@@ -243,14 +242,11 @@ void NativeScriptRuntime::CallJavaMethod(const Local<Object>& caller, const stri
 					return;
 				}
 			}
+			entry->clazz = clazz;
 		}
 
-		if (entry->clazz != nullptr)
-		{
-			clazz = entry->clazz;
-			mid = reinterpret_cast<jmethodID>(entry->memberId);
-		}
-
+		mid = reinterpret_cast<jmethodID>(entry->memberId);
+		clazz = entry->clazz;
 		sig = &entry->sig;
 		returnType = &entry->returnType;
 		retType = entry->retType;
