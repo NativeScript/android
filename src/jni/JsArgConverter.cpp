@@ -247,7 +247,7 @@ void JsArgConverter::SetConvertedObject(int index, jobject obj, bool isGlobalRef
 	else
 	{
 		m_storedObjects.push_back(index);
-		m_args[index].l = m_env.NewLocalRef(obj);
+		m_args[index].l = obj;
 	}
 }
 
@@ -349,7 +349,7 @@ bool JsArgConverter::ConvertJavaScriptBoolean(const Local<Value>& jsValue, int i
 
 bool JsArgConverter::ConvertJavaScriptString(const Local<Value>& jsValue, int index)
 {
-	JniLocalRef stringObject(ConvertToJavaString(jsValue));
+	jstring stringObject = ConvertToJavaString(jsValue);
 	SetConvertedObject(index, stringObject);
 
 	return true;
@@ -462,11 +462,6 @@ bool JsArgConverter::ConvertJavaScriptArray(const Local<Array>& jsArr, int index
 	if (success)
 	{
 		SetConvertedObject(index, arr);
-	}
-
-	if (arr != nullptr)
-	{
-		m_env.DeleteLocalRef(arr);
 	}
 
 	return success;

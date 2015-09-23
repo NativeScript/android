@@ -19,20 +19,9 @@ string tns::ConvertToString(const v8::Local<String>& s)
 
 jstring tns::ConvertToJavaString(const Local<Value>& value)
 {
-	Local<String> valueAsString;
-	if (value->IsStringObject())
-	{
-		auto stringObject = Local<StringObject>::Cast(value);
-		valueAsString = stringObject->ValueOf();
-	}
-	else
-	{
-		valueAsString = value->ToString();
-	}
-
 	JEnv env;
-	String::Value stringValue(valueAsString);
-	return env.NewString((const jchar*)*stringValue, valueAsString->Length());
+	String::Value stringValue(value);
+	return env.NewString((const jchar*)*stringValue, stringValue.length());
 }
 
 Local<String> tns::ConvertToV8String(const jchar* data, int length)
