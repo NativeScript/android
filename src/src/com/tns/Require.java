@@ -175,7 +175,7 @@ class Require
 						if (object != null)
 						{
 							String mainFile = object.getString("main");
-							if(!mainFile.contains(".js")) {
+							if(!mainFile.endsWith(".js")) {
 								mainFile += ".js";
 							}
 							jsFile = new File(directory.getAbsolutePath(), mainFile);
