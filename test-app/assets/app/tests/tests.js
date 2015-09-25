@@ -1783,6 +1783,17 @@ describe("Tests ", function () {
 		expect(value456).toBe(456);
 	});
 	
+	it("When_using_package_json_should_load_module_even_if_js_extend_is_not_specified", function () {
+		
+		__log("TEST: When_using_package_json_should_load_module_even_if_js_extend_is_not_specified");
+		
+		var module = require("../modules");
+		var value456 = module.value123;
+		
+		expect(value456).toBe(123);
+	});
+	
+	
 	it("When_require_bcl_module_it_should_be_loaded", function () {
 		
 		__log("TEST: When_require_bcl_module_it_should_be_loaded");
