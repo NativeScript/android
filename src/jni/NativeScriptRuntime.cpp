@@ -87,27 +87,9 @@ bool NativeScriptRuntime::RegisterInstance(const Local<Object>& jsObject, const 
 
 	DEBUG_WRITE("RegisterInstance called for '%s'", fullClassName.c_str());
 
-	if(fullClassName == "java/lang/Object_") {
-		int a = 5;
-	}
 	JEnv env;
 
-	// get class from implementation object if you can
-	jclass generatedJavaClass = nullptr;
-	bool classIsResolved = false;
-	if (!implementationObject.IsEmpty())
-	{
-		auto val = implementationObject->GetHiddenValue(ConvertToV8String(fullClassName));
-		if (!val.IsEmpty())
-		{
-			void* voidPointerToVal = val.As<External>()->Value();
-			generatedJavaClass = reinterpret_cast<jclass>(voidPointerToVal);
-			classIsResolved = true;
-		}
-	}
-	if(!classIsResolved) {
-		generatedJavaClass = ResolveClass(fullClassName, implementationObject);
-	}
+	jclass generatedJavaClass = ResolveClass(fullClassName, implementationObject);
 
 	int javaObjectID = objectManager->GenerateNewObjectID();
 

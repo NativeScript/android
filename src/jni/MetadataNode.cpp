@@ -767,8 +767,6 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
 	thiz->SetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::CallSuper), True(isolate));
 
 	string fullClassName = CreateFullClassName(className, extendNameAndLocation);
-	jclass generatedClass = NativeScriptRuntime::ResolveClass(fullClassName, implementationObject);
-	implementationObject->SetHiddenValue(ConvertToV8String(fullClassName), External::New(isolate, generatedClass));
 
 	implementationObject->SetPrototype(thiz->GetPrototype());
 	thiz->SetPrototype(implementationObject);
