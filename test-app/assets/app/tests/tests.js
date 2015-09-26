@@ -1753,13 +1753,12 @@ describe("Tests ", function () {
 		  		return "button1"	
 		}});
 		
-
-		var button = new MyButton();
-		var clazz1 = button.getClass();
+		var clazz1 = MyButton.class;
 		var name1 = clazz1.getName();
 		expect(name1.indexOf("MyButton1615")).not.toEqual(-1);
 
-		var clazz2 = MyButton.class;
+		var button = new MyButton();
+		var clazz2 = button.getClass();
 		var name2 = clazz2.getName();
 		expect(name2.indexOf("MyButton1615")).not.toEqual(-1);
 	});
