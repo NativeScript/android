@@ -19,6 +19,7 @@
 */
 
 def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
+def allJarPaths = new LinkedList <String> ()
 
 buildscript {
     repositories {
@@ -154,54 +155,60 @@ task addAarDependencies <</*doLast*/ {
 	}
 }
 
-task collectAllJars(type: Copy) {
+task collectAllJars {
+	
 	def explodedAarDir = project.buildDir.getAbsolutePath() + "/intermediates/exploded-aar/"
 	def sdkPath = android.sdkDirectory.getAbsolutePath();
 	def androidJar = sdkPath + "/platforms/" + android.compileSdkVersion + "/android.jar"
-	def outDir = "$rootDir/metadata/libs"
-
-	// copies all jars in metadata/libs dir and makes sure all copied jars have different names
-	// this is necessary because static binding generator cannot process jars in nested folders
+	
 	doFirst {
+		allJarPaths.add(androidJar);
+	
 		def ft = fileTree(dir: explodedAarDir, include: "**/*.jar")
-		def count = 0;
-		
 		ft.each { currentJarFile ->
-			//rename jar on copy
-			def newName = "ambiguous_jar_" + count++ + ".jar"
-			copy {
-				from currentJarFile
-				into outDir
-				rename currentJarFile.getName(), newName
-			}
+			allJarPaths.add(currentJarFile.getAbsolutePath())
+		}
+		
+		configurations.compile.each { File dependencyFile -> 
+			allJarPaths.add(dependencyFile.getAbsolutePath())
 		}
 	}
-		
-	from configurations.compile
-	from androidJar
-	include '**/*.jar'
-	includeEmptyDirs = false
-	
-	into outDir
 }
 
 task ensureMetadataOutDir {
-	def outputDir = file("$rootDir/metadata/output")
-	outputDir.mkdirs()
+	doFirst {
+		def outputDir = file("$rootDir/metadata/output")
+		outputDir.mkdirs()
+	}
 }
 
-task buildMetadata(type: JavaExec) {
-	outputs.upToDateWhen {		
+task buildMetadata (type: Exec) {
+
+	outputs.upToDateWhen {
 		!collectAllJars.didWork
 	}
 
-	main '-jar'
-	def str = new LinkedList <String> ();
-	str.add("build-tools/metadata-generator.jar")
-	str.add("metadata/libs")
-	str.add("metadata/output")
+	doFirst{
+	
+		workingDir "build-tools"
+		
+		def str = new LinkedList <String> ();
+		str.add("metadata-generator.jar")
+		str.add("../metadata/output")
 
-	args str.toArray()
+		for(def i = 0; i < allJarPaths.size(); i++) {
+			str.add(allJarPaths.get(i));
+		}	
+
+		if(isWinOs) {
+			commandLine "cmd", "/c", "rmg.bat"
+		}
+		else{
+			commandLine "./rmg.sh"
+		}
+		
+		args str.toArray()
+	}
 }
 
 task copyMetadata(type: Copy) {
@@ -245,10 +252,7 @@ task cleanLocalAarFiles(type: Delete) {
 // 7. Build metadata
 // 8. Copy metadata
 
-if(!project.hasProperty("runSBGenerator")) {
-	cleanLocalAarFiles.dependsOn(deleteJavaDir)
-}
-
+cleanLocalAarFiles.dependsOn(deleteJavaDir)
 collectAllJars.dependsOn(cleanLocalAarFiles)
 ensureMetadataOutDir.dependsOn(collectAllJars)
 buildMetadata.dependsOn(ensureMetadataOutDir)
