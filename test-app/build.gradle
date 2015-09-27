@@ -97,7 +97,6 @@ task collectAllJars {
 	
 	doFirst {
 		allJarPaths.add(androidJar);
-		allJarPaths.add("$rootDir/metadata/libs/testapp.jar");
 	
 		def ft = fileTree(dir: explodedAarDir, include: "**/*.jar")
 		ft.each { currentJarFile ->
@@ -107,6 +106,8 @@ task collectAllJars {
 		configurations.compile.each { File dependencyFile -> 
 			allJarPaths.add(dependencyFile.getAbsolutePath())
 		}
+		
+		allJarPaths.add("$rootDir/metadata/libs/testapp.jar");
 	}
 }
 
