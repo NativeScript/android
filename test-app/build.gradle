@@ -1,4 +1,5 @@
 def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
+def allJarPaths = new LinkedList <String> ()
 
 buildscript {
     repositories {
@@ -89,32 +90,24 @@ task copyLibNativescriptLibrary (type: Copy) {
 	into "$rootDir/libs"
 }
 
-task collectAllJars(type: Copy) {
+task collectAllJars {
+
 	def explodedAarDir = project.buildDir.getAbsolutePath() + "/intermediates/exploded-aar/"
 	def androidJar = sdkPath + "/platforms/" + android.compileSdkVersion + "/android.jar"
-	def outDir = "$rootDir/metadata/libs"
-
+	
 	doFirst {
+		allJarPaths.add(androidJar);
+		allJarPaths.add("$rootDir/metadata/libs/testapp.jar");
+	
 		def ft = fileTree(dir: explodedAarDir, include: "**/*.jar")
-		def count = 0;
+		ft.each { currentJarFile ->
+			allJarPaths.add(currentJarFile.getAbsolutePath())
+		}
 		
-		ft.each { currentFile ->
-			
-			def newName = "ambiguous_jar_" + count++ + ".jar"
-			copy {
-				from currentFile
-				into outDir
-				rename currentFile.getName(), newName
-			}
+		configurations.compile.each { File dependencyFile -> 
+			allJarPaths.add(dependencyFile.getAbsolutePath())
 		}
 	}
-		
-	from configurations.compile
-	from androidJar
-	include '**/*.jar'
-	includeEmptyDirs = false
-	
-	into outDir
 }
 
 task ensureMetadataOutDir {
@@ -122,18 +115,32 @@ task ensureMetadataOutDir {
 	outputDir.mkdirs()
 }
 
-task buildMetadata(type: JavaExec) {
+task buildMetadata(type: Exec) {
 	outputs.upToDateWhen {		
 		!collectAllJars.didWork
 	}
+	
+	doFirst{
+	
+		workingDir "../dist/framework/build-tools"
+		
+		def str = new LinkedList <String> ();
+		str.add("metadata-generator.jar")
+		str.add("../../../test-app/metadata/output")
 
-	main '-jar'
-	def str = new LinkedList <String> ();
-	str.add("../dist/framework/build-tools/metadata-generator.jar")
-	str.add("metadata/libs")
-	str.add("metadata/output")
+		for(def i = 0; i < allJarPaths.size(); i++) {
+			str.add(allJarPaths.get(i));
+		}
 
-	args str.toArray()
+		if(isWinOs) {
+			commandLine "cmd", "/c", "rmg.bat"
+		}
+		else{
+			commandLine "./rmg.sh"
+		}
+		
+		args str.toArray()
+	}
 }
 
 task copyMetadata(type: Copy) {
