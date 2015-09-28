@@ -1129,10 +1129,9 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 
 
 	//
-	JEnv env;
 	//resolve class (pre-generated or generated runtime from dex generator)
-	jclass generatedClass = NativeScriptRuntime::ResolveClass(fullClassName, implementationObject); //resolve class returns GlobalRef
-	std::string generatedFullClassName = s_objectManager->GetClassName(generatedClass);
+	jclass resolvedClass = NativeScriptRuntime::ResolveClass(fullClassName, implementationObject); //resolve class returns GlobalRef
+	std::string generatedFullClassName = s_objectManager->GetClassName(resolvedClass);
 	//
 
 	auto fullExtendedName = generatedFullClassName;
@@ -1154,9 +1153,6 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 	{
 		//mark the implementationObject as such and set a pointer to it's class node inside it for reuse validation later
 		implementationObject->SetHiddenValue(implementationObjectPropertyName, String::NewFromUtf8(isolate, fullExtendedName.c_str()));
-
-		//append resolved class to implementation object
-		implementationObject->SetHiddenValue(ConvertToV8String(fullExtendedName), External::New(Isolate::GetCurrent(), generatedClass));
 	}
 	else
 	{
