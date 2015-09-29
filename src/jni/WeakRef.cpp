@@ -11,9 +11,16 @@ WeakRef::WeakRef()
 {
 }
 
+void WeakRef::Init(v8::Isolate *isolate, Local<ObjectTemplate>& globalObjectTemplate, ObjectManager *objectManager)
+{
+	s_objectManager = objectManager;
+
+	globalObjectTemplate->Set(ConvertToV8String("WeakRef"), FunctionTemplate::New(isolate, ConstructorCallback));
+}
+
 void WeakRef::ConstructorCallback(const FunctionCallbackInfo<Value>& args)
 {
-	Isolate *isolate = Isolate::GetCurrent();
+	auto isolate = args.GetIsolate();
 
 	if (args.IsConstructCall())
 	{
@@ -25,7 +32,7 @@ void WeakRef::ConstructorCallback(const FunctionCallbackInfo<Value>& args)
 			{
 				auto targetObj = target.As<Object>();
 
-				auto weakRef = Object::New(isolate);
+				auto weakRef = s_objectManager->GetEmptyObject(isolate);
 
 				auto poTarget = new Persistent<Object>(isolate, targetObj);
 				auto poHolder = new Persistent<Object>(isolate, weakRef);
@@ -128,7 +135,7 @@ void WeakRef::GettertCallback(const FunctionCallbackInfo<Value>& args)
 	}
 }
 
-Handle<Function> WeakRef::GetGetterFunction(Isolate *isolate)
+Local<Function> WeakRef::GetGetterFunction(Isolate *isolate)
 {
 	if (s_poGetterFunc != nullptr)
 	{
@@ -136,13 +143,13 @@ Handle<Function> WeakRef::GetGetterFunction(Isolate *isolate)
 	}
 	else
 	{
-		Handle<Function> getterFunc = FunctionTemplate::New(isolate, GettertCallback)->GetFunction();
+		auto getterFunc = FunctionTemplate::New(isolate, GettertCallback)->GetFunction();
 		s_poGetterFunc = new Persistent<Function>(isolate, getterFunc);
 		return getterFunc;
 	}
 }
 
-Handle<Function> WeakRef::GetClearFunction(Isolate *isolate)
+Local<Function> WeakRef::GetClearFunction(Isolate *isolate)
 {
 	if (s_poClearFunc != nullptr)
 	{
@@ -150,7 +157,7 @@ Handle<Function> WeakRef::GetClearFunction(Isolate *isolate)
 	}
 	else
 	{
-		Handle<Function> clearFunc = FunctionTemplate::New(isolate, ClearCallback)->GetFunction();
+		auto clearFunc = FunctionTemplate::New(isolate, ClearCallback)->GetFunction();
 		s_poClearFunc = new Persistent<Function>(isolate, clearFunc);
 		return clearFunc;
 	}
@@ -159,3 +166,4 @@ Handle<Function> WeakRef::GetClearFunction(Isolate *isolate)
 
 Persistent<Function>* WeakRef::s_poClearFunc = nullptr;
 Persistent<Function>* WeakRef::s_poGetterFunc = nullptr;
+ObjectManager* WeakRef::s_objectManager = nullptr;

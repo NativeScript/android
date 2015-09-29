@@ -51,7 +51,7 @@ JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value>& args, bool
 	}
 }
 
-bool JsArgConverter::ConvertArg(const Handle<Value>& arg, int index)
+bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 {
 	bool success = false;
 
@@ -68,7 +68,7 @@ bool JsArgConverter::ConvertArg(const Handle<Value>& arg, int index)
 	{
 		ASSERT_MESSAGE(typeSignature[0] == '[', "Expected array signature, actual signature=%s", typeSignature.c_str());
 
-		auto jsArr = Handle<Array>::Cast(arg);
+		auto jsArr = Local<Array>::Cast(arg);
 
 		success = ConvertJavaScriptArray(jsArr, index);
 
@@ -247,11 +247,11 @@ void JsArgConverter::SetConvertedObject(int index, jobject obj, bool isGlobalRef
 	else
 	{
 		m_storedObjects.push_back(index);
-		m_args[index].l = m_env.NewLocalRef(obj);
+		m_args[index].l = obj;
 	}
 }
 
-bool JsArgConverter::ConvertJavaScriptNumber(const Handle<Value>& jsValue, int index)
+bool JsArgConverter::ConvertJavaScriptNumber(const Local<Value>& jsValue, int index)
 {
 	bool success = true;
 
@@ -309,7 +309,7 @@ bool JsArgConverter::ConvertJavaScriptNumber(const Handle<Value>& jsValue, int i
 	return success;
 }
 
-bool JsArgConverter::ConvertJavaScriptBoolean(const Handle<Value>& jsValue, int index)
+bool JsArgConverter::ConvertJavaScriptBoolean(const Local<Value>& jsValue, int index)
 {
 	bool success;
 
@@ -324,7 +324,7 @@ bool JsArgConverter::ConvertJavaScriptBoolean(const Handle<Value>& jsValue, int 
 		}
 		else
 		{
-			auto boolObj = Handle<BooleanObject>::Cast(jsValue);
+			auto boolObj = Local<BooleanObject>::Cast(jsValue);
 			auto val = boolObj->Get(V8StringConstants::GetValueOf());
 			if (!val.IsEmpty() && val->IsFunction())
 			{
@@ -347,15 +347,15 @@ bool JsArgConverter::ConvertJavaScriptBoolean(const Handle<Value>& jsValue, int 
 	return success;
 }
 
-bool JsArgConverter::ConvertJavaScriptString(const Handle<Value>& jsValue, int index)
+bool JsArgConverter::ConvertJavaScriptString(const Local<Value>& jsValue, int index)
 {
-	JniLocalRef stringObject(ConvertToJavaString(jsValue));
+	jstring stringObject = ConvertToJavaString(jsValue);
 	SetConvertedObject(index, stringObject);
 
 	return true;
 }
 
-bool JsArgConverter::ConvertJavaScriptArray(const Handle<Array>& jsArr, int index)
+bool JsArgConverter::ConvertJavaScriptArray(const Local<Array>& jsArr, int index)
 {
 	bool success = true;
 
@@ -462,11 +462,6 @@ bool JsArgConverter::ConvertJavaScriptArray(const Handle<Array>& jsArr, int inde
 	if (success)
 	{
 		SetConvertedObject(index, arr);
-	}
-
-	if (arr != nullptr)
-	{
-		m_env.DeleteLocalRef(arr);
 	}
 
 	return success;

@@ -3,7 +3,6 @@ package com.tns;
 import java.lang.Thread.UncaughtExceptionHandler;
 
 import android.content.Context;
-import android.util.Log;
 
 public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHandler 
 {
@@ -11,8 +10,11 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
 	
 	private final UncaughtExceptionHandler defaultHandler;
 	
-	public NativeScriptUncaughtExceptionHandler(Context context)
+	private final Logger logger; 
+	
+	public NativeScriptUncaughtExceptionHandler(Logger logger, Context context)
 	{
+		this.logger = logger;
 		this.context = context;
 		defaultHandler = Thread.getDefaultUncaughtExceptionHandler();
 	}
@@ -22,7 +24,7 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
 	{
 		String errorMessage = ErrorReport.getErrorMessage(ex);
 		
-		if (Platform.IsLogEnabled) Log.e(Platform.DEFAULT_LOG_TAG, "Uncaught Exception Message=" + errorMessage);
+		if (logger.isEnabled()) logger.write("Uncaught Exception Message=" + errorMessage);
 
 		if(!ErrorReport.startActivity(context, errorMessage) && defaultHandler != null)
 		{

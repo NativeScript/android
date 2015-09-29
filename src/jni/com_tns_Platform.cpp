@@ -20,6 +20,7 @@
 #include "SimpleProfiler.h"
 #include "SimpleAllocator.h"
 #include "File.h"
+#include "JType.h"
 #include <sstream>
 #include <android/log.h>
 #include <assert.h>
@@ -30,6 +31,8 @@ using namespace std;
 using namespace tns;
 
 void AppInitCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
+
+jobject ConvertJsValueToJavaObject(JEnv& env, const Local<Value>& value, int classReturnType);
 
 //TODO: Lubo: properly release this jni global ref on shutdown
 JavaVM *g_jvm = nullptr;
@@ -121,7 +124,8 @@ void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring pa
 	globalTemplate->Set(ConvertToV8String("__disableVerboseLogging"), FunctionTemplate::New(isolate, NativeScriptRuntime::DisableVerboseLoggingMethodCallback));
 	globalTemplate->Set(ConvertToV8String("__exit"), FunctionTemplate::New(isolate, NativeScriptRuntime::ExitMethodCallback));
 	globalTemplate->Set(ConvertToV8String("require"), FunctionTemplate::New(isolate, NativeScriptRuntime::RequireCallback));
-	globalTemplate->Set(ConvertToV8String("WeakRef"), FunctionTemplate::New(isolate, WeakRef::ConstructorCallback));
+
+	WeakRef::Init(isolate, globalTemplate, g_objectManager);
 
 	SimpleProfiler::Init(isolate, globalTemplate);
 
@@ -131,6 +135,8 @@ void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring pa
 	PrimaryContext = new Persistent<Context>(isolate, context);
 
 	context_scope = new Context::Scope(context);
+
+	g_objectManager->Init(isolate);
 
 	auto global = context->Global();
 
@@ -150,7 +156,7 @@ void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring pa
 	Profiler::Init(pckName);
 	JsDebugger::Init(isolate, pckName);
 
-	PrepareExtendFunction(isolate, filesPath);
+	//PrepareExtendFunction(isolate, filesPath);
 
 	NativeScriptRuntime::BuildMetadata(env, filesPath);
 
@@ -175,7 +181,6 @@ extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj
 	Isolate::Scope isolate_scope(isolate);
 	HandleScope handleScope(isolate);
 
-	g_objectManager->SetGCHooks();
 	ExceptionUtil::GetInstance()->Init(g_jvm, g_objectManager);
 
 	JEnv env(_env);
@@ -185,7 +190,7 @@ extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj
 	Constants::APP_ROOT_FOLDER_PATH = NativeScriptRuntime::APP_FILES_DIR + "/app/";
 }
 
-extern "C" void Java_com_tns_Platform_runNativeScript(JNIEnv *_env, jobject obj, jstring appModuleName)
+extern "C" void Java_com_tns_Platform_runNativeScript(JNIEnv *_env, jobject obj, jstring scriptFile)
 {
 	JEnv env(_env);
 	auto isolate = g_isolate;
@@ -193,11 +198,11 @@ extern "C" void Java_com_tns_Platform_runNativeScript(JNIEnv *_env, jobject obj,
 
 	HandleScope handleScope(isolate);
 
-	Handle<Object> moduleObject;
-	string modulePath = ArgConverter::jstringToString(appModuleName);
+	Local<Object> moduleObject;
+	string filePath = ArgConverter::jstringToString(scriptFile);
 	bool hasError = false;
 
-	NativeScriptRuntime::CompileAndRun(modulePath, hasError, moduleObject, true /*is bootstrap call*/);
+	NativeScriptRuntime::CompileAndRun(filePath, hasError, moduleObject);
 
 	/*
 	 * moduleObject (export module) can be set to js variable but currently we start the script implicitly without returning the moduleObject (just calling it)
@@ -209,6 +214,55 @@ extern "C" void Java_com_tns_Platform_runNativeScript(JNIEnv *_env, jobject obj,
 	//DEBUG_WRITE("Forcing V8 garbage collection");
 	//while (!V8::IdleNotification());
 }
+
+extern "C" jobject Java_com_tns_Platform_runScript(JNIEnv *_env, jobject obj, jstring scriptFile)
+{
+	JEnv env(_env);
+	jobject res = nullptr;
+
+	auto isolate = g_isolate;
+	Isolate::Scope isolate_scope(isolate);
+	HandleScope handleScope(isolate);
+	auto context = isolate->GetCurrentContext();
+
+	auto filename = ArgConverter::jstringToString(scriptFile);
+	auto src = File::ReadText(filename);
+	auto source = ConvertToV8String(src);
+
+	TryCatch tc;
+
+	Local<Script> script;
+	ScriptOrigin origin(ConvertToV8String(filename));
+	auto maybeScript = Script::Compile(context, source, &origin).ToLocal(&script);
+
+	if (!ExceptionUtil::GetInstance()->HandleTryCatch(tc, "Script " + filename + " contains compilation errors!"))
+	{
+		if (!script.IsEmpty())
+		{
+			Local<Value> result;
+			auto maybeResult = script->Run(context).ToLocal(&result);
+
+			if (!ExceptionUtil::GetInstance()->HandleTryCatch(tc, "Error running script " + filename))
+			{
+				if (!result.IsEmpty())
+				{
+					res = ConvertJsValueToJavaObject(env, result, static_cast<int>(Type::Null));
+				}
+				else
+				{
+					DEBUG_WRITE(">>runScript maybeResult is empty");
+				}
+			}
+		}
+		else
+		{
+			DEBUG_WRITE(">>runScript maybeScript is empty");
+		}
+	}
+
+	return res;
+}
+
 
 void AppInitCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
@@ -243,7 +297,7 @@ void AppInitCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 	ExceptionUtil::GetInstance()->CheckForJavaException(env);
 }
 
-jobject ConvertJsValueToJavaObject(JEnv& env, const Handle<Value>& value, int classReturnType)
+jobject ConvertJsValueToJavaObject(JEnv& env, const Local<Value>& value, int classReturnType)
 {
 	JsArgToArrayConverter argConverter(value, false/*is implementation object*/, classReturnType);
 	jobject jr = argConverter.GetConvertedArg();
@@ -325,8 +379,8 @@ extern "C" void Java_com_tns_Platform_createJSInstanceNative(JNIEnv *_env, jobje
 
 	string existingClassName = ArgConverter::jstringToString(className);
 	string jniName = Util::ConvertFromCanonicalToJniName(existingClassName);
-	Handle<Object> jsInstance;
-	Handle<Object> implementationObject;
+	Local<Object> jsInstance;
+	Local<Object> implementationObject;
 
 	auto proxyClassName = g_objectManager->GetClassName(javaObject);
 	//

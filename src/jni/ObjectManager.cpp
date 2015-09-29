@@ -25,7 +25,7 @@ ObjectManager::ObjectManager()
 	GET_JAVAOBJECT_BY_ID_METHOD_ID = env.GetStaticMethodID(PlatformClass, "getJavaObjectByID", "(I)Ljava/lang/Object;");
 	assert(GET_JAVAOBJECT_BY_ID_METHOD_ID != nullptr);
 
-	GET_OR_CREATE_JAVA_OBJECT_ID_METHOD_ID = env.GetStaticMethodID(PlatformClass, "getorCreateJavaObjectID", "(Ljava/lang/Object;)I");
+	GET_OR_CREATE_JAVA_OBJECT_ID_METHOD_ID = env.GetStaticMethodID(PlatformClass, "getOrCreateJavaObjectID", "(Ljava/lang/Object;)I");
 	assert(GET_OR_CREATE_JAVA_OBJECT_ID_METHOD_ID != nullptr);
 
 	MAKE_INSTANCE_WEAK_BATCH_METHOD_ID = env.GetStaticMethodID(PlatformClass, "makeInstanceWeak", "(Ljava/nio/ByteBuffer;IZ)V");
@@ -43,19 +43,23 @@ ObjectManager::ObjectManager()
 	ObjectManager::instance = this;
 }
 
-void ObjectManager::SetGCHooks()
+void ObjectManager::Init(Isolate *isolate)
 {
-	V8::AddGCPrologueCallback(ObjectManager::OnGcStartedStatic, kGCTypeAll);
+	auto jsWrapperFuncTemplate = FunctionTemplate::New(isolate, JSWrapperConstructorCallback);
+	jsWrapperFuncTemplate->InstanceTemplate()->SetInternalFieldCount(static_cast<int>(MetadataNodeKeys::END));
+	auto jsWrapperFunc = jsWrapperFuncTemplate->GetFunction();
+	s_poJsWrapperFunc = new Persistent<Function>(isolate, jsWrapperFunc);
 
+	V8::AddGCPrologueCallback(ObjectManager::OnGcStartedStatic, kGCTypeAll);
 	V8::AddGCEpilogueCallback(ObjectManager::OnGcFinishedStatic, kGCTypeAll);
 }
 
-jweak ObjectManager::GetJavaObjectByJsObjectStatic(const Handle<Object>& object)
+jweak ObjectManager::GetJavaObjectByJsObjectStatic(const Local<Object>& object)
 {
 	return ObjectManager::instance->GetJavaObjectByJsObject(object);
 }
 
-jweak ObjectManager::GetJavaObjectByJsObject(const Handle<Object>& object)
+jweak ObjectManager::GetJavaObjectByJsObject(const Local<Object>& object)
 {
 	jweak javaObject = nullptr;
 
@@ -69,32 +73,41 @@ jweak ObjectManager::GetJavaObjectByJsObject(const Handle<Object>& object)
 	return javaObject;
 }
 
-JSInstanceInfo* ObjectManager::GetJSInstanceInfo(const Handle<Object>& object)
+JSInstanceInfo* ObjectManager::GetJSInstanceInfo(const Local<Object>& object)
 {
 	DEBUG_WRITE("ObjectManager::GetJSInstanceInfo: called");
 	JSInstanceInfo *jsInstanceInfo = nullptr;
 
-	Isolate* isolate = Isolate::GetCurrent();
+	auto isolate = Isolate::GetCurrent();
 	HandleScope handleScope(isolate);
 
-	auto v8HiddenJS = V8StringConstants::GetHiddenJSInstance();
-	auto hiddenValue = object->GetHiddenValue(v8HiddenJS);
-	if (hiddenValue.IsEmpty())
+	int internalFieldCound = NativeScriptExtension::GetInternalFieldCount(object);
+	const int count = static_cast<int>(MetadataNodeKeys::END);
+	const int jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
+	if (internalFieldCound == count)
 	{
-		//Typescript object layout has an object instance as child of the actual registered instance. checking for that
-		auto prototypeObject = object->GetPrototype().As<Object>();
-
-		if (!prototypeObject.IsEmpty() && prototypeObject->IsObject())
+		auto jsInfo = object->GetInternalField(jsInfoIdx);
+		if (jsInfo->IsUndefined())
 		{
-			DEBUG_WRITE("GetJSInstanceInfo: need to check prototype :%d", prototypeObject->GetIdentityHash());
-			hiddenValue = prototypeObject->GetHiddenValue(v8HiddenJS);
-		}
-	}
+			//Typescript object layout has an object instance as child of the actual registered instance. checking for that
+			auto prototypeObject = object->GetPrototype().As<Object>();
 
-	if (!hiddenValue.IsEmpty())
-	{
-		auto external = hiddenValue.As<External>();
-		jsInstanceInfo = static_cast<JSInstanceInfo*>(external->Value());
+			if (!prototypeObject.IsEmpty() && prototypeObject->IsObject())
+			{
+				DEBUG_WRITE("GetJSInstanceInfo: need to check prototype :%d", prototypeObject->GetIdentityHash());
+				internalFieldCound = NativeScriptExtension::GetInternalFieldCount(prototypeObject);
+				if (internalFieldCound == count)
+				{
+					jsInfo = prototypeObject->GetInternalField(jsInfoIdx);
+				}
+			}
+		}
+
+		if (!jsInfo.IsEmpty() && jsInfo->IsExternal())
+		{
+			auto external = jsInfo.As<External>();
+			jsInstanceInfo = static_cast<JSInstanceInfo*>(external->Value());
+		}
 	}
 
 	return jsInstanceInfo;
@@ -120,7 +133,7 @@ void ObjectManager::UpdateCache(int objectID, jobject obj)
 	m_cache.update(objectID, obj);
 }
 
-jclass ObjectManager::GetJavaClass(const Handle<Object>& instance)
+jclass ObjectManager::GetJavaClass(const Local<Object>& instance)
 {
 	DEBUG_WRITE("GetClass called");
 
@@ -130,7 +143,7 @@ jclass ObjectManager::GetJavaClass(const Handle<Object>& instance)
 	return clazz;
 }
 
-void ObjectManager::SetJavaClass(const Handle<Object>& instance, jclass clazz)
+void ObjectManager::SetJavaClass(const Local<Object>& instance, jclass clazz)
 {
 	DEBUG_WRITE("SetClass called");
 
@@ -148,7 +161,7 @@ int ObjectManager::GetOrCreateObjectId(jobject object)
 	return javaObjectID;
 }
 
-Handle<Object> ObjectManager::GetJsObjectByJavaObjectStatic(int javaObjectID)
+Local<Object> ObjectManager::GetJsObjectByJavaObjectStatic(int javaObjectID)
 {
 	return ObjectManager::instance->GetJsObjectByJavaObject(javaObjectID);
 }
@@ -170,17 +183,17 @@ Local<Object> ObjectManager::GetJsObjectByJavaObject(int javaObjectID)
 	return handleScope.Escape(localObject);
 }
 
-Handle<Object> ObjectManager::CreateJSWrapperStatic(jint javaObjectID, const string& typeName)
+Local<Object> ObjectManager::CreateJSWrapperStatic(jint javaObjectID, const string& typeName)
 {
 	return ObjectManager::instance->CreateJSWrapper(javaObjectID, typeName);
 }
 
-Handle<Object> ObjectManager::CreateJSWrapper(jint javaObjectID, const string& typeName)
+Local<Object> ObjectManager::CreateJSWrapper(jint javaObjectID, const string& typeName)
 {
 	return CreateJSWrapperHelper(javaObjectID, typeName, nullptr);
 }
 
-Handle<Object> ObjectManager::CreateJSWrapper(jint javaObjectID, const string& typeName, jobject instance)
+Local<Object> ObjectManager::CreateJSWrapper(jint javaObjectID, const string& typeName, jobject instance)
 {
 	JEnv env;
 
@@ -189,7 +202,7 @@ Handle<Object> ObjectManager::CreateJSWrapper(jint javaObjectID, const string& t
 	return CreateJSWrapperHelper(javaObjectID, typeName, clazz);
 }
 
-Handle<Object> ObjectManager::CreateJSWrapperHelper(jint javaObjectID, const string& typeName, jclass clazz)
+Local<Object> ObjectManager::CreateJSWrapperHelper(jint javaObjectID, const string& typeName, jclass clazz)
 {
 	auto isolate = Isolate::GetCurrent();
 
@@ -206,7 +219,7 @@ Handle<Object> ObjectManager::CreateJSWrapperHelper(jint javaObjectID, const str
 }
 
 
-void ObjectManager::Link(const Handle<Object>& object, uint32_t javaObjectID, jclass clazz)
+void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID, jclass clazz)
 {
 	auto isolate = Isolate::GetCurrent();
 
@@ -222,26 +235,17 @@ void ObjectManager::Link(const Handle<Object>& object, uint32_t javaObjectID, jc
 	auto state = new ObjectWeakCallbackState(this, jsInstanceInfo, objectHandle);
 	objectHandle->SetWeak(state, JSObjectWeakCallbackStatic);
 
-	auto hiddenString = V8StringConstants::GetHiddenJSInstance();
+	auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
+	bool alreadyLinked = !object->GetInternalField(jsInfoIdx)->IsUndefined();
+	//ASSERT_MESSAGE(alreadyLinked, "object should not have been linked before");
 
-	bool alreadyLinked = !object->GetHiddenValue(hiddenString).IsEmpty();
-	ASSERT_MESSAGE(!alreadyLinked, "object should not have been linked before");
-
-	auto hiddenValue = External::New(isolate, jsInstanceInfo);
-	object->SetHiddenValue(hiddenString, hiddenValue);
+	auto jsInfo = External::New(isolate, jsInstanceInfo);
+	object->SetInternalField(jsInfoIdx, jsInfo);
 
 	idToObject.insert(make_pair(javaObjectID, objectHandle));
 }
 
-bool ObjectManager::Unlink(Handle<Object>& object)
-{
-	auto hiddenString = V8StringConstants::GetHiddenJSInstance();
-	auto found = !object->GetHiddenValue(hiddenString).IsEmpty();
-	object->SetHiddenValue(hiddenString, Handle<Value>());
-	return found;
-}
-
-bool ObjectManager::CloneLink(const Handle<Object>& src, const Handle<Object>& dest)
+bool ObjectManager::CloneLink(const Local<Object>& src, const Local<Object>& dest)
 {
 	auto jsInfo = GetJSInstanceInfo(src);
 
@@ -249,9 +253,9 @@ bool ObjectManager::CloneLink(const Handle<Object>& src, const Handle<Object>& d
 
 	if (success)
 	{
-		auto hiddenString = V8StringConstants::GetHiddenJSInstance();
-		auto hiddenValue = External::New(Isolate::GetCurrent(), jsInfo);
-		dest->SetHiddenValue(hiddenString, hiddenValue);
+		auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
+		auto jsInfo = src->GetInternalField(jsInfoIdx);
+		dest->SetInternalField(jsInfoIdx, jsInfo);
 	}
 
 	return success;
@@ -490,7 +494,10 @@ void ObjectManager::MarkReachableObjects(Isolate *isolate, const Local<Object>& 
 			s.push(proto);
 		}
 
-		auto propNames = NativeScriptExtension::GetPropertyKeys(isolate, o);
+		auto context = isolate->GetCurrentContext();
+		bool success = false;
+		auto propNames = NativeScriptExtension::GetPropertyKeys(isolate, context, o, success);
+		assert(success);
 		int len = propNames->Length();
 		for (int i = 0; i < len; i++)
 		{
@@ -502,8 +509,8 @@ void ObjectManager::MarkReachableObjects(Isolate *isolate, const Local<Object>& 
 				bool isPropDescriptor = o->HasRealNamedCallbackProperty(name);
 				if (isPropDescriptor)
 				{
-					Handle<Value> getter;
-					Handle<Value> setter;
+					Local<Value> getter;
+					Local<Value> setter;
 					NativeScriptExtension::GetAssessorPair(isolate, o, name, getter, setter);
 
 					if (!getter.IsEmpty() && getter->IsFunction())
@@ -735,5 +742,18 @@ void ObjectManager::DeleteWeakGlobalRefCallback(const jweak& object, void *state
 	env.DeleteWeakGlobalRef(object);
 }
 
+Local<Object> ObjectManager::GetEmptyObject(Isolate *isolate)
+{
+	auto emptyObjCtorFunc = Local<Function>::New(isolate, *s_poJsWrapperFunc);
+	auto val = emptyObjCtorFunc->CallAsConstructor(0, nullptr);
+	assert(val->IsObject());
+	auto obj = val.As<Object>();
+	return obj;
+}
+
+void ObjectManager::JSWrapperConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info)
+{
+}
 
 ObjectManager* ObjectManager::instance = nullptr;
+Persistent<Function>* ObjectManager::s_poJsWrapperFunc = nullptr;

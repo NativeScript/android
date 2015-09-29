@@ -14,8 +14,6 @@ import java.net.URISyntaxException;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import android.util.Log;
-
 public class FileSystem
 {
 	public static String readAll(InputStream inputStream) throws IOException

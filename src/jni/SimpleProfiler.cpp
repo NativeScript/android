@@ -46,7 +46,7 @@ SimpleProfiler::~SimpleProfiler()
 	}
 }
 
-void SimpleProfiler::Init(Isolate *isolate, Handle<ObjectTemplate>& globalTemplate)
+void SimpleProfiler::Init(Isolate *isolate, Local<ObjectTemplate>& globalTemplate)
 {
 	s_frames.reserve(10000);
 	auto funcName = String::NewFromUtf8(isolate, "__printProfilerData");

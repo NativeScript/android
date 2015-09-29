@@ -9,7 +9,7 @@ namespace tns
 	class NumericCasts
 	{
 	public:
-			void CreateGlobalCastFunctions(const v8::Handle<v8::ObjectTemplate>& globalTemplate);
+			void CreateGlobalCastFunctions(const v8::Local<v8::ObjectTemplate>& globalTemplate);
 
 	private:
 			void MarkAsLongCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
@@ -24,7 +24,7 @@ namespace tns
 
 			void MarkAsDoubleCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-			v8::Persistent<v8::Object>* MarkJsObject(const v8::Handle<v8::Object>& object, const std::string& mark, const v8::Handle<v8::Value>& value);
+			v8::Persistent<v8::Object>* MarkJsObject(const v8::Local<v8::Object>& object, const std::string& mark, const v8::Local<v8::Value>& value);
 
 			static void MarkAsLongCallbackStatic(const v8::FunctionCallbackInfo<v8::Value>& args);
 

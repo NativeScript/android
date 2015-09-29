@@ -1,10 +1,7 @@
 package com.tns;
 
-import java.io.BufferedReader;
-import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Constructor;
@@ -21,25 +18,18 @@ import java.util.HashSet;
 
 import org.json.JSONObject;
 
-import android.content.Context;
-import android.content.pm.ApplicationInfo;
-import android.content.pm.PackageInfo;
-import android.content.pm.PackageManager;
-import android.content.pm.PackageManager.NameNotFoundException;
-import android.os.Handler;
-import android.os.Looper;
-import android.util.Log;
 import android.util.SparseArray;
 
 import com.tns.bindings.ProxyGenerator;
 import com.tns.internal.ExtractPolicy;
-import com.tns.internal.Plugin;
 
 public class Platform
 {
 	private static native void initNativeScript(String filesPath, int appJavaObjectId, boolean verboseLoggingEnabled, String packageName, String jsOptions);
 
 	private static native void runNativeScript(String appModuleName);
+	
+	private static native Object runScript(String filePath) throws NativeScriptException;
 
 	private static native Object callJSMethodNative(int javaObjectID, String methodName, int retType, boolean isConstructor, Object... packagedArgs) throws NativeScriptException;
 
@@ -73,85 +63,96 @@ public class Platform
 	private static Class<?> errorActivityClass;
 	
 	private final static Object keyNotFoundObject = new Object();
-	public final static String ApplicationAssetsPath = "app/";
 	private static int currentObjectId = -1;
 	
 	private static ExtractPolicy extractPolicy;
 
-	private static Thread mainThread;
-
 	private static long lastUsedMemory = 0;
 	
 	private static ArrayList<Constructor<?>> ctorCache = new ArrayList<Constructor<?>>();
+	
+	private static Logger logger;
+	
+	private static ThreadScheduler threadScheduler;
 
 	private static JsDebugger jsDebugger;
 	
-	public static boolean IsLogEnabled = BuildConfig.DEBUG;
-	
 	private static DexFactory dexFactory;
-	public final static String DEFAULT_LOG_TAG = "TNS.Java";
 	
-	public static Class<?> getErrorActivityClass(){
+	private final static Comparator<Method> methodComparator = new Comparator<Method>()
+	{
+		public int compare(Method lhs, Method rhs)
+		{
+			return lhs.getName().compareTo(rhs.getName());
+		}
+	};
+
+	public static Class<?> getErrorActivityClass()
+	{
 		return errorActivityClass;
 	}
 	
-	public static void setErrorActivityClass(Class<?> clazz){
+	public static void setErrorActivityClass(Class<?> clazz)
+	{
 		errorActivityClass = clazz;
 	}
 	
-	public static int init(String appName, File runtimeLibPath, File rootDir, File appDir, File debuggerSetupDir, ClassLoader classLoader, File dexDir, String dexThumb) throws RuntimeException
+	public static int init(ThreadScheduler threadScheduler, Logger logger, String appName, File runtimeLibPath, File rootDir, File appDir, File debuggerSetupDir, ClassLoader classLoader, File dexDir, String dexThumb) throws RuntimeException
 	{
-		return init(null, appName, runtimeLibPath, rootDir, appDir, debuggerSetupDir, classLoader, dexDir, dexThumb);
+		return init(null, threadScheduler, logger, appName, runtimeLibPath, rootDir, appDir, debuggerSetupDir, classLoader, dexDir, dexThumb);
 	}
 	
-	public static int init(Object application, String appName, File runtimeLibPath, File rootDir, File appDir, File debuggerSetupDir, ClassLoader classLoader, File dexDir, String dexThumb) throws RuntimeException
+	public static int init(Object application, ThreadScheduler threadScheduler, Logger logger, String appName, File runtimeLibPath, File rootDir, File appDir, File debuggerSetupDir, ClassLoader classLoader, File dexDir, String dexThumb) throws RuntimeException
 	{
 		if (initialized)
 		{
 			throw new RuntimeException("NativeScriptApplication already initialized");
 		}
+
+		Platform.threadScheduler = threadScheduler;
+		
+		Platform.logger = logger;
 		
 		loadLibrary(runtimeLibPath, "NativeScript");
 		
-		mainThread = Thread.currentThread();
-
-		Platform.dexFactory = new DexFactory(classLoader, dexDir, dexThumb);
+		Platform.dexFactory = new DexFactory(logger, classLoader, dexDir, dexThumb);
 
 		int appJavaObjectId = -1;
 		if (application != null)
 		{
-			if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "Initializing NativeScript JAVA");
+			if (logger.isEnabled()) logger.write("Initializing NativeScript JAVA");
 			appJavaObjectId = generateNewObjectId();
 			makeInstanceStrong(application, appJavaObjectId);
-			if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "Initialized app instance id:" + appJavaObjectId);
+			if (logger.isEnabled()) logger.write("Initialized app instance id:" + appJavaObjectId);
 		}
 
 		try
 		{
-			Require.init(rootDir, appDir);
+			Require.init(logger, rootDir, appDir);
 		}
 		catch (IOException ex)
 		{
 			throw new RuntimeException("Fail to initialize Require class", ex);
 		}
 		String jsOptions = readJsOptions(appDir);
-		Platform.initNativeScript(Require.getApplicationFilesPath(), appJavaObjectId, IsLogEnabled, appName, jsOptions);
+		Platform.initNativeScript(Require.getApplicationFilesPath(), appJavaObjectId, logger.isEnabled(), appName, jsOptions);
 		
 		if (debuggerSetupDir != null)
 		{
-			jsDebugger = new JsDebugger(debuggerSetupDir);
+			jsDebugger = new JsDebugger(logger, threadScheduler, debuggerSetupDir);
 											//also runs javaServerThread with resolved port
 			int debuggerPort = jsDebugger.getDebuggerPortFromEnvironment();
+			if (logger.isEnabled()) logger.write("port=" + debuggerPort);
 		}
 		
 		//
-		if (IsLogEnabled)
+		if (logger.isEnabled())
 		{
 			Date d = new Date();
 			int pid = android.os.Process.myPid();
 			File f = new File("/proc/" + pid);
 			Date lastModDate = new Date(f.lastModified());
-			Log.d(DEFAULT_LOG_TAG, "init time=" + (d.getTime() - lastModDate.getTime()));
+			logger.write("init time=" + (d.getTime() - lastModDate.getTime()));
 		}
 		//
 
@@ -191,21 +192,24 @@ public class Platform
 		}
 	}
 	
+	@RuntimeCallable
 	public static void enableVerboseLogging()
 	{
-		IsLogEnabled = true;
+		logger.setEnabled(true);
 		ProxyGenerator.IsLogEnabled = true;
 		enableVerboseLoggingNative();
 	}
 
+	@RuntimeCallable
 	public static void disableVerboseLogging()
 	{
-		IsLogEnabled = false;
+		logger.setEnabled(false);
 		ProxyGenerator.IsLogEnabled = false;
 		disableVerboseLoggingNative();
 	}
 
-	public static void appFail(Throwable ex, String message)
+	@RuntimeCallable
+	static void appFail(Throwable ex, String message)
 	{
 		// TODO: allow app to handle fail message report here. For example
 		// integrate google app reports
@@ -241,12 +245,27 @@ public class Platform
 		runNativeScript(bootstrapPath);
 	}
 	
+	public static Object runScript(File jsFile) throws NativeScriptException
+	{
+		Object result = null;
+		
+		if (jsFile.exists() && jsFile.isFile())
+		{
+			String filePath = jsFile.getAbsolutePath();
+			result = runScript(filePath);
+		}
+		
+		return result;
+	}
+	
+	@RuntimeCallable
 	private static Class<?> resolveClass(String fullClassName, String[] methodOverrides) throws ClassNotFoundException, IOException{
 		Class<?> javaClass = ClassResolver.resolveClass(fullClassName, dexFactory, methodOverrides);
 		
 		return javaClass;
 	}
 
+	@RuntimeCallable
 	private static int cacheConstructor(Class<?> clazz, Object[] args) throws ClassNotFoundException, IOException
 	{
 		Constructor<?> ctor = MethodResolver.resolveConstructor(clazz, args);
@@ -260,6 +279,7 @@ public class Platform
 		return ctorId;
 	}
 
+	@RuntimeCallable
 	private static Object createInstance(Object[] args, int objectId, int constructorId) throws InstantiationException, IllegalAccessException, ClassNotFoundException, NoSuchMethodException, IllegalArgumentException, InvocationTargetException, IOException
 	{
 		Constructor<?> ctor = ctorCache.get(constructorId);
@@ -303,6 +323,7 @@ public class Platform
 		return instance;
 	}
 	
+	@RuntimeCallable
 	private static long getChangeInBytesOfUsedMemory()
 	{
 		long usedMemory = runtime.totalMemory() - runtime.freeMemory();
@@ -343,7 +364,7 @@ public class Platform
 				
 		createJSInstanceNative(instance, javaObjectID, className);
 
-		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "JSInstance for " + instance.getClass().toString() + " created with overrides");
+		if (logger.isEnabled()) logger.write("JSInstance for " + instance.getClass().toString() + " created with overrides");
 	}
 	
 	@RuntimeCallable
@@ -366,7 +387,7 @@ public class Platform
 				}
 				catch (Exception e1)
 				{
-					if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, ">>loader=" + classLoader.toString() + " " + e1.getMessage());
+					if (logger.isEnabled()) logger.write(">>loader=" + classLoader.toString() + " " + e1.getMessage());
 				}
 			}
 			if (clazz == null)
@@ -503,14 +524,7 @@ public class Platform
 		return ret;
 	}
 	
-	private final static Comparator<Method> methodComparator = new Comparator<Method>()
-	{
-		public int compare(Method lhs, Method rhs)
-		{
-			return lhs.getName().compareTo(rhs.getName());
-		}
-	};
-
+	@RuntimeCallable
 	private static void makeInstanceStrong(Object instance, int objectId)
 	{
 		if (instance == null)
@@ -534,12 +548,12 @@ public class Platform
 			}
 		}
 
-		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "MakeInstanceStrong (" + key + ", " + instance.getClass().toString() + ")");
+		if (logger.isEnabled()) logger.write("MakeInstanceStrong (" + key + ", " + instance.getClass().toString() + ")");
 	}
 
 	private static void makeInstanceWeak(int javaObjectID, boolean keepAsWeak)
 	{
-		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "makeInstanceWeak instance " + javaObjectID + " keepAsWeak=" + keepAsWeak);
+		if (logger.isEnabled()) logger.write("makeInstanceWeak instance " + javaObjectID + " keepAsWeak=" + keepAsWeak);
 		Object instance = strongInstances.get(javaObjectID);
 		
 		if (keepAsWeak) {
@@ -551,6 +565,7 @@ public class Platform
 		strongJavaObjectToID.remove(instance);
 	}
 	
+	@RuntimeCallable
 	private static void makeInstanceWeak(ByteBuffer buff, int length, boolean keepAsWeak)
 	{
 		buff.position(0);
@@ -561,6 +576,7 @@ public class Platform
 		}
 	}
 	
+	@RuntimeCallable
 	private static void checkWeakObjectAreAlive(ByteBuffer input, ByteBuffer output, int length)
 	{
 		input.position(0);
@@ -596,9 +612,10 @@ public class Platform
 		}
 	}
 	
-	public static Object getJavaObjectByID(int javaObjectID) throws Exception
+	@RuntimeCallable
+	private static Object getJavaObjectByID(int javaObjectID) throws Exception
 	{
-		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "Platform.getJavaObjectByID:" + javaObjectID);
+		if (logger.isEnabled()) logger.write("Platform.getJavaObjectByID:" + javaObjectID);
 
 		Object instance = strongInstances.get(javaObjectID, keyNotFoundObject);
 
@@ -634,7 +651,8 @@ public class Platform
 		return id;
 	}
 
-	public static int getorCreateJavaObjectID(Object obj)
+	@RuntimeCallable
+	public static int getOrCreateJavaObjectID(Object obj)
 	{
 		Integer result = getJavaObjectID(obj);
 
@@ -678,11 +696,11 @@ public class Platform
 		Integer javaObjectID = getJavaObjectID(javaObject);
 		if (javaObjectID == null)
 		{
-			if (IsLogEnabled) Log.e(DEFAULT_LOG_TAG, "Platform.CallJSMethod: calling js method " + methodName + " with javaObjectID " + javaObjectID + " type=" + ((javaObject != null) ? javaObject.getClass().getName() : "null"));
+			if (logger.isEnabled()) logger.write("Platform.CallJSMethod: calling js method " + methodName + " with javaObjectID " + javaObjectID + " type=" + ((javaObject != null) ? javaObject.getClass().getName() : "null"));
 			appFail(null, "Application failed");
 		}
 
-		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "Platform.CallJSMethod: calling js method " + methodName + " with javaObjectID " + javaObjectID + " type=" + ((javaObject != null) ? javaObject.getClass().getName() : "null"));
+		if (logger.isEnabled()) logger.write("Platform.CallJSMethod: calling js method " + methodName + " with javaObjectID " + javaObjectID + " type=" + ((javaObject != null) ? javaObject.getClass().getName() : "null"));
 
 		Object result = dispatchCallJSMethodNative(javaObjectID, methodName, isConstructor, delay, retType, args);
 
@@ -712,7 +730,7 @@ public class Platform
 				if (typeId == TypeIDs.JsObject)
 				{
 					javaClassPath = value.getClass().getName();
-					value = getorCreateJavaObjectID(value);
+					value = getOrCreateJavaObjectID(value);
 				}
 
 				packagedArgs[jsArgsIndex++] = typeId;
@@ -726,11 +744,12 @@ public class Platform
 		return packagedArgs;
 	}
 
-	public static String resolveMethodOverload(String className, String methodName, Object[] args) throws Exception
+	@RuntimeCallable
+	private static String resolveMethodOverload(String className, String methodName, Object[] args) throws Exception
 	{
-		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "resolveMethodOverload: Resolving method " + methodName + " on class " + className);
+		if (logger.isEnabled()) logger.write("resolveMethodOverload: Resolving method " + methodName + " on class " + className);
 		String res = MethodResolver.resolveMethodOverload(classCache, className, methodName, args);
-		if (IsLogEnabled) Log.d(DEFAULT_LOG_TAG, "resolveMethodOverload: method found :" + res);
+		if (logger.isEnabled()) logger.write("resolveMethodOverload: method found :" + res);
 		if (res == null)
 		{
 			throw new Exception("Failed resolving method " + methodName + " on class " + className);
@@ -739,7 +758,7 @@ public class Platform
 		return res;
 	}
 	
-	public static boolean isJavaThrowable(Object obj)
+	private static boolean isJavaThrowable(Object obj)
 	{
 		boolean isJavaThrowable = false;
 
@@ -789,19 +808,17 @@ public class Platform
 		final int returnType = TypeIDs.GetObjectTypeId(retType);
 		Object ret = null;
 		
-		boolean isMainThread = mainThread.equals(Thread.currentThread());
+		boolean isWorkThread = threadScheduler.getThread().equals(Thread.currentThread());
 		
 		final Object[] tmpArgs = extendConstructorArgs(methodName, isConstructor, args);
 
-		if (isMainThread)
+		if (isWorkThread)
 		{
 			Object[] packagedArgs = packageArgs(tmpArgs);
 			ret = callJSMethodNative(javaObjectID, methodName, returnType, isConstructor, packagedArgs);
 		}
 		else
 		{
-			Handler mainThreadHandler = new Handler(Looper.getMainLooper());
-
 			final Object[] arr = new Object[2];
 			
 			final boolean isCtor = isConstructor; 
@@ -835,7 +852,7 @@ public class Platform
 				catch (InterruptedException e) {}
 			}
 
-			boolean success = mainThreadHandler.post(r);
+			boolean success = threadScheduler.post(r);
 
 			if (success)
 			{
@@ -861,112 +878,20 @@ public class Platform
 		return ret;
 	}
 	
+	@RuntimeCallable
 	private static Class<?> getCachedClass(String className)
 	{
 		Class<?> clazz = classCache.get(className);
 		return clazz;
 	}
 
-    private static Class<?> findClass(String className) throws ClassNotFoundException
+	@RuntimeCallable
+	private static Class<?> findClass(String className) throws ClassNotFoundException
     {
     	Class<?> clazz = dexFactory.findClass(className);
 		return clazz;
     }
     
-    public static void initLogging(Context context)
-    {
-    	int flags;
-		boolean verboseLogging = false;
-		try
-		{
-			flags = context.getPackageManager().getPackageInfo(context.getPackageName(), 0).applicationInfo.flags;
-			verboseLogging = ((flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0);
-		}
-		catch (NameNotFoundException e)
-		{
-			e.printStackTrace();
-			return;
-		}
-		
-		if (!verboseLogging)
-		{
-			return;
-		}
-		
-    	String verboseLoggingProp = readSystemProperty("nativescript.verbose.logging");
-    	if (verboseLoggingProp.equals("true") || verboseLoggingProp.equals("TRUE") ||
-    		verboseLoggingProp.equals("yes") || verboseLoggingProp.equals("YES") ||
-    		verboseLoggingProp.equals("enabled") || verboseLoggingProp.equals("ENABLED"))
-    	{
-    		Platform.IsLogEnabled = true;
-    	}
-    }
-    
-    
-	private static String readSystemProperty(String name)
-	{
-		InputStreamReader in = null;
-		BufferedReader reader = null;
-		try
-		{
-			Process proc = Runtime.getRuntime().exec(new String[] { "/system/bin/getprop", name });
-			in = new InputStreamReader(proc.getInputStream());
-			reader = new BufferedReader(in);
-			return reader.readLine();
-		}
-		catch (IOException e)
-		{
-			return null;
-		}
-		finally
-		{
-			silentClose(in);
-			silentClose(reader);
-		}
-	}
-
-	public static void silentClose(Closeable closeable)
-	{
-		if (closeable == null)
-		{
-			return;
-		}
-		try
-		{
-			closeable.close();
-		}
-		catch (IOException ignored)
-		{
-		}
-	}
-	
-	static boolean runPlugin(Context context)
-	{
-		boolean success = false;
-		String pluginClassName;
-		try
-		{
-			ApplicationInfo ai = context.getPackageManager().getApplicationInfo(context.getPackageName(), PackageManager.GET_META_DATA);
-			pluginClassName = ai.metaData.getString("com.tns.internal.Plugin");
-		}
-		catch (Exception e)
-		{
-			pluginClassName = "org.nativescript.livesync.LiveSyncPlugin";
-			if (IsLogEnabled) e.printStackTrace();
-		}
-		try
-		{
-			Class<?> liveSyncPluginClass = Class.forName(pluginClassName);
-			Plugin p = (Plugin)liveSyncPluginClass.newInstance();
-			success = p.execute(context);
-		}
-		catch (Exception e)
-		{
-			if (IsLogEnabled) e.printStackTrace();
-		}
-		return success;
-	}
-	
 	public static void purgeAllProxies()
 	{
 		if (dexFactory == null)
@@ -975,41 +900,6 @@ public class Platform
 		}
 		
 		dexFactory.purgeAllProxies();
-	}
-	
-	public static boolean isDebuggableApp(Context context)
-	{
-		int flags;
-		try
-		{
-			flags = context.getPackageManager().getPackageInfo(context.getPackageName(), 0).applicationInfo.flags;
-		}
-		catch (NameNotFoundException e)
-		{
-			flags = 0;
-			e.printStackTrace();
-		}
-
-		boolean isDebuggableApp = ((flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0);
-		return isDebuggableApp;
-	}
-	
-	public static String getDexThumb(Context context)
-	{
-		try
-		{
-			PackageInfo packageInfo = context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
-			int code = packageInfo.versionCode;
-			long updateTime = packageInfo.lastUpdateTime;
-			return String.valueOf(updateTime) + "-" + String.valueOf(code);
-		}
-		catch (PackageManager.NameNotFoundException e)
-		{
-			Log.e(Platform.DEFAULT_LOG_TAG, "Error while getting current proxy thumb");
-			e.printStackTrace();
-		}
-
-		return null;
 	}
 	
 	private static String readJsOptions(File appDir)
@@ -1035,7 +925,7 @@ public class Platform
 			}
 			catch (Exception e)
 			{
-				if (IsLogEnabled) e.printStackTrace();
+				if (logger.isEnabled()) e.printStackTrace();
 			}
 		}
 		

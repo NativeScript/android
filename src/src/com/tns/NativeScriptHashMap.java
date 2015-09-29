@@ -382,13 +382,13 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
 	@Override
 	public boolean containsValue(Object value)
 	{
-		HashMapEntry[] tab = table;
+		HashMapEntry<K, V>[] tab = table;
 		int len = tab.length;
 		if (value == null)
 		{
 			for (int i = 0; i < len; i++)
 			{
-				for (HashMapEntry e = tab[i]; e != null; e = e.next)
+				for (HashMapEntry<K, V> e = tab[i]; e != null; e = e.next)
 				{
 					if (e.value == null)
 					{
@@ -402,7 +402,7 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
 		// value is non-null
 		for (int i = 0; i < len; i++)
 		{
-			for (HashMapEntry e = tab[i]; e != null; e = e.next)
+			for (HashMapEntry<K, V> e = tab[i]; e != null; e = e.next)
 			{
 				if (value.equals(e.value))
 				{

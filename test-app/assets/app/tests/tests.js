@@ -1753,13 +1753,12 @@ describe("Tests ", function () {
 		  		return "button1"	
 		}});
 		
-
-		var button = new MyButton();
-		var clazz1 = button.getClass();
+		var clazz1 = MyButton.class;
 		var name1 = clazz1.getName();
 		expect(name1.indexOf("MyButton1615")).not.toEqual(-1);
 
-		var clazz2 = MyButton.class;
+		var button = new MyButton();
+		var clazz2 = button.getClass();
 		var name2 = clazz2.getName();
 		expect(name2.indexOf("MyButton1615")).not.toEqual(-1);
 	});
@@ -1782,6 +1781,17 @@ describe("Tests ", function () {
 		
 		expect(value456).toBe(456);
 	});
+	
+	it("When_using_package_json_should_load_module_even_if_js_extend_is_not_specified", function () {
+		
+		__log("TEST: When_using_package_json_should_load_module_even_if_js_extend_is_not_specified");
+		
+		var module = require("../modules");
+		var value456 = module.value123;
+		
+		expect(value456).toBe(123);
+	});
+	
 	
 	it("When_require_bcl_module_it_should_be_loaded", function () {
 		

@@ -25,7 +25,7 @@ extern ObjectManager *g_objectManager;
 extern int AppJavaObjectID;
 
 
-jobject ConvertJsValueToJavaObject(JEnv& env, const Handle<Value>& value);
+jobject ConvertJsValueToJavaObject(JEnv& env, const Local<Value>& value);
 
 extern "C" jobjectArray Java_com_tns_NativeScriptActivity_getMethodOverrides(JNIEnv *_env, jobject obj, jint objectId, jobjectArray packagedArgs)
 {

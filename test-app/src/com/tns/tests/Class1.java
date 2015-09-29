@@ -1,7 +1,5 @@
 package com.tns.tests;
 
-import com.tns.Platform;
-
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
@@ -43,7 +41,7 @@ public class Class1
 				public void run()
 				{
 					String s = cb.getMessage();
-					Log.d(Platform.DEFAULT_LOG_TAG, "printMessgeWithDelay=" + s);
+					Log.d("TestApp", "printMessgeWithDelay=" + s);
 				}
 			};
 

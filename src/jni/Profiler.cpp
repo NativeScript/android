@@ -45,14 +45,14 @@ void Profiler::StopCPUProfilerCallback(const v8::FunctionCallbackInfo<v8::Value>
 	args.GetReturnValue().Set(Boolean::New(isolate, stopped));
 }
 
-void Profiler::StartCPUProfiler(Isolate *isolate, const Handle<String>& name)
+void Profiler::StartCPUProfiler(Isolate *isolate, const Local<String>& name)
 {
 	auto v8prof = isolate->GetCpuProfiler();
 	v8prof->StartProfiling(name, true);
 }
 
 
-bool Profiler::StopCPUProfiler(Isolate *isolate, const Handle<String>& name)
+bool Profiler::StopCPUProfiler(Isolate *isolate, const Local<String>& name)
 {
 	auto v8prof = isolate->GetCpuProfiler();
 	auto cpuProfile = v8prof->StopProfiling(name);

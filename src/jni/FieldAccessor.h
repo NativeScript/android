@@ -14,9 +14,9 @@ namespace tns
 	public:
 		void Init(JavaVM *jvm, ObjectManager *objectManager);
 
-		v8::Handle<v8::Value> GetJavaField(const v8::Handle<v8::Object>& target, FieldCallbackData *fieldData);
+		v8::Local<v8::Value> GetJavaField(const v8::Local<v8::Object>& target, FieldCallbackData *fieldData);
 
-		void SetJavaField(const v8::Handle<v8::Object>& target, const v8::Handle<v8::Value>& value, FieldCallbackData *fieldData);
+		void SetJavaField(const v8::Local<v8::Object>& target, const v8::Local<v8::Value>& value, FieldCallbackData *fieldData);
 
 	private:
 

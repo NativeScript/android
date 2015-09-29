@@ -13,14 +13,20 @@ import java.io.OutputStreamWriter;
 import android.content.Context;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
-import android.util.Log;
 
-import com.tns.Platform;
+import com.tns.Logger;
 
 public class DefaultExtractPolicy implements ExtractPolicy
 {
+	private final Logger logger;
+	
 	private final static String ASSETS_THUMB_FILENAME = "assetsThumb";
-
+	
+	public DefaultExtractPolicy(Logger logger)
+	{
+		this.logger = logger;
+	}
+	
 	public boolean shouldExtract(android.content.Context context)
 	{
 		String assetsThumb = generateAssetsThumb(context);
@@ -48,7 +54,7 @@ public class DefaultExtractPolicy implements ExtractPolicy
 		return null;
 	}
 
-	private static String generateAssetsThumb(Context context)
+	private String generateAssetsThumb(Context context)
 	{
 		try
 		{
@@ -59,14 +65,14 @@ public class DefaultExtractPolicy implements ExtractPolicy
 		}
 		catch (PackageManager.NameNotFoundException e)
 		{
-			Log.e(Platform.DEFAULT_LOG_TAG, "Error while getting current assets thumb");
+			logger.write("Error while getting current assets thumb");
 			e.printStackTrace();
 		}
 
 		return null;
 	}
 
-	private static String getCachedAssetsThumb(String assetsThumbFilePath)
+	private String getCachedAssetsThumb(String assetsThumbFilePath)
 	{
 		try
 		{
@@ -83,12 +89,12 @@ public class DefaultExtractPolicy implements ExtractPolicy
 		}
 		catch (FileNotFoundException e)
 		{
-			Log.e(Platform.DEFAULT_LOG_TAG, "Error while getting current assets thumb");
+			logger.write("Error while getting current assets thumb");
 			e.printStackTrace();
 		}
 		catch (IOException e)
 		{
-			Log.e(Platform.DEFAULT_LOG_TAG, "Error while getting current asstes thumb");
+			logger.write("Error while getting current asstes thumb");
 			e.printStackTrace();
 		}
 
@@ -116,12 +122,12 @@ public class DefaultExtractPolicy implements ExtractPolicy
 		}
 		catch (FileNotFoundException e)
 		{
-			Log.e(Platform.DEFAULT_LOG_TAG, "Error while writting current assets thumb");
+			logger.write("Error while writting current assets thumb");
 			e.printStackTrace();
 		}
 		catch (IOException e)
 		{
-			Log.e(Platform.DEFAULT_LOG_TAG, "Error while writting current assets thumb");
+			logger.write("Error while writting current assets thumb");
 			e.printStackTrace();
 		}
 	}

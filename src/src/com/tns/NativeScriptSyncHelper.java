@@ -1,20 +1,15 @@
 package com.tns;
 
-import java.io.BufferedReader;
-import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.util.ArrayList;
 
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager.NameNotFoundException;
-import android.util.Log;
 
 public class NativeScriptSyncHelper
 {
@@ -22,56 +17,34 @@ public class NativeScriptSyncHelper
 	private static final String SYNC_SOURCE_DIR = "/sync/";
 	private static final String FULL_SYNC_SOURCE_DIR = "/fullsync/";
 	private static final String REMOVED_SYNC_SOURCE_DIR = "/removedsync/";
-	private static final String SYNC_THUMB_FILE = "syncThumb";
-	private static final String COMMAND_FULL_SYNC = "fullsync";
-	private static final String COMMAND_SYNC = "sync";
-	private static final String COMMAND_SYNC_WITH_REMOVED = "sync-with-removed";
+	
+	private static Logger logger;
 
-	public static void sync(Context context)
+	public static void sync(Logger logger, Context context)
 	{
+		NativeScriptSyncHelper.logger = logger;
+		
 		boolean shouldExecuteSync = getShouldExecuteSync(context);
 		
 		if (!shouldExecuteSync)
 		{
-			if (Platform.IsLogEnabled)
+			if (logger.isEnabled())
 			{
-				Log.d(Platform.DEFAULT_LOG_TAG, "Sync is not enabled.");
+				logger.write("Sync is not enabled.");
 			}
 			return;
 		}
 
-//		String syncThumbFilePath = SYNC_ROOT_SOURCE_DIR + context.getPackageName() + SYNC_THUMB_FILE;
-//		String syncData = getSyncThumb(syncThumbFilePath);
-//		if (syncData == null)
-//		{
-//			return;
-//		}
-//		
-//		String[] syncCommandAndThumb = syncData.split("");
-//		String syncCommand = syncCommandAndThumb[0];
-//		String syncThumb = syncCommandAndThumb[1];
-//		if (syncThumb == null)
-//		{
-//			return;
-//		}
-//		
-//		String oldSyncThumbFilePath = context.getFilesDir() + "syncThumb";
-//		String oldSyncThumb = getSyncThumb(oldSyncThumbFilePath);
-//		if (oldSyncThumb.equalsIgnoreCase(syncThumb))
-//		{
-//			return;
-//		}
-		
 		String syncPath = SYNC_ROOT_SOURCE_DIR + context.getPackageName() + SYNC_SOURCE_DIR;
 		String fullSyncPath = SYNC_ROOT_SOURCE_DIR + context.getPackageName() + FULL_SYNC_SOURCE_DIR;
 		String removedSyncPath = SYNC_ROOT_SOURCE_DIR + context.getPackageName() + REMOVED_SYNC_SOURCE_DIR;
 		
-		if (Platform.IsLogEnabled)
+		if (logger.isEnabled())
 		{
-			Log.d(Platform.DEFAULT_LOG_TAG, "Sync is enabled:");
-			Log.d(Platform.DEFAULT_LOG_TAG, "Sync path              : " + syncPath);
-			Log.d(Platform.DEFAULT_LOG_TAG, "Full sync path         : " + fullSyncPath);
-			Log.d(Platform.DEFAULT_LOG_TAG, "Removed files sync path: " + removedSyncPath);
+			logger.write("Sync is enabled:");
+			logger.write("Sync path              : " + syncPath);
+			logger.write("Full sync path         : " + fullSyncPath);
+			logger.write("Removed files sync path: " + removedSyncPath);
 		}
 		
 		
@@ -140,7 +113,7 @@ public class NativeScriptSyncHelper
 			boolean success = pathname.delete();
 			if (!success)
 			{
-				Log.e(Platform.DEFAULT_LOG_TAG, "Syncing: file not deleted: " + pathname.getAbsolutePath().toString());
+				logger.write("Syncing: file not deleted: " + pathname.getAbsolutePath().toString());
 			}
 			return false;
 		}
@@ -161,7 +134,7 @@ public class NativeScriptSyncHelper
 		boolean success = directory.delete();
 		if (!success && directory.exists())
 		{
-			Log.e(Platform.DEFAULT_LOG_TAG, "Syncing: directory not deleted: " + directory.getAbsolutePath().toString());
+			logger.write("Syncing: directory not deleted: " + directory.getAbsolutePath().toString());
 		}
 	}
 	
@@ -176,9 +149,9 @@ public class NativeScriptSyncHelper
 				File file = files[i];
 				if (file.isFile())
 				{
-					if (Platform.IsLogEnabled)
+					if (logger.isEnabled())
 					{
-						Log.d(Platform.DEFAULT_LOG_TAG, "Syncing: " + file.getAbsolutePath().toString());
+						logger.write("Syncing: " + file.getAbsolutePath().toString());
 					}
 					
 					String targetFilePath = file.getAbsolutePath().replace(sourceRootAbsolutePath, targetRootAbsolutePath);
@@ -193,7 +166,7 @@ public class NativeScriptSyncHelper
 				    boolean success = copyFile(file.getAbsolutePath(), targetFilePath);
 					if (!success)
 					{
-						Log.e(Platform.DEFAULT_LOG_TAG, "Sync failed: " + file.getAbsolutePath().toString());
+						logger.write("Sync failed: " + file.getAbsolutePath().toString());
 					}
 				}
 				else
@@ -240,9 +213,9 @@ public class NativeScriptSyncHelper
 				File file = files[i];
 				if (file.isFile())
 				{
-					if (Platform.IsLogEnabled)
+					if (logger.isEnabled())
 					{
-						Log.d(Platform.DEFAULT_LOG_TAG, "Syncing removed file: " + file.getAbsolutePath().toString());
+						logger.write("Syncing removed file: " + file.getAbsolutePath().toString());
 					}
 					
 					String targetFilePath = file.getAbsolutePath().replace(sourceRootAbsolutePath, targetRootAbsolutePath);
@@ -283,13 +256,13 @@ public class NativeScriptSyncHelper
 		}
 		catch (FileNotFoundException e)
 		{
-			Log.e(Platform.DEFAULT_LOG_TAG, "Error copying file " + sourceFile);
+			logger.write("Error copying file " + sourceFile);
 			e.printStackTrace();
 			return false;
 		}
 		catch (IOException e)
 		{
-			Log.e(Platform.DEFAULT_LOG_TAG, "Error copying file " + sourceFile);
+			logger.write("Error copying file " + sourceFile);
 		    e.printStackTrace();
 		    return false;
 		}

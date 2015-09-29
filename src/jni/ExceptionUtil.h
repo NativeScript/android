@@ -42,19 +42,19 @@ namespace tns
 		 * A callback to the V8's AddMessageListener method.
 		 * Reports any uncaught non-critical errors.
 		 */
-		static void OnUncaughtError(v8::Handle<v8::Message> message, v8::Handle<v8::Value> error);
-		static void CallJsFuncWithErr(v8::Handle<v8::Value> errObj);
+		static void OnUncaughtError(v8::Local<v8::Message> message, v8::Local<v8::Value> error);
+		static void CallJsFuncWithErr(v8::Local<v8::Value> errObj);
 
 		static ExceptionUtil* GetInstance();
 
 	private:
 		ExceptionUtil();
 
-		std::string GetErrorStackTrace(const v8::Handle<v8::StackTrace>& stackTrace);
-		std::string GetErrorMessage(const v8::Handle<v8::Message>& message, const v8::Handle<v8::Value>& error);
-		std::string PrintErrorMessage(const v8::Handle<v8::Message>& message, const v8::Handle<v8::Value>& error);
+		std::string GetErrorStackTrace(const v8::Local<v8::StackTrace>& stackTrace);
+		std::string GetErrorMessage(const v8::Local<v8::Message>& message, const v8::Local<v8::Value>& error);
+		std::string PrintErrorMessage(const v8::Local<v8::Message>& message, const v8::Local<v8::Value>& error);
 
-		jweak TryGetJavaThrowableObject(JEnv& env, const v8::Handle<v8::Object>& jsObj);
+		jweak TryGetJavaThrowableObject(JEnv& env, const v8::Local<v8::Object>& jsObj);
 
 		static ExceptionUtil* instance;
 

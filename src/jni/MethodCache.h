@@ -5,6 +5,7 @@
 #include <map>
 #include "v8.h"
 #include "JEnv.h"
+#include "MetadataEntry.h"
 
 namespace tns
 {
@@ -14,10 +15,12 @@ namespace tns
 		struct CacheMethodInfo
 		{
 			CacheMethodInfo()
-				: mid(nullptr), clazz(nullptr), isStatic(false)
+				: retType(MethodReturnType::Unknown), mid(nullptr), clazz(nullptr), isStatic(false)
 			{
 			}
 			std::string signature;
+			std::string returnType;
+			MethodReturnType retType;
 			jmethodID mid;
 			jclass clazz;
 			bool isStatic;
@@ -33,7 +36,7 @@ namespace tns
 	private:
 		MethodCache() {}
 
-		static std::string GetType(const v8::Handle<v8::Value>& value);
+		static std::string GetType(const v8::Local<v8::Value>& value);
 
 		static std::string ResolveJavaMethod(const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& className, const std::string& methodName);
 

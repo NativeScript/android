@@ -1,7 +1,5 @@
 package com.tns.tests;
 
-import com.tns.Platform;
-
 import android.util.Log;
 
 
@@ -25,6 +23,6 @@ public class ExceptionHandlingTest
 	
 	public void onEvent1(String s)
 	{
-		Log.d(Platform.DEFAULT_LOG_TAG, "ExceptionHandlingTest.onEvent1 is called");
+		Log.d("TestApp", "ExceptionHandlingTest.onEvent1 is called");
 	}
 }

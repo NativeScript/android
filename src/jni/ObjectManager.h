@@ -21,42 +21,49 @@ namespace tns
 	public:
 		ObjectManager();
 
-		void SetGCHooks();
+		void Init(v8::Isolate *isolate);
 
-		static jweak GetJavaObjectByJsObjectStatic(const v8::Handle<v8::Object>& object);
+		static jweak GetJavaObjectByJsObjectStatic(const v8::Local<v8::Object>& object);
 
-		jweak GetJavaObjectByJsObject(const v8::Handle<v8::Object>& object);
+		jweak GetJavaObjectByJsObject(const v8::Local<v8::Object>& object);
 
 		jweak GetJavaObjectByID(uint32_t javaObjectID);
 
 		void UpdateCache(int objectID, jobject obj);
 
-		jclass GetJavaClass(const v8::Handle<v8::Object>& instance);
+		jclass GetJavaClass(const v8::Local<v8::Object>& instance);
 
-		void SetJavaClass(const v8::Handle<v8::Object>& instance, jclass clazz);
+		void SetJavaClass(const v8::Local<v8::Object>& instance, jclass clazz);
 		int GetOrCreateObjectId(jobject object);
 
-		static v8::Handle<v8::Object> GetJsObjectByJavaObjectStatic(int javaObjectID);
+		static v8::Local<v8::Object> GetJsObjectByJavaObjectStatic(int javaObjectID);
 
 		v8::Local<v8::Object> GetJsObjectByJavaObject(int javaObjectID);
 
-		static v8::Handle<v8::Object> CreateJSWrapperStatic(jint javaObjectID, const std::string& typeName);
+		static v8::Local<v8::Object> CreateJSWrapperStatic(jint javaObjectID, const std::string& typeName);
 
-		v8::Handle<v8::Object> CreateJSWrapper(jint javaObjectID, const std::string& typeName);
+		v8::Local<v8::Object> CreateJSWrapper(jint javaObjectID, const std::string& typeName);
 
-		v8::Handle<v8::Object> CreateJSWrapper(jint javaObjectID, const std::string& typeName, jobject instance);
+		v8::Local<v8::Object> CreateJSWrapper(jint javaObjectID, const std::string& typeName, jobject instance);
 
-		void Link(const v8::Handle<v8::Object>& object, uint32_t javaObjectID, jclass clazz);
+		void Link(const v8::Local<v8::Object>& object, uint32_t javaObjectID, jclass clazz);
 
-		bool Unlink(v8::Handle<v8::Object>& object);
-
-		bool CloneLink(const v8::Handle<v8::Object>& src, const v8::Handle<v8::Object>& dest);
+		bool CloneLink(const v8::Local<v8::Object>& src, const v8::Local<v8::Object>& dest);
 
 		std::string GetClassName(jobject javaObject);
 
 		std::string GetClassName(jclass clazz);
 
 		int GenerateNewObjectID();
+
+		v8::Local<v8::Object> GetEmptyObject(v8::Isolate *isolate);
+
+		enum class MetadataNodeKeys
+		{
+				JsInfo,
+				CallSuper,
+				END
+		};
 
 	private:
 		struct ObjectWeakCallbackState
@@ -117,7 +124,7 @@ namespace tns
 			int javaObjectId;
 		};
 
-		JSInstanceInfo* GetJSInstanceInfo(const v8::Handle<v8::Object>& object);
+		JSInstanceInfo* GetJSInstanceInfo(const v8::Local<v8::Object>& object);
 
 		void ReleaseJSInstance(v8::Persistent<v8::Object> *po, JSInstanceInfo *jsInstanceInfo);
 
@@ -129,7 +136,7 @@ namespace tns
 
 		void CheckWeakObjectsAreAlive(const std::vector<PersistentObjectIdPair>& instances, DirectBuffer& inputBuff, DirectBuffer& outputBuff);
 
-		v8::Handle<v8::Object> CreateJSWrapperHelper(jint javaObjectID, const std::string& typeName, jclass clazz);
+		v8::Local<v8::Object> CreateJSWrapperHelper(jint javaObjectID, const std::string& typeName, jclass clazz);
 
 		static void JSObjectWeakCallbackStatic(const v8::WeakCallbackData<v8::Object, ObjectWeakCallbackState>& data);
 
@@ -152,6 +159,8 @@ namespace tns
 		static jweak NewWeakGlobalRefCallback(const int& javaObjectID, void *state);
 
 		static void DeleteWeakGlobalRefCallback(const jweak& object, void *state);
+
+		static void JSWrapperConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 
 		int m_numberOfGC;
 
@@ -190,6 +199,8 @@ namespace tns
 		jmethodID CHECK_WEAK_OBJECTS_ARE_ALIVE_METHOD_ID;
 
 		static ObjectManager *instance;
+
+		static v8::Persistent<v8::Function>* s_poJsWrapperFunc;
 	};
 }
 

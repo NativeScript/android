@@ -281,6 +281,11 @@ public class Button1 extends ButtonBase
 		}
 		return arr;
 	}
+	
+	public int getArrayLength(int[] arr)
+	{
+		return (arr != null) ? arr.length : 0;
+	}
 
 	public void printArray1(int[] arr)
 	{

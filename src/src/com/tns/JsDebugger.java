@@ -21,12 +21,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.pm.ApplicationInfo;
-import android.content.pm.PackageManager.NameNotFoundException;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
-import android.util.Log;
 
 public class JsDebugger
 {
@@ -40,7 +35,7 @@ public class JsDebugger
 
 	private static native void sendCommand(byte[] command, int length);
 
-	private static final Handler mainThreadHandler = new Handler(Looper.getMainLooper());
+	private static ThreadScheduler threadScheduler;
 
 	private static final int INVALID_PORT = -1;
 
@@ -57,9 +52,13 @@ public class JsDebugger
 	private final File debuggerSetupDirectory;
 	
 	private Boolean shouldDebugBreakFlag = null;
+	
+	private final Logger logger;
 
-	public JsDebugger(File debuggerSetupDirectory)
+	public JsDebugger(Logger logger, ThreadScheduler threadScheduler, File debuggerSetupDirectory)
 	{
+		this.logger = logger;
+		JsDebugger.threadScheduler = threadScheduler;
 		this.debuggerSetupDirectory = debuggerSetupDirectory;
 	}
 
@@ -207,7 +206,7 @@ public class JsDebugger
 								int cmdLength = cmdBytes.length;
 								sendCommand(cmdBytes, cmdLength);
 
-								boolean success = mainThreadHandler.post(dispatchProcessDebugMessages);
+								boolean success = JsDebugger.threadScheduler.post(dispatchProcessDebugMessages);
 								assert success;
 							}
 							catch (UnsupportedEncodingException e)
@@ -316,7 +315,7 @@ public class JsDebugger
 
 	int getDebuggerPortFromEnvironment()
 	{
-		if (Platform.IsLogEnabled) Log.d(Platform.DEFAULT_LOG_TAG, "getDebuggerPortFromEnvironment");
+		if (logger.isEnabled()) logger.write("getDebuggerPortFromEnvironment");
 		int port = INVALID_PORT;
 		
 		File envOutFile = new File(debuggerSetupDirectory, portEnvOutputFile);
@@ -349,7 +348,7 @@ public class JsDebugger
 		
 		boolean shouldDebugBreakFlag = shouldDebugBreak(); 
 		
-		if (Platform.IsLogEnabled) Log.d(Platform.DEFAULT_LOG_TAG, "shouldDebugBreakFlag=" + shouldDebugBreakFlag);
+		if (logger.isEnabled()) logger.write("shouldDebugBreakFlag=" + shouldDebugBreakFlag);
 		
 		if (shouldDebugBreakFlag)
 		{
@@ -368,7 +367,7 @@ public class JsDebugger
 		
 		boolean envInFileFlag = envInFile.exists();
 		
-		if (Platform.IsLogEnabled) Log.d(Platform.DEFAULT_LOG_TAG, "envInFileFlag=" + envInFileFlag);
+		if (logger.isEnabled()) logger.write("envInFileFlag=" + envInFileFlag);
 		
 		if (envInFileFlag)
 		{
@@ -430,8 +429,6 @@ public class JsDebugger
 				envInFile.delete();
 			}
 		}
-		
-		Log.d(Platform.DEFAULT_LOG_TAG, "port=" + port);
 		
 		return port;
 	}

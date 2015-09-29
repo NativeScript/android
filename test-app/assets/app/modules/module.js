@@ -17,3 +17,5 @@ module.exports = {
 		return true;
 	}
 }
+
+module.exports.value123 = 123;

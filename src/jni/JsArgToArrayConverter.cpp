@@ -16,7 +16,7 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
-JsArgToArrayConverter::JsArgToArrayConverter(const v8::Handle<Value>& arg, bool isImplementationObject, int classReturnType) :
+JsArgToArrayConverter::JsArgToArrayConverter(const v8::Local<Value>& arg, bool isImplementationObject, int classReturnType) :
 		m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()), m_return_type(classReturnType)
 {
 	if (!isImplementationObject)
@@ -30,7 +30,7 @@ JsArgToArrayConverter::JsArgToArrayConverter(const v8::Handle<Value>& arg, bool 
 }
 
 
-JsArgToArrayConverter::JsArgToArrayConverter(const v8::FunctionCallbackInfo<Value>& args, bool hasImplementationObject, const Handle<Object>& outerThis) :
+JsArgToArrayConverter::JsArgToArrayConverter(const v8::FunctionCallbackInfo<Value>& args, bool hasImplementationObject, const Local<Object>& outerThis) :
 		m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()), m_return_type(static_cast<int>(Type::Null))
 {
 	auto isInnerClass = !outerThis.IsEmpty();
@@ -79,7 +79,7 @@ JsArgToArrayConverter::JsArgToArrayConverter(const v8::FunctionCallbackInfo<Valu
 }
 
 
-bool JsArgToArrayConverter::ConvertArg(const Handle<Value>& arg, int index)
+bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 {
 	bool success = false;
 	stringstream s;
@@ -157,7 +157,7 @@ bool JsArgToArrayConverter::ConvertArg(const Handle<Value>& arg, int index)
 	}
 	else if (arg->IsBooleanObject())
 	{
-		auto boolObj = Handle<BooleanObject>::Cast(arg);
+		auto boolObj = Local<BooleanObject>::Cast(arg);
 		jboolean value = boolObj->BooleanValue() ? JNI_TRUE : JNI_FALSE;
 		JniLocalRef javaObject(JType::NewBoolean(env, value));
 		SetConvertedObject(env, index, javaObject);
@@ -173,7 +173,7 @@ bool JsArgToArrayConverter::ConvertArg(const Handle<Value>& arg, int index)
 	}
 	else if (arg->IsObject())
 	{
-		Local<Object> objectWithHiddenID = arg->ToObject();
+		auto objectWithHiddenID = arg->ToObject();
 
 		auto hidden = objectWithHiddenID->GetHiddenValue(V8StringConstants::GetMarkedAsLong());
 		if (!hidden.IsEmpty())

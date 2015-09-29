@@ -18,7 +18,7 @@ void ArrayElementAccessor::Init(JavaVM *jvm, ObjectManager *objectManager)
 	this->objectManager = objectManager;
 }
 
-Handle<Value> ArrayElementAccessor::GetArrayElement(const Handle<Object>& array, uint32_t index, const string& arraySignature)
+Local<Value> ArrayElementAccessor::GetArrayElement(const Local<Object>& array, uint32_t index, const string& arraySignature)
 {
 	JEnv env;
 
@@ -104,7 +104,7 @@ Handle<Value> ArrayElementAccessor::GetArrayElement(const Handle<Object>& array,
 }
 
 
-void ArrayElementAccessor::SetArrayElement(const Handle<Object>& array, uint32_t index, const string& arraySignature, Handle<Value>& value)
+void ArrayElementAccessor::SetArrayElement(const Local<Object>& array, uint32_t index, const string& arraySignature, Local<Value>& value)
 {
 	JEnv env;
 
@@ -205,9 +205,9 @@ void ArrayElementAccessor::SetArrayElement(const Handle<Object>& array, uint32_t
 	}
 }
 
-Handle<Value> ArrayElementAccessor::CheckForArrayAccessException(JEnv& env, const string& elementSignature, const void *value)
+Local<Value> ArrayElementAccessor::CheckForArrayAccessException(JEnv& env, const string& elementSignature, const void *value)
 {
-	Handle<Value> jsValue;
+	Local<Value> jsValue;
 
 	auto isolate = Isolate::GetCurrent();
 

@@ -2,18 +2,15 @@ package com.tns;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.HashMap;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import android.content.Context;
-import android.util.Log;
 
-public class Require
+class Require
 {
+	private static Logger logger;
 	private static String RootPackageDir;
 	private static String ApplicationFilesPath;
 	private static String ModulesFilesPath;
@@ -24,8 +21,9 @@ public class Require
 	private static final HashMap<String, String> folderAsModuleCache = new HashMap<String, String>();
 	private static boolean checkForExternalPath = false;
 
-	public static void init(File rootPackageDir, File applicationFilesDir) throws IOException
+	public static void init(Logger logger, File rootPackageDir, File applicationFilesDir) throws IOException
 	{
+		Require.logger = logger; 
 		if (initialized)
 		{
 			return;
@@ -50,12 +48,12 @@ public class Require
 		initialized = true;
 	}
 
-	public static String getApplicationFilesPath()
+	static String getApplicationFilesPath()
 	{
 		return ApplicationFilesPath;
 	}
 
-	public static String bootstrapApp()
+	static String bootstrapApp()
 	{
 		// Bootstrap logic flows like:
 		// 1. Check for package.json -> `main` field
@@ -78,7 +76,8 @@ public class Require
 		return modulePath;
 	}
 
-	public static String getModulePath(String moduleName, String callingDirName)
+	@RuntimeCallable
+	private static String getModulePath(String moduleName, String callingDirName)
 	{
 		// This method is called my the NativeScriptRuntime.cpp RequireCallback method.
 		// The currentModuleDir is the directory path of the calling module.
@@ -90,9 +89,9 @@ public class Require
 			File projectRootDir = new File(RootPackageDir);
 			if (checkForExternalPath && isFileExternal(file, projectRootDir))
 			{
-				if (Platform.IsLogEnabled)
+				if (logger.isEnabled())
 				{
-					Log.e(Platform.DEFAULT_LOG_TAG, "Module " + moduleName + " is on external path");
+					logger.write("Module " + moduleName + " is on external path");
 				}
 				return "EXTERNAL_FILE_ERROR";
 			}
@@ -103,9 +102,9 @@ public class Require
 		}
 
 		// empty path will be handled by the NativeScriptRuntime.cpp and a JS error will be thrown
-		if (Platform.IsLogEnabled)
+		if (logger.isEnabled())
 		{
-			Log.e(Platform.DEFAULT_LOG_TAG, "Module " + moduleName + " not found. required from directory " + callingDirName);
+			logger.write("Module " + moduleName + " not found. required from directory " + callingDirName);
 		}
 		return "";
 	}
@@ -176,6 +175,9 @@ public class Require
 						if (object != null)
 						{
 							String mainFile = object.getString("main");
+							if(!mainFile.endsWith(".js")) {
+								mainFile += ".js";
+							}
 							jsFile = new File(directory.getAbsolutePath(), mainFile);
 							found = true;
 						}

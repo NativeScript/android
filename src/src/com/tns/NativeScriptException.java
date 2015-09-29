@@ -2,6 +2,7 @@ package com.tns;
 
 public class NativeScriptException extends RuntimeException
 {
+	@SuppressWarnings("unused")
 	private long jsValueAddress = 0;
 	
 	public NativeScriptException()

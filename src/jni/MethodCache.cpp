@@ -47,6 +47,8 @@ MethodCache::CacheMethodInfo MethodCache::ResolveMethodSignature(const string& c
 			assert(clazz != nullptr);
 			mi.clazz = clazz;
 			mi.signature = signature;
+			mi.returnType = MetadataReader::ParseReturnType(mi.signature);
+			mi.retType = MetadataReader::GetReturnType(mi.returnType);
 			mi.isStatic = isStatic;
 			mi.mid = isStatic
 						? env.GetStaticMethodID(clazz, methodName, signature)
@@ -93,7 +95,7 @@ string MethodCache::EncodeSignature(const string& className, const string& metho
 }
 
 
-string MethodCache::GetType(const v8::Handle<v8::Value>& value)
+string MethodCache::GetType(const v8::Local<v8::Value>& value)
 {
 	string type;
 

@@ -20,7 +20,7 @@ namespace tns
 
 		~SimpleProfiler();
 
-		static void Init(v8::Isolate *isolate, v8::Handle<v8::ObjectTemplate>& globalTemplate);
+		static void Init(v8::Isolate *isolate, v8::Local<v8::ObjectTemplate>& globalTemplate);
 
 		static void PrintProfilerData();
 

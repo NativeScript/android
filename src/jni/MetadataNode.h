@@ -41,19 +41,19 @@ namespace tns
 
 		std::string GetName();
 
-		v8::Handle<v8::Object> CreateWrapper(v8::Isolate *isolate);
+		v8::Local<v8::Object> CreateWrapper(v8::Isolate *isolate);
 
-		v8::Handle<v8::Object> CreateJSWrapper(v8::Isolate *isolate);
+		v8::Local<v8::Object> CreateJSWrapper(v8::Isolate *isolate);
 
-		v8::Handle<v8::Object> CreateArrayWrapper(v8::Isolate *isolate);
+		v8::Local<v8::Object> CreateArrayWrapper(v8::Isolate *isolate);
 
-		static MetadataNode* GetNodeFromHandle(const v8::Handle<v8::Object>& value);
+		static MetadataNode* GetNodeFromHandle(const v8::Local<v8::Object>& value);
 
-		static v8::Handle<v8::Object> CreateExtendedJSWrapper(v8::Isolate *isolate, const std::string& proxyClassName);
+		static v8::Local<v8::Object> CreateExtendedJSWrapper(v8::Isolate *isolate, const std::string& proxyClassName);
 
-		static v8::Handle<v8::Object> GetImplementationObject(const v8::Handle<v8::Object>& object);
+		static v8::Local<v8::Object> GetImplementationObject(const v8::Local<v8::Object>& object);
 
-		static void CreateTopLevelNamespaces(const v8::Handle<v8::Object>& global);
+		static void CreateTopLevelNamespaces(const v8::Local<v8::Object>& global);
 
 		static std::string TNS_PREFIX;
 
@@ -61,7 +61,7 @@ namespace tns
 
 		static void BuildMetadata(uint32_t nodesLength, uint8_t *nodeData, uint32_t nameLength, uint8_t *nameData, uint32_t valueLength, uint8_t *valueData);
 
-		static void InjectPrototype(v8::Handle<v8::Object>& target, v8::Handle<v8::Object>& implementationObject);
+		static void InjectPrototype(v8::Local<v8::Object>& target, v8::Local<v8::Object>& implementationObject);
 
 
 	private:
@@ -85,7 +85,7 @@ namespace tns
 
 		struct ExtendedClassData
 		{
-			ExtendedClassData(MetadataNode *_node, const std::string& _extendedName, const v8::Handle<v8::Object>& _implementationObject, std::string _fullClassName)
+			ExtendedClassData(MetadataNode *_node, const std::string& _extendedName, const v8::Local<v8::Object>& _implementationObject, std::string _fullClassName)
 				: node(_node), extendedName(_extendedName), fullClassName(_fullClassName)
 			{
 				implementationObject = new v8::Persistent<v8::Object>(v8::Isolate::GetCurrent(), _implementationObject);
@@ -104,7 +104,7 @@ namespace tns
 				: extendedCtorFunction(nullptr), node(nullptr)
 			{
 			}
-			ExtendedClassCacheData(const v8::Handle<v8::Function>& extCtorFunc, const std::string& _extendedName, MetadataNode *_node)
+			ExtendedClassCacheData(const v8::Local<v8::Function>& extCtorFunc, const std::string& _extendedName, MetadataNode *_node)
 				: extendedName(_extendedName), node(_node)
 			{
 				extendedCtorFunction = new v8::Persistent<v8::Function>(v8::Isolate::GetCurrent(), extCtorFunc);
@@ -152,17 +152,17 @@ namespace tns
 
 		static MetadataEntry GetChildMetadataForPackage(MetadataNode *node, const std::string& propName);
 
-		static MetadataNode* GetInstanceMetadata(v8::Isolate *isolate, const v8::Handle<v8::Object>& value);
+		static MetadataNode* GetInstanceMetadata(v8::Isolate *isolate, const v8::Local<v8::Object>& value);
 
-		static void SetInstanceMetadata(v8::Isolate *isolate, v8::Handle<v8::Object> value, MetadataNode *node);
+		static void SetInstanceMetadata(v8::Isolate *isolate, v8::Local<v8::Object> value, MetadataNode *node);
 
-		static TypeMetadata* GetTypeMetadata(v8::Isolate *isolate, const v8::Handle<v8::Function>& value);
+		static TypeMetadata* GetTypeMetadata(v8::Isolate *isolate, const v8::Local<v8::Function>& value);
 
-		static void SetTypeMetadata(v8::Isolate *isolate, v8::Handle<v8::Function> value, TypeMetadata *data);
+		static void SetTypeMetadata(v8::Isolate *isolate, v8::Local<v8::Function> value, TypeMetadata *data);
 
-		static MetadataNode* GetPackageMetadata(v8::Isolate *isolate, const v8::Handle<v8::Object>& value);
+		static MetadataNode* GetPackageMetadata(v8::Isolate *isolate, const v8::Local<v8::Object>& value);
 
-		static void SetPackageMetadata(v8::Isolate *isolate, v8::Handle<v8::Object> value, MetadataNode *node);
+		static void SetPackageMetadata(v8::Isolate *isolate, v8::Local<v8::Object> value, MetadataNode *node);
 
 		struct MetadataCacheItem
 		{
@@ -186,16 +186,16 @@ namespace tns
 		std::vector<MetadataCacheItem> m_superMethodCache;
 
 
-		v8::Handle<v8::Object> CreatePackageProxy(v8::Isolate *isolate);
+		v8::Local<v8::Object> CreatePackageProxy(v8::Isolate *isolate);
 
-		v8::Handle<v8::Function> GetConstructorFunction(v8::Isolate *isolate);
-		v8::Handle<v8::FunctionTemplate> GetConstructorFunctionTemplate(v8::Isolate *isolate, MetadataTreeNode *treeNode);
-		v8::Handle<v8::FunctionTemplate> GetConstructorFunctionTemplate(v8::Isolate *isolate, MetadataTreeNode *treeNode, std::vector<MethodCallbackData*>& instanceMethodsCallbackData);
+		v8::Local<v8::Function> GetConstructorFunction(v8::Isolate *isolate);
+		v8::Local<v8::FunctionTemplate> GetConstructorFunctionTemplate(v8::Isolate *isolate, MetadataTreeNode *treeNode);
+		v8::Local<v8::FunctionTemplate> GetConstructorFunctionTemplate(v8::Isolate *isolate, MetadataTreeNode *treeNode, std::vector<MethodCallbackData*>& instanceMethodsCallbackData);
 
-		v8::Handle<v8::Function> SetMembers(v8::Isolate *isolate, v8::Handle<v8::FunctionTemplate>& ctorFuncTemplate, v8::Handle<v8::ObjectTemplate>& prototypeTemplate, std::vector<MethodCallbackData*>& instanceMethodsCallbackData, const std::vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode);
-		v8::Handle<v8::Function> SetMembersFromStaticMetadata(v8::Isolate *isolate, v8::Handle<v8::FunctionTemplate>& ctorFuncTemplate, v8::Handle<v8::ObjectTemplate>& prototypeTemplate, std::vector<MethodCallbackData*>& instanceMethodsCallbackData, const std::vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode);
-		v8::Handle<v8::Function> SetMembersFromRuntimeMetadata(v8::Isolate *isolate, v8::Handle<v8::FunctionTemplate>& ctorFuncTemplate, v8::Handle<v8::ObjectTemplate>& prototypeTemplate, std::vector<MethodCallbackData*>& instanceMethodsCallbackData, const std::vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode);
-		void SetInnnerTypes(v8::Isolate *isolate, v8::Handle<v8::Function>& ctorFunction, MetadataTreeNode *treeNode);
+		v8::Local<v8::Function> SetMembers(v8::Isolate *isolate, v8::Local<v8::FunctionTemplate>& ctorFuncTemplate, v8::Local<v8::ObjectTemplate>& prototypeTemplate, std::vector<MethodCallbackData*>& instanceMethodsCallbackData, const std::vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode);
+		v8::Local<v8::Function> SetMembersFromStaticMetadata(v8::Isolate *isolate, v8::Local<v8::FunctionTemplate>& ctorFuncTemplate, v8::Local<v8::ObjectTemplate>& prototypeTemplate, std::vector<MethodCallbackData*>& instanceMethodsCallbackData, const std::vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode);
+		v8::Local<v8::Function> SetMembersFromRuntimeMetadata(v8::Isolate *isolate, v8::Local<v8::FunctionTemplate>& ctorFuncTemplate, v8::Local<v8::ObjectTemplate>& prototypeTemplate, std::vector<MethodCallbackData*>& instanceMethodsCallbackData, const std::vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode);
+		void SetInnnerTypes(v8::Isolate *isolate, v8::Local<v8::Function>& ctorFunction, MetadataTreeNode *treeNode);
 
 
 		static std::string CreateFullClassName(const std::string& className, const std::string& extendNameAndLocation);
@@ -203,7 +203,7 @@ namespace tns
 		static void InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 		static void ClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 		static void ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Value>& info);
-		static bool ValidateExtendArguments(const v8::FunctionCallbackInfo<v8::Value>& info, std::string& extendLocation, v8::Handle<v8::String>& extendName, v8::Handle<v8::Object>& implementationObject);
+		static bool ValidateExtendArguments(const v8::FunctionCallbackInfo<v8::Value>& info, std::string& extendLocation, v8::Local<v8::String>& extendName, v8::Local<v8::Object>& implementationObject);
 		static void ExtendedClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 
 		static void InnerClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
@@ -212,7 +212,7 @@ namespace tns
 		static void FieldAccessorGetterCallback(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
 		static void FieldAccessorSetterCallback(v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info);
 		static void ClassAccessorGetterCallback(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
-		static void SetClassAccessor(v8::Handle<v8::Function>& ctorFunction);
+		static void SetClassAccessor(v8::Local<v8::Function>& ctorFunction);
 		static void SuperAccessorGetterCallback(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
 		static void ArrayLengthGetterCallack(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
 
@@ -226,7 +226,7 @@ namespace tns
 		static std::map<std::string, MetadataTreeNode*> s_name2TreeNodeCache;
 		static std::map<MetadataTreeNode*, MetadataNode*> s_treeNode2NodeCache;
 
-		static bool IsValidExtendName(const v8::Handle<v8::String>& name);
+		static bool IsValidExtendName(const v8::Local<v8::String>& name);
 		static bool GetExtendLocation(std::string& extendLocation);
 		static ExtendedClassCacheData GetCachedExtendedClassData(v8::Isolate *isolate, const std::string& proxyClassName);
 
