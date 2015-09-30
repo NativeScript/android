@@ -101,7 +101,7 @@ public class FileSystem
 		String baseDir;
 		if (path.startsWith(appRootPrefix))
 		{
-			baseDir = new File(Platform.getApplicationContext().getFilesDir(), "app").getAbsolutePath();
+			baseDir = new File(NativeScriptApplication.getInstance().getApplicationContext().getFilesDir(), "app").getAbsolutePath();
 			path = path.substring(appRootPrefix.length());
 		}
 		else
