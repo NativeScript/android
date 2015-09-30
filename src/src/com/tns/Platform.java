@@ -108,7 +108,7 @@ public class Platform
 		{
 			throw new RuntimeException("NativeScriptApplication already initialized");
 		}
-		
+
 		Platform.threadScheduler = threadScheduler;
 		
 		Platform.logger = logger;

@@ -108,7 +108,6 @@ describe("Tests JNI reference leak", function () {
 		expect(n).toBe(N);
 	});
 	
-	
 	it("test_passing_javascript_array_should_not_leak", function () {
 		
 		var n = 0;
@@ -128,5 +127,4 @@ describe("Tests JNI reference leak", function () {
 		
 		expect(n).toBe(N-1);
 	});
-
 });
