@@ -481,6 +481,12 @@ class MethodResolver
 	public static boolean convertConstructorArgs(Constructor<?> ctor, Object[] args)
 	{
 		boolean success = true;
+		
+		if (ctor == null)
+		{
+			success = false;
+			return  success;
+		}
 
 		Class<?>[] paramTypes;
 		if (constructorParamTypeCache.containsKey(ctor))
