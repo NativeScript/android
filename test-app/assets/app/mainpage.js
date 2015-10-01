@@ -1,5 +1,5 @@
 __disableVerboseLogging();
-
+__log("starting tests");
 require("./tests/testWeakRef"); 
 require("./tests/tests");
 require("./tests/testMethodResolution");
@@ -26,9 +26,9 @@ var MainActivity = {
     	var k = this.toString();
     	__log("this.toString " + k);
     	this.super.onCreate(bundle);
-    	//this.super.onCreate(null);
 
     	require("./tests/testsWithContext").run(this);
+    	
     	execute(); //run jasmine
     	
     	var layout = new android.widget.LinearLayout(this);
