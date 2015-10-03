@@ -1,4 +1,4 @@
-package com.tns.internal;
+package com.tns;
 
 public interface ExtractPolicy
 {

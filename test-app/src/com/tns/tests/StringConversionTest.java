@@ -84,7 +84,7 @@ public class StringConversionTest
 	{
 		String str = null;
 		
-		Context context = com.tns.NativeScriptApplication.getInstance();
+		Context context = com.tns.MyApp.getInstance();
 		
 		InputStream inputStream = null;
 		try

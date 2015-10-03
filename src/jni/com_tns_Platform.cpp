@@ -21,6 +21,7 @@
 #include "SimpleAllocator.h"
 #include "File.h"
 #include "JType.h"
+#include "Module.h"
 #include <sstream>
 #include <android/log.h>
 #include <assert.h>
@@ -30,14 +31,11 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
-void AppInitCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
-
 jobject ConvertJsValueToJavaObject(JEnv& env, const Local<Value>& value, int classReturnType);
 
 //TODO: Lubo: properly release this jni global ref on shutdown
 JavaVM *g_jvm = nullptr;
 Persistent<Context> *PrimaryContext = nullptr;
-int AppJavaObjectID = -1;
 int count = 0;
 Context::Scope *context_scope = nullptr;
 bool tns::LogEnabled = true;
@@ -123,7 +121,6 @@ void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring pa
 	globalTemplate->Set(ConvertToV8String("__enableVerboseLogging"), FunctionTemplate::New(isolate, NativeScriptRuntime::EnableVerboseLoggingMethodCallback));
 	globalTemplate->Set(ConvertToV8String("__disableVerboseLogging"), FunctionTemplate::New(isolate, NativeScriptRuntime::DisableVerboseLoggingMethodCallback));
 	globalTemplate->Set(ConvertToV8String("__exit"), FunctionTemplate::New(isolate, NativeScriptRuntime::ExitMethodCallback));
-	globalTemplate->Set(ConvertToV8String("require"), FunctionTemplate::New(isolate, NativeScriptRuntime::RequireCallback));
 
 	WeakRef::Init(isolate, globalTemplate, g_objectManager);
 
@@ -136,14 +133,11 @@ void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring pa
 
 	context_scope = new Context::Scope(context);
 
+	Module::Init(isolate);
+
 	g_objectManager->Init(isolate);
 
 	auto global = context->Global();
-
-	auto appTemplate = ObjectTemplate::New();
-	appTemplate->Set(ConvertToV8String("init"), FunctionTemplate::New(isolate, AppInitCallback));
-	auto appInstance = appTemplate->NewInstance();
-	global->ForceSet(ConvertToV8String("app"), appInstance, readOnlyFlags);
 
 	global->ForceSet(ConvertToV8String("global"), global, readOnlyFlags);
 	global->ForceSet(ConvertToV8String("__global"), global, readOnlyFlags);
@@ -163,12 +157,11 @@ void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring pa
 	NativeScriptRuntime::CreateTopLevelNamespaces(global);
 }
 
-extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj, jstring filesPath, jint appJavaObjectId, jboolean verboseLoggingEnabled, jstring packageName, jstring jsoptions)
+extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj, jstring filesPath, jboolean verboseLoggingEnabled, jstring packageName, jstring jsoptions)
 {
-	AppJavaObjectID = appJavaObjectId;
 	tns::LogEnabled = verboseLoggingEnabled;
 
-	DEBUG_WRITE("Initializing Telerik NativeScript: app instance id:%d", appJavaObjectId);
+	DEBUG_WRITE("Initializing Telerik NativeScript");
 
 	Platform* platform = v8::platform::CreateDefaultPlatform();
 	V8::InitializePlatform(platform);
@@ -190,7 +183,7 @@ extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj
 	Constants::APP_ROOT_FOLDER_PATH = NativeScriptRuntime::APP_FILES_DIR + "/app/";
 }
 
-extern "C" void Java_com_tns_Platform_runNativeScript(JNIEnv *_env, jobject obj, jstring scriptFile)
+extern "C" void Java_com_tns_Platform_runModule(JNIEnv *_env, jobject obj, jstring scriptFile)
 {
 	JEnv env(_env);
 	auto isolate = g_isolate;
@@ -198,21 +191,10 @@ extern "C" void Java_com_tns_Platform_runNativeScript(JNIEnv *_env, jobject obj,
 
 	HandleScope handleScope(isolate);
 
-	Local<Object> moduleObject;
 	string filePath = ArgConverter::jstringToString(scriptFile);
 	bool hasError = false;
 
-	NativeScriptRuntime::CompileAndRun(filePath, hasError, moduleObject);
-
-	/*
-	 * moduleObject (export module) can be set to js variable but currently we start the script implicitly without returning the moduleObject (just calling it)
-	 *
-	 * we can do something like
-	 * var appModule = require("app"); //but currently we call the appModule only once Platform.run() and no one else has access to it
-	 */
-
-	//DEBUG_WRITE("Forcing V8 garbage collection");
-	//while (!V8::IdleNotification());
+	auto moduleObj = Module::CompileAndRun(filePath, hasError);
 }
 
 extern "C" jobject Java_com_tns_Platform_runScript(JNIEnv *_env, jobject obj, jstring scriptFile)
@@ -263,39 +245,6 @@ extern "C" jobject Java_com_tns_Platform_runScript(JNIEnv *_env, jobject obj, js
 	return res;
 }
 
-
-void AppInitCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
-{
-	ASSERT_MESSAGE(args.Length() == 1, "Application should be initialized with single parameter");
-	ASSERT_MESSAGE(args[0]->IsObject(), "Application should be initialized with single object parameter containing overridden methods");
-
-	auto isolate = Isolate::GetCurrent();
-
-	// TODO: find another way to get "com/tns/NativeScriptApplication" metadata (move it to more appropriate place)
-	auto node = MetadataNode::GetOrCreate("com/tns/NativeScriptApplication");
-	auto appInstance = node->CreateJSWrapper(isolate);
-	DEBUG_WRITE("Application object created id: %d", appInstance->GetIdentityHash());
-
-	auto implementationObject = args[0]->ToObject();
-	implementationObject->SetHiddenValue(V8StringConstants::GetClassImplementationObject(), External::New(isolate, node));
-	DEBUG_WRITE("Application object implementation object is with id: %d", implementationObject->GetIdentityHash());
-	implementationObject->SetPrototype(appInstance->GetPrototype());
-	bool appSuccess = appInstance->SetPrototype(implementationObject);
-	ASSERT_MESSAGE(appSuccess == true, "Application could not be initialized correctly");
-
-	jweak applicationObject = g_objectManager->GetJavaObjectByID(AppJavaObjectID);
-
-	JEnv env;
-	jclass appClass = env.FindClass("com/tns/NativeScriptApplication");
-	g_objectManager->Link(appInstance, AppJavaObjectID, appClass);
-
-	JniLocalRef applicationClass(env.GetObjectClass(applicationObject));
-	jmethodID setNativeScriptOverridesMethodId = env.GetMethodID((jclass)applicationClass, "setNativeScriptOverrides", "([Ljava/lang/String;)V");
-	jobjectArray methodOverrides = NativeScriptRuntime::GetMethodOverrides(env, implementationObject);
-	env.CallVoidMethod(applicationObject, setNativeScriptOverridesMethodId, methodOverrides);
-
-	ExceptionUtil::GetInstance()->CheckForJavaException(env);
-}
 
 jobject ConvertJsValueToJavaObject(JEnv& env, const Local<Value>& value, int classReturnType)
 {
@@ -383,12 +332,7 @@ extern "C" void Java_com_tns_Platform_createJSInstanceNative(JNIEnv *_env, jobje
 	Local<Object> implementationObject;
 
 	auto proxyClassName = g_objectManager->GetClassName(javaObject);
-	//
-	if (proxyClassName == "com/tns/NativeScriptActivity")
-	{
-		return;
-	}
-	//
+
 	DEBUG_WRITE("createJSInstanceNative class %s", proxyClassName.c_str());
 	jsInstance = MetadataNode::CreateExtendedJSWrapper(isolate, proxyClassName);
 	if (jsInstance.IsEmpty())

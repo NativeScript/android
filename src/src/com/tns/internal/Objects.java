@@ -1,4 +1,4 @@
-package com.tns;
+package com.tns.internal;
 
 public final class Objects
 {

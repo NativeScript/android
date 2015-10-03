@@ -1,4 +1,4 @@
-package com.tns;
+package com.tns.internal;
 
 /*
  *  Licensed to the Apache Software Foundation (ASF) under one or more
@@ -29,6 +29,8 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 
+import com.tns.NativeScriptHashCodeProvider;
+
 /**
  * WeakHashMap is an implementation of Map with keys which are WeakReferences. A
  * key/value mapping is removed when the key is no longer referenced. All
@@ -40,7 +42,7 @@ import java.util.Set;
  * @see HashMap
  * @see WeakReference
  */
-public class NativeScriptWeakHashMap<K, V> extends NativeScriptAbstractMap<K, V> implements Map<K, V>
+public class WeakHashMap<K, V> extends AbstractMap<K, V> implements Map<K, V>
 {
 
 	private static final int DEFAULT_SIZE = 16;
@@ -221,7 +223,7 @@ public class NativeScriptWeakHashMap<K, V> extends NativeScriptAbstractMap<K, V>
 	/**
 	 * Constructs a new empty {@code WeakHashMap} instance.
 	 */
-	public NativeScriptWeakHashMap()
+	public WeakHashMap()
 	{
 		this(DEFAULT_SIZE);
 	}
@@ -235,7 +237,7 @@ public class NativeScriptWeakHashMap<K, V> extends NativeScriptAbstractMap<K, V>
 	 * @throws IllegalArgumentException
 	 *             if the capacity is less than zero.
 	 */
-	public NativeScriptWeakHashMap(int capacity)
+	public WeakHashMap(int capacity)
 	{
 		if (capacity < 0)
 		{
@@ -260,7 +262,7 @@ public class NativeScriptWeakHashMap<K, V> extends NativeScriptAbstractMap<K, V>
 	 *             if the capacity is less than zero or the load factor is less
 	 *             or equal to zero.
 	 */
-	public NativeScriptWeakHashMap(int capacity, float loadFactor)
+	public WeakHashMap(int capacity, float loadFactor)
 	{
 		if (capacity < 0)
 		{
@@ -284,7 +286,7 @@ public class NativeScriptWeakHashMap<K, V> extends NativeScriptAbstractMap<K, V>
 	 * @param map
 	 *            the mappings to add.
 	 */
-	public NativeScriptWeakHashMap(Map<? extends K, ? extends V> map)
+	public WeakHashMap(Map<? extends K, ? extends V> map)
 	{
 		this(map.size() < 6 ? 11 : map.size() * 2);
 		putAllImpl(map);
@@ -347,13 +349,13 @@ public class NativeScriptWeakHashMap<K, V> extends NativeScriptAbstractMap<K, V>
 			@Override
 			public int size()
 			{
-				return NativeScriptWeakHashMap.this.size();
+				return WeakHashMap.this.size();
 			}
 
 			@Override
 			public void clear()
 			{
-				NativeScriptWeakHashMap.this.clear();
+				WeakHashMap.this.clear();
 			}
 
 			@Override
@@ -361,7 +363,7 @@ public class NativeScriptWeakHashMap<K, V> extends NativeScriptAbstractMap<K, V>
 			{
 				if (contains(object))
 				{
-					NativeScriptWeakHashMap.this.remove(((Map.Entry<?, ?>) object).getKey());
+					WeakHashMap.this.remove(((Map.Entry<?, ?>) object).getKey());
 					return true;
 				}
 				return false;
@@ -423,13 +425,13 @@ public class NativeScriptWeakHashMap<K, V> extends NativeScriptAbstractMap<K, V>
 				@Override
 				public int size()
 				{
-					return NativeScriptWeakHashMap.this.size();
+					return WeakHashMap.this.size();
 				}
 
 				@Override
 				public void clear()
 				{
-					NativeScriptWeakHashMap.this.clear();
+					WeakHashMap.this.clear();
 				}
 
 				@Override
@@ -437,7 +439,7 @@ public class NativeScriptWeakHashMap<K, V> extends NativeScriptAbstractMap<K, V>
 				{
 					if (containsKey(key))
 					{
-						NativeScriptWeakHashMap.this.remove(key);
+						WeakHashMap.this.remove(key);
 						return true;
 					}
 					return false;
@@ -489,13 +491,13 @@ public class NativeScriptWeakHashMap<K, V> extends NativeScriptAbstractMap<K, V>
 				@Override
 				public int size()
 				{
-					return NativeScriptWeakHashMap.this.size();
+					return WeakHashMap.this.size();
 				}
 
 				@Override
 				public void clear()
 				{
-					NativeScriptWeakHashMap.this.clear();
+					WeakHashMap.this.clear();
 				}
 
 				@Override

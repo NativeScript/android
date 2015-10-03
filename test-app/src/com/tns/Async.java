@@ -233,7 +233,7 @@ public class Async
 		{
 			if (options.screenWidth < 0 || options.screenHeight < 0)
 			{
-				Context appContext = NativeScriptApplication.getInstance();
+				Context appContext = MyApp.getInstance();
 				DisplayMetrics metrics = appContext.getResources().getDisplayMetrics();
 				options.screenWidth = metrics.widthPixels;
 				options.screenHeight = metrics.heightPixels;
