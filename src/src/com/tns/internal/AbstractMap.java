@@ -1,4 +1,4 @@
-package com.tns;
+package com.tns.internal;
 
 /*
  *  Licensed to the Apache Software Foundation (ASF) under one or more
@@ -39,7 +39,7 @@ import java.util.Set;
  * 
  * @since 1.2
  */
-public abstract class NativeScriptAbstractMap<K, V> implements Map<K, V>
+public abstract class AbstractMap<K, V> implements Map<K, V>
 {
 	// Lazily-initialized key set (for implementing {@link #keySet}).
 	Set<K> keySet;
@@ -194,7 +194,7 @@ public abstract class NativeScriptAbstractMap<K, V> implements Map<K, V>
 		}
 	}
 
-	protected NativeScriptAbstractMap()
+	protected AbstractMap()
 	{
 	}
 
@@ -422,7 +422,7 @@ public abstract class NativeScriptAbstractMap<K, V> implements Map<K, V>
 				@Override
 				public int size()
 				{
-					return NativeScriptAbstractMap.this.size();
+					return AbstractMap.this.size();
 				}
 
 				@Override
@@ -593,7 +593,7 @@ public abstract class NativeScriptAbstractMap<K, V> implements Map<K, V>
 				@Override
 				public int size()
 				{
-					return NativeScriptAbstractMap.this.size();
+					return AbstractMap.this.size();
 				}
 
 				@Override
@@ -634,7 +634,7 @@ public abstract class NativeScriptAbstractMap<K, V> implements Map<K, V>
 	@Override
 	protected Object clone() throws CloneNotSupportedException
 	{
-		NativeScriptAbstractMap<K, V> result = (NativeScriptAbstractMap<K, V>) super.clone();
+		AbstractMap<K, V> result = (AbstractMap<K, V>) super.clone();
 		result.keySet = null;
 		result.valuesCollection = null;
 		return result;

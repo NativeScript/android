@@ -191,7 +191,7 @@ string ExceptionUtil::GetErrorMessage(const Local<Message>& message, const Local
 	String::Utf8Value utfError(str);
 	ss << endl << endl << *utfError << endl;
 	ss << "File: \"" << ConvertToString(message->GetScriptResourceName().As<String>());
-	ss << ", line: " << message->GetLineNumber() - Constants::MODULE_LINES_OFFSET << ", column: " << message->GetStartColumn() << endl << endl;
+	ss << ", line: " << message->GetLineNumber() << ", column: " << message->GetStartColumn() << endl << endl;
 
 	string stackTraceMessage = GetErrorStackTrace(message->GetStackTrace());
 	ss << "StackTrace: " << endl << stackTraceMessage << endl;
@@ -225,16 +225,11 @@ string ExceptionUtil::GetErrorStackTrace(const Local<StackTrace>& stackTrace)
 	for (int i = 0; i < frameCount; i++)
 	{
 		auto frame = stackTrace->GetFrame(i);
-		string funcName = ConvertToString(frame->GetFunctionName());
-		string srcName = ConvertToString(frame->GetScriptName());
+		auto funcName = ConvertToString(frame->GetFunctionName());
+		auto srcName = ConvertToString(frame->GetScriptName());
+		auto lineNumber = frame->GetLineNumber();
+		auto column = frame->GetColumn();
 
-		int lineNumber = frame->GetLineNumber();
-		if (lineNumber > Constants::MODULE_LINES_OFFSET)
-		{
-			lineNumber -= Constants::MODULE_LINES_OFFSET;
-		}
-
-		int column = frame->GetColumn();
 		ss << "\tFrame: function:'" << funcName.c_str() << "', file:'" << srcName.c_str() << "', line: " << lineNumber << ", column: " << column << endl;
 	}
 
