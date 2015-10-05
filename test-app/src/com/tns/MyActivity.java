@@ -3,8 +3,7 @@
  */
 package com.tns;
 
-import java.io.File;
-
+@JavaScriptImplementation(javaScriptFile = "app/myactivity.js")
 public class MyActivity extends android.app.Activity
 {
 	public MyActivity()
@@ -17,11 +16,5 @@ public class MyActivity extends android.app.Activity
 		Object[] args = new Object[1];
 		args[0] = param_0;
 		com.tns.Platform.callJSMethod(this, "onCreate", void.class, args);
-	}
-	
-	static
-	{
-		File appDir = MyApp.getInstance().getFilesDir();
-		Platform.runModule(new File(appDir, "app/myactivity.js"));
 	}
 }

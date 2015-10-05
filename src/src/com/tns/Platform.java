@@ -15,6 +15,7 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 
 import org.json.JSONObject;
 
@@ -57,6 +58,8 @@ public class Platform
 	private static final com.tns.internal.HashMap<Object, Integer> strongJavaObjectToID = new com.tns.internal.HashMap<Object, Integer>();
 	
 	private static final com.tns.internal.WeakHashMap<Object, Integer> weakJavaObjectToID = new com.tns.internal.WeakHashMap<Object, Integer>();
+	
+	private final static Map<Class<?>, JavaScriptImplementation> loadedJavaScriptExtends = new HashMap<Class<?>, JavaScriptImplementation>();
 	
 	private static final Runtime runtime = Runtime.getRuntime();
 	private static Class<?> errorActivityClass;
@@ -344,14 +347,27 @@ public class Platform
 			createJSInstance(instance);
 		}
 	}
-
+	
 	private static void createJSInstance(Object instance)
 	{
 		int javaObjectID = generateNewObjectId();
 
 		makeInstanceStrong(instance, javaObjectID);
+		
+		Class<?> clazz = instance.getClass();
+		
+		if (!loadedJavaScriptExtends.containsKey(clazz))
+		{
+			JavaScriptImplementation jsImpl = clazz.getAnnotation(JavaScriptImplementation.class);
+			if (jsImpl != null)
+			{
+				File jsFile = new File(Module.getApplicationFilesPath(), jsImpl.javaScriptFile());
+				runModule(jsFile);
+			}
+			loadedJavaScriptExtends.put(clazz, jsImpl);
+		}
 
-		String className = instance.getClass().getName();
+		String className = clazz.getName();
 				
 		createJSInstanceNative(instance, javaObjectID, className);
 
