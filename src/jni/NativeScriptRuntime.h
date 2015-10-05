@@ -70,9 +70,13 @@ namespace tns
 
 		static void AppFail(jthrowable throwable, const char *message);
 
+		static void RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
+
 		static void CreateGlobalCastFunctions(const v8::Local<v8::ObjectTemplate>& globalTemplate);
 
 		static std::vector<std::string> GetTypeMetadata(const std::string& name, int index);
+
+		static void AddApplicationModule(const std::string& appName, v8::Persistent<v8::Object>* applicationModule);
 
 		static jobjectArray GetMethodOverrides(JEnv& env, const v8::Local<v8::Object>& implementationObject);
 
@@ -86,11 +90,15 @@ namespace tns
 
 		static void CreateTopLevelNamespaces(const v8::Local<v8::Object>& global);
 
+		static void CompileAndRun(std::string modulePath, bool& hasError, v8::Local<v8::Object>& moduleObj);
+
 		static v8::Local<v8::Object> FindClass(const std::string& className);
 
 		static MetadataTreeNode *metadataRoot;
 
 		static jclass PlatformClass;
+
+		static jclass RequireClass;
 
 		static jclass JAVA_LANG_STRING;
 
@@ -117,6 +125,8 @@ namespace tns
 
 		static jmethodID APP_FAIL_METHOD_ID;
 
+		static jmethodID GET_MODULE_PATH_METHOD_ID;
+
 		static jmethodID GET_TYPE_METADATA;
 
 		static jmethodID ENABLE_VERBOSE_LOGGING_METHOD_ID;
@@ -124,6 +134,8 @@ namespace tns
 		static jmethodID DISABLE_VERBOSE_LOGGING_METHOD_ID;
 
 		static jmethodID GET_CHANGE_IN_BYTES_OF_USED_MEMORY_METHOD_ID;
+
+		static std::map<std::string, v8::Persistent<v8::Object>*> loadedModules;
 
 		static NumericCasts castFunctions;
 

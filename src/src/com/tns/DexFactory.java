@@ -64,6 +64,12 @@ public class DexFactory
 
 	public Class<?> resolveClass(String name, String className, String[] methodOverrides) throws ClassNotFoundException, IOException
 	{
+		if (className.contains("NativeScriptActivity"))
+		{
+			// Do not extend NativeScriptActivity - it is already extended
+			return NativeScriptActivity.class;
+		}
+
 		String fullClassName = className.replace("$", "_") + CLASS_NAME_LOCATION_SEPARATOR + name;
 
 		// try to get pre-generated binding classes

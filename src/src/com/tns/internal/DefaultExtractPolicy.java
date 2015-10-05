@@ -1,4 +1,4 @@
-package com.tns;
+package com.tns.internal;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -14,8 +14,6 @@ import android.content.Context;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 
-import com.tns.ExtractPolicy;
-import com.tns.FileExtractor;
 import com.tns.Logger;
 
 public class DefaultExtractPolicy implements ExtractPolicy

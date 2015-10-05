@@ -840,6 +840,13 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
 		isSuper = !superValue.IsEmpty() && superValue->IsTrue();
 	}
 
+//	// TODO: refactor this
+	if (isSuper && (*className == "com/tns/NativeScriptActivity"))
+	{
+		string activityBaseClassName("android/app/Activity");
+		className = &activityBaseClassName;
+	}
+
 	if ((argLength == 0) && (methodName == V8StringConstants::VALUE_OF))
 	{
 		info.GetReturnValue().Set(thiz);
@@ -1100,42 +1107,17 @@ void MetadataNode::ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Va
 	Local<Object> implementationObject;
 	Local<String> extendName;
 	string extendLocation;
-	//
-	auto hasDot = false;
-	if (info.Length() == 2)
-	{
-		assert(!info[0].IsEmpty() && info[0]->IsString());
-		assert(!info[1].IsEmpty() && info[1]->IsObject());
-		string strName = ConvertToString(info[0].As<String>());
-		hasDot = strName.find('.') != string::npos;
-	}
-	if (hasDot)
-	{
-		extendName = info[0].As<String>();
-		implementationObject = info[1].As<Object>();
-	}
-	else
-	{
-		auto validArgs = ValidateExtendArguments(info, extendLocation, extendName, implementationObject);
+	auto validArgs = ValidateExtendArguments(info, extendLocation, extendName, implementationObject);
 
-		if (!validArgs)
-			return;
-	}
+	if (!validArgs)
+		return;
 
 	auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value());
 
 	DEBUG_WRITE("ExtendsCallMethodHandler: called with %s", ConvertToString(extendName).c_str());
 
 	string extendNameAndLocation = extendLocation + ConvertToString(extendName);
-	string fullClassName;
-	if (!hasDot)
-	{
-		fullClassName = TNS_PREFIX + CreateFullClassName(node->m_name, extendNameAndLocation);
-	}
-	else
-	{
-		fullClassName = ConvertToString(info[0].As<String>());
-	}
+	auto fullClassName = TNS_PREFIX + CreateFullClassName(node->m_name, extendNameAndLocation);
 
 
 	//
@@ -1252,6 +1234,11 @@ bool MetadataNode::GetExtendLocation(string& extendLocation)
 				extendLocationStream << fullPathToFile.c_str() << " unkown line number";
 				extendLocation = extendLocationStream.str();
 				return false;
+			}
+
+			if (lineNumber > Constants::MODULE_LINES_OFFSET)
+			{
+				lineNumber -= Constants::MODULE_LINES_OFFSET;
 			}
 
 			int column = frame->GetColumn();

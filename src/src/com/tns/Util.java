@@ -57,6 +57,7 @@ public final class Util
 		{
 			if (logger.isEnabled()) e.printStackTrace();
 		}
+		
 		try
 		{
 			Class<?> liveSyncPluginClass = Class.forName(pluginClassName);

@@ -128,10 +128,15 @@ string Util::GetStackTrace(int frameCount)
 			{
 				auto scriptName = frame->GetScriptName();
 				auto fileName = ConvertToString(scriptName);
-				auto lineNumber = frame->GetLineNumber();
-				auto column = frame->GetColumn();
+				ss << fileName;
 
-				ss << fileName << ":" << lineNumber << ":" << column << "\n";
+				int lineNumber = frame->GetLineNumber();
+				if (lineNumber > Constants::MODULE_LINES_OFFSET)
+				{
+					lineNumber -= Constants::MODULE_LINES_OFFSET;
+				}
+				int column = frame->GetColumn();
+				ss << ":" << lineNumber << ":" << column << "\n";
 			}
 		}
 	}

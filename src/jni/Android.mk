@@ -77,7 +77,7 @@ include $(BUILD_SHARED_LIBRARY)
 include $(CLEAR_VARS)
 LOCAL_CPPFLAGS += -std=c++11
 LOCAL_MODULE    := NativeScript
-LOCAL_SRC_FILES := com_tns_Platform.cpp com_tns_JsDebugger.cpp \
+LOCAL_SRC_FILES := com_tns_Platform.cpp com_tns_JsDebugger.cpp com_tns_NativeScriptActity.cpp \
 					JEnv.cpp DirectBuffer.cpp \
 					JsDebugger.cpp SimpleAllocator.cpp \
 					NativeScriptRuntime.cpp MetadataNode.cpp MetadataTreeNode.cpp MetadataReader.cpp \
@@ -87,7 +87,7 @@ LOCAL_SRC_FILES := com_tns_Platform.cpp com_tns_JsDebugger.cpp \
 					FieldAccessor.cpp ArrayElementAccessor.cpp \
 					ExceptionUtil.cpp Util.cpp Logger.cpp Profiler.cpp \
 					ObjectManager.cpp NumericCasts.cpp WeakRef.cpp \
-					MetadataMethodInfo.cpp SimpleProfiler.cpp JType.cpp File.cpp Module.cpp
+					MetadataMethodInfo.cpp SimpleProfiler.cpp JType.cpp File.cpp Require.cpp
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/include
 LOCAL_LDLIBS    := -llog -landroid -lz
 ifeq ($(TARGET_ARCH_ABI),armeabi-v7a)

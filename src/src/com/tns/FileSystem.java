@@ -96,12 +96,12 @@ public class FileSystem
 		return new JSONObject(content);
 	}
 	
-	public static String resolveRelativePath(String applicationFilesDir, String path, String currentDirectory)
+	public static String resolveRelativePath(String path, String currentDirectory)
 	{
 		String baseDir;
 		if (path.startsWith(appRootPrefix))
 		{
-			baseDir = new File(applicationFilesDir, "app").getAbsolutePath();
+			baseDir = new File(NativeScriptApplication.getInstance().getApplicationContext().getFilesDir(), "app").getAbsolutePath();
 			path = path.substring(appRootPrefix.length());
 		}
 		else

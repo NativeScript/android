@@ -4,7 +4,7 @@ import java.lang.Thread.UncaughtExceptionHandler;
 
 import android.content.Context;
 
-public class MyUncaughtExceptionHandler implements UncaughtExceptionHandler 
+public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHandler 
 {
 	private final Context context;
 	
@@ -12,7 +12,7 @@ public class MyUncaughtExceptionHandler implements UncaughtExceptionHandler
 	
 	private final Logger logger; 
 	
-	public MyUncaughtExceptionHandler(Logger logger, Context context)
+	public NativeScriptUncaughtExceptionHandler(Logger logger, Context context)
 	{
 		this.logger = logger;
 		this.context = context;
