@@ -277,18 +277,15 @@ public class Platform
 		{
 			StringBuilder builder = new StringBuilder();
 			builder.append(constructorId + "(");
-			if (args != null)
+			for (Object arg : args)
 			{
-				for (Object arg : args)
+				if (arg != null)
 				{
-					if (arg != null)
-					{
-						builder.append(arg.toString() + ", ");
-					}
-					else
-					{
-						builder.append("null, ");
-					}
+					builder.append(arg.toString() + ", ");
+				}
+				else
+				{
+					builder.append("null, ");
 				}
 			}
 			builder.append(")");

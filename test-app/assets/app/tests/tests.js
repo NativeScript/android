@@ -1863,27 +1863,4 @@ describe("Tests ", function () {
 		
 		expect(value123).toBe(123);
 	});
-	
-	
-	it("When_calling_non_existent_ctor_it_should_fail", function () {
-		
-		__log("TEST: When_calling_non_existent_ctor_it_should_fail: Start"); 
-	
-		try
-		{
-			var textView = android.widget.TextView;
-			var MyTextView = textView.extend({
-	
-			});
-			
-			var my = new MyTextView();
-		}
-		catch(e)
-		{
-			exceptionCaught = true;
-		}
-		
-		expect(exceptionCaught).toBe(true);
-	});
-	
 });

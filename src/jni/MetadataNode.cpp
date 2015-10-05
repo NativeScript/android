@@ -510,6 +510,8 @@ void MetadataNode::InnerClassConstructorCallback(const v8::FunctionCallbackInfo<
 
 	string fullClassName = CreateFullClassName(className, extendName);
 	bool success = NativeScriptRuntime::RegisterInstance(thiz, fullClassName, argWrapper, outerThis, false);
+
+	assert(success);
 }
 
 void MetadataNode::InnerClassAccessorGetterCallback(Local<String> property, const PropertyCallbackInfo<Value>& info)
@@ -715,6 +717,8 @@ void MetadataNode::ExtendedClassConstructorCallback(const v8::FunctionCallbackIn
 	string fullClassName = extData->fullClassName;
 
 	bool success = NativeScriptRuntime::RegisterInstance(thiz, fullClassName, argWrapper, implementationObject, false);
+
+	assert(success);
 }
 
 
@@ -771,6 +775,8 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
 	ArgsWrapper argWrapper(info, ArgType::Interface, Local<Object>());
 
 	auto success = NativeScriptRuntime::RegisterInstance(thiz, fullClassName, argWrapper, implementationObject, true);
+
+	assert(success);
 }
 
 void MetadataNode::ClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info)
@@ -790,6 +796,8 @@ void MetadataNode::ClassConstructorCallback(const v8::FunctionCallbackInfo<v8::V
 
 	string fullClassName = CreateFullClassName(className, extendName);
 	bool success = NativeScriptRuntime::RegisterInstance(thiz, fullClassName, argWrapper, outerThis, false);
+
+	//assert(success);
 }
 
 void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& info)

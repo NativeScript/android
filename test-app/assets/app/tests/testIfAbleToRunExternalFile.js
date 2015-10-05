@@ -1,9 +1,9 @@
 describe("Tests running external files", function () {
 	
 	it("When_file_outside_the_project_folder_is_required_it_should_fail", function () {
-	
-		__log("TEST: When_file_outside_the_project_folder_is_required_it_should_fail"); 
-	
+
+		__log("When_file_outside_the_project_folder_is_required_it_should_throw_IllegalAccessException"); 
+
 		var illegalAccesExceptionCaught = false;
 		var fileSeparator = "/";
 		var nonExistingFileName = "nonExistingFile";
@@ -26,5 +26,4 @@ describe("Tests running external files", function () {
 		
 		expect(exceptionCaught).toBe(true);
 	});
-
 });
