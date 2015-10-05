@@ -236,10 +236,10 @@ task startInstalledApk (type: Exec) {
 		println "---- starting installed apk"
 		
 		if(isWinOs) {
-			commandLine "cmd", "/c", "adb", "shell", "am", "start", "-n", "com.tns.android_runtime_testapp/com.tns.MyActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
+			commandLine "cmd", "/c", "adb", "shell", "am", "start", "-n", "com.tns.android_runtime_testapp/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
 		}
 		else {
-			commandLine "adb", "shell", "am", "start", "-n", "com.tns.android_runtime_testapp/com.tns.MyActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
+			commandLine "adb", "shell", "am", "start", "-n", "com.tns.android_runtime_testapp/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
 		}
 	}
 }
