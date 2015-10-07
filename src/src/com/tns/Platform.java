@@ -227,6 +227,12 @@ public class Platform
 		}
 	}
 	
+	public static void run() throws NativeScriptException
+	{
+		String mainModule = Module.bootstrapApp();
+		runModule(new File(mainModule));
+	}
+	
 	public static void runModule(File jsFile) throws NativeScriptException
 	{
 		if (jsFile.exists() && jsFile.isFile())
