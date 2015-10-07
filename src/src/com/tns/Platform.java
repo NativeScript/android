@@ -15,19 +15,19 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 
 import org.json.JSONObject;
 
 import android.util.SparseArray;
 
 import com.tns.bindings.ProxyGenerator;
-import com.tns.internal.ExtractPolicy;
 
 public class Platform
 {
-	private static native void initNativeScript(String filesPath, int appJavaObjectId, boolean verboseLoggingEnabled, String packageName, String jsOptions);
+	private static native void initNativeScript(String filesPath, boolean verboseLoggingEnabled, String packageName, String jsOptions);
 
-	private static native void runNativeScript(String appModuleName);
+	private static native void runModule(String filePath) throws NativeScriptException;
 	
 	private static native Object runScript(String filePath) throws NativeScriptException;
 
@@ -55,9 +55,11 @@ public class Platform
 	
 	private static final SparseArray<WeakReference<Object>> weakInstances = new SparseArray<WeakReference<Object>>();
 	
-	private static final NativeScriptHashMap<Object, Integer> strongJavaObjectToID = new NativeScriptHashMap<Object, Integer>();
+	private static final com.tns.internal.HashMap<Object, Integer> strongJavaObjectToID = new com.tns.internal.HashMap<Object, Integer>();
 	
-	private static final NativeScriptWeakHashMap<Object, Integer> weakJavaObjectToID = new NativeScriptWeakHashMap<Object, Integer>();
+	private static final com.tns.internal.WeakHashMap<Object, Integer> weakJavaObjectToID = new com.tns.internal.WeakHashMap<Object, Integer>();
+	
+	private final static Map<Class<?>, JavaScriptImplementation> loadedJavaScriptExtends = new HashMap<Class<?>, JavaScriptImplementation>();
 	
 	private static final Runtime runtime = Runtime.getRuntime();
 	private static Class<?> errorActivityClass;
@@ -97,12 +99,7 @@ public class Platform
 		errorActivityClass = clazz;
 	}
 	
-	public static int init(ThreadScheduler threadScheduler, Logger logger, String appName, File runtimeLibPath, File rootDir, File appDir, File debuggerSetupDir, ClassLoader classLoader, File dexDir, String dexThumb) throws RuntimeException
-	{
-		return init(null, threadScheduler, logger, appName, runtimeLibPath, rootDir, appDir, debuggerSetupDir, classLoader, dexDir, dexThumb);
-	}
-	
-	public static int init(Object application, ThreadScheduler threadScheduler, Logger logger, String appName, File runtimeLibPath, File rootDir, File appDir, File debuggerSetupDir, ClassLoader classLoader, File dexDir, String dexThumb) throws RuntimeException
+	public static void init(ThreadScheduler threadScheduler, Logger logger, String appName, File runtimeLibPath, File rootDir, File appDir, File debuggerSetupDir, ClassLoader classLoader, File dexDir, String dexThumb) throws RuntimeException
 	{
 		if (initialized)
 		{
@@ -117,25 +114,16 @@ public class Platform
 		
 		Platform.dexFactory = new DexFactory(logger, classLoader, dexDir, dexThumb);
 
-		int appJavaObjectId = -1;
-		if (application != null)
-		{
-			if (logger.isEnabled()) logger.write("Initializing NativeScript JAVA");
-			appJavaObjectId = generateNewObjectId();
-			makeInstanceStrong(application, appJavaObjectId);
-			if (logger.isEnabled()) logger.write("Initialized app instance id:" + appJavaObjectId);
-		}
-
 		try
 		{
-			Require.init(logger, rootDir, appDir);
+			Module.init(logger, rootDir, appDir);
 		}
 		catch (IOException ex)
 		{
 			throw new RuntimeException("Fail to initialize Require class", ex);
 		}
 		String jsOptions = readJsOptions(appDir);
-		Platform.initNativeScript(Require.getApplicationFilesPath(), appJavaObjectId, logger.isEnabled(), appName, jsOptions);
+		Platform.initNativeScript(Module.getApplicationFilesPath(), logger.isEnabled(), appName, jsOptions);
 		
 		if (debuggerSetupDir != null)
 		{
@@ -157,7 +145,6 @@ public class Platform
 		//
 
 		initialized = true;
-		return appJavaObjectId;
 	}
 	
 	static void loadLibrary(File runtimeLibPath, String libName)
@@ -230,7 +217,8 @@ public class Platform
 				
 				//don't throw exception to v8 if v8 is not initialized yet
 				if(!initialized) {
-					passUncaughtExceptionToJsNative(e, ErrorReport.getErrorMessage(e));	
+					// TODO:
+					//passUncaughtExceptionToJsNative(e, ErrorReport.getErrorMessage(e));	
 				}
 			}
 			
@@ -239,10 +227,19 @@ public class Platform
 		}
 	}
 	
-	public static void run()
+	public static void run() throws NativeScriptException
 	{
-		String bootstrapPath = Require.bootstrapApp();
-		runNativeScript(bootstrapPath);
+		String mainModule = Module.bootstrapApp();
+		runModule(new File(mainModule));
+	}
+	
+	public static void runModule(File jsFile) throws NativeScriptException
+	{
+		if (jsFile.exists() && jsFile.isFile())
+		{
+			String filePath = jsFile.getAbsolutePath();
+			runModule(filePath);
+		}
 	}
 	
 	public static Object runScript(File jsFile) throws NativeScriptException
@@ -356,14 +353,27 @@ public class Platform
 			createJSInstance(instance);
 		}
 	}
-
+	
 	private static void createJSInstance(Object instance)
 	{
 		int javaObjectID = generateNewObjectId();
 
 		makeInstanceStrong(instance, javaObjectID);
+		
+		Class<?> clazz = instance.getClass();
+		
+		if (!loadedJavaScriptExtends.containsKey(clazz))
+		{
+			JavaScriptImplementation jsImpl = clazz.getAnnotation(JavaScriptImplementation.class);
+			if (jsImpl != null)
+			{
+				File jsFile = new File(Module.getApplicationFilesPath(), jsImpl.javaScriptFile());
+				runModule(jsFile);
+			}
+			loadedJavaScriptExtends.put(clazz, jsImpl);
+		}
 
-		String className = instance.getClass().getName();
+		String className = clazz.getName();
 				
 		createJSInstanceNative(instance, javaObjectID, className);
 

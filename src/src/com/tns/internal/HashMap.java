@@ -1,4 +1,4 @@
-package com.tns;
+package com.tns.internal;
 
 import java.util.AbstractCollection;
 import java.util.AbstractMap;
@@ -17,6 +17,8 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamField;
 import java.io.Serializable;
+
+import com.tns.NativeScriptHashCodeProvider;
 
 //import libcore.util.Objects;
 
@@ -53,7 +55,7 @@ import java.io.Serializable;
  *            the type of mapped values
  */
 
-public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Cloneable, Serializable
+public class HashMap<K, V> extends AbstractMap<K, V> implements Cloneable, Serializable
 {
 	/**
 	 * Min capacity (other than zero) for a HashMap. Must be a power of two
@@ -125,7 +127,7 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
 	 * Constructs a new empty {@code HashMap} instance.
 	 */
 	@SuppressWarnings("unchecked")
-	public NativeScriptHashMap()
+	public HashMap()
 	{
 		table = (HashMapEntry<K, V>[]) EMPTY_TABLE;
 		threshold = -1; // Forces first put invocation to replace EMPTY_TABLE
@@ -139,7 +141,7 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
 	 * @throws IllegalArgumentException
 	 *             when the capacity is less than zero.
 	 */
-	public NativeScriptHashMap(int capacity)
+	public HashMap(int capacity)
 	{
 		if (capacity < 0)
 		{
@@ -182,7 +184,7 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
 	 *             when the capacity is less than zero or the load factor is
 	 *             less or equal to zero or NaN.
 	 */
-	public NativeScriptHashMap(int capacity, float loadFactor)
+	public HashMap(int capacity, float loadFactor)
 	{
 		this(capacity);
 
@@ -205,7 +207,7 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
 	 * @param map
 	 *            the mappings to add.
 	 */
-	public NativeScriptHashMap(Map<? extends K, ? extends V> map)
+	public HashMap(Map<? extends K, ? extends V> map)
 	{
 		this(capacityForInitSize(map.size()));
 		constructorPutAll(map);
@@ -254,10 +256,10 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
 		 * This could be made more efficient. It unnecessarily hashes all of the
 		 * elements in the map.
 		 */
-		NativeScriptHashMap<K, V> result;
+		HashMap<K, V> result;
 		try
 		{
-			result = (NativeScriptHashMap<K, V>) super.clone();
+			result = (HashMap<K, V>) super.clone();
 		}
 		catch (CloneNotSupportedException e)
 		{
@@ -927,7 +929,7 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
 				throw new IllegalStateException();
 			if (modCount != expectedModCount)
 				throw new ConcurrentModificationException();
-			NativeScriptHashMap.this.remove(lastEntryReturned.key);
+			HashMap.this.remove(lastEntryReturned.key);
 			lastEntryReturned = null;
 			expectedModCount = modCount;
 		}
@@ -1070,13 +1072,13 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
 		public boolean remove(Object o)
 		{
 			int oldSize = size;
-			NativeScriptHashMap.this.remove(o);
+			HashMap.this.remove(o);
 			return size != oldSize;
 		}
 
 		public void clear()
 		{
-			NativeScriptHashMap.this.clear();
+			HashMap.this.clear();
 		}
 	}
 
@@ -1104,7 +1106,7 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
 
 		public void clear()
 		{
-			NativeScriptHashMap.this.clear();
+			HashMap.this.clear();
 		}
 	}
 
@@ -1143,7 +1145,7 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
 
 		public void clear()
 		{
-			NativeScriptHashMap.this.clear();
+			HashMap.this.clear();
 		}
 	}
 
