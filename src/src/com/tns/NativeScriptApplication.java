@@ -767,14 +767,9 @@ public class NativeScriptApplication extends android.app.Application implements 
 	{
 		Class<?> appBuilderCallbackClass = null;
 		
-		String packageName = super.getPackageName();
-
-		String className = packageName.equals("com.tns")
-									? "com.tns.internal.AppBuilderCallbackTestImpl"
-									: "com.tns.internal.AppBuilderCallbackImpl";
-
 		try
 		{
+			String className = "com.tns.internal.AppBuilderCallbackImpl";
 			appBuilderCallbackClass = Class.forName(className);
 		}
 		catch (ClassNotFoundException e)
