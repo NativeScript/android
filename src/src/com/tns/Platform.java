@@ -113,8 +113,6 @@ public class Platform
 		
 		Platform.logger = logger;
 		
-		loadLibrary(runtimeLibPath, "NativeScript");
-		
 		Platform.dexFactory = new DexFactory(logger, classLoader, dexDir, dexThumb);
 
 		int appJavaObjectId = -1;
@@ -158,38 +156,6 @@ public class Platform
 
 		initialized = true;
 		return appJavaObjectId;
-	}
-	
-	static void loadLibrary(File runtimeLibPath, String libName)
-	{
-		if (runtimeLibPath == null)
-		{
-			System.loadLibrary(libName);
-		}
-		else if (runtimeLibPath.isDirectory())
-		{
-			String arch = System.getProperty("os.arch");
-			String lcArch = arch.toLowerCase();
-			String archDir;
-			if (lcArch.startsWith("arm"))
-			{
-				archDir = "arm";
-			}
-			else if (lcArch.startsWith("i686"))
-			{
-				archDir = "x86";
-			}
-			else
-			{
-				// TODO: add arm64, x64
-				throw new RuntimeException("Unsupported arch=" + arch);
-			}
-			System.load(new File(runtimeLibPath, "lib/" + archDir + "/" + libName +  ".so").getAbsolutePath());
-		}
-		else
-		{
-			System.load(runtimeLibPath.getAbsolutePath());
-		}
 	}
 	
 	@RuntimeCallable

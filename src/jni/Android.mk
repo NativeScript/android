@@ -61,23 +61,8 @@ include $(PREBUILT_STATIC_LIBRARY)
 
 include $(CLEAR_VARS)
 LOCAL_CPPFLAGS += -std=c++11
-LOCAL_MODULE    := AssetExtractor
-LOCAL_SRC_FILES := com_tns_AssetExtractor.cpp
-LOCAL_C_INCLUDES := $(LOCAL_PATH)/include
-LOCAL_LDLIBS    := -llog -landroid -lz
-ifeq ($(TARGET_ARCH_ABI),armeabi-v7a)
-LOCAL_STATIC_LIBRARIES := zip android-ndk-profiler
-#LOCAL_CFLAGS += -pg -DNDK_PROFILER_ENABLED
-else
-LOCAL_STATIC_LIBRARIES := zip
-endif
-include $(BUILD_SHARED_LIBRARY)
-
-
-include $(CLEAR_VARS)
-LOCAL_CPPFLAGS += -std=c++11
 LOCAL_MODULE    := NativeScript
-LOCAL_SRC_FILES := com_tns_Platform.cpp com_tns_JsDebugger.cpp com_tns_NativeScriptActity.cpp \
+LOCAL_SRC_FILES := com_tns_AssetExtractor.cpp com_tns_Platform.cpp com_tns_JsDebugger.cpp com_tns_NativeScriptActity.cpp \
 					JEnv.cpp DirectBuffer.cpp \
 					JsDebugger.cpp SimpleAllocator.cpp \
 					NativeScriptRuntime.cpp MetadataNode.cpp MetadataTreeNode.cpp MetadataReader.cpp \
@@ -91,10 +76,10 @@ LOCAL_SRC_FILES := com_tns_Platform.cpp com_tns_JsDebugger.cpp com_tns_NativeScr
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/include
 LOCAL_LDLIBS    := -llog -landroid -lz
 ifeq ($(TARGET_ARCH_ABI),armeabi-v7a)
-LOCAL_STATIC_LIBRARIES := v8_base v8_libplatform v8_libbase v8_nosnapshot android-ndk-profiler
+LOCAL_STATIC_LIBRARIES := v8_base v8_libplatform v8_libbase v8_nosnapshot android-ndk-profiler zip
 #LOCAL_CFLAGS += -pg -DNDK_PROFILER_ENABLED
 else
-LOCAL_STATIC_LIBRARIES := v8_base v8_libplatform v8_libbase v8_nosnapshot
+LOCAL_STATIC_LIBRARIES := v8_base v8_libplatform v8_libbase v8_nosnapshot zip
 endif
 include $(BUILD_SHARED_LIBRARY)
 
