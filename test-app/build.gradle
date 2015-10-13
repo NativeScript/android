@@ -116,13 +116,13 @@ task ensureMetadataOutDir {
 	outputDir.mkdirs()
 }
 
-task buildMetadata(type: Exec) {
-	outputs.upToDateWhen {		
+task buildMetadata (type: JavaExec) {
+
+	outputs.upToDateWhen {
 		!collectAllJars.didWork
 	}
 	
-	doFirst{
-	
+	doFirst {
 		workingDir "../dist/framework/build-tools"
 		
 		def str = new LinkedList <String> ();
@@ -131,15 +131,10 @@ task buildMetadata(type: Exec) {
 
 		for(def i = 0; i < allJarPaths.size(); i++) {
 			str.add(allJarPaths.get(i));
-		}
+		}	
 
-		if(isWinOs) {
-			commandLine "cmd", "/c", "rmg.bat"
-		}
-		else{
-			commandLine "./rmg.sh"
-		}
-		
+		main "-jar"
+
 		args str.toArray()
 	}
 }
