@@ -140,6 +140,10 @@ dependencies {
     // }
 }
 
+task deletePrevConfig (type: Delete) {
+	delete "$configurationsDir/include.gradle"
+}
+
 //creates product flavor config file
 task setFlavorsBeforePluginExtend {
 	def dirTree = file(configurationsDir).listFiles()
