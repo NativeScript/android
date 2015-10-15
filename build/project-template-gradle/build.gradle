@@ -19,7 +19,9 @@
 */
 
 def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
+def metadataParams = new LinkedList <String> ()
 def allJarPaths = new LinkedList <String> ()
+def configurationsDir = "configurations"
 
 buildscript {
     repositories {
@@ -138,6 +140,38 @@ dependencies {
     // }
 }
 
+//creates product flavor config file
+task setFlavorsBeforePluginExtend {
+	def dirTree = file(configurationsDir).listFiles()
+	
+	List<String> pluginNames = new ArrayList<String>()
+	dirTree.each { f ->
+		if(f.isDirectory()) {
+			println "adding plugin: " + f.getName()
+			pluginNames.add('"' + f.getName() + '"')
+		}
+	}
+	def flavors = pluginNames.join(",")
+	
+	println "creating product flavors include.gradle file in $configurationsDir folder..."
+	def flavorsFile = new File("$configurationsDir/include.gradle")
+	flavorsFile.write ""
+	flavorsFile << "android { \n"
+	flavorsFile << "\tflavorDimensions " + flavors + "\n"
+	flavorsFile << "}\n"
+}
+
+// applies additional configuration
+task pluginExtend {
+	new File("configurations").eachFileRecurse(groovy.io.FileType.FILES) {
+		if(it.name.equals('include.gradle')) {
+			println "including plugin name: " + it
+			apply from: it
+		}
+	}
+}
+
+
 task copyAarDependencies(type: Copy) {
 	// we need to copy all dependencies into a flat dir, as pointed by the repositories setup
 	from fileTree(dir: nodeModulesDir, include: ["**/*.aar"]).files
@@ -156,53 +190,65 @@ task addAarDependencies <</*doLast*/ {
 }
 
 task collectAllJars {
-	
 	def explodedAarDir = project.buildDir.getAbsolutePath() + "/intermediates/exploded-aar/"
 	def sdkPath = android.sdkDirectory.getAbsolutePath();
 	def androidJar = sdkPath + "/platforms/" + android.compileSdkVersion + "/android.jar"
 	
 	doFirst {
+		
+		configurations.compile.each { File dependencyFile -> 
+			allJarPaths.add(dependencyFile.getAbsolutePath())
+		}
+		
 		allJarPaths.add(androidJar);
-	
+		
 		def ft = fileTree(dir: explodedAarDir, include: "**/*.jar")
 		ft.each { currentJarFile ->
 			allJarPaths.add(currentJarFile.getAbsolutePath())
 		}
 		
-		configurations.compile.each { File dependencyFile -> 
-			allJarPaths.add(dependencyFile.getAbsolutePath())
+		metadataParams.add("metadata-generator.jar")
+		metadataParams.add("../metadata/output")
+		for(def i = 0; i < allJarPaths.size(); i++) {
+			metadataParams.add(allJarPaths.get(i));
 		}
 	}
 }
 
-task ensureMetadataOutDir {
-	doFirst {
-		def outputDir = file("$rootDir/metadata/output")
-		outputDir.mkdirs()
+task isMetadataGenerationNecessary {
+	def inputFile = new File("build/metadataUTD")
+	
+	inputs.file inputFile
+	outputs.upToDateWhen {
+		inputFile.exists() && 
+		(inputFile.text.trim() == metadataParams.toString().trim())
 	}
+	
+	doLast {
+		inputFile.text = metadataParams
+	}
+}
+
+isMetadataGenerationNecessary.dependsOn(collectAllJars)
+
+task ensureMetadataOutDir {
+	def outputDir = file("$rootDir/metadata/output")
+	outputDir.mkdirs()
 }
 
 
 task buildMetadata (type: JavaExec) {
 
 	outputs.upToDateWhen {
-		!collectAllJars.didWork
+		!isMetadataGenerationNecessary.didWork
 	}
 	
 	doFirst {
 		workingDir "build-tools"
-		
-		def str = new LinkedList <String> ();
-		str.add("metadata-generator.jar")
-		str.add("../metadata/output")
-
-		for(def i = 0; i < allJarPaths.size(); i++) {
-			str.add(allJarPaths.get(i));
-		}	
 
 		main "-jar"
 
-		args str.toArray()
+		args metadataParams.toArray()
 	}
 }
 
@@ -248,8 +294,8 @@ task cleanLocalAarFiles(type: Delete) {
 // 8. Copy metadata
 
 cleanLocalAarFiles.dependsOn(deleteJavaDir)
-collectAllJars.dependsOn(cleanLocalAarFiles)
-ensureMetadataOutDir.dependsOn(collectAllJars)
+isMetadataGenerationNecessary.dependsOn(cleanLocalAarFiles)
+ensureMetadataOutDir.dependsOn(isMetadataGenerationNecessary)
 buildMetadata.dependsOn(ensureMetadataOutDir)
 copyMetadata.dependsOn(buildMetadata)
 
