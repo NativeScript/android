@@ -1,3 +1,14 @@
+1.4.0
+==
+
+## Bug Fixes
+
+ - [Generated metadata is not updated after initial build until after 'gradle clean' is called (#227)](https://github.com/NativeScript/android-runtime/issues/227)
+ - [Incorrect behavior when getting or setting java fields from javascript (#219)](https://github.com/NativeScript/android-runtime/issues/219)
+ - [Better handling of package.json main configuration (#190)](https://github.com/NativeScript/android-runtime/issues/190)
+ - [Calling non existen ctor crashesh the runtime (#180)](https://github.com/NativeScript/android-runtime/issues/180)
+ - [ClassCastException when tries to convert numeric return value of overridden methods (#139)](https://github.com/NativeScript/android-runtime/issues/139)
+
 1.3.0
 ==
 
