@@ -146,31 +146,36 @@ task deletePrevConfig (type: Delete) {
 
 //creates product flavor config file
 task setFlavorsBeforePluginExtend {
-	def dirTree = file(configurationsDir).listFiles()
-	
-	List<String> pluginNames = new ArrayList<String>()
-	dirTree.each { f ->
-		if(f.isDirectory()) {
-			println "adding plugin: " + f.getName()
-			pluginNames.add('"' + f.getName() + '"')
+	def configDir = file(configurationsDir)
+	if(configDir.exists()) {
+		def dirTree = configDir.listFiles()
+		List<String> pluginNames = new ArrayList<String>()
+		dirTree.each { f ->
+			if(f.isDirectory()) {
+				println "adding plugin: " + f.getName()
+				pluginNames.add('"' + f.getName() + '"')
+			}
 		}
+		def flavors = pluginNames.join(",")
+
+		println "creating product flavors include.gradle file in $configurationsDir folder..."
+		def flavorsFile = new File("$configurationsDir/include.gradle")
+		flavorsFile.write ""
+		flavorsFile << "android { \n"
+		flavorsFile << "\tflavorDimensions " + flavors + "\n"
+		flavorsFile << "}\n"
 	}
-	def flavors = pluginNames.join(",")
-	
-	println "creating product flavors include.gradle file in $configurationsDir folder..."
-	def flavorsFile = new File("$configurationsDir/include.gradle")
-	flavorsFile.write ""
-	flavorsFile << "android { \n"
-	flavorsFile << "\tflavorDimensions " + flavors + "\n"
-	flavorsFile << "}\n"
 }
 
 // applies additional configuration
 task pluginExtend {
-	new File("configurations").eachFileRecurse(groovy.io.FileType.FILES) {
-		if(it.name.equals('include.gradle')) {
-			println "including plugin name: " + it
-			apply from: it
+	def configDir = file(configurationsDir)
+	if(configDir.exists()) {
+		configDir.eachFileRecurse(groovy.io.FileType.FILES) {
+			if(it.name.equals('include.gradle')) {
+				println "including plugin name: " + it
+				apply from: it
+			}
 		}
 	}
 }
