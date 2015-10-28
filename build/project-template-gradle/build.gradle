@@ -29,7 +29,7 @@ buildscript {
     }
 
     dependencies {
-        classpath "com.android.tools.build:gradle:1.3.0"
+        classpath "com.android.tools.build:gradle:1.3.1"
     }
 }
 
@@ -60,6 +60,23 @@ def computeBuildToolsVersion() {
 	else {
 		return "22.0.1"
 	}
+}
+
+def renameResultApks (variant) {
+	def name
+    variant.outputs.each { output ->
+
+        def apkDirectory = output.packageApplication.outputFile.parentFile
+		def apkNamePrefix = rootProject.name + "-" + variant.buildType.name
+
+        if (output.zipAlign) {
+            name = apkNamePrefix + ".apk"
+            output.outputFile = new File(apkDirectory, name);
+        }
+
+        name = apkNamePrefix + "-unaligned.apk"
+        output.packageApplication.outputFile = new File(apkDirectory, name);
+    }    
 }
 
 android {
@@ -98,6 +115,8 @@ android {
     }
 	
 	applicationVariants.all { variant ->
+		renameResultApks(variant)
+	
 		def tsk = variant.mergeAssets
 		if(project.hasProperty("runSBGenerator")) {
 			runBindingGenerator.dependsOn(copyMetadata)
@@ -140,6 +159,39 @@ dependencies {
     // }
 }
 
+
+def createIncludeFile (filePath, fileName) {
+	def defaultIncludeFile = new File(filePath, "include.gradle")
+	defaultIncludeFile.write ""
+	defaultIncludeFile << "android { \n"
+	defaultIncludeFile << "\tproductFlavors {\n"
+	defaultIncludeFile << '\t\t"' + fileName + '" {\n'
+	defaultIncludeFile << '\t\t\tdimension "' + fileName + '"\n'
+	defaultIncludeFile << "\t\t}\n"
+	defaultIncludeFile << "\t}\n"
+	defaultIncludeFile << "}"
+}
+
+task createDefaultIncludeFiles {
+	def ft = file(configurationsDir)
+		
+	ft.listFiles().each { fl ->
+		if(fl.isDirectory()) {
+			def foundIncludeFile = false
+			fl.listFiles().each { subFile ->
+				if(subFile.name == "include.gradle") {
+					foundIncludeFile = true
+				}
+			}
+			
+			if(!foundIncludeFile) {
+				println "+creating include.gradle file for: " + fl.getAbsolutePath()
+				createIncludeFile(fl.getAbsolutePath() ,fl.name)
+			}
+		}
+	}
+}
+
 task deletePrevConfig (type: Delete) {
 	delete "$configurationsDir/include.gradle"
 }
@@ -152,7 +204,7 @@ task setFlavorsBeforePluginExtend {
 		List<String> pluginNames = new ArrayList<String>()
 		dirTree.each { f ->
 			if(f.isDirectory()) {
-				println "adding plugin: " + f.getName()
+				println "+adding plugin: " + f.getName()
 				pluginNames.add('"' + f.getName() + '"')
 			}
 		}
@@ -205,7 +257,7 @@ task collectAllJars {
 	
 	doFirst {
 		
-		configurations.compile.each { File dependencyFile -> 
+		configurations.compile.each { File dependencyFile ->
 			allJarPaths.add(dependencyFile.getAbsolutePath())
 		}
 		
