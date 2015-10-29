@@ -38,6 +38,7 @@ def createPluginConfigFile = false
 def configStage = "\n:config phase: "
 def nodeModulesDir = "../../node_modules/"
 def pluginNames = new ArrayList<String>()
+def configDir = file(configurationsDir)
 
 def compiteCompileSdkVersion () {
 	if(project.hasProperty("compileSdk")) {
@@ -211,35 +212,35 @@ task createDefaultIncludeFiles {
 
 task createPluginsConfigFile {
 	description "creates product flavor config file based on what plugins are added"
-	println "$configStage createPluginsConfigFile"
 	
-	def flavorsFile = new File("$configurationsDir/include.gradle")
-	flavorsFile.write "" //clear config file
-	
-	if(createPluginConfigFile) {
-		println "\t+creating product flavors include.gradle file in $configurationsDir folder..."
-		def flavors = pluginNames.join(",")
-		println "\t+found plugins: " + flavors
-		flavorsFile << "android { \n"
-		flavorsFile << "\tflavorDimensions " + flavors + "\n"
-		flavorsFile << "}\n"
+	if(configDir.exists()) {
+		println "$configStage createPluginsConfigFile"
+		
+		def flavorsFile = new File("$configurationsDir/include.gradle")
+		flavorsFile.write "" //clear config file
+		
+		if(createPluginConfigFile) {
+			println "\t+creating product flavors include.gradle file in $configurationsDir folder..."
+			def flavors = pluginNames.join(",")
+			println "\t+found plugins: " + flavors
+			flavorsFile << "android { \n"
+			flavorsFile << "\tflavorDimensions " + flavors + "\n"
+			flavorsFile << "}\n"
+		}
 	}
 }
 
 task pluginExtend {
 	description "applies additional configuration"
-	println "$configStage pluginExtend"
-	def configDir = file(configurationsDir)
+	
 	if(configDir.exists()) {
+	println "$configStage pluginExtend"
 		configDir.eachFileRecurse(groovy.io.FileType.FILES) {
 			if(it.name.equals('include.gradle')) {
 				println "\t+applying configuration from: " + it
 				apply from: it
 			}
 		}
-	}
-	else {
-		println "\t+ERROR: there is no configurations dir"
 	}
 }
 
