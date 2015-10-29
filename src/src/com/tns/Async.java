@@ -160,7 +160,13 @@ public class Async
 				{
 					inStream = connection.getInputStream();
 				}
-				openedStreams.push(inStream);
+				
+				if(inStream == null)
+				{
+					// inStream is null when receiving status code 401 or 407
+					// see this thread for more information http://stackoverflow.com/a/24986433
+					return;
+				}
 				
 				BufferedInputStream buffer = new java.io.BufferedInputStream(inStream, 4096);
 				openedStreams.push(buffer);
