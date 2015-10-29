@@ -168,6 +168,8 @@ public class Async
 					return;
 				}
 				
+				openedStreams.push(inStream);
+				
 				BufferedInputStream buffer = new java.io.BufferedInputStream(inStream, 4096);
 				openedStreams.push(buffer);
 
