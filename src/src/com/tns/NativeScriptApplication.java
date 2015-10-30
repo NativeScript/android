@@ -734,7 +734,25 @@ public class NativeScriptApplication extends android.app.Application implements 
 				appBuilderCallbackImpl.onCreate(this);
 			}
 			
-			NativeScriptSyncHelper.sync(logger, this);
+			if (NativeScriptSyncService.isSyncEnabled(this))
+			{
+                NativeScriptSyncService syncService = new NativeScriptSyncService(logger, this);
+                
+                syncService.sync();
+                syncService.startServer();
+
+                //preserve this instance as strong reference
+                //do not preserve in NativeScriptApplication field inorder to make the code more portable 
+                Platform.getOrCreateJavaObjectID(syncService);
+			}
+			else
+			{
+				if (logger.isEnabled())
+				{
+					logger.write("NativeScript LiveSync is not enabled.");
+				}
+			}
+
 
 			String appName = this.getPackageName();
 			File rootDir = new File(this.getApplicationInfo().dataDir);
