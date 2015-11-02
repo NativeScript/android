@@ -1,6 +1,7 @@
 package com.tns;
 
 import java.io.BufferedReader;
+import java.io.Closeable;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileFilter;
@@ -20,6 +21,8 @@ import java.util.Scanner;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager.NameNotFoundException;
+import android.net.LocalServerSocket;
+import android.net.LocalSocket;
 
 public class NativeScriptSyncService
 {
@@ -30,14 +33,16 @@ public class NativeScriptSyncService
 
     private static Logger logger;
     private final Context context;
-    private ServerThread serverThread;
-    private Thread javaServerThread;
+    
     private final String syncPath;
     private final String fullSyncPath;
     private final String removedSyncPath;
     private final File fullSyncDir;
     private final File syncDir;
     private final File removedSyncDir;
+	
+    private LocalServerSocketThread localServerThread;
+	private Thread localServerJavaThread;
 
     public NativeScriptSyncService(Logger logger, Context context)
     {
@@ -54,8 +59,7 @@ public class NativeScriptSyncService
 
     public void sync()
     {
-
-        if (logger.isEnabled())
+        if (logger != null && logger.isEnabled())
         {
             logger.write("Sync is enabled:");
             logger.write("Sync path              : " + syncPath);
@@ -83,17 +87,17 @@ public class NativeScriptSyncService
         }
     }
 
-    private class ServerThread implements Runnable
+    private class LocalServerSocketThread implements Runnable
     {
         private volatile boolean running;
-        private final int port;
+        private final String name;
 
         private ListenerWorker commThread;
-        private ServerSocket serverSocket;
+        private LocalServerSocket serverSocket;
 
-        public ServerThread(int port)
+        public LocalServerSocketThread(String name)
         {
-            this.port = port;
+            this.name = name;
             this.running = false;
         }
 
@@ -115,31 +119,30 @@ public class NativeScriptSyncService
             running = true;
             try
             {
-                serverSocket = new ServerSocket(this.port);
+                serverSocket = new LocalServerSocket(this.name);
                 while (running)
                 {
-                    Socket socket = serverSocket.accept();
-
-                    commThread = new ListenerWorker(socket.getInputStream());
+                    LocalSocket socket = serverSocket.accept();
+                    commThread = new ListenerWorker(socket.getInputStream(), socket);
                     new Thread(commThread).start();
                 }
             }
             catch (IOException e)
             {
-                e.printStackTrace();
+            	e.printStackTrace();
             }
         }
     }
 
-
     private class ListenerWorker implements Runnable
     {
-        private BufferedReader reader;
         private final DataInputStream input;
+		private Closeable socket;
 
-        public ListenerWorker(InputStream inputStream)
+        public ListenerWorker(InputStream inputStream, Closeable socket)
         {
-            input = new DataInputStream(inputStream);
+            this.socket = socket;
+			input = new DataInputStream(inputStream);
         }
 
         public void run()
@@ -151,6 +154,8 @@ public class NativeScriptSyncService
                 executePartialSync(context, syncDir);
 
                 Platform.callJSMethod(NativeScriptApplication.getInstance(), "onLiveSync", Void.class);
+                
+                socket.close();
             }
             catch (IOException e)
             {
@@ -161,10 +166,9 @@ public class NativeScriptSyncService
 
     public void startServer()
     {
-        serverThread = new ServerThread(18181);
-
-        javaServerThread = new Thread(serverThread);
-        javaServerThread.start();
+        localServerThread = new LocalServerSocketThread(context.getPackageName() + "-livesync");
+        localServerJavaThread = new Thread(localServerThread);
+        localServerJavaThread.start();
     }
 
     private void deleteRecursive(File fileOrDirectory)
