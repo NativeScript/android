@@ -3,7 +3,7 @@
   "description": "NativeScript Runtime for Android",
   "version": "1.4.0",
   "files": [
-    "**/*.*"
+    "**/*"
   ],
   "devDependencies": {
     "grunt": "0.4.5",
