@@ -8,7 +8,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 
-class Require
+class Module
 {
 	private static Logger logger;
 	private static String RootPackageDir;
@@ -23,7 +23,7 @@ class Require
 
 	public static void init(Logger logger, File rootPackageDir, File applicationFilesDir) throws IOException
 	{
-		Require.logger = logger; 
+		Module.logger = logger; 
 		if (initialized)
 		{
 			return;
@@ -51,29 +51,6 @@ class Require
 	static String getApplicationFilesPath()
 	{
 		return ApplicationFilesPath;
-	}
-
-	static String bootstrapApp()
-	{
-		// Bootstrap logic flows like:
-		// 1. Check for package.json -> `main` field
-		// 2. Check for index.js
-		// 3. Check for bootstrap.js
-
-		File bootstrapFile = findModuleFile("./", "");
-		if (!bootstrapFile.exists())
-		{
-			bootstrapFile = findModuleFile("./bootstrap", "");
-		}
-
-		if (!bootstrapFile.exists())
-		{
-			Platform.appFail(null, "Application entry point file not found. Please specify either package.json with main field, index.js or bootstrap.js!");
-		}
-
-		String modulePath = bootstrapFile.getAbsolutePath();
-
-		return modulePath;
 	}
 
 	@RuntimeCallable
@@ -146,7 +123,7 @@ class Require
 		else if (moduleName.startsWith("./") || moduleName.startsWith("../") || moduleName.startsWith("~/"))
 		{
 			// same or up directory
-			String resolvedPath = FileSystem.resolveRelativePath(moduleName, currentDirectory);
+			String resolvedPath = FileSystem.resolveRelativePath(ApplicationFilesPath, moduleName, currentDirectory);
 			directory = new File(resolvedPath);
 			jsFile = isJSFile ? new File(directory.getAbsolutePath()) : new File(directory.getAbsolutePath() + ".js");
 		}
@@ -213,5 +190,27 @@ class Require
 		}
 
 		return jsFile;
+	}
+
+	static String bootstrapApp()
+	{
+		// Bootstrap logic flows like:
+		// 1. Check for package.json -> `main` field
+		// 2. Check for index.js
+		// 3. Check for bootstrap.js
+
+		File bootstrapFile = findModuleFile("./", "");
+		if (!bootstrapFile.exists())
+		{
+			bootstrapFile = findModuleFile("./bootstrap", "");
+		}
+
+		if (!bootstrapFile.exists())
+		{
+			Platform.appFail(null, "Application entry point file not found. Please specify either package.json with main field, index.js or bootstrap.js!");		
+		}
+
+		String modulePath = bootstrapFile.getAbsolutePath();
+		return modulePath;
 	}
 }

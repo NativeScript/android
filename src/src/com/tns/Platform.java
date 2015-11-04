@@ -27,7 +27,7 @@ public class Platform
 {
 	private static native void initNativeScript(String filesPath, int appJavaObjectId, boolean verboseLoggingEnabled, String packageName, String jsOptions);
 
-	private static native void runNativeScript(String appModuleName);
+	private static native void runModule(String filePath) throws NativeScriptException;
 	
 	private static native Object runScript(String filePath) throws NativeScriptException;
 
@@ -126,14 +126,14 @@ public class Platform
 
 		try
 		{
-			Require.init(logger, rootDir, appDir);
+			Module.init(logger, rootDir, appDir);
 		}
 		catch (IOException ex)
 		{
 			throw new RuntimeException("Fail to initialize Require class", ex);
 		}
 		String jsOptions = readJsOptions(appDir);
-		Platform.initNativeScript(Require.getApplicationFilesPath(), appJavaObjectId, logger.isEnabled(), appName, jsOptions);
+		Platform.initNativeScript(Module.getApplicationFilesPath(), appJavaObjectId, logger.isEnabled(), appName, jsOptions);
 		
 		if (debuggerSetupDir != null)
 		{
@@ -205,10 +205,19 @@ public class Platform
 		}
 	}
 	
-	public static void run()
+	public static void run() throws NativeScriptException
 	{
-		String bootstrapPath = Require.bootstrapApp();
-		runNativeScript(bootstrapPath);
+		String mainModule = Module.bootstrapApp();
+		runModule(new File(mainModule));
+	}
+	
+	public static void runModule(File jsFile) throws NativeScriptException
+	{
+		if (jsFile.exists() && jsFile.isFile())
+		{
+			String filePath = jsFile.getAbsolutePath();
+			runModule(filePath);
+		}
 	}
 	
 	public static Object runScript(File jsFile) throws NativeScriptException
