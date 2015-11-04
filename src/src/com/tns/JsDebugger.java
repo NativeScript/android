@@ -138,7 +138,7 @@ public class JsDebugger
         private volatile boolean running;
         private final String name;
 
-        private ListenerWorker commThread;
+        private ListenerWorker workerThread;
         private LocalServerSocket serverSocket;
 		private ResponseWorker responseWorker;
 		
@@ -170,9 +170,23 @@ public class JsDebugger
                 serverSocket = new LocalServerSocket(this.name);
                 while (running)
                 {
-                    LocalSocket socket = serverSocket.accept();
-                    commThread = new ListenerWorker(socket.getInputStream(), socket);
-                    new Thread(commThread).start();
+                	try
+    				{
+    					//wait for someone to connect to port and if he does ... open a socket
+                		LocalSocket socket = serverSocket.accept();
+    
+    					//out (send messages to node inspector)
+    					this.responseWorker = new ResponseWorker(socket);
+    					new Thread(this.responseWorker).start();
+    
+    					//in (recieve messages from node inspector)
+    					workerThread = new ListenerWorker(socket);
+    					new Thread(workerThread).start();
+    				}
+    				catch (IOException e)
+    				{
+    					e.printStackTrace();
+    				}
                 }
             }
             catch (IOException e)
@@ -190,12 +204,12 @@ public class JsDebugger
 	private class ListenerWorker implements Runnable
 	{
 		private BufferedReader input;
-		private Closeable socket;
+		private LocalSocket socket;
 
-		public ListenerWorker(InputStream inputStream, Closeable socket)
+		public ListenerWorker(LocalSocket socket) throws IOException
 		{
 			this.socket = socket;
-			this.input = new BufferedReader(new InputStreamReader(inputStream));
+			this.input = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 		}
 
 		public void run()
@@ -309,15 +323,15 @@ public class JsDebugger
 
 	private class ResponseWorker implements Runnable
 	{
-		private Socket socket;
+		private LocalSocket socket;
 
 		private final static String END_MSG = "#end#";
 
 		private OutputStream output;
 
-		public ResponseWorker(Socket clientSocket) throws IOException
+		public ResponseWorker(LocalSocket socket) throws IOException
 		{
-			this.socket = clientSocket;
+			this.socket = socket;
 			this.output = this.socket.getOutputStream();
 		}
 
