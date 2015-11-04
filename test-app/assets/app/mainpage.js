@@ -1,5 +1,6 @@
 __disableVerboseLogging();
 __log("starting tests");
+require("./tests/testMetadata");
 require("./tests/testWeakRef"); 
 require("./tests/tests");
 require("./tests/testMethodResolution");
