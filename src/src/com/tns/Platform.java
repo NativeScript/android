@@ -18,6 +18,7 @@ import java.util.HashSet;
 
 import org.json.JSONObject;
 
+import android.app.Application;
 import android.util.SparseArray;
 
 import com.tns.bindings.ProxyGenerator;
@@ -97,12 +98,7 @@ public class Platform
 		errorActivityClass = clazz;
 	}
 	
-	public static int init(ThreadScheduler threadScheduler, Logger logger, String appName, File runtimeLibPath, File rootDir, File appDir, File debuggerSetupDir, ClassLoader classLoader, File dexDir, String dexThumb) throws RuntimeException
-	{
-		return init(null, threadScheduler, logger, appName, runtimeLibPath, rootDir, appDir, debuggerSetupDir, classLoader, dexDir, dexThumb);
-	}
-	
-	public static int init(Object application, ThreadScheduler threadScheduler, Logger logger, String appName, File runtimeLibPath, File rootDir, File appDir, File debuggerSetupDir, ClassLoader classLoader, File dexDir, String dexThumb) throws RuntimeException
+	public static int init(Application application, ThreadScheduler threadScheduler, Logger logger, String appName, File runtimeLibPath, File rootDir, File appDir, ClassLoader classLoader, File dexDir, String dexThumb) throws RuntimeException
 	{
 		if (initialized)
 		{
@@ -115,13 +111,16 @@ public class Platform
 		
 		Platform.dexFactory = new DexFactory(logger, classLoader, dexDir, dexThumb);
 
-		int appJavaObjectId = -1;
-		if (application != null)
+		if (logger.isEnabled())
 		{
-			if (logger.isEnabled()) logger.write("Initializing NativeScript JAVA");
-			appJavaObjectId = generateNewObjectId();
-			makeInstanceStrong(application, appJavaObjectId);
-			if (logger.isEnabled()) logger.write("Initialized app instance id:" + appJavaObjectId);
+			logger.write("Initializing NativeScript JAVA");
+		}
+		
+		int appJavaObjectId = generateNewObjectId();
+		makeInstanceStrong(application, appJavaObjectId);
+		if (logger.isEnabled())
+		{
+			logger.write("Initialized app instance id:" + appJavaObjectId);
 		}
 
 		try
@@ -132,18 +131,17 @@ public class Platform
 		{
 			throw new RuntimeException("Fail to initialize Require class", ex);
 		}
+		
 		String jsOptions = readJsOptions(appDir);
 		Platform.initNativeScript(Require.getApplicationFilesPath(), appJavaObjectId, logger.isEnabled(), appName, jsOptions);
 		
-		if (debuggerSetupDir != null)
+		if (JsDebugger.isDebuggableApp(application))
 		{
-			jsDebugger = new JsDebugger(logger, threadScheduler, debuggerSetupDir);
-											//also runs javaServerThread with resolved port
-			int debuggerPort = jsDebugger.getDebuggerPortFromEnvironment();
-			if (logger.isEnabled()) logger.write("port=" + debuggerPort);
+			jsDebugger = new JsDebugger(application, logger, threadScheduler);
+			jsDebugger.start();
 		}
 		
-		//
+		
 		if (logger.isEnabled())
 		{
 			Date d = new Date();
@@ -152,7 +150,7 @@ public class Platform
 			Date lastModDate = new Date(f.lastModified());
 			logger.write("init time=" + (d.getTime() - lastModDate.getTime()));
 		}
-		//
+		
 
 		initialized = true;
 		return appJavaObjectId;

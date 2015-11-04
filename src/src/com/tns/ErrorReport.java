@@ -24,28 +24,28 @@ class ErrorReport
 {
 	public static final String ERROR_FILE_NAME = "hasError";
 	private final Activity activity;
-	
+
 	private final static String EXTRA_NATIVESCRIPT_ERROR_REPORT = "NativeScriptErrorMessage";
 	private final static String EXTRA_ERROR_REPORT_MSG = "msg";
 	private final static int EXTRA_ERROR_REPORT_VALUE = 1;
-	
+
 	public ErrorReport(Activity activity)
 	{
 		this.activity = activity;
 	}
-	
+
 	static boolean startActivity(final Context context, String errorMessage)
 	{
 		final Intent intent = getIntent(context);
-		if(intent == null)
+		if (intent == null)
 		{
-			return false; //(if in release mode) don't do anything
+			return false; // (if in release mode) don't do anything
 		}
-		
+
 		intent.putExtra(EXTRA_ERROR_REPORT_MSG, errorMessage);
-		
+
 		createErrorFile(context);
-		
+
 		try
 		{
 			startPendingErrorActivity(context, intent);
@@ -55,29 +55,30 @@ class ErrorReport
 			Log.d("ErrorReport", "Couldn't send pending intent! Exception: " + e.getMessage());
 		}
 
-		killProcess(context);	
-		
+		killProcess(context);
+
 		return true;
 	}
-	
+
 	static void killProcess(Context context)
 	{
 		// finish current activity and all below it first
-		if (context instanceof Activity) {
-			((Activity)context).finishAffinity();
+		if (context instanceof Activity)
+		{
+			((Activity) context).finishAffinity();
 		}
 
-		//kill process
+		// kill process
 		android.os.Process.killProcess(android.os.Process.myPid());
 	}
-	
+
 	static void startPendingErrorActivity(Context context, Intent intent) throws CanceledException
 	{
 		PendingIntent pendingIntent = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_CANCEL_CURRENT);
-		
+
 		pendingIntent.send(context, 0, intent);
 	}
-	
+
 	static String getErrorMessage(Throwable ex)
 	{
 		String content;
@@ -103,53 +104,57 @@ class ErrorReport
 			if (ps != null)
 				ps.close();
 		}
-		
+
 		return content;
 	}
-	
+
 	static Intent getIntent(Context context)
 	{
-		Class<?> errorActivityClass = Platform.getErrorActivityClass(); //can be null or can be provided beforehand
-				
-		//if in debug and errorActivityClass is not provided use ErrorReportActivity class
-		if(errorActivityClass == null && Util.isDebuggableApp(context)){
+		// can be null or can be provided beforehand
+		Class<?> errorActivityClass = Platform.getErrorActivityClass();
+
+		// if in debug and errorActivityClass is not provided use
+		// ErrorReportActivity class
+		if (errorActivityClass == null && JsDebugger.isDebuggableApp(context))
+		{
 			errorActivityClass = ErrorReportActivity.class;
 		}
 
-		//if not in debug mode should return null and use the errorActivityClass implementation provided
-		if(errorActivityClass == null)
+		// if not in debug mode should return null and use the
+		// errorActivityClass implementation provided
+		if (errorActivityClass == null)
 		{
 			return null;
 		}
-		
+
 		Intent intent = new Intent(context, errorActivityClass);
-		
+
 		intent.putExtra(EXTRA_NATIVESCRIPT_ERROR_REPORT, EXTRA_ERROR_REPORT_VALUE);
 		intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
-		
+
 		return intent;
 	}
-	
+
 	static boolean hasIntent(Intent intent)
 	{
 		int value = intent.getIntExtra(EXTRA_NATIVESCRIPT_ERROR_REPORT, 0);
-		
+
 		return value == EXTRA_ERROR_REPORT_VALUE;
 	}
 
 	void buildUI()
 	{
 		Context context = activity;
-		
+
 		LinearLayout layout = new LinearLayout(context);
 		layout.setOrientation(LinearLayout.VERTICAL);
 		activity.setContentView(layout);
-		
+
 		TextView txtHeader = new TextView(context);
 		txtHeader.setText("Callstack");
 
 		layout.addView(txtHeader);
-		
+
 		Intent intent = activity.getIntent();
 		String msg = intent.getStringExtra(EXTRA_ERROR_REPORT_MSG);
 
@@ -157,15 +162,15 @@ class ErrorReport
 		txtErrorMsg.setText(msg);
 		txtErrorMsg.setHeight(1000);
 		txtErrorMsg.setMovementMethod(new ScrollingMovementMethod());
-		
-        GradientDrawable gd = new GradientDrawable();
-        gd.setColor(0xFFFFFFFF);
-        gd.setCornerRadius(5);
-        gd.setStroke(1, 0xFF000000);
-        txtErrorMsg.setBackground(gd);
-        
+
+		GradientDrawable gd = new GradientDrawable();
+		gd.setColor(0xFFFFFFFF);
+		gd.setCornerRadius(5);
+		gd.setStroke(1, 0xFF000000);
+		txtErrorMsg.setBackground(gd);
+
 		layout.addView(txtErrorMsg);
-		
+
 		Button btnClose = new Button(context);
 		btnClose.setText("Close");
 		btnClose.setOnClickListener(new OnClickListener()
@@ -179,7 +184,7 @@ class ErrorReport
 
 		layout.addView(btnClose);
 	}
-	
+
 	private static void createErrorFile(final Context context)
 	{
 		try
