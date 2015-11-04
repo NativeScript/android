@@ -334,13 +334,7 @@ public class JsDebugger
 		{
 			debugBreak();
 		}
-		
-//		if (serverThread == null)
-//		{
-//			serverThread = new ServerThread(port);
-//		}
-//		javaServerThread = new Thread(serverThread);
-//		javaServerThread.start();
+
 		
 		debugServerThread = new DebugLocalServerSocketThread(context.getPackageName() + "-debug");
 		debugJavaServerThread = new Thread(debugServerThread);
@@ -351,11 +345,7 @@ public class JsDebugger
 	private void disableAgent()
 	{
 		disable();
-//		if (serverThread != null)
-//		{
-//			serverThread.stop();
-//		}
-		
+
 		if (debugServerThread != null)
 		{
 			debugServerThread.stop();
@@ -376,17 +366,6 @@ public class JsDebugger
 					boolean enable = bundle.getBoolean("enable", false);
 					if (enable)
 					{
-//						int port = bundle.getInt("debuggerPort", INVALID_PORT);
-//						if (port == INVALID_PORT)
-//						{
-//							if(currentPort == INVALID_PORT) {
-//								currentPort = getAvailablePort();
-//							}
-//							port = currentPort;
-//						}
-						
-						//String packageName = bundle.getString("packageName", context.getPackageName());
-						
 						boolean debugBrake = bundle.getBoolean("waitForDebugger", false);
 						enableAgent(debugBrake);
 					}
@@ -398,19 +377,6 @@ public class JsDebugger
 			}
 		}, new IntentFilter(debugAction));
 	}
-
-//	void registerGetDebuggerPortReceiver(Context context)
-//	{
-//		String getDebuggerPortAction = context.getPackageName() + "-GetDbgPort";
-//		context.registerReceiver(new BroadcastReceiver()
-//		{
-//			@Override
-//			public void onReceive(Context context, Intent intent)
-//			{
-//				this.setResultCode(currentPort);
-//			}
-//		}, new IntentFilter(getDebuggerPortAction));
-//	}
 
 	private boolean shouldDebugBreak()
 	{
