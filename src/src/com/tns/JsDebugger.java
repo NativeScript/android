@@ -354,7 +354,7 @@ public class JsDebugger
 
 	void registerEnableDisableDebuggerReceiver()
 	{
-		String debugAction = context.getPackageName() + "-Debug";
+		String debugAction = context.getPackageName() + "-debug";
 		context.registerReceiver(new BroadcastReceiver()
 		{
 			@Override
