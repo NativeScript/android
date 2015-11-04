@@ -237,16 +237,23 @@ public class JsDebugger
 								String strLen = line.substring(15).trim();
 								messageLength = Integer.parseInt(strLen);
 							}
+							
 							if (leftOver != null)
+							{
 								leftOver = null;
+							}
 						}
 						break;
+						
 					case Message:
 						if ((-1 < messageLength) && (messageLength <= line.length()))
 						{
 							String msg = line.substring(0, messageLength);
 							if (messageLength < line.length())
+							{
 								leftOver = line.substring(messageLength);
+							}
+							
 							state = State.Header;
 							headers.clear();
 
