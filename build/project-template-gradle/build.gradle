@@ -256,6 +256,17 @@ copyMetadata.dependsOn(buildMetadata)
 
 task buildapk {
 	
+	  task includePluginBuildFiles {
+
+      new File("$nodeModulesDir").eachFileRecurse(groovy.io.FileType.FILES) {
+        if(it.name.equals('include.gradle')) {
+            println "Including plugin build file: " + it
+            apply from: it
+         }
+      }
+  }
+
+	
 	//this way copy arr dependencies and addArrDependencies are executed before configuration
 	println "execute: copyAarDependencies, addAarDependencies before configuration"
 	tasks.copyAarDependencies.execute()
