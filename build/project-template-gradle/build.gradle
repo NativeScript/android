@@ -39,6 +39,8 @@ def configStage = "\n:config phase: "
 def nodeModulesDir = "../../node_modules/"
 def pluginNames = new ArrayList<String>()
 def configDir = file(configurationsDir)
+def appResExists = false
+def appResourcesName = "NativescriptAppResources"
 
 def compiteCompileSdkVersion () {
 	if(project.hasProperty("compileSdk")) {
@@ -216,6 +218,10 @@ task createDefaultIncludeFiles {
 			createPluginConfigFile = true
 			def foundIncludeFile = false
 			
+			if(fileName == appResourcesName) {
+				appResExists = true
+			}
+			
 			println "\t+found plugins: " + fileName
 			fl.listFiles().each { subFile ->
 			
@@ -225,7 +231,9 @@ task createDefaultIncludeFiles {
 				}
 			}
 			
-			pluginNames.add('"' + dimensionName + '"')
+			if(!appResExists) {
+				pluginNames.add('"' + dimensionName + '"')
+			}
 			
 			if(!foundIncludeFile) {
 				createIncludeFile(fl.getAbsolutePath() ,fileName, dimensionName)
@@ -246,6 +254,9 @@ task createPluginsConfigFile {
 		if(createPluginConfigFile) {
 			println "\t+creating product flavors include.gradle file in $configurationsDir folder..."
 			def flavors = pluginNames.join(",")
+			if(appResExists) {
+				flavors = '"' + appResourcesName + '", ' + flavors
+			}
 			flavorsFile << "android { \n"
 			flavorsFile << "\tflavorDimensions " + flavors + "\n"
 			flavorsFile << "}\n"
