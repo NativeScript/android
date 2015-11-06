@@ -150,7 +150,10 @@ namespace tns
 		}
 		else
 		{
-			option = ScriptCompiler::kProduceCodeCache;
+			if(Constants::V8_CACHE_COMPILED_CODE)
+			{
+				option = ScriptCompiler::kProduceCodeCache;
+			}
 			script = ScriptCompiler::Compile(isolate->GetCurrentContext(), &source, option).ToLocalChecked();
 			SaveScriptCache(source, path);
 		}
