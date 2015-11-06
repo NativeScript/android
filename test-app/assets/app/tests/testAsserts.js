@@ -459,4 +459,73 @@ describe("Tests that app does not crashes (no hard-fail asserts)", function () {
 		}
 		expect(exceptionThrown).toBe(true);
 	});
+	
+	it("When_require_is_called_with_wrong_number_of_arguments", function () {
+		var exceptionThrown = false;
+		try {
+			var r = require(/* no arguments */);
+		} catch(e) {
+			exceptionThrown = true;
+		}
+		expect(exceptionThrown).toBe(true);
+		
+		exceptionThrown = false;
+		try {
+			var r = require(1, 2 /* two arguments */);
+		} catch(e) {
+			exceptionThrown = true;
+		}
+		expect(exceptionThrown).toBe(true);
+	});
+
+	it("When_require_is_called_with_wrong_type_of_arguments", function () {
+		var f = require;
+		var exceptionThrown = false;
+		try {
+			var val = f(null);
+		} catch(e) {
+			exceptionThrown = true;
+		}
+		expect(exceptionThrown).toBe(true);
+		
+		exceptionThrown = false;
+		try {
+			var val = f({});
+		} catch(e) {
+			exceptionThrown = true;
+		}
+		expect(exceptionThrown).toBe(true);
+		
+		exceptionThrown = false;
+		try {
+			var val = f(undefined);
+		} catch(e) {
+			exceptionThrown = true;
+		}
+		expect(exceptionThrown).toBe(true);
+
+		exceptionThrown = false;
+		try {
+			var val = f(false);
+		} catch(e) {
+			exceptionThrown = true;
+		}
+		expect(exceptionThrown).toBe(true);
+		
+		exceptionThrown = false;
+		try {
+			var val = f(true);
+		} catch(e) {
+			exceptionThrown = true;
+		}
+		expect(exceptionThrown).toBe(true);
+
+		exceptionThrown = false;
+		try {
+			var val = f(0);
+		} catch(e) {
+			exceptionThrown = true;
+		}
+		expect(exceptionThrown).toBe(true);
+	});
 });
