@@ -189,13 +189,13 @@ def createIncludeFile (filePath, fileName, dimensionName) {
 }
 
 def sanatizeDimensionName(str) {
-	return str.replaceAll(/[\W]/, "")
+	return str.replaceAll(/\W/, "")
 }
 
 //make sure the include.gradle file, produced by the user, has only allowed characters in dimension attribute and remove any invalid characters if necessary
 def updateIncludeGradleFile(subFile, dimensionName) {
 	def igFile = new File(subFile.getAbsolutePath())
-	def newContent = igFile.text.replaceAll(/dimension\s["|'](.+)["|'']/)  { fullMatch, fDimension ->
+	def newContent = igFile.text.replaceAll(/dimension\s+["'](.+?)["']/)  { fullMatch, fDimension ->
 							def newFg = sanatizeDimensionName(fDimension)
 							dimensionName = newFg
 							return "dimension \"$newFg\""
