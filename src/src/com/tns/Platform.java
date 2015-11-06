@@ -16,8 +16,6 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 
-import org.json.JSONObject;
-
 import android.util.SparseArray;
 
 import com.tns.bindings.ProxyGenerator;

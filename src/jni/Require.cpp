@@ -54,11 +54,22 @@ namespace tns
 	{
 		SET_PROFILER_FRAME();
 
-		ASSERT_MESSAGE(args.Length() == 2, "require should be called with two parameters");
-		ASSERT_MESSAGE(!args[0]->IsUndefined() && !args[0]->IsNull(), "require called with undefined moduleName parameter");
-		ASSERT_MESSAGE(!args[1]->IsUndefined() && !args[1]->IsNull(), "require called with undefined callingModulePath parameter");
-		ASSERT_MESSAGE(args[0]->IsString(), "require should be called with string parameter");
-		ASSERT_MESSAGE(args[1]->IsString(), "require should be called with string parameter");
+		auto isolate = Isolate::GetCurrent();
+		if (args.Length() != 2)
+		{
+			isolate->ThrowException(ConvertToV8String("require should be called with two parameters"));
+			return;
+		}
+		if (!args[0]->IsString())
+		{
+			isolate->ThrowException(ConvertToV8String("require's first parameter should be string"));
+			return;
+		}
+		if (!args[1]->IsString())
+		{
+			isolate->ThrowException(ConvertToV8String("require's second parameter should be string"));
+			return;
+		}
 
 		string moduleName = ConvertToString(args[0].As<String>());
 		string callingModuleDirName = ConvertToString(args[1].As<String>());
@@ -100,7 +111,7 @@ namespace tns
 		}
 		else
 		{
-			moduleObj = Local<Object>::New(Isolate::GetCurrent(), *((*it).second));
+			moduleObj = Local<Object>::New(isolate, *((*it).second));
 		}
 
 		if(!hasError){
