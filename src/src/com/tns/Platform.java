@@ -515,7 +515,10 @@ public class Platform
 			}
 		}
 
-		if (logger.isEnabled()) logger.write("MakeInstanceStrong (" + key + ", " + instance.getClass().toString() + ")");
+		if (logger != null && logger.isEnabled())
+		{
+			logger.write("MakeInstanceStrong (" + key + ", " + instance.getClass().toString() + ")");
+		}
 	}
 
 	private static void makeInstanceWeak(int javaObjectID, boolean keepAsWeak)

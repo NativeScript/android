@@ -27,6 +27,7 @@ import android.content.pm.PackageManager.NameNotFoundException;
 import android.net.LocalServerSocket;
 import android.net.LocalSocket;
 import android.os.Bundle;
+import android.util.Log;
 
 public class JsDebugger
 {
@@ -378,15 +379,25 @@ public class JsDebugger
 		}, new IntentFilter(debugAction));
 	}
 
-	private boolean shouldDebugBreak()
+	private boolean getDebugBreakFlagAndClearIt()
 	{
-		String shouldDebugBreakFlag = Util.readSystemProperty(context.getPackageName() + "-debugbrake");
-		return Util.isPositive(shouldDebugBreakFlag);
+		File debugBreakFile = new File("/data/local/tmp", context.getPackageName() + "-debugbreak");
+		if (debugBreakFile.exists())
+		{
+			if (!debugBreakFile.delete())
+			{
+				Log.e("TNS", "Debug break temp file can not be removed. Debug sessions may not work correctly");
+			}
+			
+			return true;
+		}
+		
+		return false;
 	}
 
 	public void start()
 	{
-		enableAgent(shouldDebugBreak());
+		enableAgent(getDebugBreakFlagAndClearIt());
 	}
 	
 	public static boolean isDebuggableApp(Context context)
