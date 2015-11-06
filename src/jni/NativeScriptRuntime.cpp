@@ -847,11 +847,23 @@ void NativeScriptRuntime::RequireCallback(const v8::FunctionCallbackInfo<v8::Val
 {
 	SET_PROFILER_FRAME();
 
-	ASSERT_MESSAGE(args.Length() == 2, "require should be called with two parameters");
-	ASSERT_MESSAGE(!args[0]->IsUndefined() && !args[0]->IsNull(), "require called with undefined moduleName parameter");
-	ASSERT_MESSAGE(!args[1]->IsUndefined() && !args[1]->IsNull(), "require called with undefined callingModulePath parameter");
-	ASSERT_MESSAGE(args[0]->IsString(), "require should be called with string parameter");
-	ASSERT_MESSAGE(args[1]->IsString(), "require should be called with string parameter");
+	auto isolate = Isolate::GetCurrent();
+
+	if (args.Length() != 2)
+	{
+		isolate->ThrowException(ConvertToV8String("require should be called with two parameters"));
+		return;
+	}
+	if (!args[0]->IsString())
+	{
+		isolate->ThrowException(ConvertToV8String("require's first parameter should be string"));
+		return;
+	}
+	if (!args[1]->IsString())
+	{
+		isolate->ThrowException(ConvertToV8String("require's second parameter should be string"));
+		return;
+	}
 
 	string moduleName = ConvertToString(args[0].As<String>());
 	string callingModuleDirName = ConvertToString(args[1].As<String>());
@@ -860,8 +872,6 @@ void NativeScriptRuntime::RequireCallback(const v8::FunctionCallbackInfo<v8::Val
 	JniLocalRef jsModulename(env.NewStringUTF(moduleName.c_str()));
 	JniLocalRef jsCallingModuleDirName(env.NewStringUTF(callingModuleDirName.c_str()));
 	JniLocalRef jsModulePath(env.CallStaticObjectMethod(RequireClass, GET_MODULE_PATH_METHOD_ID, (jstring) jsModulename, (jstring) jsCallingModuleDirName));
-
-	auto isolate = Isolate::GetCurrent();
 
 	// cache the required modules by full path, not name only, since there might be some collisions with relative paths and names
 	string modulePath = ArgConverter::jstringToString((jstring) jsModulePath);
