@@ -23,6 +23,7 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.net.LocalServerSocket;
 import android.net.LocalSocket;
+import android.util.Log;
 
 public class NativeScriptSyncService
 {
@@ -247,6 +248,12 @@ public class NativeScriptSyncService
 
         if (files != null)
         {
+        	if (logger.isEnabled())
+            {
+                logger.write("Syncing total number of fiiles: " + files.length);
+            }
+        	
+        	
             for (int i = 0; i < files.length; i++)
             {
                 File file = files[i];
@@ -278,6 +285,13 @@ public class NativeScriptSyncService
                 }
             }
         }
+        else
+        {
+        	if (logger.isEnabled())
+        	{
+        		logger.write("Can't move files. Source is empty.");
+        	}
+        }
     }
 
     // this removes only the app directory from the device to preserve
@@ -299,10 +313,18 @@ public class NativeScriptSyncService
         String appPath = context.getFilesDir().getAbsolutePath() + "/app";
         final File appDir = new File(appPath);
 
-        if (appDir.exists())
+        if (!appDir.exists())
         {
-            moveFiles(sourceDir, sourceDir.getAbsolutePath(), appDir.getAbsolutePath());
+        	Log.e("TNS", "Application dir does not exists. Partial Sync failed. appDir: " + appPath);
+        	return;
         }
+        
+        if (logger.isEnabled())
+        {
+        	logger.write("Syncing sourceDir " + sourceDir.getAbsolutePath() + " with " + appDir.getAbsolutePath());
+        }
+        
+        moveFiles(sourceDir, sourceDir.getAbsolutePath(), appDir.getAbsolutePath());
     }
 
     private void deleteRemovedFiles(File sourceDir, String sourceRootAbsolutePath, String targetRootAbsolutePath)
