@@ -7,11 +7,17 @@
 
 #include "File.h"
 #include <sstream>
+#include <fstream>
 
 using namespace std;
 
 namespace tns
 {
+	bool File::Exists(const string& path)
+	{
+		std::ifstream infile(path.c_str());
+		return infile.good();
+	}
 	string File::ReadText(const string& filePath)
 	{
 		int len;

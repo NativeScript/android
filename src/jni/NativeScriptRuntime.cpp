@@ -9,7 +9,6 @@
 #include "JsArgToArrayConverter.h"
 #include "ArgConverter.h"
 #include "v8-profiler.h"
-#include "Constants.h"
 #include <assert.h>
 #include <iostream>
 #include <sstream>
@@ -29,6 +28,7 @@ using namespace tns;
 void NativeScriptRuntime::Init(JavaVM *jvm, ObjectManager *objectManager)
 {
 	NativeScriptRuntime::jvm = jvm;
+	Require::Init();
 
 	JEnv env;
 
@@ -37,9 +37,6 @@ void NativeScriptRuntime::Init(JavaVM *jvm, ObjectManager *objectManager)
 
 	PlatformClass = env.FindClass("com/tns/Platform");
 	assert(PlatformClass != nullptr);
-
-	RequireClass = env.FindClass("com/tns/Require");
-	assert(RequireClass != nullptr);
 
 	RESOLVE_CLASS_METHOD_ID = env.GetStaticMethodID(PlatformClass, "resolveClass", "(Ljava/lang/String;[Ljava/lang/String;)Ljava/lang/Class;");
 	assert(RESOLVE_CLASS_METHOD_ID != nullptr);
@@ -55,9 +52,6 @@ void NativeScriptRuntime::Init(JavaVM *jvm, ObjectManager *objectManager)
 
 	APP_FAIL_METHOD_ID = env.GetStaticMethodID(PlatformClass, "appFail", "(Ljava/lang/Throwable;Ljava/lang/String;)V");
 	assert(APP_FAIL_METHOD_ID != nullptr);
-
-	GET_MODULE_PATH_METHOD_ID = env.GetStaticMethodID(RequireClass, "getModulePath", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
-	assert(GET_MODULE_PATH_METHOD_ID != nullptr);
 
 	ENABLE_VERBOSE_LOGGING_METHOD_ID = env.GetStaticMethodID(PlatformClass, "enableVerboseLogging", "()V");
 	assert(ENABLE_VERBOSE_LOGGING_METHOD_ID != nullptr);
@@ -753,163 +747,11 @@ void NativeScriptRuntime::AppFail(jthrowable throwable, const char *message)
 }
 
 
-void NativeScriptRuntime::AddApplicationModule(const string& appName, v8::Persistent<v8::Object>* applicationModule)
-{
-	loadedModules.insert(make_pair(appName, applicationModule));
-}
-
 void NativeScriptRuntime::CreateGlobalCastFunctions(const Local<ObjectTemplate>& globalTemplate)
 {
 	castFunctions.CreateGlobalCastFunctions(globalTemplate);
 }
 
-
-void NativeScriptRuntime::CompileAndRun(string modulePath, bool& hasError, Local<Object>& moduleObj)
-{
-	auto isolate = Isolate::GetCurrent();
-
-	Local<Value> exportObj = Object::New(isolate);
-	auto tmpExportObj = new Persistent<Object>(isolate, exportObj.As<Object>());
-	loadedModules.insert(make_pair(modulePath, tmpExportObj));
-
-	TryCatch tc;
-
-	auto scriptText = Require::LoadModule(modulePath);
-
-	DEBUG_WRITE("Compiling script (module %s)", modulePath.c_str());
-	auto fullRequiredModulePath = ConvertToV8String(modulePath);
-	auto script = Script::Compile(scriptText, fullRequiredModulePath);
-	DEBUG_WRITE("Compiled script (module %s)", modulePath.c_str());
-
-	if (ExceptionUtil::GetInstance()->HandleTryCatch(tc, "Script " + modulePath + " contains compilation errors!"))
-	{
-		hasError = true;
-	}
-	else if (script.IsEmpty())
-	{
-		//think about more descriptive message -> [script_name] was empty
-		DEBUG_WRITE("%s was empty", modulePath.c_str());
-	}
-	else
-	{
-		DEBUG_WRITE("Running script (module %s)", modulePath.c_str());
-
-		auto f = script->Run().As<Function>();
-		if (ExceptionUtil::GetInstance()->HandleTryCatch(tc, "Error running script " + modulePath))
-		{
-			hasError = true;
-		}
-		else
-		{
-			auto result = f->Call(Object::New(isolate), 1, &exportObj);
-			if(ExceptionUtil::GetInstance()->HandleTryCatch(tc, "Error calling module function "))
-			{
-				hasError = true;
-			}
-			else
-			{
-				moduleObj = result.As<Object>();
-				if (moduleObj.IsEmpty())
-				{
-					auto objectTemplate = ObjectTemplate::New();
-					moduleObj = objectTemplate->NewInstance();
-				}
-
-				DEBUG_WRITE("Script completed (module %s)", modulePath.c_str());
-
-				if (!moduleObj->StrictEquals(exportObj))
-				{
-					loadedModules.erase(modulePath);
-					tmpExportObj->Reset();
-					delete tmpExportObj;
-
-					auto persistentModuleObject = new Persistent<Object>(isolate, moduleObj.As<Object>());
-
-					loadedModules.insert(make_pair(modulePath, persistentModuleObject));
-				}
-			}
-		}
-	}
-
-	if(hasError)
-	{
-		loadedModules.erase(modulePath);
-		tmpExportObj->Reset();
-		delete tmpExportObj;
-
-		// this handles recursive require calls
-		tc.ReThrow();
-	}
-}
-
-void NativeScriptRuntime::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
-{
-	SET_PROFILER_FRAME();
-
-	auto isolate = Isolate::GetCurrent();
-
-	if (args.Length() != 2)
-	{
-		isolate->ThrowException(ConvertToV8String("require should be called with two parameters"));
-		return;
-	}
-	if (!args[0]->IsString())
-	{
-		isolate->ThrowException(ConvertToV8String("require's first parameter should be string"));
-		return;
-	}
-	if (!args[1]->IsString())
-	{
-		isolate->ThrowException(ConvertToV8String("require's second parameter should be string"));
-		return;
-	}
-
-	string moduleName = ConvertToString(args[0].As<String>());
-	string callingModuleDirName = ConvertToString(args[1].As<String>());
-
-	JEnv env;
-	JniLocalRef jsModulename(env.NewStringUTF(moduleName.c_str()));
-	JniLocalRef jsCallingModuleDirName(env.NewStringUTF(callingModuleDirName.c_str()));
-	JniLocalRef jsModulePath(env.CallStaticObjectMethod(RequireClass, GET_MODULE_PATH_METHOD_ID, (jstring) jsModulename, (jstring) jsCallingModuleDirName));
-
-	// cache the required modules by full path, not name only, since there might be some collisions with relative paths and names
-	string modulePath = ArgConverter::jstringToString((jstring) jsModulePath);
-	if(modulePath == ""){
-		// module not found
-		stringstream ss;
-		ss << "Module \"" << moduleName << "\" not found";
-		string exception = ss.str();
-		ExceptionUtil::GetInstance()->ThrowExceptionToJs(exception);
-		return;
-	}
-	if (modulePath == "EXTERNAL_FILE_ERROR")
-	{
-		// module not found
-		stringstream ss;
-		ss << "Module \"" << moduleName << "\" is located on the external storage. Modules can be private application files ONLY";
-		string exception = ss.str();
-		ExceptionUtil::GetInstance()->ThrowExceptionToJs(exception);
-		return;
-	}
-
-	auto it = loadedModules.find(modulePath);
-
-	Local<Object> moduleObj;
-	bool hasError = false;
-
-	if (it == loadedModules.end())
-	{
-		CompileAndRun(modulePath, hasError, moduleObj);
-	}
-	else
-	{
-		moduleObj = Local<Object>::New(isolate, *((*it).second));
-	}
-
-	if(!hasError){
-		args.GetReturnValue().Set(moduleObj);
-	}
-}
 
 vector<string> NativeScriptRuntime::GetTypeMetadata(const string& name, int index)
 {
@@ -1108,23 +950,19 @@ int NativeScriptRuntime::GetArrayLength(const Local<Object>& arr)
 
 JavaVM* NativeScriptRuntime::jvm = nullptr;
 jclass NativeScriptRuntime::PlatformClass = nullptr;
-jclass NativeScriptRuntime::RequireClass = nullptr;
 jclass NativeScriptRuntime::JAVA_LANG_STRING = nullptr;
 jmethodID NativeScriptRuntime::RESOLVE_CLASS_METHOD_ID = nullptr;
 jmethodID NativeScriptRuntime::CREATE_INSTANCE_METHOD_ID = nullptr;
 jmethodID NativeScriptRuntime::CACHE_CONSTRUCTOR_METHOD_ID = nullptr;
 jmethodID NativeScriptRuntime::APP_FAIL_METHOD_ID = nullptr;
-jmethodID NativeScriptRuntime::GET_MODULE_PATH_METHOD_ID = nullptr;
 jmethodID NativeScriptRuntime::GET_TYPE_METADATA = nullptr;
 jmethodID NativeScriptRuntime::ENABLE_VERBOSE_LOGGING_METHOD_ID = nullptr;
 jmethodID NativeScriptRuntime::DISABLE_VERBOSE_LOGGING_METHOD_ID = nullptr;
 jmethodID NativeScriptRuntime::GET_CHANGE_IN_BYTES_OF_USED_MEMORY_METHOD_ID = nullptr;
-map<string, Persistent<Object>*> NativeScriptRuntime::loadedModules;
 MetadataTreeNode* NativeScriptRuntime::metadataRoot = nullptr;
 ObjectManager* NativeScriptRuntime::objectManager = nullptr;
 NumericCasts NativeScriptRuntime::castFunctions;
 ArrayElementAccessor NativeScriptRuntime::arrayElementAccessor;
 FieldAccessor NativeScriptRuntime::fieldAccessor;
-string NativeScriptRuntime::APP_FILES_DIR;
 map<string, int> NativeScriptRuntime::s_constructorCache;
 map<std::string, jclass> NativeScriptRuntime::s_classCache;

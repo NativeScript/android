@@ -25,6 +25,8 @@ namespace tns
 
 		operator jobject() const;
 
+		operator jboolean() const;
+
 		operator jclass() const;
 
 		operator jstring() const;

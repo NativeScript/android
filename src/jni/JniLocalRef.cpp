@@ -1,4 +1,5 @@
 #include "JniLocalRef.h"
+#include "JType.h"
 #include <cassert>
 
 using namespace v8;
@@ -68,6 +69,12 @@ JniLocalRef::operator jstring() const
 JniLocalRef::operator jclass() const
 {
 	return (jclass)m_obj;
+}
+
+JniLocalRef::operator jboolean() const
+{
+	JEnv env;
+	return JType::BooleanValue(env, m_obj);
 }
 
 

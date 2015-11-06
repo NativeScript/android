@@ -37,22 +37,6 @@ namespace tns
 
 		static bool ReadJStringInBuffer(jstring value, jsize& utfLength);
 
-		static jlong ObjectToLong(jobject object);
-
-		static jboolean ObjectToBoolean(jobject object);
-
-		static jchar ObjectToChar(jobject object);
-
-		static jbyte ObjectToByte(jobject object);
-
-		static jshort ObjectToShort(jobject object);
-
-		static jint ObjectToInt(jobject object);
-
-		static jfloat ObjectToFloat(jobject object);
-
-		static jdouble ObjectToDouble(jobject object);
-
 		static jstring ObjectToString(jobject object);
 
 		static v8::Local<v8::String> jcharToV8String(jchar value);
