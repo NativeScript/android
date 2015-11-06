@@ -4,21 +4,19 @@
 *			gradle buildapk -Prelease (release mode)
 *			gradle buildapk (debug mode -> default)
 * 	Options:
-*			-Prelease
-*			-PtargetSdk=[target_sdk] (default is 22)
-*			-PbuildToolsVersion=[build_tools_version] (default is 22.0.1)
-*			-PsupportVersion=[support_version] (default (22.2.0)
-*			-PcompileSdk=[compile_sdk_version] (default 22)
-*
+*			-Prelease  //this flag will run build in release mode
 *			-PksPath=[path_to_keystore_file]
 *			-PksPassword=[password_for_keystore_file]
 *			-Palias=[alias_to_use_from_keystore_file]
 *			-Ppassword=[password_for_alias]
 *
-*			-PrunSBGenerator
+*			-PtargetSdk=[target_sdk] (default is 22)
+*			-PbuildToolsVersion=[build_tools_version] (default is 22.0.1)
+*			-PsupportVersion=[support_version] (default (22.2.0)
+*			-PcompileSdk=[compile_sdk_version] (default 22)
+*
+*			-PrunSBGenerator //this flag will triger static binding generation
 */
-
-def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
 
 buildscript {
     repositories {
@@ -26,11 +24,23 @@ buildscript {
     }
 
     dependencies {
-        classpath "com.android.tools.build:gradle:1.3.0"
+        classpath "com.android.tools.build:gradle:1.3.1"
     }
 }
 
 apply plugin: "com.android.application"
+
+def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
+def metadataParams = new LinkedList <String> ()
+def allJarPaths = new LinkedList <String> ()
+def configurationsDir = "configurations"
+def createPluginConfigFile = false
+def configStage = "\n:config phase: "
+def nodeModulesDir = "../../node_modules/"
+def pluginNames = new ArrayList<String>()
+def configDir = file(configurationsDir)
+def appResExists = false
+def appResourcesName = "NativescriptAppResources"
 
 def compiteCompileSdkVersion () {
 	if(project.hasProperty("compileSdk")) {
@@ -58,6 +68,28 @@ def computeBuildToolsVersion() {
 		return "22.0.1"
 	}
 }
+
+def renameResultApks (variant) {
+	def name
+    variant.outputs.each { output ->
+
+        def apkDirectory = output.packageApplication.outputFile.parentFile
+		def apkNamePrefix = rootProject.name + "-" + variant.buildType.name
+
+        if (output.zipAlign) {
+            name = apkNamePrefix + ".apk"
+            output.outputFile = new File(apkDirectory, name);
+        }
+
+        name = apkNamePrefix + "-unaligned.apk"
+        output.packageApplication.outputFile = new File(apkDirectory, name);
+    }    
+}
+
+
+////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////// CONFIGURATIONS ///////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
 
 android {
 	compileSdkVersion compiteCompileSdkVersion()
@@ -95,13 +127,15 @@ android {
     }
 	
 	applicationVariants.all { variant ->
-		def tsk = variant.mergeAssets
+		renameResultApks(variant)
+	
+		def mergeAssetsTask = variant.mergeAssets
 		if(project.hasProperty("runSBGenerator")) {
 			runBindingGenerator.dependsOn(copyMetadata)
-			tsk.dependsOn(runBindingGenerator)
+			mergeAssetsTask.dependsOn(runBindingGenerator)
 		}
 		else {
-			tsk.dependsOn(copyMetadata)
+			mergeAssetsTask.dependsOn(copyMetadata)
 		}
 	}
 }
@@ -113,8 +147,6 @@ repositories {
     	dirs 'libs/aar'
 	}
 }
-
-def nodeModulesDir = "../../node_modules/"
 
 dependencies {
 	def suppotVer = "22.2.0";
@@ -135,54 +167,159 @@ dependencies {
 	// compile files("$rootDir/libs/aar") {
         // builtBy 'copyAarDependencies'
     // }
+
 }
 
-task copyAarDependencies(type: Copy) {
-	// we need to copy all dependencies into a flat dir, as pointed by the repositories setup
+
+////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////// CONFIGURATION PHASE //////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
+
+def createIncludeFile (filePath, fileName, dimensionName) {
+	println "\t+creating include.gradle file for: " + filePath
+	def defaultIncludeFile = new File(filePath, "include.gradle")
+	defaultIncludeFile.write ""
+	defaultIncludeFile << "android { \n"
+	defaultIncludeFile << "\tproductFlavors {\n"
+	defaultIncludeFile << '\t\t"' + fileName + '" {\n'
+	defaultIncludeFile << '\t\t\tdimension "' + dimensionName + '"\n'
+	defaultIncludeFile << "\t\t}\n"
+	defaultIncludeFile << "\t}\n"
+	defaultIncludeFile << "}"
+}
+
+def sanatizeDimensionName(str) {
+	return str.replaceAll(/\W/, "")
+}
+
+//make sure the include.gradle file, produced by the user, has only allowed characters in dimension attribute and remove any invalid characters if necessary
+def updateIncludeGradleFile(subFile, dimensionName) {
+	def igFile = new File(subFile.getAbsolutePath())
+	def newContent = igFile.text.replaceAll(/dimension\s+["'](.+?)["']/)  { fullMatch, fDimension ->
+							def newFg = sanatizeDimensionName(fDimension)
+							dimensionName = newFg
+							return "dimension \"$newFg\""
+						}
+	igFile.text = newContent
+	
+	return dimensionName
+}
+
+task createDefaultIncludeFiles {
+	description "creates default include.gradle files for added plugins IF NECESSARY"
+	println "$configStage createDefaultIncludeFiles"
+	def ft = file(configurationsDir)
+		
+	ft.listFiles().each { fl ->
+	
+		if(fl.isDirectory()) {
+			def fileName = fl.name
+			def dimensionName = sanatizeDimensionName(fileName)
+			createPluginConfigFile = true
+			def foundIncludeFile = false
+			
+			if(fileName == appResourcesName) {
+				appResExists = true
+			}
+			
+			println "\t+found plugins: " + fileName
+			fl.listFiles().each { subFile ->
+			
+				if(subFile.name == "include.gradle") {
+					foundIncludeFile = true
+					dimensionName = updateIncludeGradleFile(subFile, dimensionName)
+				}
+			}
+			
+			if(!appResExists) {
+				pluginNames.add('"' + dimensionName + '"')
+			}
+			
+			if(!foundIncludeFile) {
+				createIncludeFile(fl.getAbsolutePath() ,fileName, dimensionName)
+			}
+		}
+	}
+}
+
+task createPluginsConfigFile {
+	description "creates product flavor config file based on what plugins are added"
+	
+	if(configDir.exists()) {
+		println "$configStage createPluginsConfigFile"
+		
+		def flavorsFile = new File("$configurationsDir/include.gradle")
+		flavorsFile.write "" //clear config file
+		
+		if(createPluginConfigFile) {
+			println "\t+creating product flavors include.gradle file in $configurationsDir folder..."
+			def flavors = pluginNames.join(",")
+			if(appResExists) {
+				flavors = '"' + appResourcesName + '", ' + flavors
+			}
+			flavorsFile << "android { \n"
+			flavorsFile << "\tflavorDimensions " + flavors + "\n"
+			flavorsFile << "}\n"
+		}
+	}
+}
+
+task pluginExtend {
+	description "applies additional configuration"
+	
+	if(configDir.exists()) {
+	println "$configStage pluginExtend"
+		configDir.eachFileRecurse(groovy.io.FileType.FILES) {
+			if(it.name.equals('include.gradle')) {
+				println "\t+applying configuration from: " + it
+				apply from: it
+			}
+		}
+	}
+}
+
+//// doesn't work unless task is explicitly called (TODO: research configurations hook)
+// addAarDependencies.dependsOn(copyAarDependencies)
+// createDefaultIncludeFiles.dependsOn(addAarDependencies)
+// createPluginsConfigFile.dependsOn(createDefaultIncludeFiles)
+// pluginExtend.dependsOn(createPluginsConfigFile)
+
+
+////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////// BEFORE EXECUTION /////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
+
+// we need to copy all dependencies into a flat dir, as pointed by the repositories configurations at the top
+task copyAarDependencies (type: Copy) {
+	println "$configStage copyAarDependencies"
 	from fileTree(dir: nodeModulesDir, include: ["**/*.aar"]).files
 	into "libs/aar"
 }
 
-task addAarDependencies <</*doLast*/ {
-	// manually traverse all the locally copied AAR files and add them to the dependency list
+task addAarDependencies <<  {
+	println "$configStage addAarDependencies"
+	// manually traverse all the locally copied AAR files and add them to the project compilation dependencies list
 	FileTree tree = fileTree(dir: "libs/aar", include: ["**/*.aar"])
 	tree.each { File file ->
 		// remove the extension of the file (.aar)
 		def length = file.name.length() - 4
 		def fileName = file.name[0..<length]
+		println "\t+adding dependency: " + file.getAbsolutePath()
 		project.dependencies.add("compile", [name: fileName, ext: "aar"])
 	}
 }
 
-task collectAllJars(type: Copy) {
-	def explodedAarDir = project.buildDir.getAbsolutePath() + "/intermediates/exploded-aar/"
-	def sdkPath = android.sdkDirectory.getAbsolutePath();
-	def androidJar = sdkPath + "/platforms/" + android.compileSdkVersion + "/android.jar"
-	def outDir = "$rootDir/metadata/libs"
 
-	// copies all jars in metadata/libs dir and makes sure all copied jars have different names
-	// this is necessary because static binding generator cannot process jars in nested folders
-	doFirst {
-		def ft = fileTree(dir: explodedAarDir, include: "**/*.jar")
-		def count = 0;
-		
-		ft.each { currentJarFile ->
-			//rename jar on copy
-			def newName = "ambiguous_jar_" + count++ + ".jar"
-			copy {
-				from currentJarFile
-				into outDir
-				rename currentJarFile.getName(), newName
-			}
-		}
-	}
-		
-	from configurations.compile
-	from androidJar
-	include '**/*.jar'
-	includeEmptyDirs = false
-	
-	into outDir
+////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////// EXECUTUION PHASE /////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
+
+task cleanLocalAarFiles(type: Delete) {
+	delete fileTree(dir: "libs/aar", include: ["*.aar"])
+}
+
+task deleteJavaDir (type: Delete) {
+	delete "$rootDir/src/main/java"
 }
 
 task ensureMetadataOutDir {
@@ -190,21 +327,66 @@ task ensureMetadataOutDir {
 	outputDir.mkdirs()
 }
 
-task buildMetadata(type: JavaExec) {
-	outputs.upToDateWhen {		
-		!collectAllJars.didWork
+task collectAllJars {
+	description "gathers all paths to jar dependencies before building metadata with them"
+	
+	def explodedAarDir = project.buildDir.getAbsolutePath() + "/intermediates/exploded-aar/"
+	def sdkPath = android.sdkDirectory.getAbsolutePath();
+	def androidJar = sdkPath + "/platforms/" + android.compileSdkVersion + "/android.jar"
+	
+	doFirst {
+		configurations.compile.each { File dependencyFile ->
+			// println "\t+" + dependencyFile.getAbsolutePath()
+			allJarPaths.add(dependencyFile.getAbsolutePath())
+		}
+		
+		allJarPaths.add(androidJar);
+		
+		def ft = fileTree(dir: explodedAarDir, include: "**/*.jar")
+		ft.each { currentJarFile ->
+			allJarPaths.add(currentJarFile.getAbsolutePath())
+		}
+		
+		metadataParams.add("metadata-generator.jar")
+		metadataParams.add("../metadata/output")
+		for(def i = 0; i < allJarPaths.size(); i++) {
+			metadataParams.add(allJarPaths.get(i));
+		}
 	}
+}
 
-	main '-jar'
-	def str = new LinkedList <String> ();
-	str.add("build-tools/metadata-generator.jar")
-	str.add("metadata/libs")
-	str.add("metadata/output")
+task isMetadataGenerationNecessary {
+	description "checks if new metadata is necessary based on jar and aar dependencies used"
+	def inputFile = new File("build/metadataUTD")
+	
+	inputs.file inputFile
+	outputs.upToDateWhen {
+		inputFile.exists() && 
+		(inputFile.text.trim() == metadataParams.toString().trim())
+	}
+	
+	doLast {
+		inputFile.text = metadataParams
+	}
+}
 
-	args str.toArray()
+task buildMetadata (type: JavaExec) {
+	description "builds metadata with provided jar dependencies"
+	outputs.upToDateWhen {
+		!isMetadataGenerationNecessary.didWork
+	}
+	
+	doFirst {
+		workingDir "build-tools"
+
+		main "-jar"
+
+		args metadataParams.toArray()
+	}
 }
 
 task copyMetadata(type: Copy) {
+	description "moves metadata to the right place before packaging is done"
 	outputs.upToDateWhen {
 		!buildMetadata.didWork
 	}
@@ -212,6 +394,25 @@ task copyMetadata(type: Copy) {
 	from "metadata/output"
 	into "src/main/assets/metadata"
 }
+
+
+task deleteExplodedAarFolder (type: Delete) {
+	//done to build only necessary apk
+	if(project.hasProperty("release")) {
+		dependsOn assembleRelease
+	}
+	else {
+		dependsOn assembleDebug
+	}
+	
+	def explodedAarDir = project.buildDir.getAbsolutePath() + "/intermediates/exploded-aar"
+	delete explodedAarDir
+}
+
+
+////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////// OPTIONAL TASKS //////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
 
 task runBindingGenerator (type: Exec) {
 	String jarsDir = "-PjarsDir=$rootDir/metadata/libs" //re-make to use intermediates folder
@@ -227,45 +428,34 @@ task runBindingGenerator (type: Exec) {
 	}
 }
 
-task deleteJavaDir (type: Delete) {
-	delete "$rootDir/src/main/java"
-}
 
-task cleanLocalAarFiles(type: Delete) {
-	delete fileTree(dir: "libs/aar", include: ["*.aar"])
-}
+////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////// EXECUTION ORDER /////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
 
-// prepare task chain
+// -- configuration phase
 // 1. Copy *.aar dependencies
 // 2. Add *.aar dependencies
-// 3. Build
-// 4. Clean libs/aar folder
-// 5. Ensure metadata out directory
-// 6. Collect all jars
-// 7. Build metadata
-// 8. Copy metadata
+// 3. create default include files
+// 4. create plugins config file
+// 5. plugin extend (apply from include files)
 
-if(!project.hasProperty("runSBGenerator")) {
-	cleanLocalAarFiles.dependsOn(deleteJavaDir)
-}
-
-collectAllJars.dependsOn(cleanLocalAarFiles)
-ensureMetadataOutDir.dependsOn(collectAllJars)
-buildMetadata.dependsOn(ensureMetadataOutDir)
+// --execution phase
+deleteJavaDir.dependsOn(cleanLocalAarFiles)
+ensureMetadataOutDir.dependsOn(deleteJavaDir)
+collectAllJars.dependsOn(ensureMetadataOutDir)
+isMetadataGenerationNecessary.dependsOn(collectAllJars)
+buildMetadata.dependsOn(isMetadataGenerationNecessary)
 copyMetadata.dependsOn(buildMetadata)
 
+//DO NOT UNCOMMENT
+// mergeAssets.dependsOn(copyMetadata) -> look in CONFIGURATIONS(top) in android.applicationVariants to see how it's done
+
 task buildapk {
-	
-	//this way copy arr dependencies and addArrDependencies are executed before configuration
-	println "execute: copyAarDependencies, addAarDependencies before configuration"
+	// problem is compile dependencies need to be changed before configuration stage
+	// and this is the only way so far
 	tasks.copyAarDependencies.execute()
-	tasks.addAarDependencies.execute()
-	//
+    tasks.addAarDependencies.execute()
 	
-	if(project.hasProperty("release")) {
-		dependsOn assembleRelease
-	}
-	else {
-		dependsOn assembleDebug
-	}
+	dependsOn deleteExplodedAarFolder
 }
