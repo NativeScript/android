@@ -12,6 +12,7 @@
 #include "ExceptionUtil.h"
 #include "JniLocalRef.h"
 #include "ArgConverter.h"
+#include "Constants.h"
 
 #include <sstream>
 
@@ -222,6 +223,11 @@ namespace tns
 
 	ScriptCompiler::CachedData* Require::TryLoadScriptCache(const std::string& path)
 	{
+		if(!Constants::V8_CACHE_COMPILED_CODE)
+		{
+			return nullptr;
+		}
+
 		auto cachePath = path + ".cache";
 		if(!File::Exists(cachePath))
 		{
