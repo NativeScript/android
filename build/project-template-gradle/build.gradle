@@ -220,10 +220,10 @@ task runBindingGenerator (type: Exec) {
 	
 	workingDir "$rootDir/build-tools/android-static-binding-generator"
 	if(isWinOs) {
-		commandLine "cmd", "/c", "gradle", "generatebindings", jarsDir, jsCodeToParse, outDir
+		commandLine "cmd", "/c", "gradlew", "generatebindings", jarsDir, jsCodeToParse, outDir
 	}
 	else {
-		commandLine "gradle", "generatebindings", jarsDir, jsCodeToParse, outDir
+		commandLine "gradlew", "generatebindings", jarsDir, jsCodeToParse, outDir
 	}
 }
 
