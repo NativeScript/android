@@ -254,6 +254,11 @@ namespace tns
 
 	void Require::SaveScriptCache(const ScriptCompiler::Source& source, const std::string& path)
 	{
+		if(!Constants::V8_CACHE_COMPILED_CODE)
+		{
+			return;
+		}
+
 		int length = source.GetCachedData()->length;
 		auto cachePath = path + ".cache";
 		auto file = fopen(cachePath.c_str(), "wb" /* write binary */);
