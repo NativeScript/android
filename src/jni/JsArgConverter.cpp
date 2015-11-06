@@ -66,11 +66,14 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 	}
 	else if (arg->IsArray())
 	{
-		ASSERT_MESSAGE(typeSignature[0] == '[', "Expected array signature, actual signature=%s", typeSignature.c_str());
+		success = typeSignature[0] == '[';
 
-		auto jsArr = Local<Array>::Cast(arg);
+		if (success)
+		{
+			auto jsArr = Local<Array>::Cast(arg);
 
-		success = ConvertJavaScriptArray(jsArr, index);
+			success = ConvertJavaScriptArray(jsArr, index);
+		}
 
 		if (!success)
 		{

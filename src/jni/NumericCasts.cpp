@@ -79,10 +79,18 @@ void NumericCasts::MarkedJsObjectWeakCallback(const v8::WeakCallbackData<Object,
 
 void NumericCasts::MarkAsLongCallback(const v8::FunctionCallbackInfo<Value>& args)
 {
-	ASSERT_MESSAGE(args.Length() == 1, "long(x) should be called with single parameter");
-	ASSERT_MESSAGE(args[0]->IsString() || args[0]->IsStringObject() || args[0]->IsNumber() || args[0]->IsNumberObject(), "long(x) should be called with single parameter containing a long number representation");
-
 	auto isolate = Isolate::GetCurrent();
+
+	if (args.Length() != 1)
+	{
+		isolate->ThrowException(ConvertToV8String("long(x) should be called with single parameter"));
+		return;
+	}
+	if (!args[0]->IsString() && !args[0]->IsStringObject() && !args[0]->IsNumber() && !args[0]->IsNumberObject())
+	{
+		isolate->ThrowException(ConvertToV8String("long(x) should be called with single parameter containing a long number representation"));
+		return;
+	}
 
 	Local<Value> value;
 	if (args[0]->IsInt32())
@@ -109,10 +117,18 @@ void NumericCasts::MarkAsLongCallback(const v8::FunctionCallbackInfo<Value>& arg
 
 void NumericCasts::MarkAsByteCallback(const v8::FunctionCallbackInfo<Value>& args)
 {
-	ASSERT_MESSAGE(args.Length() == 1, "byte(x) should be called with single parameter");
-	ASSERT_MESSAGE(args[0]->IsString() || args[0]->IsStringObject() || args[0]->IsInt32() || args[0]->IsNumberObject(), "byte(x) should be called with single parameter containing a byte number representation");
-
 	auto isolate = Isolate::GetCurrent();
+
+	if (args.Length() != 1)
+	{
+		isolate->ThrowException(ConvertToV8String("byte(x) should be called with single parameter"));
+		return;
+	}
+	if (!args[0]->IsString() && !args[0]->IsStringObject() && !args[0]->IsNumber() && !args[0]->IsNumberObject())
+	{
+		isolate->ThrowException(ConvertToV8String("byte(x) should be called with single parameter containing a byte number representation"));
+		return;
+	}
 
 	Local<Value> value;
 	if (args[0]->IsInt32())
@@ -139,10 +155,18 @@ void NumericCasts::MarkAsByteCallback(const v8::FunctionCallbackInfo<Value>& arg
 
 void NumericCasts::MarkAsShortCallback(const v8::FunctionCallbackInfo<Value>& args)
 {
-	ASSERT_MESSAGE(args.Length() == 1, "short(x) should be called with single parameter");
-	ASSERT_MESSAGE(args[0]->IsString() || args[0]->IsStringObject() || args[0]->IsInt32() || args[0]->IsNumberObject(), "short(x) should be called with single parameter containing a short number representation");
-
 	auto isolate = Isolate::GetCurrent();
+
+	if (args.Length() != 1)
+	{
+		isolate->ThrowException(ConvertToV8String("short(x) should be called with single parameter"));
+		return;
+	}
+	if (!args[0]->IsString() && !args[0]->IsStringObject() && !args[0]->IsNumber() && !args[0]->IsNumberObject())
+	{
+		isolate->ThrowException(ConvertToV8String("short(x) should be called with single parameter containing a short number representation"));
+		return;
+	}
 
 	Local<Value> value;
 	if (args[0]->IsInt32())
@@ -169,13 +193,25 @@ void NumericCasts::MarkAsShortCallback(const v8::FunctionCallbackInfo<Value>& ar
 
 void NumericCasts::MarkAsCharCallback(const v8::FunctionCallbackInfo<Value>& args)
 {
-	ASSERT_MESSAGE(args.Length() == 1, "char(x) should be called with single parameter");
-	ASSERT_MESSAGE(args[0]->IsString(), "char(x) should be called with single parameter containing a char representation");
-
 	auto isolate = Isolate::GetCurrent();
 
+	if (args.Length() != 1)
+	{
+		isolate->ThrowException(ConvertToV8String("char(x) should be called with single parameter"));
+		return;
+	}
+	if (!args[0]->IsString())
+	{
+		isolate->ThrowException(ConvertToV8String("char(x) should be called with single parameter containing a char representation"));
+		return;
+	}
+
 	auto value = args[0]->ToString();
-	ASSERT_MESSAGE(value->Length() == 1, "char(x) should be called with single parameter containing a single char");
+	if (value->Length() != 1)
+	{
+		isolate->ThrowException(ConvertToV8String("char(x) should be called with single parameter containing a single char"));
+		return;
+	}
 
 	auto cast = Object::New(isolate);
 
@@ -192,10 +228,18 @@ void NumericCasts::MarkAsCharCallback(const v8::FunctionCallbackInfo<Value>& arg
 
 void NumericCasts::MarkAsFloatCallback(const v8::FunctionCallbackInfo<Value>& args)
 {
-	ASSERT_MESSAGE(args.Length() == 1, "float(x) should be called with single parameter");
-	ASSERT_MESSAGE(args[0]->IsNumber(), "float(x) should be called with single parameter containing a float number representation");
-
 	auto isolate = Isolate::GetCurrent();
+
+	if (args.Length() != 1)
+	{
+		isolate->ThrowException(ConvertToV8String("float(x) should be called with single parameter"));
+		return;
+	}
+	if (!args[0]->IsNumber())
+	{
+		isolate->ThrowException(ConvertToV8String("float(x) should be called with single parameter containing a float number representation"));
+		return;
+	}
 
 	auto value = args[0]->ToNumber();
 	auto cast = Object::New(isolate);
@@ -213,10 +257,18 @@ void NumericCasts::MarkAsFloatCallback(const v8::FunctionCallbackInfo<Value>& ar
 
 void NumericCasts::MarkAsDoubleCallback(const v8::FunctionCallbackInfo<Value>& args)
 {
-	ASSERT_MESSAGE(args.Length() == 1, "double(x) should be called with single parameter");
-	ASSERT_MESSAGE(args[0]->IsNumber(), "double(x) should be called with single parameter containing a double number representation");
-
 	auto isolate = Isolate::GetCurrent();
+
+	if (args.Length() != 1)
+	{
+		isolate->ThrowException(ConvertToV8String("double(x) should be called with single parameter"));
+		return;
+	}
+	if (!args[0]->IsNumber())
+	{
+		isolate->ThrowException(ConvertToV8String("double(x) should be called with single parameter containing a double number representation"));
+		return;
+	}
 
 	auto value = args[0]->ToNumber();
 	auto cast = Object::New(isolate);
