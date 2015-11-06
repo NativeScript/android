@@ -11,7 +11,7 @@ class V8Config
 	
 	public static Object[] fromPackageJSON(File appDir)
 	{
-		Object[] result = MakeDefaultOptions();
+		Object[] result = makeDefaultOptions();
 		File packageInfo = new File (appDir, "/app/package.json");
 		if(!packageInfo.exists())
 		{
@@ -43,7 +43,7 @@ class V8Config
 		return result;
 	}
 	
-	private static Object[] MakeDefaultOptions()
+	private static Object[] makeDefaultOptions()
 	{
 		Object[] result = new Object[2];
 		// v8 startup flags, defaults to --expose_gc due to tns_modules requirement 
