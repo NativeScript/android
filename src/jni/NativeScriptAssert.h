@@ -18,7 +18,6 @@ namespace tns
 	#define DEBUG_WRITE_FORCE(fmt, args...) __android_log_print(ANDROID_LOG_DEBUG, "TNS.Native", fmt, ##args)
 	#define DEBUG_WRITE_FATAL(fmt, args...) __android_log_print(ANDROID_LOG_FATAL, "TNS.Native", fmt, ##args)
 	#define ASSERT(cond) ((cond)?(void)0:__android_log_assert("##cond", "TNS.Native", ""))
-	#define ASSERT_MESSAGE(cond, fmt, args...) ((cond)?(void)0:__android_log_assert("##cond", "TNS.Native", fmt, ##args))
 	#define ASSERT_FAIL(fmt, args...) (__android_log_assert(fmt, "TNS.Native", fmt, ##args))
 }
 

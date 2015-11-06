@@ -739,7 +739,7 @@ void NativeScriptRuntime::DisableVerboseLoggingMethodCallback(const v8::Function
 void NativeScriptRuntime::ExitMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
 	auto msg = ConvertToString(args[0].As<String>());
-	ASSERT_MESSAGE(false, "%s", msg.c_str());
+	ASSERT_FAIL("%s", msg.c_str());
 	exit(-1);
 }
 
