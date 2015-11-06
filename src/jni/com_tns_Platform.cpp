@@ -266,10 +266,18 @@ extern "C" jobject Java_com_tns_Platform_runScript(JNIEnv *_env, jobject obj, js
 
 void AppInitCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-	ASSERT_MESSAGE(args.Length() == 1, "Application should be initialized with single parameter");
-	ASSERT_MESSAGE(args[0]->IsObject(), "Application should be initialized with single object parameter containing overridden methods");
-
 	auto isolate = Isolate::GetCurrent();
+
+	if (args.Length() != 1)
+	{
+		isolate->ThrowException(ConvertToV8String("Application should be initialized with single parameter"));
+		return;
+	}
+	if (!args[0]->IsObject())
+	{
+		isolate->ThrowException(ConvertToV8String("Application should be initialized with single object parameter containing overridden methods"));
+		return;
+	}
 
 	// TODO: find another way to get "com/tns/NativeScriptApplication" metadata (move it to more appropriate place)
 	auto node = MetadataNode::GetOrCreate("com/tns/NativeScriptApplication");
@@ -281,7 +289,11 @@ void AppInitCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 	DEBUG_WRITE("Application object implementation object is with id: %d", implementationObject->GetIdentityHash());
 	implementationObject->SetPrototype(appInstance->GetPrototype());
 	bool appSuccess = appInstance->SetPrototype(implementationObject);
-	ASSERT_MESSAGE(appSuccess == true, "Application could not be initialized correctly");
+	if (!appSuccess)
+	{
+		isolate->ThrowException(ConvertToV8String("Application could not be initialized correctly"));
+		return;
+	}
 
 	jweak applicationObject = g_objectManager->GetJavaObjectByID(AppJavaObjectID);
 
