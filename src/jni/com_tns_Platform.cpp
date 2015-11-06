@@ -20,6 +20,7 @@
 #include "SimpleProfiler.h"
 #include "SimpleAllocator.h"
 #include "File.h"
+#include "Require.h"
 #include "JType.h"
 #include <sstream>
 #include <android/log.h>
@@ -42,7 +43,6 @@ int count = 0;
 Context::Scope *context_scope = nullptr;
 bool tns::LogEnabled = true;
 Isolate *g_isolate = nullptr;
-std::string Constants::APP_ROOT_FOLDER_PATH = "";
 
 ObjectManager *g_objectManager = nullptr;
 SimpleAllocator g_allocator;
@@ -101,10 +101,9 @@ void PrepareExtendFunction(Isolate *isolate, jstring filesPath)
 	DEBUG_WRITE("Executed prepareExtend.js script");
 }
 
-void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring packageName, jstring jsoptions)
+void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring packageName)
 {
-	string v8flags = ArgConverter::jstringToString(jsoptions);
-	V8::SetFlagsFromString(v8flags.c_str(), v8flags.size());
+	V8::SetFlagsFromString(Constants::V8_STARTUP_FLAGS.c_str(), Constants::V8_STARTUP_FLAGS.size());
 	V8::SetCaptureStackTraceForUncaughtExceptions(true, 100, StackTrace::kOverview);
 	V8::AddMessageListener(ExceptionUtil::OnUncaughtError);
 
@@ -123,7 +122,7 @@ void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring pa
 	globalTemplate->Set(ConvertToV8String("__enableVerboseLogging"), FunctionTemplate::New(isolate, NativeScriptRuntime::EnableVerboseLoggingMethodCallback));
 	globalTemplate->Set(ConvertToV8String("__disableVerboseLogging"), FunctionTemplate::New(isolate, NativeScriptRuntime::DisableVerboseLoggingMethodCallback));
 	globalTemplate->Set(ConvertToV8String("__exit"), FunctionTemplate::New(isolate, NativeScriptRuntime::ExitMethodCallback));
-	globalTemplate->Set(ConvertToV8String("require"), FunctionTemplate::New(isolate, NativeScriptRuntime::RequireCallback));
+	globalTemplate->Set(ConvertToV8String("require"), FunctionTemplate::New(isolate, Require::Callback));
 
 	WeakRef::Init(isolate, globalTemplate, g_objectManager);
 
@@ -163,10 +162,19 @@ void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring pa
 	NativeScriptRuntime::CreateTopLevelNamespaces(global);
 }
 
-extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj, jstring filesPath, jint appJavaObjectId, jboolean verboseLoggingEnabled, jstring packageName, jstring jsoptions)
+extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj, jstring filesPath, jint appJavaObjectId, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args)
 {
 	AppJavaObjectID = appJavaObjectId;
 	tns::LogEnabled = verboseLoggingEnabled;
+
+	JEnv env(_env);
+
+	Constants::APP_ROOT_FOLDER_PATH = ArgConverter::jstringToString(filesPath) + "/app/";
+	// read config options passed from Java
+	JniLocalRef v8Flags(env.GetObjectArrayElement(args, 0));
+	Constants::V8_STARTUP_FLAGS = ArgConverter::jstringToString(v8Flags);
+	JniLocalRef cacheCode(env.GetObjectArrayElement(args, 1));
+	Constants::V8_CACHE_COMPILED_CODE = (bool)cacheCode;
 
 	DEBUG_WRITE("Initializing Telerik NativeScript: app instance id:%d", appJavaObjectId);
 
@@ -182,12 +190,7 @@ extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj
 	HandleScope handleScope(isolate);
 
 	ExceptionUtil::GetInstance()->Init(g_jvm, g_objectManager);
-
-	JEnv env(_env);
-	PrepareV8Runtime(isolate, env, filesPath, packageName, jsoptions);
-
-	NativeScriptRuntime::APP_FILES_DIR = ArgConverter::jstringToString(filesPath);
-	Constants::APP_ROOT_FOLDER_PATH = NativeScriptRuntime::APP_FILES_DIR + "/app/";
+	PrepareV8Runtime(isolate, env, filesPath, packageName);
 }
 
 extern "C" void Java_com_tns_Platform_runNativeScript(JNIEnv *_env, jobject obj, jstring scriptFile)
@@ -198,11 +201,10 @@ extern "C" void Java_com_tns_Platform_runNativeScript(JNIEnv *_env, jobject obj,
 
 	HandleScope handleScope(isolate);
 
-	Local<Object> moduleObject;
 	string filePath = ArgConverter::jstringToString(scriptFile);
 	bool hasError = false;
 
-	NativeScriptRuntime::CompileAndRun(filePath, hasError, moduleObject);
+	Require::CompileAndRun(filePath, hasError);
 
 	/*
 	 * moduleObject (export module) can be set to js variable but currently we start the script implicitly without returning the moduleObject (just calling it)
