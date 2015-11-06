@@ -737,13 +737,25 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
 			ASSERT_FAIL("Invalid extend() call. No name specified for extend. Location: %s", extendLocation.c_str());
 		}
 
-		ASSERT_MESSAGE(info[0]->IsObject(), "Invalid extend() call. No implementation object specified. Location: %s", extendLocation.c_str());
+		if (!info[0]->IsObject())
+		{
+			isolate->ThrowException(ConvertToV8String("First argument must be implementation object"));
+			return;
+		}
 		implementationObject = info[0]->ToObject();
 	}
 	else if (info.Length() == 2)
 	{
-		ASSERT_MESSAGE(info[0]->IsString(), "Invalid extend() call. No name for extend specified. Location: %s", extendLocation.c_str());
-		ASSERT_MESSAGE(info[1]->IsObject(), "Invalid extend() call. Named extend should be called with second object parameter containing overridden methods. Location: %s", extendLocation.c_str());
+		if (!info[0]->IsString())
+		{
+			isolate->ThrowException(ConvertToV8String("First argument must be string"));
+			return;
+		}
+		if (!info[1]->IsObject())
+		{
+			isolate->ThrowException(ConvertToV8String("Second argument must be implementation object"));
+			return;
+		}
 
 		DEBUG_WRITE("InterfaceConstructorCallback: getting extend name");
 		v8ExtendName = info[0]->ToString();
@@ -751,7 +763,8 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
 	}
 	else
 	{
-		ASSERT_FAIL("Invalid extend() call. Location: %s", extendLocation.c_str());
+		isolate->ThrowException(ConvertToV8String("Invalid number of arguments"));
+		return;
 	}
 
 	auto className = node->m_implType;
