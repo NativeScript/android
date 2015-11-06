@@ -703,12 +703,11 @@ jobjectArray NativeScriptRuntime::GetMethodOverrides(JEnv& env, const Local<Obje
 
 void NativeScriptRuntime::LogMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-	ASSERT_MESSAGE(args.Length() == 1, "Log should be called with string parameter");
-	ASSERT_MESSAGE(!args[0]->IsUndefined() && !args[0]->IsNull(), "Log called with undefined");
-	ASSERT_MESSAGE(args[0]->IsString(), "Log should be called with string parameter");
-
-	String::Utf8Value message(args[0]->ToString());
-	DEBUG_WRITE("%s", *message);
+	if ((args.Length() > 0) && args[0]->IsString())
+	{
+		String::Utf8Value message(args[0]->ToString());
+		DEBUG_WRITE("%s", *message);
+	}
 }
 
 void NativeScriptRuntime::DumpReferenceTablesMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
