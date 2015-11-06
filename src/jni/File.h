@@ -17,6 +17,7 @@ namespace tns
 		public:
 			static const char* ReadText(const std::string& filePath, int& length, bool& isNew);
 			static std::string ReadText(const std::string& filePath);
+			static bool Exists(const std::string& filePath);
 		private:
 			static const int BUFFER_SIZE = 1024 * 1024;
 			static char* Buffer;

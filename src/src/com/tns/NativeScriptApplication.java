@@ -755,6 +755,7 @@ public class NativeScriptApplication extends android.app.Application implements 
 				e.printStackTrace();
 			}
 			ThreadScheduler workThreadScheduler = new WorkThreadScheduler(new Handler(Looper.getMainLooper()));
+			// TODO: Refactor these 11 method parameters!!! E.g. create Settings abstract object and add default implementation object 
 			Platform.init(this, workThreadScheduler, logger, appName, null, rootDir, appDir, debuggerSetupDir, classLoader, dexDir, dexThumb);
 			Platform.runScript(new File(appDir, "internal/prepareExtend.js"));
 			Platform.run();

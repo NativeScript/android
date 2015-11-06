@@ -43,7 +43,6 @@ int count = 0;
 Context::Scope *context_scope = nullptr;
 bool tns::LogEnabled = true;
 Isolate *g_isolate = nullptr;
-std::string Constants::APP_ROOT_FOLDER_PATH = "";
 
 ObjectManager *g_objectManager = nullptr;
 SimpleAllocator g_allocator;
@@ -102,10 +101,9 @@ void PrepareExtendFunction(Isolate *isolate, jstring filesPath)
 	DEBUG_WRITE("Executed prepareExtend.js script");
 }
 
-void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring packageName, jstring jsoptions)
+void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring packageName)
 {
-	string v8flags = ArgConverter::jstringToString(jsoptions);
-	V8::SetFlagsFromString(v8flags.c_str(), v8flags.size());
+	V8::SetFlagsFromString(Constants::V8_STARTUP_FLAGS.c_str(), Constants::V8_STARTUP_FLAGS.size());
 	V8::SetCaptureStackTraceForUncaughtExceptions(true, 100, StackTrace::kOverview);
 	V8::AddMessageListener(ExceptionUtil::OnUncaughtError);
 
@@ -165,10 +163,19 @@ void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring pa
 	NativeScriptRuntime::CreateTopLevelNamespaces(global);
 }
 
-extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj, jstring filesPath, jint appJavaObjectId, jboolean verboseLoggingEnabled, jstring packageName, jstring jsoptions)
+extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj, jstring filesPath, jint appJavaObjectId, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args)
 {
 	AppJavaObjectID = appJavaObjectId;
 	tns::LogEnabled = verboseLoggingEnabled;
+
+	JEnv env(_env);
+
+	Constants::APP_ROOT_FOLDER_PATH = ArgConverter::jstringToString(filesPath) + "/app/";
+	// read config options passed from Java
+	JniLocalRef v8Flags(env.GetObjectArrayElement(args, 0));
+	Constants::V8_STARTUP_FLAGS = ArgConverter::jstringToString(v8Flags);
+	JniLocalRef cacheCode(env.GetObjectArrayElement(args, 1));
+	Constants::V8_CACHE_COMPILED_CODE = (bool)cacheCode;
 
 	DEBUG_WRITE("Initializing Telerik NativeScript: app instance id:%d", appJavaObjectId);
 
@@ -184,12 +191,7 @@ extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj
 	HandleScope handleScope(isolate);
 
 	ExceptionUtil::GetInstance()->Init(g_jvm, g_objectManager);
-
-	JEnv env(_env);
-	PrepareV8Runtime(isolate, env, filesPath, packageName, jsoptions);
-
-	NativeScriptRuntime::APP_FILES_DIR = ArgConverter::jstringToString(filesPath);
-	Constants::APP_ROOT_FOLDER_PATH = NativeScriptRuntime::APP_FILES_DIR + "/app/";
+	PrepareV8Runtime(isolate, env, filesPath, packageName);
 }
 
 extern "C" void Java_com_tns_Platform_runModule(JNIEnv *_env, jobject obj, jstring scriptFile)
@@ -257,10 +259,18 @@ extern "C" jobject Java_com_tns_Platform_runScript(JNIEnv *_env, jobject obj, js
 
 void AppInitCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-	ASSERT_MESSAGE(args.Length() == 1, "Application should be initialized with single parameter");
-	ASSERT_MESSAGE(args[0]->IsObject(), "Application should be initialized with single object parameter containing overridden methods");
-
 	auto isolate = Isolate::GetCurrent();
+
+	if (args.Length() != 1)
+	{
+		isolate->ThrowException(ConvertToV8String("Application should be initialized with single parameter"));
+		return;
+	}
+	if (!args[0]->IsObject())
+	{
+		isolate->ThrowException(ConvertToV8String("Application should be initialized with single object parameter containing overridden methods"));
+		return;
+	}
 
 	// TODO: find another way to get "com/tns/NativeScriptApplication" metadata (move it to more appropriate place)
 	auto node = MetadataNode::GetOrCreate("com/tns/NativeScriptApplication");
@@ -272,7 +282,11 @@ void AppInitCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 	DEBUG_WRITE("Application object implementation object is with id: %d", implementationObject->GetIdentityHash());
 	implementationObject->SetPrototype(appInstance->GetPrototype());
 	bool appSuccess = appInstance->SetPrototype(implementationObject);
-	ASSERT_MESSAGE(appSuccess == true, "Application could not be initialized correctly");
+	if (!appSuccess)
+	{
+		isolate->ThrowException(ConvertToV8String("Application could not be initialized correctly"));
+		return;
+	}
 
 	jweak applicationObject = g_objectManager->GetJavaObjectByID(AppJavaObjectID);
 

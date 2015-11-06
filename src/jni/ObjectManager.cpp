@@ -237,7 +237,7 @@ void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID, jcl
 
 	auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
 	bool alreadyLinked = !object->GetInternalField(jsInfoIdx)->IsUndefined();
-	//ASSERT_MESSAGE(alreadyLinked, "object should not have been linked before");
+	//TODO: fail if alreadyLinked is true?
 
 	auto jsInfo = External::New(isolate, jsInstanceInfo);
 	object->SetInternalField(jsInfoIdx, jsInfo);

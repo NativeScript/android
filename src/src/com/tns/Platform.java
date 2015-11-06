@@ -16,8 +16,6 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 
-import org.json.JSONObject;
-
 import android.util.SparseArray;
 
 import com.tns.bindings.ProxyGenerator;
@@ -25,7 +23,7 @@ import com.tns.internal.ExtractPolicy;
 
 public class Platform
 {
-	private static native void initNativeScript(String filesPath, int appJavaObjectId, boolean verboseLoggingEnabled, String packageName, String jsOptions);
+	private static native void initNativeScript(String filesPath, int appJavaObjectId, boolean verboseLoggingEnabled, String packageName, Object[] v8Options);
 
 	private static native void runModule(String filePath) throws NativeScriptException;
 	
@@ -132,8 +130,8 @@ public class Platform
 		{
 			throw new RuntimeException("Fail to initialize Require class", ex);
 		}
-		String jsOptions = readJsOptions(appDir);
-		Platform.initNativeScript(Module.getApplicationFilesPath(), appJavaObjectId, logger.isEnabled(), appName, jsOptions);
+		Object[] v8Config = V8Config.fromPackageJSON(appDir);
+		Platform.initNativeScript(Module.getApplicationFilesPath(), appJavaObjectId, logger.isEnabled(), appName, v8Config);
 		
 		if (debuggerSetupDir != null)
 		{
@@ -878,35 +876,5 @@ public class Platform
 		}
 		
 		dexFactory.purgeAllProxies();
-	}
-	
-	private static String readJsOptions(File appDir)
-	{
-		String options = "--expose_gc";
-		
-		File packageInfo = new File (appDir, "/app/package.json");
-		
-		if (packageInfo.exists())
-		{
-			JSONObject object;
-			try
-			{
-				object = FileSystem.readJSONFile(packageInfo);
-				if (object != null)
-				{
-					String opt = object.getString("jsoptions");
-					if (opt != null)
-					{
-						options = opt;
-					}
-				}
-			}
-			catch (Exception e)
-			{
-				if (logger.isEnabled()) e.printStackTrace();
-			}
-		}
-		
-		return options;
 	}
 }

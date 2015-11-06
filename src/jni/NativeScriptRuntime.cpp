@@ -9,7 +9,6 @@
 #include "JsArgToArrayConverter.h"
 #include "ArgConverter.h"
 #include "v8-profiler.h"
-#include "Constants.h"
 #include <assert.h>
 #include <iostream>
 #include <sstream>
@@ -697,12 +696,11 @@ jobjectArray NativeScriptRuntime::GetMethodOverrides(JEnv& env, const Local<Obje
 
 void NativeScriptRuntime::LogMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-	ASSERT_MESSAGE(args.Length() == 1, "Log should be called with string parameter");
-	ASSERT_MESSAGE(!args[0]->IsUndefined() && !args[0]->IsNull(), "Log called with undefined");
-	ASSERT_MESSAGE(args[0]->IsString(), "Log should be called with string parameter");
-
-	String::Utf8Value message(args[0]->ToString());
-	DEBUG_WRITE("%s", *message);
+	if ((args.Length() > 0) && args[0]->IsString())
+	{
+		String::Utf8Value message(args[0]->ToString());
+		DEBUG_WRITE("%s", *message);
+	}
 }
 
 void NativeScriptRuntime::DumpReferenceTablesMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -734,7 +732,7 @@ void NativeScriptRuntime::DisableVerboseLoggingMethodCallback(const v8::Function
 void NativeScriptRuntime::ExitMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
 	auto msg = ConvertToString(args[0].As<String>());
-	ASSERT_MESSAGE(false, "%s", msg.c_str());
+	ASSERT_FAIL("%s", msg.c_str());
 	exit(-1);
 }
 
@@ -964,6 +962,5 @@ ObjectManager* NativeScriptRuntime::objectManager = nullptr;
 NumericCasts NativeScriptRuntime::castFunctions;
 ArrayElementAccessor NativeScriptRuntime::arrayElementAccessor;
 FieldAccessor NativeScriptRuntime::fieldAccessor;
-string NativeScriptRuntime::APP_FILES_DIR;
 map<string, int> NativeScriptRuntime::s_constructorCache;
 map<std::string, jclass> NativeScriptRuntime::s_classCache;

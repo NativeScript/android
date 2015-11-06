@@ -93,9 +93,6 @@ namespace tns
 		static jclass PlatformClass;
 
 		static jclass JAVA_LANG_STRING;
-
-		static std::string APP_FILES_DIR;
-
 		//
 
 	private:

@@ -11,6 +11,7 @@
 #include "V8GlobalHelpers.h"
 #include "NativeScriptAssert.h"
 #include "ExceptionUtil.h"
+#include "Constants.h"
 
 #include <sstream>
 #include <assert.h>
@@ -99,11 +100,23 @@ Local<Function> Module::GetRequireFunction(Isolate *isolate, const string& dirNa
 
 void Module::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-	ASSERT_MESSAGE(args.Length() == 2, "require should be called with two parameters");
-	ASSERT_MESSAGE(!args[0]->IsUndefined() && !args[0]->IsNull(), "require called with undefined moduleName parameter");
-	ASSERT_MESSAGE(!args[1]->IsUndefined() && !args[1]->IsNull(), "require called with undefined callingModulePath parameter");
-	ASSERT_MESSAGE(args[0]->IsString(), "require should be called with string parameter");
-	ASSERT_MESSAGE(args[1]->IsString(), "require should be called with string parameter");
+	auto isolate = Isolate::GetCurrent();
+
+	if (args.Length() != 2)
+	{
+		isolate->ThrowException(ConvertToV8String("require should be called with two parameters"));
+		return;
+	}
+	if (!args[0]->IsString())
+	{
+		isolate->ThrowException(ConvertToV8String("require's first parameter should be string"));
+		return;
+	}
+	if (!args[1]->IsString())
+	{
+		isolate->ThrowException(ConvertToV8String("require's second parameter should be string"));
+		return;
+	}
 
 	string moduleName = ConvertToString(args[0].As<String>());
 	string callingModuleDirName = ConvertToString(args[1].As<String>());
@@ -112,8 +125,6 @@ void Module::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 	JniLocalRef jsModulename(env.NewStringUTF(moduleName.c_str()));
 	JniLocalRef jsCallingModuleDirName(env.NewStringUTF(callingModuleDirName.c_str()));
 	JniLocalRef jsModulePath(env.CallStaticObjectMethod(MODULE_CLASS, GET_MODULE_PATH_METHOD_ID, (jstring) jsModulename, (jstring) jsCallingModuleDirName));
-
-	auto isolate = Isolate::GetCurrent();
 
 	// cache the required modules by full path, not name only, since there might be some collisions with relative paths and names
 	string modulePath = ArgConverter::jstringToString((jstring) jsModulePath);
@@ -181,7 +192,30 @@ Local<Object> Module::CompileAndRun(const string& modulePath, bool& hasError)
 	DEBUG_WRITE("Compiling script (module %s)", modulePath.c_str());
 	auto fullRequiredModulePath = ConvertToV8String(modulePath);
 	moduleObj->Set(ConvertToV8String("filename"), fullRequiredModulePath);
-	auto script = Script::Compile(scriptText, fullRequiredModulePath);
+	//
+	auto cacheData = TryLoadScriptCache(modulePath);
+
+	ScriptOrigin origin(fullRequiredModulePath);
+	ScriptCompiler::Source source(scriptText, origin, cacheData);
+	ScriptCompiler::CompileOptions option = ScriptCompiler::kNoCompileOptions;
+	Local<Script> script;
+
+	if(cacheData != nullptr)
+	{
+		option = ScriptCompiler::kConsumeCodeCache;
+		script = ScriptCompiler::Compile(isolate->GetCurrentContext(), &source, option).ToLocalChecked();
+	}
+	else
+	{
+		if(Constants::V8_CACHE_COMPILED_CODE)
+		{
+			option = ScriptCompiler::kProduceCodeCache;
+		}
+		script = ScriptCompiler::Compile(isolate->GetCurrentContext(), &source, option).ToLocalChecked();
+		SaveScriptCache(source, modulePath);
+	}
+	//auto script = Script::Compile(scriptText, fullRequiredModulePath);
+	//
 	DEBUG_WRITE("Compiled script (module %s)", modulePath.c_str());
 
 	if (ExceptionUtil::GetInstance()->HandleTryCatch(tc, "Script " + modulePath + " contains compilation errors!"))
@@ -254,6 +288,49 @@ Local<String> Module::WrapModuleContent(const string& path)
 
 	return ConvertToV8String(result);
 }
+
+ScriptCompiler::CachedData* Module::TryLoadScriptCache(const std::string& path)
+{
+	if(!Constants::V8_CACHE_COMPILED_CODE)
+	{
+		return nullptr;
+	}
+
+	auto cachePath = path + ".cache";
+	if(!File::Exists(cachePath))
+	{
+		return nullptr;
+	}
+
+	auto file = fopen(cachePath.c_str(), "rb" /* read binary */);
+	fseek(file, 0, SEEK_END);
+	auto size = ftell(file);
+	rewind(file);
+
+	uint8_t* data = new uint8_t[size];
+	fread(data, sizeof(uint8_t), size, file);
+
+	auto cache = new ScriptCompiler::CachedData(data, size, ScriptCompiler::CachedData::BufferOwned);
+
+	fclose(file);
+
+	return cache;
+}
+
+void Module::SaveScriptCache(const ScriptCompiler::Source& source, const std::string& path)
+{
+	if(!Constants::V8_CACHE_COMPILED_CODE)
+	{
+		return;
+	}
+
+	int length = source.GetCachedData()->length;
+	auto cachePath = path + ".cache";
+	auto file = fopen(cachePath.c_str(), "wb" /* write binary */);
+	fwrite(source.GetCachedData()->data, sizeof(uint8_t), length, file);
+	fclose(file);
+}
+
 
 jclass Module::MODULE_CLASS = nullptr;
 jmethodID Module::GET_MODULE_PATH_METHOD_ID = nullptr;

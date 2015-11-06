@@ -32,6 +32,9 @@ namespace tns
 
 			static v8::Local<v8::Function> GetRequireFunction(v8::Isolate *isolate, const std::string& dirName);
 
+			static v8::ScriptCompiler::CachedData* TryLoadScriptCache(const std::string& path);
+			static void SaveScriptCache(const v8::ScriptCompiler::Source& source, const std::string& path);
+
 			static jclass MODULE_CLASS;
 			static jmethodID GET_MODULE_PATH_METHOD_ID;
 
