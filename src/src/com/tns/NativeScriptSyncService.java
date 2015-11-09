@@ -1,6 +1,5 @@
 package com.tns;
 
-import java.io.BufferedReader;
 import java.io.Closeable;
 import java.io.DataInputStream;
 import java.io.File;
@@ -10,13 +9,6 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.UnsupportedEncodingException;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.util.ArrayList;
-import java.util.NoSuchElementException;
-import java.util.Scanner;
 
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
@@ -154,7 +146,7 @@ public class NativeScriptSyncService
                 input.readFully(new byte[length]); //ignore the payload
                 executePartialSync(context, syncDir);
 
-                Platform.callJSMethod(NativeScriptApplication.getInstance(), "onLiveSync", Void.class);
+                Platform.runScript(new File(NativeScriptSyncService.this.context.getFilesDir(), "internal/livesync.js"));
                 
                 socket.close();
             }
@@ -411,35 +403,4 @@ public class NativeScriptSyncService
 
         return true;
     }
-
-//	private static String getSyncThumb(String syncThumbFilePath)
-//	{
-//		try
-//		{
-//			File syncThumbFile = new File(syncThumbFilePath);
-//			if (syncThumbFile.exists())
-//			{
-//				return null;
-//			}
-//				
-//			FileInputStream in = new FileInputStream(syncThumbFile);
-//			BufferedReader reader = new BufferedReader(new InputStreamReader(in));
-//			String syncThumb = reader.readLine();
-//			reader.close();
-//			in.close();
-//			return syncThumb;
-//		}
-//		catch (FileNotFoundException e)
-//		{
-//			Log.e(Platform.DEFAULT_LOG_TAG, "Error while reading sync command");
-//			e.printStackTrace();
-//		}
-//		catch (IOException e)
-//		{
-//			Log.e(Platform.DEFAULT_LOG_TAG, "Error while reading sync command");
-//			e.printStackTrace();
-//		}
-//
-//		return null;
-//	}
 }

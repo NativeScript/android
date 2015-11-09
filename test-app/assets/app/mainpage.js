@@ -64,14 +64,7 @@ app.init({
 		return MainActivity;
 	},
 	
-	
 	onCreate: function() {
 		__log("Application on create called");
-	},
-	
-	onLiveSync: function() {
-	    __enableVerboseLogging();
-	    __log("LiveSync called");
-	    __disableVerboseLogging();
 	} 
 });
