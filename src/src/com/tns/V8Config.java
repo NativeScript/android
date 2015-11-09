@@ -31,7 +31,7 @@ class V8Config
 				}
 				if(androidObject.has(CodeCacheKey))
 				{
-					result[1] = androidObject.getString(CodeCacheKey); 
+					result[1] = Boolean.parseBoolean(androidObject.getString(CodeCacheKey));
 				}
 			}
 		}
