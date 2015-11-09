@@ -215,8 +215,58 @@ public class Platform
 		
 		if (jsFile.exists() && jsFile.isFile())
 		{
-			String filePath = jsFile.getAbsolutePath();
-			result = runScript(filePath);
+			final String filePath = jsFile.getAbsolutePath();
+
+			boolean isWorkThread = threadScheduler.getThread().equals(Thread.currentThread());
+			
+			if (isWorkThread)
+			{
+				result = runScript(filePath);
+			}
+			else
+			{
+				final Object[] arr = new Object[2];
+				
+				Runnable r = new Runnable()
+				{
+					@Override
+					public void run()
+					{
+						synchronized (this)
+						{
+							try
+							{
+								arr[0] = runScript(filePath);
+							}
+							finally
+							{
+								this.notify();
+								arr[1] = Boolean.TRUE;
+							}
+						}
+					}
+				};
+				
+				boolean success = threadScheduler.post(r);
+
+				if (success)
+				{
+					synchronized (r)
+					{
+						try
+						{
+							if (arr[1] == null)
+							{
+								r.wait();
+							}
+						}
+						catch (InterruptedException e)
+						{
+							result = e;
+						}
+					}
+				}
+			}
 		}
 		
 		return result;
