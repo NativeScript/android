@@ -132,7 +132,8 @@ android {
 		def mergeAssetsTask = variant.mergeAssets
 		if(project.hasProperty("runSBGenerator")) {
 			runBindingGenerator.dependsOn(copyMetadata)
-			mergeAssetsTask.dependsOn(runBindingGenerator)
+			rbg.dependsOn(runBindingGenerator)
+			mergeAssetsTask.dependsOn(rbg)
 		}
 		else {
 			mergeAssetsTask.dependsOn(copyMetadata)
@@ -413,22 +414,12 @@ task deleteExplodedAarFolder (type: Delete) {
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////// OPTIONAL TASKS //////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
-
-task runBindingGenerator (type: Exec) {
-	doFirst {
-		String jarsDir = "-PjarsDir=" + allJarPaths
-		String jsCodeToParse = "-PjsCodeDir=$rootDir/src/main/assets/app"
-		String outDir = "-PoutDir=../../src/main/java"
-	
-		workingDir "$rootDir/build-tools/android-static-binding-generator"
-		if(isWinOs) {
-			commandLine "cmd", "/c", "gradle", "generatebindings", jsCodeToParse, outDir, jarsDir
-		}
-		else {
-			commandLine "gradle", "generatebindings", jsCodeToParse, outDir, jarsDir
-		}
-	}
+task runBindingGenerator(dependsOn: "ing:jar") {
+	rootProject.jarsDir = allJarPaths
 }
+runBindingGenerator.dependsOn("bg:jar")
+
+task rbg (dependsOn: "asbg:generatebindings")
 
 
 ////////////////////////////////////////////////////////////////////////////////////
