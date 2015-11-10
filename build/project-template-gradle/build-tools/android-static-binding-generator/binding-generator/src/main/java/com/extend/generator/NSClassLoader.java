@@ -38,8 +38,8 @@ public class NSClassLoader extends URLClassLoader
 		for(int i = 0; i < this.jarFiles.size(); i++) {
 			
 			String jarName = this.jarFiles.get(i);
-			String currentName = jarName.substring(jarName.lastIndexOf('\\') + 1);
-			jarNames[i] = currentName;
+			// String currentName = jarName.substring(jarName.lastIndexOf('\\') + 1);
+			jarNames[i] = jarName;
 		}
 		
 		return jarNames;
@@ -50,6 +50,13 @@ public class NSClassLoader extends URLClassLoader
 		File dir = new File(path);
 		this.traverseDir(dir);
 		this.populateClassNames();
+	}
+
+	public void loadJars(String[] args) {
+		for(int i = 2; i < args.length; i ++) {
+			String currentJar = args[i];
+			onFile(new File(currentJar));
+		}
 	}
 
 	private void populateClassNames()

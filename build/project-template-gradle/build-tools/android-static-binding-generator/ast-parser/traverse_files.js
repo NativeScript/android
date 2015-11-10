@@ -28,7 +28,7 @@ if(arguments.length == 3) {
 	return;
 }
 if(arguments.length == 4) {
-	console.log('you can pass an out file name as a parameter! e.g. "node traverse_files.js [interface-names.txt] [dir_to_traverse] [out_dir_name]"');
+	// console.log('you can pass an out file name as a parameter! e.g. "node traverse_files.js [interface-names.txt] [dir_to_traverse] [out_dir_name]"');
 	outFile = 'bindings.txt';
 }
 else {
@@ -72,7 +72,7 @@ function traverseFolder(inputFolder){
 			//TODO: think how to fix circular reference problem 
 			if(currentFileName.indexOf('easysax.js') == -1) { //exception because of maximum call stack exceeded (circular reference)
 				filesToTraverse.push(currentFileName);
-				console.log(currentFileName);
+				// console.log(currentFileName);
 			}
 		}
 	  })
@@ -155,7 +155,7 @@ function checkPattern(node, fullFilename){
 						className += customClassNameSeparator + customExtendClassName;
 						
 						if(!nameContainsInvalidSymbols(customExtendClassName)) {
-							console.log(className);
+							// console.log(className);
 							var lineToWrite = className + ' ' + overridenMethods.join();
 							appendToFile(lineToWrite);
 							return;
@@ -173,7 +173,7 @@ function checkPattern(node, fullFilename){
 				
 				if(!nameContainsInvalidSymbols(customExtendClassName)) {// && className.indexOf('com.tns.tests') == -1) { //binding generator takes care of this
 					var lineToWrite = className + ' ' + overridenMethods.join();
-					console.log(className);
+					// console.log(className);
 					appendToFile(lineToWrite);
 					return;
 				}
@@ -231,7 +231,7 @@ function checkPattern(node, fullFilename){
 					if(!nameContainsInvalidSymbols(customExtendClassName)) {
 						if(customExtendClassName) {
 							var lineToWrite = className + ' ' + overridenMethods.join();
-							console.log(className);
+							// console.log(className);
 							appendToFile(lineToWrite);
 							return;
 						}
