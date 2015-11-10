@@ -18,31 +18,22 @@ public class GetInterfaceNames {
 	
 	public static void main(String[] args) throws IOException, ClassNotFoundException {
 		currentDir = System.getProperty("user.dir");
-
-		String jarsDir = currentDir + "\\jars";
 		String outputFileName = "interfaces-names.txt";
 
+		// System.out.println("inside: " + args);
 		if (args != null) {
-			
-			if(args.length > 0) {
-				jarsDir = args[0];
-			}
-			if(args.length > 1) {
-				outputFileName = args[1];	
+			if(args.length < 1) {
+				throw new IllegalArgumentException("There are no parameters passed!");
 			}
 		}
-
-		if(!new File(jarsDir).exists()) {
-			System.out.println("Please provide a valid dir with jars to parse! Default dir is '.\\jars'");
-			System.exit(1);
-		}
-
-		String[] pathsToJars = getAllFilesPaths(jarsDir);
 
 		PrintWriter out = ensureOutputFile(outputFileName);
 		
-		for(String pathToJar : pathsToJars) {
-			generateInterfaceNames(pathToJar, out);
+		for(String pathToJar : args) {
+			// System.out.println("\t+jar: " + pathToJar);
+			if(pathToJar.endsWith(".jar")) {
+				generateInterfaceNames(pathToJar, out);
+			}
 		}
 
 		out.close();
@@ -104,23 +95,4 @@ public class GetInterfaceNames {
 		URLClassLoader cl = URLClassLoader.newInstance(urls);
 		return cl;
 	}
-
-	private static String[] getAllFilesPaths(String path) {
-		File folder = new File(path);
-		File[] listOfFiles = folder.listFiles();
-		String[] paths = new String[listOfFiles.length];
-		
-		for (int i = 0; i < listOfFiles.length; i++) {
-
-			if (listOfFiles[i].isFile()) {
-
-				if(listOfFiles[i].getName().indexOf(".jar") != -1) {
-					paths[i] = listOfFiles[i].getAbsolutePath();	
-				}
-			}
-		}
-
-		return paths;
-	}
-
 }
