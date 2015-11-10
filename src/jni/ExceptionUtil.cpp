@@ -190,7 +190,15 @@ string ExceptionUtil::GetErrorMessage(const Local<Message>& message, const Local
 	}
 	String::Utf8Value utfError(str);
 	ss << endl << endl << *utfError << endl;
-	ss << "File: \"" << ConvertToString(message->GetScriptResourceName().As<String>());
+	auto scriptResName = message->GetScriptResourceName();
+	if (!scriptResName.IsEmpty() && scriptResName->IsString())
+	{
+		ss << "File: \"" << ConvertToString(scriptResName.As<String>());
+	}
+	else
+	{
+		ss << "File: \"<unknown>";
+	}
 	ss << ", line: " << message->GetLineNumber() << ", column: " << message->GetStartColumn() << endl << endl;
 
 	string stackTraceMessage = GetErrorStackTrace(message->GetStackTrace());

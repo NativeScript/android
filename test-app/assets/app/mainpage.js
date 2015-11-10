@@ -1,5 +1,6 @@
 __disableVerboseLogging();
 __log("starting tests");
+
 require("./tests/testMetadata");
 require("./tests/testAsserts");
 require("./tests/testWeakRef"); 
@@ -62,7 +63,6 @@ app.init({
 		__log("action=" + action)
 		return MainActivity;
 	},
-	
 	
 	onCreate: function() {
 		__log("Application on create called");
