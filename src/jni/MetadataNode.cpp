@@ -1249,11 +1249,6 @@ bool MetadataNode::GetExtendLocation(string& extendLocation)
 				return false;
 			}
 
-			if (lineNumber > Constants::MODULE_LINES_OFFSET)
-			{
-				lineNumber -= Constants::MODULE_LINES_OFFSET;
-			}
-
 			int column = frame->GetColumn();
 			if (column < 0)
 			{

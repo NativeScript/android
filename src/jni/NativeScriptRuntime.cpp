@@ -19,7 +19,7 @@
 #include "MethodCache.h"
 #include "JsDebugger.h"
 #include "SimpleProfiler.h"
-#include "Require.h"
+#include "Module.h"
 
 using namespace v8;
 using namespace std;
@@ -28,7 +28,6 @@ using namespace tns;
 void NativeScriptRuntime::Init(JavaVM *jvm, ObjectManager *objectManager)
 {
 	NativeScriptRuntime::jvm = jvm;
-	Require::Init();
 
 	JEnv env;
 
@@ -751,7 +750,6 @@ void NativeScriptRuntime::CreateGlobalCastFunctions(const Local<ObjectTemplate>&
 {
 	castFunctions.CreateGlobalCastFunctions(globalTemplate);
 }
-
 
 vector<string> NativeScriptRuntime::GetTypeMetadata(const string& name, int index)
 {

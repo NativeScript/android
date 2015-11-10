@@ -20,8 +20,8 @@
 #include "SimpleProfiler.h"
 #include "SimpleAllocator.h"
 #include "File.h"
-#include "Require.h"
 #include "JType.h"
+#include "Module.h"
 #include <sstream>
 #include <android/log.h>
 #include <assert.h>
@@ -122,7 +122,6 @@ void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring pa
 	globalTemplate->Set(ConvertToV8String("__enableVerboseLogging"), FunctionTemplate::New(isolate, NativeScriptRuntime::EnableVerboseLoggingMethodCallback));
 	globalTemplate->Set(ConvertToV8String("__disableVerboseLogging"), FunctionTemplate::New(isolate, NativeScriptRuntime::DisableVerboseLoggingMethodCallback));
 	globalTemplate->Set(ConvertToV8String("__exit"), FunctionTemplate::New(isolate, NativeScriptRuntime::ExitMethodCallback));
-	globalTemplate->Set(ConvertToV8String("require"), FunctionTemplate::New(isolate, Require::Callback));
 
 	WeakRef::Init(isolate, globalTemplate, g_objectManager);
 
@@ -134,6 +133,8 @@ void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring pa
 	PrimaryContext = new Persistent<Context>(isolate, context);
 
 	context_scope = new Context::Scope(context);
+
+	Module::Init(isolate);
 
 	g_objectManager->Init(isolate);
 
@@ -193,7 +194,7 @@ extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj
 	PrepareV8Runtime(isolate, env, filesPath, packageName);
 }
 
-extern "C" void Java_com_tns_Platform_runNativeScript(JNIEnv *_env, jobject obj, jstring scriptFile)
+extern "C" void Java_com_tns_Platform_runModule(JNIEnv *_env, jobject obj, jstring scriptFile)
 {
 	JEnv env(_env);
 	auto isolate = g_isolate;
@@ -204,17 +205,7 @@ extern "C" void Java_com_tns_Platform_runNativeScript(JNIEnv *_env, jobject obj,
 	string filePath = ArgConverter::jstringToString(scriptFile);
 	bool hasError = false;
 
-	Require::CompileAndRun(filePath, hasError);
-
-	/*
-	 * moduleObject (export module) can be set to js variable but currently we start the script implicitly without returning the moduleObject (just calling it)
-	 *
-	 * we can do something like
-	 * var appModule = require("app"); //but currently we call the appModule only once Platform.run() and no one else has access to it
-	 */
-
-	//DEBUG_WRITE("Forcing V8 garbage collection");
-	//while (!V8::IdleNotification());
+	auto moduleObj = Module::CompileAndRun(filePath, hasError);
 }
 
 extern "C" jobject Java_com_tns_Platform_runScript(JNIEnv *_env, jobject obj, jstring scriptFile)
