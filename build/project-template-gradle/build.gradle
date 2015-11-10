@@ -415,16 +415,18 @@ task deleteExplodedAarFolder (type: Delete) {
 ////////////////////////////////////////////////////////////////////////////////////
 
 task runBindingGenerator (type: Exec) {
-	String jarsDir = "-PjarsDir=$rootDir/metadata/libs" //re-make to use intermediates folder
-	String jsCodeToParse = "-PjsCodeDir=$rootDir/src/main/assets/app"
-	String outDir = "-PoutDir=../../src/main/java"
+	doFirst {
+		String jarsDir = "-PjarsDir=" + allJarPaths
+		String jsCodeToParse = "-PjsCodeDir=$rootDir/src/main/assets/app"
+		String outDir = "-PoutDir=../../src/main/java"
 	
-	workingDir "$rootDir/build-tools/android-static-binding-generator"
-	if(isWinOs) {
-		commandLine "cmd", "/c", "gradlew", "generatebindings", jarsDir, jsCodeToParse, outDir
-	}
-	else {
-		commandLine "gradlew", "generatebindings", jarsDir, jsCodeToParse, outDir
+		workingDir "$rootDir/build-tools/android-static-binding-generator"
+		if(isWinOs) {
+			commandLine "cmd", "/c", "gradle", "generatebindings", jsCodeToParse, outDir, jarsDir
+		}
+		else {
+			commandLine "gradle", "generatebindings", jsCodeToParse, outDir, jarsDir
+		}
 	}
 }
 

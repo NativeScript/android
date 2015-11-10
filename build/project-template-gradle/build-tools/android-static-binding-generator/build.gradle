@@ -59,10 +59,11 @@ task generateInterfaceNamesList(type: JavaExec) {
 
 	main "-jar"
 	
-	def sourceJarsDir = isJarsDirPassed ? jarsDir : defaultJarsDir
+	jarsDir = jarsDir.toString().replaceAll(/[\[\]]/, "").split(", ")
+	
 	def str = new LinkedList <String> ();
 	str.add("${interfaceNameGeneratorDir}/build/libs/interface-name-generator.jar")
-	str.add(sourceJarsDir)
+	str.addAll(jarsDir)
 
 	args str.toArray()
 }
@@ -106,16 +107,18 @@ task generateBindings(type: JavaExec) {
 	main "-jar"
 	
 	def str = new LinkedList <String> ();
-	str.add("binding-generator.jar")
 	
-	//jar folder to run through
-	str.add(jarsDir) //fix hardcoded path (will be passed as project parameter)
+	str.add("binding-generator.jar")
 	
 	//generated bindings names
 	str.add(pathToBindingsFile)
 	
 	//out dir (optional)
 	str.add("$rootDir/${outDir}")
+	
+	//jar folder to run through
+	str.addAll(jarsDir) //fix hardcoded path (will be passed as project parameter)
+	
 	
 	args str.toArray()
 }
