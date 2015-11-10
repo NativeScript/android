@@ -937,7 +937,7 @@ public class JarLister {
 		overridenClasses = proxyNames;
 
 		loader = NSClassLoader.getInstance();
-		loader.loadDir(ExtendClassGenerator.jarFilesDir);
+		loader.loadJars(args);
 
 		String[] jars = loader.getJarNames();
 
@@ -967,7 +967,7 @@ public class JarLister {
 
 			JarInputStream input = null;
 
-			String jarFilename = new File(ExtendClassGenerator.jarFilesDir, jarFile).getCanonicalPath();
+			String jarFilename = new File(jarFile).getCanonicalPath();
 			try {
 				input = new JarInputStream(new FileInputStream(jarFilename));	
 			}
@@ -997,9 +997,8 @@ public class JarLister {
 			//
 
 			for (String className : classes) {
-
 				//
-				if (jarFile.equals("nativescript.jar") && className.startsWith("com.tns.com.tns.tests.")) {
+				if (jarFile.endsWith("nativescript.jar") && className.startsWith("com.tns.com.tns.tests.")) {
 					continue;
 				}
 				//

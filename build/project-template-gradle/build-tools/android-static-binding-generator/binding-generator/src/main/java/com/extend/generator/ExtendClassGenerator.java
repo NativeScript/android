@@ -23,22 +23,17 @@ public class ExtendClassGenerator {
 		if (args != null )
 		{
 			if(args.length > 0) {
-				
-				jarsDir = args[0];				
+				bindingsPath = args[0]; 		
 			}
 			if(args.length > 1) {
-				
-				bindingsPath = args[1]; 
+				outName = args[1];
 			}
-			if(args.length > 2) {
-				
-				outName = args[2];
-			}
+
+			//rest of the arguments are jar paths
 		}
 
 		new File(outName).mkdir(); //make shure there is an out folder
-		
-		jarFilesDir = new File(jarsDir).getCanonicalPath();
+
 		String pathToBindingsFile = new File(bindingsPath).getCanonicalPath();
 		outFilesDir = new File(outName).getCanonicalPath();
 		
@@ -82,12 +77,12 @@ private static HashMap<String, HashSet<String>> ReadProxyNames(String bindingsPa
 			}
 		}
 		
-		for(String key : result.keySet()) {
-			System.out.println(key);
-			for(String mn : result.get(key)){
-				System.out.println("   " + mn);
-			}
-		}
+		// for(String key : result.keySet()) {
+		// 	System.out.println(key);
+		// 	for(String mn : result.get(key)){
+		// 		System.out.println("\t" + mn);
+		// 	}
+		// }
 
 		//Close the input stream
 		br.close();
