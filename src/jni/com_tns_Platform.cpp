@@ -421,17 +421,6 @@ extern "C" jint Java_com_tns_Platform_generateNewObjectId(JNIEnv *env, jobject o
 	return objectId;
 }
 
-
-extern "C" void Java_com_tns_Platform_enableVerboseLoggingNative(JNIEnv *env, jobject obj)
-{
-	tns::LogEnabled = true;
-}
-
-extern "C" void Java_com_tns_Platform_disableVerboseLoggingNative(JNIEnv *env, jobject obj)
-{
-	tns::LogEnabled = false;
-}
-
 extern "C" void Java_com_tns_Platform_adjustAmountOfExternalAllocatedMemoryNative(JNIEnv *env, jobject obj, jlong usedMemory)
 {
 	Isolate::GetCurrent()->AdjustAmountOfExternalAllocatedMemory(usedMemory);

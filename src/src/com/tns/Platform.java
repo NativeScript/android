@@ -35,10 +35,6 @@ public class Platform
 
 	private static native int generateNewObjectId();
 
-	private static native void enableVerboseLoggingNative();
-
-	private static native void disableVerboseLoggingNative();
-	
 	private static native void adjustAmountOfExternalAllocatedMemoryNative(long changeInBytes);
 	
 	private static native void passUncaughtExceptionToJsNative(Throwable ex, String stackTrace);
@@ -161,7 +157,6 @@ public class Platform
 	{
 		logger.setEnabled(true);
 		ProxyGenerator.IsLogEnabled = true;
-		enableVerboseLoggingNative();
 	}
 
 	@RuntimeCallable
@@ -169,7 +164,6 @@ public class Platform
 	{
 		logger.setEnabled(false);
 		ProxyGenerator.IsLogEnabled = false;
-		disableVerboseLoggingNative();
 	}
 
 	@RuntimeCallable
