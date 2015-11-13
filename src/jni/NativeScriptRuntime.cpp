@@ -917,10 +917,7 @@ Local<Object> NativeScriptRuntime::FindClass(const string& className)
 	Local<Object> clazz;
 	JEnv env;
 
-	jmethodID mid = env.GetStaticMethodID(PlatformClass, "findClass", "(Ljava/lang/String;)Ljava/lang/Class;");
-	assert(mid != nullptr);
-	JniLocalRef name(env.NewStringUTF(className.c_str()));
-	jclass c = (jclass)env.CallStaticObjectMethod(PlatformClass, mid, (jstring)name);
+	jclass c = env.FindClass(className);
 	if (env.ExceptionCheck() == JNI_FALSE)
 	{
 		jint javaObjectID = objectManager->GetOrCreateObjectId(c);
@@ -930,8 +927,6 @@ Local<Object> NativeScriptRuntime::FindClass(const string& className)
 		{
 			clazz = objectManager->CreateJSWrapper(javaObjectID, "Ljava/lang/Class;", c);
 		}
-
-		env.DeleteLocalRef(c);
 	}
 	return clazz;
 }
