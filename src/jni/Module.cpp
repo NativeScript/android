@@ -214,8 +214,7 @@ Local<Object> Module::CompileAndRun(const string& modulePath, bool& hasError)
 		script = ScriptCompiler::Compile(isolate->GetCurrentContext(), &source, option).ToLocalChecked();
 		SaveScriptCache(source, modulePath);
 	}
-	//auto script = Script::Compile(scriptText, fullRequiredModulePath);
-	//
+
 	DEBUG_WRITE("Compiled script (module %s)", modulePath.c_str());
 
 	if (ExceptionUtil::GetInstance()->HandleTryCatch(tc, "Script " + modulePath + " contains compilation errors!"))
@@ -297,24 +296,14 @@ ScriptCompiler::CachedData* Module::TryLoadScriptCache(const std::string& path)
 	}
 
 	auto cachePath = path + ".cache";
-	if(!File::Exists(cachePath))
+	int length = 0;
+	auto data = File::ReadBinary(cachePath, length);
+	if(!data)
 	{
 		return nullptr;
 	}
 
-	auto file = fopen(cachePath.c_str(), "rb" /* read binary */);
-	fseek(file, 0, SEEK_END);
-	auto size = ftell(file);
-	rewind(file);
-
-	uint8_t* data = new uint8_t[size];
-	fread(data, sizeof(uint8_t), size, file);
-
-	auto cache = new ScriptCompiler::CachedData(data, size, ScriptCompiler::CachedData::BufferOwned);
-
-	fclose(file);
-
-	return cache;
+	return new ScriptCompiler::CachedData(reinterpret_cast<uint8_t*>(data), length, ScriptCompiler::CachedData::BufferOwned);
 }
 
 void Module::SaveScriptCache(const ScriptCompiler::Source& source, const std::string& path)
@@ -326,9 +315,7 @@ void Module::SaveScriptCache(const ScriptCompiler::Source& source, const std::st
 
 	int length = source.GetCachedData()->length;
 	auto cachePath = path + ".cache";
-	auto file = fopen(cachePath.c_str(), "wb" /* write binary */);
-	fwrite(source.GetCachedData()->data, sizeof(uint8_t), length, file);
-	fclose(file);
+	File::WriteBinary(cachePath, source.GetCachedData()->data, length);
 }
 
 

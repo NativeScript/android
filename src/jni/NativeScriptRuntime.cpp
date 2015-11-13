@@ -781,12 +781,12 @@ vector<string> NativeScriptRuntime::GetTypeMetadata(const string& name, int inde
 	return result;
 }
 
-void NativeScriptRuntime::BuildMetadata(JEnv& env, jstring filesPath)
+void NativeScriptRuntime::BuildMetadata(JEnv& env, string filesPath)
 {
 	timeval time1;
 	gettimeofday(&time1, nullptr);
 
-	string baseDir = ArgConverter::jstringToString(filesPath);
+	string baseDir = filesPath;
 	baseDir.append("/metadata");
 	string nodesFile = baseDir + "/treeNodeStream.dat";
 	string namesFile = baseDir + "/treeStringsStream.dat";
