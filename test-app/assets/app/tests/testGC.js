@@ -194,4 +194,21 @@ describe("Tests garbage collection", function () {
 			expect(name).toBe("dummy");
 		}
 	});
+
+	xit("should persist JavaScript object when it reappears after GC", function () {
+		
+		function getObject() {
+			var o = new java.lang.Object();
+			o.x = 123;
+			var arr = java.lang.reflect.Array.newInstance(java.lang.Object.class, 1);
+			arr[0] = o;
+			return arr;
+		}
+
+		var arr = getObject();
+		gc();
+		var o = arr[0];
+
+		expect(o.x).toBe(123);
+	});
 });
