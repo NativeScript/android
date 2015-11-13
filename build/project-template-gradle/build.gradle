@@ -37,6 +37,7 @@ def configurationsDir = "configurations"
 def createPluginConfigFile = false
 def configStage = "\n:config phase: "
 def nodeModulesDir = "../../node_modules/"
+def libDir = "../../lib/Android/"
 def pluginNames = new ArrayList<String>()
 def configDir = file(configurationsDir)
 def appResExists = false
@@ -163,6 +164,9 @@ dependencies {
 
 	// take all jars within the node_modules dir
 	compile fileTree(dir: nodeModulesDir, include: ["**/*.jar"])
+
+	// take all jars within the lib/Android dir
+	compile fileTree(dir: libDir, include: ["**/*.jar"])
 	
 	//when gradle has aar support this will be preferred instead of addAarDependencies
 	// compile files("$rootDir/libs/aar") {
