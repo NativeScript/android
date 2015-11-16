@@ -85,7 +85,6 @@ void PrepareV8Runtime(JEnv& env, string filesPath, jstring packageName)
 	{
 		startup_data = V8::CreateSnapshotDataBlob();
 		File::WriteBinary(snapshotPath, startup_data.data, startup_data.raw_size);
-		__android_log_print(ANDROID_LOG_INFO, "TNS.Native", "SnapshotLength: %d", startup_data.raw_size);
 	}
 
 	create_params.snapshot_blob = &startup_data;
