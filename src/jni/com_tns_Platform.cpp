@@ -101,7 +101,7 @@ void PrepareExtendFunction(Isolate *isolate, jstring filesPath)
 	DEBUG_WRITE("Executed prepareExtend.js script");
 }
 
-void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring packageName, jstring jsoptions)
+void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring packageName, jstring jsoptions, jobject jsDebugger)
 {
 	string v8flags = ArgConverter::jstringToString(jsoptions);
 	V8::SetFlagsFromString(v8flags.c_str(), v8flags.size());
@@ -154,7 +154,7 @@ void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring pa
 
 	string pckName = ArgConverter::jstringToString(packageName);
 	Profiler::Init(pckName);
-	JsDebugger::Init(isolate, pckName);
+	JsDebugger::Init(isolate, pckName, jsDebugger);
 
 	//PrepareExtendFunction(isolate, filesPath);
 
@@ -163,7 +163,7 @@ void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring pa
 	NativeScriptRuntime::CreateTopLevelNamespaces(global);
 }
 
-extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj, jstring filesPath, jint appJavaObjectId, jboolean verboseLoggingEnabled, jstring packageName, jstring jsoptions)
+extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj, jstring filesPath, jint appJavaObjectId, jboolean verboseLoggingEnabled, jstring packageName, jstring jsoptions, jobject jsDebugger)
 {
 	AppJavaObjectID = appJavaObjectId;
 	tns::LogEnabled = verboseLoggingEnabled;
@@ -184,7 +184,7 @@ extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj
 	ExceptionUtil::GetInstance()->Init(g_jvm, g_objectManager);
 
 	JEnv env(_env);
-	PrepareV8Runtime(isolate, env, filesPath, packageName, jsoptions);
+	PrepareV8Runtime(isolate, env, filesPath, packageName, jsoptions, jsDebugger);
 
 	NativeScriptRuntime::APP_FILES_DIR = ArgConverter::jstringToString(filesPath);
 	Constants::APP_ROOT_FOLDER_PATH = NativeScriptRuntime::APP_FILES_DIR + "/app/";

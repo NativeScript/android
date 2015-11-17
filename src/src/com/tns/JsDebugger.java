@@ -382,11 +382,18 @@ public class JsDebugger
 	private boolean getDebugBreakFlagAndClearIt()
 	{
 		File debugBreakFile = new File("/data/local/tmp", context.getPackageName() + "-debugbreak");
-		if (debugBreakFile.exists())
+		if (debugBreakFile.exists() && !debugBreakFile.isDirectory() && debugBreakFile.length() == 0)
 		{
-			if (!debugBreakFile.delete())
+			try
 			{
-				Log.e("TNS", "Debug break temp file can not be removed. Debug sessions may not work correctly");
+				java.io.FileWriter fileWriter = new java.io.FileWriter(debugBreakFile);
+				fileWriter.write("used");
+				fileWriter.close();
+			}
+			catch (IOException e)
+			{
+				Log.e("TNS", "Debug break temp file can not be marked as used. Debug sessions may not work correctly. file: " + debugBreakFile.getAbsolutePath());
+				e.printStackTrace();
 			}
 			
 			return true;

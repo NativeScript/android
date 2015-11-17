@@ -26,7 +26,7 @@ import com.tns.internal.ExtractPolicy;
 
 public class Platform
 {
-	private static native void initNativeScript(String filesPath, int appJavaObjectId, boolean verboseLoggingEnabled, String packageName, String jsOptions);
+	private static native void initNativeScript(String filesPath, int appJavaObjectId, boolean verboseLoggingEnabled, String packageName, String jsOptions, JsDebugger jsDebugger);
 
 	private static native void runNativeScript(String appModuleName);
 	
@@ -132,15 +132,18 @@ public class Platform
 			throw new RuntimeException("Fail to initialize Require class", ex);
 		}
 		
-		String jsOptions = readJsOptions(appDir);
-		Platform.initNativeScript(Require.getApplicationFilesPath(), appJavaObjectId, logger.isEnabled(), appName, jsOptions);
-		
 		if (JsDebugger.isDebuggableApp(application))
 		{
 			jsDebugger = new JsDebugger(application, logger, threadScheduler);
-			jsDebugger.start();
 		}
 		
+		String jsOptions = readJsOptions(appDir);
+		Platform.initNativeScript(Require.getApplicationFilesPath(), appJavaObjectId, logger.isEnabled(), appName, jsOptions, jsDebugger);
+		
+		if (jsDebugger != null)
+		{
+			jsDebugger.start();
+		}
 		
 		if (logger.isEnabled())
 		{
