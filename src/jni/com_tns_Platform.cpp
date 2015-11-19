@@ -63,46 +63,40 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved)
 	return JNI_VERSION_1_6;
 }
 
-void PrepareExtendFunction(Isolate *isolate, jstring filesPath)
+void PrepareV8Runtime(JEnv& env, string filesPath, jstring packageName)
 {
-	string fullPath = ArgConverter::jstringToString(filesPath);
-	fullPath.append("/internal/prepareExtend.js");
+	Platform* platform = v8::platform::CreateDefaultPlatform();
+	V8::InitializePlatform(platform);
+	V8::Initialize();
 
-	int length;
-	bool isNew;
-	const char* content = File::ReadText(fullPath, length, isNew);
+	Isolate::CreateParams create_params;
+	create_params.array_buffer_allocator = &g_allocator;
 
-	TryCatch tc;
-	auto cmd = ConvertToV8String(content, length);
-
-	if(isNew)
+	// prepare the snapshot blob
+	if(Constants::V8_HEAP_SNAPSHOT)
 	{
-		delete[] content;
+		auto snapshotPath = filesPath + "/internal/snapshot.dat";
+		StartupData startup_data;
+		if( File::Exists(snapshotPath))
+		{
+			int length;
+			startup_data.data = reinterpret_cast<char*>(File::ReadBinary(snapshotPath, length));
+			startup_data.raw_size = length;
+		}
+		else
+		{
+			startup_data = V8::CreateSnapshotDataBlob();
+			File::WriteBinary(snapshotPath, startup_data.data, startup_data.raw_size);
+		}
+
+		create_params.snapshot_blob = &startup_data;
 	}
 
-	auto origin = ConvertToV8String(fullPath);
-	DEBUG_WRITE("Compiling prepareExtend.js script");
+	g_isolate = Isolate::New(create_params);
+	auto isolate = g_isolate;
+	Isolate::Scope isolate_scope(isolate);
+	HandleScope handleScope(isolate);
 
-	auto script = Script::Compile(cmd, origin);
-	DEBUG_WRITE("Compile prepareExtend.js script");
-
-	if (script.IsEmpty() || tc.HasCaught())
-	{
-		DEBUG_WRITE("Cannot compile prepareExtend.js script");
-		return;
-	}
-
-	DEBUG_WRITE("Compiled prepareExtend.js script");
-
-	script->Run();
-
-	ExceptionUtil::GetInstance()->HandleTryCatch(tc);
-
-	DEBUG_WRITE("Executed prepareExtend.js script");
-}
-
-void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring packageName)
-{
 	V8::SetFlagsFromString(Constants::V8_STARTUP_FLAGS.c_str(), Constants::V8_STARTUP_FLAGS.size());
 	V8::SetCaptureStackTraceForUncaughtExceptions(true, 100, StackTrace::kOverview);
 	V8::AddMessageListener(ExceptionUtil::OnUncaughtError);
@@ -132,6 +126,12 @@ void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring pa
 	Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
 	PrimaryContext = new Persistent<Context>(isolate, context);
 
+	if(Constants::V8_HEAP_SNAPSHOT)
+	{
+		// we own the snapshot buffer, delete it
+		delete[] create_params.snapshot_blob->data;
+	}
+
 	context_scope = new Context::Scope(context);
 
 	Module::Init(isolate);
@@ -156,8 +156,6 @@ void PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring pa
 	Profiler::Init(pckName);
 	JsDebugger::Init(isolate, pckName);
 
-	//PrepareExtendFunction(isolate, filesPath);
-
 	NativeScriptRuntime::BuildMetadata(env, filesPath);
 
 	NativeScriptRuntime::CreateTopLevelNamespaces(global);
@@ -170,28 +168,20 @@ extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj
 
 	JEnv env(_env);
 
-	Constants::APP_ROOT_FOLDER_PATH = ArgConverter::jstringToString(filesPath) + "/app/";
+	auto filesRoot = ArgConverter::jstringToString(filesPath);
+	Constants::APP_ROOT_FOLDER_PATH = filesRoot + "/app/";
 	// read config options passed from Java
 	JniLocalRef v8Flags(env.GetObjectArrayElement(args, 0));
 	Constants::V8_STARTUP_FLAGS = ArgConverter::jstringToString(v8Flags);
 	JniLocalRef cacheCode(env.GetObjectArrayElement(args, 1));
 	Constants::V8_CACHE_COMPILED_CODE = (bool)cacheCode;
+	JniLocalRef snapshot(env.GetObjectArrayElement(args, 2));
+	Constants::V8_HEAP_SNAPSHOT = (bool)snapshot;
 
 	DEBUG_WRITE("Initializing Telerik NativeScript: app instance id:%d", appJavaObjectId);
 
-	Platform* platform = v8::platform::CreateDefaultPlatform();
-	V8::InitializePlatform(platform);
-	V8::Initialize();
-
-	Isolate::CreateParams create_params;
-	create_params.array_buffer_allocator = &g_allocator;
-	g_isolate = Isolate::New(create_params);
-	auto isolate = g_isolate;
-	Isolate::Scope isolate_scope(isolate);
-	HandleScope handleScope(isolate);
-
 	ExceptionUtil::GetInstance()->Init(g_jvm, g_objectManager);
-	PrepareV8Runtime(isolate, env, filesPath, packageName);
+	PrepareV8Runtime(env, filesRoot, packageName);
 }
 
 extern "C" void Java_com_tns_Platform_runModule(JNIEnv *_env, jobject obj, jstring scriptFile)
@@ -255,7 +245,6 @@ extern "C" jobject Java_com_tns_Platform_runScript(JNIEnv *_env, jobject obj, js
 
 	return res;
 }
-
 
 void AppInitCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
