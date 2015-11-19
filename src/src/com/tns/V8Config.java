@@ -8,6 +8,7 @@ class V8Config
 	private static final String AndroidKey = "android";
 	private static final String V8FlagsKey = "v8Flags";
 	private static final String CodeCacheKey = "codeCache";
+	private static final String HeapSnapshotKey = "heapSnapshot";
 	
 	public static Object[] fromPackageJSON(File appDir)
 	{
@@ -31,7 +32,11 @@ class V8Config
 				}
 				if(androidObject.has(CodeCacheKey))
 				{
-					result[1] = Boolean.parseBoolean(androidObject.getString(CodeCacheKey));
+					result[1] = androidObject.getBoolean(CodeCacheKey);
+				}
+				if(androidObject.has(HeapSnapshotKey))
+				{
+					result[2] = androidObject.getBoolean(HeapSnapshotKey);
 				}
 			}
 		}
@@ -50,6 +55,8 @@ class V8Config
 		result[0] = "--expose_gc";
 		// enable v8 code caching, false by default
 		result[1] = false;
+		// enable v8 heap snapshot, false by default
+		result[2] = false;
 		
 		return result;
 	}

@@ -73,21 +73,24 @@ void PrepareV8Runtime(JEnv& env, string filesPath, jstring packageName)
 	create_params.array_buffer_allocator = &g_allocator;
 
 	// prepare the snapshot blob
-	auto snapshotPath = filesPath + "/internal/snapshot.dat";
-	StartupData startup_data;
-	if(File::Exists(snapshotPath))
+	if(Constants::V8_HEAP_SNAPSHOT)
 	{
-		int length;
-		startup_data.data = reinterpret_cast<char*>(File::ReadBinary(snapshotPath, length));
-		startup_data.raw_size = length;
-	}
-	else
-	{
-		startup_data = V8::CreateSnapshotDataBlob();
-		File::WriteBinary(snapshotPath, startup_data.data, startup_data.raw_size);
-	}
+		auto snapshotPath = filesPath + "/internal/snapshot.dat";
+		StartupData startup_data;
+		if( File::Exists(snapshotPath))
+		{
+			int length;
+			startup_data.data = reinterpret_cast<char*>(File::ReadBinary(snapshotPath, length));
+			startup_data.raw_size = length;
+		}
+		else
+		{
+			startup_data = V8::CreateSnapshotDataBlob();
+			File::WriteBinary(snapshotPath, startup_data.data, startup_data.raw_size);
+		}
 
-	create_params.snapshot_blob = &startup_data;
+		create_params.snapshot_blob = &startup_data;
+	}
 
 	g_isolate = Isolate::New(create_params);
 	auto isolate = g_isolate;
@@ -123,8 +126,11 @@ void PrepareV8Runtime(JEnv& env, string filesPath, jstring packageName)
 	Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
 	PrimaryContext = new Persistent<Context>(isolate, context);
 
-	// we own the snapshot buffer, delete it
-	delete[] startup_data.data;
+	if(Constants::V8_HEAP_SNAPSHOT)
+	{
+		// we own the snapshot buffer, delete it
+		delete[] create_params.snapshot_blob->data;
+	}
 
 	context_scope = new Context::Scope(context);
 
@@ -169,6 +175,8 @@ extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj
 	Constants::V8_STARTUP_FLAGS = ArgConverter::jstringToString(v8Flags);
 	JniLocalRef cacheCode(env.GetObjectArrayElement(args, 1));
 	Constants::V8_CACHE_COMPILED_CODE = (bool)cacheCode;
+	JniLocalRef snapshot(env.GetObjectArrayElement(args, 2));
+	Constants::V8_HEAP_SNAPSHOT = (bool)snapshot;
 
 	DEBUG_WRITE("Initializing Telerik NativeScript: app instance id:%d", appJavaObjectId);
 
