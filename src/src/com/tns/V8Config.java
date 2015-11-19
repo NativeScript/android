@@ -50,13 +50,14 @@ class V8Config
 	
 	private static Object[] makeDefaultOptions()
 	{
-		Object[] result = new Object[2];
-		// v8 startup flags, defaults to --expose_gc due to tns_modules requirement 
-		result[0] = "--expose_gc";
-		// enable v8 code caching, false by default
-		result[1] = false;
-		// enable v8 heap snapshot, false by default
-		result[2] = false;
+		Object[] result = new Object[] {
+			// v8 startup flags, defaults to --expose_gc due to tns_modules requirement 
+			"--expose_gc",
+			// enable v8 code caching, false by default
+			false,
+			// enable v8 heap snapshot, false by default
+			false
+		};
 		
 		return result;
 	}
