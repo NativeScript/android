@@ -29,8 +29,6 @@ import android.net.LocalSocket;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
-import android.os.Looper;
-import android.os.Message;
 import android.util.Log;
 
 public class JsDebugger
@@ -88,12 +86,6 @@ public class JsDebugger
             this.running = false;
         }
 
-        public void stopHandlers()
-		{
-			this.requestHandler.stop();
-			this.responseHandler.stop();
-		}
-        
         public void stopResponseHandler()
 		{
 			this.responseHandler.stop();
@@ -301,7 +293,7 @@ public class JsDebugger
 		{
 			try
 			{
-				Log.d("TNS.JAVA.JsDebugger", "Sending message to v8:" + message);
+				//Log.d("TNS.JAVA.JsDebugger", "Sending message to v8:" + message);
 				
 				byte[] cmdBytes = message.getBytes("UTF-16LE");
 				int cmdLength = cmdBytes.length;
@@ -347,7 +339,7 @@ public class JsDebugger
 						break;
 					}
 					
-					Log.d("TNS.JAVA.JsDebugger", "Sending message to inspector:" + message);
+					//Log.d("TNS.JAVA.JsDebugger", "Sending message to inspector:" + message);
 					
 					sendMessageToInspector(message);
 				}
@@ -392,7 +384,7 @@ public class JsDebugger
 					output.write(utf8);
 					output.flush();
 					
-					Log.d("TNS.JAVA.JsDebugger", "Sent message to inspector:" + msg);
+					//Log.d("TNS.JAVA.JsDebugger", "Sent message to inspector:" + msg);
 				}
 				catch (IOException e)
 				{
@@ -414,7 +406,7 @@ public class JsDebugger
 	@RuntimeCallable
 	private void enqueueMessage(String message)
 	{
-		logger.write("Debug msg:" + message);
+		//logger.write("Debug msg:" + message);
 		
 		dbgMessages.add(message);
 	}
@@ -444,36 +436,12 @@ public class JsDebugger
 		}
 		catch (UnsupportedEncodingException e)
 		{
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		
-		logger.write("disableAgent: Stopping response handler");
 		debugServerThread.stopResponseHandler();
-		logger.write("disableAgent: Stopped response handler");
 	}
 
-	
-//	class LooperThread extends Thread
-//	{
-//	      public Handler mHandler;
-//
-//	      public void run()
-//	      {
-//	          Looper.prepare();
-//
-//	          mHandler = new Handler()
-//	          {
-//	              public void handleMessage(Message msg)
-//	              {
-//	            	 
-//	              }
-//	          };
-//
-//	          Looper.loop();
-//	      }
-//	  }
-	
 	private void registerEnableDisableDebuggerReceiver(Handler handler)
 	{
 		String debugAction = context.getPackageName() + "-debug";

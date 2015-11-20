@@ -13,7 +13,7 @@ JsDebugger::JsDebugger()
 
 void JsDebugger::Init(v8::Isolate *isolate, const string& packageName, jobject jsDebugger)
 {
-	__android_log_print(ANDROID_LOG_INFO, "TNS.JsDebugger", "JsDebugger::Init called");
+	//__android_log_print(ANDROID_LOG_INFO, "TNS.JsDebugger", "JsDebugger::Init called");
 
 	s_isolate = isolate;
 	s_packageName = packageName;
@@ -37,7 +37,7 @@ void JsDebugger::Init(v8::Isolate *isolate, const string& packageName, jobject j
 
 string JsDebugger::GetPackageName()
 {
-	__android_log_print(ANDROID_LOG_INFO, "TNS.JsDebugger", "JsDebugger::GetPackageName");
+	//__android_log_print(ANDROID_LOG_INFO, "TNS.JsDebugger", "JsDebugger::GetPackageName");
 	return s_packageName;
 }
 
@@ -47,11 +47,11 @@ string JsDebugger::GetPackageName()
  */
 void JsDebugger::MyMessageHandler(const v8::Debug::Message& message)
 {
-	__android_log_print(ANDROID_LOG_INFO, "TNS.JsDebugger", "JsDebugger::MyMessageHandler");
+	//__android_log_print(ANDROID_LOG_INFO, "TNS.JsDebugger", "JsDebugger::MyMessageHandler");
 
 	if (s_jsDebugger == nullptr)
 	{
-		__android_log_print(ANDROID_LOG_INFO, "TNS.JsDebugger", "JsDebugger s_jsDebugger is null...returning....");
+		//__android_log_print(ANDROID_LOG_INFO, "TNS.JsDebugger", "JsDebugger s_jsDebugger is null...returning....");
 		return;
 	}
 
@@ -69,7 +69,7 @@ void JsDebugger::MyMessageHandler(const v8::Debug::Message& message)
  */
 void JsDebugger::Enable()
 {
-	__android_log_print(ANDROID_LOG_INFO, "TNS.JsDebugger", "JsDebugger::Enable called");
+	//__android_log_print(ANDROID_LOG_INFO, "TNS.JsDebugger", "JsDebugger::Enable called");
 	auto isolate = s_isolate;
 	v8::Isolate::Scope isolate_scope(isolate);
 	v8::HandleScope handleScope(isolate);
@@ -82,7 +82,7 @@ void JsDebugger::Enable()
  */
 void JsDebugger::Disable()
 {
-	__android_log_print(ANDROID_LOG_INFO, "TNS.JsDebugger", "JsDebugger::Disable called");
+	//__android_log_print(ANDROID_LOG_INFO, "TNS.JsDebugger", "JsDebugger::Disable called");
 	auto isolate = s_isolate;
 	v8::Isolate::Scope isolate_scope(isolate);
 	v8::HandleScope handleScope(isolate);
@@ -96,7 +96,7 @@ void JsDebugger::Disable()
  */
 void JsDebugger::DebugBreak()
 {
-	__android_log_print(ANDROID_LOG_INFO, "TNS.JsDebugger", "JsDebugger::DebugBreak called");
+	//__android_log_print(ANDROID_LOG_INFO, "TNS.JsDebugger", "JsDebugger::DebugBreak called");
 	auto isolate = s_isolate;
 	v8::Isolate::Scope isolate_scope(isolate);
 	v8::HandleScope handleScope(isolate);
@@ -106,7 +106,7 @@ void JsDebugger::DebugBreak()
 
 void JsDebugger::ProcessDebugMessages()
 {
-	__android_log_print(ANDROID_LOG_INFO, "TNS.JsDebugger", "JsDebugger::ProcessDebugMessages called");
+	//__android_log_print(ANDROID_LOG_INFO, "TNS.JsDebugger", "JsDebugger::ProcessDebugMessages called");
 	auto isolate = s_isolate;
 	v8::Isolate::Scope isolate_scope(isolate);
 	v8::HandleScope handleScope(isolate);
@@ -116,7 +116,7 @@ void JsDebugger::ProcessDebugMessages()
 
 void JsDebugger::SendCommand(uint16_t *cmd, int length)
 {
-	__android_log_print(ANDROID_LOG_INFO, "TNS.JsDebugger", "JsDebugger::SendCommand called");
+	//__android_log_print(ANDROID_LOG_INFO, "TNS.JsDebugger", "JsDebugger::SendCommand called");
 	auto isolate = s_isolate;
 
 	v8::Debug::SendCommand(isolate, cmd, length, nullptr);
@@ -125,11 +125,11 @@ void JsDebugger::SendCommand(uint16_t *cmd, int length)
 void JsDebugger::DebugBreakCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
 
-	__android_log_print(ANDROID_LOG_INFO, "TNS.JsDebugger", "JsDebugger::DebugBreakCallback called");
+	//__android_log_print(ANDROID_LOG_INFO, "TNS.JsDebugger", "JsDebugger::DebugBreakCallback called");
 
 	if (s_jsDebugger == nullptr)
 	{
-		__android_log_print(ANDROID_LOG_INFO, "TNS.JsDebugger", "JsDebugger s_jsDebugger is null...returning");
+		//__android_log_print(ANDROID_LOG_INFO, "TNS.JsDebugger", "JsDebugger s_jsDebugger is null...returning");
 		return;
 	}
 
