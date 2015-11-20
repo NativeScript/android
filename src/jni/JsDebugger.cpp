@@ -25,7 +25,7 @@ void JsDebugger::Init(v8::Isolate *isolate, const string& packageName)
 
 	//enableAgent.start(.stop) what is it used for ?
 	s_EnableAgent = env.GetStaticMethodID(s_JsDebuggerClass, "enableAgent", "(Ljava/lang/String;IZ)V");
-	assert(s_EnqueueMessage != nullptr);
+	assert(s_EnableAgent != nullptr);
 }
 
 string JsDebugger::GetPackageName()
