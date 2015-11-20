@@ -7,14 +7,6 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
-string Util::ToJniName(const string& signature)
-{
-	string jniSignature = signature;
-	std::replace(jniSignature.begin(), jniSignature.end(), '.', '/');
-	return jniSignature;
-}
-
-
 string Util::JniClassPathToCanonicalName(const string& jniClassPath)
 {
 	std::string canonicalName;
@@ -106,35 +98,4 @@ string Util::ConvertFromCanonicalToJniName(const std::string& name)
 	string converted = name;
 	replace(converted.begin(), converted.end(), '.', '/');
 	return converted;
-}
-
-bool Util::StartsWith(const string& s, const string& prefix)
-{
-	size_t prefixLength = prefix.length();
-	return (prefixLength < s.length()) && (s.compare(0, prefixLength, prefix) == 0);
-}
-
-string Util::GetStackTrace(int frameCount)
-{
-	stringstream ss;
-	auto stackTrace = StackTrace::CurrentStackTrace(Isolate::GetCurrent(), frameCount, StackTrace::kOverview);
-	if (!stackTrace.IsEmpty())
-	{
-		auto count = stackTrace->GetFrameCount();
-		for (int i=0; i<count; i++)
-		{
-			auto frame = stackTrace->GetFrame(i);
-			if (!frame.IsEmpty())
-			{
-				auto scriptName = frame->GetScriptName();
-				auto fileName = ConvertToString(scriptName);
-				auto lineNumber = frame->GetLineNumber();
-				auto column = frame->GetColumn();
-
-				ss << fileName << ":" << lineNumber << ":" << column << "\n";
-			}
-		}
-	}
-
-	return ss.str();
 }
