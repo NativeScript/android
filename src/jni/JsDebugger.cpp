@@ -29,7 +29,7 @@ void JsDebugger::Init(v8::Isolate *isolate, const string& packageName, jobject j
 	assert(s_EnqueueMessage != nullptr);
 
 	//enableAgent.start(.stop) what is it used for ?
-	s_EnableAgent = env.GetMethodID(s_JsDebuggerClass, "enableAgent", "(Z)V");
+	s_EnableAgent = env.GetMethodID(s_JsDebuggerClass, "enableAgent", "()V");
 	assert(s_EnableAgent != nullptr);
 
 
@@ -134,7 +134,7 @@ void JsDebugger::DebugBreakCallback(const v8::FunctionCallbackInfo<v8::Value>& a
 	}
 
 	JEnv env;
-	env.CallVoidMethod(s_jsDebugger, s_EnableAgent, JNI_FALSE);
+	env.CallVoidMethod(s_jsDebugger, s_EnableAgent);
 
 	DebugBreak();
 }

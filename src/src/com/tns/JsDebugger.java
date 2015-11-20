@@ -27,6 +27,10 @@ import android.content.pm.PackageManager.NameNotFoundException;
 import android.net.LocalServerSocket;
 import android.net.LocalSocket;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.HandlerThread;
+import android.os.Looper;
+import android.os.Message;
 import android.util.Log;
 
 public class JsDebugger
@@ -51,11 +55,12 @@ public class JsDebugger
 	private Logger logger;
 	private Context context;
 	private DebugLocalServerSocketThread debugServerThread;
-	private Thread debugJavaServerThread;
 
 	private final static  String STOP_MESSAGE = "STOP_MESSAGE";
 	
 	private byte[] LINE_END_BYTES;
+
+	private HandlerThread handlerThread;
 	
 	public JsDebugger(Context context, Logger logger, ThreadScheduler threadScheduler)
 	{
@@ -68,7 +73,7 @@ public class JsDebugger
 		LINE_END_BYTES[1] = (byte) '\n';
 	}
 
-	private class DebugLocalServerSocketThread implements Runnable
+	private class DebugLocalServerSocketThread extends Thread
     {
         private volatile boolean running;
         private final String name;
@@ -83,10 +88,14 @@ public class JsDebugger
             this.running = false;
         }
 
-        public void stop()
+        public void stopHandlers()
 		{
-			this.running = false;
 			this.requestHandler.stop();
+			this.responseHandler.stop();
+		}
+        
+        public void stopResponseHandler()
+		{
 			this.responseHandler.stop();
 		}
         
@@ -122,6 +131,7 @@ public class JsDebugger
 	                	try
 	    				{
 	                		LocalSocket socket = serverSocket.accept();
+	                		logger.write("Debugger new connection on: " + socket.getFileDescriptor().toString());
 	                		
 	                		dbgMessages.clear();
 	                		
@@ -291,7 +301,7 @@ public class JsDebugger
 		{
 			try
 			{
-				//Log.d("TNS.JAVA.JsDebugger", "Sending message to v8:" + message);
+				Log.d("TNS.JAVA.JsDebugger", "Sending message to v8:" + message);
 				
 				byte[] cmdBytes = message.getBytes("UTF-16LE");
 				int cmdLength = cmdBytes.length;
@@ -337,7 +347,7 @@ public class JsDebugger
 						break;
 					}
 					
-					//Log.d("TNS.JAVA.JsDebugger", "Sending message to inspector:" + message);
+					Log.d("TNS.JAVA.JsDebugger", "Sending message to inspector:" + message);
 					
 					sendMessageToInspector(message);
 				}
@@ -382,7 +392,7 @@ public class JsDebugger
 					output.write(utf8);
 					output.flush();
 					
-					//Log.d("TNS.JAVA.JsDebugger", "Sent message to inspector:" + msg);
+					Log.d("TNS.JAVA.JsDebugger", "Sent message to inspector:" + msg);
 				}
 				catch (IOException e)
 				{
@@ -404,65 +414,92 @@ public class JsDebugger
 	@RuntimeCallable
 	private void enqueueMessage(String message)
 	{
-		//logger.write("Debug msg:" + message);
+		logger.write("Debug msg:" + message);
 		
 		dbgMessages.add(message);
 	}
 
 	@RuntimeCallable
-	private void enableAgent(boolean debugBrake)
+	private void enableAgent()
 	{
-		logger.write("Debug enableAgent");
+		logger.write("Enabling Debugger Agent");
 		enable();
-		
-		if (debugBrake)
-		{
-			debugBreak();
-		}
-
-		
-		debugServerThread = new DebugLocalServerSocketThread(context.getPackageName() + "-debug");
-		debugJavaServerThread = new Thread(debugServerThread);
-		debugJavaServerThread.start();
 	}
 
 	@RuntimeCallable
 	private void disableAgent()
 	{
-		logger.write("Debug disableAgent");
+		logger.write("Disabling Debugger Agent");
 		disable();
-
-		if (debugServerThread != null)
+		
+		
+		String message = "{\"seq\":0,\"type\":\"request\",\"command\":\"disconnect\"}";
+		
+		byte[] cmdBytes;
+		try
 		{
-			debugServerThread.stop();
+			cmdBytes = message.getBytes("UTF-16LE");
+			int cmdLength = cmdBytes.length;
+			sendCommand(cmdBytes, cmdLength);
 		}
+		catch (UnsupportedEncodingException e)
+		{
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		logger.write("disableAgent: Stopping response handler");
+		debugServerThread.stopResponseHandler();
+		logger.write("disableAgent: Stopped response handler");
 	}
 
-//	void registerEnableDisableDebuggerReceiver()
+	
+//	class LooperThread extends Thread
 //	{
-//		String debugAction = context.getPackageName() + "-debug";
-//		context.registerReceiver(new BroadcastReceiver()
-//		{
-//			@Override
-//			public void onReceive(Context context, Intent intent)
-//			{
-//				Bundle bundle = intent.getExtras();
-//				if (bundle != null)
-//				{
-//					boolean enable = bundle.getBoolean("enable", false);
-//					if (enable)
-//					{
-//						boolean debugBrake = bundle.getBoolean("waitForDebugger", false);
-//						enableAgent(debugBrake);
-//					}
-//					else
-//					{
-//						disableAgent(); 
-//					}
-//				}
-//			}
-//		}, new IntentFilter(debugAction));
-//	}
+//	      public Handler mHandler;
+//
+//	      public void run()
+//	      {
+//	          Looper.prepare();
+//
+//	          mHandler = new Handler()
+//	          {
+//	              public void handleMessage(Message msg)
+//	              {
+//	            	 
+//	              }
+//	          };
+//
+//	          Looper.loop();
+//	      }
+//	  }
+	
+	private void registerEnableDisableDebuggerReceiver(Handler handler)
+	{
+		String debugAction = context.getPackageName() + "-debug";
+		context.registerReceiver(new BroadcastReceiver()
+		{
+			@Override
+			public void onReceive(Context context, Intent intent)
+			{
+				Bundle bundle = intent.getExtras();
+				if (bundle != null)
+				{
+					boolean enable = bundle.getBoolean("enable", false);
+					if (enable)
+					{
+						enableAgent();
+					}
+					else
+					{
+						disableAgent(); 
+					}
+				}
+			}
+		}, new IntentFilter(debugAction), null, handler);
+	}
+	
+	
 
 	private boolean getDebugBreakFlagAndClearIt()
 	{
@@ -489,7 +526,25 @@ public class JsDebugger
 
 	public void start()
 	{
-		enableAgent(getDebugBreakFlagAndClearIt());
+		handlerThread = new HandlerThread("debugAgentBroadCastReceiverHandler");
+		handlerThread.start();
+		Handler handler = new Handler(handlerThread.getLooper());
+		
+		registerEnableDisableDebuggerReceiver(handler);
+		
+		boolean shouldDebugBrake = getDebugBreakFlagAndClearIt();
+		
+		logger.write("Enabling Debugger Agent");
+		enable();
+		
+		if (shouldDebugBrake)
+		{
+			debugBreak();
+		}
+
+		
+		debugServerThread = new DebugLocalServerSocketThread(context.getPackageName() + "-debug");
+		debugServerThread.start();
 	}
 	
 	public static boolean isDebuggableApp(Context context)
