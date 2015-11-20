@@ -47,18 +47,25 @@ public class JsDebugger
 	private ThreadScheduler threadScheduler;
 
 	private LinkedBlockingQueue<String> dbgMessages = new LinkedBlockingQueue<String>();
-
+	
 	private Logger logger;
 	private Context context;
 	private DebugLocalServerSocketThread debugServerThread;
 	private Thread debugJavaServerThread;
 
+	private final static  String STOP_MESSAGE = "STOP_MESSAGE";
+	
+	private byte[] LINE_END_BYTES;
 	
 	public JsDebugger(Context context, Logger logger, ThreadScheduler threadScheduler)
 	{
 		this.context = context;
 		this.logger = logger;
 		this.threadScheduler = threadScheduler;
+		
+		LINE_END_BYTES = new byte[2];
+		LINE_END_BYTES[0] = (byte) '\r';
+		LINE_END_BYTES[1] = (byte) '\n';
 	}
 
 	private class DebugLocalServerSocketThread implements Runnable
@@ -66,9 +73,9 @@ public class JsDebugger
         private volatile boolean running;
         private final String name;
 
-        private ListenerWorker workerThread;
+        private RequestHandler requestHandler;
         private LocalServerSocket serverSocket;
-		private ResponseWorker responseWorker;
+		private ResponseHandler responseHandler;
 		
         public DebugLocalServerSocketThread(String name)
         {
@@ -79,41 +86,75 @@ public class JsDebugger
         public void stop()
 		{
 			this.running = false;
-			this.responseWorker.stop();
-			try
-			{
-				serverSocket.close();
-			}
-			catch (IOException e)
-			{
-				e.printStackTrace();
-			}
+			this.requestHandler.stop();
+			this.responseHandler.stop();
 		}
-
+        
+        
         public void run()
         {
+        	Closeable requestHandlerCloseable = new Closeable()
+    		{
+    			@Override
+    			public void close() throws IOException
+    			{
+    				requestHandler.stop();
+    			}
+    		};
+    		
+    		Closeable responseHandlerCloseable = new Closeable()
+    		{
+    			@Override
+    			public void close() throws IOException
+    			{
+    				responseHandler.stop();
+    			}
+    		};
+        	
             running = true;
             try
             {
                 serverSocket = new LocalServerSocket(this.name);
-                while (running)
+                try 
+                {
+	                while (running)
+	                {
+	                	try
+	    				{
+	                		LocalSocket socket = serverSocket.accept();
+	                		
+	                		dbgMessages.clear();
+	                		
+	    					//out (send messages to node inspector)
+	    					this.responseHandler = new ResponseHandler(socket, requestHandlerCloseable);
+	    					Thread responseThread = new Thread(this.responseHandler);
+	    					responseThread.start();
+	    
+	    					//in (recieve messages from node inspector)
+	    					requestHandler = new RequestHandler(socket, responseHandlerCloseable);
+	    					Thread requestThread = new Thread(requestHandler);
+	    					requestThread.start();
+	    					requestThread.join();
+	    					
+	    					this.responseHandler.stop();
+	    					socket.close();
+	    				}
+	    				catch (IOException | InterruptedException e)
+	    				{
+	    					e.printStackTrace();
+	    				}
+	                }
+                }
+                finally
                 {
                 	try
-    				{
-                		LocalSocket socket = serverSocket.accept();
-    
-    					//out (send messages to node inspector)
-    					this.responseWorker = new ResponseWorker(socket);
-    					new Thread(this.responseWorker).start();
-    
-    					//in (recieve messages from node inspector)
-    					workerThread = new ListenerWorker(socket);
-    					new Thread(workerThread).start();
-    				}
-    				catch (IOException e)
-    				{
-    					e.printStackTrace();
-    				}
+        			{
+        				serverSocket.close();
+        			}
+        			catch (IOException e)
+        			{
+        				e.printStackTrace();
+        			}
                 }
             }
             catch (IOException e)
@@ -128,20 +169,38 @@ public class JsDebugger
 		Header, Message
 	}
 	
-	private class ListenerWorker implements Runnable
+	private class RequestHandler implements Runnable
 	{
 		private BufferedReader input;
-		private LocalSocket socket;
+		private Scanner scanner;
 
-		public ListenerWorker(LocalSocket socket) throws IOException
+		Runnable dispatchProcessDebugMessages = new Runnable()
 		{
-			this.socket = socket;
+			@Override
+			public void run()
+			{
+				processDebugMessages();
+			}
+		};
+
+		private boolean stop;
+		private Closeable responseHandlerCloseable;
+		
+		public RequestHandler(LocalSocket socket, Closeable responseHandlerCloseable) throws IOException
+		{
+			this.responseHandlerCloseable = responseHandlerCloseable;
 			this.input = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 		}
 
+		public void stop()
+		{
+			this.stop = true;
+			this.scanner.close();
+		}
+		
 		public void run()
 		{
-			Scanner scanner = new Scanner(this.input);
+			scanner = new Scanner(this.input);
 			scanner.useDelimiter("\r\n");
 
 			ArrayList<String> headers = new ArrayList<String>();
@@ -150,18 +209,9 @@ public class JsDebugger
 			int messageLength = -1;
 			String leftOver = null;
 
-			Runnable dispatchProcessDebugMessages = new Runnable()
-			{
-				@Override
-				public void run()
-				{
-					processDebugMessages();
-				}
-			};
-
 			try
 			{
-				while ((line = (leftOver != null) ? leftOver : scanner.nextLine()) != null)
+				while (!stop && ((line = (leftOver != null) ? leftOver : scanner.nextLine()) != null))
 				{
 					switch (state)
 					{
@@ -198,20 +248,7 @@ public class JsDebugger
 							state = State.Header;
 							headers.clear();
 
-							try
-							{
-								byte[] cmdBytes = msg.getBytes("UTF-16LE");
-								int cmdLength = cmdBytes.length;
-								sendCommand(cmdBytes, cmdLength);
-
-								boolean success = threadScheduler.post(dispatchProcessDebugMessages);
-								assert success;
-							}
-							catch (UnsupportedEncodingException e)
-							{
-								// TODO Auto-generated catch block
-								e.printStackTrace();
-							}
+							sendMessageToV8(msg);
 						}
 						else
 						{
@@ -231,90 +268,134 @@ public class JsDebugger
 			catch (NoSuchElementException e)
 			{
 				e.printStackTrace();
+
+				try
+				{
+					responseHandlerCloseable.close();
+				}
+				catch (IOException e1)
+				{
+					e1.printStackTrace();
+				}
 			}
 			finally
 			{
-				try
-				{
-					socket.close();
-				}
-				catch (IOException ex)
-				{
-					ex.printStackTrace();
-				}
-				
+				this.stop = true;
+				logger.write("sending disconnect to v8 debugger");
+				sendMessageToV8("{\"seq\":0,\"type\":\"request\",\"command\":\"disconnect\"}");
 				scanner.close();
+			}
+		}
+
+		private void sendMessageToV8(String message)
+		{
+			try
+			{
+				//Log.d("TNS.JAVA.JsDebugger", "Sending message to v8:" + message);
+				
+				byte[] cmdBytes = message.getBytes("UTF-16LE");
+				int cmdLength = cmdBytes.length;
+				sendCommand(cmdBytes, cmdLength);
+
+				threadScheduler.post(dispatchProcessDebugMessages);
+			}
+			catch (UnsupportedEncodingException e)
+			{
+				e.printStackTrace();
 			}
 		}
 	}
 
-	private class ResponseWorker implements Runnable
+	private class ResponseHandler implements Runnable
 	{
-		private LocalSocket socket;
-
-		private final static String END_MSG = "#end#";
-
 		private OutputStream output;
+		private boolean stop;
+		private Closeable requestHandlerCloseable;
 
-		public ResponseWorker(LocalSocket socket) throws IOException
+		public ResponseHandler(LocalSocket socket, Closeable requestHandlerCloseable) throws IOException
 		{
-			this.socket = socket;
-			this.output = this.socket.getOutputStream();
+			this.requestHandlerCloseable = requestHandlerCloseable;
+			this.output = socket.getOutputStream();
 		}
 
 		public void stop()
 		{
-			dbgMessages.add(END_MSG);
+			this.stop = true;
+			dbgMessages.add(STOP_MESSAGE);
 		}
 
 		@Override
 		public void run()
 		{
-			byte[] LINE_END_BYTES = new byte[2];
-			LINE_END_BYTES[0] = (byte) '\r';
-			LINE_END_BYTES[1] = (byte) '\n';
-			while (true)
+			while (!stop)
 			{
 				try
 				{
-					String msg = dbgMessages.take();
-
-					if (msg.equals(END_MSG))
+					String message = dbgMessages.take();
+					if (message.equals(STOP_MESSAGE))
+					{
 						break;
-
-					byte[] utf8;
-					try
-					{
-						utf8 = msg.getBytes("UTF8");
 					}
-					catch (UnsupportedEncodingException e1)
-					{
-						utf8 = null;
-						e1.printStackTrace();
-					}
-
-					if (utf8 != null)
-					{
-						try
-						{
-							String s = "Content-Length: " + utf8.length;
-							byte[] arr = s.getBytes("UTF8");
-							output.write(arr, 0, arr.length);
-							output.write(LINE_END_BYTES, 0, LINE_END_BYTES.length);
-							output.write(LINE_END_BYTES, 0, LINE_END_BYTES.length);
-							output.write(utf8, 0, utf8.length);
-							output.flush();
-						}
-						catch (IOException e)
-						{
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}
-					}
+					
+					//Log.d("TNS.JAVA.JsDebugger", "Sending message to inspector:" + message);
+					
+					sendMessageToInspector(message);
 				}
 				catch (InterruptedException e)
 				{
 					e.printStackTrace();
+				}
+			}
+			
+			try
+			{
+				this.output.close();
+			}
+			catch (IOException e)
+			{
+				e.printStackTrace();
+			}
+		}
+
+		private void sendMessageToInspector(String msg)
+		{
+			byte[] utf8;
+			try
+			{
+				utf8 = msg.getBytes("UTF8");
+			}
+			catch (UnsupportedEncodingException e1)
+			{
+				utf8 = null;
+				e1.printStackTrace();
+			}
+
+			if (utf8 != null)
+			{
+				try
+				{
+					String s = "Content-Length: " + utf8.length;
+					byte[] arr = s.getBytes("UTF8");
+					output.write(arr);
+					output.write(LINE_END_BYTES);
+					output.write(LINE_END_BYTES);
+					output.write(utf8);
+					output.flush();
+					
+					//Log.d("TNS.JAVA.JsDebugger", "Sent message to inspector:" + msg);
+				}
+				catch (IOException e)
+				{
+					e.printStackTrace();
+					
+					try
+					{
+						requestHandlerCloseable.close();
+					}
+					catch (IOException e1)
+					{
+						e1.printStackTrace();
+					}
 				}
 			}
 		}
@@ -323,12 +404,15 @@ public class JsDebugger
 	@RuntimeCallable
 	private void enqueueMessage(String message)
 	{
+		//logger.write("Debug msg:" + message);
+		
 		dbgMessages.add(message);
 	}
 
 	@RuntimeCallable
 	private void enableAgent(boolean debugBrake)
 	{
+		logger.write("Debug enableAgent");
 		enable();
 		
 		if (debugBrake)
@@ -345,6 +429,7 @@ public class JsDebugger
 	@RuntimeCallable
 	private void disableAgent()
 	{
+		logger.write("Debug disableAgent");
 		disable();
 
 		if (debugServerThread != null)
@@ -353,31 +438,31 @@ public class JsDebugger
 		}
 	}
 
-	void registerEnableDisableDebuggerReceiver()
-	{
-		String debugAction = context.getPackageName() + "-debug";
-		context.registerReceiver(new BroadcastReceiver()
-		{
-			@Override
-			public void onReceive(Context context, Intent intent)
-			{
-				Bundle bundle = intent.getExtras();
-				if (bundle != null)
-				{
-					boolean enable = bundle.getBoolean("enable", false);
-					if (enable)
-					{
-						boolean debugBrake = bundle.getBoolean("waitForDebugger", false);
-						enableAgent(debugBrake);
-					}
-					else
-					{
-						disableAgent(); 
-					}
-				}
-			}
-		}, new IntentFilter(debugAction));
-	}
+//	void registerEnableDisableDebuggerReceiver()
+//	{
+//		String debugAction = context.getPackageName() + "-debug";
+//		context.registerReceiver(new BroadcastReceiver()
+//		{
+//			@Override
+//			public void onReceive(Context context, Intent intent)
+//			{
+//				Bundle bundle = intent.getExtras();
+//				if (bundle != null)
+//				{
+//					boolean enable = bundle.getBoolean("enable", false);
+//					if (enable)
+//					{
+//						boolean debugBrake = bundle.getBoolean("waitForDebugger", false);
+//						enableAgent(debugBrake);
+//					}
+//					else
+//					{
+//						disableAgent(); 
+//					}
+//				}
+//			}
+//		}, new IntentFilter(debugAction));
+//	}
 
 	private boolean getDebugBreakFlagAndClearIt()
 	{
