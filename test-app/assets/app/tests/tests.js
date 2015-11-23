@@ -1886,4 +1886,9 @@ describe("Tests ", function () {
 		expect(exceptionCaught).toBe(true);
 	});
 	
+	it("should load module with null char in it", function () {
+		var text = require("../modules/moduleWithNullChar").text;
+		var s = "Hello world";
+		expect(text.length).toBe(s.length);
+	});
 });
