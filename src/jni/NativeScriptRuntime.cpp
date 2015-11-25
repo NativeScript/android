@@ -275,7 +275,6 @@ void NativeScriptRuntime::CallJavaMethod(const Local<Object>& caller, const stri
 	{
 		JsArgConverter::Error err = argConverter.GetError();
 		throw NativeScriptException(err.msg);
-		return;
 	}
 
 	auto isolate = Isolate::GetCurrent();

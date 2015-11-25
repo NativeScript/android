@@ -1151,7 +1151,6 @@ bool MetadataNode::ValidateExtendArguments(const FunctionCallbackInfo<Value>& in
 			string exceptionMessage = ss.str();
 
 			throw NativeScriptException(exceptionMessage);
-			return false;
 		}
 
 
@@ -1162,7 +1161,6 @@ bool MetadataNode::ValidateExtendArguments(const FunctionCallbackInfo<Value>& in
 			string exceptionMessage = ss.str();
 
 			throw NativeScriptException(exceptionMessage);
-			return false;
 		}
 
 		implementationObject = info[0]->ToObject();
@@ -1176,7 +1174,6 @@ bool MetadataNode::ValidateExtendArguments(const FunctionCallbackInfo<Value>& in
 			string exceptionMessage = ss.str();
 
 			throw NativeScriptException(exceptionMessage);
-			return false;
 		}
 
 		if (!info[1]->IsObject())
@@ -1186,7 +1183,6 @@ bool MetadataNode::ValidateExtendArguments(const FunctionCallbackInfo<Value>& in
 			string exceptionMessage = ss.str();
 
 			throw NativeScriptException(exceptionMessage);
-			return false;
 		}
 
 		DEBUG_WRITE("ExtendsCallMethodHandler: getting extend name");
@@ -1199,7 +1195,6 @@ bool MetadataNode::ValidateExtendArguments(const FunctionCallbackInfo<Value>& in
 			string exceptionMessage = ss.str();
 
 			throw NativeScriptException(exceptionMessage);
-			return false;
 		}
 		implementationObject = info[1]->ToObject();
 	}
@@ -1210,7 +1205,6 @@ bool MetadataNode::ValidateExtendArguments(const FunctionCallbackInfo<Value>& in
 		string exceptionMessage = ss.str();
 
 		throw NativeScriptException(exceptionMessage);
-		return false;
 	}
 
 	return true;
@@ -1249,7 +1243,6 @@ void MetadataNode::ExtendCallMethodCallback(const v8::FunctionCallbackInfo<v8::V
 	{
 		string exMsg("Cannot call 'extend' as constructor");
 		throw NativeScriptException(exMsg);
-		return;
 	}
 
 	SET_PROFILER_FRAME();
@@ -1302,7 +1295,6 @@ void MetadataNode::ExtendCallMethodCallback(const v8::FunctionCallbackInfo<v8::V
 		stringstream s;
 		s << "This object is used to extend another class '" << usedClassName << "'";
 		throw NativeScriptException(s.str());
-		return;
 	}
 
 	auto baseClassCtorFunc = node->GetConstructorFunction(isolate);

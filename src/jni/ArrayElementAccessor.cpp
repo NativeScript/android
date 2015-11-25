@@ -195,13 +195,11 @@ void ArrayElementAccessor::SetArrayElement(const Local<Object>& array, uint32_t 
 			{
 				JsArgToArrayConverter::Error err = argConverter.GetError();
 				throw NativeScriptException(string(err.msg));
-				return;
 			}
 		}
 		else
 		{
 			throw NativeScriptException(string("Cannot assign primitive value to array of objects."));
-			return;
 		}
 	}
 }
