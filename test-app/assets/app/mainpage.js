@@ -30,8 +30,7 @@ var MainActivity = {
     	__log("this.toString " + k);
     	this.super.onCreate(bundle);
 
-    	require("./tests/testsWithContext").run(this);
-    	
+    	require("./tests/testsWithContext").run(this);  	
     	execute(); //run jasmine
     	
     	var layout = new android.widget.LinearLayout(this);

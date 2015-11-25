@@ -207,7 +207,7 @@ class Module
 
 		if (!bootstrapFile.exists())
 		{
-			Platform.appFail(null, "Application entry point file not found. Please specify either package.json with main field, index.js or bootstrap.js!");		
+			throw new NativeScriptException("Application entry point file not found. Please specify either package.json with main field, index.js or bootstrap.js!");		
 		}
 
 		String modulePath = bootstrapFile.getAbsolutePath();

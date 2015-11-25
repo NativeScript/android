@@ -3,6 +3,7 @@
 #include "Util.h"
 #include "V8GlobalHelpers.h"
 #include "V8StringConstants.h"
+#include "NativeScriptException.h"
 
 using namespace v8;
 using namespace std;
@@ -32,64 +33,134 @@ NumericCasts* NumericCasts::GetThis(const v8::FunctionCallbackInfo<Value>& args)
 
 void NumericCasts::MarkAsLongCallbackStatic(const v8::FunctionCallbackInfo<Value>& args)
 {
+	try {
 	auto thisPtr = GetThis(args);
 
 	thisPtr->MarkAsLongCallback(args);
+	} catch (NativeScriptException& e) {
+		e.ReThrowToV8();
+	}
+	catch (exception e) {
+		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	}
+	catch (...) {
+		DEBUG_WRITE("Error: c++ exception!");
+	}
 }
 
 void NumericCasts::MarkAsByteCallbackStatic(const v8::FunctionCallbackInfo<Value>& args)
 {
+	try {
 	auto thisPtr = GetThis(args);
 
 	thisPtr->MarkAsByteCallback(args);
+	} catch (NativeScriptException& e) {
+		e.ReThrowToV8();
+	}
+	catch (exception e) {
+		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	}
+	catch (...) {
+		DEBUG_WRITE("Error: c++ exception!");
+	}
 }
 
 void NumericCasts::MarkAsShortCallbackStatic(const v8::FunctionCallbackInfo<Value>& args)
 {
+	try {
 	auto thisPtr = GetThis(args);
 
 	thisPtr->MarkAsShortCallback(args);
+	} catch (NativeScriptException& e) {
+		e.ReThrowToV8();
+	}
+	catch (exception e) {
+		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	}
+	catch (...) {
+		DEBUG_WRITE("Error: c++ exception!");
+	}
 }
 
 void NumericCasts::MarkAsCharCallbackStatic(const v8::FunctionCallbackInfo<Value>& args)
 {
+	try {
 	auto thisPtr = GetThis(args);
 
 	thisPtr->MarkAsCharCallback(args);
+	} catch (NativeScriptException& e) {
+		e.ReThrowToV8();
+	}
+	catch (exception e) {
+		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	}
+	catch (...) {
+		DEBUG_WRITE("Error: c++ exception!");
+	}
 }
 
 void NumericCasts::MarkAsFloatCallbackStatic(const v8::FunctionCallbackInfo<Value>& args)
 {
+	try {
 	auto thisPtr = GetThis(args);
 
 	thisPtr->MarkAsFloatCallback(args);
+	} catch (NativeScriptException& e) {
+		e.ReThrowToV8();
+	}
+	catch (exception e) {
+		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	}
+	catch (...) {
+		DEBUG_WRITE("Error: c++ exception!");
+	}
 }
 
 void NumericCasts::MarkAsDoubleCallbackStatic(const v8::FunctionCallbackInfo<Value>& args)
 {
+	try {
 	auto thisPtr = GetThis(args);
 
 	thisPtr->MarkAsDoubleCallback(args);
+	} catch (NativeScriptException& e) {
+		e.ReThrowToV8();
+	}
+	catch (exception e) {
+		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	}
+	catch (...) {
+		DEBUG_WRITE("Error: c++ exception!");
+	}
 }
 
 void NumericCasts::MarkedJsObjectWeakCallback(const v8::WeakCallbackData<Object, Persistent<Object> >& data)
 {
+	//todo: plamen5kov: re-think using try catch here
+	try {
 	data.GetParameter()->Reset();
+	} catch (NativeScriptException& e) {
+		e.ReThrowToV8();
+	}
+	catch (exception e) {
+		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	}
+	catch (...) {
+		DEBUG_WRITE("Error: c++ exception!");
+	}
 }
 
 void NumericCasts::MarkAsLongCallback(const v8::FunctionCallbackInfo<Value>& args)
 {
+	try {
 	auto isolate = Isolate::GetCurrent();
 
 	if (args.Length() != 1)
 	{
-		isolate->ThrowException(ConvertToV8String("long(x) should be called with single parameter"));
-		return;
+		throw NativeScriptException(string("long(x) should be called with single parameter"));
 	}
 	if (!args[0]->IsString() && !args[0]->IsStringObject() && !args[0]->IsNumber() && !args[0]->IsNumberObject())
 	{
-		isolate->ThrowException(ConvertToV8String("long(x) should be called with single parameter containing a long number representation"));
-		return;
+		throw NativeScriptException(string("long(x) should be called with single parameter containing a long number representation"));
 	}
 
 	Local<Value> value;
@@ -113,21 +184,29 @@ void NumericCasts::MarkAsLongCallback(const v8::FunctionCallbackInfo<Value>& arg
 	{
 		args.GetReturnValue().Set(cast);
 	}
+	} catch (NativeScriptException& e) {
+		e.ReThrowToV8();
+	}
+	catch (exception e) {
+		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	}
+	catch (...) {
+		DEBUG_WRITE("Error: c++ exception!");
+	}
 }
 
 void NumericCasts::MarkAsByteCallback(const v8::FunctionCallbackInfo<Value>& args)
 {
+	try {
 	auto isolate = Isolate::GetCurrent();
 
 	if (args.Length() != 1)
 	{
-		isolate->ThrowException(ConvertToV8String("byte(x) should be called with single parameter"));
-		return;
+		throw NativeScriptException(string("byte(x) should be called with single parameter"));
 	}
 	if (!args[0]->IsString() && !args[0]->IsStringObject() && !args[0]->IsNumber() && !args[0]->IsNumberObject())
 	{
-		isolate->ThrowException(ConvertToV8String("byte(x) should be called with single parameter containing a byte number representation"));
-		return;
+		throw NativeScriptException(string("byte(x) should be called with single parameter containing a byte number representation"));
 	}
 
 	Local<Value> value;
@@ -151,21 +230,30 @@ void NumericCasts::MarkAsByteCallback(const v8::FunctionCallbackInfo<Value>& arg
 	{
 		args.GetReturnValue().Set(cast);
 	}
+	} catch (NativeScriptException& e) {
+		e.ReThrowToV8();
+	}
+	catch (exception e) {
+		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	}
+	catch (...) {
+		DEBUG_WRITE("Error: c++ exception!");
+	}
 }
 
 void NumericCasts::MarkAsShortCallback(const v8::FunctionCallbackInfo<Value>& args)
 {
+	try {
 	auto isolate = Isolate::GetCurrent();
 
 	if (args.Length() != 1)
 	{
-		isolate->ThrowException(ConvertToV8String("short(x) should be called with single parameter"));
+		throw NativeScriptException(string("short(x) should be called with single parameter"));
 		return;
 	}
 	if (!args[0]->IsString() && !args[0]->IsStringObject() && !args[0]->IsNumber() && !args[0]->IsNumberObject())
 	{
-		isolate->ThrowException(ConvertToV8String("short(x) should be called with single parameter containing a short number representation"));
-		return;
+		throw NativeScriptException(string("short(x) should be called with single parameter containing a short number representation"));
 	}
 
 	Local<Value> value;
@@ -189,28 +277,35 @@ void NumericCasts::MarkAsShortCallback(const v8::FunctionCallbackInfo<Value>& ar
 	{
 		args.GetReturnValue().Set(cast);
 	}
+	} catch (NativeScriptException& e) {
+		e.ReThrowToV8();
+	}
+	catch (exception e) {
+		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	}
+	catch (...) {
+		DEBUG_WRITE("Error: c++ exception!");
+	}
 }
 
 void NumericCasts::MarkAsCharCallback(const v8::FunctionCallbackInfo<Value>& args)
 {
+	try {
 	auto isolate = Isolate::GetCurrent();
 
 	if (args.Length() != 1)
 	{
-		isolate->ThrowException(ConvertToV8String("char(x) should be called with single parameter"));
-		return;
+		throw NativeScriptException(string("char(x) should be called with single parameter"));
 	}
 	if (!args[0]->IsString())
 	{
-		isolate->ThrowException(ConvertToV8String("char(x) should be called with single parameter containing a char representation"));
-		return;
+		throw NativeScriptException(string("char(x) should be called with single parameter containing a char representation"));
 	}
 
 	auto value = args[0]->ToString();
 	if (value->Length() != 1)
 	{
-		isolate->ThrowException(ConvertToV8String("char(x) should be called with single parameter containing a single char"));
-		return;
+		throw NativeScriptException(string("char(x) should be called with single parameter containing a single char"));
 	}
 
 	auto cast = Object::New(isolate);
@@ -224,21 +319,29 @@ void NumericCasts::MarkAsCharCallback(const v8::FunctionCallbackInfo<Value>& arg
 	{
 		args.GetReturnValue().Set(cast);
 	}
+	} catch (NativeScriptException& e) {
+		e.ReThrowToV8();
+	}
+	catch (exception e) {
+		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	}
+	catch (...) {
+		DEBUG_WRITE("Error: c++ exception!");
+	}
 }
 
 void NumericCasts::MarkAsFloatCallback(const v8::FunctionCallbackInfo<Value>& args)
 {
+	try {
 	auto isolate = Isolate::GetCurrent();
 
 	if (args.Length() != 1)
 	{
-		isolate->ThrowException(ConvertToV8String("float(x) should be called with single parameter"));
-		return;
+		throw NativeScriptException(string("float(x) should be called with single parameter"));
 	}
 	if (!args[0]->IsNumber())
 	{
-		isolate->ThrowException(ConvertToV8String("float(x) should be called with single parameter containing a float number representation"));
-		return;
+		throw NativeScriptException(string("float(x) should be called with single parameter containing a float number representation"));
 	}
 
 	auto value = args[0]->ToNumber();
@@ -253,21 +356,29 @@ void NumericCasts::MarkAsFloatCallback(const v8::FunctionCallbackInfo<Value>& ar
 	{
 		args.GetReturnValue().Set(cast);
 	}
+	} catch (NativeScriptException& e) {
+		e.ReThrowToV8();
+	}
+	catch (exception e) {
+		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	}
+	catch (...) {
+		DEBUG_WRITE("Error: c++ exception!");
+	}
 }
 
 void NumericCasts::MarkAsDoubleCallback(const v8::FunctionCallbackInfo<Value>& args)
 {
+	try {
 	auto isolate = Isolate::GetCurrent();
 
 	if (args.Length() != 1)
 	{
-		isolate->ThrowException(ConvertToV8String("double(x) should be called with single parameter"));
-		return;
+		throw NativeScriptException(string("double(x) should be called with single parameter"));
 	}
 	if (!args[0]->IsNumber())
 	{
-		isolate->ThrowException(ConvertToV8String("double(x) should be called with single parameter containing a double number representation"));
-		return;
+		throw NativeScriptException(string("double(x) should be called with single parameter containing a double number representation"));
 	}
 
 	auto value = args[0]->ToNumber();
@@ -281,6 +392,15 @@ void NumericCasts::MarkAsDoubleCallback(const v8::FunctionCallbackInfo<Value>& a
 	else
 	{
 		args.GetReturnValue().Set(cast);
+	}
+	} catch (NativeScriptException& e) {
+		e.ReThrowToV8();
+	}
+	catch (exception e) {
+		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	}
+	catch (...) {
+		DEBUG_WRITE("Error: c++ exception!");
 	}
 }
 

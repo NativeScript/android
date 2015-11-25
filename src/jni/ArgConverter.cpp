@@ -5,6 +5,7 @@
 #include "V8GlobalHelpers.h"
 #include "V8StringConstants.h"
 #include "NativeScriptAssert.h"
+#include "NativeScriptException.h"
 #include "JType.h"
 #include <assert.h>
 #include <sstream>
@@ -32,23 +33,53 @@ void ArgConverter::Init(JavaVM *jvm)
 
 void ArgConverter::NativeScriptLongValueOfFunctionCallback(const v8::FunctionCallbackInfo<Value>& args)
 {
+	try {
 	auto isolate = Isolate::GetCurrent();
 	args.GetReturnValue().Set(Number::New(isolate, numeric_limits<double>::quiet_NaN()));
+	} catch (NativeScriptException& e) {
+		e.ReThrowToV8();
+	}
+	catch (exception e) {
+		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	}
+	catch (...) {
+		DEBUG_WRITE("Error: c++ exception!");
+	}
 }
 
 void ArgConverter::NativeScriptLongToStringFunctionCallback(const v8::FunctionCallbackInfo<Value>& args)
 {
+	try {
 	args.GetReturnValue().Set(args.This()->Get(V8StringConstants::GetValue()));
+	} catch (NativeScriptException& e) {
+		e.ReThrowToV8();
+	}
+	catch (exception e) {
+		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	}
+	catch (...) {
+		DEBUG_WRITE("Error: c++ exception!");
+	}
 }
 
 void ArgConverter::NativeScriptLongFunctionCallback(const v8::FunctionCallbackInfo<Value>& args)
 {
+	try {
 	auto isolate = Isolate::GetCurrent();
 	args.This()->SetHiddenValue(V8StringConstants::GetJavaLong(), Boolean::New(isolate, true));
 	args.This()->SetHiddenValue(V8StringConstants::GetMarkedAsLong(), args[0]);
 	args.This()->Set(V8StringConstants::GetValue(), args[0]);
 
 	args.This()->SetPrototype(Local<NumberObject>::New(Isolate::GetCurrent(), *NAN_NUMBER_OBJECT));
+	} catch (NativeScriptException& e) {
+		e.ReThrowToV8();
+	}
+	catch (exception e) {
+		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	}
+	catch (...) {
+		DEBUG_WRITE("Error: c++ exception!");
+	}
 }
 
 

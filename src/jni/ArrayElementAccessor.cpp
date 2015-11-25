@@ -5,6 +5,7 @@
 #include "Util.h"
 #include "V8GlobalHelpers.h"
 #include "NativeScriptAssert.h"
+#include "NativeScriptException.h"
 #include "JType.h"
 #include <assert.h>
 
@@ -39,14 +40,14 @@ Local<Value> ArrayElementAccessor::GetArrayElement(const Local<Object>& array, u
 		jbooleanArray boolArr = reinterpret_cast<jbooleanArray>(arr);
 		jboolean boolArrValue;
 		env.GetBooleanArrayRegion(boolArr, startIndex, length, &boolArrValue);
-		value = CheckForArrayAccessException(env, elementSignature, &boolArrValue);
+		value = ConvertToJsValue(env, elementSignature, &boolArrValue);
 	}
 	else if (elementSignature == "B")
 	{
 		jbyteArray byteArr = reinterpret_cast<jbyteArray>(arr);
 		jbyte byteArrValue;
 		env.GetByteArrayRegion(byteArr, startIndex, length, &byteArrValue);
-		value = CheckForArrayAccessException(env, elementSignature, &byteArrValue);
+		value = ConvertToJsValue(env, elementSignature, &byteArrValue);
 	}
 	else if (elementSignature == "C")
 	{
@@ -55,7 +56,7 @@ Local<Value> ArrayElementAccessor::GetArrayElement(const Local<Object>& array, u
 		env.GetCharArrayRegion(charArr, startIndex, length, &charArrValue);
 		JniLocalRef s(env.NewString(&charArrValue, 1));
 		const char* singleChar = env.GetStringUTFChars(s, &isCopy);
-		value = CheckForArrayAccessException(env, elementSignature, singleChar);
+		value = ConvertToJsValue(env, elementSignature, singleChar);
 		env.ReleaseStringUTFChars(s, singleChar);
 	}
 	else if (elementSignature == "S")
@@ -63,40 +64,40 @@ Local<Value> ArrayElementAccessor::GetArrayElement(const Local<Object>& array, u
 		jshortArray shortArr = reinterpret_cast<jshortArray>(arr);
 		jshort shortArrValue;
 		env.GetShortArrayRegion(shortArr, startIndex, length, &shortArrValue);
-		value = CheckForArrayAccessException(env, elementSignature, &shortArrValue);
+		value = ConvertToJsValue(env, elementSignature, &shortArrValue);
 	}
 	else if (elementSignature == "I")
 	{
 		jintArray intArr = reinterpret_cast<jintArray>(arr);
 		jint intArrValue;
 		env.GetIntArrayRegion(intArr, startIndex, length, &intArrValue);
-		value = CheckForArrayAccessException(env, elementSignature, &intArrValue);
+		value = ConvertToJsValue(env, elementSignature, &intArrValue);
 	}
 	else if (elementSignature == "J")
 	{
 		jlongArray longArr = reinterpret_cast<jlongArray>(arr);
 		jlong longArrValue;
 		env.GetLongArrayRegion(longArr, startIndex, length, &longArrValue);
-		value = CheckForArrayAccessException(env, elementSignature, &longArrValue);
+		value = ConvertToJsValue(env, elementSignature, &longArrValue);
 	}
 	else if (elementSignature == "F")
 	{
 		jfloatArray floatArr = reinterpret_cast<jfloatArray>(arr);
 		jfloat floatArrValue;
 		env.GetFloatArrayRegion(floatArr, startIndex, length, &floatArrValue);
-		value = CheckForArrayAccessException(env, elementSignature, &floatArrValue);
+		value = ConvertToJsValue(env, elementSignature, &floatArrValue);
 	}
 	else if (elementSignature == "D")
 	{
 		jdoubleArray doubleArr = reinterpret_cast<jdoubleArray>(arr);
 		jdouble doubleArrValue;
 		env.GetDoubleArrayRegion(doubleArr, startIndex, length, &doubleArrValue);
-		value = CheckForArrayAccessException(env, elementSignature, &doubleArrValue);
+		value = ConvertToJsValue(env, elementSignature, &doubleArrValue);
 	}
 	else
 	{
 		jobject result = env.GetObjectArrayElement(reinterpret_cast<jobjectArray>(arr), index);
-		value = CheckForArrayAccessException(env, elementSignature, &result);
+		value = ConvertToJsValue(env, elementSignature, &result);
 		env.DeleteLocalRef(result);
 	}
 
@@ -116,19 +117,19 @@ void ArrayElementAccessor::SetArrayElement(const Local<Object>& array, uint32_t 
 	const string elementSignature = arraySignature.substr(1);
 	jboolean isCopy = false;
 
-	if (elementSignature == "Z")
+	if (elementSignature == "Z") //bool
 	{
 		jboolean boolElementValue = (jboolean) value->BooleanValue();
 		jbooleanArray boolArr = reinterpret_cast<jbooleanArray>(arr);
 		env.SetBooleanArrayRegion(boolArr, index, 1, &boolElementValue);
 	}
-	else if (elementSignature == "B")
+	else if (elementSignature == "B") //byte
 	{
 		jbyte byteElementValue = (jbyte) value->Int32Value();
 		jbyteArray byteArr = reinterpret_cast<jbyteArray>(arr);
 		env.SetByteArrayRegion(byteArr, index, 1, &byteElementValue);
 	}
-	else if (elementSignature == "C")
+	else if (elementSignature == "C") //char
 	{
 		String::Utf8Value utf8(value->ToString());
 		JniLocalRef s(env.NewString((jchar*) *utf8, 1));
@@ -138,19 +139,19 @@ void ArrayElementAccessor::SetArrayElement(const Local<Object>& array, uint32_t 
 		jcharArray charArr = reinterpret_cast<jcharArray>(arr);
 		env.SetCharArrayRegion(charArr, index, 1, &charElementValue);
 	}
-	else if (elementSignature == "S")
+	else if (elementSignature == "S") //short
 	{
 		jshort shortElementValue = (jshort) value->Int32Value();
 		jshortArray shortArr = reinterpret_cast<jshortArray>(arr);
 		env.SetShortArrayRegion(shortArr, index, 1, &shortElementValue);
 	}
-	else if (elementSignature == "I")
+	else if (elementSignature == "I") //int
 	{
 		jint intElementValue = value->Int32Value();
 		jintArray intArr = reinterpret_cast<jintArray>(arr);
 		env.SetIntArrayRegion(intArr, index, 1, &intElementValue);
 	}
-	else if (elementSignature == "J")
+	else if (elementSignature == "J") //long
 	{
 		jlong longElementValue;
 		if (value->IsObject())
@@ -164,19 +165,19 @@ void ArrayElementAccessor::SetArrayElement(const Local<Object>& array, uint32_t 
 		jlongArray longArr = reinterpret_cast<jlongArray>(arr);
 		env.SetLongArrayRegion(longArr, index, 1, &longElementValue);
 	}
-	else if (elementSignature == "F")
+	else if (elementSignature == "F") //float
 	{
 		jfloat floatElementValue = (jfloat) value->NumberValue();
 		jfloatArray floatArr = reinterpret_cast<jfloatArray>(arr);
 		env.SetFloatArrayRegion(floatArr, index, 1, &floatElementValue);
 	}
-	else if (elementSignature == "D")
+	else if (elementSignature == "D") //double
 	{
 		jdouble doubleElementValue = (jdouble) value->NumberValue();
 		jdoubleArray doubleArr = reinterpret_cast<jdoubleArray>(arr);
 		env.SetDoubleArrayRegion(doubleArr, index, 1, &doubleElementValue);
 	}
-	else
+	else //string or object
 	{
 		bool isReferenceType = value->IsObject() || value->IsString();
 		if (isReferenceType)
@@ -193,35 +194,25 @@ void ArrayElementAccessor::SetArrayElement(const Local<Object>& array, uint32_t 
 			else
 			{
 				JsArgToArrayConverter::Error err = argConverter.GetError();
-				ExceptionUtil::GetInstance()->ThrowExceptionToJs(err.msg);
+				throw NativeScriptException(string(err.msg));
 				return;
 			}
 		}
 		else
 		{
-			ExceptionUtil::GetInstance()->ThrowExceptionToJs("Cannot assign primitive value to array of objects.");
+			throw NativeScriptException(string("Cannot assign primitive value to array of objects."));
 			return;
 		}
 	}
 }
 
-Local<Value> ArrayElementAccessor::CheckForArrayAccessException(JEnv& env, const string& elementSignature, const void *value)
+Local<Value> ArrayElementAccessor::ConvertToJsValue(JEnv& env, const string& elementSignature, const void *value)
 {
 	Local<Value> jsValue;
 
 	auto isolate = Isolate::GetCurrent();
 
-	JniLocalRef exc(env.ExceptionOccurred());
-	if (nullptr != (jthrowable) exc)
-	{
-		DEBUG_WRITE("Error during getting array element");
-		// env.ExceptionDescribe(); We will print this manually in the ExceptionUtil
-		env.ExceptionClear();
-		string errMsg;
-		ExceptionUtil::GetInstance()->GetExceptionMessage(env, exc, errMsg);
-		ExceptionUtil::GetInstance()->ThrowExceptionToJs(errMsg);
-	}
-	else if (elementSignature == "Z")
+	if (elementSignature == "Z")
 	{
 		jsValue = Boolean::New(isolate, *(jboolean*) value);
 	}

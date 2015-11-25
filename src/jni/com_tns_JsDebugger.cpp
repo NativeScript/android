@@ -1,39 +1,85 @@
 #include "JEnv.h"
 #include "JsDebugger.h"
 #include "ArgConverter.h"
+#include "NativeScriptException.h"
+#include "NativeScriptAssert.h"
+
 #include <string>
+
+using namespace tns;
 
 extern "C" void Java_com_tns_JsDebugger_processDebugMessages(JNIEnv *env, jobject obj)
 {
-	tns::JsDebugger::ProcessDebugMessages();
+	try {
+	JsDebugger::ProcessDebugMessages();
+	} catch (NativeScriptException& e) {
+		e.ReThrowToJava();
+	}
+	catch (std::exception e) {
+		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	}
+	catch (...) {
+		DEBUG_WRITE("Error: c++ exception!");
+	}
 }
 
 extern "C" void Java_com_tns_JsDebugger_enable(JNIEnv *env, jobject obj)
 {
-	tns::JsDebugger::Enable();
+	try {
+	JsDebugger::Enable();
+	} catch (NativeScriptException& e) {
+		e.ReThrowToJava();
+	}
+	catch (std::exception e) {
+		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	}
+	catch (...) {
+		DEBUG_WRITE("Error: c++ exception!");
+	}
 }
 
 extern "C" void Java_com_tns_JsDebugger_disable(JNIEnv *env, jobject obj)
 {
-	tns::JsDebugger::Disable();
+	try {
+	JsDebugger::Disable();
+	} catch (NativeScriptException& e) {
+		e.ReThrowToJava();
+	}
+	catch (std::exception e) {
+		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	}
+	catch (...) {
+		DEBUG_WRITE("Error: c++ exception!");
+	}
 }
 
 extern "C" void Java_com_tns_JsDebugger_debugBreak(JNIEnv *env, jobject obj)
 {
-	tns::JsDebugger::DebugBreak();
+	try {
+	JsDebugger::DebugBreak();
+	} catch (NativeScriptException& e) {
+		e.ReThrowToJava();
+	}
+	catch (std::exception e) {
+		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	}
+	catch (...) {
+		DEBUG_WRITE("Error: c++ exception!");
+	}
 }
-
 
 extern "C" void Java_com_tns_JsDebugger_sendCommand(JNIEnv *_env, jobject obj, jbyteArray command, jint length)
 {
-	tns::JEnv env(_env);
-	auto buf = new jbyte[length];
-
-	env.GetByteArrayRegion(command, 0, length, buf);
-
-	int len = length / sizeof(uint16_t);
-	tns::JsDebugger::SendCommand(reinterpret_cast<uint16_t*>(buf), len);
-
-	delete[] buf;
+	try {
+	JsDebugger::SendCommand(_env, obj, command, length);
+	} catch (NativeScriptException& e) {
+		e.ReThrowToJava();
+	}
+	catch (std::exception e) {
+		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	}
+	catch (...) {
+		DEBUG_WRITE("Error: c++ exception!");
+	}
 }
 

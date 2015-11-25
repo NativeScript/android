@@ -16,7 +16,6 @@
 #include "FieldAccessor.h"
 #include "ArrayElementAccessor.h"
 #include "ObjectManager.h"
-#include "ExceptionUtil.h"
 
 namespace tns
 {
@@ -46,7 +45,7 @@ namespace tns
 
 		static void CallJavaMethod(const v8::Local<v8::Object>& caller, const std::string& className, const std::string& methodName, MetadataEntry *entry, bool isStatic, bool isSuper, const v8::FunctionCallbackInfo<v8::Value>& args);
 
-		static v8::Local<v8::Value> CallJSMethod(JNIEnv *_env, const v8::Local<v8::Object>& jsObject, const std::string& methodName, jobjectArray args, v8::TryCatch& tc);
+		static v8::Local<v8::Value> CallJSMethod(JNIEnv *_env, const v8::Local<v8::Object>& jsObject, const std::string& methodName, jobjectArray args);
 
 		//
 
@@ -67,8 +66,6 @@ namespace tns
 		static void OverridesWeakCallback(v8::Isolate* isolate, v8::Persistent<v8::Object>* target, void* arg);
 
 		static v8::Local<v8::Object> GetImplementationObjectFromArg(const v8::FunctionCallbackInfo<v8::Value>& args);
-
-		static void AppFail(jthrowable throwable, const char *message);
 
 		static void CreateGlobalCastFunctions(const v8::Local<v8::ObjectTemplate>& globalTemplate);
 
@@ -112,8 +109,6 @@ namespace tns
 
 		static jmethodID CACHE_CONSTRUCTOR_METHOD_ID;
 
-		static jmethodID APP_FAIL_METHOD_ID;
-
 		static jmethodID GET_TYPE_METADATA;
 
 		static jmethodID ENABLE_VERBOSE_LOGGING_METHOD_ID;
@@ -127,8 +122,6 @@ namespace tns
 		static ArrayElementAccessor arrayElementAccessor;
 
 		static FieldAccessor fieldAccessor;
-
-		static ExceptionUtil exceptionUtil;
 	
 		static ObjectManager *objectManager;
 

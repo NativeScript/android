@@ -37,7 +37,7 @@ public class Platform
 
 	private static native void adjustAmountOfExternalAllocatedMemoryNative(long changeInBytes);
 	
-	private static native void passUncaughtExceptionToJsNative(Throwable ex, String stackTrace);
+	static native void passUncaughtExceptionToJsNative(Throwable ex, String stackTrace);
 	
 	private static boolean initialized;
 	
@@ -80,6 +80,10 @@ public class Platform
 			return lhs.getName().compareTo(rhs.getName());
 		}
 	};
+	
+	public static boolean IsInitialized() {
+		return initialized;
+	}
 
 	public static Class<?> getErrorActivityClass()
 	{
@@ -166,37 +170,6 @@ public class Platform
 		ProxyGenerator.IsLogEnabled = false;
 	}
 
-	@RuntimeCallable
-	static void appFail(Throwable ex, String message)
-	{
-		// TODO: allow app to handle fail message report here. For example
-		// integrate google app reports
-		// Log.d(DEFAULT_LOG_TAG, message);
-		// System.exit(-1);
-		
-		if (ex == null) {
-			ex = new NativeScriptException(message);
-		}
-		
-		// TODO: We need to know whether to fail the app fast here - e.g. System.exit or just raise an exception
-		try {
-			UncheckedThrow.Throw(ex);
-		} catch (NativeScriptException e) {
-			if(e == ex){
-				// exception is not caught by user code, go to the JavaScript side to raise the __uncaughtError handler
-				// TODO: We may want to allow JS code to mark the exception as Handled
-				
-				//don't throw exception to v8 if v8 is not initialized yet
-				if(!initialized) {
-					passUncaughtExceptionToJsNative(e, ErrorReport.getErrorMessage(e));	
-				}
-			}
-			
-			// re-throw the exception to crash the current thread
-			UncheckedThrow.Throw(e);
-		}
-	}
-	
 	public static void run() throws NativeScriptException
 	{
 		String mainModule = Module.bootstrapApp();
@@ -719,8 +692,7 @@ public class Platform
 		Integer javaObjectID = getJavaObjectID(javaObject);
 		if (javaObjectID == null)
 		{
-			if (logger.isEnabled()) logger.write("Platform.CallJSMethod: calling js method " + methodName + " with javaObjectID " + javaObjectID + " type=" + ((javaObject != null) ? javaObject.getClass().getName() : "null"));
-			appFail(null, "Application failed");
+			throw new NativeScriptException("Cannot find object id for instance=" + ((javaObject == null) ? "null" : javaObject));
 		}
 
 		if (logger.isEnabled()) logger.write("Platform.CallJSMethod: calling js method " + methodName + " with javaObjectID " + javaObjectID + " type=" + ((javaObject != null) ? javaObject.getClass().getName() : "null"));
@@ -779,20 +751,6 @@ public class Platform
 		}
 
 		return res;
-	}
-	
-	private static boolean isJavaThrowable(Object obj)
-	{
-		boolean isJavaThrowable = false;
-
-		if (obj != null)
-		{
-			Class<?> c = obj.getClass();
-
-			isJavaThrowable = Throwable.class.isAssignableFrom(c);
-		}
-
-		return isJavaThrowable;
 	}
 	
 	private static Object[] extendConstructorArgs(String methodName, boolean isConstructor, Object[] args)

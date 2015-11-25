@@ -1,7 +1,6 @@
 #include "MethodCache.h"
 #include "JniLocalRef.h"
 #include "JsArgToArrayConverter.h"
-#include "ExceptionUtil.h"
 #include "MetadataNode.h"
 #include "NativeScriptAssert.h"
 #include "Util.h"
@@ -195,18 +194,13 @@ string MethodCache::ResolveJavaMethod(const FunctionCallbackInfo<Value>& args, c
 
 	jstring signature = (jstring) env.CallStaticObjectMethod(PLATFORM_CLASS, RESOLVE_METHOD_OVERLOAD_METHOD_ID, (jstring) jsClassName, (jstring) jsMethodName, arrArgs);
 
-	bool exceptionOccurred = ExceptionUtil::GetInstance()->CheckForJavaException(env);
-
 	string resolvedSignature;
 
-	if (!exceptionOccurred)
-	{
-		const char* str = env.GetStringUTFChars(signature, nullptr);
-		resolvedSignature = string(str);
-		env.ReleaseStringUTFChars(signature, str);
+	const char* str = env.GetStringUTFChars(signature, nullptr);
+	resolvedSignature = string(str);
+	env.ReleaseStringUTFChars(signature, str);
 
-		env.DeleteLocalRef(signature);
-	}
+	env.DeleteLocalRef(signature);
 
 	return resolvedSignature;
 }

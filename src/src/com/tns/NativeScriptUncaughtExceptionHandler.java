@@ -22,6 +22,14 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
 	@Override
 	public void uncaughtException(Thread thread, Throwable ex)
 	{
+		if(Platform.IsInitialized()) {
+			try {
+				Platform.passUncaughtExceptionToJsNative(ex, ErrorReport.getErrorMessage(ex));
+			} catch (Throwable t) {
+				t.printStackTrace();
+			}
+		}
+		
 		String errorMessage = ErrorReport.getErrorMessage(ex);
 		
 		if (logger.isEnabled()) logger.write("Uncaught Exception Message=" + errorMessage);

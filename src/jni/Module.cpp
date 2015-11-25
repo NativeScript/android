@@ -10,8 +10,8 @@
 #include "ArgConverter.h"
 #include "V8GlobalHelpers.h"
 #include "NativeScriptAssert.h"
-#include "ExceptionUtil.h"
 #include "Constants.h"
+#include "NativeScriptException.h"
 
 #include <sstream>
 #include <assert.h>
@@ -100,74 +100,79 @@ Local<Function> Module::GetRequireFunction(Isolate *isolate, const string& dirNa
 
 void Module::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-	auto isolate = Isolate::GetCurrent();
+	try {
+		auto isolate = Isolate::GetCurrent();
 
-	if (args.Length() != 2)
-	{
-		isolate->ThrowException(ConvertToV8String("require should be called with two parameters"));
-		return;
+		if (args.Length() != 2)
+		{
+			throw NativeScriptException(string("require should be called with two parameters"));
+		}
+		if (!args[0]->IsString())
+		{
+			throw NativeScriptException(string("require's first parameter should be string"));
+		}
+		if (!args[1]->IsString())
+		{
+			throw NativeScriptException(string("require's second parameter should be string"));
+		}
+
+		string moduleName = ConvertToString(args[0].As<String>());
+		string callingModuleDirName = ConvertToString(args[1].As<String>());
+
+		JEnv env;
+		JniLocalRef jsModulename(env.NewStringUTF(moduleName.c_str()));
+		JniLocalRef jsCallingModuleDirName(env.NewStringUTF(callingModuleDirName.c_str()));
+		JniLocalRef jsModulePath(env.CallStaticObjectMethod(MODULE_CLASS, GET_MODULE_PATH_METHOD_ID, (jstring) jsModulename, (jstring) jsCallingModuleDirName));
+
+		// cache the required modules by full path, not name only, since there might be some collisions with relative paths and names
+		string modulePath = ArgConverter::jstringToString((jstring) jsModulePath);
+		if(modulePath == ""){
+			// module not found
+			stringstream ss;
+			ss << "Module \"" << moduleName << "\" not found";
+			string exception = ss.str();
+			throw NativeScriptException(exception);
+		}
+		if (modulePath == "EXTERNAL_FILE_ERROR")
+		{
+			// module not found
+			stringstream ss;
+			ss << "Module \"" << moduleName << "\" is located on the external storage. Modules can be private application files ONLY";
+			string exception = ss.str();
+			throw NativeScriptException(exception);
+		}
+
+		auto it = s_loadedModules.find(modulePath);
+
+		bool hasError = false;
+
+		Local<Object> moduleObj;
+
+		if (it == s_loadedModules.end())
+		{
+			moduleObj = CompileAndRun(modulePath, hasError);
+		}
+		else
+		{
+			moduleObj = Local<Object>::New(isolate, *it->second);
+		}
+
+		if(!hasError)
+		{
+			auto exportsObj = moduleObj->Get(ConvertToV8String("exports"));
+
+			assert(!exportsObj.IsEmpty());
+
+			args.GetReturnValue().Set(exportsObj);
+		}
+	} catch (NativeScriptException& e) {
+		e.ReThrowToV8();
 	}
-	if (!args[0]->IsString())
-	{
-		isolate->ThrowException(ConvertToV8String("require's first parameter should be string"));
-		return;
+	catch (exception e) {
+		DEBUG_WRITE("Error: c++ exception: %s", e.what());
 	}
-	if (!args[1]->IsString())
-	{
-		isolate->ThrowException(ConvertToV8String("require's second parameter should be string"));
-		return;
-	}
-
-	string moduleName = ConvertToString(args[0].As<String>());
-	string callingModuleDirName = ConvertToString(args[1].As<String>());
-
-	JEnv env;
-	JniLocalRef jsModulename(env.NewStringUTF(moduleName.c_str()));
-	JniLocalRef jsCallingModuleDirName(env.NewStringUTF(callingModuleDirName.c_str()));
-	JniLocalRef jsModulePath(env.CallStaticObjectMethod(MODULE_CLASS, GET_MODULE_PATH_METHOD_ID, (jstring) jsModulename, (jstring) jsCallingModuleDirName));
-
-	// cache the required modules by full path, not name only, since there might be some collisions with relative paths and names
-	string modulePath = ArgConverter::jstringToString((jstring) jsModulePath);
-	if(modulePath == ""){
-		// module not found
-		stringstream ss;
-		ss << "Module \"" << moduleName << "\" not found";
-		string exception = ss.str();
-		ExceptionUtil::GetInstance()->ThrowExceptionToJs(exception);
-		return;
-	}
-	if (modulePath == "EXTERNAL_FILE_ERROR")
-	{
-		// module not found
-		stringstream ss;
-		ss << "Module \"" << moduleName << "\" is located on the external storage. Modules can be private application files ONLY";
-		string exception = ss.str();
-		ExceptionUtil::GetInstance()->ThrowExceptionToJs(exception);
-		return;
-	}
-
-	auto it = s_loadedModules.find(modulePath);
-
-	bool hasError = false;
-
-	Local<Object> moduleObj;
-
-	if (it == s_loadedModules.end())
-	{
-		moduleObj = CompileAndRun(modulePath, hasError);
-	}
-	else
-	{
-		moduleObj = Local<Object>::New(isolate, *it->second);
-	}
-
-	if(!hasError)
-	{
-		auto exportsObj = moduleObj->Get(ConvertToV8String("exports"));
-
-		assert(!exportsObj.IsEmpty());
-
-		args.GetReturnValue().Set(exportsObj);
+	catch (...) {
+		DEBUG_WRITE("Error: c++ exception!");
 	}
 }
 
@@ -217,13 +222,12 @@ Local<Object> Module::CompileAndRun(const string& modulePath, bool& hasError)
 
 	DEBUG_WRITE("Compiled script (module %s)", modulePath.c_str());
 
-	if (ExceptionUtil::GetInstance()->HandleTryCatch(tc, "Script " + modulePath + " contains compilation errors!"))
-	{
-		hasError = true;
+	if(tc.HasCaught()) {
+		throw NativeScriptException(tc, "Script " + modulePath + " contains compilation errors!");
 	}
-	else if (script.IsEmpty())
+
+	if (script.IsEmpty())
 	{
-		//think about more descriptive message -> [script_name] was empty
 		DEBUG_WRITE("%s was empty", modulePath.c_str());
 	}
 	else
@@ -231,42 +235,27 @@ Local<Object> Module::CompileAndRun(const string& modulePath, bool& hasError)
 		DEBUG_WRITE("Running script (module %s)", modulePath.c_str());
 
 		auto f = script->Run().As<Function>();
-		if (ExceptionUtil::GetInstance()->HandleTryCatch(tc, "Error running script " + modulePath))
-		{
-			hasError = true;
+		if(tc.HasCaught()) {
+			throw NativeScriptException(tc, "Error running script " + modulePath);
 		}
-		else
-		{
-			auto fileName = ConvertToV8String(modulePath);
-			char pathcopy[1024];
-			strcpy(pathcopy, modulePath.c_str());
-			string strDirName(dirname(pathcopy));
-			auto dirName = ConvertToV8String(strDirName);
-			auto require = GetRequireFunction(isolate, strDirName);
-			Local<Value> requireArgs[5] { moduleObj, exportsObj, require, fileName, dirName };
 
-			auto thiz = Object::New(isolate);
-			f->Call(thiz, sizeof(requireArgs) / sizeof(Local<Value>), requireArgs);
-			if(ExceptionUtil::GetInstance()->HandleTryCatch(tc, "Error calling module function "))
-			{
-				hasError = true;
-			}
+		auto fileName = ConvertToV8String(modulePath);
+		char pathcopy[1024];
+		strcpy(pathcopy, modulePath.c_str());
+		string strDirName(dirname(pathcopy));
+		auto dirName = ConvertToV8String(strDirName);
+		auto require = GetRequireFunction(isolate, strDirName);
+		Local<Value> requireArgs[5] { moduleObj, exportsObj, require, fileName, dirName };
+
+		auto thiz = Object::New(isolate);
+		f->Call(thiz, sizeof(requireArgs) / sizeof(Local<Value>), requireArgs);
+
+		if(tc.HasCaught()) {
+			throw NativeScriptException(tc, "Error calling module function ");
 		}
 	}
 
-	if(hasError)
-	{
-		s_loadedModules.erase(modulePath);
-		poModuleObj->Reset();
-		delete poModuleObj;
-
-		// this handles recursive require calls
-		tc.ReThrow();
-	}
-	else
-	{
-		result = moduleObj;
-	}
+	result = moduleObj;
 
 	return result;
 }
