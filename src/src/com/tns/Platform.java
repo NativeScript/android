@@ -81,7 +81,7 @@ public class Platform
 		}
 	};
 	
-	public static boolean IsInitialized() {
+	public static boolean isInitialized() {
 		return initialized;
 	}
 
