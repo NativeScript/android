@@ -260,11 +260,7 @@ task createPluginsConfigFile {
 			println "\t+creating product flavors include.gradle file in $configurationsDir folder..."
 			def flavors = pluginNames.join(",")
 			if(appResExists) {
-				if (flavors == '') {
-					flavors = '"' + appResourcesName + '"'
-				} else {
-					flavors = '"' + appResourcesName + '", ' + flavors
-				}
+				flavors = '"' + appResourcesName + '", ' + flavors
 			}
 			flavorsFile << "android { \n"
 			flavorsFile << "\tflavorDimensions " + flavors + "\n"
@@ -406,12 +402,9 @@ task copyMetadata(type: Copy) {
 
 
 task deleteExplodedAarFolder (type: Delete) {
-	//done to build only necessary apk
-	if(project.hasProperty("release")) {
-		dependsOn assembleRelease
-	}
-	else {
-		dependsOn assembleDebug
+
+	outputs.upToDateWhen {
+		!isMetadataGenerationNecessary.didWork
 	}
 	
 	def explodedAarDir = project.buildDir.getAbsolutePath() + "/intermediates/exploded-aar"
@@ -457,6 +450,14 @@ task buildapk {
 	// and this is the only way so far
 	tasks.copyAarDependencies.execute()
     tasks.addAarDependencies.execute()
+	
+	//done to build only necessary apk
+	if(project.hasProperty("release")) {
+		dependsOn assembleRelease
+	}
+	else {
+		dependsOn assembleDebug
+	}
 	
 	dependsOn deleteExplodedAarFolder
 }
