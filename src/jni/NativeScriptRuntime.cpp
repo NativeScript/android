@@ -9,6 +9,7 @@
 #include "JsArgToArrayConverter.h"
 #include "ArgConverter.h"
 #include "v8-profiler.h"
+#include "NativeScriptException.h"
 #include <assert.h>
 #include <iostream>
 #include <sstream>
@@ -48,9 +49,6 @@ void NativeScriptRuntime::Init(JavaVM *jvm, ObjectManager *objectManager)
 
 	GET_TYPE_METADATA = env.GetStaticMethodID(PlatformClass, "getTypeMetadata", "(Ljava/lang/String;I)[Ljava/lang/String;");
 	assert(GET_TYPE_METADATA != nullptr);
-
-	APP_FAIL_METHOD_ID = env.GetStaticMethodID(PlatformClass, "appFail", "(Ljava/lang/Throwable;Ljava/lang/String;)V");
-	assert(APP_FAIL_METHOD_ID != nullptr);
 
 	ENABLE_VERBOSE_LOGGING_METHOD_ID = env.GetStaticMethodID(PlatformClass, "enableVerboseLogging", "()V");
 	assert(ENABLE_VERBOSE_LOGGING_METHOD_ID != nullptr);
@@ -147,8 +145,6 @@ void NativeScriptRuntime::SetArrayElement(const Local<Object>& array, uint32_t i
 	JEnv env;
 
 	arrayElementAccessor.SetArrayElement(array, index, arraySignature, value);
-
-	ExceptionUtil::GetInstance()->CheckForJavaException(env);
 }
 
 Local<Value> NativeScriptRuntime::GetJavaField(const Local<Object>& caller, FieldCallbackData *fieldData)
@@ -191,6 +187,7 @@ void NativeScriptRuntime::CallJavaMethod(const Local<Object>& caller, const stri
 				clazz = env.FindClass(callerClassName);
 				if (clazz == nullptr)
 				{
+					//todo: plamen5kov: throw exception here
 					DEBUG_WRITE("Cannot resolve caller's class name: %s", callerClassName.c_str());
 					return;
 				}
@@ -201,6 +198,7 @@ void NativeScriptRuntime::CallJavaMethod(const Local<Object>& caller, const stri
 
 				if (entry->memberId == nullptr)
 				{
+					//todo: plamen5kov: throw exception here
 					DEBUG_WRITE("Cannot resolve a method %s on caller class: %s", methodName.c_str(), callerClassName.c_str());
 					return;
 				}
@@ -213,6 +211,7 @@ void NativeScriptRuntime::CallJavaMethod(const Local<Object>& caller, const stri
 
 				if (entry->memberId == nullptr)
 				{
+					//todo: plamen5kov: throw exception here
 					DEBUG_WRITE("Cannot resolve a method %s on class: %s", methodName.c_str(), className.c_str());
 					return;
 				}
@@ -275,8 +274,7 @@ void NativeScriptRuntime::CallJavaMethod(const Local<Object>& caller, const stri
 	if (!argConverter.IsValid())
 	{
 		JsArgConverter::Error err = argConverter.GetError();
-		ExceptionUtil::GetInstance()->ThrowExceptionToJs(err.msg);
-		return;
+		throw NativeScriptException(err.msg);
 	}
 
 	auto isolate = Isolate::GetCurrent();
@@ -292,9 +290,7 @@ void NativeScriptRuntime::CallJavaMethod(const Local<Object>& caller, const stri
 		{
 			stringstream ss;
 			ss << "No java object found on which to call \"" << methodName << "\" method. It is possible your Javascript object is not linked with the corresponding Java class. Try passing context(this) to the constructor function.";
-			string exceptionMessage = ss.str();
-			isolate->ThrowException(v8::Exception::ReferenceError(ConvertToV8String(exceptionMessage)));
-			return;
+			throw NativeScriptException(ss.str());
 		}
 	}
 
@@ -485,21 +481,17 @@ void NativeScriptRuntime::CallJavaMethod(const Local<Object>& caller, const stri
 				result = env.CallObjectMethodA(callerJavaObject, mid, javaArgs);
 			}
 
-			exceptionOccurred = env.ExceptionCheck() == JNI_TRUE;
-
-			if (!exceptionOccurred)
+			if (result != nullptr)
 			{
-				if (result != nullptr)
-				{
-					auto objectResult = ArgConverter::jstringToV8String(static_cast<jstring>(result));
-					args.GetReturnValue().Set(objectResult);
-					env.DeleteLocalRef(result);
-				}
-				else
-				{
-					args.GetReturnValue().Set(Null(isolate));
-				}
+				auto objectResult = ArgConverter::jstringToV8String(static_cast<jstring>(result));
+				args.GetReturnValue().Set(objectResult);
+				env.DeleteLocalRef(result);
 			}
+			else
+			{
+				args.GetReturnValue().Set(Null(isolate));
+			}
+
 			break;
 		}
 		case MethodReturnType::Object:
@@ -520,38 +512,34 @@ void NativeScriptRuntime::CallJavaMethod(const Local<Object>& caller, const stri
 				result = env.CallObjectMethodA(callerJavaObject, mid, javaArgs);
 			}
 
-			exceptionOccurred = env.ExceptionCheck() == JNI_TRUE;
-
-			if (!exceptionOccurred)
+			if (result != nullptr)
 			{
-				if (result != nullptr)
+				auto isString = env.IsInstanceOf(result, JAVA_LANG_STRING);
+
+				Local<Value> objectResult;
+				if (isString)
 				{
-					auto isString = env.IsInstanceOf(result, JAVA_LANG_STRING);
-
-					Local<Value> objectResult;
-					if (isString)
-					{
-						objectResult = ArgConverter::jstringToV8String((jstring)result);
-					}
-					else
-					{
-						jint javaObjectID = objectManager->GetOrCreateObjectId(result);
-						objectResult = objectManager->GetJsObjectByJavaObject(javaObjectID);
-
-						if (objectResult.IsEmpty())
-						{
-							objectResult = objectManager->CreateJSWrapper(javaObjectID, *returnType, result);
-						}
-					}
-
-					args.GetReturnValue().Set(objectResult);
-					env.DeleteLocalRef(result);
+					objectResult = ArgConverter::jstringToV8String((jstring)result);
 				}
 				else
 				{
-					args.GetReturnValue().Set(Null(isolate));
+					jint javaObjectID = objectManager->GetOrCreateObjectId(result);
+					objectResult = objectManager->GetJsObjectByJavaObject(javaObjectID);
+
+					if (objectResult.IsEmpty())
+					{
+						objectResult = objectManager->CreateJSWrapper(javaObjectID, *returnType, result);
+					}
 				}
+
+				args.GetReturnValue().Set(objectResult);
+				env.DeleteLocalRef(result);
 			}
+			else
+			{
+				args.GetReturnValue().Set(Null(isolate));
+			}
+
 			break;
 		}
 		default:
@@ -563,7 +551,7 @@ void NativeScriptRuntime::CallJavaMethod(const Local<Object>& caller, const stri
 
 	static uint32_t adjustMemCount = 0;
 
-	if (!ExceptionUtil::GetInstance()->CheckForJavaException(env) && ((++adjustMemCount % 2) == 0))
+	if ((++adjustMemCount % 2) == 0)
 	{
 		AdjustAmountOfExternalAllocatedMemory(env, isolate);
 	}
@@ -610,17 +598,13 @@ jobject NativeScriptRuntime::CreateJavaInstance(int objectID, const std::string&
 				(jint) objectID,
 				ctorId);
 
-		bool exceptionFound = ExceptionUtil::GetInstance()->CheckForJavaException(env);
 
-		if (!exceptionFound)
-		{
-			instance = obj;
-		}
+		instance = obj;
 	}
 	else
 	{
 		JsArgToArrayConverter::Error err = argConverter.GetError();
-		ExceptionUtil::GetInstance()->ThrowExceptionToJs(err.msg);
+		throw NativeScriptException(err.msg);
 	}
 
 	return instance;
@@ -696,15 +680,26 @@ jobjectArray NativeScriptRuntime::GetMethodOverrides(JEnv& env, const Local<Obje
 
 void NativeScriptRuntime::LogMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
+	try {
 	if ((args.Length() > 0) && args[0]->IsString())
 	{
 		String::Utf8Value message(args[0]->ToString());
 		DEBUG_WRITE("%s", *message);
 	}
+	} catch (NativeScriptException& e) {
+		e.ReThrowToV8();
+	}
+	catch (exception e) {
+		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	}
+	catch (...) {
+		DEBUG_WRITE("Error: c++ exception!");
+	}
 }
 
 void NativeScriptRuntime::DumpReferenceTablesMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
+	try {
 	JEnv env;
 	jclass vmDbgClass = env.FindClass("dalvik/system/VMDebug");
 	if (vmDbgClass != nullptr)
@@ -715,38 +710,67 @@ void NativeScriptRuntime::DumpReferenceTablesMethodCallback(const v8::FunctionCa
 			env.CallStaticVoidMethod(vmDbgClass, mid);
 		}
 	}
+	} catch (NativeScriptException& e) {
+		e.ReThrowToV8();
+	}
+	catch (exception e) {
+		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	}
+	catch (...) {
+		DEBUG_WRITE("Error: c++ exception!");
+	}
 }
 
 void NativeScriptRuntime::EnableVerboseLoggingMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
+	try {
 	tns::LogEnabled = true;
 	JEnv env;
 	env.CallStaticVoidMethod(PlatformClass, ENABLE_VERBOSE_LOGGING_METHOD_ID);
+	} catch (NativeScriptException& e) {
+		e.ReThrowToV8();
+	}
+	catch (exception e) {
+		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	}
+	catch (...) {
+		DEBUG_WRITE("Error: c++ exception!");
+	}
 }
 
 void NativeScriptRuntime::DisableVerboseLoggingMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
+	try {
 	tns::LogEnabled = false;
 	JEnv env;
 	env.CallStaticVoidMethod(PlatformClass, DISABLE_VERBOSE_LOGGING_METHOD_ID);
+	} catch (NativeScriptException& e) {
+		e.ReThrowToV8();
+	}
+	catch (exception e) {
+		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	}
+	catch (...) {
+		DEBUG_WRITE("Error: c++ exception!");
+	}
 }
 
 void NativeScriptRuntime::ExitMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
+	try {
 	auto msg = ConvertToString(args[0].As<String>());
 	ASSERT_FAIL("%s", msg.c_str());
 	exit(-1);
+	} catch (NativeScriptException& e) {
+		e.ReThrowToV8();
+	}
+	catch (exception e) {
+		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	}
+	catch (...) {
+		DEBUG_WRITE("Error: c++ exception!");
+	}
 }
-
-void NativeScriptRuntime::AppFail(jthrowable throwable, const char *message)
-{
-	//ASSERT_FAIL(message);
-
-	JEnv env;
-	jstring msg = env.NewStringUTF(message);
-	env.CallStaticVoidMethod(PlatformClass, APP_FAIL_METHOD_ID, throwable, msg);
-}
-
 
 void NativeScriptRuntime::CreateGlobalCastFunctions(const Local<ObjectTemplate>& globalTemplate)
 {
@@ -793,7 +817,9 @@ void NativeScriptRuntime::BuildMetadata(JEnv& env, string filesPath)
 	string valuesFile = baseDir + "/treeValueStream.dat";
 
 	FILE *f = fopen(nodesFile.c_str(), "rb");
-	assert(f != nullptr);
+	if(f == nullptr) {
+		throw NativeScriptException(string("metadata file (treeNodeStream.dat) couldn't be opened!"));
+	}
 	fseek(f, 0, SEEK_END);
 	int lenNodes = ftell(f);
 	assert((lenNodes % sizeof(MetadataTreeNodeRawData)) == 0);
@@ -805,7 +831,9 @@ void NativeScriptRuntime::BuildMetadata(JEnv& env, string filesPath)
 	const int _512KB = 524288;
 
 	f = fopen(namesFile.c_str(), "rb");
-	assert(f != nullptr);
+	if(f == nullptr) {
+		throw NativeScriptException(string("metadata file (treeStringsStream.dat) couldn't be opened!"));
+	}
 	fseek(f, 0, SEEK_END);
 	int lenNames = ftell(f);
 	char *names = new char[lenNames + _512KB];
@@ -814,7 +842,9 @@ void NativeScriptRuntime::BuildMetadata(JEnv& env, string filesPath)
 	fclose(f);
 
 	f = fopen(valuesFile.c_str(), "rb");
-	assert(f != nullptr);
+	if(f == nullptr) {
+		throw NativeScriptException(string("metadata file (treeValueStream.dat) couldn't be opened!"));
+	}
 	fseek(f, 0, SEEK_END);
 	int lenValues = ftell(f);
 	char *values = new char[lenValues + _512KB];
@@ -839,13 +869,12 @@ void NativeScriptRuntime::BuildMetadata(JEnv& env, string filesPath)
 	//delete[] values;
 }
 
-
 void NativeScriptRuntime::CreateTopLevelNamespaces(const Local<Object>& global)
 {
 	MetadataNode::CreateTopLevelNamespaces(global);
 }
 
-Local<Value> NativeScriptRuntime::CallJSMethod(JNIEnv *_env, const Local<Object>& jsObject, const string& methodName, jobjectArray args, TryCatch& tc)
+Local<Value> NativeScriptRuntime::CallJSMethod(JNIEnv *_env, const Local<Object>& jsObject, const string& methodName, jobjectArray args)
 {
 	SET_PROFILER_FRAME();
 
@@ -854,28 +883,21 @@ Local<Value> NativeScriptRuntime::CallJSMethod(JNIEnv *_env, const Local<Object>
 
 	auto isolate = Isolate::GetCurrent();
 
-	auto exceptionUtil = ExceptionUtil::GetInstance();
-
 	//auto method = MetadataNode::GetPropertyFromImplementationObject(jsObject, jsMethodName);
 	auto method = jsObject->Get(ConvertToV8String(methodName));
+
 
 	if (method.IsEmpty() || method->IsUndefined())
 	{
 		stringstream ss;
 		ss << "Cannot find method '" << methodName << "' implementation";
-
-		ExceptionUtil::GetInstance()->ThrowExceptionToJs(ss.str());
-
-		result = Undefined(isolate);
+		throw NativeScriptException(ss.str());
 	}
 	else if (!method->IsFunction())
 	{
 		stringstream ss;
 		ss << "Property '" << methodName << "' is not a function";
-
-		ExceptionUtil::GetInstance()->ThrowExceptionToJs(ss.str());
-
-		result = Undefined(isolate);
+		throw NativeScriptException(ss.str());
 	}
 	else
 	{
@@ -893,6 +915,7 @@ Local<Value> NativeScriptRuntime::CallJSMethod(JNIEnv *_env, const Local<Object>
 
 		DEBUG_WRITE("implementationObject->GetIdentityHash()=%d", jsObject->GetIdentityHash());
 
+		TryCatch tc;
 		Local<Value> jsResult;
 		{
 			SET_PROFILER_FRAME();
@@ -901,9 +924,11 @@ Local<Value> NativeScriptRuntime::CallJSMethod(JNIEnv *_env, const Local<Object>
 
 		//TODO: if javaResult is a pure js object create a java object that represents this object in java land
 
-		if (tc.HasCaught())
-		{
-			jsResult = Undefined(isolate);
+		if(tc.HasCaught()) {
+			stringstream ss;
+			ss << "Calling js method " << methodName << " failed";
+			string exceptionMessage = ss.str();
+			throw NativeScriptException(tc, ss.str());
 		}
 
 		result = handleScope.Escape(jsResult);
@@ -949,7 +974,6 @@ jclass NativeScriptRuntime::JAVA_LANG_STRING = nullptr;
 jmethodID NativeScriptRuntime::RESOLVE_CLASS_METHOD_ID = nullptr;
 jmethodID NativeScriptRuntime::CREATE_INSTANCE_METHOD_ID = nullptr;
 jmethodID NativeScriptRuntime::CACHE_CONSTRUCTOR_METHOD_ID = nullptr;
-jmethodID NativeScriptRuntime::APP_FAIL_METHOD_ID = nullptr;
 jmethodID NativeScriptRuntime::GET_TYPE_METADATA = nullptr;
 jmethodID NativeScriptRuntime::ENABLE_VERBOSE_LOGGING_METHOD_ID = nullptr;
 jmethodID NativeScriptRuntime::DISABLE_VERBOSE_LOGGING_METHOD_ID = nullptr;

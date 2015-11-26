@@ -7,6 +7,7 @@
 #include "V8GlobalHelpers.h"
 #include "V8NativeScriptExtension.h"
 #include "V8StringConstants.h"
+#include "NativeScriptException.h"
 #include <assert.h>
 #include <algorithm>
 
@@ -224,8 +225,6 @@ void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID, jcl
 	auto isolate = Isolate::GetCurrent();
 
 	DEBUG_WRITE("Linking js object: %d and java instance id: %d", object->GetIdentityHash(), javaObjectID);
-
-	JEnv env;
 
 	auto jsInstanceInfo = new JSInstanceInfo();
 	jsInstanceInfo->JavaObjectID = javaObjectID;
@@ -560,12 +559,32 @@ void ObjectManager::MarkReachableObjects(Isolate *isolate, const Local<Object>& 
 
 void ObjectManager::OnGcStartedStatic(GCType type, GCCallbackFlags flags)
 {
+	try {
 	instance->OnGcStarted(type, flags);
+	} catch (NativeScriptException& e) {
+		e.ReThrowToV8();
+	}
+	catch (exception e) {
+		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	}
+	catch (...) {
+		DEBUG_WRITE("Error: c++ exception!");
+	}
 }
 
 void ObjectManager::OnGcFinishedStatic(GCType type, GCCallbackFlags flags)
 {
+	try {
 	instance->OnGcFinished(type, flags);
+	} catch (NativeScriptException& e) {
+		e.ReThrowToV8();
+	}
+	catch (exception e) {
+		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	}
+	catch (...) {
+		DEBUG_WRITE("Error: c++ exception!");
+	}
 }
 
 void ObjectManager::OnGcStarted(GCType type, GCCallbackFlags flags)

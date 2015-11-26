@@ -11,7 +11,7 @@ namespace tns
 	public:
 		JniLocalRef();
 
-		JniLocalRef(jobject obj);
+		JniLocalRef(jobject obj, bool isWeak = false);
 
 		JniLocalRef(jclass obj);
 
@@ -56,6 +56,8 @@ namespace tns
 	private:
 
 		jobject m_obj;
+
+		bool m_isWeak;
 	};
 }
 

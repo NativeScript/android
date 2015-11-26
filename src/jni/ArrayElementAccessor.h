@@ -5,7 +5,6 @@
 #include "v8.h"
 #include <string>
 #include "ObjectManager.h"
-#include "ExceptionUtil.h"
 
 namespace tns
 {
@@ -19,7 +18,7 @@ namespace tns
 		void SetArrayElement(const v8::Local<v8::Object>& array, uint32_t index, const std::string& arraySignature, v8::Local<v8::Value>& value);
 
 	private:
-		v8::Local<v8::Value> CheckForArrayAccessException(JEnv& env, const std::string& elementSignature, const void *value);
+		v8::Local<v8::Value> ConvertToJsValue(JEnv& env, const std::string& elementSignature, const void *value);
 
 		JavaVM *jvm;
 

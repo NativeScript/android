@@ -1,6 +1,8 @@
 #include "Profiler.h"
 #include "V8GlobalHelpers.h"
 #include "prof.h"
+#include "NativeScriptException.h"
+#include "NativeScriptAssert.h"
 #include <assert.h>
 #include <stack>
 
@@ -22,6 +24,7 @@ void Profiler::Init(const string& appName)
 
 void Profiler::StartCPUProfilerCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
+	try {
 	auto isolate = Isolate::GetCurrent();
 	auto started = false;
 	if ((args.Length() == 1) && (args[0]->IsString()))
@@ -30,11 +33,23 @@ void Profiler::StartCPUProfilerCallback(const v8::FunctionCallbackInfo<v8::Value
 		StartCPUProfiler(isolate, name);
 		started = true;
 	}
+
 	args.GetReturnValue().Set(Boolean::New(isolate, started));
+
+	} catch (NativeScriptException& e) {
+		e.ReThrowToV8();
+	}
+	catch (exception e) {
+		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	}
+	catch (...) {
+		DEBUG_WRITE("Error: c++ exception!");
+	}
 }
 
 void Profiler::StopCPUProfilerCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
+	try {
 	auto isolate = Isolate::GetCurrent();
 	auto stopped = false;
 	if ((args.Length() == 1) && (args[0]->IsString()))
@@ -43,6 +58,15 @@ void Profiler::StopCPUProfilerCallback(const v8::FunctionCallbackInfo<v8::Value>
 		stopped = StopCPUProfiler(isolate, name);
 	}
 	args.GetReturnValue().Set(Boolean::New(isolate, stopped));
+	} catch (NativeScriptException& e) {
+		e.ReThrowToV8();
+	}
+	catch (exception e) {
+		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	}
+	catch (...) {
+		DEBUG_WRITE("Error: c++ exception!");
+	}
 }
 
 void Profiler::StartCPUProfiler(Isolate *isolate, const Local<String>& name)
@@ -170,12 +194,32 @@ bool Profiler::Write(CpuProfile *cpuProfile)
 
 void Profiler::StartNDKProfilerCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
+	try {
 	StartNDKProfiler();
+	} catch (NativeScriptException& e) {
+		e.ReThrowToV8();
+	}
+	catch (exception e) {
+		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	}
+	catch (...) {
+		DEBUG_WRITE("Error: c++ exception!");
+	}
 }
 
 void Profiler::StopNDKProfilerCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
+	try {
 	StopNDKProfiler();
+	} catch (NativeScriptException& e) {
+		e.ReThrowToV8();
+	}
+	catch (exception e) {
+		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	}
+	catch (...) {
+		DEBUG_WRITE("Error: c++ exception!");
+	}
 }
 
 void Profiler::StartNDKProfiler()
@@ -226,6 +270,7 @@ class FileOutputStream: public OutputStream
 
 void Profiler::HeapSnapshotMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
+	try {
 	struct timespec nowt;
 	clock_gettime(CLOCK_MONOTONIC, &nowt);
 	uint64_t now = (int64_t) nowt.tv_sec*1000000000LL + nowt.tv_nsec;
@@ -250,6 +295,15 @@ void Profiler::HeapSnapshotMethodCallback(const v8::FunctionCallbackInfo<v8::Val
 	snap->Serialize(&stream, HeapSnapshot::kJSON);
 	fclose(fp);
 	const_cast<HeapSnapshot*>(snap)->Delete();
+	} catch (NativeScriptException& e) {
+		e.ReThrowToV8();
+	}
+	catch (exception e) {
+		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	}
+	catch (...) {
+		DEBUG_WRITE("Error: c++ exception!");
+	}
 }
 
 string Profiler::s_appName;

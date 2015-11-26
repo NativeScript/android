@@ -23,7 +23,7 @@ namespace tns
 
 		static std::string GetPackageName();
 
-		static void SendCommand(uint16_t *cmd, int length);
+		static void SendCommand(JNIEnv *_env, jobject obj, jbyteArray command, jint length);
 
 		static void DebugBreakCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
@@ -31,6 +31,7 @@ namespace tns
 		JsDebugger();
 
 		static void MyMessageHandler(const v8::Debug::Message& message);
+		static void SendCommandToV8(uint16_t *cmd, int length);
 
 		static std::string s_packageName;
 		static jclass s_JsDebuggerClass;

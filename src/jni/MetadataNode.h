@@ -202,7 +202,7 @@ namespace tns
 		static void MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 		static void InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 		static void ClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
-		static void ExtendCallMethodHandler(const v8::FunctionCallbackInfo<v8::Value>& info);
+		static void ExtendCallMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 		static bool ValidateExtendArguments(const v8::FunctionCallbackInfo<v8::Value>& info, std::string& extendLocation, v8::Local<v8::String>& extendName, v8::Local<v8::Object>& implementationObject);
 		static void ExtendedClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 

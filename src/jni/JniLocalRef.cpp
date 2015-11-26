@@ -6,28 +6,28 @@ using namespace v8;
 using namespace tns;
 
 JniLocalRef::JniLocalRef()
-	: m_obj(nullptr)
+	: m_obj(nullptr), m_isWeak(false)
 {
 }
 
 
-JniLocalRef::JniLocalRef(jobject obj)
-	: m_obj(obj)
+JniLocalRef::JniLocalRef(jobject obj, bool isWeak)
+	: m_obj(obj), m_isWeak(isWeak)
 {
 }
 
 
 JniLocalRef::JniLocalRef(jclass obj)
-	: m_obj(obj)
+	: m_obj(obj), m_isWeak(false)
 {
 }
-
 
 JniLocalRef::JniLocalRef(const JniLocalRef& rhs)
 {
 	JEnv env;
 
-	m_obj = env.NewLocalRef(rhs.m_obj);
+	m_obj = rhs.m_isWeak ? rhs.m_obj : env.NewLocalRef(rhs.m_obj);
+	m_isWeak = rhs.m_isWeak;
 }
 
 
@@ -42,14 +42,22 @@ JniLocalRef& JniLocalRef::operator=(const JniLocalRef& rhs)
 {
     if(this != &rhs)
     {
-    	JEnv env;
-		if (m_obj != nullptr)
-		{
-			env.DeleteLocalRef(m_obj);
-		}
-		m_obj = (rhs.m_obj != nullptr)
-					? env.NewLocalRef(rhs.m_obj)
-					: nullptr;
+    	m_isWeak = rhs.m_isWeak;
+    	if (m_isWeak)
+    	{
+    		m_obj = rhs.m_obj;
+    	}
+    	else
+    	{
+			JEnv env;
+			if (m_obj != nullptr)
+			{
+				env.DeleteLocalRef(m_obj);
+			}
+			m_obj = (rhs.m_obj != nullptr)
+						? env.NewLocalRef(rhs.m_obj)
+						: nullptr;
+    	}
     }
     return *this;
 }
@@ -145,7 +153,7 @@ JniLocalRef::operator jobjectArray() const
 
 JniLocalRef::~JniLocalRef()
 {
-	if (m_obj != nullptr)
+	if ((m_obj != nullptr) && !m_isWeak)
 	{
 		JEnv env;
 		env.DeleteLocalRef(m_obj);

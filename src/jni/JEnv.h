@@ -182,15 +182,25 @@ namespace tns
 		void* GetDirectBufferAddress(jobject buf);
 		jlong GetDirectBufferCapacity(jobject buf);
 
+		jboolean IsAssignableFrom(jclass clazz1, jclass clazz2);
+
 
 		template<typename... Args>
 		void CallVoidMethod(jobject obj, jmethodID methodID, Args... args)
 		{
 			m_env->CallVoidMethod(obj, methodID, args...);
+			CheckForJavaException();
 		}
 
 		template<typename... Args>
 		void CallStaticVoidMethod(jclass clazz, jmethodID methodID, Args... args)
+		{
+			m_env->CallStaticVoidMethod(clazz, methodID, args...);
+			CheckForJavaException();
+		}
+
+		template<typename... Args>
+		void CallAppFail(jclass clazz, jmethodID methodID, Args... args)
 		{
 			m_env->CallStaticVoidMethod(clazz, methodID, args...);
 		}
@@ -198,90 +208,121 @@ namespace tns
 		template<typename... Args>
 		jint CallStaticIntMethod(jclass clazz, jmethodID methodID, Args... args)
 		{
-			return m_env->CallStaticIntMethod(clazz, methodID, args...);
+			jint ji = m_env->CallStaticIntMethod(clazz, methodID, args...);
+			CheckForJavaException();
+			return ji;
 		}
 
 		template<typename... Args>
 		jlong CallStaticLongMethod(jclass clazz, jmethodID methodID, Args... args)
 		{
-			return m_env->CallStaticLongMethod(clazz, methodID, args...);
+			jlong jd = m_env->CallStaticLongMethod(clazz, methodID, args...);
+			CheckForJavaException();
+			return jd;
 		}
 
 		template<typename... Args>
 		jobject CallStaticObjectMethod(jclass clazz, jmethodID methodID, Args... args)
 		{
-			return m_env->CallStaticObjectMethod(clazz, methodID, args...);
+			jobject jo = m_env->CallStaticObjectMethod(clazz, methodID, args...);
+			CheckForJavaException();
+			return jo;
 		}
 
 		template<typename... Args>
 		jboolean CallStaticBooleanMethod(jclass clazz, jmethodID methodID, Args... args)
 		{
-			return m_env->CallStaticBooleanMethod(clazz, methodID, args...);
+			jboolean jbl = m_env->CallStaticBooleanMethod(clazz, methodID, args...);
+			CheckForJavaException();
+			return jbl;
 		}
 
 		template<typename... Args>
 		jobject CallObjectMethod(jobject obj, jmethodID methodID, Args... args)
 		{
-			return m_env->CallObjectMethod(obj, methodID, args...);
+			jobject jo = m_env->CallObjectMethod(obj, methodID, args...);
+			CheckForJavaException();
+			return jo;
 		}
 
 		template<typename... Args>
 		jboolean CallBooleanMethod(jobject obj, jmethodID methodID, Args... args)
 		{
-			return m_env->CallBooleanMethod(obj, methodID, args...);
+			jboolean jbl = m_env->CallBooleanMethod(obj, methodID, args...);
+			CheckForJavaException();
+			return jbl;
 		}
 
 		template<typename... Args>
 		jchar CallCharMethod(jobject obj, jmethodID methodID, Args... args)
 		{
-			return m_env->CallCharMethod(obj, methodID, args...);
+			jchar jc = m_env->CallCharMethod(obj, methodID, args...);
+			CheckForJavaException();
+			return jc;
 		}
 
 		template<typename... Args>
 		jbyte CallByteMethod(jobject obj, jmethodID methodID, Args... args)
 		{
-			return m_env->CallByteMethod(obj, methodID, args...);
+			jbyte jbt = m_env->CallByteMethod(obj, methodID, args...);
+			CheckForJavaException();
+			return jbt;
 		}
 
 		template<typename... Args>
 		jshort CallShortMethod(jobject obj, jmethodID methodID, Args... args)
 		{
-			return m_env->CallShortMethod(obj, methodID, args...);
+			jshort jsh = m_env->CallShortMethod(obj, methodID, args...);
+			CheckForJavaException();
+			return jsh;
 		}
 
 		template<typename... Args>
 		jint CallIntMethod(jobject obj, jmethodID methodID, Args... args)
 		{
-			return m_env->CallIntMethod(obj, methodID, args...);
+			jint ji = m_env->CallIntMethod(obj, methodID, args...);
+			CheckForJavaException();
+			return ji;
 		}
 
 		template<typename... Args>
 		jlong CallLongMethod(jobject obj, jmethodID methodID, Args... args)
 		{
-			return m_env->CallLongMethod(obj, methodID, args...);
+			jlong jl = m_env->CallLongMethod(obj, methodID, args...);
+			CheckForJavaException();
+			return jl;
 		}
 
 		template<typename... Args>
 		jfloat CallFloatMethod(jobject obj, jmethodID methodID, Args... args)
 		{
-			return m_env->CallFloatMethod(obj, methodID, args...);
+			jfloat jf = m_env->CallFloatMethod(obj, methodID, args...);
+			CheckForJavaException();
+			return jf;
 		}
 
 		template<typename... Args>
 		jdouble CallDoubleMethod(jobject obj, jmethodID methodID, Args... args)
 		{
-			return m_env->CallDoubleMethod(obj, methodID, args...);
+			jdouble jd = m_env->CallDoubleMethod(obj, methodID, args...);
+			CheckForJavaException();
+			return jd;
 		}
 
 		template<typename... Args>
 		jobject NewObject(jclass clazz, jmethodID methodID, Args... args)
 		{
-			return m_env->NewObject(clazz, methodID, args...);
+			jobject jo = m_env->NewObject(clazz, methodID, args...);
+			CheckForJavaException();
+			return jo;
+
 		}
 
 		static void Init(JavaVM *jvm);
 
 	private:
+		void CheckForJavaException();
+
 		JNIEnv *m_env;
 		bool m_detach;
 

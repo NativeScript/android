@@ -1,6 +1,8 @@
 #include "JsDebugger.h"
 #include "V8GlobalHelpers.h"
 #include "JniLocalRef.h"
+#include "NativeScriptException.h"
+#include "NativeScriptAssert.h"
 #include <assert.h>
 
 using namespace std;
@@ -31,21 +33,6 @@ void JsDebugger::Init(v8::Isolate *isolate, const string& packageName)
 string JsDebugger::GetPackageName()
 {
 	return s_packageName;
-}
-
-/* *
- * private method that takes debug message as json from v8
- * after it gets the message the message handler passes it to enqueueMessage method in java
- */
-void JsDebugger::MyMessageHandler(const v8::Debug::Message& message)
-{
-	auto json = message.GetJSON();
-	auto str = ConvertToString(json);
-
-	JEnv env;
-	JniLocalRef s(env.NewStringUTF(str.c_str()));
-
-	env.CallStaticVoidMethod(s_JsDebuggerClass, s_EnqueueMessage, (jstring)s);
 }
 
 /* *
@@ -94,15 +81,21 @@ void JsDebugger::ProcessDebugMessages()
 	v8::Debug::ProcessDebugMessages();
 }
 
-void JsDebugger::SendCommand(uint16_t *cmd, int length)
-{
-	auto isolate = s_isolate;
+void JsDebugger::SendCommand(JNIEnv *_env, jobject obj, jbyteArray command, jint length) {
+	tns::JEnv env(_env);
+	auto buf = new jbyte[length];
 
-	v8::Debug::SendCommand(isolate, cmd, length, nullptr);
+	env.GetByteArrayRegion(command, 0, length, buf);
+
+	int len = length / sizeof(uint16_t);
+	SendCommandToV8(reinterpret_cast<uint16_t*>(buf), len);
+
+	delete[] buf;
 }
 
 void JsDebugger::DebugBreakCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
+	try {
 	JEnv env;
 	JniLocalRef packageName(env.NewStringUTF(s_packageName.c_str()));
 
@@ -116,8 +109,38 @@ void JsDebugger::DebugBreakCallback(const v8::FunctionCallbackInfo<v8::Value>& a
 	env.CallStaticVoidMethod(s_JsDebuggerClass, s_EnableAgent, (jstring)packageName, port, jniFalse);
 
 	DebugBreak();
+	} catch (NativeScriptException& e) {
+		e.ReThrowToV8();
+	}
+	catch (exception e) {
+		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	}
+	catch (...) {
+		DEBUG_WRITE("Error: c++ exception!");
+	}
 }
 
+void JsDebugger::SendCommandToV8(uint16_t *cmd, int length)
+{
+	auto isolate = s_isolate;
+
+	v8::Debug::SendCommand(isolate, cmd, length, nullptr);
+}
+
+/* *
+ * private method that takes debug message as json from v8
+ * after it gets the message the message handler passes it to enqueueMessage method in java
+ */
+void JsDebugger::MyMessageHandler(const v8::Debug::Message& message)
+{
+	auto json = message.GetJSON();
+	auto str = ConvertToString(json);
+
+	JEnv env;
+	JniLocalRef s(env.NewStringUTF(str.c_str()));
+
+	env.CallStaticVoidMethod(s_JsDebuggerClass, s_EnqueueMessage, (jstring)s);
+}
 
 v8::Isolate* JsDebugger::s_isolate = nullptr;
 string JsDebugger::s_packageName = "";
