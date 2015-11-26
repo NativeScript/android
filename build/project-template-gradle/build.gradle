@@ -260,7 +260,11 @@ task createPluginsConfigFile {
 			println "\t+creating product flavors include.gradle file in $configurationsDir folder..."
 			def flavors = pluginNames.join(",")
 			if(appResExists) {
-				flavors = '"' + appResourcesName + '", ' + flavors
+				if (flavors == '') {
+					flavors = '"' + appResourcesName + '"'
+				} else {
+					flavors = '"' + appResourcesName + '", ' + flavors
+				}
 			}
 			flavorsFile << "android { \n"
 			flavorsFile << "\tflavorDimensions " + flavors + "\n"
