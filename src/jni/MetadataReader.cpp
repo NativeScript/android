@@ -526,6 +526,7 @@ MetadataTreeNode* MetadataReader::GetOrCreateTreeNodeByName(const string& classN
 				typeLine >> kind >> name;
 				auto cKind = kind[0];
 
+				// package, class, interface
 				assert((cKind == 'P') || (cKind == 'C') || (cKind == 'I'));
 
 				if ((cKind == 'C') || (cKind == 'I'))

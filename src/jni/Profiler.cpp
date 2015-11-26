@@ -3,7 +3,6 @@
 #include "prof.h"
 #include "NativeScriptException.h"
 #include "NativeScriptAssert.h"
-#include <assert.h>
 #include <stack>
 
 using namespace v8;

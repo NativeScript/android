@@ -1,7 +1,6 @@
 #include "JsArgToArrayConverter.h"
 #include <limits>
 #include <sstream>
-#include <assert.h>
 #include "ObjectManager.h"
 #include "NativeScriptAssert.h"
 #include "ArgConverter.h"
