@@ -498,6 +498,7 @@ Local<Function> MetadataNode::SetMembersFromRuntimeMetadata(Isolate *isolate, Lo
 
 		char chKind = kind[0];
 
+		// method or field
 		assert((chKind == 'M') || (chKind == 'F'));
 
 		MetadataEntry entry;

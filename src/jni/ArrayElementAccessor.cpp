@@ -7,7 +7,6 @@
 #include "NativeScriptAssert.h"
 #include "NativeScriptException.h"
 #include "JType.h"
-#include <assert.h>
 
 using namespace v8;
 using namespace std;

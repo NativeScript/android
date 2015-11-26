@@ -1,6 +1,7 @@
 package com.tns;
 
 import java.io.File;
+import java.lang.Thread.UncaughtExceptionHandler;
 
 import android.app.Application;
 import android.content.pm.PackageManager.NameNotFoundException;
@@ -710,14 +711,18 @@ public class NativeScriptApplication extends android.app.Application implements 
 		
 		System.loadLibrary("NativeScript");
 		
-		Logger logger = new LogcatLogger(BuildConfig.DEBUG, this);
+		Logger logger = new LogcatLogger(BuildConfig.DEBUG, this);		
 		
 		boolean showErrorIntent = hasErrorIntent();
 		if (!showErrorIntent)
 		{
 			appInstance = this;
 			
-			prepareAppBuilderCallbackImpl(logger);
+			Thread.UncaughtExceptionHandler exHandler = new NativeScriptUncaughtExceptionHandler(logger, this);
+			
+			prepareAppBuilderCallbackImpl(logger, exHandler);
+			
+			Thread.setDefaultUncaughtExceptionHandler(exHandler);
 			
 			// TODO: refactor
 			ExtractPolicy extractPolicy = (appBuilderCallbackImpl != null)
@@ -782,7 +787,7 @@ public class NativeScriptApplication extends android.app.Application implements 
 		}
 	}
 	
-	private void prepareAppBuilderCallbackImpl(Logger logger)
+	private void prepareAppBuilderCallbackImpl(Logger logger, UncaughtExceptionHandler exHandler)
 	{
 		Class<?> appBuilderCallbackClass = null;
 		
@@ -824,11 +829,9 @@ public class NativeScriptApplication extends android.app.Application implements 
 			}
 		}
 
-		Thread.UncaughtExceptionHandler exHandler = (appBuilderCallbackImpl != null)
-				? appBuilderCallbackImpl.getDefaultUncaughtExceptionHandler()
-				: new NativeScriptUncaughtExceptionHandler(logger, this);
-
-		Thread.setDefaultUncaughtExceptionHandler(exHandler);
+		if(appBuilderCallbackImpl != null) {
+			exHandler = appBuilderCallbackImpl.getDefaultUncaughtExceptionHandler();	
+		}
 		
 		boolean shouldEnableDebugging = (appBuilderCallbackImpl != null)
 				? appBuilderCallbackImpl.shouldEnableDebugging(this)

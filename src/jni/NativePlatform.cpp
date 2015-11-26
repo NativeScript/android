@@ -25,7 +25,6 @@
 #include "NativePlatform.h"
 #include <sstream>
 #include <android/log.h>
-#include <assert.h>
 #include <string>
 
 using namespace v8;
