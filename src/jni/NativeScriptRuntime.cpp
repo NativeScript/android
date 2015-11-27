@@ -20,7 +20,6 @@
 #include "MethodCache.h"
 #include "JsDebugger.h"
 #include "SimpleProfiler.h"
-#include "Module.h"
 
 using namespace v8;
 using namespace std;

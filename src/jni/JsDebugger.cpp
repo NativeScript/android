@@ -21,11 +21,9 @@ void JsDebugger::Init(v8::Isolate *isolate, const string& packageName)
 	s_JsDebuggerClass = env.FindClass("com/tns/JsDebugger");
 	assert(s_JsDebuggerClass != nullptr);
 
-	//what is enqueue message used for
 	s_EnqueueMessage = env.GetStaticMethodID(s_JsDebuggerClass, "enqueueMessage", "(Ljava/lang/String;)V");
 	assert(s_EnqueueMessage != nullptr);
 
-	//enableAgent.start(.stop) what is it used for ?
 	s_EnableAgent = env.GetStaticMethodID(s_JsDebuggerClass, "enableAgent", "(Ljava/lang/String;IZ)V");
 	assert(s_EnableAgent != nullptr);
 }
