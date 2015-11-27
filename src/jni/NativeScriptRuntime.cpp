@@ -756,20 +756,9 @@ void NativeScriptRuntime::DisableVerboseLoggingMethodCallback(const v8::Function
 
 void NativeScriptRuntime::ExitMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-	try {
-		auto msg = ConvertToString(args[0].As<String>());
-		stringstream ss;
-		ss << "You crashed the app on purpose with: __exit('" << msg << "')";
-		throw NativeScriptException(ss.str());
-	} catch (NativeScriptException& e) {
-		e.ReThrowToV8();
-	}
-	catch (exception e) {
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
-	}
-	catch (...) {
-		DEBUG_WRITE("Error: c++ exception!");
-	}
+	auto msg = ConvertToString(args[0].As<String>());
+	DEBUG_WRITE_FATAL("FORCE EXIT: %s", msg.c_str());
+	exit(-1);
 }
 
 void NativeScriptRuntime::CreateGlobalCastFunctions(const Local<ObjectTemplate>& globalTemplate)
