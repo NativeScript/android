@@ -85,6 +85,7 @@ void NativeScriptException::ReThrowToJava() {
 void NativeScriptException::Init(JavaVM *jvm, ObjectManager *objectManager)
 {
 	NativeScriptException::objectManager = objectManager;
+	assert(NativeScriptException::objectManager != nullptr);
 
 	JEnv env;
 
@@ -139,7 +140,6 @@ void NativeScriptException::OnUncaughtError(Local<Message> message, Local<Value>
 
 void NativeScriptException::CallJsFuncWithErr(Local<Value> errObj)
 {
-	//create handle scope
 	auto isolate = Isolate::GetCurrent();
 	HandleScope scope(isolate);
 
@@ -220,11 +220,8 @@ void NativeScriptException::ThrowExceptionToV8(const string& exceptionMessage)
 
 string NativeScriptException::GetFullMessage(const TryCatch& tc, bool isExceptionEmpty, bool isMessageEmpty, const string& prependMessage)
 {
-	//if there is a javascript exception caught by TryCatch
-	// (no one dealt with the js exception in the js frame so we need to so we don't reach V8::AddMessageListener(OnUncaughtError))
-	auto ex = tc.Exception(); //get the exception
+	auto ex = tc.Exception();
 
-	//if js exception is not empty take it's message
 	string message;
 	if(!isExceptionEmpty && !isMessageEmpty){
 		message = PrintErrorMessage(tc.Message(), ex);
@@ -236,7 +233,6 @@ string NativeScriptException::GetFullMessage(const TryCatch& tc, bool isExceptio
 
 	DEBUG_WRITE("Error: %s", loggedMessage.c_str());
 
-	//if js exception is fatal throw to java
 	if(!tc.CanContinue()) {
 		stringstream errM;
 		errM << endl << "An uncaught error has occurred and V8's TryCatch block CAN'T be continued. ";
@@ -246,13 +242,13 @@ string NativeScriptException::GetFullMessage(const TryCatch& tc, bool isExceptio
 	return loggedMessage;
 }
 
-// THROW TO JAVA
 JniLocalRef NativeScriptException::GetJavaException(const TryCatch& tc, bool isExceptionEmpty, bool isMessageEmpty, const string& prependMessage)
 {
+	assert(tc.HasCaught());
 	JniLocalRef javaThrowable;
 
 	auto ex = tc.Exception();
-	//if js exception is fatal throw to java
+
 	if(!tc.CanContinue()) {
 		return javaThrowable;
 	}
