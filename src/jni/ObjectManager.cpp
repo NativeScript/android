@@ -10,6 +10,7 @@
 #include "NativeScriptException.h"
 #include <assert.h>
 #include <algorithm>
+#include <sstream>
 
 using namespace v8;
 using namespace std;
@@ -357,9 +358,12 @@ void ObjectManager::ReleaseJSInstance(Persistent<Object> *po, JSInstanceInfo *js
 	int javaObjectID = jsInstanceInfo->JavaObjectID;
 
 	auto it = idToObject.find(javaObjectID);
+
 	if (it == idToObject.end())
 	{
-		ASSERT_FAIL("js object with id:%d not found", javaObjectID);
+		stringstream ss;
+		ss << "(InternalError): Js object with id: " << javaObjectID << " not found";
+		throw NativeScriptException(ss.str());
 	}
 
 	assert(po == it->second);

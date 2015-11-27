@@ -1,6 +1,7 @@
 #include "JavaObjectArrayCache.h"
 #include "JniLocalRef.h"
-#include <assert.h>
+#include "NativeScriptException.h"
+#include <sstream>
 
 using namespace tns;
 
@@ -20,25 +21,20 @@ jobjectArray JavaObjectArrayCache::GetJavaObjectArray(int length)
 {
 	bool supportedLength = length < MAX_JAVA_PARAMS_COUNT;
 
-	assert(supportedLength);
-
-	jobjectArray arr;
-
-	if (supportedLength)
-	{
-		arr = s_objArr[length];
-
-		if (arr == nullptr)
-		{
-			JEnv env;
-			jclass objectClass = env.FindClass("java/lang/Object");
-			JniLocalRef tmpArr(env.NewObjectArray(length, objectClass, nullptr));
-			s_objArr[length] = arr = (jobjectArray)env.NewGlobalRef(tmpArr);
-		}
+	if(!supportedLength) {
+		stringstream ss;
+		ss << "You are trying to override more than the MAX_JAVA_PARAMS_COUNT: " << MAX_JAVA_PARAMS_COUNT;
+		throw NativeScriptException(ss.str());
 	}
-	else
+
+	jobjectArray arr = s_objArr[length];
+
+	if (arr == nullptr)
 	{
-		arr = nullptr;
+		JEnv env;
+		jclass objectClass = env.FindClass("java/lang/Object");
+		JniLocalRef tmpArr(env.NewObjectArray(length, objectClass, nullptr));
+		s_objArr[length] = arr = (jobjectArray)env.NewGlobalRef(tmpArr);
 	}
 
 	return arr;
@@ -49,25 +45,20 @@ jobjectArray JavaObjectArrayCache::GetJavaStringArray(int length)
 {
 	bool supportedLength = length < MAX_OVERWRITE_METHOD_COUNT;
 
-	assert(supportedLength);
-
-	jobjectArray arr;
-
-	if (supportedLength)
-	{
-		arr = s_strArr[length];
-
-		if (arr == nullptr)
-		{
-			JEnv env;
-			jclass stringClass = env.FindClass("java/lang/String");
-			JniLocalRef tmpArr(env.NewObjectArray(length, stringClass, nullptr));
-			s_strArr[length] = arr = (jobjectArray)env.NewGlobalRef(tmpArr);
-		}
+	if(!supportedLength) {
+		stringstream ss;
+		ss << "You are trying to override more than the MAX_OVERWRITE_METHOD_COUNT: " << MAX_OVERWRITE_METHOD_COUNT;
+		throw NativeScriptException(ss.str());
 	}
-	else
+
+	jobjectArray arr = s_strArr[length];
+
+	if (arr == nullptr)
 	{
-		arr = nullptr;
+		JEnv env;
+		jclass stringClass = env.FindClass("java/lang/String");
+		JniLocalRef tmpArr(env.NewObjectArray(length, stringClass, nullptr));
+		s_strArr[length] = arr = (jobjectArray)env.NewGlobalRef(tmpArr);
 	}
 
 	return arr;

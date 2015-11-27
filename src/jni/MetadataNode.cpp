@@ -162,7 +162,9 @@ Local<Object> MetadataNode::CreateWrapper(Isolate *isolate)
 	}
 	else
 	{
-		ASSERT_FAIL("Can't create proxy for this type=%d", nodeType);
+		stringstream ss;
+		ss << "(InternalError): Can't create proxy for this type=" <<  static_cast<int>(nodeType);
+		throw NativeScriptException(ss.str());
 	}
 
 	return handle_scope.Escape(obj);
@@ -272,7 +274,6 @@ void MetadataNode::FieldAccessorGetterCallback(Local<String> property, const Pro
 	try {
 	auto thiz = info.This();
 	auto fieldCallbackData = reinterpret_cast<FieldCallbackData*>(info.Data().As<External>()->Value());
-
 	auto value = NativeScriptRuntime::GetJavaField(thiz, fieldCallbackData);
 	info.GetReturnValue().Set(value);
 	} catch (NativeScriptException& e) {
@@ -775,7 +776,6 @@ void MetadataNode::ExtendedClassConstructorCallback(const v8::FunctionCallbackIn
 	auto implementationObject = Local<Object>::New(isolate, *extData->implementationObject);
 
 	const auto& extendName = extData->extendedName;
-//	auto className = TNS_PREFIX + extData->node->m_name;
 
 	SetInstanceMetadata(isolate, thiz, extData->node);
 	thiz->SetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::CallSuper), True(isolate));
@@ -783,7 +783,6 @@ void MetadataNode::ExtendedClassConstructorCallback(const v8::FunctionCallbackIn
 
 	ArgsWrapper argWrapper(info, ArgType::Class, Local<Object>());
 
-//	string fullClassName = CreateFullClassName(className, extendName);
 	string fullClassName = extData->fullClassName;
 
 	bool success = NativeScriptRuntime::RegisterInstance(thiz, fullClassName, argWrapper, implementationObject, false);
@@ -816,7 +815,9 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
 	{
 		if (!extendLocationFound)
 		{
-			ASSERT_FAIL("Invalid extend() call. No name specified for extend. Location: %s", extendLocation.c_str());
+			stringstream ss;
+			ss << "(InternalError): Invalid extend() call. No name specified for extend. Location: " << extendLocation.c_str();
+			throw NativeScriptException(ss.str());
 		}
 
 		if (!info[0]->IsObject())
@@ -905,67 +906,67 @@ void MetadataNode::ClassConstructorCallback(const v8::FunctionCallbackInfo<v8::V
 void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
 	try {
-	SET_PROFILER_FRAME();
+		SET_PROFILER_FRAME();
 
-	auto e = info.Data().As<External>();
+		auto e = info.Data().As<External>();
 
-	auto callbackData = reinterpret_cast<MethodCallbackData*>(e->Value());
+		auto callbackData = reinterpret_cast<MethodCallbackData*>(e->Value());
 
-	int argLength = info.Length();
+		int argLength = info.Length();
 
-	MetadataEntry *entry = nullptr;
+		MetadataEntry *entry = nullptr;
 
-	string *className;
-	const auto& first = callbackData->candidates.front();
-	const auto& methodName = first.name;
+		string *className;
+		const auto& first = callbackData->candidates.front();
+		const auto& methodName = first.name;
 
-	while ((callbackData != nullptr) && (entry == nullptr))
-	{
-		auto& candidates = callbackData->candidates;
-
-		className = &callbackData->node->m_name;
-
-		auto found = false;
-		for (auto& c: candidates)
+		while ((callbackData != nullptr) && (entry == nullptr))
 		{
-			found = c.paramCount == argLength;
-			if (found)
+			auto& candidates = callbackData->candidates;
+
+			className = &callbackData->node->m_name;
+
+			auto found = false;
+			for (auto& c: candidates)
 			{
-				entry = &c;
-				break;
+				found = c.paramCount == argLength;
+				if (found)
+				{
+					entry = &c;
+					break;
+				}
+			}
+
+			if (!found)
+			{
+				callbackData = callbackData->parent;
 			}
 		}
 
-		if (!found)
+		auto thiz = info.This();
+
+		auto isSuper = false;
+		if (!first.isStatic)
 		{
-			callbackData = callbackData->parent;
+			auto superValue = thiz->GetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::CallSuper));
+			isSuper = !superValue.IsEmpty() && superValue->IsTrue();
 		}
-	}
 
-	auto thiz = info.This();
+	//	// TODO: refactor this
+		if (isSuper && (*className == "com/tns/NativeScriptActivity"))
+		{
+			string activityBaseClassName("android/app/Activity");
+			className = &activityBaseClassName;
+		}
 
-	auto isSuper = false;
-	if (!first.isStatic)
-	{
-		auto superValue = thiz->GetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::CallSuper));
-		isSuper = !superValue.IsEmpty() && superValue->IsTrue();
-	}
-
-//	// TODO: refactor this
-	if (isSuper && (*className == "com/tns/NativeScriptActivity"))
-	{
-		string activityBaseClassName("android/app/Activity");
-		className = &activityBaseClassName;
-	}
-
-	if ((argLength == 0) && (methodName == V8StringConstants::VALUE_OF))
-	{
-		info.GetReturnValue().Set(thiz);
-	}
-	else
-	{
-		NativeScriptRuntime::CallJavaMethod(thiz, *className, methodName, entry, first.isStatic, isSuper, info);
-	}
+		if ((argLength == 0) && (methodName == V8StringConstants::VALUE_OF))
+		{
+			info.GetReturnValue().Set(thiz);
+		}
+		else
+		{
+			NativeScriptRuntime::CallJavaMethod(thiz, *className, methodName, entry, first.isStatic, isSuper, info);
+		}
 	} catch (NativeScriptException& e) {
 		e.ReThrowToV8();
 	}
