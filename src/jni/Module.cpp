@@ -208,7 +208,11 @@ Local<Object> Module::CompileAndRun(const string& modulePath, bool& hasError)
 	if(cacheData != nullptr)
 	{
 		option = ScriptCompiler::kConsumeCodeCache;
-		script = ScriptCompiler::Compile(isolate->GetCurrentContext(), &source, option).ToLocalChecked();
+		auto maybeScript = ScriptCompiler::Compile(isolate->GetCurrentContext(), &source, option);
+		if (maybeScript.IsEmpty() || tc.HasCaught()) {
+			throw NativeScriptException(tc, "Cannot compile " + modulePath);
+		}
+		script = maybeScript.ToLocalChecked();
 	}
 	else
 	{
@@ -216,7 +220,11 @@ Local<Object> Module::CompileAndRun(const string& modulePath, bool& hasError)
 		{
 			option = ScriptCompiler::kProduceCodeCache;
 		}
-		script = ScriptCompiler::Compile(isolate->GetCurrentContext(), &source, option).ToLocalChecked();
+		auto maybeScript = ScriptCompiler::Compile(isolate->GetCurrentContext(), &source, option);
+		if (maybeScript.IsEmpty() || tc.HasCaught()) {
+			throw NativeScriptException(tc, "Cannot compile " + modulePath);
+		}
+		script = maybeScript.ToLocalChecked();
 		SaveScriptCache(source, modulePath);
 	}
 
