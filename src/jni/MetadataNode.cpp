@@ -162,7 +162,9 @@ Local<Object> MetadataNode::CreateWrapper(Isolate *isolate)
 	}
 	else
 	{
-		ASSERT_FAIL("Can't create proxy for this type=%d", nodeType);
+		stringstream ss;
+		ss << "(InternalError): Can't create proxy for this type=" <<  static_cast<int>(nodeType);
+		throw NativeScriptException(ss.str());
 	}
 
 	return handle_scope.Escape(obj);
@@ -272,7 +274,6 @@ void MetadataNode::FieldAccessorGetterCallback(Local<String> property, const Pro
 	try {
 	auto thiz = info.This();
 	auto fieldCallbackData = reinterpret_cast<FieldCallbackData*>(info.Data().As<External>()->Value());
-
 	auto value = NativeScriptRuntime::GetJavaField(thiz, fieldCallbackData);
 	info.GetReturnValue().Set(value);
 	} catch (NativeScriptException& e) {
@@ -816,7 +817,9 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
 	{
 		if (!extendLocationFound)
 		{
-			ASSERT_FAIL("Invalid extend() call. No name specified for extend. Location: %s", extendLocation.c_str());
+			stringstream ss;
+			ss << "(InternalError): Invalid extend() call. No name specified for extend. Location: " << extendLocation.c_str();
+			throw NativeScriptException(ss.str());
 		}
 
 		if (!info[0]->IsObject())

@@ -20,7 +20,6 @@ NativeScriptException::NativeScriptException(JEnv& env)
 NativeScriptException::NativeScriptException(const std::string& message)
 	:m_javascriptException(Local<Value>()), m_message(message)
 {
-	DEBUG_WRITE("NativeScriptException-1");
 }
 
 NativeScriptException::NativeScriptException(const v8::Local<v8::Value>& jsException, const std::string& message)

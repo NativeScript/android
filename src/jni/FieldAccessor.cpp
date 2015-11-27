@@ -4,7 +4,9 @@
 #include "NativeScriptAssert.h"
 #include "Util.h"
 #include "V8GlobalHelpers.h"
+#include "NativeScriptException.h"
 #include <assert.h>
+#include <sstream>
 
 using namespace v8;
 using namespace std;
@@ -186,9 +188,9 @@ Local<Value> FieldAccessor::GetJavaField(const Local<Object>& target, FieldCallb
 			}
 			default:
 			{
-				// TODO:
-				ASSERT_FAIL("Unknown field type");
-				break;
+				stringstream ss;
+				ss << "(InternalError): in FieldAccessor::GetJavaField: Unknown field type: '" << fieldTypeName[0] << "'";
+				throw NativeScriptException(ss.str());
 			}
 		}
 	}
@@ -397,9 +399,9 @@ void FieldAccessor::SetJavaField(const Local<Object>& target, const Local<Value>
 			}
 			default:
 			{
-				// TODO:
-				ASSERT_FAIL("Unknown field type");
-				break;
+				stringstream ss;
+				ss << "(InternalError): in FieldAccessor::SetJavaField: Unknown field type: '" << fieldTypeName[0] << "'";
+				throw NativeScriptException(ss.str());
 			}
 		}
 	}
