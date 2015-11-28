@@ -12,6 +12,7 @@
 #include "NativeScriptAssert.h"
 #include "Constants.h"
 #include "NativeScriptException.h"
+#include "Util.h"
 
 #include <sstream>
 #include <assert.h>
@@ -28,8 +29,8 @@ void Module::Init(Isolate *isolate)
 	MODULE_CLASS = env.FindClass("com/tns/Module");
 	assert(MODULE_CLASS != nullptr);
 
-	GET_MODULE_PATH_METHOD_ID = env.GetStaticMethodID(MODULE_CLASS, "getModulePath", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
-	assert(GET_MODULE_PATH_METHOD_ID != nullptr);
+	RESOLVE_PATH_METHOD_ID = env.GetStaticMethodID(MODULE_CLASS, "resolvePath", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
+	assert(RESOLVE_PATH_METHOD_ID != nullptr);
 
 	string requireFactoryScript =
 	"(function () { "
@@ -122,7 +123,7 @@ void Module::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 		JEnv env;
 		JniLocalRef jsModulename(env.NewStringUTF(moduleName.c_str()));
 		JniLocalRef jsCallingModuleDirName(env.NewStringUTF(callingModuleDirName.c_str()));
-		JniLocalRef jsModulePath(env.CallStaticObjectMethod(MODULE_CLASS, GET_MODULE_PATH_METHOD_ID, (jstring) jsModulename, (jstring) jsCallingModuleDirName));
+		JniLocalRef jsModulePath(env.CallStaticObjectMethod(MODULE_CLASS, RESOLVE_PATH_METHOD_ID, (jstring) jsModulename, (jstring) jsCallingModuleDirName));
 
 		// cache the required modules by full path, not name only, since there might be some collisions with relative paths and names
 		string modulePath = ArgConverter::jstringToString((jstring) jsModulePath);
@@ -144,20 +145,26 @@ void Module::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 
 		auto it = s_loadedModules.find(modulePath);
 
-		bool hasError = false;
-
 		Local<Object> moduleObj;
+
+		auto isData = false;
 
 		if (it == s_loadedModules.end())
 		{
-			moduleObj = CompileAndRun(modulePath, hasError);
+			moduleObj = Load(modulePath, isData);
 		}
 		else
 		{
 			moduleObj = Local<Object>::New(isolate, *it->second);
 		}
 
-		if(!hasError)
+		if (isData)
+		{
+			assert(!moduleObj.IsEmpty());
+
+			args.GetReturnValue().Set(moduleObj);
+		}
+		else
 		{
 			auto exportsObj = moduleObj->Get(ConvertToV8String("exports"));
 
@@ -165,7 +172,9 @@ void Module::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 
 			args.GetReturnValue().Set(exportsObj);
 		}
-	} catch (NativeScriptException& e) {
+	}
+	catch (NativeScriptException& e)
+	{
 		e.ReThrowToV8();
 	}
 	catch (exception e) {
@@ -176,41 +185,99 @@ void Module::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 	}
 }
 
-Local<Object> Module::CompileAndRun(const string& modulePath, bool& hasError)
+Local<Object> Module::Load(const string& path, bool& isData)
 {
 	Local<Object> result;
 
 	auto isolate = Isolate::GetCurrent();
 
+	if (Util::EndsWith(path, ".js"))
+	{
+		isData = false;
+		result = LoadModule(isolate, path);
+	}
+	else if (Util::EndsWith(path, ".json"))
+	{
+		isData = true;
+		result = LoadData(isolate, path);
+	}
+	else
+	{
+		string errMsg = "Unsupported file extension: " + path;
+		throw NativeScriptException(errMsg);
+	}
+
+	return result;
+}
+
+Local<Object> Module::LoadModule(Isolate *isolate, const string& modulePath)
+{
+	Local<Object> result;
+
 	auto moduleObj = Object::New(isolate);
 	auto exportsObj = Object::New(isolate);
 	auto exportsPropName = ConvertToV8String("exports");
 	moduleObj->Set(exportsPropName, exportsObj);
+	auto fullRequiredModulePath = ConvertToV8String(modulePath);
+	moduleObj->Set(ConvertToV8String("filename"), fullRequiredModulePath);
 
 	auto poModuleObj = new Persistent<Object>(isolate, moduleObj);
 	s_loadedModules.insert(make_pair(modulePath, poModuleObj));
 
 	TryCatch tc;
 
-	auto scriptText = Module::WrapModuleContent(modulePath);
+	Local<Function> moduleFunc;
 
-	DEBUG_WRITE("Compiling script (module %s)", modulePath.c_str());
-	auto fullRequiredModulePath = ConvertToV8String(modulePath);
-	moduleObj->Set(ConvertToV8String("filename"), fullRequiredModulePath);
+	auto script = LoadScript(isolate, modulePath, fullRequiredModulePath);
+
+	moduleFunc = script->Run().As<Function>();
+	if (tc.HasCaught())
+	{
+		throw NativeScriptException(tc, "Error running script " + modulePath);
+	}
+
+	auto fileName = ConvertToV8String(modulePath);
+	char pathcopy[1024];
+	strcpy(pathcopy, modulePath.c_str());
+	string strDirName(dirname(pathcopy));
+	auto dirName = ConvertToV8String(strDirName);
+	auto require = GetRequireFunction(isolate, strDirName);
+	Local<Value> requireArgs[5] { moduleObj, exportsObj, require, fileName, dirName };
+
+	auto thiz = Object::New(isolate);
+	moduleFunc->Call(thiz, sizeof(requireArgs) / sizeof(Local<Value>), requireArgs);
+
+	if(tc.HasCaught()) {
+		throw NativeScriptException(tc, "Error calling module function ");
+	}
+
+	result = moduleObj;
+
+	return result;
+}
+
+Local<Script> Module::LoadScript(Isolate *isolate, const string& path, const Local<String>& fullRequiredModulePath)
+{
+	Local<Script> script;
+
+	TryCatch tc;
+
+	auto scriptText = Module::WrapModuleContent(path);
+
+	DEBUG_WRITE("Compiling script (module %s)", path.c_str());
 	//
-	auto cacheData = TryLoadScriptCache(modulePath);
+	auto cacheData = TryLoadScriptCache(path);
 
 	ScriptOrigin origin(fullRequiredModulePath);
 	ScriptCompiler::Source source(scriptText, origin, cacheData);
 	ScriptCompiler::CompileOptions option = ScriptCompiler::kNoCompileOptions;
-	Local<Script> script;
 
 	if(cacheData != nullptr)
 	{
 		option = ScriptCompiler::kConsumeCodeCache;
 		auto maybeScript = ScriptCompiler::Compile(isolate->GetCurrentContext(), &source, option);
 		if (maybeScript.IsEmpty() || tc.HasCaught()) {
-			throw NativeScriptException(tc, "Cannot compile " + modulePath);
+			throw NativeScriptException(tc, "Cannot compile " + path);
 		}
 		script = maybeScript.ToLocalChecked();
 	}
@@ -222,52 +289,47 @@ Local<Object> Module::CompileAndRun(const string& modulePath, bool& hasError)
 		}
 		auto maybeScript = ScriptCompiler::Compile(isolate->GetCurrentContext(), &source, option);
 		if (maybeScript.IsEmpty() || tc.HasCaught()) {
-			throw NativeScriptException(tc, "Cannot compile " + modulePath);
+			throw NativeScriptException(tc, "Cannot compile " + path);
 		}
 		script = maybeScript.ToLocalChecked();
-		SaveScriptCache(source, modulePath);
+		SaveScriptCache(source, path);
 	}
 
-	DEBUG_WRITE("Compiled script (module %s)", modulePath.c_str());
+	DEBUG_WRITE("Compiled script (module %s)", path.c_str());
 
-	if(tc.HasCaught()) {
-		throw NativeScriptException(tc, "Script " + modulePath + " contains compilation errors!");
-	}
-
-	if (script.IsEmpty())
-	{
-		DEBUG_WRITE("%s was empty", modulePath.c_str());
-	}
-	else
-	{
-		DEBUG_WRITE("Running script (module %s)", modulePath.c_str());
-
-		auto f = script->Run().As<Function>();
-		if(tc.HasCaught()) {
-			throw NativeScriptException(tc, "Error running script " + modulePath);
-		}
-
-		auto fileName = ConvertToV8String(modulePath);
-		char pathcopy[1024];
-		strcpy(pathcopy, modulePath.c_str());
-		string strDirName(dirname(pathcopy));
-		auto dirName = ConvertToV8String(strDirName);
-		auto require = GetRequireFunction(isolate, strDirName);
-		Local<Value> requireArgs[5] { moduleObj, exportsObj, require, fileName, dirName };
-
-		auto thiz = Object::New(isolate);
-		f->Call(thiz, sizeof(requireArgs) / sizeof(Local<Value>), requireArgs);
-
-		if(tc.HasCaught()) {
-			throw NativeScriptException(tc, "Error calling module function ");
-		}
-	}
-
-	result = moduleObj;
-
-	return result;
+	return script;
 }
 
+Local<Object> Module::LoadData(Isolate *isolate, const string& path)
+{
+	Local<Object> json;
+
+	auto jsonData = File::ReadText(path);
+
+	TryCatch tc;
+
+	auto jsonStr = ConvertToV8String(jsonData);
+
+	auto maybeValue = JSON::Parse(isolate, jsonStr);
+
+	if (maybeValue.IsEmpty() || tc.HasCaught())
+	{
+		string errMsg = "Cannot parse JSON file " + path;
+		throw NativeScriptException(tc, errMsg);
+	}
+
+	auto value = maybeValue.ToLocalChecked();
+
+	if (!value->IsObject())
+	{
+		string errMsg = "JSON is not valid, file=" + path;
+		throw NativeScriptException(errMsg);
+	}
+
+	json = value.As<Object>();
+
+	return json;
+}
 
 Local<String> Module::WrapModuleContent(const string& path)
 {
@@ -317,7 +379,7 @@ void Module::SaveScriptCache(const ScriptCompiler::Source& source, const std::st
 
 
 jclass Module::MODULE_CLASS = nullptr;
-jmethodID Module::GET_MODULE_PATH_METHOD_ID = nullptr;
+jmethodID Module::RESOLVE_PATH_METHOD_ID = nullptr;
 
 const char* Module::MODULE_PART_1 = "(function(module, exports, require, __filename, __dirname){ ";
 const char* Module::MODULE_PART_2 = "\n})";

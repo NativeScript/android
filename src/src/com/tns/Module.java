@@ -2,6 +2,7 @@ package com.tns;
 
 import java.io.File;
 import java.io.IOException;
+import java.security.InvalidParameterException;
 import java.util.HashMap;
 
 import org.json.JSONException;
@@ -54,12 +55,12 @@ class Module
 	}
 
 	@RuntimeCallable
-	private static String getModulePath(String moduleName, String callingDirName)
+	private static String resolvePath(String path, String baseDir)
 	{
 		// This method is called my the NativeScriptRuntime.cpp RequireCallback method.
-		// The currentModuleDir is the directory path of the calling module.
+		// The baseDir is the directory path of the calling module.
 		checkForExternalPath = true;
-		File file = findModuleFile(moduleName, callingDirName);
+		File file = resolvePathHelper(path, baseDir);
 
 		if (file != null && file.exists())
 		{
@@ -68,7 +69,7 @@ class Module
 			{
 				if (logger.isEnabled())
 				{
-					logger.write("Module " + moduleName + " is on external path");
+					logger.write("Module " + path + " is on external path");
 				}
 				return "EXTERNAL_FILE_ERROR";
 			}
@@ -81,7 +82,7 @@ class Module
 		// empty path will be handled by the NativeScriptRuntime.cpp and a JS error will be thrown
 		if (logger.isEnabled())
 		{
-			logger.write("Module " + moduleName + " not found. required from directory " + callingDirName);
+			logger.write("Module " + path + " not found. required from directory " + baseDir);
 		}
 		return "";
 	}
@@ -103,38 +104,37 @@ class Module
 		return true;
 	}
 	
-	private static File findModuleFile(String moduleName, String currentDirectory)
+	private static File resolvePathHelper(String path, String baseDir)
 	{
 		File directory = null;
-		File jsFile = null;
-		boolean isJSFile = moduleName.endsWith(".js");
+		File file = null;
 
-		if (currentDirectory == null || currentDirectory.isEmpty())
+		if (baseDir == null || baseDir.isEmpty())
 		{
-			currentDirectory = ApplicationFilesPath + ModulesFilesPath;
+			baseDir = ApplicationFilesPath + ModulesFilesPath;
 		}
 
-		if (moduleName.startsWith("/"))
+		if (path.startsWith("/"))
 		{
 			// absolute path
-			directory = new File(moduleName);
-			jsFile = isJSFile ? new File(moduleName) : new File(moduleName + ".js");
+			directory = new File(path);
+			file = getFileWithExtension(path);
 		}
-		else if (moduleName.startsWith("./") || moduleName.startsWith("../") || moduleName.startsWith("~/"))
+		else if (path.startsWith("./") || path.startsWith("../") || path.startsWith("~/"))
 		{
 			// same or up directory
-			String resolvedPath = FileSystem.resolveRelativePath(ApplicationFilesPath, moduleName, currentDirectory);
+			String resolvedPath = FileSystem.resolveRelativePath(ApplicationFilesPath, path, baseDir);
 			directory = new File(resolvedPath);
-			jsFile = isJSFile ? new File(directory.getAbsolutePath()) : new File(directory.getAbsolutePath() + ".js");
+			file = getFileWithExtension(directory.getAbsolutePath());
 		}
 		else
 		{
 			// search for tns_module
-			directory = new File(ApplicationFilesPath + NativeScriptModulesFilesPath, moduleName);
-			jsFile = isJSFile ? new File(directory.getPath()) : new File(directory.getPath() + ".js");
+			directory = new File(ApplicationFilesPath + NativeScriptModulesFilesPath, path);
+			file = getFileWithExtension(directory.getPath());
 		}
 
-		if (!jsFile.exists() && directory.exists() && directory.isDirectory())
+		if (!file.exists() && directory.exists() && directory.isDirectory())
 		{
 			// We are pointing to a directory, check for already resolved file
 			String folderPath = directory.getAbsolutePath();
@@ -155,41 +155,61 @@ class Module
 							if(!mainFile.endsWith(".js")) {
 								mainFile += ".js";
 							}
-							jsFile = new File(directory.getAbsolutePath(), mainFile);
+							file = new File(directory.getAbsolutePath(), mainFile);
 							found = true;
 						}
 					}
 					catch (IOException e)
 					{
 						// json read failed
-						jsFile = null;
+						file = null;
 					}
 					catch (JSONException e)
 					{
-						jsFile = null;
+						file = null;
 					}
 				}
 				if (!found)
 				{
 					// search for index.js
-					jsFile = new File(directory.getPath() + "/index.js");
+					file = new File(directory.getPath() + "/index.js");
 				}
 				
 				// TODO: search for <folderName>.js ?
 				
-				if(jsFile != null) {
+				if(file != null) {
 					// cache the main file for later use
-					folderAsModuleCache.put(folderPath, jsFile.getAbsolutePath());
+					folderAsModuleCache.put(folderPath, file.getAbsolutePath());
 				}
 			}
 			else {
 				// do not check whether this path is external for the application - it is already checked
 				checkForExternalPath = false;
-				jsFile = new File(cachedPath);
+				file = new File(cachedPath);
 			}
 		}
 
-		return jsFile;
+		return file;
+	}
+	
+	private static File getFileWithExtension(String path)
+	{
+		String fallbackExtension;
+		
+		boolean isJSFile = path.endsWith(".js");
+		boolean isJSONFile = path.endsWith(".json");
+		
+		if (isJSFile || isJSONFile)
+		{
+			fallbackExtension = "";
+		}
+		else
+		{
+			fallbackExtension = ".js";
+		}
+		
+		File file = new File(path + fallbackExtension);
+		return file;
 	}
 
 	static String bootstrapApp()
@@ -199,10 +219,10 @@ class Module
 		// 2. Check for index.js
 		// 3. Check for bootstrap.js
 
-		File bootstrapFile = findModuleFile("./", "");
+		File bootstrapFile = resolvePathHelper("./", "");
 		if (!bootstrapFile.exists())
 		{
-			bootstrapFile = findModuleFile("./bootstrap", "");
+			bootstrapFile = resolvePathHelper("./bootstrap", "");
 		}
 
 		if (!bootstrapFile.exists())

@@ -96,9 +96,12 @@ void NativePlatform::RunModule(JNIEnv *_env, jobject obj, jstring scriptFile)
 	HandleScope handleScope(isolate);
 
 	string filePath = ArgConverter::jstringToString(scriptFile);
-	bool hasError = false;
 
-	auto moduleObj = Module::CompileAndRun(filePath, hasError);
+	bool isData = false;
+
+	auto moduleObj = Module::Load(filePath, isData);
+
+	assert(!isData);
 }
 
 jobject NativePlatform::RunScript(JNIEnv *_env, jobject obj, jstring scriptFile)

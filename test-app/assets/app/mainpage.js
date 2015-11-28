@@ -22,6 +22,7 @@ require("./tests/testFieldGetSet");
 require("./tests/extendedClassesTests");
 require("./tests/extendClassNameTests");
 require("./tests/testJniReferenceLeak");
+require("./tests/testRequireJSON");
 
 var MainActivity = {
     onCreate: function (bundle) {

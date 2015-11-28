@@ -21,12 +21,18 @@ namespace tns
 		public:
 			static void Init(v8::Isolate *isolate);
 
-			static v8::Local<v8::String> WrapModuleContent(const std::string& path);
-
-			static v8::Local<v8::Object> CompileAndRun(const std::string& modulePath, bool& hasError);
+			static v8::Local<v8::Object> Load(const std::string& path, bool& isData);
 
 		private:
 			Module() = default;
+
+			static v8::Local<v8::String> WrapModuleContent(const std::string& path);
+
+			static v8::Local<v8::Object> LoadModule(v8::Isolate *isolate, const std::string& path);
+
+			static v8::Local<v8::Object> LoadData(v8::Isolate *isolate, const std::string& path);
+
+			static v8::Local<v8::Script> LoadScript(v8::Isolate *isolate, const std::string& modulePath, const v8::Local<v8::String>& fullRequiredModulePath);
 
 			static void RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
@@ -36,7 +42,7 @@ namespace tns
 			static void SaveScriptCache(const v8::ScriptCompiler::Source& source, const std::string& path);
 
 			static jclass MODULE_CLASS;
-			static jmethodID GET_MODULE_PATH_METHOD_ID;
+			static jmethodID RESOLVE_PATH_METHOD_ID;
 
 			static const char* MODULE_PART_1;
 			static const char* MODULE_PART_2;

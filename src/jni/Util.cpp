@@ -86,6 +86,16 @@ void Util::SplitString(const string& str, const string& delimiters, vector<strin
 	}
 }
 
+bool Util::EndsWith(const string& str, const string& suffix)
+{
+	bool res = false;
+    if (str.size() > suffix.size())
+    {
+    	res = equal(suffix.rbegin(), suffix.rend(), str.rbegin());
+    }
+    return res;
+}
+
 string Util::ConvertFromJniToCanonicalName(const std::string& name)
 {
 	string converted = name;

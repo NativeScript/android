@@ -1,4 +1,6 @@
 {
 	"main": "boot.js",
-	"jsoptions": "--expose_gc"
+	"android": {
+		"v8Flags": "--expose_gc"
+	}
 }
