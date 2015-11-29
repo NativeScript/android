@@ -23,6 +23,7 @@ require("./tests/extendedClassesTests");
 require("./tests/extendClassNameTests");
 require("./tests/testJniReferenceLeak");
 require("./tests/testRequireJSON");
+require("./tests/testNativeModules");
 
 var MainActivity = {
     onCreate: function (bundle) {

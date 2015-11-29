@@ -197,9 +197,10 @@ class Module
 		String fallbackExtension;
 		
 		boolean isJSFile = path.endsWith(".js");
+		boolean isSOFile = path.endsWith(".so");
 		boolean isJSONFile = path.endsWith(".json");
 		
-		if (isJSFile || isJSONFile)
+		if (isJSFile || isJSONFile || isSOFile)
 		{
 			fallbackExtension = "";
 		}
