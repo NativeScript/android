@@ -34,10 +34,11 @@ namespace tns
 		static string GetExceptionMessage(JEnv& env, jthrowable exception);
 		static Local<Value> WrapJavaException(JEnv& env);
 		static void ThrowExceptionToV8(const string& exceptionMessage);
+		static Local<Value> GetJavaExceptionFromEnv(const JniLocalRef& exc, JEnv& env);
 
 		string GetFullMessage(const TryCatch& tc, bool isExceptionEmpty, bool isMessageEmpty, const string& prependMessage = "");
-		JniLocalRef GetJavaException(const TryCatch& tc, bool isExceptionEmpty, bool isMessageEmpty, const string& prependMessage = "");
 
+		JniLocalRef GetJavaException(const TryCatch& tc, bool isExceptionEmpty, bool isMessageEmpty, const string& prependMessage = "");
 		Local<Value> m_javascriptException;
 		JniLocalRef m_javaException;
 		string m_message;
