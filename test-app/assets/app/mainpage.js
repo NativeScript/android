@@ -17,7 +17,6 @@ require("./tests/stringConversionTests");
 require("./tests/testsForTypescript"); 
 require("./tests/testGC");
 require("./tests/testsMemoryManagement");
-require("./tests/testIfAbleToRunExternalFile");
 require("./tests/testFieldGetSet");
 require("./tests/extendedClassesTests");
 require("./tests/extendClassNameTests");
