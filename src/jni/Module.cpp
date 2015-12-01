@@ -17,6 +17,7 @@
 #include <sstream>
 #include <assert.h>
 #include <libgen.h>
+#include <dlfcn.h>
 
 using namespace v8;
 using namespace std;
@@ -170,13 +171,20 @@ void Module::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 	}
 }
 
+void Module::RequireNativeCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
+{
+	auto ext = args.Data().As<External>();
+	auto funcPtr = reinterpret_cast<FunctionCallback>(ext->Value());
+	funcPtr(args);
+}
+
 Local<Object> Module::Load(const string& path, bool& isData)
 {
 	Local<Object> result;
 
 	auto isolate = Isolate::GetCurrent();
 
-	if (Util::EndsWith(path, ".js"))
+	if (Util::EndsWith(path, ".js") || Util::EndsWith(path, ".so"))
 	{
 		isData = false;
 		result = LoadModule(isolate, path);
@@ -213,12 +221,44 @@ Local<Object> Module::LoadModule(Isolate *isolate, const string& modulePath)
 
 	Local<Function> moduleFunc;
 
-	auto script = LoadScript(isolate, modulePath, fullRequiredModulePath);
-
-	moduleFunc = script->Run().As<Function>();
-	if (tc.HasCaught())
+	if (Util::EndsWith(modulePath, ".js"))
 	{
-		throw NativeScriptException(tc, "Error running script " + modulePath);
+		auto script = LoadScript(isolate, modulePath, fullRequiredModulePath);
+
+		moduleFunc = script->Run().As<Function>();
+		if (tc.HasCaught())
+		{
+			throw NativeScriptException(tc, "Error running script " + modulePath);
+		}
+	}
+	else if (Util::EndsWith(modulePath, ".so"))
+	{
+		auto handle = dlopen (modulePath.c_str(), RTLD_LAZY);
+		if (handle == nullptr)
+		{
+			auto error = dlerror();
+			string errMsg(error);
+			throw NativeScriptException(errMsg);
+		}
+		auto func = dlsym(handle, "NSMain");
+		if (func == nullptr)
+		{
+			string errMsg("Cannot find 'NSMain' in " + modulePath);
+			throw NativeScriptException(errMsg);
+		}
+		auto extFunc = External::New(isolate, func);
+		auto ft = FunctionTemplate::New(isolate, RequireNativeCallback, extFunc);
+		auto maybeFunc = ft->GetFunction(isolate->GetCurrentContext());
+		if (maybeFunc.IsEmpty() || tc.HasCaught())
+		{
+			throw NativeScriptException(tc, "Cannot create native module function callback");
+		}
+		moduleFunc = maybeFunc.ToLocalChecked();
+	}
+	else
+	{
+		string errMsg = "Unsupported file extension: " + modulePath;
+		throw NativeScriptException(errMsg);
 	}
 
 	auto fileName = ConvertToV8String(modulePath);
