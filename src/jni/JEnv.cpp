@@ -13,8 +13,8 @@ using namespace std;
 
 
 
-JEnv::JEnv(bool detach)
-	: m_detach(detach), m_env(nullptr)
+JEnv::JEnv()
+	: m_env(nullptr)
 {
 	JNIEnv *env = nullptr;
 	jint ret = s_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
@@ -29,29 +29,12 @@ JEnv::JEnv(bool detach)
 }
 
 JEnv::JEnv(JNIEnv *jniEnv)
-	: m_env(jniEnv), m_detach(false)
+	: m_env(jniEnv)
 {
 }
 
 JEnv::~JEnv()
 {
-	if (m_detach)
-	{
-		pid_t pid = getpid();
-		pid_t tid = gettid();
-
-		if (pid != tid)
-		{
-			JNIEnv *env = nullptr;
-			jint ret = s_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
-
-			if ((ret == JNI_OK) && (env != nullptr))
-			{
-				jint ret = s_jvm->DetachCurrentThread();
-				assert(ret == JNI_OK);
-			}
-		}
-	}
 }
 
 JEnv::operator JNIEnv*() const

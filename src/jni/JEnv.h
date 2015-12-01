@@ -10,7 +10,7 @@ namespace tns
 	class JEnv
 	{
 	public:
-		JEnv(bool detach = false);
+		JEnv();
 
 		JEnv(JNIEnv *jniEnv);
 
@@ -324,7 +324,6 @@ namespace tns
 		void CheckForJavaException();
 
 		JNIEnv *m_env;
-		bool m_detach;
 
 		static JavaVM *s_jvm;
 

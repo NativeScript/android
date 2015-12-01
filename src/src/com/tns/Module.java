@@ -57,40 +57,17 @@ class Module
 	@RuntimeCallable
 	private static String resolvePath(String path, String baseDir)
 	{
-		// This method is called my the NativeScriptRuntime.cpp RequireCallback method.
 		// The baseDir is the directory path of the calling module.
 		checkForExternalPath = true;
 		File file = resolvePathHelper(path, baseDir);
 
-		if (file != null && file.exists())
-		{
-			File projectRootDir = new File(RootPackageDir);
-			if (checkForExternalPath && isFileExternal(file, projectRootDir))
-			{
-				if (logger.isEnabled())
-				{
-					logger.write("Module " + path + " is on external path");
-				}
-				return "EXTERNAL_FILE_ERROR";
-			}
-			else
-			{
-				return file.getAbsolutePath();
-			}
-		}
-
-		// empty path will be handled by the NativeScriptRuntime.cpp and a JS error will be thrown
-		if (logger.isEnabled())
-		{
-			logger.write("Module " + path + " not found. required from directory " + baseDir);
-		}
-		return "";
+		return file.getAbsolutePath();
 	}
 
 	private static boolean isFileExternal(File source, File target)
 	{
 		File currentParentDir = source.getParentFile();
-
+		
 		while (currentParentDir != null)
 		{
 			if (currentParentDir.equals(target))
@@ -108,6 +85,7 @@ class Module
 	{
 		File directory = null;
 		File file = null;
+		String possibleException  = null;
 
 		if (baseDir == null || baseDir.isEmpty())
 		{
@@ -119,6 +97,9 @@ class Module
 			// absolute path
 			directory = new File(path);
 			file = getFileWithExtension(path);
+			if(!file.exists()) {
+				possibleException = "Failed to find module with absolute path: \"" + path + "\".";
+			}
 		}
 		else if (path.startsWith("./") || path.startsWith("../") || path.startsWith("~/"))
 		{
@@ -126,12 +107,27 @@ class Module
 			String resolvedPath = FileSystem.resolveRelativePath(ApplicationFilesPath, path, baseDir);
 			directory = new File(resolvedPath);
 			file = getFileWithExtension(directory.getAbsolutePath());
+			
+			if(!file.exists()) {
+				if(path.startsWith("~/")) {
+					possibleException = "Failed to find module: \"" + path + "\", relative to: " + ModulesFilesPath;
+				}
+				else {
+					String paretnFolderPath = file.getParentFile().getAbsolutePath();
+					if(ApplicationFilesPath.length() <= paretnFolderPath.length()) {
+						possibleException = "Failed to find module: \"" + path + "\", relative to: " + paretnFolderPath.substring(ApplicationFilesPath.length()) + "/";
+					}
+				}
+			}
 		}
 		else
 		{
 			// search for tns_module
 			directory = new File(ApplicationFilesPath + NativeScriptModulesFilesPath, path);
 			file = getFileWithExtension(directory.getPath());
+			if(!file.exists()) {
+				possibleException = "Failed to find module: \"" + path + "\", relative to: " + NativeScriptModulesFilesPath;
+			}
 		}
 
 		if (!file.exists() && directory.exists() && directory.isDirectory())
@@ -161,14 +157,14 @@ class Module
 					}
 					catch (IOException e)
 					{
-						// json read failed
-						file = null;
+						throw new NativeScriptException(e.getMessage());
 					}
 					catch (JSONException e)
 					{
-						file = null;
+						throw new NativeScriptException(e.getMessage());
 					}
 				}
+				
 				if (!found)
 				{
 					// search for index.js
@@ -177,10 +173,8 @@ class Module
 				
 				// TODO: search for <folderName>.js ?
 				
-				if(file != null) {
-					// cache the main file for later use
-					folderAsModuleCache.put(folderPath, file.getAbsolutePath());
-				}
+				// cache the main file for later use
+				folderAsModuleCache.put(folderPath, file.getAbsolutePath());
 			}
 			else {
 				// do not check whether this path is external for the application - it is already checked
@@ -188,8 +182,20 @@ class Module
 				file = new File(cachedPath);
 			}
 		}
-
-		return file;
+		
+		File projectRootDir = new File(ApplicationFilesPath);
+		if (checkForExternalPath && isFileExternal(file, projectRootDir))
+		{
+			throw new NativeScriptException("Module " + path + " is an external path. You can only load modules inside the application!");
+		}
+		
+		if (file.exists())
+		{
+			return file;
+		}
+		else {
+			throw new NativeScriptException(possibleException);
+		}
 	}
 	
 	private static File getFileWithExtension(String path)

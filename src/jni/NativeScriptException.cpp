@@ -173,12 +173,19 @@ Local<Value> NativeScriptException::WrapJavaException(JEnv& env)
 	{
 		jfieldID fieldID = env.GetFieldID(env.GetObjectClass(exc), "jsValueAddress", "J");
 		jlong addr = env.GetLongField(exc, fieldID);
+
+		jmethodID gmId = env.GetMethodID(env.GetObjectClass(exc), "getMessage", "()Ljava/lang/String;");
+		jobject javaMessage = env.CallObjectMethod(exc, gmId);
+
 		Local<Value> v;
 		if (addr != 0)
 		{
 			auto pv = (Persistent<Value> *) addr;
 			v = Local<Value>::New(isolate, *pv);
 			pv->Reset();
+		}
+		else if(javaMessage != nullptr) {
+			v = GetJavaExceptionFromEnv(exc, env);
 		}
 		else
 		{
@@ -189,25 +196,30 @@ Local<Value> NativeScriptException::WrapJavaException(JEnv& env)
 	}
 	else
 	{
-		auto errMsg = GetExceptionMessage(env, exc);
-		DEBUG_WRITE("Error during java interop errorMessage %s", errMsg.c_str());
-
-		auto msg = ConvertToV8String(errMsg);
-		auto errObj = Exception::Error(msg).As<Object>();
-
-		jint javaObjectID = objectManager->GetOrCreateObjectId((jobject) exc);
-		auto nativeExceptionObject = objectManager->GetJsObjectByJavaObject(javaObjectID);
-
-		if (nativeExceptionObject.IsEmpty())
-		{
-			string className = objectManager->GetClassName((jobject)exc);
-			nativeExceptionObject = objectManager->CreateJSWrapper(javaObjectID, className);
-		}
-
-		errObj->Set(V8StringConstants::GetNativeException(), nativeExceptionObject);
-
+		auto errObj = GetJavaExceptionFromEnv(exc, env);
 		return errObj;
 	}
+}
+
+Local<Value> NativeScriptException::GetJavaExceptionFromEnv(const JniLocalRef& exc, JEnv& env) {
+	auto errMsg = GetExceptionMessage(env, exc);
+	DEBUG_WRITE("Error during java interop errorMessage %s", errMsg.c_str());
+
+	auto msg = ConvertToV8String(errMsg);
+	auto errObj = Exception::Error(msg).As<Object>();
+
+	jint javaObjectID = objectManager->GetOrCreateObjectId((jobject) exc);
+	auto nativeExceptionObject = objectManager->GetJsObjectByJavaObject(javaObjectID);
+
+	if (nativeExceptionObject.IsEmpty())
+	{
+		string className = objectManager->GetClassName((jobject)exc);
+		nativeExceptionObject = objectManager->CreateJSWrapper(javaObjectID, className);
+	}
+
+	errObj->Set(V8StringConstants::GetNativeException(), nativeExceptionObject);
+
+	return errObj;
 }
 
 void NativeScriptException::ThrowExceptionToV8(const string& exceptionMessage)

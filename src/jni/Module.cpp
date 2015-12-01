@@ -128,21 +128,6 @@ void Module::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 
 		// cache the required modules by full path, not name only, since there might be some collisions with relative paths and names
 		string modulePath = ArgConverter::jstringToString((jstring) jsModulePath);
-		if(modulePath == ""){
-			// module not found
-			stringstream ss;
-			ss << "Module \"" << moduleName << "\" not found";
-			string exception = ss.str();
-			throw NativeScriptException(exception);
-		}
-		if (modulePath == "EXTERNAL_FILE_ERROR")
-		{
-			// module not found
-			stringstream ss;
-			ss << "Module \"" << moduleName << "\" is located on the external storage. Modules can be private application files ONLY";
-			string exception = ss.str();
-			throw NativeScriptException(exception);
-		}
 
 		auto it = s_loadedModules.find(modulePath);
 
