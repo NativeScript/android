@@ -9,6 +9,8 @@ import java.io.UnsupportedEncodingException;
 import android.app.Activity;
 import android.app.PendingIntent;
 import android.app.PendingIntent.CanceledException;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.drawable.GradientDrawable;
@@ -151,7 +153,7 @@ class ErrorReport
 		layout.addView(txtHeader);
 		
 		Intent intent = activity.getIntent();
-		String msg = intent.getStringExtra(EXTRA_ERROR_REPORT_MSG);
+		final String msg = intent.getStringExtra(EXTRA_ERROR_REPORT_MSG);
 
 		TextView txtErrorMsg = new TextView(context);
 		txtErrorMsg.setText(msg);
@@ -176,7 +178,22 @@ class ErrorReport
 				activity.finish();
 			}
 		});
+		
+		Button copyToClipboard = new Button(context);
+		copyToClipboard.setText("Copy to clipboard");
+		copyToClipboard.setOnClickListener(new OnClickListener()
+		{
+			@Override
+			public void onClick(View v)
+			{
 
+				ClipboardManager clipboard = (ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
+				ClipData clip = ClipData.newPlainText("nsError", msg);
+				clipboard.setPrimaryClip(clip);
+			}
+		});
+
+		layout.addView(copyToClipboard);
 		layout.addView(btnClose);
 	}
 	
