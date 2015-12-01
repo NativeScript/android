@@ -17,12 +17,12 @@ require("./tests/stringConversionTests");
 require("./tests/testsForTypescript"); 
 require("./tests/testGC");
 require("./tests/testsMemoryManagement");
-require("./tests/testIfAbleToRunExternalFile");
 require("./tests/testFieldGetSet");
 require("./tests/extendedClassesTests");
 require("./tests/extendClassNameTests");
 require("./tests/testJniReferenceLeak");
 require("./tests/testRequireJSON");
+require("./tests/requireExceptionTests");
 
 var MainActivity = {
     onCreate: function (bundle) {
