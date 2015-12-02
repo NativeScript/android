@@ -1,3 +1,19 @@
+1.5.0
+==
+
+## What's New
+
+ - Improved LiveSync
+ - [Improved error handling](https://github.com/NativeScript/android-runtime/issues/221)
+ - Use Gradle Wrapper
+ - Use V8 code cache (experimental)
+ 
+ ## Bug Fixes
+
+ - Proper handling of HTTP 401 status code
+ - [Generate metadata for protected interfaces](https://github.com/NativeScript/android-runtime/issues/236)
+ - [Fix loading module with NULL char in it](https://github.com/NativeScript/android-runtime/issues/271)
+
 1.4.0
 ==
 
