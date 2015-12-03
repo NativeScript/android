@@ -142,43 +142,25 @@ class ErrorReport
 	void buildUI()
 	{
 		Context context = activity;
-		
+		Intent intent = activity.getIntent();
+		final String msg = intent.getStringExtra(EXTRA_ERROR_REPORT_MSG);
+
+		//container
 		LinearLayout layout = new LinearLayout(context);
 		layout.setOrientation(LinearLayout.VERTICAL);
 		activity.setContentView(layout);
 		
+		//header
 		TextView txtHeader = new TextView(context);
 		txtHeader.setText("Callstack");
-
-		layout.addView(txtHeader);
 		
-		Intent intent = activity.getIntent();
-		final String msg = intent.getStringExtra(EXTRA_ERROR_REPORT_MSG);
-
+		//error + stacktrace
 		TextView txtErrorMsg = new TextView(context);
 		txtErrorMsg.setText(msg);
 		txtErrorMsg.setHeight(1000);
 		txtErrorMsg.setMovementMethod(new ScrollingMovementMethod());
 		
-        GradientDrawable gd = new GradientDrawable();
-        gd.setColor(0xFFFFFFFF);
-        gd.setCornerRadius(5);
-        gd.setStroke(1, 0xFF000000);
-        txtErrorMsg.setBackground(gd);
-        
-		layout.addView(txtErrorMsg);
-		
-		Button btnClose = new Button(context);
-		btnClose.setText("Close");
-		btnClose.setOnClickListener(new OnClickListener()
-		{
-			@Override
-			public void onClick(View v)
-			{
-				activity.finish();
-			}
-		});
-		
+		// copy button
 		Button copyToClipboard = new Button(context);
 		copyToClipboard.setText("Copy to clipboard");
 		copyToClipboard.setOnClickListener(new OnClickListener()
@@ -192,9 +174,10 @@ class ErrorReport
 				clipboard.setPrimaryClip(clip);
 			}
 		});
-
+		
+		layout.addView(txtHeader);
+		layout.addView(txtErrorMsg);
 		layout.addView(copyToClipboard);
-		layout.addView(btnClose);
 	}
 	
 	private static void createErrorFile(final Context context)
