@@ -152,7 +152,7 @@ class ErrorReport
 		
 		//header
 		TextView txtHeader = new TextView(context);
-		txtHeader.setText("Callstack");
+		txtHeader.setText("Unhandled Exception");
 		
 		//error + stacktrace
 		TextView txtErrorMsg = new TextView(context);
