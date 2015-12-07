@@ -222,9 +222,10 @@ task createDefaultIncludeFiles {
 			def dimensionName = sanatizeDimensionName(fileName)
 			createPluginConfigFile = true
 			def foundIncludeFile = false
-			
+			def isAppResDir = false
 			if(fileName == appResourcesName) {
 				appResExists = true
+				isAppResDir = true
 			}
 			
 			println "\t+found plugins: " + fileName
@@ -236,7 +237,7 @@ task createDefaultIncludeFiles {
 				}
 			}
 			
-			if(!appResExists) {
+			if(!isAppResDir) {
 				pluginNames.add('"' + dimensionName + '"')
 			}
 			
