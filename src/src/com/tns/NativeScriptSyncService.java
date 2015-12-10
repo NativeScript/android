@@ -145,6 +145,7 @@ public class NativeScriptSyncService
                 int length = input.readInt();
                 input.readFully(new byte[length]); //ignore the payload
                 executePartialSync(context, syncDir);
+                executeRemovedSync(context, removedSyncDir);
 
                 Platform.runScript(new File(NativeScriptSyncService.this.context.getFilesDir(), "internal/livesync.js"));
                 
