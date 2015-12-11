@@ -270,6 +270,8 @@ Local<Object> Module::LoadModule(Isolate *isolate, const string& modulePath)
 	Local<Value> requireArgs[5] { moduleObj, exportsObj, require, fileName, dirName };
 
 	auto thiz = Object::New(isolate);
+	auto extendsName = ConvertToV8String("__extends");
+	thiz->Set(extendsName, isolate->GetCurrentContext()->Global()->Get(extendsName));
 	moduleFunc->Call(thiz, sizeof(requireArgs) / sizeof(Local<Value>), requireArgs);
 
 	if(tc.HasCaught()) {
