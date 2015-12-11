@@ -322,8 +322,15 @@ public class NativeScriptSyncService
 
     private void deleteRemovedFiles(File sourceDir, String sourceRootAbsolutePath, String targetRootAbsolutePath)
     {
+    	if(!sourceDir.exists()) {
+    		if (logger.isEnabled())
+            {
+                logger.write("Directory does not exist: " + sourceDir.getAbsolutePath());
+            }
+    	}
+    	
         File[] files = sourceDir.listFiles();
-
+        
         if (files != null)
         {
             for (int i = 0; i < files.length; i++)
