@@ -113,17 +113,10 @@ class ErrorReport
 	{
 		Class<?> errorActivityClass = Platform.getErrorActivityClass(); //can be null or can be provided beforehand
 				
-		//if in debug and errorActivityClass is not provided use ErrorReportActivity class
-		if(errorActivityClass == null && Util.isDebuggableApp(context)){
+		if (errorActivityClass == null) {
 			errorActivityClass = ErrorReportActivity.class;
 		}
 
-		//if not in debug mode should return null and use the errorActivityClass implementation provided
-		if(errorActivityClass == null)
-		{
-			return null;
-		}
-		
 		Intent intent = new Intent(context, errorActivityClass);
 		
 		intent.putExtra(EXTRA_NATIVESCRIPT_ERROR_REPORT, EXTRA_ERROR_REPORT_VALUE);
