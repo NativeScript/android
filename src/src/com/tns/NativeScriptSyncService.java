@@ -145,6 +145,7 @@ public class NativeScriptSyncService
                 int length = input.readInt();
                 input.readFully(new byte[length]); //ignore the payload
                 executePartialSync(context, syncDir);
+                executeRemovedSync(context, removedSyncDir);
 
                 Platform.runScript(new File(NativeScriptSyncService.this.context.getFilesDir(), "internal/livesync.js"));
                 
@@ -321,8 +322,15 @@ public class NativeScriptSyncService
 
     private void deleteRemovedFiles(File sourceDir, String sourceRootAbsolutePath, String targetRootAbsolutePath)
     {
+    	if(!sourceDir.exists()) {
+    		if (logger.isEnabled())
+            {
+                logger.write("Directory does not exist: " + sourceDir.getAbsolutePath());
+            }
+    	}
+    	
         File[] files = sourceDir.listFiles();
-
+        
         if (files != null)
         {
             for (int i = 0; i < files.length; i++)
