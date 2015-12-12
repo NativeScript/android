@@ -553,4 +553,22 @@ describe("Tests that app does not crashes (no hard-fail asserts)", function () {
 		}
 		expect(exceptionThrown).toBe(true);
 	});
+	
+	it("should not crash the app when __native(this) call is missed in TypeScript constructor", function () {
+		var MyObject = (function (_super) {
+		    __extends(MyObject, _super);
+		    function MyObject(name) {
+		        _super.call(this);
+		    }
+		    MyObject.prototype.hashCode = function () {
+		    	return 123;
+		    }
+		    return MyObject;
+		})(java.lang.Object);
+
+		var o = new MyObject();
+		var hashCode = o.hashCode();
+
+		expect(hashCode).toBe(123);
+	});
 });
