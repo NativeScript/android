@@ -528,4 +528,29 @@ describe("Tests that app does not crashes (no hard-fail asserts)", function () {
 		}
 		expect(exceptionThrown).toBe(true);
 	});
+
+	it("should throw an exception when trying to link invalid this to a Java object", function () {
+		var __extends = function (d, b) {
+			   for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
+			   function __() { this.constructor = d; }
+			   d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+			};
+		var MyObject = (function (_super) {
+		    __extends(MyObject, _super);
+		    function MyObject(name) {
+		        _super.call(this);
+		        return __native(this);
+		    }
+		    return MyObject;
+		})(java.lang.Object);
+
+		var exceptionThrown;
+		try {
+			var o = new MyObject();
+			exceptionThrown = false;
+		} catch (e) {
+			exceptionThrown = true;
+		}
+		expect(exceptionThrown).toBe(true);
+	});
 });

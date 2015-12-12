@@ -223,6 +223,14 @@ Local<Object> ObjectManager::CreateJSWrapperHelper(jint javaObjectID, const stri
 
 void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID, jclass clazz)
 {
+	int internalFieldCound = NativeScriptExtension::GetInternalFieldCount(object);
+	const int count = static_cast<int>(MetadataNodeKeys::END);
+	if (internalFieldCound != count)
+	{
+		string errMsg("Trying to link invalid 'this' to a Java object");
+		throw NativeScriptException(errMsg);
+	}
+
 	auto isolate = Isolate::GetCurrent();
 
 	DEBUG_WRITE("Linking js object: %d and java instance id: %d", object->GetIdentityHash(), javaObjectID);
