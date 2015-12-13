@@ -597,7 +597,6 @@ jobject NativeScriptRuntime::CreateJavaInstance(int objectID, const std::string&
 				(jint) objectID,
 				ctorId);
 
-
 		instance = obj;
 	}
 	else
@@ -697,6 +696,11 @@ void NativeScriptRuntime::LogMethodCallback(const v8::FunctionCallbackInfo<v8::V
 }
 
 void NativeScriptRuntime::DumpReferenceTablesMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
+{
+	DumpReferenceTablesMethod();
+}
+
+void NativeScriptRuntime::DumpReferenceTablesMethod()
 {
 	try {
 	JEnv env;

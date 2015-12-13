@@ -547,6 +547,11 @@ jint JEnv::Throw(jthrowable obj)
 	return m_env->Throw(obj);
 }
 
+jint JEnv::ThrowNew(jclass clazz, const string& message)
+{
+	return m_env->ThrowNew(clazz, message.c_str());
+}
+
 jthrowable JEnv::ExceptionOccurred()
 {
 	jthrowable jt = m_env->ExceptionOccurred();

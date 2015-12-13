@@ -12,28 +12,34 @@ using namespace v8;
 
 
 NativeScriptException::NativeScriptException(JEnv& env)
+	:m_javascriptException(Local<Value>())
 {
-	m_javascriptException = WrapJavaException(env);
+	JniLocalRef ex(env.ExceptionOccurred());
+	env.ExceptionClear();
+	m_javaException = ex;
 }
 
 
-NativeScriptException::NativeScriptException(const std::string& message)
-	:m_javascriptException(Local<Value>()), m_message(message)
+NativeScriptException::NativeScriptException(const string& message)
+	:m_javascriptException(Local<Value>()), m_javaException(JniLocalRef()), m_message(message)
 {
 }
 
-NativeScriptException::NativeScriptException(const v8::Local<v8::Value>& jsException, const std::string& message)
-	:m_javascriptException(jsException), m_message(message)
+NativeScriptException::NativeScriptException(const Local<Value>& jsException, const string& message)
+	:m_javascriptException(jsException), m_javaException(JniLocalRef()), m_message(message)
 {
 }
 
 NativeScriptException::NativeScriptException(TryCatch& tc, const string& message)
-	:m_javascriptException(Local<Value>())
+	:m_javascriptException(Local<Value>()), m_javaException(JniLocalRef())
 {
+	m_javascriptException= Local<Value>();
+	m_javaException = JniLocalRef();
+
 	bool isMessageEmpty = tc.Message().IsEmpty();
 	bool isExceptionEmpty = tc.Exception().IsEmpty();
 	m_message = GetFullMessage(tc, isExceptionEmpty, isMessageEmpty, message);
-	m_javaException = GetJavaException(tc, isExceptionEmpty, isMessageEmpty, message);
+	m_javaException = JniLocalRef(GetJavaException(tc, isExceptionEmpty, isMessageEmpty, message));
 }
 
 void NativeScriptException::ReThrowToV8() {
@@ -45,8 +51,9 @@ void NativeScriptException::ReThrowToV8() {
 	else if(!m_javascriptException.IsEmpty()) {
 		isolate->ThrowException(m_javascriptException);
 	}
-	else if (m_javaException.IsNull()){
-		isolate->ThrowException(Exception::Error(ConvertToV8String("Error: You are trying to throw java exception to V8.")));
+	else if (!m_javaException.IsNull()){
+		auto errObj = WrapJavaException();
+		isolate->ThrowException(errObj);
 	}
 	else {
 		isolate->ThrowException(Exception::Error(ConvertToV8String("No javascript exception or message provided.")));
@@ -54,7 +61,6 @@ void NativeScriptException::ReThrowToV8() {
 }
 
 void NativeScriptException::ReThrowToJava() {
-
 	jthrowable ex;
 	JEnv env;
 
@@ -159,46 +165,42 @@ void NativeScriptException::CallJsFuncWithErr(Local<Value> errObj)
 	}
 }
 
-
-// private
-//throw to v8 after JNI call caused JAVA exception
-Local<Value> NativeScriptException::WrapJavaException(JEnv& env)
+Local<Value> NativeScriptException::WrapJavaException()
 {
-	auto isolate = Isolate::GetCurrent();
-	JniLocalRef exc(env.ExceptionOccurred());
+	Local<Value> errObj;
 
-	env.ExceptionClear();
-	string excClassName = objectManager->GetClassName((jobject)exc);
+	JEnv env;
+	auto isolate = Isolate::GetCurrent();
+
+	string excClassName = objectManager->GetClassName((jobject)m_javaException);
 	if (excClassName == "com/tns/NativeScriptException")
 	{
-		jfieldID fieldID = env.GetFieldID(env.GetObjectClass(exc), "jsValueAddress", "J");
-		jlong addr = env.GetLongField(exc, fieldID);
+		jfieldID fieldID = env.GetFieldID(env.GetObjectClass(m_javaException), "jsValueAddress", "J");
+		jlong addr = env.GetLongField(m_javaException, fieldID);
 
-		jmethodID gmId = env.GetMethodID(env.GetObjectClass(exc), "getMessage", "()Ljava/lang/String;");
-		jobject javaMessage = env.CallObjectMethod(exc, gmId);
+		jmethodID gmId = env.GetMethodID(env.GetObjectClass(m_javaException), "getMessage", "()Ljava/lang/String;");
+		jobject javaMessage = env.CallObjectMethod(m_javaException, gmId);
 
-		Local<Value> v;
 		if (addr != 0)
 		{
 			auto pv = (Persistent<Value> *) addr;
-			v = Local<Value>::New(isolate, *pv);
+			errObj = Local<Value>::New(isolate, *pv);
 			pv->Reset();
 		}
 		else if(javaMessage != nullptr) {
-			v = GetJavaExceptionFromEnv(exc, env);
+			errObj = GetJavaExceptionFromEnv(m_javaException, env);
 		}
 		else
 		{
-			v = Null(isolate);
+			errObj = Null(isolate);
 		}
-
-		return v;
 	}
 	else
 	{
-		auto errObj = GetJavaExceptionFromEnv(exc, env);
-		return errObj;
+		errObj = GetJavaExceptionFromEnv(m_javaException, env);
 	}
+
+	return errObj;
 }
 
 Local<Value> NativeScriptException::GetJavaExceptionFromEnv(const JniLocalRef& exc, JEnv& env) {
@@ -293,21 +295,32 @@ JniLocalRef NativeScriptException::GetJavaException(const TryCatch& tc, bool isE
 	return javaThrowable;
 }
 
-jweak NativeScriptException::TryGetJavaThrowableObject(JEnv& env, const Local<v8::Object>& jsObj)
+jweak NativeScriptException::TryGetJavaThrowableObject(JEnv& env, const Local<Object>& jsObj)
 {
 	jweak javaThrowableObject = nullptr;
 
 	jweak javaObj = objectManager->GetJavaObjectByJsObject(jsObj);
+	JniLocalRef objClass;
 
 	if (javaObj != nullptr)
 	{
-		JniLocalRef obj(env.GetObjectClass(javaObj));
-		jboolean ret = env.IsAssignableFrom(obj, THROWABLE_CLASS);
-
-		if (ret == JNI_TRUE)
+		objClass = JniLocalRef(env.GetObjectClass(javaObj));
+	}
+	else
+	{
+		auto nativeEx = jsObj->Get(V8StringConstants::GetNativeException());
+		if (!nativeEx.IsEmpty() && nativeEx->IsObject())
 		{
-			javaThrowableObject = javaObj;
+			javaObj = objectManager->GetJavaObjectByJsObject(nativeEx.As<Object>());
+			objClass = JniLocalRef(env.GetObjectClass(javaObj));
 		}
+	}
+
+	auto isThrowable = !objClass.IsNull() ? env.IsAssignableFrom(objClass, THROWABLE_CLASS) : JNI_FALSE;
+
+	if (isThrowable == JNI_TRUE)
+	{
+		javaThrowableObject = javaObj;
 	}
 
 	return javaThrowableObject;
@@ -320,7 +333,7 @@ string NativeScriptException::PrintErrorMessage(const Local<Message>& message, c
 	// split the message by new lines to workaround the LogCat's maximum characters in a single message
 	stringstream ss(errorMessage);
 	string line;
-	while (std::getline(ss, line, '\n')) {
+	while (getline(ss, line, '\n')) {
 		// TODO: Log in the V8's Console as well?
 		DEBUG_WRITE("%s", line.c_str());
 	}

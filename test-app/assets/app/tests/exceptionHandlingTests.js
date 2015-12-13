@@ -266,4 +266,25 @@ describe("Tests exception handling ", function () {
 		expect(exceptionCaught).toBe(true);
 		
 	});
+	
+	it("should not wrap the thrown exception into NativeScriptException", function () {
+		var MyTest1 = com.tns.tests.ExceptionHandlingTest.extend({
+			onGetFile: function(s) {
+				new java.io.File("/blah/blah").createNewFile();
+			}
+		});
+		var mt1 = new MyTest1();
+		var e1 = mt1.getException("myfile1.txt");
+		expect(e1.getClass()).toBe(java.io.IOException.class);
+
+		var MyTest2 = com.tns.tests.ExceptionHandlingTest.extend({
+			onGetFile: function(s) {
+				throw new java.io.IOException(s);
+			}
+		});
+		var mt2 = new MyTest2();
+		var e2 = mt2.getException("myfile2.txt");
+		expect(e2.getClass()).toBe(java.io.IOException.class);
+	});
+
 });
