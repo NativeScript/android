@@ -69,7 +69,7 @@ void NativeScriptException::ReThrowToJava() {
 		}
 		else
 		{
-			JniLocalRef msg(env.NewStringUTF("XXX"));
+			JniLocalRef msg(env.NewStringUTF("Java Error!"));
 			ex = static_cast<jthrowable>(env.NewObject(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_THROWABLE_CTOR_ID, (jstring)msg, (jobject)m_javaException));
 		}
 	}
