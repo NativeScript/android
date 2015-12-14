@@ -368,10 +368,12 @@ task collectAllJars {
 task isMetadataGenerationNecessary {
 	description "checks if new metadata is necessary based on jar and aar dependencies used"
 	def inputFile = new File("build/metadataUTD")
-	
+	def metadataDir = new File("metadata/output");
 	inputs.file inputFile
 	outputs.upToDateWhen {
 		inputFile.exists() && 
+		metadataDir.exists() &&
+		metadataDir.list().length == 3 &&
 		(inputFile.text.trim() == metadataParams.toString().trim())
 	}
 	
