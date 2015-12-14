@@ -89,7 +89,7 @@ void NativeScriptException::ReThrowToJava() {
 
 		if (ex == nullptr)
 		{
-			JniLocalRef msg(env.NewStringUTF("Error: You are trying to throw javascript exception to java."));
+			JniLocalRef msg(env.NewStringUTF(m_message.c_str()));
 			ex = static_cast<jthrowable>(env.NewObject(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_JSVALUE_CTOR_ID, (jstring)msg, reinterpret_cast<jlong>(m_javascriptException)));
 		}
 		else
