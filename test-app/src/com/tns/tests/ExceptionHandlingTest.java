@@ -1,6 +1,6 @@
 package com.tns.tests;
 
-import java.io.IOException;
+import com.tns.NativeScriptException;
 
 import android.util.Log;
 
@@ -28,7 +28,7 @@ public class ExceptionHandlingTest
 		Log.d("TestApp", "ExceptionHandlingTest.onEvent1 is called");
 	}
 	
-	public void onGetFile(String s) throws IOException
+	public void onGetFile(String s)
 	{
 		Log.d("TestApp", "ExceptionHandlingTest.onGetFile is called");
 	}
@@ -40,10 +40,11 @@ public class ExceptionHandlingTest
 		{
 			this.onGetFile(s);
 		}
-		catch (IOException e)
+		catch (NativeScriptException e)
 		{
 			ret = e;
 		}
+
 		return ret;
 	}
 }

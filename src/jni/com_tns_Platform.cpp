@@ -3,9 +3,10 @@
 #include "NativeScriptException.h"
 #include "NativeScriptAssert.h"
 
-using namespace v8;
 using namespace std;
 using namespace tns;
+
+v8::Isolate *g_isolate = nullptr;
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved)
 {
@@ -25,7 +26,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved)
 extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj, jstring filesPath, jint appJavaObjectId, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args)
 {
 	try {
-	NativePlatform::InitNativeScript(_env, obj, filesPath, appJavaObjectId, verboseLoggingEnabled, packageName, args);
+		g_isolate = NativePlatform::InitNativeScript(_env, obj, filesPath, appJavaObjectId, verboseLoggingEnabled, packageName, args);
 	} catch (NativeScriptException& e) {
 		e.ReThrowToJava();
 	}
@@ -39,8 +40,11 @@ extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj
 
 extern "C" void Java_com_tns_Platform_runModule(JNIEnv *_env, jobject obj, jstring scriptFile)
 {
+	v8::Isolate::Scope isolate_scope(g_isolate);
+	v8::HandleScope handleScope(g_isolate);
+
 	try {
-	NativePlatform::RunModule(_env, obj, scriptFile);
+		NativePlatform::RunModule(_env, obj, scriptFile);
 	} catch (NativeScriptException& e) {
 		e.ReThrowToJava();
 	}
@@ -54,9 +58,12 @@ extern "C" void Java_com_tns_Platform_runModule(JNIEnv *_env, jobject obj, jstri
 
 extern "C" jobject Java_com_tns_Platform_runScript(JNIEnv *_env, jobject obj, jstring scriptFile)
 {
+	v8::Isolate::Scope isolate_scope(g_isolate);
+	v8::HandleScope handleScope(g_isolate);
+
 	jobject o = nullptr;
 	try {
-	o = NativePlatform::RunScript(_env, obj, scriptFile);
+		o = NativePlatform::RunScript(_env, obj, scriptFile);
 	} catch (NativeScriptException& e) {
 		e.ReThrowToJava();
 	}
@@ -71,10 +78,14 @@ extern "C" jobject Java_com_tns_Platform_runScript(JNIEnv *_env, jobject obj, js
 
 extern "C" jobject Java_com_tns_Platform_callJSMethodNative(JNIEnv *_env, jobject obj, jint javaObjectID, jstring methodName, jint retType, jboolean isConstructor, jobjectArray packagedArgs)
 {
+	v8::Isolate::Scope isolate_scope(g_isolate);
+	v8::HandleScope handleScope(g_isolate);
+
 	jobject o = nullptr;
 	try {
 		o = NativePlatform::CallJSMethodNative(_env, obj, javaObjectID, methodName, retType, isConstructor, packagedArgs);
 	} catch (NativeScriptException& e) {
+		DEBUG_WRITE(">>callJSMethodNative g_isolate=%d", g_isolate);
 		e.ReThrowToJava();
 	}
 	catch (std::exception e) {
@@ -88,8 +99,11 @@ extern "C" jobject Java_com_tns_Platform_callJSMethodNative(JNIEnv *_env, jobjec
 
 extern "C" void Java_com_tns_Platform_createJSInstanceNative(JNIEnv *_env, jobject obj, jobject javaObject, jint javaObjectID, jstring className)
 {
+	v8::Isolate::Scope isolate_scope(g_isolate);
+	v8::HandleScope handleScope(g_isolate);
+
 	try {
-	NativePlatform::CreateJSInstanceNative(_env, obj, javaObject, javaObjectID, className);
+		NativePlatform::CreateJSInstanceNative(_env, obj, javaObject, javaObjectID, className);
 	} catch (NativeScriptException& e) {
 		e.ReThrowToJava();
 	}
@@ -104,7 +118,7 @@ extern "C" void Java_com_tns_Platform_createJSInstanceNative(JNIEnv *_env, jobje
 extern "C" jint Java_com_tns_Platform_generateNewObjectId(JNIEnv *env, jobject obj)
 {
 	try {
-	return NativePlatform::GenerateNewObjectId(env, obj);
+		return NativePlatform::GenerateNewObjectId(env, obj);
 	} catch (NativeScriptException& e) {
 		e.ReThrowToJava();
 	}
@@ -118,6 +132,9 @@ extern "C" jint Java_com_tns_Platform_generateNewObjectId(JNIEnv *env, jobject o
 
 extern "C" void Java_com_tns_Platform_adjustAmountOfExternalAllocatedMemoryNative(JNIEnv *env, jobject obj, jlong usedMemory)
 {
+	v8::Isolate::Scope isolate_scope(g_isolate);
+	v8::HandleScope handleScope(g_isolate);
+
 	try {
 	NativePlatform::AdjustAmountOfExternalAllocatedMemoryNative(env, obj, usedMemory);
 	} catch (NativeScriptException& e) {
@@ -133,8 +150,11 @@ extern "C" void Java_com_tns_Platform_adjustAmountOfExternalAllocatedMemoryNativ
 
 extern "C" void Java_com_tns_Platform_passUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, jthrowable exception, jstring stackTrace)
 {
+	v8::Isolate::Scope isolate_scope(g_isolate);
+	v8::HandleScope handleScope(g_isolate);
+
 	try {
-	NativePlatform::PassUncaughtExceptionToJsNative(env, obj, exception, stackTrace);
+		NativePlatform::PassUncaughtExceptionToJsNative(env, obj, exception, stackTrace);
 	} catch (NativeScriptException& e) {
 		e.ReThrowToJava();
 	}

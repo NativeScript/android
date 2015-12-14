@@ -35,17 +35,12 @@ using namespace tns;
 JavaVM *g_jvm = nullptr;
 Persistent<Context> *PrimaryContext = nullptr;
 Context::Scope *context_scope = nullptr;
-Isolate *g_isolate = nullptr;
 ObjectManager *g_objectManager = nullptr;
 bool tns::LogEnabled = true;
 int AppJavaObjectID = -1;
 int count = 0;
 SimpleAllocator g_allocator;
 
-jobject ConvertJsValueToJavaObject(JEnv& env, const Local<Value>& value, int classReturnType);
-void AppInitCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
-void static PrepareExtendFunction(Isolate *isolate, jstring filesPath);
-void static PrepareV8Runtime(Isolate *isolate, JEnv& env, jstring filesPath, jstring packageName);
 
 jint NativePlatform::JNI_ON_LOAD(JavaVM *vm, void *reserved)
 {
@@ -63,7 +58,7 @@ jint NativePlatform::JNI_ON_LOAD(JavaVM *vm, void *reserved)
 	return JNI_VERSION_1_6;
 }
 
-void NativePlatform::InitNativeScript(JNIEnv *_env, jobject obj, jstring filesPath, jint appJavaObjectId, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args)
+Isolate* NativePlatform::InitNativeScript(JNIEnv *_env, jobject obj, jstring filesPath, jint appJavaObjectId, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args)
 {
 	AppJavaObjectID = appJavaObjectId;
 	tns::LogEnabled = verboseLoggingEnabled;
@@ -83,17 +78,13 @@ void NativePlatform::InitNativeScript(JNIEnv *_env, jobject obj, jstring filesPa
 	DEBUG_WRITE("Initializing Telerik NativeScript: app instance id:%d", appJavaObjectId);
 
 	NativeScriptException::Init(g_jvm, g_objectManager);
-	PrepareV8Runtime(env, filesRoot, packageName);
-
+	s_isolate = PrepareV8Runtime(env, filesRoot, packageName);
+	return s_isolate;
 }
 
 void NativePlatform::RunModule(JNIEnv *_env, jobject obj, jstring scriptFile)
 {
 	JEnv env(_env);
-	auto isolate = g_isolate;
-	Isolate::Scope isolate_scope(isolate);
-
-	HandleScope handleScope(isolate);
 
 	string filePath = ArgConverter::jstringToString(scriptFile);
 
@@ -109,9 +100,7 @@ jobject NativePlatform::RunScript(JNIEnv *_env, jobject obj, jstring scriptFile)
 	JEnv env(_env);
 	jobject res = nullptr;
 
-	auto isolate = g_isolate;
-	Isolate::Scope isolate_scope(isolate);
-	HandleScope handleScope(isolate);
+	auto isolate = s_isolate;
 	auto context = isolate->GetCurrentContext();
 
 	auto filename = ArgConverter::jstringToString(scriptFile);
@@ -157,14 +146,11 @@ jobject NativePlatform::CallJSMethodNative(JNIEnv *_env, jobject obj, jint javaO
 {
 	SET_PROFILER_FRAME();
 
-	auto isolate = g_isolate;
-	Isolate::Scope isolate_scope(isolate);
+	auto isolate = s_isolate;
 
 	JEnv env(_env);
 
 	DEBUG_WRITE("CallJSMethodNative called javaObjectID=%d", javaObjectID);
-
-	HandleScope handleScope(isolate);
 
 	auto jsObject = g_objectManager->GetJsObjectByJavaObject(javaObjectID);
 	if (jsObject.IsEmpty())
@@ -199,12 +185,10 @@ void NativePlatform::CreateJSInstanceNative(JNIEnv *_env, jobject obj, jobject j
 
 	DEBUG_WRITE("createJSInstanceNative called");
 
-	auto isolate = g_isolate;
-	Isolate::Scope isolate_scope(isolate);
+	auto isolate = s_isolate;
 
 	JEnv env(_env);
 
-	HandleScope handleScope(isolate);
 	// TODO: Do we need a TryCatch here? It is currently not used anywhere
 	 TryCatch tc;
 
@@ -253,9 +237,7 @@ void NativePlatform::AdjustAmountOfExternalAllocatedMemoryNative(JNIEnv *env, jo
 
 void NativePlatform::PassUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, jthrowable exception, jstring stackTrace)
 {
-	auto isolate = g_isolate;
-	Isolate::Scope isolate_scope(isolate);
-	HandleScope handleScope(isolate);
+	auto isolate = s_isolate;
 
 	//create error message
 	string errMsg = "The application crashed because of an uncaught exception. You can look at \"stackTrace\" or \"nativeException\" for more detailed information about the exception.";
@@ -330,7 +312,7 @@ void NativePlatform::AppInitCallback(const v8::FunctionCallbackInfo<v8::Value>& 
 	}
 }
 
-void NativePlatform::PrepareV8Runtime(JEnv& env, string filesPath, jstring packageName)
+Isolate* NativePlatform::PrepareV8Runtime(JEnv& env, const string& filesPath, jstring packageName)
 {
 	Platform* platform = v8::platform::CreateDefaultPlatform();
 	V8::InitializePlatform(platform);
@@ -359,8 +341,7 @@ void NativePlatform::PrepareV8Runtime(JEnv& env, string filesPath, jstring packa
 		create_params.snapshot_blob = &startup_data;
 	}
 
-	g_isolate = Isolate::New(create_params);
-	auto isolate = g_isolate;
+	auto isolate = Isolate::New(create_params);
 	Isolate::Scope isolate_scope(isolate);
 	HandleScope handleScope(isolate);
 
@@ -426,6 +407,8 @@ void NativePlatform::PrepareV8Runtime(JEnv& env, string filesPath, jstring packa
 	NativeScriptRuntime::BuildMetadata(env, filesPath);
 
 	NativeScriptRuntime::CreateTopLevelNamespaces(global);
+
+	return isolate;
 }
 
 jobject NativePlatform::ConvertJsValueToJavaObject(JEnv& env, const Local<Value>& value, int classReturnType)
@@ -480,3 +463,5 @@ void NativePlatform::PrepareExtendFunction(Isolate *isolate, jstring filesPath)
 
 	DEBUG_WRITE("Executed prepareExtend.js script");
 }
+
+Isolate* NativePlatform::s_isolate = nullptr;

@@ -80,7 +80,7 @@ describe("Tests exception handling ", function () {
 		expect(exceptionThrown).toBe(true);
 		expect(exceptionCaught).toBe(true);
 		expect(nativeExceptionFound).toBe(true);
-		expect(exMsg).toBe("This exception is thrown from JavaScript!");
+		expect(exMsg.indexOf("onEvent1")).not.toEqual(-1);
 	});
 	
 	it("TestThrowJSExceptionAndCatchInJava", function () {
@@ -275,7 +275,7 @@ describe("Tests exception handling ", function () {
 		});
 		var mt1 = new MyTest1();
 		var e1 = mt1.getException("myfile1.txt");
-		expect(e1.getClass()).toBe(java.io.IOException.class);
+		expect(e1.getCause().getClass()).toBe(java.io.IOException.class);
 
 		var MyTest2 = com.tns.tests.ExceptionHandlingTest.extend({
 			onGetFile: function(s) {
@@ -284,7 +284,7 @@ describe("Tests exception handling ", function () {
 		});
 		var mt2 = new MyTest2();
 		var e2 = mt2.getException("myfile2.txt");
-		expect(e2.getClass()).toBe(java.io.IOException.class);
+		expect(e2.getCause().getClass()).toBe(java.io.IOException.class);
 	});
 
 });
