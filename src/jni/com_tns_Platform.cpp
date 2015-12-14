@@ -85,7 +85,6 @@ extern "C" jobject Java_com_tns_Platform_callJSMethodNative(JNIEnv *_env, jobjec
 	try {
 		o = NativePlatform::CallJSMethodNative(_env, obj, javaObjectID, methodName, retType, isConstructor, packagedArgs);
 	} catch (NativeScriptException& e) {
-		DEBUG_WRITE(">>callJSMethodNative g_isolate=%d", g_isolate);
 		e.ReThrowToJava();
 	}
 	catch (std::exception e) {
