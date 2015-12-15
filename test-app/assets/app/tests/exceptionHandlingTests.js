@@ -19,9 +19,13 @@ describe("Tests exception handling ", function () {
 		var ex = { myProp: "SomeValue" };
 		
 		var EH = com.tns.tests.ExceptionHandlingTest.extend("ExceptionHandlingTest", {
-			onEvent1: function(s) {
-				exceptionThrown = true;
-				throw ex;
+			onEvent1: function(s, n) {
+				if (n === 0) {
+					exceptionThrown = true;
+					throw ex;
+				} else {
+					this.triggerEvent1(s, n-1);
+				}
 			}
 		});
 		
@@ -29,7 +33,7 @@ describe("Tests exception handling ", function () {
 		
 		try
 		{
-			eh.triggerEvent1("test");
+			eh.triggerEvent1("test", 5);
 		}
 		catch (e)
 		{
@@ -55,9 +59,13 @@ describe("Tests exception handling ", function () {
 		var ex = new java.lang.Exception("This exception is thrown from JavaScript!");
 		
 		var EH = com.tns.tests.ExceptionHandlingTest.extend("ExceptionHandlingTest53", {
-			onEvent1: function(s) {
-				exceptionThrown = true;
-				throw ex;
+			onEvent1: function(s, n) {
+				if (n === 0) {
+					exceptionThrown = true;
+					throw ex;
+				} else {
+					this.triggerEvent1(s, n-1);
+				}
 			}
 		});
 		
@@ -65,7 +73,7 @@ describe("Tests exception handling ", function () {
 		
 		try
 		{
-			eh.triggerEvent1("test");
+			eh.triggerEvent1("test", 5);
 		}
 		catch (e)
 		{
@@ -80,7 +88,7 @@ describe("Tests exception handling ", function () {
 		expect(exceptionThrown).toBe(true);
 		expect(exceptionCaught).toBe(true);
 		expect(nativeExceptionFound).toBe(true);
-		expect(exMsg).toBe("This exception is thrown from JavaScript!");
+		expect(exMsg.indexOf("onEvent1")).not.toEqual(-1);
 	});
 	
 	it("TestThrowJSExceptionAndCatchInJava", function () {
@@ -91,9 +99,13 @@ describe("Tests exception handling ", function () {
 		var exceptionCaught = true;
 		
 		var EH = com.tns.tests.ExceptionHandlingTest.extend("ExceptionHandlingTest89", {
-			onEvent1: function(s) {
-				exceptionThrown = true;
-				throw "My Exception String";
+			onEvent1: function(s, n) {
+				if (n === 0) {
+					exceptionThrown = true;
+					throw "My Exception String";
+				} else {
+					this.triggerEvent1WithCatchClause(s, n-1);
+				}
 			}
 		});
 		
@@ -101,7 +113,7 @@ describe("Tests exception handling ", function () {
 		
 		try
 		{
-			eh.triggerEvent1WithCatchClause("test");
+			eh.triggerEvent1WithCatchClause("test", 5);
 			exceptionCaught = false;
 		}
 		catch (e)
@@ -123,9 +135,13 @@ describe("Tests exception handling ", function () {
 		var ex = new java.lang.Exception("This exception is thrown from JavaScript!");
 		
 		var EH = com.tns.tests.ExceptionHandlingTest.extend("ExceptionHandlingTest121", {
-			onEvent1: function(s) {
-				exceptionThrown = true;
-				throw ex;
+			onEvent1: function(s, n) {
+				if (n === 0) {
+					exceptionThrown = true;
+					throw ex;
+				} else {
+					this.triggerEvent1WithCatchClause(s, n-1);
+				}
 			}
 		});
 		
@@ -133,7 +149,7 @@ describe("Tests exception handling ", function () {
 		
 		try
 		{
-			eh.triggerEvent1WithCatchClause("test");
+			eh.triggerEvent1WithCatchClause("test", 5);
 			exceptionCaught = false;
 		}
 		catch (e)
@@ -266,4 +282,33 @@ describe("Tests exception handling ", function () {
 		expect(exceptionCaught).toBe(true);
 		
 	});
+	
+	it("should not wrap the thrown exception into NativeScriptException", function () {
+		var MyTest1 = com.tns.tests.ExceptionHandlingTest.extend({
+			onGetFile: function(s, n) {
+				if (n === 0) {
+					new java.io.File("/blah/blah").createNewFile();	
+				} else {
+					this.getExceptionRec(s, n-1)
+				}
+			}
+		});
+		var mt1 = new MyTest1();
+		var e1 = mt1.getException("myfile1.txt", 5);
+		expect(e1.getCause().getClass()).toBe(java.io.IOException.class);
+
+		var MyTest2 = com.tns.tests.ExceptionHandlingTest.extend({
+			onGetFile: function(s, n) {
+				if (n === 0) {
+					throw new java.io.IOException(s);	
+				} else {
+					this.getExceptionRec(s, n-1)
+				}
+			}
+		});
+		var mt2 = new MyTest2();
+		var e2 = mt2.getException("myfile2.txt", 5);
+		expect(e2.getCause().getClass()).toBe(java.io.IOException.class);
+	});
+
 });

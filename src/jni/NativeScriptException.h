@@ -6,42 +6,36 @@
 #include "JniLocalRef.h"
 #include "ObjectManager.h"
 
-using namespace v8;
-using namespace std;
-
 namespace tns
 {
 	class NativeScriptException
 	{
 	public:
 		NativeScriptException(JEnv& env);
-		NativeScriptException(const string& message);
-		NativeScriptException(const Local<Value>& jsException, const string& message = "");
-		NativeScriptException(TryCatch& tc, const string& message = "");
+		NativeScriptException(const std::string& message);
+		NativeScriptException(v8::TryCatch& tc, const std::string& message = "");
 
 		void ReThrowToV8();
 		void ReThrowToJava();
 
 		static void Init(JavaVM *jvm, ObjectManager *objectManager);
-		static void OnUncaughtError(Local<Message> message, Local<Value> error);
-		static void CallJsFuncWithErr(Local<Value> errObj);
+		static void OnUncaughtError(v8::Local<v8::Message> message, v8::Local<v8::Value> error);
+		static void CallJsFuncWithErr(v8::Local<v8::Value> errObj);
 
 	private:
-		static jweak TryGetJavaThrowableObject(JEnv& env, const Local<Object>& jsObj);
-		static string PrintErrorMessage(const Local<Message>& message, const Local<Value>& error);
-		static string GetErrorMessage(const Local<Message>& message, const Local<Value>& error);
-		static string GetErrorStackTrace(const Local<StackTrace>& stackTrace);
-		static string GetExceptionMessage(JEnv& env, jthrowable exception);
-		static Local<Value> WrapJavaException(JEnv& env);
-		static void ThrowExceptionToV8(const string& exceptionMessage);
-		static Local<Value> GetJavaExceptionFromEnv(const JniLocalRef& exc, JEnv& env);
+		jweak TryGetJavaThrowableObject(JEnv& env, const v8::Local<v8::Object>& jsObj);
+		std::string GetExceptionMessage(JEnv& env, jthrowable exception);
+		v8::Local<v8::Value> WrapJavaToJsException();
+		v8::Local<v8::Value> GetJavaExceptionFromEnv(const JniLocalRef& exc, JEnv& env);
+		static std::string PrintErrorMessage(const v8::Local<v8::Message>& message, const v8::Local<v8::Value>& error);
+		static std::string GetErrorMessage(const v8::Local<v8::Message>& message, const v8::Local<v8::Value>& error);
+		static std::string GetErrorStackTrace(const v8::Local<v8::StackTrace>& stackTrace);
 
-		string GetFullMessage(const TryCatch& tc, bool isExceptionEmpty, bool isMessageEmpty, const string& prependMessage = "");
+		std::string GetFullMessage(const v8::TryCatch& tc, bool isExceptionEmpty, bool isMessageEmpty, const std::string& prependMessage = "");
 
-		JniLocalRef GetJavaException(const TryCatch& tc, bool isExceptionEmpty, bool isMessageEmpty, const string& prependMessage = "");
-		Local<Value> m_javascriptException;
+		v8::Persistent<v8::Value> *m_javascriptException;
 		JniLocalRef m_javaException;
-		string m_message;
+		std::string m_message;
 
 
 		static ObjectManager *objectManager;
@@ -52,6 +46,9 @@ namespace tns
 		static jmethodID THROWABLE_TO_STRING_METHOD_ID;
 		static jclass STACK_TRACE_ELEMENT_CLASS;
 		static jmethodID FRAME_TO_STRING_METHOD_ID;
+		static jclass NATIVESCRIPTEXCEPTION_CLASS;
+		static jmethodID NATIVESCRIPTEXCEPTION_JSVALUE_CTOR_ID;
+		static jmethodID NATIVESCRIPTEXCEPTION_THROWABLE_CTOR_ID;
 	};
 }
 

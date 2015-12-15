@@ -4,6 +4,7 @@
 #include <sstream>
 
 using namespace tns;
+using namespace std;
 
 
 JavaObjectArrayCache::JavaObjectArrayCache()

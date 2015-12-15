@@ -128,6 +128,7 @@ namespace tns
 		void GetStringUTFRegion(jstring str, jsize start, jsize len, char *buf);
 
 		jint Throw(jthrowable obj);
+		jint ThrowNew(jclass clazz, const std::string& message);
 		jboolean ExceptionCheck();
 		jthrowable ExceptionOccurred();
 		void ExceptionDescribe();
