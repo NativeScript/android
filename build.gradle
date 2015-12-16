@@ -85,10 +85,10 @@ task createDistDir {
 	// }
 // }
 
-task copyLatestWidgetsJar (type: Copy) {
-	from widgetsPath //passed by jenkins
-	into "$rootDir/build/project-template-gradle/libs"
-}
+// task copyLatestWidgetsJar (type: Copy) {
+	// from widgetsPath //passed by jenkins
+	// into "$rootDir/build/project-template-gradle/libs"
+// }
 
 //when repository is not private
 // task cloneSBgeneratorInTemplate (type: Exec) {
@@ -193,9 +193,9 @@ createDistDir.dependsOn(cleanDistDir)
 
 
 //copy framework structure
-copyLatestWidgetsJar.dependsOn(createDistDir)
+// copyLatestWidgetsJar.dependsOn(createDistDir)
 // cloneSBgeneratorInTemplate.dependsOn(copyLatestWidgetsJar)
-copyGradleTemplate.dependsOn(copyLatestWidgetsJar)
+copyGradleTemplate.dependsOn(createDistDir)
 copyInternalFolder.dependsOn(copyGradleTemplate)
 copyPackageJson.dependsOn(copyInternalFolder)
 
