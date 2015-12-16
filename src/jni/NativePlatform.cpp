@@ -47,11 +47,14 @@ jint NativePlatform::JNI_ON_LOAD(JavaVM *vm, void *reserved)
 	__android_log_print(ANDROID_LOG_INFO, "TNS.Native", "NativeScript Runtime Version %s, commit %s", NATIVE_SCRIPT_RUNTIME_VERSION, NATIVE_SCRIPT_RUNTIME_COMMIT_SHA);
 	DEBUG_WRITE("JNI_ONLoad");
 
-	g_jvm = vm;
+	if (g_jvm == nullptr)
+	{
+		g_jvm = vm;
 
-	JEnv::Init(g_jvm);
+		JEnv::Init(g_jvm);
 
-	g_objectManager = new ObjectManager();
+		g_objectManager = new ObjectManager();
+	}
 
 	DEBUG_WRITE("JNI_ONLoad END");
 
