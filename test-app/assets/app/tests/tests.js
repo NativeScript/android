@@ -1891,4 +1891,11 @@ describe("Tests ", function () {
 		var s = "Hello world";
 		expect(text.length).toBe(s.length);
 	});
+
+	it("should load module through global.require", function () {
+		expect(typeof global.require).toBe("function");
+		
+		var module3 = global.require("./modules/module3");
+		expect(module3.msg).toBe("module3");
+	});
 });
