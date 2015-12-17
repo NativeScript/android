@@ -9,6 +9,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
@@ -116,7 +117,7 @@ public class NativeScriptSyncService
                 while (running)
                 {
                     LocalSocket socket = serverSocket.accept();
-                    commThread = new ListenerWorker(socket.getInputStream(), socket);
+                    commThread = new ListenerWorker(socket);
                     new Thread(commThread).start();
                 }
             }
@@ -131,11 +132,13 @@ public class NativeScriptSyncService
     {
         private final DataInputStream input;
 		private Closeable socket;
+		private OutputStream output;
 
-        public ListenerWorker(InputStream inputStream, Closeable socket)
+        public ListenerWorker(LocalSocket socket) throws IOException
         {
             this.socket = socket;
-			input = new DataInputStream(inputStream);
+			input = new DataInputStream(socket.getInputStream());
+			output = socket.getOutputStream();
         }
 
         public void run()
@@ -148,7 +151,14 @@ public class NativeScriptSyncService
                 executeRemovedSync(context, removedSyncDir);
 
                 Platform.runScript(new File(NativeScriptSyncService.this.context.getFilesDir(), "internal/livesync.js"));
-                
+                try 
+                {
+                	output.write(1);
+                }
+                catch (IOException e) 
+                {
+                	e.printStackTrace();
+                }
                 socket.close();
             }
             catch (IOException e)
