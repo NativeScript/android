@@ -269,6 +269,8 @@ Local<Object> Module::LoadModule(Isolate *isolate, const string& modulePath)
 	auto require = GetRequireFunction(isolate, strDirName);
 	Local<Value> requireArgs[5] { moduleObj, exportsObj, require, fileName, dirName };
 
+	moduleObj->Set(ConvertToV8String("require"), require);
+
 	auto thiz = Object::New(isolate);
 	auto extendsName = ConvertToV8String("__extends");
 	thiz->Set(extendsName, isolate->GetCurrentContext()->Global()->Get(extendsName));

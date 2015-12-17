@@ -1,0 +1,1 @@
+exports.msg = "module2";
