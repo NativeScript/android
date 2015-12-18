@@ -17,7 +17,8 @@ using namespace std;
 using namespace tns;
 
 ObjectManager::ObjectManager()
-	: m_numberOfGC(0), m_currentObjectId(0), m_cache(NewWeakGlobalRefCallback, DeleteWeakGlobalRefCallback, 1000, this)
+:
+		m_numberOfGC(0), m_currentObjectId(0), m_cache(NewWeakGlobalRefCallback, DeleteWeakGlobalRefCallback, 1000, this)
 {
 	JEnv env;
 
@@ -153,7 +154,6 @@ void ObjectManager::SetJavaClass(const Local<Object>& instance, jclass clazz)
 	jsInfo->clazz = clazz;
 }
 
-
 int ObjectManager::GetOrCreateObjectId(jobject object)
 {
 	JEnv env;
@@ -220,7 +220,6 @@ Local<Object> ObjectManager::CreateJSWrapperHelper(jint javaObjectID, const stri
 	return jsWrapper;
 }
 
-
 void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID, jclass clazz)
 {
 	int internalFieldCound = NativeScriptExtension::GetInternalFieldCount(object);
@@ -269,14 +268,13 @@ bool ObjectManager::CloneLink(const Local<Object>& src, const Local<Object>& des
 	return success;
 }
 
-
 string ObjectManager::GetClassName(jobject javaObject)
 {
 	JEnv env;
 
 	JniLocalRef objectClass(env.GetObjectClass(javaObject));
 
-	return GetClassName((jclass)objectClass);
+	return GetClassName((jclass) objectClass);
 }
 
 string ObjectManager::GetClassName(jclass clazz)
@@ -397,7 +395,7 @@ void ObjectManager::ReleaseRegularObjects()
 	auto& marked = topGCInfo.markedForGC;
 	int numberOfGC = topGCInfo.numberOfGC;
 
-	for (auto po: marked)
+	for (auto po : marked)
 	{
 		if (m_released.contains(po))
 			continue;
@@ -444,7 +442,7 @@ bool ObjectManager::HasImplObject(Isolate *isolate, const Local<Object>& obj)
 
 void ObjectManager::MarkReachableObjects(Isolate *isolate, const Local<Object>& obj)
 {
-	stack< Local<Value> > s;
+	stack<Local<Value> > s;
 
 	s.push(obj);
 
@@ -482,7 +480,7 @@ void ObjectManager::MarkReachableObjects(Isolate *isolate, const Local<Object>& 
 
 			int closureObjectLength;
 			auto closureObjects = NativeScriptExtension::GetClosureObjects(isolate, func, &closureObjectLength);
-			for (int i=0; i<closureObjectLength; i++)
+			for (int i = 0; i < closureObjectLength; i++)
 			{
 				auto& curV = *(closureObjects + i);
 				if (!curV.IsEmpty() && curV->IsObject())
@@ -528,7 +526,7 @@ void ObjectManager::MarkReachableObjects(Isolate *isolate, const Local<Object>& 
 					{
 						int getterClosureObjectLength = 0;
 						auto getterClosureObjects = NativeScriptExtension::GetClosureObjects(isolate, getter.As<Function>(), &getterClosureObjectLength);
-						for (int i=0; i<getterClosureObjectLength; i++)
+						for (int i = 0; i < getterClosureObjectLength; i++)
 						{
 							auto& curV = *(getterClosureObjects + i);
 							if (!curV.IsEmpty() && curV->IsObject())
@@ -543,7 +541,7 @@ void ObjectManager::MarkReachableObjects(Isolate *isolate, const Local<Object>& 
 					{
 						int setterClosureObjectLength = 0;
 						auto setterClosureObjects = NativeScriptExtension::GetClosureObjects(isolate, setter.As<Function>(), &setterClosureObjectLength);
-						for (int i=0; i<setterClosureObjectLength; i++)
+						for (int i = 0; i < setterClosureObjectLength; i++)
 						{
 							auto& curV = *(setterClosureObjects + i);
 							if (!curV.IsEmpty() && curV->IsObject())
@@ -571,30 +569,40 @@ void ObjectManager::MarkReachableObjects(Isolate *isolate, const Local<Object>& 
 
 void ObjectManager::OnGcStartedStatic(GCType type, GCCallbackFlags flags)
 {
-	try {
-	instance->OnGcStarted(type, flags);
-	} catch (NativeScriptException& e) {
+	try
+	{
+		instance->OnGcStarted(type, flags);
+	}
+	catch (NativeScriptException& e)
+	{
 		e.ReThrowToV8();
 	}
-	catch (exception e) {
+	catch (exception e)
+	{
 		DEBUG_WRITE("Error: c++ exception: %s", e.what());
 	}
-	catch (...) {
+	catch (...)
+	{
 		DEBUG_WRITE("Error: c++ exception!");
 	}
 }
 
 void ObjectManager::OnGcFinishedStatic(GCType type, GCCallbackFlags flags)
 {
-	try {
-	instance->OnGcFinished(type, flags);
-	} catch (NativeScriptException& e) {
+	try
+	{
+		instance->OnGcFinished(type, flags);
+	}
+	catch (NativeScriptException& e)
+	{
 		e.ReThrowToV8();
 	}
-	catch (exception e) {
+	catch (exception e)
+	{
 		DEBUG_WRITE("Error: c++ exception: %s", e.what());
 	}
-	catch (...) {
+	catch (...)
+	{
 		DEBUG_WRITE("Error: c++ exception!");
 	}
 }
@@ -610,12 +618,12 @@ void ObjectManager::OnGcFinished(GCType type, GCCallbackFlags flags)
 	assert(!m_markedForGC.empty());
 
 	auto isolate = Isolate::GetCurrent();
-	for (auto weakObj: m_implObjWeak)
+	for (auto weakObj : m_implObjWeak)
 	{
 		auto obj = Local<Object>::New(isolate, *weakObj.po);
 		MarkReachableObjects(isolate, obj);
 	}
-	for (auto strongObj: m_implObjStrong)
+	for (auto strongObj : m_implObjStrong)
 	{
 		auto obj = Local<Object>::New(isolate, *strongObj.po);
 		MarkReachableObjects(isolate, obj);
@@ -650,14 +658,14 @@ void ObjectManager::MakeRegularObjectsWeak(const set<int>& instances, DirectBuff
 
 	jboolean keepAsWeak = JNI_FALSE;
 
-	for (auto javaObjectId: instances)
+	for (auto javaObjectId : instances)
 	{
 		bool success = inputBuff.Write(javaObjectId);
 
 		if (!success)
 		{
 			int length = inputBuff.Length();
-			env.CallStaticVoidMethod(PlatformClass, MAKE_INSTANCE_WEAK_BATCH_METHOD_ID, (jobject)inputBuff, length, keepAsWeak);
+			env.CallStaticVoidMethod(PlatformClass, MAKE_INSTANCE_WEAK_BATCH_METHOD_ID, (jobject) inputBuff, length, keepAsWeak);
 			inputBuff.Reset();
 			success = inputBuff.Write(javaObjectId);
 			assert(success);
@@ -666,7 +674,7 @@ void ObjectManager::MakeRegularObjectsWeak(const set<int>& instances, DirectBuff
 	int size = inputBuff.Size();
 	if (size > 0)
 	{
-		env.CallStaticVoidMethod(PlatformClass, MAKE_INSTANCE_WEAK_BATCH_METHOD_ID, (jobject)inputBuff, size, keepAsWeak);
+		env.CallStaticVoidMethod(PlatformClass, MAKE_INSTANCE_WEAK_BATCH_METHOD_ID, (jobject) inputBuff, size, keepAsWeak);
 	}
 
 	inputBuff.Reset();
@@ -678,7 +686,7 @@ void ObjectManager::MakeImplObjectsWeak(const vector<PersistentObjectIdPair>& in
 
 	jboolean keepAsWeak = JNI_TRUE;
 
-	for (const auto& poIdPair: instances)
+	for (const auto& poIdPair : instances)
 	{
 		int javaObjectId = poIdPair.javaObjectId;
 
@@ -688,7 +696,7 @@ void ObjectManager::MakeImplObjectsWeak(const vector<PersistentObjectIdPair>& in
 		{
 			int length = inputBuff.Length();
 			jboolean keepAsWeak = JNI_TRUE;
-			env.CallStaticVoidMethod(PlatformClass, MAKE_INSTANCE_WEAK_BATCH_METHOD_ID, (jobject)inputBuff, length, keepAsWeak);
+			env.CallStaticVoidMethod(PlatformClass, MAKE_INSTANCE_WEAK_BATCH_METHOD_ID, (jobject) inputBuff, length, keepAsWeak);
 			inputBuff.Reset();
 			success = inputBuff.Write(javaObjectId);
 			assert(success);
@@ -698,7 +706,7 @@ void ObjectManager::MakeImplObjectsWeak(const vector<PersistentObjectIdPair>& in
 	if (size > 0)
 	{
 		jboolean keepAsWeak = JNI_TRUE;
-		env.CallStaticVoidMethod(PlatformClass, MAKE_INSTANCE_WEAK_BATCH_METHOD_ID, (jobject)inputBuff, size, keepAsWeak);
+		env.CallStaticVoidMethod(PlatformClass, MAKE_INSTANCE_WEAK_BATCH_METHOD_ID, (jobject) inputBuff, size, keepAsWeak);
 	}
 
 	inputBuff.Reset();
@@ -708,7 +716,7 @@ void ObjectManager::CheckWeakObjectsAreAlive(const vector<PersistentObjectIdPair
 {
 	JEnv env;
 
-	for (const auto& poIdPair: instances)
+	for (const auto& poIdPair : instances)
 	{
 		int javaObjectId = poIdPair.javaObjectId;
 
@@ -717,10 +725,10 @@ void ObjectManager::CheckWeakObjectsAreAlive(const vector<PersistentObjectIdPair
 		if (!success)
 		{
 			int length = inputBuff.Length();
-			env.CallStaticVoidMethod(PlatformClass, CHECK_WEAK_OBJECTS_ARE_ALIVE_METHOD_ID, (jobject)inputBuff, (jobject)outputBuff, length);
+			env.CallStaticVoidMethod(PlatformClass, CHECK_WEAK_OBJECTS_ARE_ALIVE_METHOD_ID, (jobject) inputBuff, (jobject) outputBuff, length);
 			//
 			int *released = outputBuff.GetData();
-			for (int i=0; i<length; i++)
+			for (int i = 0; i < length; i++)
 			{
 				bool isReleased = *released++ != 0;
 
@@ -739,9 +747,9 @@ void ObjectManager::CheckWeakObjectsAreAlive(const vector<PersistentObjectIdPair
 	int size = inputBuff.Size();
 	if (size > 0)
 	{
-		env.CallStaticVoidMethod(PlatformClass, CHECK_WEAK_OBJECTS_ARE_ALIVE_METHOD_ID, (jobject)inputBuff, (jobject)outputBuff, size);
+		env.CallStaticVoidMethod(PlatformClass, CHECK_WEAK_OBJECTS_ARE_ALIVE_METHOD_ID, (jobject) inputBuff, (jobject) outputBuff, size);
 		int *released = outputBuff.GetData();
-		for (int i=0; i<size; i++)
+		for (int i = 0; i < size; i++)
 		{
 			bool isReleased = *released++ != 0;
 

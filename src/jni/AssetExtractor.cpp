@@ -87,7 +87,7 @@ void AssetExtractor::mkdir_rec(const char *dir)
 	snprintf(opath, sizeof(opath), "%s", dir);
 	size_t len = strlen(opath);
 
-	if(opath[len - 1] == '/')
+	if (opath[len - 1] == '/')
 		opath[len - 1] = 0;
 
 	for (char *p = opath + 1; *p; p++)
@@ -105,7 +105,8 @@ void AssetExtractor::mkdir_rec(const char *dir)
 
 std::string AssetExtractor::jstringToString(JNIEnv *env, jstring value)
 {
-	if (value == nullptr) {
+	if (value == nullptr)
+	{
 		return std::string();
 	}
 

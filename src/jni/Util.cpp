@@ -44,7 +44,7 @@ void Util::SplitString(const string& str, const string& delimiters, vector<strin
 {
 	string::size_type delimPos = 0, tokenPos = 0, pos = 0;
 
-	if(str.length()<1)
+	if (str.length() < 1)
 		return;
 
 	while (true)
@@ -58,7 +58,7 @@ void Util::SplitString(const string& str, const string& delimiters, vector<strin
 			{
 				if (tokenPos < delimPos)
 				{
-					tokens.push_back(str.substr(pos,delimPos-pos));
+					tokens.push_back(str.substr(pos, delimPos - pos));
 				}
 				else
 				{
@@ -69,7 +69,7 @@ void Util::SplitString(const string& str, const string& delimiters, vector<strin
 			{
 				tokens.push_back("");
 			}
-			pos = delimPos+1;
+			pos = delimPos + 1;
 		}
 		else
 		{
@@ -89,11 +89,11 @@ void Util::SplitString(const string& str, const string& delimiters, vector<strin
 bool Util::EndsWith(const string& str, const string& suffix)
 {
 	bool res = false;
-    if (str.size() > suffix.size())
-    {
-    	res = equal(suffix.rbegin(), suffix.rend(), str.rbegin());
-    }
-    return res;
+	if (str.size() > suffix.size())
+	{
+		res = equal(suffix.rbegin(), suffix.rend(), str.rbegin());
+	}
+	return res;
 }
 
 string Util::ConvertFromJniToCanonicalName(const std::string& name)

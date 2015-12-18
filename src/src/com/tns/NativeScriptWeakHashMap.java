@@ -321,8 +321,7 @@ public class NativeScriptWeakHashMap<K, V> extends NativeScriptAbstractMap<K, V>
 	 * 
 	 * @param key
 	 *            the key to search for.
-	 * @return {@code true} if this map contains the specified key,
-	 *         {@code false} otherwise.
+	 * @return {@code true} if this map contains the specified key, {@code false} otherwise.
 	 */
 	@Override
 	public boolean containsKey(Object key)
@@ -465,16 +464,9 @@ public class NativeScriptWeakHashMap<K, V> extends NativeScriptAbstractMap<K, V>
 	 * collection supports remove, removeAll, retainAll and clear operations,
 	 * and it does not support add or addAll operations.
 	 * <p>
-	 * This method returns a collection which is the subclass of
-	 * AbstractCollection. The iterator method of this subclass returns a
-	 * "wrapper object" over the iterator of map's entrySet(). The size method
-	 * wraps the map's size method and the contains method wraps the map's
-	 * containsValue method.
+	 * This method returns a collection which is the subclass of AbstractCollection. The iterator method of this subclass returns a "wrapper object" over the iterator of map's entrySet(). The size method wraps the map's size method and the contains method wraps the map's containsValue method.
 	 * <p>
-	 * The collection is created when this method is called at first time and
-	 * returned in response to all subsequent calls. This method may return
-	 * different Collection when multiple calls to this method, since it has no
-	 * synchronization performed.
+	 * The collection is created when this method is called at first time and returned in response to all subsequent calls. This method may return different Collection when multiple calls to this method, since it has no synchronization performed.
 	 * 
 	 * @return a collection of the values contained in this map.
 	 */
@@ -525,8 +517,7 @@ public class NativeScriptWeakHashMap<K, V> extends NativeScriptAbstractMap<K, V>
 	 * 
 	 * @param key
 	 *            the key.
-	 * @return the value of the mapping with the specified key, or {@code null}
-	 *         if no mapping for the specified key is found.
+	 * @return the value of the mapping with the specified key, or {@code null} if no mapping for the specified key is found.
 	 */
 	@Override
 	public V get(Object key)
@@ -592,8 +583,7 @@ public class NativeScriptWeakHashMap<K, V> extends NativeScriptAbstractMap<K, V>
 	 * 
 	 * @param value
 	 *            the value to search for.
-	 * @return {@code true} if this map contains the specified value,
-	 *         {@code false} otherwise.
+	 * @return {@code true} if this map contains the specified value, {@code false} otherwise.
 	 */
 	@Override
 	public boolean containsValue(Object value)
@@ -690,8 +680,7 @@ public class NativeScriptWeakHashMap<K, V> extends NativeScriptAbstractMap<K, V>
 	 *            the key.
 	 * @param value
 	 *            the value.
-	 * @return the value of any previous mapping with the specified key or
-	 *         {@code null} if there was no mapping.
+	 * @return the value of any previous mapping with the specified key or {@code null} if there was no mapping.
 	 */
 	@Override
 	public V put(K key, V value)

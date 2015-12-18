@@ -14,7 +14,7 @@ public final class Util
 	private Util()
 	{
 	}
-	
+
 	public static String getDexThumb(Context context) throws NameNotFoundException
 	{
 		PackageInfo packageInfo = context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
@@ -39,7 +39,7 @@ public final class Util
 		boolean isDebuggableApp = ((flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0);
 		return isDebuggableApp;
 	}
-	
+
 	static boolean runPlugin(Logger logger, Context context)
 	{
 		boolean success = false;
@@ -55,18 +55,20 @@ public final class Util
 		}
 		catch (Exception e)
 		{
-			if (logger.isEnabled()) e.printStackTrace();
+			if (logger.isEnabled())
+				e.printStackTrace();
 		}
-		
+
 		try
 		{
 			Class<?> liveSyncPluginClass = Class.forName(pluginClassName);
-			Plugin p = (Plugin)liveSyncPluginClass.newInstance();
+			Plugin p = (Plugin) liveSyncPluginClass.newInstance();
 			success = p.execute(context);
 		}
 		catch (Exception e)
 		{
-			if (logger.isEnabled()) e.printStackTrace();
+			if (logger.isEnabled())
+				e.printStackTrace();
 		}
 		return success;
 	}

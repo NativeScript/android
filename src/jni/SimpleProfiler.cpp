@@ -8,11 +8,11 @@
 using namespace tns;
 using namespace v8;
 
-
 SimpleProfiler::SimpleProfiler(char *fileName, int lineNumber)
-	: m_frame(nullptr), m_time(0)
+:
+		m_frame(nullptr), m_time(0)
 {
-	for(auto& f: s_frames)
+	for (auto& f : s_frames)
 	{
 		if ((f.fileName == fileName) && (f.lineNumber == lineNumber))
 		{
@@ -31,10 +31,9 @@ SimpleProfiler::SimpleProfiler(char *fileName, int lineNumber)
 	{
 		struct timespec nowt;
 		clock_gettime(CLOCK_MONOTONIC, &nowt);
-		m_time = (int64_t) nowt.tv_sec*1000000000LL + nowt.tv_nsec;
+		m_time = (int64_t) nowt.tv_sec * 1000000000LL + nowt.tv_nsec;
 	}
 }
-
 
 SimpleProfiler::~SimpleProfiler()
 {
@@ -43,7 +42,7 @@ SimpleProfiler::~SimpleProfiler()
 	{
 		struct timespec nowt;
 		clock_gettime(CLOCK_MONOTONIC, &nowt);
-		auto time = (int64_t) nowt.tv_sec*1000000000LL + nowt.tv_nsec;
+		auto time = (int64_t) nowt.tv_sec * 1000000000LL + nowt.tv_nsec;
 		m_frame->time += (time - m_time);
 	}
 }
@@ -55,19 +54,23 @@ void SimpleProfiler::Init(Isolate *isolate, Local<ObjectTemplate>& globalTemplat
 	globalTemplate->Set(funcName, FunctionTemplate::New(isolate, PrintProfilerDataCallback));
 }
 
-
 void SimpleProfiler::PrintProfilerDataCallback(const FunctionCallbackInfo<Value>& args)
 {
-	try {
-	PrintProfilerData();
+	try
+	{
+		PrintProfilerData();
 
-	} catch (NativeScriptException& e) {
+	}
+	catch (NativeScriptException& e)
+	{
 		e.ReThrowToV8();
 	}
-	catch (std::exception& e) {
+	catch (std::exception& e)
+	{
 		DEBUG_WRITE("Error: c++ exception: %s", e.what());
 	}
-	catch (...) {
+	catch (...)
+	{
 		DEBUG_WRITE("Error: c++ exception!");
 	}
 }
@@ -75,7 +78,7 @@ void SimpleProfiler::PrintProfilerDataCallback(const FunctionCallbackInfo<Value>
 void SimpleProfiler::PrintProfilerData()
 {
 	std::sort(s_frames.begin(), s_frames.end());
-	for (auto& f: s_frames)
+	for (auto& f : s_frames)
 	{
 		__android_log_print(ANDROID_LOG_DEBUG, "TNS.Native", "Time: %lld, File: %s, Line: %d", f.time, f.fileName, f.lineNumber);
 	}

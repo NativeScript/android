@@ -10,24 +10,24 @@ using namespace std;
 using namespace tns;
 using namespace v8;
 
-
 NativeScriptException::NativeScriptException(JEnv& env)
-	: m_javascriptException(nullptr)
+:
+		m_javascriptException(nullptr)
 {
 	JniLocalRef ex(env.ExceptionOccurred());
 	env.ExceptionClear();
 	m_javaException = ex;
 }
 
-
 NativeScriptException::NativeScriptException(const string& message)
-	:m_javascriptException(nullptr), m_javaException(JniLocalRef()), m_message(message)
+:
+		m_javascriptException(nullptr), m_javaException(JniLocalRef()), m_message(message)
 {
 }
 
-
 NativeScriptException::NativeScriptException(TryCatch& tc, const string& message)
-	: m_javaException(JniLocalRef())
+:
+		m_javaException(JniLocalRef())
 {
 	auto isolate = Isolate::GetCurrent();
 	m_javascriptException = new Persistent<Value>(isolate, tc.Exception());
@@ -37,32 +37,39 @@ NativeScriptException::NativeScriptException(TryCatch& tc, const string& message
 	tc.Reset();
 }
 
-void NativeScriptException::ReThrowToV8() {
+void NativeScriptException::ReThrowToV8()
+{
 	auto isolate = Isolate::GetCurrent();
 	Local<Value> errObj;
 
-	if(m_javascriptException != nullptr) {
+	if (m_javascriptException != nullptr)
+	{
 		errObj = Local<Value>::New(isolate, *m_javascriptException);
 	}
-	else if (!m_message.empty()){
+	else if (!m_message.empty())
+	{
 		errObj = Exception::Error(ConvertToV8String(m_message));
 	}
-	else if (!m_javaException.IsNull()){
+	else if (!m_javaException.IsNull())
+	{
 		errObj = WrapJavaToJsException();
 	}
-	else {
+	else
+	{
 		errObj = Exception::Error(ConvertToV8String("No javascript exception or message provided."));
 	}
 
 	isolate->ThrowException(errObj);
 }
 
-void NativeScriptException::ReThrowToJava() {
+void NativeScriptException::ReThrowToJava()
+{
 	jthrowable ex = nullptr;
 	JEnv env;
 
-	if (!m_javaException.IsNull()){
-		auto excClassName = objectManager->GetClassName((jobject)m_javaException);
+	if (!m_javaException.IsNull())
+	{
+		auto excClassName = objectManager->GetClassName((jobject) m_javaException);
 		if (excClassName == "com/tns/NativeScriptException")
 		{
 			ex = m_javaException;
@@ -70,10 +77,11 @@ void NativeScriptException::ReThrowToJava() {
 		else
 		{
 			JniLocalRef msg(env.NewStringUTF("Java Error!"));
-			ex = static_cast<jthrowable>(env.NewObject(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_THROWABLE_CTOR_ID, (jstring)msg, (jobject)m_javaException));
+			ex = static_cast<jthrowable>(env.NewObject(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_THROWABLE_CTOR_ID, (jstring) msg, (jobject) m_javaException));
 		}
 	}
-	else if (m_javascriptException != nullptr) {
+	else if (m_javascriptException != nullptr)
+	{
 		/*
 		 * If exception is an object, then check if it has 'nativeException' property and it if does then use it.
 		 * If the found 'nativeException' is of type different than com.tns.NativeScript then we should wrap it and keep
@@ -84,13 +92,13 @@ void NativeScriptException::ReThrowToJava() {
 		auto errObj = Local<Value>::New(isolate, *m_javascriptException);
 		if (errObj->IsObject())
 		{
-			ex = (jthrowable)TryGetJavaThrowableObject(env, errObj.As<Object>());
+			ex = (jthrowable) TryGetJavaThrowableObject(env, errObj.As<Object>());
 		}
 
 		if (ex == nullptr)
 		{
 			JniLocalRef msg(env.NewStringUTF(m_message.c_str()));
-			ex = static_cast<jthrowable>(env.NewObject(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_JSVALUE_CTOR_ID, (jstring)msg, reinterpret_cast<jlong>(m_javascriptException)));
+			ex = static_cast<jthrowable>(env.NewObject(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_JSVALUE_CTOR_ID, (jstring) msg, reinterpret_cast<jlong>(m_javascriptException)));
 		}
 		else
 		{
@@ -98,17 +106,19 @@ void NativeScriptException::ReThrowToJava() {
 			if (excClassName != "com/tns/NativeScriptException")
 			{
 				JniLocalRef msg(env.NewStringUTF(m_message.c_str()));
-				ex = static_cast<jthrowable>(env.NewObject(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_THROWABLE_CTOR_ID, (jstring)msg, ex));
+				ex = static_cast<jthrowable>(env.NewObject(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_THROWABLE_CTOR_ID, (jstring) msg, ex));
 			}
 		}
 	}
-	else if (!m_message.empty()){
+	else if (!m_message.empty())
+	{
 		JniLocalRef msg(env.NewStringUTF(m_message.c_str()));
-		ex = static_cast<jthrowable>(env.NewObject(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_JSVALUE_CTOR_ID, (jstring)msg, (jlong)0));
+		ex = static_cast<jthrowable>(env.NewObject(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_JSVALUE_CTOR_ID, (jstring) msg, (jlong) 0));
 	}
-	else {
+	else
+	{
 		JniLocalRef msg(env.NewStringUTF("No java exception or message provided."));
-		ex = static_cast<jthrowable>(env.NewObject(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_JSVALUE_CTOR_ID, (jstring)msg, (jlong)0));
+		ex = static_cast<jthrowable>(env.NewObject(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_JSVALUE_CTOR_ID, (jstring) msg, (jlong) 0));
 	}
 
 	env.Throw(ex);
@@ -161,11 +171,13 @@ void NativeScriptException::OnUncaughtError(Local<Message> message, Local<Value>
 	HandleScope scope(isolate);
 
 	Local<Object> errorObject;
-	if(error->IsObject()){
+	if (error->IsObject())
+	{
 		errorObject = error.As<Object>();
 		errorObject->Set(ConvertToV8String("message"), ConvertToV8String(errorMessage));
 	}
-	else {
+	else
+	{
 		errorObject = Exception::Error(ConvertToV8String(errorMessage)).As<Object>();
 	}
 
@@ -191,7 +203,7 @@ void NativeScriptException::CallJsFuncWithErr(Local<Value> errObj)
 	auto isEmpty = handler.IsEmpty();
 	auto isFunction = handler->IsFunction();
 
-	if(!isEmpty && isFunction)
+	if (!isEmpty && isFunction)
 	{
 		auto thiz = Object::New(isolate);
 		auto func = handler.As<Function>();
@@ -207,7 +219,7 @@ Local<Value> NativeScriptException::WrapJavaToJsException()
 	JEnv env;
 	auto isolate = Isolate::GetCurrent();
 
-	string excClassName = objectManager->GetClassName((jobject)m_javaException);
+	string excClassName = objectManager->GetClassName((jobject) m_javaException);
 	if (excClassName == "com/tns/NativeScriptException")
 	{
 		jfieldID fieldID = env.GetFieldID(env.GetObjectClass(m_javaException), "jsValueAddress", "J");
@@ -235,7 +247,8 @@ Local<Value> NativeScriptException::WrapJavaToJsException()
 	return errObj;
 }
 
-Local<Value> NativeScriptException::GetJavaExceptionFromEnv(const JniLocalRef& exc, JEnv& env) {
+Local<Value> NativeScriptException::GetJavaExceptionFromEnv(const JniLocalRef& exc, JEnv& env)
+{
 	auto errMsg = GetExceptionMessage(env, exc);
 	DEBUG_WRITE("Error during java interop errorMessage %s", errMsg.c_str());
 
@@ -247,7 +260,7 @@ Local<Value> NativeScriptException::GetJavaExceptionFromEnv(const JniLocalRef& e
 
 	if (nativeExceptionObject.IsEmpty())
 	{
-		string className = objectManager->GetClassName((jobject)exc);
+		string className = objectManager->GetClassName((jobject) exc);
 		nativeExceptionObject = objectManager->CreateJSWrapper(javaObjectID, className);
 	}
 
@@ -256,13 +269,13 @@ Local<Value> NativeScriptException::GetJavaExceptionFromEnv(const JniLocalRef& e
 	return errObj;
 }
 
-
 string NativeScriptException::GetFullMessage(const TryCatch& tc, bool isExceptionEmpty, bool isMessageEmpty, const string& prependMessage)
 {
 	auto ex = tc.Exception();
 
 	string message;
-	if(!isExceptionEmpty && !isMessageEmpty){
+	if (!isExceptionEmpty && !isMessageEmpty)
+	{
 		message = PrintErrorMessage(tc.Message(), ex);
 	}
 
@@ -272,7 +285,8 @@ string NativeScriptException::GetFullMessage(const TryCatch& tc, bool isExceptio
 
 	DEBUG_WRITE("Error: %s", loggedMessage.c_str());
 
-	if(!tc.CanContinue()) {
+	if (!tc.CanContinue())
+	{
 		stringstream errM;
 		errM << endl << "An uncaught error has occurred and V8's TryCatch block CAN'T be continued. ";
 		loggedMessage = errM.str() + loggedMessage;
@@ -319,7 +333,8 @@ string NativeScriptException::PrintErrorMessage(const Local<Message>& message, c
 	// split the message by new lines to workaround the LogCat's maximum characters in a single message
 	stringstream ss(errorMessage);
 	string line;
-	while (getline(ss, line, '\n')) {
+	while (getline(ss, line, '\n'))
+	{
 		// TODO: Log in the V8's Console as well?
 		DEBUG_WRITE("%s", line.c_str());
 	}
@@ -377,7 +392,6 @@ string NativeScriptException::GetErrorStackTrace(const Local<StackTrace>& stackT
 
 	return ss.str();
 }
-
 
 string NativeScriptException::GetExceptionMessage(JEnv& env, jthrowable exception)
 {

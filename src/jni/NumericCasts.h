@@ -8,10 +8,10 @@ namespace tns
 {
 	class NumericCasts
 	{
-	public:
+		public:
 			void CreateGlobalCastFunctions(const v8::Local<v8::ObjectTemplate>& globalTemplate);
 
-	private:
+		private:
 			void MarkAsLongCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 			void MarkAsByteCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
@@ -43,6 +43,5 @@ namespace tns
 			static NumericCasts* GetThis(const v8::FunctionCallbackInfo<v8::Value>& args);
 	};
 }
-
 
 #endif /* NUMERICCASTS_H_ */

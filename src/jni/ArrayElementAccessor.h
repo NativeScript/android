@@ -10,21 +10,20 @@ namespace tns
 {
 	class ArrayElementAccessor
 	{
-	public:
-		void Init(JavaVM *jvm, ObjectManager *objectManager);
+		public:
+			void Init(JavaVM *jvm, ObjectManager *objectManager);
 
-		v8::Local<v8::Value> GetArrayElement(const v8::Local<v8::Object>& array, uint32_t index, const std::string& arraySignature);
+			v8::Local<v8::Value> GetArrayElement(const v8::Local<v8::Object>& array, uint32_t index, const std::string& arraySignature);
 
-		void SetArrayElement(const v8::Local<v8::Object>& array, uint32_t index, const std::string& arraySignature, v8::Local<v8::Value>& value);
+			void SetArrayElement(const v8::Local<v8::Object>& array, uint32_t index, const std::string& arraySignature, v8::Local<v8::Value>& value);
 
-	private:
-		v8::Local<v8::Value> ConvertToJsValue(JEnv& env, const std::string& elementSignature, const void *value);
+		private:
+			v8::Local<v8::Value> ConvertToJsValue(JEnv& env, const std::string& elementSignature, const void *value);
 
-		JavaVM *jvm;
+			JavaVM *jvm;
 
-		ObjectManager *objectManager;
+			ObjectManager *objectManager;
 	};
 }
-
 
 #endif /* ARRAYELEMENTACCESSOR_H_ */

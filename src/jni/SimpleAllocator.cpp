@@ -1,15 +1,11 @@
 #include "SimpleAllocator.h"
 #include <cstdlib>
 
-
 using namespace tns;
-
 
 SimpleAllocator::SimpleAllocator()
 {
 }
-
-
 
 SimpleAllocator::~SimpleAllocator()
 {
@@ -32,6 +28,4 @@ void SimpleAllocator::Free(void* data, size_t length)
 {
 	free(data);
 }
-
-
 

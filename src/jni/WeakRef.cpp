@@ -21,55 +21,60 @@ void WeakRef::Init(v8::Isolate *isolate, Local<ObjectTemplate>& globalObjectTemp
 
 void WeakRef::ConstructorCallback(const FunctionCallbackInfo<Value>& args)
 {
-	try {
-	auto isolate = args.GetIsolate();
-
-	if (args.IsConstructCall())
+	try
 	{
-		if (args.Length() == 1)
+		auto isolate = args.GetIsolate();
+
+		if (args.IsConstructCall())
 		{
-			auto target = args[0];
-
-			if (target->IsObject())
+			if (args.Length() == 1)
 			{
-				auto targetObj = target.As<Object>();
+				auto target = args[0];
 
-				auto weakRef = s_objectManager->GetEmptyObject(isolate);
+				if (target->IsObject())
+				{
+					auto targetObj = target.As<Object>();
 
-				auto poTarget = new Persistent<Object>(isolate, targetObj);
-				auto poHolder = new Persistent<Object>(isolate, weakRef);
-				auto callbackState = new CallbackState(poTarget, poHolder);
+					auto weakRef = s_objectManager->GetEmptyObject(isolate);
 
-				poTarget->SetWeak(callbackState, WeakTargetCallback);
-				poHolder->SetWeak(callbackState, WeakHolderCallback);
+					auto poTarget = new Persistent<Object>(isolate, targetObj);
+					auto poHolder = new Persistent<Object>(isolate, weakRef);
+					auto callbackState = new CallbackState(poTarget, poHolder);
 
-				weakRef->Set(ConvertToV8String("get"), GetGetterFunction(isolate));
-				weakRef->Set(ConvertToV8String("clear"), GetClearFunction(isolate));
-				weakRef->SetHiddenValue(V8StringConstants::GetTarget(), External::New(isolate, poTarget));
+					poTarget->SetWeak(callbackState, WeakTargetCallback);
+					poHolder->SetWeak(callbackState, WeakHolderCallback);
 
-				args.GetReturnValue().Set(weakRef);
+					weakRef->Set(ConvertToV8String("get"), GetGetterFunction(isolate));
+					weakRef->Set(ConvertToV8String("clear"), GetClearFunction(isolate));
+					weakRef->SetHiddenValue(V8StringConstants::GetTarget(), External::New(isolate, poTarget));
+
+					args.GetReturnValue().Set(weakRef);
+				}
+				else
+				{
+					throw NativeScriptException(string("The WeakRef constructor expects an object argument."));
+				}
 			}
 			else
 			{
-				throw NativeScriptException(string("The WeakRef constructor expects an object argument."));
+				throw NativeScriptException(string("The WeakRef constructor expects single parameter."));
 			}
 		}
 		else
 		{
-			throw NativeScriptException(string("The WeakRef constructor expects single parameter."));
+			throw NativeScriptException(string("WeakRef must be used as a construct call."));
 		}
 	}
-	else
+	catch (NativeScriptException& e)
 	{
-		throw NativeScriptException(string("WeakRef must be used as a construct call."));
-	}
-	} catch (NativeScriptException& e) {
 		e.ReThrowToV8();
 	}
-	catch (exception e) {
+	catch (exception e)
+	{
 		DEBUG_WRITE("Error: c++ exception: %s", e.what());
 	}
-	catch (...) {
+	catch (...)
+	{
 		DEBUG_WRITE("Error: c++ exception!");
 	}
 }
@@ -98,132 +103,156 @@ void WeakRef::WeakTargetCallback(const WeakCallbackData<Object, CallbackState>& 
 
 void WeakRef::WeakHolderCallback(const WeakCallbackData<Object, CallbackState>& data)
 {
-	try {
-	auto callbackState = data.GetParameter();
-	auto poHolder = callbackState->holder;
-	auto isolate = data.GetIsolate();
-	auto holder = Local<Object>::New(isolate, *poHolder);
-
-	auto poTarget = reinterpret_cast<Persistent<Object>*>(holder->GetHiddenValue(V8StringConstants::GetTarget()).As<External>()->Value());
-
-	if (poTarget != nullptr)
+	try
 	{
-		poHolder->SetWeak(callbackState, WeakHolderCallback);
-	}
-	else
-	{
-		poHolder->Reset();
-		delete poHolder;
-		callbackState->holder = nullptr;
-		if (callbackState->target == nullptr)
+		auto callbackState = data.GetParameter();
+		auto poHolder = callbackState->holder;
+		auto isolate = data.GetIsolate();
+		auto holder = Local<Object>::New(isolate, *poHolder);
+
+		auto poTarget = reinterpret_cast<Persistent<Object>*>(holder->GetHiddenValue(V8StringConstants::GetTarget()).As<External>()->Value());
+
+		if (poTarget != nullptr)
 		{
-			delete callbackState;
+			poHolder->SetWeak(callbackState, WeakHolderCallback);
+		}
+		else
+		{
+			poHolder->Reset();
+			delete poHolder;
+			callbackState->holder = nullptr;
+			if (callbackState->target == nullptr)
+			{
+				delete callbackState;
+			}
 		}
 	}
-	} catch (NativeScriptException& e) {
+	catch (NativeScriptException& e)
+	{
 		e.ReThrowToV8();
 	}
-	catch (exception e) {
+	catch (exception e)
+	{
 		DEBUG_WRITE("Error: c++ exception: %s", e.what());
 	}
-	catch (...) {
+	catch (...)
+	{
 		DEBUG_WRITE("Error: c++ exception!");
 	}
 }
 
 void WeakRef::ClearCallback(const FunctionCallbackInfo<Value>& args)
 {
-	try {
-	auto holder = args.This();
-	auto isolate = Isolate::GetCurrent();
+	try
+	{
+		auto holder = args.This();
+		auto isolate = Isolate::GetCurrent();
 
-	holder->SetHiddenValue(V8StringConstants::GetTarget(), External::New(isolate, nullptr));
-	} catch (NativeScriptException& e) {
+		holder->SetHiddenValue(V8StringConstants::GetTarget(), External::New(isolate, nullptr));
+	}
+	catch (NativeScriptException& e)
+	{
 		e.ReThrowToV8();
 	}
-	catch (exception e) {
+	catch (exception e)
+	{
 		DEBUG_WRITE("Error: c++ exception: %s", e.what());
 	}
-	catch (...) {
+	catch (...)
+	{
 		DEBUG_WRITE("Error: c++ exception!");
 	}
 }
 
 void WeakRef::GettertCallback(const FunctionCallbackInfo<Value>& args)
 {
-	try {
-	auto holder = args.This();
-	auto poTarget = reinterpret_cast<Persistent<Object>*>(holder->GetHiddenValue(V8StringConstants::GetTarget()).As<External>()->Value());
-	auto isolate = Isolate::GetCurrent();
+	try
+	{
+		auto holder = args.This();
+		auto poTarget = reinterpret_cast<Persistent<Object>*>(holder->GetHiddenValue(V8StringConstants::GetTarget()).As<External>()->Value());
+		auto isolate = Isolate::GetCurrent();
 
-	if (poTarget != nullptr)
-	{
-		auto target = Local<Object>::New(isolate, *poTarget);
-		args.GetReturnValue().Set(target);
+		if (poTarget != nullptr)
+		{
+			auto target = Local<Object>::New(isolate, *poTarget);
+			args.GetReturnValue().Set(target);
+		}
+		else
+		{
+			args.GetReturnValue().Set(Null(isolate));
+		}
 	}
-	else
+	catch (NativeScriptException& e)
 	{
-		args.GetReturnValue().Set(Null(isolate));
-	}
-	} catch (NativeScriptException& e) {
 		e.ReThrowToV8();
 	}
-	catch (exception e) {
+	catch (exception e)
+	{
 		DEBUG_WRITE("Error: c++ exception: %s", e.what());
 	}
-	catch (...) {
+	catch (...)
+	{
 		DEBUG_WRITE("Error: c++ exception!");
 	}
 }
 
 Local<Function> WeakRef::GetGetterFunction(Isolate *isolate)
 {
-	try {
-	if (s_poGetterFunc != nullptr)
+	try
 	{
-		return Local<Function>::New(isolate, *s_poGetterFunc);
+		if (s_poGetterFunc != nullptr)
+		{
+			return Local<Function>::New(isolate, *s_poGetterFunc);
+		}
+		else
+		{
+			auto getterFunc = FunctionTemplate::New(isolate, GettertCallback)->GetFunction();
+			s_poGetterFunc = new Persistent<Function>(isolate, getterFunc);
+			return getterFunc;
+		}
 	}
-	else
+	catch (NativeScriptException& e)
 	{
-		auto getterFunc = FunctionTemplate::New(isolate, GettertCallback)->GetFunction();
-		s_poGetterFunc = new Persistent<Function>(isolate, getterFunc);
-		return getterFunc;
-	}
-	} catch (NativeScriptException& e) {
 		e.ReThrowToV8();
 	}
-	catch (exception e) {
+	catch (exception e)
+	{
 		DEBUG_WRITE("Error: c++ exception: %s", e.what());
 	}
-	catch (...) {
+	catch (...)
+	{
 		DEBUG_WRITE("Error: c++ exception!");
 	}
 }
 
 Local<Function> WeakRef::GetClearFunction(Isolate *isolate)
 {
-	try {
-	if (s_poClearFunc != nullptr)
+	try
 	{
-		return Local<Function>::New(isolate, *s_poClearFunc);
+		if (s_poClearFunc != nullptr)
+		{
+			return Local<Function>::New(isolate, *s_poClearFunc);
+		}
+		else
+		{
+			auto clearFunc = FunctionTemplate::New(isolate, ClearCallback)->GetFunction();
+			s_poClearFunc = new Persistent<Function>(isolate, clearFunc);
+			return clearFunc;
+		}
 	}
-	else
+	catch (NativeScriptException& e)
 	{
-		auto clearFunc = FunctionTemplate::New(isolate, ClearCallback)->GetFunction();
-		s_poClearFunc = new Persistent<Function>(isolate, clearFunc);
-		return clearFunc;
-	}
-	} catch (NativeScriptException& e) {
 		e.ReThrowToV8();
 	}
-	catch (exception e) {
+	catch (exception e)
+	{
 		DEBUG_WRITE("Error: c++ exception: %s", e.what());
 	}
-	catch (...) {
+	catch (...)
+	{
 		DEBUG_WRITE("Error: c++ exception!");
 	}
 }
-
 
 Persistent<Function>* WeakRef::s_poClearFunc = nullptr;
 Persistent<Function>* WeakRef::s_poGetterFunc = nullptr;

@@ -21,13 +21,13 @@ jstring tns::ConvertToJavaString(const Local<Value>& value)
 {
 	JEnv env;
 	String::Value stringValue(value);
-	return env.NewString((const jchar*)*stringValue, stringValue.length());
+	return env.NewString((const jchar*) *stringValue, stringValue.length());
 }
 
 Local<String> tns::ConvertToV8String(const jchar* data, int length)
 {
 	auto isolate = Isolate::GetCurrent();
-	return String::NewFromTwoByte(isolate, (const uint16_t*)data, String::kNormalString, length);
+	return String::NewFromTwoByte(isolate, (const uint16_t*) data, String::kNormalString, length);
 }
 
 Local<String> tns::ConvertToV8String(const string& s)
@@ -41,7 +41,7 @@ Local<String> tns::ConvertToV8String(const string& s)
 Local<String> tns::ConvertToV8String(const char *data, int length)
 {
 	auto isolate = Isolate::GetCurrent();
-	return String::NewFromUtf8(isolate, (const char *)data, String::kNormalString, length);
+	return String::NewFromUtf8(isolate, (const char *) data, String::kNormalString, length);
 }
 
 Local<Value> tns::V8GetHiddenValue(const Local<Object>& obj, const string& propName)

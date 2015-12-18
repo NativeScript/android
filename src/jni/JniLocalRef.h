@@ -8,58 +8,57 @@ namespace tns
 {
 	class JniLocalRef
 	{
-	public:
-		JniLocalRef();
+		public:
+			JniLocalRef();
 
-		JniLocalRef(jobject obj, bool isWeak = false);
+			JniLocalRef(jobject obj, bool isWeak = false);
 
-		JniLocalRef(jclass obj);
+			JniLocalRef(jclass obj);
 
-		JniLocalRef(const JniLocalRef& rhs);
+			JniLocalRef(const JniLocalRef& rhs);
 
-		~JniLocalRef();
+			~JniLocalRef();
 
-		bool IsNull() const;
+			bool IsNull() const;
 
-		JniLocalRef& operator=(const JniLocalRef& rhs);
+			JniLocalRef& operator=(const JniLocalRef& rhs);
 
-		operator jobject() const;
+			operator jobject() const;
 
-		operator jboolean() const;
+			operator jboolean() const;
 
-		operator jclass() const;
+			operator jclass() const;
 
-		operator jstring() const;
+			operator jstring() const;
 
-		operator jthrowable() const;
+			operator jthrowable() const;
 
-		operator jarray() const;
+			operator jarray() const;
 
-		operator jbyteArray() const;
+			operator jbyteArray() const;
 
-		operator jshortArray() const;
+			operator jshortArray() const;
 
-		operator jintArray() const;
+			operator jintArray() const;
 
-		operator jlongArray() const;
+			operator jlongArray() const;
 
-		operator jfloatArray() const;
+			operator jfloatArray() const;
 
-		operator jdoubleArray() const;
+			operator jdoubleArray() const;
 
-		operator jbooleanArray() const;
+			operator jbooleanArray() const;
 
-		operator jcharArray() const;
+			operator jcharArray() const;
 
-		operator jobjectArray() const;
+			operator jobjectArray() const;
 
-	private:
+		private:
 
-		jobject m_obj;
+			jobject m_obj;
 
-		bool m_isWeak;
+			bool m_isWeak;
 	};
 }
-
 
 #endif /* JNILOCALREF_H_ */

@@ -28,24 +28,13 @@ import java.io.Serializable;
  * All elements are permitted as keys or values, including null.
  * 
  * <p>
- * Note that the iteration order for HashMap is non-deterministic. If you want
- * deterministic iteration, use {@link LinkedHashMap}.
+ * Note that the iteration order for HashMap is non-deterministic. If you want deterministic iteration, use {@link LinkedHashMap}.
  * 
  * <p>
- * Note: the implementation of {@code HashMap} is not synchronized. If one
- * thread of several threads accessing an instance modifies the map
- * structurally, access to the map needs to be synchronized. A structural
- * modification is an operation that adds or removes an entry. Changes in the
- * value of an entry are not structural changes.
+ * Note: the implementation of {@code HashMap} is not synchronized. If one thread of several threads accessing an instance modifies the map structurally, access to the map needs to be synchronized. A structural modification is an operation that adds or removes an entry. Changes in the value of an entry are not structural changes.
  * 
  * <p>
- * The {@code Iterator} created by calling the {@code iterator} method may throw
- * a {@code ConcurrentModificationException} if the map is structurally changed
- * while an iterator is used to iterate over the elements. Only the
- * {@code remove} method that is provided by the iterator allows for removal of
- * elements during iteration. It is not possible to guarantee that this
- * mechanism works in all cases of unsynchronized concurrent modification. It
- * should only be used for debugging purposes.
+ * The {@code Iterator} created by calling the {@code iterator} method may throw a {@code ConcurrentModificationException} if the map is structurally changed while an iterator is used to iterate over the elements. Only the {@code remove} method that is provided by the iterator allows for removal of elements during iteration. It is not possible to guarantee that this mechanism works in all cases of unsynchronized concurrent modification. It should only be used for debugging purposes.
  * 
  * @param <K>
  *            the type of keys maintained by this map
@@ -80,10 +69,7 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
 	 * API.
 	 * 
 	 * <p>
-	 * Note that this constant has no impact on the behavior of the program, but
-	 * it is emitted as part of the serialized form. The load factor of .75 is
-	 * hardwired into the program, which uses cheap shifts in place of expensive
-	 * division.
+	 * Note that this constant has no impact on the behavior of the program, but it is emitted as part of the serialized form. The load factor of .75 is hardwired into the program, which uses cheap shifts in place of expensive division.
 	 */
 	static final float DEFAULT_LOAD_FACTOR = .75F;
 
@@ -292,8 +278,7 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
 	/**
 	 * Returns whether this map is empty.
 	 * 
-	 * @return {@code true} if this map has no elements, {@code false}
-	 *         otherwise.
+	 * @return {@code true} if this map has no elements, {@code false} otherwise.
 	 * @see #size()
 	 */
 	@Override
@@ -318,8 +303,7 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
 	 * 
 	 * @param key
 	 *            the key.
-	 * @return the value of the mapping with the specified key, or {@code null}
-	 *         if no mapping for the specified key is found.
+	 * @return the value of the mapping with the specified key, or {@code null} if no mapping for the specified key is found.
 	 */
 	public V get(Object key)
 	{
@@ -347,8 +331,7 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
 	 * 
 	 * @param key
 	 *            the key to search for.
-	 * @return {@code true} if this map contains the specified key,
-	 *         {@code false} otherwise.
+	 * @return {@code true} if this map contains the specified key, {@code false} otherwise.
 	 */
 	@Override
 	public boolean containsKey(Object key)
@@ -376,8 +359,7 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
 	 * 
 	 * @param value
 	 *            the value to search for.
-	 * @return {@code true} if this map contains the specified value,
-	 *         {@code false} otherwise.
+	 * @return {@code true} if this map contains the specified value, {@code false} otherwise.
 	 */
 	@Override
 	public boolean containsValue(Object value)
@@ -420,8 +402,7 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
 	 *            the key.
 	 * @param value
 	 *            the value.
-	 * @return the value of any previous mapping with the specified key or
-	 *         {@code null} if there was no such mapping.
+	 * @return the value of any previous mapping with the specified key or {@code null} if there was no such mapping.
 	 */
 	@Override
 	public V put(K key, V value)
@@ -786,17 +767,10 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
 	 * collection supports remove, removeAll, retainAll and clear operations,
 	 * and it does not support add or addAll operations.
 	 * <p>
-	 * This method returns a collection which is the subclass of
-	 * AbstractCollection. The iterator method of this subclass returns a
-	 * "wrapper object" over the iterator of map's entrySet(). The {@code size}
-	 * method wraps the map's size method and the {@code contains} method wraps
-	 * the map's containsValue method.
+	 * This method returns a collection which is the subclass of AbstractCollection. The iterator method of this subclass returns a "wrapper object" over the iterator of map's entrySet(). The {@code size} method wraps the map's size method and the {@code contains} method wraps the map's containsValue method.
 	 * </p>
 	 * <p>
-	 * The collection is created when this method is called for the first time
-	 * and returned in response to all subsequent calls. This method may return
-	 * different collections when multiple concurrent calls occur, since no
-	 * synchronization is performed.
+	 * The collection is created when this method is called for the first time and returned in response to all subsequent calls. This method may return different collections when multiple concurrent calls occur, since no synchronization is performed.
 	 * </p>
 	 * 
 	 * @return a collection of the values contained in this map.

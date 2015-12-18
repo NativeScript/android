@@ -41,7 +41,6 @@ int AppJavaObjectID = -1;
 int count = 0;
 SimpleAllocator g_allocator;
 
-
 jint NativePlatform::JNI_ON_LOAD(JavaVM *vm, void *reserved)
 {
 	__android_log_print(ANDROID_LOG_INFO, "TNS.Native", "NativeScript Runtime Version %s, commit %s", NATIVE_SCRIPT_RUNTIME_VERSION, NATIVE_SCRIPT_RUNTIME_COMMIT_SHA);
@@ -74,9 +73,9 @@ Isolate* NativePlatform::InitNativeScript(JNIEnv *_env, jobject obj, jstring fil
 	JniLocalRef v8Flags(env.GetObjectArrayElement(args, 0));
 	Constants::V8_STARTUP_FLAGS = ArgConverter::jstringToString(v8Flags);
 	JniLocalRef cacheCode(env.GetObjectArrayElement(args, 1));
-	Constants::V8_CACHE_COMPILED_CODE = (bool)cacheCode;
+	Constants::V8_CACHE_COMPILED_CODE = (bool) cacheCode;
 	JniLocalRef snapshot(env.GetObjectArrayElement(args, 2));
-	Constants::V8_HEAP_SNAPSHOT = (bool)snapshot;
+	Constants::V8_HEAP_SNAPSHOT = (bool) snapshot;
 
 	DEBUG_WRITE("Initializing Telerik NativeScript: app instance id:%d", appJavaObjectId);
 
@@ -116,7 +115,8 @@ jobject NativePlatform::RunScript(JNIEnv *_env, jobject obj, jstring scriptFile)
 	ScriptOrigin origin(ConvertToV8String(filename));
 	auto maybeScript = Script::Compile(context, source, &origin).ToLocal(&script);
 
-	if(tc.HasCaught()) {
+	if (tc.HasCaught())
+	{
 		throw NativeScriptException(tc, "Script " + filename + " contains compilation errors!");
 	}
 
@@ -125,7 +125,8 @@ jobject NativePlatform::RunScript(JNIEnv *_env, jobject obj, jstring scriptFile)
 		Local<Value> result;
 		auto maybeResult = script->Run(context).ToLocal(&result);
 
-		if(tc.HasCaught()) {
+		if (tc.HasCaught())
+		{
 			throw NativeScriptException(tc, "Error running script " + filename);
 		}
 		if (!result.IsEmpty())
@@ -193,7 +194,7 @@ void NativePlatform::CreateJSInstanceNative(JNIEnv *_env, jobject obj, jobject j
 	JEnv env(_env);
 
 	// TODO: Do we need a TryCatch here? It is currently not used anywhere
-	 TryCatch tc;
+	TryCatch tc;
 
 	string existingClassName = ArgConverter::jstringToString(className);
 	string jniName = Util::ConvertFromCanonicalToJniName(existingClassName);
@@ -252,7 +253,7 @@ void NativePlatform::PassUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, j
 
 	if (nativeExceptionObject.IsEmpty())
 	{
-		string className = g_objectManager->GetClassName((jobject)exception);
+		string className = g_objectManager->GetClassName((jobject) exception);
 		//create proxy object that wraps the java err
 		nativeExceptionObject = g_objectManager->CreateJSWrapper(javaObjectID, className);
 	}
@@ -267,50 +268,55 @@ void NativePlatform::PassUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, j
 
 void NativePlatform::AppInitCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-	try {
-	auto isolate = Isolate::GetCurrent();
-
-	if (args.Length() != 1)
+	try
 	{
-		throw NativeScriptException(string("Application should be initialized with single parameter"));
+		auto isolate = Isolate::GetCurrent();
+
+		if (args.Length() != 1)
+		{
+			throw NativeScriptException(string("Application should be initialized with single parameter"));
+		}
+		if (!args[0]->IsObject())
+		{
+			throw NativeScriptException(string("Application should be initialized with single object parameter containing overridden methods"));
+		}
+
+		// TODO: find another way to get "com/tns/NativeScriptApplication" metadata (move it to more appropriate place)
+		auto node = MetadataNode::GetOrCreate("com/tns/NativeScriptApplication");
+		auto appInstance = node->CreateJSWrapper(isolate);
+		DEBUG_WRITE("Application object created id: %d", appInstance->GetIdentityHash());
+
+		auto implementationObject = args[0]->ToObject();
+		implementationObject->SetHiddenValue(V8StringConstants::GetClassImplementationObject(), External::New(isolate, node));
+		DEBUG_WRITE("Application object implementation object is with id: %d", implementationObject->GetIdentityHash());
+		implementationObject->SetPrototype(appInstance->GetPrototype());
+		bool appSuccess = appInstance->SetPrototype(implementationObject);
+		if (!appSuccess)
+		{
+			throw NativeScriptException(string("Application could not be initialized correctly"));
+		}
+
+		jweak applicationObject = g_objectManager->GetJavaObjectByID(AppJavaObjectID);
+
+		JEnv env;
+		jclass appClass = env.FindClass("com/tns/NativeScriptApplication");
+		g_objectManager->Link(appInstance, AppJavaObjectID, appClass);
+
+		JniLocalRef applicationClass(env.GetObjectClass(applicationObject));
+		jmethodID setNativeScriptOverridesMethodId = env.GetMethodID((jclass) applicationClass, "setNativeScriptOverrides", "([Ljava/lang/String;)V");
+		jobjectArray methodOverrides = NativeScriptRuntime::GetMethodOverrides(env, implementationObject);
+		env.CallVoidMethod(applicationObject, setNativeScriptOverridesMethodId, methodOverrides);
 	}
-	if (!args[0]->IsObject())
+	catch (NativeScriptException& e)
 	{
-		throw NativeScriptException(string("Application should be initialized with single object parameter containing overridden methods"));
-	}
-
-	// TODO: find another way to get "com/tns/NativeScriptApplication" metadata (move it to more appropriate place)
-	auto node = MetadataNode::GetOrCreate("com/tns/NativeScriptApplication");
-	auto appInstance = node->CreateJSWrapper(isolate);
-	DEBUG_WRITE("Application object created id: %d", appInstance->GetIdentityHash());
-
-	auto implementationObject = args[0]->ToObject();
-	implementationObject->SetHiddenValue(V8StringConstants::GetClassImplementationObject(), External::New(isolate, node));
-	DEBUG_WRITE("Application object implementation object is with id: %d", implementationObject->GetIdentityHash());
-	implementationObject->SetPrototype(appInstance->GetPrototype());
-	bool appSuccess = appInstance->SetPrototype(implementationObject);
-	if (!appSuccess)
-	{
-		throw NativeScriptException(string("Application could not be initialized correctly"));
-	}
-
-	jweak applicationObject = g_objectManager->GetJavaObjectByID(AppJavaObjectID);
-
-	JEnv env;
-	jclass appClass = env.FindClass("com/tns/NativeScriptApplication");
-	g_objectManager->Link(appInstance, AppJavaObjectID, appClass);
-
-	JniLocalRef applicationClass(env.GetObjectClass(applicationObject));
-	jmethodID setNativeScriptOverridesMethodId = env.GetMethodID((jclass)applicationClass, "setNativeScriptOverrides", "([Ljava/lang/String;)V");
-	jobjectArray methodOverrides = NativeScriptRuntime::GetMethodOverrides(env, implementationObject);
-	env.CallVoidMethod(applicationObject, setNativeScriptOverridesMethodId, methodOverrides);
-	} catch (NativeScriptException& e) {
 		e.ReThrowToV8();
 	}
-	catch (exception e) {
+	catch (exception e)
+	{
 		DEBUG_WRITE("Error: c++ exception: %s", e.what());
 	}
-	catch (...) {
+	catch (...)
+	{
 		DEBUG_WRITE("Error: c++ exception!");
 	}
 }
@@ -325,11 +331,11 @@ Isolate* NativePlatform::PrepareV8Runtime(JEnv& env, const string& filesPath, js
 	create_params.array_buffer_allocator = &g_allocator;
 
 	// prepare the snapshot blob
-	if(Constants::V8_HEAP_SNAPSHOT)
+	if (Constants::V8_HEAP_SNAPSHOT)
 	{
 		auto snapshotPath = filesPath + "/internal/snapshot.dat";
 		StartupData startup_data;
-		if( File::Exists(snapshotPath))
+		if (File::Exists(snapshotPath))
 		{
 			int length;
 			startup_data.data = reinterpret_cast<char*>(File::ReadBinary(snapshotPath, length));
@@ -377,7 +383,7 @@ Isolate* NativePlatform::PrepareV8Runtime(JEnv& env, const string& filesPath, js
 	Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
 	PrimaryContext = new Persistent<Context>(isolate, context);
 
-	if(Constants::V8_HEAP_SNAPSHOT)
+	if (Constants::V8_HEAP_SNAPSHOT)
 	{
 		// we own the snapshot buffer, delete it
 		delete[] create_params.snapshot_blob->data;
@@ -439,7 +445,7 @@ void NativePlatform::PrepareExtendFunction(Isolate *isolate, jstring filesPath)
 	TryCatch tc;
 	auto cmd = ConvertToV8String(content, length);
 
-	if(isNew)
+	if (isNew)
 	{
 		delete[] content;
 	}
@@ -460,7 +466,8 @@ void NativePlatform::PrepareExtendFunction(Isolate *isolate, jstring filesPath)
 
 	script->Run();
 
-	if(tc.HasCaught()) {
+	if (tc.HasCaught())
+	{
 		throw NativeScriptException(tc);
 	}
 

@@ -26,7 +26,7 @@ namespace tns
 
 		string s(content, len);
 
-		if(isNew)
+		if (isNew)
 		{
 			delete[] content;
 		}
@@ -37,13 +37,13 @@ namespace tns
 	void* File::ReadBinary(const string& filePath, int& length)
 	{
 		length = 0;
-		if(!File::Exists(filePath))
+		if (!File::Exists(filePath))
 		{
 			return nullptr;
 		}
 
 		auto file = fopen(filePath.c_str(), READ_BINARY);
-		if(!file)
+		if (!file)
 		{
 			return nullptr;
 		}
@@ -62,7 +62,7 @@ namespace tns
 	bool File::WriteBinary(const string& filePath, const void* data, int length)
 	{
 		auto file = fopen(filePath.c_str(), WRITE_BINARY);
-		if(!file)
+		if (!file)
 		{
 			return false;
 		}
@@ -83,7 +83,7 @@ namespace tns
 
 		rewind(file);
 
-		if(isNew)
+		if (isNew)
 		{
 			char* newBuffer = new char[charLength];
 			fread(newBuffer, 1, charLength, file);

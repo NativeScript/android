@@ -28,7 +28,6 @@ JsArgToArrayConverter::JsArgToArrayConverter(const v8::Local<Value>& arg, bool i
 	}
 }
 
-
 JsArgToArrayConverter::JsArgToArrayConverter(const v8::FunctionCallbackInfo<Value>& args, bool hasImplementationObject, const Local<Object>& outerThis) :
 		m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()), m_return_type(static_cast<int>(Type::Null))
 {
@@ -77,7 +76,6 @@ JsArgToArrayConverter::JsArgToArrayConverter(const v8::FunctionCallbackInfo<Valu
 	m_isValid = success;
 }
 
-
 bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 {
 	bool success = false;
@@ -103,7 +101,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 	else if (arg->IsNumber() || arg->IsNumberObject())
 	{
 		double d = arg->NumberValue();
-		int64_t i = (int64_t)d;
+		int64_t i = (int64_t) d;
 		bool isInteger = d == i;
 
 		if (isInteger)
@@ -115,11 +113,11 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 			//because default return type is null (ref type)
 			if ((INT_MIN <= i) && (i <= INT_MAX) && (returnType == Type::Int || returnType == Type::Null))
 			{
-				obj = JType::NewInt(env, (jint)d);
+				obj = JType::NewInt(env, (jint) d);
 			}
 			else /*isLong*/
 			{
-				obj = JType::NewLong(env, (jlong)d);
+				obj = JType::NewLong(env, (jlong) d);
 			}
 
 			JniLocalRef javaObject(obj);
@@ -134,11 +132,13 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 			//if returnType is double it will cast to double
 			//if there is no return type specified it will cast to float
 			//because default return type is null (ref type)
-			if((FLT_MIN <= d) && (d <= FLT_MAX) && (returnType == Type::Float || returnType == Type::Null)) {
-				obj = JType::NewFloat(env, (jfloat)d);
+			if ((FLT_MIN <= d) && (d <= FLT_MAX) && (returnType == Type::Float || returnType == Type::Null))
+			{
+				obj = JType::NewFloat(env, (jfloat) d);
 			}
-			else {/*isDouble*/
-				obj = JType::NewDouble(env, (jdouble)d);
+			else
+			{/*isDouble*/
+				obj = JType::NewDouble(env, (jdouble) d);
 			}
 
 			JniLocalRef javaObject(obj);
@@ -201,12 +201,12 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 			{
 				string value = ConvertToString(hidden->ToString());
 				int byteArg = atoi(value.c_str());
-				value = (jbyte)byteArg;
+				value = (jbyte) byteArg;
 			}
 			else if (hidden->IsInt32())
 			{
 				int byteArg = hidden->ToInt32()->Int32Value();
-				value = (jbyte)byteArg;
+				value = (jbyte) byteArg;
 			}
 
 			JniLocalRef javaObject(JType::NewByte(env, value));
@@ -222,12 +222,12 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 			{
 				string value = ConvertToString(hidden->ToString());
 				int shortArg = atoi(value.c_str());
-				value = (jshort)shortArg;
+				value = (jshort) shortArg;
 			}
 			else if (hidden->IsInt32())
 			{
 				jlong shortArg = hidden->ToInt32()->Int32Value();
-				value = (jshort)shortArg;
+				value = (jshort) shortArg;
 			}
 
 			JniLocalRef javaObject(JType::NewShort(env, value));
@@ -242,7 +242,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 			if (hidden->IsNumber())
 			{
 				double doubleArg = hidden->ToNumber()->NumberValue();
-				value = (jdouble)doubleArg;
+				value = (jdouble) doubleArg;
 			}
 
 			JniLocalRef javaObject(JType::NewDouble(env, value));
@@ -257,7 +257,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 			if (hidden->IsNumber())
 			{
 				double floatArg = hidden->ToNumber()->NumberValue();
-				value = (jfloat)floatArg;
+				value = (jfloat) floatArg;
 			}
 
 			JniLocalRef javaObject(JType::NewFloat(env, value));
@@ -272,7 +272,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 			if (hidden->IsString())
 			{
 				string str = ConvertToString(hidden->ToString());
-				value = (jchar)str[0];
+				value = (jchar) str[0];
 			}
 
 			JniLocalRef javaObject(JType::NewChar(env, value));

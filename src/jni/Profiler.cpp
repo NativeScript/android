@@ -9,61 +9,68 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
-
 Profiler::Profiler()
 {
 }
-
 
 void Profiler::Init(const string& appName)
 {
 	s_appName = appName;
 }
 
-
 void Profiler::StartCPUProfilerCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-	try {
-	auto isolate = Isolate::GetCurrent();
-	auto started = false;
-	if ((args.Length() == 1) && (args[0]->IsString()))
+	try
 	{
-		auto name = args[0]->ToString();
-		StartCPUProfiler(isolate, name);
-		started = true;
+		auto isolate = Isolate::GetCurrent();
+		auto started = false;
+		if ((args.Length() == 1) && (args[0]->IsString()))
+		{
+			auto name = args[0]->ToString();
+			StartCPUProfiler(isolate, name);
+			started = true;
+		}
+
+		args.GetReturnValue().Set(Boolean::New(isolate, started));
+
 	}
-
-	args.GetReturnValue().Set(Boolean::New(isolate, started));
-
-	} catch (NativeScriptException& e) {
+	catch (NativeScriptException& e)
+	{
 		e.ReThrowToV8();
 	}
-	catch (exception e) {
+	catch (exception e)
+	{
 		DEBUG_WRITE("Error: c++ exception: %s", e.what());
 	}
-	catch (...) {
+	catch (...)
+	{
 		DEBUG_WRITE("Error: c++ exception!");
 	}
 }
 
 void Profiler::StopCPUProfilerCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-	try {
-	auto isolate = Isolate::GetCurrent();
-	auto stopped = false;
-	if ((args.Length() == 1) && (args[0]->IsString()))
+	try
 	{
-		auto name = args[0]->ToString();
-		stopped = StopCPUProfiler(isolate, name);
+		auto isolate = Isolate::GetCurrent();
+		auto stopped = false;
+		if ((args.Length() == 1) && (args[0]->IsString()))
+		{
+			auto name = args[0]->ToString();
+			stopped = StopCPUProfiler(isolate, name);
+		}
+		args.GetReturnValue().Set(Boolean::New(isolate, stopped));
 	}
-	args.GetReturnValue().Set(Boolean::New(isolate, stopped));
-	} catch (NativeScriptException& e) {
+	catch (NativeScriptException& e)
+	{
 		e.ReThrowToV8();
 	}
-	catch (exception e) {
+	catch (exception e)
+	{
 		DEBUG_WRITE("Error: c++ exception: %s", e.what());
 	}
-	catch (...) {
+	catch (...)
+	{
 		DEBUG_WRITE("Error: c++ exception!");
 	}
 }
@@ -73,7 +80,6 @@ void Profiler::StartCPUProfiler(Isolate *isolate, const Local<String>& name)
 	auto v8prof = isolate->GetCpuProfiler();
 	v8prof->StartProfiling(name, true);
 }
-
 
 bool Profiler::StopCPUProfiler(Isolate *isolate, const Local<String>& name)
 {
@@ -95,7 +101,7 @@ bool Profiler::Write(CpuProfile *cpuProfile)
 {
 	struct timespec nowt;
 	clock_gettime(CLOCK_MONOTONIC, &nowt);
-	uint64_t now = (int64_t) nowt.tv_sec*1000000000LL + nowt.tv_nsec;
+	uint64_t now = (int64_t) nowt.tv_sec * 1000000000LL + nowt.tv_nsec;
 
 	auto sec = static_cast<unsigned long>(now / 1000000);
 	auto usec = static_cast<unsigned long>(now % 1000000);
@@ -134,21 +140,21 @@ bool Profiler::Write(CpuProfile *cpuProfile)
 		else
 		{
 			snprintf(buff, sizeof(buff), "{\"functionName\":\"%s\",\"scriptId\":%d,\"url\":\"%s\",\"lineNumber\":%d,\"columnNumber\":%d,\"hitCount\":%u,\"callUID\":%u,\"deoptReason\":\"%s\",\"id\":%u,\"children\":[",
-				ConvertToString(node->GetFunctionName()).c_str(),
-				node->GetScriptId(),
-				ConvertToString(node->GetScriptResourceName()).c_str(),
-				node->GetLineNumber(),
-				node->GetColumnNumber(),
-				node->GetHitCount(),
-				node->GetCallUid(),
-				node->GetBailoutReason(),
-				node->GetNodeId());
+					ConvertToString(node->GetFunctionName()).c_str(),
+					node->GetScriptId(),
+					ConvertToString(node->GetScriptResourceName()).c_str(),
+					node->GetLineNumber(),
+					node->GetColumnNumber(),
+					node->GetHitCount(),
+					node->GetCallUid(),
+					node->GetBailoutReason(),
+					node->GetNodeId());
 			fwrite(buff, sizeof(char), strlen(buff), fp);
 
 			s.push(CLOSE_NODE);
 
 			int count = node->GetChildrenCount();
-			for (int i=0; i<count; i++)
+			for (int i = 0; i < count; i++)
 			{
 				if (i > 0)
 				{
@@ -165,7 +171,7 @@ bool Profiler::Write(CpuProfile *cpuProfile)
 	snprintf(buff, sizeof(buff), ",\"startTime\":%lf,\"endTime\":%lf,\"samples\":[", startTime, endTime);
 	fwrite(buff, sizeof(char), strlen(buff), fp);
 	int sampleCount = cpuProfile->GetSamplesCount();
-	for (int i=0; i<sampleCount; i++)
+	for (int i = 0; i < sampleCount; i++)
 	{
 		auto format = (i > 0) ? ",%d" : "%d";
 		snprintf(buff, sizeof(buff), format, cpuProfile->GetSample(i)->GetScriptId());
@@ -174,16 +180,16 @@ bool Profiler::Write(CpuProfile *cpuProfile)
 
 	// TODO: update V8, see https://codereview.chromium.org/259803002/
 	/*
-	snprintf(buff, sizeof(buff), "],\"timestamps\":[");
-	fwrite(buff, sizeof(char), strlen(buff), fp);
-	auto currTimeStamp = startTimeStamp;
-	for (int i=0; i<sampleCount; i++)
-	{
-		auto format = (i > 0) ? ",%lld" : "%lld";
-		snprintf(buff, sizeof(buff), format, cpuProfile->GetSampleTimestamp(i));
-		fwrite(buff, sizeof(char), strlen(buff), fp);
-	}
-	*/
+	 snprintf(buff, sizeof(buff), "],\"timestamps\":[");
+	 fwrite(buff, sizeof(char), strlen(buff), fp);
+	 auto currTimeStamp = startTimeStamp;
+	 for (int i=0; i<sampleCount; i++)
+	 {
+	 auto format = (i > 0) ? ",%lld" : "%lld";
+	 snprintf(buff, sizeof(buff), format, cpuProfile->GetSampleTimestamp(i));
+	 fwrite(buff, sizeof(char), strlen(buff), fp);
+	 }
+	 */
 
 	fwrite("]}", sizeof(char), 2, fp);
 	fclose(fp);
@@ -193,30 +199,40 @@ bool Profiler::Write(CpuProfile *cpuProfile)
 
 void Profiler::StartNDKProfilerCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-	try {
-	StartNDKProfiler();
-	} catch (NativeScriptException& e) {
+	try
+	{
+		StartNDKProfiler();
+	}
+	catch (NativeScriptException& e)
+	{
 		e.ReThrowToV8();
 	}
-	catch (exception e) {
+	catch (exception e)
+	{
 		DEBUG_WRITE("Error: c++ exception: %s", e.what());
 	}
-	catch (...) {
+	catch (...)
+	{
 		DEBUG_WRITE("Error: c++ exception!");
 	}
 }
 
 void Profiler::StopNDKProfilerCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-	try {
-	StopNDKProfiler();
-	} catch (NativeScriptException& e) {
+	try
+	{
+		StopNDKProfiler();
+	}
+	catch (NativeScriptException& e)
+	{
 		e.ReThrowToV8();
 	}
-	catch (exception e) {
+	catch (exception e)
+	{
 		DEBUG_WRITE("Error: c++ exception: %s", e.what());
 	}
-	catch (...) {
+	catch (...)
+	{
 		DEBUG_WRITE("Error: c++ exception!");
 	}
 }
@@ -228,7 +244,7 @@ void Profiler::StartNDKProfiler()
 #endif
 }
 
-void  Profiler::StopNDKProfiler()
+void Profiler::StopNDKProfiler()
 {
 #ifdef NDK_PROFILER_ENABLED
 	moncleanup();
@@ -269,38 +285,43 @@ class FileOutputStream: public OutputStream
 
 void Profiler::HeapSnapshotMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-	try {
-	struct timespec nowt;
-	clock_gettime(CLOCK_MONOTONIC, &nowt);
-	uint64_t now = (int64_t) nowt.tv_sec*1000000000LL + nowt.tv_nsec;
-
-	unsigned long sec = static_cast<unsigned long>(now / 1000000);
-	unsigned long usec = static_cast<unsigned long>(now % 1000000);
-
-	char filename[256];
-	snprintf(filename, sizeof(filename), "/sdcard/%s-heapdump-%lu.%lu.heapsnapshot", s_appName.c_str(), sec, usec);
-
-	FILE* fp = fopen(filename, "w");
-	if (fp == nullptr)
+	try
 	{
-		return;
+		struct timespec nowt;
+		clock_gettime(CLOCK_MONOTONIC, &nowt);
+		uint64_t now = (int64_t) nowt.tv_sec * 1000000000LL + nowt.tv_nsec;
+
+		unsigned long sec = static_cast<unsigned long>(now / 1000000);
+		unsigned long usec = static_cast<unsigned long>(now % 1000000);
+
+		char filename[256];
+		snprintf(filename, sizeof(filename), "/sdcard/%s-heapdump-%lu.%lu.heapsnapshot", s_appName.c_str(), sec, usec);
+
+		FILE* fp = fopen(filename, "w");
+		if (fp == nullptr)
+		{
+			return;
+		}
+
+		Isolate* isolate = Isolate::GetCurrent();
+
+		const HeapSnapshot* snap = isolate->GetHeapProfiler()->TakeHeapSnapshot();
+
+		FileOutputStream stream(fp);
+		snap->Serialize(&stream, HeapSnapshot::kJSON);
+		fclose(fp);
+		const_cast<HeapSnapshot*>(snap)->Delete();
 	}
-
-	Isolate* isolate = Isolate::GetCurrent();
-
-	const HeapSnapshot* snap = isolate->GetHeapProfiler()->TakeHeapSnapshot();
-
-	FileOutputStream stream(fp);
-	snap->Serialize(&stream, HeapSnapshot::kJSON);
-	fclose(fp);
-	const_cast<HeapSnapshot*>(snap)->Delete();
-	} catch (NativeScriptException& e) {
+	catch (NativeScriptException& e)
+	{
 		e.ReThrowToV8();
 	}
-	catch (exception e) {
+	catch (exception e)
+	{
 		DEBUG_WRITE("Error: c++ exception: %s", e.what());
 	}
-	catch (...) {
+	catch (...)
+	{
 		DEBUG_WRITE("Error: c++ exception!");
 	}
 }

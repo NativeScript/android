@@ -118,12 +118,12 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 			{
 				string strValue = ConvertToString(hidden->ToString());
 				int64_t longArg = atoll(strValue.c_str());
-				jlong value = (jlong)longArg;
+				jlong value = (jlong) longArg;
 				success = ConvertFromCastFunctionObject(value, index);
 			}
 			else if (hidden->IsInt32())
 			{
-				jlong value = (jlong)hidden->ToInt32()->IntegerValue();
+				jlong value = (jlong) hidden->ToInt32()->IntegerValue();
 				success = ConvertFromCastFunctionObject(value, index);
 			}
 			return success;
@@ -142,12 +142,12 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 			{
 				string strValue = ConvertToString(hidden->ToString());
 				int byteArg = atoi(strValue.c_str());
-				jbyte value = (jbyte)byteArg;
+				jbyte value = (jbyte) byteArg;
 				success = ConvertFromCastFunctionObject(value, index);
 			}
 			else if (hidden->IsInt32())
 			{
-				jbyte value = (jbyte)hidden->ToInt32()->Int32Value();
+				jbyte value = (jbyte) hidden->ToInt32()->Int32Value();
 				success = ConvertFromCastFunctionObject(value, index);
 			}
 			return success;
@@ -160,12 +160,12 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 			{
 				string strValue = ConvertToString(hidden->ToString());
 				int shortArg = atoi(strValue.c_str());
-				jshort value = (jshort)shortArg;
+				jshort value = (jshort) shortArg;
 				success = ConvertFromCastFunctionObject(value, index);
 			}
 			else if (hidden->IsInt32())
 			{
-				jshort value = (jshort)hidden->ToInt32()->Int32Value();
+				jshort value = (jshort) hidden->ToInt32()->Int32Value();
 				success = ConvertFromCastFunctionObject(value, index);
 			}
 			return success;
@@ -177,7 +177,7 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 			if (hidden->IsNumber())
 			{
 				double doubleArg = hidden->ToNumber()->NumberValue();
-				jdouble value = (jdouble)doubleArg;
+				jdouble value = (jdouble) doubleArg;
 				success = ConvertFromCastFunctionObject(value, index);
 			}
 			return success;
@@ -189,7 +189,7 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 			if (hidden->IsNumber())
 			{
 				double floatArg = hidden->ToNumber()->NumberValue();
-				jfloat value = (jfloat)floatArg;
+				jfloat value = (jfloat) floatArg;
 				success = ConvertFromCastFunctionObject(value, index);
 			}
 			return success;
@@ -201,7 +201,7 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 			if (hidden->IsString())
 			{
 				string value = ConvertToString(hidden->ToString());
-				m_args[index].c = (jchar)value[0];
+				m_args[index].c = (jchar) value[0];
 				success = true;
 			}
 			return success;
@@ -257,7 +257,9 @@ bool JsArgConverter::ConvertJavaScriptNumber(const Local<Value>& jsValue, int in
 {
 	bool success = true;
 
-	jvalue value =  { 0 };
+	jvalue value =
+	{
+			0 };
 
 	const auto& typeSignature = m_tokens->at(index);
 
@@ -378,82 +380,82 @@ bool JsArgConverter::ConvertJavaScriptArray(const Local<Array>& jsArr, int index
 	{
 		case 'Z':
 			arr = m_env.NewBooleanArray(arrLength);
-			for (jsize i=0; i<arrLength; i++)
+			for (jsize i = 0; i < arrLength; i++)
 			{
 				jboolean value = jsArr->Get(i)->BooleanValue();
-				m_env.SetBooleanArrayRegion((jbooleanArray)arr, i, 1, &value);
+				m_env.SetBooleanArrayRegion((jbooleanArray) arr, i, 1, &value);
 			}
 			break;
 		case 'B':
 			arr = m_env.NewByteArray(arrLength);
-			for (jsize i=0; i<arrLength; i++)
+			for (jsize i = 0; i < arrLength; i++)
 			{
 				jbyte value = jsArr->Get(i)->Int32Value();
-				m_env.SetByteArrayRegion((jbyteArray)arr, i, 1, &value);
+				m_env.SetByteArrayRegion((jbyteArray) arr, i, 1, &value);
 			}
 			break;
 		case 'C':
 			arr = m_env.NewCharArray(arrLength);
-			for (jsize i=0; i<arrLength; i++)
+			for (jsize i = 0; i < arrLength; i++)
 			{
 				String::Utf8Value utf8(jsArr->Get(i)->ToString());
 				JniLocalRef s(m_env.NewString((jchar*) *utf8, 1));
 				const char* singleChar = m_env.GetStringUTFChars(s, nullptr);
 				jchar value = *singleChar;
 				m_env.ReleaseStringUTFChars(s, singleChar);
-				m_env.SetCharArrayRegion((jcharArray)arr, i, 1, &value);
+				m_env.SetCharArrayRegion((jcharArray) arr, i, 1, &value);
 			}
 			break;
 		case 'S':
 			arr = m_env.NewShortArray(arrLength);
-			for (jsize i=0; i<arrLength; i++)
+			for (jsize i = 0; i < arrLength; i++)
 			{
 				jshort value = jsArr->Get(i)->Int32Value();
-				m_env.SetShortArrayRegion((jshortArray)arr, i, 1, &value);
+				m_env.SetShortArrayRegion((jshortArray) arr, i, 1, &value);
 			}
 			break;
 		case 'I':
 			arr = m_env.NewIntArray(arrLength);
-			for (jsize i=0; i<arrLength; i++)
+			for (jsize i = 0; i < arrLength; i++)
 			{
 				jint value = jsArr->Get(i)->Int32Value();
-				m_env.SetIntArrayRegion((jintArray)arr, i, 1, &value);
+				m_env.SetIntArrayRegion((jintArray) arr, i, 1, &value);
 			}
 			break;
 		case 'J':
 			arr = m_env.NewLongArray(arrLength);
-			for (jsize i=0; i<arrLength; i++)
+			for (jsize i = 0; i < arrLength; i++)
 			{
 				jlong value = jsArr->Get(i)->Int32Value();
-				m_env.SetLongArrayRegion((jlongArray)arr, i, 1, &value);
+				m_env.SetLongArrayRegion((jlongArray) arr, i, 1, &value);
 			}
 			break;
 		case 'F':
 			arr = m_env.NewFloatArray(arrLength);
-			for (jsize i=0; i<arrLength; i++)
+			for (jsize i = 0; i < arrLength; i++)
 			{
 				jfloat value = jsArr->Get(i)->NumberValue();
-				m_env.SetFloatArrayRegion((jfloatArray)arr, i, 1, &value);
+				m_env.SetFloatArrayRegion((jfloatArray) arr, i, 1, &value);
 			}
 			break;
 		case 'D':
 			arr = m_env.NewDoubleArray(arrLength);
-			for (jsize i=0; i<arrLength; i++)
+			for (jsize i = 0; i < arrLength; i++)
 			{
 				jdouble value = jsArr->Get(i)->NumberValue();
-				m_env.SetDoubleArrayRegion((jdoubleArray)arr, i, 1, &value);
+				m_env.SetDoubleArrayRegion((jdoubleArray) arr, i, 1, &value);
 			}
 			break;
 		case 'L':
 			strippedClassName = elementType.substr(1, elementType.length() - 2);
 			elementClass = m_env.FindClass(strippedClassName);
 			arr = m_env.NewObjectArray(arrLength, elementClass, nullptr);
-			for (int i=0; i<arrLength; i++)
+			for (int i = 0; i < arrLength; i++)
 			{
 				auto v = jsArr->Get(i);
-				JsArgToArrayConverter c(v, false, (int)Type::Null);
+				JsArgToArrayConverter c(v, false, (int) Type::Null);
 				jobject o = c.GetConvertedArg();
-				m_env.SetObjectArrayElement((jobjectArray)arr, i, o);
+				m_env.SetObjectArrayElement((jobjectArray) arr, i, o);
 			}
 			break;
 		default:
@@ -469,7 +471,6 @@ bool JsArgConverter::ConvertJavaScriptArray(const Local<Array>& jsArr, int index
 	return success;
 }
 
-
 template<typename T>
 bool JsArgConverter::ConvertFromCastFunctionObject(T value, int index)
 {
@@ -482,32 +483,32 @@ bool JsArgConverter::ConvertFromCastFunctionObject(T value, int index)
 	switch (typeSignaturePrefix)
 	{
 		case 'B':
-			m_args[index].b = (jbyte)value;
+			m_args[index].b = (jbyte) value;
 			success = true;
 			break;
 
 		case 'S':
-			m_args[index].s = (jshort)value;
+			m_args[index].s = (jshort) value;
 			success = true;
 			break;
 
 		case 'I':
-			m_args[index].i = (jint)value;
+			m_args[index].i = (jint) value;
 			success = true;
 			break;
 
 		case 'J':
-			m_args[index].j = (jlong)value;
+			m_args[index].j = (jlong) value;
 			success = true;
 			break;
 
 		case 'F':
-			m_args[index].f = (jfloat)value;
+			m_args[index].f = (jfloat) value;
 			success = true;
 			break;
 
 		case 'D':
-			m_args[index].d = (jdouble)value;
+			m_args[index].d = (jdouble) value;
 			success = true;
 			break;
 

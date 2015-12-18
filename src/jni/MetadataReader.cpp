@@ -5,18 +5,18 @@
 #include <sstream>
 #include <assert.h>
 
-
-
 using namespace std;
 using namespace tns;
 
 MetadataReader::MetadataReader()
-	: m_nodesLength(0), m_nodeData(nullptr), m_nameLength(0), m_nameData(nullptr), m_valueLength(0), m_valueData(nullptr), m_root(nullptr), m_getTypeMetadataCallback(nullptr)
+:
+		m_nodesLength(0), m_nodeData(nullptr), m_nameLength(0), m_nameData(nullptr), m_valueLength(0), m_valueData(nullptr), m_root(nullptr), m_getTypeMetadataCallback(nullptr)
 {
 }
 
 MetadataReader::MetadataReader(uint32_t nodesLength, uint8_t *nodeData, uint32_t nameLength, uint8_t *nameData, uint32_t valueLength, uint8_t *valueData, GetTypeMetadataCallback getTypeMetadataCallback)
-	: m_nodesLength(nodesLength), m_nodeData(nodeData), m_nameLength(nameLength), m_nameData(nameData), m_valueLength(valueLength), m_valueData(valueData), m_getTypeMetadataCallback(getTypeMetadataCallback)
+:
+		m_nodesLength(nodesLength), m_nodeData(nodeData), m_nameLength(nameLength), m_nameData(nameData), m_valueLength(valueLength), m_valueData(valueData), m_getTypeMetadataCallback(getTypeMetadataCallback)
 {
 	m_root = BuildTree();
 }
@@ -138,10 +138,11 @@ MethodReturnType MetadataReader::GetReturnType(const string& returnType)
 			retType = MethodReturnType::Boolean;
 			break;
 		case '[':
-		case 'L':
+			case 'L':
 			retType = (returnType == "Ljava/lang/String;")
 						? MethodReturnType::String
-						: MethodReturnType::Object;
+							:
+							MethodReturnType::Object;
 			break;
 		default:
 			assert(false);
@@ -299,7 +300,7 @@ string MetadataReader::ReadTypeNameInternal(MetadataTreeNode *treeNode)
 				if (!IsNodeTypeArray(curNodeType))
 				{
 					if ((IsNodeTypeClass(prevNodeType) || IsNodeTypeInterface(prevNodeType))
-						&& (IsNodeTypeClass(curNodeType) || IsNodeTypeInterface(curNodeType)))
+							&& (IsNodeTypeClass(curNodeType) || IsNodeTypeInterface(curNodeType)))
 					{
 						name = "$" + name;
 					}
@@ -324,7 +325,7 @@ string MetadataReader::ReadTypeNameInternal(MetadataTreeNode *treeNode)
 bool MetadataReader::IsNodeTypeArray(uint8_t type)
 {
 	bool isArray = (((type & MetadataTreeNode::PRIMITIVE) == 0)
-					&& ((type & MetadataTreeNode::ARRAY) == MetadataTreeNode::ARRAY));
+			&& ((type & MetadataTreeNode::ARRAY) == MetadataTreeNode::ARRAY));
 
 	return isArray;
 }
@@ -339,7 +340,7 @@ bool MetadataReader::IsNodeTypeStatic(uint8_t type)
 bool MetadataReader::IsNodeTypeClass(uint8_t type)
 {
 	bool isClass = (((type & MetadataTreeNode::PRIMITIVE) == 0)
-					&& ((type & MetadataTreeNode::CLASS) == MetadataTreeNode::CLASS));
+			&& ((type & MetadataTreeNode::CLASS) == MetadataTreeNode::CLASS));
 
 	return isClass;
 }
@@ -347,7 +348,7 @@ bool MetadataReader::IsNodeTypeClass(uint8_t type)
 bool MetadataReader::IsNodeTypeInterface(uint8_t type)
 {
 	bool isInterface = (((type & MetadataTreeNode::PRIMITIVE) == 0)
-						&& ((type & MetadataTreeNode::INTERFACE) == MetadataTreeNode::INTERFACE));
+			&& ((type & MetadataTreeNode::INTERFACE) == MetadataTreeNode::INTERFACE));
 
 	return isInterface;
 }
@@ -456,7 +457,7 @@ MetadataTreeNode* MetadataReader::GetOrCreateTreeNodeByName(const string& classN
 			cn = cn.substr(1, cn.length() - 2);
 	}
 
-	vector<string> names;
+	vector < string > names;
 	Util::SplitString(cn, "/$", names);
 
 	if (arrayIdx > 0)
@@ -466,11 +467,12 @@ MetadataTreeNode* MetadataReader::GetOrCreateTreeNodeByName(const string& classN
 
 		uint16_t forwardedNodeId = GetNodeId(forwardedNode);
 		vector<MetadataTreeNode*>& children = *treeNode->children;
-		for (auto childNode: children)
+		for (auto childNode : children)
 		{
 			uint32_t childNodeId = (childNode->offsetValue >= ARRAY_OFFSET)
 									? (childNode->offsetValue - ARRAY_OFFSET)
-									: GetNodeId(childNode);
+										:
+										GetNodeId(childNode);
 
 			if (childNodeId == forwardedNodeId)
 			{
@@ -504,9 +506,9 @@ MetadataTreeNode* MetadataReader::GetOrCreateTreeNodeByName(const string& classN
 
 		if (child == nullptr)
 		{
-			vector<string> api = m_getTypeMetadataCallback(cn, curIdx);
+			vector < string > api = m_getTypeMetadataCallback(cn, curIdx);
 
-			for (auto part: api)
+			for (auto part : api)
 			{
 				vector<MetadataTreeNode*> *children = treeNode->children;
 				if (children == nullptr)
@@ -592,5 +594,4 @@ MetadataTreeNode* MetadataReader::GetBaseClassNode(MetadataTreeNode *treeNode)
 
 	return baseClassNode;
 }
-
 

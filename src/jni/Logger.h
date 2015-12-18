@@ -5,13 +5,12 @@ namespace tns
 {
 	class Logger
 	{
-	public:
-		Logger();
+		public:
+			Logger();
 
-		void Write();
-	private:
+			void Write();
+			private:
 	};
 }
-
 
 #endif /* LOGGER_H_ */

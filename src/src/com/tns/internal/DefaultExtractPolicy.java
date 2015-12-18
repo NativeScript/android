@@ -19,14 +19,14 @@ import com.tns.Logger;
 public class DefaultExtractPolicy implements ExtractPolicy
 {
 	private final Logger logger;
-	
+
 	private final static String ASSETS_THUMB_FILENAME = "assetsThumb";
-	
+
 	public DefaultExtractPolicy(Logger logger)
 	{
 		this.logger = logger;
 	}
-	
+
 	public boolean shouldExtract(android.content.Context context)
 	{
 		String assetsThumb = generateAssetsThumb(context);

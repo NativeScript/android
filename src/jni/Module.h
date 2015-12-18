@@ -59,5 +59,4 @@ namespace tns
 	};
 }
 
-
 #endif /* JNI_MODULE_H_ */

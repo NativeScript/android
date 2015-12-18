@@ -103,7 +103,6 @@ Local<Value> ArrayElementAccessor::GetArrayElement(const Local<Object>& array, u
 	return handleScope.Escape(value);
 }
 
-
 void ArrayElementAccessor::SetArrayElement(const Local<Object>& array, uint32_t index, const string& arraySignature, Local<Value>& value)
 {
 	JEnv env;
@@ -183,7 +182,7 @@ void ArrayElementAccessor::SetArrayElement(const Local<Object>& array, uint32_t 
 		{
 			auto object = value.As<Object>();
 
-			JsArgToArrayConverter argConverter(value, false, (int)Type::Null);
+			JsArgToArrayConverter argConverter(value, false, (int) Type::Null);
 			if (argConverter.IsValid())
 			{
 				jobjectArray objArr = reinterpret_cast<jobjectArray>(arr);

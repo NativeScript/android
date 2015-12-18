@@ -40,7 +40,7 @@ public class JsDebugger
 	private static final int INVALID_PORT = -1;
 
 	private static final String portEnvInputFile = "envDebug.in";
-	
+
 	private static final String portEnvOutputFile = "envDebug.out";
 
 	private static final String DEBUG_BREAK_FILENAME = "debugbreak";
@@ -50,9 +50,9 @@ public class JsDebugger
 	private static LinkedBlockingQueue<String> dbgMessages = new LinkedBlockingQueue<String>();
 
 	private final File debuggerSetupDirectory;
-	
+
 	private Boolean shouldDebugBreakFlag = null;
-	
+
 	private final Logger logger;
 
 	public JsDebugger(Logger logger, ThreadScheduler threadScheduler, File debuggerSetupDirectory)
@@ -93,12 +93,12 @@ public class JsDebugger
 			}
 		}
 
-		//when someone runs our server we do:
+		// when someone runs our server we do:
 		public void run()
 		{
 			try
 			{
-				//open server port to run on
+				// open server port to run on
 				serverSocket = new ServerSocket(this.port);
 				running = true;
 			}
@@ -108,19 +108,19 @@ public class JsDebugger
 				e.printStackTrace();
 			}
 
-			//start listening and responding through that socket
+			// start listening and responding through that socket
 			while (running)
 			{
 				try
 				{
-					//wait for someone to connect to port and if he does ... open a socket
+					// wait for someone to connect to port and if he does ... open a socket
 					Socket socket = serverSocket.accept();
 
-					//out (send messages to node inspector)
+					// out (send messages to node inspector)
 					this.responseWorker = new ResponseWorker(socket);
 					new Thread(this.responseWorker).start();
 
-					//in (recieve messages from node inspector)
+					// in (recieve messages from node inspector)
 					commThread = new ListenerWorker(socket.getInputStream());
 					new Thread(commThread).start();
 				}
@@ -136,7 +136,8 @@ public class JsDebugger
 	{
 		private enum State
 		{
-			Header, Message
+			Header,
+			Message
 		}
 
 		private BufferedReader input;
@@ -174,59 +175,59 @@ public class JsDebugger
 				{
 					switch (state)
 					{
-					case Header:
-						if (line.length() == 0)
-						{
-							state = State.Message;
-						}
-						else
-						{
-							headers.add(line);
-							if (line.startsWith("Content-Length:"))
+						case Header:
+							if (line.length() == 0)
 							{
-								String strLen = line.substring(15).trim();
-								messageLength = Integer.parseInt(strLen);
-							}
-							if (leftOver != null)
-								leftOver = null;
-						}
-						break;
-					case Message:
-						if ((-1 < messageLength) && (messageLength <= line.length()))
-						{
-							String msg = line.substring(0, messageLength);
-							if (messageLength < line.length())
-								leftOver = line.substring(messageLength);
-							state = State.Header;
-							headers.clear();
-
-							try
-							{
-								byte[] cmdBytes = msg.getBytes("UTF-16LE");
-								int cmdLength = cmdBytes.length;
-								sendCommand(cmdBytes, cmdLength);
-
-								boolean success = JsDebugger.threadScheduler.post(dispatchProcessDebugMessages);
-								assert success;
-							}
-							catch (UnsupportedEncodingException e)
-							{
-								// TODO Auto-generated catch block
-								e.printStackTrace();
-							}
-						}
-						else
-						{
-							if (leftOver == null)
-							{
-								leftOver = line;
+								state = State.Message;
 							}
 							else
 							{
-								leftOver += line;
+								headers.add(line);
+								if (line.startsWith("Content-Length:"))
+								{
+									String strLen = line.substring(15).trim();
+									messageLength = Integer.parseInt(strLen);
+								}
+								if (leftOver != null)
+									leftOver = null;
 							}
-						}
-						break;
+							break;
+						case Message:
+							if ((-1 < messageLength) && (messageLength <= line.length()))
+							{
+								String msg = line.substring(0, messageLength);
+								if (messageLength < line.length())
+									leftOver = line.substring(messageLength);
+								state = State.Header;
+								headers.clear();
+
+								try
+								{
+									byte[] cmdBytes = msg.getBytes("UTF-16LE");
+									int cmdLength = cmdBytes.length;
+									sendCommand(cmdBytes, cmdLength);
+
+									boolean success = JsDebugger.threadScheduler.post(dispatchProcessDebugMessages);
+									assert success;
+								}
+								catch (UnsupportedEncodingException e)
+								{
+									// TODO Auto-generated catch block
+									e.printStackTrace();
+								}
+							}
+							else
+							{
+								if (leftOver == null)
+								{
+									leftOver = line;
+								}
+								else
+								{
+									leftOver += line;
+								}
+							}
+							break;
 					}
 				}
 			}
@@ -315,9 +316,10 @@ public class JsDebugger
 
 	int getDebuggerPortFromEnvironment()
 	{
-		if (logger.isEnabled()) logger.write("getDebuggerPortFromEnvironment");
+		if (logger.isEnabled())
+			logger.write("getDebuggerPortFromEnvironment");
 		int port = INVALID_PORT;
-		
+
 		File envOutFile = new File(debuggerSetupDirectory, portEnvOutputFile);
 		OutputStreamWriter w = null;
 		try
@@ -345,14 +347,15 @@ public class JsDebugger
 			}
 			w = null;
 		}
-		
-		boolean shouldDebugBreakFlag = shouldDebugBreak(); 
-		
-		if (logger.isEnabled()) logger.write("shouldDebugBreakFlag=" + shouldDebugBreakFlag);
-		
+
+		boolean shouldDebugBreakFlag = shouldDebugBreak();
+
+		if (logger.isEnabled())
+			logger.write("shouldDebugBreakFlag=" + shouldDebugBreakFlag);
+
 		if (shouldDebugBreakFlag)
 		{
-			
+
 			try
 			{
 				Thread.sleep(3 * 1000);
@@ -364,11 +367,12 @@ public class JsDebugger
 		}
 
 		File envInFile = new File(debuggerSetupDirectory, portEnvInputFile);
-		
+
 		boolean envInFileFlag = envInFile.exists();
-		
-		if (logger.isEnabled()) logger.write("envInFileFlag=" + envInFileFlag);
-		
+
+		if (logger.isEnabled())
+			logger.write("envInFileFlag=" + envInFileFlag);
+
 		if (envInFileFlag)
 		{
 			BufferedReader reader = null;
@@ -429,7 +433,7 @@ public class JsDebugger
 				envInFile.delete();
 			}
 		}
-		
+
 		return port;
 	}
 
@@ -461,7 +465,7 @@ public class JsDebugger
 		}
 		return port;
 	}
-	
+
 	@RuntimeCallable
 	private static void enqueueMessage(String message)
 	{
@@ -507,7 +511,8 @@ public class JsDebugger
 						int port = bundle.getInt("debuggerPort", INVALID_PORT);
 						if (port == INVALID_PORT)
 						{
-							if(currentPort == INVALID_PORT) {
+							if (currentPort == INVALID_PORT)
+							{
 								currentPort = getAvailablePort();
 							}
 							port = currentPort;
@@ -521,7 +526,7 @@ public class JsDebugger
 					else
 					{
 						// keep socket on the same port when we disable
-						JsDebugger.disableAgent(); 
+						JsDebugger.disableAgent();
 					}
 				}
 			}
@@ -547,16 +552,16 @@ public class JsDebugger
 		{
 			return shouldDebugBreakFlag;
 		}
-		
+
 		File debugBreakFile = new File(debuggerSetupDirectory, DEBUG_BREAK_FILENAME);
-		
+
 		shouldDebugBreakFlag = debugBreakFile.exists();
-		
+
 		if (shouldDebugBreakFlag)
 		{
 			debugBreakFile.delete();
 		}
-		
+
 		return shouldDebugBreakFlag;
 	}
 }

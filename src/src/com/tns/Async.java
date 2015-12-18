@@ -41,7 +41,7 @@ public class Async
 		private static final String DeleteMethod = "DELETE";
 		private static final String GetMethod = "GET";
 		private static CookieManager cookieManager;
-		
+
 		public static class KeyValuePair
 		{
 			public String key;
@@ -96,25 +96,25 @@ public class Async
 
 		public static class RequestResult
 		{
-			public static final class ByteArrayOutputStream2 extends java.io.ByteArrayOutputStream 
+			public static final class ByteArrayOutputStream2 extends java.io.ByteArrayOutputStream
 			{
-			    public ByteArrayOutputStream2()
-			    {
-			    	super(); 
-			    }
-			    
-			    public ByteArrayOutputStream2(int size) 
-			    { 
-			    	super(size); 
-			    }
+				public ByteArrayOutputStream2()
+				{
+					super();
+				}
 
-			    /** Returns the internal buffer of this ByteArrayOutputStream, without copying. */
-			    public synchronized byte[] buf()
-			    {
-			        return this.buf;
-			    }
+				public ByteArrayOutputStream2(int size)
+				{
+					super(size);
+				}
+
+				/** Returns the internal buffer of this ByteArrayOutputStream, without copying. */
+				public synchronized byte[] buf()
+				{
+					return this.buf;
+				}
 			}
-			
+
 			public ByteArrayOutputStream raw;
 			public ArrayList<KeyValuePair> headers = new ArrayList<KeyValuePair>();
 			public int statusCode;
@@ -125,7 +125,7 @@ public class Async
 			public void getHeaders(HttpURLConnection connection)
 			{
 				Map<String, List<String>> headers = connection.getHeaderFields();
-				if(headers == null) 
+				if (headers == null)
 				{
 					// no headers, this may happen if there is no internet connection currently available
 					return;
@@ -150,7 +150,7 @@ public class Async
 				this.statusCode = connection.getResponseCode();
 
 				int contentLength = connection.getContentLength();
-				
+
 				InputStream inStream;
 				if (this.statusCode >= 400)
 				{
@@ -160,16 +160,16 @@ public class Async
 				{
 					inStream = connection.getInputStream();
 				}
-				
-				if(inStream == null)
+
+				if (inStream == null)
 				{
 					// inStream is null when receiving status code 401 or 407
 					// see this thread for more information http://stackoverflow.com/a/24986433
 					return;
 				}
-				
+
 				openedStreams.push(inStream);
-				
+
 				BufferedInputStream buffer = new java.io.BufferedInputStream(inStream, 4096);
 				openedStreams.push(buffer);
 
@@ -182,10 +182,10 @@ public class Async
 				{
 					responseStream.write(buff, 0, read);
 				}
-				
+
 				this.raw = responseStream;
 				buff = null;
-				
+
 				// make the byte array conversion here, not in the JavaScript
 				// world for better performance
 				// since we do not have some explicit way to determine whether
@@ -196,7 +196,7 @@ public class Async
 					// large files
 					BitmapFactory.Options bitmapOptions = new BitmapFactory.Options();
 					bitmapOptions.inJustDecodeBounds = true;
-					
+
 					// check the size of the bitmap first
 					BitmapFactory.decodeByteArray(responseStream.buf(), 0, responseStream.size(), bitmapOptions);
 					if (bitmapOptions.outWidth > 0 && bitmapOptions.outHeight > 0)
@@ -246,12 +246,13 @@ public class Async
 				options.screenWidth = metrics.widthPixels;
 				options.screenHeight = metrics.heightPixels;
 			}
-			
-			if(cookieManager == null) {
+
+			if (cookieManager == null)
+			{
 				cookieManager = new CookieManager();
 				CookieHandler.setDefault(cookieManager);
 			}
-			
+
 			new HttpRequestTask(callback, context).executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, options);
 		}
 
@@ -292,7 +293,7 @@ public class Async
 					}
 
 					// Do not attempt to write the content (body) for DELETE method, Java will throw directly
-					if(requestMethod != DeleteMethod)
+					if (requestMethod != DeleteMethod)
 					{
 						options.writeContent(connection, openedStreams);
 					}

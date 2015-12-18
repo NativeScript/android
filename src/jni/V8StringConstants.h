@@ -25,9 +25,11 @@
 //const int V8_STRING_NATIVE_EXCEPTION = 18;
 //const int V8_STRING_TARGET = 19;
 
-namespace tns {
-	class V8StringConstants {
-	public:
+namespace tns
+{
+	class V8StringConstants
+	{
+		public:
 			static v8::Local<v8::String> GetClassImplementationObject();
 			static v8::Local<v8::String> GetDebugName();
 			static v8::Local<v8::String> GetExtend();
@@ -75,8 +77,11 @@ namespace tns {
 			static const std::string VALUE_OF;
 			static const std::string VALUE;
 			static const std::string UNCAUGHT_ERROR;
-	private:
-			V8StringConstants() {};
+			private:
+			V8StringConstants()
+			{
+			}
+			;
 
 			static v8::Persistent<v8::String> *CLASS_IMPLEMENTATION_OBJECT_PERSISTENT;
 			static v8::Persistent<v8::String> *DEBUG_NAME_PERSISTENT;
