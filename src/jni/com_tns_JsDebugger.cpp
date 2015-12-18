@@ -18,13 +18,13 @@ extern "C" void Java_com_tns_JsDebugger_processDebugMessages(JNIEnv *env, jobjec
 	{
 		e.ReThrowToJava();
 	}
-	catch (std::exception e)
-	{
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		nsEx.ReThrowToJava();
 	}
-	catch (...)
-	{
-		DEBUG_WRITE("Error: c++ exception!");
+	catch (...) {
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToJava();
 	}
 }
 
@@ -38,13 +38,13 @@ extern "C" void Java_com_tns_JsDebugger_enable(JNIEnv *env, jobject obj)
 	{
 		e.ReThrowToJava();
 	}
-	catch (std::exception e)
-	{
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		nsEx.ReThrowToJava();
 	}
-	catch (...)
-	{
-		DEBUG_WRITE("Error: c++ exception!");
+	catch (...) {
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToJava();
 	}
 }
 
@@ -58,13 +58,13 @@ extern "C" void Java_com_tns_JsDebugger_disable(JNIEnv *env, jobject obj)
 	{
 		e.ReThrowToJava();
 	}
-	catch (std::exception e)
-	{
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		nsEx.ReThrowToJava();
 	}
-	catch (...)
-	{
-		DEBUG_WRITE("Error: c++ exception!");
+	catch (...) {
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToJava();
 	}
 }
 
@@ -78,13 +78,13 @@ extern "C" void Java_com_tns_JsDebugger_debugBreak(JNIEnv *env, jobject obj)
 	{
 		e.ReThrowToJava();
 	}
-	catch (std::exception e)
-	{
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		nsEx.ReThrowToJava();
 	}
-	catch (...)
-	{
-		DEBUG_WRITE("Error: c++ exception!");
+	catch (...) {
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToJava();
 	}
 }
 
@@ -98,13 +98,13 @@ extern "C" void Java_com_tns_JsDebugger_sendCommand(JNIEnv *_env, jobject obj, j
 	{
 		e.ReThrowToJava();
 	}
-	catch (std::exception e)
-	{
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		nsEx.ReThrowToJava();
 	}
-	catch (...)
-	{
-		DEBUG_WRITE("Error: c++ exception!");
+	catch (...) {
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToJava();
 	}
 }
 

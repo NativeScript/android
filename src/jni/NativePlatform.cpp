@@ -311,13 +311,13 @@ void NativePlatform::AppInitCallback(const v8::FunctionCallbackInfo<v8::Value>& 
 	{
 		e.ReThrowToV8();
 	}
-	catch (exception e)
-	{
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		nsEx.ReThrowToV8();
 	}
-	catch (...)
-	{
-		DEBUG_WRITE("Error: c++ exception!");
+	catch (...) {
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
 	}
 }
 

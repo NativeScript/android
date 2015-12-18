@@ -43,13 +43,13 @@ void NumericCasts::MarkAsLongCallbackStatic(const v8::FunctionCallbackInfo<Value
 	{
 		e.ReThrowToV8();
 	}
-	catch (exception e)
-	{
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		nsEx.ReThrowToV8();
 	}
-	catch (...)
-	{
-		DEBUG_WRITE("Error: c++ exception!");
+	catch (...) {
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
 	}
 }
 
@@ -65,13 +65,13 @@ void NumericCasts::MarkAsByteCallbackStatic(const v8::FunctionCallbackInfo<Value
 	{
 		e.ReThrowToV8();
 	}
-	catch (exception e)
-	{
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		nsEx.ReThrowToV8();
 	}
-	catch (...)
-	{
-		DEBUG_WRITE("Error: c++ exception!");
+	catch (...) {
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
 	}
 }
 
@@ -87,13 +87,13 @@ void NumericCasts::MarkAsShortCallbackStatic(const v8::FunctionCallbackInfo<Valu
 	{
 		e.ReThrowToV8();
 	}
-	catch (exception e)
-	{
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		nsEx.ReThrowToV8();
 	}
-	catch (...)
-	{
-		DEBUG_WRITE("Error: c++ exception!");
+	catch (...) {
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
 	}
 }
 
@@ -109,13 +109,13 @@ void NumericCasts::MarkAsCharCallbackStatic(const v8::FunctionCallbackInfo<Value
 	{
 		e.ReThrowToV8();
 	}
-	catch (exception e)
-	{
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		nsEx.ReThrowToV8();
 	}
-	catch (...)
-	{
-		DEBUG_WRITE("Error: c++ exception!");
+	catch (...) {
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
 	}
 }
 
@@ -131,13 +131,13 @@ void NumericCasts::MarkAsFloatCallbackStatic(const v8::FunctionCallbackInfo<Valu
 	{
 		e.ReThrowToV8();
 	}
-	catch (exception e)
-	{
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		nsEx.ReThrowToV8();
 	}
-	catch (...)
-	{
-		DEBUG_WRITE("Error: c++ exception!");
+	catch (...) {
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
 	}
 }
 
@@ -153,13 +153,13 @@ void NumericCasts::MarkAsDoubleCallbackStatic(const v8::FunctionCallbackInfo<Val
 	{
 		e.ReThrowToV8();
 	}
-	catch (exception e)
-	{
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		nsEx.ReThrowToV8();
 	}
-	catch (...)
-	{
-		DEBUG_WRITE("Error: c++ exception!");
+	catch (...) {
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
 	}
 }
 
@@ -174,13 +174,13 @@ void NumericCasts::MarkedJsObjectWeakCallback(const v8::WeakCallbackData<Object,
 	{
 		e.ReThrowToV8();
 	}
-	catch (exception e)
-	{
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		nsEx.ReThrowToV8();
 	}
-	catch (...)
-	{
-		DEBUG_WRITE("Error: c++ exception!");
+	catch (...) {
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
 	}
 }
 
@@ -225,13 +225,13 @@ void NumericCasts::MarkAsLongCallback(const v8::FunctionCallbackInfo<Value>& arg
 	{
 		e.ReThrowToV8();
 	}
-	catch (exception e)
-	{
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		nsEx.ReThrowToV8();
 	}
-	catch (...)
-	{
-		DEBUG_WRITE("Error: c++ exception!");
+	catch (...) {
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
 	}
 }
 
@@ -276,13 +276,13 @@ void NumericCasts::MarkAsByteCallback(const v8::FunctionCallbackInfo<Value>& arg
 	{
 		e.ReThrowToV8();
 	}
-	catch (exception e)
-	{
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		nsEx.ReThrowToV8();
 	}
-	catch (...)
-	{
-		DEBUG_WRITE("Error: c++ exception!");
+	catch (...) {
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
 	}
 }
 
@@ -328,13 +328,13 @@ void NumericCasts::MarkAsShortCallback(const v8::FunctionCallbackInfo<Value>& ar
 	{
 		e.ReThrowToV8();
 	}
-	catch (exception e)
-	{
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		nsEx.ReThrowToV8();
 	}
-	catch (...)
-	{
-		DEBUG_WRITE("Error: c++ exception!");
+	catch (...) {
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
 	}
 }
 
@@ -375,13 +375,13 @@ void NumericCasts::MarkAsCharCallback(const v8::FunctionCallbackInfo<Value>& arg
 	{
 		e.ReThrowToV8();
 	}
-	catch (exception e)
-	{
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		nsEx.ReThrowToV8();
 	}
-	catch (...)
-	{
-		DEBUG_WRITE("Error: c++ exception!");
+	catch (...) {
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
 	}
 }
 
@@ -417,13 +417,13 @@ void NumericCasts::MarkAsFloatCallback(const v8::FunctionCallbackInfo<Value>& ar
 	{
 		e.ReThrowToV8();
 	}
-	catch (exception e)
-	{
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		nsEx.ReThrowToV8();
 	}
-	catch (...)
-	{
-		DEBUG_WRITE("Error: c++ exception!");
+	catch (...) {
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
 	}
 }
 
@@ -459,13 +459,13 @@ void NumericCasts::MarkAsDoubleCallback(const v8::FunctionCallbackInfo<Value>& a
 	{
 		e.ReThrowToV8();
 	}
-	catch (exception e)
-	{
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		nsEx.ReThrowToV8();
 	}
-	catch (...)
-	{
-		DEBUG_WRITE("Error: c++ exception!");
+	catch (...) {
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
 	}
 }
 
