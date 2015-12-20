@@ -31,11 +31,11 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved)
 	}
 }
 
-extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj, jstring filesPath, jint appJavaObjectId, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args)
+extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj, jstring filesPath, jint appJavaObjectId, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jobject jsDebugger)
 {
 	try
 	{
-		g_isolate = NativePlatform::InitNativeScript(_env, obj, filesPath, appJavaObjectId, verboseLoggingEnabled, packageName, args);
+		g_isolate = NativePlatform::InitNativeScript(_env, obj, filesPath, appJavaObjectId, verboseLoggingEnabled, packageName, args, jsDebugger);
 	}
 	catch (NativeScriptException& e)
 	{

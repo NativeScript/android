@@ -1,6 +1,7 @@
 package com.tns;
 
 import java.io.BufferedReader;
+import java.io.Closeable;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileReader;
@@ -21,10 +22,20 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager.NameNotFoundException;
+import android.net.LocalServerSocket;
+import android.net.LocalSocket;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.HandlerThread;
+import android.util.Log;
 
 public class JsDebugger
 {
+	public static boolean enableDebuggingOverride;
+
+
 	private static native void processDebugMessages();
 
 	private static native void enable();
@@ -35,123 +46,163 @@ public class JsDebugger
 
 	private static native void sendCommand(byte[] command, int length);
 
-	private static ThreadScheduler threadScheduler;
+	private ThreadScheduler threadScheduler;
 
-	private static final int INVALID_PORT = -1;
+	private LinkedBlockingQueue<String> dbgMessages = new LinkedBlockingQueue<String>();
+	
+	private Logger logger;
+	private Context context;
+	private DebugLocalServerSocketThread debugServerThread;
 
-	private static final String portEnvInputFile = "envDebug.in";
+	private final static  String STOP_MESSAGE = "STOP_MESSAGE";
+	
+	private byte[] LINE_END_BYTES;
 
-	private static final String portEnvOutputFile = "envDebug.out";
-
-	private static final String DEBUG_BREAK_FILENAME = "debugbreak";
-
-	private static int currentPort = INVALID_PORT;
-
-	private static LinkedBlockingQueue<String> dbgMessages = new LinkedBlockingQueue<String>();
-
-	private final File debuggerSetupDirectory;
-
-	private Boolean shouldDebugBreakFlag = null;
-
-	private final Logger logger;
-
-	public JsDebugger(Logger logger, ThreadScheduler threadScheduler, File debuggerSetupDirectory)
+	private HandlerThread handlerThread;
+	
+	public JsDebugger(Context context, Logger logger, ThreadScheduler threadScheduler)
 	{
+		this.context = context;
 		this.logger = logger;
-		JsDebugger.threadScheduler = threadScheduler;
-		this.debuggerSetupDirectory = debuggerSetupDirectory;
+		this.threadScheduler = threadScheduler;
+		
+		LINE_END_BYTES = new byte[2];
+		LINE_END_BYTES[0] = (byte) '\r';
+		LINE_END_BYTES[1] = (byte) '\n';
 	}
 
-	private static ServerSocket serverSocket;
-	private static ServerThread serverThread = null;
-	private static Thread javaServerThread = null;
+	private class DebugLocalServerSocketThread extends Thread
+    {
+        private volatile boolean running;
+        private final String name;
 
-	private static class ServerThread implements Runnable
-	{
-		private volatile boolean running;
-		private final int port;
-		private ResponseWorker responseWorker;
-		private ListenerWorker commThread;
+        private RequestHandler requestHandler;
+        private LocalServerSocket serverSocket;
+		private ResponseHandler responseHandler;
+		
+        public DebugLocalServerSocketThread(String name)
+        {
+            this.name = name;
+            this.running = false;
+        }
 
-		public ServerThread(int port)
+        public void stopResponseHandler()
 		{
-			this.port = port;
-			this.running = false;
+			this.responseHandler.stop();
+		}
+        
+        
+        public void run()
+        {
+        	Closeable requestHandlerCloseable = new Closeable()
+    		{
+    			@Override
+    			public void close() throws IOException
+    			{
+    				requestHandler.stop();
+    			}
+    		};
+    		
+    		Closeable responseHandlerCloseable = new Closeable()
+    		{
+    			@Override
+    			public void close() throws IOException
+    			{
+    				responseHandler.stop();
+    			}
+    		};
+        	
+            running = true;
+            try
+            {
+                serverSocket = new LocalServerSocket(this.name);
+                try 
+                {
+	                while (running)
+	                {
+	                	try
+	    				{
+	                		LocalSocket socket = serverSocket.accept();
+	                		logger.write("Debugger new connection on: " + socket.getFileDescriptor().toString());
+	                		
+	                		dbgMessages.clear();
+	                		
+	    					//out (send messages to node inspector)
+	    					this.responseHandler = new ResponseHandler(socket, requestHandlerCloseable);
+	    					Thread responseThread = new Thread(this.responseHandler);
+	    					responseThread.start();
+	    
+	    					//in (recieve messages from node inspector)
+	    					requestHandler = new RequestHandler(socket, responseHandlerCloseable);
+	    					Thread requestThread = new Thread(requestHandler);
+	    					requestThread.start();
+	    					requestThread.join();
+	    					
+	    					this.responseHandler.stop();
+	    					socket.close();
+	    				}
+	    				catch (IOException | InterruptedException e)
+	    				{
+	    					e.printStackTrace();
+	    				}
+	                }
+                }
+                finally
+                {
+                	try
+        			{
+        				serverSocket.close();
+        			}
+        			catch (IOException e)
+        			{
+        				e.printStackTrace();
+        			}
+                }
+            }
+            catch (IOException e)
+            {
+            	e.printStackTrace();
+            }
+        }
+    }
+
+	private enum State
+	{
+		Header, Message
+	}
+	
+	private class RequestHandler implements Runnable
+	{
+		private BufferedReader input;
+		private Scanner scanner;
+
+		Runnable dispatchProcessDebugMessages = new Runnable()
+		{
+			@Override
+			public void run()
+			{
+				processDebugMessages();
+			}
+		};
+
+		private boolean stop;
+		private Closeable responseHandlerCloseable;
+		
+		public RequestHandler(LocalSocket socket, Closeable responseHandlerCloseable) throws IOException
+		{
+			this.responseHandlerCloseable = responseHandlerCloseable;
+			this.input = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 		}
 
 		public void stop()
 		{
-			this.running = false;
-			this.responseWorker.stop();
-			try
-			{
-				serverSocket.close();
-			}
-			catch (IOException e)
-			{
-				e.printStackTrace();
-			}
+			this.stop = true;
+			this.scanner.close();
 		}
-
-		// when someone runs our server we do:
+		
 		public void run()
 		{
-			try
-			{
-				// open server port to run on
-				serverSocket = new ServerSocket(this.port);
-				running = true;
-			}
-			catch (IOException e)
-			{
-				running = false;
-				e.printStackTrace();
-			}
-
-			// start listening and responding through that socket
-			while (running)
-			{
-				try
-				{
-					// wait for someone to connect to port and if he does ... open a socket
-					Socket socket = serverSocket.accept();
-
-					// out (send messages to node inspector)
-					this.responseWorker = new ResponseWorker(socket);
-					new Thread(this.responseWorker).start();
-
-					// in (recieve messages from node inspector)
-					commThread = new ListenerWorker(socket.getInputStream());
-					new Thread(commThread).start();
-				}
-				catch (IOException e)
-				{
-					e.printStackTrace();
-				}
-			}
-		}
-	}
-
-	private static class ListenerWorker implements Runnable
-	{
-		private enum State
-		{
-			Header,
-			Message
-		}
-
-		private BufferedReader input;
-
-		public ListenerWorker(InputStream inputStream)
-		{
-			this.input = new BufferedReader(new InputStreamReader(inputStream));
-		}
-
-		private volatile boolean running = true;
-
-		public void run()
-		{
-			Scanner scanner = new Scanner(this.input);
+			scanner = new Scanner(this.input);
 			scanner.useDelimiter("\r\n");
 
 			ArrayList<String> headers = new ArrayList<String>();
@@ -160,343 +211,240 @@ public class JsDebugger
 			int messageLength = -1;
 			String leftOver = null;
 
-			Runnable dispatchProcessDebugMessages = new Runnable()
-			{
-				@Override
-				public void run()
-				{
-					processDebugMessages();
-				}
-			};
-
 			try
 			{
-				while (running && ((line = (leftOver != null) ? leftOver : scanner.nextLine()) != null))
+				while (!stop && ((line = (leftOver != null) ? leftOver : scanner.nextLine()) != null))
 				{
 					switch (state)
 					{
-						case Header:
-							if (line.length() == 0)
+					case Header:
+						if (line.length() == 0)
+						{
+							state = State.Message;
+						}
+						else
+						{
+							headers.add(line);
+							if (line.startsWith("Content-Length:"))
 							{
-								state = State.Message;
+								String strLen = line.substring(15).trim();
+								messageLength = Integer.parseInt(strLen);
+							}
+							
+							if (leftOver != null)
+							{
+								leftOver = null;
+							}
+						}
+						break;
+						
+					case Message:
+						if ((-1 < messageLength) && (messageLength <= line.length()))
+						{
+							String msg = line.substring(0, messageLength);
+							if (messageLength < line.length())
+							{
+								leftOver = line.substring(messageLength);
+							}
+							
+							state = State.Header;
+							headers.clear();
+
+							sendMessageToV8(msg);
+						}
+						else
+						{
+							if (leftOver == null)
+							{
+								leftOver = line;
 							}
 							else
 							{
-								headers.add(line);
-								if (line.startsWith("Content-Length:"))
-								{
-									String strLen = line.substring(15).trim();
-									messageLength = Integer.parseInt(strLen);
-								}
-								if (leftOver != null)
-									leftOver = null;
+								leftOver += line;
 							}
-							break;
-						case Message:
-							if ((-1 < messageLength) && (messageLength <= line.length()))
-							{
-								String msg = line.substring(0, messageLength);
-								if (messageLength < line.length())
-									leftOver = line.substring(messageLength);
-								state = State.Header;
-								headers.clear();
-
-								try
-								{
-									byte[] cmdBytes = msg.getBytes("UTF-16LE");
-									int cmdLength = cmdBytes.length;
-									sendCommand(cmdBytes, cmdLength);
-
-									boolean success = JsDebugger.threadScheduler.post(dispatchProcessDebugMessages);
-									assert success;
-								}
-								catch (UnsupportedEncodingException e)
-								{
-									// TODO Auto-generated catch block
-									e.printStackTrace();
-								}
-							}
-							else
-							{
-								if (leftOver == null)
-								{
-									leftOver = line;
-								}
-								else
-								{
-									leftOver += line;
-								}
-							}
-							break;
+						}
+						break;
 					}
 				}
 			}
 			catch (NoSuchElementException e)
 			{
 				e.printStackTrace();
+
+				try
+				{
+					responseHandlerCloseable.close();
+				}
+				catch (IOException e1)
+				{
+					e1.printStackTrace();
+				}
 			}
 			finally
 			{
+				this.stop = true;
+				logger.write("sending disconnect to v8 debugger");
+				sendMessageToV8("{\"seq\":0,\"type\":\"request\",\"command\":\"disconnect\"}");
 				scanner.close();
+			}
+		}
+
+		private void sendMessageToV8(String message)
+		{
+			try
+			{
+				//Log.d("TNS.JAVA.JsDebugger", "Sending message to v8:" + message);
+				
+				byte[] cmdBytes = message.getBytes("UTF-16LE");
+				int cmdLength = cmdBytes.length;
+				sendCommand(cmdBytes, cmdLength);
+
+				threadScheduler.post(dispatchProcessDebugMessages);
+			}
+			catch (UnsupportedEncodingException e)
+			{
+				e.printStackTrace();
 			}
 		}
 	}
 
-	private static class ResponseWorker implements Runnable
+	private class ResponseHandler implements Runnable
 	{
-		private Socket socket;
-
-		private final static String END_MSG = "#end#";
-
 		private OutputStream output;
+		private boolean stop;
+		private Closeable requestHandlerCloseable;
 
-		public ResponseWorker(Socket clientSocket) throws IOException
+		public ResponseHandler(LocalSocket socket, Closeable requestHandlerCloseable) throws IOException
 		{
-			this.socket = clientSocket;
-			this.output = this.socket.getOutputStream();
+			this.requestHandlerCloseable = requestHandlerCloseable;
+			this.output = socket.getOutputStream();
 		}
 
 		public void stop()
 		{
-			dbgMessages.add(END_MSG);
+			this.stop = true;
+			dbgMessages.add(STOP_MESSAGE);
 		}
 
 		@Override
 		public void run()
 		{
-			byte[] LINE_END_BYTES = new byte[2];
-			LINE_END_BYTES[0] = (byte) '\r';
-			LINE_END_BYTES[1] = (byte) '\n';
-			while (true)
+			while (!stop)
 			{
 				try
 				{
-					String msg = dbgMessages.take();
-
-					if (msg.equals(END_MSG))
+					String message = dbgMessages.take();
+					if (message.equals(STOP_MESSAGE))
+					{
 						break;
-
-					byte[] utf8;
-					try
-					{
-						utf8 = msg.getBytes("UTF8");
 					}
-					catch (UnsupportedEncodingException e1)
-					{
-						utf8 = null;
-						e1.printStackTrace();
-					}
-
-					if (utf8 != null)
-					{
-						try
-						{
-							String s = "Content-Length: " + utf8.length;
-							byte[] arr = s.getBytes("UTF8");
-							output.write(arr, 0, arr.length);
-							output.write(LINE_END_BYTES, 0, LINE_END_BYTES.length);
-							output.write(LINE_END_BYTES, 0, LINE_END_BYTES.length);
-							output.write(utf8, 0, utf8.length);
-							output.flush();
-						}
-						catch (IOException e)
-						{
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}
-					}
+					
+					//Log.d("TNS.JAVA.JsDebugger", "Sending message to inspector:" + message);
+					
+					sendMessageToInspector(message);
 				}
 				catch (InterruptedException e)
 				{
 					e.printStackTrace();
 				}
 			}
+			
+			try
+			{
+				this.output.close();
+			}
+			catch (IOException e)
+			{
+				e.printStackTrace();
+			}
 		}
-	}
 
-	int getDebuggerPortFromEnvironment()
-	{
-		if (logger.isEnabled())
-			logger.write("getDebuggerPortFromEnvironment");
-		int port = INVALID_PORT;
+		private void sendMessageToInspector(String msg)
+		{
+			byte[] utf8;
+			try
+			{
+				utf8 = msg.getBytes("UTF8");
+			}
+			catch (UnsupportedEncodingException e1)
+			{
+				utf8 = null;
+				e1.printStackTrace();
+			}
 
-		File envOutFile = new File(debuggerSetupDirectory, portEnvOutputFile);
-		OutputStreamWriter w = null;
-		try
-		{
-			w = new OutputStreamWriter(new FileOutputStream(envOutFile, false));
-			String currentPID = "PID=" + android.os.Process.myPid() + "\n";
-			w.write(currentPID);
-		}
-		catch (IOException e1)
-		{
-			e1.printStackTrace();
-		}
-		finally
-		{
-			if (w != null)
+			if (utf8 != null)
 			{
 				try
 				{
-					w.close();
+					String s = "Content-Length: " + utf8.length;
+					byte[] arr = s.getBytes("UTF8");
+					output.write(arr);
+					output.write(LINE_END_BYTES);
+					output.write(LINE_END_BYTES);
+					output.write(utf8);
+					output.flush();
+					
+					//Log.d("TNS.JAVA.JsDebugger", "Sent message to inspector:" + msg);
 				}
 				catch (IOException e)
 				{
 					e.printStackTrace();
-				}
-			}
-			w = null;
-		}
-
-		boolean shouldDebugBreakFlag = shouldDebugBreak();
-
-		if (logger.isEnabled())
-			logger.write("shouldDebugBreakFlag=" + shouldDebugBreakFlag);
-
-		if (shouldDebugBreakFlag)
-		{
-
-			try
-			{
-				Thread.sleep(3 * 1000);
-			}
-			catch (InterruptedException e1)
-			{
-				e1.printStackTrace();
-			}
-		}
-
-		File envInFile = new File(debuggerSetupDirectory, portEnvInputFile);
-
-		boolean envInFileFlag = envInFile.exists();
-
-		if (logger.isEnabled())
-			logger.write("envInFileFlag=" + envInFileFlag);
-
-		if (envInFileFlag)
-		{
-			BufferedReader reader = null;
-			try
-			{
-				reader = new BufferedReader(new FileReader(envInFile));
-				String line = reader.readLine();
-				int requestedPort;
-				try
-				{
-					requestedPort = Integer.parseInt(line);
-				}
-				catch (NumberFormatException e)
-				{
-					requestedPort = INVALID_PORT;
-				}
-
-				w = new OutputStreamWriter(new FileOutputStream(envOutFile, true));
-				int localPort = (requestedPort != INVALID_PORT) ? requestedPort : getAvailablePort();
-				String strLocalPort = "PORT=" + localPort + "\n";
-				w.write(strLocalPort);
-				port = currentPort = localPort;
-				//
-				enable();
-				debugBreak();
-				serverThread = new ServerThread(port);
-				javaServerThread = new Thread(serverThread);
-				javaServerThread.start();
-			}
-			catch (IOException e1)
-			{
-				e1.printStackTrace();
-			}
-			finally
-			{
-				if (reader != null)
-				{
+					
 					try
 					{
-						reader.close();
+						requestHandlerCloseable.close();
 					}
-					catch (IOException e)
+					catch (IOException e1)
 					{
-						e.printStackTrace();
+						e1.printStackTrace();
 					}
-				}
-				if (w != null)
-				{
-					try
-					{
-						w.close();
-					}
-					catch (IOException e)
-					{
-						e.printStackTrace();
-					}
-				}
-				envInFile.delete();
-			}
-		}
-
-		return port;
-	}
-
-	private static int getAvailablePort()
-	{
-		int port = 0;
-		ServerSocket s = null;
-		try
-		{
-			s = new ServerSocket(0);
-			port = s.getLocalPort();
-		}
-		catch (IOException e)
-		{
-			port = INVALID_PORT;
-		}
-		finally
-		{
-			if (s != null)
-			{
-				try
-				{
-					s.close();
-				}
-				catch (IOException e)
-				{
 				}
 			}
 		}
-		return port;
 	}
 
 	@RuntimeCallable
-	private static void enqueueMessage(String message)
+	private void enqueueMessage(String message)
 	{
+		//logger.write("Debug msg:" + message);
+		
 		dbgMessages.add(message);
 	}
 
 	@RuntimeCallable
-	private static void enableAgent(String packageName, int port, boolean waitForConnection)
+	private void enableAgent()
 	{
+		logger.write("Enabling Debugger Agent");
 		enable();
-		if (serverThread == null)
-		{
-			serverThread = new ServerThread(port);
-		}
-		javaServerThread = new Thread(serverThread);
-		javaServerThread.start();
 	}
 
 	@RuntimeCallable
-	private static void disableAgent()
+	private void disableAgent()
 	{
+		logger.write("Disabling Debugger Agent");
 		disable();
-		if (serverThread != null)
+		
+		
+		String message = "{\"seq\":0,\"type\":\"request\",\"command\":\"disconnect\"}";
+		
+		byte[] cmdBytes;
+		try
 		{
-			serverThread.stop();
+			cmdBytes = message.getBytes("UTF-16LE");
+			int cmdLength = cmdBytes.length;
+			sendCommand(cmdBytes, cmdLength);
 		}
+		catch (UnsupportedEncodingException e)
+		{
+			e.printStackTrace();
+		}
+		
+		debugServerThread.stopResponseHandler();
 	}
 
-	static void registerEnableDisableDebuggerReceiver(Context context)
+	private void registerEnableDisableDebuggerReceiver(Handler handler)
 	{
-		String debugAction = context.getPackageName() + "-Debug";
+		String debugAction = context.getPackageName() + "-debug";
 		context.registerReceiver(new BroadcastReceiver()
 		{
 			@Override
@@ -508,60 +456,84 @@ public class JsDebugger
 					boolean enable = bundle.getBoolean("enable", false);
 					if (enable)
 					{
-						int port = bundle.getInt("debuggerPort", INVALID_PORT);
-						if (port == INVALID_PORT)
-						{
-							if (currentPort == INVALID_PORT)
-							{
-								currentPort = getAvailablePort();
-							}
-							port = currentPort;
-						}
-						String packageName = bundle.getString("packageName", context.getPackageName());
-						boolean waitForDebugger = bundle.getBoolean("waitForDebugger", false);
-						JsDebugger.enableAgent(packageName, port, waitForDebugger);
-						currentPort = port;
-						this.setResultCode(currentPort);
+						enableAgent();
 					}
 					else
 					{
-						// keep socket on the same port when we disable
-						JsDebugger.disableAgent();
+						disableAgent(); 
 					}
 				}
 			}
-		}, new IntentFilter(debugAction));
+		}, new IntentFilter(debugAction), null, handler);
 	}
+	
+	
 
-	static void registerGetDebuggerPortReceiver(Context context)
+	private boolean getDebugBreakFlagAndClearIt()
 	{
-		String getDebuggerPortAction = context.getPackageName() + "-GetDbgPort";
-		context.registerReceiver(new BroadcastReceiver()
+		File debugBreakFile = new File("/data/local/tmp", context.getPackageName() + "-debugbreak");
+		if (debugBreakFile.exists() && !debugBreakFile.isDirectory() && debugBreakFile.length() == 0)
 		{
-			@Override
-			public void onReceive(Context context, Intent intent)
+			try
 			{
-				this.setResultCode(currentPort);
+				java.io.FileWriter fileWriter = new java.io.FileWriter(debugBreakFile);
+				fileWriter.write("used");
+				fileWriter.close();
 			}
-		}, new IntentFilter(getDebuggerPortAction));
+			catch (IOException e)
+			{
+				Log.e("TNS", "Debug break temp file can not be marked as used. Debug sessions may not work correctly. file: " + debugBreakFile.getAbsolutePath());
+				e.printStackTrace();
+			}
+			
+			return true;
+		}
+		
+		return false;
 	}
 
-	private boolean shouldDebugBreak()
+	public void start()
 	{
-		if (shouldDebugBreakFlag != null)
+		handlerThread = new HandlerThread("debugAgentBroadCastReceiverHandler");
+		handlerThread.start();
+		Handler handler = new Handler(handlerThread.getLooper());
+		
+		registerEnableDisableDebuggerReceiver(handler);
+		
+		boolean shouldDebugBrake = getDebugBreakFlagAndClearIt();
+		
+		logger.write("Enabling Debugger Agent");
+		enable();
+		
+		if (shouldDebugBrake)
 		{
-			return shouldDebugBreakFlag;
+			debugBreak();
 		}
 
-		File debugBreakFile = new File(debuggerSetupDirectory, DEBUG_BREAK_FILENAME);
-
-		shouldDebugBreakFlag = debugBreakFile.exists();
-
-		if (shouldDebugBreakFlag)
+		
+		debugServerThread = new DebugLocalServerSocketThread(context.getPackageName() + "-debug");
+		debugServerThread.start();
+	}
+	
+	public static boolean isDebuggableApp(Context context)
+	{
+		if (enableDebuggingOverride)
 		{
-			debugBreakFile.delete();
+			return true;
+		}
+		
+		int flags;
+		try
+		{
+			flags = context.getPackageManager().getPackageInfo(context.getPackageName(), 0).applicationInfo.flags;
+		}
+		catch (NameNotFoundException e)
+		{
+			flags = 0;
+			e.printStackTrace();
 		}
 
-		return shouldDebugBreakFlag;
+		boolean isDebuggableApp = ((flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0);
+		return isDebuggableApp;
 	}
 }

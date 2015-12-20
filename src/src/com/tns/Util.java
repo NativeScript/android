@@ -1,5 +1,7 @@
 package com.tns;
 
+import java.io.*;
+
 import com.tns.internal.Plugin;
 
 import android.content.Context;
@@ -21,23 +23,6 @@ public final class Util
 		int code = packageInfo.versionCode;
 		long updateTime = packageInfo.lastUpdateTime;
 		return String.valueOf(updateTime) + "-" + String.valueOf(code);
-	}
-
-	public static boolean isDebuggableApp(Context context)
-	{
-		int flags;
-		try
-		{
-			flags = context.getPackageManager().getPackageInfo(context.getPackageName(), 0).applicationInfo.flags;
-		}
-		catch (NameNotFoundException e)
-		{
-			flags = 0;
-			e.printStackTrace();
-		}
-
-		boolean isDebuggableApp = ((flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0);
-		return isDebuggableApp;
 	}
 
 	static boolean runPlugin(Logger logger, Context context)
@@ -71,5 +56,49 @@ public final class Util
 				e.printStackTrace();
 		}
 		return success;
+	}
+	
+	public static String readSystemProperty(String name)
+	{
+		InputStreamReader in = null;
+		BufferedReader reader = null;
+		try
+		{
+			Process proc = Runtime.getRuntime().exec(new String[] { "/system/bin/getprop", name });
+			in = new InputStreamReader(proc.getInputStream());
+			reader = new BufferedReader(in);
+			return reader.readLine();
+		}
+		catch (IOException e)
+		{
+			return null;
+		}
+		finally
+		{
+			silentClose(in);
+			silentClose(reader);
+		}
+	}
+	
+	private static void silentClose(Closeable closeable)
+	{
+		if (closeable == null)
+		{
+			return;
+		}
+		try
+		{
+			closeable.close();
+		}
+		catch (IOException ignored)
+		{
+		}
+	}
+	
+	public static Boolean isPositive(String value)
+	{
+		return (value.equals("true") || value.equals("TRUE") ||
+				value.equals("yes") || value.equals("YES") ||
+				value.equals("enabled") || value.equals("ENABLED"));
 	}
 }

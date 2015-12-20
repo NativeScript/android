@@ -1015,9 +1015,7 @@ public class NativeScriptApplication extends android.app.Application implements 
 			String appName = this.getPackageName();
 			File rootDir = new File(this.getApplicationInfo().dataDir);
 			File appDir = this.getFilesDir();
-			File debuggerSetupDir = Util.isDebuggableApp(this)
-					? getExternalFilesDir(null)
-					: null;
+			
 			ClassLoader classLoader = this.getClassLoader();
 			File dexDir = new File(rootDir, "code_cache/secondary-dexes");
 			String dexThumb = null;
@@ -1033,7 +1031,7 @@ public class NativeScriptApplication extends android.app.Application implements 
 			}
 			ThreadScheduler workThreadScheduler = new WorkThreadScheduler(new Handler(Looper.getMainLooper()));
 			// TODO: Refactor these 11 method parameters!!! E.g. create Settings abstract object and add default implementation object
-			Platform.init(this, workThreadScheduler, logger, appName, null, rootDir, appDir, debuggerSetupDir, classLoader, dexDir, dexThumb);
+			Platform.init(this, workThreadScheduler, logger, appName, null, rootDir, appDir, classLoader, dexDir, dexThumb);
 			Platform.runScript(new File(appDir, "internal/prepareExtend.js"));
 			Platform.run();
 
@@ -1088,14 +1086,11 @@ public class NativeScriptApplication extends android.app.Application implements 
 			exHandler = appBuilderCallbackImpl.getDefaultUncaughtExceptionHandler();
 		}
 
-		boolean shouldEnableDebugging = (appBuilderCallbackImpl != null)
-				? appBuilderCallbackImpl.shouldEnableDebugging(this)
-				: Util.isDebuggableApp(this);
+		
 
-		if (shouldEnableDebugging)
+		if (appBuilderCallbackImpl != null)
 		{
-			JsDebugger.registerEnableDisableDebuggerReceiver(this);
-			JsDebugger.registerGetDebuggerPortReceiver(this);
+			JsDebugger.enableDebuggingOverride = appBuilderCallbackImpl.shouldEnableDebugging(this);
 		}
 	}
 
