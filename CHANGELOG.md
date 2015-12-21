@@ -1,3 +1,20 @@
+1.5.1
+==
+
+## What's New
+
+ - [Enable requiring of JSON files (like in Node) (#217)](https://github.com/NativeScript/android-runtime/issues/217)
+ - [Revisit the "assert" routine in the JNI part (#221)](https://github.com/NativeScript/android-runtime/issues/221)
+ - [Android CallStack  (#228)](https://github.com/NativeScript/android-runtime/issues/228)
+ - [error handling introducing c++ exceptions (#277)](https://github.com/NativeScript/android-runtime/pull/277)
+ - [Simplify require errors (#287)](https://github.com/NativeScript/android-runtime/issues/287)
+ - [Experimental: Support native modules (#291)](https://github.com/NativeScript/android-runtime/issues/291)
+ - Gradle script improvements
+
+## Bug Fixes
+
+ - [Print meaningful error when metadata generator fails to reflect a class (#245)](https://github.com/NativeScript/android-runtime/issues/245)
+
 1.5.0
 ==
 
