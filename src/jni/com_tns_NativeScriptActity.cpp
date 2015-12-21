@@ -73,13 +73,13 @@ extern "C" jobjectArray Java_com_tns_NativeScriptActivity_getMethodOverrides(JNI
 	{
 		e.ReThrowToJava();
 	}
-	catch (std::exception e)
-	{
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		nsEx.ReThrowToJava();
 	}
-	catch (...)
-	{
-		DEBUG_WRITE("Error: c++ exception!");
+	catch (...) {
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToJava();
 	}
 	return joa;
 }

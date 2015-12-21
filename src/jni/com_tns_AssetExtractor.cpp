@@ -3,6 +3,7 @@
 #include "NativeScriptException.h"
 #include "NativeScriptAssert.h"
 
+
 using namespace tns;
 
 void mkdir_rec(const char *dir);
@@ -17,12 +18,12 @@ extern "C" void Java_com_tns_AssetExtractor_extractAssets(JNIEnv *env, jobject o
 	{
 		e.ReThrowToJava();
 	}
-	catch (std::exception e)
-	{
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		nsEx.ReThrowToJava();
 	}
-	catch (...)
-	{
-		DEBUG_WRITE("Error: c++ exception!");
+	catch (...) {
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToJava();
 	}
 }
