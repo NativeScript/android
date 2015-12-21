@@ -146,4 +146,10 @@ describe("Tests require exceptions ", function () {
 		expect(exceptionCaught).toBe(true);
 		expect(partialMessage).toBe(thrownException);
 	});
+	
+	it("when requiring a module with package.json, but with NO 'main' property in it the runtime should look for index.js", function () {
+		var fromIndexJs = require("~/modules3");
+		
+		expect(fromIndexJs.value123.toString()).toBe("123");
+	});
 });
