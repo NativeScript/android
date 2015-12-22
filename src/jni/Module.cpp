@@ -222,7 +222,7 @@ Local<Object> Module::LoadModule(Isolate *isolate, const string& modulePath)
 	moduleObj->Set(ConvertToV8String("filename"), fullRequiredModulePath);
 
 	auto poModuleObj = new Persistent<Object>(isolate, moduleObj);
-	s_loadedModules.insert(make_pair(modulePath, poModuleObj));
+	TempModule tempModule(modulePath, poModuleObj);
 
 	TryCatch tc;
 
@@ -288,6 +288,7 @@ Local<Object> Module::LoadModule(Isolate *isolate, const string& modulePath)
 		throw NativeScriptException(tc, "Error calling module function ");
 	}
 
+	tempModule.SaveToCache();
 	result = moduleObj;
 
 	return result;
