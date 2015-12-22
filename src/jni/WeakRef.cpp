@@ -3,6 +3,7 @@
 #include "V8StringConstants.h"
 #include "NativeScriptAssert.h"
 #include "NativeScriptException.h"
+#include <sstream>
 
 using namespace v8;
 using namespace tns;

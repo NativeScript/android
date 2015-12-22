@@ -2,6 +2,7 @@
 #include "NativePlatform.h"
 #include "NativeScriptException.h"
 #include "NativeScriptAssert.h"
+#include <sstream>
 
 using namespace std;
 using namespace tns;

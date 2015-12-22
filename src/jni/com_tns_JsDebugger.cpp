@@ -3,10 +3,11 @@
 #include "ArgConverter.h"
 #include "NativeScriptException.h"
 #include "NativeScriptAssert.h"
-
+#include <sstream>
 #include <string>
 
 using namespace tns;
+using namespace std;
 
 extern "C" void Java_com_tns_JsDebugger_processDebugMessages(JNIEnv *env, jobject obj)
 {

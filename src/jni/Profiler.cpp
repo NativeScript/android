@@ -4,6 +4,7 @@
 #include "NativeScriptException.h"
 #include "NativeScriptAssert.h"
 #include <stack>
+#include <sstream>
 
 using namespace v8;
 using namespace std;

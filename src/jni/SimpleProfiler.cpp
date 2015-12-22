@@ -4,9 +4,12 @@
 #include <algorithm>
 #include <time.h>
 #include <android/log.h>
+#include <sstream>
 
 using namespace tns;
 using namespace v8;
+using namespace std;
+
 
 SimpleProfiler::SimpleProfiler(char *fileName, int lineNumber)
 :

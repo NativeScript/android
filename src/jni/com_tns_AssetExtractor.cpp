@@ -3,8 +3,10 @@
 #include "NativeScriptException.h"
 #include "NativeScriptAssert.h"
 
+#include <sstream>
 
 using namespace tns;
+using namespace std;
 
 void mkdir_rec(const char *dir);
 
