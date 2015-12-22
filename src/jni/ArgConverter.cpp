@@ -43,7 +43,9 @@ void ArgConverter::NativeScriptLongValueOfFunctionCallback(const v8::FunctionCal
 		e.ReThrowToV8();
 	}
 	catch (std::exception e) {
-		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToV8();
 	}
 	catch (...) {
@@ -63,7 +65,9 @@ void ArgConverter::NativeScriptLongToStringFunctionCallback(const v8::FunctionCa
 		e.ReThrowToV8();
 	}
 	catch (std::exception e) {
-		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToV8();
 	}
 	catch (...) {
@@ -88,7 +92,9 @@ void ArgConverter::NativeScriptLongFunctionCallback(const v8::FunctionCallbackIn
 		e.ReThrowToV8();
 	}
 	catch (std::exception e) {
-		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToV8();
 	}
 	catch (...) {

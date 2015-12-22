@@ -70,7 +70,9 @@ void WeakRef::ConstructorCallback(const FunctionCallbackInfo<Value>& args)
 		e.ReThrowToV8();
 	}
 	catch (std::exception e) {
-		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToV8();
 	}
 	catch (...) {
@@ -132,7 +134,9 @@ void WeakRef::WeakHolderCallback(const WeakCallbackData<Object, CallbackState>& 
 		e.ReThrowToV8();
 	}
 	catch (std::exception e) {
-		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToV8();
 	}
 	catch (...) {
@@ -155,7 +159,9 @@ void WeakRef::ClearCallback(const FunctionCallbackInfo<Value>& args)
 		e.ReThrowToV8();
 	}
 	catch (std::exception e) {
-		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToV8();
 	}
 	catch (...) {
@@ -187,7 +193,9 @@ void WeakRef::GettertCallback(const FunctionCallbackInfo<Value>& args)
 		e.ReThrowToV8();
 	}
 	catch (std::exception e) {
-		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToV8();
 	}
 	catch (...) {
@@ -216,7 +224,9 @@ Local<Function> WeakRef::GetGetterFunction(Isolate *isolate)
 		e.ReThrowToV8();
 	}
 	catch (std::exception e) {
-		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToV8();
 	}
 	catch (...) {
@@ -245,7 +255,9 @@ Local<Function> WeakRef::GetClearFunction(Isolate *isolate)
 		e.ReThrowToV8();
 	}
 	catch (std::exception e) {
-		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToV8();
 	}
 	catch (...) {

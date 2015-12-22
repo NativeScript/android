@@ -203,7 +203,9 @@ void MetadataNode::ArrayLengthGetterCallack(Local<String> property, const Proper
 		e.ReThrowToV8();
 	}
 	catch (std::exception e) {
-		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToV8();
 	}
 	catch (...) {
@@ -265,7 +267,9 @@ void MetadataNode::ClassAccessorGetterCallback(Local<String> property, const Pro
 		e.ReThrowToV8();
 	}
 	catch (std::exception e) {
-		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToV8();
 	}
 	catch (...) {
@@ -288,7 +292,9 @@ void MetadataNode::FieldAccessorGetterCallback(Local<String> property, const Pro
 		e.ReThrowToV8();
 	}
 	catch (std::exception e) {
-		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToV8();
 	}
 	catch (...) {
@@ -324,7 +330,9 @@ void MetadataNode::FieldAccessorSetterCallback(Local<String> property, Local<Val
 		e.ReThrowToV8();
 	}
 	catch (std::exception e) {
-		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToV8();
 	}
 	catch (...) {
@@ -367,7 +375,9 @@ void MetadataNode::SuperAccessorGetterCallback(Local<String> property, const Pro
 		e.ReThrowToV8();
 	}
 	catch (std::exception e) {
-		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToV8();
 	}
 	catch (...) {
@@ -593,7 +603,9 @@ void MetadataNode::InnerClassConstructorCallback(const v8::FunctionCallbackInfo<
 		e.ReThrowToV8();
 	}
 	catch (std::exception e) {
-		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToV8();
 	}
 	catch (...) {
@@ -636,7 +648,9 @@ void MetadataNode::InnerClassAccessorGetterCallback(Local<String> property, cons
 		e.ReThrowToV8();
 	}
 	catch (std::exception e) {
-		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToV8();
 	}
 	catch (...) {
@@ -821,7 +835,9 @@ void MetadataNode::ExtendedClassConstructorCallback(const v8::FunctionCallbackIn
 		e.ReThrowToV8();
 	}
 	catch (std::exception e) {
-		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToV8();
 	}
 	catch (...) {
@@ -848,7 +864,7 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
 		{
 			if (!extendLocationFound)
 			{
-				stringstream ss;
+		stringstream ss;
 				ss << "(InternalError): Invalid extend() call. No name specified for extend. Location: " << extendLocation.c_str();
 				throw NativeScriptException(ss.str());
 			}
@@ -902,7 +918,9 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
 		e.ReThrowToV8();
 	}
 	catch (std::exception e) {
-		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToV8();
 	}
 	catch (...) {
@@ -936,7 +954,9 @@ void MetadataNode::ClassConstructorCallback(const v8::FunctionCallbackInfo<v8::V
 		e.ReThrowToV8();
 	}
 	catch (std::exception e) {
-		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToV8();
 	}
 	catch (...) {
@@ -1016,7 +1036,9 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
 		e.ReThrowToV8();
 	}
 	catch (std::exception e) {
-		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToV8();
 	}
 	catch (...) {
@@ -1040,7 +1062,9 @@ void MetadataNode::ArrayIndexedPropertyGetterCallback(uint32_t index, const Prop
 		e.ReThrowToV8();
 	}
 	catch (std::exception e) {
-		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToV8();
 	}
 	catch (...) {
@@ -1064,7 +1088,9 @@ void MetadataNode::ArrayIndexedPropertySetterCallback(uint32_t index, Local<Valu
 		e.ReThrowToV8();
 	}
 	catch (std::exception e) {
-		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToV8();
 	}
 	catch (...) {
@@ -1190,7 +1216,9 @@ void MetadataNode::PackageGetterCallback(Local<String> property, const PropertyC
 		e.ReThrowToV8();
 	}
 	catch (std::exception e) {
-		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToV8();
 	}
 	catch (...) {
@@ -1385,7 +1413,9 @@ void MetadataNode::ExtendCallMethodCallback(const v8::FunctionCallbackInfo<v8::V
 		e.ReThrowToV8();
 	}
 	catch (std::exception e) {
-		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToV8();
 	}
 	catch (...) {

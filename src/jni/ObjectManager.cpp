@@ -578,7 +578,9 @@ void ObjectManager::OnGcStartedStatic(GCType type, GCCallbackFlags flags)
 		e.ReThrowToV8();
 	}
 	catch (std::exception e) {
-		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToV8();
 	}
 	catch (...) {
@@ -598,7 +600,9 @@ void ObjectManager::OnGcFinishedStatic(GCType type, GCCallbackFlags flags)
 		e.ReThrowToV8();
 	}
 	catch (std::exception e) {
-		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToV8();
 	}
 	catch (...) {

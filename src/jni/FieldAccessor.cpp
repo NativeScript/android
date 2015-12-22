@@ -189,9 +189,9 @@ Local<Value> FieldAccessor::GetJavaField(const Local<Object>& target, FieldCallb
 			}
 			default:
 				{
-				stringstream ss;
-				ss << "(InternalError): in FieldAccessor::GetJavaField: Unknown field type: '" << fieldTypeName[0] << "'";
-				throw NativeScriptException(ss.str());
+					stringstream ss;
+					ss << "(InternalError): in FieldAccessor::GetJavaField: Unknown field type: '" << fieldTypeName[0] << "'";
+					throw NativeScriptException(ss.str());
 			}
 		}
 	}
@@ -402,7 +402,7 @@ void FieldAccessor::SetJavaField(const Local<Object>& target, const Local<Value>
 			}
 			default:
 				{
-				stringstream ss;
+		stringstream ss;
 				ss << "(InternalError): in FieldAccessor::SetJavaField: Unknown field type: '" << fieldTypeName[0] << "'";
 				throw NativeScriptException(ss.str());
 			}

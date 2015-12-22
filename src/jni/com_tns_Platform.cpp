@@ -19,7 +19,9 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved)
 		e.ReThrowToJava();
 	}
 	catch (std::exception e) {
-		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToJava();
 	}
 	catch (...) {
@@ -39,7 +41,9 @@ extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj
 		e.ReThrowToJava();
 	}
 	catch (std::exception e) {
-		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToJava();
 	}
 	catch (...) {
@@ -62,7 +66,9 @@ extern "C" void Java_com_tns_Platform_runModule(JNIEnv *_env, jobject obj, jstri
 		e.ReThrowToJava();
 	}
 	catch (std::exception e) {
-		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToJava();
 	}
 	catch (...) {
@@ -86,7 +92,9 @@ extern "C" jobject Java_com_tns_Platform_runScript(JNIEnv *_env, jobject obj, js
 		e.ReThrowToJava();
 	}
 	catch (std::exception e) {
-		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToJava();
 	}
 	catch (...) {
@@ -111,7 +119,9 @@ extern "C" jobject Java_com_tns_Platform_callJSMethodNative(JNIEnv *_env, jobjec
 		e.ReThrowToJava();
 	}
 	catch (std::exception e) {
-		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToJava();
 	}
 	catch (...) {
@@ -135,7 +145,9 @@ extern "C" void Java_com_tns_Platform_createJSInstanceNative(JNIEnv *_env, jobje
 		e.ReThrowToJava();
 	}
 	catch (std::exception e) {
-		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToJava();
 	}
 	catch (...) {
@@ -155,7 +167,9 @@ extern "C" jint Java_com_tns_Platform_generateNewObjectId(JNIEnv *env, jobject o
 		e.ReThrowToJava();
 	}
 	catch (std::exception e) {
-		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToJava();
 	}
 	catch (...) {
@@ -178,7 +192,9 @@ extern "C" void Java_com_tns_Platform_adjustAmountOfExternalAllocatedMemoryNativ
 		e.ReThrowToJava();
 	}
 	catch (std::exception e) {
-		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToJava();
 	}
 	catch (...) {
@@ -201,7 +217,9 @@ extern "C" void Java_com_tns_Platform_passUncaughtExceptionToJsNative(JNIEnv *en
 		e.ReThrowToJava();
 	}
 	catch (std::exception e) {
-		NativeScriptException nsEx(std::string("Error: c++ exception: %s", e.what()));
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToJava();
 	}
 	catch (...) {
