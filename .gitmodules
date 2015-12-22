@@ -2,3 +2,6 @@
 	path = android-metadata-generator
 	url = https://github.com/NativeScript/android-metadata-generator.git
 	branch = master
+[submodule "test-app/assets/app/shared"]
+	path = test-app/assets/app/shared
+	url = git@github.com:NativeScript/common-runtime-tests-app.git
