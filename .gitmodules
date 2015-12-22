@@ -5,3 +5,6 @@
 [submodule "test-app/assets/app/shared"]
 	path = test-app/assets/app/shared
 	url = git@github.com:NativeScript/common-runtime-tests-app.git
+[submodule "test-app/assets/app/tns_modules/shared"]
+	path = test-app/assets/app/tns_modules/shared
+	url = git@github.com:NativeScript/common-runtime-tests-modules.git
