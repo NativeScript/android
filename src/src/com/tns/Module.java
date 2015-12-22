@@ -168,7 +168,7 @@ class Module
 					}
 					catch (JSONException e)
 					{
-						throw new NativeScriptException(e.getMessage());
+						file = null;
 					}
 				}
 
@@ -177,11 +177,13 @@ class Module
 					// search for index.js
 					file = new File(directory.getPath() + "/index.js");
 				}
-
+				
 				// TODO: search for <folderName>.js ?
 
-				// cache the main file for later use
-				folderAsModuleCache.put(folderPath, file.getAbsolutePath());
+				if(file != null) {
+					// cache the main file for later use
+					folderAsModuleCache.put(folderPath, file.getAbsolutePath());					
+				}
 			}
 			else
 			{
