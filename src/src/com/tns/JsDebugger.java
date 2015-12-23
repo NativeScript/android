@@ -126,10 +126,6 @@ public class JsDebugger
 	                		LocalSocket socket = serverSocket.accept();
 	                		logger.write("Debugger new connection on: " + socket.getFileDescriptor().toString());
 	                		
-	                		dbgMessages.clear();
-	                		dbgMessages.addAll(compileMessages);
-	                		
-	                		
 	    					//out (send messages to node inspector)
 	    					this.responseHandler = new ResponseHandler(socket, requestHandlerCloseable);
 	    					Thread responseThread = new Thread(this.responseHandler);
@@ -144,7 +140,8 @@ public class JsDebugger
 	    					this.responseHandler.stop();
 	    					socket.close();
 	    					
-	    					
+	    					dbgMessages.clear();
+	                		dbgMessages.addAll(compileMessages);
 	    				}
 	    				catch (IOException | InterruptedException e)
 	    				{
