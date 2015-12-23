@@ -49,6 +49,7 @@ public class JsDebugger
 	private ThreadScheduler threadScheduler;
 
 	private LinkedBlockingQueue<String> dbgMessages = new LinkedBlockingQueue<String>();
+	private LinkedBlockingQueue<String> compileMessages = new LinkedBlockingQueue<String>();
 	
 	private Logger logger;
 	private Context context;
@@ -126,6 +127,8 @@ public class JsDebugger
 	                		logger.write("Debugger new connection on: " + socket.getFileDescriptor().toString());
 	                		
 	                		dbgMessages.clear();
+	                		dbgMessages.addAll(compileMessages);
+	                		
 	                		
 	    					//out (send messages to node inspector)
 	    					this.responseHandler = new ResponseHandler(socket, requestHandlerCloseable);
@@ -140,6 +143,8 @@ public class JsDebugger
 	    					
 	    					this.responseHandler.stop();
 	    					socket.close();
+	    					
+	    					
 	    				}
 	    				catch (IOException | InterruptedException e)
 	    				{
@@ -293,7 +298,7 @@ public class JsDebugger
 		{
 			try
 			{
-				//Log.d("TNS.JAVA.JsDebugger", "Sending message to v8:" + message);
+				Log.d("TNS.JAVA.JsDebugger", "Sending message to v8:" + message);
 				
 				byte[] cmdBytes = message.getBytes("UTF-16LE");
 				int cmdLength = cmdBytes.length;
@@ -339,7 +344,7 @@ public class JsDebugger
 						break;
 					}
 					
-					//Log.d("TNS.JAVA.JsDebugger", "Sending message to inspector:" + message);
+					Log.d("TNS.JAVA.JsDebugger", "Sending message to inspector:" + message);
 					
 					sendMessageToInspector(message);
 				}
@@ -384,7 +389,7 @@ public class JsDebugger
 					output.write(utf8);
 					output.flush();
 					
-					//Log.d("TNS.JAVA.JsDebugger", "Sent message to inspector:" + msg);
+					Log.d("TNS.JAVA.JsDebugger", "Sent message to inspector:" + msg);
 				}
 				catch (IOException e)
 				{
@@ -406,9 +411,16 @@ public class JsDebugger
 	@RuntimeCallable
 	private void enqueueMessage(String message)
 	{
-		//logger.write("Debug msg:" + message);
+		logger.write("Debug msg:" + message);
 		
 		dbgMessages.add(message);
+		
+		if (message.contains("type\":\"event") &&
+			message.contains("event\":\"afterCompile") &&
+			message.contains("success\":true"))
+		{
+			compileMessages.add(message);
+		}
 	}
 
 	@RuntimeCallable
