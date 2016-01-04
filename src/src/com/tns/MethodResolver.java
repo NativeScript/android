@@ -96,7 +96,7 @@ class MethodResolver
 		while (t.isArray())
 		{
 			array += "[";
-			t = type.getComponentType();
+			t = t.getComponentType();
 		}
 
 		String signature = primitiveTypesSignature.get(t.getName());
