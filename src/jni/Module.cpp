@@ -284,6 +284,9 @@ Local<Object> Module::LoadModule(Isolate *isolate, const string& modulePath)
 
 	moduleObj->Set(ConvertToV8String("require"), require);
 
+	auto moduleId = modulePath.substr(Constants::APP_ROOT_FOLDER_PATH.length() - 4);
+	moduleObj->Set(ConvertToV8String("id"),  ConvertToV8String(moduleId));
+
 	auto thiz = Object::New(isolate);
 	auto extendsName = ConvertToV8String("__extends");
 	thiz->Set(extendsName, isolate->GetCurrentContext()->Global()->Get(extendsName));
