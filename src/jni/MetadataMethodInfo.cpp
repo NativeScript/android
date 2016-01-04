@@ -20,7 +20,6 @@ uint8_t MethodInfo::CheckIsResolved()
 	return resolvedData;
 }
 
-
 uint16_t MethodInfo::GetSignatureLength()
 {
 	m_signatureLength = *reinterpret_cast<uint16_t*>(m_pData);
@@ -34,7 +33,7 @@ std::string MethodInfo::GetSignature() //use nodeId's to read the whole signatur
 	uint16_t *nodeIdPtr = reinterpret_cast<uint16_t*>(m_pData);
 	string signature = "(";
 	string ret;
-	for (int i=0; i< m_signatureLength; i++)
+	for (int i = 0; i < m_signatureLength; i++)
 	{
 		uint16_t nodeId = *nodeIdPtr++;
 		string curArgTypeName = m_reader->ReadTypeName(nodeId);

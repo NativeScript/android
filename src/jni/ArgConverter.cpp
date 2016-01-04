@@ -33,59 +33,79 @@ void ArgConverter::Init(JavaVM *jvm)
 
 void ArgConverter::NativeScriptLongValueOfFunctionCallback(const v8::FunctionCallbackInfo<Value>& args)
 {
-	try {
-	auto isolate = Isolate::GetCurrent();
-	args.GetReturnValue().Set(Number::New(isolate, numeric_limits<double>::quiet_NaN()));
-	} catch (NativeScriptException& e) {
+	try
+	{
+		auto isolate = Isolate::GetCurrent();
+		args.GetReturnValue().Set(Number::New(isolate, numeric_limits<double>::quiet_NaN()));
+	}
+	catch (NativeScriptException& e)
+	{
 		e.ReThrowToV8();
 	}
-	catch (exception e) {
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
+		nsEx.ReThrowToV8();
 	}
 	catch (...) {
-		DEBUG_WRITE("Error: c++ exception!");
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
 	}
 }
 
 void ArgConverter::NativeScriptLongToStringFunctionCallback(const v8::FunctionCallbackInfo<Value>& args)
 {
-	try {
-	args.GetReturnValue().Set(args.This()->Get(V8StringConstants::GetValue()));
-	} catch (NativeScriptException& e) {
+	try
+	{
+		args.GetReturnValue().Set(args.This()->Get(V8StringConstants::GetValue()));
+	}
+	catch (NativeScriptException& e)
+	{
 		e.ReThrowToV8();
 	}
-	catch (exception e) {
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
+		nsEx.ReThrowToV8();
 	}
 	catch (...) {
-		DEBUG_WRITE("Error: c++ exception!");
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
 	}
 }
 
 void ArgConverter::NativeScriptLongFunctionCallback(const v8::FunctionCallbackInfo<Value>& args)
 {
-	try {
-	auto isolate = Isolate::GetCurrent();
-	args.This()->SetHiddenValue(V8StringConstants::GetJavaLong(), Boolean::New(isolate, true));
-	args.This()->SetHiddenValue(V8StringConstants::GetMarkedAsLong(), args[0]);
-	args.This()->Set(V8StringConstants::GetValue(), args[0]);
+	try
+	{
+		auto isolate = Isolate::GetCurrent();
+		args.This()->SetHiddenValue(V8StringConstants::GetJavaLong(), Boolean::New(isolate, true));
+		args.This()->SetHiddenValue(V8StringConstants::GetMarkedAsLong(), args[0]);
+		args.This()->Set(V8StringConstants::GetValue(), args[0]);
 
-	args.This()->SetPrototype(Local<NumberObject>::New(Isolate::GetCurrent(), *NAN_NUMBER_OBJECT));
-	} catch (NativeScriptException& e) {
+		args.This()->SetPrototype(Local<NumberObject>::New(Isolate::GetCurrent(), *NAN_NUMBER_OBJECT));
+	}
+	catch (NativeScriptException& e)
+	{
 		e.ReThrowToV8();
 	}
-	catch (exception e) {
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
+		nsEx.ReThrowToV8();
 	}
 	catch (...) {
-		DEBUG_WRITE("Error: c++ exception!");
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
 	}
 }
 
-
 jstring ArgConverter::ObjectToString(jobject object)
 {
-	return (jstring)object;
+	return (jstring) object;
 }
 
 Local<Array> ArgConverter::ConvertJavaArgsToJsArgs(jobjectArray args)
@@ -105,7 +125,7 @@ Local<Array> ArgConverter::ConvertJavaArgsToJsArgs(jobjectArray args)
 		JniLocalRef argJavaClassPath(env.GetObjectArrayElement(args, jArrayIndex++));
 
 		jint length;
-		Type argTypeID = (Type)JType::IntValue(env, argTypeIDObj);
+		Type argTypeID = (Type) JType::IntValue(env, argTypeIDObj);
 
 		Local<Value> jsArg;
 		switch (argTypeID)
@@ -114,7 +134,7 @@ Local<Array> ArgConverter::ConvertJavaArgsToJsArgs(jobjectArray args)
 				jsArg = Boolean::New(isolate, JType::BooleanValue(env, arg));
 				break;
 			case Type::Char:
-				jsArg =jcharToV8String(JType::CharValue(env, arg));
+				jsArg = jcharToV8String(JType::CharValue(env, arg));
 				break;
 			case Type::Byte:
 				jsArg = Number::New(isolate, JType::ByteValue(env, arg));
@@ -135,10 +155,10 @@ Local<Array> ArgConverter::ConvertJavaArgsToJsArgs(jobjectArray args)
 				jsArg = Number::New(isolate, JType::DoubleValue(env, arg));
 				break;
 			case Type::String:
-				jsArg = jstringToV8String((jstring)arg);
+				jsArg = jstringToV8String((jstring) arg);
 				break;
 			case Type::JsObject:
-			{
+				{
 				jint javaObjectID = JType::IntValue(env, arg);
 				jsArg = ObjectManager::GetJsObjectByJavaObjectStatic(javaObjectID);
 
@@ -163,13 +183,15 @@ Local<Array> ArgConverter::ConvertJavaArgsToJsArgs(jobjectArray args)
 
 std::string ArgConverter::jstringToString(jstring value)
 {
-	if (value == nullptr) {
+	if (value == nullptr)
+	{
 		return string();
 	}
 
 	jsize utfLength;
 	bool readInBuffer = ReadJStringInBuffer(value, utfLength);
-	if(readInBuffer) {
+	if (readInBuffer)
+	{
 		string s(charBuffer, utfLength);
 		return s;
 	}
@@ -186,7 +208,7 @@ std::string ArgConverter::jstringToString(jstring value)
 
 Local<Value> ArgConverter::jstringToV8String(jstring value)
 {
-	if	(value == nullptr)
+	if (value == nullptr)
 	{
 		return Null(Isolate::GetCurrent());
 	}
@@ -200,20 +222,23 @@ Local<Value> ArgConverter::jstringToV8String(jstring value)
 	return v8String;
 }
 
-bool ArgConverter::ReadJStringInBuffer(jstring value, jsize& utfLength) {
-	if (value == nullptr) {
+bool ArgConverter::ReadJStringInBuffer(jstring value, jsize& utfLength)
+{
+	if (value == nullptr)
+	{
 		return false;
 	}
 
 	JEnv env;
 	utfLength = env.GetStringUTFLength(value);
-	if(utfLength > BUFFER_SIZE) {
+	if (utfLength > BUFFER_SIZE)
+	{
 		return false;
 	}
 
 	jsize strLength = env.GetStringLength(value);
 	// use existing buffer to prevent extensive memory allocation
-	env.GetStringUTFRegion(value, (jsize)0, strLength, charBuffer);
+	env.GetStringUTFRegion(value, (jsize) 0, strLength, charBuffer);
 
 	return true;
 }
@@ -246,7 +271,6 @@ Local<Value> ArgConverter::ConvertFromJavaLong(jlong value)
 	return convertedValue;
 }
 
-
 int64_t ArgConverter::ConvertToJavaLong(const Local<Value>& value)
 {
 	assert(!value.IsEmpty());
@@ -274,7 +298,7 @@ bool ArgConverter::TryConvertToJavaLong(const Local<Value>& value, jlong& javaLo
 	{
 		if (value->IsNumber() || value->IsNumberObject())
 		{
-			javaLong = (jlong)value->IntegerValue();
+			javaLong = (jlong) value->IntegerValue();
 			success = true;
 		}
 		else if (value->IsObject())
@@ -283,7 +307,7 @@ bool ArgConverter::TryConvertToJavaLong(const Local<Value>& value, jlong& javaLo
 			auto isJavaLongValue = obj->GetHiddenValue(V8StringConstants::GetJavaLong());
 			if (!isJavaLongValue.IsEmpty() && isJavaLongValue->BooleanValue())
 			{
-				javaLong = (jlong)ConvertToJavaLong(value);
+				javaLong = (jlong) ConvertToJavaLong(value);
 				success = true;
 			}
 		}
@@ -291,8 +315,6 @@ bool ArgConverter::TryConvertToJavaLong(const Local<Value>& value, jlong& javaLo
 
 	return success;
 }
-
-
 
 JavaVM* ArgConverter::jvm = nullptr;
 Persistent<Function>* ArgConverter::NATIVESCRIPT_NUMERA_CTOR_FUNC = nullptr;

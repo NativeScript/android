@@ -11,10 +11,9 @@
 using namespace tns;
 using namespace std;
 
-
-
 JEnv::JEnv()
-	: m_env(nullptr)
+:
+		m_env(nullptr)
 {
 	JNIEnv *env = nullptr;
 	jint ret = s_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
@@ -29,7 +28,8 @@ JEnv::JEnv()
 }
 
 JEnv::JEnv(JNIEnv *jniEnv)
-	: m_env(jniEnv)
+:
+		m_env(jniEnv)
 {
 }
 
@@ -54,7 +54,6 @@ jmethodID JEnv::GetStaticMethodID(jclass clazz, const string& name, const string
 	CheckForJavaException();
 	return mid;
 }
-
 
 jfieldID JEnv::GetFieldID(jclass clazz, const string& name, const string& sig)
 {
@@ -123,7 +122,6 @@ jbyte JEnv::CallByteMethodA(jobject obj, jmethodID methodID, jvalue* args)
 	return jbt;
 }
 
-
 jchar JEnv::CallStaticCharMethodA(jclass clazz, jmethodID methodID, jvalue* args)
 {
 	jchar jch = m_env->CallStaticCharMethodA(clazz, methodID, args);
@@ -142,7 +140,6 @@ jchar JEnv::CallCharMethodA(jobject obj, jmethodID methodID, jvalue* args)
 	CheckForJavaException();
 	return jch;
 }
-
 
 jshort JEnv::CallStaticShortMethodA(jclass clazz, jmethodID methodID, jvalue* args)
 {
@@ -241,7 +238,6 @@ jdouble JEnv::CallDoubleMethodA(jobject obj, jmethodID methodID, jvalue* args)
 	return jdb;
 }
 
-
 jobject JEnv::CallStaticObjectMethodA(jclass clazz, jmethodID methodID, jvalue* args)
 {
 	jobject jo = m_env->CallStaticObjectMethodA(clazz, methodID, args);
@@ -260,8 +256,6 @@ jobject JEnv::CallObjectMethodA(jobject obj, jmethodID methodID, jvalue* args)
 	CheckForJavaException();
 	return jo;
 }
-
-
 
 jobject JEnv::GetStaticObjectField(jclass clazz, jfieldID fieldID)
 {
@@ -363,7 +357,6 @@ void JEnv::SetStaticDoubleField(jclass clazz, jfieldID fieldID, jdouble value)
 	m_env->SetStaticDoubleField(clazz, fieldID, value);
 	CheckForJavaException();
 }
-
 
 jobject JEnv::GetObjectField(jobject obj, jfieldID fieldID)
 {
@@ -479,7 +472,6 @@ jstring JEnv::NewStringUTF(const char* bytes)
 	return jst;
 }
 
-
 jobjectArray JEnv::NewObjectArray(jsize length, jclass elementClass, jobject initialElement)
 {
 	jobjectArray joa = m_env->NewObjectArray(length, elementClass, initialElement);
@@ -537,7 +529,8 @@ const int JEnv::GetStringUTFLength(jstring str)
 	return ci;
 }
 
-void JEnv::GetStringUTFRegion(jstring str, jsize start, jsize len, char *buf) {
+void JEnv::GetStringUTFRegion(jstring str, jsize start, jsize len, char *buf)
+{
 	m_env->GetStringUTFRegion(str, start, len, buf);
 	CheckForJavaException();
 }
@@ -603,7 +596,6 @@ void JEnv::DeleteWeakGlobalRef(jweak obj)
 	m_env->DeleteWeakGlobalRef(obj);
 	CheckForJavaException();
 }
-
 
 jobject JEnv::NewLocalRef(jobject ref)
 {
@@ -718,7 +710,6 @@ void JEnv::GetDoubleArrayRegion(jdoubleArray array, jsize start, jsize len, jdou
 	CheckForJavaException();
 }
 
-
 void JEnv::SetByteArrayRegion(jbyteArray array, jsize start, jsize len, const jbyte* buf)
 {
 	m_env->SetByteArrayRegion(array, start, len, buf);
@@ -812,7 +803,8 @@ jlong JEnv::GetDirectBufferCapacity(jobject buf)
 	return jl;
 }
 
-jboolean JEnv::IsAssignableFrom(jclass clazz1, jclass clazz2) {
+jboolean JEnv::IsAssignableFrom(jclass clazz1, jclass clazz2)
+{
 	jboolean jbl = m_env->IsAssignableFrom(clazz1, clazz2);
 	CheckForJavaException();
 	return jbl;

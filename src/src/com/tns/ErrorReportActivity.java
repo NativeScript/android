@@ -5,7 +5,8 @@ import android.os.Bundle;
 
 public class ErrorReportActivity extends Activity
 {
-	public void onCreate(Bundle savedInstanceState) {
+	public void onCreate(Bundle savedInstanceState)
+	{
 		super.onCreate(savedInstanceState);
 		new ErrorReport(this).buildUI();
 	}
@@ -13,8 +14,8 @@ public class ErrorReportActivity extends Activity
 	@Override
 	protected void onPause()
 	{
-		//the moment the error activity is not in the foreground we want to kill the process
-		super.onPause();	
+		// the moment the error activity is not in the foreground we want to kill the process
+		super.onPause();
 		ErrorReport.killProcess(this);
 	}
 }

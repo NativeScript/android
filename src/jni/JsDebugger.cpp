@@ -4,6 +4,7 @@
 #include "NativeScriptException.h"
 #include "NativeScriptAssert.h"
 #include <assert.h>
+#include <sstream>
 
 using namespace std;
 using namespace tns;
@@ -79,7 +80,8 @@ void JsDebugger::ProcessDebugMessages()
 	v8::Debug::ProcessDebugMessages();
 }
 
-void JsDebugger::SendCommand(JNIEnv *_env, jobject obj, jbyteArray command, jint length) {
+void JsDebugger::SendCommand(JNIEnv *_env, jobject obj, jbyteArray command, jint length)
+{
 	tns::JEnv env(_env);
 	auto buf = new jbyte[length];
 
@@ -93,28 +95,35 @@ void JsDebugger::SendCommand(JNIEnv *_env, jobject obj, jbyteArray command, jint
 
 void JsDebugger::DebugBreakCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-	try {
-	JEnv env;
-	JniLocalRef packageName(env.NewStringUTF(s_packageName.c_str()));
-
-	jint port = 8181;
-	if ((args.Length() > 0) && args[0]->IsInt32())
+	try
 	{
-		port = args[0]->Int32Value();
+		JEnv env;
+		JniLocalRef packageName(env.NewStringUTF(s_packageName.c_str()));
+
+		jint port = 8181;
+		if ((args.Length() > 0) && args[0]->IsInt32())
+		{
+			port = args[0]->Int32Value();
+		}
+		jboolean jniFalse = JNI_FALSE;
+
+		env.CallStaticVoidMethod(s_JsDebuggerClass, s_EnableAgent, (jstring) packageName, port, jniFalse);
+
+		DebugBreak();
 	}
-	jboolean jniFalse = JNI_FALSE;
-
-	env.CallStaticVoidMethod(s_JsDebuggerClass, s_EnableAgent, (jstring)packageName, port, jniFalse);
-
-	DebugBreak();
-	} catch (NativeScriptException& e) {
+	catch (NativeScriptException& e)
+	{
 		e.ReThrowToV8();
 	}
-	catch (exception e) {
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
+		nsEx.ReThrowToV8();
 	}
 	catch (...) {
-		DEBUG_WRITE("Error: c++ exception!");
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
 	}
 }
 
@@ -137,7 +146,7 @@ void JsDebugger::MyMessageHandler(const v8::Debug::Message& message)
 	JEnv env;
 	JniLocalRef s(env.NewStringUTF(str.c_str()));
 
-	env.CallStaticVoidMethod(s_JsDebuggerClass, s_EnqueueMessage, (jstring)s);
+	env.CallStaticVoidMethod(s_JsDebuggerClass, s_EnqueueMessage, (jstring) s);
 }
 
 v8::Isolate* JsDebugger::s_isolate = nullptr;

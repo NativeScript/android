@@ -51,7 +51,8 @@ MethodCache::CacheMethodInfo MethodCache::ResolveMethodSignature(const string& c
 			mi.isStatic = isStatic;
 			mi.mid = isStatic
 						? env.GetStaticMethodID(clazz, methodName, signature)
-						: env.GetMethodID(clazz, methodName, signature);
+									:
+							env.GetMethodID(clazz, methodName, signature);
 
 			s_cache.insert(make_pair(key, mi));
 		}
@@ -63,7 +64,6 @@ MethodCache::CacheMethodInfo MethodCache::ResolveMethodSignature(const string& c
 
 	return mi;
 }
-
 
 string MethodCache::EncodeSignature(const string& className, const string& methodName, const FunctionCallbackInfo<Value>& args, bool isStatic)
 {
@@ -84,7 +84,7 @@ string MethodCache::EncodeSignature(const string& className, const string& metho
 	s << len;
 	sig.append(s.str());
 
-	for (int i=0; i<len; i++)
+	for (int i = 0; i < len; i++)
 	{
 		sig.append(".");
 		sig.append(GetType(args[i]));
@@ -92,7 +92,6 @@ string MethodCache::EncodeSignature(const string& className, const string& metho
 
 	return sig;
 }
-
 
 string MethodCache::GetType(const v8::Local<v8::Value>& value)
 {
@@ -136,7 +135,7 @@ string MethodCache::GetType(const v8::Local<v8::Value>& value)
 	else if (value->IsNumber() || value->IsNumberObject())
 	{
 		double d = value->NumberValue();
-		int64_t i = (int64_t)d;
+		int64_t i = (int64_t) d;
 		bool isInteger = d == i;
 
 		type = isInteger ? "intnumber" : "doublenumber";
@@ -179,7 +178,6 @@ string MethodCache::GetType(const v8::Local<v8::Value>& value)
 	return type;
 }
 
-
 string MethodCache::ResolveJavaMethod(const FunctionCallbackInfo<Value>& args, const string& className, const string& methodName)
 {
 	JEnv env;
@@ -204,7 +202,6 @@ string MethodCache::ResolveJavaMethod(const FunctionCallbackInfo<Value>& args, c
 
 	return resolvedSignature;
 }
-
 
 map<string, MethodCache::CacheMethodInfo> MethodCache::s_cache;
 jclass MethodCache::PLATFORM_CLASS = nullptr;

@@ -35,14 +35,15 @@ Local<Value> FieldAccessor::GetJavaField(const Local<Object>& target, FieldCallb
 	auto isPrimitiveType = fieldTypeName.size() == 1;
 	auto isFieldArray = fieldTypeName[0] == '[';
 
-
 	if (fieldData->fid == nullptr)
 	{
 		auto fieldJniSig = isPrimitiveType
-								? fieldTypeName
-								: (isFieldArray
+							? fieldTypeName
+								:
+								(isFieldArray
 									? fieldTypeName
-									: ("L" + fieldTypeName + ";"));
+										:
+										("L" + fieldTypeName + ";"));
 
 		if (isStatic)
 		{
@@ -187,10 +188,10 @@ Local<Value> FieldAccessor::GetJavaField(const Local<Object>& target, FieldCallb
 				break;
 			}
 			default:
-			{
-				stringstream ss;
-				ss << "(InternalError): in FieldAccessor::GetJavaField: Unknown field type: '" << fieldTypeName[0] << "'";
-				throw NativeScriptException(ss.str());
+				{
+					stringstream ss;
+					ss << "(InternalError): in FieldAccessor::GetJavaField: Unknown field type: '" << fieldTypeName[0] << "'";
+					throw NativeScriptException(ss.str());
 			}
 		}
 	}
@@ -207,12 +208,13 @@ Local<Value> FieldAccessor::GetJavaField(const Local<Object>& target, FieldCallb
 			result = env.GetObjectField(targetJavaObject, fieldId);
 		}
 
-		if(result != nullptr) {
+		if (result != nullptr)
+		{
 
 			bool isString = fieldTypeName == "java/lang/String";
 			if (isString)
 			{
-				auto resultV8Value = ArgConverter::jstringToV8String((jstring)result);
+				auto resultV8Value = ArgConverter::jstringToV8String((jstring) result);
 				fieldResult = handleScope.Escape(resultV8Value);
 			}
 			else
@@ -252,14 +254,15 @@ void FieldAccessor::SetJavaField(const Local<Object>& target, const Local<Value>
 	auto isPrimitiveType = fieldTypeName.size() == 1;
 	auto isFieldArray = fieldTypeName[0] == '[';
 
-
 	if (fieldData->fid == nullptr)
 	{
 		auto fieldJniSig = isPrimitiveType
-								? fieldTypeName
-								: (isFieldArray
+							? fieldTypeName
+								:
+								(isFieldArray
 									? fieldTypeName
-									: ("L" + fieldTypeName + ";"));
+										:
+										("L" + fieldTypeName + ";"));
 
 		if (isStatic)
 		{
@@ -398,8 +401,8 @@ void FieldAccessor::SetJavaField(const Local<Object>& target, const Local<Value>
 				break;
 			}
 			default:
-			{
-				stringstream ss;
+				{
+		stringstream ss;
 				ss << "(InternalError): in FieldAccessor::SetJavaField: Unknown field type: '" << fieldTypeName[0] << "'";
 				throw NativeScriptException(ss.str());
 			}
@@ -410,7 +413,8 @@ void FieldAccessor::SetJavaField(const Local<Object>& target, const Local<Value>
 		bool isString = fieldTypeName == "java/lang/String";
 		jobject result = nullptr;
 
-		if(!value->IsNull()) {
+		if (!value->IsNull())
+		{
 			if (isString)
 			{
 				//TODO: validate valie is a string;
@@ -419,7 +423,7 @@ void FieldAccessor::SetJavaField(const Local<Object>& target, const Local<Value>
 			else
 			{
 				auto objectWithHiddenID = value->ToObject();
-				result =objectManager->GetJavaObjectByJsObject(objectWithHiddenID);
+				result = objectManager->GetJavaObjectByJsObject(objectWithHiddenID);
 			}
 		}
 

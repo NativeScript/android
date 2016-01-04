@@ -3,7 +3,8 @@
 
 namespace tns
 {
-	Type JType::getClassType(int retType) {
+	Type JType::getClassType(int retType)
+	{
 		Type classReturnType = static_cast<Type>(retType);
 		return classReturnType;
 	}
@@ -106,7 +107,7 @@ namespace tns
 
 	void JType::EnsureInstance(JEnv env, JType **instance, Type type)
 	{
-		if((*instance) != nullptr)
+		if ((*instance) != nullptr)
 		{
 			return;
 		}
@@ -118,7 +119,7 @@ namespace tns
 	void JType::Init(JEnv env, Type type)
 	{
 		// TODO: Provide a fallback mechanism to prevent possible field name changes
-		switch(type)
+		switch (type)
 		{
 			case Type::Byte:
 				this->clazz = env.FindClass("java/lang/Byte");

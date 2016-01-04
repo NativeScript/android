@@ -32,10 +32,7 @@ import java.util.Set;
  * Subclasses that permit new mappings to be added must override {@link #put}.
  * 
  * <p>
- * The default implementations of many methods are inefficient for large maps.
- * For example in the default implementation, each call to {@link #get} performs
- * a linear iteration of the entry set. Subclasses should override such methods
- * to improve their performance.
+ * The default implementations of many methods are inefficient for large maps. For example in the default implementation, each call to {@link #get} performs a linear iteration of the entry set. Subclasses should override such methods to improve their performance.
  * 
  * @since 1.2
  */
@@ -86,8 +83,7 @@ public abstract class NativeScriptAbstractMap<K, V> implements Map<K, V>
 		}
 
 		/**
-		 * This base implementation throws {@code UnsupportedOperationException}
-		 * always.
+		 * This base implementation throws {@code UnsupportedOperationException} always.
 		 */
 		public V setValue(V object)
 		{
@@ -213,8 +209,7 @@ public abstract class NativeScriptAbstractMap<K, V> implements Map<K, V>
 	 * {@inheritDoc}
 	 * 
 	 * <p>
-	 * This implementation iterates its key set, looking for a key that
-	 * {@code key} equals.
+	 * This implementation iterates its key set, looking for a key that {@code key} equals.
 	 */
 	public boolean containsKey(Object key)
 	{
@@ -246,8 +241,7 @@ public abstract class NativeScriptAbstractMap<K, V> implements Map<K, V>
 	 * {@inheritDoc}
 	 * 
 	 * <p>
-	 * This implementation iterates its entry set, looking for an entry with a
-	 * value that {@code value} equals.
+	 * This implementation iterates its entry set, looking for an entry with a value that {@code value} equals.
 	 */
 	public boolean containsValue(Object value)
 	{
@@ -281,11 +275,7 @@ public abstract class NativeScriptAbstractMap<K, V> implements Map<K, V>
 	 * {@inheritDoc}
 	 * 
 	 * <p>
-	 * This implementation first checks the structure of {@code object}. If it
-	 * is not a map or of a different size, this returns false. Otherwise it
-	 * iterates its own entry set, looking up each entry's key in {@code object}
-	 * . If any value does not equal the other map's value for the same key,
-	 * this returns false. Otherwise it returns true.
+	 * This implementation first checks the structure of {@code object}. If it is not a map or of a different size, this returns false. Otherwise it iterates its own entry set, looking up each entry's key in {@code object} . If any value does not equal the other map's value for the same key, this returns false. Otherwise it returns true.
 	 */
 	@Override
 	public boolean equals(Object object)
@@ -339,8 +329,7 @@ public abstract class NativeScriptAbstractMap<K, V> implements Map<K, V>
 	 * {@inheritDoc}
 	 * 
 	 * <p>
-	 * This implementation iterates its entry set, looking for an entry with a
-	 * key that {@code key} equals.
+	 * This implementation iterates its entry set, looking for an entry with a key that {@code key} equals.
 	 */
 	public V get(Object key)
 	{
@@ -374,8 +363,7 @@ public abstract class NativeScriptAbstractMap<K, V> implements Map<K, V>
 	 * {@inheritDoc}
 	 * 
 	 * <p>
-	 * This implementation iterates its entry set, summing the hashcodes of its
-	 * entries.
+	 * This implementation iterates its entry set, summing the hashcodes of its entries.
 	 */
 	@Override
 	public int hashCode()
@@ -404,8 +392,7 @@ public abstract class NativeScriptAbstractMap<K, V> implements Map<K, V>
 	 * {@inheritDoc}
 	 * 
 	 * <p>
-	 * This implementation returns a view that calls through this to map. Its
-	 * iterator transforms this map's entry set iterator to return keys.
+	 * This implementation returns a view that calls through this to map. Its iterator transforms this map's entry set iterator to return keys.
 	 */
 	public Set<K> keySet()
 	{
@@ -468,8 +455,7 @@ public abstract class NativeScriptAbstractMap<K, V> implements Map<K, V>
 	 * {@inheritDoc}
 	 * 
 	 * <p>
-	 * This implementation iterates through {@code map}'s entry set, calling
-	 * {@code put()} for each.
+	 * This implementation iterates through {@code map}'s entry set, calling {@code put()} for each.
 	 */
 	public void putAll(Map<? extends K, ? extends V> map)
 	{
@@ -483,8 +469,7 @@ public abstract class NativeScriptAbstractMap<K, V> implements Map<K, V>
 	 * {@inheritDoc}
 	 * 
 	 * <p>
-	 * This implementation iterates its entry set, removing the entry with a key
-	 * that {@code key} equals.
+	 * This implementation iterates its entry set, removing the entry with a key that {@code key} equals.
 	 */
 	public V remove(Object key)
 	{
@@ -531,9 +516,7 @@ public abstract class NativeScriptAbstractMap<K, V> implements Map<K, V>
 	 * {@inheritDoc}
 	 * 
 	 * <p>
-	 * This implementation composes a string by iterating its entry set. If this
-	 * map contains itself as a key or a value, the string "(this Map)" will
-	 * appear in its place.
+	 * This implementation composes a string by iterating its entry set. If this map contains itself as a key or a value, the string "(this Map)" will appear in its place.
 	 */
 	@Override
 	public String toString()
@@ -581,8 +564,7 @@ public abstract class NativeScriptAbstractMap<K, V> implements Map<K, V>
 	 * {@inheritDoc}
 	 * 
 	 * <p>
-	 * This implementation returns a view that calls through this to map. Its
-	 * iterator transforms this map's entry set iterator to return values.
+	 * This implementation returns a view that calls through this to map. Its iterator transforms this map's entry set iterator to return values.
 	 */
 	public Collection<V> values()
 	{

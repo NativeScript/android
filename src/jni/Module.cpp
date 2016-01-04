@@ -34,14 +34,14 @@ void Module::Init(Isolate *isolate)
 	assert(RESOLVE_PATH_METHOD_ID != nullptr);
 
 	string requireFactoryScript =
-	"(function () { "
-	"	function require_factory(requireInternal, dirName) { "
-	"		return function require(modulePath) { "
-	"			return requireInternal(modulePath, dirName); "
-	"		} "
-	"	} "
-	"	return require_factory; "
-	"})()";
+			"(function () { "
+					"	function require_factory(requireInternal, dirName) { "
+					"		return function require(modulePath) { "
+					"			return requireInternal(modulePath, dirName); "
+					"		} "
+					"	} "
+					"	return require_factory; "
+					"})()";
 
 	auto source = ConvertToV8String(requireFactoryScript);
 	auto context = isolate->GetCurrentContext();
@@ -63,6 +63,10 @@ void Module::Init(Isolate *isolate)
 	auto requireFuncTemplate = FunctionTemplate::New(isolate, RequireCallback);
 	auto requireFunc = requireFuncTemplate->GetFunction();
 	s_poRequireFunction = new Persistent<Function>(isolate, requireFunc);
+
+	auto global = isolate->GetCurrentContext()->Global();
+	auto globalRequire = GetRequireFunction(isolate, Constants::APP_ROOT_FOLDER_PATH);
+	global->Set(ConvertToV8String("require"), globalRequire);
 }
 
 Local<Function> Module::GetRequireFunction(Isolate *isolate, const string& dirName)
@@ -83,7 +87,9 @@ Local<Function> Module::GetRequireFunction(Isolate *isolate, const string& dirNa
 
 		auto requireInternalFunc = Local<Function>::New(isolate, *s_poRequireFunction);
 
-		Local<Value> args[2] { requireInternalFunc, ConvertToV8String(dirName) };
+		Local<Value> args[2]
+		{
+				requireInternalFunc, ConvertToV8String(dirName) };
 		Local<Value> result;
 		auto thiz = Object::New(isolate);
 		auto success = requireFuncFactory->Call(context, thiz, 2, args).ToLocal(&result);
@@ -102,7 +108,8 @@ Local<Function> Module::GetRequireFunction(Isolate *isolate, const string& dirNa
 
 void Module::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-	try {
+	try
+	{
 		auto isolate = Isolate::GetCurrent();
 
 		if (args.Length() != 2)
@@ -163,11 +170,15 @@ void Module::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 	{
 		e.ReThrowToV8();
 	}
-	catch (exception e) {
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+				stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
+		nsEx.ReThrowToV8();
 	}
 	catch (...) {
-		DEBUG_WRITE("Error: c++ exception!");
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
 	}
 }
 
@@ -215,7 +226,7 @@ Local<Object> Module::LoadModule(Isolate *isolate, const string& modulePath)
 	moduleObj->Set(ConvertToV8String("filename"), fullRequiredModulePath);
 
 	auto poModuleObj = new Persistent<Object>(isolate, moduleObj);
-	s_loadedModules.insert(make_pair(modulePath, poModuleObj));
+	TempModule tempModule(modulePath, poModuleObj);
 
 	TryCatch tc;
 
@@ -233,7 +244,7 @@ Local<Object> Module::LoadModule(Isolate *isolate, const string& modulePath)
 	}
 	else if (Util::EndsWith(modulePath, ".so"))
 	{
-		auto handle = dlopen (modulePath.c_str(), RTLD_LAZY);
+		auto handle = dlopen(modulePath.c_str(), RTLD_LAZY);
 		if (handle == nullptr)
 		{
 			auto error = dlerror();
@@ -267,19 +278,23 @@ Local<Object> Module::LoadModule(Isolate *isolate, const string& modulePath)
 	string strDirName(dirname(pathcopy));
 	auto dirName = ConvertToV8String(strDirName);
 	auto require = GetRequireFunction(isolate, strDirName);
-	Local<Value> requireArgs[5] { moduleObj, exportsObj, require, fileName, dirName };
+	Local<Value> requireArgs[5]
+	{
+			moduleObj, exportsObj, require, fileName, dirName };
 
 	moduleObj->Set(ConvertToV8String("require"), require);
 
 	auto thiz = Object::New(isolate);
 	auto extendsName = ConvertToV8String("__extends");
 	thiz->Set(extendsName, isolate->GetCurrentContext()->Global()->Get(extendsName));
-	moduleFunc->Call(thiz, sizeof(requireArgs) / sizeof(Local<Value>), requireArgs);
+	moduleFunc->Call(thiz, sizeof(requireArgs) / sizeof(Local<Value> ), requireArgs);
 
-	if(tc.HasCaught()) {
+	if (tc.HasCaught())
+	{
 		throw NativeScriptException(tc, "Error calling module function ");
 	}
 
+	tempModule.SaveToCache();
 	result = moduleObj;
 
 	return result;
@@ -301,23 +316,25 @@ Local<Script> Module::LoadScript(Isolate *isolate, const string& path, const Loc
 	ScriptCompiler::Source source(scriptText, origin, cacheData);
 	ScriptCompiler::CompileOptions option = ScriptCompiler::kNoCompileOptions;
 
-	if(cacheData != nullptr)
+	if (cacheData != nullptr)
 	{
 		option = ScriptCompiler::kConsumeCodeCache;
 		auto maybeScript = ScriptCompiler::Compile(isolate->GetCurrentContext(), &source, option);
-		if (maybeScript.IsEmpty() || tc.HasCaught()) {
+		if (maybeScript.IsEmpty() || tc.HasCaught())
+		{
 			throw NativeScriptException(tc, "Cannot compile " + path);
 		}
 		script = maybeScript.ToLocalChecked();
 	}
 	else
 	{
-		if(Constants::V8_CACHE_COMPILED_CODE)
+		if (Constants::V8_CACHE_COMPILED_CODE)
 		{
 			option = ScriptCompiler::kProduceCodeCache;
 		}
 		auto maybeScript = ScriptCompiler::Compile(isolate->GetCurrentContext(), &source, option);
-		if (maybeScript.IsEmpty() || tc.HasCaught()) {
+		if (maybeScript.IsEmpty() || tc.HasCaught())
+		{
 			throw NativeScriptException(tc, "Cannot compile " + path);
 		}
 		script = maybeScript.ToLocalChecked();
@@ -378,7 +395,7 @@ Local<String> Module::WrapModuleContent(const string& path)
 
 ScriptCompiler::CachedData* Module::TryLoadScriptCache(const std::string& path)
 {
-	if(!Constants::V8_CACHE_COMPILED_CODE)
+	if (!Constants::V8_CACHE_COMPILED_CODE)
 	{
 		return nullptr;
 	}
@@ -386,7 +403,7 @@ ScriptCompiler::CachedData* Module::TryLoadScriptCache(const std::string& path)
 	auto cachePath = path + ".cache";
 	int length = 0;
 	auto data = File::ReadBinary(cachePath, length);
-	if(!data)
+	if (!data)
 	{
 		return nullptr;
 	}
@@ -396,7 +413,7 @@ ScriptCompiler::CachedData* Module::TryLoadScriptCache(const std::string& path)
 
 void Module::SaveScriptCache(const ScriptCompiler::Source& source, const std::string& path)
 {
-	if(!Constants::V8_CACHE_COMPILED_CODE)
+	if (!Constants::V8_CACHE_COMPILED_CODE)
 	{
 		return;
 	}
@@ -405,7 +422,6 @@ void Module::SaveScriptCache(const ScriptCompiler::Source& source, const std::st
 	auto cachePath = path + ".cache";
 	File::WriteBinary(cachePath, source.GetCachedData()->data, length);
 }
-
 
 jclass Module::MODULE_CLASS = nullptr;
 jmethodID Module::RESOLVE_PATH_METHOD_ID = nullptr;

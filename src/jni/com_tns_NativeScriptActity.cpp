@@ -29,7 +29,8 @@ jobject ConvertJsValueToJavaObject(JEnv& env, const Local<Value>& value);
 extern "C" jobjectArray Java_com_tns_NativeScriptActivity_getMethodOverrides(JNIEnv *_env, jobject obj, jint objectId, jobjectArray packagedArgs)
 {
 	jobjectArray joa = nullptr;
-	try {
+	try
+	{
 		DEBUG_WRITE("getMethodOverrides called");
 
 		auto isolate = g_isolate;
@@ -67,14 +68,20 @@ extern "C" jobjectArray Java_com_tns_NativeScriptActivity_getMethodOverrides(JNI
 
 		jobjectArray methodOverrides = NativeScriptRuntime::GetMethodOverrides(env, jsInstance);
 		joa = methodOverrides;
-	} catch (NativeScriptException& e) {
+	}
+	catch (NativeScriptException& e)
+	{
 		e.ReThrowToJava();
 	}
 	catch (std::exception e) {
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
+		nsEx.ReThrowToJava();
 	}
 	catch (...) {
-		DEBUG_WRITE("Error: c++ exception!");
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToJava();
 	}
 	return joa;
 }

@@ -7,34 +7,31 @@ namespace tns
 {
 	class DirectBuffer
 	{
-	public:
-		DirectBuffer(uint32_t capacity = 65536);
-		~DirectBuffer();
+		public:
+			DirectBuffer(uint32_t capacity = 65536);
+			~DirectBuffer();
 
-		operator jobject() const;
+			operator jobject() const;
 
-		int* GetData() const;
-		int Length() const;
-		int Size() const;
+			int* GetData() const;
+			int Length() const;
+			int Size() const;
 
-		void Reset();
-		bool Write(int value);
+			void Reset();
+			bool Write(int value);
 
-		bool Dirty() const
-		{
-			return m_pos != m_data;
-		}
+			bool Dirty() const
+			{
+				return m_pos != m_data;
+			}
 
-
-	private:
-		jobject m_buff;
-		int *m_data;
-		jlong m_length;
-		int *m_pos;
-		int *m_end;
+		private:
+			jobject m_buff;
+			int *m_data;
+			jlong m_length;
+			int *m_pos;
+			int *m_end;
 	};
 }
-
-
 
 #endif /* DIRECTBUFFER_H_ */

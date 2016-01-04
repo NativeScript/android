@@ -18,189 +18,194 @@ namespace tns
 {
 	class ObjectManager
 	{
-	public:
-		ObjectManager();
+		public:
+			ObjectManager();
 
-		void Init(v8::Isolate *isolate);
+			void Init(v8::Isolate *isolate);
 
-		static jweak GetJavaObjectByJsObjectStatic(const v8::Local<v8::Object>& object);
+			static jweak GetJavaObjectByJsObjectStatic(const v8::Local<v8::Object>& object);
 
-		jweak GetJavaObjectByJsObject(const v8::Local<v8::Object>& object);
+			jweak GetJavaObjectByJsObject(const v8::Local<v8::Object>& object);
 
-		jweak GetJavaObjectByID(uint32_t javaObjectID);
+			jweak GetJavaObjectByID(uint32_t javaObjectID);
 
-		void UpdateCache(int objectID, jobject obj);
+			void UpdateCache(int objectID, jobject obj);
 
-		jclass GetJavaClass(const v8::Local<v8::Object>& instance);
+			jclass GetJavaClass(const v8::Local<v8::Object>& instance);
 
-		void SetJavaClass(const v8::Local<v8::Object>& instance, jclass clazz);
-		int GetOrCreateObjectId(jobject object);
+			void SetJavaClass(const v8::Local<v8::Object>& instance, jclass clazz);
+			int GetOrCreateObjectId(jobject object);
 
-		static v8::Local<v8::Object> GetJsObjectByJavaObjectStatic(int javaObjectID);
+			static v8::Local<v8::Object> GetJsObjectByJavaObjectStatic(int javaObjectID);
 
-		v8::Local<v8::Object> GetJsObjectByJavaObject(int javaObjectID);
+			v8::Local<v8::Object> GetJsObjectByJavaObject(int javaObjectID);
 
-		static v8::Local<v8::Object> CreateJSWrapperStatic(jint javaObjectID, const std::string& typeName);
+			static v8::Local<v8::Object> CreateJSWrapperStatic(jint javaObjectID, const std::string& typeName);
 
-		v8::Local<v8::Object> CreateJSWrapper(jint javaObjectID, const std::string& typeName);
+			v8::Local<v8::Object> CreateJSWrapper(jint javaObjectID, const std::string& typeName);
 
-		v8::Local<v8::Object> CreateJSWrapper(jint javaObjectID, const std::string& typeName, jobject instance);
+			v8::Local<v8::Object> CreateJSWrapper(jint javaObjectID, const std::string& typeName, jobject instance);
 
-		void Link(const v8::Local<v8::Object>& object, uint32_t javaObjectID, jclass clazz);
+			void Link(const v8::Local<v8::Object>& object, uint32_t javaObjectID, jclass clazz);
 
-		bool CloneLink(const v8::Local<v8::Object>& src, const v8::Local<v8::Object>& dest);
+			bool CloneLink(const v8::Local<v8::Object>& src, const v8::Local<v8::Object>& dest);
 
-		std::string GetClassName(jobject javaObject);
+			std::string GetClassName(jobject javaObject);
 
-		std::string GetClassName(jclass clazz);
+			std::string GetClassName(jclass clazz);
 
-		int GenerateNewObjectID();
+			int GenerateNewObjectID();
 
-		v8::Local<v8::Object> GetEmptyObject(v8::Isolate *isolate);
+			v8::Local<v8::Object> GetEmptyObject(v8::Isolate *isolate);
 
-		enum class MetadataNodeKeys
-		{
+			enum class MetadataNodeKeys
+			{
 				JsInfo,
 				CallSuper,
 				END
-		};
+			};
 
-	private:
-		struct ObjectWeakCallbackState
-		{
-			ObjectWeakCallbackState(ObjectManager *_thisPtr, JSInstanceInfo *_jsInfo, v8::Persistent<v8::Object> *_target)
-				: thisPtr(_thisPtr), jsInfo(_jsInfo), target(_target)
+		private:
+			struct ObjectWeakCallbackState
 			{
-			}
+					ObjectWeakCallbackState(ObjectManager *_thisPtr, JSInstanceInfo *_jsInfo, v8::Persistent<v8::Object> *_target)
+					:
+							thisPtr(_thisPtr), jsInfo(_jsInfo), target(_target)
+					{
+					}
 
-			ObjectManager *thisPtr;
-			JSInstanceInfo *jsInfo;
-			v8::Persistent<v8::Object> *target;
-		};
+					ObjectManager *thisPtr;
+					JSInstanceInfo *jsInfo;
+					v8::Persistent<v8::Object> *target;
+			};
 
-		struct GarbageCollectionInfo
-		{
-			GarbageCollectionInfo(int _numberOfGC)
-				: numberOfGC(_numberOfGC)
+			struct GarbageCollectionInfo
 			{
-			}
-			std::vector<v8::Persistent<v8::Object>*> markedForGC;
-			int numberOfGC;
-		};
+					GarbageCollectionInfo(int _numberOfGC)
+					:
+							numberOfGC(_numberOfGC)
+					{
+					}
+					std::vector<v8::Persistent<v8::Object>*> markedForGC;
+					int numberOfGC;
+			};
 
-		class PersistentObjectIdSet
-		{
-		public:
-			PersistentObjectIdSet() { /* TODO: use functors */ }
-
-			void clear()
+			class PersistentObjectIdSet
 			{
-				m_POs.clear();
-				m_IDs.clear();
-			}
+				public:
+					PersistentObjectIdSet()
+					{ /* TODO: use functors */
+					}
 
-			void insert(v8::Persistent<v8::Object>* po, int javaObjectId)
+					void clear()
+					{
+						m_POs.clear();
+						m_IDs.clear();
+					}
+
+					void insert(v8::Persistent<v8::Object>* po, int javaObjectId)
+					{
+						m_POs.insert(po);
+						m_IDs.insert(javaObjectId);
+					}
+
+					bool contains(v8::Persistent<v8::Object>* po)
+					{
+						return m_POs.find(po) != m_POs.end();
+					}
+
+					std::set<v8::Persistent<v8::Object>*> m_POs;
+					std::set<int> m_IDs;
+			};
+
+			struct PersistentObjectIdPair
 			{
-				m_POs.insert(po);
-				m_IDs.insert(javaObjectId);
-			}
+					PersistentObjectIdPair(v8::Persistent<v8::Object>* _po, int _javaObjectId)
+					:
+							po(_po), javaObjectId(_javaObjectId)
+					{
+					}
+					v8::Persistent<v8::Object> *po;
+					int javaObjectId;
+			};
 
-			bool contains(v8::Persistent<v8::Object>* po)
-			{
-				return m_POs.find(po) != m_POs.end();
-			}
+			JSInstanceInfo* GetJSInstanceInfo(const v8::Local<v8::Object>& object);
 
-			std::set<v8::Persistent<v8::Object>*> m_POs;
-			std::set<int> m_IDs;
-		};
+			void ReleaseJSInstance(v8::Persistent<v8::Object> *po, JSInstanceInfo *jsInstanceInfo);
 
-		struct PersistentObjectIdPair
-		{
-			PersistentObjectIdPair(v8::Persistent<v8::Object>* _po, int _javaObjectId)
-				: po(_po), javaObjectId(_javaObjectId)
-			{
-			}
-			v8::Persistent<v8::Object> *po;
-			int javaObjectId;
-		};
+			void ReleaseRegularObjects();
 
-		JSInstanceInfo* GetJSInstanceInfo(const v8::Local<v8::Object>& object);
+			void MakeRegularObjectsWeak(const std::set<int>& instances, DirectBuffer& inputBuff);
 
-		void ReleaseJSInstance(v8::Persistent<v8::Object> *po, JSInstanceInfo *jsInstanceInfo);
+			void MakeImplObjectsWeak(const std::vector<PersistentObjectIdPair>& instances, DirectBuffer& inputBuff);
 
-		void ReleaseRegularObjects();
+			void CheckWeakObjectsAreAlive(const std::vector<PersistentObjectIdPair>& instances, DirectBuffer& inputBuff, DirectBuffer& outputBuff);
 
-		void MakeRegularObjectsWeak(const std::set<int>& instances, DirectBuffer& inputBuff);
+			v8::Local<v8::Object> CreateJSWrapperHelper(jint javaObjectID, const std::string& typeName, jclass clazz);
 
-		void MakeImplObjectsWeak(const std::vector<PersistentObjectIdPair>& instances, DirectBuffer& inputBuff);
+			static void JSObjectWeakCallbackStatic(const v8::WeakCallbackData<v8::Object, ObjectWeakCallbackState>& data);
 
-		void CheckWeakObjectsAreAlive(const std::vector<PersistentObjectIdPair>& instances, DirectBuffer& inputBuff, DirectBuffer& outputBuff);
+			void JSObjectWeakCallback(v8::Isolate *isolate, ObjectWeakCallbackState *callbackState);
 
-		v8::Local<v8::Object> CreateJSWrapperHelper(jint javaObjectID, const std::string& typeName, jclass clazz);
+			bool HasImplObject(v8::Isolate *isolate, const v8::Local<v8::Object>& obj);
 
-		static void JSObjectWeakCallbackStatic(const v8::WeakCallbackData<v8::Object, ObjectWeakCallbackState>& data);
+			void MarkReachableObjects(v8::Isolate *isolate, const v8::Local<v8::Object>& obj);
 
-		void JSObjectWeakCallback(v8::Isolate *isolate, ObjectWeakCallbackState *callbackState);
+			void OnGcStarted(v8::GCType type, v8::GCCallbackFlags flags);
 
-		bool HasImplObject(v8::Isolate *isolate, const v8::Local<v8::Object>& obj);
+			void OnGcFinished(v8::GCType type, v8::GCCallbackFlags flags);
 
-		void MarkReachableObjects(v8::Isolate *isolate, const v8::Local<v8::Object>& obj);
+			static void OnGcStartedStatic(v8::GCType type, v8::GCCallbackFlags flags);
 
-		void OnGcStarted(v8::GCType type, v8::GCCallbackFlags flags);
+			static void OnGcFinishedStatic(v8::GCType type, v8::GCCallbackFlags flags);
 
-		void OnGcFinished(v8::GCType type, v8::GCCallbackFlags flags);
+			jobject GetJavaObjectByIDImpl(uint32_t javaObjectID);
 
-		static void OnGcStartedStatic(v8::GCType type, v8::GCCallbackFlags flags);
+			static jweak NewWeakGlobalRefCallback(const int& javaObjectID, void *state);
 
-		static void OnGcFinishedStatic(v8::GCType type, v8::GCCallbackFlags flags);
+			static void DeleteWeakGlobalRefCallback(const jweak& object, void *state);
 
-		jobject GetJavaObjectByIDImpl(uint32_t javaObjectID);
+			static void JSWrapperConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 
-		static jweak NewWeakGlobalRefCallback(const int& javaObjectID, void *state);
+			int m_numberOfGC;
 
-		static void DeleteWeakGlobalRefCallback(const jweak& object, void *state);
+			std::stack<GarbageCollectionInfo> m_markedForGC;
 
-		static void JSWrapperConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
+			std::map<int, v8::Persistent<v8::Object>*> idToObject;
 
-		int m_numberOfGC;
+			PersistentObjectIdSet m_released;
 
-		std::stack<GarbageCollectionInfo> m_markedForGC;
+			std::set<uint8_t*> m_visited;
 
-		std::map<int, v8::Persistent<v8::Object>*> idToObject;
+			LRUCache<int, jweak, std::tr1::unordered_map> m_cache;
 
-		PersistentObjectIdSet m_released;
+			std::set<v8::Persistent<v8::Object>*> m_visitedPOs;
+			std::vector<PersistentObjectIdPair> m_implObjWeak;
+			std::vector<PersistentObjectIdPair> m_implObjStrong;
 
-		std::set<uint8_t*> m_visited;
+			volatile int m_currentObjectId;
 
-		LRUCache<int, jweak, std::tr1::unordered_map> m_cache;
+			DirectBuffer m_buff;
 
-		std::set<v8::Persistent<v8::Object>*> m_visitedPOs;
-		std::vector<PersistentObjectIdPair> m_implObjWeak;
-		std::vector<PersistentObjectIdPair> m_implObjStrong;
+			DirectBuffer m_outBuff;
 
-		volatile int m_currentObjectId;
+			jclass PlatformClass;
 
-		DirectBuffer m_buff;
+			jclass JAVA_LANG_CLASS;
 
-		DirectBuffer m_outBuff;
+			jmethodID GET_NAME_METHOD_ID;
 
-		jclass PlatformClass;
+			jmethodID GET_JAVAOBJECT_BY_ID_METHOD_ID;
 
-		jclass JAVA_LANG_CLASS;
+			jmethodID GET_OR_CREATE_JAVA_OBJECT_ID_METHOD_ID;
 
-		jmethodID GET_NAME_METHOD_ID;
+			jmethodID MAKE_INSTANCE_WEAK_BATCH_METHOD_ID;
 
-		jmethodID GET_JAVAOBJECT_BY_ID_METHOD_ID;
+			jmethodID CHECK_WEAK_OBJECTS_ARE_ALIVE_METHOD_ID;
 
-		jmethodID GET_OR_CREATE_JAVA_OBJECT_ID_METHOD_ID;
+			static ObjectManager *instance;
 
-		jmethodID MAKE_INSTANCE_WEAK_BATCH_METHOD_ID;
-
-		jmethodID CHECK_WEAK_OBJECTS_ARE_ALIVE_METHOD_ID;
-
-		static ObjectManager *instance;
-
-		static v8::Persistent<v8::Function>* s_poJsWrapperFunc;
+			static v8::Persistent<v8::Function>* s_poJsWrapperFunc;
 	};
 }
 

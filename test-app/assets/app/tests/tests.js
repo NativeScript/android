@@ -1903,4 +1903,11 @@ describe("Tests ", function () {
 		var module2 = module1.module.require("./module2");
 		expect(module2.msg).toBe("module2");
 	});
+
+	it("should load module through global.require", function () {
+		expect(typeof global.require).toBe("function");
+		
+		var module3 = global.require("./modules/module3");
+		expect(module3.msg).toBe("module3");
+	});
 });

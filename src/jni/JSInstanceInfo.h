@@ -7,16 +7,16 @@ namespace tns
 {
 	class JSInstanceInfo
 	{
-	public:
-		JSInstanceInfo()
-		{
-			IsJavaObjectWeak = false;
-			JavaObjectID = -1;
-		}
+		public:
+			JSInstanceInfo()
+			{
+				IsJavaObjectWeak = false;
+				JavaObjectID = -1;
+			}
 
-		bool IsJavaObjectWeak;
-		uint32_t JavaObjectID;
-		jclass clazz;
+			bool IsJavaObjectWeak;
+			uint32_t JavaObjectID;
+			jclass clazz;
 	};
 }
 

@@ -21,7 +21,6 @@ DirectBuffer::DirectBuffer(uint32_t length)
 	m_buff = env.NewGlobalRef(buff);
 }
 
-
 DirectBuffer::operator jobject() const
 {
 	return m_buff;
@@ -41,7 +40,6 @@ int DirectBuffer::Size() const
 {
 	return m_pos - m_data;
 }
-
 
 void DirectBuffer::Reset()
 {

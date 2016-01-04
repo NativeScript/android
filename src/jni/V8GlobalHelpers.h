@@ -22,5 +22,4 @@ namespace tns
 	bool V8SetHiddenValue(const v8::Local<v8::Object>& obj, const std::string& propName, const v8::Local<v8::Value>& value);
 }
 
-
 #endif /* V8GLOBALHELPERS_H_ */

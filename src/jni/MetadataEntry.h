@@ -35,27 +35,28 @@ namespace tns
 
 	struct MetadataEntry
 	{
-		MetadataEntry()
-			: isTypeMember(false), name(std::string()), treeNode(nullptr), sig(std::string()), returnType(std::string()), retType(MethodReturnType::Unknown), paramCount(0),
-			  isStatic(false), isFinal(false), declaringType(std::string()),
-			  isResolved(false), memberId(nullptr), clazz(nullptr)
-		{
-		}
-		MetadataTreeNode *treeNode;
-		NodeType type;
-		std::string name;
-		std::string sig;
-		std::string returnType;
-		MethodReturnType retType;
-		std::string declaringType;
-		int paramCount;
-		bool isStatic;
-		bool isFinal;
-		bool isTypeMember;
-		bool isResolved;
-		void *memberId;
-		jclass clazz;
-		std::vector<std::string> parsedSig;
+			MetadataEntry()
+			:
+					isTypeMember(false), name(std::string()), treeNode(nullptr), sig(std::string()), returnType(std::string()), retType(MethodReturnType::Unknown), paramCount(0),
+							isStatic(false), isFinal(false), declaringType(std::string()),
+							isResolved(false), memberId(nullptr), clazz(nullptr)
+			{
+			}
+			MetadataTreeNode *treeNode;
+			NodeType type;
+			std::string name;
+			std::string sig;
+			std::string returnType;
+			MethodReturnType retType;
+			std::string declaringType;
+			int paramCount;
+			bool isStatic;
+			bool isFinal;
+			bool isTypeMember;
+			bool isResolved;
+			void *memberId;
+			jclass clazz;
+			std::vector<std::string> parsedSig;
 	};
 }
 

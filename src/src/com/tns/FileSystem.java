@@ -17,7 +17,7 @@ import org.json.JSONObject;
 public class FileSystem
 {
 	private static final String appRootPrefix = "~/";
-	
+
 	public static String readAll(InputStream inputStream) throws IOException
 	{
 		StringBuilder text;
@@ -35,24 +35,26 @@ public class FileSystem
 				text.append('\n');
 			}
 		}
-		catch (IOException e){
+		catch (IOException e)
+		{
 			return "";
 		}
 		finally
 		{
-			if (buffReader != null){
+			if (buffReader != null)
+			{
 				buffReader.close();
 			}
 		}
 
 		return text.toString();
 	}
-	
-	
+
 	private final static byte[] buff = new byte[65536];
-	
-	public static String readText(File file) throws FileNotFoundException, IOException{
-		int fileLength = (int)file.length();
+
+	public static String readText(File file) throws FileNotFoundException, IOException
+	{
+		int fileLength = (int) file.length();
 		if (fileLength < buff.length)
 		{
 			FileInputStream fis = null;
@@ -78,24 +80,26 @@ public class FileSystem
 				inputStream = new BufferedInputStream(new FileInputStream(file));
 				return readAll(inputStream);
 			}
-			catch (FileNotFoundException e){
+			catch (FileNotFoundException e)
+			{
 				return "";
 			}
 			finally
 			{
-				if (inputStream != null){
+				if (inputStream != null)
+				{
 					inputStream.close();
 				}
 			}
 		}
 	}
-	
+
 	public static JSONObject readJSONFile(File file) throws IOException, JSONException
 	{
 		String content = readText(file);
 		return new JSONObject(content);
 	}
-	
+
 	public static String resolveRelativePath(String applicationFilesDir, String path, String currentDirectory)
 	{
 		String baseDir;
@@ -120,7 +124,8 @@ public class FileSystem
 				URI uri = new URI(baseDir);
 				return uri.resolve(path).getPath();
 			}
-			catch(URISyntaxException e1){
+			catch (URISyntaxException e1)
+			{
 				return null;
 			}
 		}

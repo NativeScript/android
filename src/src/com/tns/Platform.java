@@ -26,7 +26,7 @@ public class Platform
 	private static native void initNativeScript(String filesPath, int appJavaObjectId, boolean verboseLoggingEnabled, String packageName, Object[] v8Options);
 
 	private static native void runModule(String filePath) throws NativeScriptException;
-	
+
 	private static native Object runScript(String filePath) throws NativeScriptException;
 
 	private static native Object callJSMethodNative(int javaObjectID, String methodName, int retType, boolean isConstructor, Object... packagedArgs) throws NativeScriptException;
@@ -36,43 +36,43 @@ public class Platform
 	private static native int generateNewObjectId();
 
 	private static native void adjustAmountOfExternalAllocatedMemoryNative(long changeInBytes);
-	
+
 	static native void passUncaughtExceptionToJsNative(Throwable ex, String stackTrace);
-	
+
 	private static boolean initialized;
-	
+
 	private static final HashMap<String, Class<?>> classCache = new HashMap<String, Class<?>>();
-	
+
 	private static final HashSet<ClassLoader> classLoaderCache = new HashSet<ClassLoader>();
 
 	private static final SparseArray<Object> strongInstances = new SparseArray<Object>();
-	
+
 	private static final SparseArray<WeakReference<Object>> weakInstances = new SparseArray<WeakReference<Object>>();
-	
+
 	private static final NativeScriptHashMap<Object, Integer> strongJavaObjectToID = new NativeScriptHashMap<Object, Integer>();
-	
+
 	private static final NativeScriptWeakHashMap<Object, Integer> weakJavaObjectToID = new NativeScriptWeakHashMap<Object, Integer>();
-	
+
 	private static final Runtime runtime = Runtime.getRuntime();
 	private static Class<?> errorActivityClass;
-	
+
 	private final static Object keyNotFoundObject = new Object();
 	private static int currentObjectId = -1;
-	
+
 	private static ExtractPolicy extractPolicy;
 
 	private static long lastUsedMemory = 0;
-	
+
 	private static ArrayList<Constructor<?>> ctorCache = new ArrayList<Constructor<?>>();
-	
+
 	private static Logger logger;
-	
+
 	private static ThreadScheduler threadScheduler;
 
 	private static JsDebugger jsDebugger;
-	
+
 	private static DexFactory dexFactory;
-	
+
 	private final static Comparator<Method> methodComparator = new Comparator<Method>()
 	{
 		public int compare(Method lhs, Method rhs)
@@ -80,8 +80,9 @@ public class Platform
 			return lhs.getName().compareTo(rhs.getName());
 		}
 	};
-	
-	public static boolean isInitialized() {
+
+	public static boolean isInitialized()
+	{
 		return initialized;
 	}
 
@@ -89,37 +90,39 @@ public class Platform
 	{
 		return errorActivityClass;
 	}
-	
+
 	public static void setErrorActivityClass(Class<?> clazz)
 	{
 		errorActivityClass = clazz;
 	}
-	
+
 	public static int init(ThreadScheduler threadScheduler, Logger logger, String appName, File runtimeLibPath, File rootDir, File appDir, File debuggerSetupDir, ClassLoader classLoader, File dexDir, String dexThumb) throws RuntimeException
 	{
 		return init(null, threadScheduler, logger, appName, runtimeLibPath, rootDir, appDir, debuggerSetupDir, classLoader, dexDir, dexThumb);
 	}
-	
+
 	public static int init(Object application, ThreadScheduler threadScheduler, Logger logger, String appName, File runtimeLibPath, File rootDir, File appDir, File debuggerSetupDir, ClassLoader classLoader, File dexDir, String dexThumb) throws RuntimeException
 	{
 		if (initialized)
 		{
 			throw new RuntimeException("NativeScriptApplication already initialized");
 		}
-		
+
 		Platform.threadScheduler = threadScheduler;
-		
+
 		Platform.logger = logger;
-		
+
 		Platform.dexFactory = new DexFactory(logger, classLoader, dexDir, dexThumb);
 
 		int appJavaObjectId = -1;
 		if (application != null)
 		{
-			if (logger.isEnabled()) logger.write("Initializing NativeScript JAVA");
+			if (logger.isEnabled())
+				logger.write("Initializing NativeScript JAVA");
 			appJavaObjectId = generateNewObjectId();
 			makeInstanceStrong(application, appJavaObjectId);
-			if (logger.isEnabled()) logger.write("Initialized app instance id:" + appJavaObjectId);
+			if (logger.isEnabled())
+				logger.write("Initialized app instance id:" + appJavaObjectId);
 		}
 
 		try
@@ -132,15 +135,16 @@ public class Platform
 		}
 		Object[] v8Config = V8Config.fromPackageJSON(appDir);
 		Platform.initNativeScript(Module.getApplicationFilesPath(), appJavaObjectId, logger.isEnabled(), appName, v8Config);
-		
+
 		if (debuggerSetupDir != null)
 		{
 			jsDebugger = new JsDebugger(logger, threadScheduler, debuggerSetupDir);
-											//also runs javaServerThread with resolved port
+			// also runs javaServerThread with resolved port
 			int debuggerPort = jsDebugger.getDebuggerPortFromEnvironment();
-			if (logger.isEnabled()) logger.write("port=" + debuggerPort);
+			if (logger.isEnabled())
+				logger.write("port=" + debuggerPort);
 		}
-		
+
 		//
 		if (logger.isEnabled())
 		{
@@ -155,7 +159,7 @@ public class Platform
 		initialized = true;
 		return appJavaObjectId;
 	}
-	
+
 	@RuntimeCallable
 	public static void enableVerboseLogging()
 	{
@@ -175,7 +179,7 @@ public class Platform
 		String mainModule = Module.bootstrapApp();
 		runModule(new File(mainModule));
 	}
-	
+
 	public static void runModule(File jsFile) throws NativeScriptException
 	{
 		if (jsFile.exists() && jsFile.isFile())
@@ -184,17 +188,17 @@ public class Platform
 			runModule(filePath);
 		}
 	}
-	
+
 	public static Object runScript(File jsFile) throws NativeScriptException
 	{
 		Object result = null;
-		
+
 		if (jsFile.exists() && jsFile.isFile())
 		{
 			final String filePath = jsFile.getAbsolutePath();
 
 			boolean isWorkThread = threadScheduler.getThread().equals(Thread.currentThread());
-			
+
 			if (isWorkThread)
 			{
 				result = runScript(filePath);
@@ -202,7 +206,7 @@ public class Platform
 			else
 			{
 				final Object[] arr = new Object[2];
-				
+
 				Runnable r = new Runnable()
 				{
 					@Override
@@ -222,7 +226,7 @@ public class Platform
 						}
 					}
 				};
-				
+
 				boolean success = threadScheduler.post(r);
 
 				if (success)
@@ -244,14 +248,15 @@ public class Platform
 				}
 			}
 		}
-		
+
 		return result;
 	}
-	
+
 	@RuntimeCallable
-	private static Class<?> resolveClass(String fullClassName, String[] methodOverrides) throws ClassNotFoundException, IOException{
+	private static Class<?> resolveClass(String fullClassName, String[] methodOverrides) throws ClassNotFoundException, IOException
+	{
 		Class<?> javaClass = ClassResolver.resolveClass(fullClassName, dexFactory, methodOverrides);
-		
+
 		return javaClass;
 	}
 
@@ -260,12 +265,12 @@ public class Platform
 	{
 		Constructor<?> ctor = MethodResolver.resolveConstructor(clazz, args);
 
-		//TODO: Lubo: Not thread safe already.
-		//TODO: Lubo: Does not check for existing items
+		// TODO: Lubo: Not thread safe already.
+		// TODO: Lubo: Does not check for existing items
 		int ctorId = ctorCache.size();
-		
+
 		ctorCache.add(ctor);
-		
+
 		return ctorId;
 	}
 
@@ -310,12 +315,12 @@ public class Platform
 		{
 			Platform.currentObjectId = -1;
 		}
-		
+
 		adjustAmountOfExternalAllocatedMemory();
-		
+
 		return instance;
 	}
-	
+
 	@RuntimeCallable
 	private static long getChangeInBytesOfUsedMemory()
 	{
@@ -324,7 +329,7 @@ public class Platform
 		lastUsedMemory = usedMemory;
 		return changeInBytes;
 	}
-	
+
 	private static void adjustAmountOfExternalAllocatedMemory()
 	{
 		long changeInBytes = getChangeInBytesOfUsedMemory();
@@ -354,20 +359,21 @@ public class Platform
 		makeInstanceStrong(instance, javaObjectID);
 
 		String className = instance.getClass().getName();
-				
+
 		createJSInstanceNative(instance, javaObjectID, className);
 
-		if (logger.isEnabled()) logger.write("JSInstance for " + instance.getClass().toString() + " created with overrides");
+		if (logger.isEnabled())
+			logger.write("JSInstance for " + instance.getClass().toString() + " created with overrides");
 	}
-	
+
 	@RuntimeCallable
 	private static String[] getTypeMetadata(String className, int index) throws ClassNotFoundException
 	{
 		Class<?> clazz = classCache.get(className);
-		
+
 		if (clazz == null)
 		{
-			for (ClassLoader classLoader: classLoaderCache)
+			for (ClassLoader classLoader : classLoaderCache)
 			{
 				try
 				{
@@ -380,7 +386,8 @@ public class Platform
 				}
 				catch (Exception e1)
 				{
-					if (logger.isEnabled()) logger.write(">>loader=" + classLoader.toString() + " " + e1.getMessage());
+					if (logger.isEnabled())
+						logger.write(">>loader=" + classLoader.toString() + " " + e1.getMessage());
 				}
 			}
 			if (clazz == null)
@@ -388,12 +395,12 @@ public class Platform
 				clazz = Class.forName(className);
 			}
 		}
-		
+
 		String[] result = getTypeMetadata(clazz, index);
-		
+
 		return result;
 	}
-	
+
 	private static String[] getTypeMetadata(Class<?> clazz, int index)
 	{
 		Class<?> mostOuterClass = clazz.getEnclosingClass();
@@ -406,30 +413,29 @@ public class Platform
 				break;
 			mostOuterClass = nextOuterClass;
 		}
-		
+
 		Package p = (mostOuterClass != null)
-						? mostOuterClass.getPackage()
-						: clazz.getPackage();
-						
+				? mostOuterClass.getPackage()
+				: clazz.getPackage();
+
 		int packageCount = 1;
 		String pname = p.getName();
-		for (int i=0; i<pname.length(); i++)
+		for (int i = 0; i < pname.length(); i++)
 		{
 			if (pname.charAt(i) == '.')
 				++packageCount;
 		}
-		
+
 		String name = clazz.getName();
 		String[] parts = name.split("[\\.\\$]");
-		
+
 		int endIdx = parts.length;
 		int len = endIdx - index;
 		String[] result = new String[len];
-		
-		
-		int endOuterTypeIdx = packageCount + outerClasses.size(); 
-		
-		for (int i=index; i<endIdx; i++)
+
+		int endOuterTypeIdx = packageCount + outerClasses.size();
+
+		for (int i = index; i < endIdx; i++)
 		{
 			if (i < packageCount)
 			{
@@ -450,11 +456,11 @@ public class Platform
 
 		return result;
 	}
-	
+
 	private static String getTypeMetadata(Class<?> clazz)
 	{
 		StringBuilder sb = new StringBuilder();
-		
+
 		if (clazz.isInterface())
 		{
 			sb.append("I ");
@@ -463,7 +469,7 @@ public class Platform
 		{
 			sb.append("C ");
 		}
-		
+
 		if (Modifier.isStatic(clazz.getModifiers()))
 		{
 			sb.append("S\n");
@@ -472,14 +478,14 @@ public class Platform
 		{
 			sb.append("I\n");
 		}
-		
+
 		Class<?> baseClass = clazz.getSuperclass();
 		sb.append("B " + ((baseClass != null) ? baseClass.getName() : "").replace('.', '/') + "\n");
-	
+
 		Method[] methods = clazz.getDeclaredMethods();
 		Arrays.sort(methods, methodComparator);
-		
-		for (Method m: methods)
+
+		for (Method m : methods)
 		{
 			int modifiers = m.getModifiers();
 			if (!Modifier.isStatic(modifiers) && (Modifier.isPublic(modifiers) || Modifier.isProtected(modifiers)))
@@ -496,9 +502,9 @@ public class Platform
 				sb.append("\n");
 			}
 		}
-		
+
 		Field[] fields = clazz.getDeclaredFields();
-		for (Field f: fields)
+		for (Field f : fields)
 		{
 			int modifiers = f.getModifiers();
 			if (!Modifier.isStatic(modifiers) && (Modifier.isPublic(modifiers) || Modifier.isProtected(modifiers)))
@@ -511,12 +517,12 @@ public class Platform
 				sb.append(" 0\n");
 			}
 		}
-		
+
 		String ret = sb.toString();
-		
+
 		return ret;
 	}
-	
+
 	@RuntimeCallable
 	private static void makeInstanceStrong(Object instance, int objectId)
 	{
@@ -524,11 +530,11 @@ public class Platform
 		{
 			throw new IllegalArgumentException("instance cannot be null");
 		}
-		
+
 		int key = objectId;
 		strongInstances.put(key, instance);
 		strongJavaObjectToID.put(instance, key);
-		
+
 		Class<?> clazz = instance.getClass();
 		String className = clazz.getName();
 		if (!classCache.containsKey(className))
@@ -549,46 +555,48 @@ public class Platform
 
 	private static void makeInstanceWeak(int javaObjectID, boolean keepAsWeak)
 	{
-		if (logger.isEnabled()) logger.write("makeInstanceWeak instance " + javaObjectID + " keepAsWeak=" + keepAsWeak);
+		if (logger.isEnabled())
+			logger.write("makeInstanceWeak instance " + javaObjectID + " keepAsWeak=" + keepAsWeak);
 		Object instance = strongInstances.get(javaObjectID);
-		
-		if (keepAsWeak) {
+
+		if (keepAsWeak)
+		{
 			weakJavaObjectToID.put(instance, Integer.valueOf(javaObjectID));
 			weakInstances.put(javaObjectID, new WeakReference<Object>(instance));
 		}
-		
+
 		strongInstances.delete(javaObjectID);
 		strongJavaObjectToID.remove(instance);
 	}
-	
+
 	@RuntimeCallable
 	private static void makeInstanceWeak(ByteBuffer buff, int length, boolean keepAsWeak)
 	{
 		buff.position(0);
-		for (int i=0; i<length; i++)
+		for (int i = 0; i < length; i++)
 		{
 			int javaObjectId = buff.getInt();
 			makeInstanceWeak(javaObjectId, keepAsWeak);
 		}
 	}
-	
+
 	@RuntimeCallable
 	private static void checkWeakObjectAreAlive(ByteBuffer input, ByteBuffer output, int length)
 	{
 		input.position(0);
 		output.position(0);
-		for (int i=0; i<length; i++)
+		for (int i = 0; i < length; i++)
 		{
 			int javaObjectId = input.getInt();
-			
+
 			WeakReference<Object> weakRef = weakInstances.get(javaObjectId);
-			
+
 			int isReleased;
-			
+
 			if (weakRef != null)
 			{
 				Object instance = weakRef.get();
-				
+
 				if (instance == null)
 				{
 					isReleased = 1;
@@ -603,15 +611,16 @@ public class Platform
 			{
 				isReleased = 1;
 			}
-			
+
 			output.putInt(isReleased);
 		}
 	}
-	
+
 	@RuntimeCallable
 	private static Object getJavaObjectByID(int javaObjectID) throws Exception
 	{
-		if (logger.isEnabled()) logger.write("Platform.getJavaObjectByID:" + javaObjectID);
+		if (logger.isEnabled())
+			logger.write("Platform.getJavaObjectByID:" + javaObjectID);
 
 		Object instance = strongInstances.get(javaObjectID, keyNotFoundObject);
 
@@ -622,14 +631,14 @@ public class Platform
 			{
 				throw new NativeScriptException("No weak reference found. Attempt to use cleared object reference id=" + javaObjectID);
 			}
-			
+
 			instance = wr.get();
 			if (instance == null)
 			{
 				throw new NativeScriptException("Attempt to use cleared object reference id=" + javaObjectID);
 			}
 		}
-		
+
 		// Log.d(DEFAULT_LOG_TAG,
 		// "Platform.getJavaObjectByID found strong object with id:" +
 		// javaObjectID);
@@ -669,20 +678,20 @@ public class Platform
 	{
 		return callJSMethod(javaObject, methodName, retType, false /* isConstructor */, args);
 	}
-	
+
 	public static Object callJSMethodWithDelay(Object javaObject, String methodName, Class<?> retType, long delay, Object... args) throws NativeScriptException
 	{
-		return callJSMethod(javaObject, methodName, retType, false /* isConstructor */, delay, args); 
+		return callJSMethod(javaObject, methodName, retType, false /* isConstructor */, delay, args);
 	}
-	
+
 	public static Object callJSMethod(Object javaObject, String methodName, Class<?> retType, boolean isConstructor, Object... args) throws NativeScriptException
 	{
 		Object ret = callJSMethod(javaObject, methodName, retType, isConstructor, 0, args);
-		
+
 		return ret;
 	}
-	
-	public static Object callJSMethod(Object javaObject, String methodName, boolean isConstructor,  Object... args) throws NativeScriptException
+
+	public static Object callJSMethod(Object javaObject, String methodName, boolean isConstructor, Object... args) throws NativeScriptException
 	{
 		return callJSMethod(javaObject, methodName, void.class, isConstructor, 0, args);
 	}
@@ -695,7 +704,8 @@ public class Platform
 			throw new NativeScriptException("Cannot find object id for instance=" + ((javaObject == null) ? "null" : javaObject));
 		}
 
-		if (logger.isEnabled()) logger.write("Platform.CallJSMethod: calling js method " + methodName + " with javaObjectID " + javaObjectID + " type=" + ((javaObject != null) ? javaObject.getClass().getName() : "null"));
+		if (logger.isEnabled())
+			logger.write("Platform.CallJSMethod: calling js method " + methodName + " with javaObjectID " + javaObjectID + " type=" + ((javaObject != null) ? javaObject.getClass().getName() : "null"));
 
 		Object result = dispatchCallJSMethodNative(javaObjectID, methodName, isConstructor, delay, retType, args);
 
@@ -711,11 +721,11 @@ public class Platform
 	{
 		int len = (args != null) ? (args.length * 3) : 0;
 		Object[] packagedArgs = new Object[len];
-		
+
 		if (len > 0)
 		{
 			int jsArgsIndex = 0;
-			
+
 			for (int i = 0; i < args.length; i++)
 			{
 				Object value = args[i];
@@ -742,9 +752,11 @@ public class Platform
 	@RuntimeCallable
 	private static String resolveMethodOverload(String className, String methodName, Object[] args) throws Exception
 	{
-		if (logger.isEnabled()) logger.write("resolveMethodOverload: Resolving method " + methodName + " on class " + className);
+		if (logger.isEnabled())
+			logger.write("resolveMethodOverload: Resolving method " + methodName + " on class " + className);
 		String res = MethodResolver.resolveMethodOverload(classCache, className, methodName, args);
-		if (logger.isEnabled()) logger.write("resolveMethodOverload: method found :" + res);
+		if (logger.isEnabled())
+			logger.write("resolveMethodOverload: method found :" + res);
 		if (res == null)
 		{
 			throw new Exception("Failed resolving method " + methodName + " on class " + className);
@@ -752,11 +764,11 @@ public class Platform
 
 		return res;
 	}
-	
+
 	private static Object[] extendConstructorArgs(String methodName, boolean isConstructor, Object[] args)
 	{
 		Object[] arr = null;
-		
+
 		if (methodName.equals("init"))
 		{
 			if (args == null)
@@ -775,7 +787,7 @@ public class Platform
 		{
 			arr = args;
 		}
-		
+
 		return arr;
 	}
 
@@ -788,9 +800,9 @@ public class Platform
 	{
 		final int returnType = TypeIDs.GetObjectTypeId(retType);
 		Object ret = null;
-		
+
 		boolean isWorkThread = threadScheduler.getThread().equals(Thread.currentThread());
-		
+
 		final Object[] tmpArgs = extendConstructorArgs(methodName, isConstructor, args);
 
 		if (isWorkThread)
@@ -801,8 +813,8 @@ public class Platform
 		else
 		{
 			final Object[] arr = new Object[2];
-			
-			final boolean isCtor = isConstructor; 
+
+			final boolean isCtor = isConstructor;
 			Runnable r = new Runnable()
 			{
 				@Override
@@ -823,14 +835,16 @@ public class Platform
 					}
 				}
 			};
-			
+
 			if (delay > 0)
 			{
 				try
 				{
 					Thread.sleep(delay);
 				}
-				catch (InterruptedException e) {}
+				catch (InterruptedException e)
+				{
+				}
 			}
 
 			boolean success = threadScheduler.post(r);
@@ -858,7 +872,7 @@ public class Platform
 
 		return ret;
 	}
-	
+
 	@RuntimeCallable
 	private static Class<?> getCachedClass(String className)
 	{
@@ -868,18 +882,18 @@ public class Platform
 
 	@RuntimeCallable
 	private static Class<?> findClass(String className) throws ClassNotFoundException
-    {
-    	Class<?> clazz = dexFactory.findClass(className);
+	{
+		Class<?> clazz = dexFactory.findClass(className);
 		return clazz;
-    }
-    
+	}
+
 	public static void purgeAllProxies()
 	{
 		if (dexFactory == null)
 		{
 			return;
 		}
-		
+
 		dexFactory.purgeAllProxies();
 	}
 }

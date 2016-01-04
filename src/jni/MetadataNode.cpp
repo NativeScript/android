@@ -25,7 +25,6 @@ void MetadataNode::Init(ObjectManager *objectManager)
 	s_metadataKey = new Persistent<String>(isolate, key);
 }
 
-
 MetadataNode::MetadataNode(MetadataTreeNode *treeNode) :
 		m_treeNode(treeNode)
 {
@@ -44,8 +43,9 @@ MetadataNode::MetadataNode(MetadataTreeNode *treeNode) :
 		bool isPrefix;
 		auto impTypeName = s_metadataReader.ReadInterfaceImplementationTypeName(m_treeNode, isPrefix);
 		m_implType = isPrefix
-					? (impTypeName + m_name)
-					: impTypeName;
+						? (impTypeName + m_name)
+							:
+							impTypeName;
 	}
 }
 
@@ -71,7 +71,6 @@ MetadataNode* MetadataNode::GetOrCreate(const string& className)
 {
 	return GetOrCreateInternal(className);
 }
-
 
 MetadataNode* MetadataNode::GetOrCreateInternal(const string& className)
 {
@@ -135,7 +134,6 @@ MetadataTreeNode* MetadataNode::GetOrCreateTreeNodeByName(const string& classNam
 	return result;
 }
 
-
 string MetadataNode::GetName()
 {
 	return m_name;
@@ -150,7 +148,7 @@ Local<Object> MetadataNode::CreateWrapper(Isolate *isolate)
 	uint8_t nodeType = s_metadataReader.GetNodeType(m_treeNode);
 
 	bool isClass = s_metadataReader.IsNodeTypeClass(nodeType),
-		isInterface = s_metadataReader.IsNodeTypeInterface(nodeType);
+			isInterface = s_metadataReader.IsNodeTypeInterface(nodeType);
 
 	if (isClass || isInterface)
 	{
@@ -163,7 +161,7 @@ Local<Object> MetadataNode::CreateWrapper(Isolate *isolate)
 	else
 	{
 		stringstream ss;
-		ss << "(InternalError): Can't create proxy for this type=" <<  static_cast<int>(nodeType);
+		ss << "(InternalError): Can't create proxy for this type=" << static_cast<int>(nodeType);
 		throw NativeScriptException(ss.str());
 	}
 
@@ -194,18 +192,25 @@ Local<Object> MetadataNode::CreateJSWrapper(Isolate *isolate)
 
 void MetadataNode::ArrayLengthGetterCallack(Local<String> property, const PropertyCallbackInfo<Value>& info)
 {
-	try {
-	auto thiz = info.This();
-	auto length = NativeScriptRuntime::GetArrayLength(thiz);
-	info.GetReturnValue().Set(Integer::New(info.GetIsolate(), length));
-	} catch (NativeScriptException& e) {
+	try
+	{
+		auto thiz = info.This();
+		auto length = NativeScriptRuntime::GetArrayLength(thiz);
+		info.GetReturnValue().Set(Integer::New(info.GetIsolate(), length));
+	}
+	catch (NativeScriptException& e)
+	{
 		e.ReThrowToV8();
 	}
-	catch (exception e) {
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
+		nsEx.ReThrowToV8();
 	}
 	catch (...) {
-		DEBUG_WRITE("Error: c++ exception!");
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
 	}
 }
 
@@ -227,7 +232,6 @@ Local<Object> MetadataNode::CreateArrayWrapper(Isolate *isolate)
 	return arr;
 }
 
-
 Local<Object> MetadataNode::CreatePackageProxy(Isolate *isolate)
 {
 	EscapableHandleScope handleScope(isolate);
@@ -241,8 +245,6 @@ Local<Object> MetadataNode::CreatePackageProxy(Isolate *isolate)
 	return handleScope.Escape(package);
 }
 
-
-
 void MetadataNode::SetClassAccessor(Local<Function>& ctorFunction)
 {
 	auto classFieldName = ConvertToV8String("class");
@@ -251,108 +253,136 @@ void MetadataNode::SetClassAccessor(Local<Function>& ctorFunction)
 
 void MetadataNode::ClassAccessorGetterCallback(Local<String> property, const PropertyCallbackInfo<Value>& info)
 {
-	try {
-	auto thiz = info.This();
-	auto isolate = info.GetIsolate();
-	auto data = GetTypeMetadata(isolate, thiz.As<Function>());
+	try
+	{
+		auto thiz = info.This();
+		auto isolate = info.GetIsolate();
+		auto data = GetTypeMetadata(isolate, thiz.As<Function>());
 
-	auto value = NativeScriptRuntime::FindClass(data->name);
-	info.GetReturnValue().Set(value);
-	} catch (NativeScriptException& e) {
+		auto value = NativeScriptRuntime::FindClass(data->name);
+		info.GetReturnValue().Set(value);
+	}
+	catch (NativeScriptException& e)
+	{
 		e.ReThrowToV8();
 	}
-	catch (exception e) {
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
+		nsEx.ReThrowToV8();
 	}
 	catch (...) {
-		DEBUG_WRITE("Error: c++ exception!");
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
 	}
 }
 
 void MetadataNode::FieldAccessorGetterCallback(Local<String> property, const PropertyCallbackInfo<Value>& info)
 {
-	try {
-	auto thiz = info.This();
-	auto fieldCallbackData = reinterpret_cast<FieldCallbackData*>(info.Data().As<External>()->Value());
-	auto value = NativeScriptRuntime::GetJavaField(thiz, fieldCallbackData);
-	info.GetReturnValue().Set(value);
-	} catch (NativeScriptException& e) {
-		e.ReThrowToV8();
-	}
-	catch (exception e) {
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
-	}
-	catch (...) {
-		DEBUG_WRITE("Error: c++ exception!");
-	}
-}
-void MetadataNode::FieldAccessorSetterCallback(Local<String> property,Local<Value> value, const PropertyCallbackInfo<void>& info)
-{
-	try {
-	DEBUG_WRITE("FieldAccessorSetterCallback");
-
-	auto thiz = info.This();
-	auto fieldCallbackData = reinterpret_cast<FieldCallbackData*>(info.Data().As<External>()->Value());
-
-	if (fieldCallbackData->isFinal)
+	try
 	{
-		stringstream ss;
-		ss << "You are trying to set \"" << fieldCallbackData->name << "\" which is a final field! Final fields can only be read.";
-		string exceptionMessage = ss.str();
-
-		throw NativeScriptException(exceptionMessage);
-	}
-	else
-	{
-		NativeScriptRuntime::SetJavaField(thiz, value, fieldCallbackData);
+		auto thiz = info.This();
+		auto fieldCallbackData = reinterpret_cast<FieldCallbackData*>(info.Data().As<External>()->Value());
+		auto value = NativeScriptRuntime::GetJavaField(thiz, fieldCallbackData);
 		info.GetReturnValue().Set(value);
 	}
-	} catch (NativeScriptException& e) {
+	catch (NativeScriptException& e)
+	{
 		e.ReThrowToV8();
 	}
-	catch (exception e) {
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
+		nsEx.ReThrowToV8();
 	}
 	catch (...) {
-		DEBUG_WRITE("Error: c++ exception!");
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
+	}
+}
+void MetadataNode::FieldAccessorSetterCallback(Local<String> property, Local<Value> value, const PropertyCallbackInfo<void>& info)
+{
+	try
+	{
+		DEBUG_WRITE("FieldAccessorSetterCallback");
+
+		auto thiz = info.This();
+		auto fieldCallbackData = reinterpret_cast<FieldCallbackData*>(info.Data().As<External>()->Value());
+
+		if (fieldCallbackData->isFinal)
+		{
+			stringstream ss;
+			ss << "You are trying to set \"" << fieldCallbackData->name << "\" which is a final field! Final fields can only be read.";
+			string exceptionMessage = ss.str();
+
+			throw NativeScriptException(exceptionMessage);
+		}
+		else
+		{
+			NativeScriptRuntime::SetJavaField(thiz, value, fieldCallbackData);
+			info.GetReturnValue().Set(value);
+		}
+	}
+	catch (NativeScriptException& e)
+	{
+		e.ReThrowToV8();
+	}
+	catch (std::exception e) {
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
+		nsEx.ReThrowToV8();
+	}
+	catch (...) {
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
 	}
 }
 
 void MetadataNode::SuperAccessorGetterCallback(Local<String> property, const PropertyCallbackInfo<Value>& info)
 {
-	try {
-	auto thiz = info.This();
-	auto isolate = info.GetIsolate();
-	auto k = ConvertToV8String("supervalue");
-	auto superValue = thiz->GetHiddenValue(k).As<Object>();
-	if (superValue.IsEmpty())
+	try
 	{
-		superValue = s_objectManager->GetEmptyObject(isolate);
-		bool d = superValue->Delete(ConvertToV8String("toString"));
-		d = superValue->Delete(ConvertToV8String("valueOf"));
-		superValue->SetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::CallSuper), True(isolate));
+		auto thiz = info.This();
+		auto isolate = info.GetIsolate();
+		auto k = ConvertToV8String("supervalue");
+		auto superValue = thiz->GetHiddenValue(k).As<Object>();
+		if (superValue.IsEmpty())
+		{
+			superValue = s_objectManager->GetEmptyObject(isolate);
+			bool d = superValue->Delete(ConvertToV8String("toString"));
+			d = superValue->Delete(ConvertToV8String("valueOf"));
+			superValue->SetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::CallSuper), True(isolate));
 
-		superValue->SetPrototype(thiz->GetPrototype().As<Object>()->GetPrototype().As<Object>()->GetPrototype());
-		thiz->SetHiddenValue(k, superValue);
-		s_objectManager->CloneLink(thiz, superValue);
+			superValue->SetPrototype(thiz->GetPrototype().As<Object>()->GetPrototype().As<Object>()->GetPrototype());
+			thiz->SetHiddenValue(k, superValue);
+			s_objectManager->CloneLink(thiz, superValue);
 
-		DEBUG_WRITE("superValue.GetPrototype=%d", superValue->GetPrototype().As<Object>()->GetIdentityHash());
+			DEBUG_WRITE("superValue.GetPrototype=%d", superValue->GetPrototype().As<Object>()->GetIdentityHash());
 
-		auto node = GetInstanceMetadata(isolate, thiz);
-		SetInstanceMetadata(isolate, superValue, node);
+			auto node = GetInstanceMetadata(isolate, thiz);
+			SetInstanceMetadata(isolate, superValue, node);
 
-		thiz->SetHiddenValue(k, superValue);
+			thiz->SetHiddenValue(k, superValue);
+		}
+
+		info.GetReturnValue().Set(superValue);
 	}
-
-	info.GetReturnValue().Set(superValue);
-	} catch (NativeScriptException& e) {
+	catch (NativeScriptException& e)
+	{
 		e.ReThrowToV8();
 	}
-	catch (exception e) {
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
+		nsEx.ReThrowToV8();
 	}
 	catch (...) {
-		DEBUG_WRITE("Error: c++ exception!");
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
 	}
 }
 
@@ -362,7 +392,8 @@ Local<Function> MetadataNode::SetMembers(Isolate *isolate, Local<FunctionTemplat
 
 	return hasCustomMetadata
 			? SetMembersFromRuntimeMetadata(isolate, ctorFuncTemplate, prototypeTemplate, instanceMethodsCallbackData, baseInstanceMethodsCallbackData, treeNode)
-			: SetMembersFromStaticMetadata(isolate, ctorFuncTemplate, prototypeTemplate, instanceMethodsCallbackData, baseInstanceMethodsCallbackData, treeNode);
+						:
+				SetMembersFromStaticMetadata(isolate, ctorFuncTemplate, prototypeTemplate, instanceMethodsCallbackData, baseInstanceMethodsCallbackData, treeNode);
 }
 
 Local<Function> MetadataNode::SetMembersFromStaticMetadata(Isolate *isolate, Local<FunctionTemplate>& ctorFuncTemplate, Local<ObjectTemplate>& prototypeTemplate, vector<MethodCallbackData*>& instanceMethodsCallbackData, const vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode)
@@ -399,7 +430,8 @@ Local<Function> MetadataNode::SetMembersFromStaticMetadata(Isolate *isolate, Loc
 			instanceMethodsCallbackData.push_back(callbackData);
 			auto itBegin = baseInstanceMethodsCallbackData.begin();
 			auto itEnd = baseInstanceMethodsCallbackData.end();
-			auto itFound = find_if(itBegin, itEnd, [&entry] (MethodCallbackData *x) { return x->candidates.front().name == entry.name; });
+			auto itFound = find_if(itBegin, itEnd, [&entry] (MethodCallbackData *x)
+			{	return x->candidates.front().name == entry.name;});
 			if (itFound != itEnd)
 			{
 				callbackData->parent = *itFound;
@@ -518,7 +550,8 @@ Local<Function> MetadataNode::SetMembersFromRuntimeMetadata(Isolate *isolate, Lo
 				instanceMethodsCallbackData.push_back(callbackData);
 				auto itBegin = baseInstanceMethodsCallbackData.begin();
 				auto itEnd = baseInstanceMethodsCallbackData.end();
-				auto itFound = find_if(itBegin, itEnd, [&entry] (MethodCallbackData *x) { return x->candidates.front().name == entry.name; });
+				auto itFound = find_if(itBegin, itEnd, [&entry] (MethodCallbackData *x)
+				{	return x->candidates.front().name == entry.name;});
 				if (itFound != itEnd)
 				{
 					callbackData->parent = *itFound;
@@ -548,67 +581,81 @@ Local<Function> MetadataNode::SetMembersFromRuntimeMetadata(Isolate *isolate, Lo
 
 void MetadataNode::InnerClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
-	try {
-	auto thiz = info.This();
-	auto isolate = info.GetIsolate();
-	auto data = reinterpret_cast<InnerClassData*>(info.Data().As<External>()->Value());
+	try
+	{
+		auto thiz = info.This();
+		auto isolate = info.GetIsolate();
+		auto data = reinterpret_cast<InnerClassData*>(info.Data().As<External>()->Value());
 
-	auto outerThis = Local<Object>::New(isolate, *data->outerThis);
-	string extendName;
-	auto className = data->node->m_name;
+		auto outerThis = Local<Object>::New(isolate, *data->outerThis);
+		string extendName;
+		auto className = data->node->m_name;
 
-	SetInstanceMetadata(info.GetIsolate(), thiz, data->node);
+		SetInstanceMetadata(info.GetIsolate(), thiz, data->node);
 
-	ArgsWrapper argWrapper(info, ArgType::Class, outerThis);
+		ArgsWrapper argWrapper(info, ArgType::Class, outerThis);
 
-	string fullClassName = CreateFullClassName(className, extendName);
-	bool success = NativeScriptRuntime::RegisterInstance(thiz, fullClassName, argWrapper, outerThis, false);
-	} catch (NativeScriptException& e) {
+		string fullClassName = CreateFullClassName(className, extendName);
+		bool success = NativeScriptRuntime::RegisterInstance(thiz, fullClassName, argWrapper, outerThis, false);
+	}
+	catch (NativeScriptException& e)
+	{
 		e.ReThrowToV8();
 	}
-	catch (exception e) {
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
+		nsEx.ReThrowToV8();
 	}
 	catch (...) {
-		DEBUG_WRITE("Error: c++ exception!");
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
 	}
 }
 
 void MetadataNode::InnerClassAccessorGetterCallback(Local<String> property, const PropertyCallbackInfo<Value>& info)
 {
-	try {
-	auto isolate = info.GetIsolate();
-	auto thiz = info.This();
-	auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value());
-
-	auto innerKey = ConvertToV8String("inner:" + node->m_treeNode->name);
-
-	auto innerTypeCtorFunc = thiz->GetHiddenValue(innerKey).As<Function>();
-	if (innerTypeCtorFunc.IsEmpty())
+	try
 	{
-		auto funcTemplate = node->GetConstructorFunctionTemplate(isolate, node->m_treeNode);
-		auto ctorFunc = funcTemplate->GetFunction();
+		auto isolate = info.GetIsolate();
+		auto thiz = info.This();
+		auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value());
 
-		auto innerClassData = External::New(isolate, new InnerClassData(new Persistent<Object>(isolate, thiz), node));
-		auto innerTypeCtorFuncTemplate = FunctionTemplate::New(isolate, InnerClassConstructorCallback, innerClassData);
-		innerTypeCtorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(static_cast<int>(ObjectManager::MetadataNodeKeys::END));
-		innerTypeCtorFunc = innerTypeCtorFuncTemplate->GetFunction();
-		auto prototypeName = ConvertToV8String("prototype");
-		auto innerTypeCtorFuncPrototype = innerTypeCtorFunc->Get(prototypeName).As<Object>();
-		innerTypeCtorFuncPrototype->SetPrototype(ctorFunc->Get(prototypeName));
+		auto innerKey = ConvertToV8String("inner:" + node->m_treeNode->name);
 
-		thiz->SetHiddenValue(innerKey, innerTypeCtorFunc);
+		auto innerTypeCtorFunc = thiz->GetHiddenValue(innerKey).As<Function>();
+		if (innerTypeCtorFunc.IsEmpty())
+		{
+			auto funcTemplate = node->GetConstructorFunctionTemplate(isolate, node->m_treeNode);
+			auto ctorFunc = funcTemplate->GetFunction();
+
+			auto innerClassData = External::New(isolate, new InnerClassData(new Persistent<Object>(isolate, thiz), node));
+			auto innerTypeCtorFuncTemplate = FunctionTemplate::New(isolate, InnerClassConstructorCallback, innerClassData);
+			innerTypeCtorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(static_cast<int>(ObjectManager::MetadataNodeKeys::END));
+			innerTypeCtorFunc = innerTypeCtorFuncTemplate->GetFunction();
+			auto prototypeName = ConvertToV8String("prototype");
+			auto innerTypeCtorFuncPrototype = innerTypeCtorFunc->Get(prototypeName).As<Object>();
+			innerTypeCtorFuncPrototype->SetPrototype(ctorFunc->Get(prototypeName));
+
+			thiz->SetHiddenValue(innerKey, innerTypeCtorFunc);
+		}
+
+		info.GetReturnValue().Set(innerTypeCtorFunc);
 	}
-
-	info.GetReturnValue().Set(innerTypeCtorFunc);
-	} catch (NativeScriptException& e) {
+	catch (NativeScriptException& e)
+	{
 		e.ReThrowToV8();
 	}
-	catch (exception e) {
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
+		nsEx.ReThrowToV8();
 	}
 	catch (...) {
-		DEBUG_WRITE("Error: c++ exception!");
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
 	}
 }
 
@@ -620,7 +667,7 @@ void MetadataNode::SetInnnerTypes(Isolate *isolate, Local<Function>& ctorFunctio
 
 		auto prototypeTemplate2 = ctorFunction->Get(ConvertToV8String("prototype")).As<Object>();
 
-		for (auto curChild: children)
+		for (auto curChild : children)
 		{
 			auto childNode = GetOrCreateInternal(curChild);
 
@@ -642,7 +689,6 @@ void MetadataNode::SetInnnerTypes(Isolate *isolate, Local<Function>& ctorFunctio
 		}
 	}
 }
-
 
 Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate *isolate, MetadataTreeNode *treeNode)
 {
@@ -713,9 +759,6 @@ Local<Function> MetadataNode::GetConstructorFunction(Isolate *isolate)
 	return ctorFunc;
 }
 
-
-
-
 MetadataNode::TypeMetadata* MetadataNode::GetTypeMetadata(Isolate *isolate, const Local<Function>& value)
 {
 	auto data = reinterpret_cast<TypeMetadata*>(V8GetHiddenValue(value, "typemetadata").As<External>()->Value());
@@ -748,7 +791,7 @@ void MetadataNode::SetInstanceMetadata(Isolate *isolate, Local<Object> value, Me
 MetadataNode* MetadataNode::GetPackageMetadata(Isolate *isolate, const Local<Object>& value)
 {
 	MetadataNode *node = nullptr;
-	auto ext =  value->GetHiddenValue(ConvertToV8String("tns::PackageMetadata"));
+	auto ext = value->GetHiddenValue(ConvertToV8String("tns::PackageMetadata"));
 	if (!ext.IsEmpty())
 	{
 		node = reinterpret_cast<MetadataNode*>(ext.As<External>()->Value());
@@ -761,151 +804,171 @@ void MetadataNode::SetPackageMetadata(Isolate *isolate, Local<Object> value, Met
 	value->SetHiddenValue(ConvertToV8String("tns::PackageMetadata"), External::New(isolate, node));
 }
 
-
 void MetadataNode::ExtendedClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
-	try {
-	SET_PROFILER_FRAME();
+	try
+	{
+		SET_PROFILER_FRAME();
 
-	assert(info.IsConstructCall());
+		assert(info.IsConstructCall());
 
-	auto isolate = info.GetIsolate();
-	auto thiz = info.This();
-	auto extData = reinterpret_cast<ExtendedClassData*>(info.Data().As<External>()->Value());
+		auto isolate = info.GetIsolate();
+		auto thiz = info.This();
+		auto extData = reinterpret_cast<ExtendedClassData*>(info.Data().As<External>()->Value());
 
-	auto implementationObject = Local<Object>::New(isolate, *extData->implementationObject);
+		auto implementationObject = Local<Object>::New(isolate, *extData->implementationObject);
 
-	const auto& extendName = extData->extendedName;
+		const auto& extendName = extData->extendedName;
 
-	SetInstanceMetadata(isolate, thiz, extData->node);
-	thiz->SetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::CallSuper), True(isolate));
-	thiz->SetHiddenValue(ConvertToV8String("t::implObj"), implementationObject);
+		SetInstanceMetadata(isolate, thiz, extData->node);
+		thiz->SetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::CallSuper), True(isolate));
+		thiz->SetHiddenValue(ConvertToV8String("t::implObj"), implementationObject);
 
-	ArgsWrapper argWrapper(info, ArgType::Class, Local<Object>());
+		ArgsWrapper argWrapper(info, ArgType::Class, Local<Object>());
 
-	string fullClassName = extData->fullClassName;
+		string fullClassName = extData->fullClassName;
 
-	bool success = NativeScriptRuntime::RegisterInstance(thiz, fullClassName, argWrapper, implementationObject, false);
-	} catch (NativeScriptException& e) {
+		bool success = NativeScriptRuntime::RegisterInstance(thiz, fullClassName, argWrapper, implementationObject, false);
+	}
+	catch (NativeScriptException& e)
+	{
 		e.ReThrowToV8();
 	}
-	catch (exception e) {
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
+		nsEx.ReThrowToV8();
 	}
 	catch (...) {
-		DEBUG_WRITE("Error: c++ exception!");
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
 	}
 }
 
-
 void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
-	try {
-	SET_PROFILER_FRAME();
-
-	auto isolate = info.GetIsolate();
-	auto thiz = info.This();
-	auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value());
-
-	Local<Object> implementationObject;
-	Local<String> v8ExtendName;
-	string extendLocation;
-	bool extendLocationFound = GetExtendLocation(extendLocation);
-	if (info.Length() == 1)
+	try
 	{
-		if (!extendLocationFound)
+		SET_PROFILER_FRAME();
+
+		auto isolate = info.GetIsolate();
+		auto thiz = info.This();
+		auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value());
+
+		Local<Object> implementationObject;
+		Local<String> v8ExtendName;
+		string extendLocation;
+		bool extendLocationFound = GetExtendLocation(extendLocation);
+		if (info.Length() == 1)
 		{
-			stringstream ss;
-			ss << "(InternalError): Invalid extend() call. No name specified for extend. Location: " << extendLocation.c_str();
-			throw NativeScriptException(ss.str());
+			if (!extendLocationFound)
+			{
+		stringstream ss;
+				ss << "(InternalError): Invalid extend() call. No name specified for extend. Location: " << extendLocation.c_str();
+				throw NativeScriptException(ss.str());
+			}
+
+			if (!info[0]->IsObject())
+			{
+				throw NativeScriptException(string("First argument must be implementation object"));
+			}
+			implementationObject = info[0]->ToObject();
+		}
+		else if (info.Length() == 2)
+		{
+			if (!info[0]->IsString())
+			{
+				throw NativeScriptException(string("First argument must be string"));
+			}
+			if (!info[1]->IsObject())
+			{
+				throw NativeScriptException(string("Second argument must be implementation object"));
+			}
+
+			DEBUG_WRITE("InterfaceConstructorCallback: getting extend name");
+			v8ExtendName = info[0]->ToString();
+			implementationObject = info[1]->ToObject();
+		}
+		else
+		{
+			throw NativeScriptException(string("Invalid number of arguments"));
 		}
 
-		if (!info[0]->IsObject())
-		{
-			throw NativeScriptException(string("First argument must be implementation object"));
-		}
-		implementationObject = info[0]->ToObject();
+		auto className = node->m_implType;
+		auto extendName = ConvertToString(v8ExtendName);
+		auto extendNameAndLocation = extendLocation + extendName;
+		SetInstanceMetadata(isolate, implementationObject, node);
+
+		//@@@ Refactor
+		thiz->SetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::CallSuper), True(isolate));
+
+		string fullClassName = CreateFullClassName(className, extendNameAndLocation);
+
+		implementationObject->SetPrototype(thiz->GetPrototype());
+		thiz->SetPrototype(implementationObject);
+		thiz->SetHiddenValue(ConvertToV8String("t::implObj"), implementationObject);
+
+		ArgsWrapper argWrapper(info, ArgType::Interface, Local<Object>());
+
+		auto success = NativeScriptRuntime::RegisterInstance(thiz, fullClassName, argWrapper, implementationObject, true);
 	}
-	else if (info.Length() == 2)
+	catch (NativeScriptException& e)
 	{
-		if (!info[0]->IsString())
-		{
-			throw NativeScriptException(string("First argument must be string"));
-		}
-		if (!info[1]->IsObject())
-		{
-			throw NativeScriptException(string("Second argument must be implementation object"));
-		}
-
-		DEBUG_WRITE("InterfaceConstructorCallback: getting extend name");
-		v8ExtendName = info[0]->ToString();
-		implementationObject = info[1]->ToObject();
-	}
-	else
-	{
-		throw NativeScriptException(string("Invalid number of arguments"));
-	}
-
-	auto className = node->m_implType;
-	auto extendName = ConvertToString(v8ExtendName);
-	auto extendNameAndLocation = extendLocation + extendName;
-	SetInstanceMetadata(isolate, implementationObject, node);
-
-	//@@@ Refactor
-	thiz->SetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::CallSuper), True(isolate));
-
-	string fullClassName = CreateFullClassName(className, extendNameAndLocation);
-
-	implementationObject->SetPrototype(thiz->GetPrototype());
-	thiz->SetPrototype(implementationObject);
-	thiz->SetHiddenValue(ConvertToV8String("t::implObj"), implementationObject);
-
-	ArgsWrapper argWrapper(info, ArgType::Interface, Local<Object>());
-
-	auto success = NativeScriptRuntime::RegisterInstance(thiz, fullClassName, argWrapper, implementationObject, true);
-	} catch (NativeScriptException& e) {
 		e.ReThrowToV8();
 	}
-	catch (exception e) {
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
+		nsEx.ReThrowToV8();
 	}
 	catch (...) {
-		DEBUG_WRITE("Error: c++ exception!");
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
 	}
 }
 
 void MetadataNode::ClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
-	try {
-	SET_PROFILER_FRAME();
+	try
+	{
+		SET_PROFILER_FRAME();
 
-	auto thiz = info.This();
-	auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value());
+		auto thiz = info.This();
+		auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value());
 
-	Local<Object> outerThis;
-	string extendName;
-	auto className = node->m_name;
+		Local<Object> outerThis;
+		string extendName;
+		auto className = node->m_name;
 
-	SetInstanceMetadata(info.GetIsolate(), thiz, node);
+		SetInstanceMetadata(info.GetIsolate(), thiz, node);
 
-	ArgsWrapper argWrapper(info, ArgType::Class, outerThis);
+		ArgsWrapper argWrapper(info, ArgType::Class, outerThis);
 
-	string fullClassName = CreateFullClassName(className, extendName);
-	bool success = NativeScriptRuntime::RegisterInstance(thiz, fullClassName, argWrapper, outerThis, false);
-	} catch (NativeScriptException& e) {
+		string fullClassName = CreateFullClassName(className, extendName);
+		bool success = NativeScriptRuntime::RegisterInstance(thiz, fullClassName, argWrapper, outerThis, false);
+	}
+	catch (NativeScriptException& e)
+	{
 		e.ReThrowToV8();
 	}
-	catch (exception e) {
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
+		nsEx.ReThrowToV8();
 	}
 	catch (...) {
-		DEBUG_WRITE("Error: c++ exception!");
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
 	}
 }
 
 void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
-	try {
+	try
+	{
 		SET_PROFILER_FRAME();
 
 		auto e = info.Data().As<External>();
@@ -927,7 +990,7 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
 			className = &callbackData->node->m_name;
 
 			auto found = false;
-			for (auto& c: candidates)
+			for (auto& c : candidates)
 			{
 				found = c.paramCount == argLength;
 				if (found)
@@ -952,7 +1015,7 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
 			isSuper = !superValue.IsEmpty() && superValue->IsTrue();
 		}
 
-	//	// TODO: refactor this
+		//	// TODO: refactor this
 		if (isSuper && (*className == "com/tns/NativeScriptActivity"))
 		{
 			string activityBaseClassName("android/app/Activity");
@@ -967,52 +1030,72 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
 		{
 			NativeScriptRuntime::CallJavaMethod(thiz, *className, methodName, entry, first.isStatic, isSuper, info);
 		}
-	} catch (NativeScriptException& e) {
+	}
+	catch (NativeScriptException& e)
+	{
 		e.ReThrowToV8();
 	}
-	catch (exception e) {
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
+		nsEx.ReThrowToV8();
 	}
 	catch (...) {
-		DEBUG_WRITE("Error: c++ exception!");
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
 	}
 }
 
 void MetadataNode::ArrayIndexedPropertyGetterCallback(uint32_t index, const PropertyCallbackInfo<Value>& info)
 {
-	try {
-	auto node = GetNodeFromHandle(info.This());
+	try
+	{
+		auto node = GetNodeFromHandle(info.This());
 
-	auto element = NativeScriptRuntime::GetArrayElement(info.This(), index, node->m_name);
+		auto element = NativeScriptRuntime::GetArrayElement(info.This(), index, node->m_name);
 
-	info.GetReturnValue().Set(element);
-	} catch (NativeScriptException& e) {
+		info.GetReturnValue().Set(element);
+	}
+	catch (NativeScriptException& e)
+	{
 		e.ReThrowToV8();
 	}
-	catch (exception e) {
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
+		nsEx.ReThrowToV8();
 	}
 	catch (...) {
-		DEBUG_WRITE("Error: c++ exception!");
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
 	}
 }
 
 void MetadataNode::ArrayIndexedPropertySetterCallback(uint32_t index, Local<Value> value, const PropertyCallbackInfo<Value>& info)
 {
-	try {
+	try
+	{
 		auto node = GetNodeFromHandle(info.This());
 
 		NativeScriptRuntime::SetArrayElement(info.This(), index, node->m_name, value);
 
 		info.GetReturnValue().Set(value);
-	} catch (NativeScriptException& e) {
+	}
+	catch (NativeScriptException& e)
+	{
 		e.ReThrowToV8();
 	}
-	catch (exception e) {
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
+		nsEx.ReThrowToV8();
 	}
 	catch (...) {
-		DEBUG_WRITE("Error: c++ exception!");
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
 	}
 }
 
@@ -1093,52 +1176,56 @@ Local<Object> MetadataNode::GetImplementationObject(const Local<Object>& object)
 
 void MetadataNode::PackageGetterCallback(Local<String> property, const PropertyCallbackInfo<Value>& info)
 {
-	try {
-	string propName = ConvertToString(property);
-
-	if (propName.empty())
-		return;
-
-	auto isolate = Isolate::GetCurrent();
-	HandleScope handleScope(isolate);
-
-	auto thiz = info.This();
-
-	auto cachedItem = thiz->GetHiddenValue(property);
-
-	if (cachedItem.IsEmpty())
+	try
 	{
-		auto node = GetPackageMetadata(isolate, thiz);
+		string propName = ConvertToString(property);
 
-		uint8_t nodeType = s_metadataReader.GetNodeType(node->m_treeNode);
+		if (propName.empty())
+			return;
 
-		DEBUG_WRITE("MetadataNode::GetterCallback: prop '%s' for node '%s' called, nodeType=%d, hash=%d", propName.c_str(), node->m_treeNode->name.c_str(), nodeType, thiz.IsEmpty() ? -42 : thiz->GetIdentityHash());
+		auto isolate = Isolate::GetCurrent();
+		HandleScope handleScope(isolate);
 
-		auto child = GetChildMetadataForPackage(node, propName);
-		auto foundChild = child.treeNode != nullptr;
+		auto thiz = info.This();
 
-		if (foundChild)
+		auto cachedItem = thiz->GetHiddenValue(property);
+
+		if (cachedItem.IsEmpty())
 		{
-			auto childNode = MetadataNode::GetOrCreateInternal(child.treeNode);
-			cachedItem = childNode->CreateWrapper(isolate);
-			thiz->SetHiddenValue(property, cachedItem);
-		}
-	}
+			auto node = GetPackageMetadata(isolate, thiz);
 
-	info.GetReturnValue().Set(cachedItem);
-	} catch (NativeScriptException& e) {
+			uint8_t nodeType = s_metadataReader.GetNodeType(node->m_treeNode);
+
+			DEBUG_WRITE("MetadataNode::GetterCallback: prop '%s' for node '%s' called, nodeType=%d, hash=%d", propName.c_str(), node->m_treeNode->name.c_str(), nodeType, thiz.IsEmpty() ? -42 : thiz->GetIdentityHash());
+
+			auto child = GetChildMetadataForPackage(node, propName);
+			auto foundChild = child.treeNode != nullptr;
+
+			if (foundChild)
+			{
+				auto childNode = MetadataNode::GetOrCreateInternal(child.treeNode);
+				cachedItem = childNode->CreateWrapper(isolate);
+				thiz->SetHiddenValue(property, cachedItem);
+			}
+		}
+
+		info.GetReturnValue().Set(cachedItem);
+	}
+	catch (NativeScriptException& e)
+	{
 		e.ReThrowToV8();
 	}
-	catch (exception e) {
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
+		nsEx.ReThrowToV8();
 	}
 	catch (...) {
-		DEBUG_WRITE("Error: c++ exception!");
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
 	}
 }
-
-
-
 
 bool MetadataNode::ValidateExtendArguments(const FunctionCallbackInfo<Value>& info, string& extendLocation, v8::Local<v8::String>& extendName, Local<Object>& implementationObject)
 {
@@ -1154,7 +1241,6 @@ bool MetadataNode::ValidateExtendArguments(const FunctionCallbackInfo<Value>& in
 
 			throw NativeScriptException(exceptionMessage);
 		}
-
 
 		if (!info[0]->IsObject())
 		{
@@ -1190,7 +1276,7 @@ bool MetadataNode::ValidateExtendArguments(const FunctionCallbackInfo<Value>& in
 		DEBUG_WRITE("ExtendsCallMethodHandler: getting extend name");
 		extendName = info[0]->ToString();
 		bool isValidExtendName = IsValidExtendName(extendName);
-		if(!isValidExtendName)
+		if (!isValidExtendName)
 		{
 			stringstream ss;
 			ss << "The extend name \"" << ConvertToString(extendName) << "\" you provided contains invalid symbols. Try using the symbols [a-z, A-Z, 0-9, _]." << endl;
@@ -1212,7 +1298,6 @@ bool MetadataNode::ValidateExtendArguments(const FunctionCallbackInfo<Value>& in
 	return true;
 }
 
-
 MetadataNode::ExtendedClassCacheData MetadataNode::GetCachedExtendedClassData(Isolate *isolate, const string& proxyClassName)
 {
 
@@ -1230,7 +1315,7 @@ string MetadataNode::CreateFullClassName(const std::string& className, const std
 {
 	string fullClassName = className;
 
-	if(!extendNameAndLocation.empty())
+	if (!extendNameAndLocation.empty())
 	{
 		fullClassName += Constants::CLASS_NAME_LOCATION_SEPARATOR + extendNameAndLocation;
 	}
@@ -1240,97 +1325,102 @@ string MetadataNode::CreateFullClassName(const std::string& className, const std
 
 void MetadataNode::ExtendCallMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
-	try {
-	if (info.IsConstructCall())
+	try
 	{
-		string exMsg("Cannot call 'extend' as constructor");
-		throw NativeScriptException(exMsg);
+		if (info.IsConstructCall())
+		{
+			string exMsg("Cannot call 'extend' as constructor");
+			throw NativeScriptException(exMsg);
+		}
+
+		SET_PROFILER_FRAME();
+
+		Local<Object> implementationObject;
+		Local<String> extendName;
+		string extendLocation;
+		auto validArgs = ValidateExtendArguments(info, extendLocation, extendName, implementationObject);
+
+		if (!validArgs)
+			return;
+
+		auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value());
+
+		DEBUG_WRITE("ExtendsCallMethodHandler: called with %s", ConvertToString(extendName).c_str());
+
+		string extendNameAndLocation = extendLocation + ConvertToString(extendName);
+		auto fullClassName = TNS_PREFIX + CreateFullClassName(node->m_name, extendNameAndLocation);
+
+		//
+		//resolve class (pre-generated or generated runtime from dex generator)
+		jclass resolvedClass = NativeScriptRuntime::ResolveClass(fullClassName, implementationObject); //resolve class returns GlobalRef
+		std::string generatedFullClassName = s_objectManager->GetClassName(resolvedClass);
+		//
+
+		auto fullExtendedName = generatedFullClassName;
+		DEBUG_WRITE("ExtendsCallMethodHandler: extend full name %s", fullClassName.c_str());
+
+		auto isolate = info.GetIsolate();
+		auto cachedData = GetCachedExtendedClassData(isolate, fullExtendedName);
+		if (cachedData.extendedCtorFunction != nullptr)
+		{
+			auto cachedExtendedCtorFunc = Local<Function>::New(isolate, *cachedData.extendedCtorFunction);
+			info.GetReturnValue().Set(cachedExtendedCtorFunc);
+			return;
+		}
+
+		auto implementationObjectPropertyName = V8StringConstants::GetClassImplementationObject();
+		//reuse validation - checks that implementationObject is not reused for different classes
+		auto implementationObjectProperty = implementationObject->GetHiddenValue(implementationObjectPropertyName).As<String>();
+		if (implementationObjectProperty.IsEmpty())
+		{
+			//mark the implementationObject as such and set a pointer to it's class node inside it for reuse validation later
+			implementationObject->SetHiddenValue(implementationObjectPropertyName, String::NewFromUtf8(isolate, fullExtendedName.c_str()));
+		}
+		else
+		{
+			string usedClassName = ConvertToString(implementationObjectProperty);
+			stringstream s;
+			s << "This object is used to extend another class '" << usedClassName << "'";
+			throw NativeScriptException(s.str());
+		}
+
+		auto baseClassCtorFunc = node->GetConstructorFunction(isolate);
+		auto extendData = External::New(isolate, new ExtendedClassData(node, extendNameAndLocation, implementationObject, fullExtendedName));
+		auto extendFuncTemplate = FunctionTemplate::New(isolate, ExtendedClassConstructorCallback, extendData);
+		extendFuncTemplate->InstanceTemplate()->SetInternalFieldCount(static_cast<int>(ObjectManager::MetadataNodeKeys::END));
+
+		auto extendFunc = extendFuncTemplate->GetFunction();
+		auto prototypeName = ConvertToV8String("prototype");
+		implementationObject->SetPrototype(baseClassCtorFunc->Get(prototypeName));
+		implementationObject->SetAccessor(ConvertToV8String("super"), SuperAccessorGetterCallback, nullptr, implementationObject);
+
+		auto extendFuncPrototype = extendFunc->Get(prototypeName).As<Object>();
+		auto p = extendFuncPrototype->GetPrototype();
+		extendFuncPrototype->SetPrototype(implementationObject);
+		extendFunc->SetPrototype(baseClassCtorFunc);
+
+		SetClassAccessor(extendFunc);
+		SetTypeMetadata(isolate, extendFunc, new TypeMetadata(fullExtendedName));
+		info.GetReturnValue().Set(extendFunc);
+
+		s_name2NodeCache.insert(make_pair(fullExtendedName, node));
+
+		ExtendedClassCacheData cacheData(extendFunc, fullExtendedName, node);
+		s_extendedCtorFuncCache.insert(make_pair(fullExtendedName, cacheData));
 	}
-
-	SET_PROFILER_FRAME();
-
-	Local<Object> implementationObject;
-	Local<String> extendName;
-	string extendLocation;
-	auto validArgs = ValidateExtendArguments(info, extendLocation, extendName, implementationObject);
-
-	if (!validArgs)
-		return;
-
-	auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value());
-
-	DEBUG_WRITE("ExtendsCallMethodHandler: called with %s", ConvertToString(extendName).c_str());
-
-	string extendNameAndLocation = extendLocation + ConvertToString(extendName);
-	auto fullClassName = TNS_PREFIX + CreateFullClassName(node->m_name, extendNameAndLocation);
-
-
-	//
-	//resolve class (pre-generated or generated runtime from dex generator)
-	jclass resolvedClass = NativeScriptRuntime::ResolveClass(fullClassName, implementationObject); //resolve class returns GlobalRef
-	std::string generatedFullClassName = s_objectManager->GetClassName(resolvedClass);
-	//
-
-	auto fullExtendedName = generatedFullClassName;
-	DEBUG_WRITE("ExtendsCallMethodHandler: extend full name %s", fullClassName.c_str());
-
-	auto isolate = info.GetIsolate();
-	auto cachedData = GetCachedExtendedClassData(isolate, fullExtendedName);
-	if (cachedData.extendedCtorFunction != nullptr)
+	catch (NativeScriptException& e)
 	{
-		auto cachedExtendedCtorFunc = Local<Function>::New(isolate, *cachedData.extendedCtorFunction);
-		info.GetReturnValue().Set(cachedExtendedCtorFunc);
-		return;
-	}
-
-	auto implementationObjectPropertyName = V8StringConstants::GetClassImplementationObject();
-	//reuse validation - checks that implementationObject is not reused for different classes
-	auto implementationObjectProperty = implementationObject->GetHiddenValue(implementationObjectPropertyName).As<String>();
-	if (implementationObjectProperty.IsEmpty())
-	{
-		//mark the implementationObject as such and set a pointer to it's class node inside it for reuse validation later
-		implementationObject->SetHiddenValue(implementationObjectPropertyName, String::NewFromUtf8(isolate, fullExtendedName.c_str()));
-	}
-	else
-	{
-		string usedClassName = ConvertToString(implementationObjectProperty);
-		stringstream s;
-		s << "This object is used to extend another class '" << usedClassName << "'";
-		throw NativeScriptException(s.str());
-	}
-
-	auto baseClassCtorFunc = node->GetConstructorFunction(isolate);
-	auto extendData = External::New(isolate, new ExtendedClassData(node, extendNameAndLocation, implementationObject, fullExtendedName));
-	auto extendFuncTemplate = FunctionTemplate::New(isolate, ExtendedClassConstructorCallback, extendData);
-	extendFuncTemplate->InstanceTemplate()->SetInternalFieldCount(static_cast<int>(ObjectManager::MetadataNodeKeys::END));
-
-	auto extendFunc = extendFuncTemplate->GetFunction();
-	auto prototypeName = ConvertToV8String("prototype");
-	implementationObject->SetPrototype(baseClassCtorFunc->Get(prototypeName));
-	implementationObject->SetAccessor(ConvertToV8String("super"), SuperAccessorGetterCallback, nullptr, implementationObject);
-
-	auto extendFuncPrototype = extendFunc->Get(prototypeName).As<Object>();
-	auto p = extendFuncPrototype->GetPrototype();
-	extendFuncPrototype->SetPrototype(implementationObject);
-	extendFunc->SetPrototype(baseClassCtorFunc);
-
-
-	SetClassAccessor(extendFunc);
-	SetTypeMetadata(isolate, extendFunc, new TypeMetadata(fullExtendedName));
-	info.GetReturnValue().Set(extendFunc);
-
-	s_name2NodeCache.insert(make_pair(fullExtendedName, node));
-
-	ExtendedClassCacheData cacheData(extendFunc, fullExtendedName, node);
-	s_extendedCtorFuncCache.insert(make_pair(fullExtendedName, cacheData));
-	} catch (NativeScriptException& e) {
 		e.ReThrowToV8();
 	}
-	catch (exception e) {
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+	catch (std::exception e) {
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
+		nsEx.ReThrowToV8();
 	}
 	catch (...) {
-		DEBUG_WRITE("Error: c++ exception!");
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
 	}
 }
 
@@ -1338,13 +1428,13 @@ bool MetadataNode::IsValidExtendName(const Local<String>& name)
 {
 	string extendNam = ConvertToString(name);
 
-	for(int i = 0; i < extendNam.size(); i++)
+	for (int i = 0; i < extendNam.size(); i++)
 	{
 		char currentSymbol = extendNam[i];
 		bool isValidExtendNameSymbol = isalpha(currentSymbol) ||
-										isdigit(currentSymbol) ||
-										currentSymbol == '_';
-		if(!isValidExtendNameSymbol)
+				isdigit(currentSymbol) ||
+				currentSymbol == '_';
+		if (!isValidExtendNameSymbol)
 		{
 			return false;
 		}
@@ -1352,7 +1442,6 @@ bool MetadataNode::IsValidExtendName(const Local<String>& name)
 
 	return true;
 }
-
 
 bool MetadataNode::GetExtendLocation(string& extendLocation)
 {
@@ -1397,7 +1486,6 @@ bool MetadataNode::GetExtendLocation(string& extendLocation)
 				return false;
 			}
 
-
 			extendLocationStream << "f" << fullPathToFile.c_str() << "_l" << lineNumber << "_c" << column << "__";
 			//DEBUG_WRITE("EXTEND_LOCATION %s", extendLocationStream.str().c_str());
 		}
@@ -1407,14 +1495,11 @@ bool MetadataNode::GetExtendLocation(string& extendLocation)
 	return true;
 }
 
-
 MetadataNode* MetadataNode::GetNodeFromHandle(const Local<Object>& value)
 {
 	auto node = GetInstanceMetadata(Isolate::GetCurrent(), value);
 	return node;
 }
-
-
 
 MetadataEntry MetadataNode::GetChildMetadataForPackage(MetadataNode *node, const string& propName)
 {
@@ -1424,7 +1509,7 @@ MetadataEntry MetadataNode::GetChildMetadataForPackage(MetadataNode *node, const
 
 	const auto& children = *node->m_treeNode->children;
 
-	for (auto treeNodeChild: children)
+	for (auto treeNodeChild : children)
 	{
 		if (propName == treeNodeChild->name)
 		{
@@ -1438,20 +1523,14 @@ MetadataEntry MetadataNode::GetChildMetadataForPackage(MetadataNode *node, const
 				string declaringType = s_metadataReader.ReadInterfaceImplementationTypeName(treeNodeChild, isPrefix);
 				child.declaringType = isPrefix
 										? (declaringType + s_metadataReader.ReadTypeName(child.treeNode))
-										: declaringType;
+											:
+											declaringType;
 			}
 		}
 	}
 
 	return child;
 }
-
-
-
-
-
-
-
 
 void MetadataNode::BuildMetadata(uint32_t nodesLength, uint8_t *nodeData, uint32_t nameLength, uint8_t *nameData, uint32_t valueLength, uint8_t *valueData)
 {
@@ -1466,7 +1545,7 @@ void MetadataNode::CreateTopLevelNamespaces(const Local<Object>& global)
 
 	const auto& children = *root->children;
 
-	for (auto treeNode: children)
+	for (auto treeNode : children)
 	{
 		uint8_t nodeType = s_metadataReader.GetNodeType(treeNode);
 
@@ -1488,7 +1567,6 @@ void MetadataNode::InjectPrototype(Local<Object>& target, Local<Object>& impleme
 	implementationObject->SetPrototype(target->GetPrototype());
 	target->SetPrototype(implementationObject);
 }
-
 
 string MetadataNode::TNS_PREFIX = "com/tns/gen/";
 std::map<std::string, MetadataNode*> MetadataNode::s_name2NodeCache;

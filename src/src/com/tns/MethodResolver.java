@@ -13,7 +13,7 @@ import java.util.Map;
 class MethodResolver
 {
 	private static Map<String, String> primitiveTypesSignature = new HashMap<String, String>();
-	
+
 	static
 	{
 		// Boolean
@@ -43,30 +43,32 @@ class MethodResolver
 		// Void
 		primitiveTypesSignature.put("void", "V");
 	}
-	
+
 	private static class Tuple<X, Y>
-	{ 
-	  public final X x; 
-	  public final Y y;
-	  
-	  public Tuple(X x, Y y)
-	  { 
-	    this.x = x; 
-	    this.y = y; 
-	  } 
+	{
+		public final X x;
+		public final Y y;
+
+		public Tuple(X x, Y y)
+		{
+			this.x = x;
+			this.y = y;
+		}
 	}
-	
-	private static class DistanceComparator implements Comparator<Tuple<?, Integer>> {
-	    @Override
-	    public int compare(Tuple<?, Integer> left, Tuple<?, Integer> right) {
-	        return left.y.compareTo(right.y);
-	    }
+
+	private static class DistanceComparator implements Comparator<Tuple<?, Integer>>
+	{
+		@Override
+		public int compare(Tuple<?, Integer> left, Tuple<?, Integer> right)
+		{
+			return left.y.compareTo(right.y);
+		}
 	}
-	
+
 	private static DistanceComparator distanceComparator = new DistanceComparator();
-	
+
 	private static Map<Constructor<?>, Class<?>[]> constructorParamTypeCache = new HashMap<Constructor<?>, Class<?>[]>();
-	
+
 	public static String getMethodSignature(Class<?> retType, Class<?>[] params)
 	{
 		StringBuilder ret = new StringBuilder();
@@ -89,20 +91,20 @@ class MethodResolver
 		}
 
 		Class<?> t = type;
-		
+
 		String array = "";
 		while (t.isArray())
 		{
 			array += "[";
-			t = type.getComponentType();
+			t = t.getComponentType();
 		}
-		
+
 		String signature = primitiveTypesSignature.get(t.getName());
-		if(signature == null)
+		if (signature == null)
 		{
 			signature = "L" + t.getName().replace('.', '/') + ";";
 		}
-		
+
 		return array + signature;
 	}
 
@@ -115,24 +117,24 @@ class MethodResolver
 			clazz = Class.forName(className);
 		}
 		int argLength = (args != null) ? args.length : 0;
-		
+
 		ArrayList<Tuple<Method, Integer>> candidates = new ArrayList<Tuple<Method, Integer>>();
-		
+
 		Class<?> c = clazz;
 		int iterationIndex = 0;
 		while (c != null)
 		{
 			tryFindMatches(methodName, candidates, args, argLength, c.getDeclaredMethods());
-			if(candidates.size() > iterationIndex && candidates.get(iterationIndex).y == 0)
+			if (candidates.size() > iterationIndex && candidates.get(iterationIndex).y == 0)
 			{
 				// direct matching (distance 0) found
 				break;
 			}
-			
+
 			c = c.getSuperclass();
 			iterationIndex++;
 		}
-		
+
 		if (!candidates.isEmpty())
 		{
 			if (candidates.size() > 1)
@@ -143,7 +145,7 @@ class MethodResolver
 
 		return methodSig;
 	}
-	
+
 	static void tryFindMatches(String methodName, ArrayList<Tuple<Method, Integer>> candidates, Object[] args, int argLength, Method[] methods)
 	{
 		for (Method method : methods)
@@ -152,17 +154,17 @@ class MethodResolver
 			{
 				continue;
 			}
-				
+
 			int modifiers = method.getModifiers();
 			if (!Modifier.isPublic(modifiers) && !Modifier.isProtected(modifiers))
 			{
 				continue;
 			}
-			
+
 			Class<?>[] params = method.getParameterTypes();
 
 			boolean success = false;
-			
+
 			if (params.length == argLength)
 			{
 				int dist = 0;
@@ -176,7 +178,7 @@ class MethodResolver
 					{
 						if (args[i] != null)
 						{
-							Tuple<Boolean, Integer> res = isAssignableFrom(params[i], args[i].getClass()); 
+							Tuple<Boolean, Integer> res = isAssignableFrom(params[i], args[i].getClass());
 							success = res.x.booleanValue();
 							dist += res.y;
 						}
@@ -193,13 +195,13 @@ class MethodResolver
 				if (success)
 				{
 					candidates.add(new Tuple<Method, Integer>(method, Integer.valueOf(dist)));
-					if (dist == 0) 
+					if (dist == 0)
 						break;
 				}
 			}
 		}
 	}
-	
+
 	static Constructor<?> resolveConstructor(Class<?> clazz, Object[] args) throws ClassNotFoundException, IOException
 	{
 		Constructor<?>[] constructors = clazz.getConstructors();
@@ -208,8 +210,8 @@ class MethodResolver
 		{
 			return constructors[0];
 		}
-		
-		ArrayList<Tuple<Constructor<?>, Integer>> candidates = new ArrayList<Tuple<Constructor<?>, Integer>>(); 
+
+		ArrayList<Tuple<Constructor<?>, Integer>> candidates = new ArrayList<Tuple<Constructor<?>, Integer>>();
 
 		int argLen = (args != null) ? args.length : 0;
 
@@ -240,7 +242,7 @@ class MethodResolver
 				{
 					if (args[i] != null)
 					{
-						Tuple<Boolean, Integer> res = isAssignableFrom(paramTypes[i], args[i].getClass()); 
+						Tuple<Boolean, Integer> res = isAssignableFrom(paramTypes[i], args[i].getClass());
 						success = res.x.booleanValue();
 						dist += res.y;
 					}
@@ -258,21 +260,21 @@ class MethodResolver
 
 			if (success)
 			{
-				if (dist == 0) 
+				if (dist == 0)
 				{
 					return constructor;
 				}
 				candidates.add(new Tuple<Constructor<?>, Integer>(constructor, Integer.valueOf(dist)));
 			}
 		}
-		
+
 		if (!candidates.isEmpty())
 		{
 			Collections.sort(candidates, distanceComparator);
 			Constructor<?> selectedCtor = candidates.get(0).x;
-			
+
 			boolean success = convertConstructorArgs(selectedCtor, args);
-			
+
 			return success ? selectedCtor : null;
 		}
 
@@ -472,20 +474,20 @@ class MethodResolver
 				}
 			}
 		}
-		
+
 		Tuple<Boolean, Integer> ret = new Tuple<Boolean, Integer>(Boolean.valueOf(success), Integer.valueOf(dist));
-		
+
 		return ret;
 	}
-	
+
 	public static boolean convertConstructorArgs(Constructor<?> ctor, Object[] args)
 	{
 		boolean success = true;
-		
+
 		if (ctor == null)
 		{
 			success = false;
-			return  success;
+			return success;
 		}
 
 		Class<?>[] paramTypes;
@@ -498,41 +500,41 @@ class MethodResolver
 			paramTypes = ctor.getParameterTypes();
 			constructorParamTypeCache.put(ctor, paramTypes);
 		}
-		
-		for (int i=0; i<paramTypes.length; i++)
+
+		for (int i = 0; i < paramTypes.length; i++)
 		{
 			Class<?> cuurParamType = paramTypes[i];
-			
+
 			if (cuurParamType.isPrimitive())
 			{
 				success = convertPrimitiveArg(cuurParamType, args, i);
 			}
-			
+
 			if (!success)
 				break;
 		}
-		
+
 		return success;
 	}
-	
+
 	private static boolean convertPrimitiveArg(Class<?> primitiveType, Object[] args, int argIndex)
 	{
 		boolean success = false;
-		
+
 		Object currentArg = args[argIndex];
 		Class<?> currentArgClass = currentArg.getClass();
 		Number n;
-		
+
 		if (primitiveType.equals(byte.class))
 		{
 			if (currentArgClass.equals(Byte.class)
-				|| currentArgClass.equals(Short.class)
-				|| currentArgClass.equals(Integer.class)
-				|| currentArgClass.equals(Long.class)
-				|| currentArgClass.equals(Float.class)
-				|| currentArgClass.equals(Double.class))
+					|| currentArgClass.equals(Short.class)
+					|| currentArgClass.equals(Integer.class)
+					|| currentArgClass.equals(Long.class)
+					|| currentArgClass.equals(Float.class)
+					|| currentArgClass.equals(Double.class))
 			{
-				n = (Number)currentArg;
+				n = (Number) currentArg;
 				args[argIndex] = Byte.valueOf(n.byteValue());
 				success = true;
 			}
@@ -540,13 +542,13 @@ class MethodResolver
 		else if (primitiveType.equals(short.class))
 		{
 			if (currentArgClass.equals(Byte.class)
-				|| currentArgClass.equals(Short.class)
-				|| currentArgClass.equals(Integer.class)
-				|| currentArgClass.equals(Long.class)
-				|| currentArgClass.equals(Float.class)
-				|| currentArgClass.equals(Double.class))
+					|| currentArgClass.equals(Short.class)
+					|| currentArgClass.equals(Integer.class)
+					|| currentArgClass.equals(Long.class)
+					|| currentArgClass.equals(Float.class)
+					|| currentArgClass.equals(Double.class))
 			{
-				n = (Number)currentArg;
+				n = (Number) currentArg;
 				args[argIndex] = Short.valueOf(n.shortValue());
 				success = true;
 			}
@@ -554,13 +556,13 @@ class MethodResolver
 		else if (primitiveType.equals(int.class))
 		{
 			if (currentArgClass.equals(Byte.class)
-				|| currentArgClass.equals(Short.class)
-				|| currentArgClass.equals(Integer.class)
-				|| currentArgClass.equals(Long.class)
-				|| currentArgClass.equals(Float.class)
-				|| currentArgClass.equals(Double.class))
+					|| currentArgClass.equals(Short.class)
+					|| currentArgClass.equals(Integer.class)
+					|| currentArgClass.equals(Long.class)
+					|| currentArgClass.equals(Float.class)
+					|| currentArgClass.equals(Double.class))
 			{
-				n = (Number)currentArg;
+				n = (Number) currentArg;
 				args[argIndex] = Integer.valueOf(n.intValue());
 				success = true;
 			}
@@ -568,13 +570,13 @@ class MethodResolver
 		else if (primitiveType.equals(long.class))
 		{
 			if (currentArgClass.equals(Byte.class)
-				|| currentArgClass.equals(Short.class)
-				|| currentArgClass.equals(Integer.class)
-				|| currentArgClass.equals(Long.class)
-				|| currentArgClass.equals(Float.class)
-				|| currentArgClass.equals(Double.class))
+					|| currentArgClass.equals(Short.class)
+					|| currentArgClass.equals(Integer.class)
+					|| currentArgClass.equals(Long.class)
+					|| currentArgClass.equals(Float.class)
+					|| currentArgClass.equals(Double.class))
 			{
-				n = (Number)currentArg;
+				n = (Number) currentArg;
 				args[argIndex] = Long.valueOf(n.longValue());
 				success = true;
 			}
@@ -582,13 +584,13 @@ class MethodResolver
 		else if (primitiveType.equals(float.class))
 		{
 			if (currentArgClass.equals(Byte.class)
-				|| currentArgClass.equals(Short.class)
-				|| currentArgClass.equals(Integer.class)
-				|| currentArgClass.equals(Long.class)
-				|| currentArgClass.equals(Float.class)
-				|| currentArgClass.equals(Double.class))
+					|| currentArgClass.equals(Short.class)
+					|| currentArgClass.equals(Integer.class)
+					|| currentArgClass.equals(Long.class)
+					|| currentArgClass.equals(Float.class)
+					|| currentArgClass.equals(Double.class))
 			{
-				n = (Number)currentArg;
+				n = (Number) currentArg;
 				args[argIndex] = Float.valueOf(n.floatValue());
 				success = true;
 			}
@@ -596,13 +598,13 @@ class MethodResolver
 		else if (primitiveType.equals(double.class))
 		{
 			if (currentArgClass.equals(Byte.class)
-				|| currentArgClass.equals(Short.class)
-				|| currentArgClass.equals(Integer.class)
-				|| currentArgClass.equals(Long.class)
-				|| currentArgClass.equals(Float.class)
-				|| currentArgClass.equals(Double.class))
+					|| currentArgClass.equals(Short.class)
+					|| currentArgClass.equals(Integer.class)
+					|| currentArgClass.equals(Long.class)
+					|| currentArgClass.equals(Float.class)
+					|| currentArgClass.equals(Double.class))
 			{
-				n = (Number)currentArg;
+				n = (Number) currentArg;
 				args[argIndex] = Double.valueOf(n.doubleValue());
 				success = true;
 			}
@@ -615,7 +617,7 @@ class MethodResolver
 		{
 			success = currentArgClass.equals(Boolean.class);
 		}
-		
+
 		return success;
 	}
 }

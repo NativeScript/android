@@ -63,7 +63,7 @@ public class TypeIDs
 			return TypeIDs.JsObject;
 		}
 	}
-	
+
 	public static int GetObjectTypeId(Class<?> clazz)
 	{
 		if (clazz.equals(void.class))

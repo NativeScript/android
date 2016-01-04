@@ -56,8 +56,35 @@ namespace tns
 			static std::map<std::string, v8::Persistent<v8::Function>*> s_requireCache;
 
 			static std::map<std::string, v8::Persistent<v8::Object>*> s_loadedModules;
-	};
-}
 
+			class TempModule
+			{
+				public:
+				TempModule(const std::string& modulePath, v8::Persistent<v8::Object> *poModuleObj)
+				:m_dispose(true), m_modulePath(modulePath), m_poModuleObj(poModuleObj)
+				{
+					s_loadedModules.insert(make_pair(m_modulePath, m_poModuleObj));
+				}
+
+				~TempModule()
+				{
+					if (m_dispose)
+					{
+						s_loadedModules.erase(m_modulePath);
+					}
+				}
+
+				void SaveToCache()
+				{
+					m_dispose = false;
+				}
+
+				private:
+				bool m_dispose;
+				std::string m_modulePath;
+				v8::Persistent<v8::Object> *m_poModuleObj;
+			};
+		};
+	}
 
 #endif /* JNI_MODULE_H_ */

@@ -3,21 +3,31 @@
 #include "NativeScriptException.h"
 #include "NativeScriptAssert.h"
 
+#include <sstream>
+
 using namespace tns;
+using namespace std;
 
 void mkdir_rec(const char *dir);
 
 extern "C" void Java_com_tns_AssetExtractor_extractAssets(JNIEnv *env, jobject obj, jstring apk, jstring outputDir, jboolean _forceOverwrite)
 {
-	try {
-	AssetExtractor::ExtractAssets(env, obj, apk, outputDir, _forceOverwrite);
-	} catch (NativeScriptException& e) {
+	try
+	{
+		AssetExtractor::ExtractAssets(env, obj, apk, outputDir, _forceOverwrite);
+	}
+	catch (NativeScriptException& e)
+	{
 		e.ReThrowToJava();
 	}
 	catch (std::exception e) {
-		DEBUG_WRITE("Error: c++ exception: %s", e.what());
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
+		nsEx.ReThrowToJava();
 	}
 	catch (...) {
-		DEBUG_WRITE("Error: c++ exception!");
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToJava();
 	}
 }

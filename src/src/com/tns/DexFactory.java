@@ -39,7 +39,7 @@ public class DexFactory
 		this.classLoader = classLoader;
 		this.dexDir = dexBaseDir;
 		this.dexThumb = dexThumb;
-		
+
 		this.odexDir = new File(this.dexDir, "odex");
 		this.proxyGenerator = new ProxyGenerator(this.dexDir.getAbsolutePath());
 		ProxyGenerator.IsLogEnabled = logger.isEnabled();
@@ -73,9 +73,10 @@ public class DexFactory
 		String fullClassName = className.replace("$", "_") + CLASS_NAME_LOCATION_SEPARATOR + name;
 
 		// try to get pre-generated binding classes
-		try {
+		try
+		{
 			Class<?> pregeneratedClass = classLoader.loadClass(fullClassName.replace("-", "_"));
-			
+
 			return pregeneratedClass;
 		}
 		catch (Exception e)
@@ -92,8 +93,8 @@ public class DexFactory
 		String classToProxy = this.getClassToProxyName(className);
 		String dexFilePath = classToProxy + CLASS_NAME_LOCATION_SEPARATOR + name;
 		File dexFile = this.getDexFile(dexFilePath);
-		
-		//generate dex file
+
+		// generate dex file
 		if (dexFile == null)
 		{
 			long startGenTime = System.nanoTime();
@@ -113,7 +114,7 @@ public class DexFactory
 			}
 		}
 
-		//creates jar file from already generated dex file
+		// creates jar file from already generated dex file
 		String jarFilePath = dexFile.getPath().replace(".dex", ".jar");
 		File jarFile = new File(jarFilePath);
 
@@ -121,19 +122,19 @@ public class DexFactory
 		{
 			FileOutputStream jarFileStream = new FileOutputStream(jarFile);
 			ZipOutputStream out = new ZipOutputStream(jarFileStream);
-			
-		    out.putNextEntry(new ZipEntry("classes.dex"));
-		    byte[] dexData = new byte[(int)dexFile.length()];
-		    FileInputStream fi = new FileInputStream(dexFile);
-		    fi.read(dexData, 0, dexData.length);
-		    fi.close();
-		    
-		    out.write(dexData);
-		    out.closeEntry();
-		    out.close();
+
+			out.putNextEntry(new ZipEntry("classes.dex"));
+			byte[] dexData = new byte[(int) dexFile.length()];
+			FileInputStream fi = new FileInputStream(dexFile);
+			fi.read(dexData, 0, dexData.length);
+			fi.close();
+
+			out.write(dexData);
+			out.closeEntry();
+			out.close();
 		}
 		//
-		
+
 		Class<?> result = null;
 		DexFile df = null;
 		try

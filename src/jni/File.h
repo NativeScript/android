@@ -20,13 +20,12 @@ namespace tns
 			static bool Exists(const std::string& filePath);
 			static bool WriteBinary(const std::string& filePath, const void* inData, int length);
 			static void* ReadBinary(const std::string& filePath, int& length);
-		private:
+			private:
 			static const int BUFFER_SIZE = 1024 * 1024;
 			static char* Buffer;
 			static const char* WRITE_BINARY;
 			static const char* READ_BINARY;
 	};
 }
-
 
 #endif /* JNI_FILE_H_ */
