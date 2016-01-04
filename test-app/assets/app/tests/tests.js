@@ -622,36 +622,6 @@ describe("Tests ", function () {
 		expect(file).toBe(file2);
 	});
 	
-	it("TestGarbageCollection", function (done) {
-		var normalTest = function () { 
-
-			__log("TEST: TestGarbageCollection");
-			
-			var obj = new com.tns.tests.ClassX();
-			
-			obj.dummy();
-			
-			obj = null;
-			
-			gc();
-			java.lang.System.gc();
-			gc();
-			java.lang.System.gc();
-			gc();
-			java.lang.System.gc();
-			
-			new java.lang.Thread(new java.lang.Runnable("ThreadFunc", {
-				run: function() {
-					var isCollected = com.tns.tests.ClassX.IsCollected;
-					__log('----------> isCollected: ' + isCollected);
-					expect(isCollected).toBe(true);
-					done();
-				}
-			})).start();
-		};
-		normalTest();
-	});
-	
 	it("TestWorkingWithJavaArrayDoesNotMakeMemoryLeak", function () {
 		
 
@@ -730,80 +700,6 @@ describe("Tests ", function () {
 
 		expect(isCalled).toEqual(true);
 		expect(isConstructor).toEqual(false);
-		
-	});
-	
-	it("TestRequire", function () {
-		
-		__log("TEST: TestRequire");
-		
-		var exceptionCaught = false;
-		try{
-			var myModule = require("../simplemodule");	
-		}
-		catch(e) {
-			exceptionCaught = true;
-		}
-		
-		myModule.myLog("Hello world from NativeScript!");
-		
-		expect(exceptionCaught).toBe(false);
-	});
-	
-	it("TestArrays", function () {
-		
-		__log("TEST: TestArrays");
-		
-		var MyButton = com.tns.tests.Button1.extend("MyButton639", {
-			toString : function() {
-			  	return "button1";	
-			}
-		});
-		var tester = new MyButton(); 
-		var instances = tester.getDummyInstances();
-		
-		var instanceFound = false;
-
-		for (var i = 0; i < instances.length; i++)
-		{
-			if (instances[i].getName() == "second");
-			{
-				instanceFound = true;
-			}
-		}
-		
-		expect(instanceFound).toEqual(true);
-		
-		instances[0] = instances[1];
-		
-		var instances0name = instances[0].getName();
-		var instances1name = instances[1].getName();
-		
-		expect(instances0name).toEqual(instances1name);
-	});
-	
-	it("TestArrayLengthPropertyIsNumber", function () {
-		
-		__log("TEST: TestArrayLengthPropertyIsNumber");
-		
-		var expectedLength = 10;
-
-		function getLength(x)
-		{
-			var arr = x.getIntArray1(expectedLength);
-			
-			return arr ? arr.length : 123456;
-		}
-		
-		var MyButton = com.tns.tests.Button1.extend("MyButton680", {
-			toString : function() {
-			  	return "button1";	
-			}
-		});
-		
-		var count = getLength(new MyButton());
-		
-		expect(count).toBe(expectedLength);
 		
 	});
 	
