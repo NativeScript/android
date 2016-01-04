@@ -1,1 +1,0 @@
-exports.msg = "module2";
