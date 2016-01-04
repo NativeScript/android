@@ -7,6 +7,36 @@ describe("Tests garbage collection", function () {
 	beforeEach(function() {
 		jasmine.addCustomEqualityTester(myCustomEquality);
 	});
+
+	it("TestGarbageCollection", function (done) {
+		var normalTest = function () { 
+
+			__log("TEST: TestGarbageCollection");
+			
+			var obj = new com.tns.tests.ClassX();
+			
+			obj.dummy();
+			
+			obj = null;
+			
+			gc();
+			java.lang.System.gc();
+			gc();
+			java.lang.System.gc();
+			gc();
+			java.lang.System.gc();
+			
+			new java.lang.Thread(new java.lang.Runnable("ThreadFunc", {
+				run: function() {
+					var isCollected = com.tns.tests.ClassX.IsCollected;
+					__log('----------> isCollected: ' + isCollected);
+					expect(isCollected).toBe(true);
+					done();
+				}
+			})).start();
+		};
+		normalTest();
+	});
 	
 	// this test has implicit assert in com.tns.Platform.getJavaObjectByID method
 	it("test1", function () {
