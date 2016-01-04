@@ -393,11 +393,11 @@ Isolate* NativePlatform::PrepareV8Runtime(JEnv& env, const string& filesPath, js
 
 	context_scope = new Context::Scope(context);
 
-	Module::Init(isolate);
-
 	g_objectManager->Init(isolate);
 
 	auto global = context->Global();
+
+	Module::Init(isolate);
 
 	auto appTemplate = ObjectTemplate::New();
 	appTemplate->Set(ConvertToV8String("init"), FunctionTemplate::New(isolate, AppInitCallback));

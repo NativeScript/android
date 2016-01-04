@@ -63,6 +63,10 @@ void Module::Init(Isolate *isolate)
 	auto requireFuncTemplate = FunctionTemplate::New(isolate, RequireCallback);
 	auto requireFunc = requireFuncTemplate->GetFunction();
 	s_poRequireFunction = new Persistent<Function>(isolate, requireFunc);
+
+	auto global = isolate->GetCurrentContext()->Global();
+	auto globalRequire = GetRequireFunction(isolate, Constants::APP_ROOT_FOLDER_PATH);
+	global->Set(ConvertToV8String("require"), globalRequire);
 }
 
 Local<Function> Module::GetRequireFunction(Isolate *isolate, const string& dirName)
