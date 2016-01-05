@@ -284,8 +284,9 @@ Local<Object> Module::LoadModule(Isolate *isolate, const string& modulePath)
 
 	moduleObj->Set(ConvertToV8String("require"), require);
 
-	auto moduleId = modulePath.substr(Constants::APP_ROOT_FOLDER_PATH.length() - 4);
-	moduleObj->Set(ConvertToV8String("id"),  ConvertToV8String(moduleId));
+	auto moduleIdProp = ConvertToV8String("id");
+	const auto readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
+	moduleObj->DefineOwnProperty(isolate->GetCurrentContext(), moduleIdProp, fileName, readOnlyFlags);
 
 	auto thiz = Object::New(isolate);
 	auto extendsName = ConvertToV8String("__extends");
