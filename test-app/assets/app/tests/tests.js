@@ -622,36 +622,6 @@ describe("Tests ", function () {
 		expect(file).toBe(file2);
 	});
 	
-	it("TestGarbageCollection", function (done) {
-		var normalTest = function () { 
-
-			__log("TEST: TestGarbageCollection");
-			
-			var obj = new com.tns.tests.ClassX();
-			
-			obj.dummy();
-			
-			obj = null;
-			
-			gc();
-			java.lang.System.gc();
-			gc();
-			java.lang.System.gc();
-			gc();
-			java.lang.System.gc();
-			
-			new java.lang.Thread(new java.lang.Runnable("ThreadFunc", {
-				run: function() {
-					var isCollected = com.tns.tests.ClassX.IsCollected;
-					__log('----------> isCollected: ' + isCollected);
-					expect(isCollected).toBe(true);
-					done();
-				}
-			})).start();
-		};
-		normalTest();
-	});
-	
 	it("TestWorkingWithJavaArrayDoesNotMakeMemoryLeak", function () {
 		
 
@@ -730,80 +700,6 @@ describe("Tests ", function () {
 
 		expect(isCalled).toEqual(true);
 		expect(isConstructor).toEqual(false);
-		
-	});
-	
-	it("TestRequire", function () {
-		
-		__log("TEST: TestRequire");
-		
-		var exceptionCaught = false;
-		try{
-			var myModule = require("../simplemodule");	
-		}
-		catch(e) {
-			exceptionCaught = true;
-		}
-		
-		myModule.myLog("Hello world from NativeScript!");
-		
-		expect(exceptionCaught).toBe(false);
-	});
-	
-	it("TestArrays", function () {
-		
-		__log("TEST: TestArrays");
-		
-		var MyButton = com.tns.tests.Button1.extend("MyButton639", {
-			toString : function() {
-			  	return "button1";	
-			}
-		});
-		var tester = new MyButton(); 
-		var instances = tester.getDummyInstances();
-		
-		var instanceFound = false;
-
-		for (var i = 0; i < instances.length; i++)
-		{
-			if (instances[i].getName() == "second");
-			{
-				instanceFound = true;
-			}
-		}
-		
-		expect(instanceFound).toEqual(true);
-		
-		instances[0] = instances[1];
-		
-		var instances0name = instances[0].getName();
-		var instances1name = instances[1].getName();
-		
-		expect(instances0name).toEqual(instances1name);
-	});
-	
-	it("TestArrayLengthPropertyIsNumber", function () {
-		
-		__log("TEST: TestArrayLengthPropertyIsNumber");
-		
-		var expectedLength = 10;
-
-		function getLength(x)
-		{
-			var arr = x.getIntArray1(expectedLength);
-			
-			return arr ? arr.length : 123456;
-		}
-		
-		var MyButton = com.tns.tests.Button1.extend("MyButton680", {
-			toString : function() {
-			  	return "button1";	
-			}
-		});
-		
-		var count = getLength(new MyButton());
-		
-		expect(count).toBe(expectedLength);
 		
 	});
 	
@@ -1763,108 +1659,6 @@ describe("Tests ", function () {
 		expect(name2.indexOf("MyButton1615")).not.toEqual(-1);
 	});
 	
-	it("When_using_global_in_a_module_global_should_be_defined", function () {
-		
-		__log("TEST: When_using_global_in_a_module_global_should_be_defined");
-		
-		var module = require("../modules/module");
-		var canAccessGlobalObject = module.accessGlobalObject();
-		expect(canAccessGlobalObject).toBe(true);
-	});
-	
-	it("When_using_package_json_should_load_module", function () {
-		
-		__log("TEST: When_using_package_json_should_load_module");
-		
-		var module2 = require("../module2");
-		var value456 = module2.value456;
-		
-		expect(value456).toBe(456);
-	});
-	
-	it("When_using_package_json_should_load_module_even_if_js_extend_is_not_specified", function () {
-		
-		__log("TEST: When_using_package_json_should_load_module_even_if_js_extend_is_not_specified");
-		
-		var module = require("../modules");
-		var value456 = module.value123;
-		
-		expect(value456).toBe(123);
-	});
-	
-	
-	it("When_require_bcl_module_it_should_be_loaded", function () {
-		
-		__log("TEST: When_require_bcl_module_it_should_be_loaded");
-		
-		var module = require("bclmodule");
-		var moduleName = module.getModuleName();
-		var expectedModuleName = "bclModule";
-		expect(moduleName).toBe(expectedModuleName);
-	});
-	
-	it("When_require_a_module_it_should_be_loaded", function () {
-		
-		__log("TEST: When_require_a_module_it_should_be_loaded");
-		
-		var module = require("./testModules/testmodule");
-		var moduleName = module.getModuleName();
-		
-		expect(moduleName).toEqual("testModule");
-	});
-	
-	it("When_require_a_module_via_app_root_syntax_it_should_be_loaded", function () {
-		
-		__log("TEST: When_require_a_module_via_app_root_syntax_it_should_be_loaded");
-		
-		var mymodule = require("~/modules/mymodule");
-		var value = mymodule.echo(12345)
-		
-		expect(value).toBe(12345);
-	});
-
-	
-	it("When_require_a_bcl_module_in_a_dir_it_should_be_loaded", function () {
-		
-		__log("TEST: When_require_a_bcl_module_in_a_dir_it_should_be_loaded");
-		
-		var module = require("tests/testModules/testBclModule");
-		var moduleName = module.getModuleName();
-		
-		expect(moduleName).toEqual("testBclModule");
-	});
-	
-	it("When_require_a_module_that_is_a_directory_name_it_should_load_the_index_js_inside_it", function () {
-		
-		__log("TEST: When_require_a_module_that_is_a_directory_name_it_should_load_the_index_js_inside_it");
-		
-		var module = require("./testModules/someDirModule");
-		var moduleName = module.getModuleName();
-		
-		expect(moduleName).toEqual("index.js");
-	});
-	
-	it("When_require_a_bcl_module_that_is_a_directory_name_it_should_load_the_index_js_inside_it", function () {
-		
-		__log("TEST: When_require_a_bcl_module_that_is_a_directory_name_it_should_load_the_index_js_inside_it");
-		
-		var module = require("tests/testModules/someBclDirModule");
-		var moduleName = module.getModuleName();
-		
-		expect(moduleName).toEqual("bclindex.js");
-	});
-	
-	it("When_require_a_bcl_module_that_is_a_directory_name_it_should_load_the_package_json_inside_it", function () {
-		
-		__log("TEST: When_require_a_bcl_module_that_is_a_directory_name_it_should_load_the_package_json_inside_it");
-		
-		var module = require("tests/testModules/someModule");
-		var value123 = module.value123;
-		
-		expect(value123).toBe(123);
-	});
-	
-	
 	it("When_calling_non_existent_ctor_it_should_fail", function () {
 		
 		__log("TEST: When_calling_non_existent_ctor_it_should_fail: Start"); 
@@ -1884,30 +1678,5 @@ describe("Tests ", function () {
 		}
 		
 		expect(exceptionCaught).toBe(true);
-	});
-	
-	it("should load module with null char in it", function () {
-		var text = require("../modules/moduleWithNullChar").text;
-		var s = "Hello world";
-		expect(text.length).toBe(s.length);
-	});
-	
-	it("should have module.require exported function", function () {
-		expect(typeof module.require).toBe("function");
-	});
-
-	it("should load module through module.require exported function", function () {
-		var module1 = require("../modules/module1");
-		expect(module1.msg).toBe("module1");
-		
-		var module2 = module1.module.require("./module2");
-		expect(module2.msg).toBe("module2");
-	});
-
-	it("should load module through global.require", function () {
-		expect(typeof global.require).toBe("function");
-		
-		var module3 = global.require("./modules/module3");
-		expect(module3.msg).toBe("module3");
 	});
 });

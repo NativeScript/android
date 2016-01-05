@@ -1,6 +1,22 @@
 __disableVerboseLogging();
 __log("starting tests");
 
+// methods that common tests need to run
+var testContent = "";
+__collect = gc;
+TNSClearOutput = function () {
+	testContent = "";
+}
+TNSLog = function (text) {
+	testContent += text;
+}
+TNSGetOutput = function () {
+	return testContent;
+}
+__approot = __dirname.substr(0, __dirname.length - 4);
+
+require("./shared");
+
 require("./tests/testMetadata");
 require("./tests/testAsserts");
 require("./tests/testWeakRef"); 
@@ -21,7 +37,6 @@ require("./tests/testFieldGetSet");
 require("./tests/extendedClassesTests");
 require("./tests/extendClassNameTests");
 require("./tests/testJniReferenceLeak");
-require("./tests/testRequireJSON");
 require("./tests/testNativeModules");
 require("./tests/requireExceptionTests");
 
