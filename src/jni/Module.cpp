@@ -284,6 +284,13 @@ Local<Object> Module::LoadModule(Isolate *isolate, const string& modulePath)
 
 	moduleObj->Set(ConvertToV8String("require"), require);
 
+	auto moduleIdProp = ConvertToV8String("id");
+	const auto readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
+	Maybe<bool> success = moduleObj->DefineOwnProperty(isolate->GetCurrentContext(), moduleIdProp, fileName, readOnlyFlags);
+	if(success.IsNothing()) {
+		throw NativeScriptException(string("Couldn't execute method 'DefineOwnProperty' on 'moduleObj' in 'Module::LoadModule'."));
+	}
+
 	auto thiz = Object::New(isolate);
 	auto extendsName = ConvertToV8String("__extends");
 	thiz->Set(extendsName, isolate->GetCurrentContext()->Global()->Get(extendsName));
