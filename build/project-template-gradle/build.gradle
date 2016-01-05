@@ -40,8 +40,8 @@ def nodeModulesDir = "../../node_modules/"
 def libDir = "../../lib/Android/"
 def pluginNames = new ArrayList<String>()
 def configDir = file(configurationsDir)
-def appResExists = false
-def appResourcesName = "NativescriptAppResources"
+def nsarFolder = "nsar"
+def nsarPath = "src/" + nsarFolder
 
 def compiteCompileSdkVersion () {
 	if(project.hasProperty("compileSdk")) {
@@ -140,6 +140,14 @@ android {
 			mergeAssetsTask.dependsOn(copyMetadata)
 		}
 	}
+	
+	// done because of android manifest we want to merge
+	// flavorDimensions "NSAR"
+	productFlavors {
+		"$nsarFolder" {
+			dimension "$nsarFolder"
+		}
+	}
 }
 
 repositories {
@@ -222,11 +230,6 @@ task createDefaultIncludeFiles {
 			def dimensionName = sanatizeDimensionName(fileName)
 			createPluginConfigFile = true
 			def foundIncludeFile = false
-			def isAppResDir = false
-			if(fileName == appResourcesName) {
-				appResExists = true
-				isAppResDir = true
-			}
 			
 			println "\t+found plugins: " + fileName
 			fl.listFiles().each { subFile ->
@@ -237,9 +240,7 @@ task createDefaultIncludeFiles {
 				}
 			}
 			
-			if(!isAppResDir) {
-				pluginNames.add('"' + dimensionName + '"')
-			}
+			pluginNames.add('"' + dimensionName + '"')
 			
 			if(!foundIncludeFile) {
 				createIncludeFile(fl.getAbsolutePath() ,fileName, dimensionName)
@@ -260,15 +261,9 @@ task createPluginsConfigFile {
 		if(createPluginConfigFile) {
 			println "\t+creating product flavors include.gradle file in $configurationsDir folder..."
 			def flavors = pluginNames.join(",")
-			if(appResExists) {
-				if (flavors == '') {
-					flavors = '"' + appResourcesName + '"'
-				} else {
-					flavors = '"' + appResourcesName + '", ' + flavors
-				}
-			}
+			
 			flavorsFile << "android { \n"
-			flavorsFile << "\tflavorDimensions " + flavors + "\n"
+			flavorsFile << "\tflavorDimensions \"" + nsarFolder + "\", " + flavors + "\n"
 			flavorsFile << "}\n"
 		}
 	}
@@ -276,7 +271,13 @@ task createPluginsConfigFile {
 
 task pluginExtend {
 	description "applies additional configuration"
-	
+
+	def pathToAppGradle = "../../app/App_Resources/Android/app.gradle" 
+	def appGradle = file(pathToAppGradle)
+	if(appGradle.exists()) {
+		apply from: pathToAppGradle
+	}
+
 	if(configDir.exists()) {
 	println "$configStage pluginExtend"
 		configDir.eachFileRecurse(groovy.io.FileType.FILES) {
@@ -294,10 +295,20 @@ task pluginExtend {
 // createPluginsConfigFile.dependsOn(createDefaultIncludeFiles)
 // pluginExtend.dependsOn(createPluginsConfigFile)
 
-
 ////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////// BEFORE EXECUTION /////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
+
+
+task cleanNsar (type: Delete) {
+	delete nsarPath
+}
+
+task makeNsarDir (type: Copy) {
+	println "$configStage create nativescript app resources dir"
+	from "../../app/App_Resources/Android/AndroidManifest.xml"
+	into nsarPath
+}
 
 // we need to copy all dependencies into a flat dir, as pointed by the repositories configurations at the top
 task copyAarDependencies (type: Copy) {
@@ -369,6 +380,7 @@ task isMetadataGenerationNecessary {
 	description "checks if new metadata is necessary based on jar and aar dependencies used"
 	def inputFile = new File("build/metadataUTD")
 	def metadataDir = new File("metadata/output");
+	
 	inputs.file inputFile
 	outputs.upToDateWhen {
 		inputFile.exists() && 
@@ -457,6 +469,8 @@ task buildapk {
 	// and this is the only way so far
 	tasks.copyAarDependencies.execute()
     tasks.addAarDependencies.execute()
+    tasks.cleanNsar.execute();
+    tasks.makeNsarDir.execute();
 	
 	//done to build only necessary apk
 	if(project.hasProperty("release")) {
