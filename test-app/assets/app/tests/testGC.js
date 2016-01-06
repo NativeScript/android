@@ -8,7 +8,7 @@ describe("Tests garbage collection", function () {
 		jasmine.addCustomEqualityTester(myCustomEquality);
 	});
 
-	it("TestGarbageCollection", function (done) {
+	xit("TestGarbageCollection", function (done) {
 		var normalTest = function () { 
 
 			__log("TEST: TestGarbageCollection");
