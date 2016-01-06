@@ -13,19 +13,21 @@ JsDebugger::JsDebugger()
 {
 }
 
-void JsDebugger::Init(v8::Isolate *isolate, const string& packageName)
+void JsDebugger::Init(v8::Isolate *isolate, const string& packageName, jobject jsDebugger)
 {
 	s_isolate = isolate;
 	s_packageName = packageName;
 
 	JEnv env;
+	s_jsDebugger = env.NewGlobalRef(jsDebugger);
+
 	s_JsDebuggerClass = env.FindClass("com/tns/JsDebugger");
 	assert(s_JsDebuggerClass != nullptr);
 
-	s_EnqueueMessage = env.GetStaticMethodID(s_JsDebuggerClass, "enqueueMessage", "(Ljava/lang/String;)V");
+	s_EnqueueMessage = env.GetMethodID(s_JsDebuggerClass, "enqueueMessage", "(Ljava/lang/String;)V");
 	assert(s_EnqueueMessage != nullptr);
 
-	s_EnableAgent = env.GetStaticMethodID(s_JsDebuggerClass, "enableAgent", "(Ljava/lang/String;IZ)V");
+	s_EnableAgent = env.GetMethodID(s_JsDebuggerClass, "enableAgent", "()V");
 	assert(s_EnableAgent != nullptr);
 }
 
@@ -95,19 +97,15 @@ void JsDebugger::SendCommand(JNIEnv *_env, jobject obj, jbyteArray command, jint
 
 void JsDebugger::DebugBreakCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
+	if (s_jsDebugger == nullptr)
+	{
+		return;
+	}
+
 	try
 	{
 		JEnv env;
-		JniLocalRef packageName(env.NewStringUTF(s_packageName.c_str()));
-
-		jint port = 8181;
-		if ((args.Length() > 0) && args[0]->IsInt32())
-		{
-			port = args[0]->Int32Value();
-		}
-		jboolean jniFalse = JNI_FALSE;
-
-		env.CallStaticVoidMethod(s_JsDebuggerClass, s_EnableAgent, (jstring) packageName, port, jniFalse);
+		env.CallStaticVoidMethod(s_JsDebuggerClass, s_EnableAgent);
 
 		DebugBreak();
 	}
@@ -140,16 +138,22 @@ void JsDebugger::SendCommandToV8(uint16_t *cmd, int length)
  */
 void JsDebugger::MyMessageHandler(const v8::Debug::Message& message)
 {
+	if (s_jsDebugger == nullptr)
+	{
+		return;
+	}
+
 	auto json = message.GetJSON();
 	auto str = ConvertToString(json);
 
 	JEnv env;
 	JniLocalRef s(env.NewStringUTF(str.c_str()));
 
-	env.CallStaticVoidMethod(s_JsDebuggerClass, s_EnqueueMessage, (jstring) s);
+	env.CallVoidMethod(s_jsDebugger, s_EnqueueMessage, (jstring) s);
 }
 
 v8::Isolate* JsDebugger::s_isolate = nullptr;
+jobject JsDebugger::s_jsDebugger = nullptr;
 string JsDebugger::s_packageName = "";
 jclass JsDebugger::s_JsDebuggerClass = nullptr;
 jmethodID JsDebugger::s_EnqueueMessage = nullptr;

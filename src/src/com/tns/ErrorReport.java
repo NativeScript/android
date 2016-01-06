@@ -115,7 +115,7 @@ class ErrorReport
 		Class<?> errorActivityClass = Platform.getErrorActivityClass(); // can be null or can be provided beforehand
 
 		// if in debug and errorActivityClass is not provided use ErrorReportActivity class
-		if (errorActivityClass == null && Util.isDebuggableApp(context))
+		if (errorActivityClass == null && JsDebugger.isDebuggableApp(context))
 		{
 			errorActivityClass = ErrorReportActivity.class;
 		}

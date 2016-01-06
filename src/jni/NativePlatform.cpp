@@ -60,7 +60,7 @@ jint NativePlatform::JNI_ON_LOAD(JavaVM *vm, void *reserved)
 	return JNI_VERSION_1_6;
 }
 
-Isolate* NativePlatform::InitNativeScript(JNIEnv *_env, jobject obj, jstring filesPath, jint appJavaObjectId, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args)
+Isolate* NativePlatform::InitNativeScript(JNIEnv *_env, jobject obj, jstring filesPath, jint appJavaObjectId, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jobject jsDebugger)
 {
 	AppJavaObjectID = appJavaObjectId;
 	tns::LogEnabled = verboseLoggingEnabled;
@@ -80,7 +80,7 @@ Isolate* NativePlatform::InitNativeScript(JNIEnv *_env, jobject obj, jstring fil
 	DEBUG_WRITE("Initializing Telerik NativeScript: app instance id:%d", appJavaObjectId);
 
 	NativeScriptException::Init(g_jvm, g_objectManager);
-	s_isolate = PrepareV8Runtime(env, filesRoot, packageName);
+	s_isolate = PrepareV8Runtime(env, filesRoot, packageName, jsDebugger);
 	return s_isolate;
 }
 
@@ -323,7 +323,7 @@ void NativePlatform::AppInitCallback(const v8::FunctionCallbackInfo<v8::Value>& 
 	}
 }
 
-Isolate* NativePlatform::PrepareV8Runtime(JEnv& env, const string& filesPath, jstring packageName)
+Isolate* NativePlatform::PrepareV8Runtime(JEnv& env, const string& filesPath, jstring packageName, jobject jsDebugger)
 {
 	Platform* platform = v8::platform::CreateDefaultPlatform();
 	V8::InitializePlatform(platform);
@@ -413,7 +413,7 @@ Isolate* NativePlatform::PrepareV8Runtime(JEnv& env, const string& filesPath, js
 
 	string pckName = ArgConverter::jstringToString(packageName);
 	Profiler::Init(pckName);
-	JsDebugger::Init(isolate, pckName);
+	JsDebugger::Init(isolate, pckName, jsDebugger);
 
 	NativeScriptRuntime::BuildMetadata(env, filesPath);
 
