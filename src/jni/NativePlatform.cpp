@@ -23,6 +23,7 @@
 #include "Module.h"
 #include "NativeScriptException.h"
 #include "NativePlatform.h"
+#include "ArrayHelper.h"
 #include <sstream>
 #include <android/log.h>
 #include <string>
@@ -418,6 +419,8 @@ Isolate* NativePlatform::PrepareV8Runtime(JEnv& env, const string& filesPath, js
 	NativeScriptRuntime::BuildMetadata(env, filesPath);
 
 	NativeScriptRuntime::CreateTopLevelNamespaces(global);
+
+	ArrayHelper::Init(g_objectManager, context);
 
 	return isolate;
 }

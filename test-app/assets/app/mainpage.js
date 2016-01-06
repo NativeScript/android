@@ -39,6 +39,7 @@ require("./tests/extendClassNameTests");
 require("./tests/testJniReferenceLeak");
 require("./tests/testNativeModules");
 require("./tests/requireExceptionTests");
+require("./tests/java-array-test");
 
 var MainActivity = {
     onCreate: function (bundle) {
