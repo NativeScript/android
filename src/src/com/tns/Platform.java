@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.lang.ref.WeakReference;
+import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -895,5 +896,15 @@ public class Platform
 		}
 
 		dexFactory.purgeAllProxies();
+	}
+	
+	@RuntimeCallable
+	private static Object createArrayHelper(String arrayClassName, int size) throws ClassNotFoundException
+	{
+		Class<?> clazz = Class.forName(arrayClassName);
+		
+		Object arr = Array.newInstance(clazz, size);
+		
+		return arr;
 	}
 }

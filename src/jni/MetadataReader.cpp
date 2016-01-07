@@ -466,6 +466,10 @@ MetadataTreeNode* MetadataReader::GetOrCreateTreeNodeByName(const string& classN
 		MetadataTreeNode *forwardedNode = GetOrCreateTreeNodeByName(cn);
 
 		uint16_t forwardedNodeId = GetNodeId(forwardedNode);
+		if (treeNode->children == nullptr)
+		{
+			treeNode->children = new vector<MetadataTreeNode*>();
+		}
 		vector<MetadataTreeNode*>& children = *treeNode->children;
 		for (auto childNode : children)
 		{

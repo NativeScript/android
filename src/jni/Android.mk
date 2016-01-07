@@ -73,7 +73,7 @@ LOCAL_SRC_FILES :=	com_tns_AssetExtractor.cpp AssetExtractor.cpp\
 					ArgConverter.cpp JsArgToArrayConverter.cpp JsArgConverter.cpp V8GlobalHelpers.cpp V8StringConstants.cpp \
 					FieldAccessor.cpp ArrayElementAccessor.cpp \
 					Util.cpp Logger.cpp Profiler.cpp \
-					ObjectManager.cpp NumericCasts.cpp WeakRef.cpp \
+					ObjectManager.cpp NumericCasts.cpp WeakRef.cpp ArrayHelper.cpp \
 					MetadataMethodInfo.cpp SimpleProfiler.cpp JType.cpp File.cpp Module.cpp Constants.cpp 
 
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/include
