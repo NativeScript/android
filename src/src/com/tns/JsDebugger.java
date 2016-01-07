@@ -123,8 +123,10 @@ public class JsDebugger
 	                {
 	                	try
 	    				{
+	                		logger.write("NativeScript Debugger new connection on: " + socket.getFileDescriptor().toString());
+	                		
 	                		LocalSocket socket = serverSocket.accept();
-	                		logger.write("Debugger new connection on: " + socket.getFileDescriptor().toString());
+	                		logger.write("NativeScript Debugger new connection on: " + socket.getFileDescriptor().toString());
 	                		
 	    					//out (send messages to node inspector)
 	    					this.responseHandler = new ResponseHandler(socket, requestHandlerCloseable);
@@ -285,7 +287,7 @@ public class JsDebugger
 			finally
 			{
 				this.stop = true;
-				logger.write("sending disconnect to v8 debugger");
+				//logger.write("sending disconnect to v8 debugger");
 				sendMessageToV8("{\"seq\":0,\"type\":\"request\",\"command\":\"disconnect\"}");
 				scanner.close();
 			}
@@ -295,7 +297,7 @@ public class JsDebugger
 		{
 			try
 			{
-				Log.d("TNS.JAVA.JsDebugger", "Sending message to v8:" + message);
+				//Log.d("TNS.JAVA.JsDebugger", "Sending message to v8:" + message);
 				
 				byte[] cmdBytes = message.getBytes("UTF-16LE");
 				int cmdLength = cmdBytes.length;
@@ -341,7 +343,7 @@ public class JsDebugger
 						break;
 					}
 					
-					Log.d("TNS.JAVA.JsDebugger", "Sending message to inspector:" + message);
+					//Log.d("TNS.JAVA.JsDebugger", "Sending message to inspector:" + message);
 					
 					sendMessageToInspector(message);
 				}
@@ -386,7 +388,7 @@ public class JsDebugger
 					output.write(utf8);
 					output.flush();
 					
-					Log.d("TNS.JAVA.JsDebugger", "Sent message to inspector:" + msg);
+					//Log.d("TNS.JAVA.JsDebugger", "Sent message to inspector:" + msg);
 				}
 				catch (IOException e)
 				{
@@ -408,7 +410,7 @@ public class JsDebugger
 	@RuntimeCallable
 	private void enqueueMessage(String message)
 	{
-		logger.write("Debug msg:" + message);
+		//logger.write("Debug msg:" + message);
 		
 		dbgMessages.add(message);
 		
@@ -423,14 +425,14 @@ public class JsDebugger
 	@RuntimeCallable
 	private void enableAgent()
 	{
-		logger.write("Enabling Debugger Agent");
+		logger.write("Enabling NativeScript Debugger Agent");
 		enable();
 	}
 
 	@RuntimeCallable
 	private void disableAgent()
 	{
-		logger.write("Disabling Debugger Agent");
+		logger.write("Disabling NativeScript Debugger Agent");
 		disable();
 		
 		
