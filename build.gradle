@@ -1,4 +1,6 @@
 import groovy.json.JsonSlurper //used to parse package.json
+import groovy.json.JsonBuilder
+import groovy.json.JsonOutput
 
 def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
 def localMetadataGen = "../android-metadata-generator/dist/tns-android-metadata-generator-0.0.1.tgz"
@@ -9,14 +11,14 @@ def commitVersionFile = "commit.txt"
 
 task checkEnvironmentVariables {
 	if ("$System.env.JAVA_HOME" == "" || "$System.env.JAVA_HOME" == "null") {
-        throw new GradleException("Set JAVA_HOME to point to the correct Jdk location\n");
-    }
+		throw new GradleException("Set JAVA_HOME to point to the correct Jdk location\n");
+	}
 	if ("$System.env.ANDROID_HOME" == "" || "$System.env.ANDROID_HOME" == "null") {
-        throw new GradleException("Set ANDROID_HOME to point to the correct Android SDK location\n");
-    }
+		throw new GradleException("Set ANDROID_HOME to point to the correct Android SDK location\n");
+	}
 	if ("$System.env.GIT_COMMIT" == "null") {
-        logger.warn("Warning: The GIT_COMMIT is not set. This NativeScript Android Runtime will not be tagged with the git commit it is build from\n");
-    }
+		logger.warn("Warning: The GIT_COMMIT is not set. This NativeScript Android Runtime will not be tagged with the git commit it is build from\n");
+	}
 	if(project.hasProperty("devmode") == true && !project.hasProperty("metadataGenSrc") && !file("../android-metadata-generator").exists()) {
 		throw new GradleException("../android-metadata-generator directory not found and no metadataGenSrc option specified. Clone the android-metadata-generator repo first.\n");
 	}
@@ -25,7 +27,7 @@ task checkEnvironmentVariables {
 	}
 }
 
-task checkAndroidCommand(type:Exec) {		
+task checkAndroidCommand(type:Exec) {
 	
 	if(isWinOs) {
 		commandLine "cmd", "/c", "android", "-h"
@@ -40,8 +42,8 @@ task checkAndroidCommand(type:Exec) {
 		def successResult = isWinOs ? 0 : 1
 		
 		if (execResult.exitValue != successResult) {//1 is ok result for android tool
-            throw new GradleException("\n--> 'android' command not found. Set the PATH variable to include the path to Android SDK Tools directory.\n\nError: " + errorOutput + "\nexitValue: " + execResult.exitValue)
-        }
+			throw new GradleException("\n--> 'android' command not found. Set the PATH variable to include the path to Android SDK Tools directory.\n\nError: " + errorOutput + "\nexitValue: " + execResult.exitValue)
+		}
 	}
 }
 
@@ -85,11 +87,6 @@ task createDistDir {
 	// }
 // }
 
-// task copyLatestWidgetsJar (type: Copy) {
-	// from widgetsPath //passed by jenkins
-	// into "$rootDir/build/project-template-gradle/libs"
-// }
-
 //when repository is not private
 // task cloneSBgeneratorInTemplate (type: Exec) {
 	// workingDir "$rootDir/build/project-template-gradle/build-tools"
@@ -126,7 +123,7 @@ task getPackageVersion {
 }
 
 task getCommitVersion {
-	if("$System.env.GIT_COMMIT" != "null") {		
+	if("$System.env.GIT_COMMIT" != "null") {        
 		String content = "$System.env.GIT_COMMIT"
 		arVersion = content.trim()
 	}
@@ -188,19 +185,39 @@ task packFramework (type: Exec) {
 	}
 }
 
+task fixVersion << {
+	if(project.hasProperty("PACKAGE_VERSION")) {
+		def inputFile = new File("./package.json")
+		def json = new JsonSlurper().parseText(inputFile.text)
+		json.version = json.version + "-" + PACKAGE_VERSION
+		def jb = new JsonBuilder(json);
+		inputFile.text = JsonOutput.prettyPrint(jb.toString())
+	}
+}
+
+task revertPackageJson (type: Exec) {
+	if(isWinOs) {
+		commandLine "cmd", "/c", "git", "checkout", "--", "./package.json"
+	}
+	else {
+		commandLine "git", "checkout", "--", "./package.json"
+	}
+}
+
 //clean and set up dirs
 createDistDir.dependsOn(cleanDistDir)
 
 
 //copy framework structure
-// copyLatestWidgetsJar.dependsOn(createDistDir)
 // cloneSBgeneratorInTemplate.dependsOn(copyLatestWidgetsJar)
 copyGradleTemplate.dependsOn(createDistDir)
 copyInternalFolder.dependsOn(copyGradleTemplate)
-copyPackageJson.dependsOn(copyInternalFolder)
+fixVersion.dependsOn(copyInternalFolder)
+copyPackageJson.dependsOn(fixVersion)
+revertPackageJson.dependsOn(copyPackageJson)
 
 //get version from package json
-getPackageVersion.dependsOn(copyPackageJson)
+getPackageVersion.dependsOn(revertPackageJson)
 getCommitVersion.dependsOn(getPackageVersion)
 deleteCommitFile.dependsOn(getCommitVersion)
 
