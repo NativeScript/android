@@ -123,8 +123,6 @@ public class JsDebugger
 	                {
 	                	try
 	    				{
-	                		logger.write("NativeScript Debugger new connection on: " + socket.getFileDescriptor().toString());
-	                		
 	                		LocalSocket socket = serverSocket.accept();
 	                		logger.write("NativeScript Debugger new connection on: " + socket.getFileDescriptor().toString());
 	                		
