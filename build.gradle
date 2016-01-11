@@ -142,7 +142,7 @@ task generateRuntime (type: Exec) {
 			commandLine "cmd", "/c" , "gradle", "buildar", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"
 		}
 		else {
-			commandLine "gradle", "buildar", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "--stacktrace"
+			commandLine "gradle", "buildar", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "--stacktrace", "-x", "lint"
 		}
 	}
 }
