@@ -5,7 +5,7 @@
 #ifndef V8_V8_TEST_H_
 #define V8_V8_TEST_H_
 
-#include "v8.h"  // NOLINT(build/include)
+#include "v8.h"
 
 /**
  * Testing support for the V8 JavaScript engine.

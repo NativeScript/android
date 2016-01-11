@@ -6,7 +6,7 @@
 #define V8_V8_PROFILER_H_
 
 #include <vector>
-#include "v8.h"  // NOLINT(build/include)
+#include "v8.h"
 
 /**
  * Profiler support for the V8 JavaScript engine.
@@ -309,7 +309,7 @@ class V8_EXPORT HeapGraphNode {
 /**
  * An interface for exporting data from V8, using "push" model.
  */
-class V8_EXPORT OutputStream {  // NOLINT
+class V8_EXPORT OutputStream {
  public:
   enum WriteResult {
     kContinue = 0,
@@ -403,7 +403,7 @@ class V8_EXPORT HeapSnapshot {
  * An interface for reporting progress and controlling long-running
  * activities.
  */
-class V8_EXPORT ActivityControl {  // NOLINT
+class V8_EXPORT ActivityControl {
  public:
   enum ControlOption {
     kContinue = 0,
@@ -579,7 +579,7 @@ class V8_EXPORT HeapProfiler {
  * keeps them alive only during snapshot collection. Afterwards, they
  * are freed by calling the Dispose class function.
  */
-class V8_EXPORT RetainedObjectInfo {  // NOLINT
+class V8_EXPORT RetainedObjectInfo {
  public:
   /** Called by V8 when it no longer needs an instance. */
   virtual void Dispose() = 0;
