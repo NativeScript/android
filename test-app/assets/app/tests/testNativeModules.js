@@ -9,6 +9,8 @@ describe("Tests native modules)", function () {
 		var lcArch = sysArch.toLowerCase();
 		if (lcArch.indexOf("arm") > -1) {
 			arch = "arm";
+		} else if (lcArch.indexOf("aarch64") > -1) {
+			arch = "arm64";
 		} else if (lcArch.indexOf("i686") > -1) {
 			arch = "x86";
 		} else {

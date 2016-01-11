@@ -4,8 +4,8 @@ include $(CLEAR_VARS)
 LOCAL_MODULE    := v8_base
 ifeq ($(TARGET_ARCH_ABI),armeabi-v7a)
     LOCAL_SRC_FILES := libs/arm/libv8_base.a
-else ifeq ($(TARGET_ARCH_ABI),armeabi)
-    LOCAL_SRC_FILES := libs/arm/libv8_base.a
+else ifeq ($(TARGET_ARCH_ABI),arm64-v8a)
+    LOCAL_SRC_FILES := libs/arm64/libv8_base.a
 else ifeq ($(TARGET_ARCH_ABI),x86)
     LOCAL_SRC_FILES := libs/x86/libv8_base.a
 endif
@@ -15,8 +15,8 @@ include $(CLEAR_VARS)
 LOCAL_MODULE    := v8_libplatform
 ifeq ($(TARGET_ARCH_ABI),armeabi-v7a)
     LOCAL_SRC_FILES := libs/arm/libv8_libplatform.a
-else ifeq ($(TARGET_ARCH_ABI),armeabi)
-    LOCAL_SRC_FILES := libs/arm/libv8_libplatform.a
+else ifeq ($(TARGET_ARCH_ABI),arm64-v8a)
+    LOCAL_SRC_FILES := libs/arm64/libv8_libplatform.a
 else ifeq ($(TARGET_ARCH_ABI),x86)
     LOCAL_SRC_FILES := libs/x86/libv8_libplatform.a
 endif
@@ -27,8 +27,8 @@ include $(CLEAR_VARS)
 LOCAL_MODULE    := v8_libbase
 ifeq ($(TARGET_ARCH_ABI),armeabi-v7a)
     LOCAL_SRC_FILES := libs/arm/libv8_libbase.a
-else ifeq ($(TARGET_ARCH_ABI),armeabi)
-    LOCAL_SRC_FILES := libs/arm/libv8_libbase.a
+else ifeq ($(TARGET_ARCH_ABI),arm64-v8a)
+    LOCAL_SRC_FILES := libs/arm64/libv8_libbase.a
 else ifeq ($(TARGET_ARCH_ABI),x86)
     LOCAL_SRC_FILES := libs/x86/libv8_libbase.a
 endif
@@ -40,8 +40,8 @@ include $(CLEAR_VARS)
 LOCAL_MODULE    := v8_nosnapshot
 ifeq ($(TARGET_ARCH_ABI),armeabi-v7a)
     LOCAL_SRC_FILES := libs/arm/libv8_nosnapshot.a
-else ifeq ($(TARGET_ARCH_ABI),armeabi)
-    LOCAL_SRC_FILES := libs/arm/libv8_nosnapshot.a
+else ifeq ($(TARGET_ARCH_ABI),arm64-v8a)
+    LOCAL_SRC_FILES := libs/arm64/libv8_nosnapshot.a
 else ifeq ($(TARGET_ARCH_ABI),x86)
     LOCAL_SRC_FILES := libs/x86/libv8_nosnapshot.a
 endif
@@ -51,8 +51,8 @@ include $(CLEAR_VARS)
 LOCAL_MODULE    := zip
 ifeq ($(TARGET_ARCH_ABI),armeabi-v7a)
     LOCAL_SRC_FILES := libs/arm/libzip.a
-else ifeq ($(TARGET_ARCH_ABI),armeabi)
-    LOCAL_SRC_FILES := libs/arm/libzip.a
+else ifeq ($(TARGET_ARCH_ABI),arm64-v8a)
+    LOCAL_SRC_FILES := libs/arm64/libzip.a
 else ifeq ($(TARGET_ARCH_ABI),x86)
     LOCAL_SRC_FILES := libs/x86/libzip.a
 endif
