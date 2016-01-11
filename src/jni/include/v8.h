@@ -19,8 +19,8 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "v8-version.h"
-#include "v8config.h"
+#include "v8-version.h"  // NOLINT(build/include)
+#include "v8config.h"    // NOLINT(build/include)
 
 // We reserve the V8_* prefix for macros defined in V8 public API and
 // assume there are no name conflicts with the embedder's code.
@@ -638,7 +638,7 @@ template <class T> class PersistentBase {
   friend class Object;
 
   explicit V8_INLINE PersistentBase(T* val) : val_(val) {}
-  PersistentBase(const PersistentBase& other) = delete;
+  PersistentBase(const PersistentBase& other) = delete;  // NOLINT
   void operator=(const PersistentBase&) = delete;
   V8_INLINE static T* New(Isolate* isolate, T* that);
 
@@ -732,12 +732,12 @@ template <class T, class M> class Persistent : public PersistentBase<T> {
   V8_INLINE Persistent(const Persistent<S, M2>& that) : PersistentBase<T>(0) {
     Copy(that);
   }
-  V8_INLINE Persistent& operator=(const Persistent& that) {
+  V8_INLINE Persistent& operator=(const Persistent& that) { // NOLINT
     Copy(that);
     return *this;
   }
   template <class S, class M2>
-  V8_INLINE Persistent& operator=(const Persistent<S, M2>& that) {
+  V8_INLINE Persistent& operator=(const Persistent<S, M2>& that) { // NOLINT
     Copy(that);
     return *this;
   }
@@ -752,7 +752,7 @@ template <class T, class M> class Persistent : public PersistentBase<T> {
 
   // TODO(dcarney): this is pretty useless, fix or remove
   template <class S>
-  V8_INLINE static Persistent<T>& Cast(Persistent<S>& that) {
+  V8_INLINE static Persistent<T>& Cast(Persistent<S>& that) { // NOLINT
 #ifdef V8_ENABLE_CHECKS
     // If we're going to perform the type check then we have to check
     // that the handle isn't empty before doing the checked cast.
@@ -762,7 +762,7 @@ template <class T, class M> class Persistent : public PersistentBase<T> {
   }
 
   // TODO(dcarney): this is pretty useless, fix or remove
-  template <class S> V8_INLINE Persistent<S>& As() {
+  template <class S> V8_INLINE Persistent<S>& As() { // NOLINT
     return Persistent<S>::Cast(*this);
   }
 
@@ -815,7 +815,7 @@ class Global : public PersistentBase<T> {
   /**
    * Move constructor.
    */
-  V8_INLINE Global(Global&& other) : PersistentBase<T>(other.val_) {
+  V8_INLINE Global(Global&& other) : PersistentBase<T>(other.val_) {  // NOLINT
     other.val_ = nullptr;
   }
   V8_INLINE ~Global() { this->Reset(); }
@@ -823,7 +823,7 @@ class Global : public PersistentBase<T> {
    * Move via assignment.
    */
   template <class S>
-  V8_INLINE Global& operator=(Global<S>&& rhs) {
+  V8_INLINE Global& operator=(Global<S>&& rhs) {  // NOLINT
     TYPE_CHECK(T, S);
     if (this != &rhs) {
       this->Reset();
@@ -835,7 +835,7 @@ class Global : public PersistentBase<T> {
   /**
    * Pass allows returning uniques from functions, etc.
    */
-  Global Pass() { return static_cast<Global&&>(*this); }
+  Global Pass() { return static_cast<Global&&>(*this); }  // NOLINT
 
   /*
    * For compatibility with Chromium's base::Bind (base::Passed).
@@ -2175,7 +2175,7 @@ class V8_EXPORT String : public Name {
    */
   bool IsExternalOneByte() const;
 
-  class V8_EXPORT ExternalStringResourceBase {
+  class V8_EXPORT ExternalStringResourceBase {  // NOLINT
    public:
     virtual ~ExternalStringResourceBase() {}
 
@@ -3362,7 +3362,7 @@ class V8_EXPORT ArrayBuffer : public Object {
    *
    * This API is experimental and may change significantly.
    */
-  class V8_EXPORT Allocator {
+  class V8_EXPORT Allocator { // NOLINT
    public:
     virtual ~Allocator() {}
 
@@ -3394,7 +3394,7 @@ class V8_EXPORT ArrayBuffer : public Object {
    *
    * This API is experimental and may change significantly.
    */
-  class V8_EXPORT Contents {
+  class V8_EXPORT Contents { // NOLINT
    public:
     Contents() : data_(NULL), byte_length_(0) {}
 
@@ -3757,7 +3757,7 @@ class V8_EXPORT SharedArrayBuffer : public Object {
    *
    * This API is experimental and may change significantly.
    */
-  class V8_EXPORT Contents {
+  class V8_EXPORT Contents {  // NOLINT
    public:
     Contents() : data_(NULL), byte_length_(0) {}
 
@@ -4736,7 +4736,7 @@ class V8_EXPORT ExternalOneByteStringResourceImpl
 /**
  * Ignore
  */
-class V8_EXPORT Extension {
+class V8_EXPORT Extension {  // NOLINT
  public:
   // Note that the strings passed into this constructor must live as long
   // as the Extension itself.
@@ -5160,7 +5160,7 @@ typedef void (*JitCodeEventHandler)(const JitCodeEvent* event);
 /**
  * Interface for iterating through all external resources in the heap.
  */
-class V8_EXPORT ExternalResourceVisitor {
+class V8_EXPORT ExternalResourceVisitor {  // NOLINT
  public:
   virtual ~ExternalResourceVisitor() {}
   virtual void VisitExternalString(Local<String> string) {}
@@ -5170,7 +5170,7 @@ class V8_EXPORT ExternalResourceVisitor {
 /**
  * Interface for iterating through all the persistent handles in the heap.
  */
-class V8_EXPORT PersistentHandleVisitor {
+class V8_EXPORT PersistentHandleVisitor {  // NOLINT
  public:
   virtual ~PersistentHandleVisitor() {}
   virtual void VisitPersistentHandle(Persistent<Value>* value,
@@ -6858,9 +6858,9 @@ class V8_EXPORT Locker {
 
 namespace internal {
 
-const int kApiPointerSize = sizeof(void*);
-const int kApiIntSize = sizeof(int);
-const int kApiInt64Size = sizeof(int64_t);
+const int kApiPointerSize = sizeof(void*);  // NOLINT
+const int kApiIntSize = sizeof(int);  // NOLINT
+const int kApiInt64Size = sizeof(int64_t);  // NOLINT
 
 // Tag information for HeapObject.
 const int kHeapObjectTag = 1;
