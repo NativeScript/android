@@ -46,6 +46,7 @@ void JsDebugger::Enable()
 	v8::HandleScope handleScope(isolate);
 
 	v8::Debug::SetMessageHandler(MyMessageHandler);
+	enabled = true;
 }
 
 /* *
@@ -53,6 +54,7 @@ void JsDebugger::Enable()
  */
 void JsDebugger::Disable()
 {
+	enabled = false;
 	auto isolate = s_isolate;
 	v8::Isolate::Scope isolate_scope(isolate);
 	v8::HandleScope handleScope(isolate);
@@ -125,6 +127,28 @@ void JsDebugger::DebugBreakCallback(const v8::FunctionCallbackInfo<v8::Value>& a
 	}
 }
 
+void JsDebugger::ConsoleMessageCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
+{
+	if (s_jsDebugger == nullptr || !enabled)
+	{
+		return;
+	}
+
+	auto isolate = s_isolate;
+	v8::Isolate::Scope isolate_scope(isolate);
+	v8::HandleScope handleScope(isolate);
+
+	if ((args.Length() > 0) && args[0]->IsString())
+	{
+		std::string message = ConvertToString(args[0]->ToString());
+		//jboolean isError = (jboolean) = args[1]->ToBoolean()->BooleanValue();
+
+		JEnv env;
+		JniLocalRef s(env.NewStringUTF(message.c_str()));
+		env.CallVoidMethod(s_jsDebugger, s_EnqueueMessage, (jstring) s);
+	}
+}
+
 void JsDebugger::SendCommandToV8(uint16_t *cmd, int length)
 {
 	auto isolate = s_isolate;
@@ -148,10 +172,10 @@ void JsDebugger::MyMessageHandler(const v8::Debug::Message& message)
 
 	JEnv env;
 	JniLocalRef s(env.NewStringUTF(str.c_str()));
-
 	env.CallVoidMethod(s_jsDebugger, s_EnqueueMessage, (jstring) s);
 }
 
+bool JsDebugger::enabled = false;
 v8::Isolate* JsDebugger::s_isolate = nullptr;
 jobject JsDebugger::s_jsDebugger = nullptr;
 string JsDebugger::s_packageName = "";
