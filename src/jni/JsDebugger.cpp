@@ -8,6 +8,7 @@
 
 using namespace std;
 using namespace tns;
+using namespace v8;
 
 JsDebugger::JsDebugger()
 {
@@ -135,16 +136,80 @@ void JsDebugger::ConsoleMessageCallback(const v8::FunctionCallbackInfo<v8::Value
 	}
 
 	auto isolate = s_isolate;
-	v8::Isolate::Scope isolate_scope(isolate);
-	v8::HandleScope handleScope(isolate);
+	Isolate::Scope isolate_scope(isolate);
+	HandleScope handleScope(isolate);
 
 	if ((args.Length() > 0) && args[0]->IsString())
 	{
 		std::string message = ConvertToString(args[0]->ToString());
 		//jboolean isError = (jboolean) = args[1]->ToBoolean()->BooleanValue();
 
+
+		std:string type = "log";
+		if (args.Length() > 1  && args[1]->IsString())
+		{
+			type = ConvertToString(args[1]->ToString());
+		}
+
+		string srcFileName = "";
+		int lineNumber = 0;
+		int columnNumber = 0;
+
+		auto stackTrace = StackTrace::CurrentStackTrace(Isolate::GetCurrent(), 2, StackTrace::kOverview);
+		if (!stackTrace.IsEmpty())
+		{
+			auto frame = stackTrace->GetFrame(1);
+			if (!frame.IsEmpty())
+			{
+				auto scriptName = frame->GetScriptName();
+				if (!scriptName.IsEmpty())
+				{
+					srcFileName = ConvertToString(scriptName);
+				}
+
+				lineNumber = frame->GetLineNumber();
+				columnNumber = frame->GetColumn();
+			}
+		}
+
+
+
+
+		//    			var consoleEvent = {
+		//	    			"seq":0,
+		//	    			"type":"event",
+		//	    			"event":"messageAdded",
+		//	    			"success":true,
+		//	    			"body":
+		//	    			{
+		//	    				"message":
+		//	    				{
+		//	    			        "source":"console-api",
+		//	    			        "type": "log",
+		//	    			        "level": '',
+		//	    			        "line": 0,
+		//	    			        "column": 0,
+		//	    			        "url": "",
+		//	    			        "groupLevel": 7,
+		//	    			        "repeatCount": 1,
+		//	    			        "text": "My message"
+		//	    			    }
+		//	    			}
+		//    			};
+
+		stringstream consoleEventSS;
+		consoleEventSS << "{\"seq\":0, \"type\":\"event\", \"event\":\"messageAdded\", \"success\":true, \"body\": { \"message\": { \"source\":\"console-api\", "
+				<< " \"type\": \"" << type << "\", "
+				<< " \"level\": \"\", "
+				<< " \"line\": " << lineNumber << ","
+				<< " \"colum\": " << columnNumber << ","
+				<< " \"url\" : \"" << srcFileName << "\","
+				<< " \"groupLevel\": 7, \"repeatCount\": 1, "
+				<< " \"text\": \"" << message << "\" } } }";
+
+
 		JEnv env;
-		JniLocalRef s(env.NewStringUTF(message.c_str()));
+		JniLocalRef s(env.NewStringUTF(consoleEventSS.str().c_str()));
 		env.CallVoidMethod(s_jsDebugger, s_EnqueueMessage, (jstring) s);
 	}
 }
