@@ -202,7 +202,7 @@ void JsDebugger::ConsoleMessageCallback(const v8::FunctionCallbackInfo<v8::Value
 				<< " \"type\": \"" << type << "\", "
 				<< " \"level\": \"\", "
 				<< " \"line\": " << lineNumber << ","
-				<< " \"colum\": " << columnNumber << ","
+				<< " \"column\": " << columnNumber << ","
 				<< " \"url\" : \"" << srcFileName << "\","
 				<< " \"groupLevel\": 7, \"repeatCount\": 1, "
 				<< " \"text\": \"" << message << "\" } } }";
