@@ -1,31 +1,31 @@
 /*
-*	Script builds apk in release or debug mode
-*	To run: 
-*			gradle buildapk -Prelease (release mode)
-*			gradle buildapk (debug mode -> default)
-* 	Options:
-*			-Prelease  //this flag will run build in release mode
-*			-PksPath=[path_to_keystore_file]
-*			-PksPassword=[password_for_keystore_file]
-*			-Palias=[alias_to_use_from_keystore_file]
-*			-Ppassword=[password_for_alias]
+*   Script builds apk in release or debug mode
+*   To run: 
+*           gradle buildapk -Prelease (release mode)
+*           gradle buildapk (debug mode -> default)
+*   Options:
+*           -Prelease  //this flag will run build in release mode
+*           -PksPath=[path_to_keystore_file]
+*           -PksPassword=[password_for_keystore_file]
+*           -Palias=[alias_to_use_from_keystore_file]
+*           -Ppassword=[password_for_alias]
 *
-*			-PtargetSdk=[target_sdk] (default is 22)
-*			-PbuildToolsVersion=[build_tools_version] (default is 22.0.1)
-*			-PsupportVersion=[support_version] (default (22.2.0)
-*			-PcompileSdk=[compile_sdk_version] (default 22)
+*           -PtargetSdk=[target_sdk] (default is 22)
+*           -PbuildToolsVersion=[build_tools_version] (default is 22.0.1)
+*           -PsupportVersion=[support_version] (default (22.2.0)
+*           -PcompileSdk=[compile_sdk_version] (default 22)
 *
-*			-PrunSBGenerator //this flag will triger static binding generation
+*           -PrunSBGenerator //this flag will triger static binding generation
 */
 
 buildscript {
-    repositories {
-        jcenter()
-    }
+	repositories {
+		jcenter()
+	}
 
-    dependencies {
-        classpath "com.android.tools.build:gradle:1.3.1"
-    }
+	dependencies {
+		classpath "com.android.tools.build:gradle:1.3.1"
+	}
 }
 
 apply plugin: "com.android.application"
@@ -40,8 +40,6 @@ def nodeModulesDir = "../../node_modules/"
 def libDir = "../../lib/Android/"
 def pluginNames = new ArrayList<String>()
 def configDir = file(configurationsDir)
-def nsarFolder = "nsar"
-def nsarPath = "src/" + nsarFolder
 
 def compiteCompileSdkVersion () {
 	if(project.hasProperty("compileSdk")) {
@@ -72,19 +70,19 @@ def computeBuildToolsVersion() {
 
 def renameResultApks (variant) {
 	def name
-    variant.outputs.each { output ->
+	variant.outputs.each { output ->
 
-        def apkDirectory = output.packageApplication.outputFile.parentFile
+		def apkDirectory = output.packageApplication.outputFile.parentFile
 		def apkNamePrefix = rootProject.name + "-" + variant.buildType.name
 
-        if (output.zipAlign) {
-            name = apkNamePrefix + ".apk"
-            output.outputFile = new File(apkDirectory, name);
-        }
+		if (output.zipAlign) {
+			name = apkNamePrefix + ".apk"
+			output.outputFile = new File(apkDirectory, name);
+		}
 
-        name = apkNamePrefix + "-unaligned.apk"
-        output.packageApplication.outputFile = new File(apkDirectory, name);
-    }    
+		name = apkNamePrefix + "-unaligned.apk"
+		output.packageApplication.outputFile = new File(apkDirectory, name);
+	}    
 }
 
 
@@ -94,7 +92,7 @@ def renameResultApks (variant) {
 
 android {
 	compileSdkVersion compiteCompileSdkVersion()
-    buildToolsVersion computeBuildToolsVersion()
+	buildToolsVersion computeBuildToolsVersion()
 	
 	defaultConfig {
 		minSdkVersion 17
@@ -102,12 +100,12 @@ android {
 	}
 	
 	sourceSets.main {
-        jniLibs.srcDir "libs/jni"
-    }
+		jniLibs.srcDir "libs/jni"
+	}
 	
 	signingConfigs {
-        release {
-            if(project.hasProperty("release")) {
+		release {
+			if(project.hasProperty("release")) {
 				if(project.hasProperty("ksPath") &&
 					project.hasProperty("ksPassword") &&
 					project.hasProperty("alias") &&
@@ -119,13 +117,13 @@ android {
 					keyPassword password
 				}
 			}
-        }
-    }
-    buildTypes {
-        release {
-            signingConfig signingConfigs.release
-        }
-    }
+		}
+	}
+	buildTypes {
+		release {
+			signingConfig signingConfigs.release
+		}
+	}
 	
 	applicationVariants.all { variant ->
 		renameResultApks(variant)
@@ -140,21 +138,13 @@ android {
 			mergeAssetsTask.dependsOn(copyMetadata)
 		}
 	}
-	
-	// done because of android manifest we want to merge
-	// flavorDimensions "NSAR"
-	productFlavors {
-		"$nsarFolder" {
-			dimension "$nsarFolder"
-		}
-	}
 }
 
 repositories {
-    jcenter()
-    // used for local *.AAR files
-    flatDir {
-    	dirs 'libs/aar'
+	jcenter()
+	// used for local *.AAR files
+	flatDir {
+		dirs 'libs/aar'
 	}
 }
 
@@ -164,10 +154,10 @@ dependencies {
 		suppotVer = supportVersion
 	}
 	
-    compile "com.android.support:support-v4:$suppotVer"
-    compile "com.android.support:appcompat-v7:$suppotVer"
+	compile "com.android.support:support-v4:$suppotVer"
+	compile "com.android.support:appcompat-v7:$suppotVer"
 
-    // take all jars within the libs dir
+	// take all jars within the libs dir
 	compile fileTree(dir: "libs", include: ["**/*.jar"])
 
 	// take all jars within the node_modules dir
@@ -178,8 +168,8 @@ dependencies {
 	
 	//when gradle has aar support this will be preferred instead of addAarDependencies
 	// compile files("$rootDir/libs/aar") {
-        // builtBy 'copyAarDependencies'
-    // }
+		// builtBy 'copyAarDependencies'
+	// }
 
 }
 
@@ -263,7 +253,7 @@ task createPluginsConfigFile {
 			def flavors = pluginNames.join(",")
 			
 			flavorsFile << "android { \n"
-			flavorsFile << "\tflavorDimensions \"" + nsarFolder + "\", " + flavors + "\n"
+			flavorsFile << "\tflavorDimensions " + flavors + "\n"
 			flavorsFile << "}\n"
 		}
 	}
@@ -298,17 +288,6 @@ task pluginExtend {
 ////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////// BEFORE EXECUTION /////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
-
-
-task cleanNsar (type: Delete) {
-	delete nsarPath
-}
-
-task makeNsarDir (type: Copy) {
-	println "$configStage create nativescript app resources dir"
-	from "../../app/App_Resources/Android/AndroidManifest.xml"
-	into nsarPath
-}
 
 // we need to copy all dependencies into a flat dir, as pointed by the repositories configurations at the top
 task copyAarDependencies (type: Copy) {
@@ -468,10 +447,7 @@ task buildapk {
 	// problem is compile dependencies need to be changed before configuration stage
 	// and this is the only way so far
 	tasks.copyAarDependencies.execute()
-    tasks.addAarDependencies.execute()
-    tasks.cleanNsar.execute();
-    tasks.makeNsarDir.execute();
-	
+	tasks.addAarDependencies.execute()
 	//done to build only necessary apk
 	if(project.hasProperty("release")) {
 		dependsOn assembleRelease
