@@ -1,4 +1,4 @@
-var sys = require('sys'),
+var 
 	searchForFile = require('child_process').exec,
 	execFindFile = require('child_process').exec,
 	fs = require('fs'),
