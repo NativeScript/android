@@ -145,10 +145,10 @@ void JsDebugger::ConsoleMessageCallback(const v8::FunctionCallbackInfo<v8::Value
 		//jboolean isError = (jboolean) = args[1]->ToBoolean()->BooleanValue();
 
 
-		std:string type = "log";
+		std:string level = "log";
 		if (args.Length() > 1  && args[1]->IsString())
 		{
-			type = ConvertToString(args[1]->ToString());
+			level = ConvertToString(args[1]->ToString());
 		}
 
 		string srcFileName = "";
@@ -186,7 +186,7 @@ void JsDebugger::ConsoleMessageCallback(const v8::FunctionCallbackInfo<v8::Value
 		//	    				{
 		//	    			        "source":"console-api",
 		//	    			        "type": "log",
-		//	    			        "level": '',
+		//	    			        "level": 'error',
 		//	    			        "line": 0,
 		//	    			        "column": 0,
 		//	    			        "url": "",
@@ -199,8 +199,8 @@ void JsDebugger::ConsoleMessageCallback(const v8::FunctionCallbackInfo<v8::Value
 
 		stringstream consoleEventSS;
 		consoleEventSS << "{\"seq\":0, \"type\":\"event\", \"event\":\"messageAdded\", \"success\":true, \"body\": { \"message\": { \"source\":\"console-api\", "
-				<< " \"type\": \"" << type << "\", "
-				<< " \"level\": \"\", "
+				<< " \"type\": \"log\","
+				<< " \"level\": \"" << level << "\", "
 				<< " \"line\": " << lineNumber << ","
 				<< " \"column\": " << columnNumber << ","
 				<< " \"url\" : \"" << srcFileName << "\","
