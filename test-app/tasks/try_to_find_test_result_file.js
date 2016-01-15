@@ -8,7 +8,6 @@ var sys = require('sys'),
 	processTimeout = 11 * 60 * 1000, // 11 minutes timeout (empirical constant :)) 
 	searchInterval = 10000;
 	
-
 searchForFile("", getFile);
 
 function getFile(error, stdout, stderr) {
@@ -29,16 +28,15 @@ function checkIfFileExists(err,stout,stderr) {
 
 	//if you find file in sdcard exit process
 	if(!err) {
-		console.log('found file!');
+		console.log('Tests results file found file!');
 		isTimeToExit = true;
 	}
 	else {
-		console.log(err);
-		console.log('file not found yet!');
-	}
-	
-	//if the time to get the file is out exit process
-	if(isTimeToExit) {
-		process.exit();
+		//if the time to get the file is out exit process
+    if(isTimeToExit) {
+      console.log(err);
+      console.log('Tests results file not found!');
+      process.exit();
+    }
 	}
 }
