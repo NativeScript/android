@@ -27,12 +27,16 @@ namespace tns
 
 			static void DebugBreakCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
+			static void ConsoleMessageCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
+
 		private:
 			JsDebugger();
 
 			static void MyMessageHandler(const v8::Debug::Message& message);
+
 			static void SendCommandToV8(uint16_t *cmd, int length);
 
+			static bool enabled;
 			static std::string s_packageName;
 			static jclass s_JsDebuggerClass;
 			static jobject s_jsDebugger;
