@@ -60,7 +60,19 @@ class Module
 		checkForExternalPath = true;
 		File file = resolvePathHelper(path, baseDir);
 
-		return file.getAbsolutePath();
+		String resolvedPath;
+
+		try
+		{
+			resolvedPath = file.getCanonicalPath();
+		}
+		catch (IOException e)
+		{
+			e.printStackTrace();
+			resolvedPath = file.getAbsolutePath();
+		}
+
+		return resolvedPath;
 	}
 
 	private static boolean isFileExternal(File source, File target)
@@ -177,12 +189,13 @@ class Module
 					// search for index.js
 					file = new File(directory.getPath() + "/index.js");
 				}
-				
+
 				// TODO: search for <folderName>.js ?
 
-				if(file != null) {
+				if (file != null)
+				{
 					// cache the main file for later use
-					folderAsModuleCache.put(folderPath, file.getAbsolutePath());					
+					folderAsModuleCache.put(folderPath, file.getAbsolutePath());
 				}
 			}
 			else
