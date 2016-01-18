@@ -29,7 +29,7 @@ function checkIfFileExists(err,stout,stderr) {
 	//if you find file in sdcard exit process
 	if(!err) {
 		console.log('Tests results file found file!');
-		isTimeToExit = true;
+		process.exit();
 	}
 	else {
 		//if the time to get the file is out exit process
