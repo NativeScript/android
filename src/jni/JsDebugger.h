@@ -36,6 +36,8 @@ namespace tns
 
 			static void SendCommandToV8(uint16_t *cmd, int length);
 
+			static void ConsoleMessage(const v8::FunctionCallbackInfo<v8::Value>& args);
+
 			static bool enabled;
 			static std::string s_packageName;
 			static jclass s_JsDebuggerClass;

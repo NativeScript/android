@@ -139,6 +139,28 @@ void JsDebugger::ConsoleMessageCallback(const v8::FunctionCallbackInfo<v8::Value
 	Isolate::Scope isolate_scope(isolate);
 	HandleScope handleScope(isolate);
 
+	try
+	{
+		ConsoleMessage(args);
+	}
+	catch (NativeScriptException& e)
+	{
+		e.ReThrowToV8();
+	}
+	catch (std::exception e) {
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
+		nsEx.ReThrowToV8();
+	}
+	catch (...) {
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
+	}
+}
+
+void JsDebugger::ConsoleMessage(const v8::FunctionCallbackInfo<v8::Value>& args)
+{
 	if ((args.Length() > 0) && args[0]->IsString())
 	{
 		std::string message = ConvertToString(args[0]->ToString());
