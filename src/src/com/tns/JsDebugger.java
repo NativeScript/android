@@ -503,25 +503,24 @@ public class JsDebugger
 
 	public void start()
 	{
+		debugServerThread = new DebugLocalServerSocketThread(context.getPackageName() + "-debug");
+		debugServerThread.start();
+		
+		
 		handlerThread = new HandlerThread("debugAgentBroadCastReceiverHandler");
 		handlerThread.start();
 		Handler handler = new Handler(handlerThread.getLooper());
 		
 		registerEnableDisableDebuggerReceiver(handler);
 		
-		boolean shouldDebugBrake = getDebugBreakFlagAndClearIt();
-		
 		logger.write("Enabling Debugger Agent");
 		enable();
-		
+
+		boolean shouldDebugBrake = getDebugBreakFlagAndClearIt();
 		if (shouldDebugBrake)
 		{
 			debugBreak();
 		}
-
-		
-		debugServerThread = new DebugLocalServerSocketThread(context.getPackageName() + "-debug");
-		debugServerThread.start();
 	}
 	
 	public static boolean isDebuggableApp(Context context)
