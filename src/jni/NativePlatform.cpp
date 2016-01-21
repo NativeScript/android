@@ -42,7 +42,7 @@ int AppJavaObjectID = -1;
 int count = 0;
 SimpleAllocator g_allocator;
 
-jint NativePlatform::JNI_ON_LOAD(JavaVM *vm, void *reserved)
+void NativePlatform::Init(JavaVM *vm, void *reserved)
 {
 	__android_log_print(ANDROID_LOG_INFO, "TNS.Native", "NativeScript Runtime Version %s, commit %s", NATIVE_SCRIPT_RUNTIME_VERSION, NATIVE_SCRIPT_RUNTIME_COMMIT_SHA);
 	DEBUG_WRITE("JNI_ONLoad");
@@ -57,8 +57,6 @@ jint NativePlatform::JNI_ON_LOAD(JavaVM *vm, void *reserved)
 	}
 
 	DEBUG_WRITE("JNI_ONLoad END");
-
-	return JNI_VERSION_1_6;
 }
 
 Isolate* NativePlatform::InitNativeScript(JNIEnv *_env, jobject obj, jstring filesPath, jint appJavaObjectId, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jobject jsDebugger)

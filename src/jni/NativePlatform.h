@@ -15,7 +15,7 @@ namespace tns
 	class NativePlatform
 	{
 		public:
-			static jint JNI_ON_LOAD(JavaVM *vm, void *reserved);
+			static void Init(JavaVM *vm, void *reserved);
 			static v8::Isolate* InitNativeScript(JNIEnv *_env, jobject obj, jstring filesPath, jint appJavaObjectId, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jobject jsDebugger);
 			static void RunModule(JNIEnv *_env, jobject obj, jstring scriptFile);
 			static jobject RunScript(JNIEnv *_env, jobject obj, jstring scriptFile);
