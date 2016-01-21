@@ -7,7 +7,6 @@
 #include "JSInstanceInfo.h"
 #include "DirectBuffer.h"
 #include "LRUCache.h"
-#include <unordered_map>
 #include <map>
 #include <set>
 #include <stack>
@@ -177,7 +176,7 @@ namespace tns
 
 			std::set<uint8_t*> m_visited;
 
-			LRUCache<int, jweak, std::tr1::unordered_map> m_cache;
+			LRUCache<int, jweak> m_cache;
 
 			std::set<v8::Persistent<v8::Object>*> m_visitedPOs;
 			std::vector<PersistentObjectIdPair> m_implObjWeak;

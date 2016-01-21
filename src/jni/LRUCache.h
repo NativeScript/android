@@ -19,6 +19,7 @@
 
 #include <cassert>
 #include <list>
+#include <unordered_map>
 
 namespace tns
 {
@@ -30,7 +31,7 @@ namespace tns
 	// different type argument signatures of those
 	// containers; the default comparator/hash/allocator
 	// will be used.
-	template<typename K, typename V, template<typename ...> class MAP>
+	template<typename K, typename V>
 	class LRUCache
 	{
 		public:
@@ -42,7 +43,7 @@ namespace tns
 			typedef std::list<key_type> key_tracker_type;
 
 		// Key to value and key history iterator
-			typedef MAP<key_type, std::pair<value_type, typename key_tracker_type::iterator>> key_to_value_type;
+			typedef std::tr1::unordered_map< key_type, std::pair<value_type, typename key_tracker_type::iterator> > key_to_value_type;
 
 		// Constuctor specifies the cached function and
 		// the maximum number of records to be stored
