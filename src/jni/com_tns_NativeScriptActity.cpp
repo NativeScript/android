@@ -28,17 +28,16 @@ jobject ConvertJsValueToJavaObject(JEnv& env, const Local<Value>& value);
 //no need to extract the methods to a separate class because this file will be gone in the near future.
 extern "C" jobjectArray Java_com_tns_NativeScriptActivity_getMethodOverrides(JNIEnv *_env, jobject obj, jint objectId, jobjectArray packagedArgs)
 {
+	auto isolate = g_isolate;
+	Isolate::Scope isolate_scope(isolate);
+	HandleScope handleScope(isolate);
+
 	jobjectArray joa = nullptr;
 	try
 	{
 		DEBUG_WRITE("getMethodOverrides called");
 
-		auto isolate = g_isolate;
-		Isolate::Scope isolate_scope(isolate);
-
 		JEnv env(_env);
-
-		HandleScope handleScope(isolate);
 
 		auto appInstance = g_objectManager->GetJsObjectByJavaObject(AppJavaObjectID);
 		if (appInstance.IsEmpty())
