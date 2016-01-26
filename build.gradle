@@ -1,3 +1,17 @@
+/*
+*	Test command 
+*			gradle packar -PtargetSdk=android-23 -PminSdk=17  -PbuildToolsVersion=23.0.2 -PsupportVersion=23.0.1  -PcompileSdk=android-23
+*	To run: 
+*			gradle packar
+*
+* 	Options:
+*			-PtargetSdk=[target_sdk]
+*			-PminSdk=[target_sdk]
+*			-PbuildToolsVersion=[build_tools_version]
+*			-PsupportVersion=[support_version]
+*			-PcompileSdk=[compile_sdk_version]
+*/
+
 import groovy.json.JsonSlurper //used to parse package.json
 import groovy.json.JsonBuilder
 import groovy.json.JsonOutput
@@ -8,6 +22,12 @@ def distDir = "$rootDir/dist"
 def pVersion = "no package version was provided by build.gradle build"
 def arVersion = "no commit sha was provided by build.gradle build"
 def commitVersionFile = "commit.txt"
+
+def compileSdkVer = "";
+def buildToolsVer = "";
+def minSdkVer = "";
+def targetSdkVer = "";
+def supportVer = "";
 
 task checkEnvironmentVariables {
 	if ("$System.env.JAVA_HOME" == "" || "$System.env.JAVA_HOME" == "null") {
@@ -24,6 +44,22 @@ task checkEnvironmentVariables {
 	}
 	if(project.hasProperty("metadataGen") && !file("../android-metadata-generator/dist/tns-android-metadata-generator-0.0.1.tgz").exists()) {
 		throw new GradleException("android-metadata-generator build output not found and no metadataGen option specified. Build android-metadata-generator first.\n");
+	}
+	
+	if(project.hasProperty("compileSdk")) {
+		compileSdkVer = "-PcompileSdk=$compileSdk"
+	}
+	if(project.hasProperty("buildToolsVersion")) {
+		buildToolsVer = "-PbuildToolsVersion=$buildToolsVersion"
+	}
+	if(project.hasProperty("minSdk")) {
+		minSdkVer = "-PminSdk=$minSdk"
+	}
+	if(project.hasProperty("targetSdk")) {
+		targetSdkVer = "-PtargetSdk=$targetSdk"
+	}
+	if(project.hasProperty("supportVersion")) {
+		supportVer = "-PsupportVersion=$supportVersion"
 	}
 }
 
@@ -136,13 +172,13 @@ task deleteCommitFile (type: Delete) {
 task generateRuntime (type: Exec) {
 	doFirst{
 		workingDir "$rootDir/src"
-		
+
 		//command gradle buildar -PpackageVersion=[from_package.json] -PgitCommitVersion=[from_some_sys_variable]
 		if(isWinOs) {
-			commandLine "cmd", "/c" , "gradle", "buildar", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"
+			commandLine "cmd", "/c" , "gradle", "buildar", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", compileSdkVer, buildToolsVer, minSdkVer, targetSdkVer, supportVer
 		}
 		else {
-			commandLine "gradle", "buildar", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"
+			commandLine "gradle", "buildar", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", compileSdkVer, buildToolsVer, minSdkVer, targetSdkVer, supportVer
 		}
 	}
 }

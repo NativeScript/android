@@ -1,3 +1,17 @@
+/*
+*	Test command:
+*			gradle runtest -PtargetSdk=android-23 -PminSdk=17  -PbuildToolsVersion=23.0.2 -PsupportVersion=23.0.1  -PcompileSdk=android-23
+*	To run:
+*			gradle runtest
+*
+* 	Options:
+*			-PtargetSdk=[target_sdk] (default is 22)
+*			-PminSdk=[target_sdk] (default is 17)
+*			-PbuildToolsVersion=[build_tools_version] (default is 22.0.1)
+*			-PsupportVersion=[support_version] (default (22.2.0)
+*			-PcompileSdk=[compile_sdk_version] (default 22)
+*/
+
 def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
 def allJarPaths = new LinkedList <String> ()
 
@@ -13,9 +27,36 @@ buildscript {
 
 apply plugin: "com.android.application"
 
+
+def compiteCompileSdkVersion () {
+	if(project.hasProperty("compileSdk")) {
+		return compileSdk
+	}
+	else {
+		return 22
+	}
+}
+
+def computeBuildToolsVersion() {
+	if(project.hasProperty("buildToolsVersion")) {
+		return buildToolsVersion
+	}
+	else {
+		return "22.0.1"
+	}
+}
+
+def computeMinSdkVersion() {
+	if(project.hasProperty("minSdk")) {
+		return targetSdk
+	}
+	else {
+		return 17
+	}
+}
+
 def computeTargetSdkVersion() {
 	if(project.hasProperty("targetSdk")) {
-	
 		return targetSdk
 	}
 	else {
@@ -23,12 +64,19 @@ def computeTargetSdkVersion() {
 	}
 }
 
+def computeSupportVersion() { 
+	if(project.hasProperty("supportVersion")) {
+		return supportVersion
+	}
+	return "22.2.0"
+}
+
 android {
-	compileSdkVersion 22
-    buildToolsVersion "22.0.1"
+	compileSdkVersion compiteCompileSdkVersion()
+    buildToolsVersion computeBuildToolsVersion()
 	
 	defaultConfig {
-		minSdkVersion 17
+		minSdkVersion computeMinSdkVersion()
 		targetSdkVersion computeTargetSdkVersion()
 	}
 	
@@ -77,7 +125,9 @@ repositories {
 
 dependencies {
 	def nativescriptJarPath = "$rootDir/libs/nativescript.jar"
-	compile 'com.android.support:support-v4:22.2.0'
+	def suppotVer = computeSupportVersion();
+	
+	compile "com.android.support:support-v4:$suppotVer"
 	compile files(nativescriptJarPath)
 }
 

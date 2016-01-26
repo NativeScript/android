@@ -3,7 +3,17 @@
 *	It builds the C++ part of the runtime with the ndk-build command, which is currently impossible to do with the android plugin for gradle
 *	The script also builds the nativescript.jar file containing the binding generator and the rest of the android runtime
 *
-*	How to run script and build android runtime run: "gradle buildar"
+*	Test command:
+*			gradle buildar -PtargetSdk=android-23 -PminSdk=17  -PbuildToolsVersion=23.0.2 -PsupportVersion=23.0.1  -PcompileSdk=android-23
+*	To run: 
+*			gradle buildar
+*
+* 	Options:
+*			-PtargetSdk=[target_sdk] (default is 22)
+*			-PminSdk=[target_sdk] (default is 19)
+*			-PbuildToolsVersion=[build_tools_version] (default is 22.0.1)
+*			-PsupportVersion=[support_version] (default (22.2.0)
+*			-PcompileSdk=[compile_sdk_version] (default 22)
 */
 
 def distDir = "$rootDir/dist"
@@ -23,14 +33,57 @@ buildscript {
 
 apply plugin: 'com.android.library' //com.android.application for applications (build process is different)
 
+def compiteCompileSdkVersion () {
+	if(project.hasProperty("compileSdk")) {
+		return compileSdk
+	}
+	else {
+		return 22
+	}
+}
+
+def computeBuildToolsVersion() {
+	if(project.hasProperty("buildToolsVersion")) {
+		return buildToolsVersion
+	}
+	else {
+		return "22.0.1"
+	}
+}
+
+def computeMinSdkVersion() {
+	if(project.hasProperty("minSdk")) {
+		return targetSdk
+	}
+	else {
+		return 19
+	}
+}
+
+def computeTargetSdkVersion() {
+	if(project.hasProperty("targetSdk")) {
+		return targetSdk
+	}
+	else {
+		return 22
+	}
+}
+
+def computeSupportVersion() { 
+	if(project.hasProperty("supportVersion")) {
+		return supportVersion
+	}
+	return "22.2.0"
+}
+
 //configuration of the android plugin for gradle
 android {
-	compileSdkVersion 22
-    buildToolsVersion "22.0.1"
+	compileSdkVersion compiteCompileSdkVersion()
+    buildToolsVersion computeBuildToolsVersion()
 	
 	defaultConfig {
-        minSdkVersion 19
-        targetSdkVersion 22
+        minSdkVersion computeMinSdkVersion()
+        targetSdkVersion computeTargetSdkVersion()
         versionCode 1
         versionName "1.0"
     }
@@ -53,10 +106,11 @@ repositories {
 
 dependencies {
 	def sdkPath = android.sdkDirectory.getAbsolutePath();
-	def androidJar = sdkPath + "/platforms/" + android.compileSdkVersion + "/android.jar"	
-    
-	compile 'com.android.support:support-v4:22.2.0'
-    compile 'com.android.support:appcompat-v7:22.2.0'
+	def androidJar = sdkPath + "/platforms/" + android.compileSdkVersion + "/android.jar"
+	def suppotVer = computeSupportVersion();
+	
+	compile "com.android.support:support-v4:$suppotVer"
+    compile "com.android.support:appcompat-v7:$suppotVer"
 	compile files(androidJar)
 	compile files(pathToBindingGeneratorJar)
 }
