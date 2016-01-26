@@ -1,8 +1,8 @@
 /*
 *	Test command:
-*			gradle runtest -PtargetSdk=android-23 -PminSdk=17  -PbuildToolsVersion=23.0.2 -PsupportVersion=23.0.1  -PcompileSdk=android-23
+*			gradlew runtest -PtargetSdk=android-23 -PminSdk=17  -PbuildToolsVersion=23.0.2 -PsupportVersion=23.0.1  -PcompileSdk=android-23
 *	To run:
-*			gradle runtest
+*			gradlew runtest
 *
 * 	Options:
 *			-PtargetSdk=[target_sdk] (default is 22)
@@ -238,10 +238,10 @@ task runJarProject (type: Exec) {
 	println "---- jar project so metadata can be made for it"
 	
 	if(isWinOs) {
-		commandLine "cmd", "/c", "gradle", "-b", "jarProject.gradle", "jarReleaseClasses", "copyJaredProject"
+		commandLine "cmd", "/c", "gradlew", "-b", "jarProject.gradle", "jarReleaseClasses", "copyJaredProject"
 	}
 	else {
-		commandLine "gradle", "-b", "jarProject.gradle", "jarReleaseClasses", "copyJaredProject"
+		commandLine "gradlew", "-b", "jarProject.gradle", "jarReleaseClasses", "copyJaredProject"
 	}
 }
 

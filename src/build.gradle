@@ -4,9 +4,9 @@
 *	The script also builds the nativescript.jar file containing the binding generator and the rest of the android runtime
 *
 *	Test command:
-*			gradle buildar -PtargetSdk=android-23 -PminSdk=17  -PbuildToolsVersion=23.0.2 -PsupportVersion=23.0.1  -PcompileSdk=android-23
+*			gradlew buildar -PtargetSdk=android-23 -PminSdk=17  -PbuildToolsVersion=23.0.2 -PsupportVersion=23.0.1  -PcompileSdk=android-23
 *	To run: 
-*			gradle buildar
+*			gradlew buildar
 *
 * 	Options:
 *			-PtargetSdk=[target_sdk] (default is 22)
@@ -175,10 +175,10 @@ task generateBindingGeneratorClasses (type: Exec ) {
 	workingDir "../binding-generator/Generator" 
 
 	if(isWinOs) {
-		commandLine "cmd", "/c", "gradle", "build", "-PoutClassesDir=$rootDir/build/intermediates/classes/release"
+		commandLine "cmd", "/c", "gradlew", "build", "-PoutClassesDir=$rootDir/build/intermediates/classes/release"
 	}
 	else {
-		commandLine "gradle", "build", "-PoutClassesDir=$rootDir/build/intermediates/classes/release"
+		commandLine "gradlew", "build", "-PoutClassesDir=$rootDir/build/intermediates/classes/release"
 	}
 }
 

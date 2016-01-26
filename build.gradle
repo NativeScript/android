@@ -1,8 +1,8 @@
 /*
 *	Test command 
-*			gradle packar -PtargetSdk=android-23 -PminSdk=17  -PbuildToolsVersion=23.0.2 -PsupportVersion=23.0.1  -PcompileSdk=android-23
+*			gradlew packar -PtargetSdk=android-23 -PminSdk=17  -PbuildToolsVersion=23.0.2 -PsupportVersion=23.0.1  -PcompileSdk=android-23
 *	To run: 
-*			gradle packar
+*			gradlew packar
 *
 * 	Options:
 *			-PtargetSdk=[target_sdk]
@@ -173,12 +173,12 @@ task generateRuntime (type: Exec) {
 	doFirst{
 		workingDir "$rootDir/src"
 
-		//command gradle buildar -PpackageVersion=[from_package.json] -PgitCommitVersion=[from_some_sys_variable]
+		//command gradlew buildar -PpackageVersion=[from_package.json] -PgitCommitVersion=[from_some_sys_variable]
 		if(isWinOs) {
-			commandLine "cmd", "/c" , "gradle", "buildar", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", compileSdkVer, buildToolsVer, minSdkVer, targetSdkVer, supportVer
+			commandLine "cmd", "/c" , "gradlew", "buildar", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", compileSdkVer, buildToolsVer, minSdkVer, targetSdkVer, supportVer
 		}
 		else {
-			commandLine "gradle", "buildar", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", compileSdkVer, buildToolsVer, minSdkVer, targetSdkVer, supportVer
+			commandLine "gradlew", "buildar", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", compileSdkVer, buildToolsVer, minSdkVer, targetSdkVer, supportVer
 		}
 	}
 }
@@ -192,10 +192,10 @@ task generateMetadataGeneratorJar (type: Exec) {
 	workingDir "$rootDir/android-metadata-generator"
 	
 	if(isWinOs) {
-		commandLine "cmd", "/c", "gradle", "jarmg"
+		commandLine "cmd", "/c", "gradlew", "jarmg"
 	}
 	else {
-		commandLine "gradle", "jarmg"
+		commandLine "gradlew", "jarmg"
 	}
 }
 
