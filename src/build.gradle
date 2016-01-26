@@ -178,7 +178,7 @@ task generateBindingGeneratorClasses (type: Exec ) {
 		commandLine "cmd", "/c", "gradlew", "build", "-PoutClassesDir=$rootDir/build/intermediates/classes/release"
 	}
 	else {
-		commandLine "gradlew", "build", "-PoutClassesDir=$rootDir/build/intermediates/classes/release"
+		commandLine "./gradlew", "build", "-PoutClassesDir=$rootDir/build/intermediates/classes/release"
 	}
 }
 

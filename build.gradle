@@ -178,7 +178,7 @@ task generateRuntime (type: Exec) {
 			commandLine "cmd", "/c" , "gradlew", "buildar", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", compileSdkVer, buildToolsVer, minSdkVer, targetSdkVer, supportVer
 		}
 		else {
-			commandLine "gradlew", "buildar", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", compileSdkVer, buildToolsVer, minSdkVer, targetSdkVer, supportVer
+			commandLine "./gradlew", "buildar", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", compileSdkVer, buildToolsVer, minSdkVer, targetSdkVer, supportVer
 		}
 	}
 }
@@ -195,7 +195,7 @@ task generateMetadataGeneratorJar (type: Exec) {
 		commandLine "cmd", "/c", "gradlew", "jarmg"
 	}
 	else {
-		commandLine "gradlew", "jarmg"
+		commandLine "./gradlew", "jarmg"
 	}
 }
 

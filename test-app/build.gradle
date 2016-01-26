@@ -246,7 +246,7 @@ task runJarProject (type: Exec) {
 		commandLine "cmd", "/c", "gradlew", "-b", "jarProject.gradle", "jarReleaseClasses", "copyJaredProject"
 	}
 	else {
-		commandLine "gradlew", "-b", "jarProject.gradle", "jarReleaseClasses", "copyJaredProject"
+		commandLine "./gradlew", "-b", "jarProject.gradle", "jarReleaseClasses", "copyJaredProject"
 	}
 }
 
