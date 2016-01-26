@@ -1472,15 +1472,25 @@ bool MetadataNode::GetExtendLocation(string& extendLocation)
 			}
 
 			string srcFileName = ConvertToString(scriptName);
+			string fullPathToFile;
+			if(srcFileName == "<embedded script>")
+			{
+				// Corner case, extend call is coming from the heap snapshot script
+				// This is possible for lazily compiled code - e.g. from the body of a function
+				fullPathToFile = "_embedded_script_";
+			}
+			else
+			{
+				string hardcodedPathToSkip = Constants::APP_ROOT_FOLDER_PATH;
 
-			string hardcodedPathToSkip = Constants::APP_ROOT_FOLDER_PATH;
+				int startIndex = hardcodedPathToSkip.length();
+				int strToTakeLen = (srcFileName.length() - startIndex - 3); // 3 refers to .js at the end of file name
+				fullPathToFile = srcFileName.substr(startIndex, strToTakeLen);
 
-			int startIndex = hardcodedPathToSkip.length();
-			int strToTakeLen = (srcFileName.length() - startIndex - 3); // 3 refers to .js at the end of file name
-			string fullPathToFile = srcFileName.substr(startIndex, strToTakeLen);
+				std::replace(fullPathToFile.begin(), fullPathToFile.end(), '/', '_');
+				std::replace(fullPathToFile.begin(), fullPathToFile.end(), '.', '_');
+			}
 
-			std::replace(fullPathToFile.begin(), fullPathToFile.end(), '/', '_');
-			std::replace(fullPathToFile.begin(), fullPathToFile.end(), '.', '_');
 			int lineNumber = frame->GetLineNumber();
 			if (lineNumber < 0)
 			{

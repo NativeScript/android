@@ -46,7 +46,7 @@ SimpleProfiler::~SimpleProfiler()
 		struct timespec nowt;
 		clock_gettime(CLOCK_MONOTONIC, &nowt);
 		auto time = (int64_t) nowt.tv_sec * 1000000000LL + nowt.tv_nsec;
-		m_frame->time += (time - m_time);
+		m_frame->time += (time - m_time) / 1000000;
 	}
 }
 
@@ -85,7 +85,7 @@ void SimpleProfiler::PrintProfilerData()
 	std::sort(s_frames.begin(), s_frames.end());
 	for (auto& f : s_frames)
 	{
-		__android_log_print(ANDROID_LOG_DEBUG, "TNS.Native", "Time: %lld, File: %s, Line: %d", f.time, f.fileName, f.lineNumber);
+		__android_log_print(ANDROID_LOG_DEBUG, "TNS.Native.Profiler", "Time: %lld, File: %s, Line: %d", f.time, f.fileName, f.lineNumber);
 	}
 }
 

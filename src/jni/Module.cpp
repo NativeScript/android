@@ -13,6 +13,7 @@
 #include "Constants.h"
 #include "NativeScriptException.h"
 #include "Util.h"
+#include "SimpleProfiler.h"
 
 #include <sstream>
 #include <assert.h>
@@ -34,14 +35,20 @@ void Module::Init(Isolate *isolate)
 	assert(RESOLVE_PATH_METHOD_ID != nullptr);
 
 	string requireFactoryScript =
-			"(function () { "
-					"	function require_factory(requireInternal, dirName) { "
-					"		return function require(modulePath) { "
-					"			return requireInternal(modulePath, dirName); "
-					"		} "
-					"	} "
-					"	return require_factory; "
-					"})()";
+	"(function () { "
+	"	function require_factory(requireInternal, dirName) { "
+	"		return function require(modulePath) { "
+	"			if(global.__requireOverride) { "
+	"				var result = global.__requireOverride(modulePath, dirName); "
+	"				if(result) { "
+	"					return result; "
+	"				} "
+	"			} "
+	"			return requireInternal(modulePath, dirName); "
+	"		} "
+	"	} "
+	"	return require_factory; "
+	"})()";
 
 	auto source = ConvertToV8String(requireFactoryScript);
 	auto context = isolate->GetCurrentContext();
@@ -272,6 +279,8 @@ Local<Object> Module::LoadModule(Isolate *isolate, const string& modulePath)
 		throw NativeScriptException(errMsg);
 	}
 
+	SET_PROFILER_FRAME();
+
 	auto fileName = ConvertToV8String(modulePath);
 	char pathcopy[1024];
 	strcpy(pathcopy, modulePath.c_str());
@@ -280,7 +289,8 @@ Local<Object> Module::LoadModule(Isolate *isolate, const string& modulePath)
 	auto require = GetRequireFunction(isolate, strDirName);
 	Local<Value> requireArgs[5]
 	{
-			moduleObj, exportsObj, require, fileName, dirName };
+		moduleObj, exportsObj, require, fileName, dirName
+	};
 
 	moduleObj->Set(ConvertToV8String("require"), require);
 

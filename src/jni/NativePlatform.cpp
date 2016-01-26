@@ -74,7 +74,9 @@ Isolate* NativePlatform::InitNativeScript(JNIEnv *_env, jobject obj, jstring fil
 	JniLocalRef cacheCode(env.GetObjectArrayElement(args, 1));
 	Constants::V8_CACHE_COMPILED_CODE = (bool) cacheCode;
 	JniLocalRef snapshot(env.GetObjectArrayElement(args, 2));
-	Constants::V8_HEAP_SNAPSHOT = (bool) snapshot;
+	Constants::V8_HEAP_SNAPSHOT = (bool)snapshot;
+	JniLocalRef snapshotScript(env.GetObjectArrayElement(args, 3));
+	Constants::V8_HEAP_SNAPSHOT_SCRIPT = ArgConverter::jstringToString(snapshotScript);
 
 	DEBUG_WRITE("Initializing Telerik NativeScript: app instance id:%d", appJavaObjectId);
 
@@ -329,14 +331,15 @@ Isolate* NativePlatform::PrepareV8Runtime(JEnv& env, const string& filesPath, js
 	V8::Initialize();
 
 	Isolate::CreateParams create_params;
-	create_params.array_buffer_allocator = &g_allocator;
+	StartupData startup_data;
+	string customScript;
 
+	create_params.array_buffer_allocator = &g_allocator;
 	// prepare the snapshot blob
 	if (Constants::V8_HEAP_SNAPSHOT)
 	{
-		auto snapshotPath = filesPath + "/internal/snapshot.dat";
-		StartupData startup_data;
-		if (File::Exists(snapshotPath))
+		auto snapshotPath = filesPath + "/internal/snapshot.blob";
+		if( File::Exists(snapshotPath))
 		{
 			int length;
 			startup_data.data = reinterpret_cast<char*>(File::ReadBinary(snapshotPath, length));
@@ -344,7 +347,13 @@ Isolate* NativePlatform::PrepareV8Runtime(JEnv& env, const string& filesPath, js
 		}
 		else
 		{
-			startup_data = V8::CreateSnapshotDataBlob();
+			// check for custom script to include in the snapshot
+			if(Constants::V8_HEAP_SNAPSHOT_SCRIPT.size() > 0 && File::Exists(Constants::V8_HEAP_SNAPSHOT_SCRIPT))
+			{
+				customScript = File::ReadText(Constants::V8_HEAP_SNAPSHOT_SCRIPT);
+			}
+
+			startup_data = V8::CreateSnapshotDataBlob(customScript.c_str());
 			File::WriteBinary(snapshotPath, startup_data.data, startup_data.raw_size);
 		}
 
@@ -375,6 +384,7 @@ Isolate* NativePlatform::PrepareV8Runtime(JEnv& env, const string& filesPath, js
 	globalTemplate->Set(ConvertToV8String("__enableVerboseLogging"), FunctionTemplate::New(isolate, NativeScriptRuntime::EnableVerboseLoggingMethodCallback));
 	globalTemplate->Set(ConvertToV8String("__disableVerboseLogging"), FunctionTemplate::New(isolate, NativeScriptRuntime::DisableVerboseLoggingMethodCallback));
 	globalTemplate->Set(ConvertToV8String("__exit"), FunctionTemplate::New(isolate, NativeScriptRuntime::ExitMethodCallback));
+	globalTemplate->Set(ConvertToV8String("__nativeRequire"), FunctionTemplate::New(isolate, Module::RequireCallback));
 
 	WeakRef::Init(isolate, globalTemplate, g_objectManager);
 
@@ -388,7 +398,7 @@ Isolate* NativePlatform::PrepareV8Runtime(JEnv& env, const string& filesPath, js
 	if (Constants::V8_HEAP_SNAPSHOT)
 	{
 		// we own the snapshot buffer, delete it
-		delete[] create_params.snapshot_blob->data;
+		delete[] startup_data.data;
 	}
 
 	context_scope = new Context::Scope(context);

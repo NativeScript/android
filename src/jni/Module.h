@@ -23,6 +23,8 @@ namespace tns
 
 			static v8::Local<v8::Object> Load(const std::string& path, bool& isData);
 
+			static void RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
+
 		private:
 			Module() = default;
 
@@ -33,8 +35,6 @@ namespace tns
 			static v8::Local<v8::Object> LoadData(v8::Isolate *isolate, const std::string& path);
 
 			static v8::Local<v8::Script> LoadScript(v8::Isolate *isolate, const std::string& modulePath, const v8::Local<v8::String>& fullRequiredModulePath);
-
-			static void RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 			static void RequireNativeCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
