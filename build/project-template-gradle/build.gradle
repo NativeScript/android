@@ -128,7 +128,7 @@ android {
 	applicationVariants.all { variant ->
 		renameResultApks(variant)
 	
-		def mergeAssetsTask = variant.mergeAssets
+		def mergeAssetsTask = variant.dex
 		if(project.hasProperty("runSBGenerator")) {
 			runBindingGenerator.dependsOn(copyMetadata)
 			rbg.dependsOn(runBindingGenerator)
@@ -318,10 +318,6 @@ task cleanLocalAarFiles(type: Delete) {
 	delete fileTree(dir: "libs/aar", include: ["*.aar"])
 }
 
-task deleteJavaDir (type: Delete) {
-	delete "$rootDir/src/main/java"
-}
-
 task ensureMetadataOutDir {
 	def outputDir = file("$rootDir/metadata/output")
 	outputDir.mkdirs()
@@ -347,6 +343,8 @@ task collectAllJars {
 			allJarPaths.add(currentJarFile.getAbsolutePath())
 		}
 		
+		allJarPaths.add("$rootDir/build/intermediates/classes");
+		
 		metadataParams.add("metadata-generator.jar")
 		metadataParams.add("../metadata/output")
 		for(def i = 0; i < allJarPaths.size(); i++) {
@@ -355,30 +353,14 @@ task collectAllJars {
 	}
 }
 
-task isMetadataGenerationNecessary {
-	description "checks if new metadata is necessary based on jar and aar dependencies used"
-	def inputFile = new File("build/metadataUTD")
-	def metadataDir = new File("metadata/output");
-	
-	inputs.file inputFile
-	outputs.upToDateWhen {
-		inputFile.exists() && 
-		metadataDir.exists() &&
-		metadataDir.list().length == 3 &&
-		(inputFile.text.trim() == metadataParams.toString().trim())
-	}
-	
-	doLast {
-		inputFile.text = metadataParams
-	}
-}
-
 task buildMetadata (type: JavaExec) {
 	description "builds metadata with provided jar dependencies"
-	outputs.upToDateWhen {
-		!isMetadataGenerationNecessary.didWork
-	}
 	
+	inputs.files(allJarPaths)
+	inputs.dir("build/intermediates/classes")
+	
+	outputs.files("metadata/output/treeNodeStream.dat", "metadata/output/treeStringsStream.dat", "metadata/output/treeValueStream.dat")
+
 	doFirst {
 		workingDir "build-tools"
 
@@ -395,16 +377,12 @@ task copyMetadata(type: Copy) {
 	}
 
 	from "metadata/output"
-	into "src/main/assets/metadata"
+	into "build/intermediates/assets/debug/metadata"
 }
 
 
 task deleteExplodedAarFolder (type: Delete) {
 
-	outputs.upToDateWhen {
-		!isMetadataGenerationNecessary.didWork
-	}
-	
 	def explodedAarDir = project.buildDir.getAbsolutePath() + "/intermediates/exploded-aar"
 	delete explodedAarDir
 }
@@ -433,11 +411,9 @@ task rbg (dependsOn: "asbg:generatebindings")
 // 5. plugin extend (apply from include files)
 
 // --execution phase
-deleteJavaDir.dependsOn(cleanLocalAarFiles)
-ensureMetadataOutDir.dependsOn(deleteJavaDir)
+ensureMetadataOutDir.dependsOn(cleanLocalAarFiles)
 collectAllJars.dependsOn(ensureMetadataOutDir)
-isMetadataGenerationNecessary.dependsOn(collectAllJars)
-buildMetadata.dependsOn(isMetadataGenerationNecessary)
+buildMetadata.dependsOn(collectAllJars)
 copyMetadata.dependsOn(buildMetadata)
 
 //DO NOT UNCOMMENT
