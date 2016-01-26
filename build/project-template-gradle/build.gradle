@@ -40,6 +40,7 @@ def nodeModulesDir = "../../node_modules/"
 def libDir = "../../lib/Android/"
 def pluginNames = new ArrayList<String>()
 def configDir = file(configurationsDir)
+def firstApplicationBuildType = ""
 
 def compiteCompileSdkVersion () {
 	if(project.hasProperty("compileSdk")) {
@@ -127,6 +128,10 @@ android {
 	
 	applicationVariants.all { variant ->
 		renameResultApks(variant)
+		
+		if (firstApplicationBuildType == "") {
+			firstApplicationBuildType = variant.buildType.name;
+		}
 	
 		def mergeAssetsTask = variant.dex
 		if(project.hasProperty("runSBGenerator")) {
@@ -377,7 +382,7 @@ task copyMetadata(type: Copy) {
 	}
 
 	from "metadata/output"
-	into "build/intermediates/assets/debug/metadata"
+	into "build/intermediates/assets/$firstApplicationBuildType/metadata"
 }
 
 
