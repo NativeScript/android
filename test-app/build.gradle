@@ -107,6 +107,11 @@ android {
 		def tsk = variant.mergeAssets
 		tsk.dependsOn(copyMetadata)
 	}
+	
+	packagingOptions {
+		exclude 'resources.arsc'
+		exclude "AndroidManifest.xml"
+	}
 }
 
 def sdkPath = android.sdkDirectory.getAbsolutePath();
