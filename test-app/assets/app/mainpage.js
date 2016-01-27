@@ -40,6 +40,7 @@ require("./tests/testJniReferenceLeak");
 require("./tests/testNativeModules");
 require("./tests/requireExceptionTests");
 require("./tests/java-array-test");
+require("./tests/field-access-test");
 
 var MainActivity = {
     onCreate: function (bundle) {

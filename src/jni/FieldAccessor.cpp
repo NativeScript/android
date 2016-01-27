@@ -60,6 +60,13 @@ Local<Value> FieldAccessor::GetJavaField(const Local<Object>& target, FieldCallb
 	if (!isStatic)
 	{
 		targetJavaObject = objectManager->GetJavaObjectByJsObject(target);
+
+		if (targetJavaObject == nullptr)
+		{
+			stringstream ss;
+			ss << "Cannot access property '" << fieldData->name << "' because there is no corresponding Java object";
+			throw NativeScriptException(ss.str());
+		}
 	}
 
 	auto fieldId = fieldData->fid;
@@ -283,6 +290,13 @@ void FieldAccessor::SetJavaField(const Local<Object>& target, const Local<Value>
 	if (!isStatic)
 	{
 		targetJavaObject = objectManager->GetJavaObjectByJsObject(target);
+
+		if (targetJavaObject == nullptr)
+		{
+			stringstream ss;
+			ss << "Cannot access property '" << fieldData->name << "' because there is no corresponding Java object";
+			throw NativeScriptException(ss.str());
+		}
 	}
 
 	auto fieldId = fieldData->fid;

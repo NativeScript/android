@@ -284,6 +284,13 @@ void MetadataNode::FieldAccessorGetterCallback(Local<String> property, const Pro
 	{
 		auto thiz = info.This();
 		auto fieldCallbackData = reinterpret_cast<FieldCallbackData*>(info.Data().As<External>()->Value());
+
+		if (!fieldCallbackData->isStatic && thiz->StrictEquals(info.Holder()))
+		{
+			info.GetReturnValue().SetUndefined();
+			return;
+		}
+
 		auto value = NativeScriptRuntime::GetJavaField(thiz, fieldCallbackData);
 		info.GetReturnValue().Set(value);
 	}
@@ -306,10 +313,14 @@ void MetadataNode::FieldAccessorSetterCallback(Local<String> property, Local<Val
 {
 	try
 	{
-		DEBUG_WRITE("FieldAccessorSetterCallback");
-
 		auto thiz = info.This();
 		auto fieldCallbackData = reinterpret_cast<FieldCallbackData*>(info.Data().As<External>()->Value());
+
+		if (!fieldCallbackData->isStatic && thiz->StrictEquals(info.Holder()))
+		{
+			info.GetReturnValue().SetUndefined();
+			return;
+		}
 
 		if (fieldCallbackData->isFinal)
 		{
