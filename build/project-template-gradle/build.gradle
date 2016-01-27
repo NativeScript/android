@@ -388,6 +388,10 @@ task copyMetadata(type: Copy) {
 
 task deleteExplodedAarFolder (type: Delete) {
 
+	outputs.upToDateWhen {
+		!buildMetadata.didWork
+	}
+
 	def explodedAarDir = project.buildDir.getAbsolutePath() + "/intermediates/exploded-aar"
 	delete explodedAarDir
 }
