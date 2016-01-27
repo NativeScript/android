@@ -29,6 +29,8 @@ def minSdkVer = "";
 def targetSdkVer = "";
 def supportVer = "";
 
+def envVars = new LinkedList<String>()
+
 task checkEnvironmentVariables {
 	if ("$System.env.JAVA_HOME" == "" || "$System.env.JAVA_HOME" == "null") {
 		throw new GradleException("Set JAVA_HOME to point to the correct Jdk location\n");
@@ -48,18 +50,23 @@ task checkEnvironmentVariables {
 	
 	if(project.hasProperty("compileSdk")) {
 		compileSdkVer = "-PcompileSdk=$compileSdk"
+		envVars.add(compileSdkVer)
 	}
 	if(project.hasProperty("buildToolsVersion")) {
 		buildToolsVer = "-PbuildToolsVersion=$buildToolsVersion"
+		envVars.add(buildToolsVer)
 	}
 	if(project.hasProperty("minSdk")) {
 		minSdkVer = "-PminSdk=$minSdk"
+		envVars.add(minSdkVer)
 	}
 	if(project.hasProperty("targetSdk")) {
 		targetSdkVer = "-PtargetSdk=$targetSdk"
+		envVars.add(targetSdkVer)
 	}
 	if(project.hasProperty("supportVersion")) {
 		supportVer = "-PsupportVersion=$supportVersion"
+		envVars.add(supportVer)
 	}
 }
 
@@ -175,10 +182,20 @@ task generateRuntime (type: Exec) {
 
 		//command gradlew buildar -PpackageVersion=[from_package.json] -PgitCommitVersion=[from_some_sys_variable]
 		if(isWinOs) {
-			commandLine "cmd", "/c" , "gradlew", "buildar", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", compileSdkVer, buildToolsVer, minSdkVer, targetSdkVer, supportVer
+			envVars.addFirst("-PgitCommitVersion=${arVersion}");
+			envVars.addFirst("-PpackageVersion=${pVersion}");
+			envVars.addFirst("buildar");
+			envVars.addFirst("gradlew");
+			envVars.addFirst("/c");
+			envVars.addFirst("cmd");
+			commandLine envVars.toArray()
 		}
 		else {
-			commandLine "./gradlew", "buildar", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", compileSdkVer, buildToolsVer, minSdkVer, targetSdkVer, supportVer
+			envVars.addFirst("-PgitCommitVersion=${arVersion}");
+			envVars.addFirst("-PpackageVersion=${pVersion}");
+			envVars.addFirst("buildar");
+			envVars.addFirst("./gradlew");
+			commandLine envVars.toArray();
 		}
 	}
 }
