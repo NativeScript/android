@@ -135,12 +135,12 @@ android {
 	
 		def mergeAssetsTask = variant.dex
 		if(project.hasProperty("runSBGenerator")) {
-			runBindingGenerator.dependsOn(copyMetadata)
+			runBindingGenerator.dependsOn(buildMetadata)
 			rbg.dependsOn(runBindingGenerator)
 			mergeAssetsTask.dependsOn(rbg)
 		}
 		else {
-			mergeAssetsTask.dependsOn(copyMetadata)
+			mergeAssetsTask.dependsOn(buildMetadata)
 		}
 	}
 }
@@ -373,16 +373,13 @@ task buildMetadata (type: JavaExec) {
 
 		args metadataParams.toArray()
 	}
-}
-
-task copyMetadata(type: Copy) {
-	description "moves metadata to the right place before packaging is done"
-	outputs.upToDateWhen {
-		!buildMetadata.didWork
+	
+	doLast {
+		copy {
+			from "metadata/output"
+			into "build/intermediates/assets/${firstApplicationBuildType}/metadata"
+		}
 	}
-
-	from "metadata/output"
-	into "build/intermediates/assets/$firstApplicationBuildType/metadata"
 }
 
 
@@ -423,7 +420,6 @@ task rbg (dependsOn: "asbg:generatebindings")
 ensureMetadataOutDir.dependsOn(cleanLocalAarFiles)
 collectAllJars.dependsOn(ensureMetadataOutDir)
 buildMetadata.dependsOn(collectAllJars)
-copyMetadata.dependsOn(buildMetadata)
 
 //DO NOT UNCOMMENT
 // mergeAssets.dependsOn(copyMetadata) -> look in CONFIGURATIONS(top) in android.applicationVariants to see how it's done
