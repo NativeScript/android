@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/NativeScript/android-runtime.svg?branch=master)](https://travis-ci.org/NativeScript/android-runtime)
+
 # Android-Runtime
 Contains the source code for the NativeScript's Android runtime.
 
