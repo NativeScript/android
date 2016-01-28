@@ -48,7 +48,6 @@ void AssetExtractor::ExtractAssets(JNIEnv *env, jobject obj, jstring apk, jstrin
 
 			if (shouldOverwrite || forceOverwrite)
 			{
-				//DEBUG_WRITE("write asset %s", assetFullname.c_str());
 				strcpy(pathcopy, name);
 				auto path = dirname(pathcopy);
 				std::string dirFullname(baseDir);
@@ -60,19 +59,23 @@ void AssetExtractor::ExtractAssets(JNIEnv *env, jobject obj, jstring apk, jstrin
 
 				auto fd = fopen(assetFullname.c_str(), "w");
 
-				zip_int64_t sum = 0;
-				while (sum != sb.size)
+				if (fd != nullptr)
 				{
-					zip_int64_t len = zip_fread(zf, buf, sizeof(buf));
-					assert(len > 0);
+					zip_int64_t sum = 0;
+					while (sum != sb.size)
+					{
+						zip_int64_t len = zip_fread(zf, buf, sizeof(buf));
+						assert(len > 0);
 
-					fwrite(buf, 1, len, fd);
-					sum += len;
+						fwrite(buf, 1, len, fd);
+						sum += len;
+					}
+					fclose(fd);
+					utimbuf t;
+					t.modtime = sb.mtime;
+					ret = utime(assetFullname.c_str(), &t);
 				}
-				fclose(fd);
-				utimbuf t;
-				t.modtime = sb.mtime;
-				ret = utime(assetFullname.c_str(), &t);
+
 				zip_fclose(zf);
 			}
 		}
