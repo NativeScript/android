@@ -90,6 +90,11 @@ android {
 	lintOptions {
 		abortOnError false
 	}
+	
+	packagingOptions {
+		exclude 'resources.arsc'
+		exclude "AndroidManifest.xml"
+	}
 }
 
 repositories {
