@@ -1,10 +1,5 @@
 package com.tns;
 
-import java.io.BufferedReader;
-import java.io.Closeable;
-import java.io.IOException;
-import java.io.InputStreamReader;
-
 import android.content.Context;
 import android.util.Log;
 

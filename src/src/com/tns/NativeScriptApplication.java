@@ -962,7 +962,6 @@ public class NativeScriptApplication extends android.app.Application implements 
 
 	public void onCreate()
 	{
-
 		System.loadLibrary("NativeScript");
 
 		Logger logger = new LogcatLogger(BuildConfig.DEBUG, this);

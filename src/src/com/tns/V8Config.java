@@ -9,7 +9,8 @@ class V8Config
 	private static final String V8FlagsKey = "v8Flags";
 	private static final String CodeCacheKey = "codeCache";
 	private static final String HeapSnapshotKey = "heapSnapshot";
-
+	private static final String HeapSnapshotScriptKey = "heapSnapshotScript";
+	
 	public static Object[] fromPackageJSON(File appDir)
 	{
 		Object[] result = makeDefaultOptions();
@@ -38,6 +39,11 @@ class V8Config
 				{
 					result[2] = androidObject.getBoolean(HeapSnapshotKey);
 				}
+				if(androidObject.has(HeapSnapshotScriptKey))
+				{
+					String value = androidObject.getString(HeapSnapshotScriptKey);
+					result[3] = FileSystem.resolveRelativePath(appDir.getPath(), value, appDir + "/app/");
+				}
 			}
 		}
 		catch (Exception e)
@@ -50,14 +56,15 @@ class V8Config
 
 	private static Object[] makeDefaultOptions()
 	{
-		Object[] result = new Object[]
-		{
-				// v8 startup flags, defaults to --expose_gc due to tns_modules requirement
-				"--expose_gc",
-				// enable v8 code caching, false by default
-				false,
-				// enable v8 heap snapshot, false by default
-				false
+		Object[] result = new Object[] {
+			// v8 startup flags, defaults to --expose_gc due to tns_modules requirement 
+			"--expose_gc",
+			// enable v8 code caching, false by default
+			false,
+			// enable v8 heap snapshot, false by default
+			false,
+			// arbitrary script to be included in the snapshot
+			""
 		};
 
 		return result;
