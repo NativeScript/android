@@ -224,10 +224,20 @@ task revertVersionFile (type: Exec) {
 	}
 }
 
+task jarRuntimeClasses(type: Exec) {
+	workingDir "build/intermediates/classes/release" 
+	
+	if(isWinOs) {
+		commandLine "cmd", "/c", "jar", "-cf", "nativescript.jar", "."
+	}
+	else {
+		commandLine "jar", "-cf", "nativescript.jar", "."
+	}
+}
+
 task copyRuntime (type: Copy) {
-	from "$rootDir/build/intermediates/bundles/release/classes.jar"
+	from "build/intermediates/classes/release/nativescript.jar"
 	into "$rootDir/dist/libs"
-	rename "classes.jar", "nativescript.jar"
 }
 
 //clean
@@ -254,8 +264,9 @@ revertNdkConfiguration.dependsOn(cleanCppRuntime)
 revertVersionFile.dependsOn(revertNdkConfiguration)
 
 //we need build command to resolve dependencies without manually calling every step
-build.dependsOn(revertVersionFile) 
-copyRuntime.dependsOn(build)
+build.dependsOn(revertVersionFile)
+jarRuntimeClasses.dependsOn(build)
+copyRuntime.dependsOn(jarRuntimeClasses)
 
 task buildar {
 	dependsOn copyRuntime
