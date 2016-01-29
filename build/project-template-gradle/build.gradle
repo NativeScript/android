@@ -356,16 +356,38 @@ task buildMetadata (type: JavaExec) {
 		def androidHome = new File(System.properties['user.home'], ".android")
 		def keyStoreFile = new File(androidHome, "debug.keystore")
 
-		def cmd = "jarsigner -sigalg SHA1withRSA -digestalg SHA1 " + (project.ext.selectedBuildType.equals("release")
-					? ("-storepass " + project.password + " -keypass " + project.ksPassword + " -keystore \"" + project.ksPath + "\" \"" +  currentApk + "\" " + project.alias)
-					: ("-storepass android -keypass android -keystore \"" + keyStoreFile.getAbsolutePath() + "\" \"" +  currentApk + "\"  androiddebugkey"))
+		def storePass
+		def keyPass
+		def keyStorePath
+		def alias
+
+		currentApk = "\"" + currentApk + "\""
+
+		if (project.ext.selectedBuildType.equals("release")) {
+			storePass = project.password
+			keyPass = project.ksPassword
+			keyStorePath = "\"" + project.ksPath + "\""
+			alias = project.alias
+		} else {
+			storePass = "android"
+			keyPass = "android"
+			keyStorePath = "\"" + keyStoreFile.getAbsolutePath() + "\""
+			alias = "androiddebugkey"
+		}
+
+		def cmdParams = new ArrayList<String>(["jarsigner", "-sigalg", "SHA1withRSA", "-digestalg", "SHA1", "-storepass", storePass, "-keypass", keyPass, "-keystore", keyStorePath, currentApk, alias])
+
+		if (isWinOs) {
+			cmdParams.add(0, "/c")
+			cmdParams.add(0, "cmd")
+		}
 
 		exec {
 			if (isWinOs) {
-				commandLine "cmd", "/c", cmd
+				commandLine cmdParams.toArray()
 			}
 			else {
-				commandLine cmd
+				commandLine cmdParams.toArray()
 			}
 		}
 	}
