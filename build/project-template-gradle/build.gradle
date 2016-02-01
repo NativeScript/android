@@ -361,17 +361,15 @@ task buildMetadata (type: JavaExec) {
 		def keyStorePath
 		def alias
 
-		currentApk = "\"" + currentApk + "\""
-
 		if (project.ext.selectedBuildType.equals("release")) {
 			storePass = project.password
 			keyPass = project.ksPassword
-			keyStorePath = "\"" + project.ksPath + "\""
+			keyStorePath = project.ksPath
 			alias = project.alias
 		} else {
 			storePass = "android"
 			keyPass = "android"
-			keyStorePath = "\"" + keyStoreFile.getAbsolutePath() + "\""
+			keyStorePath = keyStoreFile.getAbsolutePath()
 			alias = "androiddebugkey"
 		}
 
