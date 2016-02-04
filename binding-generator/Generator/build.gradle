@@ -1,3 +1,4 @@
+
 /* 
 *	Compiles binding generator 
 *	to run: "gradle build"
@@ -6,6 +7,13 @@
 */
 apply plugin: "java"
 
+def compiteCompileSdkVersion () {
+	if(project.hasProperty("compileSdk")) {
+		return compileSdk
+	}
+	return "android-22"
+}
+
 //workaround because there is a problem when the binding generator is compiled with java 1.7/1.8
 sourceCompatibility = 1.6
 targetCompatibility = 1.6
@@ -13,7 +21,7 @@ targetCompatibility = 1.6
 def pathToAndroidSdkPlatforms = "$System.env.ANDROID_HOME" + "/platforms"
 
 dependencies {
-	compile files(pathToAndroidSdkPlatforms + "/android-22/android.jar")
+	compile files(pathToAndroidSdkPlatforms + "/" + compiteCompileSdkVersion() + "/android.jar")
 }
 
 sourceSets {
@@ -25,6 +33,3 @@ sourceSets {
 	def isOutClassesDirSet = project.hasProperty("outClassesDir")
 	main.output.classesDir = isOutClassesDirSet ? outClassesDir : "$rootDir/build/classesss"
 }
-
-
-
