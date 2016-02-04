@@ -179,23 +179,24 @@ task deleteCommitFile (type: Delete) {
 task generateRuntime (type: Exec) {
 	doFirst{
 		workingDir "$rootDir/src"
-
+		def passParams = new LinkedList<String>()
+		passParams.addAll(envVars);
 		//command gradlew buildar -PpackageVersion=[from_package.json] -PgitCommitVersion=[from_some_sys_variable]
 		if(isWinOs) {
-			envVars.addFirst("-PgitCommitVersion=${arVersion}");
-			envVars.addFirst("-PpackageVersion=${pVersion}");
-			envVars.addFirst("buildar");
-			envVars.addFirst("gradlew");
-			envVars.addFirst("/c");
-			envVars.addFirst("cmd");
-			commandLine envVars.toArray()
+			passParams.addFirst("-PgitCommitVersion=${arVersion}");
+			passParams.addFirst("-PpackageVersion=${pVersion}");
+			passParams.addFirst("buildar");
+			passParams.addFirst("gradlew");
+			passParams.addFirst("/c");
+			passParams.addFirst("cmd");
+			commandLine passParams.toArray()
 		}
 		else {
-			envVars.addFirst("-PgitCommitVersion=${arVersion}");
-			envVars.addFirst("-PpackageVersion=${pVersion}");
-			envVars.addFirst("buildar");
-			envVars.addFirst("./gradlew");
-			commandLine envVars.toArray();
+			passParams.addFirst("-PgitCommitVersion=${arVersion}");
+			passParams.addFirst("-PpackageVersion=${pVersion}");
+			passParams.addFirst("buildar");
+			passParams.addFirst("./gradlew");
+			commandLine passParams.toArray();
 		}
 	}
 }
@@ -288,16 +289,23 @@ task packar {
 	dependsOn packFramework
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+task runTest(type: Exec) {
+	if(project.hasProperty("enableTest")) {
+		workingDir "$rootDir/test-app"
+		
+		def passParams = new LinkedList<String>()
+		passParams.addAll(envVars);
+		if(isWinOs) {
+			passParams.addFirst("runtest");
+			passParams.addFirst("gradle");
+			passParams.addFirst("/c");
+			passParams.addFirst("cmd");
+			commandLine passParams.toArray();
+		}
+		else {
+			passParams.addFirst("runtest");
+			passParams.addFirst("./gradle");
+			commandLine passParams.toArray();
+		}
+	}
+}

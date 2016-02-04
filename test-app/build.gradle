@@ -28,7 +28,7 @@ buildscript {
 apply plugin: "com.android.application"
 
 
-def compiteCompileSdkVersion () {
+def computeCompileSdkVersion () {
 	if(project.hasProperty("compileSdk")) {
 		return compileSdk
 	}
@@ -64,7 +64,7 @@ def computeSupportVersion() {
 }
 
 android {
-	compileSdkVersion compiteCompileSdkVersion()
+	compileSdkVersion computeCompileSdkVersion()
     buildToolsVersion computeBuildToolsVersion()
 	
 	defaultConfig {
