@@ -297,14 +297,14 @@ task runTest(type: Exec) {
 		passParams.addAll(envVars);
 		if(isWinOs) {
 			passParams.addFirst("runtest");
-			passParams.addFirst("gradle");
+			passParams.addFirst("gradlew");
 			passParams.addFirst("/c");
 			passParams.addFirst("cmd");
 			commandLine passParams.toArray();
 		}
 		else {
 			passParams.addFirst("runtest");
-			passParams.addFirst("./gradle");
+			passParams.addFirst("./gradlew");
 			commandLine passParams.toArray();
 		}
 	}
