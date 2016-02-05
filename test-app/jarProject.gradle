@@ -17,19 +17,51 @@ repositories {
     jcenter()
 }
 
-dependencies {
-	// def sdkPath = android.sdkDirectory.getAbsolutePath();
-	// def androidJar = sdkPath + "/platforms/" + android.compileSdkVersion + "/android.jar"	
-	def nativescriptJar = "../dist/framework/libs/nativescript.jar"
-    
-	compile 'com.android.support:support-v4:22.2.0'
-	compile files(nativescriptJar)
-    // compile 'com.android.support:appcompat-v7:22.2.0'
-	// compile files(androidJar)
+def computeCompileSdkVersion () {
+	if(project.hasProperty("compileSdk")) {
+		return compileSdk
+	}
+	return 22
 }
+
+def computeBuildToolsVersion() {
+	if(project.hasProperty("buildToolsVersion")) {
+		return buildToolsVersion
+	}
+	return "22.0.1"
+}
+
+def computeMinSdkVersion() {
+	if(project.hasProperty("minSdk")) {
+		return minSdk
+	}
+	return 17
+}
+
+def computeTargetSdkVersion() {
+	if(project.hasProperty("targetSdk")) {
+		return targetSdk
+	}
+	return 22
+}
+
+def computeSupportVersion() { 
+	if(project.hasProperty("supportVersion")) {
+		return supportVersion
+	}
+	return "22.2.0"
+}
+
+
 android {
-	buildToolsVersion "22.0.1"
-	compileSdkVersion 22
+
+	compileSdkVersion computeCompileSdkVersion()
+    buildToolsVersion computeBuildToolsVersion()
+	
+	defaultConfig {
+		minSdkVersion computeMinSdkVersion()
+		targetSdkVersion computeTargetSdkVersion()
+	}
 	
 	sourceSets.main {
 		//manifest is necessary to generate a BuildConfig.java file necessary for build
@@ -37,6 +69,15 @@ android {
 		res.srcDir "res"
 		java.srcDir "src"
 	}
+}
+
+dependencies {
+	def nativescriptJar = "../dist/framework/libs/nativescript.jar"
+	def suppotVer = computeSupportVersion();
+    
+	compile "com.android.support:support-v4:$suppotVer"
+	compile files(nativescriptJar)
+    // compile "com.android.support:appcompat-v7:suppotVer"
 }
 
 task copyJaredProject (type:Copy) {
