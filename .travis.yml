@@ -41,8 +41,8 @@ script:
   - "./gradlew packar -i -PPACKAGE_VERSION=$PACKAGE_VERSION -PcompileSdk=android-$ANDROID_VERSION -PsupportVersion=$ANDROID_SUPPORT_VERSION
   --stacktrace"
   - "./gradlew runtest -PenableTest -PcompileSdk=android-$ANDROID_VERSION -PsupportVersion=$ANDROID_SUPPORT_VERSION -PtargetSdk=$ANDROID_VERSION --stacktrace"
-deploy:
-  provider: npm
-  skip_cleanup: true
-  api_key:
-    secure: XT/8wS89uTgtGehwQ+rW6wYNNFWBpi3gcaNXixdmIx+mfkdPpaA6fq6zL3MltXFItd/3jXQicX/51mwavPDRcspBrLj+7E8CDCdZBZnnuYnafl9hTIG6+1Woe0YiJOOUTMaBg6umHGZMnF9PFPfIkxRyBexWv/t4hDHtNzoAJaE=
+#deploy:
+#  provider: npm
+#  skip_cleanup: true
+#  api_key:
+#    secure: XT/8wS89uTgtGehwQ+rW6wYNNFWBpi3gcaNXixdmIx+mfkdPpaA6fq6zL3MltXFItd/3jXQicX/51mwavPDRcspBrLj+7E8CDCdZBZnnuYnafl9hTIG6+1Woe0YiJOOUTMaBg6umHGZMnF9PFPfIkxRyBexWv/t4hDHtNzoAJaE=
