@@ -1,47 +1,48 @@
 env:
-    global:
-        - NDK_VERSION=r10e
+  global:
+  - NDK_VERSION=r10e
+  - PACKAGE_VERSION=autodeploy-test-1
+  - ANDROID_VERSION=19
+  - ANDROID_SUPPORT_VERSION=19.0.0
 sudo: false
-language:
-    android
+language: android
 jdk:
-    - oraclejdk8
+  - oraclejdk8
 git:
-    submodules: false
+  submodules: false
 android:
-    components:
-        - platform-tools
-        - tools
-
-        - build-tools-22.0.1
-        - android-19
-
-        - extra-android-support
-        - extra-android-m2repository
-
-        - sys-img-armeabi-v7a-android-19
-
+  components:
+  - platform-tools
+  - tools
+  - build-tools-22.0.1
+  - android-19
+  - extra-android-support
+  - extra-android-m2repository
+  - sys-img-armeabi-v7a-android-19
 before_cache:
-        - rm -f $HOME/.gradle/caches/modules-2/modules-2.lock
+  - rm -f $HOME/.gradle/caches/modules-2/modules-2.lock
 cache:
-    directories:
-        - $HOME/.gradle/caches/
-        - $HOME/.gradle/wrapper/
+  directories:
+  - "$HOME/.gradle/caches/"
+  - "$HOME/.gradle/wrapper/"
 before_install:
-    - sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules
-    - git submodule update --init --recursive
-    - wget http://dl.google.com/android/ndk/android-ndk-$NDK_VERSION-linux-x86_64.bin
-    - chmod +x android-ndk-$NDK_VERSION-linux-x86_64.bin
-    - ./android-ndk-$NDK_VERSION-linux-x86_64.bin | egrep -v ^Extracting
-    - export ANDROID_NDK_HOME=`pwd`/android-ndk-$NDK_VERSION
-    - export PATH=${PATH}:${ANDROID_NDK_HOME}
-
+  - sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules
+  - git submodule update --init --recursive
+  - wget http://dl.google.com/android/ndk/android-ndk-$NDK_VERSION-linux-x86_64.bin
+  - chmod +x android-ndk-$NDK_VERSION-linux-x86_64.bin
+  - "./android-ndk-$NDK_VERSION-linux-x86_64.bin | egrep -v ^Extracting"
+  - export ANDROID_NDK_HOME=`pwd`/android-ndk-$NDK_VERSION
+  - export PATH=${PATH}:${ANDROID_NDK_HOME}
 before_script:
-    - echo no | android create avd --force -n Arm19 -t android-19 -b armeabi-v7a -c 12M
-    - emulator -avd Arm19 -no-skin -no-audio -no-window &
-    - android-wait-for-emulator
-
+  - echo no | android create avd --force -n Arm19 -t android-19 -b armeabi-v7a -c 12M
+  - emulator -avd Arm19 -no-skin -no-audio -no-window &
+  - android-wait-for-emulator
 script:
-    - ./gradlew packar -i -PPACKAGE_VERSION=5.5.5 -PcompileSdk=android-19 -PsupportVersion=19.0.0 --stacktrace
-    - ./gradlew runtest -PenableTest -PcompileSdk=android-19 -PsupportVersion=19.0.0 -PtargetSdk=19 --stacktrace
-
+  - "./gradlew packar -i -PPACKAGE_VERSION=$PACKAGE_VERSION -PcompileSdk=android-$ANDROID_VERSION -PsupportVersion=$ANDROID_SUPPORT_VERSION
+  --stacktrace"
+  - "./gradlew runtest -PenableTest -PcompileSdk=android-$ANDROID_VERSION -PsupportVersion=$ANDROID_SUPPORT_VERSION -PtargetSdk=$ANDROID_VERSION --stacktrace"
+deploy:
+  provider: npm
+  skip_cleanup: true
+  api_key:
+    secure: XT/8wS89uTgtGehwQ+rW6wYNNFWBpi3gcaNXixdmIx+mfkdPpaA6fq6zL3MltXFItd/3jXQicX/51mwavPDRcspBrLj+7E8CDCdZBZnnuYnafl9hTIG6+1Woe0YiJOOUTMaBg6umHGZMnF9PFPfIkxRyBexWv/t4hDHtNzoAJaE=
