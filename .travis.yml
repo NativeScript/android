@@ -53,19 +53,16 @@ before_deploy:
   - mv package android-runtime
   - cd android-runtime
   - rm ../.deploymentpackage
-#  - cp ~/.npmrc ~/npmrc_BACKUP
   - nvm install 4.2.6
   - nvm use 4.2.6
-#  - cp ~/npmrc_BACKUP ~/.npmrc
 after_deploy:
-#  - cp ~/npmrc_BACKUP ~/.npmrc
   - echo $NPMRC > ~/.npmrc
   - npm dist-tag add $PACKAGE_NAME@$FULL_PACKAGE_VERSION next
 deploy:
   provider: npm
   email: nativescript@telerik.com
   on:
-    branch: master
+    branch: DISABLED-a-really-non-existent-branch-to-publish-from-DISABLED
   skip_cleanup: true
   api_key:
     secure: aFJZR8VIbFAlXfFx5G2AveSgpGjr40prghvw8m06X0yvmUQlucwHVyq+Ov0ZD94br8d7OUOPbUzh+p9N/+oXLAXOj3DbQmJaCc+fk/e+avHu1BRy3fg295P9BQau1Abu+2ZO7tUbg5zAqJqhbEgjXsr9B5gxl+vwh4lbDhCPCwo=
