@@ -178,13 +178,14 @@ Local<Object> MetadataNode::CreateJSWrapper(Isolate *isolate)
 	}
 	else
 	{
-		auto ctorFunc = GetConstructorFunction(isolate);
-
-		//obj = Object::New(isolate);
 		obj = s_objectManager->GetEmptyObject(isolate);
-		obj->Set(ConvertToV8String("constructor"), ctorFunc);
-		obj->SetPrototype(ctorFunc->Get(ConvertToV8String("prototype")));
-		SetInstanceMetadata(isolate, obj, this);
+		if (!obj.IsEmpty())
+		{
+			auto ctorFunc = GetConstructorFunction(isolate);
+			obj->Set(ConvertToV8String("constructor"), ctorFunc);
+			obj->SetPrototype(ctorFunc->Get(ConvertToV8String("prototype")));
+			SetInstanceMetadata(isolate, obj, this);
+		}
 	}
 
 	return obj;

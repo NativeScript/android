@@ -26,6 +26,7 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
 		{
 			try
 			{
+				ex.printStackTrace();
 				Platform.passUncaughtExceptionToJsNative(ex, ErrorReport.getErrorMessage(ex));
 			}
 			catch (Throwable t)

@@ -214,9 +214,12 @@ Local<Object> ObjectManager::CreateJSWrapperHelper(jint javaObjectID, const stri
 
 	auto jsWrapper = node->CreateJSWrapper(isolate);
 
-	JEnv env;
-	auto claz = env.FindClass(className);
-	Link(jsWrapper, javaObjectID, claz);
+	if (!jsWrapper.IsEmpty())
+	{
+		JEnv env;
+		auto claz = env.FindClass(className);
+		Link(jsWrapper, javaObjectID, claz);
+	}
 	return jsWrapper;
 }
 
@@ -789,6 +792,10 @@ Local<Object> ObjectManager::GetEmptyObject(Isolate *isolate)
 {
 	auto emptyObjCtorFunc = Local<Function>::New(isolate, *s_poJsWrapperFunc);
 	auto val = emptyObjCtorFunc->CallAsConstructor(0, nullptr);
+	if (val.IsEmpty())
+	{
+		return Local<Object>();
+	}
 	assert(val->IsObject());
 	auto obj = val.As<Object>();
 	return obj;

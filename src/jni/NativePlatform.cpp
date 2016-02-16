@@ -257,6 +257,10 @@ void NativePlatform::PassUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, j
 		string className = g_objectManager->GetClassName((jobject) exception);
 		//create proxy object that wraps the java err
 		nativeExceptionObject = g_objectManager->CreateJSWrapper(javaObjectID, className);
+		if (nativeExceptionObject.IsEmpty())
+		{
+			nativeExceptionObject = Object::New(isolate);
+		}
 	}
 
 	//create a JS error object
