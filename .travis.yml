@@ -59,7 +59,7 @@ deploy:
   provider: npm
   email: nativescript@telerik.com
   on:
-    branch: master
+    branch: NON-EXISTING-master
     tags: true
   skip_cleanup: true
   tag: next
