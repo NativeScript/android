@@ -1,3 +1,24 @@
+1.6.0
+==
+
+## What's New
+
+ - [Build common test infrastructure for Android and iOS](https://github.com/NativeScript/android-runtime/issues/68)
+ - [New syntax for Java arrays](https://github.com/NativeScript/android-runtime/issues/70)
+ - [Improved debugger](https://github.com/NativeScript/android-runtime/issues/112)
+ - [Log in the debugger console](https://github.com/NativeScript/android-runtime/issues/145)
+ - [Update documentation](https://github.com/NativeScript/android-runtime/issues/290)
+ - [Provide support for ARMv8a](https://github.com/NativeScript/android-runtime/issues/297)
+ - [Imroved exception handling](https://github.com/NativeScript/android-runtime/issues/300)
+ - Gradle script improvements
+
+## Bug Fixes
+
+ - [Fix app crash during debugging (#270)](https://github.com/NativeScript/android-runtime/issues/270)
+ - [Fix app hang during array marshalling](https://github.com/NativeScript/android-runtime/issues/320)
+ - [Fix incorrect module resolution](https://github.com/NativeScript/android-runtime/issues/334)
+ - [Fix app crash during debugging (#338)](https://github.com/NativeScript/android-runtime/issues/338)
+
 1.5.1
 ==
 
