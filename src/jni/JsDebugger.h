@@ -21,6 +21,8 @@ namespace tns
 
 			static void DebugBreak();
 
+			static bool IsDebuggerActive();
+
 			static std::string GetPackageName();
 
 			static void SendCommand(JNIEnv *_env, jobject obj, jbyteArray command, jint length);
@@ -43,6 +45,7 @@ namespace tns
 			static jclass s_JsDebuggerClass;
 			static jobject s_jsDebugger;
 			static jmethodID s_EnqueueMessage;
+			static jmethodID s_EnqueueConsoleMessage;
 			static jmethodID s_EnableAgent;
 			static v8::Isolate *s_isolate;
 
