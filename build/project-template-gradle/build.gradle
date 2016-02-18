@@ -161,7 +161,7 @@ dependencies {
 	compile fileTree(dir: "libs", include: ["**/*.jar"])
 
 	// take all jars within the node_modules dir
-	compile fileTree(dir: nodeModulesDir, include: ["**/platforms/android/**/*.jar"])
+	compile fileTree(dir: nodeModulesDir, include: ["**/platforms/android/**/*.jar"], exclude: '**/.bin/**')
 
 	// take all jars within the lib/Android dir
 	compile fileTree(dir: libDir, include: ["**/*.jar"])
@@ -292,7 +292,7 @@ task pluginExtend {
 // we need to copy all dependencies into a flat dir, as pointed by the repositories configurations at the top
 task copyAarDependencies (type: Copy) {
 	println "$configStage copyAarDependencies"
-	from fileTree(dir: nodeModulesDir, include: ["**/*.aar"]).files
+	from fileTree(dir: nodeModulesDir, include: ["**/*.aar"], exclude: '**/.bin/**').files
 	into "libs/aar"
 }
 
