@@ -22,12 +22,19 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
 	@Override
 	public void uncaughtException(Thread thread, Throwable ex)
 	{
+		String errorMessage = ErrorReport.getErrorMessage(ex);
+		
 		if (Platform.isInitialized())
 		{
 			try
 			{
 				ex.printStackTrace();
-				Platform.passUncaughtExceptionToJsNative(ex, ErrorReport.getErrorMessage(ex));
+				Platform.passUncaughtExceptionToJsNative(ex, errorMessage);
+				
+				if (JsDebugger.isJsDebugerActive())
+				{
+					return;
+				}
 			}
 			catch (Throwable t)
 			{
@@ -35,10 +42,10 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
 			}
 		}
 
-		String errorMessage = ErrorReport.getErrorMessage(ex);
-
 		if (logger.isEnabled())
+		{
 			logger.write("Uncaught Exception Message=" + errorMessage);
+		}
 
 		if (!ErrorReport.startActivity(context, errorMessage) && defaultHandler != null)
 		{

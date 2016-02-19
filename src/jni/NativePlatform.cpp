@@ -263,12 +263,28 @@ void NativePlatform::PassUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, j
 		}
 	}
 
+	string stackTraceText = ArgConverter::jstringToString(stackTrace);
+	errMsg += "\n" + stackTraceText;
+
 	//create a JS error object
 	errObj->Set(V8StringConstants::GetNativeException(), nativeExceptionObject);
 	errObj->Set(V8StringConstants::GetStackTrace(), ArgConverter::jstringToV8String(stackTrace));
 
-	//pass err to JS
-	NativeScriptException::CallJsFuncWithErr(errObj);
+
+	if (JsDebugger::IsDebuggerActive())
+	{
+		__android_log_print(ANDROID_LOG_DEBUG, "TNS.Native", "debuger active throwing exception with message %s", errMsg.c_str());
+
+		JsDebugger::ConsoleMessage(errMsg, "error");
+		//throwing unhandled error to debugger so catch all and catch unhandled exceptions setting on client can be triggered
+		DEBUG_WRITE_FORCE("throwing unhandled error to debugger");
+		NativeScriptException(errMsg).ReThrowToV8();
+	}
+	else
+	{
+		//pass err to JS
+		NativeScriptException::CallJsFuncWithErr(errObj);
+	}
 }
 
 void NativePlatform::AppInitCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
