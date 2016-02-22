@@ -959,83 +959,96 @@ public class NativeScriptApplication extends android.app.Application implements 
 
 		return hasErrorIntent;
 	}
+	
+	private boolean initializing;
 
 	public void onCreate()
 	{
-		System.loadLibrary("NativeScript");
-
-		Logger logger = new LogcatLogger(BuildConfig.DEBUG, this);
-
-		boolean showErrorIntent = hasErrorIntent();
-		if (!showErrorIntent)
+		if(this.initializing)
 		{
-			appInstance = this;
-
-			Thread.UncaughtExceptionHandler exHandler = new NativeScriptUncaughtExceptionHandler(logger, this);
-
-			prepareAppBuilderCallbackImpl(logger, exHandler);
-
-			Thread.setDefaultUncaughtExceptionHandler(exHandler);
-
-			// TODO: refactor
-			ExtractPolicy extractPolicy = (appBuilderCallbackImpl != null)
-					? appBuilderCallbackImpl.getExtractPolicy()
-					: new DefaultExtractPolicy(logger);
-			boolean skipAssetExtraction = Util.runPlugin(logger, this);
-			if (!skipAssetExtraction)
-			{
-				new AssetExtractor(null, logger).extractAssets(this, extractPolicy);
-			}
-
-			if (appBuilderCallbackImpl != null)
-			{
-				appBuilderCallbackImpl.onCreate(this);
-			}
-
-			if (NativeScriptSyncService.isSyncEnabled(this))
-			{
-				NativeScriptSyncService syncService = new NativeScriptSyncService(logger, this);
-
-				syncService.sync();
-				syncService.startServer();
-
-				// preserve this instance as strong reference
-				// do not preserve in NativeScriptApplication field inorder to make the code more portable
-				Platform.getOrCreateJavaObjectID(syncService);
-			}
-			else
-			{
-				if (logger.isEnabled())
-				{
-					logger.write("NativeScript LiveSync is not enabled.");
-				}
-			}
-
-			String appName = this.getPackageName();
-			File rootDir = new File(this.getApplicationInfo().dataDir);
-			File appDir = this.getFilesDir();
-			
-			ClassLoader classLoader = this.getClassLoader();
-			File dexDir = new File(rootDir, "code_cache/secondary-dexes");
-			String dexThumb = null;
-			try
-			{
-				dexThumb = Util.getDexThumb(this);
-			}
-			catch (NameNotFoundException e)
-			{
-				if (logger.isEnabled())
-					logger.write("Error while getting current proxy thumb");
-				e.printStackTrace();
-			}
-			ThreadScheduler workThreadScheduler = new WorkThreadScheduler(new Handler(Looper.getMainLooper()));
-			// TODO: Refactor these 11 method parameters!!! E.g. create Settings abstract object and add default implementation object
-			Platform.init(this, workThreadScheduler, logger, appName, null, rootDir, appDir, classLoader, dexDir, dexThumb);
-			Platform.runScript(new File(appDir, "internal/prepareExtend.js"));
-			Platform.run();
-
-			onCreateInternal();
+			// This may happen if the app.init object is not populated while accessing the Application object
+			return;
 		}
+		
+		boolean showErrorIntent = hasErrorIntent();
+		if(showErrorIntent)
+		{
+			return;
+		}
+		
+		this.initializing = true;
+		
+		System.loadLibrary("NativeScript");
+		Logger logger = new LogcatLogger(BuildConfig.DEBUG, this);
+		
+		appInstance = this;
+
+		Thread.UncaughtExceptionHandler exHandler = new NativeScriptUncaughtExceptionHandler(logger, this);
+
+		prepareAppBuilderCallbackImpl(logger, exHandler);
+
+		Thread.setDefaultUncaughtExceptionHandler(exHandler);
+
+		// TODO: refactor
+		ExtractPolicy extractPolicy = (appBuilderCallbackImpl != null)
+				? appBuilderCallbackImpl.getExtractPolicy()
+				: new DefaultExtractPolicy(logger);
+		boolean skipAssetExtraction = Util.runPlugin(logger, this);
+		if (!skipAssetExtraction)
+		{
+			new AssetExtractor(null, logger).extractAssets(this, extractPolicy);
+		}
+
+		if (appBuilderCallbackImpl != null)
+		{
+			appBuilderCallbackImpl.onCreate(this);
+		}
+
+		if (NativeScriptSyncService.isSyncEnabled(this))
+		{
+			NativeScriptSyncService syncService = new NativeScriptSyncService(logger, this);
+
+			syncService.sync();
+			syncService.startServer();
+
+			// preserve this instance as strong reference
+			// do not preserve in NativeScriptApplication field inorder to make the code more portable
+			Platform.getOrCreateJavaObjectID(syncService);
+		}
+		else
+		{
+			if (logger.isEnabled())
+			{
+				logger.write("NativeScript LiveSync is not enabled.");
+			}
+		}
+
+		String appName = this.getPackageName();
+		File rootDir = new File(this.getApplicationInfo().dataDir);
+		File appDir = this.getFilesDir();
+		
+		ClassLoader classLoader = this.getClassLoader();
+		File dexDir = new File(rootDir, "code_cache/secondary-dexes");
+		String dexThumb = null;
+		try
+		{
+			dexThumb = Util.getDexThumb(this);
+		}
+		catch (NameNotFoundException e)
+		{
+			if (logger.isEnabled())
+				logger.write("Error while getting current proxy thumb");
+			e.printStackTrace();
+		}
+		ThreadScheduler workThreadScheduler = new WorkThreadScheduler(new Handler(Looper.getMainLooper()));
+		// TODO: Refactor these 11 method parameters!!! E.g. create Settings abstract object and add default implementation object
+		Platform.init(this, workThreadScheduler, logger, appName, null, rootDir, appDir, classLoader, dexDir, dexThumb);
+		Platform.runScript(new File(appDir, "internal/prepareExtend.js"));
+		Platform.run();
+
+		onCreateInternal();
+		
+		this.initializing = false;
 	}
 
 	private void prepareAppBuilderCallbackImpl(Logger logger, UncaughtExceptionHandler exHandler)
