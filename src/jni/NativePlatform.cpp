@@ -304,7 +304,12 @@ void NativePlatform::AppInitCallback(const v8::FunctionCallbackInfo<v8::Value>& 
 
 		// TODO: find another way to get "com/tns/NativeScriptApplication" metadata (move it to more appropriate place)
 		auto node = MetadataNode::GetOrCreate("com/tns/NativeScriptApplication");
-		auto appInstance = node->CreateJSWrapper(isolate);
+		auto appInstance = g_objectManager->GetJsObjectByJavaObject(AppJavaObjectID);
+		if(appInstance.IsEmpty())
+		{
+			appInstance = node->CreateJSWrapper(isolate);
+		}
+
 		DEBUG_WRITE("Application object created id: %d", appInstance->GetIdentityHash());
 
 		auto implementationObject = args[0]->ToObject();
