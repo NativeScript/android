@@ -24,6 +24,8 @@ namespace tns
 			static jint GenerateNewObjectId(JNIEnv *env, jobject obj);
 			static void AdjustAmountOfExternalAllocatedMemoryNative(JNIEnv *env, jobject obj, jlong usedMemory);
 			static void PassUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, jthrowable exception, jstring stackTrace);
+			static jobject AllocateByteBuffer(JNIEnv *_env, jint capacity, jlongArray address);
+			static void FreeByteBuffer(JNIEnv *_env, jlong address);
 
 			bool LogEnabled = true;
 			private:

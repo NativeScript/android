@@ -19,18 +19,18 @@ require("./shared");
 
 require("./tests/testMetadata");
 require("./tests/testAsserts");
-require("./tests/testWeakRef"); 
+require("./tests/testWeakRef");
 require("./tests/tests");
 require("./tests/testMethodResolution");
 require("./tests/testArrays");
 require("./tests/testsForRuntimeBindingGenerator");
 require("./tests/testPrimitiveTypeConversion");
-require("./tests/numericConversionTests"); 
-require("./tests/inheritanceChainResolutionTest"); 
+require("./tests/numericConversionTests");
+require("./tests/inheritanceChainResolutionTest");
 require("./tests/exceptionHandlingTests");
 require("./tests/dispatchCallbacksOnUiThreadTests");
 require("./tests/stringConversionTests");
-require("./tests/testsForTypescript"); 
+require("./tests/testsForTypescript");
 require("./tests/testGC");
 require("./tests/testsMemoryManagement");
 require("./tests/testFieldGetSet");
@@ -41,6 +41,7 @@ require("./tests/testNativeModules");
 require("./tests/requireExceptionTests");
 require("./tests/java-array-test");
 require("./tests/field-access-test");
+require("./tests/byte-buffer-test");
 
 var MainActivity = {
     onCreate: function (bundle) {
@@ -51,7 +52,7 @@ var MainActivity = {
 
     	require("./tests/testsWithContext").run(this);  	
     	execute(); //run jasmine
-    	
+
     	var layout = new android.widget.LinearLayout(this);
     	layout.setOrientation(1);
     	this.setContentView(layout);

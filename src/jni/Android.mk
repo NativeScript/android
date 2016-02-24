@@ -64,9 +64,9 @@ LOCAL_CPPFLAGS += -std=c++11
 LOCAL_MODULE    := NativeScript
 LOCAL_SRC_FILES :=	com_tns_AssetExtractor.cpp AssetExtractor.cpp\
 					com_tns_Platform.cpp NativePlatform.cpp \
-					com_tns_JsDebugger.cpp com_tns_NativeScriptActity.cpp \
+					com_tns_JsDebugger.cpp com_tns_NativeScriptActity.cpp com_tns_DirectBufferFactory.cpp \
 					JEnv.cpp DirectBuffer.cpp NativeScriptException.cpp \
-					JsDebugger.cpp SimpleAllocator.cpp \
+					JsDebugger.cpp SimpleAllocator.cpp ArrayBufferHelper.cpp \
 					NativeScriptRuntime.cpp MetadataNode.cpp MetadataTreeNode.cpp MetadataReader.cpp \
 					MethodCache.cpp JavaObjectArrayCache.cpp \
 					JniLocalRef.cpp JniSignatureParser.cpp \
