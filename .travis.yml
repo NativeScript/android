@@ -55,12 +55,12 @@ before_deploy:
   - rm ../.deploymentpackage
   - nvm install 4.2.6
   - nvm use 4.2.6
+  - node ./.travis/add-publishConfig.js next
 deploy:
   provider: npm
   email: nativescript@telerik.com
   on:
-    branch: NON-EXISTING-master
-    tags: true
+    branch: auto-publish-next
   skip_cleanup: true
   api_key:
     secure: aFJZR8VIbFAlXfFx5G2AveSgpGjr40prghvw8m06X0yvmUQlucwHVyq+Ov0ZD94br8d7OUOPbUzh+p9N/+oXLAXOj3DbQmJaCc+fk/e+avHu1BRy3fg295P9BQau1Abu+2ZO7tUbg5zAqJqhbEgjXsr9B5gxl+vwh4lbDhCPCwo=
