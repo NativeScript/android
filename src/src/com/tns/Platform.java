@@ -159,9 +159,6 @@ public class Platform
 			logger.write("init time=" + (d.getTime() - lastModDate.getTime()));
 		}
 		
-		directBufferFactory = new DirectBufferFactory(logger);
-		directBufferFactory.startListener();
-
 		initialized = true;
 		return appJavaObjectId;
 	}
@@ -913,8 +910,13 @@ public class Platform
 		return arr;
 	}
 	
-	public static ByteBuffer allocateByteBuffer(int capacity)
+	public synchronized static ByteBuffer allocateByteBuffer(int capacity)
 	{
+		if (directBufferFactory == null)
+		{
+			directBufferFactory = new DirectBufferFactory(logger);
+			directBufferFactory.startListener();
+		}
 		ByteBuffer buffer = directBufferFactory.create(capacity);
 		return buffer;
 	}
