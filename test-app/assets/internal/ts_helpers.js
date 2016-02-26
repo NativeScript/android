@@ -94,7 +94,8 @@
 	function JavaProxy(className) {
 	    return function (target) {
 	    	var extended = target.extend(className, target.prototype)
-	        return target;
+	    	extended.name = className;
+	    	return extended;
 	    };
 	}
 
