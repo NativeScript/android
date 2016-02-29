@@ -25,7 +25,7 @@ import com.tns.bindings.ProxyGenerator;
 
 public class Platform
 {
-	private static native void initNativeScript(String filesPath, int appJavaObjectId, boolean verboseLoggingEnabled, String packageName, Object[] v8Options, JsDebugger jsDebugger);
+	private static native void initNativeScript(String filesPath, boolean verboseLoggingEnabled, String packageName, Object[] v8Options, JsDebugger jsDebugger);
 
 	private static native void runModule(String filePath) throws NativeScriptException;
 
@@ -100,7 +100,7 @@ public class Platform
 		errorActivityClass = clazz;
 	}
 
-	public static int init(Application application, ThreadScheduler threadScheduler, Logger logger, String appName, File runtimeLibPath, File rootDir, File appDir, ClassLoader classLoader, File dexDir, String dexThumb) throws RuntimeException
+	public static void init(Application application, ThreadScheduler threadScheduler, Logger logger, String appName, File runtimeLibPath, File rootDir, File appDir, ClassLoader classLoader, File dexDir, String dexThumb) throws RuntimeException
 	{
 		if (initialized)
 		{
@@ -113,20 +113,10 @@ public class Platform
 
 		Platform.dexFactory = new DexFactory(logger, classLoader, dexDir, dexThumb);
 
-		int appJavaObjectId = -1;
-		
 		if (logger.isEnabled())
 		{
 			logger.write("Initializing NativeScript JAVA");
 		}
-			
-		appJavaObjectId = generateNewObjectId();
-		makeInstanceStrong(application, appJavaObjectId);
-		if (logger.isEnabled())
-		{
-			logger.write("Initialized app instance id:" + appJavaObjectId);
-		}
-		
 
 		try
 		{
@@ -143,7 +133,7 @@ public class Platform
 			jsDebugger = new JsDebugger(application, logger, threadScheduler);
 		}
 		
-		Platform.initNativeScript(Module.getApplicationFilesPath(), appJavaObjectId, logger.isEnabled(), appName, v8Config, jsDebugger);
+		Platform.initNativeScript(Module.getApplicationFilesPath(), logger.isEnabled(), appName, v8Config, jsDebugger);
 
 		if (jsDebugger != null)
 		{
@@ -160,7 +150,6 @@ public class Platform
 		}
 
 		initialized = true;
-		return appJavaObjectId;
 	}
 
 	@RuntimeCallable

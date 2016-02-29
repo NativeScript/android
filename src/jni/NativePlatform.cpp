@@ -38,7 +38,6 @@ Persistent<Context> *PrimaryContext = nullptr;
 Context::Scope *context_scope = nullptr;
 ObjectManager *g_objectManager = nullptr;
 bool tns::LogEnabled = true;
-int AppJavaObjectID = -1;
 int count = 0;
 SimpleAllocator g_allocator;
 
@@ -59,9 +58,8 @@ void NativePlatform::Init(JavaVM *vm, void *reserved)
 	DEBUG_WRITE("JNI_ONLoad END");
 }
 
-Isolate* NativePlatform::InitNativeScript(JNIEnv *_env, jobject obj, jstring filesPath, jint appJavaObjectId, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jobject jsDebugger)
+Isolate* NativePlatform::InitNativeScript(JNIEnv *_env, jobject obj, jstring filesPath, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jobject jsDebugger)
 {
-	AppJavaObjectID = appJavaObjectId;
 	tns::LogEnabled = verboseLoggingEnabled;
 
 	JEnv env(_env);
@@ -78,7 +76,7 @@ Isolate* NativePlatform::InitNativeScript(JNIEnv *_env, jobject obj, jstring fil
 	JniLocalRef snapshotScript(env.GetObjectArrayElement(args, 3));
 	Constants::V8_HEAP_SNAPSHOT_SCRIPT = ArgConverter::jstringToString(snapshotScript);
 
-	DEBUG_WRITE("Initializing Telerik NativeScript: app instance id:%d", appJavaObjectId);
+	DEBUG_WRITE("Initializing Telerik NativeScript");
 
 	NativeScriptException::Init(g_jvm, g_objectManager);
 	s_isolate = PrepareV8Runtime(env, filesRoot, packageName, jsDebugger);

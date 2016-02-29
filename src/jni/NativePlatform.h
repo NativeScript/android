@@ -14,7 +14,7 @@ namespace tns
 	{
 		public:
 			static void Init(JavaVM *vm, void *reserved);
-			static v8::Isolate* InitNativeScript(JNIEnv *_env, jobject obj, jstring filesPath, jint appJavaObjectId, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jobject jsDebugger);
+			static v8::Isolate* InitNativeScript(JNIEnv *_env, jobject obj, jstring filesPath, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jobject jsDebugger);
 			static void RunModule(JNIEnv *_env, jobject obj, jstring scriptFile);
 			static jobject RunScript(JNIEnv *_env, jobject obj, jstring scriptFile);
 			static jobject CallJSMethodNative(JNIEnv *_env, jobject obj, jint javaObjectID, jstring methodName, jint retType, jboolean isConstructor, jobjectArray packagedArgs);
