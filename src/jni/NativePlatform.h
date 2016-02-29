@@ -6,8 +6,6 @@
 #include "ObjectManager.h"
 #include "SimpleAllocator.h"
 
-void AppInitCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
-
 jobject ConvertJsValueToJavaObject(tns::JEnv& env, const v8::Local<v8::Value>& value, int classReturnType);
 
 namespace tns
@@ -30,7 +28,6 @@ namespace tns
 
 			static void PrepareExtendFunction(v8::Isolate *isolate, jstring filesPath);
 			static v8::Isolate* PrepareV8Runtime(JEnv& env, const std::string& filesPath, jstring packageName, jobject jsDebugger);
-			static void AppInitCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 			static jobject ConvertJsValueToJavaObject(JEnv& env, const v8::Local<v8::Value>& value, int classReturnType);
 
 			static v8::Isolate *s_isolate;

@@ -281,68 +281,6 @@ void NativePlatform::PassUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, j
 	}
 }
 
-void NativePlatform::AppInitCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
-{
-	try
-	{
-		auto isolate = Isolate::GetCurrent();
-
-		if (args.Length() != 1)
-		{
-			throw NativeScriptException(string("Application should be initialized with single parameter"));
-		}
-		if (!args[0]->IsObject())
-		{
-			throw NativeScriptException(string("Application should be initialized with single object parameter containing overridden methods"));
-		}
-
-		// TODO: find another way to get "com/tns/NativeScriptApplication" metadata (move it to more appropriate place)
-		auto node = MetadataNode::GetOrCreate("com/tns/NativeScriptApplication");
-		auto appInstance = g_objectManager->GetJsObjectByJavaObject(AppJavaObjectID);
-		if(appInstance.IsEmpty())
-		{
-			appInstance = node->CreateJSWrapper(isolate);
-		}
-
-		DEBUG_WRITE("Application object created id: %d", appInstance->GetIdentityHash());
-
-		auto implementationObject = args[0]->ToObject();
-		implementationObject->SetHiddenValue(V8StringConstants::GetClassImplementationObject(), External::New(isolate, node));
-		DEBUG_WRITE("Application object implementation object is with id: %d", implementationObject->GetIdentityHash());
-		implementationObject->SetPrototype(appInstance->GetPrototype());
-		bool appSuccess = appInstance->SetPrototype(implementationObject);
-		if (!appSuccess)
-		{
-			throw NativeScriptException(string("Application could not be initialized correctly"));
-		}
-
-		jweak applicationObject = g_objectManager->GetJavaObjectByID(AppJavaObjectID);
-
-		JEnv env;
-		jclass appClass = env.FindClass("com/tns/NativeScriptApplication");
-		g_objectManager->Link(appInstance, AppJavaObjectID, appClass);
-
-		JniLocalRef applicationClass(env.GetObjectClass(applicationObject));
-		jmethodID setNativeScriptOverridesMethodId = env.GetMethodID((jclass) applicationClass, "setNativeScriptOverrides", "([Ljava/lang/String;)V");
-		jobjectArray methodOverrides = NativeScriptRuntime::GetMethodOverrides(env, implementationObject);
-		env.CallVoidMethod(applicationObject, setNativeScriptOverridesMethodId, methodOverrides);
-	}
-	catch (NativeScriptException& e)
-	{
-		e.ReThrowToV8();
-	}
-	catch (std::exception e) {
-				stringstream ss;
-		ss << "Error: c++ exception: " << e.what() << endl;
-		NativeScriptException nsEx(ss.str());
-		nsEx.ReThrowToV8();
-	}
-	catch (...) {
-		NativeScriptException nsEx(std::string("Error: c++ exception!"));
-		nsEx.ReThrowToV8();
-	}
-}
-
 Isolate* NativePlatform::PrepareV8Runtime(JEnv& env, const string& filesPath, jstring packageName, jobject jsDebugger)
 {
 	Platform* platform = v8::platform::CreateDefaultPlatform();
@@ -428,11 +366,6 @@ Isolate* NativePlatform::PrepareV8Runtime(JEnv& env, const string& filesPath, js
 	auto global = context->Global();
 
 	Module::Init(isolate);
-
-	auto appTemplate = ObjectTemplate::New();
-	appTemplate->Set(ConvertToV8String("init"), FunctionTemplate::New(isolate, AppInitCallback));
-	auto appInstance = appTemplate->NewInstance();
-	global->ForceSet(ConvertToV8String("app"), appInstance, readOnlyFlags);
 
 	global->ForceSet(ConvertToV8String("global"), global, readOnlyFlags);
 	global->ForceSet(ConvertToV8String("__global"), global, readOnlyFlags);
