@@ -203,12 +203,6 @@ void NativePlatform::CreateJSInstanceNative(JNIEnv *_env, jobject obj, jobject j
 	Local<Object> implementationObject;
 
 	auto proxyClassName = g_objectManager->GetClassName(javaObject);
-	//
-	if (proxyClassName == "com/tns/NativeScriptActivity")
-	{
-		return;
-	}
-	//
 	DEBUG_WRITE("createJSInstanceNative class %s", proxyClassName.c_str());
 	jsInstance = MetadataNode::CreateExtendedJSWrapper(isolate, proxyClassName);
 	if (jsInstance.IsEmpty())

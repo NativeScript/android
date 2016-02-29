@@ -16,12 +16,12 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 
 import android.app.Application;
 import android.util.SparseArray;
 
 import com.tns.bindings.ProxyGenerator;
-import com.tns.internal.ExtractPolicy;
 
 public class Platform
 {
@@ -54,6 +54,8 @@ public class Platform
 	private static final NativeScriptHashMap<Object, Integer> strongJavaObjectToID = new NativeScriptHashMap<Object, Integer>();
 
 	private static final NativeScriptWeakHashMap<Object, Integer> weakJavaObjectToID = new NativeScriptWeakHashMap<Object, Integer>();
+	
+	private final static Map<Class<?>, JavaScriptImplementation> loadedJavaScriptExtends = new HashMap<Class<?>, JavaScriptImplementation>();
 
 	private static final Runtime runtime = Runtime.getRuntime();
 	private static Class<?> errorActivityClass;
@@ -358,8 +360,21 @@ public class Platform
 		int javaObjectID = generateNewObjectId();
 
 		makeInstanceStrong(instance, javaObjectID);
-
-		String className = instance.getClass().getName();
+		
+		Class<?> clazz = instance.getClass();
+		
+		if (!loadedJavaScriptExtends.containsKey(clazz))
+		{
+			JavaScriptImplementation jsImpl = clazz.getAnnotation(JavaScriptImplementation.class);
+			if (jsImpl != null)
+			{
+				File jsFile = new File(Module.getApplicationFilesPath(), jsImpl.javaScriptFile());
+				runModule(jsFile);
+			}
+			loadedJavaScriptExtends.put(clazz, jsImpl);
+		}
+  		  
+		String className = clazz.getName();
 
 		createJSInstanceNative(instance, javaObjectID, className);
 
