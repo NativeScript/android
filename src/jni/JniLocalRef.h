@@ -11,7 +11,7 @@ namespace tns
 		public:
 			JniLocalRef();
 
-			JniLocalRef(jobject obj, bool isWeak = false);
+			JniLocalRef(jobject obj);
 
 			JniLocalRef(jclass obj);
 
@@ -54,10 +54,7 @@ namespace tns
 			operator jobjectArray() const;
 
 		private:
-
 			jobject m_obj;
-
-			bool m_isWeak;
 	};
 }
 
