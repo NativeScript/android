@@ -57,20 +57,21 @@ void ObjectManager::Init(Isolate *isolate)
 	V8::AddGCEpilogueCallback(ObjectManager::OnGcFinishedStatic, kGCTypeAll);
 }
 
-jweak ObjectManager::GetJavaObjectByJsObjectStatic(const Local<Object>& object)
+JniLocalRef ObjectManager::GetJavaObjectByJsObjectStatic(const Local<Object>& object)
 {
 	return ObjectManager::instance->GetJavaObjectByJsObject(object);
 }
 
-jweak ObjectManager::GetJavaObjectByJsObject(const Local<Object>& object)
+JniLocalRef ObjectManager::GetJavaObjectByJsObject(const Local<Object>& object)
 {
-	jweak javaObject = nullptr;
+	JniLocalRef javaObject;
 
 	JSInstanceInfo *jsInstanceInfo = GetJSInstanceInfo(object);
 
 	if (jsInstanceInfo != nullptr)
 	{
-		javaObject = GetJavaObjectByID(jsInstanceInfo->JavaObjectID);
+		JEnv env;
+		javaObject = JniLocalRef(env.NewLocalRef(GetJavaObjectByID(jsInstanceInfo->JavaObjectID)));
 	}
 
 	return javaObject;

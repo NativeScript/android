@@ -3,6 +3,7 @@
 
 #include "v8.h"
 #include "JEnv.h"
+#include "JniLocalRef.h"
 #include "ArgsWrapper.h"
 #include "JSInstanceInfo.h"
 #include "DirectBuffer.h"
@@ -22,11 +23,9 @@ namespace tns
 
 			void Init(v8::Isolate *isolate);
 
-			static jweak GetJavaObjectByJsObjectStatic(const v8::Local<v8::Object>& object);
+			static JniLocalRef GetJavaObjectByJsObjectStatic(const v8::Local<v8::Object>& object);
 
-			jweak GetJavaObjectByJsObject(const v8::Local<v8::Object>& object);
-
-			jweak GetJavaObjectByID(uint32_t javaObjectID);
+			JniLocalRef GetJavaObjectByJsObject(const v8::Local<v8::Object>& object);
 
 			void UpdateCache(int objectID, jobject obj);
 
@@ -157,6 +156,8 @@ namespace tns
 			static void OnGcStartedStatic(v8::GCType type, v8::GCCallbackFlags flags);
 
 			static void OnGcFinishedStatic(v8::GCType type, v8::GCCallbackFlags flags);
+
+			jweak GetJavaObjectByID(uint32_t javaObjectID);
 
 			jobject GetJavaObjectByIDImpl(uint32_t javaObjectID);
 

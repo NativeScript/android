@@ -1,7 +1,6 @@
 #include "JsArgConverter.h"
 #include <sstream>
 #include "ObjectManager.h"
-#include "NativeScriptAssert.h"
 #include "ArgConverter.h"
 #include "JniLocalRef.h"
 #include "JniSignatureParser.h"
@@ -207,11 +206,14 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 			return success;
 		}
 
-		jweak obj = ObjectManager::GetJavaObjectByJsObjectStatic(jsObject);
-		SetConvertedObject(index, obj, true);
-		success = obj != nullptr;
+		auto obj = ObjectManager::GetJavaObjectByJsObjectStatic(jsObject);
+		success = !obj.IsNull();
 
-		if (!success)
+		if (success)
+		{
+			SetConvertedObject(index, obj.Move());
+		}
+		else
 		{
 			sprintf(buff, "Cannot convert object to %s at index %d", typeSignature.c_str(), index);
 		}
@@ -236,20 +238,12 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 	return success;
 }
 
-void JsArgConverter::SetConvertedObject(int index, jobject obj, bool isGlobalRef)
+void JsArgConverter::SetConvertedObject(int index, jobject obj)
 {
-	if (obj == nullptr)
-	{
-		m_args[index].l = obj;
-	}
-	else if (isGlobalRef)
-	{
-		m_args[index].l = obj;
-	}
-	else
+	m_args[index].l = obj;
+	if (obj != nullptr)
 	{
 		m_storedObjects.push_back(index);
-		m_args[index].l = obj;
 	}
 }
 

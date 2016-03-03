@@ -93,7 +93,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 	else if (arg->IsInt32() && (returnType == Type::Int || returnType == Type::Null))
 	{
 		jint value = arg->Int32Value();
-		JniLocalRef javaObject(JType::NewInt(env, value));
+		auto javaObject = JType::NewInt(env, value);
 		SetConvertedObject(env, index, javaObject);
 
 		success = true;
@@ -120,8 +120,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 				obj = JType::NewLong(env, (jlong) d);
 			}
 
-			JniLocalRef javaObject(obj);
-			SetConvertedObject(env, index, javaObject);
+			SetConvertedObject(env, index, obj);
 
 			success = true;
 		}
@@ -141,8 +140,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 				obj = JType::NewDouble(env, (jdouble) d);
 			}
 
-			JniLocalRef javaObject(obj);
-			SetConvertedObject(env, index, javaObject);
+			SetConvertedObject(env, index, obj);
 
 			success = true;
 		}
@@ -150,7 +148,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 	else if (arg->IsBoolean())
 	{
 		jboolean value = arg->BooleanValue();
-		JniLocalRef javaObject(JType::NewBoolean(env, value));
+		auto javaObject = JType::NewBoolean(env, value);
 		SetConvertedObject(env, index, javaObject);
 		success = true;
 	}
@@ -158,14 +156,14 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 	{
 		auto boolObj = Local<BooleanObject>::Cast(arg);
 		jboolean value = boolObj->BooleanValue() ? JNI_TRUE : JNI_FALSE;
-		JniLocalRef javaObject(JType::NewBoolean(env, value));
+		auto javaObject = JType::NewBoolean(env, value);
 		SetConvertedObject(env, index, javaObject);
 
 		success = true;
 	}
 	else if (arg->IsString() || arg->IsStringObject())
 	{
-		JniLocalRef stringObject(ConvertToJavaString(arg));
+		auto stringObject = ConvertToJavaString(arg);
 		SetConvertedObject(env, index, stringObject);
 
 		success = true;
@@ -188,7 +186,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 				value = hidden->ToInt32()->Int32Value();
 			}
 
-			JniLocalRef javaObject(JType::NewLong(env, value));
+			auto javaObject = JType::NewLong(env, value);
 			SetConvertedObject(env, index, javaObject);
 			return true;
 		}
@@ -209,7 +207,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 				value = (jbyte) byteArg;
 			}
 
-			JniLocalRef javaObject(JType::NewByte(env, value));
+			auto javaObject = JType::NewByte(env, value);
 			SetConvertedObject(env, index, javaObject);
 			return true;
 		}
@@ -230,7 +228,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 				value = (jshort) shortArg;
 			}
 
-			JniLocalRef javaObject(JType::NewShort(env, value));
+			auto javaObject = JType::NewShort(env, value);
 			SetConvertedObject(env, index, javaObject);
 			return true;
 		}
@@ -245,7 +243,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 				value = (jdouble) doubleArg;
 			}
 
-			JniLocalRef javaObject(JType::NewDouble(env, value));
+			auto javaObject = JType::NewDouble(env, value);
 			SetConvertedObject(env, index, javaObject);
 			return true;
 		}
@@ -260,7 +258,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 				value = (jfloat) floatArg;
 			}
 
-			JniLocalRef javaObject(JType::NewFloat(env, value));
+			auto javaObject = JType::NewFloat(env, value);
 			SetConvertedObject(env, index, javaObject);
 			return true;
 		}
@@ -275,16 +273,16 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 				value = (jchar) str[0];
 			}
 
-			JniLocalRef javaObject(JType::NewChar(env, value));
+			auto javaObject = JType::NewChar(env, value);
 			SetConvertedObject(env, index, javaObject);
 			return true;
 		}
 
-		jweak obj = ObjectManager::GetJavaObjectByJsObjectStatic(objectWithHiddenID);
-		success = obj != nullptr;
+		auto obj = ObjectManager::GetJavaObjectByJsObjectStatic(objectWithHiddenID);
+		success = !obj.IsNull();
 		if (success)
 		{
-			SetConvertedObject(env, index, obj, true);
+			SetConvertedObject(env, index, obj.Move());
 		}
 		else
 		{
@@ -316,20 +314,12 @@ jobject JsArgToArrayConverter::GetConvertedArg()
 	return (m_argsLen > 0) ? m_argsAsObject[0] : nullptr;
 }
 
-void JsArgToArrayConverter::SetConvertedObject(JEnv& env, int index, jobject obj, bool isGlobalRef)
+void JsArgToArrayConverter::SetConvertedObject(JEnv& env, int index, jobject obj)
 {
-	if (obj == nullptr)
-	{
-		m_argsAsObject[index] = obj;
-	}
-	else if (isGlobalRef)
-	{
-		m_argsAsObject[index] = obj;
-	}
-	else
+	m_argsAsObject[index] = obj;
+	if (obj != nullptr)
 	{
 		m_storedIndexes.push_back(index);
-		m_argsAsObject[index] = env.NewLocalRef(obj);
 	}
 }
 

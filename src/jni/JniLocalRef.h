@@ -15,13 +15,15 @@ namespace tns
 
 			JniLocalRef(jclass obj);
 
-			JniLocalRef(const JniLocalRef& rhs);
+			JniLocalRef(JniLocalRef&& rhs);
 
 			~JniLocalRef();
 
 			bool IsNull() const;
 
-			JniLocalRef& operator=(const JniLocalRef& rhs);
+			jobject Move();
+
+			JniLocalRef& operator=(JniLocalRef&& rhs);
 
 			operator jobject() const;
 

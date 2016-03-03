@@ -23,11 +23,10 @@ JniLocalRef::JniLocalRef(jclass obj)
 {
 }
 
-JniLocalRef::JniLocalRef(const JniLocalRef& rhs)
+JniLocalRef::JniLocalRef(JniLocalRef&& rhs)
+	: m_obj(rhs.m_obj)
 {
-	JEnv env;
-
-	m_obj = env.NewLocalRef(rhs.m_obj);
+	rhs.m_obj = nullptr;
 }
 
 bool JniLocalRef::IsNull() const
@@ -35,19 +34,17 @@ bool JniLocalRef::IsNull() const
 	return m_obj == nullptr;
 }
 
-JniLocalRef& JniLocalRef::operator=(const JniLocalRef& rhs)
+jobject JniLocalRef::Move()
 {
-	if (this != &rhs)
-	{
-		JEnv env;
-		if (m_obj != nullptr)
-		{
-			env.DeleteLocalRef(m_obj);
-		}
-		m_obj = (rhs.m_obj != nullptr)
-				? env.NewLocalRef(rhs.m_obj)
-				: nullptr;
-	}
+	auto value = m_obj;
+	m_obj = nullptr;
+	return value;
+}
+
+JniLocalRef& JniLocalRef::operator=(JniLocalRef&& rhs)
+{
+	m_obj = rhs.m_obj;
+	rhs.m_obj = nullptr;
 	return *this;
 }
 
