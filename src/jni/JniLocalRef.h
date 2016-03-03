@@ -11,7 +11,7 @@ namespace tns
 		public:
 			JniLocalRef();
 
-			JniLocalRef(jobject obj);
+			JniLocalRef(jobject obj, bool isGlobal = false);
 
 			JniLocalRef(jclass obj);
 
@@ -20,6 +20,8 @@ namespace tns
 			~JniLocalRef();
 
 			bool IsNull() const;
+
+			bool IsGlobal() const;
 
 			jobject Move();
 
@@ -57,6 +59,7 @@ namespace tns
 
 		private:
 			jobject m_obj;
+			bool m_isGlobal;
 	};
 }
 

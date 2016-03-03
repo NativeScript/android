@@ -282,7 +282,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 		success = !obj.IsNull();
 		if (success)
 		{
-			SetConvertedObject(env, index, obj.Move());
+			SetConvertedObject(env, index, obj.Move(), obj.IsGlobal());
 		}
 		else
 		{
@@ -314,10 +314,10 @@ jobject JsArgToArrayConverter::GetConvertedArg()
 	return (m_argsLen > 0) ? m_argsAsObject[0] : nullptr;
 }
 
-void JsArgToArrayConverter::SetConvertedObject(JEnv& env, int index, jobject obj)
+void JsArgToArrayConverter::SetConvertedObject(JEnv& env, int index, jobject obj, bool isGlobal)
 {
 	m_argsAsObject[index] = obj;
-	if (obj != nullptr)
+	if ((obj != nullptr) && !isGlobal)
 	{
 		m_storedIndexes.push_back(index);
 	}

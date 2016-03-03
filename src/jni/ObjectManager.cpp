@@ -43,6 +43,12 @@ ObjectManager::ObjectManager()
 	GET_NAME_METHOD_ID = env.GetMethodID(JAVA_LANG_CLASS, "getName", "()Ljava/lang/String;");
 	assert(GET_NAME_METHOD_ID != nullptr);
 
+	auto useGlobalRefsMethodID = env.GetStaticMethodID(PlatformClass, "useGlobalRefs", "()Z");
+	assert(useGlobalRefsMethodID != nullptr);
+
+	auto useGlobalRefs = env.CallStaticBooleanMethod(PlatformClass, useGlobalRefsMethodID);
+	m_useGlobalRefs = useGlobalRefs == JNI_TRUE;
+
 	ObjectManager::instance = this;
 }
 
@@ -64,17 +70,24 @@ JniLocalRef ObjectManager::GetJavaObjectByJsObjectStatic(const Local<Object>& ob
 
 JniLocalRef ObjectManager::GetJavaObjectByJsObject(const Local<Object>& object)
 {
-	JniLocalRef javaObject;
-
 	JSInstanceInfo *jsInstanceInfo = GetJSInstanceInfo(object);
 
 	if (jsInstanceInfo != nullptr)
 	{
 		JEnv env;
-		javaObject = JniLocalRef(env.NewLocalRef(GetJavaObjectByID(jsInstanceInfo->JavaObjectID)));
+		if (m_useGlobalRefs)
+		{
+			JniLocalRef javaObject(GetJavaObjectByID(jsInstanceInfo->JavaObjectID), true);
+			return javaObject;
+		}
+		else
+		{
+			JniLocalRef javaObject(env.NewLocalRef(GetJavaObjectByID(jsInstanceInfo->JavaObjectID)));
+			return javaObject;
+		}
 	}
 
-	return javaObject;
+	return JniLocalRef();
 }
 
 JSInstanceInfo* ObjectManager::GetJSInstanceInfo(const Local<Object>& object)

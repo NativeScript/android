@@ -43,7 +43,7 @@ namespace tns
 		private:
 			bool ConvertArg(const v8::Local<v8::Value>& arg, int index);
 
-			void SetConvertedObject(JEnv& env, int index, jobject obj);
+			void SetConvertedObject(JEnv& env, int index, jobject obj, bool isGlobal = false);
 
 			int m_argsLen;
 

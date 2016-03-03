@@ -211,7 +211,7 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 
 		if (success)
 		{
-			SetConvertedObject(index, obj.Move());
+			SetConvertedObject(index, obj.Move(), obj.IsGlobal());
 		}
 		else
 		{
@@ -238,10 +238,10 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 	return success;
 }
 
-void JsArgConverter::SetConvertedObject(int index, jobject obj)
+void JsArgConverter::SetConvertedObject(int index, jobject obj, bool isGlobal)
 {
 	m_args[index].l = obj;
-	if (obj != nullptr)
+	if ((obj != nullptr) && !isGlobal)
 	{
 		m_storedObjects.push_back(index);
 	}

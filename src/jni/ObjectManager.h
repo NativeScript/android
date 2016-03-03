@@ -189,6 +189,8 @@ namespace tns
 
 			DirectBuffer m_outBuff;
 
+			bool m_useGlobalRefs;
+
 			jclass PlatformClass;
 
 			jclass JAVA_LANG_CLASS;

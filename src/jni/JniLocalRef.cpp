@@ -6,25 +6,22 @@ using namespace v8;
 using namespace tns;
 
 JniLocalRef::JniLocalRef()
-:
-		m_obj(nullptr)
+	: m_obj(nullptr), m_isGlobal(false)
 {
 }
 
-JniLocalRef::JniLocalRef(jobject obj)
-:
-		m_obj(obj)
+JniLocalRef::JniLocalRef(jobject obj, bool isGlobal)
+	: m_obj(obj), m_isGlobal(isGlobal)
 {
 }
 
 JniLocalRef::JniLocalRef(jclass obj)
-:
-		m_obj(obj)
+	: m_obj(obj), m_isGlobal(false)
 {
 }
 
 JniLocalRef::JniLocalRef(JniLocalRef&& rhs)
-	: m_obj(rhs.m_obj)
+	: m_obj(rhs.m_obj), m_isGlobal(rhs.m_isGlobal)
 {
 	rhs.m_obj = nullptr;
 }
@@ -32,6 +29,11 @@ JniLocalRef::JniLocalRef(JniLocalRef&& rhs)
 bool JniLocalRef::IsNull() const
 {
 	return m_obj == nullptr;
+}
+
+bool JniLocalRef::IsGlobal() const
+{
+	return m_isGlobal;
 }
 
 jobject JniLocalRef::Move()
@@ -44,6 +46,7 @@ jobject JniLocalRef::Move()
 JniLocalRef& JniLocalRef::operator=(JniLocalRef&& rhs)
 {
 	m_obj = rhs.m_obj;
+	m_isGlobal = rhs.m_isGlobal;
 	rhs.m_obj = nullptr;
 	return *this;
 }
@@ -126,7 +129,7 @@ JniLocalRef::operator jobjectArray() const
 
 JniLocalRef::~JniLocalRef()
 {
-	if (m_obj != nullptr)
+	if ((m_obj != nullptr) && !m_isGlobal)
 	{
 		JEnv env;
 		env.DeleteLocalRef(m_obj);
