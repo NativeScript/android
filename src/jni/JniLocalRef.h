@@ -2,6 +2,7 @@
 #define JNILOCALREF_H_
 
 #include "JEnv.h"
+#include "JType.h"
 #include "v8.h"
 
 namespace tns
@@ -9,53 +10,136 @@ namespace tns
 	class JniLocalRef
 	{
 		public:
-			JniLocalRef();
+			JniLocalRef()
+				: m_obj(nullptr), m_isGlobal(false)
+			{
+			}
 
-			JniLocalRef(jobject obj, bool isGlobal = false);
+			JniLocalRef(jobject obj, bool isGlobal = false)
+				: m_obj(obj), m_isGlobal(isGlobal)
+			{
+			}
 
-			JniLocalRef(jclass obj);
+			JniLocalRef(jclass obj)
+				: m_obj(obj), m_isGlobal(false)
+			{
+			}
 
-			JniLocalRef(JniLocalRef&& rhs);
+			JniLocalRef(JniLocalRef&& rhs)
+				: m_obj(rhs.m_obj), m_isGlobal(rhs.m_isGlobal)
+			{
+				rhs.m_obj = nullptr;
+			}
 
-			~JniLocalRef();
+			bool IsNull() const
+			{
+				return m_obj == nullptr;
+			}
 
-			bool IsNull() const;
+			bool IsGlobal() const
+			{
+				return m_isGlobal;
+			}
 
-			bool IsGlobal() const;
+			jobject Move()
+			{
+				auto value = m_obj;
+				m_obj = nullptr;
+				return value;
+			}
 
-			jobject Move();
+			JniLocalRef& operator=(JniLocalRef&& rhs)
+			{
+				m_obj = rhs.m_obj;
+				m_isGlobal = rhs.m_isGlobal;
+				rhs.m_obj = nullptr;
+				return *this;
+			}
 
-			JniLocalRef& operator=(JniLocalRef&& rhs);
+			operator jobject() const
+			{
+				return m_obj;
+			}
 
-			operator jobject() const;
+			operator jstring() const
+			{
+				return reinterpret_cast<jstring>(m_obj);
+			}
 
-			operator jboolean() const;
+			operator jclass() const
+			{
+				return reinterpret_cast<jclass>(m_obj);
+			}
 
-			operator jclass() const;
+			operator jboolean() const
+			{
+				JEnv env;
+				return JType::BooleanValue(env, m_obj);
+			}
 
-			operator jstring() const;
+			operator jthrowable() const
+			{
+				return reinterpret_cast<jthrowable>(m_obj);
+			}
 
-			operator jthrowable() const;
+			operator jarray()const
+			{
+				return reinterpret_cast<jarray>(m_obj);
+			}
 
-			operator jarray() const;
+			operator jbyteArray() const
+			{
+				return reinterpret_cast<jbyteArray>(m_obj);
+			}
 
-			operator jbyteArray() const;
+			operator jshortArray() const
+			{
+				return reinterpret_cast<jshortArray>(m_obj);
+			}
 
-			operator jshortArray() const;
+			operator jintArray() const
+			{
+				return reinterpret_cast<jintArray>(m_obj);
+			}
 
-			operator jintArray() const;
+			operator jlongArray() const
+			{
+				return reinterpret_cast<jlongArray>(m_obj);
+			}
 
-			operator jlongArray() const;
+			operator jfloatArray() const
+			{
+				return reinterpret_cast<jfloatArray>(m_obj);
+			}
 
-			operator jfloatArray() const;
+			operator jdoubleArray() const
+			{
+				return reinterpret_cast<jdoubleArray>(m_obj);
+			}
 
-			operator jdoubleArray() const;
+			operator jbooleanArray() const
+			{
+				return reinterpret_cast<jbooleanArray>(m_obj);
+			}
 
-			operator jbooleanArray() const;
+			operator jcharArray() const
+			{
+				return reinterpret_cast<jcharArray>(m_obj);
+			}
 
-			operator jcharArray() const;
+			operator jobjectArray() const
+			{
+				return reinterpret_cast<jobjectArray>(m_obj);
+			}
 
-			operator jobjectArray() const;
+			~JniLocalRef()
+			{
+				if ((m_obj != nullptr) && !m_isGlobal)
+				{
+					JEnv env;
+					env.DeleteLocalRef(m_obj);
+				}
+			}
 
 		private:
 			jobject m_obj;
