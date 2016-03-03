@@ -159,7 +159,7 @@ namespace tns
 
 			jweak GetJavaObjectByID(uint32_t javaObjectID);
 
-			jobject GetJavaObjectByIDImpl(JEnv& env, uint32_t javaObjectID);
+			jobject GetJavaObjectByIDImpl(uint32_t javaObjectID);
 
 			static jweak NewWeakGlobalRefCallback(const int& javaObjectID, void *state);
 
@@ -168,6 +168,8 @@ namespace tns
 			static void JSWrapperConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 
 			int m_numberOfGC;
+
+			JEnv m_env;
 
 			std::stack<GarbageCollectionInfo> m_markedForGC;
 
