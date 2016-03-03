@@ -137,10 +137,8 @@ jweak ObjectManager::GetJavaObjectByID(uint32_t javaObjectID)
 	return obj;
 }
 
-jobject ObjectManager::GetJavaObjectByIDImpl(uint32_t javaObjectID)
+jobject ObjectManager::GetJavaObjectByIDImpl(JEnv& env, uint32_t javaObjectID)
 {
-	JEnv env;
-
 	jobject object = env.CallStaticObjectMethod(PlatformClass, GET_JAVAOBJECT_BY_ID_METHOD_ID, javaObjectID);
 	return object;
 }
@@ -788,9 +786,10 @@ jweak ObjectManager::NewWeakGlobalRefCallback(const int& javaObjectID, void *sta
 {
 	ObjectManager *objManager = reinterpret_cast<ObjectManager*>(state);
 
-	JniLocalRef obj(objManager->GetJavaObjectByIDImpl(javaObjectID));
-
 	JEnv env;
+
+	JniLocalRef obj(objManager->GetJavaObjectByIDImpl(env, javaObjectID));
+
 	jweak weakRef = env.NewWeakGlobalRef(obj);
 
 	return weakRef;

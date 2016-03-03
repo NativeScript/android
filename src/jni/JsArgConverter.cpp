@@ -538,13 +538,11 @@ JsArgConverter::~JsArgConverter()
 {
 	if (m_argsLen > 0)
 	{
-		JEnv env;
-
 		int length = m_storedObjects.size();
 		for (int i = 0; i < length; i++)
 		{
 			int index = m_storedObjects[i];
-			env.DeleteLocalRef(m_args[index].l);
+			m_env.DeleteLocalRef(m_args[index].l);
 		}
 	}
 }

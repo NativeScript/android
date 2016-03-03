@@ -159,7 +159,7 @@ namespace tns
 
 			jweak GetJavaObjectByID(uint32_t javaObjectID);
 
-			jobject GetJavaObjectByIDImpl(uint32_t javaObjectID);
+			jobject GetJavaObjectByIDImpl(JEnv& env, uint32_t javaObjectID);
 
 			static jweak NewWeakGlobalRefCallback(const int& javaObjectID, void *state);
 
