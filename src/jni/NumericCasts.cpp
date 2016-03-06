@@ -21,6 +21,32 @@ void NumericCasts::CreateGlobalCastFunctions(const Local<ObjectTemplate>& global
 	globalTemplate->Set(ConvertToV8String("double"), FunctionTemplate::New(isolate, NumericCasts::MarkAsDoubleCallbackStatic, ext));
 	globalTemplate->Set(ConvertToV8String("float"), FunctionTemplate::New(isolate, NumericCasts::MarkAsFloatCallbackStatic, ext));
 	globalTemplate->Set(ConvertToV8String("char"), FunctionTemplate::New(isolate, NumericCasts::MarkAsCharCallbackStatic, ext));
+
+	s_castMarker = new Persistent<String>(isolate, ConvertToV8String("t::cast"));
+}
+
+CastType NumericCasts::GetCastType(const Local<Object>& object)
+{
+	auto ret = CastType::None;
+	auto isolate = Isolate::GetCurrent();
+	auto key = Local<String>::New(isolate, *s_castMarker);
+	auto hidden = object->GetHiddenValue(key);
+	if (!hidden.IsEmpty())
+	{
+		ret = static_cast<CastType>(hidden->Int32Value());
+	}
+	return ret;
+}
+
+Local<Value> NumericCasts::GetCastValue(const Local<Object>& object)
+{
+	auto value = object->Get(ConvertToV8String("value"));
+	return value;
+}
+
+void NumericCasts::MarkAsLong(const v8::Local<v8::Object>& object, const v8::Local<v8::Value>& value)
+{
+	MarkJsObject(object, CastType::Long, value);
 }
 
 NumericCasts* NumericCasts::GetThis(const v8::FunctionCallbackInfo<Value>& args)
@@ -176,29 +202,6 @@ void NumericCasts::MarkAsDoubleCallbackStatic(const v8::FunctionCallbackInfo<Val
 	}
 }
 
-void NumericCasts::MarkedJsObjectWeakCallback(const v8::WeakCallbackData<Object, Persistent<Object> >& data)
-{
-	//todo: plamen5kov: re-think using try catch here
-	try
-	{
-		data.GetParameter()->Reset();
-	}
-	catch (NativeScriptException& e)
-	{
-		e.ReThrowToV8();
-	}
-	catch (std::exception e) {
-		stringstream ss;
-		ss << "Error: c++ exception: " << e.what() << endl;
-		NativeScriptException nsEx(ss.str());
-		nsEx.ReThrowToV8();
-	}
-	catch (...) {
-		NativeScriptException nsEx(std::string("Error: c++ exception!"));
-		nsEx.ReThrowToV8();
-	}
-}
-
 void NumericCasts::MarkAsLongCallback(const v8::FunctionCallbackInfo<Value>& args)
 {
 	try
@@ -225,16 +228,8 @@ void NumericCasts::MarkAsLongCallback(const v8::FunctionCallbackInfo<Value>& arg
 		}
 
 		auto cast = Object::New(isolate);
-
-		auto markedObject = MarkJsObject(cast, V8StringConstants::MARKED_AS_LONG, value);
-		if (markedObject != nullptr)
-		{
-			args.GetReturnValue().Set(*markedObject);
-		}
-		else
-		{
-			args.GetReturnValue().Set(cast);
-		}
+		MarkJsObject(cast, CastType::Long, value);
+		args.GetReturnValue().Set(cast);
 	}
 	catch (NativeScriptException& e)
 	{
@@ -278,16 +273,8 @@ void NumericCasts::MarkAsByteCallback(const v8::FunctionCallbackInfo<Value>& arg
 		}
 
 		auto cast = Object::New(isolate);
-
-		auto markedObject = MarkJsObject(cast, V8StringConstants::MARKED_AS_BYTE, value);
-		if (markedObject != nullptr)
-		{
-			args.GetReturnValue().Set(*markedObject);
-		}
-		else
-		{
-			args.GetReturnValue().Set(cast);
-		}
+		MarkJsObject(cast, CastType::Byte, value);
+		args.GetReturnValue().Set(cast);
 	}
 	catch (NativeScriptException& e)
 	{
@@ -332,16 +319,8 @@ void NumericCasts::MarkAsShortCallback(const v8::FunctionCallbackInfo<Value>& ar
 		}
 
 		auto cast = Object::New(isolate);
-
-		auto markedObject = MarkJsObject(cast, V8StringConstants::MARKED_AS_SHORT, value);
-		if (markedObject != nullptr)
-		{
-			args.GetReturnValue().Set(*markedObject);
-		}
-		else
-		{
-			args.GetReturnValue().Set(cast);
-		}
+		MarkJsObject(cast, CastType::Short, value);
+		args.GetReturnValue().Set(cast);
 	}
 	catch (NativeScriptException& e)
 	{
@@ -381,16 +360,8 @@ void NumericCasts::MarkAsCharCallback(const v8::FunctionCallbackInfo<Value>& arg
 		}
 
 		auto cast = Object::New(isolate);
-
-		auto markedObject = MarkJsObject(cast, V8StringConstants::MARKED_AS_CHAR, value);
-		if (markedObject != nullptr)
-		{
-			args.GetReturnValue().Set(*markedObject);
-		}
-		else
-		{
-			args.GetReturnValue().Set(cast);
-		}
+		MarkJsObject(cast, CastType::Char, value);
+		args.GetReturnValue().Set(cast);
 	}
 	catch (NativeScriptException& e)
 	{
@@ -425,16 +396,8 @@ void NumericCasts::MarkAsFloatCallback(const v8::FunctionCallbackInfo<Value>& ar
 
 		auto value = args[0]->ToNumber();
 		auto cast = Object::New(isolate);
-
-		auto markedObject = MarkJsObject(cast, V8StringConstants::MARKED_AS_FLOAT, value);
-		if (markedObject != nullptr)
-		{
-			args.GetReturnValue().Set(*markedObject);
-		}
-		else
-		{
-			args.GetReturnValue().Set(cast);
-		}
+		MarkJsObject(cast, CastType::Float, value);
+		args.GetReturnValue().Set(cast);
 	}
 	catch (NativeScriptException& e)
 	{
@@ -469,16 +432,8 @@ void NumericCasts::MarkAsDoubleCallback(const v8::FunctionCallbackInfo<Value>& a
 
 		auto value = args[0]->ToNumber();
 		auto cast = Object::New(isolate);
-
-		auto markedObject = MarkJsObject(cast, V8StringConstants::MARKED_AS_DOUBLE, value);
-		if (markedObject != nullptr)
-		{
-			args.GetReturnValue().Set(*markedObject);
-		}
-		else
-		{
-			args.GetReturnValue().Set(cast);
-		}
+		MarkJsObject(cast, CastType::Double, value);
+		args.GetReturnValue().Set(cast);
 	}
 	catch (NativeScriptException& e)
 	{
@@ -496,24 +451,14 @@ void NumericCasts::MarkAsDoubleCallback(const v8::FunctionCallbackInfo<Value>& a
 	}
 }
 
-Persistent<Object>* NumericCasts::MarkJsObject(const Local<Object>& object, const string& mark, const Local<Value>& value)
+void NumericCasts::MarkJsObject(const Local<Object>& object, CastType castType, const Local<Value>& value)
 {
 	auto isolate = Isolate::GetCurrent();
-
-	auto key = ConvertToV8String(mark);
-	auto marked = object->GetHiddenValue(key);
-
-	//Allow marking again with different value, but don't oversubscribe for weak event for second time
-	if (!marked.IsEmpty())
-	{
-		object->SetHiddenValue(key, value);
-		return nullptr;
-	}
-
-	object->SetHiddenValue(key, value);
-	DEBUG_WRITE("MarkJsObject: Marking js object: %d with %s", object->GetIdentityHash(), mark.c_str());
-
-	auto objectHandle = new Persistent<Object>(isolate, object);
-	objectHandle->SetWeak(objectHandle, MarkedJsObjectWeakCallback);
-	return objectHandle;
+	auto key = Local<String>::New(isolate, *s_castMarker);
+	auto type = Integer::New(isolate, static_cast<int>(castType));
+	object->SetHiddenValue(key, type);
+	object->Set(ConvertToV8String("value"), value);
+	DEBUG_WRITE("MarkJsObject: Marking js object: %d with cast type: %d", object->GetIdentityHash(), castType);
 }
+
+Persistent<String> *NumericCasts::s_castMarker = nullptr;

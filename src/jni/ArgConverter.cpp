@@ -6,6 +6,7 @@
 #include "V8StringConstants.h"
 #include "NativeScriptAssert.h"
 #include "NativeScriptException.h"
+#include "NumericCasts.h"
 #include "JType.h"
 #include <assert.h>
 #include <sstream>
@@ -25,7 +26,7 @@ void ArgConverter::Init(JavaVM *jvm)
 	ft->SetClassName(V8StringConstants::GetLongNumber());
 	ft->InstanceTemplate()->Set(V8StringConstants::GetValueOf(), FunctionTemplate::New(isolate, ArgConverter::NativeScriptLongValueOfFunctionCallback));
 	ft->InstanceTemplate()->Set(V8StringConstants::GetToString(), FunctionTemplate::New(isolate, ArgConverter::NativeScriptLongToStringFunctionCallback));
-	NATIVESCRIPT_NUMERA_CTOR_FUNC = new Persistent<Function>(isolate, ft->GetFunction());
+	NATIVESCRIPT_NUMBER_CTOR_FUNC = new Persistent<Function>(isolate, ft->GetFunction());
 
 	auto nanObject = Number::New(isolate, numeric_limits<double>::quiet_NaN()).As<NumberObject>();
 	NAN_NUMBER_OBJECT = new Persistent<NumberObject>(isolate, nanObject);
@@ -81,11 +82,10 @@ void ArgConverter::NativeScriptLongFunctionCallback(const v8::FunctionCallbackIn
 	try
 	{
 		auto isolate = Isolate::GetCurrent();
-		args.This()->SetHiddenValue(V8StringConstants::GetJavaLong(), Boolean::New(isolate, true));
-		args.This()->SetHiddenValue(V8StringConstants::GetMarkedAsLong(), args[0]);
-		args.This()->Set(V8StringConstants::GetValue(), args[0]);
-
-		args.This()->SetPrototype(Local<NumberObject>::New(Isolate::GetCurrent(), *NAN_NUMBER_OBJECT));
+		auto thiz = args.This();
+		thiz->SetHiddenValue(V8StringConstants::GetJavaLong(), Boolean::New(isolate, true));
+		NumericCasts::MarkAsLong(thiz, args[0]);
+		thiz->SetPrototype(Local<NumberObject>::New(Isolate::GetCurrent(), *NAN_NUMBER_OBJECT));
 	}
 	catch (NativeScriptException& e)
 	{
@@ -265,7 +265,7 @@ Local<Value> ArgConverter::ConvertFromJavaLong(jlong value)
 		char strNumber[24];
 		sprintf(strNumber, "%lld", longValue);
 		Local<Value> strValue = ConvertToV8String(strNumber);
-		convertedValue = Local<Function>::New(isolate, *NATIVESCRIPT_NUMERA_CTOR_FUNC)->CallAsConstructor(1, &strValue);
+		convertedValue = Local<Function>::New(isolate, *NATIVESCRIPT_NUMBER_CTOR_FUNC)->CallAsConstructor(1, &strValue);
 	}
 
 	return convertedValue;
@@ -317,6 +317,6 @@ bool ArgConverter::TryConvertToJavaLong(const Local<Value>& value, jlong& javaLo
 }
 
 JavaVM* ArgConverter::jvm = nullptr;
-Persistent<Function>* ArgConverter::NATIVESCRIPT_NUMERA_CTOR_FUNC = nullptr;
+Persistent<Function>* ArgConverter::NATIVESCRIPT_NUMBER_CTOR_FUNC = nullptr;
 Persistent<NumberObject>* ArgConverter::NAN_NUMBER_OBJECT = nullptr;
 char* ArgConverter::charBuffer = new char[ArgConverter::BUFFER_SIZE];

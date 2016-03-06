@@ -49,7 +49,7 @@ namespace tns
 
 			static const long long JS_LONG_LIMIT = ((long long) 1) << 53;
 
-			static v8::Persistent<v8::Function> *NATIVESCRIPT_NUMERA_CTOR_FUNC;
+			static v8::Persistent<v8::Function> *NATIVESCRIPT_NUMBER_CTOR_FUNC;
 			static v8::Persistent<v8::NumberObject> *NAN_NUMBER_OBJECT;
 
 			static char *charBuffer;
