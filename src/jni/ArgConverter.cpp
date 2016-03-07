@@ -290,32 +290,6 @@ int64_t ArgConverter::ConvertToJavaLong(const Local<Value>& value)
 	return longValue;
 }
 
-bool ArgConverter::TryConvertToJavaLong(const Local<Value>& value, jlong& javaLong)
-{
-	bool success = false;
-
-	if (!value.IsEmpty())
-	{
-		if (value->IsNumber() || value->IsNumberObject())
-		{
-			javaLong = (jlong) value->IntegerValue();
-			success = true;
-		}
-		else if (value->IsObject())
-		{
-			auto obj = Local<Object>::Cast(value);
-			auto isJavaLongValue = obj->GetHiddenValue(V8StringConstants::GetJavaLong());
-			if (!isJavaLongValue.IsEmpty() && isJavaLongValue->BooleanValue())
-			{
-				javaLong = (jlong) ConvertToJavaLong(value);
-				success = true;
-			}
-		}
-	}
-
-	return success;
-}
-
 JavaVM* ArgConverter::jvm = nullptr;
 Persistent<Function>* ArgConverter::NATIVESCRIPT_NUMBER_CTOR_FUNC = nullptr;
 Persistent<NumberObject>* ArgConverter::NAN_NUMBER_OBJECT = nullptr;

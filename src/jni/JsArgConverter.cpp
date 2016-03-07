@@ -215,17 +215,6 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 			default:
 				throw NativeScriptException("Unsupported cast type");
 		}
-
-//		auto hidden = jsObject->GetHiddenValue(V8StringConstants::GetMarkedAsLong());
-//		if (!hidden.IsEmpty())
-//		{
-//		}
-//		else if (ArgConverter::TryConvertToJavaLong(jsObject, javaLongValue))
-//		{
-//			m_args[index].j = javaLongValue;
-//			success = true;
-//			return success;
-//		}
 	}
 	else if (arg->IsUndefined() || arg->IsNull())
 	{
