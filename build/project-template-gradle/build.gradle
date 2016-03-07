@@ -149,7 +149,7 @@ repositories {
 }
 
 dependencies {
-	def suppotVer = "22.2.0";
+	def suppotVer = "23.2.0";
 	if(project.hasProperty("supportVersion")) {
 		suppotVer = supportVersion
 	}

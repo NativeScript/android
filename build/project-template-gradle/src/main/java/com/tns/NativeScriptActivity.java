@@ -1,7 +1,7 @@
 package com.tns;
 
 @JavaScriptImplementation(javaScriptFile = "app/tns_modules/ui/frme/frame.js")
-public class NativeScriptActivity extends android.app.Activity implements com.tns.NativeScriptHashCodeProvider {
+public class NativeScriptActivity extends android.support.v7.app.AppCompatActivity implements com.tns.NativeScriptHashCodeProvider {
 
     public NativeScriptActivity()
     {
@@ -47,6 +47,14 @@ public class NativeScriptActivity extends android.app.Activity implements com.tn
         params[1] = resultCode;
         params[2] = data;
         com.tns.Platform.callJSMethod(this, "onActivityResult", void.class, params);
+    }
+    
+    public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
+        java.lang.Object[] params = new Object[3];
+        params[0] = requestCode;
+        params[1] = permissions;
+        params[2] = grantResults;
+        com.tns.Platform.callJSMethod(this, "onRequestPermissionsResult", void.class, params);
     }
 
     public boolean equals__super(java.lang.Object other) {
