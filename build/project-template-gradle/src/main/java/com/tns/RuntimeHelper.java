@@ -84,6 +84,14 @@ public class RuntimeHelper
 			String appName = app.getPackageName();
 			File rootDir = new File(app.getApplicationInfo().dataDir);
 			File appDir = app.getFilesDir();
+			
+			try
+			{
+				appDir = appDir.getCanonicalFile();
+			}
+			catch (IOException e1)
+			{
+			}
 
 			ClassLoader classLoader = app.getClassLoader();
 			File dexDir = new File(rootDir, "code_cache/secondary-dexes");
