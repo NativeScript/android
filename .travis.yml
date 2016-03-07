@@ -1,34 +1,68 @@
 env:
-    global:
-        - NDK_VERSION=r10e
+  global:
+  - NDK_VERSION=r10e
+  - DATE=$(date +%Y-%m-%d)
+  - PACKAGE_VERSION=$DATE-$TRAVIS_BUILD_NUMBER
+  - ANDROID_VERSION=19
+  - ANDROID_SUPPORT_VERSION=19.0.0
+  - PACKAGE_NAME=tns-android
 sudo: false
-language:
-    android
+language: android
 jdk:
-    - oraclejdk8
+  - oraclejdk8
 git:
-    submodules: false
+  submodules: false
 android:
-    components:
-        - platform-tools
-        - tools
-
-        - build-tools-22.0.1
-        - android-22
-
-        - extra-android-support
-        - extra-android-m2repository
-
-        - sys-img-x86_64-android-22
+  components:
+  - platform-tools
+  - tools
+  - build-tools-22.0.1
+  - android-19
+  - extra-android-support
+  - extra-android-m2repository
+  - sys-img-armeabi-v7a-android-19
+before_cache:
+  - rm -f $HOME/.gradle/caches/modules-2/modules-2.lock
+cache:
+  directories:
+  - "$HOME/.gradle/caches/"
+  - "$HOME/.gradle/wrapper/"
 before_install:
-    - sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules
-    - git submodule update --init --recursive
-    - wget http://dl.google.com/android/ndk/android-ndk-$NDK_VERSION-linux-x86_64.bin
-    - chmod +x android-ndk-$NDK_VERSION-linux-x86_64.bin
-    - ./android-ndk-$NDK_VERSION-linux-x86_64.bin | egrep -v ^Extracting
-    - export ANDROID_NDK_HOME=`pwd`/android-ndk-$NDK_VERSION
-    - export PATH=${PATH}:${ANDROID_NDK_HOME}
-
+  - sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules
+  - git submodule update --init --recursive
+  - wget http://dl.google.com/android/ndk/android-ndk-$NDK_VERSION-linux-x86_64.bin
+  - chmod +x android-ndk-$NDK_VERSION-linux-x86_64.bin
+  - "./android-ndk-$NDK_VERSION-linux-x86_64.bin | egrep -v ^Extracting"
+  - export ANDROID_NDK_HOME=`pwd`/android-ndk-$NDK_VERSION
+  - export PATH=${PATH}:${ANDROID_NDK_HOME}
+before_script:
+  - echo no | android create avd --force -n Arm19 -t android-19 -b armeabi-v7a -c 12M
+  - emulator -avd Arm19 -no-skin -no-audio -no-window &
+  - android-wait-for-emulator
 script:
-    - gradle packar -PPACKAGE_VERSION=5.5.5
-
+  - "./gradlew packar -i -PPACKAGE_VERSION=$PACKAGE_VERSION -PcompileSdk=android-$ANDROID_VERSION
+  -PsupportVersion=$ANDROID_SUPPORT_VERSION --stacktrace"
+  - "./gradlew runtest -PenableTest -PcompileSdk=android-$ANDROID_VERSION -PsupportVersion=$ANDROID_SUPPORT_VERSION
+  -PtargetSdk=$ANDROID_VERSION --stacktrace"
+before_deploy:
+  - FULL_PACKAGE_VERSION=`sed -n 's/\s*"version":\s*"\([a-zA-Z0-9.\-]\+\)"/\1/p' dist/package.json`
+  - mv dist/$PACKAGE_NAME-$FULL_PACKAGE_VERSION.tgz ../.deploymentpackage
+  - mv .travis ../
+  - cd ..
+  - rm -rf android-runtime
+  - tar -zxvf .deploymentpackage
+  - mv package android-runtime
+  - cd android-runtime
+  - rm ../.deploymentpackage
+  - nvm install 4.2.6
+  - nvm use 4.2.6
+  - mv ../.travis ./
+  - node ./.travis/add-publishConfig.js next
+deploy:
+  provider: npm
+  email: nativescript@telerik.com
+  on:
+    branch: master
+  skip_cleanup: true
+  api_key:
+    secure: aFJZR8VIbFAlXfFx5G2AveSgpGjr40prghvw8m06X0yvmUQlucwHVyq+Ov0ZD94br8d7OUOPbUzh+p9N/+oXLAXOj3DbQmJaCc+fk/e+avHu1BRy3fg295P9BQau1Abu+2ZO7tUbg5zAqJqhbEgjXsr9B5gxl+vwh4lbDhCPCwo=

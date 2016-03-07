@@ -25,6 +25,23 @@ public final class Util
 		return String.valueOf(updateTime) + "-" + String.valueOf(code);
 	}
 
+	public static boolean isDebuggableApp(Context context)
+	{
+		int flags;
+		try
+		{
+			flags = context.getPackageManager().getPackageInfo(context.getPackageName(), 0).applicationInfo.flags;
+		}
+		catch (NameNotFoundException e)
+		{
+			flags = 0;
+			e.printStackTrace();
+		}
+
+		boolean isDebuggableApp = ((flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0);
+		return isDebuggableApp;
+	}
+
 	static boolean runPlugin(Logger logger, Context context)
 	{
 		boolean success = false;

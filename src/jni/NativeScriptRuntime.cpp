@@ -277,14 +277,14 @@ void NativeScriptRuntime::CallJavaMethod(const Local<Object>& caller, const stri
 
 	auto isolate = Isolate::GetCurrent();
 
-	jweak callerJavaObject;
+	JniLocalRef callerJavaObject;
 
 	jvalue* javaArgs = argConverter.ToArgs();
 
 	if (!isStatic)
 	{
 		callerJavaObject = objectManager->GetJavaObjectByJsObject(caller);
-		if (callerJavaObject == nullptr)
+		if (callerJavaObject.IsNull())
 		{
 			stringstream ss;
 			ss << "No java object found on which to call \"" << methodName << "\" method. It is possible your Javascript object is not linked with the corresponding Java class. Try passing context(this) to the constructor function.";
@@ -980,7 +980,7 @@ int NativeScriptRuntime::GetArrayLength(const Local<Object>& arr)
 {
 	JEnv env;
 
-	auto javaArr = reinterpret_cast<jarray>(objectManager->GetJavaObjectByJsObject(arr));
+	auto javaArr = objectManager->GetJavaObjectByJsObject(arr);
 
 	auto length = env.GetArrayLength(javaArr);
 

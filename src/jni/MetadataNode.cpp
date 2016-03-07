@@ -178,13 +178,14 @@ Local<Object> MetadataNode::CreateJSWrapper(Isolate *isolate)
 	}
 	else
 	{
-		auto ctorFunc = GetConstructorFunction(isolate);
-
-		//obj = Object::New(isolate);
 		obj = s_objectManager->GetEmptyObject(isolate);
-		obj->Set(ConvertToV8String("constructor"), ctorFunc);
-		obj->SetPrototype(ctorFunc->Get(ConvertToV8String("prototype")));
-		SetInstanceMetadata(isolate, obj, this);
+		if (!obj.IsEmpty())
+		{
+			auto ctorFunc = GetConstructorFunction(isolate);
+			obj->Set(ConvertToV8String("constructor"), ctorFunc);
+			obj->SetPrototype(ctorFunc->Get(ConvertToV8String("prototype")));
+			SetInstanceMetadata(isolate, obj, this);
+		}
 	}
 
 	return obj;
@@ -1026,13 +1027,6 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
 			isSuper = !superValue.IsEmpty() && superValue->IsTrue();
 		}
 
-		//	// TODO: refactor this
-		if (isSuper && (*className == "com/tns/NativeScriptActivity"))
-		{
-			string activityBaseClassName("android/app/Activity");
-			className = &activityBaseClassName;
-		}
-
 		if ((argLength == 0) && (methodName == V8StringConstants::VALUE_OF))
 		{
 			info.GetReturnValue().Set(thiz);
@@ -1349,17 +1343,55 @@ void MetadataNode::ExtendCallMethodCallback(const v8::FunctionCallbackInfo<v8::V
 		Local<Object> implementationObject;
 		Local<String> extendName;
 		string extendLocation;
-		auto validArgs = ValidateExtendArguments(info, extendLocation, extendName, implementationObject);
 
-		if (!validArgs)
-			return;
+		auto hasDot = false;
+		if (info.Length() == 2)
+		{
+			if (info[0].IsEmpty() || !info[0]->IsString())
+			{
+				stringstream ss;
+				ss << "Invalid extend() call. No name for extend specified at location: " << extendLocation.c_str();
+				string exceptionMessage = ss.str();
 
+				throw NativeScriptException(exceptionMessage);
+			}
+			if (info[1].IsEmpty() || !info[1]->IsObject())
+			{
+				stringstream ss;
+				ss << "Invalid extend() call. Named extend should be called with second object parameter containing overridden methods at location: " << extendLocation.c_str();
+				string exceptionMessage = ss.str();
+
+				throw NativeScriptException(exceptionMessage);
+			}
+			string strName = ConvertToString(info[0].As<String>());
+			hasDot = strName.find('.') != string::npos;
+		}
+		if (hasDot)
+		{
+			extendName = info[0].As<String>();
+			implementationObject = info[1].As<Object>();
+		}
+		else
+		{
+			auto validArgs = ValidateExtendArguments(info, extendLocation, extendName, implementationObject);
+
+			if (!validArgs)
+				return;
+		}
 		auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value());
 
 		DEBUG_WRITE("ExtendsCallMethodHandler: called with %s", ConvertToString(extendName).c_str());
 
 		string extendNameAndLocation = extendLocation + ConvertToString(extendName);
-		auto fullClassName = TNS_PREFIX + CreateFullClassName(node->m_name, extendNameAndLocation);
+		string fullClassName;
+		if (!hasDot)
+		{
+			fullClassName = TNS_PREFIX + CreateFullClassName(node->m_name, extendNameAndLocation);
+		}
+		else
+		{
+			fullClassName = ConvertToString(info[0].As<String>());
+		}
 
 		//
 		//resolve class (pre-generated or generated runtime from dex generator)

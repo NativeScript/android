@@ -28,6 +28,10 @@ void JsDebugger::Init(v8::Isolate *isolate, const string& packageName, jobject j
 	s_EnqueueMessage = env.GetMethodID(s_JsDebuggerClass, "enqueueMessage", "(Ljava/lang/String;)V");
 	assert(s_EnqueueMessage != nullptr);
 
+	s_EnqueueConsoleMessage = env.GetMethodID(s_JsDebuggerClass, "enqueueConsoleMessage", "(Ljava/lang/String;Ljava/lang/String;IILjava/lang/String;)V");
+	assert(s_EnqueueConsoleMessage != nullptr);
+
+
 	s_EnableAgent = env.GetMethodID(s_JsDebuggerClass, "enableAgent", "()V");
 	assert(s_EnableAgent != nullptr);
 }
@@ -74,6 +78,11 @@ void JsDebugger::DebugBreak()
 	v8::HandleScope handleScope(isolate);
 
 	v8::Debug::DebugBreak(isolate);
+}
+
+bool JsDebugger::IsDebuggerActive()
+{
+	return s_jsDebugger != nullptr && enabled;
 }
 
 void JsDebugger::ProcessDebugMessages()
@@ -164,8 +173,6 @@ void JsDebugger::ConsoleMessage(const v8::FunctionCallbackInfo<v8::Value>& args)
 	if ((args.Length() > 0) && args[0]->IsString())
 	{
 		std::string message = ConvertToString(args[0]->ToString());
-		//jboolean isError = (jboolean) = args[1]->ToBoolean()->BooleanValue();
-
 
 		std:string level = "log";
 		if (args.Length() > 1  && args[1]->IsString())
@@ -194,45 +201,46 @@ void JsDebugger::ConsoleMessage(const v8::FunctionCallbackInfo<v8::Value>& args)
 			}
 		}
 
-
-
-
-		//    			var consoleEvent = {
-		//	    			"seq":0,
-		//	    			"type":"event",
-		//	    			"event":"messageAdded",
-		//	    			"success":true,
-		//	    			"body":
-		//	    			{
-		//	    				"message":
-		//	    				{
-		//	    			        "source":"console-api",
-		//	    			        "type": "log",
-		//	    			        "level": 'error',
-		//	    			        "line": 0,
-		//	    			        "column": 0,
-		//	    			        "url": "",
-		//	    			        "groupLevel": 7,
-		//	    			        "repeatCount": 1,
-		//	    			        "text": "My message"
-		//	    			    }
-		//	    			}
-		//    			};
-
-		stringstream consoleEventSS;
-		consoleEventSS << "{\"seq\":0, \"type\":\"event\", \"event\":\"messageAdded\", \"success\":true, \"body\": { \"message\": { \"source\":\"console-api\", "
-				<< " \"type\": \"log\","
-				<< " \"level\": \"" << level << "\", "
-				<< " \"line\": " << lineNumber << ","
-				<< " \"column\": " << columnNumber << ","
-				<< " \"url\" : \"" << srcFileName << "\","
-				<< " \"groupLevel\": 7, \"repeatCount\": 1, "
-				<< " \"text\": \"" << message << "\" } } }";
-
-
 		JEnv env;
-		JniLocalRef s(env.NewStringUTF(consoleEventSS.str().c_str()));
-		env.CallVoidMethod(s_jsDebugger, s_EnqueueMessage, (jstring) s);
+		JniLocalRef jniText(env.NewStringUTF(message.c_str()));
+		JniLocalRef jniLevel(env.NewStringUTF(level.c_str()));
+		JniLocalRef jniSrcFileName(env.NewStringUTF(srcFileName.c_str()));
+
+		env.CallVoidMethod(s_jsDebugger, s_EnqueueConsoleMessage, (jstring) jniText, (jstring)jniLevel, lineNumber, columnNumber, (jstring)jniSrcFileName);
+	}
+}
+
+void JsDebugger::ConsoleMessage(const string& message, const string& level, const string& srcFileName, int lineNumber, int columnNumber)
+{
+	if (s_jsDebugger == nullptr || !enabled)
+	{
+		return;
+	}
+
+	try
+	{
+		JEnv env;
+		JniLocalRef jniText(env.NewStringUTF(message.c_str()));
+		JniLocalRef jniLevel(env.NewStringUTF(level.c_str()));
+		JniLocalRef jniSrcFileName(env.NewStringUTF(srcFileName.c_str()));
+
+		env.CallVoidMethod(s_jsDebugger, s_EnqueueConsoleMessage, (jstring) jniText, (jstring) jniLevel, lineNumber, columnNumber, (jstring) jniSrcFileName);
+	}
+	catch (NativeScriptException& e)
+	{
+		e.ReThrowToV8();
+	}
+	catch (std::exception e)
+	{
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
+		nsEx.ReThrowToV8();
+	}
+	catch (...)
+	{
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
 	}
 }
 
@@ -268,5 +276,6 @@ jobject JsDebugger::s_jsDebugger = nullptr;
 string JsDebugger::s_packageName = "";
 jclass JsDebugger::s_JsDebuggerClass = nullptr;
 jmethodID JsDebugger::s_EnqueueMessage = nullptr;
+jmethodID JsDebugger::s_EnqueueConsoleMessage = nullptr;
 jmethodID JsDebugger::s_EnableAgent = nullptr;
 

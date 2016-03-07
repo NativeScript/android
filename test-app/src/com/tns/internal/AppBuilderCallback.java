@@ -1,5 +1,7 @@
 package com.tns.internal;
 
+import com.tns.ExtractPolicy;
+
 public interface AppBuilderCallback
 {
 	void onConfigurationChanged(android.content.Context context, android.content.res.Configuration newConfig);

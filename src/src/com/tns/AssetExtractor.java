@@ -2,8 +2,6 @@ package com.tns;
 
 import java.io.File;
 
-import com.tns.internal.ExtractPolicy;
-import com.tns.internal.FileExtractor;
 
 import android.content.Context;
 

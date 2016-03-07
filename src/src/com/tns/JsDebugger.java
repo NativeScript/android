@@ -12,6 +12,9 @@ import java.util.NoSuchElementException;
 import java.util.Scanner;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -39,6 +42,8 @@ public class JsDebugger
 	private static native void debugBreak();
 
 	private static native void sendCommand(byte[] command, int length);
+	
+	private static native boolean isDebugerActive();
 
 	private ThreadScheduler threadScheduler;
 
@@ -74,6 +79,7 @@ public class JsDebugger
         private RequestHandler requestHandler;
         private LocalServerSocket serverSocket;
 		private ResponseHandler responseHandler;
+		
 		
         public DebugLocalServerSocketThread(String name)
         {
@@ -118,6 +124,7 @@ public class JsDebugger
 	                	try
 	    				{
 	                		LocalSocket socket = serverSocket.accept();
+
 	                		logger.write("NativeScript Debugger new connection on: " + socket.getFileDescriptor().toString());
 	                		
 	    					//out (send messages to node inspector)
@@ -129,6 +136,7 @@ public class JsDebugger
 	    					requestHandler = new RequestHandler(socket, responseHandlerCloseable);
 	    					Thread requestThread = new Thread(requestHandler);
 	    					requestThread.start();
+	    					
 	    					requestThread.join();
 	    					
 	    					this.responseHandler.stop();
@@ -137,10 +145,13 @@ public class JsDebugger
 	    					dbgMessages.clear();
 	                		dbgMessages.addAll(compileMessages);
 	    				}
-	    				catch (IOException | InterruptedException e)
+	    				catch (IOException e)
 	    				{
 	    					e.printStackTrace();
 	    				}
+	                	catch (InterruptedException e) {
+	                		e.printStackTrace();
+	                	}
 	                }
                 }
                 finally
@@ -413,6 +424,68 @@ public class JsDebugger
 			compileMessages.add(message);
 		}
 	}
+	
+	@RuntimeCallable
+	private void enqueueConsoleMessage(String text, String level, int lineNumber, int columnNumber, String srcFileName)
+	{
+		//    			var consoleEvent = {
+		//	    			"seq":0,
+		//	    			"type":"event",
+		//	    			"event":"messageAdded",
+		//	    			"success":true,
+		//	    			"body":
+		//	    			{
+		//	    				"message":
+		//	    				{
+		//	    			        "source":"console-api",
+		//	    			        "type": "log",
+		//	    			        "level": 'error',
+		//	    			        "line": 0,
+		//	    			        "column": 0,
+		//	    			        "url": "",
+		//	    			        "groupLevel": 7,
+		//	    			        "repeatCount": 1,
+		//	    			        "text": "My message"
+		//	    			    }
+		//	    			}
+		//    			};
+
+		try
+		{
+			JSONObject consoleMessage = new JSONObject();
+			consoleMessage.put("seq", 0);			
+			consoleMessage.put("type", "event");
+			consoleMessage.put("event", "messageAdded");
+			consoleMessage.put("success", true);
+			
+
+			JSONObject message = new JSONObject();
+			message.put("source", "console-api");
+			message.put("type", "log");
+			message.put("level", level);
+			message.put("line", lineNumber);
+			message.put("column", columnNumber);
+			message.put("url", srcFileName);
+			message.put("groupLevel", 7);
+			message.put("repeatCount", 1);
+			message.put("text", text);
+			
+			JSONObject body = new JSONObject();
+			body.put("message", message);
+			
+			consoleMessage.put("body", body);
+			
+			String sendingText = consoleMessage.toString();
+			
+			Log.d("TNS.JAVA.JsDebugger", "Sending console message to inspector:" + sendingText);
+			
+			dbgMessages.add(sendingText);
+		}
+		catch (JSONException e)
+		{
+			e.printStackTrace();
+		}
+	}
 
 	@RuntimeCallable
 	private void enableAgent()
@@ -537,5 +610,10 @@ public class JsDebugger
 
 		boolean isDebuggableApp = ((flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0);
 		return isDebuggableApp;
+	}
+
+	public static boolean isJsDebugerActive()
+	{
+		return isDebugerActive();
 	}
 }

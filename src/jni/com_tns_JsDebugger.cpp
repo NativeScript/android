@@ -97,6 +97,28 @@ extern "C" void Java_com_tns_JsDebugger_debugBreak(JNIEnv *env, jobject obj)
 	}
 }
 
+extern "C" jboolean Java_com_tns_JsDebugger_isDebugerActive(JNIEnv *env, jobject obj)
+{
+	try
+	{
+		return (jboolean)JsDebugger::IsDebuggerActive();
+	}
+	catch (NativeScriptException& e)
+	{
+		e.ReThrowToJava();
+	}
+	catch (std::exception e) {
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
+		nsEx.ReThrowToJava();
+	}
+	catch (...) {
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToJava();
+	}
+}
+
 extern "C" void Java_com_tns_JsDebugger_sendCommand(JNIEnv *_env, jobject obj, jbyteArray command, jint length)
 {
 	try
