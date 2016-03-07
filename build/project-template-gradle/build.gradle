@@ -33,6 +33,7 @@ apply plugin: "com.android.application"
 def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
 def metadataParams = new LinkedList <String> ()
 def allJarPaths = new LinkedList <String> ()
+def configurationsDir = "configurations"
 def createPluginConfigFile = false
 def configStage = "\n:config phase: "
 def nodeModulesDir = "../../node_modules/"
@@ -180,15 +181,103 @@ dependencies {
 ///////////////////////////// CONFIGURATION PHASE //////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
 
+def createIncludeFile (filePath, fileName, dimensionName) {
+	println "\t+creating include.gradle file for: " + filePath
+	def defaultIncludeFile = new File(filePath, "include.gradle")
+	defaultIncludeFile.write ""
+	defaultIncludeFile << "android { \n"
+	defaultIncludeFile << "\tproductFlavors {\n"
+	defaultIncludeFile << '\t\t"' + fileName + '" {\n'
+	defaultIncludeFile << '\t\t\tdimension "' + dimensionName + '"\n'
+	defaultIncludeFile << "\t\t}\n"
+	defaultIncludeFile << "\t}\n"
+	defaultIncludeFile << "}"
+}
 
+def sanatizeDimensionName(str) {
+	return str.replaceAll(/\W/, "")
+}
+
+//make sure the include.gradle file, produced by the user, has only allowed characters in dimension attribute and remove any invalid characters if necessary
+def updateIncludeGradleFile(subFile, dimensionName) {
+	def igFile = new File(subFile.getAbsolutePath())
+	def newContent = igFile.text.replaceAll(/dimension\s+["'](.+?)["']/)  { fullMatch, fDimension ->
+							def newFg = sanatizeDimensionName(fDimension)
+							dimensionName = newFg
+							return "dimension \"$newFg\""
+						}
+	igFile.text = newContent
+	
+	return dimensionName
+}
+
+task createDefaultIncludeFiles {
+	description "creates default include.gradle files for added plugins IF NECESSARY"
+	println "$configStage createDefaultIncludeFiles"
+	def ft = file(configurationsDir)
+		
+	ft.listFiles().each { fl ->
+	
+		if(fl.isDirectory()) {
+			def fileName = fl.name
+			def dimensionName = sanatizeDimensionName(fileName)
+			createPluginConfigFile = true
+			def foundIncludeFile = false
+			
+			println "\t+found plugins: " + fileName
+			fl.listFiles().each { subFile ->
+			
+				if(subFile.name == "include.gradle") {
+					foundIncludeFile = true
+					dimensionName = updateIncludeGradleFile(subFile, dimensionName)
+				}
+			}
+			
+			pluginNames.add('"' + dimensionName + '"')
+			
+			if(!foundIncludeFile) {
+				createIncludeFile(fl.getAbsolutePath() ,fileName, dimensionName)
+			}
+		}
+	}
+}
+
+task createPluginsConfigFile {
+	description "creates product flavor config file based on what plugins are added"
+	
+	if(configDir.exists()) {
+		println "$configStage createPluginsConfigFile"
+		
+		def flavorsFile = new File("$configurationsDir/include.gradle")
+		flavorsFile.write "" //clear config file
+		
+		if(createPluginConfigFile) {
+			println "\t+creating product flavors include.gradle file in $configurationsDir folder..."
+			def flavors = pluginNames.join(",")
+			
+			flavorsFile << "android { \n"
+			flavorsFile << "\tflavorDimensions " + flavors + "\n"
+			flavorsFile << "}\n"
+		}
+	}
+}
 
 task pluginExtend {
 	description "applies additional configuration"
 
-	configDir.eachFileRecurse(groovy.io.FileType.FILES) {
-		if(it.name.equals('include.gradle')) {
-			println "\t+applying configuration from: " + it
-			apply from: it
+	def pathToAppGradle = "../../app/App_Resources/Android/app.gradle" 
+	def appGradle = file(pathToAppGradle)
+	if(appGradle.exists()) {
+		apply from: pathToAppGradle
+	}
+
+	if(configDir.exists()) {
+	println "$configStage pluginExtend"
+		configDir.eachFileRecurse(groovy.io.FileType.FILES) {
+			if(it.name.equals('include.gradle')) {
+				println "\t+applying configuration from: " + it
+				apply from: it
+			}
 		}
 	}
 }
