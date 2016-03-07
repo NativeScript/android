@@ -7,6 +7,7 @@ import android.content.pm.PackageManager.NameNotFoundException;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import java.io.IOException;
 
 public class RuntimeHelper
 {
