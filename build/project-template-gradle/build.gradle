@@ -403,9 +403,10 @@ task buildMetadata (type: JavaExec) {
         zip_properties.put("encoding", "UTF-8")
 
 		def currentApk = project.ext.currentApkFile
+		def currentApkAsEncoded = currentApk.replace(" ", "%20")
 		def urlPrefix = "jar:file:" + (isWinOs ? "/" : "")
 
-		def zip_disk = URI.create(urlPrefix + currentApk);
+		def zip_disk = URI.create(urlPrefix + currentApkAsEncoded);
 
 		def zipfs
 		def pathInZipfile
