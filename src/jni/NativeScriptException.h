@@ -23,7 +23,7 @@ namespace tns
 			static void CallJsFuncWithErr(v8::Local<v8::Value> errObj);
 
 		private:
-			jweak TryGetJavaThrowableObject(JEnv& env, const v8::Local<v8::Object>& jsObj);
+			JniLocalRef TryGetJavaThrowableObject(JEnv& env, const v8::Local<v8::Object>& jsObj);
 			std::string GetExceptionMessage(JEnv& env, jthrowable exception);
 			v8::Local<v8::Value> WrapJavaToJsException();
 			v8::Local<v8::Value> GetJavaExceptionFromEnv(const JniLocalRef& exc, JEnv& env);

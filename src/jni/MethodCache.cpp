@@ -6,6 +6,8 @@
 #include "Util.h"
 #include "V8GlobalHelpers.h"
 #include "V8StringConstants.h"
+#include "NumericCasts.h"
+#include "NativeScriptException.h"
 #include <sstream>
 #include <assert.h>
 
@@ -143,36 +145,42 @@ string MethodCache::GetType(const v8::Local<v8::Value>& value)
 	else if (value->IsObject())
 	{
 		auto object = value->ToObject();
+		auto castType = NumericCasts::GetCastType(object);
+		MetadataNode *node;
 
-		if (!object->GetHiddenValue(V8StringConstants::GetMarkedAsByte()).IsEmpty())
+		switch (castType)
 		{
-			type = "byte";
-		}
-		else if ((!object->GetHiddenValue(V8StringConstants::GetMarkedAsLong()).IsEmpty())
-				|| (!object->GetHiddenValue(V8StringConstants::GetJavaLong()).IsEmpty()))
-		{
-			type = "long";
-		}
-		else if (!object->GetHiddenValue(V8StringConstants::GetMarkedAsShort()).IsEmpty())
-		{
-			type = "short";
-		}
-		else if (!object->GetHiddenValue(V8StringConstants::GetMarkedAsChar()).IsEmpty())
-		{
-			type = "char";
-		}
-		else if (!object->GetHiddenValue(V8StringConstants::GetMarkedAsFloat()).IsEmpty())
-		{
-			type = "float";
-		}
-		else if (!object->GetHiddenValue(V8StringConstants::GetMarkedAsDouble()).IsEmpty())
-		{
-			type = "double";
-		}
-		else
-		{
-			MetadataNode *node = MetadataNode::GetNodeFromHandle(object);
-			type = (node != nullptr) ? node->GetName() : "<unknown>";
+			case CastType::Char:
+				type = "char";
+				break;
+
+			case CastType::Byte:
+				type = "byte";
+				break;
+
+			case CastType::Short:
+				type = "short";
+				break;
+
+			case CastType::Long:
+				type = "long";
+				break;
+
+			case CastType::Float:
+				type = "float";
+				break;
+
+			case CastType::Double:
+				type = "double";
+				break;
+
+			case CastType::None:
+				node = MetadataNode::GetNodeFromHandle(object);
+				type = (node != nullptr) ? node->GetName() : "<unknown>";
+				break;
+
+			default:
+				throw NativeScriptException("Unsupported cast type");
 		}
 	}
 	return type;

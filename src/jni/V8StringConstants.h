@@ -44,12 +44,6 @@ namespace tns
 			static v8::Local<v8::String> GetToString();
 			static v8::Local<v8::String> GetHiddenJSInstance();
 			static v8::Local<v8::String> GetJavaLong();
-			static v8::Local<v8::String> GetMarkedAsByte();
-			static v8::Local<v8::String> GetMarkedAsChar();
-			static v8::Local<v8::String> GetMarkedAsDouble();
-			static v8::Local<v8::String> GetMarkedAsFloat();
-			static v8::Local<v8::String> GetMarkedAsLong();
-			static v8::Local<v8::String> GetMarkedAsShort();
 			static v8::Local<v8::String> GetValueOf();
 			static v8::Local<v8::String> GetValue();
 			static v8::Local<v8::String> GetUncaughtError();
@@ -97,12 +91,6 @@ namespace tns
 			static v8::Persistent<v8::String> *TO_STRING_PERSISTENT;
 			static v8::Persistent<v8::String> *HIDDEN_JS_INSTANCE_PERSISTENT;
 			static v8::Persistent<v8::String> *JAVA_LONG_PERSISTENT;
-			static v8::Persistent<v8::String> *MARKED_AS_BYTE_PERSISTENT;
-			static v8::Persistent<v8::String> *MARKED_AS_CHAR_PERSISTENT;
-			static v8::Persistent<v8::String> *MARKED_AS_DOUBLE_PERSISTENT;
-			static v8::Persistent<v8::String> *MARKED_AS_FLOAT_PERSISTENT;
-			static v8::Persistent<v8::String> *MARKED_AS_LONG_PERSISTENT;
-			static v8::Persistent<v8::String> *MARKED_AS_SHORT_PERSISTENT;
 			static v8::Persistent<v8::String> *VALUE_OF_PERSISTENT;
 			static v8::Persistent<v8::String> *VALUE_PERSISTENT;
 			static v8::Persistent<v8::String> *UNCAUGHT_ERROR_PERSISTENT;

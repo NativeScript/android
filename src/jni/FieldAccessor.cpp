@@ -27,7 +27,7 @@ Local<Value> FieldAccessor::GetJavaField(const Local<Object>& target, FieldCallb
 
 	Local<Value> fieldResult;
 
-	jweak targetJavaObject;
+	JniLocalRef targetJavaObject;
 
 	const auto& fieldTypeName = fieldData->signature;
 	auto isStatic = fieldData->isStatic;
@@ -61,7 +61,7 @@ Local<Value> FieldAccessor::GetJavaField(const Local<Object>& target, FieldCallb
 	{
 		targetJavaObject = objectManager->GetJavaObjectByJsObject(target);
 
-		if (targetJavaObject == nullptr)
+		if (targetJavaObject.IsNull())
 		{
 			stringstream ss;
 			ss << "Cannot access property '" << fieldData->name << "' because there is no corresponding Java object";
@@ -253,7 +253,7 @@ void FieldAccessor::SetJavaField(const Local<Object>& target, const Local<Value>
 	auto isolate = Isolate::GetCurrent();
 	HandleScope handleScope(isolate);
 
-	jweak targetJavaObject;
+	JniLocalRef targetJavaObject;
 
 	const auto& fieldTypeName = fieldData->signature;
 	auto isStatic = fieldData->isStatic;
@@ -291,7 +291,7 @@ void FieldAccessor::SetJavaField(const Local<Object>& target, const Local<Value>
 	{
 		targetJavaObject = objectManager->GetJavaObjectByJsObject(target);
 
-		if (targetJavaObject == nullptr)
+		if (targetJavaObject.IsNull())
 		{
 			stringstream ss;
 			ss << "Cannot access property '" << fieldData->name << "' because there is no corresponding Java object";
@@ -425,7 +425,7 @@ void FieldAccessor::SetJavaField(const Local<Object>& target, const Local<Value>
 	else
 	{
 		bool isString = fieldTypeName == "java/lang/String";
-		jobject result = nullptr;
+		JniLocalRef result;
 
 		if (!value->IsNull())
 		{
@@ -448,11 +448,6 @@ void FieldAccessor::SetJavaField(const Local<Object>& target, const Local<Value>
 		else
 		{
 			env.SetObjectField(targetJavaObject, fieldId, result);
-		}
-
-		if (isString)
-		{
-			env.DeleteLocalRef(result);
 		}
 	}
 }
