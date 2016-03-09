@@ -462,8 +462,9 @@ task buildMetadata (type: JavaExec) {
 			keyStorePath = keyStoreFile.getAbsolutePath()
 			alias = "androiddebugkey"
 		}
+		def jarSignerPath = new File(System.getenv("JAVA_HOME"), "bin/jarsigner").getAbsolutePath()
 
-		def cmdParams = new ArrayList<String>(["jarsigner", "-sigalg", "SHA1withRSA", "-digestalg", "SHA1", "-storepass", storePass, "-keypass", keyPass, "-keystore", keyStorePath, currentApk, alias])
+		def cmdParams = new ArrayList<String>([jarSignerPath, "-sigalg", "SHA1withRSA", "-digestalg", "SHA1", "-storepass", storePass, "-keypass", keyPass, "-keystore", keyStorePath, currentApk, alias])
 
 		if (isWinOs) {
 			cmdParams.add(0, "/c")
