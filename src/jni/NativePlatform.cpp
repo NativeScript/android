@@ -24,6 +24,7 @@
 #include "NativeScriptException.h"
 #include "NativePlatform.h"
 #include "ArrayHelper.h"
+#include "ArrayBufferHelper.h"
 #include <sstream>
 #include <android/log.h>
 #include <string>
@@ -382,6 +383,8 @@ Isolate* NativePlatform::PrepareV8Runtime(JEnv& env, const string& filesPath, js
 
 	ArrayHelper::Init(g_objectManager, context);
 
+	ArrayBufferHelper::CreateConvertFunctions(g_objectManager, global);
+
 	return isolate;
 }
 
@@ -439,4 +442,25 @@ void NativePlatform::PrepareExtendFunction(Isolate *isolate, jstring filesPath)
 	DEBUG_WRITE("Executed prepareExtend.js script");
 }
 
+jobject NativePlatform::AllocateByteBuffer(JNIEnv *_env, jint capacity, jlongArray address)
+{
+	JEnv env(_env);
+	jobject buffer = nullptr;
+	void *data = malloc(capacity);
+	if (data != nullptr)
+	{
+		buffer = env.NewDirectByteBuffer(data, capacity);
+	}
+	jlong addr = reinterpret_cast<jlong>(data);
+	env.SetLongArrayRegion(address, 0, 1, &addr);
+	return buffer;
+}
+
+void NativePlatform::FreeByteBuffer(JNIEnv *_env, jlong address)
+{
+	void *data = reinterpret_cast<void*>(address);
+	free(data);
+}
+
 Isolate* NativePlatform::s_isolate = nullptr;
+

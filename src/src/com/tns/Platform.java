@@ -76,6 +76,8 @@ public class Platform
 	private static JsDebugger jsDebugger;
 
 	private static DexFactory dexFactory;
+	
+	private static DirectBufferFactory directBufferFactory;
 
 	private final static Comparator<Method> methodComparator = new Comparator<Method>()
 	{
@@ -148,7 +150,7 @@ public class Platform
 			Date lastModDate = new Date(f.lastModified());
 			logger.write("init time=" + (d.getTime() - lastModDate.getTime()));
 		}
-
+		
 		initialized = true;
 	}
 
@@ -910,6 +912,17 @@ public class Platform
 		Object arr = Array.newInstance(clazz, size);
 		
 		return arr;
+	}
+	
+	public synchronized static ByteBuffer allocateByteBuffer(int capacity)
+	{
+		if (directBufferFactory == null)
+		{
+			directBufferFactory = new DirectBufferFactory(logger);
+			directBufferFactory.startListener();
+		}
+		ByteBuffer buffer = directBufferFactory.create(capacity);
+		return buffer;
 	}
 
 	@RuntimeCallable
