@@ -923,6 +923,7 @@ public class Platform
 		}
 		ByteBuffer buffer = directBufferFactory.create(capacity);
 		return buffer;
+	}
 
 	@RuntimeCallable
 	private static boolean useGlobalRefs()
