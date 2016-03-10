@@ -398,8 +398,6 @@ task buildMetadata (type: JavaExec) {
 			aaptCommand += ".exe"
 		}
 		
-		println ">>aapt found=" + new File(aaptCommand).exists()
-		
 		def tmpAPKPath = tmpResourceAPK.getPath()
 		
 		def removeCmdParams = new ArrayList<String>([aaptCommand, "remove", tmpAPKPath, "assets/metadata/treeNodeStream.dat", "assets/metadata/treeStringsStream.dat", "assets/metadata/treeValueStream.dat"])
