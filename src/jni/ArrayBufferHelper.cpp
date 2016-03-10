@@ -66,7 +66,7 @@ void ArrayBufferHelper::CreateFromCallbackImpl(const FunctionCallbackInfo<Value>
 
 	auto obj = s_objectManager->GetJavaObjectByJsObject(argObj);
 
-	if (obj == nullptr)
+	if (obj.IsNull())
 	{
 		throw NativeScriptException("Wrong type of argument (object expected)");
 	}
