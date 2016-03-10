@@ -79,20 +79,10 @@ def renameResultApks (variant) {
         def apkDirectory = output.packageApplication.outputFile.parentFile
 		def apkNamePrefix = rootProject.name + "-" + variant.buildType.name
 
-        if (output.zipAlign) {
-			if (project.ext.selectedBuildType == variant.buildType.name) {
-				output.zipAlign.dependsOn(buildMetadata)
-			}
-
-            name = apkNamePrefix + ".apk"
-            output.outputFile = new File(apkDirectory, name);
-        }
-
         name = apkNamePrefix + "-unaligned.apk"
         output.packageApplication.outputFile = new File(apkDirectory, name);
 
 		if (output.packageApplication && (project.ext.selectedBuildType == variant.buildType.name)) {
-			buildMetadata.dependsOn(output.packageApplication)
 			project.ext.currentApkFile = output.packageApplication.outputFile.getAbsolutePath().replace('\\', '/')
 		}
     }
@@ -140,6 +130,14 @@ android {
 	
 	applicationVariants.all { variant ->
 		renameResultApks(variant)
+	}
+	
+	
+	applicationVariants.all { variant ->
+		def variantName = variant.name.capitalize()
+		def compileSourcesTaskName = "compile${variantName}Sources"
+		def compileSourcesTask = project.tasks.findByName(compileSourcesTaskName)
+		compileSourcesTask.finalizedBy "buildMetadata"
 	}
 }
 
@@ -323,7 +321,7 @@ task cleanLocalAarFiles(type: Delete) {
 }
 
 task ensureMetadataOutDir {
-	def outputDir = file("$rootDir/metadata/output")
+	def outputDir = file("$rootDir/metadata/output/assets/metadata")
 	outputDir.mkdirs()
 }
 
@@ -348,7 +346,7 @@ task collectAllJars {
 		}
 		
 		metadataParams.add("metadata-generator.jar")
-		metadataParams.add("../metadata/output")
+		metadataParams.add("../metadata/output/assets/metadata")
 		for(def i = 0; i < allJarPaths.size(); i++) {
 			metadataParams.add(allJarPaths.get(i));
 		}
@@ -382,7 +380,7 @@ task buildMetadata (type: JavaExec) {
 	inputs.files(allJarPaths)
 	inputs.dir("build/intermediates/classes")
 
-	outputs.files("metadata/output/treeNodeStream.dat", "metadata/output/treeStringsStream.dat", "metadata/output/treeValueStream.dat")
+	outputs.files("metadata/output/assets/metadata/treeNodeStream.dat", "metadata/output/assets/metadata/treeStringsStream.dat", "metadata/output/assets/metadata/treeValueStream.dat")
 
 	doFirst {
 		workingDir "build-tools"
@@ -391,93 +389,32 @@ task buildMetadata (type: JavaExec) {
 
 		args metadataParams.toArray()
 	}
-
+	
 	doLast {
-		copy {
-			from "metadata/output"
-			into "src/main/assets/metadata"
-		}
-
-        def zip_properties = new HashMap<String, String>()
-        zip_properties.put("create", "true")
-        zip_properties.put("encoding", "UTF-8")
-
-		def currentApk = project.ext.currentApkFile
-		def currentApkAsEncoded = currentApk.replace(" ", "%20")
-		def urlPrefix = "jar:file:" + (isWinOs ? "/" : "")
-
-		def zip_disk = URI.create(urlPrefix + currentApkAsEncoded);
-
-		def zipfs
-		def pathInZipfile
-		try {
-			zipfs = java.nio.file.FileSystems.newFileSystem(zip_disk, zip_properties)
-
-			def filesToDelete = ["assets/metadata/treeNodeStream.dat", "assets/metadata/treeStringsStream.dat", "assets/metadata/treeValueStream.dat",
-								"META-INF/CERT.RSA", "META-INF/CERT.SF", "META-INF/MANIFEST.MF"]
-
-			for (def file: filesToDelete) {
-				 pathInZipfile = zipfs.getPath(file)
-				if (java.nio.file.Files.exists(pathInZipfile)) {
-					java.nio.file.Files.delete(pathInZipfile)
-				}
-			}
-
-			pathInZipfile = zipfs.getPath("assets/metadata")
-			if (!java.nio.file.Files.exists(pathInZipfile)) {
-				java.nio.file.Files.createDirectory(pathInZipfile)
-			}
-
-			def metadataFiles = ["treeNodeStream.dat", "treeStringsStream.dat", "treeValueStream.dat"]
-			for (def mdFile: metadataFiles) {
-				pathInZipfile = java.nio.file.Files.createFile(zipfs.getPath("assets/metadata/" + mdFile))
-
-				def mdFilePath = java.nio.file.Paths.get("$rootDir/metadata/output/" + mdFile)
-				def data = java.nio.file.Files.readAllBytes(mdFilePath)
-
-				java.nio.file.Files.write(pathInZipfile, data, java.nio.file.StandardOpenOption.WRITE)
-			}
-		} finally {
-			if (zipfs != null) {
-				zipfs.close()
-			}
-		}
-
-		def androidHome = new File(System.properties['user.home'], ".android")
-		def keyStoreFile = new File(androidHome, "debug.keystore")
-
-		def storePass
-		def keyPass
-		def keyStorePath
-		def alias
-
-		if (project.ext.selectedBuildType.equals("release")) {
-			storePass = project.password
-			keyPass = project.ksPassword
-			keyStorePath = project.ksPath
-			alias = project.alias
-		} else {
-			storePass = "android"
-			keyPass = "android"
-			keyStorePath = keyStoreFile.getAbsolutePath()
-			alias = "androiddebugkey"
-		}
-		def jarSignerPath = new File(System.getenv("JAVA_HOME"), "bin/jarsigner").getAbsolutePath()
-
-		def cmdParams = new ArrayList<String>([jarSignerPath, "-sigalg", "SHA1withRSA", "-digestalg", "SHA1", "-storepass", storePass, "-keypass", keyPass, "-keystore", keyStorePath, currentApk, alias])
-
+		def tmpResourceAPK = new File("${buildDir}/intermediates/res/resources-${project.ext.selectedBuildType}.ap_")
+		
+		def aaptCommand = "${android.getSdkDirectory().getAbsolutePath()}/build-tools/${android.buildToolsVersion}/aapt"
 		if (isWinOs) {
-			cmdParams.add(0, "/c")
-			cmdParams.add(0, "cmd")
+			aaptCommand += ".exe"
 		}
-
+		
+		println ">>aapt found=" + new File(aaptCommand).exists()
+		
+		def tmpAPKPath = tmpResourceAPK.getPath()
+		
+		def removeCmdParams = new ArrayList<String>([aaptCommand, "remove", tmpAPKPath, "assets/metadata/treeNodeStream.dat", "assets/metadata/treeStringsStream.dat", "assets/metadata/treeValueStream.dat"])
+		
 		exec {
-			if (isWinOs) {
-				commandLine cmdParams.toArray()
-			}
-			else {
-				commandLine cmdParams.toArray()
-			}
+			ignoreExitValue true
+			workingDir "metadata/output"
+			commandLine removeCmdParams.toArray()
+		}
+		
+		def addCmdParams = new ArrayList<String>([aaptCommand, "add", tmpAPKPath, "assets/metadata/treeNodeStream.dat", "assets/metadata/treeStringsStream.dat", "assets/metadata/treeValueStream.dat"])
+		
+		exec {
+			workingDir "metadata/output"
+			commandLine addCmdParams.toArray()
 		}
 	}
 }
@@ -492,6 +429,7 @@ task deleteExplodedAarFolder (type: Delete) {
 	def explodedAarDir = project.buildDir.getAbsolutePath() + "/intermediates/exploded-aar"
 	delete explodedAarDir
 }
+
 
 
 ////////////////////////////////////////////////////////////////////////////////////
