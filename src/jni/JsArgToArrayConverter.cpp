@@ -10,6 +10,8 @@
 #include "V8StringConstants.h"
 #include "JavaObjectArrayCache.h"
 #include "JType.h"
+#include "NumericCasts.h"
+#include "NativeScriptException.h"
 
 using namespace v8;
 using namespace std;
@@ -93,7 +95,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 	else if (arg->IsInt32() && (returnType == Type::Int || returnType == Type::Null))
 	{
 		jint value = arg->Int32Value();
-		JniLocalRef javaObject(JType::NewInt(env, value));
+		auto javaObject = JType::NewInt(env, value);
 		SetConvertedObject(env, index, javaObject);
 
 		success = true;
@@ -120,8 +122,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 				obj = JType::NewLong(env, (jlong) d);
 			}
 
-			JniLocalRef javaObject(obj);
-			SetConvertedObject(env, index, javaObject);
+			SetConvertedObject(env, index, obj);
 
 			success = true;
 		}
@@ -141,8 +142,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 				obj = JType::NewDouble(env, (jdouble) d);
 			}
 
-			JniLocalRef javaObject(obj);
-			SetConvertedObject(env, index, javaObject);
+			SetConvertedObject(env, index, obj);
 
 			success = true;
 		}
@@ -150,7 +150,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 	else if (arg->IsBoolean())
 	{
 		jboolean value = arg->BooleanValue();
-		JniLocalRef javaObject(JType::NewBoolean(env, value));
+		auto javaObject = JType::NewBoolean(env, value);
 		SetConvertedObject(env, index, javaObject);
 		success = true;
 	}
@@ -158,137 +158,145 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 	{
 		auto boolObj = Local<BooleanObject>::Cast(arg);
 		jboolean value = boolObj->BooleanValue() ? JNI_TRUE : JNI_FALSE;
-		JniLocalRef javaObject(JType::NewBoolean(env, value));
+		auto javaObject = JType::NewBoolean(env, value);
 		SetConvertedObject(env, index, javaObject);
 
 		success = true;
 	}
 	else if (arg->IsString() || arg->IsStringObject())
 	{
-		JniLocalRef stringObject(ConvertToJavaString(arg));
+		auto stringObject = ConvertToJavaString(arg);
 		SetConvertedObject(env, index, stringObject);
 
 		success = true;
 	}
 	else if (arg->IsObject())
 	{
-		auto objectWithHiddenID = arg->ToObject();
+		auto jsObj = arg->ToObject();
 
-		auto hidden = objectWithHiddenID->GetHiddenValue(V8StringConstants::GetMarkedAsLong());
-		if (!hidden.IsEmpty())
+		auto castType = NumericCasts::GetCastType(jsObj);
+		Local<Value> castValue;
+		jchar charValue;
+		jbyte byteValue;
+		jshort shortValue;
+		jlong longValue;
+		jfloat floatValue;
+		jdouble doubleValue;
+		jobject javaObject;
+		JniLocalRef obj;
+
+		switch (castType)
 		{
-			jlong value = 0;
-			if (hidden->IsString())
-			{
-				auto strValue = ConvertToString(hidden->ToString());
-				value = atoll(strValue.c_str());
-			}
-			else if (hidden->IsInt32())
-			{
-				value = hidden->ToInt32()->Int32Value();
-			}
+			case CastType::Char:
+				castValue = NumericCasts::GetCastValue(jsObj);
+				charValue = '\0';
+				if (castValue->IsString())
+				{
+					string str = ConvertToString(castValue->ToString());
+					charValue = (jchar) str[0];
+				}
+				javaObject = JType::NewChar(env, charValue);
+				SetConvertedObject(env, index, javaObject);
+				success = true;
+				break;
 
-			JniLocalRef javaObject(JType::NewLong(env, value));
-			SetConvertedObject(env, index, javaObject);
-			return true;
-		}
+			case CastType::Byte:
+				castValue = NumericCasts::GetCastValue(jsObj);
+				byteValue = 0;
+				if (castValue->IsString())
+				{
+					string value = ConvertToString(castValue->ToString());
+					int byteArg = atoi(value.c_str());
+					byteValue = (jbyte) byteArg;
+				}
+				else if (castValue->IsInt32())
+				{
+					int byteArg = castValue->ToInt32()->Int32Value();
+					byteValue = (jbyte) byteArg;
+				}
+				javaObject = JType::NewByte(env, byteValue);
+				SetConvertedObject(env, index, javaObject);
+				success = true;
+				break;
 
-		hidden = objectWithHiddenID->GetHiddenValue(V8StringConstants::GetMarkedAsByte());
-		if (!hidden.IsEmpty())
-		{
-			jbyte value = 0;
-			if (hidden->IsString())
-			{
-				string value = ConvertToString(hidden->ToString());
-				int byteArg = atoi(value.c_str());
-				value = (jbyte) byteArg;
-			}
-			else if (hidden->IsInt32())
-			{
-				int byteArg = hidden->ToInt32()->Int32Value();
-				value = (jbyte) byteArg;
-			}
+			case CastType::Short:
+				castValue = NumericCasts::GetCastValue(jsObj);
+				shortValue = 0;
+				if (castValue->IsString())
+				{
+					string value = ConvertToString(castValue->ToString());
+					int shortArg = atoi(value.c_str());
+					shortValue = (jshort) shortArg;
+				}
+				else if (castValue->IsInt32())
+				{
+					jlong shortArg = castValue->ToInt32()->Int32Value();
+					shortValue = (jshort) shortArg;
+				}
+				javaObject = JType::NewShort(env, shortValue);
+				SetConvertedObject(env, index, javaObject);
+				success = true;
+				break;
 
-			JniLocalRef javaObject(JType::NewByte(env, value));
-			SetConvertedObject(env, index, javaObject);
-			return true;
-		}
+			case CastType::Long:
+				castValue = NumericCasts::GetCastValue(jsObj);
+				longValue = 0;
+				if (castValue->IsString())
+				{
+					auto strValue = ConvertToString(castValue->ToString());
+					longValue = atoll(strValue.c_str());
+				}
+				else if (castValue->IsInt32())
+				{
+					longValue = castValue->ToInt32()->Int32Value();
+				}
+				javaObject = JType::NewLong(env, longValue);
+				SetConvertedObject(env, index, javaObject);
+				success = true;
+				break;
 
-		hidden = objectWithHiddenID->GetHiddenValue(V8StringConstants::GetMarkedAsShort());
-		if (!hidden.IsEmpty())
-		{
-			jshort value = 0;
-			if (hidden->IsString())
-			{
-				string value = ConvertToString(hidden->ToString());
-				int shortArg = atoi(value.c_str());
-				value = (jshort) shortArg;
-			}
-			else if (hidden->IsInt32())
-			{
-				jlong shortArg = hidden->ToInt32()->Int32Value();
-				value = (jshort) shortArg;
-			}
+			case CastType::Float:
+				castValue = NumericCasts::GetCastValue(jsObj);
+				floatValue = 0;
+				if (castValue->IsNumber())
+				{
+					double floatArg = castValue->ToNumber()->NumberValue();
+					floatValue = (jfloat) floatArg;
+				}
+				javaObject = JType::NewFloat(env, floatValue);
+				SetConvertedObject(env, index, javaObject);
+				success = true;
+				break;
 
-			JniLocalRef javaObject(JType::NewShort(env, value));
-			SetConvertedObject(env, index, javaObject);
-			return true;
-		}
+			case CastType::Double:
+				castValue = NumericCasts::GetCastValue(jsObj);
+				doubleValue = 0;
+				if (castValue->IsNumber())
+				{
+					double doubleArg = castValue->ToNumber()->NumberValue();
+					doubleValue = (jdouble) doubleArg;
+				}
+				javaObject = JType::NewDouble(env, doubleValue);
+				SetConvertedObject(env, index, javaObject);
+				success = true;
+				break;
 
-		hidden = objectWithHiddenID->GetHiddenValue(V8StringConstants::GetMarkedAsDouble());
-		if (!hidden.IsEmpty())
-		{
-			jdouble value = 0;
-			if (hidden->IsNumber())
-			{
-				double doubleArg = hidden->ToNumber()->NumberValue();
-				value = (jdouble) doubleArg;
-			}
+			case CastType::None:
+				obj = ObjectManager::GetJavaObjectByJsObjectStatic(jsObj);
+				success = !obj.IsNull();
+				if (success)
+				{
+					SetConvertedObject(env, index, obj.Move(), obj.IsGlobal());
+				}
+				else
+				{
+					s << "Cannot convert JavaScript object with id " << jsObj->GetIdentityHash() << " at index " << index;
+				}
+				break;
 
-			JniLocalRef javaObject(JType::NewDouble(env, value));
-			SetConvertedObject(env, index, javaObject);
-			return true;
-		}
+			default:
+				throw NativeScriptException("Unsupported cast type");
 
-		hidden = objectWithHiddenID->GetHiddenValue(V8StringConstants::GetMarkedAsFloat());
-		if (!hidden.IsEmpty())
-		{
-			jfloat value = 0;
-			if (hidden->IsNumber())
-			{
-				double floatArg = hidden->ToNumber()->NumberValue();
-				value = (jfloat) floatArg;
-			}
-
-			JniLocalRef javaObject(JType::NewFloat(env, value));
-			SetConvertedObject(env, index, javaObject);
-			return true;
-		}
-
-		hidden = objectWithHiddenID->GetHiddenValue(V8StringConstants::GetMarkedAsChar());
-		if (!hidden.IsEmpty())
-		{
-			jchar value = '\0';
-			if (hidden->IsString())
-			{
-				string str = ConvertToString(hidden->ToString());
-				value = (jchar) str[0];
-			}
-
-			JniLocalRef javaObject(JType::NewChar(env, value));
-			SetConvertedObject(env, index, javaObject);
-			return true;
-		}
-
-		jweak obj = ObjectManager::GetJavaObjectByJsObjectStatic(objectWithHiddenID);
-		success = obj != nullptr;
-		if (success)
-		{
-			SetConvertedObject(env, index, obj, true);
-		}
-		else
-		{
-			s << "Cannot convert JavaScript object with id " << objectWithHiddenID->GetIdentityHash() << " at index " << index;
 		}
 	}
 	else if (arg->IsUndefined() || arg->IsNull())
@@ -316,20 +324,12 @@ jobject JsArgToArrayConverter::GetConvertedArg()
 	return (m_argsLen > 0) ? m_argsAsObject[0] : nullptr;
 }
 
-void JsArgToArrayConverter::SetConvertedObject(JEnv& env, int index, jobject obj, bool isGlobalRef)
+void JsArgToArrayConverter::SetConvertedObject(JEnv& env, int index, jobject obj, bool isGlobal)
 {
-	if (obj == nullptr)
-	{
-		m_argsAsObject[index] = obj;
-	}
-	else if (isGlobalRef)
-	{
-		m_argsAsObject[index] = obj;
-	}
-	else
+	m_argsAsObject[index] = obj;
+	if ((obj != nullptr) && !isGlobal)
 	{
 		m_storedIndexes.push_back(index);
-		m_argsAsObject[index] = env.NewLocalRef(obj);
 	}
 }
 

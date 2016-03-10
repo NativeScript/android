@@ -25,8 +25,6 @@ namespace tns
 
 			static int64_t ConvertToJavaLong(const v8::Local<v8::Value>& value);
 
-			static bool TryConvertToJavaLong(const v8::Local<v8::Value>& value, jlong& javaLong);
-
 			static v8::Local<v8::Value> jstringToV8String(jstring value);
 
 			static std::string jstringToString(jstring value);
@@ -49,7 +47,7 @@ namespace tns
 
 			static const long long JS_LONG_LIMIT = ((long long) 1) << 53;
 
-			static v8::Persistent<v8::Function> *NATIVESCRIPT_NUMERA_CTOR_FUNC;
+			static v8::Persistent<v8::Function> *NATIVESCRIPT_NUMBER_CTOR_FUNC;
 			static v8::Persistent<v8::NumberObject> *NAN_NUMBER_OBJECT;
 
 			static char *charBuffer;

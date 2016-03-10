@@ -1,7 +1,6 @@
 #include "JsArgConverter.h"
 #include <sstream>
 #include "ObjectManager.h"
-#include "NativeScriptAssert.h"
 #include "ArgConverter.h"
 #include "JniLocalRef.h"
 #include "JniSignatureParser.h"
@@ -10,6 +9,8 @@
 #include "Util.h"
 #include "V8GlobalHelpers.h"
 #include "V8StringConstants.h"
+#include "NumericCasts.h"
+#include "NativeScriptException.h"
 
 using namespace v8;
 using namespace std;
@@ -111,109 +112,108 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 		jlong javaLongValue;
 		auto jsObject = arg->ToObject();
 
-		auto hidden = jsObject->GetHiddenValue(V8StringConstants::GetMarkedAsLong());
-		if (!hidden.IsEmpty())
-		{
-			if (hidden->IsString())
-			{
-				string strValue = ConvertToString(hidden->ToString());
-				int64_t longArg = atoll(strValue.c_str());
-				jlong value = (jlong) longArg;
-				success = ConvertFromCastFunctionObject(value, index);
-			}
-			else if (hidden->IsInt32())
-			{
-				jlong value = (jlong) hidden->ToInt32()->IntegerValue();
-				success = ConvertFromCastFunctionObject(value, index);
-			}
-			return success;
-		}
-		else if (ArgConverter::TryConvertToJavaLong(jsObject, javaLongValue))
-		{
-			m_args[index].j = javaLongValue;
-			success = true;
-			return success;
-		}
+		auto castType = NumericCasts::GetCastType(jsObject);
 
-		hidden = jsObject->GetHiddenValue(V8StringConstants::GetMarkedAsByte());
-		if (!hidden.IsEmpty())
-		{
-			if (hidden->IsString())
-			{
-				string strValue = ConvertToString(hidden->ToString());
-				int byteArg = atoi(strValue.c_str());
-				jbyte value = (jbyte) byteArg;
-				success = ConvertFromCastFunctionObject(value, index);
-			}
-			else if (hidden->IsInt32())
-			{
-				jbyte value = (jbyte) hidden->ToInt32()->Int32Value();
-				success = ConvertFromCastFunctionObject(value, index);
-			}
-			return success;
-		}
+		Local<Value> castValue;
+		JniLocalRef obj;
 
-		hidden = jsObject->GetHiddenValue(V8StringConstants::GetMarkedAsShort());
-		if (!hidden.IsEmpty())
+		switch (castType)
 		{
-			if (hidden->IsString())
-			{
-				string strValue = ConvertToString(hidden->ToString());
-				int shortArg = atoi(strValue.c_str());
-				jshort value = (jshort) shortArg;
-				success = ConvertFromCastFunctionObject(value, index);
-			}
-			else if (hidden->IsInt32())
-			{
-				jshort value = (jshort) hidden->ToInt32()->Int32Value();
-				success = ConvertFromCastFunctionObject(value, index);
-			}
-			return success;
-		}
+			case CastType::Char:
+				castValue = NumericCasts::GetCastValue(jsObject);
+				if (castValue->IsString())
+				{
+					string value = ConvertToString(castValue->ToString());
+					m_args[index].c = (jchar) value[0];
+					success = true;
+				}
+				break;
 
-		hidden = jsObject->GetHiddenValue(V8StringConstants::GetMarkedAsDouble());
-		if (!hidden.IsEmpty())
-		{
-			if (hidden->IsNumber())
-			{
-				double doubleArg = hidden->ToNumber()->NumberValue();
-				jdouble value = (jdouble) doubleArg;
-				success = ConvertFromCastFunctionObject(value, index);
-			}
-			return success;
-		}
+			case CastType::Byte:
+				castValue = NumericCasts::GetCastValue(jsObject);
+				if (castValue->IsString())
+				{
+					string strValue = ConvertToString(castValue->ToString());
+					int byteArg = atoi(strValue.c_str());
+					jbyte value = (jbyte) byteArg;
+					success = ConvertFromCastFunctionObject(value, index);
+				}
+				else if (castValue->IsInt32())
+				{
+					jbyte value = (jbyte) castValue->ToInt32()->Int32Value();
+					success = ConvertFromCastFunctionObject(value, index);
+				}
+				break;
 
-		hidden = jsObject->GetHiddenValue(V8StringConstants::GetMarkedAsFloat());
-		if (!hidden.IsEmpty())
-		{
-			if (hidden->IsNumber())
-			{
-				double floatArg = hidden->ToNumber()->NumberValue();
-				jfloat value = (jfloat) floatArg;
-				success = ConvertFromCastFunctionObject(value, index);
-			}
-			return success;
-		}
+			case CastType::Short:
+				castValue = NumericCasts::GetCastValue(jsObject);
+				if (castValue->IsString())
+				{
+					string strValue = ConvertToString(castValue->ToString());
+					int shortArg = atoi(strValue.c_str());
+					jshort value = (jshort) shortArg;
+					success = ConvertFromCastFunctionObject(value, index);
+				}
+				else if (castValue->IsInt32())
+				{
+					jshort value = (jshort) castValue->ToInt32()->Int32Value();
+					success = ConvertFromCastFunctionObject(value, index);
+				}
+				break;
 
-		hidden = jsObject->GetHiddenValue(V8StringConstants::GetMarkedAsChar());
-		if (!hidden.IsEmpty())
-		{
-			if (hidden->IsString())
-			{
-				string value = ConvertToString(hidden->ToString());
-				m_args[index].c = (jchar) value[0];
-				success = true;
-			}
-			return success;
-		}
+			case CastType::Long:
+				castValue = NumericCasts::GetCastValue(jsObject);
+				if (castValue->IsString())
+				{
+					string strValue = ConvertToString(castValue->ToString());
+					int64_t longArg = atoll(strValue.c_str());
+					jlong value = (jlong) longArg;
+					success = ConvertFromCastFunctionObject(value, index);
+				}
+				else if (castValue->IsInt32())
+				{
+					jlong value = (jlong) castValue->ToInt32()->IntegerValue();
+					success = ConvertFromCastFunctionObject(value, index);
+				}
+				break;
 
-		jweak obj = ObjectManager::GetJavaObjectByJsObjectStatic(jsObject);
-		SetConvertedObject(index, obj, true);
-		success = obj != nullptr;
+			case CastType::Float:
+				castValue = NumericCasts::GetCastValue(jsObject);
+				if (castValue->IsNumber())
+				{
+					double floatArg = castValue->ToNumber()->NumberValue();
+					jfloat value = (jfloat) floatArg;
+					success = ConvertFromCastFunctionObject(value, index);
+				}
+				break;
 
-		if (!success)
-		{
-			sprintf(buff, "Cannot convert object to %s at index %d", typeSignature.c_str(), index);
+			case CastType::Double:
+				castValue = NumericCasts::GetCastValue(jsObject);
+				if (castValue->IsNumber())
+				{
+					double doubleArg = castValue->ToNumber()->NumberValue();
+					jdouble value = (jdouble) doubleArg;
+					success = ConvertFromCastFunctionObject(value, index);
+				}
+				break;
+
+
+			case CastType::None:
+				obj = ObjectManager::GetJavaObjectByJsObjectStatic(jsObject);
+				success = !obj.IsNull();
+
+				if (success)
+				{
+					SetConvertedObject(index, obj.Move(), obj.IsGlobal());
+				}
+				else
+				{
+					sprintf(buff, "Cannot convert object to %s at index %d", typeSignature.c_str(), index);
+				}
+				break;
+
+			default:
+				throw NativeScriptException("Unsupported cast type");
 		}
 	}
 	else if (arg->IsUndefined() || arg->IsNull())
@@ -236,20 +236,12 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 	return success;
 }
 
-void JsArgConverter::SetConvertedObject(int index, jobject obj, bool isGlobalRef)
+void JsArgConverter::SetConvertedObject(int index, jobject obj, bool isGlobal)
 {
-	if (obj == nullptr)
-	{
-		m_args[index].l = obj;
-	}
-	else if (isGlobalRef)
-	{
-		m_args[index].l = obj;
-	}
-	else
+	m_args[index].l = obj;
+	if ((obj != nullptr) && !isGlobal)
 	{
 		m_storedObjects.push_back(index);
-		m_args[index].l = obj;
 	}
 }
 
@@ -544,13 +536,11 @@ JsArgConverter::~JsArgConverter()
 {
 	if (m_argsLen > 0)
 	{
-		JEnv env;
-
 		int length = m_storedObjects.size();
 		for (int i = 0; i < length; i++)
 		{
 			int index = m_storedObjects[i];
-			env.DeleteLocalRef(m_args[index].l);
+			m_env.DeleteLocalRef(m_args[index].l);
 		}
 	}
 }

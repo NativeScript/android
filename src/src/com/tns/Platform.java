@@ -16,16 +16,16 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 
 import android.app.Application;
 import android.util.SparseArray;
 
 import com.tns.bindings.ProxyGenerator;
-import com.tns.internal.ExtractPolicy;
 
 public class Platform
 {
-	private static native void initNativeScript(String filesPath, int appJavaObjectId, boolean verboseLoggingEnabled, String packageName, Object[] v8Options, JsDebugger jsDebugger);
+	private static native void initNativeScript(String filesPath, boolean verboseLoggingEnabled, String packageName, Object[] v8Options, JsDebugger jsDebugger);
 
 	private static native void runModule(String filePath) throws NativeScriptException;
 
@@ -54,6 +54,8 @@ public class Platform
 	private static final NativeScriptHashMap<Object, Integer> strongJavaObjectToID = new NativeScriptHashMap<Object, Integer>();
 
 	private static final NativeScriptWeakHashMap<Object, Integer> weakJavaObjectToID = new NativeScriptWeakHashMap<Object, Integer>();
+	
+	private final static Map<Class<?>, JavaScriptImplementation> loadedJavaScriptExtends = new HashMap<Class<?>, JavaScriptImplementation>();
 
 	private static final Runtime runtime = Runtime.getRuntime();
 	private static Class<?> errorActivityClass;
@@ -100,7 +102,7 @@ public class Platform
 		errorActivityClass = clazz;
 	}
 
-	public static int init(Application application, ThreadScheduler threadScheduler, Logger logger, String appName, File runtimeLibPath, File rootDir, File appDir, ClassLoader classLoader, File dexDir, String dexThumb) throws RuntimeException
+	public static void init(Application application, ThreadScheduler threadScheduler, Logger logger, String appName, File runtimeLibPath, File rootDir, File appDir, ClassLoader classLoader, File dexDir, String dexThumb) throws RuntimeException
 	{
 		if (initialized)
 		{
@@ -113,20 +115,10 @@ public class Platform
 
 		Platform.dexFactory = new DexFactory(logger, classLoader, dexDir, dexThumb);
 
-		int appJavaObjectId = -1;
-		
 		if (logger.isEnabled())
 		{
 			logger.write("Initializing NativeScript JAVA");
 		}
-			
-		appJavaObjectId = generateNewObjectId();
-		makeInstanceStrong(application, appJavaObjectId);
-		if (logger.isEnabled())
-		{
-			logger.write("Initialized app instance id:" + appJavaObjectId);
-		}
-		
 
 		try
 		{
@@ -143,7 +135,7 @@ public class Platform
 			jsDebugger = new JsDebugger(application, logger, threadScheduler);
 		}
 		
-		Platform.initNativeScript(Module.getApplicationFilesPath(), appJavaObjectId, logger.isEnabled(), appName, v8Config, jsDebugger);
+		Platform.initNativeScript(Module.getApplicationFilesPath(), logger.isEnabled(), appName, v8Config, jsDebugger);
 
 		if (jsDebugger != null)
 		{
@@ -160,7 +152,6 @@ public class Platform
 		}
 		
 		initialized = true;
-		return appJavaObjectId;
 	}
 
 	@RuntimeCallable
@@ -360,8 +351,21 @@ public class Platform
 		int javaObjectID = generateNewObjectId();
 
 		makeInstanceStrong(instance, javaObjectID);
-
-		String className = instance.getClass().getName();
+		
+		Class<?> clazz = instance.getClass();
+		
+		if (!loadedJavaScriptExtends.containsKey(clazz))
+		{
+			JavaScriptImplementation jsImpl = clazz.getAnnotation(JavaScriptImplementation.class);
+			if (jsImpl != null)
+			{
+				File jsFile = new File(Module.getApplicationFilesPath(), jsImpl.javaScriptFile());
+				runModule(jsFile);
+			}
+			loadedJavaScriptExtends.put(clazz, jsImpl);
+		}
+  		  
+		String className = clazz.getName();
 
 		createJSInstanceNative(instance, javaObjectID, className);
 
@@ -919,5 +923,12 @@ public class Platform
 		}
 		ByteBuffer buffer = directBufferFactory.create(capacity);
 		return buffer;
+
+	@RuntimeCallable
+	private static boolean useGlobalRefs()
+	{
+		int JELLY_BEAN = 16;
+		boolean useGlobalRefs = android.os.Build.VERSION.SDK_INT >= JELLY_BEAN; 
+		return useGlobalRefs;
 	}
 }

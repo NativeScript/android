@@ -6,8 +6,6 @@
 #include "ObjectManager.h"
 #include "SimpleAllocator.h"
 
-void AppInitCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
-
 jobject ConvertJsValueToJavaObject(tns::JEnv& env, const v8::Local<v8::Value>& value, int classReturnType);
 
 namespace tns
@@ -16,7 +14,7 @@ namespace tns
 	{
 		public:
 			static void Init(JavaVM *vm, void *reserved);
-			static v8::Isolate* InitNativeScript(JNIEnv *_env, jobject obj, jstring filesPath, jint appJavaObjectId, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jobject jsDebugger);
+			static v8::Isolate* InitNativeScript(JNIEnv *_env, jobject obj, jstring filesPath, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jobject jsDebugger);
 			static void RunModule(JNIEnv *_env, jobject obj, jstring scriptFile);
 			static jobject RunScript(JNIEnv *_env, jobject obj, jstring scriptFile);
 			static jobject CallJSMethodNative(JNIEnv *_env, jobject obj, jint javaObjectID, jstring methodName, jint retType, jboolean isConstructor, jobjectArray packagedArgs);
@@ -32,7 +30,6 @@ namespace tns
 
 			static void PrepareExtendFunction(v8::Isolate *isolate, jstring filesPath);
 			static v8::Isolate* PrepareV8Runtime(JEnv& env, const std::string& filesPath, jstring packageName, jobject jsDebugger);
-			static void AppInitCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 			static jobject ConvertJsValueToJavaObject(JEnv& env, const v8::Local<v8::Value>& value, int classReturnType);
 
 			static v8::Isolate *s_isolate;

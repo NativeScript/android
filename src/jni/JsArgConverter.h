@@ -49,7 +49,7 @@ namespace tns
 
 			bool ConvertJavaScriptString(const v8::Local<v8::Value>& jsValue, int index);
 
-			void SetConvertedObject(int index, jobject obj, bool isGlobalRef = false);
+			void SetConvertedObject(int index, jobject obj, bool isGlobal = false);
 
 			template<typename T>
 			bool ConvertFromCastFunctionObject(T value, int index);
