@@ -19,6 +19,10 @@ namespace tns
 			static void CreateFromCallbackImpl(const v8::FunctionCallbackInfo<v8::Value>& info);
 
 			static ObjectManager *s_objectManager;
+
+			static jclass s_ByteBufferClass;
+
+			static jmethodID s_isDirectMethodID;
 	};
 }
 

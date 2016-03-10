@@ -73,13 +73,32 @@ void ArrayBufferHelper::CreateFromCallbackImpl(const FunctionCallbackInfo<Value>
 
 	JEnv env;
 
-	auto clazz = env.FindClass("java/nio/MappedByteBuffer");
-
-	auto isMappedBuffer = env.IsInstanceOf(obj, clazz);
-
-	if (!isMappedBuffer)
+	if (s_ByteBufferClass == nullptr)
 	{
-		throw NativeScriptException("Wrong type of argument (MappedBuffer expected)");
+		s_ByteBufferClass = env.FindClass("java/nio/ByteBuffer");
+		assert(s_ByteBufferClass != nullptr);
+	}
+
+	auto isByteBuffer = env.IsInstanceOf(obj, s_ByteBufferClass);
+
+	if (!isByteBuffer)
+	{
+		throw NativeScriptException("Wrong type of argument (ByteBuffer expected)");
+	}
+
+	if (s_isDirectMethodID == nullptr)
+	{
+		s_isDirectMethodID = env.GetMethodID(s_ByteBufferClass, "isDirect", "()Z");
+		assert(s_isDirectMethodID != nullptr);
+	}
+
+	auto jbool = env.CallBooleanMethod(obj, s_isDirectMethodID);
+
+	auto isDirectBuffer = jbool == JNI_TRUE;
+
+	if (!isDirectBuffer)
+	{
+		throw NativeScriptException("Direct ByteBuffer expected)");
 	}
 
 	auto data = env.GetDirectBufferAddress(obj);
@@ -93,3 +112,5 @@ void ArrayBufferHelper::CreateFromCallbackImpl(const FunctionCallbackInfo<Value>
 }
 
 ObjectManager* ArrayBufferHelper::s_objectManager = nullptr;
+jclass ArrayBufferHelper::s_ByteBufferClass = nullptr;
+jmethodID ArrayBufferHelper::s_isDirectMethodID = nullptr;
