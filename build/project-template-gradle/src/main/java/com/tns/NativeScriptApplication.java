@@ -12,16 +12,9 @@ public class NativeScriptApplication extends android.app.Application implements 
         thiz = this;
     }
 
-    protected void attachBaseContext(android.content.Context param_0) {
-        super.attachBaseContext(param_0);
-
-        new RuntimeHelper(this).initRuntime();
-
-        Platform.initInstance(this);
-    }
-
-
     public void onCreate() {
+		new RuntimeHelper(this).initRuntime();
+        Platform.initInstance(this);
         java.lang.Object[] params = null;
         com.tns.Platform.callJSMethod(this, "onCreate", void.class, params);
     }
