@@ -65,7 +65,7 @@ LOCAL_MODULE    := NativeScript
 LOCAL_SRC_FILES :=	com_tns_AssetExtractor.cpp AssetExtractor.cpp\
 					com_tns_Platform.cpp NativePlatform.cpp \
 					com_tns_JsDebugger.cpp \
-					JEnv.cpp DirectBuffer.cpp NativeScriptException.cpp \
+					JEnv.cpp DirectBuffer.cpp ArrayBufferHelper.cpp NativeScriptException.cpp \
 					JsDebugger.cpp SimpleAllocator.cpp \
 					NativeScriptRuntime.cpp MetadataNode.cpp MetadataTreeNode.cpp MetadataReader.cpp \
 					MethodCache.cpp JavaObjectArrayCache.cpp \

@@ -382,6 +382,9 @@ Isolate* NativePlatform::PrepareV8Runtime(JEnv& env, const string& filesPath, js
 
 	ArrayHelper::Init(g_objectManager, context);
 
+	s_arrayBufferHeper = ArrayBufferHelper(g_objectManager);
+	s_arrayBufferHeper.CreateConvertFunctions(global);
+
 	return isolate;
 }
 
@@ -398,45 +401,5 @@ jobject NativePlatform::ConvertJsValueToJavaObject(JEnv& env, const Local<Value>
 	return javaResult;
 }
 
-void NativePlatform::PrepareExtendFunction(Isolate *isolate, jstring filesPath)
-{
-	string fullPath = ArgConverter::jstringToString(filesPath);
-	fullPath.append("/internal/prepareExtend.js");
-
-	int length;
-	bool isNew;
-	const char* content = File::ReadText(fullPath, length, isNew);
-
-	TryCatch tc;
-	auto cmd = ConvertToV8String(content, length);
-
-	if (isNew)
-	{
-		delete[] content;
-	}
-
-	auto origin = ConvertToV8String(fullPath);
-	DEBUG_WRITE("Compiling prepareExtend.js script");
-
-	auto script = Script::Compile(cmd, origin);
-	DEBUG_WRITE("Compile prepareExtend.js script");
-
-	if (script.IsEmpty() || tc.HasCaught())
-	{
-		DEBUG_WRITE("Cannot compile prepareExtend.js script");
-		return;
-	}
-
-	DEBUG_WRITE("Compiled prepareExtend.js script");
-
-	script->Run();
-
-	if (tc.HasCaught())
-	{
-		throw NativeScriptException(tc);
-	}
-
-	DEBUG_WRITE("Executed prepareExtend.js script");
-}
-
 Isolate* NativePlatform::s_isolate = nullptr;
+ArrayBufferHelper NativePlatform::s_arrayBufferHeper = ArrayBufferHelper(nullptr);
