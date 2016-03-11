@@ -39,7 +39,7 @@ def configStage = "\n:config phase: "
 def nodeModulesDir = "../../node_modules/"
 def libDir = "../../lib/Android/"
 def pluginNames = new ArrayList<String>()
-def configDir = file(nodeModulesDir)
+def configDir = file(configurationsDir)
 def appResExists = false
 def appResourcesName = "NativescriptAppResources"
 
@@ -69,25 +69,24 @@ def computeBuildToolsVersion() {
 		return "22.0.1"
 	}
 }
-
 project.ext.selectedBuildType = project.hasProperty("release") ? "release" : "debug"
 
 def renameResultApks (variant) {
 	def name
-    variant.outputs.each { output ->
+	variant.outputs.each { output ->
 
-        def apkDirectory = output.packageApplication.outputFile.parentFile
+		def apkDirectory = output.packageApplication.outputFile.parentFile
 		def apkNamePrefix = rootProject.name + "-" + variant.buildType.name
 
-        name = apkNamePrefix + "-unaligned.apk"
-        output.packageApplication.outputFile = new File(apkDirectory, name);
-
-		if (output.packageApplication && (project.ext.selectedBuildType == variant.buildType.name)) {
-			project.ext.currentApkFile = output.packageApplication.outputFile.getAbsolutePath().replace('\\', '/')
+		if (output.zipAlign) {
+			name = apkNamePrefix + ".apk"
+			output.outputFile = new File(apkDirectory, name);
 		}
-    }
-}
 
+		name = apkNamePrefix + "-unaligned.apk"
+		output.packageApplication.outputFile = new File(apkDirectory, name);
+	}    
+}
 
 ////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////// CONFIGURATIONS ///////////////////////////////////////
@@ -391,7 +390,20 @@ task buildMetadata (type: JavaExec) {
 	}
 	
 	doLast {
-		def tmpResourceAPK = new File("${buildDir}/intermediates/res/resources-${project.ext.selectedBuildType}.ap_")
+		copy {
+			from "metadata/output/assets/metadata"
+			into "src/main/assets/metadata"
+		}
+		
+		def files = new File("${buildDir}/intermediates/res").listFiles()
+		def tmpResourceAPK = null
+		for (File f: files) {
+			def name = f.getName();
+			if (name.endsWith(".ap_")) {
+				tmpResourceAPK = f;
+				break;
+			}
+		}
 		
 		def aaptCommand = "${android.getSdkDirectory().getAbsolutePath()}/build-tools/${android.buildToolsVersion}/aapt"
 		if (isWinOs) {
@@ -477,3 +489,4 @@ task buildapk {
 	
 	dependsOn deleteExplodedAarFolder
 }
+
