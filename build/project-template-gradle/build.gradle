@@ -192,7 +192,7 @@ task pluginStructureCheck {
 				&&
 				!fileName.endsWith(".jar")
 			){
-			println "WARNING: The file: " + f + " is depricated, you can read more about what will be the expected plugin structure here: (add link to blog post)" 
+			println "WARNING: The file: " + f + " is depricated, you can read more about what will be the expected plugin structure here: https://www.nativescript.org/blog/migrating-n-android-plugins-from-version-1.7-to-2.0" 
 		}
 	}
 }
