@@ -686,18 +686,17 @@ void MetadataNode::SetInnnerTypes(Isolate *isolate, Local<Function>& ctorFunctio
 			auto type = s_metadataReader.GetNodeType(curChild);
 			auto isStatic = s_metadataReader.IsNodeTypeStatic(type);
 
-			if (isStatic)
-			{
-				auto innerTypeCtorFuncTemplate = childNode->GetConstructorFunctionTemplate(isolate, curChild);
-				auto innerTypeCtorFunc = innerTypeCtorFuncTemplate->GetFunction();
-				auto innerTypeName = ConvertToV8String(curChild->name);
-				ctorFunction->Set(innerTypeName, innerTypeCtorFunc);
-			}
-			else
+			auto innerTypeName = ConvertToV8String(curChild->name);
+			auto innerTypeCtorFuncTemplate = childNode->GetConstructorFunctionTemplate(isolate, curChild);
+			auto innerTypeCtorFunc = innerTypeCtorFuncTemplate->GetFunction();
+
+			if (!isStatic)
 			{
 				auto innerTypeName = ConvertToV8String(curChild->name);
 				prototypeTemplate2->SetAccessor(innerTypeName, InnerClassAccessorGetterCallback, nullptr, External::New(isolate, childNode));
 			}
+
+			ctorFunction->Set(innerTypeName, innerTypeCtorFunc);
 		}
 	}
 }
