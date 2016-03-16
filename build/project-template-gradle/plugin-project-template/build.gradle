@@ -1,0 +1,16 @@
+apply plugin: "com.android.library"
+
+buildDir = "../build"
+
+android {
+    compileSdkVersion compiteCompileSdkVersion()
+	buildToolsVersion computeBuildToolsVersion()
+	
+	defaultConfig {
+		minSdkVersion 17
+		targetSdkVersion computeTargetSdkVersion()
+	}
+}
+dependencies {
+    compile fileTree(dir: "libs", include: ["*.jar"])
+}

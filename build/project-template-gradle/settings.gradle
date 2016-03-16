@@ -3,3 +3,24 @@ include "asbg", "ing", "bg"
 project(":asbg").projectDir = file("build-tools/android-static-binding-generator")
 project(":ing").projectDir = file("build-tools/android-static-binding-generator/interface-name-generator")
 project(":bg").projectDir = file("build-tools/android-static-binding-generator/binding-generator")
+
+// Include plugin directories as projects
+def ft = file("configurations")
+ft.listFiles().each { fl ->
+    if(fl.isDirectory()) {
+        def dstr = fl.toString()
+        def pluginName = fl.name
+                
+        // Cleanup
+        delete pluginName
+        
+        copy {
+            from "plugin-project-template"
+            into pluginName
+        } 
+        
+        println "including plugin project $pluginName"
+        include pluginName               
+    }
+}
+
