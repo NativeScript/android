@@ -21,4 +21,11 @@ describe("Tests Java object field access", function () {
 		}
 		expect(exceptionCaught).toBe(true);
 	});
+	
+	it("should be able to get public static field of inner type", function () {
+		var AudioSource = android.media.MediaRecorder.AudioSource;
+		var mic_constant = AudioSource.MIC;
+		expect(AudioSource).not.toBe(undefined);
+		expect(mic_constant).toBe(1);
+	});
 });
