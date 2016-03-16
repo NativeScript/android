@@ -1,3 +1,16 @@
+1.7.0
+==
+
+## What's New
+ - [Extendind Application and Activity classes](https://github.com/NativeScript/android-runtime/issues/226)
+ - Gradle script improvements
+
+## Bug Fixes
+
+ - [App crashes with "NativeScriptApplication already initialized"](https://github.com/NativeScript/android-runtime/issues/362)
+ - [Upgrade to Gradle 1.5.0]https://github.com/NativeScript/android-runtime/issues/375)
+
+
 1.6.0
 ==
 
