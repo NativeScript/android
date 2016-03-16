@@ -8,7 +8,7 @@
 ## Bug Fixes
 
  - [App crashes with "NativeScriptApplication already initialized"](https://github.com/NativeScript/android-runtime/issues/362)
- - [Upgrade to Gradle 1.5.0]https://github.com/NativeScript/android-runtime/issues/375)
+ - [Upgrade to Gradle 1.5.0](https://github.com/NativeScript/android-runtime/issues/375)
 
 
 1.6.0
