@@ -14,7 +14,6 @@ public class NativeScriptApplication extends android.app.Application implements 
 
     public void onCreate() {
 		new RuntimeHelper(this).initRuntime();
-        Platform.initInstance(this);
         java.lang.Object[] params = null;
         com.tns.Platform.callJSMethod(this, "onCreate", void.class, params);
     }
