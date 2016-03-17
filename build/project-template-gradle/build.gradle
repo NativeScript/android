@@ -225,6 +225,21 @@ task createPluginSubprojects {
             manifestFile << "<manifest xmlns:android='http://schemas.android.com/apk/res/android' package='org.nativescript.$sanitizedPluginName'>\n"
             manifestFile << "</manifest>"          
         }
+        else {
+            // Check for package attribute
+            def manifest = new XmlSlurper(false, true).parse(manifestFile)
+            if (manifest.@package == "") {
+                manifest.@package = "org.nativescript." + sanitizedPluginName
+                
+                def outputBuilder = new groovy.xml.StreamingMarkupBuilder()                
+                def xml = groovy.xml.XmlUtil.serialize(outputBuilder.bind {
+                    mkp.declareNamespace("android":"http://schemas.android.com/apk/res/android")
+                    mkp.yield manifest    
+                })
+
+                manifestFile.write xml
+            }            
+        }        
     }
 }
 
