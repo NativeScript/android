@@ -49,6 +49,14 @@ public class NativeScriptActivity extends android.app.Activity implements com.tn
         com.tns.Platform.callJSMethod(this, "onActivityResult", void.class, params);
     }
 
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        java.lang.Object[] params = new Object[3];
+        params[0] = requestCode;
+        params[1] = permissions;
+        params[2] = grantResults;
+        com.tns.Platform.callJSMethod(this, "onRequestPermissionsResult", void.class, params);
+    }
+
     public boolean equals__super(java.lang.Object other) {
         return super.equals(other);
     }
