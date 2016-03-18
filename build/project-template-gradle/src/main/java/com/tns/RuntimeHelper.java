@@ -109,6 +109,7 @@ public class RuntimeHelper
 			ThreadScheduler workThreadScheduler = new WorkThreadScheduler(new Handler(Looper.getMainLooper()));
 			Platform.init(this.app, workThreadScheduler, logger, appName, null, rootDir, appDir, classLoader, dexDir, dexThumb);
 			Platform.runScript(new File(appDir, "internal/ts_helpers.js"));
+			Platform.initInstance(this);
 			Platform.run();
 		}
 	}
