@@ -7,8 +7,9 @@ import android.content.pm.PackageManager.NameNotFoundException;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import java.io.IOException;
 
-class RuntimeHelper
+public class RuntimeHelper
 {
 	private final Application app;
 	
@@ -45,8 +46,7 @@ class RuntimeHelper
 	{
 		System.loadLibrary("NativeScript");
 		
-		//Logger logger = new LogcatLogger(BuildConfig.DEBUG, this);
-		Logger logger = new LogcatLogger(true, app);
+		Logger logger = new LogcatLogger(false, app);
 		
 		boolean showErrorIntent = hasErrorIntent();
 		if (!showErrorIntent)
@@ -55,15 +55,8 @@ class RuntimeHelper
 
 			Thread.setDefaultUncaughtExceptionHandler(exHandler);
 			
-			boolean shouldEnableDebugging = Util.isDebuggableApp(app);
-					
-			if (shouldEnableDebugging)
-			{
-				//JsDebugger.registerEnableDisableDebuggerReceiver(app);
-				//JsDebugger.registerGetDebuggerPortReceiver(app);
-			}
+			Async.Http.setApplicationContext(this.app);
 			
-			// TODO: refactor
 			ExtractPolicy extractPolicy = new DefaultExtractPolicy(logger);
 			boolean skipAssetExtraction = Util.runPlugin(logger, app);
 			if (!skipAssetExtraction)
@@ -92,9 +85,15 @@ class RuntimeHelper
 			String appName = app.getPackageName();
 			File rootDir = new File(app.getApplicationInfo().dataDir);
 			File appDir = app.getFilesDir();
-			File debuggerSetupDir = Util.isDebuggableApp(app)
-										? app.getExternalFilesDir(null)
-										: null;
+			
+			try
+			{
+				appDir = appDir.getCanonicalFile();
+			}
+			catch (IOException e1)
+			{
+			}
+
 			ClassLoader classLoader = app.getClassLoader();
 			File dexDir = new File(rootDir, "code_cache/secondary-dexes");
 			String dexThumb = null;
@@ -108,8 +107,9 @@ class RuntimeHelper
 				e.printStackTrace();
 			}
 			ThreadScheduler workThreadScheduler = new WorkThreadScheduler(new Handler(Looper.getMainLooper()));
-			Platform.init(this.app, workThreadScheduler, logger, appName, null, rootDir, appDir, /* debuggerSetupDir, */ classLoader, dexDir, dexThumb);
+			Platform.init(this.app, workThreadScheduler, logger, appName, null, rootDir, appDir, classLoader, dexDir, dexThumb);
 			Platform.runScript(new File(appDir, "internal/ts_helpers.js"));
+			Platform.initInstance(this.app);
 			Platform.run();
 		}
 	}
