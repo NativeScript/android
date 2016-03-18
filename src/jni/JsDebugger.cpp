@@ -82,7 +82,7 @@ void JsDebugger::DebugBreak()
 
 bool JsDebugger::IsDebuggerActive()
 {
-	return s_jsDebugger != nullptr && enabled;
+	return s_processedCommands;
 }
 
 void JsDebugger::ProcessDebugMessages()
@@ -249,6 +249,8 @@ void JsDebugger::SendCommandToV8(uint16_t *cmd, int length)
 	auto isolate = s_isolate;
 
 	v8::Debug::SendCommand(isolate, cmd, length, nullptr);
+
+	s_processedCommands = true;
 }
 
 /* *
@@ -278,4 +280,4 @@ jclass JsDebugger::s_JsDebuggerClass = nullptr;
 jmethodID JsDebugger::s_EnqueueMessage = nullptr;
 jmethodID JsDebugger::s_EnqueueConsoleMessage = nullptr;
 jmethodID JsDebugger::s_EnableAgent = nullptr;
-
+bool JsDebugger::s_processedCommands = false;

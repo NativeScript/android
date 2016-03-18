@@ -97,7 +97,7 @@ extern "C" void Java_com_tns_JsDebugger_debugBreak(JNIEnv *env, jobject obj)
 	}
 }
 
-extern "C" jboolean Java_com_tns_JsDebugger_isDebugerActive(JNIEnv *env, jobject obj)
+extern "C" jboolean Java_com_tns_JsDebugger_isDebuggerActive(JNIEnv *env, jobject obj)
 {
 	try
 	{
