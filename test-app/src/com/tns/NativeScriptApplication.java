@@ -1,6 +1,3 @@
-/*
- * Warning: this file may be auto-generated in future. Edit with caution.
- */
 package com.tns;
 
 import android.app.Application;
@@ -17,19 +14,31 @@ public class NativeScriptApplication extends android.app.Application implements 
 
     public void onCreate() {
 		new RuntimeHelper(this).initRuntime();
-        java.lang.Object[] params = null;
-        com.tns.Platform.callJSMethod(this, "onCreate", void.class, params);
+		if (Platform.isInitialized()) {
+	        java.lang.Object[] params = null;
+	        com.tns.Platform.callJSMethod(this, "onCreate", void.class, params);
+		} else {
+			super.onCreate();
+		}
     }
 
     public void onLowMemory() {
-        java.lang.Object[] params = null;
-        com.tns.Platform.callJSMethod(this, "onLowMemory", void.class, params);
+    	if (Platform.isInitialized()) {
+	        java.lang.Object[] params = null;
+	        com.tns.Platform.callJSMethod(this, "onLowMemory", void.class, params);
+    	} else {
+    		super.onLowMemory();
+    	}
     }
 
     public void onTrimMemory(int level) {
-        java.lang.Object[] params = new Object[1];
-        params[0] = level;
-        com.tns.Platform.callJSMethod(this, "onTrimMemory", void.class, params);
+    	if (Platform.isInitialized()) {
+	        java.lang.Object[] params = new Object[1];
+	        params[0] = level;
+	        com.tns.Platform.callJSMethod(this, "onTrimMemory", void.class, params);
+    	} else {
+    		super.onTrimMemory(level);
+    	}
     }
 
     public boolean equals__super(java.lang.Object other) {

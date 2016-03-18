@@ -43,7 +43,7 @@ public class JsDebugger
 
 	private static native void sendCommand(byte[] command, int length);
 	
-	private static native boolean isDebugerActive();
+	private static native boolean isDebuggerActive();
 
 	private ThreadScheduler threadScheduler;
 
@@ -612,8 +612,8 @@ public class JsDebugger
 		return isDebuggableApp;
 	}
 
-	public static boolean isJsDebugerActive()
+	public static boolean isJsDebuggerActive()
 	{
-		return isDebugerActive();
+		return isDebuggerActive();
 	}
 }

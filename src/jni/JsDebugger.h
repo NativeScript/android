@@ -51,6 +51,7 @@ namespace tns
 			static jmethodID s_EnqueueConsoleMessage;
 			static jmethodID s_EnableAgent;
 			static v8::Isolate *s_isolate;
+			static bool s_processedCommands;
 
 			static const int INVALID_PORT = -1;
 	};

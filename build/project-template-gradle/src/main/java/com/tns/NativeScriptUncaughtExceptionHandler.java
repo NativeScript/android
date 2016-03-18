@@ -31,7 +31,7 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
 				ex.printStackTrace();
 				Platform.passUncaughtExceptionToJsNative(ex, errorMessage);
 				
-				if (JsDebugger.isJsDebugerActive())
+				if (JsDebugger.isJsDebuggerActive())
 				{
 					return;
 				}
