@@ -1,3 +1,12 @@
+1.7.1
+==
+
+## Bug Fixes
+
+ - [Fix application initialization](https://github.com/NativeScript/android-runtime/issues/396)
+ - [Fix error activity](https://github.com/NativeScript/android-runtime/issues/395)
+
+
 1.7.0
 ==
 
