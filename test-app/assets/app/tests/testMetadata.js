@@ -21,4 +21,12 @@ describe("Tests metadata", function () {
 		expect(exceptionCaught).toBe(false);
 	});
 
+	it("should be able to access static fields declared in interface from implementing class", function () {
+		var c = new com.tns.tests.MyTestDerivedClass();
+		
+		var staticFieldFromInterface = android.app.Activity.TRIM_MEMORY_RUNNING_MODERATE;
+		var expected = 5;
+		
+		expect(staticFieldFromInterface).toBe(expected);
+	});
 });
