@@ -59,6 +59,8 @@ public class JsDebugger
 	private byte[] LINE_END_BYTES;
 
 	private HandlerThread handlerThread;
+
+	public boolean jsDebuggerEnabled;
 	
 	public JsDebugger(Context context, Logger logger, ThreadScheduler threadScheduler)
 	{
@@ -124,7 +126,12 @@ public class JsDebugger
 	                	try
 	    				{
 	                		LocalSocket socket = serverSocket.accept();
-
+	                		
+	                		if (!jsDebuggerEnabled)
+	                		{
+	                			enable();
+	                		}
+	                		
 	                		logger.write("NativeScript Debugger new connection on: " + socket.getFileDescriptor().toString());
 	                		
 	    					//out (send messages to node inspector)
@@ -492,6 +499,7 @@ public class JsDebugger
 	{
 		logger.write("Enabling NativeScript Debugger Agent");
 		enable();
+		jsDebuggerEnabled = true;
 	}
 
 	@RuntimeCallable
@@ -499,7 +507,7 @@ public class JsDebugger
 	{
 		logger.write("Disabling NativeScript Debugger Agent");
 		disable();
-		
+		jsDebuggerEnabled = true;
 		
 		String message = "{\"seq\":0,\"type\":\"request\",\"command\":\"disconnect\"}";
 		
@@ -580,12 +588,13 @@ public class JsDebugger
 		
 		registerEnableDisableDebuggerReceiver(handler);
 		
-		logger.write("Enabling Debugger Agent");
-		enable();
-
 		boolean shouldDebugBrake = getDebugBreakFlagAndClearIt();
 		if (shouldDebugBrake)
 		{
+			logger.write("Enabling Debugger Agent");
+			enable();
+			jsDebuggerEnabled = true;
+			
 			debugBreak();
 		}
 	}
