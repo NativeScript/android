@@ -507,7 +507,6 @@ public class JsDebugger
 	{
 		logger.write("Disabling NativeScript Debugger Agent");
 		disable();
-		jsDebuggerEnabled = true;
 		
 		String message = "{\"seq\":0,\"type\":\"request\",\"command\":\"disconnect\"}";
 		
