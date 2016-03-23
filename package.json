@@ -13,5 +13,6 @@
     "grunt-mkdir": "0.1.2",
     "grunt-replace": "0.7.9",
     "node-fs" : "0.1.7" 
-  }
+  },
+  "homepage": "https://github.com/NativeScript/android-runtime/#readme"
 }
