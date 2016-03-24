@@ -580,12 +580,10 @@ public class JsDebugger
 		
 		registerEnableDisableDebuggerReceiver(handler);
 		
-		logger.write("Enabling Debugger Agent");
-		enable();
-
 		boolean shouldDebugBrake = getDebugBreakFlagAndClearIt();
 		if (shouldDebugBrake)
 		{
+			enableAgent();
 			debugBreak();
 		}
 	}
