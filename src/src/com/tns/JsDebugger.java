@@ -583,8 +583,8 @@ public class JsDebugger
 		logger.write("Enabling Debugger Agent");
 		enable();
 
-		boolean shouldDebugBrake = getDebugBreakFlagAndClearIt();
-		if (shouldDebugBrake)
+		boolean shouldDebugBreak = getDebugBreakFlagAndClearIt();
+		if (shouldDebugBreak)
 		{
 			debugBreak();
 		}
