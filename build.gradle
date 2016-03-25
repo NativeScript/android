@@ -258,6 +258,11 @@ task revertPackageJson (type: Exec) {
 	}
 }
 
+task copyReadme (type: Copy) {
+	from "README.md"
+	into "$rootDir/dist"
+}
+
 //clean and set up dirs
 createDistDir.dependsOn(cleanDistDir)
 
@@ -283,8 +288,10 @@ copyGeneratedRuntime.dependsOn(generateRuntime)
 generateMetadataGeneratorJar.dependsOn(copyGeneratedRuntime)
 copyGeneratedMetadataGeneratorJar.dependsOn(generateMetadataGeneratorJar)
 
+copyReadme.dependsOn(copyGeneratedMetadataGeneratorJar)
+
 //pack runtime
-packFramework.dependsOn(copyGeneratedMetadataGeneratorJar)
+packFramework.dependsOn(copyReadme)
 task packar {
 	dependsOn packFramework
 }
