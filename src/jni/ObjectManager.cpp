@@ -335,7 +335,7 @@ void ObjectManager::JSObjectWeakCallback(Isolate *isolate, ObjectWeakCallbackSta
 			}
 			else
 			{
-				m_implObjStrong.push_back(PersistentObjectIdPair(po, javaObjectID));
+				m_implObjStrong.insert(make_pair(javaObjectID, po));
 				jsInstanceInfo->IsJavaObjectWeak = true;
 			}
 		}
@@ -495,6 +495,12 @@ void ObjectManager::MarkReachableObjects(Isolate *isolate, const Local<Object>& 
 		auto jsInfo = GetJSInstanceInfo(o);
 		if (jsInfo != nullptr)
 		{
+			auto hasImplObject = HasImplObject(isolate, o);
+			if (hasImplObject)
+			{
+				jsInfo->IsJavaObjectWeak = false;
+				m_implObjStrong[jsInfo->JavaObjectID] = nullptr;
+			}
 			o->SetHiddenValue(propName, curGCNumValue);
 		}
 
@@ -628,9 +634,9 @@ void ObjectManager::OnGcFinished(GCType type, GCCallbackFlags flags)
 		auto obj = Local<Object>::New(isolate, *weakObj.po);
 		MarkReachableObjects(isolate, obj);
 	}
-	for (auto strongObj : m_implObjStrong)
+	for (const auto& kv : m_implObjStrong)
 	{
-		auto obj = Local<Object>::New(isolate, *strongObj.po);
+		auto obj = Local<Object>::New(isolate, *kv.second);
 		MarkReachableObjects(isolate, obj);
 	}
 
@@ -681,24 +687,27 @@ void ObjectManager::MakeRegularObjectsWeak(const set<int>& instances, DirectBuff
 	inputBuff.Reset();
 }
 
-void ObjectManager::MakeImplObjectsWeak(const vector<PersistentObjectIdPair>& instances, DirectBuffer& inputBuff)
+void ObjectManager::MakeImplObjectsWeak(const map<int, Persistent<Object>*>& instances, DirectBuffer& inputBuff)
 {
 	jboolean keepAsWeak = JNI_TRUE;
 
-	for (const auto& poIdPair : instances)
+	for (const auto& kv : instances)
 	{
-		int javaObjectId = poIdPair.javaObjectId;
-
-		bool success = inputBuff.Write(javaObjectId);
-
-		if (!success)
+		if (kv.second != nullptr)
 		{
-			int length = inputBuff.Length();
-			jboolean keepAsWeak = JNI_TRUE;
-			m_env.CallStaticVoidMethod(PlatformClass, MAKE_INSTANCE_WEAK_BATCH_METHOD_ID, (jobject) inputBuff, length, keepAsWeak);
-			inputBuff.Reset();
-			success = inputBuff.Write(javaObjectId);
-			assert(success);
+			int javaObjectId = kv.first;
+
+			bool success = inputBuff.Write(javaObjectId);
+
+			if (!success)
+			{
+				int length = inputBuff.Length();
+				jboolean keepAsWeak = JNI_TRUE;
+				m_env.CallStaticVoidMethod(PlatformClass, MAKE_INSTANCE_WEAK_BATCH_METHOD_ID, (jobject) inputBuff, length, keepAsWeak);
+				inputBuff.Reset();
+				success = inputBuff.Write(javaObjectId);
+				assert(success);
+			}
 		}
 	}
 	int size = inputBuff.Size();
