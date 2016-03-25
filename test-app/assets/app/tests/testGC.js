@@ -241,4 +241,27 @@ describe("Tests garbage collection", function () {
 
 		expect(o.x).toBe(123);
 	});
+
+	it("should keep extended instances alive after GC", function () {
+		var C1 = com.tns.tests.Class1.extend({});
+
+		function createObjects(name) {
+			var c1 = new C1();
+
+			var cb1 = new com.tns.tests.Class1.Callback1(name, {
+				getMessage: function() {
+					var msg = c1.getMessage();
+					return msg;
+				}
+			});
+
+			return com.tns.tests.Class1.Class2.printMessageWithDelay(cb1, 5 * 1000);
+		}
+
+		expect(createObjects("Callback452356")).toBe(true);
+		expect(createObjects("Callback417892")).toBe(true);
+
+		gc();
+		java.lang.System.gc();
+	});
 });

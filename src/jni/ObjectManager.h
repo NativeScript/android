@@ -135,7 +135,7 @@ namespace tns
 
 			void MakeRegularObjectsWeak(const std::set<int>& instances, DirectBuffer& inputBuff);
 
-			void MakeImplObjectsWeak(const std::vector<PersistentObjectIdPair>& instances, DirectBuffer& inputBuff);
+			void MakeImplObjectsWeak(const std::map<int, v8::Persistent<v8::Object>*>& instances, DirectBuffer& inputBuff);
 
 			void CheckWeakObjectsAreAlive(const std::vector<PersistentObjectIdPair>& instances, DirectBuffer& inputBuff, DirectBuffer& outputBuff);
 
@@ -183,7 +183,7 @@ namespace tns
 
 			std::set<v8::Persistent<v8::Object>*> m_visitedPOs;
 			std::vector<PersistentObjectIdPair> m_implObjWeak;
-			std::vector<PersistentObjectIdPair> m_implObjStrong;
+			std::map<int, v8::Persistent<v8::Object>*> m_implObjStrong;
 
 			volatile int m_currentObjectId;
 
