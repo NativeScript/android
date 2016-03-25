@@ -636,8 +636,12 @@ void ObjectManager::OnGcFinished(GCType type, GCCallbackFlags flags)
 	}
 	for (const auto& kv : m_implObjStrong)
 	{
-		auto obj = Local<Object>::New(isolate, *kv.second);
-		MarkReachableObjects(isolate, obj);
+		Persistent<Object> *po = kv.second;
+		if (po != nullptr)
+		{
+			auto obj = Local<Object>::New(isolate, *po);
+			MarkReachableObjects(isolate, obj);
+		}
 	}
 
 	ReleaseRegularObjects();
