@@ -174,11 +174,8 @@ public class Platform
 
 	public static void runModule(File jsFile) throws NativeScriptException
 	{
-		if (jsFile.exists() && jsFile.isFile())
-		{
-			String filePath = jsFile.getAbsolutePath();
-			runModule(filePath);
-		}
+		String filePath = jsFile.getPath();
+		runModule(filePath);
 	}
 
 	public static Object runScript(File jsFile) throws NativeScriptException
@@ -357,7 +354,7 @@ public class Platform
 			JavaScriptImplementation jsImpl = clazz.getAnnotation(JavaScriptImplementation.class);
 			if (jsImpl != null)
 			{
-				File jsFile = new File(Module.getApplicationFilesPath(), jsImpl.javaScriptFile());
+				File jsFile = new File(jsImpl.javaScriptFile());
 				runModule(jsFile);
 			}
 			loadedJavaScriptExtends.put(clazz, jsImpl);

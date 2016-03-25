@@ -145,7 +145,7 @@ void Module::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 
 		auto isData = false;
 
-		auto moduleObj = Load(modulePath, isData);
+		auto moduleObj = LoadImpl(modulePath, isData);
 
 		if (isData)
 		{
@@ -185,7 +185,17 @@ void Module::RequireNativeCallback(const v8::FunctionCallbackInfo<v8::Value>& ar
 	funcPtr(args);
 }
 
-Local<Object> Module::Load(const string& path, bool& isData)
+void Module::Load(const string& path)
+{
+	auto isolate = Isolate::GetCurrent();
+	auto context = isolate->GetCurrentContext();
+	auto globalObject = context->Global();
+	auto require = globalObject->Get(context, ConvertToV8String("require")).ToLocalChecked().As<Function>();
+	Local<Value> args[] = { ConvertToV8String(path) };
+	require->Call(context, globalObject, 1, args);
+}
+
+Local<Object> Module::LoadImpl(const string& path, bool& isData)
 {
 	Local<Object> result;
 
