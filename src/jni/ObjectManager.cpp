@@ -16,6 +16,7 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
+
 ObjectManager::ObjectManager()
 :
 		m_env(JEnv()), m_numberOfGC(0), m_currentObjectId(0), m_cache(NewWeakGlobalRefCallback, DeleteWeakGlobalRefCallback, 1000, this)
@@ -452,6 +453,8 @@ void ObjectManager::MarkReachableObjects(Isolate *isolate, const Local<Object>& 
 	assert(!m_markedForGC.empty());
 	auto& topGCInfo = m_markedForGC.top();
 	int numberOfGC = topGCInfo.numberOfGC;
+	auto fromJsInfo = GetJSInstanceInfo(obj);
+	auto fromId = fromJsInfo->JavaObjectID;
 
 	auto curGCNumValue = Integer::New(isolate, numberOfGC);
 
@@ -466,6 +469,18 @@ void ObjectManager::MarkReachableObjects(Isolate *isolate, const Local<Object>& 
 		}
 
 		auto o = top.As<Object>();
+
+		auto jsInfo = GetJSInstanceInfo(o);
+		if ((jsInfo != nullptr) && (jsInfo->JavaObjectID != fromId))
+		{
+			auto hasImplObject = HasImplObject(isolate, o);
+			if (hasImplObject)
+			{
+				jsInfo->IsJavaObjectWeak = false;
+				m_implObjStrong[jsInfo->JavaObjectID] = nullptr;
+			}
+			o->SetHiddenValue(propName, curGCNumValue);
+		}
 
 		uint8_t *addr = NativeScriptExtension::GetAddress(o);
 		auto itFound = m_visited.find(addr);
@@ -490,18 +505,6 @@ void ObjectManager::MarkReachableObjects(Isolate *isolate, const Local<Object>& 
 				}
 			}
 			NativeScriptExtension::ReleaseClosureObjects(closureObjects);
-		}
-
-		auto jsInfo = GetJSInstanceInfo(o);
-		if (jsInfo != nullptr)
-		{
-			auto hasImplObject = HasImplObject(isolate, o);
-			if (hasImplObject)
-			{
-				jsInfo->IsJavaObjectWeak = false;
-				m_implObjStrong[jsInfo->JavaObjectID] = nullptr;
-			}
-			o->SetHiddenValue(propName, curGCNumValue);
 		}
 
 		auto proto = o->GetPrototype();
