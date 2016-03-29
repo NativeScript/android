@@ -46,7 +46,7 @@ public class RuntimeHelper
 	{
 		System.loadLibrary("NativeScript");
 		
-		Logger logger = new LogcatLogger(false, app);
+		Logger logger = new LogcatLogger(true, app);
 		
 		boolean showErrorIntent = hasErrorIntent();
 		if (!showErrorIntent)
