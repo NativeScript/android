@@ -395,6 +395,7 @@ public class Platform
 			if (clazz == null)
 			{
 				clazz = Class.forName(className);
+				classCache.put(className, clazz);
 			}
 		}
 
@@ -750,13 +751,29 @@ public class Platform
 
 		return packagedArgs;
 	}
+	
+	static Class<?> getClassForName(String className) throws ClassNotFoundException {
+		Class<?> clazz = classCache.get(className);
+		if (clazz == null)
+		{
+			clazz = Class.forName(className);
+			if (clazz != null) {
+				classCache.put(className, clazz);
+			}
+		}
+		
+		return clazz;
+	}
 
 	@RuntimeCallable
 	private static String resolveMethodOverload(String className, String methodName, Object[] args) throws Exception
 	{
 		if (logger.isEnabled())
 			logger.write("resolveMethodOverload: Resolving method " + methodName + " on class " + className);
-		String res = MethodResolver.resolveMethodOverload(classCache, className, methodName, args);
+		
+		Class<?> clazz = getClassForName(className);
+		
+		String res = MethodResolver.resolveMethodOverload(clazz, methodName, args);
 		if (logger.isEnabled())
 			logger.write("resolveMethodOverload: method found :" + res);
 		if (res == null)
@@ -902,7 +919,7 @@ public class Platform
 	@RuntimeCallable
 	private static Object createArrayHelper(String arrayClassName, int size) throws ClassNotFoundException
 	{
-		Class<?> clazz = Class.forName(arrayClassName);
+		Class<?> clazz = getClassForName(arrayClassName);
 		
 		Object arr = Array.newInstance(clazz, size);
 		
