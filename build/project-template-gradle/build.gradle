@@ -41,7 +41,8 @@ def libDir = "$projectDir/../../lib/Android/"
 def pluginNames = new ArrayList<String>()
 def configDir = file(configurationsDir)
 def appResExists = false
-def appResourcesName = "NativescriptAppResources"
+def appResourcesName = "NativescriptAppResources
+def shouldRunBindingGenerator = project.hasProperty("runSBGenerator")
 
 def compiteCompileSdkVersion () {
 	if(project.hasProperty("compileSdk")) {
@@ -136,7 +137,15 @@ android {
 		def variantName = variant.name.capitalize()
 		def compileSourcesTaskName = "compile${variantName}Sources"
 		def compileSourcesTask = project.tasks.findByName(compileSourcesTaskName)
-		compileSourcesTask.finalizedBy "buildMetadata"
+		
+		def generateBuildConfigTask = variant.generateBuildConfig;
+		generateBuildConfigTask.finalizedBy(collectAllJars)
+		
+		if(shouldRunBindingGenerator) {
+			collectAllJars.finalizedBy(setProperties)
+		}
+		
+		compileSourcesTask.finalizedBy(buildMetadata)
 	}
 }
 
@@ -461,14 +470,14 @@ task deleteExplodedAarFolder (type: Delete) {
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////// OPTIONAL TASKS //////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
-task runBindingGenerator(dependsOn: "ing:jar") {
-	rootProject.jarsDir = allJarPaths
-}
-runBindingGenerator.dependsOn("bg:jar")
+task setProperties {
+	project.ext.jarFiles = []
+	doLast {
+		project.jarFiles = allJarPaths
+	}
+} 
 
-task rbg (dependsOn: "asbg:generatebindings")
-
-
+setProperties.finalizedBy("asbg:generateBindings")
 
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////// EXECUTION ORDER /////////////////////////////////////
