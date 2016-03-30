@@ -192,7 +192,12 @@ void Module::Load(const string& path)
 	auto globalObject = context->Global();
 	auto require = globalObject->Get(context, ConvertToV8String("require")).ToLocalChecked().As<Function>();
 	Local<Value> args[] = { ConvertToV8String(path) };
+	TryCatch tc;
 	require->Call(context, globalObject, 1, args);
+	if (tc.HasCaught())
+	{
+		throw NativeScriptException(tc, "Fail to load module: " + path);
+	}
 }
 
 Local<Object> Module::LoadImpl(const string& path, bool& isData)
