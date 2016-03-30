@@ -40,8 +40,6 @@ def nodeModulesDir = "../../node_modules/"
 def libDir = "$projectDir/../../lib/Android/"
 def pluginNames = new ArrayList<String>()
 def configDir = file(configurationsDir)
-def appResExists = false
-def appResourcesName = "NativescriptAppResources
 def shouldRunBindingGenerator = project.hasProperty("runSBGenerator")
 
 def compiteCompileSdkVersion () {
