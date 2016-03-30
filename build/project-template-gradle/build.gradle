@@ -372,7 +372,25 @@ task collectAllJars {
 		for(def i = 0; i < allJarPaths.size(); i++) {
 			metadataParams.add(allJarPaths.get(i));
 		}
+	}
+}
 
+
+task buildMetadata (type: JavaExec) {
+	description "builds metadata with provided jar dependencies"
+
+	inputs.files(allJarPaths)
+	inputs.dir("build/intermediates/classes")
+
+	outputs.files("metadata/output/assets/metadata/treeNodeStream.dat", "metadata/output/assets/metadata/treeStringsStream.dat", "metadata/output/assets/metadata/treeValueStream.dat")
+
+	doFirst {
+		workingDir "build-tools"
+
+		main "-jar"
+
+		// get compiled classes to pass to metadata generator
+		// these need to be called after the classes have compiled
 		def classesDir = "$buildDir/intermediates/classes"
 
 		def classesSubDirs = new File(classesDir).listFiles()
@@ -411,13 +429,13 @@ task buildMetadata (type: JavaExec) {
 
 		args metadataParams.toArray()
 	}
-	
+
 	doLast {
 		copy {
 			from "$projectDir/metadata/output/assets/metadata"
 			into "$projectDir/src/main/assets/metadata"
 		}
-		
+
 		def files = new File("${buildDir}/intermediates/res").listFiles()
 		def tmpResourceAPK = null
 		for (File f: files) {
@@ -427,24 +445,24 @@ task buildMetadata (type: JavaExec) {
 				break;
 			}
 		}
-		
+
 		def aaptCommand = "${android.getSdkDirectory().getAbsolutePath()}/build-tools/${android.buildToolsVersion}/aapt"
 		if (isWinOs) {
 			aaptCommand += ".exe"
 		}
-		
+
 		def tmpAPKPath = tmpResourceAPK.getPath()
-		
+
 		def removeCmdParams = new ArrayList<String>([aaptCommand, "remove", tmpAPKPath, "assets/metadata/treeNodeStream.dat", "assets/metadata/treeStringsStream.dat", "assets/metadata/treeValueStream.dat"])
-		
+
 		exec {
 			ignoreExitValue true
 			workingDir "$projectDir/metadata/output"
 			commandLine removeCmdParams.toArray()
 		}
-		
+
 		def addCmdParams = new ArrayList<String>([aaptCommand, "add", tmpAPKPath, "assets/metadata/treeNodeStream.dat", "assets/metadata/treeStringsStream.dat", "assets/metadata/treeValueStream.dat"])
-		
+
 		exec {
 			workingDir "$projectDir/metadata/output"
 			commandLine addCmdParams.toArray()
