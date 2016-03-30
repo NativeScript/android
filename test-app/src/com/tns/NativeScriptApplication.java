@@ -2,7 +2,7 @@ package com.tns;
 
 import android.app.Application;
 
-@JavaScriptImplementation(javaScriptFile = "app/MyApp.js")
+@JavaScriptImplementation(javaScriptFile = "./MyApp.js")
 public class NativeScriptApplication extends android.app.Application implements com.tns.NativeScriptHashCodeProvider {
 
     private static NativeScriptApplication thiz;

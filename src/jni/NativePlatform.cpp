@@ -88,12 +88,7 @@ void NativePlatform::RunModule(JNIEnv *_env, jobject obj, jstring scriptFile)
 	JEnv env(_env);
 
 	string filePath = ArgConverter::jstringToString(scriptFile);
-
-	bool isData = false;
-
-	auto moduleObj = Module::Load(filePath, isData);
-
-	assert(!isData);
+	Module::Load(filePath);
 }
 
 jobject NativePlatform::RunScript(JNIEnv *_env, jobject obj, jstring scriptFile)

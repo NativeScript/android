@@ -3,7 +3,7 @@
  */
 package com.tns;
 
-@JavaScriptImplementation(javaScriptFile = "app/MyActivity.js")
+@JavaScriptImplementation(javaScriptFile = "./MyActivity.js")
 public class NativeScriptActivity extends android.app.Activity
 {
 	public NativeScriptActivity()

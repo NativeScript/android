@@ -1,6 +1,6 @@
 package com.tns;
 
-@JavaScriptImplementation(javaScriptFile = "app/tns_modules/ui/frame/frame.js")
+@JavaScriptImplementation(javaScriptFile = "ui/frame")
 public class NativeScriptActivity extends android.app.Activity implements com.tns.NativeScriptHashCodeProvider {
 
     public NativeScriptActivity()
