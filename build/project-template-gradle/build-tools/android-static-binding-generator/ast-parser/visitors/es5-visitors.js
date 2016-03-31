@@ -4,11 +4,11 @@ var es5_visitors = (function () {
 
 		defaultExtendDecoratorName = "JavaProxy",
 		columnOffset = 1,
-		TYPESCRIPT_EXTEND_STRING = "_frnal_prepareExtend_l62_c37__";
 		FILE_SEPARATOR = "_f",
 		LINE_SEPARATOR = "_l",
 		COLUMN_SEPARATOR = "_c",
 		DECLARED_CLASS_SEPARATOR = "__",
+		TYPESCRIPT_EXTEND_STRING = FILE_SEPARATOR + "rnal_ts_helpers_l47_c38",
 		customExtendsArr = [],
 		normalExtendsArr = [],
 		interfacesArr = [];
@@ -113,7 +113,7 @@ var es5_visitors = (function () {
 
 		var isDecorated = traverseToFindDecorate(path, config, extendClass, overriddenMethodNames);
 		if(!isDecorated) {
-			var lineToWrite = _generateLineToWrite("", extendClass, overriddenMethodNames, TYPESCRIPT_EXTEND_STRING + declaredClassName, "");
+			var lineToWrite = _generateLineToWrite("", extendClass, overriddenMethodNames, TYPESCRIPT_EXTEND_STRING + DECLARED_CLASS_SEPARATOR + declaredClassName, "");
 			if(config.logger) {
 				config.logger.info(lineToWrite)
 			}
