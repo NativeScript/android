@@ -147,11 +147,6 @@ task copyGradleTemplate (type: Copy) {
 	into "$rootDir/dist/framework"
 }
 
-task copyInternalFolder (type: Copy) {
-	from "$rootDir/src/assets/internal"
-	into "$rootDir/dist/framework/src/main/assets/internal"
-}
-
 task copyPackageJson (type: Copy) {
 	from "$rootDir/package.json"
 	into "$rootDir/dist"
@@ -270,8 +265,7 @@ createDistDir.dependsOn(cleanDistDir)
 //copy framework structure
 // cloneSBgeneratorInTemplate.dependsOn(copyLatestWidgetsJar)
 copyGradleTemplate.dependsOn(createDistDir)
-copyInternalFolder.dependsOn(copyGradleTemplate)
-fixVersion.dependsOn(copyInternalFolder)
+fixVersion.dependsOn(copyGradleTemplate)
 copyPackageJson.dependsOn(fixVersion)
 revertPackageJson.dependsOn(copyPackageJson)
 
