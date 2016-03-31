@@ -216,7 +216,7 @@ public class DexFactory
 			classToProxyFile += "-" + this.dexThumb;
 		}
 
-		String dexFilePath = dexDir + classToProxyFile + ".dex";
+		String dexFilePath = dexDir + "/" + classToProxyFile + ".dex";
 		File dexFile = new File(dexFilePath);
 		if (dexFile.exists())
 		{

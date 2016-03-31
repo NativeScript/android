@@ -33,7 +33,7 @@ class ClassResolver
 
 		if (clazz == null)
 		{
-			clazz = Class.forName(className);
+			clazz = Platform.getClassForName(className);
 		}
 
 		return clazz;
