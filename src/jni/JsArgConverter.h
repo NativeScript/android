@@ -56,6 +56,8 @@ namespace tns
 
 			JEnv m_env;
 
+			v8::Isolate *m_isolate;
+
 			int m_argsLen;
 
 			bool m_isValid;

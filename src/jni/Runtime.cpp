@@ -1,4 +1,4 @@
-#include "NativeScriptRuntime.h"
+#include "CallbackHandlers.h"
 #include "MetadataNode.h"
 #include "JniLocalRef.h"
 #include "JsArgConverter.h"
@@ -22,7 +22,7 @@
 #include "JType.h"
 #include "Module.h"
 #include "NativeScriptException.h"
-#include "NativePlatform.h"
+#include "Runtime.h"
 #include "ArrayHelper.h"
 #include <sstream>
 #include <android/log.h>
@@ -33,57 +33,118 @@ using namespace std;
 using namespace tns;
 
 //TODO: Lubo: properly release this jni global ref on shutdown
-JavaVM *g_jvm = nullptr;
+
 Persistent<Context> *PrimaryContext = nullptr;
 Context::Scope *context_scope = nullptr;
-ObjectManager *g_objectManager = nullptr;
 bool tns::LogEnabled = true;
-int count = 0;
 SimpleAllocator g_allocator;
 
-void NativePlatform::Init(JavaVM *vm, void *reserved)
+void Runtime::Init(JavaVM *vm, void *reserved)
 {
 	__android_log_print(ANDROID_LOG_INFO, "TNS.Native", "NativeScript Runtime Version %s, commit %s", NATIVE_SCRIPT_RUNTIME_VERSION, NATIVE_SCRIPT_RUNTIME_COMMIT_SHA);
 	DEBUG_WRITE("JNI_ONLoad");
 
-	if (g_jvm == nullptr)
+	if (Runtime::s_jvm == nullptr)
 	{
-		g_jvm = vm;
+		s_jvm = vm;
 
-		JEnv::Init(g_jvm);
-
-		g_objectManager = new ObjectManager();
+		JEnv::Init(s_jvm);
 	}
 
 	DEBUG_WRITE("JNI_ONLoad END");
 }
 
-Isolate* NativePlatform::InitNativeScript(JNIEnv *_env, jobject obj, jstring filesPath, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jobject jsDebugger)
+Runtime::Runtime(JNIEnv *env, jobject runtime, int id)
+	: m_env(env), m_id(id), m_isolate(nullptr)
 {
-	tns::LogEnabled = verboseLoggingEnabled;
+	m_runtime = m_env.NewGlobalRef(runtime);
+	m_objectManager = new ObjectManager(m_runtime);
+	s_id2RuntimeCache.insert(make_pair(id, this));
+}
 
-	JEnv env(_env);
+Runtime* Runtime::GetRuntime(int runtimeId)
+{
+	auto itFound = s_id2RuntimeCache.find(runtimeId);
+	auto runtime = (itFound != s_id2RuntimeCache.end())
+			? itFound->second
+			: nullptr;
+
+	if (runtime == nullptr)
+	{
+		stringstream ss;
+		ss << "Cannot find runtime for id:" << runtimeId;
+		throw NativeScriptException(ss.str());
+	}
+
+	return runtime;
+}
+
+Runtime* Runtime::GetRuntime(v8::Isolate *isolate)
+{
+	auto itFound = s_isolate2RuntimesCache.find(isolate);
+	auto runtime = (itFound != s_isolate2RuntimesCache.end())
+			? itFound->second
+			: nullptr;
+
+	if (runtime == nullptr)
+	{
+		stringstream ss;
+		ss << "Cannot find runtime for isolate: " << isolate;
+		throw NativeScriptException(ss.str());
+	}
+
+	return runtime;
+}
+
+Isolate* Runtime::GetIsolate() const
+{
+	return m_isolate;
+}
+
+jobject Runtime::GetJavaRuntime() const
+{
+	return m_runtime;
+}
+
+ObjectManager* Runtime::GetObjectManager() const
+{
+	return m_objectManager;
+}
+
+void Runtime::Init(JNIEnv *_env, jobject obj, int runtimeId, jstring filesPath, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jobject jsDebugger)
+{
+	auto runtime = new Runtime(_env, obj, runtimeId);
+
+	auto enableLog = verboseLoggingEnabled == JNI_TRUE;
+
+	runtime->Init(filesPath, enableLog, packageName, args, jsDebugger);
+}
+
+void Runtime::Init(jstring filesPath, bool verboseLoggingEnabled, jstring packageName, jobjectArray args, jobject jsDebugger)
+{
+	m_logEnabled = verboseLoggingEnabled;
 
 	auto filesRoot = ArgConverter::jstringToString(filesPath);
 	Constants::APP_ROOT_FOLDER_PATH = filesRoot + "/app/";
 	// read config options passed from Java
-	JniLocalRef v8Flags(env.GetObjectArrayElement(args, 0));
+	JniLocalRef v8Flags(m_env.GetObjectArrayElement(args, 0));
 	Constants::V8_STARTUP_FLAGS = ArgConverter::jstringToString(v8Flags);
-	JniLocalRef cacheCode(env.GetObjectArrayElement(args, 1));
+	JniLocalRef cacheCode(m_env.GetObjectArrayElement(args, 1));
 	Constants::V8_CACHE_COMPILED_CODE = (bool) cacheCode;
-	JniLocalRef snapshot(env.GetObjectArrayElement(args, 2));
+	JniLocalRef snapshot(m_env.GetObjectArrayElement(args, 2));
 	Constants::V8_HEAP_SNAPSHOT = (bool)snapshot;
-	JniLocalRef snapshotScript(env.GetObjectArrayElement(args, 3));
+	JniLocalRef snapshotScript(m_env.GetObjectArrayElement(args, 3));
 	Constants::V8_HEAP_SNAPSHOT_SCRIPT = ArgConverter::jstringToString(snapshotScript);
 
 	DEBUG_WRITE("Initializing Telerik NativeScript");
 
-	NativeScriptException::Init(g_jvm, g_objectManager);
-	s_isolate = PrepareV8Runtime(env, filesRoot, packageName, jsDebugger);
-	return s_isolate;
+	NativeScriptException::Init(m_objectManager);
+	m_isolate = PrepareV8Runtime(filesRoot, packageName, jsDebugger);
+
+	s_isolate2RuntimesCache.insert(make_pair(m_isolate, this));
 }
 
-void NativePlatform::RunModule(JNIEnv *_env, jobject obj, jstring scriptFile)
+void Runtime::RunModule(JNIEnv *_env, jobject obj, jstring scriptFile)
 {
 	JEnv env(_env);
 
@@ -91,12 +152,12 @@ void NativePlatform::RunModule(JNIEnv *_env, jobject obj, jstring scriptFile)
 	Module::Load(filePath);
 }
 
-jobject NativePlatform::RunScript(JNIEnv *_env, jobject obj, jstring scriptFile)
+jobject Runtime::RunScript(JNIEnv *_env, jobject obj, jstring scriptFile)
 {
 	JEnv env(_env);
 	jobject res = nullptr;
 
-	auto isolate = s_isolate;
+	auto isolate = m_isolate;
 	auto context = isolate->GetCurrentContext();
 
 	auto filename = ArgConverter::jstringToString(scriptFile);
@@ -140,17 +201,17 @@ jobject NativePlatform::RunScript(JNIEnv *_env, jobject obj, jstring scriptFile)
 	return res;
 }
 
-jobject NativePlatform::CallJSMethodNative(JNIEnv *_env, jobject obj, jint javaObjectID, jstring methodName, jint retType, jboolean isConstructor, jobjectArray packagedArgs)
+jobject Runtime::CallJSMethodNative(JNIEnv *_env, jobject obj, jint javaObjectID, jstring methodName, jint retType, jboolean isConstructor, jobjectArray packagedArgs)
 {
 	SET_PROFILER_FRAME();
 
-	auto isolate = s_isolate;
+	auto isolate = m_isolate;
 
 	JEnv env(_env);
 
 	DEBUG_WRITE("CallJSMethodNative called javaObjectID=%d", javaObjectID);
 
-	auto jsObject = g_objectManager->GetJsObjectByJavaObject(javaObjectID);
+	auto jsObject = m_objectManager->GetJsObjectByJavaObject(javaObjectID);
 	if (jsObject.IsEmpty())
 	{
 		stringstream ss;
@@ -164,26 +225,26 @@ jobject NativePlatform::CallJSMethodNative(JNIEnv *_env, jobject obj, jint javaO
 	{
 		DEBUG_WRITE("CallJSMethodNative: Updating linked instance with its real class");
 		jclass instanceClass = env.GetObjectClass(obj);
-		g_objectManager->SetJavaClass(jsObject, instanceClass);
+		m_objectManager->SetJavaClass(jsObject, instanceClass);
 	}
 
 	DEBUG_WRITE("CallJSMethodNative called jsObject=%d", jsObject->GetIdentityHash());
 
 	string method_name = ArgConverter::jstringToString(methodName);
-	auto jsResult = NativeScriptRuntime::CallJSMethod(env, jsObject, method_name, packagedArgs);
+	auto jsResult = CallbackHandlers::CallJSMethod(m_isolate, env, jsObject, method_name, packagedArgs);
 
 	int classReturnType = retType;
 	jobject javaObject = ConvertJsValueToJavaObject(env, jsResult, classReturnType);
 	return javaObject;
 }
 
-void NativePlatform::CreateJSInstanceNative(JNIEnv *_env, jobject obj, jobject javaObject, jint javaObjectID, jstring className)
+void Runtime::CreateJSInstanceNative(JNIEnv *_env, jobject obj, jobject javaObject, jint javaObjectID, jstring className)
 {
 	SET_PROFILER_FRAME();
 
 	DEBUG_WRITE("createJSInstanceNative called");
 
-	auto isolate = s_isolate;
+	auto isolate = m_isolate;
 
 	JEnv env(_env);
 
@@ -195,9 +256,9 @@ void NativePlatform::CreateJSInstanceNative(JNIEnv *_env, jobject obj, jobject j
 	Local<Object> jsInstance;
 	Local<Object> implementationObject;
 
-	auto proxyClassName = g_objectManager->GetClassName(javaObject);
+	auto proxyClassName = m_objectManager->GetClassName(javaObject);
 	DEBUG_WRITE("createJSInstanceNative class %s", proxyClassName.c_str());
-	jsInstance = MetadataNode::CreateExtendedJSWrapper(isolate, proxyClassName);
+	jsInstance = MetadataNode::CreateExtendedJSWrapper(isolate, m_objectManager, proxyClassName);
 	if (jsInstance.IsEmpty())
 	{
 		throw NativeScriptException(string("NativeScript application not initialized correctly. Cannot create extended JS wrapper."));
@@ -212,38 +273,38 @@ void NativePlatform::CreateJSInstanceNative(JNIEnv *_env, jobject obj, jobject j
 	DEBUG_WRITE("createJSInstanceNative: implementationObject :%d", implementationObject->GetIdentityHash());
 
 	jclass clazz = env.FindClass(jniName);
-	g_objectManager->Link(jsInstance, javaObjectID, clazz);
+	m_objectManager->Link(jsInstance, javaObjectID, clazz);
 }
 
-jint NativePlatform::GenerateNewObjectId(JNIEnv *env, jobject obj)
+jint Runtime::GenerateNewObjectId(JNIEnv *env, jobject obj)
 {
-	int objectId = g_objectManager->GenerateNewObjectID();
+	int objectId = m_objectManager->GenerateNewObjectID();
 
 	return objectId;
 }
 
-void NativePlatform::AdjustAmountOfExternalAllocatedMemoryNative(JNIEnv *env, jobject obj, jlong usedMemory)
+void Runtime::AdjustAmountOfExternalAllocatedMemoryNative(JNIEnv *env, jobject obj, jlong usedMemory)
 {
 	Isolate::GetCurrent()->AdjustAmountOfExternalAllocatedMemory(usedMemory);
 }
 
-void NativePlatform::PassUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, jthrowable exception, jstring stackTrace)
+void Runtime::PassUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, jthrowable exception, jstring stackTrace)
 {
-	auto isolate = s_isolate;
+	auto isolate = m_isolate;
 
 	//create error message
 	string errMsg = "The application crashed because of an uncaught exception. You can look at \"stackTrace\" or \"nativeException\" for more detailed information about the exception.";
 	auto errObj = Exception::Error(ConvertToV8String(errMsg)).As<Object>();
 
 	//create a new native exception js object
-	jint javaObjectID = g_objectManager->GetOrCreateObjectId((jobject) exception);
-	auto nativeExceptionObject = g_objectManager->GetJsObjectByJavaObject(javaObjectID);
+	jint javaObjectID = m_objectManager->GetOrCreateObjectId((jobject) exception);
+	auto nativeExceptionObject = m_objectManager->GetJsObjectByJavaObject(javaObjectID);
 
 	if (nativeExceptionObject.IsEmpty())
 	{
-		string className = g_objectManager->GetClassName((jobject) exception);
+		string className = m_objectManager->GetClassName((jobject) exception);
 		//create proxy object that wraps the java err
-		nativeExceptionObject = g_objectManager->CreateJSWrapper(javaObjectID, className);
+		nativeExceptionObject = m_objectManager->CreateJSWrapper(javaObjectID, className);
 		if (nativeExceptionObject.IsEmpty())
 		{
 			nativeExceptionObject = Object::New(isolate);
@@ -274,9 +335,9 @@ void NativePlatform::PassUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, j
 	}
 }
 
-Isolate* NativePlatform::PrepareV8Runtime(JEnv& env, const string& filesPath, jstring packageName, jobject jsDebugger)
+Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName, jobject jsDebugger)
 {
-	Platform* platform = v8::platform::CreateDefaultPlatform();
+	auto platform = v8::platform::CreateDefaultPlatform();
 	V8::InitializePlatform(platform);
 	V8::Initialize();
 
@@ -328,20 +389,20 @@ Isolate* NativePlatform::PrepareV8Runtime(JEnv& env, const string& filesPath, js
 	globalTemplate->Set(ConvertToV8String("__startCPUProfiler"), FunctionTemplate::New(isolate, Profiler::StartCPUProfilerCallback));
 	globalTemplate->Set(ConvertToV8String("__stopCPUProfiler"), FunctionTemplate::New(isolate, Profiler::StopCPUProfilerCallback));
 	globalTemplate->Set(ConvertToV8String("__heapSnapshot"), FunctionTemplate::New(isolate, Profiler::HeapSnapshotMethodCallback));
-	globalTemplate->Set(ConvertToV8String("__log"), FunctionTemplate::New(isolate, NativeScriptRuntime::LogMethodCallback));
-	globalTemplate->Set(ConvertToV8String("__dumpReferenceTables"), FunctionTemplate::New(isolate, NativeScriptRuntime::DumpReferenceTablesMethodCallback));
+	globalTemplate->Set(ConvertToV8String("__log"), FunctionTemplate::New(isolate, CallbackHandlers::LogMethodCallback));
+	globalTemplate->Set(ConvertToV8String("__dumpReferenceTables"), FunctionTemplate::New(isolate, CallbackHandlers::DumpReferenceTablesMethodCallback));
 	globalTemplate->Set(ConvertToV8String("__debugbreak"), FunctionTemplate::New(isolate, JsDebugger::DebugBreakCallback));
 	globalTemplate->Set(ConvertToV8String("__consoleMessage"), FunctionTemplate::New(isolate, JsDebugger::ConsoleMessageCallback));
-	globalTemplate->Set(ConvertToV8String("__enableVerboseLogging"), FunctionTemplate::New(isolate, NativeScriptRuntime::EnableVerboseLoggingMethodCallback));
-	globalTemplate->Set(ConvertToV8String("__disableVerboseLogging"), FunctionTemplate::New(isolate, NativeScriptRuntime::DisableVerboseLoggingMethodCallback));
-	globalTemplate->Set(ConvertToV8String("__exit"), FunctionTemplate::New(isolate, NativeScriptRuntime::ExitMethodCallback));
+	globalTemplate->Set(ConvertToV8String("__enableVerboseLogging"), FunctionTemplate::New(isolate, CallbackHandlers::EnableVerboseLoggingMethodCallback));
+	globalTemplate->Set(ConvertToV8String("__disableVerboseLogging"), FunctionTemplate::New(isolate, CallbackHandlers::DisableVerboseLoggingMethodCallback));
+	globalTemplate->Set(ConvertToV8String("__exit"), FunctionTemplate::New(isolate, CallbackHandlers::ExitMethodCallback));
 	globalTemplate->Set(ConvertToV8String("__nativeRequire"), FunctionTemplate::New(isolate, Module::RequireCallback));
 
-	WeakRef::Init(isolate, globalTemplate, g_objectManager);
+	m_weakRef.Init(isolate, globalTemplate, m_objectManager);
 
 	SimpleProfiler::Init(isolate, globalTemplate);
 
-	NativeScriptRuntime::CreateGlobalCastFunctions(globalTemplate);
+	CallbackHandlers::CreateGlobalCastFunctions(globalTemplate);
 
 	Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
 	PrimaryContext = new Persistent<Context>(isolate, context);
@@ -354,7 +415,7 @@ Isolate* NativePlatform::PrepareV8Runtime(JEnv& env, const string& filesPath, js
 
 	context_scope = new Context::Scope(context);
 
-	g_objectManager->Init(isolate);
+	m_objectManager->Init(isolate);
 
 	auto global = context->Global();
 
@@ -363,26 +424,26 @@ Isolate* NativePlatform::PrepareV8Runtime(JEnv& env, const string& filesPath, js
 	global->ForceSet(ConvertToV8String("global"), global, readOnlyFlags);
 	global->ForceSet(ConvertToV8String("__global"), global, readOnlyFlags);
 
-	ArgConverter::Init(g_jvm);
+	ArgConverter::Init();
 
-	NativeScriptRuntime::Init(g_jvm, g_objectManager);
+	CallbackHandlers::Init(m_objectManager);
 
 	string pckName = ArgConverter::jstringToString(packageName);
 	Profiler::Init(pckName);
 	JsDebugger::Init(isolate, pckName, jsDebugger);
 
-	NativeScriptRuntime::BuildMetadata(env, filesPath);
+	MetadataNode::BuildMetadata(filesPath);
 
-	NativeScriptRuntime::CreateTopLevelNamespaces(global);
+	MetadataNode::CreateTopLevelNamespaces(global);
 
-	ArrayHelper::Init(g_objectManager, context);
+	ArrayHelper::Init(context);
 
 	return isolate;
 }
 
-jobject NativePlatform::ConvertJsValueToJavaObject(JEnv& env, const Local<Value>& value, int classReturnType)
+jobject Runtime::ConvertJsValueToJavaObject(JEnv& env, const Local<Value>& value, int classReturnType)
 {
-	JsArgToArrayConverter argConverter(value, false/*is implementation object*/, classReturnType);
+	JsArgToArrayConverter argConverter(m_isolate, value, false/*is implementation object*/, classReturnType);
 	jobject jr = argConverter.GetConvertedArg();
 	jobject javaResult = nullptr;
 	if (jr != nullptr)
@@ -393,7 +454,7 @@ jobject NativePlatform::ConvertJsValueToJavaObject(JEnv& env, const Local<Value>
 	return javaResult;
 }
 
-void NativePlatform::PrepareExtendFunction(Isolate *isolate, jstring filesPath)
+void Runtime::PrepareExtendFunction(Isolate *isolate, jstring filesPath)
 {
 	string fullPath = ArgConverter::jstringToString(filesPath);
 	fullPath.append("/internal/prepareExtend.js");
@@ -434,4 +495,7 @@ void NativePlatform::PrepareExtendFunction(Isolate *isolate, jstring filesPath)
 	DEBUG_WRITE("Executed prepareExtend.js script");
 }
 
-Isolate* NativePlatform::s_isolate = nullptr;
+JavaVM* Runtime::s_jvm = nullptr;
+map<int, Runtime*> Runtime::s_id2RuntimeCache;
+map<Isolate*, Runtime*> Runtime::s_isolate2RuntimesCache;
+

@@ -9,7 +9,7 @@ import org.ow2.asmdex.FieldVisitor;
 import org.ow2.asmdex.MethodVisitor;
 import org.ow2.asmdex.structureCommon.Label;
 
-class dummy
+class Dummy
 {
 	public static void dummyMethod(Object thiz, String name, Object... args)
 	{
@@ -43,7 +43,7 @@ class dummy
 	
 	public static void callDummyGenMethod()
 	{
-		Random val = dummy.<Object, Integer, Random>dummyGenMethod(new Object(), "someName", new Object(), 5);
+		Random val = Dummy.<Object, Integer, Random>dummyGenMethod(new Object(), "someName", new Object(), 5);
 		
 	}
 	

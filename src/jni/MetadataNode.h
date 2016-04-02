@@ -33,21 +33,21 @@ namespace tns
 	class MetadataNode
 	{
 		public:
-			static void Init(ObjectManager *objectManager);
+			static void Init();
 
-			static void BuildMetadata(uint8_t *nodes, int nodesLength, uint8_t *names, uint8_t *values);
+			static void BuildMetadata(const std::string& filesPath);
 
 			std::string GetName();
 
 			v8::Local<v8::Object> CreateWrapper(v8::Isolate *isolate);
 
-			v8::Local<v8::Object> CreateJSWrapper(v8::Isolate *isolate);
+			v8::Local<v8::Object> CreateJSWrapper(v8::Isolate *isolate, ObjectManager *objectManager);
 
 			v8::Local<v8::Object> CreateArrayWrapper(v8::Isolate *isolate);
 
 			static MetadataNode* GetNodeFromHandle(const v8::Local<v8::Object>& value);
 
-			static v8::Local<v8::Object> CreateExtendedJSWrapper(v8::Isolate *isolate, const std::string& proxyClassName);
+			static v8::Local<v8::Object> CreateExtendedJSWrapper(v8::Isolate *isolate, ObjectManager *objectManager, const std::string& proxyClassName);
 
 			static v8::Local<v8::Object> GetImplementationObject(const v8::Local<v8::Object>& object);
 
@@ -58,8 +58,6 @@ namespace tns
 			static MetadataNode* GetOrCreate(const std::string& className);
 
 			static void BuildMetadata(uint32_t nodesLength, uint8_t *nodeData, uint32_t nameLength, uint8_t *nameData, uint32_t valueLength, uint8_t *valueData);
-
-			static void InjectPrototype(v8::Local<v8::Object>& target, v8::Local<v8::Object>& implementationObject);
 
 		private:
 			struct MethodCallbackData
@@ -146,9 +144,9 @@ namespace tns
 				Field
 			};
 
-			static MetadataNode* GetOrCreateInternal(MetadataTreeNode *treeNode);
+			static void BuildMetadata(uint8_t *nodes, int nodesLength, uint8_t *names, uint8_t *values);
 
-			static MetadataNode* GetOrCreateInternal(const std::string& className);
+			static MetadataNode* GetOrCreateInternal(MetadataTreeNode *treeNode);
 
 			static MetadataTreeNode* GetOrCreateTreeNodeByName(const std::string& className);
 
@@ -230,13 +228,11 @@ namespace tns
 
 			static bool IsValidExtendName(const v8::Local<v8::String>& name);
 			static bool GetExtendLocation(std::string& extendLocation);
-			static ExtendedClassCacheData GetCachedExtendedClassData(v8::Isolate *isolate, const std::string& proxyClassName);
+			static ExtendedClassCacheData GetCachedExtendedClassData(const std::string& proxyClassName);
 
 			static MetadataReader s_metadataReader;
 
 			static v8::Persistent<v8::String> *s_metadataKey;
-
-			static ObjectManager *s_objectManager;
 
 			struct CtorCacheItem
 			{

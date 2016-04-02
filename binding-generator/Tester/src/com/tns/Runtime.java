@@ -6,7 +6,7 @@ import java.lang.reflect.Method;
 
 import com.tns.runtimebindinggenerator.tester.MethodResolver;
 
-public class Platform
+public class Runtime
 {
 	public static Object implementationObject;
 

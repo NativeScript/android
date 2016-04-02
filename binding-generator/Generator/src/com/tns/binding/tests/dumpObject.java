@@ -7,10 +7,10 @@ import org.ow2.asmdex.FieldVisitor;
 import org.ow2.asmdex.MethodVisitor;
 import org.ow2.asmdex.structureCommon.Label;
 
-public class dumpObject
+public class DumpObject
 {
 
-	public static void dumpObject(ApplicationWriter aw) {
+	public static void dump(ApplicationWriter aw) {
 		ClassVisitor cv;
 		FieldVisitor fv;
 		MethodVisitor mv;
@@ -35,6 +35,7 @@ public class dumpObject
 			fv = cv.visitField(org.ow2.asmdex.Opcodes.ACC_PRIVATE, "__initialized", "Z", null, null);
 			fv.visitEnd();
 		}
+		String runtimeClass = "Lcom/tns/Runtime;";
 		{
 			mv = cv.visitMethod(org.ow2.asmdex.Opcodes.ACC_PUBLIC + org.ow2.asmdex.Opcodes.ACC_CONSTRUCTOR, "<init>", "V", null, null);
 			mv.visitCode();
@@ -45,14 +46,14 @@ public class dumpObject
 			Label l0 = new Label();
 			mv.visitJumpInsn(org.ow2.asmdex.Opcodes.INSN_IF_NEZ, l0, 1, 0);
 			mv.visitFieldInsn(org.ow2.asmdex.Opcodes.INSN_IPUT_BOOLEAN, "Lcom/tns/java/lang/Object;", "__initialized", "Z", 2, 3);
-			mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, "Lcom/tns/Platform;", "initInstance", "VLjava/lang/Object;", new int[] { 3 });
+			mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, runtimeClass, "initInstance", "VLjava/lang/Object;", new int[] { 3 });
 			mv.visitLabel(l0);
 			mv.visitFieldInsn(org.ow2.asmdex.Opcodes.INSN_IGET_BOOLEAN, "Lcom/tns/java/lang/Object;", "__ctorOverridden", "Z", 1, 3);
 			Label l1 = new Label();
 			mv.visitJumpInsn(org.ow2.asmdex.Opcodes.INSN_IF_EQZ, l1, 1, 0);
 			mv.visitVarInsn(org.ow2.asmdex.Opcodes.INSN_CONST_4, 0, 0);
 			mv.visitStringInsn(org.ow2.asmdex.Opcodes.INSN_CONST_STRING, 1, "init");
-			mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, "Lcom/tns/Platform;", "callJSMethod", "Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;Z[Ljava/lang/Object;", new int[] { 3, 1, 2, 0 });
+			mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, runtimeClass, "callJSMethod", "Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;Z[Ljava/lang/Object;", new int[] { 3, 1, 2, 0 });
 			mv.visitLabel(l1);
 			mv.visitInsn(org.ow2.asmdex.Opcodes.INSN_RETURN_VOID);
 			mv.visitEnd();
@@ -66,7 +67,7 @@ public class dumpObject
 			mv.visitJumpInsn(org.ow2.asmdex.Opcodes.INSN_IF_NEZ, l0, 1, 0);
 			mv.visitVarInsn(org.ow2.asmdex.Opcodes.INSN_CONST_4, 1, 1);
 			mv.visitFieldInsn(org.ow2.asmdex.Opcodes.INSN_IPUT_BOOLEAN, "Lcom/tns/java/lang/Object;", "__initialized", "Z", 1, 2);
-			mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, "Lcom/tns/Platform;", "initInstance", "VLjava/lang/Object;", new int[] { 2 });
+			mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, runtimeClass, "initInstance", "VLjava/lang/Object;", new int[] { 2 });
 			mv.visitLabel(l0);
 			mv.visitFieldInsn(org.ow2.asmdex.Opcodes.INSN_IGET_BYTE, "Lcom/tns/java/lang/Object;", "__ho0", "B", 1, 2);
 			mv.visitOperationInsn(org.ow2.asmdex.Opcodes.INSN_AND_INT_LIT8, 1, 1, 0, 1);
@@ -74,7 +75,7 @@ public class dumpObject
 			mv.visitJumpInsn(org.ow2.asmdex.Opcodes.INSN_IF_LEZ, l1, 1, 0);
 			mv.visitVarInsn(org.ow2.asmdex.Opcodes.INSN_CONST_4, 0, 0);
 			mv.visitStringInsn(org.ow2.asmdex.Opcodes.INSN_CONST_STRING, 1, "clone");
-			mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, "Lcom/tns/Platform;", "callJSMethod", "Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;[Ljava/lang/Object;", new int[] { 2, 1, 0 });
+			mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, runtimeClass, "callJSMethod", "Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;[Ljava/lang/Object;", new int[] { 2, 1, 0 });
 			mv.visitIntInsn(org.ow2.asmdex.Opcodes.INSN_MOVE_RESULT_OBJECT, 1);
 			Label l2 = new Label();
 			mv.visitLabel(l2);
@@ -103,7 +104,7 @@ public class dumpObject
 			Label l0 = new Label();
 			mv.visitJumpInsn(org.ow2.asmdex.Opcodes.INSN_IF_NEZ, l0, 1, 0);
 			mv.visitFieldInsn(org.ow2.asmdex.Opcodes.INSN_IPUT_BOOLEAN, "Lcom/tns/java/lang/Object;", "__initialized", "Z", 2, 3);
-			mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, "Lcom/tns/Platform;", "initInstance", "VLjava/lang/Object;", new int[] { 3 });
+			mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, runtimeClass, "initInstance", "VLjava/lang/Object;", new int[] { 3 });
 			mv.visitLabel(l0);
 			mv.visitFieldInsn(org.ow2.asmdex.Opcodes.INSN_IGET_BYTE, "Lcom/tns/java/lang/Object;", "__ho0", "B", 1, 3);
 			mv.visitOperationInsn(org.ow2.asmdex.Opcodes.INSN_AND_INT_LIT8, 1, 1, 0, 2);
@@ -113,7 +114,7 @@ public class dumpObject
 			mv.visitVarInsn(org.ow2.asmdex.Opcodes.INSN_CONST_4, 1, 0);
 			mv.visitArrayOperationInsn(org.ow2.asmdex.Opcodes.INSN_APUT_OBJECT, 4, 0, 1);
 			mv.visitStringInsn(org.ow2.asmdex.Opcodes.INSN_CONST_STRING, 1, "equals");
-			mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, "Lcom/tns/Platform;", "callJSMethod", "Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;[Ljava/lang/Object;", new int[] { 3, 1, 0 });
+			mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, runtimeClass, "callJSMethod", "Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;[Ljava/lang/Object;", new int[] { 3, 1, 0 });
 			mv.visitIntInsn(org.ow2.asmdex.Opcodes.INSN_MOVE_RESULT_OBJECT, 1);
 			mv.visitTypeInsn(org.ow2.asmdex.Opcodes.INSN_CHECK_CAST, 0, 1, 0, "Ljava/lang/Boolean;");
 			mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_VIRTUAL, "Ljava/lang/Boolean;", "booleanValue", "Z", new int[] { 1 });
@@ -145,7 +146,7 @@ public class dumpObject
 			mv.visitJumpInsn(org.ow2.asmdex.Opcodes.INSN_IF_NEZ, l0, 1, 0);
 			mv.visitVarInsn(org.ow2.asmdex.Opcodes.INSN_CONST_4, 1, 1);
 			mv.visitFieldInsn(org.ow2.asmdex.Opcodes.INSN_IPUT_BOOLEAN, "Lcom/tns/java/lang/Object;", "__initialized", "Z", 1, 2);
-			mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, "Lcom/tns/Platform;", "initInstance", "VLjava/lang/Object;", new int[] { 2 });
+			mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, runtimeClass, "initInstance", "VLjava/lang/Object;", new int[] { 2 });
 			mv.visitLabel(l0);
 			mv.visitFieldInsn(org.ow2.asmdex.Opcodes.INSN_IGET_BYTE, "Lcom/tns/java/lang/Object;", "__ho0", "B", 1, 2);
 			mv.visitOperationInsn(org.ow2.asmdex.Opcodes.INSN_AND_INT_LIT8, 1, 1, 0, 4);
@@ -153,7 +154,7 @@ public class dumpObject
 			mv.visitJumpInsn(org.ow2.asmdex.Opcodes.INSN_IF_LEZ, l1, 1, 0);
 			mv.visitVarInsn(org.ow2.asmdex.Opcodes.INSN_CONST_4, 0, 0);
 			mv.visitStringInsn(org.ow2.asmdex.Opcodes.INSN_CONST_STRING, 1, "finalize");
-			mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, "Lcom/tns/Platform;", "callJSMethod", "Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;[Ljava/lang/Object;", new int[] { 2, 1, 0 });
+			mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, runtimeClass, "callJSMethod", "Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;[Ljava/lang/Object;", new int[] { 2, 1, 0 });
 			Label l2 = new Label();
 			mv.visitLabel(l2);
 			mv.visitInsn(org.ow2.asmdex.Opcodes.INSN_RETURN_VOID);
@@ -179,7 +180,7 @@ public class dumpObject
 			mv.visitJumpInsn(org.ow2.asmdex.Opcodes.INSN_IF_NEZ, l0, 1, 0);
 			mv.visitVarInsn(org.ow2.asmdex.Opcodes.INSN_CONST_4, 1, 1);
 			mv.visitFieldInsn(org.ow2.asmdex.Opcodes.INSN_IPUT_BOOLEAN, "Lcom/tns/java/lang/Object;", "__initialized", "Z", 1, 2);
-			mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, "Lcom/tns/Platform;", "initInstance", "VLjava/lang/Object;", new int[] { 2 });
+			mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, runtimeClass, "initInstance", "VLjava/lang/Object;", new int[] { 2 });
 			mv.visitLabel(l0);
 			mv.visitFieldInsn(org.ow2.asmdex.Opcodes.INSN_IGET_BYTE, "Lcom/tns/java/lang/Object;", "__ho0", "B", 1, 2);
 			mv.visitOperationInsn(org.ow2.asmdex.Opcodes.INSN_AND_INT_LIT8, 1, 1, 0, 8);
@@ -187,7 +188,7 @@ public class dumpObject
 			mv.visitJumpInsn(org.ow2.asmdex.Opcodes.INSN_IF_LEZ, l1, 1, 0);
 			mv.visitVarInsn(org.ow2.asmdex.Opcodes.INSN_CONST_4, 0, 0);
 			mv.visitStringInsn(org.ow2.asmdex.Opcodes.INSN_CONST_STRING, 1, "hashCode");
-			mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, "Lcom/tns/Platform;", "callJSMethod", "Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;[Ljava/lang/Object;", new int[] { 2, 1, 0 });
+			mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, runtimeClass, "callJSMethod", "Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;[Ljava/lang/Object;", new int[] { 2, 1, 0 });
 			mv.visitIntInsn(org.ow2.asmdex.Opcodes.INSN_MOVE_RESULT_OBJECT, 1);
 			mv.visitTypeInsn(org.ow2.asmdex.Opcodes.INSN_CHECK_CAST, 0, 1, 0, "Ljava/lang/Integer;");
 			mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_VIRTUAL, "Ljava/lang/Integer;", "intValue", "I", new int[] { 1 });
@@ -299,7 +300,7 @@ public class dumpObject
 			mv.visitJumpInsn(org.ow2.asmdex.Opcodes.INSN_IF_NEZ, l0, 1, 0);
 			mv.visitVarInsn(org.ow2.asmdex.Opcodes.INSN_CONST_4, 1, 1);
 			mv.visitFieldInsn(org.ow2.asmdex.Opcodes.INSN_IPUT_BOOLEAN, "Lcom/tns/java/lang/Object;", "__initialized", "Z", 1, 2);
-			mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, "Lcom/tns/Platform;", "initInstance", "VLjava/lang/Object;", new int[] { 2 });
+			mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, runtimeClass, "initInstance", "VLjava/lang/Object;", new int[] { 2 });
 			mv.visitLabel(l0);
 			mv.visitFieldInsn(org.ow2.asmdex.Opcodes.INSN_IGET_BYTE, "Lcom/tns/java/lang/Object;", "__ho0", "B", 1, 2);
 			mv.visitOperationInsn(org.ow2.asmdex.Opcodes.INSN_AND_INT_LIT8, 1, 1, 0, 16);
@@ -307,7 +308,7 @@ public class dumpObject
 			mv.visitJumpInsn(org.ow2.asmdex.Opcodes.INSN_IF_LEZ, l1, 1, 0);
 			mv.visitVarInsn(org.ow2.asmdex.Opcodes.INSN_CONST_4, 0, 0);
 			mv.visitStringInsn(org.ow2.asmdex.Opcodes.INSN_CONST_STRING, 1, "toString");
-			mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, "Lcom/tns/Platform;", "callJSMethod", "Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;[Ljava/lang/Object;", new int[] { 2, 1, 0 });
+			mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, runtimeClass, "callJSMethod", "Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;[Ljava/lang/Object;", new int[] { 2, 1, 0 });
 			mv.visitIntInsn(org.ow2.asmdex.Opcodes.INSN_MOVE_RESULT_OBJECT, 1);
 			mv.visitTypeInsn(org.ow2.asmdex.Opcodes.INSN_CHECK_CAST, 0, 1, 0, "Ljava/lang/String;");
 			Label l2 = new Label();

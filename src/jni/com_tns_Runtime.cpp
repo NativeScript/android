@@ -1,5 +1,5 @@
 #include "V8StringConstants.h"
-#include "NativePlatform.h"
+#include "Runtime.h"
 #include "NativeScriptException.h"
 #include "NativeScriptAssert.h"
 #include <sstream>
@@ -7,13 +7,11 @@
 using namespace std;
 using namespace tns;
 
-v8::Isolate *g_isolate = nullptr;
-
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved)
 {
 	try
 	{
-		NativePlatform::Init(vm, reserved);
+		Runtime::Init(vm, reserved);
 	}
 	catch (NativeScriptException& e)
 	{
@@ -33,11 +31,11 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved)
 	return JNI_VERSION_1_6;
 }
 
-extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj, jstring filesPath, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jobject jsDebugger)
+extern "C" void Java_com_tns_Runtime_initNativeScript(JNIEnv *_env, jobject obj, jint runtimeId, jstring filesPath, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jobject jsDebugger)
 {
 	try
 	{
-		g_isolate = NativePlatform::InitNativeScript(_env, obj, filesPath, verboseLoggingEnabled, packageName, args, jsDebugger);
+		Runtime::Init(_env, obj, runtimeId, filesPath, verboseLoggingEnabled, packageName, args, jsDebugger);
 	}
 	catch (NativeScriptException& e)
 	{
@@ -55,14 +53,17 @@ extern "C" void Java_com_tns_Platform_initNativeScript(JNIEnv *_env, jobject obj
 	}
 }
 
-extern "C" void Java_com_tns_Platform_runModule(JNIEnv *_env, jobject obj, jstring scriptFile)
+extern "C" void Java_com_tns_Runtime_runModule(JNIEnv *_env, jobject obj, jint runtimeId, jstring scriptFile)
 {
-	v8::Isolate::Scope isolate_scope(g_isolate);
-	v8::HandleScope handleScope(g_isolate);
+	auto runtime = Runtime::GetRuntime(runtimeId);
+	auto isolate = runtime->GetIsolate();
+	v8::Isolate::Scope isolate_scope(isolate);
+	v8::HandleScope handleScope(isolate);
 
 	try
 	{
-		NativePlatform::RunModule(_env, obj, scriptFile);
+		auto runtime = Runtime::GetRuntime(runtimeId);
+		runtime->RunModule(_env, obj, scriptFile);
 	}
 	catch (NativeScriptException& e)
 	{
@@ -80,15 +81,18 @@ extern "C" void Java_com_tns_Platform_runModule(JNIEnv *_env, jobject obj, jstri
 	}
 }
 
-extern "C" jobject Java_com_tns_Platform_runScript(JNIEnv *_env, jobject obj, jstring scriptFile)
+extern "C" jobject Java_com_tns_Runtime_runScript(JNIEnv *_env, jobject obj, jint runtimeId, jstring scriptFile)
 {
-	v8::Isolate::Scope isolate_scope(g_isolate);
-	v8::HandleScope handleScope(g_isolate);
+	auto runtime = Runtime::GetRuntime(runtimeId);
+	auto isolate = runtime->GetIsolate();
+
+	v8::Isolate::Scope isolate_scope(isolate);
+	v8::HandleScope handleScope(isolate);
 
 	jobject o = nullptr;
 	try
 	{
-		o = NativePlatform::RunScript(_env, obj, scriptFile);
+		o = runtime->RunScript(_env, obj, scriptFile);
 	}
 	catch (NativeScriptException& e)
 	{
@@ -107,15 +111,18 @@ extern "C" jobject Java_com_tns_Platform_runScript(JNIEnv *_env, jobject obj, js
 	return o;
 }
 
-extern "C" jobject Java_com_tns_Platform_callJSMethodNative(JNIEnv *_env, jobject obj, jint javaObjectID, jstring methodName, jint retType, jboolean isConstructor, jobjectArray packagedArgs)
+extern "C" jobject Java_com_tns_Runtime_callJSMethodNative(JNIEnv *_env, jobject obj, jint runtimeId, jint javaObjectID, jstring methodName, jint retType, jboolean isConstructor, jobjectArray packagedArgs)
 {
-	v8::Isolate::Scope isolate_scope(g_isolate);
-	v8::HandleScope handleScope(g_isolate);
+	auto runtime = Runtime::GetRuntime(runtimeId);
+	auto isolate = runtime->GetIsolate();
+
+	v8::Isolate::Scope isolate_scope(isolate);
+	v8::HandleScope handleScope(isolate);
 
 	jobject o = nullptr;
 	try
 	{
-		o = NativePlatform::CallJSMethodNative(_env, obj, javaObjectID, methodName, retType, isConstructor, packagedArgs);
+		o = runtime->CallJSMethodNative(_env, obj, javaObjectID, methodName, retType, isConstructor, packagedArgs);
 	}
 	catch (NativeScriptException& e)
 	{
@@ -134,14 +141,17 @@ extern "C" jobject Java_com_tns_Platform_callJSMethodNative(JNIEnv *_env, jobjec
 	return o;
 }
 
-extern "C" void Java_com_tns_Platform_createJSInstanceNative(JNIEnv *_env, jobject obj, jobject javaObject, jint javaObjectID, jstring className)
+extern "C" void Java_com_tns_Runtime_createJSInstanceNative(JNIEnv *_env, jobject obj, jint runtimeId, jobject javaObject, jint javaObjectID, jstring className)
 {
-	v8::Isolate::Scope isolate_scope(g_isolate);
-	v8::HandleScope handleScope(g_isolate);
+	auto runtime = Runtime::GetRuntime(runtimeId);
+	auto isolate = runtime->GetIsolate();
+
+	v8::Isolate::Scope isolate_scope(isolate);
+	v8::HandleScope handleScope(isolate);
 
 	try
 	{
-		NativePlatform::CreateJSInstanceNative(_env, obj, javaObject, javaObjectID, className);
+		runtime->CreateJSInstanceNative(_env, obj, javaObject, javaObjectID, className);
 	}
 	catch (NativeScriptException& e)
 	{
@@ -159,11 +169,12 @@ extern "C" void Java_com_tns_Platform_createJSInstanceNative(JNIEnv *_env, jobje
 	}
 }
 
-extern "C" jint Java_com_tns_Platform_generateNewObjectId(JNIEnv *env, jobject obj)
+extern "C" jint Java_com_tns_Runtime_generateNewObjectId(JNIEnv *env, jobject obj, jint runtimeId)
 {
 	try
 	{
-		return NativePlatform::GenerateNewObjectId(env, obj);
+		auto runtime = Runtime::GetRuntime(runtimeId);
+		return runtime->GenerateNewObjectId(env, obj);
 	}
 	catch (NativeScriptException& e)
 	{
@@ -181,14 +192,17 @@ extern "C" jint Java_com_tns_Platform_generateNewObjectId(JNIEnv *env, jobject o
 	}
 }
 
-extern "C" void Java_com_tns_Platform_adjustAmountOfExternalAllocatedMemoryNative(JNIEnv *env, jobject obj, jlong usedMemory)
+extern "C" void Java_com_tns_Runtime_adjustAmountOfExternalAllocatedMemoryNative(JNIEnv *env, jobject obj, jint runtimeId, jlong usedMemory)
 {
-	v8::Isolate::Scope isolate_scope(g_isolate);
-	v8::HandleScope handleScope(g_isolate);
+	auto runtime = Runtime::GetRuntime(runtimeId);
+	auto isolate = runtime->GetIsolate();
+
+	v8::Isolate::Scope isolate_scope(isolate);
+	v8::HandleScope handleScope(isolate);
 
 	try
 	{
-		NativePlatform::AdjustAmountOfExternalAllocatedMemoryNative(env, obj, usedMemory);
+		runtime->AdjustAmountOfExternalAllocatedMemoryNative(env, obj, usedMemory);
 	}
 	catch (NativeScriptException& e)
 	{
@@ -206,14 +220,17 @@ extern "C" void Java_com_tns_Platform_adjustAmountOfExternalAllocatedMemoryNativ
 	}
 }
 
-extern "C" void Java_com_tns_Platform_passUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, jthrowable exception, jstring stackTrace)
+extern "C" void Java_com_tns_Runtime_passUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, jint runtimeId, jthrowable exception, jstring stackTrace)
 {
-	v8::Isolate::Scope isolate_scope(g_isolate);
-	v8::HandleScope handleScope(g_isolate);
+	auto runtime = Runtime::GetRuntime(runtimeId);
+	auto isolate = runtime->GetIsolate();
+
+	v8::Isolate::Scope isolate_scope(isolate);
+	v8::HandleScope handleScope(isolate);
 
 	try
 	{
-		NativePlatform::PassUncaughtExceptionToJsNative(env, obj, exception, stackTrace);
+		runtime->PassUncaughtExceptionToJsNative(env, obj, exception, stackTrace);
 	}
 	catch (NativeScriptException& e)
 	{

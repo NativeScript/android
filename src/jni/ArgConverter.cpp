@@ -8,6 +8,7 @@
 #include "NativeScriptException.h"
 #include "NumericCasts.h"
 #include "JType.h"
+#include "Runtime.h"
 #include <assert.h>
 #include <sstream>
 #include <cstdlib>
@@ -16,10 +17,8 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
-void ArgConverter::Init(JavaVM *jvm)
+void ArgConverter::Init()
 {
-	ArgConverter::jvm = jvm;
-
 	auto isolate = Isolate::GetCurrent();
 
 	auto ft = FunctionTemplate::New(isolate, ArgConverter::NativeScriptLongFunctionCallback);
@@ -108,14 +107,15 @@ jstring ArgConverter::ObjectToString(jobject object)
 	return (jstring) object;
 }
 
-Local<Array> ArgConverter::ConvertJavaArgsToJsArgs(jobjectArray args)
+Local<Array> ArgConverter::ConvertJavaArgsToJsArgs(Isolate *isolate, jobjectArray args)
 {
 	JEnv env;
 
-	auto isolate = Isolate::GetCurrent();
-
 	int argc = env.GetArrayLength(args) / 3;
 	Local<Array> arr(Array::New(isolate, argc));
+
+	auto runtime = Runtime::GetRuntime(isolate);
+	auto objectManager = runtime->GetObjectManager();
 
 	int jArrayIndex = 0;
 	for (int i = 0; i < argc; i++)
@@ -160,13 +160,13 @@ Local<Array> ArgConverter::ConvertJavaArgsToJsArgs(jobjectArray args)
 			case Type::JsObject:
 				{
 				jint javaObjectID = JType::IntValue(env, arg);
-				jsArg = ObjectManager::GetJsObjectByJavaObjectStatic(javaObjectID);
+				jsArg = objectManager->GetJsObjectByJavaObject(javaObjectID);
 
 				if (jsArg.IsEmpty())
 				{
 					string argClassName = jstringToString(ObjectToString(argJavaClassPath));
 					argClassName = Util::ConvertFromCanonicalToJniName(argClassName);
-					jsArg = ObjectManager::CreateJSWrapperStatic(javaObjectID, argClassName);
+					jsArg = objectManager->CreateJSWrapper(javaObjectID, argClassName);
 				}
 				break;
 			}
@@ -290,7 +290,6 @@ int64_t ArgConverter::ConvertToJavaLong(const Local<Value>& value)
 	return longValue;
 }
 
-JavaVM* ArgConverter::jvm = nullptr;
 Persistent<Function>* ArgConverter::NATIVESCRIPT_NUMBER_CTOR_FUNC = nullptr;
 Persistent<NumberObject>* ArgConverter::NAN_NUMBER_OBJECT = nullptr;
 char* ArgConverter::charBuffer = new char[ArgConverter::BUFFER_SIZE];
