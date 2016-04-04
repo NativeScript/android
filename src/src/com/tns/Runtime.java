@@ -147,7 +147,7 @@ public class Runtime
 	{
 		Runtime runtime = Runtime.getCurrentRuntime();
 		
-		return runtime.isInitializedImpl();
+		return (runtime != null) ? runtime.isInitializedImpl() : false;
 	}
 
 	private boolean isInitializedImpl()
