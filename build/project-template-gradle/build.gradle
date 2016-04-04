@@ -332,7 +332,7 @@ task addAarDependencies <<  {
 ////////////////////////////////////////////////////////////////////////////////////
 
 task cleanLocalAarFiles(type: Delete) {
-	delete fileTree(dir: "libs/aar", include: ["*.aar"])
+	delete fileTree(dir: "$projectDir/libs/aar", include: ["*.aar"])
 }
 
 task ensureMetadataOutDir {
