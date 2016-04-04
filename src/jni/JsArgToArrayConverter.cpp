@@ -13,6 +13,7 @@
 #include "NumericCasts.h"
 #include "NativeScriptException.h"
 #include "Runtime.h"
+#include "MetadataNode.h"
 
 using namespace v8;
 using namespace std;
@@ -287,6 +288,30 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 
 			case CastType::None:
 				obj = objectManager->GetJavaObjectByJsObject(jsObj);
+                
+				castValue = jsObj->GetHiddenValue(ConvertToV8String("node"));
+				if(!castValue.IsEmpty()) {
+					auto n = reinterpret_cast<MetadataNode*>(castValue.As<External>()->Value());
+					auto type = (n != nullptr) ? n->GetName() : "";
+
+					jclass nullClazz = env.FindClass("com/tns/NullObject");
+					jmethodID ctor = env.GetMethodID(nullClazz, "<init>", "(Ljava/lang/Class;)V");
+					jclass clazzToNull = env.FindClass(type.c_str());
+					jobject nullObjType = env.NewObject(nullClazz, ctor, clazzToNull);
+
+					if(nullObjType != nullptr)
+					{
+						SetConvertedObject(env, index, nullObjType, false);
+					}
+					else
+					{
+						SetConvertedObject(env, index, nullptr);
+					}
+
+					success = true;
+					return success;
+				}
+
 				success = !obj.IsNull();
 				if (success)
 				{
@@ -300,7 +325,6 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 
 			default:
 				throw NativeScriptException("Unsupported cast type");
-
 		}
 	}
 	else if (arg->IsUndefined() || arg->IsNull())

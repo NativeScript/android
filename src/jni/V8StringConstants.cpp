@@ -28,6 +28,17 @@ namespace tns
 		return Local<String>::New(isolate, *EXTEND_PERSISTENT);
 	}
 
+	Local<String> V8StringConstants::GetNullObject()
+	{
+		auto isolate = Isolate::GetCurrent();
+		if (NULL_OBJECT_PERSISTENT == nullptr)
+		{
+			auto str = String::NewFromUtf8(isolate, NULL_OBJECT.c_str());
+			NULL_OBJECT_PERSISTENT = new Persistent<String>(Isolate::GetCurrent(), str);
+		}
+		return Local<String>::New(isolate, *NULL_OBJECT_PERSISTENT);
+	}
+
 	Local<String> V8StringConstants::GetIsPrototypeImplementationObject()
 	{
 		auto isolate = Isolate::GetCurrent();
@@ -184,6 +195,7 @@ namespace tns
 
 	const string V8StringConstants::CLASS_IMPLEMENTATION_OBJECT = "t::ClassImplementationObject";
 	const string V8StringConstants::EXTEND = "extend";
+	const string V8StringConstants::NULL_OBJECT = "null";
 	const string V8StringConstants::IS_PROTOTYPE_IMPLEMENTATION_OBJECT = "__isPrototypeImplementationObject";
 	const string V8StringConstants::NATIVE_EXCEPTION = "nativeException";
 	const string V8StringConstants::STACK_TRACE = "stackTrace";
@@ -209,6 +221,7 @@ namespace tns
 	// TODO: These are not thread-safe!
 	Persistent<String> *V8StringConstants::CLASS_IMPLEMENTATION_OBJECT_PERSISTENT;
 	Persistent<String> *V8StringConstants::EXTEND_PERSISTENT;
+	Persistent<String> *V8StringConstants::NULL_OBJECT_PERSISTENT;
 	Persistent<String> *V8StringConstants::IS_PROTOTYPE_IMPLEMENTATION_OBJECT_PERSISTENT;
 	Persistent<String> *V8StringConstants::NATIVE_EXCEPTION_PERSISTENT;
 	Persistent<String> *V8StringConstants::STACK_TRACE_PERSISTENT;

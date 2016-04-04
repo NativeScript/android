@@ -274,6 +274,41 @@ void MetadataNode::ClassAccessorGetterCallback(Local<String> property, const Pro
 	}
 }
 
+void MetadataNode::NullObjectAccessorGetterCallback(Local<String> property,const PropertyCallbackInfo<Value>& info)
+{
+	try
+	{
+		DEBUG_WRITE("NullObjectAccessorGetterCallback");
+		auto isolate = info.GetIsolate();
+
+		auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value());
+
+		DEBUG_WRITE("NullObjectAccessorGetterCallback node name: %s", node->GetName().c_str());
+
+		Local<Object> value = Object::New(isolate);
+		auto k = ConvertToV8String("node");
+		value->SetHiddenValue(k, External::New(isolate, node));
+		value->SetHiddenValue(ConvertToV8String("isnull"), Boolean::New(isolate, true));
+		// TODO: Pesho: Set .valueOf() callback to return null
+
+		info.GetReturnValue().Set(value);
+	}
+	catch (NativeScriptException& e)
+	{
+		e.ReThrowToV8();
+	}
+	catch (std::exception e) {
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
+		nsEx.ReThrowToV8();
+	}
+	catch (...) {
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
+	}
+}
+
 void MetadataNode::FieldAccessorGetterCallback(Local<String> property, const PropertyCallbackInfo<Value>& info)
 {
 	try
@@ -509,6 +544,11 @@ Local<Function> MetadataNode::SetMembersFromStaticMetadata(Isolate *isolate, Loc
 		auto fieldData = External::New(isolate, new FieldCallbackData(entry));
 		ctorFunction->SetAccessor(fieldName, FieldAccessorGetterCallback, FieldAccessorSetterCallback, fieldData, AccessControl::DEFAULT, PropertyAttribute::DontDelete);
 	}
+
+	auto nullObjectName = V8StringConstants::GetNullObject();
+
+	Local<Value> nullObjectData = External::New(isolate, this);
+	ctorFunction->SetAccessor(nullObjectName, NullObjectAccessorGetterCallback, nullptr, nullObjectData);
 
 	SetClassAccessor(ctorFunction);
 
@@ -988,6 +1028,7 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
 
 		auto callbackData = reinterpret_cast<MethodCallbackData*>(e->Value());
 
+		// Number of arguments the method is invoked with
 		int argLength = info.Length();
 
 		MetadataEntry *entry = nullptr;
@@ -1002,6 +1043,7 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
 
 			className = &callbackData->node->m_name;
 
+			// Iterates through all methods and finds the best match based on the number of arguments
 			auto found = false;
 			for (auto& c : candidates)
 			{
@@ -1009,10 +1051,12 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
 				if (found)
 				{
 					entry = &c;
+					DEBUG_WRITE("MetaDataEntry Method %s's signature is: %s", entry->name.c_str(), entry->sig.c_str());
 					break;
 				}
 			}
 
+			// Iterates through the parent class's methods to find a good match
 			if (!found)
 			{
 				callbackData = callbackData->parent;

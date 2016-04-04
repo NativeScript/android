@@ -21,5 +21,10 @@ describe("Test Method Resolution", function () {
 		
 		expect(value).toBe(2);
 	});
-
+	
+	it("When_call_method_methodWithOverloadsWithOneArgument_with_java.lang.Object_argument", function () {
+		__log("TEST: When_call_method_methodWithOverloadsWithOneArgument_with_java.lang.Object_argument");
+		
+		
+	});
 });
