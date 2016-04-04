@@ -438,8 +438,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 
 	ArrayHelper::Init(context);
 
-	s_arrayBufferHeper = ArrayBufferHelper(g_objectManager);
-	s_arrayBufferHeper.CreateConvertFunctions(global);
+	m_arrayBufferHelper.CreateConvertFunctions(isolate, global, m_objectManager);
 
 	return isolate;
 }

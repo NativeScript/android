@@ -8,14 +8,15 @@
 using namespace v8;
 using namespace tns;
 
-ArrayBufferHelper::ArrayBufferHelper(ObjectManager *objectManager)
-	: m_objectManager(objectManager), m_ByteBufferClass(nullptr), m_isDirectMethodID(nullptr)
+ArrayBufferHelper::ArrayBufferHelper()
+	: m_objectManager(nullptr), m_ByteBufferClass(nullptr), m_isDirectMethodID(nullptr)
 {
 }
 
-void ArrayBufferHelper::CreateConvertFunctions(const Local<Object>& global)
+void ArrayBufferHelper::CreateConvertFunctions(Isolate *isolate, const Local<Object>& global, ObjectManager *objectManager)
 {
-	auto isolate = Isolate::GetCurrent();
+	m_objectManager = objectManager;
+
 	auto extData = External::New(isolate, this);
 	auto fromFunc = FunctionTemplate::New(isolate, CreateFromCallbackStatic, extData)->GetFunction();
 	auto ctx = isolate->GetCurrentContext();

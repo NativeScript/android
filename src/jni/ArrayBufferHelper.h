@@ -9,9 +9,9 @@ namespace tns
 	class ArrayBufferHelper
 	{
 		public:
-			ArrayBufferHelper(ObjectManager *objectManager);
+			ArrayBufferHelper();
 
-			void CreateConvertFunctions(const v8::Local<v8::Object>& global);
+			void CreateConvertFunctions(v8::Isolate *isolate, const v8::Local<v8::Object>& global, ObjectManager *objectManager);
 
 		private:
 
