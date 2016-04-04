@@ -1,0 +1,707 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites>
+ <testsuite name="TNS require" timestamp="2016-04-04T10:33:44" hostname="localhost" time="0.079" errors="0" tests="43" skipped="0" failures="0">
+  <testcase classname="TNS require" name="path with leading slash is treated as absolute from the root of the device" time="0.004">
+  </testcase>
+  <testcase classname="TNS require" name="can change require object" time="0.002">
+  </testcase>
+  <testcase classname="TNS require" name="can circularly require module index" time="0.002">
+  </testcase>
+  <testcase classname="TNS require" name="can circularly require modules" time="0.001">
+  </testcase>
+  <testcase classname="TNS require" name="can circularly require and export" time="0.002">
+  </testcase>
+  <testcase classname="TNS require" name="can bubble exports from one module to another in non-circular require" time="0.01">
+  </testcase>
+  <testcase classname="TNS require" name="module has id with the name of the file" time="0.001">
+  </testcase>
+  <testcase classname="TNS require" name="modules can require further modules" time="0.001">
+  </testcase>
+  <testcase classname="TNS require" name="deletes module cache on error" time="0.011">
+  </testcase>
+  <testcase classname="TNS require" name="can export var-s" time="0.002">
+  </testcase>
+  <testcase classname="TNS require" name="can require a module multiple times, sharing the required module instance" time="0.001">
+  </testcase>
+  <testcase classname="TNS require" name="can set variables in the global object" time="0.002">
+  </testcase>
+  <testcase classname="TNS require" name="throws for missing modules" time="0.003">
+  </testcase>
+  <testcase classname="TNS require" name="would load package.json if available, and use its &amp;apos;main&amp;apos; property for js file name" time="0.001">
+  </testcase>
+  <testcase classname="TNS require" name="would load package.json if available, and use its &amp;apos;main&amp;apos; property for js file name without extension" time="0.001">
+  </testcase>
+  <testcase classname="TNS require" name="would load package.json if available, but if there is no &amp;apos;main&amp;apos; property, would fallback to index.js" time="0">
+  </testcase>
+  <testcase classname="TNS require" name="would throw if a package.json main file can not be located" time="0.001">
+  </testcase>
+  <testcase classname="TNS require" name="require extensions" time="0.001">
+  </testcase>
+  <testcase classname="TNS require" name="package.json main property in tns_modules points to a js file in tns_modules" time="0">
+  </testcase>
+  <testcase classname="TNS require" name="can require from tns_modules" time="0.001">
+  </testcase>
+  <testcase classname="TNS require" name="searches tns_modules before app" time="0.001">
+  </testcase>
+  <testcase classname="TNS require" name="when require a tns_module that is a directory name it should load the index js inside it" time="0">
+  </testcase>
+  <testcase classname="TNS require" name="when require a tns_module that is a directory name it should load the package json inside it" time="0">
+  </testcase>
+  <testcase classname="TNS require" name="has a priority to load from tns_module first then from app and relative folder" time="0.002">
+  </testcase>
+  <testcase classname="TNS require" name="can set properties in the global object" time="0">
+  </testcase>
+  <testcase classname="TNS require" name="can simply require" time="0">
+  </testcase>
+  <testcase classname="TNS require" name="can require modules and modules can export" time="0.001">
+  </testcase>
+  <testcase classname="TNS require" name="required module can require a second module" time="0">
+  </testcase>
+  <testcase classname="TNS require" name="can require a module that can require second module and both can export" time="0.001">
+  </testcase>
+  <testcase classname="TNS require" name="can can catch a syntax error in module" time="0.003">
+  </testcase>
+  <testcase classname="TNS require" name="can can catch a runtime error in module" time="0.003">
+  </testcase>
+  <testcase classname="TNS require" name="require relative to home" time="0">
+  </testcase>
+  <testcase classname="TNS require" name="require file when there is directory with the same name" time="0.001">
+  </testcase>
+  <testcase classname="TNS require" name="file ending with commented line" time="0.001">
+  </testcase>
+  <testcase classname="TNS require" name="should require JSON files" time="0">
+  </testcase>
+  <testcase classname="TNS require" name="should handle JSON file errors" time="0.002">
+  </testcase>
+  <testcase classname="TNS require" name="shouldn&amp;apos;t load invalid JSON file" time="0.004">
+  </testcase>
+  <testcase classname="TNS require" name="when using global in a module global should be defined" time="0">
+  </testcase>
+  <testcase classname="TNS require" name="when require a module via app root syntax it should be loaded" time="0.001">
+  </testcase>
+  <testcase classname="TNS require" name="should load module with null char in it" time="0">
+  </testcase>
+  <testcase classname="TNS require" name="should have module.require exported function" time="0.001">
+  </testcase>
+  <testcase classname="TNS require" name="should load module through module.require exported function" time="0.006">
+  </testcase>
+  <testcase classname="TNS require" name="should load module through global.require" time="0.002">
+  </testcase>
+ </testsuite>
+ <testsuite name="WeakRef" timestamp="2016-04-04T10:33:44" hostname="localhost" time="0.007" errors="0" tests="5" skipped="0" failures="0">
+  <testcase classname="WeakRef" name="should exist" time="0">
+  </testcase>
+  <testcase classname="WeakRef" name="should work" time="0.006">
+  </testcase>
+  <testcase classname="WeakRef" name="should throw when constructed with zero parameters" time="0">
+  </testcase>
+  <testcase classname="WeakRef" name="should throw when constructed with primitive parameters" time="0.001">
+  </testcase>
+  <testcase classname="WeakRef" name="should be clearable" time="0">
+  </testcase>
+ </testsuite>
+ <testsuite name="Tests metadata" timestamp="2016-04-04T10:33:44" hostname="localhost" time="0.017" errors="0" tests="3" skipped="0" failures="0">
+  <testcase classname="Tests metadata" name="Can_access_protected_static_members_of_protected_interface" time="0.016">
+  </testcase>
+  <testcase classname="Tests metadata" name="should access public methods of non-public base classes" time="0">
+  </testcase>
+  <testcase classname="Tests metadata" name="should be able to access static fields declared in interface from implementing class" time="0">
+  </testcase>
+ </testsuite>
+ <testsuite name="Tests that app does not crashes (no hard-fail asserts)" timestamp="2016-04-04T10:33:44" hostname="localhost" time="0.054" errors="0" tests="20" skipped="0" failures="0">
+  <testcase classname="Tests that app does not crashes (no hard-fail asserts)" name="When_interface_is_constucted_with_wrong_number_of_arguments" time="0">
+  </testcase>
+  <testcase classname="Tests that app does not crashes (no hard-fail asserts)" name="When_interface_is_constucted_with_wrong_type_of_arguments" time="0.001">
+  </testcase>
+  <testcase classname="Tests that app does not crashes (no hard-fail asserts)" name="When_class_is_extended_with_wrong_number_of_arguments" time="0.001">
+  </testcase>
+  <testcase classname="Tests that app does not crashes (no hard-fail asserts)" name="When_class_is_extended_with_wrong_type_of_arguments" time="0.001">
+  </testcase>
+  <testcase classname="Tests that app does not crashes (no hard-fail asserts)" name="When_byte_cast_function_is_called_with_wrong_number_of_arguments" time="0">
+  </testcase>
+  <testcase classname="Tests that app does not crashes (no hard-fail asserts)" name="When_byte_cast_function_is_called_with_wrong_type_of_arguments" time="0.004">
+  </testcase>
+  <testcase classname="Tests that app does not crashes (no hard-fail asserts)" name="When_short_cast_function_is_called_with_wrong_number_of_arguments" time="0.001">
+  </testcase>
+  <testcase classname="Tests that app does not crashes (no hard-fail asserts)" name="When_short_cast_function_is_called_with_wrong_type_of_arguments" time="0.001">
+  </testcase>
+  <testcase classname="Tests that app does not crashes (no hard-fail asserts)" name="When_long_cast_function_is_called_with_wrong_number_of_arguments" time="0.001">
+  </testcase>
+  <testcase classname="Tests that app does not crashes (no hard-fail asserts)" name="When_long_cast_function_is_called_with_wrong_type_of_arguments" time="0.001">
+  </testcase>
+  <testcase classname="Tests that app does not crashes (no hard-fail asserts)" name="When_float_cast_function_is_called_with_wrong_number_of_arguments" time="0.001">
+  </testcase>
+  <testcase classname="Tests that app does not crashes (no hard-fail asserts)" name="When_float_cast_function_is_called_with_wrong_type_of_arguments" time="0.001">
+  </testcase>
+  <testcase classname="Tests that app does not crashes (no hard-fail asserts)" name="When_double_cast_function_is_called_with_wrong_number_of_arguments" time="0">
+  </testcase>
+  <testcase classname="Tests that app does not crashes (no hard-fail asserts)" name="When_double_cast_function_is_called_with_wrong_type_of_arguments" time="0.001">
+  </testcase>
+  <testcase classname="Tests that app does not crashes (no hard-fail asserts)" name="When_char_cast_function_is_called_with_wrong_number_of_arguments" time="0.001">
+  </testcase>
+  <testcase classname="Tests that app does not crashes (no hard-fail asserts)" name="When_char_cast_function_is_called_with_wrong_type_of_arguments" time="0.002">
+  </testcase>
+  <testcase classname="Tests that app does not crashes (no hard-fail asserts)" name="When_require_is_called_with_wrong_number_of_arguments" time="0">
+  </testcase>
+  <testcase classname="Tests that app does not crashes (no hard-fail asserts)" name="When_require_is_called_with_wrong_type_of_arguments" time="0.002">
+  </testcase>
+  <testcase classname="Tests that app does not crashes (no hard-fail asserts)" name="should throw an exception when trying to link invalid this to a Java object" time="0.001">
+  </testcase>
+  <testcase classname="Tests that app does not crashes (no hard-fail asserts)" name="should not crash the app when __native(this) call is missed in TypeScript constructor" time="0.034">
+  </testcase>
+ </testsuite>
+ <testsuite name="Test WeakRef " timestamp="2016-04-04T10:33:44" hostname="localhost" time="0.021" errors="0" tests="6" skipped="0" failures="0">
+  <testcase classname="Test WeakRef " name="Test if WeakRef gets cleared after gc" time="0.008">
+  </testcase>
+  <testcase classname="Test WeakRef " name="Test if WeakRef gets cleared after clear" time="0">
+  </testcase>
+  <testcase classname="Test WeakRef " name="Test if WeakRef can create multiple instances" time="0.001">
+  </testcase>
+  <testcase classname="Test WeakRef " name="Test if WeakRef can create multiple instances 2" time="0.006">
+  </testcase>
+  <testcase classname="Test WeakRef " name="Test if WeakRef throws exception when constructed with wrong number of parameters" time="0.001">
+  </testcase>
+  <testcase classname="Test WeakRef " name="Test if WeakRef throws exception when constructed with non object" time="0.004">
+  </testcase>
+ </testsuite>
+ <testsuite name="Tests " timestamp="2016-04-04T10:33:44" hostname="localhost" time="1.781" errors="0" tests="83" skipped="0" failures="1">
+  <testcase classname="Tests " name="When_extending_a_class_two_times" time="0.054">
+  </testcase>
+  <testcase classname="Tests " name="When_extending_a_class_two_times_with_no_extend_names" time="0.055">
+  </testcase>
+  <testcase classname="Tests " name="When_extending_a_class_with_method_overloads_by_argument_type" time="0.034">
+  </testcase>
+  <testcase classname="Tests " name="When_implementing_an_interface_with_new_the_overrides_should_work" time="0.056">
+  </testcase>
+  <testcase classname="Tests " name="When_calling_instanceof_on_field_result_it_should_work" time="0.026">
+  </testcase>
+  <testcase classname="Tests " name="When_calling_instanceof_on_method_result_it_should_work" time="0.023">
+  </testcase>
+  <testcase classname="Tests " name="When_calling_instanceof_on_method_argument_it_should_work" time="0.025">
+  </testcase>
+  <testcase classname="Tests " name="When_calling_instanceof_on_interface_it_should_work" time="0.067">
+  </testcase>
+  <testcase classname="Tests " name="When_calling_instanceof_it_should_work" time="0.028">
+  </testcase>
+  <testcase classname="Tests " name="When_calling_instance_and_static_member_with_same_name_the_calls_should_succeed" time="0.025">
+  </testcase>
+  <testcase classname="Tests " name="When_calling_toString_on_an_java_object_it_should_call_the_java_method" time="0.002">
+  </testcase>
+  <testcase classname="Tests " name="When_calling_toString_on_an_java_object_that_has_overriden_toString_in_js_it_should_call_the_js_method" time="0.028">
+  </testcase>
+  <testcase classname="Tests " name="When_extending_a_class_two_times_without_second_implementation_object" time="0.023">
+  </testcase>
+  <testcase classname="Tests " name="When__calling_super_method_using_the_prototype_property_of_a_function_it_should_call_the_super_method" time="0.001">
+  </testcase>
+  <testcase classname="Tests " name="When__calling_super_method_using_the_prototype_property_of_a_extended_function_it_should_call_the_super_method" time="0.02">
+  </testcase>
+  <testcase classname="Tests " name="When__calling_super_method_using_the_prototype_property_of_a_extended_function_it_should_call_the_super_method2" time="0.021">
+  </testcase>
+  <testcase classname="Tests " name="When_extending_a_class_and_calling_super_toString" time="0.021">
+  </testcase>
+  <testcase classname="Tests " name="When_extending_a_class_and_calling_super_method_it_should_work" time="0.021">
+  </testcase>
+  <testcase classname="Tests " name="When_accessing_static_members_on_an_extended_class" time="0.038">
+  </testcase>
+  <testcase classname="Tests " name="When_implementing_an_interface_with_new__the_overrides_should_work" time="0.042">
+  </testcase>
+  <testcase classname="Tests " name="When_a_java_method_returns_object_that_needs_js_instance__it_should_create_the_instance" time="0.021">
+  </testcase>
+  <testcase classname="Tests " name="When_a_java_method_returns_object_that_needs_js_instance__it_should_create_the_instance_according_to_the_actual_return_type" time="0.019">
+  </testcase>
+  <testcase classname="Tests " name="When_a_java_field_returns_object_that_needs_js_instance__it_should_create_the_instance_according_to_the_actual_return_type" time="0.02">
+  </testcase>
+  <testcase classname="Tests " name="When_a_java_argument_is_passed_to_js_that_needs_js_instance__it_should_create_the_instance_according_to_the_actual_return_type" time="0.022">
+  </testcase>
+  <testcase classname="Tests " name="When_a_java_object_is_returned_from_indexer_that_needs_js_instance__it_should_create_the_instance_according_to_the_actual_return_type" time="0.021">
+  </testcase>
+  <testcase classname="Tests " name="When_accessing_a_static_field_on_a_javascript_instance_it_should_work" time="0.021">
+  </testcase>
+  <testcase classname="Tests " name="TestRequireDirName" time="0.001">
+  </testcase>
+  <testcase classname="Tests " name="TestRequireFileName" time="0">
+  </testcase>
+  <testcase classname="Tests " name="TestWorkingWithJavaArrayDoesNotMakeMemoryLeak" time="0.657">
+  </testcase>
+  <testcase classname="Tests " name="TestConstructorOverride" time="0.021">
+  </testcase>
+  <testcase classname="Tests " name="TestConstructorOverrideOnTypeWithInitMethod" time="0.019">
+  </testcase>
+  <testcase classname="Tests " name="TestCreationOfLocationListener" time="0.023">
+  </testcase>
+  <testcase classname="Tests " name="TestInnerClassCreation" time="0.021">
+  </testcase>
+  <testcase classname="Tests " name="TestNestedClassCreation" time="0">
+  </testcase>
+  <testcase classname="Tests " name="TestCallMethodOnAnObjectReturnedAsObjectWithoutMetadata" time="0.001">
+  </testcase>
+  <testcase classname="Tests " name="TestGetFieldOnAnObjectReturnedAsObjectWithoutMetadata" time="0">
+  </testcase>
+  <testcase classname="Tests " name="TestSetFloatInstanceField" time="0.005">
+  </testcase>
+  <testcase classname="Tests " name="TestCallMethodOnAnObjectPassedAsParameterInOverriddenMethodAsAnObjectWithoutMetadata" time="0.021">
+  </testcase>
+  <testcase classname="Tests " name="TestAccessArrayElementAsObjectWithoutMetadata" time="0">
+  </testcase>
+  <testcase classname="Tests " name="TestCallMethodThatReturnsNull" time="0">
+  </testcase>
+  <testcase classname="Tests " name="TestCallMethodThatReturnsNullString" time="0">
+  </testcase>
+  <testcase classname="Tests " name="TestAccessNullField" time="0.001">
+  </testcase>
+  <testcase classname="Tests " name="TestAccessNullArrayElement" time="0">
+  </testcase>
+  <testcase classname="Tests " name="TEMPLATE" time="0">
+  </testcase>
+  <testcase classname="Tests " name="TestCallMethodWithCharVarArg" time="0.001">
+  </testcase>
+  <testcase classname="Tests " name="TestCallMethodWithObjectVarArg" time="0">
+  </testcase>
+  <testcase classname="Tests " name="TestCanInheritFromClassInAndroidSupportLibrary" time="0.002">
+   <failure type="exception" message="Error: java.lang.ClassNotFoundException: Didn&amp;apos;t find class &amp;quot;android.support.v4.os.ParcelableCompat&amp;quot; on path: DexPathList[[zip file &amp;quot;/data/app/com.tns.android_runtime_testapp-1/base.apk&amp;quot;],nativeLibraryDirectories=[/data/app/com.tns.android_runtime_testapp-1/lib/x86, /data/app/com.tns.android_runtime_testapp-1/base.apk!/lib/x86, /vendor/lib, /system/lib]]
+    dalvik.system.BaseDexClassLoader.findClass(BaseDexClassLoader.java:56)
+    java.lang.ClassLoader.loadClass(ClassLoader.java:511)
+    java.lang.ClassLoader.loadClass(ClassLoader.java:469)
+    java.lang.Class.classForName(Native Method)
+    java.lang.Class.forName(Class.java:324)
+    java.lang.Class.forName(Class.java:285)
+    com.tns.DexFactory.generateDex(DexFactory.java:239)
+    com.tns.DexFactory.resolveClass(DexFactory.java:100)
+    com.tns.ClassResolver.resolveClass(ClassResolver.java:38)
+    com.tns.Runtime.resolveClass(Runtime.java:307)
+    com.tns.Runtime.callJSMethodNative(Native Method)
+    com.tns.Runtime.dispatchCallJSMethodNative(Runtime.java:901)
+    com.tns.Runtime.callJSMethodImpl(Runtime.java:784)
+    com.tns.Runtime.callJSMethod(Runtime.java:770)
+    com.tns.Runtime.callJSMethod(Runtime.java:751)
+    com.tns.Runtime.callJSMethod(Runtime.java:741)
+    com.tns.NativeScriptActivity.onCreate(NativeScriptActivity.java:18)
+    android.app.Activity.performCreate(Activity.java:6237)
+    android.app.Instrumentation.callActivityOnCreate(Instrumentation.java:1107)
+    android.app.ActivityThread.performLaunchActivity(ActivityThread.java:2369)
+    android.app.ActivityThread.handleLaunchActivity(ActivityThread.java:2476)
+    android.app.ActivityThread.-wrap11(ActivityThread.java)
+    android.app.ActivityThread$H.handleMessage(ActivityThread.java:1344)
+    android.os.Handler.dispatchMessage(Handler.java:102)
+    android.os.Looper.loop(Looper.java:148)
+    android.app.ActivityThread.main(ActivityThread.java:5417)
+    java.lang.reflect.Method.invoke(Native Method)
+    com.android.internal.os.ZygoteInit$MethodAndArgsCaller.run(ZygoteInit.java:726)
+    com.android.internal.os.ZygoteInit.main(ZygoteInit.java:616)"><![CDATA[Error: java.lang.ClassNotFoundException: Didn't find class "android.support.v4.os.ParcelableCompat" on path: DexPathList[[zip file "/data/app/com.tns.android_runtime_testapp-1/base.apk"],nativeLibraryDirectories=[/data/app/com.tns.android_runtime_testapp-1/lib/x86, /data/app/com.tns.android_runtime_testapp-1/base.apk!/lib/x86, /vendor/lib, /system/lib]]
+    dalvik.system.BaseDexClassLoader.findClass(BaseDexClassLoader.java:56)
+    java.lang.ClassLoader.loadClass(ClassLoader.java:511)
+    java.lang.ClassLoader.loadClass(ClassLoader.java:469)
+    java.lang.Class.classForName(Native Method)
+    java.lang.Class.forName(Class.java:324)
+    java.lang.Class.forName(Class.java:285)
+    com.tns.DexFactory.generateDex(DexFactory.java:239)
+    com.tns.DexFactory.resolveClass(DexFactory.java:100)
+    com.tns.ClassResolver.resolveClass(ClassResolver.java:38)
+    com.tns.Runtime.resolveClass(Runtime.java:307)
+    com.tns.Runtime.callJSMethodNative(Native Method)
+    com.tns.Runtime.dispatchCallJSMethodNative(Runtime.java:901)
+    com.tns.Runtime.callJSMethodImpl(Runtime.java:784)
+    com.tns.Runtime.callJSMethod(Runtime.java:770)
+    com.tns.Runtime.callJSMethod(Runtime.java:751)
+    com.tns.Runtime.callJSMethod(Runtime.java:741)
+    com.tns.NativeScriptActivity.onCreate(NativeScriptActivity.java:18)
+    android.app.Activity.performCreate(Activity.java:6237)
+    android.app.Instrumentation.callActivityOnCreate(Instrumentation.java:1107)
+    android.app.ActivityThread.performLaunchActivity(ActivityThread.java:2369)
+    android.app.ActivityThread.handleLaunchActivity(ActivityThread.java:2476)
+    android.app.ActivityThread.-wrap11(ActivityThread.java)
+    android.app.ActivityThread$H.handleMessage(ActivityThread.java:1344)
+    android.os.Handler.dispatchMessage(Handler.java:102)
+    android.os.Looper.loop(Looper.java:148)
+    android.app.ActivityThread.main(ActivityThread.java:5417)
+    java.lang.reflect.Method.invoke(Native Method)
+    com.android.internal.os.ZygoteInit$MethodAndArgsCaller.run(ZygoteInit.java:726)
+    com.android.internal.os.ZygoteInit.main(ZygoteInit.java:616)
+    at Error (native)
+    at Object.<anonymous> (/data/data/com.tns.android_runtime_testapp/files/app/tests/tests.js:937:67)
+    at attemptSync (/data/data/com.tns.android_runtime_testapp/files/app/Infrastructure/Jasmine/jasmine-2.0.1/jasmine.js:1610:12)
+    at QueueRunner.run (/data/data/com.tns.android_runtime_testapp/files/app/Infrastructure/Jasmine/jasmine-2.0.1/jasmine.js:1598:9)
+    at QueueRunner.execute (/data/data/com.tns.android_runtime_testapp/files/app/Infrastructure/Jasmine/jasmine-2.0.1/jasmine.js:1585:10)
+    at Spec.Env.queueRunnerFactory (/data/data/com.tns.android_runtime_testapp/files/app/Infrastructure/Jasmine/jasmine-2.0.1/jasmine.js:513:35)
+    at Spec.execute (/data/data/com.tns.android_runtime_testapp/files/app/Infrastructure/Jasmine/jasmine-2.0.1/jasmine.js:295:10)
+    at Object.<anonymous> (/data/data/com.tns.android_runtime_testapp/files/app/Infrastructure/Jasmine/jasmine-2.0.1/jasmine.js:1822:37)
+    at attemptAsync (/data/data/com.tns.android_runtime_testapp/files/app/Infrastructure/Jasmine/jasmine-2.0.1/jasmine.js:1634:12)
+    at QueueRunner.run (/data/data/com.tns.android_runtime_testapp/files/app/Infrastructure/Jasmine/jasmine-2.0.1/jasmine.js:1596:16)]]>
+   </failure>
+  </testcase>
+  <testcase classname="Tests " name="TestCallMethodWithByteParameter" time="0.001">
+  </testcase>
+  <testcase classname="Tests " name="TestCallMethodWithFloatParameter" time="0">
+  </testcase>
+  <testcase classname="Tests " name="TestCanCallStaticMethodThroughBaseClass" time="0.001">
+  </testcase>
+  <testcase classname="Tests " name="TestUseFieldThatIsArray" time="0">
+  </testcase>
+  <testcase classname="Tests " name="TestCanAssignArrayToField" time="0">
+  </testcase>
+  <testcase classname="Tests " name="TestCallMethodThatReturnsLong" time="0.001">
+  </testcase>
+  <testcase classname="Tests " name="TestCallMethodWithLongParameter" time="0.001">
+  </testcase>
+  <testcase classname="Tests " name="TestCallMethodWithLongCastArgument" time="0.001">
+  </testcase>
+  <testcase classname="Tests " name="TestCallToStringOfNativeScriptLongObject" time="0">
+  </testcase>
+  <testcase classname="Tests " name="TestCallMethodWithLongParameterWithNumberObject" time="0">
+  </testcase>
+  <testcase classname="Tests " name="TestCallMethodWithMinAndMaxLongValues" time="0.001">
+  </testcase>
+  <testcase classname="Tests " name="TestCallMethodWithByteParameter" time="0">
+  </testcase>
+  <testcase classname="Tests " name="TestCallMethodWithShortParameter" time="0">
+  </testcase>
+  <testcase classname="Tests " name="TestCallMethodWithBooleanParameter" time="0.001">
+  </testcase>
+  <testcase classname="Tests " name="TestThrowJavaScriptExceptionWhenCannotResolveJavaMethod" time="0">
+  </testcase>
+  <testcase classname="Tests " name="TestThrowJavaScriptExceptionWhenCannotResolveJavaConstructor" time="0.001">
+  </testcase>
+  <testcase classname="Tests " name="TestThrowJavaScriptExceptionWhenSetArrayRefElementWithNakedJavaScriptObject" time="0.001">
+  </testcase>
+  <testcase classname="Tests " name="TestThrowJavaScriptExceptionWhenSetArrayRefElementWithJavaScriptPrimitive" time="0.001">
+  </testcase>
+  <testcase classname="Tests " name="TestThrowJavaScriptExceptionWhenCreateJavaObjectWithNakedJavaScriptObject" time="0">
+  </testcase>
+  <testcase classname="Tests " name="TestThrowJavaScriptExceptionWhenCallJavaMethodWithNakedJavaScriptObject" time="0.001">
+  </testcase>
+  <testcase classname="Tests " name="TestThrowJavaScriptExceptionWhenCallJavaMethodWithJavaScriptPrimitiveWhenJavaRefIsExpected" time="0">
+  </testcase>
+  <testcase classname="Tests " name="TestThrowJavaScriptExceptionWhenOverideMethodImplementationIsDeleted" time="0.023">
+  </testcase>
+  <testcase classname="Tests " name="TestThrowJavaScriptExceptionWhenOverideMethodImplementationIsOverwritten" time="0.025">
+  </testcase>
+  <testcase classname="Tests " name="TestThrowJavaScriptExceptionWhenPartiallyImplementedInterfaceIsUsed" time="0.05">
+  </testcase>
+  <testcase classname="Tests " name="TestThrowJavaScriptExceptionWhenImplementationObjectIsUsedToExtendMoreThanOneClass" time="0.042">
+  </testcase>
+  <testcase classname="Tests " name="TestThrowJavaScriptExceptionWhenPassBooleanArgumentWhereNotExpected" time="0.001">
+  </testcase>
+  <testcase classname="Tests " name="TestThrowJavaScriptExceptionWhenPassNumberArgumentWhereNotExpected" time="0.001">
+  </testcase>
+  <testcase classname="Tests " name="TestCallProctedMethodDefinedAsAbstractAndThenOverwritten" time="0.02">
+  </testcase>
+  <testcase classname="Tests " name="TestCharSequenceReturnValueIsTreatedAsStringWhenItIsString" time="0">
+  </testcase>
+  <testcase classname="Tests " name="TestObjectReturnValueIsTreatedAsStringWhenItIsString" time="0">
+  </testcase>
+  <testcase classname="Tests " name="TestCanFindImplementationObjectWhenCreateExtendedObjectFromJava" time="0.021">
+  </testcase>
+  <testcase classname="Tests " name="TestCanCallMethodThatReturnsArrayOfInterfaces" time="0.023">
+  </testcase>
+  <testcase classname="Tests " name="TestCanParseSignatureWithTypesThatContainsCapitalLettersForPrimitiveTypes" time="0.002">
+  </testcase>
+  <testcase classname="Tests " name="TestCanCallToStringOnClassProxy" time="0.001">
+  </testcase>
+  <testcase classname="Tests " name="When_accessing_class_property_on_a_extended_class_it_should_return_the_extended_class" time="0.023">
+  </testcase>
+  <testcase classname="Tests " name="When_calling_non_existent_ctor_it_should_fail" time="0.028">
+  </testcase>
+ </testsuite>
+ <testsuite name="Test Method Resolution" timestamp="2016-04-04T10:33:46" hostname="localhost" time="0.001" errors="0" tests="3" skipped="0" failures="0">
+  <testcase classname="Test Method Resolution" name="When_call_overloaded_base_method_it_should_call_base_method1" time="0">
+  </testcase>
+  <testcase classname="Test Method Resolution" name="When_call_overloaded_base_method_it_should_call_base_method2" time="0">
+  </testcase>
+  <testcase classname="Test Method Resolution" name="When_call_method_methodWithOverloadsWithOneArgument_with_java.lang.Object_argument" time="0.001">
+  </testcase>
+ </testsuite>
+ <testsuite name="Tests array operations" timestamp="2016-04-04T10:33:46" hostname="localhost" time="1.763" errors="0" tests="5" skipped="0" failures="0">
+  <testcase classname="Tests array operations" name="TestWorkingWithJavaArrayDoesNotMakeMemoryLeak" time="1.057">
+  </testcase>
+  <testcase classname="Tests array operations" name="TestArraySize" time="0.001">
+  </testcase>
+  <testcase classname="Tests array operations" name="TestArrayOperations" time="0.644">
+  </testcase>
+  <testcase classname="Tests array operations" name="TestArrays" time="0.025">
+  </testcase>
+  <testcase classname="Tests array operations" name="TestArrayLengthPropertyIsNumber" time="0.036">
+  </testcase>
+ </testsuite>
+ <testsuite name="Tests for runtime binding generator" timestamp="2016-04-04T10:33:48" hostname="localhost" time="0.1" errors="0" tests="2" skipped="0" failures="0">
+  <testcase classname="Tests for runtime binding generator" name="When_generating_a_proxy_of_nested_interface_at_runtime" time="0.075">
+  </testcase>
+  <testcase classname="Tests for runtime binding generator" name="When_generating_a_proxy_of_android_class_at_runtime" time="0.025">
+  </testcase>
+ </testsuite>
+ <testsuite name="Tests primitive type conversion" timestamp="2016-04-04T10:33:48" hostname="localhost" time="0.031" errors="0" tests="1" skipped="0" failures="0">
+  <testcase classname="Tests primitive type conversion" name="convert_char" time="0.031">
+  </testcase>
+ </testsuite>
+ <testsuite name="Tests numeric conversions and constructor/method resolutions" timestamp="2016-04-04T10:33:48" hostname="localhost" time="0.369" errors="0" tests="39" skipped="0" failures="0">
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestCreateInstanceWithConstructorResolutionWithNumberLiteral" time="0.001">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestCreateInstanceWithConstructorResolutionWithCastFunctions" time="0">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestCreateInstanceWithConstructorResolutionWithValuesFromJavaCalls" time="0">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestCreateInstanceWithConstructorResolutionWithPromotingValueUp" time="0.001">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestCreateInstanceWithConstructorResolutionWithPromotingValueDown" time="0.001">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestCallMethodWithResolutionWithPromotingValueUp" time="0">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestCallMethodWithResolutionWithPromotingValueDown" time="0">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestLongCastToFloatConversionWhenThereIsDoubleOverload" time="0.001">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestByteCastToFloatConversionWhenThereIsDoubleOverload" time="0">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestShortCastToFloatConversionWhenThereIsDoubleOverload" time="0">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestDoubleCastWhenThereIsDoubleOverload" time="0">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestNumberExpressionToFloatConversionWhenThereIsDoubleOverload" time="0.001">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestDoubleCastToLongConversionWhenThereIsShortOverload" time="0">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestFloatCastToLongConversionWhenThereIsShortOverload" time="0">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestFloatCastToShortConversionWhenThereIsObjectOverload" time="0">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestByteCastToShortConversionWhenThereIsObjectOverload" time="0">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestResolveMethodWithByteCast" time="0.001">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestResolveMethodWithShortCast" time="0">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestResolveMethodWithoutCastFunction" time="0">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestResolveMethodWithLongCast" time="0">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestResolveMethodWithFloatCast" time="0">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestResolveMethodWithDoubleCast" time="0.001">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestResolveIntMethodWithNumberObjectWithIntArgument" time="0">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestResolveIntMethodWithNumberObjectWithDoubleArgument" time="0">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestIfNeedsToReturnLongItAlwaysReturnsLong" time="0.024">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestIfNeedsToReturnLongItAlwaysReturnsLong1" time="0.024">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestIfNeedsToReturnLongItAlwaysReturnsLong2" time="0.023">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestIfNeedsToReturnLongItAlwaysReturnsLong3" time="0.022">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestIfNeedsToReturnIntItAlwaysReturnsInt" time="0.028">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestIfNeedsToReturnIntAndWePassLongExceptionShouldBeThrown" time="0.03">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestIfNeedsToReturnDoubleItAlwaysReturnsDouble" time="0.025">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestIfNeedsToReturnDoubleItAlwaysReturnsDouble1" time="0.024">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestIfNeedsToReturnDoubleItAlwaysReturnsDouble2" time="0.024">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestIfNeedsToReturnDoubleItAlwaysReturnsDouble3" time="0.022">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestIfNeedsToReturnDoubleItAlwaysReturnsDouble4" time="0.023">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestIfNeedsToReturnFloatItAlwaysReturnsFloat" time="0.023">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestIfNeedsToReturnFloatItAlwaysReturnsFloat1" time="0.021">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestIfNeedsToReturnFloatAndWePassDoubleExceptionShouldBeThrown" time="0.024">
+  </testcase>
+  <testcase classname="Tests numeric conversions and constructor/method resolutions" name="TestIfNeedsToReturnFloatAndWePassDoubleExceptionShouldBeThrown1" time="0.025">
+  </testcase>
+ </testsuite>
+ <testsuite name="Tests inheritance chain resolution" timestamp="2016-04-04T10:33:48" hostname="localhost" time="0.002" errors="0" tests="2" skipped="0" failures="0">
+  <testcase classname="Tests inheritance chain resolution" name="TestCallWithStringArgumentWhenThereIsStringOverload" time="0">
+  </testcase>
+  <testcase classname="Tests inheritance chain resolution" name="TestCallWithStringArgumentWhenThereIsNoStringOverload" time="0.002">
+  </testcase>
+ </testsuite>
+ <testsuite name="Tests exception handling " timestamp="2016-04-04T10:33:48" hostname="localhost" time="0.226" errors="0" tests="10" skipped="0" failures="0">
+  <testcase classname="Tests exception handling " name="TestThrowJSExceptionThroughJavaAndCatchInJS" time="0.036">
+  </testcase>
+  <testcase classname="Tests exception handling " name="TestThrowJavaExceptionFromJsThroughJavaAndCatchInJS" time="0.046">
+  </testcase>
+  <testcase classname="Tests exception handling " name="TestThrowJSExceptionAndCatchInJava" time="0.027">
+  </testcase>
+  <testcase classname="Tests exception handling " name="TestThrowJavaExceptionFromJsAndCatchInJava" time="0.024">
+  </testcase>
+  <testcase classname="Tests exception handling " name="TestMethodThatThrowsException" time="0.002">
+  </testcase>
+  <testcase classname="Tests exception handling " name="TestErrorObjectContainsJavaNativeException" time="0.001">
+  </testcase>
+  <testcase classname="Tests exception handling " name="TestConstructorThatThrowsException" time="0.001">
+  </testcase>
+  <testcase classname="Tests exception handling " name="TestArrayElementGetAccessThatThrowsException" time="0.001">
+  </testcase>
+  <testcase classname="Tests exception handling " name="TestArrayElementSetAccessThatThrowsException" time="0">
+  </testcase>
+  <testcase classname="Tests exception handling " name="should not wrap the thrown exception into NativeScriptException" time="0.087">
+  </testcase>
+ </testsuite>
+ <testsuite name="Tests dispatch callbacks on UI thread " timestamp="2016-04-04T10:33:48" hostname="localhost" time="0.024" errors="0" tests="1" skipped="0" failures="0">
+  <testcase classname="Tests dispatch callbacks on UI thread " name="TestProcessDataCallbackShouldBeExecutedOnUiThread" time="0.023">
+  </testcase>
+ </testsuite>
+ <testsuite name="Tests string conversion " timestamp="2016-04-04T10:33:48" hostname="localhost" time="0.095" errors="0" tests="4" skipped="0" failures="0">
+  <testcase classname="Tests string conversion " name="TestCanConvertNonTrivalJavaString1" time="0.02">
+  </testcase>
+  <testcase classname="Tests string conversion " name="TestCanConvertNonTrivalJavaString2" time="0.021">
+  </testcase>
+  <testcase classname="Tests string conversion " name="TestCanConvertNonTrivalJavaString3" time="0.014">
+  </testcase>
+  <testcase classname="Tests string conversion " name="TestCanConvertNonTrivalJavaString4" time="0.04">
+  </testcase>
+ </testsuite>
+ <testsuite name="Tests typescript" timestamp="2016-04-04T10:33:48" hostname="localhost" time="0.255" errors="0" tests="13" skipped="0" failures="0">
+  <testcase classname="Tests typescript" name="When_creating_a_typescript_instance_with_constructor_property_it_should_support_this" time="0.027">
+  </testcase>
+  <testcase classname="Tests typescript" name="When_creating_a_typescript_instance_it_should_support_overriden_members" time="0.025">
+  </testcase>
+  <testcase classname="Tests typescript" name="When_creating_a_typescript_instance_it_should_support_calling_super_members_from_overriden_members" time="0.024">
+  </testcase>
+  <testcase classname="Tests typescript" name="When_creating_a_pure_typescript_inheritance_chain_it_should_work" time="0">
+  </testcase>
+  <testcase classname="Tests typescript" name="When_creating_a_typescript_instance_it_should_be_a_valid_nativescript_instance" time="0.024">
+  </testcase>
+  <testcase classname="Tests typescript" name="When_creating_a_typescript_instance_it_should_be_a_valid_nativescript_instance" time="0.026">
+  </testcase>
+  <testcase classname="Tests typescript" name="When_creating_a_typescript_instance_it_should_support_member_access" time="0.025">
+  </testcase>
+  <testcase classname="Tests typescript" name="When_creating_a_typescript_instance_it_should_support_calling_super_members_from_super_prototype" time="0.025">
+  </testcase>
+  <testcase classname="Tests typescript" name="When_extending_an_already_extended_object_it_should_throw_an_error" time="0.001">
+  </testcase>
+  <testcase classname="Tests typescript" name="When_accessing_a_static_field_on_a_typescript_instance_it_should_work" time="0.002">
+  </testcase>
+  <testcase classname="Tests typescript" name="When_calling_a_static_method_on_a_typescript_instance_it_should_work" time="0">
+  </testcase>
+  <testcase classname="Tests typescript" name="When_inherit_from_android_base_class_it_should_create_an_instance" time="0.027">
+  </testcase>
+  <testcase classname="Tests typescript" name="When_creating_a_typescript_instance_and_anonymous_interfaces_in_its_ctor_it_should_work" time="0.048">
+  </testcase>
+ </testsuite>
+ <testsuite name="Tests garbage collection" timestamp="2016-04-04T10:33:49" hostname="localhost" time="0.449" errors="0" tests="9" skipped="3" failures="0">
+  <testcase classname="Tests garbage collection" name="TestGarbageCollection" time="0"><skipped />
+  </testcase>
+  <testcase classname="Tests garbage collection" name="test1" time="0.119">
+  </testcase>
+  <testcase classname="Tests garbage collection" name="test2" time="0.059">
+  </testcase>
+  <testcase classname="Tests garbage collection" name="test3" time="0.061">
+  </testcase>
+  <testcase classname="Tests garbage collection" name="test4" time="0.065">
+  </testcase>
+  <testcase classname="Tests garbage collection" name="test5" time="0"><skipped />
+  </testcase>
+  <testcase classname="Tests garbage collection" name="testAccessingStringFieldWontLeak" time="0.047">
+  </testcase>
+  <testcase classname="Tests garbage collection" name="should persist JavaScript object when it reappears after GC" time="0"><skipped />
+  </testcase>
+  <testcase classname="Tests garbage collection" name="should keep extended instances alive after GC" time="0.098">
+  </testcase>
+ </testsuite>
+ <testsuite name="Tests for memmory managment" timestamp="2016-04-04T10:33:49" hostname="localhost" time="0.052" errors="0" tests="1" skipped="0" failures="0">
+  <testcase classname="Tests for memmory managment" name="TestSecondaryCallbackInvokationWithObjectParamsShouldWork" time="0.052">
+  </testcase>
+ </testsuite>
+ <testsuite name="Tests final fields set" timestamp="2016-04-04T10:33:49" hostname="localhost" time="0.001" errors="0" tests="2" skipped="0" failures="0">
+  <testcase classname="Tests final fields set" name="When trying to set a final field throw exception" time="0.001">
+  </testcase>
+  <testcase classname="Tests final fields set" name="When setting a field with null it should return null object" time="0">
+  </testcase>
+ </testsuite>
+ <testsuite name="Tests extended classes " timestamp="2016-04-04T10:33:49" hostname="localhost" time="0.119" errors="0" tests="3" skipped="0" failures="0">
+  <testcase classname="Tests extended classes " name="Instance_with_no_extension_shouldnt_use_previously_defined_implementation_object" time="0.025">
+  </testcase>
+  <testcase classname="Tests extended classes " name="Instance_with_extension_shouldnt_use_previously_defined_implementation_object" time="0.067">
+  </testcase>
+  <testcase classname="Tests extended classes " name="Newly_created_instances_should_behave_the_same_and_not_use_previously_defined_implementation_objects" time="0.027">
+  </testcase>
+ </testsuite>
+ <testsuite name="Tests extend class name " timestamp="2016-04-04T10:33:49" hostname="localhost" time="0.024" errors="0" tests="2" skipped="0" failures="0">
+  <testcase classname="Tests extend class name " name="When_naming_extension_class_user_should_give_valid_name" time="0.023">
+  </testcase>
+  <testcase classname="Tests extend class name " name="When_naming_extension_contains_invalid_symbols_should_throw_exception" time="0.001">
+  </testcase>
+ </testsuite>
+ <testsuite name="Tests JNI reference leak" timestamp="2016-04-04T10:33:49" hostname="localhost" time="8.319" errors="0" tests="5" skipped="0" failures="0">
+  <testcase classname="Tests JNI reference leak" name="test_if_method_param_marshalling_leaks" time="0.646">
+  </testcase>
+  <testcase classname="Tests JNI reference leak" name="test_if_field_access_marshalling_leaks" time="0.588">
+  </testcase>
+  <testcase classname="Tests JNI reference leak" name="test_if_callback_parameter_marshalling_leaks" time="1.563">
+  </testcase>
+  <testcase classname="Tests JNI reference leak" name="test_if_global_reference_leaks_when_interface_implementation_is_created" time="5.156">
+  </testcase>
+  <testcase classname="Tests JNI reference leak" name="test_passing_javascript_array_should_not_leak" time="0.366">
+  </testcase>
+ </testsuite>
+ <testsuite name="Tests native modules)" timestamp="2016-04-04T10:33:58" hostname="localhost" time="0.002" errors="0" tests="1" skipped="0" failures="0">
+  <testcase classname="Tests native modules)" name="should load native module" time="0.001">
+  </testcase>
+ </testsuite>
+ <testsuite name="Tests require exceptions " timestamp="2016-04-04T10:33:58" hostname="localhost" time="0.01" errors="0" tests="8" skipped="0" failures="0">
+  <testcase classname="Tests require exceptions " name="when file is required by absolute path and is outside the project folder an exception should be thrown" time="0.003">
+  </testcase>
+  <testcase classname="Tests require exceptions " name="when requiring a relative extenal path an exception should be thrown" time="0.002">
+  </testcase>
+  <testcase classname="Tests require exceptions " name="when requiring a relative (../) non existing module and error should be thrown" time="0">
+  </testcase>
+  <testcase classname="Tests require exceptions " name="when requiring a relative (~/) non existing module and error should be thrown" time="0.001">
+  </testcase>
+  <testcase classname="Tests require exceptions " name="when requiring a relative (./) non existing module and error should be thrown" time="0.001">
+  </testcase>
+  <testcase classname="Tests require exceptions " name="when requiring a relative non existing tns_module an error should be thrown" time="0.001">
+  </testcase>
+  <testcase classname="Tests require exceptions " name="when requiring a relative non existing tns_module from folder an error should be thrown" time="0.001">
+  </testcase>
+  <testcase classname="Tests require exceptions " name="TestRequire" time="0.001">
+  </testcase>
+ </testsuite>
+ <testsuite name="Tests instancing java arrays" timestamp="2016-04-04T10:33:58" hostname="localhost" time="0.005" errors="0" tests="12" skipped="0" failures="0">
+  <testcase classname="Tests instancing java arrays" name="should throw an exception when call Array.create with wrong number of arguments" time="0.002">
+  </testcase>
+  <testcase classname="Tests instancing java arrays" name="should throw an exception when call Array.create with wrong type of arguments" time="0">
+  </testcase>
+  <testcase classname="Tests instancing java arrays" name="should instantiate primitive char array" time="0.001">
+  </testcase>
+  <testcase classname="Tests instancing java arrays" name="should instantiate primitive boolean array" time="0">
+  </testcase>
+  <testcase classname="Tests instancing java arrays" name="should instantiate primitive byte array" time="0">
+  </testcase>
+  <testcase classname="Tests instancing java arrays" name="should instantiate primitive short array" time="0">
+  </testcase>
+  <testcase classname="Tests instancing java arrays" name="should instantiate primitive int array" time="0.001">
+  </testcase>
+  <testcase classname="Tests instancing java arrays" name="should instantiate primitive long array" time="0">
+  </testcase>
+  <testcase classname="Tests instancing java arrays" name="should instantiate primitive float array" time="0">
+  </testcase>
+  <testcase classname="Tests instancing java arrays" name="should instantiate primitive double array" time="0">
+  </testcase>
+  <testcase classname="Tests instancing java arrays" name="should instantiate Object array" time="0.001">
+  </testcase>
+  <testcase classname="Tests instancing java arrays" name="should instantiate jagged java.lang.String array" time="0">
+  </testcase>
+ </testsuite>
+ <testsuite name="Tests Java object field access" timestamp="2016-04-04T10:33:58" hostname="localhost" time="0.001" errors="0" tests="2" skipped="0" failures="0">
+  <testcase classname="Tests Java object field access" name="should not crash when Java object protytype is enumerated" time="0">
+  </testcase>
+  <testcase classname="Tests Java object field access" name="should not crash when Java property is acceess through plain JavaScritp object" time="0.001">
+  </testcase>
+ </testsuite>
+ <testsuite name="Tests with context " timestamp="2016-04-04T10:33:58" hostname="localhost" time="0.106" errors="0" tests="5" skipped="0" failures="0">
+  <testcase classname="Tests with context " name="TestConstructorOverrideForBuiltinType" time="0.029">
+  </testcase>
+  <testcase classname="Tests with context " name="TestConstructorOverrideForBuiltinTypeWithInitMethod" time="0.043">
+  </testcase>
+  <testcase classname="Tests with context " name="TestBuiltinNestedClassCreation" time="0.002">
+  </testcase>
+  <testcase classname="Tests with context " name="TestPublicWindowManagerImplWithoutMetadata" time="0.003">
+  </testcase>
+  <testcase classname="Tests with context " name="TestCanPassCharSequenceArray" time="0.029">
+  </testcase>
+ </testsuite>
+</testsuites>

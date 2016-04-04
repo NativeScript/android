@@ -104,15 +104,12 @@ string MethodCache::GetType(const v8::Local<v8::Value>& value)
 	{
 		auto objVal = value->ToObject();
 
-		string const IS_NULL_FIELD = "isnull";
-		string const NODE_FIELD = "node";
-		Local<Value> a = objVal->GetHiddenValue(ConvertToV8String(IS_NULL_FIELD));
+		Local<Value> nullNode = objVal->GetHiddenValue(V8StringConstants::GetNullNodeName());
 
-		if(!a.IsEmpty()) {
-			auto node = objVal->GetHiddenValue(ConvertToV8String(NODE_FIELD));
-			auto n = reinterpret_cast<MetadataNode*>(node.As<External>()->Value());
+		if(!nullNode.IsEmpty()) {
+			auto treeNode = reinterpret_cast<MetadataNode*>(nullNode.As<External>()->Value());
 
-			type = (n != nullptr) ? n->GetName() : "<unknown>";
+			type = (treeNode != nullptr) ? treeNode->GetName() : "<unknown>";
 
 			DEBUG_WRITE("Parameter of type %s with NULL value is passed to the method.", type.c_str());
 			return type;

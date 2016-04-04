@@ -289,13 +289,23 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 			case CastType::None:
 				obj = objectManager->GetJavaObjectByJsObject(jsObj);
                 
-				castValue = jsObj->GetHiddenValue(ConvertToV8String("node"));
-				if(!castValue.IsEmpty()) {
-					auto n = reinterpret_cast<MetadataNode*>(castValue.As<External>()->Value());
-					auto type = (n != nullptr) ? n->GetName() : "";
+				castValue = jsObj->GetHiddenValue(V8StringConstants::GetNullNodeName());
 
-					jclass nullClazz = env.FindClass("com/tns/NullObject");
-					jmethodID ctor = env.GetMethodID(nullClazz, "<init>", "(Ljava/lang/Class;)V");
+				if(!castValue.IsEmpty()) {
+					auto node = reinterpret_cast<MetadataNode*>(castValue.As<External>()->Value());
+
+					if(node == nullptr) {
+						s << "Cannot get type of the null argument at index " << index;
+						success = false;
+						break;
+					}
+
+					auto type = node->GetName();
+					auto nullObjName = "com/tns/NullObject";
+					auto nullObjCtorSig = "(Ljava/lang/Class;)V";
+
+					jclass nullClazz = env.FindClass(nullObjName);
+					jmethodID ctor = env.GetMethodID(nullClazz, "<init>", nullObjCtorSig);
 					jclass clazzToNull = env.FindClass(type.c_str());
 					jobject nullObjType = env.NewObject(nullClazz, ctor, clazzToNull);
 

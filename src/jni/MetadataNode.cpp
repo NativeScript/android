@@ -286,10 +286,8 @@ void MetadataNode::NullObjectAccessorGetterCallback(Local<String> property,const
 		DEBUG_WRITE("NullObjectAccessorGetterCallback node name: %s", node->GetName().c_str());
 
 		Local<Object> value = Object::New(isolate);
-		auto k = ConvertToV8String("node");
-		value->SetHiddenValue(k, External::New(isolate, node));
-		value->SetHiddenValue(ConvertToV8String("isnull"), Boolean::New(isolate, true));
-		// TODO: Pesho: Set .valueOf() callback to return null
+		value->SetHiddenValue(V8StringConstants::GetNullNodeName(), External::New(isolate, node));
+		// TODO: pete: Set .valueOf() callback to return null
 
 		info.GetReturnValue().Set(value);
 	}
