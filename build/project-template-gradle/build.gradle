@@ -33,11 +33,11 @@ apply plugin: "com.android.application"
 def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
 def metadataParams = new LinkedList <String> ()
 def allJarPaths = new LinkedList <String> ()
-def configurationsDir = "configurations"
+def configurationsDir = "$projectDir/configurations"
 def createPluginConfigFile = false
 def configStage = "\n:config phase: "
 def nodeModulesDir = "../../node_modules/"
-def libDir = "../../lib/Android/"
+def libDir = "$projectDir/../../lib/Android/"
 def pluginNames = new ArrayList<String>()
 def configDir = file(configurationsDir)
 def appResExists = false
@@ -102,7 +102,7 @@ android {
 	}
 	
 	sourceSets.main {
-        jniLibs.srcDir "libs/jni"
+        jniLibs.srcDir "$projectDir/libs/jni"
     }
 	
 	signingConfigs {
@@ -278,7 +278,7 @@ task createPluginsConfigFile {
 task pluginExtend {
 	description "applies additional configuration"
 
-	def pathToAppGradle = "../../app/App_Resources/Android/app.gradle" 
+	def pathToAppGradle = "$projectDir/../../app/App_Resources/Android/app.gradle" 
 	def appGradle = file(pathToAppGradle)
 	if(appGradle.exists()) {
 		apply from: pathToAppGradle
@@ -310,13 +310,13 @@ task pluginExtend {
 task copyAarDependencies (type: Copy) {
 	println "$configStage copyAarDependencies"
 	from fileTree(dir: nodeModulesDir, include: ["**/*.aar"], exclude: '**/.bin/**').files
-	into "libs/aar"
+	into "$projectDir/libs/aar"
 }
 
 task addAarDependencies <<  {
 	println "$configStage addAarDependencies"
 	// manually traverse all the locally copied AAR files and add them to the project compilation dependencies list
-	FileTree tree = fileTree(dir: "libs/aar", include: ["**/*.aar"])
+	FileTree tree = fileTree(dir: "$projectDir/libs/aar", include: ["**/*.aar"])
 	tree.each { File file ->
 		// remove the extension of the file (.aar)
 		def length = file.name.length() - 4
@@ -336,7 +336,7 @@ task cleanLocalAarFiles(type: Delete) {
 }
 
 task ensureMetadataOutDir {
-	def outputDir = file("$rootDir/metadata/output/assets/metadata")
+	def outputDir = file("$projectDir/metadata/output/assets/metadata")
 	outputDir.mkdirs()
 }
 
@@ -361,12 +361,12 @@ task collectAllJars {
 		}
 		
 		metadataParams.add("metadata-generator.jar")
-		metadataParams.add("../metadata/output/assets/metadata")
+		metadataParams.add("$projectDir/metadata/output/assets/metadata")
 		for(def i = 0; i < allJarPaths.size(); i++) {
 			metadataParams.add(allJarPaths.get(i));
 		}
 
-		def classesDir = "$rootDir/build/intermediates/classes"
+		def classesDir = "$buildDir/intermediates/classes"
 
 		def classesSubDirs = new File(classesDir).listFiles()
 
@@ -393,7 +393,7 @@ task buildMetadata (type: JavaExec) {
 	description "builds metadata with provided jar dependencies"
 	
 	inputs.files(allJarPaths)
-	inputs.dir("build/intermediates/classes")
+	inputs.dir("$buildDir/intermediates/classes")
 
 	outputs.files("metadata/output/assets/metadata/treeNodeStream.dat", "metadata/output/assets/metadata/treeStringsStream.dat", "metadata/output/assets/metadata/treeValueStream.dat")
 
@@ -407,8 +407,8 @@ task buildMetadata (type: JavaExec) {
 	
 	doLast {
 		copy {
-			from "metadata/output/assets/metadata"
-			into "src/main/assets/metadata"
+			from "$projectDir/metadata/output/assets/metadata"
+			into "$projectDir/src/main/assets/metadata"
 		}
 		
 		def files = new File("${buildDir}/intermediates/res").listFiles()
@@ -432,14 +432,14 @@ task buildMetadata (type: JavaExec) {
 		
 		exec {
 			ignoreExitValue true
-			workingDir "metadata/output"
+			workingDir "$projectDir/metadata/output"
 			commandLine removeCmdParams.toArray()
 		}
 		
 		def addCmdParams = new ArrayList<String>([aaptCommand, "add", tmpAPKPath, "assets/metadata/treeNodeStream.dat", "assets/metadata/treeStringsStream.dat", "assets/metadata/treeValueStream.dat"])
 		
 		exec {
-			workingDir "metadata/output"
+			workingDir "$projectDir/metadata/output"
 			commandLine addCmdParams.toArray()
 		}
 	}
