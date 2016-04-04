@@ -144,7 +144,7 @@ repositories {
     jcenter()
     // used for local *.AAR files
     flatDir {
-    	dirs 'libs/aar'
+    	dirs '$projectDir/libs/aar'
 	}
 }
 
