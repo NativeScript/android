@@ -17,12 +17,12 @@ public class Dump
 	private static final String callJsMethodSignatureCtor = "Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;Z[Ljava/lang/Object;";
 	private static final String callJsMethodSignatureMethod = "Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/Class;[Ljava/lang/Object;";
 	private static final String LCOM_TNS = "Lcom/tns/gen/";
-	private static final String LCOM_TNS_PLATFORM = "Lcom/tns/Platform;";
+	private static final String LCOM_TNS_RUNTIME = "Lcom/tns/Runtime;";
 	static final String preferenceActivityJniSignature = "Lcom/tns/android/preference/PreferenceActivity;";
 	static final String preferenceActivityClass = "Landroid/preference/PreferenceActivity;";
 	static final String objectClass = "Ljava/lang/Object;";
 
-	static final String platformClass = LCOM_TNS_PLATFORM;
+	static final String runtimeClass = LCOM_TNS_RUNTIME;
 	static final String callJSMethodName = "callJSMethod";
 	static final String initInstanceMethodName = "initInstance";
 
@@ -617,7 +617,7 @@ public class Dump
 		int argCount = generateArrayForCallJsArguments(mv, ctor.getParameterTypes(), thisRegister, classSignature, tnsClassSignature);
 		mv.visitStringInsn(org.ow2.asmdex.Opcodes.INSN_CONST_STRING, 1, "init"); //put "init" in register 1
 		mv.visitVarInsn(org.ow2.asmdex.Opcodes.INSN_CONST_4, 2, 1); //put true to register 2 == isConstructor argument
-		mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, LCOM_TNS_PLATFORM, "callJSMethod", callJsMethodSignatureCtor, new int[]
+		mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, LCOM_TNS_RUNTIME, "callJSMethod", callJsMethodSignatureCtor, new int[]
 		{ 3, 1, 2, 0 }); //invoke callJSMethod(this, "init", true, params)
 	}
 
@@ -628,7 +628,7 @@ public class Dump
 		mv.visitJumpInsn(org.ow2.asmdex.Opcodes.INSN_IF_NEZ, label, thisRegister - 2, 0); //compare local var 1 with false
 		mv.visitVarInsn(org.ow2.asmdex.Opcodes.INSN_CONST_4, thisRegister - 1, 1); 		//put true in local var 1 
 		mv.visitFieldInsn(org.ow2.asmdex.Opcodes.INSN_IPUT_BOOLEAN, tnsClassSignature, "__initialized", "Z", thisRegister - 1 , thisRegister); //set field to the value of 2
-		mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, LCOM_TNS_PLATFORM, "initInstance", "VLjava/lang/Object;", new int[] { thisRegister }); //call init instance passing this as arugment
+		mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, LCOM_TNS_RUNTIME, "initInstance", "VLjava/lang/Object;", new int[] { thisRegister }); //call init instance passing this as arugment
 		mv.visitLabel(label);
 	}
 	
@@ -789,7 +789,7 @@ public class Dump
  			mv.visitTypeInsn(org.ow2.asmdex.Opcodes.INSN_CONST_CLASS, 2, 0, 0, getClassSignatureOfType(returnType)); 
 		}
 		
-		mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, platformClass, callJSMethodName, callJsMethodSignatureMethod, new int[] { thisRegister, 1, 2, 0 });
+		mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, runtimeClass, callJSMethodName, callJsMethodSignatureMethod, new int[] { thisRegister, 1, 2, 0 });
 		
 		//Label returnLabel = new Label();
 		//mv.visitLabel(returnLabel);

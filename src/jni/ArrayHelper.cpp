@@ -3,6 +3,7 @@
 #include "JEnv.h"
 #include "JniLocalRef.h"
 #include "NativeScriptException.h"
+#include "Runtime.h"
 #include <assert.h>
 #include <sstream>
 
@@ -14,17 +15,15 @@ ArrayHelper::ArrayHelper()
 {
 }
 
-void ArrayHelper::Init(ObjectManager *objectManager, const Local<Context>& context)
+void ArrayHelper::Init(const Local<Context>& context)
 {
 	JEnv env;
 
-	PLATFORM_CLASS = env.FindClass("com/tns/Platform");
-	assert(PLATFORM_CLASS != nullptr);
+	RUNTIME_CLASS = env.FindClass("com/tns/Runtime");
+	assert(RUNTIME_CLASS != nullptr);
 
-	CREATE_ARRAY_HELPER = env.GetStaticMethodID(PLATFORM_CLASS, "createArrayHelper", "(Ljava/lang/String;I)Ljava/lang/Object;");
+	CREATE_ARRAY_HELPER = env.GetStaticMethodID(RUNTIME_CLASS, "createArrayHelper", "(Ljava/lang/String;I)Ljava/lang/Object;");
 	assert(CREATE_ARRAY_HELPER != nullptr);
-
-	s_objectManager = objectManager;
 
 	auto global = context->Global();
 	auto arr = global->Get(context, ConvertToV8String("Array"));
@@ -80,6 +79,9 @@ void ArrayHelper::CreateJavaArray(const v8::FunctionCallbackInfo<v8::Value>& inf
 
 	JniLocalRef array;
 
+	auto runtime = Runtime::GetRuntime(isolate);
+	auto objectManager = runtime->GetObjectManager();
+
 	if (type->IsString())
 	{
 		if (!length->IsInt32())
@@ -123,7 +125,7 @@ void ArrayHelper::CreateJavaArray(const v8::FunctionCallbackInfo<v8::Value>& inf
 			return;
 		}
 
-		auto c = s_objectManager->GetJavaObjectByJsObjectStatic(clazz.As<Object>());
+		auto c = objectManager->GetJavaObjectByJsObject(clazz.As<Object>());
 
 		JEnv env;
 		array = env.NewObjectArray(len, static_cast<jclass>(c), nullptr);
@@ -134,8 +136,8 @@ void ArrayHelper::CreateJavaArray(const v8::FunctionCallbackInfo<v8::Value>& inf
 		return;
 	}
 
-	jint javaObjectID = s_objectManager->GetOrCreateObjectId(array);
-	auto jsWrapper = s_objectManager->CreateJSWrapper(javaObjectID, "" /* ignored */, array);
+	jint javaObjectID = objectManager->GetOrCreateObjectId(array);
+	auto jsWrapper = objectManager->CreateJSWrapper(javaObjectID, "" /* ignored */, array);
 	info.GetReturnValue().Set(jsWrapper);
 }
 
@@ -186,12 +188,11 @@ jobject ArrayHelper::CreateArrayByClassName(const string& typeName, int length)
 	else
 	{
 		JniLocalRef s(env.NewStringUTF(typeName.c_str()));
-		array = env.CallStaticObjectMethod(PLATFORM_CLASS, CREATE_ARRAY_HELPER, (jstring)s, length);
+		array = env.CallStaticObjectMethod(RUNTIME_CLASS, CREATE_ARRAY_HELPER, (jstring)s, length);
 	}
 
 	return array;
 }
 
-ObjectManager* ArrayHelper::s_objectManager = nullptr;
-jclass ArrayHelper::PLATFORM_CLASS = nullptr;
+jclass ArrayHelper::RUNTIME_CLASS = nullptr;
 jmethodID ArrayHelper::CREATE_ARRAY_HELPER = nullptr;

@@ -12,13 +12,14 @@
 #include "JType.h"
 #include "NumericCasts.h"
 #include "NativeScriptException.h"
+#include "Runtime.h"
 
 using namespace v8;
 using namespace std;
 using namespace tns;
 
-JsArgToArrayConverter::JsArgToArrayConverter(const v8::Local<Value>& arg, bool isImplementationObject, int classReturnType) :
-		m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()), m_return_type(classReturnType)
+JsArgToArrayConverter::JsArgToArrayConverter(Isolate *isolate, const v8::Local<Value>& arg, bool isImplementationObject, int classReturnType)
+	: m_isolate(isolate), m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()), m_return_type(classReturnType)
 {
 	if (!isImplementationObject)
 	{
@@ -30,8 +31,8 @@ JsArgToArrayConverter::JsArgToArrayConverter(const v8::Local<Value>& arg, bool i
 	}
 }
 
-JsArgToArrayConverter::JsArgToArrayConverter(const v8::FunctionCallbackInfo<Value>& args, bool hasImplementationObject, const Local<Object>& outerThis) :
-		m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()), m_return_type(static_cast<int>(Type::Null))
+JsArgToArrayConverter::JsArgToArrayConverter(const v8::FunctionCallbackInfo<Value>& args, bool hasImplementationObject, const Local<Object>& outerThis)
+	: m_isolate(args.GetIsolate()), m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()), m_return_type(static_cast<int>(Type::Null))
 {
 	auto isInnerClass = !outerThis.IsEmpty();
 	if (isInnerClass)
@@ -185,6 +186,9 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 		jobject javaObject;
 		JniLocalRef obj;
 
+		auto runtime = Runtime::GetRuntime(m_isolate);
+		auto objectManager = runtime->GetObjectManager();
+
 		switch (castType)
 		{
 			case CastType::Char:
@@ -282,7 +286,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 				break;
 
 			case CastType::None:
-				obj = ObjectManager::GetJavaObjectByJsObjectStatic(jsObj);
+				obj = objectManager->GetJavaObjectByJsObject(jsObj);
 				success = !obj.IsNull();
 				if (success)
 				{

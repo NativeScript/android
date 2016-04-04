@@ -25,6 +25,7 @@ public class NativeScriptSyncService
 	private static final String FULL_SYNC_SOURCE_DIR = "/fullsync/";
 	private static final String REMOVED_SYNC_SOURCE_DIR = "/removedsync/";
 
+	private final Runtime runtime;
 	private static Logger logger;
 	private final Context context;
 
@@ -38,8 +39,9 @@ public class NativeScriptSyncService
 	private LocalServerSocketThread localServerThread;
 	private Thread localServerJavaThread;
 
-	public NativeScriptSyncService(Logger logger, Context context)
+	public NativeScriptSyncService(Runtime runtime, Logger logger, Context context)
 	{
+		this.runtime = runtime;
 		this.logger = logger;
 		this.context = context;
 
@@ -150,7 +152,7 @@ public class NativeScriptSyncService
 				executePartialSync(context, syncDir);
 				executeRemovedSync(context, removedSyncDir);
 
-				Platform.runScript(new File(NativeScriptSyncService.this.context.getFilesDir(), "internal/livesync.js"));
+				runtime.runScript(new File(NativeScriptSyncService.this.context.getFilesDir(), "internal/livesync.js"));
 				try
 				{
 					output.write(1);

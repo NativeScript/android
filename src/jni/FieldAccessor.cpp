@@ -5,6 +5,7 @@
 #include "Util.h"
 #include "V8GlobalHelpers.h"
 #include "NativeScriptException.h"
+#include "Runtime.h"
 #include <assert.h>
 #include <sstream>
 
@@ -12,18 +13,13 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
-void FieldAccessor::Init(JavaVM *jvm, ObjectManager *objectManager)
-{
-	this->jvm = jvm;
-	this->objectManager = objectManager;
-}
-
-Local<Value> FieldAccessor::GetJavaField(const Local<Object>& target, FieldCallbackData *fieldData)
+Local<Value> FieldAccessor::GetJavaField(Isolate *isolate, const Local<Object>& target, FieldCallbackData *fieldData)
 {
 	JEnv env;
 
-	auto isolate = Isolate::GetCurrent();
 	EscapableHandleScope handleScope(isolate);
+	auto runtime = Runtime::GetRuntime(isolate);
+	auto objectManager = runtime->GetObjectManager();
 
 	Local<Value> fieldResult;
 
@@ -246,12 +242,13 @@ Local<Value> FieldAccessor::GetJavaField(const Local<Object>& target, FieldCallb
 	return fieldResult;
 }
 
-void FieldAccessor::SetJavaField(const Local<Object>& target, const Local<Value>& value, FieldCallbackData *fieldData)
+void FieldAccessor::SetJavaField(Isolate *isolate, const Local<Object>& target, const Local<Value>& value, FieldCallbackData *fieldData)
 {
 	JEnv env;
 
-	auto isolate = Isolate::GetCurrent();
 	HandleScope handleScope(isolate);
+	auto runtime = Runtime::GetRuntime(isolate);
+	auto objectManager = runtime->GetObjectManager();
 
 	JniLocalRef targetJavaObject;
 

@@ -2,45 +2,48 @@ package com.tns;
 
 import android.app.Application;
 
-@JavaScriptImplementation(javaScriptFile = "app/tns_modules/application/application.js")
+@JavaScriptImplementation(javaScriptFile = "application")
 public class NativeScriptApplication extends android.app.Application implements com.tns.NativeScriptHashCodeProvider {
 
     private static NativeScriptApplication thiz;
 
-    public NativeScriptApplication()
-    {
+    public NativeScriptApplication() {
         thiz = this;
     }
 
-    protected void attachBaseContext(android.content.Context param_0) {
-        super.attachBaseContext(param_0);
-
-        new RuntimeHelper(this).initRuntime();
-
-        Platform.initInstance(this);
-    }
-
-
     public void onCreate() {
-        java.lang.Object[] params = null;
-        com.tns.Platform.callJSMethod(this, "onCreate", void.class, params);
+		new RuntimeHelper(this).initRuntime();
+		if (Runtime.isInitialized()) {
+	        java.lang.Object[] params = null;
+	        com.tns.Runtime.callJSMethod(this, "onCreate", void.class, params);
+		} else {
+			super.onCreate();
+		}
     }
 
     public void onLowMemory() {
-        java.lang.Object[] params = null;
-        com.tns.Platform.callJSMethod(this, "onLowMemory", void.class, params);
+    	if (Runtime.isInitialized()) {
+	        java.lang.Object[] params = null;
+	        com.tns.Runtime.callJSMethod(this, "onLowMemory", void.class, params);
+    	} else {
+    		super.onLowMemory();
+    	}
     }
 
     public void onTrimMemory(int level) {
-        java.lang.Object[] params = new Object[1];
-        params[0] = level;
-        com.tns.Platform.callJSMethod(this, "onTrimMemory", void.class, params);
+    	if (Runtime.isInitialized()) {
+	        java.lang.Object[] params = new Object[1];
+	        params[0] = level;
+	        com.tns.Runtime.callJSMethod(this, "onTrimMemory", void.class, params);
+    	} else {
+    		super.onTrimMemory(level);
+    	}
     }
-
 
     public boolean equals__super(java.lang.Object other) {
         return super.equals(other);
     }
+
     public int hashCode__super() {
         return super.hashCode();
     }
@@ -48,5 +51,4 @@ public class NativeScriptApplication extends android.app.Application implements 
     public static Application getInstance() {
         return thiz;
     }
-
 }

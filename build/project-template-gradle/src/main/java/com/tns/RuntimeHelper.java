@@ -51,7 +51,7 @@ public class RuntimeHelper
 		boolean showErrorIntent = hasErrorIntent();
 		if (!showErrorIntent)
 		{
-			Thread.UncaughtExceptionHandler exHandler = new NativeScriptUncaughtExceptionHandler(logger, app);
+			NativeScriptUncaughtExceptionHandler exHandler = new NativeScriptUncaughtExceptionHandler(logger, app);
 
 			Thread.setDefaultUncaughtExceptionHandler(exHandler);
 			
@@ -64,24 +64,6 @@ public class RuntimeHelper
 				new AssetExtractor(null, logger).extractAssets(app, extractPolicy);
 			}
 			
-			if (NativeScriptSyncService.isSyncEnabled(this.app))
-			{
-				NativeScriptSyncService syncService = new NativeScriptSyncService(logger, this.app);
-
-				syncService.sync();
-				syncService.startServer();
-
-				// preserve this instance as strong reference
-				// do not preserve in NativeScriptApplication field inorder to make the code more portable
-				Platform.getOrCreateJavaObjectID(syncService);
-			}
-			else
-			{
-				if (logger.isEnabled())
-				{
-					logger.write("NativeScript LiveSync is not enabled.");
-				}
-			}
 			String appName = app.getPackageName();
 			File rootDir = new File(app.getApplicationInfo().dataDir);
 			File appDir = app.getFilesDir();
@@ -107,9 +89,38 @@ public class RuntimeHelper
 				e.printStackTrace();
 			}
 			ThreadScheduler workThreadScheduler = new WorkThreadScheduler(new Handler(Looper.getMainLooper()));
-			Platform.init(this.app, workThreadScheduler, logger, appName, null, rootDir, appDir, classLoader, dexDir, dexThumb);
-			Platform.runScript(new File(appDir, "internal/ts_helpers.js"));
-			Platform.run();
+			Configuration config = new Configuration(this.app, workThreadScheduler, logger, appName, null, rootDir, appDir, classLoader, dexDir, dexThumb);
+			Runtime runtime = new Runtime(config);
+			
+			exHandler.setRuntime(runtime);
+			
+			if (NativeScriptSyncService.isSyncEnabled(this.app))
+			{
+				NativeScriptSyncService syncService = new NativeScriptSyncService(runtime, logger, this.app);
+
+				syncService.sync();
+				syncService.startServer();
+
+				// preserve this instance as strong reference
+				// do not preserve in NativeScriptApplication field inorder to make the code more portable
+				// @@@
+				//Runtime.getOrCreateJavaObjectID(syncService);
+			}
+			else
+			{
+				if (logger.isEnabled())
+				{
+					logger.write("NativeScript LiveSync is not enabled.");
+				}
+			}
+			
+			
+
+			
+			runtime.init();
+			runtime.runScript(new File(appDir, "internal/ts_helpers.js"));
+			Runtime.initInstance(this.app);
+			runtime.run();
 		}
 	}
 	

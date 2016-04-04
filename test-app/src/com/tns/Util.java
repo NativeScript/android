@@ -81,7 +81,7 @@ public final class Util
 		BufferedReader reader = null;
 		try
 		{
-			Process proc = Runtime.getRuntime().exec(new String[] { "/system/bin/getprop", name });
+			Process proc = java.lang.Runtime.getRuntime().exec(new String[] { "/system/bin/getprop", name });
 			in = new InputStreamReader(proc.getInputStream());
 			reader = new BufferedReader(in);
 			return reader.readLine();

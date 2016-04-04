@@ -1,5 +1,5 @@
-#ifndef NATIVESCRIPTRUNTIME_H_
-#define NATIVESCRIPTRUNTIME_H_
+#ifndef CALLBACKHANDLERS_H_
+#define CALLBACKHANDLERS_H_
 
 #include <string>
 #include <map>
@@ -19,38 +19,40 @@
 
 namespace tns
 {
-	class NativeScriptRuntime
+	class CallbackHandlers
 	{
 		public:
 
-			static void Init(JavaVM *jvm, ObjectManager *objectManager);
+			static void Init(ObjectManager *objectManager);
 
-			static v8::Local<v8::Object> CreateJSWrapper(jint javaObjectID, const std::string& typeName);
+			static v8::Local<v8::Object> CreateJSWrapper(v8::Isolate *isolate, jint javaObjectID, const std::string& typeName);
 
 			static jobject CreateJavaInstance(int objectID, const std::string& fullClassName, const ArgsWrapper& argWrapper, jclass javaClass, bool isInterface);
 
-			static bool RegisterInstance(const v8::Local<v8::Object>& jsObject, const std::string& fullClassName, const ArgsWrapper& argWrapper, const v8::Local<v8::Object>& implementationObject, bool isInterface);
+			static bool RegisterInstance(v8::Isolate *isolate, const v8::Local<v8::Object>& jsObject, const std::string& fullClassName, const ArgsWrapper& argWrapper, const v8::Local<v8::Object>& implementationObject, bool isInterface);
 
-			static jclass ResolveClass(const std::string& fullClassname, const v8::Local<v8::Object>& implementationObject);
+			static jclass ResolveClass(v8::Isolate *isolate, const std::string& fullClassname, const v8::Local<v8::Object>& implementationObject);
+
+			static std::string ResolveClassName(v8::Isolate *isolate, const std::string& fullClassname, const v8::Local<v8::Object>& implementationObject);
 			//
 
-			static v8::Local<v8::Value> GetArrayElement(const v8::Local<v8::Object>& array, uint32_t index, const std::string& arraySignature);
+			static v8::Local<v8::Value> GetArrayElement(v8::Isolate *isolate, const v8::Local<v8::Object>& array, uint32_t index, const std::string& arraySignature);
 
-			static void SetArrayElement(const v8::Local<v8::Object>& array, uint32_t index, const std::string& arraySignature, v8::Local<v8::Value>& value);
+			static void SetArrayElement(v8::Isolate *isolate, const v8::Local<v8::Object>& array, uint32_t index, const std::string& arraySignature, v8::Local<v8::Value>& value);
 
-			static int GetArrayLength(const v8::Local<v8::Object>& arr);
+			static int GetArrayLength(v8::Isolate *isolate, const v8::Local<v8::Object>& arr);
 
 			//
 
 			static void CallJavaMethod(const v8::Local<v8::Object>& caller, const std::string& className, const std::string& methodName, MetadataEntry *entry, bool isStatic, bool isSuper, const v8::FunctionCallbackInfo<v8::Value>& args);
 
-			static v8::Local<v8::Value> CallJSMethod(JNIEnv *_env, const v8::Local<v8::Object>& jsObject, const std::string& methodName, jobjectArray args);
+			static v8::Local<v8::Value> CallJSMethod(v8::Isolate *isolate, JNIEnv *_env, const v8::Local<v8::Object>& jsObject, const std::string& methodName, jobjectArray args);
 
 			//
 
-			static v8::Local<v8::Value> GetJavaField(const v8::Local<v8::Object>& caller, FieldCallbackData *fieldData);
+			static v8::Local<v8::Value> GetJavaField(v8::Isolate *isolate, const v8::Local<v8::Object>& caller, FieldCallbackData *fieldData);
 
-			static void SetJavaField(const v8::Local<v8::Object>& target, const v8::Local<v8::Value>& value, FieldCallbackData *fieldData);
+			static void SetJavaField(v8::Isolate *isolate, const v8::Local<v8::Object>& target, const v8::Local<v8::Value>& value, FieldCallbackData *fieldData);
 
 			//
 
@@ -80,21 +82,17 @@ namespace tns
 
 			static void DisableVerboseLoggingMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-			static void BuildMetadata(JEnv& env, std::string filesPath);
-
-			static void CreateTopLevelNamespaces(const v8::Local<v8::Object>& global);
-
-			static v8::Local<v8::Object> FindClass(const std::string& className);
+			static v8::Local<v8::Object> FindClass(v8::Isolate *isolate, const std::string& className);
 
 			static MetadataTreeNode *metadataRoot;
 
-			static jclass PlatformClass;
+			static jclass RUNTIME_CLASS;
 
 			static jclass JAVA_LANG_STRING;
 			//
 
 		private:
-			NativeScriptRuntime()
+			CallbackHandlers()
 			{
 			}
 
@@ -103,8 +101,6 @@ namespace tns
 			static int64_t AdjustAmountOfExternalAllocatedMemory(JEnv& env, v8::Isolate *isolate);
 
 			static v8::Persistent<v8::Object>* MarkJsObject(const v8::Local<v8::Object>& object, std::string mark, const v8::Local<v8::Value>& value);
-
-			static JavaVM *jvm;
 
 			static jmethodID RESOLVE_CLASS_METHOD_ID;
 
@@ -126,12 +122,10 @@ namespace tns
 
 			static FieldAccessor fieldAccessor;
 
-			static ObjectManager *objectManager;
-
 			static std::map<std::string, int> s_constructorCache;
 
 			static std::map<std::string, jclass> s_classCache;
 	};
 }
 
-#endif /* NATIVESCRIPTRUNTIME_H_ */
+#endif /* CALLBACKHANDLERS_H_ */

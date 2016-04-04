@@ -10,7 +10,7 @@ namespace tns
 	class ArrayHelper
 	{
 		public:
-			static void Init(ObjectManager *objectManager, const v8::Local<v8::Context>& context);
+			static void Init(const v8::Local<v8::Context>& context);
 
 		private:
 			ArrayHelper();
@@ -23,9 +23,7 @@ namespace tns
 
 			static jobject CreateArrayByClassName(const std::string& typeName, int length);
 
-			static ObjectManager *s_objectManager;
-
-			static jclass PLATFORM_CLASS;
+			static jclass RUNTIME_CLASS;
 
 			static jmethodID CREATE_ARRAY_HELPER;
 	};

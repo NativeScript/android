@@ -143,20 +143,9 @@ void Module::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 		// cache the required modules by full path, not name only, since there might be some collisions with relative paths and names
 		string modulePath = ArgConverter::jstringToString((jstring) jsModulePath);
 
-		auto it = s_loadedModules.find(modulePath);
-
-		Local<Object> moduleObj;
-
 		auto isData = false;
 
-		if (it == s_loadedModules.end())
-		{
-			moduleObj = Load(modulePath, isData);
-		}
-		else
-		{
-			moduleObj = Local<Object>::New(isolate, *it->second);
-		}
+		auto moduleObj = LoadImpl(modulePath, isData);
 
 		if (isData)
 		{
@@ -196,26 +185,51 @@ void Module::RequireNativeCallback(const v8::FunctionCallbackInfo<v8::Value>& ar
 	funcPtr(args);
 }
 
-Local<Object> Module::Load(const string& path, bool& isData)
+void Module::Load(const string& path)
+{
+	auto isolate = Isolate::GetCurrent();
+	auto context = isolate->GetCurrentContext();
+	auto globalObject = context->Global();
+	auto require = globalObject->Get(context, ConvertToV8String("require")).ToLocalChecked().As<Function>();
+	Local<Value> args[] = { ConvertToV8String(path) };
+	TryCatch tc;
+	require->Call(context, globalObject, 1, args);
+	if (tc.HasCaught())
+	{
+		throw NativeScriptException(tc, "Fail to load module: " + path);
+	}
+}
+
+Local<Object> Module::LoadImpl(const string& path, bool& isData)
 {
 	Local<Object> result;
 
 	auto isolate = Isolate::GetCurrent();
 
-	if (Util::EndsWith(path, ".js") || Util::EndsWith(path, ".so"))
+	auto it = s_loadedModules.find(path);
+
+	if (it == s_loadedModules.end())
 	{
-		isData = false;
-		result = LoadModule(isolate, path);
-	}
-	else if (Util::EndsWith(path, ".json"))
-	{
-		isData = true;
-		result = LoadData(isolate, path);
+		if (Util::EndsWith(path, ".js") || Util::EndsWith(path, ".so"))
+		{
+			isData = false;
+			result = LoadModule(isolate, path);
+		}
+		else if (Util::EndsWith(path, ".json"))
+		{
+			isData = true;
+			result = LoadData(isolate, path);
+		}
+		else
+		{
+			string errMsg = "Unsupported file extension: " + path;
+			throw NativeScriptException(errMsg);
+		}
 	}
 	else
 	{
-		string errMsg = "Unsupported file extension: " + path;
-		throw NativeScriptException(errMsg);
+		isData = Util::EndsWith(path, ".json");
+		result = Local<Object>::New(isolate, *it->second);
 	}
 
 	return result;

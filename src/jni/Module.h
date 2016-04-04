@@ -21,7 +21,7 @@ namespace tns
 		public:
 			static void Init(v8::Isolate *isolate);
 
-			static v8::Local<v8::Object> Load(const std::string& path, bool& isData);
+			static void Load(const std::string& path);
 
 			static void RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
@@ -29,6 +29,8 @@ namespace tns
 			Module() = default;
 
 			static v8::Local<v8::String> WrapModuleContent(const std::string& path);
+
+			static v8::Local<v8::Object> LoadImpl(const std::string& path, bool& isData);
 
 			static v8::Local<v8::Object> LoadModule(v8::Isolate *isolate, const std::string& path);
 
