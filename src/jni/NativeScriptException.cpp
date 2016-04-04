@@ -1,7 +1,6 @@
 #include "Util.h"
 #include "NativeScriptException.h"
 #include "V8GlobalHelpers.h"
-#include "NativeScriptRuntime.h"
 #include "NativeScriptAssert.h"
 #include "V8StringConstants.h"
 #include <sstream>
@@ -123,15 +122,15 @@ void NativeScriptException::ReThrowToJava()
 	env.Throw(ex);
 }
 
-void NativeScriptException::Init(JavaVM *jvm, ObjectManager *objectManager)
+void NativeScriptException::Init(ObjectManager *objectManager)
 {
 	NativeScriptException::objectManager = objectManager;
 	assert(NativeScriptException::objectManager != nullptr);
 
 	JEnv env;
 
-	PlatformClass = env.FindClass("com/tns/Platform");
-	assert(PlatformClass != nullptr);
+	RUNTIME_CLASS = env.FindClass("com/tns/Runtime");
+	assert(RUNTIME_CLASS != nullptr);
 
 	THROWABLE_CLASS = env.FindClass("java/lang/Throwable");
 	assert(THROWABLE_CLASS != nullptr);
@@ -444,7 +443,7 @@ string NativeScriptException::GetExceptionMessage(JEnv& env, jthrowable exceptio
 }
 
 ObjectManager* NativeScriptException::objectManager = nullptr;
-jclass NativeScriptException::PlatformClass = nullptr;
+jclass NativeScriptException::RUNTIME_CLASS = nullptr;
 jclass NativeScriptException::THROWABLE_CLASS = nullptr;
 jmethodID NativeScriptException::THROWABLE_GET_CAUSE_METHOD_ID = nullptr;
 jmethodID NativeScriptException::THROWABLE_GET_STACK_TRACE_METHOD_ID = nullptr;

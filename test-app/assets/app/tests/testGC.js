@@ -38,7 +38,7 @@ describe("Tests garbage collection", function () {
 		normalTest();
 	});
 	
-	// this test has implicit assert in com.tns.Platform.getJavaObjectByID method
+	// this test has implicit assert in com.tns.Runtime.getJavaObjectByID method
 	it("test1", function () {
 		
 	  	function createObjects(name) {
@@ -61,7 +61,7 @@ describe("Tests garbage collection", function () {
 		java.lang.System.gc();
 	});
 	
-	// this test has implicit assert in com.tns.Platform.getJavaObjectByID method
+	// this test has implicit assert in com.tns.Runtime.getJavaObjectByID method
 	it("test2", function () {
 		
 		function indref1() {
@@ -90,7 +90,7 @@ describe("Tests garbage collection", function () {
 		java.lang.System.gc();
 	});
 	
-	// this test has implicit assert in com.tns.Platform.getJavaObjectByID method
+	// this test has implicit assert in com.tns.Runtime.getJavaObjectByID method
 	it("test3", function () {
 		
 		function indref2() {
@@ -125,7 +125,7 @@ describe("Tests garbage collection", function () {
 		java.lang.System.gc();
 	});
 	
-	// this test has implicit assert in com.tns.Platform.getJavaObjectByID method
+	// this test has implicit assert in com.tns.Runtime.getJavaObjectByID method
 	it("test4", function () {
 		
 		function indref3() {
@@ -166,7 +166,7 @@ describe("Tests garbage collection", function () {
 		java.lang.System.gc();
 	});
 	
-	// this test has implicit assert in com.tns.Platform.getJavaObjectByID method
+	// this test has implicit assert in com.tns.Runtime.getJavaObjectByID method
 	//originally test was commented out
 	xit("test5", function () {
 		

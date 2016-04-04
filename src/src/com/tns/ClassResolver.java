@@ -4,7 +4,14 @@ import java.io.IOException;
 
 class ClassResolver
 {
-	public static Class<?> resolveClass(String fullClassName, DexFactory dexFactory, String[] methodOverrides) throws ClassNotFoundException, IOException
+	private final Runtime runtime;
+	
+	public ClassResolver(Runtime runtime)
+	{
+		this.runtime = runtime;
+	}
+	
+	public Class<?> resolveClass(String fullClassName, DexFactory dexFactory, String[] methodOverrides) throws ClassNotFoundException, IOException
 	{
 		String cannonicalClassName = fullClassName.replace('/', '.');
 		String name = null;
@@ -33,7 +40,7 @@ class ClassResolver
 
 		if (clazz == null)
 		{
-			clazz = Platform.getClassForName(className);
+			clazz = Runtime.getClassForName(className);
 		}
 
 		return clazz;

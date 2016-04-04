@@ -325,7 +325,7 @@ namespace tns
 
 			static JavaVM *s_jvm;
 
-			static jclass PLATFORM_CLASS;
+			static jclass RUNTIME_CLASS;
 
 			static jmethodID GET_CACHED_CLASS_METHOD_ID;
 

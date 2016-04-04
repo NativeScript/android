@@ -17,9 +17,9 @@ namespace tns
 	class ArgConverter
 	{
 		public:
-			static void Init(JavaVM *jvm);
+			static void Init();
 
-			static v8::Local<v8::Array> ConvertJavaArgsToJsArgs(jobjectArray args);
+			static v8::Local<v8::Array> ConvertJavaArgsToJsArgs(v8::Isolate *isolate, jobjectArray args);
 
 			static v8::Local<v8::Value> ConvertFromJavaLong(jlong value);
 
@@ -30,9 +30,6 @@ namespace tns
 			static std::string jstringToString(jstring value);
 
 		private:
-
-			static JavaVM *jvm;
-
 			static bool ReadJStringInBuffer(jstring value, jsize& utfLength);
 
 			static jstring ObjectToString(jobject object);

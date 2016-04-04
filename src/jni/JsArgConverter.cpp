@@ -11,13 +11,14 @@
 #include "V8StringConstants.h"
 #include "NumericCasts.h"
 #include "NativeScriptException.h"
+#include "Runtime.h"
 
 using namespace v8;
 using namespace std;
 using namespace tns;
 
-JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value>& args, bool hasImplementationObject, const string& methodSignature, MetadataEntry *entry) :
-		m_env(JEnv()), m_methodSignature(methodSignature), m_isValid(true), m_error(Error()), m_tokens(nullptr)
+JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value>& args, bool hasImplementationObject, const string& methodSignature, MetadataEntry *entry)
+	: m_isolate(args.GetIsolate()), m_env(JEnv()), m_methodSignature(methodSignature), m_isValid(true), m_error(Error()), m_tokens(nullptr)
 {
 	m_argsLen = !hasImplementationObject ? args.Length() : args.Length() - 1;
 
@@ -117,6 +118,9 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 		Local<Value> castValue;
 		JniLocalRef obj;
 
+		auto runtime = Runtime::GetRuntime(m_isolate);
+		auto objectManager = runtime->GetObjectManager();
+
 		switch (castType)
 		{
 			case CastType::Char:
@@ -199,7 +203,7 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 
 
 			case CastType::None:
-				obj = ObjectManager::GetJavaObjectByJsObjectStatic(jsObject);
+				obj = objectManager->GetJavaObjectByJsObject(jsObject);
 				success = !obj.IsNull();
 
 				if (success)
@@ -445,7 +449,7 @@ bool JsArgConverter::ConvertJavaScriptArray(const Local<Array>& jsArr, int index
 			for (int i = 0; i < arrLength; i++)
 			{
 				auto v = jsArr->Get(i);
-				JsArgToArrayConverter c(v, false, (int) Type::Null);
+				JsArgToArrayConverter c(m_isolate, v, false, (int) Type::Null);
 				jobject o = c.GetConvertedArg();
 				m_env.SetObjectArrayElement((jobjectArray) arr, i, o);
 			}
