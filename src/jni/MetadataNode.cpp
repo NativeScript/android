@@ -25,7 +25,7 @@ void MetadataNode::Init()
 }
 
 MetadataNode::MetadataNode(MetadataTreeNode *treeNode) :
-		m_treeNode(treeNode)
+				m_treeNode(treeNode)
 {
 	uint8_t nodeType = s_metadataReader.GetNodeType(treeNode);
 
@@ -42,9 +42,9 @@ MetadataNode::MetadataNode(MetadataTreeNode *treeNode) :
 		bool isPrefix;
 		auto impTypeName = s_metadataReader.ReadInterfaceImplementationTypeName(m_treeNode, isPrefix);
 		m_implType = isPrefix
-						? (impTypeName + m_name)
-							:
-							impTypeName;
+				? (impTypeName + m_name)
+						:
+						impTypeName;
 	}
 }
 
@@ -281,15 +281,39 @@ void MetadataNode::NullObjectAccessorGetterCallback(Local<String> property,const
 		DEBUG_WRITE("NullObjectAccessorGetterCallback");
 		auto isolate = info.GetIsolate();
 
-		// TODO: pete: Set .valueOf() callback to return null
 		auto thiz = info.This();
-		if(!(thiz->GetHiddenValue(V8StringConstants::GetNullNodeName())).IsEmpty())
+		if((thiz->GetHiddenValue(V8StringConstants::GetNullNodeName())).IsEmpty())
 		{
 			auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value());
 			thiz->SetHiddenValue(V8StringConstants::GetNullNodeName(), External::New(isolate, node));
+			auto funcTemplate = FunctionTemplate::New(isolate, MetadataNode::NullValueOfCallback);
+			thiz->Delete(V8StringConstants::GetValueOf());
+			thiz->Set(V8StringConstants::GetValueOf(), funcTemplate->GetFunction());
 		}
 
 		info.GetReturnValue().Set(thiz);
+	}
+	catch (NativeScriptException& e)
+	{
+		e.ReThrowToV8();
+	}
+	catch (std::exception e) {
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
+		nsEx.ReThrowToV8();
+	}
+	catch (...) {
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
+	}
+}
+
+void MetadataNode::NullValueOfCallback(const FunctionCallbackInfo<Value>& args) {
+	try
+	{
+		auto isolate = Isolate::GetCurrent();
+		args.GetReturnValue().Set(Null(isolate));
 	}
 	catch (NativeScriptException& e)
 	{
@@ -435,8 +459,8 @@ Local<Function> MetadataNode::SetMembers(Isolate *isolate, Local<FunctionTemplat
 
 	return hasCustomMetadata
 			? SetMembersFromRuntimeMetadata(isolate, ctorFuncTemplate, prototypeTemplate, instanceMethodsCallbackData, baseInstanceMethodsCallbackData, treeNode)
-						:
-				SetMembersFromStaticMetadata(isolate, ctorFuncTemplate, prototypeTemplate, instanceMethodsCallbackData, baseInstanceMethodsCallbackData, treeNode);
+					:
+					SetMembersFromStaticMetadata(isolate, ctorFuncTemplate, prototypeTemplate, instanceMethodsCallbackData, baseInstanceMethodsCallbackData, treeNode);
 }
 
 Local<Function> MetadataNode::SetMembersFromStaticMetadata(Isolate *isolate, Local<FunctionTemplate>& ctorFuncTemplate, Local<ObjectTemplate>& prototypeTemplate, vector<MethodCallbackData*>& instanceMethodsCallbackData, const vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode)
@@ -474,7 +498,7 @@ Local<Function> MetadataNode::SetMembersFromStaticMetadata(Isolate *isolate, Loc
 			auto itBegin = baseInstanceMethodsCallbackData.begin();
 			auto itEnd = baseInstanceMethodsCallbackData.end();
 			auto itFound = find_if(itBegin, itEnd, [&entry] (MethodCallbackData *x)
-			{	return x->candidates.front().name == entry.name;});
+					{	return x->candidates.front().name == entry.name;});
 			if (itFound != itEnd)
 			{
 				callbackData->parent = *itFound;
@@ -599,7 +623,7 @@ Local<Function> MetadataNode::SetMembersFromRuntimeMetadata(Isolate *isolate, Lo
 				auto itBegin = baseInstanceMethodsCallbackData.begin();
 				auto itEnd = baseInstanceMethodsCallbackData.end();
 				auto itFound = find_if(itBegin, itEnd, [&entry] (MethodCallbackData *x)
-				{	return x->candidates.front().name == entry.name;});
+						{	return x->candidates.front().name == entry.name;});
 				if (itFound != itEnd)
 				{
 					callbackData->parent = *itFound;
@@ -912,7 +936,7 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
 		{
 			if (!extendLocationFound)
 			{
-		stringstream ss;
+				stringstream ss;
 				ss << "(InternalError): Invalid extend() call. No name specified for extend. Location: " << extendLocation.c_str();
 				throw NativeScriptException(ss.str());
 			}
@@ -1618,9 +1642,9 @@ MetadataEntry MetadataNode::GetChildMetadataForPackage(MetadataNode *node, const
 				bool isPrefix;
 				string declaringType = s_metadataReader.ReadInterfaceImplementationTypeName(treeNodeChild, isPrefix);
 				child.declaringType = isPrefix
-										? (declaringType + s_metadataReader.ReadTypeName(child.treeNode))
-											:
-											declaringType;
+						? (declaringType + s_metadataReader.ReadTypeName(child.treeNode))
+								:
+								declaringType;
 			}
 		}
 	}
