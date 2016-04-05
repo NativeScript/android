@@ -8,7 +8,29 @@ describe("Test Method Resolution When Nulls are passed", function () {
 	var fileNull = java.io.File.null;
 	var stringNull = java.lang.String.null;
 	
-
+	it("When_accessing_.null_of_a_node_the_same_instance_will_be_returned", function () {
+		__log("TEST: When_accessing_.null_of_a_node_the_same_instance_will_be_returned");
+		
+		var dummyNull = com.tns.tests.DummyClass.null;
+		var testIterations = 10;
+		
+		for (var i = 0; i < testIterations; i++) {
+			var res = dummyNull === com.tns.tests.DummyClass.null;
+			expect(res).toBe(true);
+		}
+	});
+	
+	it("When_call_method_valueOf_of_.null_object_should_return_null", function () {
+		__log("TEST: When_call_method_valueOf_of_.null_object_should_return_null");
+		
+		var res = objNull.valueOf();
+		expect(res).toBeNull();
+		res = stringNull.valueOf();
+		expect(res).toBeNull();
+		res = dummyNull.valueOf();
+		expect(res).toBeNull();
+	});
+	
 	it("When_call_method_methodWithOverloadsWithOneArgument_with_java.lang.Object_argument", function () {
 		__log("TEST: When_call_method_methodWithOverloadsWithOneArgument_with_java.lang.Object_argument");
 		

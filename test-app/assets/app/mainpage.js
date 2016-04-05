@@ -22,6 +22,7 @@ require("./tests/testAsserts");
 require("./tests/testWeakRef"); 
 require("./tests/tests");
 require("./tests/testMethodResolution");
+require("./tests/testMethodResolutionWithNulls");
 require("./tests/testArrays");
 require("./tests/testsForRuntimeBindingGenerator");
 require("./tests/testPrimitiveTypeConversion");
