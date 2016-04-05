@@ -312,7 +312,7 @@ void MetadataNode::NullObjectAccessorGetterCallback(Local<String> property,const
 void MetadataNode::NullValueOfCallback(const FunctionCallbackInfo<Value>& args) {
 	try
 	{
-		auto isolate = Isolate::GetCurrent();
+		auto isolate = args.GetIsolate();
 		args.GetReturnValue().Set(Null(isolate));
 	}
 	catch (NativeScriptException& e)
