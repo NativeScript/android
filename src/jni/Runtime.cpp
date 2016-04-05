@@ -424,9 +424,9 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 	global->ForceSet(ConvertToV8String("global"), global, readOnlyFlags);
 	global->ForceSet(ConvertToV8String("__global"), global, readOnlyFlags);
 
-	ArgConverter::Init();
+	ArgConverter::Init(isolate);
 
-	CallbackHandlers::Init(m_objectManager);
+	CallbackHandlers::Init(isolate, m_objectManager);
 
 	string pckName = ArgConverter::jstringToString(packageName);
 	Profiler::Init(pckName);
@@ -434,7 +434,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 
 	MetadataNode::BuildMetadata(filesPath);
 
-	MetadataNode::CreateTopLevelNamespaces(global);
+	MetadataNode::CreateTopLevelNamespaces(isolate, global);
 
 	ArrayHelper::Init(context);
 

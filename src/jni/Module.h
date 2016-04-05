@@ -26,11 +26,15 @@ namespace tns
 			static void RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 		private:
+			struct Cache;
+
 			Module() = default;
+
+			static Cache* GetCache(v8::Isolate *isolate);
 
 			static v8::Local<v8::String> WrapModuleContent(const std::string& path);
 
-			static v8::Local<v8::Object> LoadImpl(const std::string& path, bool& isData);
+			static v8::Local<v8::Object> LoadImpl(v8::Isolate *isolate, const std::string& path, bool& isData);
 
 			static v8::Local<v8::Object> LoadModule(v8::Isolate *isolate, const std::string& path);
 
@@ -48,31 +52,37 @@ namespace tns
 			static jclass MODULE_CLASS;
 			static jmethodID RESOLVE_PATH_METHOD_ID;
 
-			static const char* MODULE_PART_1;
-			static const char* MODULE_PART_2;
+			static const char* MODULE_PROLOGUE;
+			static const char* MODULE_EPILOGUE;
+			static std::map<v8::Isolate*, Cache*> s_cache;
 
-			static v8::Persistent<v8::Function> *s_poRequireFunction;
+			struct Cache
+			{
+				v8::Persistent<v8::Function> *RequireFunction;
 
-			static v8::Persistent<v8::Function> *s_poRequireFactoryFunction;
+				v8::Persistent<v8::Function> *RequireFactoryFunction;
 
-			static std::map<std::string, v8::Persistent<v8::Function>*> s_requireCache;
+				std::map<std::string, v8::Persistent<v8::Function>*> RequireCache;
 
-			static std::map<std::string, v8::Persistent<v8::Object>*> s_loadedModules;
+				std::map<std::string, v8::Persistent<v8::Object>*> LoadedModules;
+			};
 
 			class TempModule
 			{
 				public:
-				TempModule(const std::string& modulePath, v8::Persistent<v8::Object> *poModuleObj)
-				:m_dispose(true), m_modulePath(modulePath), m_poModuleObj(poModuleObj)
+				TempModule(v8::Isolate *isolate, const std::string& modulePath, v8::Persistent<v8::Object> *poModuleObj)
+				:m_isolate(isolate), m_dispose(true), m_modulePath(modulePath), m_poModuleObj(poModuleObj)
 				{
-					s_loadedModules.insert(make_pair(m_modulePath, m_poModuleObj));
+					auto cache = GetCache(isolate);
+					cache->LoadedModules.insert(make_pair(m_modulePath, m_poModuleObj));
 				}
 
 				~TempModule()
 				{
 					if (m_dispose)
 					{
-						s_loadedModules.erase(m_modulePath);
+						auto cache = GetCache(m_isolate);
+						cache->LoadedModules.erase(m_modulePath);
 					}
 				}
 
@@ -83,6 +93,7 @@ namespace tns
 
 				private:
 				bool m_dispose;
+				v8::Isolate *m_isolate;
 				std::string m_modulePath;
 				v8::Persistent<v8::Object> *m_poModuleObj;
 			};

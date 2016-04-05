@@ -23,7 +23,7 @@ void Profiler::StartCPUProfilerCallback(const v8::FunctionCallbackInfo<v8::Value
 {
 	try
 	{
-		auto isolate = Isolate::GetCurrent();
+		auto isolate = args.GetIsolate();
 		auto started = false;
 		if ((args.Length() == 1) && (args[0]->IsString()))
 		{
@@ -55,7 +55,7 @@ void Profiler::StopCPUProfilerCallback(const v8::FunctionCallbackInfo<v8::Value>
 {
 	try
 	{
-		auto isolate = Isolate::GetCurrent();
+		auto isolate = args.GetIsolate();
 		auto stopped = false;
 		if ((args.Length() == 1) && (args[0]->IsString()))
 		{
@@ -312,7 +312,7 @@ void Profiler::HeapSnapshotMethodCallback(const v8::FunctionCallbackInfo<v8::Val
 			return;
 		}
 
-		Isolate* isolate = Isolate::GetCurrent();
+		auto isolate = args.GetIsolate();
 
 		const HeapSnapshot* snap = isolate->GetHeapProfiler()->TakeHeapSnapshot();
 

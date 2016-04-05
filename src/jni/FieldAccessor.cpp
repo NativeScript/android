@@ -159,7 +159,7 @@ Local<Value> FieldAccessor::GetJavaField(Isolate *isolate, const Local<Object>& 
 				{
 					result = env.GetLongField(targetJavaObject, fieldId);
 				}
-				fieldResult = handleScope.Escape(ArgConverter::ConvertFromJavaLong(result));
+				fieldResult = handleScope.Escape(ArgConverter::ConvertFromJavaLong(isolate, result));
 				break;
 			}
 			case 'F': //float
