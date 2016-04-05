@@ -1,5 +1,7 @@
 package com.tns.tests;
 
+import java.io.File;
+
 import android.util.Log;
 
 public class DummyClass
@@ -279,8 +281,7 @@ public class DummyClass
 		return "boolean=" + value;
 	}
 	
-	public String method2(Object obj)
-	{
+	public String method2(Object obj) {
 		String ret = "obj=" + ((obj != null) ? obj.toString() : "<null>");
 		Log.d("NativeScript.Java", "inside DummyClass.method2 with ret=" + ret);
 		return ret;
@@ -302,5 +303,54 @@ public class DummyClass
 		impl.doSomething();
 	}
 	
+	public String methodWithOverloadsWithOneArgument(Object arg) {
+		return Object.class.getName();
+	}
+	
+	public String methodWithOverloadsWithOneArgument(DummyClass arg) {
+		return DummyClass.class.getName();
+	}
+	
+	public String methodWithOverloadsWithOneArgument(String arg) {
+		return String.class.getName();
+	}
+	
+	public String methodWithOverloadsWithOneArgument(File arg) {
+		return File.class.getName();
+	}
+	
+	public String methodWithOverloadsWithOneArgument(MyInterface arg) {
+		return MyInterface.class.getName();
+	}
+	
+	public String methodWithOverloadsWithOneArgument(MyPublicInterface arg) {
+		return MyPublicInterface.class.getName();
+	}
+	
+	public String methodWithOverloadsWithThreeArguments(Object arg1, String arg2, Object arg3) {
+		return new StringBuilder(Object.class.getName()).append(separator).append(String.class.getName()).append(separator).append(Object.class.getName()).toString();
+	}
+	
+	public String methodWithOverloadsWithThreeArguments(Object arg1, String arg2, MyInterface arg3) {
+		return new StringBuilder(Object.class.getName()).append(separator).append(String.class.getName()).append(separator).append(MyInterface.class.getName()).toString();
+	}
+	
+	public String methodWithOverloadsWithThreeArguments(Object arg1, String arg2, MyPublicInterface arg3) {
+		return new StringBuilder(Object.class.getName()).append(separator).append(String.class.getName()).append(separator).append(MyPublicInterface.class.getName()).toString();
+	}
+	
+	public String methodWithOverloadsWithThreeArguments(Object arg1, Object arg2, Object arg3) {
+		return new StringBuilder(Object.class.getName()).append(separator).append(Object.class.getName()).append(separator).append(Object.class.getName()).toString();
+	}
+	
+	public String methodWithOverloadsWithThreeArguments(MyInterface arg1, MyInterface arg2, MyPublicInterface arg3) {
+		return new StringBuilder(MyInterface.class.getName()).append(separator).append(MyInterface.class.getName()).append(separator).append(MyPublicInterface.class.getName()).toString();
+	}
+	
+	public String methodWithOverloadsWithThreeArguments(String arg1, Object arg2, Object arg3) {
+		return new StringBuilder(String.class.getName()).append(separator).append(Object.class.getName()).append(separator).append(Object.class.getName()).toString();
+	}
+	
 	private final String logTag = "TNS.Java";
+	private final String separator = " and ";
 }

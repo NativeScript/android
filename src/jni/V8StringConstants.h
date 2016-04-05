@@ -33,6 +33,8 @@ namespace tns
 			static v8::Local<v8::String> GetClassImplementationObject();
 			static v8::Local<v8::String> GetDebugName();
 			static v8::Local<v8::String> GetExtend();
+			static v8::Local<v8::String> GetNullObject();
+			static v8::Local<v8::String> GetNullNodeName();
 			static v8::Local<v8::String> GetIsPrototypeImplementationObject();
 			static v8::Local<v8::String> GetNativeException();
 			static v8::Local<v8::String> GetStackTrace();
@@ -51,6 +53,8 @@ namespace tns
 			static const std::string CLASS_IMPLEMENTATION_OBJECT;
 			static const std::string DEBUG_NAME;
 			static const std::string EXTEND;
+			static const std::string NULL_OBJECT;
+			static const std::string NULL_NODE_NAME;
 			static const std::string IS_PROTOTYPE_IMPLEMENTATION_OBJECT;
 			static const std::string NATIVE_EXCEPTION;
 			static const std::string STACK_TRACE;
@@ -80,6 +84,8 @@ namespace tns
 			static v8::Persistent<v8::String> *CLASS_IMPLEMENTATION_OBJECT_PERSISTENT;
 			static v8::Persistent<v8::String> *DEBUG_NAME_PERSISTENT;
 			static v8::Persistent<v8::String> *EXTEND_PERSISTENT;
+			static v8::Persistent<v8::String> *NULL_OBJECT_PERSISTENT;
+			static v8::Persistent<v8::String> *NULL_NODE_NAME_PERSISTENT;
 			static v8::Persistent<v8::String> *IS_PROTOTYPE_IMPLEMENTATION_OBJECT_PERSISTENT;
 			static v8::Persistent<v8::String> *NATIVE_EXCEPTION_PERSISTENT;
 			static v8::Persistent<v8::String> *STACK_TRACE_PERSISTENT;

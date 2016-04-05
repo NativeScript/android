@@ -172,7 +172,10 @@ class MethodResolver
 					{
 						if (args[i] != null)
 						{
-							Tuple<Boolean, Integer> res = isAssignableFrom(params[i], args[i].getClass());
+							Class<?> argClass = args[i] instanceof NullObject ? 
+									((NullObject)args[i]).getNullObjectClass() 
+									: args[i].getClass();
+							Tuple<Boolean, Integer> res = isAssignableFrom(params[i], argClass);
 							success = res.x.booleanValue();
 							dist += res.y;
 						}

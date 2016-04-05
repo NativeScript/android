@@ -210,6 +210,9 @@ namespace tns
 			static void InnerClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 			static void InnerClassAccessorGetterCallback(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
 
+			static void NullObjectAccessorGetterCallback(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
+			static void NullValueOfCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
+
 			static void FieldAccessorGetterCallback(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
 			static void FieldAccessorSetterCallback(v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info);
 			static void ClassAccessorGetterCallback(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
