@@ -281,15 +281,15 @@ void MetadataNode::NullObjectAccessorGetterCallback(Local<String> property,const
 		DEBUG_WRITE("NullObjectAccessorGetterCallback");
 		auto isolate = info.GetIsolate();
 
-		auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value());
-
-		DEBUG_WRITE("NullObjectAccessorGetterCallback node name: %s", node->GetName().c_str());
-
-		Local<Object> value = Object::New(isolate);
-		value->SetHiddenValue(V8StringConstants::GetNullNodeName(), External::New(isolate, node));
 		// TODO: pete: Set .valueOf() callback to return null
+		auto thiz = info.This();
+		if(!(thiz->GetHiddenValue(V8StringConstants::GetNullNodeName())).IsEmpty())
+		{
+			auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value());
+			thiz->SetHiddenValue(V8StringConstants::GetNullNodeName(), External::New(isolate, node));
+		}
 
-		info.GetReturnValue().Set(value);
+		info.GetReturnValue().Set(thiz);
 	}
 	catch (NativeScriptException& e)
 	{
@@ -389,28 +389,26 @@ void MetadataNode::SuperAccessorGetterCallback(Local<String> property, const Pro
 	{
 		auto thiz = info.This();
 		auto isolate = info.GetIsolate();
-		auto k = ConvertToV8String("supervalue");
-		auto superValue = thiz->GetHiddenValue(k).As<Object>();
+		auto key = ConvertToV8String("supervalue");
+		auto superValue = thiz->GetHiddenValue(key).As<Object>();
 		if (superValue.IsEmpty())
 		{
 			auto runtime = Runtime::GetRuntime(isolate);
 			auto objectManager = runtime->GetObjectManager();
 
 			superValue = objectManager->GetEmptyObject(isolate);
-			bool d = superValue->Delete(ConvertToV8String("toString"));
-			d = superValue->Delete(ConvertToV8String("valueOf"));
+			bool d = superValue->Delete(V8StringConstants::GetToString());
+			d = superValue->Delete(V8StringConstants::GetValueOf());
 			superValue->SetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::CallSuper), True(isolate));
 
 			superValue->SetPrototype(thiz->GetPrototype().As<Object>()->GetPrototype().As<Object>()->GetPrototype());
-			thiz->SetHiddenValue(k, superValue);
+			thiz->SetHiddenValue(key, superValue);
 			objectManager->CloneLink(thiz, superValue);
 
 			DEBUG_WRITE("superValue.GetPrototype=%d", superValue->GetPrototype().As<Object>()->GetIdentityHash());
 
 			auto node = GetInstanceMetadata(isolate, thiz);
 			SetInstanceMetadata(isolate, superValue, node);
-
-			thiz->SetHiddenValue(k, superValue);
 		}
 
 		info.GetReturnValue().Set(superValue);
