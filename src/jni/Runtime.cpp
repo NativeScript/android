@@ -122,7 +122,7 @@ void Runtime::Init(JNIEnv *_env, jobject obj, int runtimeId, jstring filesPath, 
 
 void Runtime::Init(jstring filesPath, bool verboseLoggingEnabled, jstring packageName, jobjectArray args, jobject jsDebugger)
 {
-	m_logEnabled = verboseLoggingEnabled;
+	LogEnabled = m_logEnabled = verboseLoggingEnabled;
 
 	auto filesRoot = ArgConverter::jstringToString(filesPath);
 	Constants::APP_ROOT_FOLDER_PATH = filesRoot + "/app/";
