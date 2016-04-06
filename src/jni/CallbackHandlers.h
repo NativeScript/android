@@ -23,7 +23,7 @@ namespace tns
 	{
 		public:
 
-			static void Init(ObjectManager *objectManager);
+			static void Init(v8::Isolate *isolate, ObjectManager *objectManager);
 
 			static v8::Local<v8::Object> CreateJSWrapper(v8::Isolate *isolate, jint javaObjectID, const std::string& typeName);
 
@@ -84,13 +84,6 @@ namespace tns
 
 			static v8::Local<v8::Object> FindClass(v8::Isolate *isolate, const std::string& className);
 
-			static MetadataTreeNode *metadataRoot;
-
-			static jclass RUNTIME_CLASS;
-
-			static jclass JAVA_LANG_STRING;
-			//
-
 		private:
 			CallbackHandlers()
 			{
@@ -101,6 +94,10 @@ namespace tns
 			static int64_t AdjustAmountOfExternalAllocatedMemory(JEnv& env, v8::Isolate *isolate);
 
 			static v8::Persistent<v8::Object>* MarkJsObject(const v8::Local<v8::Object>& object, std::string mark, const v8::Local<v8::Value>& value);
+
+			static jclass RUNTIME_CLASS;
+
+			static jclass JAVA_LANG_STRING;
 
 			static jmethodID RESOLVE_CLASS_METHOD_ID;
 
@@ -121,6 +118,8 @@ namespace tns
 			static ArrayElementAccessor arrayElementAccessor;
 
 			static FieldAccessor fieldAccessor;
+
+			static MetadataTreeNode *metadataRoot;
 
 			static std::map<std::string, int> s_constructorCache;
 

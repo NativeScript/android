@@ -26,7 +26,7 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
-void CallbackHandlers::Init(ObjectManager *objectManager)
+void CallbackHandlers::Init(Isolate *isolate, ObjectManager *objectManager)
 {
 	JEnv env;
 
@@ -57,7 +57,7 @@ void CallbackHandlers::Init(ObjectManager *objectManager)
 	GET_CHANGE_IN_BYTES_OF_USED_MEMORY_METHOD_ID = env.GetMethodID(RUNTIME_CLASS, "getChangeInBytesOfUsedMemory", "()J");
 	assert(GET_CHANGE_IN_BYTES_OF_USED_MEMORY_METHOD_ID != nullptr);
 
-	MetadataNode::Init();
+	MetadataNode::Init(isolate);
 
 	MethodCache::Init();
 }
@@ -279,7 +279,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object>& caller, const string&
 		throw NativeScriptException(err.msg);
 	}
 
-	auto isolate = Isolate::GetCurrent();
+	auto isolate = args.GetIsolate();
 
 	JniLocalRef callerJavaObject;
 
@@ -428,7 +428,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object>& caller, const string&
 			{
 				result = env.CallLongMethodA(callerJavaObject, mid, javaArgs);
 			}
-			auto jsLong = ArgConverter::ConvertFromJavaLong(result);
+			auto jsLong = ArgConverter::ConvertFromJavaLong(isolate, result);
 			args.GetReturnValue().Set(jsLong);
 			break;
 		}
