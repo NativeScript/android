@@ -369,12 +369,11 @@ task collectAllJars {
 	}
 }
 
-
 task buildMetadata (type: JavaExec) {
 	description "builds metadata with provided jar dependencies"
 	
 	inputs.files(allJarPaths)
-	inputs.dir("build/intermediates/classes")
+	inputs.dir("$buildDir/intermediates/classes")
 
 	outputs.files("metadata/output/assets/metadata/treeNodeStream.dat", "metadata/output/assets/metadata/treeStringsStream.dat", "metadata/output/assets/metadata/treeValueStream.dat")
 
@@ -382,7 +381,7 @@ task buildMetadata (type: JavaExec) {
 		workingDir "build-tools"
 
 		main "-jar"
-		
+
 		// get compiled classes to pass to metadata generator
 		// these need to be called after the classes have compiled
 		def classesDir = "$buildDir/intermediates/classes"
@@ -404,22 +403,6 @@ task buildMetadata (type: JavaExec) {
 		if (classesDirBuildType.exists()) {
 			metadataParams.add(classesDirBuildType.getAbsolutePath())
 		}
-	}
-}
-
-
-task buildMetadata (type: JavaExec) {
-	description "builds metadata with provided jar dependencies"
-	
-	inputs.files(allJarPaths)
-	inputs.dir("$buildDir/intermediates/classes")
-
-	outputs.files("metadata/output/assets/metadata/treeNodeStream.dat", "metadata/output/assets/metadata/treeStringsStream.dat", "metadata/output/assets/metadata/treeValueStream.dat")
-
-	doFirst {
-		workingDir "build-tools"
-
-		main "-jar"
 
 		args metadataParams.toArray()
 	}
