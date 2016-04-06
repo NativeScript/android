@@ -14,8 +14,6 @@
 *			-PbuildToolsVersion=[build_tools_version] (default is 22.0.1)
 *			-PsupportVersion=[support_version] (default (22.2.0)
 *			-PcompileSdk=[compile_sdk_version] (default 22)
-*
-*			-PrunSBGenerator //this flag will triger static binding generation
 */
 
 buildscript {
@@ -40,8 +38,6 @@ def nodeModulesDir = "../../node_modules/"
 def libDir = "$projectDir/../../lib/Android/"
 def pluginNames = new ArrayList<String>()
 def configDir = file(configurationsDir)
-def appResExists = false
-def appResourcesName = "NativescriptAppResources"
 
 def compiteCompileSdkVersion () {
 	if(project.hasProperty("compileSdk")) {
@@ -136,7 +132,12 @@ android {
 		def variantName = variant.name.capitalize()
 		def compileSourcesTaskName = "compile${variantName}Sources"
 		def compileSourcesTask = project.tasks.findByName(compileSourcesTaskName)
-		compileSourcesTask.finalizedBy "buildMetadata"
+		
+		def generateBuildConfigTask = variant.generateBuildConfig;
+		generateBuildConfigTask.finalizedBy(collectAllJars)
+		collectAllJars.finalizedBy(setProperties)
+		
+		compileSourcesTask.finalizedBy(buildMetadata)
 	}
 }
 
@@ -365,7 +366,25 @@ task collectAllJars {
 		for(def i = 0; i < allJarPaths.size(); i++) {
 			metadataParams.add(allJarPaths.get(i));
 		}
+	}
+}
 
+
+task buildMetadata (type: JavaExec) {
+	description "builds metadata with provided jar dependencies"
+	
+	inputs.files(allJarPaths)
+	inputs.dir("build/intermediates/classes")
+
+	outputs.files("metadata/output/assets/metadata/treeNodeStream.dat", "metadata/output/assets/metadata/treeStringsStream.dat", "metadata/output/assets/metadata/treeValueStream.dat")
+
+	doFirst {
+		workingDir "build-tools"
+
+		main "-jar"
+		
+		// get compiled classes to pass to metadata generator
+		// these need to be called after the classes have compiled
 		def classesDir = "$buildDir/intermediates/classes"
 
 		def classesSubDirs = new File(classesDir).listFiles()
@@ -461,14 +480,20 @@ task deleteExplodedAarFolder (type: Delete) {
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////// OPTIONAL TASKS //////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
-task runBindingGenerator(dependsOn: "ing:jar") {
-	rootProject.jarsDir = allJarPaths
-}
-runBindingGenerator.dependsOn("bg:jar")
+task setProperties {
+	project.ext.jarFiles = []
+	doLast {
+		def list = [];
+		allJarPaths.each({f -> 
+			if(f.endsWith(".jar")) {
+				list.add(f);
+			}
+		})
+		project.jarFiles = list;
+	}
+} 
 
-task rbg (dependsOn: "asbg:generatebindings")
-
-
+setProperties.finalizedBy("asbg:generateBindings")
 
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////// EXECUTION ORDER /////////////////////////////////////
