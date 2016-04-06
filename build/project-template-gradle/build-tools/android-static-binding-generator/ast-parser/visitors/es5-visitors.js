@@ -449,7 +449,7 @@ var es5_visitors = (function () {
 	}
 
 	function _generateLineToWrite(classNameFromDecorator, extendClass, overriddenMethodNames, extendInfo, filePath) {
-		var lineToWrite = extendClass + "*" + extendInfo.replace(/[\\-]/g, "_") + "*" + overriddenMethodNames + "*" + classNameFromDecorator + "*" + filePath;
+		var lineToWrite = extendClass + "*" + extendInfo.replace(/[\\/\\-]/g, "_") + "*" + overriddenMethodNames + "*" + classNameFromDecorator + "*" + filePath;
 		return lineToWrite;
 	}
 
