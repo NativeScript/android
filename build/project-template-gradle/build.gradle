@@ -14,8 +14,6 @@
 *			-PbuildToolsVersion=[build_tools_version] (default is 22.0.1)
 *			-PsupportVersion=[support_version] (default (22.2.0)
 *			-PcompileSdk=[compile_sdk_version] (default 22)
-*
-*			-PrunSBGenerator //this flag will triger static binding generation
 */
 
 buildscript {
@@ -40,7 +38,6 @@ def nodeModulesDir = "../../node_modules/"
 def libDir = "$projectDir/../../lib/Android/"
 def pluginNames = new ArrayList<String>()
 def configDir = file(configurationsDir)
-def shouldRunBindingGenerator = project.hasProperty("runSBGenerator")
 
 def compiteCompileSdkVersion () {
 	if(project.hasProperty("compileSdk")) {
@@ -138,10 +135,7 @@ android {
 		
 		def generateBuildConfigTask = variant.generateBuildConfig;
 		generateBuildConfigTask.finalizedBy(collectAllJars)
-		
-		if(shouldRunBindingGenerator) {
-			collectAllJars.finalizedBy(setProperties)
-		}
+		collectAllJars.finalizedBy(setProperties)
 		
 		compileSourcesTask.finalizedBy(buildMetadata)
 	}
