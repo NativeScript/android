@@ -671,7 +671,7 @@ public class Runtime
 			}
 			else
 			{
-				isReleased = 1;
+				isReleased = (strongInstances.get(javaObjectId) == null) ? 1 : 0;
 			}
 
 			output.putInt(isReleased);
