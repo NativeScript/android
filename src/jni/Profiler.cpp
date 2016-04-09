@@ -179,22 +179,18 @@ bool Profiler::Write(CpuProfile *cpuProfile)
 	for (int i = 0; i < sampleCount; i++)
 	{
 		auto format = (i > 0) ? ",%d" : "%d";
-		snprintf(buff, sizeof(buff), format, cpuProfile->GetSample(i)->GetScriptId());
+		snprintf(buff, sizeof(buff), format, cpuProfile->GetSample(i)->GetNodeId());
 		fwrite(buff, sizeof(char), strlen(buff), fp);
 	}
 
-	// TODO: update V8, see https://codereview.chromium.org/259803002/
-	/*
-	 snprintf(buff, sizeof(buff), "],\"timestamps\":[");
-	 fwrite(buff, sizeof(char), strlen(buff), fp);
-	 auto currTimeStamp = startTimeStamp;
-	 for (int i=0; i<sampleCount; i++)
-	 {
-	 auto format = (i > 0) ? ",%lld" : "%lld";
-	 snprintf(buff, sizeof(buff), format, cpuProfile->GetSampleTimestamp(i));
-	 fwrite(buff, sizeof(char), strlen(buff), fp);
-	 }
-	 */
+	snprintf(buff, sizeof(buff), "],\"timestamps\":[");
+	fwrite(buff, sizeof(char), strlen(buff), fp);
+	for (int i=0; i<sampleCount; i++)
+	{
+		auto format = (i > 0) ? ",%lld" : "%lld";
+		snprintf(buff, sizeof(buff), format, cpuProfile->GetSampleTimestamp(i));
+		fwrite(buff, sizeof(char), strlen(buff), fp);
+	}
 
 	fwrite("]}", sizeof(char), 2, fp);
 	fclose(fp);
