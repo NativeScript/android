@@ -506,8 +506,10 @@ Local<Function> MetadataNode::SetMembersFromStaticMetadata(Isolate *isolate, Loc
 
 			auto funcData = External::New(isolate, callbackData);
 			auto funcTemplate = FunctionTemplate::New(isolate, MethodCallback, funcData);
+			auto func = funcTemplate->GetFunction();
 			auto funcName = ConvertToV8String(entry.name);
-			prototypeTemplate->Set(funcName, funcTemplate->GetFunction());
+			func->SetName(funcName);
+			prototypeTemplate->Set(funcName, func);
 			lastMethodName = entry.name;
 		}
 		callbackData->candidates.push_back(entry);
@@ -542,8 +544,10 @@ Local<Function> MetadataNode::SetMembersFromStaticMetadata(Isolate *isolate, Loc
 			callbackData = new MethodCallbackData(this);
 			auto funcData = External::New(isolate, callbackData);
 			auto funcTemplate = FunctionTemplate::New(isolate, MethodCallback, funcData);
+			auto func = funcTemplate->GetFunction();
 			auto funcName = ConvertToV8String(entry.name);
-			ctorFunction->Set(funcName, funcTemplate->GetFunction());
+			func->SetName(funcName);
+			ctorFunction->Set(funcName, func);
 			lastMethodName = entry.name;
 		}
 		callbackData->candidates.push_back(entry);
@@ -631,8 +635,10 @@ Local<Function> MetadataNode::SetMembersFromRuntimeMetadata(Isolate *isolate, Lo
 
 				auto funcData = External::New(isolate, callbackData);
 				auto funcTemplate = FunctionTemplate::New(isolate, MethodCallback, funcData);
+				auto func = funcTemplate->GetFunction();
 				auto funcName = ConvertToV8String(entry.name);
-				prototypeTemplate->Set(funcName, funcTemplate->GetFunction());
+				func->SetName(funcName);
+				prototypeTemplate->Set(funcName, func);
 				lastMethodName = entry.name;
 			}
 			callbackData->candidates.push_back(entry);
