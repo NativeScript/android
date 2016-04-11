@@ -1,13 +1,18 @@
 {
-  "name": "ast_parser",
+  "name": "ast-parser",
   "version": "1.0.0",
-  "description": "Parses javascript code and extracts extend class and interfaces names",
-  "main": "traverse_files.js",
-  "private": true,
+  "description": "",
+  "main": "js_parser.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
   "author": "",
+  "license": "ISC",
   "dependencies": {
+    "babel-traverse": "^6.4.5",
+    "babel-types": "^6.4.5",
+    "babylon": "^6.4.5",
     "filewalker": "^0.1.2",
-    "lazy": "^1.0.11",
-    "uglify-js": "^2.4.23"
+    "lazy": "^1.0.11"
   }
 }

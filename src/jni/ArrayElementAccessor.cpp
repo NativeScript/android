@@ -35,14 +35,14 @@ Local<Value> ArrayElementAccessor::GetArrayElement(Isolate *isolate, const Local
 		jbooleanArray boolArr = static_cast<jbooleanArray>(arr);
 		jboolean boolArrValue;
 		env.GetBooleanArrayRegion(boolArr, startIndex, length, &boolArrValue);
-		value = ConvertToJsValue(objectManager, env, elementSignature, &boolArrValue);
+		value = ConvertToJsValue(isolate, objectManager, env, elementSignature, &boolArrValue);
 	}
 	else if (elementSignature == "B")
 	{
 		jbyteArray byteArr = static_cast<jbyteArray>(arr);
 		jbyte byteArrValue;
 		env.GetByteArrayRegion(byteArr, startIndex, length, &byteArrValue);
-		value = ConvertToJsValue(objectManager, env, elementSignature, &byteArrValue);
+		value = ConvertToJsValue(isolate, objectManager, env, elementSignature, &byteArrValue);
 	}
 	else if (elementSignature == "C")
 	{
@@ -51,7 +51,7 @@ Local<Value> ArrayElementAccessor::GetArrayElement(Isolate *isolate, const Local
 		env.GetCharArrayRegion(charArr, startIndex, length, &charArrValue);
 		JniLocalRef s(env.NewString(&charArrValue, 1));
 		const char* singleChar = env.GetStringUTFChars(s, &isCopy);
-		value = ConvertToJsValue(objectManager, env, elementSignature, singleChar);
+		value = ConvertToJsValue(isolate, objectManager, env, elementSignature, singleChar);
 		env.ReleaseStringUTFChars(s, singleChar);
 	}
 	else if (elementSignature == "S")
@@ -59,40 +59,40 @@ Local<Value> ArrayElementAccessor::GetArrayElement(Isolate *isolate, const Local
 		jshortArray shortArr = static_cast<jshortArray>(arr);
 		jshort shortArrValue;
 		env.GetShortArrayRegion(shortArr, startIndex, length, &shortArrValue);
-		value = ConvertToJsValue(objectManager, env, elementSignature, &shortArrValue);
+		value = ConvertToJsValue(isolate, objectManager, env, elementSignature, &shortArrValue);
 	}
 	else if (elementSignature == "I")
 	{
 		jintArray intArr = static_cast<jintArray>(arr);
 		jint intArrValue;
 		env.GetIntArrayRegion(intArr, startIndex, length, &intArrValue);
-		value = ConvertToJsValue(objectManager, env, elementSignature, &intArrValue);
+		value = ConvertToJsValue(isolate, objectManager, env, elementSignature, &intArrValue);
 	}
 	else if (elementSignature == "J")
 	{
 		jlongArray longArr = static_cast<jlongArray>(arr);
 		jlong longArrValue;
 		env.GetLongArrayRegion(longArr, startIndex, length, &longArrValue);
-		value = ConvertToJsValue(objectManager, env, elementSignature, &longArrValue);
+		value = ConvertToJsValue(isolate, objectManager, env, elementSignature, &longArrValue);
 	}
 	else if (elementSignature == "F")
 	{
 		jfloatArray floatArr = static_cast<jfloatArray>(arr);
 		jfloat floatArrValue;
 		env.GetFloatArrayRegion(floatArr, startIndex, length, &floatArrValue);
-		value = ConvertToJsValue(objectManager, env, elementSignature, &floatArrValue);
+		value = ConvertToJsValue(isolate, objectManager, env, elementSignature, &floatArrValue);
 	}
 	else if (elementSignature == "D")
 	{
 		jdoubleArray doubleArr = static_cast<jdoubleArray>(arr);
 		jdouble doubleArrValue;
 		env.GetDoubleArrayRegion(doubleArr, startIndex, length, &doubleArrValue);
-		value = ConvertToJsValue(objectManager, env, elementSignature, &doubleArrValue);
+		value = ConvertToJsValue(isolate, objectManager, env, elementSignature, &doubleArrValue);
 	}
 	else
 	{
 		jobject result = env.GetObjectArrayElement(static_cast<jobjectArray>(arr), index);
-		value = ConvertToJsValue(objectManager, env, elementSignature, &result);
+		value = ConvertToJsValue(isolate, objectManager, env, elementSignature, &result);
 		env.DeleteLocalRef(result);
 	}
 
@@ -199,11 +199,9 @@ void ArrayElementAccessor::SetArrayElement(Isolate *isolate, const Local<Object>
 	}
 }
 
-Local<Value> ArrayElementAccessor::ConvertToJsValue(ObjectManager *objectManager, JEnv& env, const string& elementSignature, const void *value)
+Local<Value> ArrayElementAccessor::ConvertToJsValue(Isolate *isolate, ObjectManager *objectManager, JEnv& env, const string& elementSignature, const void *value)
 {
 	Local<Value> jsValue;
-
-	auto isolate = Isolate::GetCurrent();
 
 	if (elementSignature == "Z")
 	{
@@ -227,7 +225,7 @@ Local<Value> ArrayElementAccessor::ConvertToJsValue(ObjectManager *objectManager
 	}
 	else if (elementSignature == "J")
 	{
-		jsValue = ArgConverter::ConvertFromJavaLong(*(jlong*) value);
+		jsValue = ArgConverter::ConvertFromJavaLong(isolate, *(jlong*) value);
 	}
 	else if (elementSignature == "F")
 	{

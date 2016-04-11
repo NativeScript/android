@@ -159,7 +159,7 @@ void WeakRef::ClearCallback(const FunctionCallbackInfo<Value>& args)
 	try
 	{
 		auto holder = args.This();
-		auto isolate = Isolate::GetCurrent();
+		auto isolate = args.GetIsolate();
 
 		holder->SetHiddenValue(V8StringConstants::GetTarget(), External::New(isolate, nullptr));
 	}
@@ -185,7 +185,7 @@ void WeakRef::GettertCallback(const FunctionCallbackInfo<Value>& args)
 	{
 		auto holder = args.This();
 		auto poTarget = reinterpret_cast<Persistent<Object>*>(holder->GetHiddenValue(V8StringConstants::GetTarget()).As<External>()->Value());
-		auto isolate = Isolate::GetCurrent();
+		auto isolate = args.GetIsolate();
 
 		if (poTarget != nullptr)
 		{

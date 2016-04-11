@@ -67,7 +67,7 @@ MethodCache::CacheMethodInfo MethodCache::ResolveMethodSignature(const string& c
 
 	return mi;
 }
-
+// Encoded signature <className>.S/I.<methodName>.<argsCount>.<arg1class>.<...>
 string MethodCache::EncodeSignature(const string& className, const string& methodName, const FunctionCallbackInfo<Value>& args, bool isStatic)
 {
 	string sig(className);
@@ -99,6 +99,22 @@ string MethodCache::EncodeSignature(const string& className, const string& metho
 string MethodCache::GetType(const v8::Local<v8::Value>& value)
 {
 	string type;
+
+	if(value->IsObject())
+	{
+		auto objVal = value->ToObject();
+
+		Local<Value> nullNode = objVal->GetHiddenValue(V8StringConstants::GetNullNodeName());
+
+		if(!nullNode.IsEmpty()) {
+			auto treeNode = reinterpret_cast<MetadataNode*>(nullNode.As<External>()->Value());
+
+			type = (treeNode != nullptr) ? treeNode->GetName() : "<unknown>";
+
+			DEBUG_WRITE("Parameter of type %s with NULL value is passed to the method.", type.c_str());
+			return type;
+		}
+	}
 
 	if (value->IsArray() || value->IsArrayBuffer() || value->IsArrayBufferView() || value->IsTypedArray()
 			|| value->IsFloat32Array() || value->IsFloat64Array()

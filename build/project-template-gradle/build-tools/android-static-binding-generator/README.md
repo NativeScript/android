@@ -1,1 +1,0 @@
-Deals with generating the bindings necessary for a nativescript project

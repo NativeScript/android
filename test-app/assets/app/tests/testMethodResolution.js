@@ -21,5 +21,4 @@ describe("Test Method Resolution", function () {
 		
 		expect(value).toBe(2);
 	});
-
 });

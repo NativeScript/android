@@ -7,6 +7,7 @@
 #include "SimpleAllocator.h"
 #include "WeakRef.h"
 #include "ArrayBufferHelper.h"
+#include "Profiler.h"
 
 jobject ConvertJsValueToJavaObject(tns::JEnv& env, const v8::Local<v8::Value>& value, int classReturnType);
 
@@ -54,8 +55,10 @@ namespace tns
 
 			WeakRef m_weakRef;
 
+			Profiler m_profiler;
+
 			static void PrepareExtendFunction(v8::Isolate *isolate, jstring filesPath);
-			v8::Isolate* PrepareV8Runtime(const std::string& filesPath, jstring packageName, jobject jsDebugger);
+			v8::Isolate* PrepareV8Runtime(const std::string& filesPath, jstring packageName, jobject jsDebugger, jstring profilerOutputDir);
 			jobject ConvertJsValueToJavaObject(JEnv& env, const v8::Local<v8::Value>& value, int classReturnType);
 
 			static std::map<int, Runtime*> s_id2RuntimeCache;

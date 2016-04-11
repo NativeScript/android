@@ -461,7 +461,6 @@ void ObjectManager::MarkReachableObjects(Isolate *isolate, const Local<Object>& 
 			auto hasImplObject = HasImplObject(isolate, o);
 			if (hasImplObject)
 			{
-				jsInfo->IsJavaObjectWeak = false;
 				m_implObjStrong[jsInfo->JavaObjectID] = nullptr;
 			}
 			o->SetHiddenValue(propName, curGCNumValue);

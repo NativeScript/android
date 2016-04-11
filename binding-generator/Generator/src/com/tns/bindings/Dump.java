@@ -389,65 +389,110 @@ public class Dump
 		
 		return result.values().toArray(new Method[result.size()]);
 	}
+	
+	private String getMethodSignature(Method m)
+	{
+		String sig = m.toGenericString();
+		
+		int nameIdx = sig.indexOf("(");
+		int endSigIdx = sig.indexOf(")") + 1;
+		
+		return m.getName() + sig.substring(nameIdx, endSigIdx);
+	}
 
 	private Method[] getSupportedMethods(Class<?> clazz, HashSet<String> methodOverrides)
 	{
 		ArrayList<Method> result = new ArrayList<Method>();
-		HashMap<String, Method> finalMethods = new HashMap<String, Method>();
-		ArrayList<Class<?>> implementedInterfaces = new ArrayList<Class<?>>();
-		while (clazz != null)
+
+		if (clazz.isInterface())
 		{
-			Method[] methods = clazz.getDeclaredMethods();
-			
-			ArrayList<Method> methodz = new ArrayList<Method>();
-			
-			for (int i = 0; i < methods.length; i++)
+			Set<String> objectMethods = new HashSet<String>();
+			for (Method objMethod: java.lang.Object.class.getDeclaredMethods())
 			{
-				Method candidateMethod = methods[i];
-				if (methodOverrides != null && !methodOverrides.contains(candidateMethod.getName()))
+				if (!Modifier.isStatic(objMethod.getModifiers()))
 				{
-					continue;
-				}
-				
-				methodz.add(methods[i]);
-			}
-			
-			
-			Class<?>[] interfaces = clazz.getInterfaces();
-			for (int i = 0; i < interfaces.length; i++)
-			{
-				implementedInterfaces.add(interfaces[i]);
-			}
-			
-			for (int i = 0; i < methodz.size(); i++)
-			{
-				Method method = methodz.get(i);
-				
-				if (isMethodSupported(method, finalMethods))
-				{
-					result.add(method);
+					String sig = getMethodSignature(objMethod);
+					objectMethods.add(sig);
 				}
 			}
-			
-			clazz = clazz.getSuperclass();
+			Set<Method> notImplementedObjectMethods = new HashSet<Method>();
+			Method[] ifaceMethods = clazz.getDeclaredMethods();
+			for (Method ifaceMethod: ifaceMethods)
+			{
+				if (!Modifier.isStatic(ifaceMethod.getModifiers()))
+				{
+					String sig = getMethodSignature(ifaceMethod);
+					if (objectMethods.contains(sig) && !methodOverrides.contains(ifaceMethod.getName()))
+					{
+						notImplementedObjectMethods.add(ifaceMethod);
+					}
+				}
+			}
+			for (Method ifaceMethod: ifaceMethods)
+			{
+				if (!notImplementedObjectMethods.contains(ifaceMethod))
+				{
+					result.add(ifaceMethod);
+				}
+			}
 		}
-		
-		for (int i = 0; i < implementedInterfaces.size(); i++)
+		else
 		{
-			Class<?> implementedInterface = implementedInterfaces.get(i);
-			Method[] interfaceMethods = implementedInterface.getMethods();
-			for (int j = 0; j < interfaceMethods.length; j++)
+			HashMap<String, Method> finalMethods = new HashMap<String, Method>();
+			ArrayList<Class<?>> implementedInterfaces = new ArrayList<Class<?>>();
+			while (clazz != null)
 			{
-				Method method = interfaceMethods[j];
+				Method[] methods = clazz.getDeclaredMethods();
 				
-				if (methodOverrides != null && !methodOverrides.contains(method.getName()))
+				ArrayList<Method> methodz = new ArrayList<Method>();
+				
+				for (int i = 0; i < methods.length; i++)
 				{
-					continue;
+					Method candidateMethod = methods[i];
+					if (methodOverrides != null && !methodOverrides.contains(candidateMethod.getName()))
+					{
+						continue;
+					}
+					
+					methodz.add(methods[i]);
 				}
 				
-				if (!isMethodMarkedAsFinalInClassHierarchy(method, finalMethods))
+				Class<?>[] interfaces = clazz.getInterfaces();
+				for (int i = 0; i < interfaces.length; i++)
 				{
-					result.add(method);	
+					implementedInterfaces.add(interfaces[i]);
+				}
+				
+				for (int i = 0; i < methodz.size(); i++)
+				{
+					Method method = methodz.get(i);
+					
+					if (isMethodSupported(method, finalMethods))
+					{
+						result.add(method);
+					}
+				}
+				
+				clazz = clazz.getSuperclass();
+			}
+			
+			for (int i = 0; i < implementedInterfaces.size(); i++)
+			{
+				Class<?> implementedInterface = implementedInterfaces.get(i);
+				Method[] interfaceMethods = implementedInterface.getMethods();
+				for (int j = 0; j < interfaceMethods.length; j++)
+				{
+					Method method = interfaceMethods[j];
+					
+					if (methodOverrides != null && !methodOverrides.contains(method.getName()))
+					{
+						continue;
+					}
+					
+					if (!isMethodMarkedAsFinalInClassHierarchy(method, finalMethods))
+					{
+						result.add(method);	
+					}
 				}
 			}
 		}

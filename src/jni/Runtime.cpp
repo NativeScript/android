@@ -13,7 +13,6 @@
 #include "Version.h"
 #include "JEnv.h"
 #include "WeakRef.h"
-#include "Profiler.h"
 #include "NativeScriptAssert.h"
 #include "JsDebugger.h"
 #include "SimpleProfiler.h"
@@ -122,7 +121,7 @@ void Runtime::Init(JNIEnv *_env, jobject obj, int runtimeId, jstring filesPath, 
 
 void Runtime::Init(jstring filesPath, bool verboseLoggingEnabled, jstring packageName, jobjectArray args, jobject jsDebugger)
 {
-	m_logEnabled = verboseLoggingEnabled;
+	LogEnabled = m_logEnabled = verboseLoggingEnabled;
 
 	auto filesRoot = ArgConverter::jstringToString(filesPath);
 	Constants::APP_ROOT_FOLDER_PATH = filesRoot + "/app/";
@@ -135,11 +134,12 @@ void Runtime::Init(jstring filesPath, bool verboseLoggingEnabled, jstring packag
 	Constants::V8_HEAP_SNAPSHOT = (bool)snapshot;
 	JniLocalRef snapshotScript(m_env.GetObjectArrayElement(args, 3));
 	Constants::V8_HEAP_SNAPSHOT_SCRIPT = ArgConverter::jstringToString(snapshotScript);
+	JniLocalRef profilerOutputDir(m_env.GetObjectArrayElement(args, 4));
 
 	DEBUG_WRITE("Initializing Telerik NativeScript");
 
 	NativeScriptException::Init(m_objectManager);
-	m_isolate = PrepareV8Runtime(filesRoot, packageName, jsDebugger);
+	m_isolate = PrepareV8Runtime(filesRoot, packageName, jsDebugger, profilerOutputDir);
 
 	s_isolate2RuntimesCache.insert(make_pair(m_isolate, this));
 }
@@ -335,7 +335,7 @@ void Runtime::PassUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, jthrowab
 	}
 }
 
-Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName, jobject jsDebugger)
+Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName, jobject jsDebugger, jstring profilerOutputDir)
 {
 	auto platform = v8::platform::CreateDefaultPlatform();
 	V8::InitializePlatform(platform);
@@ -384,11 +384,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 
 	const auto readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
 
-	globalTemplate->Set(ConvertToV8String("__startNDKProfiler"), FunctionTemplate::New(isolate, Profiler::StartNDKProfilerCallback));
-	globalTemplate->Set(ConvertToV8String("__stopNDKProfiler"), FunctionTemplate::New(isolate, Profiler::StopNDKProfilerCallback));
-	globalTemplate->Set(ConvertToV8String("__startCPUProfiler"), FunctionTemplate::New(isolate, Profiler::StartCPUProfilerCallback));
-	globalTemplate->Set(ConvertToV8String("__stopCPUProfiler"), FunctionTemplate::New(isolate, Profiler::StopCPUProfilerCallback));
-	globalTemplate->Set(ConvertToV8String("__heapSnapshot"), FunctionTemplate::New(isolate, Profiler::HeapSnapshotMethodCallback));
 	globalTemplate->Set(ConvertToV8String("__log"), FunctionTemplate::New(isolate, CallbackHandlers::LogMethodCallback));
 	globalTemplate->Set(ConvertToV8String("__dumpReferenceTables"), FunctionTemplate::New(isolate, CallbackHandlers::DumpReferenceTablesMethodCallback));
 	globalTemplate->Set(ConvertToV8String("__debugbreak"), FunctionTemplate::New(isolate, JsDebugger::DebugBreakCallback));
@@ -424,17 +419,18 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 	global->ForceSet(ConvertToV8String("global"), global, readOnlyFlags);
 	global->ForceSet(ConvertToV8String("__global"), global, readOnlyFlags);
 
-	ArgConverter::Init();
+	ArgConverter::Init(isolate);
 
-	CallbackHandlers::Init(m_objectManager);
+	CallbackHandlers::Init(isolate, m_objectManager);
 
-	string pckName = ArgConverter::jstringToString(packageName);
-	Profiler::Init(pckName);
+	auto pckName = ArgConverter::jstringToString(packageName);
+	auto outputDir = ArgConverter::jstringToString(profilerOutputDir);
+	m_profiler.Init(isolate, global, pckName, outputDir);
 	JsDebugger::Init(isolate, pckName, jsDebugger);
 
 	MetadataNode::BuildMetadata(filesPath);
 
-	MetadataNode::CreateTopLevelNamespaces(global);
+	MetadataNode::CreateTopLevelNamespaces(isolate, global);
 
 	ArrayHelper::Init(context);
 
