@@ -260,6 +260,8 @@ var es5_visitors = (function () {
 					}
 				}
 				else {
+					// don't throw here, because there can be a valid js extend that has nothing to do with NS
+					return;
 					throw {
 						message: "Not enough or too many arguments passed(" + extendArguments.length + ") when trying to extend class in file: " + config.filePath,
 						errCode: 1
@@ -267,6 +269,8 @@ var es5_visitors = (function () {
 				}
 			}
 			else {
+				// don't throw here, because there can be a valid js extend that has nothing to do with NS
+				return;
 				throw {
 					message: "You need to call the extend with parameters. Example: '...extend(\"a.b.C\", {...overrides...})') in file: " + config.filePath,
 					errCode: 1
@@ -303,6 +307,8 @@ var es5_visitors = (function () {
 			normalExtendsArr.push(lineToWrite)
 		}
 		else {
+				// don't throw here, because there can be a valid js extend that has nothing to do with NS
+				return;
 				throw {
 					message: "You need to call the extend '...extend(\"extend_name\", {...overrides...})'), file: " + config.filePath,
 					errCode: 1
