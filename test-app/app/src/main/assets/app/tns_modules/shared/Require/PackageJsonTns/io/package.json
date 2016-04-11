@@ -1,0 +1,7 @@
+{
+	"name": "foo",
+	"version": "1.2.3",
+	"description": "An io package",
+	"main": "io.js",
+	"man": "./man/doc.1"
+}
