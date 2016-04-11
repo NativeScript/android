@@ -12,13 +12,15 @@ def cachedJarsFilePath = "$projectDir/cached.txt"
 def shouldRun = true
 def absoluteOutDir = project.outDir
 def absoluteJsCodeDir = project.jsCodeDir
+def utf8 = java.nio.charset.StandardCharsets.UTF_8
+def current = ""
 
 // depends on passed jars and generated interface-names
 task generateInterfaceNamesList() {
 	doFirst {
-		def current = project.jarFiles
+		current = project.jarFiles
 		def cache = new File(cachedJarsFilePath)
-		def utf8 = java.nio.charset.StandardCharsets.UTF_8
+		
 		if (cache.exists()) {
 			def contents = new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(cachedJarsFilePath)), utf8).trim()
 			shouldRun = !contents.equals(current.toString())
