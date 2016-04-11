@@ -7,23 +7,19 @@
 #include "NativeScriptAssert.h"
 #include "NativeScriptException.h"
 #include "JType.h"
+#include "Runtime.h"
 
 using namespace v8;
 using namespace std;
 using namespace tns;
 
-void ArrayElementAccessor::Init(JavaVM *jvm, ObjectManager *objectManager)
-{
-	this->jvm = jvm;
-	this->objectManager = objectManager;
-}
-
-Local<Value> ArrayElementAccessor::GetArrayElement(const Local<Object>& array, uint32_t index, const string& arraySignature)
+Local<Value> ArrayElementAccessor::GetArrayElement(Isolate *isolate, const Local<Object>& array, uint32_t index, const string& arraySignature)
 {
 	JEnv env;
 
-	Isolate* isolate = Isolate::GetCurrent();
 	EscapableHandleScope handleScope(isolate);
+	auto runtime = Runtime::GetRuntime(isolate);
+	auto objectManager = runtime->GetObjectManager();
 
 	auto arr = objectManager->GetJavaObjectByJsObject(array);
 
@@ -39,14 +35,14 @@ Local<Value> ArrayElementAccessor::GetArrayElement(const Local<Object>& array, u
 		jbooleanArray boolArr = static_cast<jbooleanArray>(arr);
 		jboolean boolArrValue;
 		env.GetBooleanArrayRegion(boolArr, startIndex, length, &boolArrValue);
-		value = ConvertToJsValue(env, elementSignature, &boolArrValue);
+		value = ConvertToJsValue(isolate, objectManager, env, elementSignature, &boolArrValue);
 	}
 	else if (elementSignature == "B")
 	{
 		jbyteArray byteArr = static_cast<jbyteArray>(arr);
 		jbyte byteArrValue;
 		env.GetByteArrayRegion(byteArr, startIndex, length, &byteArrValue);
-		value = ConvertToJsValue(env, elementSignature, &byteArrValue);
+		value = ConvertToJsValue(isolate, objectManager, env, elementSignature, &byteArrValue);
 	}
 	else if (elementSignature == "C")
 	{
@@ -55,7 +51,7 @@ Local<Value> ArrayElementAccessor::GetArrayElement(const Local<Object>& array, u
 		env.GetCharArrayRegion(charArr, startIndex, length, &charArrValue);
 		JniLocalRef s(env.NewString(&charArrValue, 1));
 		const char* singleChar = env.GetStringUTFChars(s, &isCopy);
-		value = ConvertToJsValue(env, elementSignature, singleChar);
+		value = ConvertToJsValue(isolate, objectManager, env, elementSignature, singleChar);
 		env.ReleaseStringUTFChars(s, singleChar);
 	}
 	else if (elementSignature == "S")
@@ -63,52 +59,53 @@ Local<Value> ArrayElementAccessor::GetArrayElement(const Local<Object>& array, u
 		jshortArray shortArr = static_cast<jshortArray>(arr);
 		jshort shortArrValue;
 		env.GetShortArrayRegion(shortArr, startIndex, length, &shortArrValue);
-		value = ConvertToJsValue(env, elementSignature, &shortArrValue);
+		value = ConvertToJsValue(isolate, objectManager, env, elementSignature, &shortArrValue);
 	}
 	else if (elementSignature == "I")
 	{
 		jintArray intArr = static_cast<jintArray>(arr);
 		jint intArrValue;
 		env.GetIntArrayRegion(intArr, startIndex, length, &intArrValue);
-		value = ConvertToJsValue(env, elementSignature, &intArrValue);
+		value = ConvertToJsValue(isolate, objectManager, env, elementSignature, &intArrValue);
 	}
 	else if (elementSignature == "J")
 	{
 		jlongArray longArr = static_cast<jlongArray>(arr);
 		jlong longArrValue;
 		env.GetLongArrayRegion(longArr, startIndex, length, &longArrValue);
-		value = ConvertToJsValue(env, elementSignature, &longArrValue);
+		value = ConvertToJsValue(isolate, objectManager, env, elementSignature, &longArrValue);
 	}
 	else if (elementSignature == "F")
 	{
 		jfloatArray floatArr = static_cast<jfloatArray>(arr);
 		jfloat floatArrValue;
 		env.GetFloatArrayRegion(floatArr, startIndex, length, &floatArrValue);
-		value = ConvertToJsValue(env, elementSignature, &floatArrValue);
+		value = ConvertToJsValue(isolate, objectManager, env, elementSignature, &floatArrValue);
 	}
 	else if (elementSignature == "D")
 	{
 		jdoubleArray doubleArr = static_cast<jdoubleArray>(arr);
 		jdouble doubleArrValue;
 		env.GetDoubleArrayRegion(doubleArr, startIndex, length, &doubleArrValue);
-		value = ConvertToJsValue(env, elementSignature, &doubleArrValue);
+		value = ConvertToJsValue(isolate, objectManager, env, elementSignature, &doubleArrValue);
 	}
 	else
 	{
 		jobject result = env.GetObjectArrayElement(static_cast<jobjectArray>(arr), index);
-		value = ConvertToJsValue(env, elementSignature, &result);
+		value = ConvertToJsValue(isolate, objectManager, env, elementSignature, &result);
 		env.DeleteLocalRef(result);
 	}
 
 	return handleScope.Escape(value);
 }
 
-void ArrayElementAccessor::SetArrayElement(const Local<Object>& array, uint32_t index, const string& arraySignature, Local<Value>& value)
+void ArrayElementAccessor::SetArrayElement(Isolate *isolate, const Local<Object>& array, uint32_t index, const string& arraySignature, Local<Value>& value)
 {
 	JEnv env;
 
-	Isolate* isolate = Isolate::GetCurrent();
 	HandleScope handleScope(isolate);
+	auto runtime = Runtime::GetRuntime(isolate);
+	auto objectManager = runtime->GetObjectManager();
 
 	auto arr = objectManager->GetJavaObjectByJsObject(array);
 
@@ -182,7 +179,7 @@ void ArrayElementAccessor::SetArrayElement(const Local<Object>& array, uint32_t 
 		{
 			auto object = value.As<Object>();
 
-			JsArgToArrayConverter argConverter(value, false, (int) Type::Null);
+			JsArgToArrayConverter argConverter(isolate, value, false, (int) Type::Null);
 			if (argConverter.IsValid())
 			{
 				jobjectArray objArr = static_cast<jobjectArray>(arr);
@@ -202,11 +199,9 @@ void ArrayElementAccessor::SetArrayElement(const Local<Object>& array, uint32_t 
 	}
 }
 
-Local<Value> ArrayElementAccessor::ConvertToJsValue(JEnv& env, const string& elementSignature, const void *value)
+Local<Value> ArrayElementAccessor::ConvertToJsValue(Isolate *isolate, ObjectManager *objectManager, JEnv& env, const string& elementSignature, const void *value)
 {
 	Local<Value> jsValue;
-
-	auto isolate = Isolate::GetCurrent();
 
 	if (elementSignature == "Z")
 	{
@@ -230,7 +225,7 @@ Local<Value> ArrayElementAccessor::ConvertToJsValue(JEnv& env, const string& ele
 	}
 	else if (elementSignature == "J")
 	{
-		jsValue = ArgConverter::ConvertFromJavaLong(*(jlong*) value);
+		jsValue = ArgConverter::ConvertFromJavaLong(isolate, *(jlong*) value);
 	}
 	else if (elementSignature == "F")
 	{

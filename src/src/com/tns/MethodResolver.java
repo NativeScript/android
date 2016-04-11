@@ -108,23 +108,27 @@ class MethodResolver
 		return array + signature;
 	}
 
-	static String resolveMethodOverload(HashMap<String, Class<?>> classCache, String className, String methodName, Object[] args) throws ClassNotFoundException
-	{
-		String methodSig = null;
-		Class<?> clazz = classCache.get(className);
-		if (clazz == null)
-		{
-			clazz = Class.forName(className);
-		}
-		int argLength = (args != null) ? args.length : 0;
+	static HashMap<Class<?>, MethodFinder> methodOverloadsForClass = new HashMap<Class<?>, MethodFinder>();
+	static ArrayList<Tuple<Method, Integer>> candidates = new ArrayList<Tuple<Method, Integer>>();
 
-		ArrayList<Tuple<Method, Integer>> candidates = new ArrayList<Tuple<Method, Integer>>();
+	static String resolveMethodOverload(Class<?> clazz, String methodName, Object[] args) throws ClassNotFoundException
+	{
+		candidates.clear();
+		int argLength = (args != null) ? args.length : 0;
 
 		Class<?> c = clazz;
 		int iterationIndex = 0;
 		while (c != null)
 		{
-			tryFindMatches(methodName, candidates, args, argLength, c.getDeclaredMethods());
+			MethodFinder finder = methodOverloadsForClass.get(c);
+			if (finder == null)
+			{
+				finder = new MethodFinder(c);
+				methodOverloadsForClass.put(c, finder);
+			}
+
+			ArrayList<Method> matchingMethods = finder.getMatchingMethods(methodName);
+			tryFindMatches(methodName, candidates, args, argLength, matchingMethods);
 			if (candidates.size() > iterationIndex && candidates.get(iterationIndex).y == 0)
 			{
 				// direct matching (distance 0) found
@@ -139,28 +143,18 @@ class MethodResolver
 		{
 			if (candidates.size() > 1)
 				Collections.sort(candidates, distanceComparator);
+
 			Method method = candidates.get(0).x;
-			methodSig = getMethodSignature(method.getReturnType(), method.getParameterTypes());
+			return getMethodSignature(method.getReturnType(), method.getParameterTypes());
 		}
 
-		return methodSig;
+		return null;
 	}
 
-	static void tryFindMatches(String methodName, ArrayList<Tuple<Method, Integer>> candidates, Object[] args, int argLength, Method[] methods)
+	static void tryFindMatches(String methodName, ArrayList<Tuple<Method, Integer>> candidates, Object[] args, int argLength, ArrayList<Method> methods)
 	{
 		for (Method method : methods)
 		{
-			if (!method.getName().equals(methodName))
-			{
-				continue;
-			}
-
-			int modifiers = method.getModifiers();
-			if (!Modifier.isPublic(modifiers) && !Modifier.isProtected(modifiers))
-			{
-				continue;
-			}
-
 			Class<?>[] params = method.getParameterTypes();
 
 			boolean success = false;
@@ -178,7 +172,10 @@ class MethodResolver
 					{
 						if (args[i] != null)
 						{
-							Tuple<Boolean, Integer> res = isAssignableFrom(params[i], args[i].getClass());
+							Class<?> argClass = args[i] instanceof NullObject ? 
+									((NullObject)args[i]).getNullObjectClass() 
+									: args[i].getClass();
+							Tuple<Boolean, Integer> res = isAssignableFrom(params[i], argClass);
 							success = res.x.booleanValue();
 							dist += res.y;
 						}
@@ -619,5 +616,39 @@ class MethodResolver
 		}
 
 		return success;
+	}
+	
+	static class MethodFinder {
+		private Method[] declaredMethods;
+		private HashMap<String, ArrayList<Method>> matchingMethods = new HashMap<String, ArrayList<Method>>();
+		public MethodFinder(Class<?> clazz) {
+			this.declaredMethods = clazz.getDeclaredMethods();
+		}
+		
+		public ArrayList<Method> getMatchingMethods(String methodName) {
+			ArrayList<Method> matches = this.matchingMethods.get(methodName);
+			if (matches == null) {
+				matches = new ArrayList<Method>();
+				for (Method method : this.declaredMethods)
+				{
+					if (!method.getName().equals(methodName))
+					{
+						continue;
+					}
+
+					int modifiers = method.getModifiers();
+					if (!Modifier.isPublic(modifiers) && !Modifier.isProtected(modifiers))
+					{
+						continue;
+					}
+
+					matches.add(method);
+				}
+
+				matchingMethods.put(methodName, matches);
+			}
+			
+			return matches;
+		}
 	}
 }

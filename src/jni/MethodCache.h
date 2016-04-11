@@ -43,7 +43,7 @@ namespace tns
 
 			static std::string ResolveJavaMethod(const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& className, const std::string& methodName);
 
-			static jclass PLATFORM_CLASS;
+			static jclass RUNTIME_CLASS;
 
 			static jmethodID RESOLVE_METHOD_OVERLOAD_METHOD_ID;
 

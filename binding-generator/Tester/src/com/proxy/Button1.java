@@ -2,7 +2,7 @@ package com.proxy;
 
 import java.lang.reflect.Array;
 
-import com.tns.Platform;
+import com.tns.Runtime;
 
 import android.content.Context;
 import android.util.Log;

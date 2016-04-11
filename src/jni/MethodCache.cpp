@@ -8,6 +8,7 @@
 #include "V8StringConstants.h"
 #include "NumericCasts.h"
 #include "NativeScriptException.h"
+#include "Runtime.h"
 #include <sstream>
 #include <assert.h>
 
@@ -19,10 +20,10 @@ void MethodCache::Init()
 {
 	JEnv env;
 
-	PLATFORM_CLASS = env.FindClass("com/tns/Platform");
-	assert(PLATFORM_CLASS != nullptr);
+	RUNTIME_CLASS = env.FindClass("com/tns/Runtime");
+	assert(RUNTIME_CLASS != nullptr);
 
-	RESOLVE_METHOD_OVERLOAD_METHOD_ID = env.GetStaticMethodID(PLATFORM_CLASS, "resolveMethodOverload", "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;");
+	RESOLVE_METHOD_OVERLOAD_METHOD_ID = env.GetMethodID(RUNTIME_CLASS, "resolveMethodOverload", "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;");
 	assert(RESOLVE_METHOD_OVERLOAD_METHOD_ID != nullptr);
 }
 
@@ -66,7 +67,7 @@ MethodCache::CacheMethodInfo MethodCache::ResolveMethodSignature(const string& c
 
 	return mi;
 }
-
+// Encoded signature <className>.S/I.<methodName>.<argsCount>.<arg1class>.<...>
 string MethodCache::EncodeSignature(const string& className, const string& methodName, const FunctionCallbackInfo<Value>& args, bool isStatic)
 {
 	string sig(className);
@@ -98,6 +99,22 @@ string MethodCache::EncodeSignature(const string& className, const string& metho
 string MethodCache::GetType(const v8::Local<v8::Value>& value)
 {
 	string type;
+
+	if(value->IsObject())
+	{
+		auto objVal = value->ToObject();
+
+		Local<Value> nullNode = objVal->GetHiddenValue(V8StringConstants::GetNullNodeName());
+
+		if(!nullNode.IsEmpty()) {
+			auto treeNode = reinterpret_cast<MetadataNode*>(nullNode.As<External>()->Value());
+
+			type = (treeNode != nullptr) ? treeNode->GetName() : "<unknown>";
+
+			DEBUG_WRITE("Parameter of type %s with NULL value is passed to the method.", type.c_str());
+			return type;
+		}
+	}
 
 	if (value->IsArray() || value->IsArrayBuffer() || value->IsArrayBufferView() || value->IsTypedArray()
 			|| value->IsFloat32Array() || value->IsFloat64Array()
@@ -198,7 +215,9 @@ string MethodCache::ResolveJavaMethod(const FunctionCallbackInfo<Value>& args, c
 
 	jobjectArray arrArgs = argConverter.ToJavaArray();
 
-	jstring signature = (jstring) env.CallStaticObjectMethod(PLATFORM_CLASS, RESOLVE_METHOD_OVERLOAD_METHOD_ID, (jstring) jsClassName, (jstring) jsMethodName, arrArgs);
+	auto runtime = Runtime::GetRuntime(args.GetIsolate());
+
+	jstring signature = (jstring) env.CallObjectMethod(runtime->GetJavaRuntime(), RESOLVE_METHOD_OVERLOAD_METHOD_ID, (jstring) jsClassName, (jstring) jsMethodName, arrArgs);
 
 	string resolvedSignature;
 
@@ -212,5 +231,5 @@ string MethodCache::ResolveJavaMethod(const FunctionCallbackInfo<Value>& args, c
 }
 
 map<string, MethodCache::CacheMethodInfo> MethodCache::s_cache;
-jclass MethodCache::PLATFORM_CLASS = nullptr;
+jclass MethodCache::RUNTIME_CLASS = nullptr;
 jmethodID MethodCache::RESOLVE_METHOD_OVERLOAD_METHOD_ID = nullptr;
