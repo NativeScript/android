@@ -37,7 +37,6 @@ task generateInterfaceNamesList() {
 
 				args str.toArray()
 			}
-			java.nio.file.Files.write(java.nio.file.Paths.get(cachedJarsFilePath), [current.toString()], utf8)
 		}
 	}
 }
@@ -92,6 +91,7 @@ task generateBindings() {
 
 				args str.toArray()
 			}
+			java.nio.file.Files.write(java.nio.file.Paths.get(cachedJarsFilePath), [current.toString()], utf8)
 		}
 	}
 }
