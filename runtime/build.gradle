@@ -1,4 +1,5 @@
 apply plugin: 'com.android.model.library'
+
 model {
     android {
         compileSdkVersion = 23
@@ -22,17 +23,10 @@ model {
 
         ldLibs.addAll(["android", "dl", "log", "atomic", "z"])
 
-        //replace all arm with ${targetPlatform.getName()}
-        ldLibs.add("${file("src/main/libs/armeabi-v7a/libv8_base.a")}".toString())
-        ldLibs.add("${file("src/main/libs/armeabi-v7a/libv8_libplatform.a")}".toString())
-        ldLibs.add("${file("src/main/libs/armeabi-v7a/libv8_libbase.a")}".toString())
-        ldLibs.add("${file("src/main/libs/armeabi-v7a/libv8_nosnapshot.a")}".toString())
-        ldLibs.add("${file("src/main/libs/armeabi-v7a/libzip.a")}".toString())
-
         //stl     = "c++_static"
         stl = "stlport_static"
 
-        abiFilters.addAll(["armeabi-v7a"])
+        abiFilters.addAll(["armeabi-v7a", "x86", "arm64-v8a"])
     }
     // jni is the default dir; config this if yours is in different directory
     android.sources {
@@ -72,13 +66,41 @@ model {
             cppFlags.addAll(["-mhard-float", "-D_NDK_MATH_NO_SOFTFP=1", "-mfloat-abi=hard"])
             ldLibs.add("m_hard")
             ldFlags.add("-Wl,--no-warn-mismatch")
+
+            ldLibs.add("${file("src/main/libs/armeabi-v7a/libv8_base.a")}".toString())
+            ldLibs.add("${file("src/main/libs/armeabi-v7a/libv8_libplatform.a")}".toString())
+            ldLibs.add("${file("src/main/libs/armeabi-v7a/libv8_libbase.a")}".toString())
+            ldLibs.add("${file("src/main/libs/armeabi-v7a/libv8_nosnapshot.a")}".toString())
+            ldLibs.add("${file("src/main/libs/armeabi-v7a/libzip.a")}".toString())
+        }
+
+        create("x86") {
+            cppFlags.addAll(["-mhard-float", "-D_NDK_MATH_NO_SOFTFP=1"])
+            ldFlags.add("-Wl,--no-warn-mismatch")
+
+            ldLibs.add("${file("src/main/libs/x86/libv8_base.a")}".toString())
+            ldLibs.add("${file("src/main/libs/x86/libv8_libplatform.a")}".toString())
+            ldLibs.add("${file("src/main/libs/x86/libv8_libbase.a")}".toString())
+            ldLibs.add("${file("src/main/libs/x86/libv8_nosnapshot.a")}".toString())
+            ldLibs.add("${file("src/main/libs/x86/libzip.a")}".toString())
+        }
+
+        create("arm64-v8a") {
+            cppFlags.addAll(["-mhard-float", "-D_NDK_MATH_NO_SOFTFP=1"])
+            ldFlags.add("-Wl,--no-warn-mismatch")
+
+            ldLibs.add("${file("src/main/libs/arm64-v8a/libv8_base.a")}".toString())
+            ldLibs.add("${file("src/main/libs/arm64-v8a/libv8_libplatform.a")}".toString())
+            ldLibs.add("${file("src/main/libs/arm64-v8a/libv8_libbase.a")}".toString())
+            ldLibs.add("${file("src/main/libs/arm64-v8a/libv8_nosnapshot.a")}".toString())
+            ldLibs.add("${file("src/main/libs/arm64-v8a/libzip.a")}".toString())
         }
     }
 //    android.productFlavors {
 //        create("arm7") {
 //            ndk.abiFilters.add("armeabi-v7a")
 //        }
-
+//
 //        create ("arm8") {
 //            ndk.abiFilters.add("arm64-v8a")
 //        }
@@ -86,10 +108,10 @@ model {
 //        create ("x86-32") {
 //            ndk.abiFilters.add("x86")
 //        }
-
-        // for detailed abiFilter descriptions, refer to "Supported ABIs" @
-        // https://developer.android.com/ndk/guides/abis.html#sa
-        // build one including all productFlavors
+//
+//         for detailed abiFilter descriptions, refer to "Supported ABIs" @
+//         https://developer.android.com/ndk/guides/abis.html#sa
+//         build one including all productFlavors
 //        create("fat")
 //    }
 

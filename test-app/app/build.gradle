@@ -28,7 +28,6 @@ model {
 
 dependencies {
     compile project(':runtime')
-    //compile project(':runtime-source')
     compile project(':binding-generator')
     compile fileTree(dir: 'libs', include: ['*.jar'])
     testCompile 'junit:junit:4.12'
