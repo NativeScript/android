@@ -484,7 +484,7 @@ public class JsDebugger
 			
 			String sendingText = consoleMessage.toString();
 			
-			Log.d("TNS.JAVA.JsDebugger", "Sending console message to inspector:" + sendingText);
+			logger.write("Sending console message to inspector:" + sendingText);
 			
 			dbgMessages.add(sendingText);
 		}
@@ -587,8 +587,8 @@ public class JsDebugger
 		
 		registerEnableDisableDebuggerReceiver(handler);
 		
-		boolean shouldDebugBrake = getDebugBreakFlagAndClearIt();
-		if (shouldDebugBrake)
+		boolean shouldDebugBreak = getDebugBreakFlagAndClearIt();
+		if (shouldDebugBreak)
 		{
 			logger.write("Enabling Debugger Agent");
 			enable();

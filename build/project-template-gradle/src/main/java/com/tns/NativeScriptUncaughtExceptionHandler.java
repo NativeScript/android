@@ -11,12 +11,19 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
 	private final UncaughtExceptionHandler defaultHandler;
 
 	private final Logger logger;
-
+	
+	private Runtime runtime;
+	
 	public NativeScriptUncaughtExceptionHandler(Logger logger, Context context)
 	{
 		this.logger = logger;
 		this.context = context;
 		defaultHandler = Thread.getDefaultUncaughtExceptionHandler();
+	}
+	
+	public void setRuntime(Runtime runtime)
+	{
+		this.runtime = runtime;
 	}
 
 	@Override
@@ -24,12 +31,15 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
 	{
 		String errorMessage = ErrorReport.getErrorMessage(ex);
 		
-		if (Platform.isInitialized())
+		if (Runtime.isInitialized())
 		{
 			try
 			{
 				ex.printStackTrace();
-				Platform.passUncaughtExceptionToJsNative(ex, errorMessage);
+				if (runtime != null)
+				{
+					runtime.passUncaughtExceptionToJs(ex, errorMessage);
+				}
 				
 				if (JsDebugger.isJsDebuggerActive())
 				{

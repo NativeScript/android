@@ -10,11 +10,6 @@ JavaObjectArrayCache::JavaObjectArrayCache()
 {
 }
 
-void JavaObjectArrayCache::Init(JavaVM *jvm)
-{
-	s_jvm = jvm;
-}
-
 jobjectArray JavaObjectArrayCache::GetJavaObjectArray(int length)
 {
 	bool supportedLength = length < MAX_JAVA_PARAMS_COUNT;
@@ -63,7 +58,6 @@ jobjectArray JavaObjectArrayCache::GetJavaStringArray(int length)
 	return arr;
 }
 
-JavaVM* JavaObjectArrayCache::s_jvm = nullptr;
 __thread jobjectArray JavaObjectArrayCache::s_objArr[MAX_JAVA_PARAMS_COUNT] =
 {
 		nullptr };

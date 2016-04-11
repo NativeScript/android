@@ -65,11 +65,13 @@ void Module::Init(Isolate *isolate)
 
 	auto requireFactoryFunction = result.As<Function>();
 
-	s_poRequireFactoryFunction = new Persistent<Function>(isolate, requireFactoryFunction);
+	auto cache = GetCache(isolate);
+
+	cache->RequireFactoryFunction = new Persistent<Function>(isolate, requireFactoryFunction);
 
 	auto requireFuncTemplate = FunctionTemplate::New(isolate, RequireCallback);
 	auto requireFunc = requireFuncTemplate->GetFunction();
-	s_poRequireFunction = new Persistent<Function>(isolate, requireFunc);
+	cache->RequireFunction = new Persistent<Function>(isolate, requireFunc);
 
 	auto global = isolate->GetCurrentContext()->Global();
 	auto globalRequire = GetRequireFunction(isolate, Constants::APP_ROOT_FOLDER_PATH);
@@ -80,19 +82,21 @@ Local<Function> Module::GetRequireFunction(Isolate *isolate, const string& dirNa
 {
 	Local<Function> requireFunc;
 
-	auto itFound = s_requireCache.find(dirName);
+	auto cache = GetCache(isolate);
 
-	if (itFound != s_requireCache.end())
+	auto itFound = cache->RequireCache.find(dirName);
+
+	if (itFound != cache->RequireCache.end())
 	{
 		requireFunc = Local<Function>::New(isolate, *itFound->second);
 	}
 	else
 	{
-		auto requireFuncFactory = Local<Function>::New(isolate, *s_poRequireFactoryFunction);
+		auto requireFuncFactory = Local<Function>::New(isolate, *cache->RequireFactoryFunction);
 
 		auto context = isolate->GetCurrentContext();
 
-		auto requireInternalFunc = Local<Function>::New(isolate, *s_poRequireFunction);
+		auto requireInternalFunc = Local<Function>::New(isolate, *cache->RequireFunction);
 
 		Local<Value> args[2]
 		{
@@ -107,7 +111,7 @@ Local<Function> Module::GetRequireFunction(Isolate *isolate, const string& dirNa
 
 		auto poFunc = new Persistent<Function>(isolate, requireFunc);
 
-		s_requireCache.insert(make_pair(dirName, poFunc));
+		cache->RequireCache.insert(make_pair(dirName, poFunc));
 	}
 
 	return requireFunc;
@@ -117,7 +121,7 @@ void Module::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
 	try
 	{
-		auto isolate = Isolate::GetCurrent();
+		auto isolate = args.GetIsolate();
 
 		if (args.Length() != 2)
 		{
@@ -145,7 +149,7 @@ void Module::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 
 		auto isData = false;
 
-		auto moduleObj = Load(modulePath, isData);
+		auto moduleObj = LoadImpl(isolate, modulePath, isData);
 
 		if (isData)
 		{
@@ -185,15 +189,30 @@ void Module::RequireNativeCallback(const v8::FunctionCallbackInfo<v8::Value>& ar
 	funcPtr(args);
 }
 
-Local<Object> Module::Load(const string& path, bool& isData)
+void Module::Load(const string& path)
+{
+	auto isolate = Isolate::GetCurrent();
+	auto context = isolate->GetCurrentContext();
+	auto globalObject = context->Global();
+	auto require = globalObject->Get(context, ConvertToV8String("require")).ToLocalChecked().As<Function>();
+	Local<Value> args[] = { ConvertToV8String(path) };
+	TryCatch tc;
+	require->Call(context, globalObject, 1, args);
+	if (tc.HasCaught())
+	{
+		throw NativeScriptException(tc, "Fail to load module: " + path);
+	}
+}
+
+Local<Object> Module::LoadImpl(Isolate *isolate, const string& path, bool& isData)
 {
 	Local<Object> result;
 
-	auto isolate = Isolate::GetCurrent();
+	auto cache = GetCache(isolate);
 
-	auto it = s_loadedModules.find(path);
+	auto it = cache->LoadedModules.find(path);
 
-	if (it == s_loadedModules.end())
+	if (it == cache->LoadedModules.end())
 	{
 		if (Util::EndsWith(path, ".js") || Util::EndsWith(path, ".so"))
 		{
@@ -232,7 +251,7 @@ Local<Object> Module::LoadModule(Isolate *isolate, const string& modulePath)
 	moduleObj->Set(ConvertToV8String("filename"), fullRequiredModulePath);
 
 	auto poModuleObj = new Persistent<Object>(isolate, moduleObj);
-	TempModule tempModule(modulePath, poModuleObj);
+	TempModule tempModule(isolate, modulePath, poModuleObj);
 
 	TryCatch tc;
 
@@ -401,10 +420,10 @@ Local<String> Module::WrapModuleContent(const string& path)
 	string dirName = path.substr(0, separatorIndex);
 
 	// TODO: Use statically allocated buffer for better performance
-	string result(MODULE_PART_1);
+	string result(MODULE_PROLOGUE);
 	result.reserve(content.length() + 1024);
 	result += content;
-	result += MODULE_PART_2;
+	result += MODULE_EPILOGUE;
 
 	return ConvertToV8String(result);
 }
@@ -439,12 +458,25 @@ void Module::SaveScriptCache(const ScriptCompiler::Source& source, const std::st
 	File::WriteBinary(cachePath, source.GetCachedData()->data, length);
 }
 
+Module::Cache* Module::GetCache(Isolate *isolate)
+{
+	Cache *cache;
+	auto itFound = s_cache.find(isolate);
+	if (itFound == s_cache.end())
+	{
+		cache = new Cache;
+		s_cache.insert(make_pair(isolate, cache));
+	}
+	else
+	{
+		cache = itFound->second;
+	}
+	return cache;
+}
+
 jclass Module::MODULE_CLASS = nullptr;
 jmethodID Module::RESOLVE_PATH_METHOD_ID = nullptr;
 
-const char* Module::MODULE_PART_1 = "(function(module, exports, require, __filename, __dirname){ ";
-const char* Module::MODULE_PART_2 = "\n})";
-Persistent<Function>* Module::s_poRequireFunction = nullptr;
-Persistent<Function>* Module::s_poRequireFactoryFunction = nullptr;
-map<string, Persistent<Function>*> Module::s_requireCache;
-map<string, Persistent<Object>*> Module::s_loadedModules;
+const char* Module::MODULE_PROLOGUE = "(function(module, exports, require, __filename, __dirname){ ";
+const char* Module::MODULE_EPILOGUE = "\n})";
+map<Isolate*, Module::Cache*> Module::s_cache;

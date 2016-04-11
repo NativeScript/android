@@ -17,7 +17,6 @@ import java.util.Map;
 import java.util.Stack;
 
 import android.app.Application;
-import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.AsyncTask;
