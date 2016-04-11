@@ -18,7 +18,7 @@ using namespace std;
 using namespace tns;
 
 JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value>& args, bool hasImplementationObject, const string& methodSignature, MetadataEntry *entry)
-	: m_isolate(args.GetIsolate()), m_env(JEnv()), m_methodSignature(methodSignature), m_isValid(true), m_error(Error()), m_tokens(nullptr)
+: m_isolate(args.GetIsolate()), m_env(JEnv()), m_methodSignature(methodSignature), m_isValid(true), m_error(Error()), m_tokens(nullptr)
 {
 	m_argsLen = !hasImplementationObject ? args.Length() : args.Length() - 1;
 
@@ -48,6 +48,68 @@ JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value>& args, bool
 			{
 				break;
 			}
+		}
+	}
+}
+
+JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value>& args, const string& methodSignature, const Local<Object>& outerThis)
+: m_isolate(args.GetIsolate()), m_env(JEnv()), m_methodSignature(methodSignature), m_isValid(true), m_error(Error()), m_tokens(nullptr)
+{
+	auto isInnerClass = !outerThis.IsEmpty();
+	if (isInnerClass)
+	{
+		m_argsLen = args.Length() + 1;
+	}
+	else
+	{
+		m_argsLen = args.Length();
+	}
+
+	JniSignatureParser parser(m_methodSignature);
+	m_tokens2 = parser.Parse();
+	m_tokens = &m_tokens2;
+
+	for (int i = 0; i < m_argsLen; i++)
+	{
+		if (isInnerClass)
+		{
+			if (i == 0)
+			{
+				m_isValid = ConvertArg(outerThis, i);
+			}
+			else
+			{
+				m_isValid = ConvertArg(args[i - 1], i);
+			}
+		}
+		else
+		{
+			m_isValid = ConvertArg(args[i], i);
+		}
+
+		if (!m_isValid)
+		{
+			break;
+		}
+	}
+}
+
+JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value>& args, const string& methodSignature)
+: m_isolate(args.GetIsolate()), m_env(JEnv()), m_methodSignature(methodSignature), m_isValid(true), m_error(Error()), m_tokens(nullptr)
+{
+	m_argsLen = args.Length();
+
+	JniSignatureParser parser(m_methodSignature);
+	m_tokens2 = parser.Parse();
+	m_tokens = &m_tokens2;
+
+	for (int i = 0; i < m_argsLen; i++)
+	{
+		m_isValid = ConvertArg(args[i], i);
+
+		if (!m_isValid)
+		{
+			break;
 		}
 	}
 }
@@ -204,14 +266,14 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 
 			case CastType::None:
 				obj = objectManager->GetJavaObjectByJsObject(jsObject);
-                
+
 				castValue = jsObject->GetHiddenValue(ConvertToV8String(V8StringConstants::NULL_NODE_NAME));
 				if(!castValue.IsEmpty()) {
 					SetConvertedObject(index, nullptr);
 					success = true;
-					return success;
+					break;
 				}
-                
+
 				success = !obj.IsNull();
 
 				if (success)

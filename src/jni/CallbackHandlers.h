@@ -27,14 +27,13 @@ namespace tns
 
 			static v8::Local<v8::Object> CreateJSWrapper(v8::Isolate *isolate, jint javaObjectID, const std::string& typeName);
 
-			static jobject CreateJavaInstance(int objectID, const std::string& fullClassName, const ArgsWrapper& argWrapper, jclass javaClass, bool isInterface);
-
 			static bool RegisterInstance(v8::Isolate *isolate, const v8::Local<v8::Object>& jsObject, const std::string& fullClassName, const ArgsWrapper& argWrapper, const v8::Local<v8::Object>& implementationObject, bool isInterface);
+
+			static std::string ResolveConstructor(v8::Isolate *isolate, const ArgsWrapper& argWrapper, const std::string& fullClassName, jclass javaClass, bool isInterface);
 
 			static jclass ResolveClass(v8::Isolate *isolate, const std::string& fullClassname, const v8::Local<v8::Object>& implementationObject);
 
 			static std::string ResolveClassName(v8::Isolate *isolate, const std::string& fullClassname, const v8::Local<v8::Object>& implementationObject);
-			//
 
 			static v8::Local<v8::Value> GetArrayElement(v8::Isolate *isolate, const v8::Local<v8::Object>& array, uint32_t index, const std::string& arraySignature);
 
@@ -101,9 +100,9 @@ namespace tns
 
 			static jmethodID RESOLVE_CLASS_METHOD_ID;
 
-			static jmethodID CREATE_INSTANCE_METHOD_ID;
+			static jfieldID CURRENT_OBJECTID_FIELD_ID;
 
-			static jmethodID CACHE_CONSTRUCTOR_METHOD_ID;
+			static jmethodID MAKE_INSTANCE_STRONG_ID;
 
 			static jmethodID GET_TYPE_METADATA;
 

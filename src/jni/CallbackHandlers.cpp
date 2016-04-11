@@ -39,11 +39,11 @@ void CallbackHandlers::Init(Isolate *isolate, ObjectManager *objectManager)
 	RESOLVE_CLASS_METHOD_ID = env.GetMethodID(RUNTIME_CLASS, "resolveClass", "(Ljava/lang/String;[Ljava/lang/String;)Ljava/lang/Class;");
 	assert(RESOLVE_CLASS_METHOD_ID != nullptr);
 
-	CREATE_INSTANCE_METHOD_ID = env.GetMethodID(RUNTIME_CLASS, "createInstance", "([Ljava/lang/Object;II)Ljava/lang/Object;");
-	assert(CREATE_INSTANCE_METHOD_ID != nullptr);
+	CURRENT_OBJECTID_FIELD_ID = env.GetStaticFieldID(RUNTIME_CLASS, "currentObjectId", "I");
+	assert(CURRENT_OBJECTID_FIELD_ID != nullptr);
 
-	CACHE_CONSTRUCTOR_METHOD_ID = env.GetMethodID(RUNTIME_CLASS, "cacheConstructor", "(Ljava/lang/Class;[Ljava/lang/Object;)I");
-	assert(CACHE_CONSTRUCTOR_METHOD_ID != nullptr);
+	MAKE_INSTANCE_STRONG_ID = env.GetMethodID(RUNTIME_CLASS, "makeInstanceStrong", "(Ljava/lang/Object;I)V");
+	assert(MAKE_INSTANCE_STRONG_ID != nullptr);
 
 	GET_TYPE_METADATA = env.GetStaticMethodID(RUNTIME_CLASS, "getTypeMetadata", "(Ljava/lang/String;I)[Ljava/lang/String;");
 	assert(GET_TYPE_METADATA != nullptr);
@@ -80,7 +80,31 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object>& j
 	DEBUG_WRITE("RegisterInstance: Linking new instance");
 	objectManager->Link(jsObject, javaObjectID, nullptr);
 
-	jobject instance = CreateJavaInstance(javaObjectID, fullClassName, argWrapper, generatedJavaClass, isInterface);
+	// resolve constructor
+	auto mi = MethodCache::ResolveConstructorSignature(argWrapper, fullClassName, generatedJavaClass, isInterface);
+
+	jobject instance;
+
+	env.SetStaticIntField(RUNTIME_CLASS, CURRENT_OBJECTID_FIELD_ID, javaObjectID);
+
+	if(argWrapper.type == ArgType::Interface)
+	{
+		instance = env.NewObject(generatedJavaClass, mi.mid);
+	}
+	else
+	{
+		// resolve arguments before passing them on to the constructor
+		JsArgConverter argConverter(argWrapper.args, mi.signature, argWrapper.outerThis);
+		auto ctorArgs = argConverter.ToArgs();
+
+		instance = env.NewObjectA(generatedJavaClass, mi.mid, ctorArgs);
+	}
+
+	env.CallVoidMethod(runtime->GetJavaRuntime(), MAKE_INSTANCE_STRONG_ID, instance, javaObjectID);
+
+	env.SetStaticIntField(RUNTIME_CLASS, CURRENT_OBJECTID_FIELD_ID, -1);
+
+	AdjustAmountOfExternalAllocatedMemory(env, isolate);
 
 	JniLocalRef localInstance(instance);
 	success = !localInstance.IsNull();
@@ -196,8 +220,8 @@ void CallbackHandlers::CallJavaMethod(const Local<Object>& caller, const string&
 				}
 
 				entry->memberId = isStatic ?
-												env.GetStaticMethodID(clazz, methodName, entry->sig) :
-												env.GetMethodID(clazz, methodName, entry->sig);
+						env.GetStaticMethodID(clazz, methodName, entry->sig) :
+						env.GetMethodID(clazz, methodName, entry->sig);
 
 				if (entry->memberId == nullptr)
 				{
@@ -209,8 +233,8 @@ void CallbackHandlers::CallJavaMethod(const Local<Object>& caller, const string&
 			else
 			{
 				entry->memberId = isStatic ?
-												env.GetStaticMethodID(clazz, methodName, entry->sig) :
-												env.GetMethodID(clazz, methodName, entry->sig);
+						env.GetStaticMethodID(clazz, methodName, entry->sig) :
+						env.GetMethodID(clazz, methodName, entry->sig);
 
 				if (entry->memberId == nullptr)
 				{
@@ -302,7 +326,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object>& caller, const string&
 	switch (retType)
 	{
 		case MethodReturnType::Void:
-			{
+		{
 			if (isStatic)
 			{
 				env.CallStaticVoidMethodA(clazz, mid, javaArgs);
@@ -318,7 +342,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object>& caller, const string&
 			break;
 		}
 		case MethodReturnType::Boolean:
-			{
+		{
 			jboolean result;
 			if (isStatic)
 			{
@@ -336,7 +360,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object>& caller, const string&
 			break;
 		}
 		case MethodReturnType::Byte:
-			{
+		{
 			jbyte result;
 			if (isStatic)
 			{
@@ -354,7 +378,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object>& caller, const string&
 			break;
 		}
 		case MethodReturnType::Char:
-			{
+		{
 			jchar result;
 			if (isStatic)
 			{
@@ -377,7 +401,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object>& caller, const string&
 			break;
 		}
 		case MethodReturnType::Short:
-			{
+		{
 			jshort result;
 			if (isStatic)
 			{
@@ -395,7 +419,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object>& caller, const string&
 			break;
 		}
 		case MethodReturnType::Int:
-			{
+		{
 			jint result;
 			if (isStatic)
 			{
@@ -414,7 +438,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object>& caller, const string&
 
 		}
 		case MethodReturnType::Long:
-			{
+		{
 			jlong result;
 			if (isStatic)
 			{
@@ -433,7 +457,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object>& caller, const string&
 			break;
 		}
 		case MethodReturnType::Float:
-			{
+		{
 			jfloat result;
 			if (isStatic)
 			{
@@ -451,7 +475,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object>& caller, const string&
 			break;
 		}
 		case MethodReturnType::Double:
-			{
+		{
 			jdouble result;
 			if (isStatic)
 			{
@@ -469,7 +493,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object>& caller, const string&
 			break;
 		}
 		case MethodReturnType::String:
-			{
+		{
 			jobject result = nullptr;
 			bool exceptionOccurred;
 
@@ -500,7 +524,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object>& caller, const string&
 			break;
 		}
 		case MethodReturnType::Object:
-			{
+		{
 			jobject result = nullptr;
 			bool exceptionOccurred;
 
@@ -548,7 +572,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object>& caller, const string&
 			break;
 		}
 		default:
-			{
+		{
 			assert(false);
 			break;
 		}
@@ -569,9 +593,9 @@ int64_t CallbackHandlers::AdjustAmountOfExternalAllocatedMemory(JEnv& env, Isola
 	int64_t changeInBytes = env.CallLongMethod(runtime->GetJavaRuntime(), GET_CHANGE_IN_BYTES_OF_USED_MEMORY_METHOD_ID);
 
 	int64_t adjustedValue = (changeInBytes != 0)
-							? isolate->AdjustAmountOfExternalAllocatedMemory(changeInBytes)
-										:
-								0;
+													? isolate->AdjustAmountOfExternalAllocatedMemory(changeInBytes)
+															:
+															0;
 
 	return adjustedValue;
 }
@@ -582,68 +606,6 @@ Local<Object> CallbackHandlers::CreateJSWrapper(Isolate *isolate, jint javaObjec
 	auto objectManager = runtime->GetObjectManager();
 
 	return objectManager->CreateJSWrapper(javaObjectID, typeName);
-}
-
-jobject CallbackHandlers::CreateJavaInstance(int objectID, const std::string& fullClassName, const ArgsWrapper& argWrapper, jclass javaClass, bool isInterface)
-{
-	SET_PROFILER_FRAME();
-
-	jobject instance = nullptr;
-	DEBUG_WRITE("CreateJavaInstance:  %s", fullClassName.c_str());
-
-	JEnv env;
-	auto& args = argWrapper.args;
-
-	JsArgToArrayConverter argConverter(args, isInterface, argWrapper.outerThis);
-	if (argConverter.IsValid())
-	{
-		jobjectArray javaArgs = argConverter.ToJavaArray();
-
-		int ctorId = GetCachedConstructorId(env, args, fullClassName, javaArgs, javaClass);
-
-		auto runtime = Runtime::GetRuntime(args.GetIsolate());
-
-		jobject obj = env.CallObjectMethod(runtime->GetJavaRuntime(),
-				CREATE_INSTANCE_METHOD_ID,
-				javaArgs,
-				(jint) objectID,
-				ctorId);
-
-		instance = obj;
-	}
-	else
-	{
-		JsArgToArrayConverter::Error err = argConverter.GetError();
-		throw NativeScriptException(err.msg);
-	}
-
-	return instance;
-}
-
-int CallbackHandlers::GetCachedConstructorId(JEnv& env, const FunctionCallbackInfo<Value>& args, const string& fullClassName, jobjectArray javaArgs, jclass javaClass)
-{
-	int ctorId = -1;
-	string encodedCtorArgs = MethodCache::EncodeSignature(fullClassName, "<init>", args, false);
-	auto itFound = s_constructorCache.find(encodedCtorArgs);
-
-	if (itFound != s_constructorCache.end())
-	{
-		ctorId = itFound->second;
-	}
-	else
-	{
-		auto runtime = Runtime::GetRuntime(args.GetIsolate());
-		jint id = env.CallIntMethod(runtime->GetJavaRuntime(), CACHE_CONSTRUCTOR_METHOD_ID, javaClass, javaArgs);
-
-		if (env.ExceptionCheck() == JNI_FALSE)
-		{
-			ctorId = id;
-			s_constructorCache.insert(make_pair(encodedCtorArgs, ctorId));
-		}
-	}
-
-	DEBUG_WRITE("GetCachedConstructorId: encodedCtorArgs=%s, ctorId=%d", encodedCtorArgs.c_str(), ctorId);
-	return ctorId;
 }
 
 //delete the returned local reference after use
@@ -702,7 +664,7 @@ void CallbackHandlers::LogMethodCallback(const v8::FunctionCallbackInfo<v8::Valu
 		e.ReThrowToV8();
 	}
 	catch (std::exception e) {
-				stringstream ss;
+		stringstream ss;
 		ss << "Error: c++ exception: " << e.what() << endl;
 		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToV8();
@@ -738,7 +700,7 @@ void CallbackHandlers::DumpReferenceTablesMethod()
 		e.ReThrowToV8();
 	}
 	catch (std::exception e) {
-				stringstream ss;
+		stringstream ss;
 		ss << "Error: c++ exception: " << e.what() << endl;
 		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToV8();
@@ -764,7 +726,7 @@ void CallbackHandlers::EnableVerboseLoggingMethodCallback(const v8::FunctionCall
 		e.ReThrowToV8();
 	}
 	catch (std::exception e) {
-				stringstream ss;
+		stringstream ss;
 		ss << "Error: c++ exception: " << e.what() << endl;
 		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToV8();
@@ -790,7 +752,7 @@ void CallbackHandlers::DisableVerboseLoggingMethodCallback(const v8::FunctionCal
 		e.ReThrowToV8();
 	}
 	catch (std::exception e) {
-				stringstream ss;
+		stringstream ss;
 		ss << "Error: c++ exception: " << e.what() << endl;
 		NativeScriptException nsEx(ss.str());
 		nsEx.ReThrowToV8();
@@ -939,9 +901,9 @@ int CallbackHandlers::GetArrayLength(Isolate *isolate, const Local<Object>& arr)
 
 jclass CallbackHandlers::RUNTIME_CLASS = nullptr;
 jclass CallbackHandlers::JAVA_LANG_STRING = nullptr;
+jfieldID CallbackHandlers::CURRENT_OBJECTID_FIELD_ID = nullptr;
 jmethodID CallbackHandlers::RESOLVE_CLASS_METHOD_ID = nullptr;
-jmethodID CallbackHandlers::CREATE_INSTANCE_METHOD_ID = nullptr;
-jmethodID CallbackHandlers::CACHE_CONSTRUCTOR_METHOD_ID = nullptr;
+jmethodID CallbackHandlers::MAKE_INSTANCE_STRONG_ID = nullptr;
 jmethodID CallbackHandlers::GET_TYPE_METADATA = nullptr;
 jmethodID CallbackHandlers::ENABLE_VERBOSE_LOGGING_METHOD_ID = nullptr;
 jmethodID CallbackHandlers::DISABLE_VERBOSE_LOGGING_METHOD_ID = nullptr;

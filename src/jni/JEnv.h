@@ -316,6 +316,13 @@ namespace tns
 
 			}
 
+			jobject NewObjectA(jclass clazz, jmethodID methodID, jvalue *args)
+			{
+				jobject jo = m_env->NewObjectA(clazz, methodID, args);
+				CheckForJavaException();
+				return jo;
+			}
+
 			static void Init(JavaVM *jvm);
 
 		private:

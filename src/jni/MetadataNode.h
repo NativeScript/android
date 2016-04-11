@@ -192,6 +192,26 @@ namespace tns
 					bool isSuper;
 			};
 
+			struct ConstructorCallbackData
+			{
+					ConstructorCallbackData()
+					:
+							node(nullptr), parent(nullptr), isSuper(false)
+					{
+					}
+
+					ConstructorCallbackData(MetadataNode *_node)
+					:
+							node(_node), parent(nullptr), isSuper(false)
+					{
+					}
+
+					std::vector<MetadataEntry> candidates;
+					MetadataNode *node;
+					MethodCallbackData *parent;
+					bool isSuper;
+			};
+
 			struct ExtendedClassData
 			{
 					ExtendedClassData(MetadataNode *_node, const std::string& _extendedName, const v8::Local<v8::Object>& _implementationObject, std::string _fullClassName)

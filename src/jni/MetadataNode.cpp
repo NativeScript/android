@@ -25,7 +25,7 @@ void MetadataNode::Init(Isolate *isolate)
 }
 
 MetadataNode::MetadataNode(MetadataTreeNode *treeNode) :
-				m_treeNode(treeNode)
+						m_treeNode(treeNode)
 {
 	uint8_t nodeType = s_metadataReader.GetNodeType(treeNode);
 
@@ -487,9 +487,13 @@ Local<Function> MetadataNode::SetMembersFromStaticMetadata(Isolate *isolate, Loc
 	curPtr += sizeof(uint16_t);
 	string lastMethodName;
 	MethodCallbackData *callbackData = nullptr;
+	ConstructorCallbackData *ctorCallbackData = nullptr;
+
 	for (auto i = 0; i < instanceMethodCout; i++)
 	{
 		auto entry = s_metadataReader.ReadInstanceMethodEntry(&curPtr);
+
+		// attach a function to the prototype of a javascript Object
 		if (entry.name != lastMethodName)
 		{
 			callbackData = new MethodCallbackData(this);
@@ -512,6 +516,20 @@ Local<Function> MetadataNode::SetMembersFromStaticMetadata(Isolate *isolate, Loc
 			prototypeTemplate->Set(funcName, func);
 			lastMethodName = entry.name;
 		}
+
+		// Pete: leaving it here will get all constructors for a node
+		// Pete: !!!! Is this even necessary?!
+		if(entry.name.compare("<init>") == 0)
+		{
+			if(ctorCallbackData == nullptr)
+			{
+				ctorCallbackData = new ConstructorCallbackData(this);
+			}
+
+			ctorCallbackData->candidates.push_back(entry);
+		}
+		// Pete: send ctorCallbackData to all <something>ConstructorCallback so that they can pass it along where necessary
+
 		callbackData->candidates.push_back(entry);
 	}
 

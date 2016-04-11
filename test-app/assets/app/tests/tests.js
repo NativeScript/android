@@ -1205,7 +1205,7 @@ describe("Tests ", function () {
 		
 		try
 		{
-			var d = new com.tns.tests.DummyClass(new java.lang.Object());
+			var d = new com.tns.tests.DummyClass(new java.io.File());
 		}
 		catch (e)
 		{

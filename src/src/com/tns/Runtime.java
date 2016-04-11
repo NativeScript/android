@@ -310,67 +310,6 @@ public class Runtime
 	}
 
 	@RuntimeCallable
-	private int cacheConstructor(Class<?> clazz, Object[] args) throws ClassNotFoundException, IOException
-	{
-		Constructor<?> ctor = MethodResolver.resolveConstructor(clazz, args);
-
-		// TODO: Lubo: Not thread safe already.
-		// TODO: Lubo: Does not check for existing items
-		int ctorId = ctorCache.size();
-
-		ctorCache.add(ctor);
-
-		return ctorId;
-	}
-
-	@RuntimeCallable
-	private Object createInstance(Object[] args, int objectId, int constructorId) throws InstantiationException, IllegalAccessException, ClassNotFoundException, NoSuchMethodException, IllegalArgumentException, InvocationTargetException, IOException
-	{
-		Constructor<?> ctor = ctorCache.get(constructorId);
-		boolean success = MethodResolver.convertConstructorArgs(ctor, args);
-
-		if (!success)
-		{
-			StringBuilder builder = new StringBuilder();
-			builder.append(constructorId + "(");
-			if (args != null)
-			{
-				for (Object arg : args)
-				{
-					if (arg != null)
-					{
-						builder.append(arg.toString() + ", ");
-					}
-					else
-					{
-						builder.append("null, ");
-					}
-				}
-			}
-			builder.append(")");
-
-			throw new InstantiationException("MethodResolver didn't resolve any constructor with the specified arguments " + builder.toString());
-		}
-
-		Object instance;
-		try
-		{
-			Runtime.currentObjectId = objectId;
-			instance = ctor.newInstance(args);
-
-			makeInstanceStrong(instance, objectId);
-		}
-		finally
-		{
-			Runtime.currentObjectId = -1;
-		}
-
-		adjustAmountOfExternalAllocatedMemory();
-
-		return instance;
-	}
-
-	@RuntimeCallable
 	private long getChangeInBytesOfUsedMemory()
 	{
 		long usedMemory = dalvikRuntime.totalMemory() - dalvikRuntime.freeMemory();
@@ -836,6 +775,24 @@ public class Runtime
 		return clazz;
 	}
 
+	@RuntimeCallable
+	private String resolveConstructorSignature(Class<?> clazz, Object[] args) throws Exception
+	{
+		// Pete: cache stuff here, or in the cpp part
+		
+		if (logger.isEnabled())
+			logger.write("resolveConstructorSignature: Resolving constructor for class " + clazz.getName());
+		
+		String res = MethodResolver.resolveConstructorSignature(clazz, args);
+
+		if (res == null)
+		{
+			throw new Exception("Failed resolving constructor on class " + clazz.getName());
+		}
+
+		return res;
+	}
+	
 	@RuntimeCallable
 	private String resolveMethodOverload(String className, String methodName, Object[] args) throws Exception
 	{
