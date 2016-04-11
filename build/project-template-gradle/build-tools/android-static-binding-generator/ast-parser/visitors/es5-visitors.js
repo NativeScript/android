@@ -99,7 +99,13 @@ var es5_visitors = (function () {
 	function traverseTsExtend(path, config) {
 
 		//this is the information for a normal extend
-		var extendClass = _getArgumentFromNodeAsString(path, 5, config)
+		var extendClass;
+		try {
+			extendClass = _getArgumentFromNodeAsString(path, 5, config)
+		} catch (e) {
+			config.logger.info(e)
+			return;
+		}
 		var overriddenMethodNames = _getOverriddenMethodsTypescript(path, 3)
 		var extendParent = _getParrent(path, 1, config);
 		var declaredClassName = "";
@@ -362,7 +368,7 @@ var es5_visitors = (function () {
 			}
 			else {
 				throw {
-					message: "Node type is not a call expression. File" + config.filePath,
+					message: "Node type is not a call expression. File=" + config.filePath  + " line=" + path.node.loc.start.line,
 					errCode: 1
 				}
 			}
