@@ -39,6 +39,10 @@ def libDir = "$projectDir/../../lib/Android/"
 def pluginNames = new ArrayList<String>()
 def configDir = file(configurationsDir)
 
+def asbgProject = project(":asbg")
+asbgProject.ext.outDir = new File("$projectDir", "src/main/java")
+asbgProject.ext.jsCodeDir = new File("$projectDir", "src/main/assets/app")
+
 def compiteCompileSdkVersion () {
 	if(project.hasProperty("compileSdk")) {
 		return compileSdk
@@ -363,9 +367,15 @@ task collectAllJars {
 		
 		metadataParams.add("metadata-generator.jar")
 		metadataParams.add("$projectDir/metadata/output/assets/metadata")
+		def jars = new LinkedList<File>()
 		for(def i = 0; i < allJarPaths.size(); i++) {
 			metadataParams.add(allJarPaths.get(i));
+			def f = new File(allJarPaths.get(i))
+			if (f.getName().endsWith(".jar")) {
+				jars.add(f)
+			}
 		}
+		asbgProject.ext.jarFiles = jars
 	}
 }
 

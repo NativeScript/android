@@ -4,88 +4,95 @@
 
 def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
 
-def bgRootDir = "$rootDir/build-tools/android-static-binding-generator"
-def astParserDir = "$bgRootDir/ast-parser"
-def interfaceNamesFilePath = "$bgRootDir/interfaces-names.txt"
-def bindingsFilePath = "$bgRootDir/bindings.txt"
-def cachedJarsFilePath = "$bgRootDir/cached.dat"
+def astParserDir = "$projectDir/ast-parser"
+def interfaceNamesFilePath = "$projectDir/interfaces-names.txt"
+def bindingsFilePath = "$projectDir/bindings.txt"
+def cachedJarsFilePath = "$projectDir/cached.txt"
 
-def absoluteOutDir = "$rootDir/$project.outDir"
-def absoluteJsCodeDir = "$rootDir/$project.jsCodeDir"
+def shouldRun = true
+def absoluteOutDir = project.outDir
+def absoluteJsCodeDir = project.jsCodeDir
 
 // depends on passed jars and generated interface-names
-task generateInterfaceNamesList(type: JavaExec) {
-	def cachedJars = new File(cachedJarsFilePath)
-	
-	inputs.file(cachedJars)
-	outputs.files(interfaceNamesFilePath)
-
+task generateInterfaceNamesList() {
 	doFirst {
-		main "-jar"
-		
-		def jarsAsStr = rootProject.jarFiles.toString();
-		def jarsArr = jarsAsStr.replaceAll(/[\[\]]/, "").split(", ")
-		
-		def str = new LinkedList <String> ();
-		str.add("interfacenamegenerator.jar")
-		str.addAll(jarsArr)
+		def current = project.jarFiles
+		def cache = new File(cachedJarsFilePath)
+		def utf8 = java.nio.charset.StandardCharsets.UTF_8
+		if (cache.exists()) {
+			def contents = new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(cachedJarsFilePath)), utf8).trim()
+			shouldRun = !contents.equals(current.toString())
+		}
 
-		args str.toArray()
-		
-		cachedJars.text = jarsAsStr
+		if (shouldRun) {
+			javaexec {
+				main "-jar"
+
+				def jarsAsStr = current.toString();
+				def jarsArr = jarsAsStr.replaceAll(/[\[\]]/, "").split(", ")
+
+				def str = new LinkedList <String> ();
+				str.add("interfacenamegenerator.jar")
+				str.addAll(jarsArr)
+
+				args str.toArray()
+			}
+			java.nio.file.Files.write(java.nio.file.Paths.get(cachedJarsFilePath), [current.toString()], utf8)
+		}
 	}
 }
 
 // won't run if node_modules are installed
-task runNpmInstallForAstParser (type: Exec) {
+task runNpmInstallForAstParser () {
+	doFirst {
+		if (shouldRun) {
+			exec {
+				workingDir astParserDir
 
-	//check this way so it doesn't slow down the build by snapshot-ing the node_modules
-	outputs.upToDateWhen {
-		(new File("$astParserDir/node_modules")).exists()
-	}
-
-	workingDir astParserDir
-	
-	if(isWinOs) {
-		commandLine "cmd", "/c", "npm", "install"
-	}
-	else {
-		commandLine "npm", "install"
+				if(isWinOs) {
+					commandLine "cmd", "/c", "npm", "install"
+				}
+				else {
+					commandLine "npm", "install"
+				}
+			}
+		}
 	}
 }
 
 // if there are new dependencies the parser will run again
-task runAstParser (type: Exec) {
-	
-	inputs.files fileTree(dir: absoluteJsCodeDir)
-	outputs.files(bindingsFilePath)
-	
-	workingDir astParserDir
-	
-	if(isWinOs) {
-		commandLine "cmd", "/c", "node", "js_parser.js" , absoluteJsCodeDir, "../bindings.txt"
-	}
-	else {
-		commandLine "node", "js_parser.js", absoluteJsCodeDir, "../bindings.txt"
+task runAstParser () {
+	doFirst {
+		if (shouldRun) {
+			exec {
+				workingDir astParserDir
+
+				if(isWinOs) {
+					commandLine "cmd", "/c", "node", "js_parser.js" , absoluteJsCodeDir, "../bindings.txt"
+				}
+				else {
+					commandLine "node", "js_parser.js", absoluteJsCodeDir, "../bindings.txt"
+				}
+			}
+		}
 	}
 }
-
 // run the static binding generator
-task generateBindings(type: JavaExec) {
-	
-	inputs.files(bindingsFilePath)
-	outputs.dir(absoluteOutDir)
-	
+task generateBindings() {
 	doFirst {
-		main "-jar"
-		
-		def str = new LinkedList <String> ();
-		str.add("staticbindinggenerator.jar")
-		str.add(bindingsFilePath)
-		str.add(absoluteOutDir)
-		str.addAll(project.jarFiles)
-		
-		args str.toArray()
+		if (shouldRun) {
+			javaexec {
+				main "-jar"
+
+				def str = new LinkedList <String> ();
+				str.add("staticbindinggenerator.jar")
+				str.add(bindingsFilePath)
+				str.add(absoluteOutDir)
+				str.addAll(project.jarFiles)
+
+				args str.toArray()
+			}
+		}
 	}
 }
 
