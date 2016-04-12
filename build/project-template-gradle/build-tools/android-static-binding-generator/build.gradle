@@ -39,23 +39,28 @@ task generateInterfaceNamesList() {
 
 				args str.toArray()
 			}
+			java.nio.file.Files.write(java.nio.file.Paths.get(cachedJarsFilePath), [current.toString()], utf8)
 		}
 	}
 }
 
 // won't run if node_modules are installed
 task runNpmInstallForAstParser () {
-	doFirst {
-		if (shouldRun) {
-			exec {
-				workingDir astParserDir
 
-				if(isWinOs) {
-					commandLine "cmd", "/c", "npm", "install"
-				}
-				else {
-					commandLine "npm", "install"
-				}
+	//check this way so it doesn't slow down the build by snapshot-ing the node_modules
+	outputs.upToDateWhen {
+		(new File("$astParserDir/node_modules")).exists()
+	}
+
+	doFirst {
+		exec {
+			workingDir astParserDir
+
+			if(isWinOs) {
+				commandLine "cmd", "/c", "npm", "install"
+			}
+			else {
+				commandLine "npm", "install"
 			}
 		}
 	}
@@ -63,37 +68,39 @@ task runNpmInstallForAstParser () {
 
 // if there are new dependencies the parser will run again
 task runAstParser () {
-	doFirst {
-		if (shouldRun) {
-			exec {
-				workingDir astParserDir
+	inputs.files fileTree(dir: absoluteJsCodeDir)
+	outputs.files(bindingsFilePath)
 
-				if(isWinOs) {
-					commandLine "cmd", "/c", "node", "js_parser.js" , absoluteJsCodeDir, "../bindings.txt"
-				}
-				else {
-					commandLine "node", "js_parser.js", absoluteJsCodeDir, "../bindings.txt"
-				}
+	doFirst {
+		exec {
+			workingDir astParserDir
+
+			if(isWinOs) {
+				commandLine "cmd", "/c", "node", "js_parser.js" , absoluteJsCodeDir, "../bindings.txt"
+			}
+			else {
+				commandLine "node", "js_parser.js", absoluteJsCodeDir, "../bindings.txt"
 			}
 		}
 	}
 }
 // run the static binding generator
 task generateBindings() {
+
+	inputs.files(bindingsFilePath)
+	outputs.dir(absoluteOutDir)
+
 	doFirst {
-		if (shouldRun) {
-			javaexec {
-				main "-jar"
+		javaexec {
+			main "-jar"
 
-				def str = new LinkedList <String> ();
-				str.add("staticbindinggenerator.jar")
-				str.add(bindingsFilePath)
-				str.add(absoluteOutDir)
-				str.addAll(project.jarFiles)
+			def str = new LinkedList <String> ();
+			str.add("staticbindinggenerator.jar")
+			str.add(bindingsFilePath)
+			str.add(absoluteOutDir)
+			str.addAll(project.jarFiles)
 
-				args str.toArray()
-			}
-			java.nio.file.Files.write(java.nio.file.Paths.get(cachedJarsFilePath), [current.toString()], utf8)
+			args str.toArray()
 		}
 	}
 }
@@ -101,3 +108,4 @@ task generateBindings() {
 runNpmInstallForAstParser.dependsOn(generateInterfaceNamesList)
 runAstParser.dependsOn(runNpmInstallForAstParser)
 generateBindings.dependsOn(runAstParser)
+
