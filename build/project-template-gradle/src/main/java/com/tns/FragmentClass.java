@@ -6,7 +6,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
-@JavaScriptImplementation(javaScriptFile = "ui/frame")
+@JavaScriptImplementation(javaScriptFile = "./tns_modules/ui/frame/frame.js")
 public class FragmentClass extends android.app.Fragment implements com.tns.NativeScriptHashCodeProvider {
 
     public FragmentClass()
