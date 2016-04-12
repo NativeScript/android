@@ -6,6 +6,7 @@
 #include "ObjectManager.h"
 #include "SimpleAllocator.h"
 #include "WeakRef.h"
+#include "ArrayBufferHelper.h"
 #include "Profiler.h"
 
 jobject ConvertJsValueToJavaObject(tns::JEnv& env, const v8::Local<v8::Value>& value, int classReturnType);
@@ -49,6 +50,8 @@ namespace tns
 			bool m_logEnabled;
 
 			ObjectManager *m_objectManager;
+
+			ArrayBufferHelper m_arrayBufferHelper;
 
 			WeakRef m_weakRef;
 

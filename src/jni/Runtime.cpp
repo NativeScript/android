@@ -434,6 +434,8 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 
 	ArrayHelper::Init(context);
 
+	m_arrayBufferHelper.CreateConvertFunctions(isolate, global, m_objectManager);
+
 	return isolate;
 }
 
@@ -494,4 +496,3 @@ void Runtime::PrepareExtendFunction(Isolate *isolate, jstring filesPath)
 JavaVM* Runtime::s_jvm = nullptr;
 map<int, Runtime*> Runtime::s_id2RuntimeCache;
 map<Isolate*, Runtime*> Runtime::s_isolate2RuntimesCache;
-
