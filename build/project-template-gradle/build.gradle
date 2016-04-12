@@ -15,7 +15,7 @@
 *			-PsupportVersion=[support_version] (default (22.2.0)
 *			-PcompileSdk=[compile_sdk_version] (default 22)
 *
-*			-PrunSBGenerator //this flag will triger static binding generation
+*			-PdontRunSbg=[true/false] (default false)
 */
 
 buildscript {
@@ -33,15 +33,19 @@ apply plugin: "com.android.application"
 def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
 def metadataParams = new LinkedList <String> ()
 def allJarPaths = new LinkedList <String> ()
-def configurationsDir = "configurations"
+def configurationsDir = "$projectDir/configurations"
 def createPluginConfigFile = false
 def configStage = "\n:config phase: "
 def nodeModulesDir = "../../node_modules/"
-def libDir = "../../lib/Android/"
-def pluginNames = new ArrayList<String>()
+def libDir = "$projectDir/../../lib/Android/"
+def flavorNames = new ArrayList<String>()
 def configDir = file(configurationsDir)
-def appResExists = false
-def appResourcesName = "NativescriptAppResources"
+
+def dontRunSbg = project.hasProperty("dontRunSbg");
+
+def asbgProject = project(":asbg")
+asbgProject.ext.outDir = new File("$projectDir", "src/main/java")
+asbgProject.ext.jsCodeDir = new File("$projectDir", "src/main/assets/app")
 
 def compiteCompileSdkVersion () {
 	if(project.hasProperty("compileSdk")) {
@@ -66,7 +70,7 @@ def computeBuildToolsVersion() {
 		return buildToolsVersion
 	}
 	else {
-		return "22.0.1"
+		return "23.0.1"
 	}
 }
 project.ext.selectedBuildType = project.hasProperty("release") ? "release" : "debug"
@@ -102,7 +106,7 @@ android {
 	}
 	
 	sourceSets.main {
-        jniLibs.srcDir "libs/jni"
+        jniLibs.srcDir "$projectDir/libs/jni"
     }
 	
 	signingConfigs {
@@ -136,7 +140,15 @@ android {
 		def variantName = variant.name.capitalize()
 		def compileSourcesTaskName = "compile${variantName}Sources"
 		def compileSourcesTask = project.tasks.findByName(compileSourcesTaskName)
-		compileSourcesTask.finalizedBy "buildMetadata"
+		
+		def generateBuildConfigTask = variant.generateBuildConfig;
+		generateBuildConfigTask.finalizedBy(collectAllJars)
+
+		if(!dontRunSbg) {
+			collectAllJars.finalizedBy(setProperties)
+		}
+		
+		compileSourcesTask.finalizedBy(buildMetadata)
 	}
 }
 
@@ -158,7 +170,7 @@ dependencies {
     compile "com.android.support:appcompat-v7:$suppotVer"
 
     // take all jars within the libs dir
-	compile fileTree(dir: "libs", include: ["**/*.jar"])
+	compile fileTree(dir: "$projectDir/libs", include: ["**/*.jar"])
 
 	// take all jars within the node_modules dir
 	compile fileTree(dir: nodeModulesDir, include: ["**/platforms/android/**/*.jar"], exclude: '**/.bin/**')
@@ -194,9 +206,8 @@ task pluginStructureCheck {
 	}
 }
 
-
 def createIncludeFile (filePath, fileName, dimensionName) {
-	println "\t+creating include.gradle file for: " + filePath + " flavor: " + fileName
+	println "\t+creating include.gradle file for: " + filePath
 	def defaultIncludeFile = new File(filePath, "include.gradle")
 	defaultIncludeFile.write ""
 	defaultIncludeFile << "android { \n"
@@ -258,10 +269,10 @@ task createDefaultIncludeFiles {
 				}
 			}
 			
-			pluginNames.add('"' + dimensionName + '"')
+			flavorNames.add('"' + dimensionName + '"')
 			
 			if(!foundIncludeFile) {
-				//createIncludeFile(fl.getAbsolutePath(), fileName, dimensionName)
+				//createIncludeFile(fl.getAbsolutePath() ,fileName, dimensionName)
 				createIncludeFile(fl.getAbsolutePath() , flavor, dimensionName)
 			}
 		}
@@ -279,7 +290,7 @@ task createPluginsConfigFile {
 		
 		if(createPluginConfigFile) {
 			println "\t+creating product flavors include.gradle file in $configurationsDir folder..."
-			def flavors = pluginNames.join(",")
+			def flavors = flavorNames.join(",")
 			
 			flavorsFile << "android { \n"
 			flavorsFile << "\tflavorDimensions " + flavors + "\n"
@@ -291,7 +302,7 @@ task createPluginsConfigFile {
 task pluginExtend {
 	description "applies additional configuration"
 
-	def pathToAppGradle = "../../app/App_Resources/Android/app.gradle" 
+	def pathToAppGradle = "$projectDir/../../app/App_Resources/Android/app.gradle" 
 	def appGradle = file(pathToAppGradle)
 	if(appGradle.exists()) {
 		apply from: pathToAppGradle
@@ -323,13 +334,13 @@ task pluginExtend {
 task copyAarDependencies (type: Copy) {
 	println "$configStage copyAarDependencies"
 	from fileTree(dir: nodeModulesDir, include: ["**/*.aar"], exclude: '**/.bin/**').files
-	into "libs/aar"
+	into "$projectDir/libs/aar"
 }
 
 task addAarDependencies <<  {
 	println "$configStage addAarDependencies"
 	// manually traverse all the locally copied AAR files and add them to the project compilation dependencies list
-	FileTree tree = fileTree(dir: "libs/aar", include: ["**/*.aar"])
+	FileTree tree = fileTree(dir: "$projectDir/libs/aar", include: ["**/*.aar"])
 	tree.each { File file ->
 		// remove the extension of the file (.aar)
 		def length = file.name.length() - 4
@@ -345,11 +356,11 @@ task addAarDependencies <<  {
 ////////////////////////////////////////////////////////////////////////////////////
 
 task cleanLocalAarFiles(type: Delete) {
-	delete fileTree(dir: "libs/aar", include: ["*.aar"])
+	delete fileTree(dir: "$projectDir/libs/aar", include: ["*.aar"])
 }
 
 task ensureMetadataOutDir {
-	def outputDir = file("$rootDir/metadata/output/assets/metadata")
+	def outputDir = file("$projectDir/metadata/output/assets/metadata")
 	outputDir.mkdirs()
 }
 
@@ -374,12 +385,35 @@ task collectAllJars {
 		}
 		
 		metadataParams.add("metadata-generator.jar")
-		metadataParams.add("../metadata/output/assets/metadata")
+		metadataParams.add("$projectDir/metadata/output/assets/metadata")
+		def jars = new LinkedList<File>()
 		for(def i = 0; i < allJarPaths.size(); i++) {
 			metadataParams.add(allJarPaths.get(i));
+			def f = new File(allJarPaths.get(i))
+			if (f.getName().endsWith(".jar")) {
+				jars.add(f)
+			}
 		}
+		asbgProject.ext.jarFiles = jars
+	}
+}
 
-		def classesDir = "$rootDir/build/intermediates/classes"
+task buildMetadata (type: JavaExec) {
+	description "builds metadata with provided jar dependencies"
+	
+	inputs.files(allJarPaths)
+	inputs.dir("$buildDir/intermediates/classes")
+
+	outputs.files("metadata/output/assets/metadata/treeNodeStream.dat", "metadata/output/assets/metadata/treeStringsStream.dat", "metadata/output/assets/metadata/treeValueStream.dat")
+
+	doFirst {
+		workingDir "build-tools"
+
+		main "-jar"
+
+		// get compiled classes to pass to metadata generator
+		// these need to be called after the classes have compiled
+		def classesDir = "$buildDir/intermediates/classes"
 
 		def classesSubDirs = new File(classesDir).listFiles()
 
@@ -398,30 +432,14 @@ task collectAllJars {
 		if (classesDirBuildType.exists()) {
 			metadataParams.add(classesDirBuildType.getAbsolutePath())
 		}
-	}
-}
-
-
-task buildMetadata (type: JavaExec) {
-	description "builds metadata with provided jar dependencies"
-	
-	inputs.files(allJarPaths)
-	inputs.dir("build/intermediates/classes")
-
-	outputs.files("metadata/output/assets/metadata/treeNodeStream.dat", "metadata/output/assets/metadata/treeStringsStream.dat", "metadata/output/assets/metadata/treeValueStream.dat")
-
-	doFirst {
-		workingDir "build-tools"
-
-		main "-jar"
 
 		args metadataParams.toArray()
 	}
 	
 	doLast {
 		copy {
-			from "metadata/output/assets/metadata"
-			into "src/main/assets/metadata"
+			from "$projectDir/metadata/output/assets/metadata"
+			into "$projectDir/src/main/assets/metadata"
 		}
 		
 		def files = new File("${buildDir}/intermediates/res").listFiles()
@@ -445,14 +463,14 @@ task buildMetadata (type: JavaExec) {
 		
 		exec {
 			ignoreExitValue true
-			workingDir "metadata/output"
+			workingDir "$projectDir/metadata/output"
 			commandLine removeCmdParams.toArray()
 		}
 		
 		def addCmdParams = new ArrayList<String>([aaptCommand, "add", tmpAPKPath, "assets/metadata/treeNodeStream.dat", "assets/metadata/treeStringsStream.dat", "assets/metadata/treeValueStream.dat"])
 		
 		exec {
-			workingDir "metadata/output"
+			workingDir "$projectDir/metadata/output"
 			commandLine addCmdParams.toArray()
 		}
 	}
@@ -474,14 +492,20 @@ task deleteExplodedAarFolder (type: Delete) {
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////// OPTIONAL TASKS //////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
-task runBindingGenerator(dependsOn: "ing:jar") {
-	rootProject.jarsDir = allJarPaths
-}
-runBindingGenerator.dependsOn("bg:jar")
+task setProperties {
+	project.ext.jarFiles = []
+	doLast {
+		def list = [];
+		allJarPaths.each({f -> 
+			if(f.endsWith(".jar")) {
+				list.add(f);
+			}
+		})
+		project.jarFiles = list;
+	}
+} 
 
-task rbg (dependsOn: "asbg:generatebindings")
-
-
+setProperties.finalizedBy("asbg:generateBindings")
 
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////// EXECUTION ORDER /////////////////////////////////////
@@ -518,4 +542,3 @@ task buildapk {
 	
 	dependsOn deleteExplodedAarFolder
 }
-
