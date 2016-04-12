@@ -44,28 +44,6 @@ task generateInterfaceNamesList() {
 	}
 }
 
-// won't run if node_modules are installed
-task runNpmInstallForAstParser () {
-
-	//check this way so it doesn't slow down the build by snapshot-ing the node_modules
-	outputs.upToDateWhen {
-		(new File("$astParserDir/node_modules")).exists()
-	}
-
-	doFirst {
-		exec {
-			workingDir astParserDir
-
-			if(isWinOs) {
-				commandLine "cmd", "/c", "npm", "install"
-			}
-			else {
-				commandLine "npm", "install"
-			}
-		}
-	}
-}
-
 // if there are new dependencies the parser will run again
 task runAstParser () {
 	inputs.files fileTree(dir: absoluteJsCodeDir)
@@ -105,7 +83,6 @@ task generateBindings() {
 	}
 }
 
-runNpmInstallForAstParser.dependsOn(generateInterfaceNamesList)
-runAstParser.dependsOn(runNpmInstallForAstParser)
+runAstParser.dependsOn(generateInterfaceNamesList)
 generateBindings.dependsOn(runAstParser)
 
