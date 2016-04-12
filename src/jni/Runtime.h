@@ -42,6 +42,7 @@ namespace tns
 
 		private:
 			Runtime(JNIEnv *env, jobject runtime, int id);
+			virtual ~Runtime();
 
 			JEnv m_env;
 			int m_id;
@@ -56,6 +57,8 @@ namespace tns
 			WeakRef m_weakRef;
 
 			Profiler m_profiler;
+
+			v8::StartupData *m_startupData;
 
 			static void PrepareExtendFunction(v8::Isolate *isolate, jstring filesPath);
 			v8::Isolate* PrepareV8Runtime(const std::string& filesPath, jstring packageName, jobject jsDebugger, jstring profilerOutputDir);

@@ -61,6 +61,11 @@ Runtime::Runtime(JNIEnv *env, jobject runtime, int id)
 	s_id2RuntimeCache.insert(make_pair(id, this));
 }
 
+Runtime::~Runtime() {
+	delete m_startupData->data;
+	delete m_startupData;
+}
+
 Runtime* Runtime::GetRuntime(int runtimeId)
 {
 	auto itFound = s_id2RuntimeCache.find(runtimeId);
@@ -342,19 +347,27 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 	V8::Initialize();
 
 	Isolate::CreateParams create_params;
-	StartupData startup_data;
 	string customScript;
 
 	create_params.array_buffer_allocator = &g_allocator;
 	// prepare the snapshot blob
 	if (Constants::V8_HEAP_SNAPSHOT)
 	{
+		DEBUG_WRITE_FORCE("Snapshot enabled.");
+
+		// From V8 documentation:
+		// To avoid unnecessary copies of data, V8 will point directly into the
+		// given data blob, so pretty please keep it around until V8 exit.
+		m_startupData = new StartupData();
+
 		auto snapshotPath = filesPath + "/internal/snapshot.blob";
 		if( File::Exists(snapshotPath))
 		{
 			int length;
-			startup_data.data = reinterpret_cast<char*>(File::ReadBinary(snapshotPath, length));
-			startup_data.raw_size = length;
+			m_startupData->data = reinterpret_cast<char*>(File::ReadBinary(snapshotPath, length));
+			m_startupData->raw_size = length;
+
+			DEBUG_WRITE_FORCE("Snapshot read %s (%dB).", snapshotPath.c_str(), length);
 		}
 		else
 		{
@@ -364,11 +377,25 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 				customScript = File::ReadText(Constants::V8_HEAP_SNAPSHOT_SCRIPT);
 			}
 
-			startup_data = V8::CreateSnapshotDataBlob(customScript.c_str());
-			File::WriteBinary(snapshotPath, startup_data.data, startup_data.raw_size);
+			DEBUG_WRITE_FORCE("Creating heap snapshot");
+			*m_startupData = V8::CreateSnapshotDataBlob(customScript.c_str());
+
+			if (m_startupData->raw_size == 0) {
+				DEBUG_WRITE_FORCE("Failed to create heap snapshot.");
+			} else {
+				bool writeSuccess = File::WriteBinary(snapshotPath, m_startupData->data, m_startupData->raw_size);
+
+				if (!writeSuccess) {
+					DEBUG_WRITE_FORCE("Failed to save created snapshot.");
+				} else {
+					DEBUG_WRITE_FORCE("Saved snapshot of %s (%dB) in %s (%dB)",
+							Constants::V8_HEAP_SNAPSHOT_SCRIPT.c_str(), customScript.size(),
+							snapshotPath.c_str(), m_startupData->raw_size);
+				}
+			}
 		}
 
-		create_params.snapshot_blob = &startup_data;
+		create_params.snapshot_blob = m_startupData;
 	}
 
 	auto isolate = Isolate::New(create_params);
@@ -401,12 +428,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 
 	Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
 	PrimaryContext = new Persistent<Context>(isolate, context);
-
-	if (Constants::V8_HEAP_SNAPSHOT)
-	{
-		// we own the snapshot buffer, delete it
-		delete[] startup_data.data;
-	}
 
 	context_scope = new Context::Scope(context);
 
