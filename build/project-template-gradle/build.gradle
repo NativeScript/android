@@ -14,6 +14,8 @@
 *			-PbuildToolsVersion=[build_tools_version] (default is 22.0.1)
 *			-PsupportVersion=[support_version] (default (22.2.0)
 *			-PcompileSdk=[compile_sdk_version] (default 22)
+*
+*			-PdontRunSbg=[true/false] (default false)
 */
 
 buildscript {
@@ -38,6 +40,8 @@ def nodeModulesDir = "../../node_modules/"
 def libDir = "$projectDir/../../lib/Android/"
 def pluginNames = new ArrayList<String>()
 def configDir = file(configurationsDir)
+
+def dontRunSbg = project.hasProperty("dontRunSbg");
 
 def asbgProject = project(":asbg")
 asbgProject.ext.outDir = new File("$projectDir", "src/main/java")
@@ -139,7 +143,10 @@ android {
 		
 		def generateBuildConfigTask = variant.generateBuildConfig;
 		generateBuildConfigTask.finalizedBy(collectAllJars)
-		collectAllJars.finalizedBy(setProperties)
+
+		if(!dontRunSbg) {
+			collectAllJars.finalizedBy(setProperties)
+		}
 		
 		compileSourcesTask.finalizedBy(buildMetadata)
 	}
