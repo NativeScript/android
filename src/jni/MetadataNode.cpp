@@ -487,7 +487,6 @@ Local<Function> MetadataNode::SetMembersFromStaticMetadata(Isolate *isolate, Loc
 	curPtr += sizeof(uint16_t);
 	string lastMethodName;
 	MethodCallbackData *callbackData = nullptr;
-	ConstructorCallbackData *ctorCallbackData = nullptr;
 
 	for (auto i = 0; i < instanceMethodCout; i++)
 	{
@@ -516,19 +515,6 @@ Local<Function> MetadataNode::SetMembersFromStaticMetadata(Isolate *isolate, Loc
 			prototypeTemplate->Set(funcName, func);
 			lastMethodName = entry.name;
 		}
-
-		// Pete: leaving it here will get all constructors for a node
-		// Pete: !!!! Is this even necessary?!
-		if(entry.name.compare("<init>") == 0)
-		{
-			if(ctorCallbackData == nullptr)
-			{
-				ctorCallbackData = new ConstructorCallbackData(this);
-			}
-
-			ctorCallbackData->candidates.push_back(entry);
-		}
-		// Pete: send ctorCallbackData to all <something>ConstructorCallback so that they can pass it along where necessary
 
 		callbackData->candidates.push_back(entry);
 	}
@@ -571,6 +557,7 @@ Local<Function> MetadataNode::SetMembersFromStaticMetadata(Isolate *isolate, Loc
 		callbackData->candidates.push_back(entry);
 	}
 
+	//attach .extend function
 	auto extendFuncName = V8StringConstants::GetExtend();
 	auto extendFuncTemplate = FunctionTemplate::New(isolate, ExtendCallMethodCallback, External::New(isolate, this));
 	ctorFunction->Set(extendFuncName, extendFuncTemplate->GetFunction());
