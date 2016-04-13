@@ -206,21 +206,25 @@ task pluginStructureCheck {
 	}
 }
 
-def createIncludeFile (filePath, fileName, dimensionName) {
-	println "\t+creating include.gradle file for: " + filePath
-	def defaultIncludeFile = new File(filePath, "include.gradle")
-	defaultIncludeFile.write ""
-	
+def createProductFlavorsContent(flavor, dimensionName)
+{
 	def content = """android {
 				productFlavors {
-					${fileName} {
+					${flavor} {
 						dimension ${dimensionName}
 					}
 				}
 			}"""
+	return content;
+}
+
+
+def createIncludeFile (filePath, flavor, dimensionName) {
+	println "\t + creating include.gradle file for ${filePath}" 
 	
-	
-	defaultIncludeFile << content
+	def defaultIncludeFile = new File(filePath, "include.gradle")
+
+	defaultIncludeFiletext.text =  createProductFlavorsContent(flavor, dimensionName);
 }
 
 def sanatizeDimensionName(str) {
@@ -273,7 +277,8 @@ def replaceProductFlavorInContent(content, dimension, flavor)
     }
     else
     {
-      return ''
+      def newProductFlavorsContent = createProductFlavorsContent(flavor, dimension);
+      return content.replace("android {", "android {\t ${newProductFlavorsContent}");
     }
 }
 
