@@ -65,7 +65,7 @@ public class Runtime
 	private final java.lang.Runtime dalvikRuntime = java.lang.Runtime.getRuntime();
 
 	private final Object keyNotFoundObject = new Object();
-	private static int currentObjectId = -1;
+	private int currentObjectId = -1;
 
 	private ExtractPolicy extractPolicy;
 
@@ -328,7 +328,7 @@ public class Runtime
 	{
 		Runtime runtime = Runtime.getCurrentRuntime();
 		
-		int objectId = Runtime.currentObjectId;
+		int objectId = runtime.currentObjectId;
 
 		if (objectId != -1)
 		{

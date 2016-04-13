@@ -123,6 +123,25 @@ namespace tns
 			static std::map<std::string, int> s_constructorCache;
 
 			static std::map<std::string, jclass> s_classCache;
+
+			struct JavaObjectIdScope
+			{
+				JavaObjectIdScope(JEnv& env, jfieldID fieldId, jobject runtime, int javaObjectId)
+					: _env(env), _fieldID(fieldId), _runtime(runtime)
+				{
+					_env.SetIntField(_runtime, _fieldID, javaObjectId);
+				}
+
+				~JavaObjectIdScope()
+				{
+					_env.SetIntField(_runtime, _fieldID, -1);
+				}
+
+				private:
+					JEnv _env;
+					jfieldID _fieldID;
+					jobject _runtime;
+			};
 	};
 }
 

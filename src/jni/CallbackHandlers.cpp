@@ -39,7 +39,7 @@ void CallbackHandlers::Init(Isolate *isolate, ObjectManager *objectManager)
 	RESOLVE_CLASS_METHOD_ID = env.GetMethodID(RUNTIME_CLASS, "resolveClass", "(Ljava/lang/String;[Ljava/lang/String;)Ljava/lang/Class;");
 	assert(RESOLVE_CLASS_METHOD_ID != nullptr);
 
-	CURRENT_OBJECTID_FIELD_ID = env.GetStaticFieldID(RUNTIME_CLASS, "currentObjectId", "I");
+	CURRENT_OBJECTID_FIELD_ID = env.GetFieldID(RUNTIME_CLASS, "currentObjectId", "I");
 	assert(CURRENT_OBJECTID_FIELD_ID != nullptr);
 
 	MAKE_INSTANCE_STRONG_ID = env.GetMethodID(RUNTIME_CLASS, "makeInstanceStrong", "(Ljava/lang/Object;I)V");
@@ -85,24 +85,24 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object>& j
 
 	jobject instance;
 
-	env.SetStaticIntField(RUNTIME_CLASS, CURRENT_OBJECTID_FIELD_ID, javaObjectID);
-
-	if(argWrapper.type == ArgType::Interface)
 	{
-		instance = env.NewObject(generatedJavaClass, mi.mid);
-	}
-	else
-	{
-		// resolve arguments before passing them on to the constructor
-		JsArgConverter argConverter(argWrapper.args, mi.signature, argWrapper.outerThis);
-		auto ctorArgs = argConverter.ToArgs();
+		JavaObjectIdScope objIdScope(env, CURRENT_OBJECTID_FIELD_ID, runtime->GetJavaRuntime(), javaObjectID);
 
-		instance = env.NewObjectA(generatedJavaClass, mi.mid, ctorArgs);
+		if(argWrapper.type == ArgType::Interface)
+		{
+			instance = env.NewObject(generatedJavaClass, mi.mid);
+		}
+		else
+		{
+			// resolve arguments before passing them on to the constructor
+			JsArgConverter argConverter(argWrapper.args, mi.signature, argWrapper.outerThis);
+			auto ctorArgs = argConverter.ToArgs();
+
+			instance = env.NewObjectA(generatedJavaClass, mi.mid, ctorArgs);
+		}
 	}
 
 	env.CallVoidMethod(runtime->GetJavaRuntime(), MAKE_INSTANCE_STRONG_ID, instance, javaObjectID);
-
-	env.SetStaticIntField(RUNTIME_CLASS, CURRENT_OBJECTID_FIELD_ID, -1);
 
 	AdjustAmountOfExternalAllocatedMemory(env, isolate);
 
@@ -137,14 +137,14 @@ jclass CallbackHandlers::ResolveClass(Isolate *isolate, const string& fullClassn
 	{
 		JEnv env;
 
-		//get needed arguments in order to load binding
+		// get needed arguments in order to load binding
 		JniLocalRef javaFullClassName(env.NewStringUTF(fullClassname.c_str()));
 
 		jobjectArray methodOverrides = GetMethodOverrides(env, implementationObject);
 
 		auto runtime = Runtime::GetRuntime(isolate);
 
-		//create or load generated binding (java class)
+		// create or load generated binding (java class)
 		JniLocalRef generatedClass(env.CallObjectMethod(runtime->GetJavaRuntime(), RESOLVE_CLASS_METHOD_ID, (jstring) javaFullClassName, methodOverrides));
 		globalRefToGeneratedClass = static_cast<jclass>(env.NewGlobalRef(generatedClass));
 
@@ -593,9 +593,9 @@ int64_t CallbackHandlers::AdjustAmountOfExternalAllocatedMemory(JEnv& env, Isola
 	int64_t changeInBytes = env.CallLongMethod(runtime->GetJavaRuntime(), GET_CHANGE_IN_BYTES_OF_USED_MEMORY_METHOD_ID);
 
 	int64_t adjustedValue = (changeInBytes != 0)
-													? isolate->AdjustAmountOfExternalAllocatedMemory(changeInBytes)
-															:
-															0;
+															? isolate->AdjustAmountOfExternalAllocatedMemory(changeInBytes)
+																	:
+																	0;
 
 	return adjustedValue;
 }
