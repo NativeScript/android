@@ -89,6 +89,9 @@ task generateBindings() {
 
 	inputs.files(bindingsFilePath)
 	outputs.dir(absoluteOutDir)
+	outputs.upToDateWhen({
+		return !shouldRun
+	})
 
 	doFirst {
 		javaexec {
