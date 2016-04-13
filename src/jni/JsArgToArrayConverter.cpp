@@ -19,6 +19,9 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
+/*
+ * Converts a single JavaScript (V8) object to its respective Java representation
+ */
 JsArgToArrayConverter::JsArgToArrayConverter(Isolate *isolate, const v8::Local<Value>& arg, bool isImplementationObject, int classReturnType)
 	: m_isolate(isolate), m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()), m_return_type(classReturnType)
 {
@@ -32,6 +35,9 @@ JsArgToArrayConverter::JsArgToArrayConverter(Isolate *isolate, const v8::Local<V
 	}
 }
 
+/*
+ * Converts an array of JavaScript (V8) objects to a Java array of objects
+ */
 JsArgToArrayConverter::JsArgToArrayConverter(const v8::FunctionCallbackInfo<Value>& args, bool hasImplementationObject, const Local<Object>& outerThis)
 	: m_isolate(args.GetIsolate()), m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()), m_return_type(static_cast<int>(Type::Null))
 {

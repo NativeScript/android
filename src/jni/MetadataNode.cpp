@@ -25,7 +25,7 @@ void MetadataNode::Init(Isolate *isolate)
 }
 
 MetadataNode::MetadataNode(MetadataTreeNode *treeNode) :
-				m_treeNode(treeNode)
+						m_treeNode(treeNode)
 {
 	uint8_t nodeType = s_metadataReader.GetNodeType(treeNode);
 
@@ -487,9 +487,12 @@ Local<Function> MetadataNode::SetMembersFromStaticMetadata(Isolate *isolate, Loc
 	curPtr += sizeof(uint16_t);
 	string lastMethodName;
 	MethodCallbackData *callbackData = nullptr;
+
 	for (auto i = 0; i < instanceMethodCout; i++)
 	{
 		auto entry = s_metadataReader.ReadInstanceMethodEntry(&curPtr);
+
+		// attach a function to the prototype of a javascript Object
 		if (entry.name != lastMethodName)
 		{
 			callbackData = new MethodCallbackData(this);
@@ -512,6 +515,7 @@ Local<Function> MetadataNode::SetMembersFromStaticMetadata(Isolate *isolate, Loc
 			prototypeTemplate->Set(funcName, func);
 			lastMethodName = entry.name;
 		}
+
 		callbackData->candidates.push_back(entry);
 	}
 
@@ -553,6 +557,7 @@ Local<Function> MetadataNode::SetMembersFromStaticMetadata(Isolate *isolate, Loc
 		callbackData->candidates.push_back(entry);
 	}
 
+	//attach .extend function
 	auto extendFuncName = V8StringConstants::GetExtend();
 	auto extendFuncTemplate = FunctionTemplate::New(isolate, ExtendCallMethodCallback, External::New(isolate, this));
 	ctorFunction->Set(extendFuncName, extendFuncTemplate->GetFunction());
