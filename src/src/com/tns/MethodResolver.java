@@ -282,10 +282,7 @@ class MethodResolver
 			Collections.sort(candidates, distanceComparator);
 			Constructor<?> selectedCtor = candidates.get(0).x;
 
-			// Pete: consider dropping this check in favor of performance
-			boolean success = convertConstructorArgs(selectedCtor, args);
-
-			return success ? selectedCtor : null;
+			return selectedCtor;
 		}
 
 		return null;
