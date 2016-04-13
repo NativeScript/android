@@ -174,9 +174,6 @@ dependencies {
 
 	// take all jars within the node_modules dir
 	compile fileTree(dir: nodeModulesDir, include: ["**/platforms/android/**/*.jar"], exclude: '**/.bin/**')
-
-	// take all jars within the lib/Android dir
-	compile fileTree(dir: libDir, include: ["**/*.jar"])
 	
 	//when gradle has aar support this will be preferred instead of addAarDependencies
 	// compile files("$rootDir/libs/aar") {
