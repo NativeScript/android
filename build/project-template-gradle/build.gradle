@@ -305,6 +305,18 @@ def updateIncludeGradleFile(targetFile, dimensionName, flavor)
 	fileEntry.text = replacedContent;
 }
 
+def renamePluginDirToFlavorName(directory, flavor) 
+{
+    def parentName = directory.getName();
+    def parentFile = new File("src", parentName);
+    if (parentFile.exists())
+    {
+        def targetDirName = new File("src", flavor);
+        println "Renaming plugin directory to flavor name: ${parentFile.getAbsolutePath()} -> ${targetDirName.getAbsolutePath()}";
+        parentFile.renameTo(targetDirName);
+    }    
+}
+
 def flavorNumber = 0
 
 task createDefaultIncludeFiles {
@@ -328,6 +340,7 @@ task createDefaultIncludeFiles {
 				if(subFile.name == "include.gradle") {
 					foundIncludeFile = true
 					updateIncludeGradleFile(subFile, dimensionName, flavor)
+					renamePluginDirToFlavorName(subFile.getParentFile(), flavor);
 				}
 			}
 			
@@ -335,6 +348,7 @@ task createDefaultIncludeFiles {
 			
 			if(!foundIncludeFile) {
 				createIncludeFile(fl.getAbsolutePath() , flavor, dimensionName)
+				renamePluginDirToFlavorName(fl, flavor);
 			}
 		}
 	}
