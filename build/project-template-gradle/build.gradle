@@ -206,16 +206,28 @@ task pluginStructureCheck {
 	}
 }
 
-def createProductFlavorsContent(flavor, dimensionName)
+def createProductFlavorsContent(flavor, dimensionName, includeAndroidContent = true)
 {
-	def content = """android {
-				productFlavors {
-					${flavor} {
-						dimension ${dimensionName}
-					}
-				}
-			}"""
-	return content;
+	if (includeAndroidContent)
+  	{
+    	def content = """android {
+          productFlavors {
+            "${flavor}" {
+              dimension "${dimensionName}"
+            }
+          }
+        }"""
+    	return content;
+	}
+	else
+	{
+    	def content = """productFlavors {
+              "${flavor}" {
+                dimension "${dimensionName}"
+              }
+            }"""
+      return content;
+	}
 }
 
 
@@ -223,7 +235,6 @@ def createIncludeFile (filePath, flavor, dimensionName) {
 	println "\t + creating include.gradle file for ${filePath}" 
 	
 	def defaultIncludeFile = new File(filePath, "include.gradle")
-
 	defaultIncludeFiletext.text =  createProductFlavorsContent(flavor, dimensionName);
 }
 
@@ -265,20 +276,23 @@ def replaceProductFlavorInContent(content, dimension, flavor)
     {
       def oldProductFlavorsText = content.substring(indexStart, indexEnd - 1);
       
-      def newProductFlavorsText = """
-          productFlavors {
-              "${flavor}" {
-                  dimension "${dimension}"
-              }
-          }
-          """;
+      def newProductFlavorsContent = createProductFlavorsContent(flavor, dimension, false);
       
-      return content.replace(oldProductFlavorsText, newProductFlavorsText);
+      return content.replace(oldProductFlavorsText, newProductFlavorsContent);
     }
     else
     {
-      def newProductFlavorsContent = createProductFlavorsContent(flavor, dimension);
-      return content.replace("android {", "android {\t ${newProductFlavorsContent}");
+        def androidContentExists = content.indexOf("android {") != -1;
+        def newProductFlavorsContent = createProductFlavorsContent(flavor, dimension, !androidContentExists);
+        
+        if (androidContentExists)
+        {
+           return content.replace("android {", "android { ${newProductFlavorsContent}");
+        }
+        else
+        {
+           return "${newProductFlavorsContent} \t ${content}"
+        }
     }
 }
 
@@ -333,17 +347,16 @@ task createPluginsConfigFile {
 		println "$configStage createPluginsConfigFile"
 		
 		def flavorsFile = new File("$configurationsDir/include.gradle")
-		flavorsFile.write "" //clear config file
-		
+
 		if(createPluginConfigFile) {
-			println "\t+creating product flavors include.gradle file in $configurationsDir folder..."
+			println "\t Creating product flavors include.gradle file in $configurationsDir folder..."
 			def flavors = flavorNames.join(", ")
 			
 			def content = """android {
 						flavorDimensions ${flavors}
 					}"""
 			
-			flavorsFile << content
+			flavorsFile.text =  content
 		}
 	}
 }
