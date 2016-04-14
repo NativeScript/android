@@ -38,7 +38,7 @@ def createPluginConfigFile = false
 def configStage = "\n:config phase: "
 def nodeModulesDir = "../../node_modules/"
 def libDir = "$projectDir/../../lib/Android/"
-def pluginNames = new ArrayList<String>()
+def flavorNames = new ArrayList<String>()
 def configDir = file(configurationsDir)
 
 def dontRunSbg = project.hasProperty("dontRunSbg");
@@ -203,35 +203,118 @@ task pluginStructureCheck {
 	}
 }
 
-def createIncludeFile (filePath, fileName, dimensionName) {
-	println "\t+creating include.gradle file for: " + filePath
+def createProductFlavorsContent(flavor, dimensionName, includeAndroidContent = true)
+{
+	if (includeAndroidContent)
+  	{
+    	def content = """android {
+          productFlavors {
+            "${flavor}" {
+              dimension "${dimensionName}"
+            }
+          }
+        }"""
+    	return content;
+	}
+	else
+	{
+    	def content = """productFlavors {
+              "${flavor}" {
+                dimension "${dimensionName}"
+              }
+            }"""
+      return content;
+	}
+}
+
+
+def createIncludeFile (filePath, flavor, dimensionName) {
+	println "\t + creating include.gradle file for ${filePath}" 
+	
 	def defaultIncludeFile = new File(filePath, "include.gradle")
-	defaultIncludeFile.write ""
-	defaultIncludeFile << "android { \n"
-	defaultIncludeFile << "\tproductFlavors {\n"
-	defaultIncludeFile << '\t\t"' + fileName + '" {\n'
-	defaultIncludeFile << '\t\t\tdimension "' + dimensionName + '"\n'
-	defaultIncludeFile << "\t\t}\n"
-	defaultIncludeFile << "\t}\n"
-	defaultIncludeFile << "}"
+	defaultIncludeFiletext.text =  createProductFlavorsContent(flavor, dimensionName);
 }
 
 def sanatizeDimensionName(str) {
 	return str.replaceAll(/\W/, "")
 }
 
-//make sure the include.gradle file, produced by the user, has only allowed characters in dimension attribute and remove any invalid characters if necessary
-def updateIncludeGradleFile(subFile, dimensionName) {
-	def igFile = new File(subFile.getAbsolutePath())
-	def newContent = igFile.text.replaceAll(/dimension\s+["'](.+?)["']/)  { fullMatch, fDimension ->
-							def newFg = sanatizeDimensionName(fDimension)
-							dimensionName = newFg
-							return "dimension \"$newFg\""
-						}
-	igFile.text = newContent
-	
-	return dimensionName
+def replaceProductFlavorInContent(content, dimension, flavor)
+{
+  def indexStart = content.indexOf("productFlavors");
+  def index = indexStart  + "productFlavors".length();
+  def indexEnd = -1;
+  def nestedOpenBraketsCount = 0;
+
+  while (index < content.length())
+  {
+      print content[index]
+      if (content[index] == "}")
+      {
+          if (nestedOpenBraketsCount == 0)
+          {
+              indexEnd = index;
+              break;
+          }
+          else
+          {
+              nestedOpenBraketsCount--;
+          }
+      }
+      else if (content[index] == "{")
+      {
+          nestedOpenBraketsCount++;
+      }
+
+      index++;
+  }
+
+    if (indexEnd != -1)
+    {
+      def oldProductFlavorsText = content.substring(indexStart, indexEnd - 1);
+      
+      def newProductFlavorsContent = createProductFlavorsContent(flavor, dimension, false);
+      
+      return content.replace(oldProductFlavorsText, newProductFlavorsContent);
+    }
+    else
+    {
+        def androidContentExists = content.indexOf("android {") != -1;
+        def newProductFlavorsContent = createProductFlavorsContent(flavor, dimension, !androidContentExists);
+        
+        if (androidContentExists)
+        {
+           return content.replace("android {", "android { ${newProductFlavorsContent}");
+        }
+        else
+        {
+           return "${newProductFlavorsContent} \t ${content}"
+        }
+    }
 }
+
+//make sure the include.gradle file, produced by the user, has only allowed characters in dimension attribute and remove any invalid characters if necessary
+def updateIncludeGradleFile(targetFile, dimensionName, flavor)
+{
+	def fileEntry = new File(targetFile.getAbsolutePath());
+	def content = fileEntry.text;
+	def replacedContent = replaceProductFlavorInContent(content, dimensionName, flavor);
+	fileEntry.text = replacedContent;
+}
+
+def renamePluginDirToFlavorName(directory, flavor) 
+{
+    def parentName = directory.getName();
+    def parentFile = new File("src", parentName);
+    if (parentFile.exists())
+    {
+        def targetDirName = new File("src", flavor);
+        println "Renaming plugin directory to flavor name: ${parentFile.getAbsolutePath()} -> ${targetDirName.getAbsolutePath()}";
+        parentFile.renameTo(targetDirName);
+    }    
+}
+
+def flavorNumber = 0
 
 task createDefaultIncludeFiles {
 	description "creates default include.gradle files for added plugins IF NECESSARY"
@@ -246,19 +329,23 @@ task createDefaultIncludeFiles {
 			createPluginConfigFile = true
 			def foundIncludeFile = false
 			
+			def flavor = "F" + flavorNumber++
+			
 			println "\t+found plugins: " + fileName
 			fl.listFiles().each { subFile ->
 			
 				if(subFile.name == "include.gradle") {
 					foundIncludeFile = true
-					dimensionName = updateIncludeGradleFile(subFile, dimensionName)
+					updateIncludeGradleFile(subFile, dimensionName, flavor)
+					renamePluginDirToFlavorName(subFile.getParentFile(), flavor);
 				}
 			}
 			
-			pluginNames.add('"' + dimensionName + '"')
+			flavorNames.add('"' + dimensionName + '"')
 			
 			if(!foundIncludeFile) {
-				createIncludeFile(fl.getAbsolutePath() ,fileName, dimensionName)
+				createIncludeFile(fl.getAbsolutePath() , flavor, dimensionName)
+				renamePluginDirToFlavorName(fl, flavor);
 			}
 		}
 	}
@@ -271,15 +358,16 @@ task createPluginsConfigFile {
 		println "$configStage createPluginsConfigFile"
 		
 		def flavorsFile = new File("$configurationsDir/include.gradle")
-		flavorsFile.write "" //clear config file
-		
+
 		if(createPluginConfigFile) {
-			println "\t+creating product flavors include.gradle file in $configurationsDir folder..."
-			def flavors = pluginNames.join(",")
+			println "\t Creating product flavors include.gradle file in $configurationsDir folder..."
+			def flavors = flavorNames.join(", ")
 			
-			flavorsFile << "android { \n"
-			flavorsFile << "\tflavorDimensions " + flavors + "\n"
-			flavorsFile << "}\n"
+			def content = """android {
+						flavorDimensions ${flavors}
+					}"""
+			
+			flavorsFile.text =  content
 		}
 	}
 }
@@ -527,4 +615,3 @@ task buildapk {
 	
 	dependsOn deleteExplodedAarFolder
 }
-
