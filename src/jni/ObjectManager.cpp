@@ -82,7 +82,7 @@ JniLocalRef ObjectManager::GetJavaObjectByJsObject(const Local<Object>& object)
 	return JniLocalRef();
 }
 
-JSInstanceInfo* ObjectManager::GetJSInstanceInfo(const Local<Object>& object)
+ObjectManager::JSInstanceInfo* ObjectManager::GetJSInstanceInfo(const Local<Object>& object)
 {
 	DEBUG_WRITE("ObjectManager::GetJSInstanceInfo: called");
 	JSInstanceInfo *jsInstanceInfo = nullptr;
@@ -90,11 +90,9 @@ JSInstanceInfo* ObjectManager::GetJSInstanceInfo(const Local<Object>& object)
 	auto isolate = Isolate::GetCurrent();
 	HandleScope handleScope(isolate);
 
-	int internalFieldCound = NativeScriptExtension::GetInternalFieldCount(object);
-	const int count = static_cast<int>(MetadataNodeKeys::END);
-	const int jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
-	if (internalFieldCound == count)
+	if (IsJsRuntimeObject(object))
 	{
+		const int jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
 		auto jsInfo = object->GetInternalField(jsInfoIdx);
 		if (jsInfo->IsUndefined())
 		{
@@ -104,8 +102,7 @@ JSInstanceInfo* ObjectManager::GetJSInstanceInfo(const Local<Object>& object)
 			if (!prototypeObject.IsEmpty() && prototypeObject->IsObject())
 			{
 				DEBUG_WRITE("GetJSInstanceInfo: need to check prototype :%d", prototypeObject->GetIdentityHash());
-				internalFieldCound = NativeScriptExtension::GetInternalFieldCount(prototypeObject);
-				if (internalFieldCound == count)
+				if (IsJsRuntimeObject(prototypeObject))
 				{
 					jsInfo = prototypeObject->GetInternalField(jsInfoIdx);
 				}
@@ -120,6 +117,12 @@ JSInstanceInfo* ObjectManager::GetJSInstanceInfo(const Local<Object>& object)
 	}
 
 	return jsInstanceInfo;
+}
+
+bool ObjectManager::IsJsRuntimeObject(const v8::Local<v8::Object>& object) {
+	int internalFieldCount = NativeScriptExtension::GetInternalFieldCount(object);
+	const int count = static_cast<int>(MetadataNodeKeys::END);
+	return internalFieldCount == count;
 }
 
 jweak ObjectManager::GetJavaObjectByID(uint32_t javaObjectID)
@@ -145,7 +148,7 @@ jclass ObjectManager::GetJavaClass(const Local<Object>& instance)
 	DEBUG_WRITE("GetClass called");
 
 	JSInstanceInfo *jsInfo = GetJSInstanceInfo(instance);
-	jclass clazz = jsInfo->clazz;
+	jclass clazz = jsInfo->ObjectClazz;
 
 	return clazz;
 }
@@ -155,7 +158,7 @@ void ObjectManager::SetJavaClass(const Local<Object>& instance, jclass clazz)
 	DEBUG_WRITE("SetClass called");
 
 	JSInstanceInfo *jsInfo = GetJSInstanceInfo(instance);
-	jsInfo->clazz = clazz;
+	jsInfo->ObjectClazz = clazz;
 }
 
 int ObjectManager::GetOrCreateObjectId(jobject object)
@@ -215,9 +218,7 @@ Local<Object> ObjectManager::CreateJSWrapperHelper(jint javaObjectID, const stri
 
 void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID, jclass clazz)
 {
-	int internalFieldCound = NativeScriptExtension::GetInternalFieldCount(object);
-	const int count = static_cast<int>(MetadataNodeKeys::END);
-	if (internalFieldCound != count)
+	if (!IsJsRuntimeObject(object))
 	{
 		string errMsg("Trying to link invalid 'this' to a Java object");
 		throw NativeScriptException(errMsg);
@@ -227,9 +228,7 @@ void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID, jcl
 
 	DEBUG_WRITE("Linking js object: %d and java instance id: %d", object->GetIdentityHash(), javaObjectID);
 
-	auto jsInstanceInfo = new JSInstanceInfo();
-	jsInstanceInfo->JavaObjectID = javaObjectID;
-	jsInstanceInfo->clazz = clazz;
+	auto jsInstanceInfo = new JSInstanceInfo(false, javaObjectID, clazz);
 
 	auto objectHandle = new Persistent<Object>(isolate, object);
 	auto state = new ObjectWeakCallbackState(this, jsInstanceInfo, objectHandle);

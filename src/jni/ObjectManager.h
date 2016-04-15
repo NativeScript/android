@@ -5,7 +5,6 @@
 #include "JEnv.h"
 #include "JniLocalRef.h"
 #include "ArgsWrapper.h"
-#include "JSInstanceInfo.h"
 #include "DirectBuffer.h"
 #include "LRUCache.h"
 #include <map>
@@ -58,6 +57,20 @@ namespace tns
 			};
 
 		private:
+
+			struct JSInstanceInfo
+			{
+				public:
+					JSInstanceInfo(bool isJavaObjectWeak, uint32_t javaObjectID, jclass claz)
+						:IsJavaObjectWeak(isJavaObjectWeak), JavaObjectID(javaObjectID), ObjectClazz(claz)
+					{
+					}
+
+					bool IsJavaObjectWeak;
+					uint32_t JavaObjectID;
+					jclass ObjectClazz;
+			};
+
 			struct ObjectWeakCallbackState
 			{
 					ObjectWeakCallbackState(ObjectManager *_thisPtr, JSInstanceInfo *_jsInfo, v8::Persistent<v8::Object> *_target)
@@ -120,6 +133,8 @@ namespace tns
 					v8::Persistent<v8::Object> *po;
 					int javaObjectId;
 			};
+
+			bool IsJsRuntimeObject(const v8::Local<v8::Object>& object);
 
 			JSInstanceInfo* GetJSInstanceInfo(const v8::Local<v8::Object>& object);
 
