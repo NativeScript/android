@@ -18,8 +18,6 @@ public class Dump
 	private static final String callJsMethodSignatureMethod = "Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/Class;[Ljava/lang/Object;";
 	private static final String LCOM_TNS = "Lcom/tns/gen/";
 	private static final String LCOM_TNS_RUNTIME = "Lcom/tns/Runtime;";
-	static final String preferenceActivityJniSignature = "Lcom/tns/android/preference/PreferenceActivity;";
-	static final String preferenceActivityClass = "Landroid/preference/PreferenceActivity;";
 	static final String objectClass = "Ljava/lang/Object;";
 
 	static final String runtimeClass = LCOM_TNS_RUNTIME;
