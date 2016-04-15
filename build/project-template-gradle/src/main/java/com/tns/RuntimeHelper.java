@@ -119,6 +119,12 @@ public class RuntimeHelper
 			
 			runtime.init();
 			runtime.runScript(new File(appDir, "internal/ts_helpers.js"));
+
+			File javaClassesModule = new File(appDir, "app/tns-java-classes.js");
+			if (javaClassesModule.exists()) {
+				runtime.runModule(javaClassesModule);
+			}
+
 			Runtime.initInstance(this.app);
 			runtime.run();
 		}
