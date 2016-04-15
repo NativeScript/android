@@ -216,6 +216,10 @@ Local<Object> ObjectManager::CreateJSWrapperHelper(jint javaObjectID, const stri
 	return jsWrapper;
 }
 
+
+/* *
+ * Link the JavaScript object and it's java counterpart with an ID
+ */
 void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID, jclass clazz)
 {
 	if (!IsJsRuntimeObject(object))
@@ -228,17 +232,19 @@ void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID, jcl
 
 	DEBUG_WRITE("Linking js object: %d and java instance id: %d", object->GetIdentityHash(), javaObjectID);
 
-	auto jsInstanceInfo = new JSInstanceInfo(false, javaObjectID, clazz);
+	auto jsInstanceInfo = new JSInstanceInfo(false/*isJavaObjWeak*/, javaObjectID, clazz);
 
 	auto objectHandle = new Persistent<Object>(isolate, object);
 	auto state = new ObjectWeakCallbackState(this, jsInstanceInfo, objectHandle);
+
+	// subscribe for JS GC event
 	objectHandle->SetWeak(state, JSObjectWeakCallbackStatic);
 
 	auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
-	bool alreadyLinked = !object->GetInternalField(jsInfoIdx)->IsUndefined();
-	//TODO: fail if alreadyLinked is true?
 
 	auto jsInfo = External::New(isolate, jsInstanceInfo);
+
+	//link
 	object->SetInternalField(jsInfoIdx, jsInfo);
 
 	idToObject.insert(make_pair(javaObjectID, objectHandle));
@@ -289,6 +295,14 @@ void ObjectManager::JSObjectWeakCallbackStatic(const WeakCallbackData<Object, Ob
 	thisPtr->JSObjectWeakCallback(isolate, callbackState);
 }
 
+/*
+ * When JS GC happens change state of the java counterpart to mirror state of JS object and REVIVE the JS object unconditionally
+ * "Regular" js objects are pushed into the "regular objects" array
+ * "Callback" js objects (ones that have implementation object) are pushed into two "special objects" array:
+ * 		-ones called for the first time which are originally strong in java
+ * 		-ones called for the second or next time which are already weak in java too
+ *	These objects are categorized by "regular" and "callback" and saved in different arrays for performance optimizations during GC
+ * */
 void ObjectManager::JSObjectWeakCallback(Isolate *isolate, ObjectWeakCallbackState *callbackState)
 {
 	DEBUG_WRITE("JSObjectWeakCallback called");
@@ -304,7 +318,6 @@ void ObjectManager::JSObjectWeakCallback(Isolate *isolate, ObjectWeakCallbackSta
 		m_visitedPOs.insert(po);
 
 		auto obj = Local<Object>::New(isolate, *po);
-
 		JSInstanceInfo *jsInstanceInfo = GetJSInstanceInfo(obj);
 		int javaObjectID = jsInstanceInfo->JavaObjectID;
 
@@ -369,6 +382,9 @@ void ObjectManager::ReleaseJSInstance(Persistent<Object> *po, JSInstanceInfo *js
 	DEBUG_WRITE("ReleaseJSObject instance disposed. id:%d", javaObjectID);
 }
 
+/*
+ * The "regular" JS objects added on ObjectManager::JSObjectWeakCallback are dealt with(released) here.
+ * */
 void ObjectManager::ReleaseRegularObjects()
 {
 	Isolate *isolate = Isolate::GetCurrent();
@@ -398,6 +414,7 @@ void ObjectManager::ReleaseRegularObjects()
 		{
 			int objGcNum = gcNum->Int32Value();
 
+			// done so we can release only java objects from this GC stack and pass all objects that will be released in parent GC stacks
 			isReachableFromImplementationObject = objGcNum >= numberOfGC;
 		}
 
@@ -426,6 +443,10 @@ bool ObjectManager::HasImplObject(Isolate *isolate, const Local<Object>& obj)
 	return hasImplObj;
 }
 
+/*
+ * When "MarkReachableObjects" is called V8 has marked all JS objects that can be released.
+ * This method builds on top of V8s marking phase, because we need to consider the JAVA counterpart objects (is it "regular" or "callback"), when marking JS ones.
+ * */
 void ObjectManager::MarkReachableObjects(Isolate *isolate, const Local<Object>& obj)
 {
 	stack<Local<Value> > s;
@@ -460,6 +481,9 @@ void ObjectManager::MarkReachableObjects(Isolate *isolate, const Local<Object>& 
 			auto hasImplObject = HasImplObject(isolate, o);
 			if (hasImplObject)
 			{
+				// this is a special case when one "callback1" object (one we are currently traversing)
+				// can reach another "callback2" object (jsInfo->JavaObjectID)
+				// here we are leaving "callback2" object to remain strong in java
 				m_implObjStrong[jsInfo->JavaObjectID] = nullptr;
 			}
 			o->SetHiddenValue(propName, curGCNumValue);
@@ -614,10 +638,14 @@ void ObjectManager::OnGcStarted(GCType type, GCCallbackFlags flags)
 	m_markedForGC.push(gcInfo);
 }
 
+/*
+ * When GC is called we need to evaluate the situation and decide what js objects to release
+ * */
 void ObjectManager::OnGcFinished(GCType type, GCCallbackFlags flags)
 {
 	assert(!m_markedForGC.empty());
 
+	//deal with all "callback" objects
 	auto isolate = Isolate::GetCurrent();
 	for (auto weakObj : m_implObjWeak)
 	{
@@ -634,6 +662,7 @@ void ObjectManager::OnGcFinished(GCType type, GCCallbackFlags flags)
 		}
 	}
 
+	//deal with regular objects
 	ReleaseRegularObjects();
 
 	m_markedForGC.pop();
@@ -655,6 +684,10 @@ void ObjectManager::OnGcFinished(GCType type, GCCallbackFlags flags)
 	}
 }
 
+/*
+ * We have all the JS "regular" objects that JS has made weak and ready to by GC'd,
+ * so we tell java to take the JAVA objects out of strong reference so they can be collected by JAVA GC
+ * */
 void ObjectManager::MakeRegularObjectsWeak(const set<int>& instances, DirectBuffer& inputBuff)
 {
 	jboolean keepAsWeak = JNI_FALSE;
@@ -681,6 +714,11 @@ void ObjectManager::MakeRegularObjectsWeak(const set<int>& instances, DirectBuff
 	inputBuff.Reset();
 }
 
+/*
+ * We have all the JS "callback" objects that JS has made weak and ready to by GC'd,
+ * so we tell java to take the JAVA objects out of strong, BUT KEEP THEM AS WEEK REFERENCES,
+ * so that if java needs to release them, it can, on a later stage.
+ * */
 void ObjectManager::MakeImplObjectsWeak(const map<int, Persistent<Object>*>& instances, DirectBuffer& inputBuff)
 {
 	jboolean keepAsWeak = JNI_TRUE;
@@ -714,6 +752,10 @@ void ObjectManager::MakeImplObjectsWeak(const map<int, Persistent<Object>*>& ins
 	inputBuff.Reset();
 }
 
+/*
+ * Consult with JAVA world to check if a java object is still in kept as a strong or weak reference
+ * If the JAVA objects are released, we can release the their counterpart JS objects
+ * */
 void ObjectManager::CheckWeakObjectsAreAlive(const vector<PersistentObjectIdPair>& instances, DirectBuffer& inputBuff, DirectBuffer& outputBuff)
 {
 	for (const auto& poIdPair : instances)
