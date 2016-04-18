@@ -8,6 +8,7 @@
 #include "NativeScriptException.h"
 #include "NumericCasts.h"
 #include "JType.h"
+#include "Runtime.h"
 #include <assert.h>
 #include <sstream>
 #include <cstdlib>
@@ -16,27 +17,25 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
-void ArgConverter::Init(JavaVM *jvm)
+void ArgConverter::Init(Isolate *isolate)
 {
-	ArgConverter::jvm = jvm;
-
-	auto isolate = Isolate::GetCurrent();
+	auto cache = GetCache(isolate);
 
 	auto ft = FunctionTemplate::New(isolate, ArgConverter::NativeScriptLongFunctionCallback);
 	ft->SetClassName(V8StringConstants::GetLongNumber());
 	ft->InstanceTemplate()->Set(V8StringConstants::GetValueOf(), FunctionTemplate::New(isolate, ArgConverter::NativeScriptLongValueOfFunctionCallback));
 	ft->InstanceTemplate()->Set(V8StringConstants::GetToString(), FunctionTemplate::New(isolate, ArgConverter::NativeScriptLongToStringFunctionCallback));
-	NATIVESCRIPT_NUMBER_CTOR_FUNC = new Persistent<Function>(isolate, ft->GetFunction());
+	cache->LongNumberCtorFunc = new Persistent<Function>(isolate, ft->GetFunction());
 
 	auto nanObject = Number::New(isolate, numeric_limits<double>::quiet_NaN()).As<NumberObject>();
-	NAN_NUMBER_OBJECT = new Persistent<NumberObject>(isolate, nanObject);
+	cache->NanNumberObject = new Persistent<NumberObject>(isolate, nanObject);
 }
 
 void ArgConverter::NativeScriptLongValueOfFunctionCallback(const v8::FunctionCallbackInfo<Value>& args)
 {
 	try
 	{
-		auto isolate = Isolate::GetCurrent();
+		auto isolate = args.GetIsolate();
 		args.GetReturnValue().Set(Number::New(isolate, numeric_limits<double>::quiet_NaN()));
 	}
 	catch (NativeScriptException& e)
@@ -81,11 +80,12 @@ void ArgConverter::NativeScriptLongFunctionCallback(const v8::FunctionCallbackIn
 {
 	try
 	{
-		auto isolate = Isolate::GetCurrent();
+		auto isolate = args.GetIsolate();
 		auto thiz = args.This();
+		auto cache = GetCache(isolate);
 		thiz->SetHiddenValue(V8StringConstants::GetJavaLong(), Boolean::New(isolate, true));
 		NumericCasts::MarkAsLong(thiz, args[0]);
-		thiz->SetPrototype(Local<NumberObject>::New(Isolate::GetCurrent(), *NAN_NUMBER_OBJECT));
+		thiz->SetPrototype(Local<NumberObject>::New(isolate, *cache->NanNumberObject));
 	}
 	catch (NativeScriptException& e)
 	{
@@ -108,14 +108,15 @@ jstring ArgConverter::ObjectToString(jobject object)
 	return (jstring) object;
 }
 
-Local<Array> ArgConverter::ConvertJavaArgsToJsArgs(jobjectArray args)
+Local<Array> ArgConverter::ConvertJavaArgsToJsArgs(Isolate *isolate, jobjectArray args)
 {
 	JEnv env;
 
-	auto isolate = Isolate::GetCurrent();
-
 	int argc = env.GetArrayLength(args) / 3;
 	Local<Array> arr(Array::New(isolate, argc));
+
+	auto runtime = Runtime::GetRuntime(isolate);
+	auto objectManager = runtime->GetObjectManager();
 
 	int jArrayIndex = 0;
 	for (int i = 0; i < argc; i++)
@@ -160,13 +161,13 @@ Local<Array> ArgConverter::ConvertJavaArgsToJsArgs(jobjectArray args)
 			case Type::JsObject:
 				{
 				jint javaObjectID = JType::IntValue(env, arg);
-				jsArg = ObjectManager::GetJsObjectByJavaObjectStatic(javaObjectID);
+				jsArg = objectManager->GetJsObjectByJavaObject(javaObjectID);
 
 				if (jsArg.IsEmpty())
 				{
 					string argClassName = jstringToString(ObjectToString(argJavaClassPath));
 					argClassName = Util::ConvertFromCanonicalToJniName(argClassName);
-					jsArg = ObjectManager::CreateJSWrapperStatic(javaObjectID, argClassName);
+					jsArg = objectManager->CreateJSWrapper(javaObjectID, argClassName);
 				}
 				break;
 			}
@@ -249,12 +250,10 @@ Local<String> ArgConverter::jcharToV8String(jchar value)
 	return v8String;
 }
 
-Local<Value> ArgConverter::ConvertFromJavaLong(jlong value)
+Local<Value> ArgConverter::ConvertFromJavaLong(Isolate *isolate, jlong value)
 {
 	Local<Value> convertedValue;
 	long long longValue = value;
-
-	auto isolate = Isolate::GetCurrent();
 
 	if ((-JS_LONG_LIMIT < longValue) && (longValue < JS_LONG_LIMIT))
 	{
@@ -262,10 +261,11 @@ Local<Value> ArgConverter::ConvertFromJavaLong(jlong value)
 	}
 	else
 	{
+		auto cache = GetCache(isolate);
 		char strNumber[24];
 		sprintf(strNumber, "%lld", longValue);
 		Local<Value> strValue = ConvertToV8String(strNumber);
-		convertedValue = Local<Function>::New(isolate, *NATIVESCRIPT_NUMBER_CTOR_FUNC)->CallAsConstructor(1, &strValue);
+		convertedValue = Local<Function>::New(isolate, *cache->LongNumberCtorFunc)->CallAsConstructor(1, &strValue);
 	}
 
 	return convertedValue;
@@ -290,7 +290,21 @@ int64_t ArgConverter::ConvertToJavaLong(const Local<Value>& value)
 	return longValue;
 }
 
-JavaVM* ArgConverter::jvm = nullptr;
-Persistent<Function>* ArgConverter::NATIVESCRIPT_NUMBER_CTOR_FUNC = nullptr;
-Persistent<NumberObject>* ArgConverter::NAN_NUMBER_OBJECT = nullptr;
+ArgConverter::Cache* ArgConverter::GetCache(v8::Isolate *isolate)
+{
+	Cache *cache;
+	auto itFound = s_cache.find(isolate);
+	if (itFound == s_cache.end())
+	{
+		cache = new Cache;
+		s_cache.insert(make_pair(isolate, cache));
+	}
+	else
+	{
+		cache = itFound->second;
+	}
+	return cache;
+}
+
+std::map<Isolate*, ArgConverter::Cache*> ArgConverter::s_cache;
 char* ArgConverter::charBuffer = new char[ArgConverter::BUFFER_SIZE];

@@ -19,11 +19,9 @@ namespace tns
 	class ObjectManager
 	{
 		public:
-			ObjectManager();
+			ObjectManager(jobject javaRuntimeObject);
 
 			void Init(v8::Isolate *isolate);
-
-			static JniLocalRef GetJavaObjectByJsObjectStatic(const v8::Local<v8::Object>& object);
 
 			JniLocalRef GetJavaObjectByJsObject(const v8::Local<v8::Object>& object);
 
@@ -34,11 +32,7 @@ namespace tns
 			void SetJavaClass(const v8::Local<v8::Object>& instance, jclass clazz);
 			int GetOrCreateObjectId(jobject object);
 
-			static v8::Local<v8::Object> GetJsObjectByJavaObjectStatic(int javaObjectID);
-
 			v8::Local<v8::Object> GetJsObjectByJavaObject(int javaObjectID);
-
-			static v8::Local<v8::Object> CreateJSWrapperStatic(jint javaObjectID, const std::string& typeName);
 
 			v8::Local<v8::Object> CreateJSWrapper(jint javaObjectID, const std::string& typeName);
 
@@ -153,9 +147,9 @@ namespace tns
 
 			void OnGcFinished(v8::GCType type, v8::GCCallbackFlags flags);
 
-			static void OnGcStartedStatic(v8::GCType type, v8::GCCallbackFlags flags);
+			static void OnGcStartedStatic(v8::Isolate *isolate, v8::GCType type, v8::GCCallbackFlags flags);
 
-			static void OnGcFinishedStatic(v8::GCType type, v8::GCCallbackFlags flags);
+			static void OnGcFinishedStatic(v8::Isolate *isolate, v8::GCType type, v8::GCCallbackFlags flags);
 
 			jweak GetJavaObjectByID(uint32_t javaObjectID);
 
@@ -166,6 +160,8 @@ namespace tns
 			static void DeleteWeakGlobalRefCallback(const jweak& object, void *state);
 
 			static void JSWrapperConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
+
+			jobject m_javaRuntimeObject;
 
 			int m_numberOfGC;
 
@@ -193,8 +189,6 @@ namespace tns
 
 			bool m_useGlobalRefs;
 
-			jclass PlatformClass;
-
 			jclass JAVA_LANG_CLASS;
 
 			jmethodID GET_NAME_METHOD_ID;
@@ -206,8 +200,6 @@ namespace tns
 			jmethodID MAKE_INSTANCE_WEAK_BATCH_METHOD_ID;
 
 			jmethodID CHECK_WEAK_OBJECTS_ARE_ALIVE_METHOD_ID;
-
-			static ObjectManager *instance;
 
 			static v8::Persistent<v8::Function>* s_poJsWrapperFunc;
 	};

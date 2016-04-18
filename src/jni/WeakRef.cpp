@@ -10,61 +10,24 @@ using namespace tns;
 using namespace std;
 
 WeakRef::WeakRef()
+	: m_objectManager(nullptr), m_poClearFunc(nullptr), m_poGetterFunc(nullptr)
 {
 }
 
 void WeakRef::Init(v8::Isolate *isolate, Local<ObjectTemplate>& globalObjectTemplate, ObjectManager *objectManager)
 {
-	s_objectManager = objectManager;
-
-	globalObjectTemplate->Set(ConvertToV8String("WeakRef"), FunctionTemplate::New(isolate, ConstructorCallback));
+	m_objectManager = objectManager;
+	auto extData = External::New(isolate, this);
+	globalObjectTemplate->Set(ConvertToV8String("WeakRef"), FunctionTemplate::New(isolate, ConstructorCallback, extData));
 }
 
 void WeakRef::ConstructorCallback(const FunctionCallbackInfo<Value>& args)
 {
 	try
 	{
-		auto isolate = args.GetIsolate();
-
-		if (args.IsConstructCall())
-		{
-			if (args.Length() == 1)
-			{
-				auto target = args[0];
-
-				if (target->IsObject())
-				{
-					auto targetObj = target.As<Object>();
-
-					auto weakRef = s_objectManager->GetEmptyObject(isolate);
-
-					auto poTarget = new Persistent<Object>(isolate, targetObj);
-					auto poHolder = new Persistent<Object>(isolate, weakRef);
-					auto callbackState = new CallbackState(poTarget, poHolder);
-
-					poTarget->SetWeak(callbackState, WeakTargetCallback);
-					poHolder->SetWeak(callbackState, WeakHolderCallback);
-
-					weakRef->Set(ConvertToV8String("get"), GetGetterFunction(isolate));
-					weakRef->Set(ConvertToV8String("clear"), GetClearFunction(isolate));
-					weakRef->SetHiddenValue(V8StringConstants::GetTarget(), External::New(isolate, poTarget));
-
-					args.GetReturnValue().Set(weakRef);
-				}
-				else
-				{
-					throw NativeScriptException(string("The WeakRef constructor expects an object argument."));
-				}
-			}
-			else
-			{
-				throw NativeScriptException(string("The WeakRef constructor expects single parameter."));
-			}
-		}
-		else
-		{
-			throw NativeScriptException(string("WeakRef must be used as a construct call."));
-		}
+		auto extData = args.Data().As<External>();
+		auto thiz = reinterpret_cast<WeakRef*>(extData->Value());
+		thiz->ConstructorCallbackImpl(args);
 	}
 	catch (NativeScriptException& e)
 	{
@@ -79,6 +42,51 @@ void WeakRef::ConstructorCallback(const FunctionCallbackInfo<Value>& args)
 	catch (...) {
 		NativeScriptException nsEx(std::string("Error: c++ exception!"));
 		nsEx.ReThrowToV8();
+	}
+}
+
+void WeakRef::ConstructorCallbackImpl(const FunctionCallbackInfo<Value>& args)
+{
+	auto isolate = args.GetIsolate();
+
+	if (args.IsConstructCall())
+	{
+		if (args.Length() == 1)
+		{
+			auto target = args[0];
+
+			if (target->IsObject())
+			{
+				auto targetObj = target.As<Object>();
+
+				auto weakRef = m_objectManager->GetEmptyObject(isolate);
+
+				auto poTarget = new Persistent<Object>(isolate, targetObj);
+				auto poHolder = new Persistent<Object>(isolate, weakRef);
+				auto callbackState = new CallbackState(poTarget, poHolder);
+
+				poTarget->SetWeak(callbackState, WeakTargetCallback);
+				poHolder->SetWeak(callbackState, WeakHolderCallback);
+
+				weakRef->Set(ConvertToV8String("get"), GetGetterFunction(isolate));
+				weakRef->Set(ConvertToV8String("clear"), GetClearFunction(isolate));
+				weakRef->SetHiddenValue(V8StringConstants::GetTarget(), External::New(isolate, poTarget));
+
+				args.GetReturnValue().Set(weakRef);
+			}
+			else
+			{
+				throw NativeScriptException(string("The WeakRef constructor expects an object argument."));
+			}
+		}
+		else
+		{
+			throw NativeScriptException(string("The WeakRef constructor expects single parameter."));
+		}
+	}
+	else
+	{
+		throw NativeScriptException(string("WeakRef must be used as a construct call."));
 	}
 }
 
@@ -151,7 +159,7 @@ void WeakRef::ClearCallback(const FunctionCallbackInfo<Value>& args)
 	try
 	{
 		auto holder = args.This();
-		auto isolate = Isolate::GetCurrent();
+		auto isolate = args.GetIsolate();
 
 		holder->SetHiddenValue(V8StringConstants::GetTarget(), External::New(isolate, nullptr));
 	}
@@ -177,7 +185,7 @@ void WeakRef::GettertCallback(const FunctionCallbackInfo<Value>& args)
 	{
 		auto holder = args.This();
 		auto poTarget = reinterpret_cast<Persistent<Object>*>(holder->GetHiddenValue(V8StringConstants::GetTarget()).As<External>()->Value());
-		auto isolate = Isolate::GetCurrent();
+		auto isolate = args.GetIsolate();
 
 		if (poTarget != nullptr)
 		{
@@ -209,14 +217,15 @@ Local<Function> WeakRef::GetGetterFunction(Isolate *isolate)
 {
 	try
 	{
-		if (s_poGetterFunc != nullptr)
+		if (m_poGetterFunc != nullptr)
 		{
-			return Local<Function>::New(isolate, *s_poGetterFunc);
+			return Local<Function>::New(isolate, *m_poGetterFunc);
 		}
 		else
 		{
-			auto getterFunc = FunctionTemplate::New(isolate, GettertCallback)->GetFunction();
-			s_poGetterFunc = new Persistent<Function>(isolate, getterFunc);
+			auto extData = External::New(isolate, this);
+			auto getterFunc = FunctionTemplate::New(isolate, GettertCallback, extData)->GetFunction();
+			m_poGetterFunc = new Persistent<Function>(isolate, getterFunc);
 			return getterFunc;
 		}
 	}
@@ -240,14 +249,15 @@ Local<Function> WeakRef::GetClearFunction(Isolate *isolate)
 {
 	try
 	{
-		if (s_poClearFunc != nullptr)
+		if (m_poClearFunc != nullptr)
 		{
-			return Local<Function>::New(isolate, *s_poClearFunc);
+			return Local<Function>::New(isolate, *m_poClearFunc);
 		}
 		else
 		{
-			auto clearFunc = FunctionTemplate::New(isolate, ClearCallback)->GetFunction();
-			s_poClearFunc = new Persistent<Function>(isolate, clearFunc);
+			auto extData = External::New(isolate, this);
+			auto clearFunc = FunctionTemplate::New(isolate, ClearCallback, extData)->GetFunction();
+			m_poClearFunc = new Persistent<Function>(isolate, clearFunc);
 			return clearFunc;
 		}
 	}
@@ -266,7 +276,3 @@ Local<Function> WeakRef::GetClearFunction(Isolate *isolate)
 		nsEx.ReThrowToV8();
 	}
 }
-
-Persistent<Function>* WeakRef::s_poClearFunc = nullptr;
-Persistent<Function>* WeakRef::s_poGetterFunc = nullptr;
-ObjectManager* WeakRef::s_objectManager = nullptr;

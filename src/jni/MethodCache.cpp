@@ -8,6 +8,7 @@
 #include "V8StringConstants.h"
 #include "NumericCasts.h"
 #include "NativeScriptException.h"
+#include "Runtime.h"
 #include <sstream>
 #include <assert.h>
 
@@ -19,11 +20,14 @@ void MethodCache::Init()
 {
 	JEnv env;
 
-	PLATFORM_CLASS = env.FindClass("com/tns/Platform");
-	assert(PLATFORM_CLASS != nullptr);
+	RUNTIME_CLASS = env.FindClass("com/tns/Runtime");
+	assert(RUNTIME_CLASS != nullptr);
 
-	RESOLVE_METHOD_OVERLOAD_METHOD_ID = env.GetStaticMethodID(PLATFORM_CLASS, "resolveMethodOverload", "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;");
+	RESOLVE_METHOD_OVERLOAD_METHOD_ID = env.GetMethodID(RUNTIME_CLASS, "resolveMethodOverload", "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;");
 	assert(RESOLVE_METHOD_OVERLOAD_METHOD_ID != nullptr);
+
+	RESOLVE_CONSTRUCTOR_SIGNATURE_ID = env.GetMethodID(RUNTIME_CLASS, "resolveConstructorSignature", "(Ljava/lang/Class;[Ljava/lang/Object;)Ljava/lang/String;");
+	assert(RESOLVE_CONSTRUCTOR_SIGNATURE_ID != nullptr);
 }
 
 MethodCache::CacheMethodInfo MethodCache::ResolveMethodSignature(const string& className, const string& methodName, const FunctionCallbackInfo<Value>& args, bool isStatic)
@@ -52,8 +56,8 @@ MethodCache::CacheMethodInfo MethodCache::ResolveMethodSignature(const string& c
 			mi.retType = MetadataReader::GetReturnType(mi.returnType);
 			mi.isStatic = isStatic;
 			mi.mid = isStatic
-						? env.GetStaticMethodID(clazz, methodName, signature)
-									:
+					? env.GetStaticMethodID(clazz, methodName, signature)
+							:
 							env.GetMethodID(clazz, methodName, signature);
 
 			s_cache.insert(make_pair(key, mi));
@@ -67,6 +71,41 @@ MethodCache::CacheMethodInfo MethodCache::ResolveMethodSignature(const string& c
 	return mi;
 }
 
+MethodCache::CacheMethodInfo MethodCache::ResolveConstructorSignature(const ArgsWrapper& argWrapper, const string& fullClassName, jclass javaClass, bool isInterface)
+{
+	auto& args = argWrapper.args;
+
+	CacheMethodInfo mi;
+
+	auto key = EncodeSignature(fullClassName, "<init>", args, false);
+
+	auto it = s_cache.find(key);
+
+	if (it == s_cache.end())
+	{
+		auto signature = ResolveConstructor(args, javaClass, isInterface, argWrapper.outerThis);
+
+		DEBUG_WRITE("ResolveConstructorSignature %s='%s'", key.c_str(), signature.c_str());
+
+		if (!signature.empty())
+		{
+			JEnv env;
+			mi.clazz = javaClass;
+			mi.signature = signature;
+			mi.mid = env.GetMethodID(javaClass, "<init>", signature);
+
+			s_cache.insert(make_pair(key, mi));
+		}
+	}
+	else
+	{
+		mi = (*it).second;
+	}
+
+	return mi;
+}
+
+// Encoded signature <className>.S/I.<methodName>.<argsCount>.<arg1class>.<...>
 string MethodCache::EncodeSignature(const string& className, const string& methodName, const FunctionCallbackInfo<Value>& args, bool isStatic)
 {
 	string sig(className);
@@ -98,6 +137,22 @@ string MethodCache::EncodeSignature(const string& className, const string& metho
 string MethodCache::GetType(const v8::Local<v8::Value>& value)
 {
 	string type;
+
+	if(value->IsObject())
+	{
+		auto objVal = value->ToObject();
+
+		Local<Value> nullNode = objVal->GetHiddenValue(V8StringConstants::GetNullNodeName());
+
+		if(!nullNode.IsEmpty()) {
+			auto treeNode = reinterpret_cast<MetadataNode*>(nullNode.As<External>()->Value());
+
+			type = (treeNode != nullptr) ? treeNode->GetName() : "<unknown>";
+
+			DEBUG_WRITE("Parameter of type %s with NULL value is passed to the method.", type.c_str());
+			return type;
+		}
+	}
 
 	if (value->IsArray() || value->IsArrayBuffer() || value->IsArrayBufferView() || value->IsTypedArray()
 			|| value->IsFloat32Array() || value->IsFloat64Array()
@@ -198,7 +253,9 @@ string MethodCache::ResolveJavaMethod(const FunctionCallbackInfo<Value>& args, c
 
 	jobjectArray arrArgs = argConverter.ToJavaArray();
 
-	jstring signature = (jstring) env.CallStaticObjectMethod(PLATFORM_CLASS, RESOLVE_METHOD_OVERLOAD_METHOD_ID, (jstring) jsClassName, (jstring) jsMethodName, arrArgs);
+	auto runtime = Runtime::GetRuntime(args.GetIsolate());
+
+	jstring signature = (jstring) env.CallObjectMethod(runtime->GetJavaRuntime(), RESOLVE_METHOD_OVERLOAD_METHOD_ID, (jstring) jsClassName, (jstring) jsMethodName, arrArgs);
 
 	string resolvedSignature;
 
@@ -211,6 +268,35 @@ string MethodCache::ResolveJavaMethod(const FunctionCallbackInfo<Value>& args, c
 	return resolvedSignature;
 }
 
+string MethodCache::ResolveConstructor(const FunctionCallbackInfo<Value>& args, jclass javaClass, bool isInterface, Local<Object> outerThis)
+{
+	JEnv env;
+	string resolvedSignature;
+
+	JsArgToArrayConverter argConverter(args, isInterface, outerThis);
+	if (argConverter.IsValid())
+	{
+		jobjectArray javaArgs = argConverter.ToJavaArray();
+
+		auto runtime = Runtime::GetRuntime(args.GetIsolate());
+
+		jstring signature = (jstring) env.CallObjectMethod(runtime->GetJavaRuntime(), RESOLVE_CONSTRUCTOR_SIGNATURE_ID, javaClass, javaArgs);
+
+		const char* str = env.GetStringUTFChars(signature, nullptr);
+		resolvedSignature = string(str);
+		env.ReleaseStringUTFChars(signature, str);
+		env.DeleteLocalRef(signature);
+	}
+	else
+	{
+		JsArgToArrayConverter::Error err = argConverter.GetError();
+		throw NativeScriptException(err.msg);
+	}
+
+	return resolvedSignature;
+}
+
 map<string, MethodCache::CacheMethodInfo> MethodCache::s_cache;
-jclass MethodCache::PLATFORM_CLASS = nullptr;
+jclass MethodCache::RUNTIME_CLASS = nullptr;
 jmethodID MethodCache::RESOLVE_METHOD_OVERLOAD_METHOD_ID = nullptr;
+jmethodID MethodCache::RESOLVE_CONSTRUCTOR_SIGNATURE_ID = nullptr;

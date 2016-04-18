@@ -10,6 +10,7 @@ class V8Config
 	private static final String CodeCacheKey = "codeCache";
 	private static final String HeapSnapshotKey = "heapSnapshot";
 	private static final String HeapSnapshotScriptKey = "heapSnapshotScript";
+	private static final String ProfilerOutputDirKey = "profilerOutputDir";
 	
 	public static Object[] fromPackageJSON(File appDir)
 	{
@@ -44,6 +45,10 @@ class V8Config
 					String value = androidObject.getString(HeapSnapshotScriptKey);
 					result[3] = FileSystem.resolveRelativePath(appDir.getPath(), value, appDir + "/app/");
 				}
+				if(androidObject.has(ProfilerOutputDirKey))
+				{
+					result[4] = androidObject.getString(ProfilerOutputDirKey);
+				}
 			}
 		}
 		catch (Exception e)
@@ -64,6 +69,8 @@ class V8Config
 			// enable v8 heap snapshot, false by default
 			false,
 			// arbitrary script to be included in the snapshot
+			"",
+			// V8 profiler output directory
 			""
 		};
 

@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Stack;
 
-import android.content.Context;
+import android.app.Application;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.AsyncTask;
@@ -241,7 +241,6 @@ public class Async
 		{
 			if (options.screenWidth < 0 || options.screenHeight < 0)
 			{
-				Context appContext = NativeScriptApplication.getInstance();
 				DisplayMetrics metrics = appContext.getResources().getDisplayMetrics();
 				options.screenWidth = metrics.widthPixels;
 				options.screenHeight = metrics.heightPixels;
@@ -254,6 +253,13 @@ public class Async
 			}
 
 			new HttpRequestTask(callback, context).executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, options);
+		}
+
+		private static Application appContext;
+
+		public static void setApplicationContext(Application app)
+		{
+			appContext = app;
 		}
 
 		static class HttpRequestTask extends AsyncTask<RequestOptions, Void, RequestResult>

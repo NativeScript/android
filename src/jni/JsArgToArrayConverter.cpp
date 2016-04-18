@@ -12,13 +12,18 @@
 #include "JType.h"
 #include "NumericCasts.h"
 #include "NativeScriptException.h"
+#include "Runtime.h"
+#include "MetadataNode.h"
 
 using namespace v8;
 using namespace std;
 using namespace tns;
 
-JsArgToArrayConverter::JsArgToArrayConverter(const v8::Local<Value>& arg, bool isImplementationObject, int classReturnType) :
-		m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()), m_return_type(classReturnType)
+/*
+ * Converts a single JavaScript (V8) object to its respective Java representation
+ */
+JsArgToArrayConverter::JsArgToArrayConverter(Isolate *isolate, const v8::Local<Value>& arg, bool isImplementationObject, int classReturnType)
+	: m_isolate(isolate), m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()), m_return_type(classReturnType)
 {
 	if (!isImplementationObject)
 	{
@@ -30,8 +35,11 @@ JsArgToArrayConverter::JsArgToArrayConverter(const v8::Local<Value>& arg, bool i
 	}
 }
 
-JsArgToArrayConverter::JsArgToArrayConverter(const v8::FunctionCallbackInfo<Value>& args, bool hasImplementationObject, const Local<Object>& outerThis) :
-		m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()), m_return_type(static_cast<int>(Type::Null))
+/*
+ * Converts an array of JavaScript (V8) objects to a Java array of objects
+ */
+JsArgToArrayConverter::JsArgToArrayConverter(const v8::FunctionCallbackInfo<Value>& args, bool hasImplementationObject, const Local<Object>& outerThis)
+	: m_isolate(args.GetIsolate()), m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()), m_return_type(static_cast<int>(Type::Null))
 {
 	auto isInnerClass = !outerThis.IsEmpty();
 	if (isInnerClass)
@@ -185,6 +193,9 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 		jobject javaObject;
 		JniLocalRef obj;
 
+		auto runtime = Runtime::GetRuntime(m_isolate);
+		auto objectManager = runtime->GetObjectManager();
+
 		switch (castType)
 		{
 			case CastType::Char:
@@ -282,7 +293,41 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 				break;
 
 			case CastType::None:
-				obj = ObjectManager::GetJavaObjectByJsObjectStatic(jsObj);
+				obj = objectManager->GetJavaObjectByJsObject(jsObj);
+                
+				castValue = jsObj->GetHiddenValue(V8StringConstants::GetNullNodeName());
+
+				if(!castValue.IsEmpty()) {
+					auto node = reinterpret_cast<MetadataNode*>(castValue.As<External>()->Value());
+
+					if(node == nullptr) {
+						s << "Cannot get type of the null argument at index " << index;
+						success = false;
+						break;
+					}
+
+					auto type = node->GetName();
+					auto nullObjName = "com/tns/NullObject";
+					auto nullObjCtorSig = "(Ljava/lang/Class;)V";
+
+					jclass nullClazz = env.FindClass(nullObjName);
+					jmethodID ctor = env.GetMethodID(nullClazz, "<init>", nullObjCtorSig);
+					jclass clazzToNull = env.FindClass(type.c_str());
+					jobject nullObjType = env.NewObject(nullClazz, ctor, clazzToNull);
+
+					if(nullObjType != nullptr)
+					{
+						SetConvertedObject(env, index, nullObjType, false);
+					}
+					else
+					{
+						SetConvertedObject(env, index, nullptr);
+					}
+
+					success = true;
+					return success;
+				}
+
 				success = !obj.IsNull();
 				if (success)
 				{
@@ -296,7 +341,6 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 
 			default:
 				throw NativeScriptException("Unsupported cast type");
-
 		}
 	}
 	else if (arg->IsUndefined() || arg->IsNull())

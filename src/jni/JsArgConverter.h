@@ -14,6 +14,10 @@ namespace tns
 		public:
 			JsArgConverter(const v8::FunctionCallbackInfo<v8::Value>& args, bool hasImplementationObject, const std::string& methodSignature, MetadataEntry *entry);
 
+			JsArgConverter(const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& methodSignature);
+
+			JsArgConverter(const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& methodSignature, const v8::Local<v8::Object>& outerThis);
+
 			~JsArgConverter();
 
 			jvalue* ToArgs();
@@ -55,6 +59,8 @@ namespace tns
 			bool ConvertFromCastFunctionObject(T value, int index);
 
 			JEnv m_env;
+
+			v8::Isolate *m_isolate;
 
 			int m_argsLen;
 

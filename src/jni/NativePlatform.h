@@ -5,6 +5,7 @@
 #include "JniLocalRef.h"
 #include "ObjectManager.h"
 #include "SimpleAllocator.h"
+#include "ArrayBufferHelper.h"
 
 jobject ConvertJsValueToJavaObject(tns::JEnv& env, const v8::Local<v8::Value>& value, int classReturnType);
 
@@ -26,11 +27,12 @@ namespace tns
 			bool LogEnabled = true;
 			private:
 
-			static void PrepareExtendFunction(v8::Isolate *isolate, jstring filesPath);
 			static v8::Isolate* PrepareV8Runtime(JEnv& env, const std::string& filesPath, jstring packageName, jobject jsDebugger);
 			static jobject ConvertJsValueToJavaObject(JEnv& env, const v8::Local<v8::Value>& value, int classReturnType);
 
 			static v8::Isolate *s_isolate;
+
+			static ArrayBufferHelper s_arrayBufferHeper;
 	};
 }
 

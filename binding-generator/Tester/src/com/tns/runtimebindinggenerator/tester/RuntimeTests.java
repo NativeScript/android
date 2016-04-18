@@ -16,7 +16,7 @@ import org.ow2.asmdex.ApplicationWriter;
 import com.proxy.Button1;
 import com.proxy.TargetObject;
 import com.tns.NativeScriptHashCodeProvider;
-import com.tns.Platform;
+import com.tns.Runtime;
 import com.tns.bindings.Dump;
 
 import dalvik.system.DexClassLoader;
@@ -117,7 +117,7 @@ public class RuntimeTests extends AndroidTestCase
 	
 	private TargetObject loadProxy(File proxyFile, TargetObject implementationObject) throws Exception
 	{
-		Platform.implementationObject = implementationObject;	
+		Runtime.implementationObject = implementationObject;	
 		
 		DexClassLoader dexClassLoader = new DexClassLoader(proxyFile.getAbsolutePath(), optimizedDexOutputPath.getAbsolutePath(), null, getContext().getClassLoader());
 		Class<?> clazz = dexClassLoader.loadClass("com.tns.gen.com.proxy.TargetObject"+ CLASS_NAME_LOCATION_SEPARATOR + "0");
@@ -130,7 +130,7 @@ public class RuntimeTests extends AndroidTestCase
 	
 	private <T> T loadAnyProxy(File proxyFile, T implementationObject) throws Exception
 	{
-		Platform.implementationObject = (Object)implementationObject;	
+		Runtime.implementationObject = (Object)implementationObject;	
 		
 		DexClassLoader dexClassLoader = new DexClassLoader(proxyFile.getAbsolutePath(), optimizedDexOutputPath.getAbsolutePath(), null, getContext().getClassLoader());
 		Class<?> clazz = dexClassLoader.loadClass("com.tns.gen." + implementationObject.getClass().getSuperclass().getCanonicalName() + CLASS_NAME_LOCATION_SEPARATOR + "0");
@@ -165,7 +165,7 @@ public class RuntimeTests extends AndroidTestCase
 	
 	private Button1 loadButton1Proxy(File proxyFile, Button1 implementationObject) throws Exception
 	{
-		Platform.implementationObject = implementationObject;	
+		Runtime.implementationObject = implementationObject;	
 		
 		DexClassLoader dexClassLoader = new DexClassLoader(proxyFile.getAbsolutePath(), optimizedDexOutputPath.getAbsolutePath(), null, getContext().getClassLoader());
 		Class<?> clazz = dexClassLoader.loadClass("com.tns.gen.com.proxy.Button1" + CLASS_NAME_LOCATION_SEPARATOR + "0");
@@ -178,7 +178,7 @@ public class RuntimeTests extends AndroidTestCase
 	
 	private TargetObject.TargetInterface loadInterfaceProxy(File proxyFile, TargetObject.TargetInterface implementationObject) throws Exception
 	{
-		Platform.implementationObject = implementationObject;	
+		Runtime.implementationObject = implementationObject;	
 		
 		DexClassLoader dexClassLoader = new DexClassLoader(proxyFile.getAbsolutePath(), optimizedDexOutputPath.getAbsolutePath(), null, getContext().getClassLoader());
 		Class<?> clazz = dexClassLoader.loadClass("com.tns.gen.com.proxy.TargetObject_TargetInterface" + CLASS_NAME_LOCATION_SEPARATOR + "0");

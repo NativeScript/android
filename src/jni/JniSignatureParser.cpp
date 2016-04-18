@@ -6,8 +6,7 @@ using namespace std;
 using namespace tns;
 
 JniSignatureParser::JniSignatureParser(const string& signature)
-:
-		m_signature(signature)
+: m_signature(signature)
 {
 }
 
@@ -21,16 +20,14 @@ vector<string> JniSignatureParser::Parse()
 
 	assert(endIdx != string::npos);
 
-	string params = m_signature.substr(startIdx + 1, endIdx - startIdx - 1);
-
-	vector < string > tokens = ParseParams(startIdx + 1, endIdx);
+	vector<string> tokens = ParseParams(startIdx + 1, endIdx);
 
 	return tokens;
 }
 
 vector<string> JniSignatureParser::ParseParams(int stardIdx, int endIdx)
 {
-	vector < string > tokens;
+	vector<string> tokens;
 
 	m_pos = stardIdx;
 
@@ -56,13 +53,13 @@ string JniSignatureParser::ReadNextToken(int endIdx)
 	switch (currChar)
 	{
 		case 'Z':
-			case 'B':
-			case 'C':
-			case 'S':
-			case 'I':
-			case 'J':
-			case 'F':
-			case 'D':
+		case 'B':
+		case 'C':
+		case 'S':
+		case 'I':
+		case 'J':
+		case 'F':
+		case 'D':
 			++m_pos;
 			token.push_back(currChar);
 			break;
@@ -85,13 +82,13 @@ string JniSignatureParser::ReadNextToken(int endIdx)
 					switch (currChar)
 					{
 						case 'Z':
-							case 'B':
-							case 'C':
-							case 'S':
-							case 'I':
-							case 'J':
-							case 'F':
-							case 'D':
+						case 'B':
+						case 'C':
+						case 'S':
+						case 'I':
+						case 'J':
+						case 'F':
+						case 'D':
 							endFound = true;
 							break;
 					}

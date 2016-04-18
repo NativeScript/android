@@ -17,12 +17,10 @@ public class Dump
 	private static final String callJsMethodSignatureCtor = "Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;Z[Ljava/lang/Object;";
 	private static final String callJsMethodSignatureMethod = "Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/String;Ljava/lang/Class;[Ljava/lang/Object;";
 	private static final String LCOM_TNS = "Lcom/tns/gen/";
-	private static final String LCOM_TNS_PLATFORM = "Lcom/tns/Platform;";
-	static final String preferenceActivityJniSignature = "Lcom/tns/android/preference/PreferenceActivity;";
-	static final String preferenceActivityClass = "Landroid/preference/PreferenceActivity;";
+	private static final String LCOM_TNS_RUNTIME = "Lcom/tns/Runtime;";
 	static final String objectClass = "Ljava/lang/Object;";
 
-	static final String platformClass = LCOM_TNS_PLATFORM;
+	static final String runtimeClass = LCOM_TNS_RUNTIME;
 	static final String callJSMethodName = "callJSMethod";
 	static final String initInstanceMethodName = "initInstance";
 
@@ -389,65 +387,110 @@ public class Dump
 		
 		return result.values().toArray(new Method[result.size()]);
 	}
+	
+	private String getMethodSignature(Method m)
+	{
+		String sig = m.toGenericString();
+		
+		int nameIdx = sig.indexOf("(");
+		int endSigIdx = sig.indexOf(")") + 1;
+		
+		return m.getName() + sig.substring(nameIdx, endSigIdx);
+	}
 
 	private Method[] getSupportedMethods(Class<?> clazz, HashSet<String> methodOverrides)
 	{
 		ArrayList<Method> result = new ArrayList<Method>();
-		HashMap<String, Method> finalMethods = new HashMap<String, Method>();
-		ArrayList<Class<?>> implementedInterfaces = new ArrayList<Class<?>>();
-		while (clazz != null)
+
+		if (clazz.isInterface())
 		{
-			Method[] methods = clazz.getDeclaredMethods();
-			
-			ArrayList<Method> methodz = new ArrayList<Method>();
-			
-			for (int i = 0; i < methods.length; i++)
+			Set<String> objectMethods = new HashSet<String>();
+			for (Method objMethod: java.lang.Object.class.getDeclaredMethods())
 			{
-				Method candidateMethod = methods[i];
-				if (methodOverrides != null && !methodOverrides.contains(candidateMethod.getName()))
+				if (!Modifier.isStatic(objMethod.getModifiers()))
 				{
-					continue;
-				}
-				
-				methodz.add(methods[i]);
-			}
-			
-			
-			Class<?>[] interfaces = clazz.getInterfaces();
-			for (int i = 0; i < interfaces.length; i++)
-			{
-				implementedInterfaces.add(interfaces[i]);
-			}
-			
-			for (int i = 0; i < methodz.size(); i++)
-			{
-				Method method = methodz.get(i);
-				
-				if (isMethodSupported(method, finalMethods))
-				{
-					result.add(method);
+					String sig = getMethodSignature(objMethod);
+					objectMethods.add(sig);
 				}
 			}
-			
-			clazz = clazz.getSuperclass();
+			Set<Method> notImplementedObjectMethods = new HashSet<Method>();
+			Method[] ifaceMethods = clazz.getDeclaredMethods();
+			for (Method ifaceMethod: ifaceMethods)
+			{
+				if (!Modifier.isStatic(ifaceMethod.getModifiers()))
+				{
+					String sig = getMethodSignature(ifaceMethod);
+					if (objectMethods.contains(sig) && !methodOverrides.contains(ifaceMethod.getName()))
+					{
+						notImplementedObjectMethods.add(ifaceMethod);
+					}
+				}
+			}
+			for (Method ifaceMethod: ifaceMethods)
+			{
+				if (!notImplementedObjectMethods.contains(ifaceMethod))
+				{
+					result.add(ifaceMethod);
+				}
+			}
 		}
-		
-		for (int i = 0; i < implementedInterfaces.size(); i++)
+		else
 		{
-			Class<?> implementedInterface = implementedInterfaces.get(i);
-			Method[] interfaceMethods = implementedInterface.getMethods();
-			for (int j = 0; j < interfaceMethods.length; j++)
+			HashMap<String, Method> finalMethods = new HashMap<String, Method>();
+			ArrayList<Class<?>> implementedInterfaces = new ArrayList<Class<?>>();
+			while (clazz != null)
 			{
-				Method method = interfaceMethods[j];
+				Method[] methods = clazz.getDeclaredMethods();
 				
-				if (methodOverrides != null && !methodOverrides.contains(method.getName()))
+				ArrayList<Method> methodz = new ArrayList<Method>();
+				
+				for (int i = 0; i < methods.length; i++)
 				{
-					continue;
+					Method candidateMethod = methods[i];
+					if (methodOverrides != null && !methodOverrides.contains(candidateMethod.getName()))
+					{
+						continue;
+					}
+					
+					methodz.add(methods[i]);
 				}
 				
-				if (!isMethodMarkedAsFinalInClassHierarchy(method, finalMethods))
+				Class<?>[] interfaces = clazz.getInterfaces();
+				for (int i = 0; i < interfaces.length; i++)
 				{
-					result.add(method);	
+					implementedInterfaces.add(interfaces[i]);
+				}
+				
+				for (int i = 0; i < methodz.size(); i++)
+				{
+					Method method = methodz.get(i);
+					
+					if (isMethodSupported(method, finalMethods))
+					{
+						result.add(method);
+					}
+				}
+				
+				clazz = clazz.getSuperclass();
+			}
+			
+			for (int i = 0; i < implementedInterfaces.size(); i++)
+			{
+				Class<?> implementedInterface = implementedInterfaces.get(i);
+				Method[] interfaceMethods = implementedInterface.getMethods();
+				for (int j = 0; j < interfaceMethods.length; j++)
+				{
+					Method method = interfaceMethods[j];
+					
+					if (methodOverrides != null && !methodOverrides.contains(method.getName()))
+					{
+						continue;
+					}
+					
+					if (!isMethodMarkedAsFinalInClassHierarchy(method, finalMethods))
+					{
+						result.add(method);	
+					}
 				}
 			}
 		}
@@ -617,7 +660,7 @@ public class Dump
 		int argCount = generateArrayForCallJsArguments(mv, ctor.getParameterTypes(), thisRegister, classSignature, tnsClassSignature);
 		mv.visitStringInsn(org.ow2.asmdex.Opcodes.INSN_CONST_STRING, 1, "init"); //put "init" in register 1
 		mv.visitVarInsn(org.ow2.asmdex.Opcodes.INSN_CONST_4, 2, 1); //put true to register 2 == isConstructor argument
-		mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, LCOM_TNS_PLATFORM, "callJSMethod", callJsMethodSignatureCtor, new int[]
+		mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, LCOM_TNS_RUNTIME, "callJSMethod", callJsMethodSignatureCtor, new int[]
 		{ 3, 1, 2, 0 }); //invoke callJSMethod(this, "init", true, params)
 	}
 
@@ -628,7 +671,7 @@ public class Dump
 		mv.visitJumpInsn(org.ow2.asmdex.Opcodes.INSN_IF_NEZ, label, thisRegister - 2, 0); //compare local var 1 with false
 		mv.visitVarInsn(org.ow2.asmdex.Opcodes.INSN_CONST_4, thisRegister - 1, 1); 		//put true in local var 1 
 		mv.visitFieldInsn(org.ow2.asmdex.Opcodes.INSN_IPUT_BOOLEAN, tnsClassSignature, "__initialized", "Z", thisRegister - 1 , thisRegister); //set field to the value of 2
-		mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, LCOM_TNS_PLATFORM, "initInstance", "VLjava/lang/Object;", new int[] { thisRegister }); //call init instance passing this as arugment
+		mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, LCOM_TNS_RUNTIME, "initInstance", "VLjava/lang/Object;", new int[] { thisRegister }); //call init instance passing this as arugment
 		mv.visitLabel(label);
 	}
 	
@@ -789,7 +832,7 @@ public class Dump
  			mv.visitTypeInsn(org.ow2.asmdex.Opcodes.INSN_CONST_CLASS, 2, 0, 0, getClassSignatureOfType(returnType)); 
 		}
 		
-		mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, platformClass, callJSMethodName, callJsMethodSignatureMethod, new int[] { thisRegister, 1, 2, 0 });
+		mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, runtimeClass, callJSMethodName, callJsMethodSignatureMethod, new int[] { thisRegister, 1, 2, 0 });
 		
 		//Label returnLabel = new Label();
 		//mv.visitLabel(returnLabel);
