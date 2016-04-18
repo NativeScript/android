@@ -15,6 +15,7 @@
  - [Provide method implementations for partially implemented interfaces. (#259)](https://github.com/NativeScript/android-runtime/issues/259)
  - [Generate metadata for protected interfaces (#236)](https://github.com/NativeScript/android-runtime/issues/236)
  - [Cannot resolve method/constructor signatures when null is passed (#90)](https://github.com/NativeScript/android-runtime/issues/90)
+ - [App seems to load up with a white screen on run, but works in debug mode #397](https://github.com/NativeScript/android-runtime/issues/397)
 
 ## Performance
 
