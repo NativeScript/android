@@ -232,7 +232,7 @@ def createIncludeFile (filePath, flavor, dimensionName) {
 	println "\t + creating include.gradle file for ${filePath}" 
 	
 	def defaultIncludeFile = new File(filePath, "include.gradle")
-	defaultIncludeFiletext.text =  createProductFlavorsContent(flavor, dimensionName);
+	defaultIncludeFile.text =  createProductFlavorsContent(flavor, dimensionName);
 }
 
 def sanatizeDimensionName(str) {
