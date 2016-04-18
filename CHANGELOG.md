@@ -1,3 +1,25 @@
+2.0.0
+==
+
+## What's New
+
+ - [Android N early developer preview (#378)](https://github.com/NativeScript/android-runtime/issues/378)
+ - [[Proposal] Static binding generator specification. (#363)](https://github.com/NativeScript/android-runtime/issues/363)
+ - [Android Runtime Support for older Android versions (#357)](https://github.com/NativeScript/android-runtime/issues/357)
+ - [Data Marshalling: Support for typed arrays (#65)](https://github.com/NativeScript/android-runtime/issues/65)
+
+## Bug Fixes
+
+ - [Wrong object lifecycle management (#382)](https://github.com/NativeScript/android-runtime/issues/382)
+ - [CLI can easily fail and blow project up on windows when you have multiple plugins. (#369)](https://github.com/NativeScript/android-runtime/issues/369)
+ - [Provide method implementations for partially implemented interfaces. (#259)](https://github.com/NativeScript/android-runtime/issues/259)
+ - [Generate metadata for protected interfaces (#236)](https://github.com/NativeScript/android-runtime/issues/236)
+ - [Cannot resolve method/constructor signatures when null is passed (#90)](https://github.com/NativeScript/android-runtime/issues/90)
+
+## Performance
+
+ - [Wrong object lifecycle management (#382)](https://github.com/NativeScript/android-runtime/issues/382)
+
 1.7.0
 ==
 
