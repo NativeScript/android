@@ -301,3 +301,14 @@ extern "C" void Java_com_tns_Runtime_passUncaughtExceptionToJsNative(JNIEnv *env
 		nsEx.ReThrowToJava();
 	}
 }
+
+extern "C" void Java_com_tns_Runtime_ClearStartupData(JNIEnv *env, jobject obj, jint runtimeId)
+{
+	auto runtime = TryGetRuntime(runtimeId);
+	if (runtime == nullptr)
+	{
+		return;
+	}
+
+	runtime->ClearStartupData(env, obj);
+}
