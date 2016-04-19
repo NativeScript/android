@@ -41,6 +41,8 @@ public class Runtime
 
 	private native void passUncaughtExceptionToJsNative(int runtimeId, Throwable ex, String stackTrace);
 	
+	private native void ClearStartupData(int runtimeId);
+	
 	void passUncaughtExceptionToJs(Throwable ex, String stackTrace)
 	{
 		passUncaughtExceptionToJsNative(getRuntimeId(), ex, stackTrace);
@@ -199,6 +201,7 @@ public class Runtime
 		{
 			jsDebugger.start();
 		}
+		ClearStartupData(getRuntimeId()); // It's safe to delete the data after the V8 debugger is initialized
 		
 		if (logger.isEnabled())
 		{
