@@ -101,7 +101,7 @@ def renameResultApks (variant) {
 task getDevDependencies << {
 	println "$configStage getDevDependencies"
 	
-	String content = new File("$rootDir/../../package.json").getText("UTF-8")
+	String content = new File("$projectDir/../../package.json").getText("UTF-8")
 	def jsonSlurper = new JsonSlurper()
 	def packageJsonMap = jsonSlurper.parseText(content)
 	
