@@ -25,6 +25,7 @@ namespace tns
 
 			static void RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
+			static void ResolveModulePath(const v8::FunctionCallbackInfo<v8::Value>& args);
 		private:
 			struct Cache;
 

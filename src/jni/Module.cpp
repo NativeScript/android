@@ -182,6 +182,41 @@ void Module::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 	}
 }
 
+void Module::ResolveModulePath(const v8::FunctionCallbackInfo<v8::Value>& args)
+{
+	try
+	{
+		if (args.Length() != 2 || !args[0]->IsString() || !args[1]->IsString())
+		{
+			throw NativeScriptException(string("__resolveModulePath should be called with two string parameters"));
+		}
+
+		string path = ConvertToString(args[0].As<String>());
+		string baseDir = ConvertToString(args[1].As<String>());
+
+		JEnv env;
+		jstring jsPath = env.NewStringUTF(path.c_str());
+		jstring jsBaseDir = env.NewStringUTF(baseDir.c_str());
+		jobject jsModulePath = env.CallStaticObjectMethod(MODULE_CLASS, RESOLVE_PATH_METHOD_ID, jsPath, jsBaseDir);
+
+		args.GetReturnValue().Set(ArgConverter::jstringToV8String((jstring) jsModulePath));
+	}
+	catch (NativeScriptException& e)
+	{
+		e.ReThrowToV8();
+	}
+	catch (std::exception e) {
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
+		nsEx.ReThrowToV8();
+	}
+	catch (...) {
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
+	}
+}
+
 void Module::RequireNativeCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
 	auto ext = args.Data().As<External>();

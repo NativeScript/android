@@ -392,6 +392,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 	globalTemplate->Set(ConvertToV8String("__disableVerboseLogging"), FunctionTemplate::New(isolate, CallbackHandlers::DisableVerboseLoggingMethodCallback));
 	globalTemplate->Set(ConvertToV8String("__exit"), FunctionTemplate::New(isolate, CallbackHandlers::ExitMethodCallback));
 	globalTemplate->Set(ConvertToV8String("__nativeRequire"), FunctionTemplate::New(isolate, Module::RequireCallback));
+	globalTemplate->Set(ConvertToV8String("__resolveModulePath"), FunctionTemplate::New(isolate, Module::ResolveModulePath));
 
 	m_weakRef.Init(isolate, globalTemplate, m_objectManager);
 
