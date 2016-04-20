@@ -18,6 +18,8 @@
 *			-PdontRunSbg=[true/false] (default false)
 */
 
+import groovy.json.JsonSlurper //used to parse package.json
+
 buildscript {
     repositories {
         jcenter()
@@ -40,6 +42,9 @@ def nodeModulesDir = "../../node_modules/"
 def libDir = "$projectDir/../../lib/Android/"
 def flavorNames = new ArrayList<String>()
 def configDir = file(configurationsDir)
+
+def packageJsonContents = [:]
+def excludedDevDependencies = ['**/.bin/**']
 
 def dontRunSbg = project.hasProperty("dontRunSbg");
 
@@ -90,6 +95,21 @@ def renameResultApks (variant) {
 		name = apkNamePrefix + "-unaligned.apk"
 		output.packageApplication.outputFile = new File(apkDirectory, name);
 	}    
+}
+
+// gets the devDependencies declared in the package.json and excludes them from the build
+task getDevDependencies << {
+	println "$configStage getDevDependencies"
+	
+	String content = new File("$projectDir/../../package.json").getText("UTF-8")
+	def jsonSlurper = new JsonSlurper()
+	def packageJsonMap = jsonSlurper.parseText(content)
+	
+	packageJsonContents = packageJsonMap.devDependencies;
+	
+	packageJsonContents.each { entry ->
+		excludedDevDependencies.add(entry.key + '/platforms/android/**/*.jar')
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -173,7 +193,7 @@ dependencies {
 	compile fileTree(dir: "$projectDir/libs", include: ["**/*.jar"])
 
 	// take all jars within the node_modules dir
-	compile fileTree(dir: nodeModulesDir, include: ["**/platforms/android/**/*.jar"], exclude: '**/.bin/**')
+	compile fileTree(dir: nodeModulesDir, include: ["**/platforms/android/**/*.jar"], exclude: excludedDevDependencies)
 	
 	//when gradle has aar support this will be preferred instead of addAarDependencies
 	// compile files("$rootDir/libs/aar") {
