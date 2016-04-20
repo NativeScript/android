@@ -12,3 +12,4 @@ bool Constants::V8_CACHE_COMPILED_CODE = false;
 bool Constants::V8_HEAP_SNAPSHOT = false;
 std::string Constants::V8_STARTUP_FLAGS = "";
 std::string Constants::V8_HEAP_SNAPSHOT_SCRIPT = "";
+std::string Constants::V8_HEAP_SNAPSHOT_BLOB = "";
