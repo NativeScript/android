@@ -135,7 +135,9 @@ void Runtime::Init(jstring filesPath, bool verboseLoggingEnabled, jstring packag
 	Constants::V8_HEAP_SNAPSHOT = (bool)snapshot;
 	JniLocalRef snapshotScript(m_env.GetObjectArrayElement(args, 3));
 	Constants::V8_HEAP_SNAPSHOT_SCRIPT = ArgConverter::jstringToString(snapshotScript);
-	JniLocalRef profilerOutputDir(m_env.GetObjectArrayElement(args, 4));
+	JniLocalRef snapshotBlob(m_env.GetObjectArrayElement(args, 4));
+	Constants::V8_HEAP_SNAPSHOT_BLOB = ArgConverter::jstringToString(snapshotBlob);
+	JniLocalRef profilerOutputDir(m_env.GetObjectArrayElement(args, 5));
 
 	DEBUG_WRITE("Initializing Telerik NativeScript");
 
@@ -360,8 +362,20 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 
 		m_startupData = new StartupData();
 
-		auto snapshotPath = filesPath + "/internal/snapshot.blob";
-		if( File::Exists(snapshotPath))
+		string snapshotPath;
+		bool saveSnapshot = true;
+		// we have a precompiled snapshot blob provided - try to load it directly
+		if (Constants::V8_HEAP_SNAPSHOT_BLOB.size() > 0)
+		{
+			snapshotPath = Constants::V8_HEAP_SNAPSHOT_BLOB;
+			saveSnapshot = false;
+		}
+		else
+		{
+			snapshotPath = filesPath + "/internal/snapshot.blob";
+		}
+
+		if (File::Exists(snapshotPath))
 		{
 			int length;
 			m_startupData->data = reinterpret_cast<char*>(File::ReadBinary(snapshotPath, length));
@@ -369,7 +383,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 
 			DEBUG_WRITE_FORCE("Snapshot read %s (%dB).", snapshotPath.c_str(), length);
 		}
-		else
+		else if(saveSnapshot)
 		{
 			// check for custom script to include in the snapshot
 			if(Constants::V8_HEAP_SNAPSHOT_SCRIPT.size() > 0 && File::Exists(Constants::V8_HEAP_SNAPSHOT_SCRIPT))
