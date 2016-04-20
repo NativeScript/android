@@ -5,7 +5,7 @@ buildscript {
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle-experimental:0.7.0-alpha1'
+        classpath 'com.android.tools.build:gradle-experimental:0.7.0-beta3'
     }
 }
 
