@@ -7,7 +7,11 @@
  - [[Proposal] Static binding generator specification. (#363)](https://github.com/NativeScript/android-runtime/issues/363)
  - [Android Runtime Support for older Android versions (#357)](https://github.com/NativeScript/android-runtime/issues/357)
  - [Data Marshalling: Support for typed arrays (#65)](https://github.com/NativeScript/android-runtime/issues/65)
-
+ - [Support Android Widgets](https://github.com/NativeScript/android-runtime/issues/69)
+ - [Add support for caching already compiled JS code](https://github.com/NativeScript/android-runtime/issues/257)
+ - [Additional Intents Crashes app](https://github.com/NativeScript/android-runtime/issues/218)
+ - [Enable Multidex support](https://github.com/NativeScript/android-runtime/issues/344)
+ 
 ## Bug Fixes
 
  - [Wrong object lifecycle management (#382)](https://github.com/NativeScript/android-runtime/issues/382)
