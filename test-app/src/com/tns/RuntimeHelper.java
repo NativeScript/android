@@ -47,6 +47,7 @@ public class RuntimeHelper
 		System.loadLibrary("NativeScript");
 		
 		Logger logger = new LogcatLogger(true, app);
+		Debugger debugger = new AndroidJsDebugger(app, logger);
 		
 		boolean showErrorIntent = hasErrorIntent();
 		if (!showErrorIntent)
@@ -89,7 +90,7 @@ public class RuntimeHelper
 				e.printStackTrace();
 			}
 			ThreadScheduler workThreadScheduler = new WorkThreadScheduler(new Handler(Looper.getMainLooper()));
-			Configuration config = new Configuration(this.app, workThreadScheduler, logger, appName, null, rootDir, appDir, classLoader, dexDir, dexThumb);
+			Configuration config = new Configuration(workThreadScheduler, logger, debugger, appName, null, rootDir, appDir, classLoader, dexDir, dexThumb);
 			Runtime runtime = new Runtime(config);
 			
 			exHandler.setRuntime(runtime);
@@ -114,15 +115,29 @@ public class RuntimeHelper
 				}
 			}
 			
-			
-
-			
 			runtime.init();
 			runtime.runScript(new File(appDir, "internal/ts_helpers.js"));
 			Runtime.initInstance(this.app);
 			runtime.run();
 		}
 	}
+	
+/*	public static boolean isDebuggableApp(Context context)
+	{
+		int flags;
+		try
+		{
+			flags = context.getPackageManager().getPackageInfo(context.getPackageName(), 0).applicationInfo.flags;
+		}
+		catch (NameNotFoundException e)
+		{
+			flags = 0;
+			e.printStackTrace();
+		}
+
+		boolean isDebuggableApp = ((flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0);
+		return isDebuggableApp;
+	}*/
 	
 	private final String logTag = "MyApp";
 }
