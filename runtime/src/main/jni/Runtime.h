@@ -6,6 +6,7 @@
 #include "ObjectManager.h"
 #include "SimpleAllocator.h"
 #include "WeakRef.h"
+#include "ArrayBufferHelper.h"
 #include "Profiler.h"
 
 jobject ConvertJsValueToJavaObject(tns::JEnv& env, const v8::Local<v8::Value>& value, int classReturnType);
@@ -38,6 +39,7 @@ namespace tns
 			jint GenerateNewObjectId(JNIEnv *env, jobject obj);
 			void AdjustAmountOfExternalAllocatedMemoryNative(JNIEnv *env, jobject obj, jlong usedMemory);
 			void PassUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, jthrowable exception, jstring stackTrace);
+			void ClearStartupData(JNIEnv *env, jobject obj);
 
 		private:
 			Runtime(JNIEnv *env, jobject runtime, int id);
@@ -50,9 +52,13 @@ namespace tns
 
 			ObjectManager *m_objectManager;
 
+			ArrayBufferHelper m_arrayBufferHelper;
+
 			WeakRef m_weakRef;
 
 			Profiler m_profiler;
+
+			v8::StartupData *m_startupData;
 
 			static void PrepareExtendFunction(v8::Isolate *isolate, jstring filesPath);
 			v8::Isolate* PrepareV8Runtime(const std::string& filesPath, jstring packageName, jobject jsDebugger, jstring profilerOutputDir);

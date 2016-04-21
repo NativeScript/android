@@ -58,6 +58,7 @@ Runtime::Runtime(JNIEnv *env, jobject runtime, int id)
 {
 	m_runtime = m_env.NewGlobalRef(runtime);
 	m_objectManager = new ObjectManager(m_runtime);
+	m_startupData = nullptr;
 	s_id2RuntimeCache.insert(make_pair(id, this));
 }
 
@@ -134,7 +135,9 @@ void Runtime::Init(jstring filesPath, bool verboseLoggingEnabled, jstring packag
 	Constants::V8_HEAP_SNAPSHOT = (bool)snapshot;
 	JniLocalRef snapshotScript(m_env.GetObjectArrayElement(args, 3));
 	Constants::V8_HEAP_SNAPSHOT_SCRIPT = ArgConverter::jstringToString(snapshotScript);
-	JniLocalRef profilerOutputDir(m_env.GetObjectArrayElement(args, 4));
+	JniLocalRef snapshotBlob(m_env.GetObjectArrayElement(args, 4));
+	Constants::V8_HEAP_SNAPSHOT_BLOB = ArgConverter::jstringToString(snapshotBlob);
+	JniLocalRef profilerOutputDir(m_env.GetObjectArrayElement(args, 5));
 
 	DEBUG_WRITE("Initializing Telerik NativeScript");
 
@@ -335,6 +338,13 @@ void Runtime::PassUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, jthrowab
 	}
 }
 
+void Runtime::ClearStartupData(JNIEnv *env, jobject obj) {
+	if (m_startupData) {
+		delete m_startupData->data;
+		delete m_startupData;
+	}
+}
+
 Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName, jobject jsDebugger, jstring profilerOutputDir)
 {
 	auto platform = v8::platform::CreateDefaultPlatform();
@@ -342,21 +352,38 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 	V8::Initialize();
 
 	Isolate::CreateParams create_params;
-	StartupData startup_data;
 	string customScript;
 
 	create_params.array_buffer_allocator = &g_allocator;
 	// prepare the snapshot blob
 	if (Constants::V8_HEAP_SNAPSHOT)
 	{
-		auto snapshotPath = filesPath + "/internal/snapshot.blob";
-		if( File::Exists(snapshotPath))
+		DEBUG_WRITE_FORCE("Snapshot enabled.");
+
+		m_startupData = new StartupData();
+
+		string snapshotPath;
+		bool saveSnapshot = true;
+		// we have a precompiled snapshot blob provided - try to load it directly
+		if (Constants::V8_HEAP_SNAPSHOT_BLOB.size() > 0)
 		{
-			int length;
-			startup_data.data = reinterpret_cast<char*>(File::ReadBinary(snapshotPath, length));
-			startup_data.raw_size = length;
+			snapshotPath = Constants::V8_HEAP_SNAPSHOT_BLOB;
+			saveSnapshot = false;
 		}
 		else
+		{
+			snapshotPath = filesPath + "/internal/snapshot.blob";
+		}
+
+		if (File::Exists(snapshotPath))
+		{
+			int length;
+			m_startupData->data = reinterpret_cast<char*>(File::ReadBinary(snapshotPath, length));
+			m_startupData->raw_size = length;
+
+			DEBUG_WRITE_FORCE("Snapshot read %s (%dB).", snapshotPath.c_str(), length);
+		}
+		else if(saveSnapshot)
 		{
 			// check for custom script to include in the snapshot
 			if(Constants::V8_HEAP_SNAPSHOT_SCRIPT.size() > 0 && File::Exists(Constants::V8_HEAP_SNAPSHOT_SCRIPT))
@@ -364,11 +391,25 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 				customScript = File::ReadText(Constants::V8_HEAP_SNAPSHOT_SCRIPT);
 			}
 
-			startup_data = V8::CreateSnapshotDataBlob(customScript.c_str());
-			File::WriteBinary(snapshotPath, startup_data.data, startup_data.raw_size);
+			DEBUG_WRITE_FORCE("Creating heap snapshot");
+			*m_startupData = V8::CreateSnapshotDataBlob(customScript.c_str());
+
+			if (m_startupData->raw_size == 0) {
+				DEBUG_WRITE_FORCE("Failed to create heap snapshot.");
+			} else {
+				bool writeSuccess = File::WriteBinary(snapshotPath, m_startupData->data, m_startupData->raw_size);
+
+				if (!writeSuccess) {
+					DEBUG_WRITE_FORCE("Failed to save created snapshot.");
+				} else {
+					DEBUG_WRITE_FORCE("Saved snapshot of %s (%dB) in %s (%dB)",
+							Constants::V8_HEAP_SNAPSHOT_SCRIPT.c_str(), customScript.size(),
+							snapshotPath.c_str(), m_startupData->raw_size);
+				}
+			}
 		}
 
-		create_params.snapshot_blob = &startup_data;
+		create_params.snapshot_blob = m_startupData;
 	}
 
 	auto isolate = Isolate::New(create_params);
@@ -402,12 +443,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 	Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
 	PrimaryContext = new Persistent<Context>(isolate, context);
 
-	if (Constants::V8_HEAP_SNAPSHOT)
-	{
-		// we own the snapshot buffer, delete it
-		delete[] startup_data.data;
-	}
-
 	context_scope = new Context::Scope(context);
 
 	m_objectManager->Init(isolate);
@@ -433,6 +468,8 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 	MetadataNode::CreateTopLevelNamespaces(isolate, global);
 
 	ArrayHelper::Init(context);
+
+	m_arrayBufferHelper.CreateConvertFunctions(isolate, global, m_objectManager);
 
 	return isolate;
 }
@@ -494,4 +531,3 @@ void Runtime::PrepareExtendFunction(Isolate *isolate, jstring filesPath)
 JavaVM* Runtime::s_jvm = nullptr;
 map<int, Runtime*> Runtime::s_id2RuntimeCache;
 map<Isolate*, Runtime*> Runtime::s_isolate2RuntimesCache;
-

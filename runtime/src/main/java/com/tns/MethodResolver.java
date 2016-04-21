@@ -175,6 +175,7 @@ class MethodResolver
 							Class<?> argClass = args[i] instanceof NullObject ? 
 									((NullObject)args[i]).getNullObjectClass() 
 									: args[i].getClass();
+									
 							Tuple<Boolean, Integer> res = isAssignableFrom(params[i], argClass);
 							success = res.x.booleanValue();
 							dist += res.y;
@@ -199,6 +200,13 @@ class MethodResolver
 		}
 	}
 
+	static String resolveConstructorSignature(Class<?> clazz, Object[] args) throws ClassNotFoundException, IOException
+	{
+		Constructor<?> ctor = resolveConstructor(clazz, args);
+		
+		return ctor != null ? getMethodSignature(null, ctor.getParameterTypes()) : null;
+	}
+	
 	static Constructor<?> resolveConstructor(Class<?> clazz, Object[] args) throws ClassNotFoundException, IOException
 	{
 		Constructor<?>[] constructors = clazz.getConstructors();
@@ -239,7 +247,11 @@ class MethodResolver
 				{
 					if (args[i] != null)
 					{
-						Tuple<Boolean, Integer> res = isAssignableFrom(paramTypes[i], args[i].getClass());
+						Class<?> argClass = args[i] instanceof NullObject ? 
+								((NullObject)args[i]).getNullObjectClass() 
+								: args[i].getClass();
+								
+						Tuple<Boolean, Integer> res = isAssignableFrom(paramTypes[i], argClass);
 						success = res.x.booleanValue();
 						dist += res.y;
 					}
@@ -270,9 +282,7 @@ class MethodResolver
 			Collections.sort(candidates, distanceComparator);
 			Constructor<?> selectedCtor = candidates.get(0).x;
 
-			boolean success = convertConstructorArgs(selectedCtor, args);
-
-			return success ? selectedCtor : null;
+			return selectedCtor;
 		}
 
 		return null;
@@ -500,11 +510,11 @@ class MethodResolver
 
 		for (int i = 0; i < paramTypes.length; i++)
 		{
-			Class<?> cuurParamType = paramTypes[i];
+			Class<?> currParamType = paramTypes[i];
 
-			if (cuurParamType.isPrimitive())
+			if (currParamType.isPrimitive())
 			{
-				success = convertPrimitiveArg(cuurParamType, args, i);
+				success = convertPrimitiveArg(currParamType, args, i);
 			}
 
 			if (!success)
