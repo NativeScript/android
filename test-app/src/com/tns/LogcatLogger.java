@@ -41,9 +41,7 @@ public final class LogcatLogger implements Logger
 
 	private void initLogging(Context context)
 	{
-		boolean isDebuggableApp = JsDebugger.isDebuggableApp(context);
-
-		if (isDebuggableApp)
+		if (true)
 		{
 			String verboseLoggingProp = Util.readSystemProperty("nativescript.verbose.logging");
 
