@@ -14,26 +14,26 @@ Profiler::Profiler()
 {
 }
 
-void Profiler::Init(const string& appName)
+void Profiler::Init(Isolate *isolate, const Local<Object>& globalObj, const string& appName, const string& outputDir)
 {
-	s_appName = appName;
+	m_appName = appName;
+	m_outputDir = outputDir;
+	auto extData = External::New(isolate, this);
+	globalObj->Set(ConvertToV8String("__startCPUProfiler"), FunctionTemplate::New(isolate, Profiler::StartCPUProfilerCallback, extData)->GetFunction());
+	globalObj->Set(ConvertToV8String("__stopCPUProfiler"), FunctionTemplate::New(isolate, Profiler::StopCPUProfilerCallback, extData)->GetFunction());
+	globalObj->Set(ConvertToV8String("__heapSnapshot"), FunctionTemplate::New(isolate, Profiler::HeapSnapshotMethodCallback, extData)->GetFunction());
+	globalObj->Set(ConvertToV8String("__startNDKProfiler"), FunctionTemplate::New(isolate, Profiler::StartNDKProfilerCallback, extData)->GetFunction());
+	globalObj->Set(ConvertToV8String("__stopNDKProfiler"), FunctionTemplate::New(isolate, Profiler::StopNDKProfilerCallback, extData)->GetFunction());
 }
 
 void Profiler::StartCPUProfilerCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
 	try
 	{
-		auto isolate = Isolate::GetCurrent();
-		auto started = false;
-		if ((args.Length() == 1) && (args[0]->IsString()))
-		{
-			auto name = args[0]->ToString();
-			StartCPUProfiler(isolate, name);
-			started = true;
-		}
-
-		args.GetReturnValue().Set(Boolean::New(isolate, started));
-
+		auto isolate = args.GetIsolate();
+		auto extData = args.Data().As<External>();
+		auto thiz = static_cast<Profiler*>(extData->Value());
+		thiz->StartCPUProfilerCallbackImpl(args);
 	}
 	catch (NativeScriptException& e)
 	{
@@ -51,18 +51,27 @@ void Profiler::StartCPUProfilerCallback(const v8::FunctionCallbackInfo<v8::Value
 	}
 }
 
+void Profiler::StartCPUProfilerCallbackImpl(const v8::FunctionCallbackInfo<v8::Value>& args)
+{
+	auto isolate = args.GetIsolate();
+	auto started = false;
+	if ((args.Length() == 1) && (args[0]->IsString()))
+	{
+		auto name = args[0]->ToString();
+		StartCPUProfiler(isolate, name);
+		started = true;
+	}
+	args.GetReturnValue().Set(started);
+}
+
 void Profiler::StopCPUProfilerCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
 	try
 	{
-		auto isolate = Isolate::GetCurrent();
-		auto stopped = false;
-		if ((args.Length() == 1) && (args[0]->IsString()))
-		{
-			auto name = args[0]->ToString();
-			stopped = StopCPUProfiler(isolate, name);
-		}
-		args.GetReturnValue().Set(Boolean::New(isolate, stopped));
+		auto isolate = args.GetIsolate();
+		auto extData = args.Data().As<External>();
+		auto thiz = static_cast<Profiler*>(extData->Value());
+		thiz->StopCPUProfilerCallbackImpl(args);
 	}
 	catch (NativeScriptException& e)
 	{
@@ -78,6 +87,18 @@ void Profiler::StopCPUProfilerCallback(const v8::FunctionCallbackInfo<v8::Value>
 		NativeScriptException nsEx(std::string("Error: c++ exception!"));
 		nsEx.ReThrowToV8();
 	}
+}
+
+void Profiler::StopCPUProfilerCallbackImpl(const v8::FunctionCallbackInfo<v8::Value>& args)
+{
+	auto isolate = args.GetIsolate();
+	auto stopped = false;
+	if ((args.Length() == 1) && (args[0]->IsString()))
+	{
+		auto name = args[0]->ToString();
+		stopped = StopCPUProfiler(isolate, name);
+	}
+	args.GetReturnValue().Set(stopped);
 }
 
 void Profiler::StartCPUProfiler(Isolate *isolate, const Local<String>& name)
@@ -113,7 +134,7 @@ bool Profiler::Write(CpuProfile *cpuProfile)
 
 	char filename[256];
 	auto profileName = ConvertToString(cpuProfile->GetTitle());
-	snprintf(filename, sizeof(filename), "/sdcard/%s-%s-%lu.%lu.cpuprofile", s_appName.c_str(), profileName.c_str(), sec, usec);
+	snprintf(filename, sizeof(filename), "%s/%s-%s-%lu.%lu.cpuprofile", m_outputDir.c_str(), m_appName.c_str(), profileName.c_str(), sec, usec);
 
 	auto fp = fopen(filename, "w");
 	if (nullptr == fp)
@@ -179,22 +200,18 @@ bool Profiler::Write(CpuProfile *cpuProfile)
 	for (int i = 0; i < sampleCount; i++)
 	{
 		auto format = (i > 0) ? ",%d" : "%d";
-		snprintf(buff, sizeof(buff), format, cpuProfile->GetSample(i)->GetScriptId());
+		snprintf(buff, sizeof(buff), format, cpuProfile->GetSample(i)->GetNodeId());
 		fwrite(buff, sizeof(char), strlen(buff), fp);
 	}
 
-	// TODO: update V8, see https://codereview.chromium.org/259803002/
-	/*
-	 snprintf(buff, sizeof(buff), "],\"timestamps\":[");
-	 fwrite(buff, sizeof(char), strlen(buff), fp);
-	 auto currTimeStamp = startTimeStamp;
-	 for (int i=0; i<sampleCount; i++)
-	 {
-	 auto format = (i > 0) ? ",%lld" : "%lld";
-	 snprintf(buff, sizeof(buff), format, cpuProfile->GetSampleTimestamp(i));
-	 fwrite(buff, sizeof(char), strlen(buff), fp);
-	 }
-	 */
+	snprintf(buff, sizeof(buff), "],\"timestamps\":[");
+	fwrite(buff, sizeof(char), strlen(buff), fp);
+	for (int i=0; i<sampleCount; i++)
+	{
+		auto format = (i > 0) ? ",%lld" : "%lld";
+		snprintf(buff, sizeof(buff), format, cpuProfile->GetSampleTimestamp(i));
+		fwrite(buff, sizeof(char), strlen(buff), fp);
+	}
 
 	fwrite("]}", sizeof(char), 2, fp);
 	fclose(fp);
@@ -206,7 +223,10 @@ void Profiler::StartNDKProfilerCallback(const v8::FunctionCallbackInfo<v8::Value
 {
 	try
 	{
-		StartNDKProfiler();
+		auto isolate = args.GetIsolate();
+		auto extData = args.Data().As<External>();
+		auto thiz = static_cast<Profiler*>(extData->Value());
+		thiz->StartNDKProfiler();
 	}
 	catch (NativeScriptException& e)
 	{
@@ -228,7 +248,10 @@ void Profiler::StopNDKProfilerCallback(const v8::FunctionCallbackInfo<v8::Value>
 {
 	try
 	{
-		StopNDKProfiler();
+		auto isolate = args.GetIsolate();
+		auto extData = args.Data().As<External>();
+		auto thiz = static_cast<Profiler*>(extData->Value());
+		thiz->StopNDKProfiler();
 	}
 	catch (NativeScriptException& e)
 	{
@@ -296,30 +319,10 @@ void Profiler::HeapSnapshotMethodCallback(const v8::FunctionCallbackInfo<v8::Val
 {
 	try
 	{
-		struct timespec nowt;
-		clock_gettime(CLOCK_MONOTONIC, &nowt);
-		uint64_t now = (int64_t) nowt.tv_sec * 1000000000LL + nowt.tv_nsec;
-
-		unsigned long sec = static_cast<unsigned long>(now / 1000000);
-		unsigned long usec = static_cast<unsigned long>(now % 1000000);
-
-		char filename[256];
-		snprintf(filename, sizeof(filename), "/sdcard/%s-heapdump-%lu.%lu.heapsnapshot", s_appName.c_str(), sec, usec);
-
-		FILE* fp = fopen(filename, "w");
-		if (fp == nullptr)
-		{
-			return;
-		}
-
-		Isolate* isolate = Isolate::GetCurrent();
-
-		const HeapSnapshot* snap = isolate->GetHeapProfiler()->TakeHeapSnapshot();
-
-		FileOutputStream stream(fp);
-		snap->Serialize(&stream, HeapSnapshot::kJSON);
-		fclose(fp);
-		const_cast<HeapSnapshot*>(snap)->Delete();
+		auto isolate = args.GetIsolate();
+		auto extData = args.Data().As<External>();
+		auto thiz = static_cast<Profiler*>(extData->Value());
+		thiz->HeapSnapshotMethodCallbackImpl(args);
 	}
 	catch (NativeScriptException& e)
 	{
@@ -337,4 +340,31 @@ void Profiler::HeapSnapshotMethodCallback(const v8::FunctionCallbackInfo<v8::Val
 	}
 }
 
-string Profiler::s_appName;
+void Profiler::HeapSnapshotMethodCallbackImpl(const v8::FunctionCallbackInfo<v8::Value>& args)
+{
+	struct timespec nowt;
+	clock_gettime(CLOCK_MONOTONIC, &nowt);
+	uint64_t now = (int64_t) nowt.tv_sec * 1000000000LL + nowt.tv_nsec;
+
+	unsigned long sec = static_cast<unsigned long>(now / 1000000);
+	unsigned long usec = static_cast<unsigned long>(now % 1000000);
+
+	char filename[256];
+	snprintf(filename, sizeof(filename), "%s/%s-heapdump-%lu.%lu.heapsnapshot", m_outputDir.c_str(), m_appName.c_str(), sec, usec);
+
+	FILE* fp = fopen(filename, "w");
+	if (fp == nullptr)
+	{
+		return;
+	}
+
+	auto isolate = args.GetIsolate();
+
+	const HeapSnapshot* snap = isolate->GetHeapProfiler()->TakeHeapSnapshot();
+
+	FileOutputStream stream(fp);
+	snap->Serialize(&stream, HeapSnapshot::kJSON);
+	fclose(fp);
+	const_cast<HeapSnapshot*>(snap)->Delete();
+}
+

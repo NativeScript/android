@@ -13,7 +13,7 @@ namespace tns
 		public:
 			JsArgToArrayConverter(const v8::FunctionCallbackInfo<v8::Value>& args, bool hasImplementationObject, const v8::Local<v8::Object>& outerThis = v8::Local<v8::Object>());
 
-			JsArgToArrayConverter(const v8::Local<v8::Value>& arg, bool isImplementationObject, int classReturnType);
+			JsArgToArrayConverter(v8::Isolate *isolate, const v8::Local<v8::Value>& arg, bool isImplementationObject, int classReturnType);
 
 			~JsArgToArrayConverter();
 
@@ -43,7 +43,9 @@ namespace tns
 		private:
 			bool ConvertArg(const v8::Local<v8::Value>& arg, int index);
 
-			void SetConvertedObject(JEnv& env, int index, jobject obj, bool isGlobalRef = false);
+			void SetConvertedObject(JEnv& env, int index, jobject obj, bool isGlobal = false);
+
+			v8::Isolate *m_isolate;
 
 			int m_argsLen;
 

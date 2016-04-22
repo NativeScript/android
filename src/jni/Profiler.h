@@ -10,8 +10,11 @@ namespace tns
 	class Profiler
 	{
 		public:
-			static void Init(const std::string& appName);
+			Profiler();
 
+			void Init(v8::Isolate *isolate, const v8::Local<v8::Object>& globalObj, const std::string& appName, const std::string& outputDir);
+
+		private:
 			static void StartCPUProfilerCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 			static void StopCPUProfilerCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
@@ -22,20 +25,25 @@ namespace tns
 
 			static void HeapSnapshotMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-		private:
-			Profiler();
+			void StartCPUProfilerCallbackImpl(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-			static void StartCPUProfiler(v8::Isolate *isolate, const v8::Local<v8::String>& name);
+			void StopCPUProfilerCallbackImpl(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-			static bool StopCPUProfiler(v8::Isolate *isolate, const v8::Local<v8::String>& name);
+			void HeapSnapshotMethodCallbackImpl(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-			static void StartNDKProfiler();
+			void StartCPUProfiler(v8::Isolate *isolate, const v8::Local<v8::String>& name);
 
-			static void StopNDKProfiler();
+			bool StopCPUProfiler(v8::Isolate *isolate, const v8::Local<v8::String>& name);
 
-			static bool Write(v8::CpuProfile *cpuProfile);
+			void StartNDKProfiler();
 
-			static std::string s_appName;
+			void StopNDKProfiler();
+
+			bool Write(v8::CpuProfile *cpuProfile);
+
+			std::string m_appName;
+
+			std::string m_outputDir;
 	};
 }
 

@@ -63,13 +63,13 @@ include $(CLEAR_VARS)
 LOCAL_CPPFLAGS += -std=c++11
 LOCAL_MODULE    := NativeScript
 LOCAL_SRC_FILES :=	com_tns_AssetExtractor.cpp AssetExtractor.cpp\
-					com_tns_Platform.cpp NativePlatform.cpp \
-					com_tns_JsDebugger.cpp com_tns_NativeScriptActity.cpp \
-					JEnv.cpp DirectBuffer.cpp NativeScriptException.cpp \
+					com_tns_Runtime.cpp Runtime.cpp \
+					com_tns_JsDebugger.cpp \
+					JEnv.cpp DirectBuffer.cpp ArrayBufferHelper.cpp NativeScriptException.cpp \
 					JsDebugger.cpp SimpleAllocator.cpp \
-					NativeScriptRuntime.cpp MetadataNode.cpp MetadataTreeNode.cpp MetadataReader.cpp \
+					CallbackHandlers.cpp MetadataNode.cpp MetadataTreeNode.cpp MetadataReader.cpp \
 					MethodCache.cpp JavaObjectArrayCache.cpp \
-					JniLocalRef.cpp JniSignatureParser.cpp \
+					JniSignatureParser.cpp \
 					ArgConverter.cpp JsArgToArrayConverter.cpp JsArgConverter.cpp V8GlobalHelpers.cpp V8StringConstants.cpp \
 					FieldAccessor.cpp ArrayElementAccessor.cpp \
 					Util.cpp Logger.cpp Profiler.cpp \

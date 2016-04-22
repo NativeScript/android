@@ -5,7 +5,7 @@ var
 	
 	isTimeToExit = false,
 	
-	processTimeout = 11 * 60 * 1000, // 11 minutes timeout (empirical constant :)) 
+	processTimeout = 20 * 60 * 1000, // 20 minutes timeout (empirical constant :)) 
 	searchInterval = 10000;
 	
 searchForFile("", getFile);

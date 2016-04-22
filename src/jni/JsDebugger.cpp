@@ -82,7 +82,7 @@ void JsDebugger::DebugBreak()
 
 bool JsDebugger::IsDebuggerActive()
 {
-	return s_jsDebugger == nullptr && enabled;
+	return s_processedCommands;
 }
 
 void JsDebugger::ProcessDebugMessages()
@@ -210,11 +210,47 @@ void JsDebugger::ConsoleMessage(const v8::FunctionCallbackInfo<v8::Value>& args)
 	}
 }
 
+void JsDebugger::ConsoleMessage(const string& message, const string& level, const string& srcFileName, int lineNumber, int columnNumber)
+{
+	if (s_jsDebugger == nullptr || !enabled)
+	{
+		return;
+	}
+
+	try
+	{
+		JEnv env;
+		JniLocalRef jniText(env.NewStringUTF(message.c_str()));
+		JniLocalRef jniLevel(env.NewStringUTF(level.c_str()));
+		JniLocalRef jniSrcFileName(env.NewStringUTF(srcFileName.c_str()));
+
+		env.CallVoidMethod(s_jsDebugger, s_EnqueueConsoleMessage, (jstring) jniText, (jstring) jniLevel, lineNumber, columnNumber, (jstring) jniSrcFileName);
+	}
+	catch (NativeScriptException& e)
+	{
+		e.ReThrowToV8();
+	}
+	catch (std::exception e)
+	{
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
+		nsEx.ReThrowToV8();
+	}
+	catch (...)
+	{
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToV8();
+	}
+}
+
 void JsDebugger::SendCommandToV8(uint16_t *cmd, int length)
 {
 	auto isolate = s_isolate;
 
 	v8::Debug::SendCommand(isolate, cmd, length, nullptr);
+
+	s_processedCommands = true;
 }
 
 /* *
@@ -244,4 +280,4 @@ jclass JsDebugger::s_JsDebuggerClass = nullptr;
 jmethodID JsDebugger::s_EnqueueMessage = nullptr;
 jmethodID JsDebugger::s_EnqueueConsoleMessage = nullptr;
 jmethodID JsDebugger::s_EnableAgent = nullptr;
-
+bool JsDebugger::s_processedCommands = false;

@@ -1,7 +1,6 @@
 #include "Util.h"
 #include "NativeScriptException.h"
 #include "V8GlobalHelpers.h"
-#include "NativeScriptRuntime.h"
 #include "NativeScriptAssert.h"
 #include "V8StringConstants.h"
 #include <sstream>
@@ -14,9 +13,8 @@ NativeScriptException::NativeScriptException(JEnv& env)
 :
 		m_javascriptException(nullptr)
 {
-	JniLocalRef ex(env.ExceptionOccurred());
+	m_javaException = JniLocalRef(env.ExceptionOccurred());
 	env.ExceptionClear();
-	m_javaException = ex;
 }
 
 NativeScriptException::NativeScriptException(const string& message)
@@ -92,7 +90,8 @@ void NativeScriptException::ReThrowToJava()
 		auto errObj = Local<Value>::New(isolate, *m_javascriptException);
 		if (errObj->IsObject())
 		{
-			ex = (jthrowable) TryGetJavaThrowableObject(env, errObj.As<Object>());
+			auto exObj = TryGetJavaThrowableObject(env, errObj.As<Object>());
+			ex = (jthrowable) exObj.Move();
 		}
 
 		if (ex == nullptr)
@@ -120,19 +119,18 @@ void NativeScriptException::ReThrowToJava()
 		JniLocalRef msg(env.NewStringUTF("No java exception or message provided."));
 		ex = static_cast<jthrowable>(env.NewObject(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_JSVALUE_CTOR_ID, (jstring) msg, (jlong) 0));
 	}
-
 	env.Throw(ex);
 }
 
-void NativeScriptException::Init(JavaVM *jvm, ObjectManager *objectManager)
+void NativeScriptException::Init(ObjectManager *objectManager)
 {
 	NativeScriptException::objectManager = objectManager;
 	assert(NativeScriptException::objectManager != nullptr);
 
 	JEnv env;
 
-	PlatformClass = env.FindClass("com/tns/Platform");
-	assert(PlatformClass != nullptr);
+	RUNTIME_CLASS = env.FindClass("com/tns/Runtime");
+	assert(RUNTIME_CLASS != nullptr);
 
 	THROWABLE_CLASS = env.FindClass("java/lang/Throwable");
 	assert(THROWABLE_CLASS != nullptr);
@@ -295,14 +293,14 @@ string NativeScriptException::GetFullMessage(const TryCatch& tc, bool isExceptio
 	return loggedMessage;
 }
 
-jweak NativeScriptException::TryGetJavaThrowableObject(JEnv& env, const Local<Object>& jsObj)
+JniLocalRef NativeScriptException::TryGetJavaThrowableObject(JEnv& env, const Local<Object>& jsObj)
 {
-	jweak javaThrowableObject = nullptr;
+	JniLocalRef javaThrowableObject;
 
-	jweak javaObj = objectManager->GetJavaObjectByJsObject(jsObj);
+	auto javaObj = objectManager->GetJavaObjectByJsObject(jsObj);
 	JniLocalRef objClass;
 
-	if (javaObj != nullptr)
+	if (!javaObj.IsNull())
 	{
 		objClass = JniLocalRef(env.GetObjectClass(javaObj));
 	}
@@ -320,7 +318,7 @@ jweak NativeScriptException::TryGetJavaThrowableObject(JEnv& env, const Local<Ob
 
 	if (isThrowable == JNI_TRUE)
 	{
-		javaThrowableObject = javaObj;
+		javaThrowableObject = JniLocalRef(env.NewLocalRef(javaObj));
 	}
 
 	return javaThrowableObject;
@@ -445,7 +443,7 @@ string NativeScriptException::GetExceptionMessage(JEnv& env, jthrowable exceptio
 }
 
 ObjectManager* NativeScriptException::objectManager = nullptr;
-jclass NativeScriptException::PlatformClass = nullptr;
+jclass NativeScriptException::RUNTIME_CLASS = nullptr;
 jclass NativeScriptException::THROWABLE_CLASS = nullptr;
 jmethodID NativeScriptException::THROWABLE_GET_CAUSE_METHOD_ID = nullptr;
 jmethodID NativeScriptException::THROWABLE_GET_STACK_TRACE_METHOD_ID = nullptr;

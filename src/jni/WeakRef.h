@@ -10,11 +10,11 @@ namespace tns
 	class WeakRef
 	{
 		public:
-			static void Init(v8::Isolate *isolate, v8::Local<v8::ObjectTemplate>& globalObjectTemplate, ObjectManager *objectManager);
-
-		private:
 			WeakRef();
 
+			void Init(v8::Isolate *isolate, v8::Local<v8::ObjectTemplate>& globalObjectTemplate, ObjectManager *objectManager);
+
+		private:
 			struct CallbackState
 			{
 					CallbackState(v8::Persistent<v8::Object> *_target, v8::Persistent<v8::Object> *_holder)
@@ -28,23 +28,25 @@ namespace tns
 
 			static void ConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-			static v8::Local<v8::Function> GetClearFunction(v8::Isolate *isolate);
-
-			static v8::Local<v8::Function> GetGetterFunction(v8::Isolate *isolate);
+			void ConstructorCallbackImpl(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 			static void ClearCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 			static void GettertCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
+			v8::Local<v8::Function> GetClearFunction(v8::Isolate *isolate);
+
+			v8::Local<v8::Function> GetGetterFunction(v8::Isolate *isolate);
+
 			static void WeakTargetCallback(const v8::WeakCallbackData<v8::Object, CallbackState>& data);
 
 			static void WeakHolderCallback(const v8::WeakCallbackData<v8::Object, CallbackState>& data);
 
-			static v8::Persistent<v8::Function> *s_poClearFunc;
+			ObjectManager *m_objectManager;
 
-			static v8::Persistent<v8::Function> *s_poGetterFunc;
+			v8::Persistent<v8::Function> *m_poClearFunc;
 
-			static ObjectManager *s_objectManager;
+			v8::Persistent<v8::Function> *m_poGetterFunc;
 	};
 }
 

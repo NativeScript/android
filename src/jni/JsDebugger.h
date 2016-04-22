@@ -31,6 +31,9 @@ namespace tns
 
 			static void ConsoleMessageCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
+			static void ConsoleMessage(const std::string& message, const std::string& level = "log", const std::string& srcFileName = "",
+					const int lineNumber = 0, const int columnNumber = 0);
+
 		private:
 			JsDebugger();
 
@@ -48,6 +51,7 @@ namespace tns
 			static jmethodID s_EnqueueConsoleMessage;
 			static jmethodID s_EnableAgent;
 			static v8::Isolate *s_isolate;
+			static bool s_processedCommands;
 
 			static const int INVALID_PORT = -1;
 	};

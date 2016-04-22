@@ -38,7 +38,7 @@ describe("Tests garbage collection", function () {
 		normalTest();
 	});
 	
-	// this test has implicit assert in com.tns.Platform.getJavaObjectByID method
+	// this test has implicit assert in com.tns.Runtime.getJavaObjectByID method
 	it("test1", function () {
 		
 	  	function createObjects(name) {
@@ -61,7 +61,7 @@ describe("Tests garbage collection", function () {
 		java.lang.System.gc();
 	});
 	
-	// this test has implicit assert in com.tns.Platform.getJavaObjectByID method
+	// this test has implicit assert in com.tns.Runtime.getJavaObjectByID method
 	it("test2", function () {
 		
 		function indref1() {
@@ -90,7 +90,7 @@ describe("Tests garbage collection", function () {
 		java.lang.System.gc();
 	});
 	
-	// this test has implicit assert in com.tns.Platform.getJavaObjectByID method
+	// this test has implicit assert in com.tns.Runtime.getJavaObjectByID method
 	it("test3", function () {
 		
 		function indref2() {
@@ -125,7 +125,7 @@ describe("Tests garbage collection", function () {
 		java.lang.System.gc();
 	});
 	
-	// this test has implicit assert in com.tns.Platform.getJavaObjectByID method
+	// this test has implicit assert in com.tns.Runtime.getJavaObjectByID method
 	it("test4", function () {
 		
 		function indref3() {
@@ -166,7 +166,7 @@ describe("Tests garbage collection", function () {
 		java.lang.System.gc();
 	});
 	
-	// this test has implicit assert in com.tns.Platform.getJavaObjectByID method
+	// this test has implicit assert in com.tns.Runtime.getJavaObjectByID method
 	//originally test was commented out
 	xit("test5", function () {
 		
@@ -240,5 +240,28 @@ describe("Tests garbage collection", function () {
 		var o = arr[0];
 
 		expect(o.x).toBe(123);
+	});
+
+	it("should keep extended instances alive after GC", function () {
+		var C1 = com.tns.tests.Class1.extend({});
+
+		function createObjects(name) {
+			var c1 = new C1();
+
+			var cb1 = new com.tns.tests.Class1.Callback1(name, {
+				getMessage: function() {
+					var msg = c1.getMessage();
+					return msg;
+				}
+			});
+
+			return com.tns.tests.Class1.Class2.printMessageWithDelay(cb1, 5 * 1000);
+		}
+
+		expect(createObjects("Callback452356")).toBe(true);
+		expect(createObjects("Callback417892")).toBe(true);
+
+		gc();
+		java.lang.System.gc();
 	});
 });

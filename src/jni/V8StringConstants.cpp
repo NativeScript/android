@@ -28,6 +28,28 @@ namespace tns
 		return Local<String>::New(isolate, *EXTEND_PERSISTENT);
 	}
 
+	Local<String> V8StringConstants::GetNullObject()
+	{
+		auto isolate = Isolate::GetCurrent();
+		if (NULL_OBJECT_PERSISTENT == nullptr)
+		{
+			auto str = String::NewFromUtf8(isolate, NULL_OBJECT.c_str());
+			NULL_OBJECT_PERSISTENT = new Persistent<String>(Isolate::GetCurrent(), str);
+		}
+		return Local<String>::New(isolate, *NULL_OBJECT_PERSISTENT);
+	}
+
+	Local<String> V8StringConstants::GetNullNodeName()
+	{
+		auto isolate = Isolate::GetCurrent();
+		if (NULL_NODE_NAME_PERSISTENT == nullptr)
+		{
+			auto str = String::NewFromUtf8(isolate, NULL_NODE_NAME.c_str());
+			NULL_NODE_NAME_PERSISTENT = new Persistent<String>(Isolate::GetCurrent(), str);
+		}
+		return Local<String>::New(isolate, *NULL_NODE_NAME_PERSISTENT);
+	}
+
 	Local<String> V8StringConstants::GetIsPrototypeImplementationObject()
 	{
 		auto isolate = Isolate::GetCurrent();
@@ -149,72 +171,6 @@ namespace tns
 		return Local<String>::New(isolate, *JAVA_LONG_PERSISTENT);
 	}
 
-	Local<String> V8StringConstants::GetMarkedAsByte()
-	{
-		auto isolate = Isolate::GetCurrent();
-		if (MARKED_AS_BYTE_PERSISTENT == nullptr)
-		{
-			auto str = String::NewFromUtf8(isolate, MARKED_AS_BYTE.c_str());
-			MARKED_AS_BYTE_PERSISTENT = new Persistent<String>(Isolate::GetCurrent(), str);
-		}
-		return Local<String>::New(isolate, *MARKED_AS_BYTE_PERSISTENT);
-	}
-
-	Local<String> V8StringConstants::GetMarkedAsChar()
-	{
-		auto isolate = Isolate::GetCurrent();
-		if (MARKED_AS_CHAR_PERSISTENT == nullptr)
-		{
-			auto str = String::NewFromUtf8(isolate, MARKED_AS_CHAR.c_str());
-			MARKED_AS_CHAR_PERSISTENT = new Persistent<String>(Isolate::GetCurrent(), str);
-		}
-		return Local<String>::New(isolate, *MARKED_AS_CHAR_PERSISTENT);
-	}
-
-	Local<String> V8StringConstants::GetMarkedAsDouble()
-	{
-		auto isolate = Isolate::GetCurrent();
-		if (MARKED_AS_DOUBLE_PERSISTENT == nullptr)
-		{
-			auto str = String::NewFromUtf8(isolate, MARKED_AS_DOUBLE.c_str());
-			MARKED_AS_DOUBLE_PERSISTENT = new Persistent<String>(Isolate::GetCurrent(), str);
-		}
-		return Local<String>::New(isolate, *MARKED_AS_DOUBLE_PERSISTENT);
-	}
-
-	Local<String> V8StringConstants::GetMarkedAsFloat()
-	{
-		auto isolate = Isolate::GetCurrent();
-		if (MARKED_AS_FLOAT_PERSISTENT == nullptr)
-		{
-			auto str = String::NewFromUtf8(isolate, MARKED_AS_FLOAT.c_str());
-			MARKED_AS_FLOAT_PERSISTENT = new Persistent<String>(Isolate::GetCurrent(), str);
-		}
-		return Local<String>::New(isolate, *MARKED_AS_FLOAT_PERSISTENT);
-	}
-
-	Local<String> V8StringConstants::GetMarkedAsLong()
-	{
-		auto isolate = Isolate::GetCurrent();
-		if (MARKED_AS_LONG_PERSISTENT == nullptr)
-		{
-			auto str = String::NewFromUtf8(isolate, MARKED_AS_LONG.c_str());
-			MARKED_AS_LONG_PERSISTENT = new Persistent<String>(Isolate::GetCurrent(), str);
-		}
-		return Local<String>::New(isolate, *MARKED_AS_LONG_PERSISTENT);
-	}
-
-	Local<String> V8StringConstants::GetMarkedAsShort()
-	{
-		auto isolate = Isolate::GetCurrent();
-		if (MARKED_AS_SHORT_PERSISTENT == nullptr)
-		{
-			auto str = String::NewFromUtf8(isolate, MARKED_AS_SHORT.c_str());
-			MARKED_AS_SHORT_PERSISTENT = new Persistent<String>(Isolate::GetCurrent(), str);
-		}
-		return Local<String>::New(isolate, *MARKED_AS_SHORT_PERSISTENT);
-	}
-
 	Local<String> V8StringConstants::GetValue()
 	{
 		auto isolate = Isolate::GetCurrent();
@@ -250,6 +206,8 @@ namespace tns
 
 	const string V8StringConstants::CLASS_IMPLEMENTATION_OBJECT = "t::ClassImplementationObject";
 	const string V8StringConstants::EXTEND = "extend";
+	const string V8StringConstants::NULL_OBJECT = "null";
+	const string V8StringConstants::NULL_NODE_NAME = "nullNode";
 	const string V8StringConstants::IS_PROTOTYPE_IMPLEMENTATION_OBJECT = "__isPrototypeImplementationObject";
 	const string V8StringConstants::NATIVE_EXCEPTION = "nativeException";
 	const string V8StringConstants::STACK_TRACE = "stackTrace";
@@ -275,6 +233,8 @@ namespace tns
 	// TODO: These are not thread-safe!
 	Persistent<String> *V8StringConstants::CLASS_IMPLEMENTATION_OBJECT_PERSISTENT;
 	Persistent<String> *V8StringConstants::EXTEND_PERSISTENT;
+	Persistent<String> *V8StringConstants::NULL_OBJECT_PERSISTENT;
+	Persistent<String> *V8StringConstants::NULL_NODE_NAME_PERSISTENT;
 	Persistent<String> *V8StringConstants::IS_PROTOTYPE_IMPLEMENTATION_OBJECT_PERSISTENT;
 	Persistent<String> *V8StringConstants::NATIVE_EXCEPTION_PERSISTENT;
 	Persistent<String> *V8StringConstants::STACK_TRACE_PERSISTENT;
@@ -286,12 +246,6 @@ namespace tns
 	Persistent<String> *V8StringConstants::TO_STRING_PERSISTENT;
 	Persistent<String> *V8StringConstants::HIDDEN_JS_INSTANCE_PERSISTENT;
 	Persistent<String> *V8StringConstants::JAVA_LONG_PERSISTENT;
-	Persistent<String> *V8StringConstants::MARKED_AS_BYTE_PERSISTENT;
-	Persistent<String> *V8StringConstants::MARKED_AS_CHAR_PERSISTENT;
-	Persistent<String> *V8StringConstants::MARKED_AS_DOUBLE_PERSISTENT;
-	Persistent<String> *V8StringConstants::MARKED_AS_FLOAT_PERSISTENT;
-	Persistent<String> *V8StringConstants::MARKED_AS_LONG_PERSISTENT;
-	Persistent<String> *V8StringConstants::MARKED_AS_SHORT_PERSISTENT;
 	Persistent<String> *V8StringConstants::VALUE_PERSISTENT;
 	Persistent<String> *V8StringConstants::VALUE_OF_PERSISTENT;
 	Persistent<String> *V8StringConstants::UNCAUGHT_ERROR_PERSISTENT;

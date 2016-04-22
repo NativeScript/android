@@ -5,6 +5,7 @@
 #include "Util.h"
 #include "V8GlobalHelpers.h"
 #include "NativeScriptException.h"
+#include "Runtime.h"
 #include <assert.h>
 #include <sstream>
 
@@ -12,22 +13,17 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
-void FieldAccessor::Init(JavaVM *jvm, ObjectManager *objectManager)
-{
-	this->jvm = jvm;
-	this->objectManager = objectManager;
-}
-
-Local<Value> FieldAccessor::GetJavaField(const Local<Object>& target, FieldCallbackData *fieldData)
+Local<Value> FieldAccessor::GetJavaField(Isolate *isolate, const Local<Object>& target, FieldCallbackData *fieldData)
 {
 	JEnv env;
 
-	auto isolate = Isolate::GetCurrent();
 	EscapableHandleScope handleScope(isolate);
+	auto runtime = Runtime::GetRuntime(isolate);
+	auto objectManager = runtime->GetObjectManager();
 
 	Local<Value> fieldResult;
 
-	jweak targetJavaObject;
+	JniLocalRef targetJavaObject;
 
 	const auto& fieldTypeName = fieldData->signature;
 	auto isStatic = fieldData->isStatic;
@@ -61,7 +57,7 @@ Local<Value> FieldAccessor::GetJavaField(const Local<Object>& target, FieldCallb
 	{
 		targetJavaObject = objectManager->GetJavaObjectByJsObject(target);
 
-		if (targetJavaObject == nullptr)
+		if (targetJavaObject.IsNull())
 		{
 			stringstream ss;
 			ss << "Cannot access property '" << fieldData->name << "' because there is no corresponding Java object";
@@ -163,7 +159,7 @@ Local<Value> FieldAccessor::GetJavaField(const Local<Object>& target, FieldCallb
 				{
 					result = env.GetLongField(targetJavaObject, fieldId);
 				}
-				fieldResult = handleScope.Escape(ArgConverter::ConvertFromJavaLong(result));
+				fieldResult = handleScope.Escape(ArgConverter::ConvertFromJavaLong(isolate, result));
 				break;
 			}
 			case 'F': //float
@@ -246,14 +242,15 @@ Local<Value> FieldAccessor::GetJavaField(const Local<Object>& target, FieldCallb
 	return fieldResult;
 }
 
-void FieldAccessor::SetJavaField(const Local<Object>& target, const Local<Value>& value, FieldCallbackData *fieldData)
+void FieldAccessor::SetJavaField(Isolate *isolate, const Local<Object>& target, const Local<Value>& value, FieldCallbackData *fieldData)
 {
 	JEnv env;
 
-	auto isolate = Isolate::GetCurrent();
 	HandleScope handleScope(isolate);
+	auto runtime = Runtime::GetRuntime(isolate);
+	auto objectManager = runtime->GetObjectManager();
 
-	jweak targetJavaObject;
+	JniLocalRef targetJavaObject;
 
 	const auto& fieldTypeName = fieldData->signature;
 	auto isStatic = fieldData->isStatic;
@@ -291,7 +288,7 @@ void FieldAccessor::SetJavaField(const Local<Object>& target, const Local<Value>
 	{
 		targetJavaObject = objectManager->GetJavaObjectByJsObject(target);
 
-		if (targetJavaObject == nullptr)
+		if (targetJavaObject.IsNull())
 		{
 			stringstream ss;
 			ss << "Cannot access property '" << fieldData->name << "' because there is no corresponding Java object";
@@ -425,7 +422,7 @@ void FieldAccessor::SetJavaField(const Local<Object>& target, const Local<Value>
 	else
 	{
 		bool isString = fieldTypeName == "java/lang/String";
-		jobject result = nullptr;
+		JniLocalRef result;
 
 		if (!value->IsNull())
 		{
@@ -448,11 +445,6 @@ void FieldAccessor::SetJavaField(const Local<Object>& target, const Local<Value>
 		else
 		{
 			env.SetObjectField(targetJavaObject, fieldId, result);
-		}
-
-		if (isString)
-		{
-			env.DeleteLocalRef(result);
 		}
 	}
 }

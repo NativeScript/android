@@ -43,7 +43,7 @@ public class JsDebugger
 
 	private static native void sendCommand(byte[] command, int length);
 	
-	private static native boolean isDebugerActive();
+	private static native boolean isDebuggerActive();
 
 	private ThreadScheduler threadScheduler;
 
@@ -477,7 +477,7 @@ public class JsDebugger
 			
 			String sendingText = consoleMessage.toString();
 			
-			Log.d("TNS.JAVA.JsDebugger", "Sending console message to inspector:" + sendingText);
+			logger.write("Sending console message to inspector:" + sendingText);
 			
 			dbgMessages.add(sendingText);
 		}
@@ -580,12 +580,10 @@ public class JsDebugger
 		
 		registerEnableDisableDebuggerReceiver(handler);
 		
-		logger.write("Enabling Debugger Agent");
-		enable();
-
-		boolean shouldDebugBrake = getDebugBreakFlagAndClearIt();
-		if (shouldDebugBrake)
+		boolean shouldDebugBreak = getDebugBreakFlagAndClearIt();
+		if (shouldDebugBreak)
 		{
+			enableAgent();
 			debugBreak();
 		}
 	}
@@ -612,8 +610,8 @@ public class JsDebugger
 		return isDebuggableApp;
 	}
 
-	public static boolean isJsDebugerActive()
+	public static boolean isJsDebuggerActive()
 	{
-		return isDebugerActive();
+		return isDebuggerActive();
 	}
 }

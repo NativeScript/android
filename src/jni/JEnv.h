@@ -316,6 +316,13 @@ namespace tns
 
 			}
 
+			jobject NewObjectA(jclass clazz, jmethodID methodID, jvalue *args)
+			{
+				jobject jo = m_env->NewObjectA(clazz, methodID, args);
+				CheckForJavaException();
+				return jo;
+			}
+
 			static void Init(JavaVM *jvm);
 
 		private:
@@ -325,7 +332,7 @@ namespace tns
 
 			static JavaVM *s_jvm;
 
-			static jclass PLATFORM_CLASS;
+			static jclass RUNTIME_CLASS;
 
 			static jmethodID GET_CACHED_CLASS_METHOD_ID;
 

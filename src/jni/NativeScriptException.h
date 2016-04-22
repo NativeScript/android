@@ -18,12 +18,12 @@ namespace tns
 			void ReThrowToV8();
 			void ReThrowToJava();
 
-			static void Init(JavaVM *jvm, ObjectManager *objectManager);
+			static void Init(ObjectManager *objectManager);
 			static void OnUncaughtError(v8::Local<v8::Message> message, v8::Local<v8::Value> error);
 			static void CallJsFuncWithErr(v8::Local<v8::Value> errObj);
 
 		private:
-			jweak TryGetJavaThrowableObject(JEnv& env, const v8::Local<v8::Object>& jsObj);
+			JniLocalRef TryGetJavaThrowableObject(JEnv& env, const v8::Local<v8::Object>& jsObj);
 			std::string GetExceptionMessage(JEnv& env, jthrowable exception);
 			v8::Local<v8::Value> WrapJavaToJsException();
 			v8::Local<v8::Value> GetJavaExceptionFromEnv(const JniLocalRef& exc, JEnv& env);
@@ -38,7 +38,7 @@ namespace tns
 			std::string m_message;
 
 			static ObjectManager *objectManager;
-			static jclass PlatformClass;
+			static jclass RUNTIME_CLASS;
 			static jclass THROWABLE_CLASS;
 			static jmethodID THROWABLE_GET_CAUSE_METHOD_ID;
 			static jmethodID THROWABLE_GET_STACK_TRACE_METHOD_ID;
