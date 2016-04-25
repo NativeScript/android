@@ -52,7 +52,7 @@ bool DirectBuffer::Write(int value)
 	if (canWrite)
 	{
 		int bigEndianInt = __builtin_bswap32(value);
-		*m_pos++ = bigEndianInt;
+		*(m_pos++) = bigEndianInt;
 	}
 	return canWrite;
 }

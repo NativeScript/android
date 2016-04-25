@@ -7,7 +7,6 @@
 #include "v8.h"
 #include "v8-debug.h"
 #include "JEnv.h"
-#include "JSInstanceInfo.h"
 #include "ArgsWrapper.h"
 #include "MetadataEntry.h"
 #include "FieldCallbackData.h"
