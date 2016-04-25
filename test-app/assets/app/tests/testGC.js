@@ -264,4 +264,32 @@ describe("Tests garbage collection", function () {
 		gc();
 		java.lang.System.gc();
 	});
+	
+	it("should properly reintroduce Java object back in a callback", function () {
+		function getTestObject() {
+			return new com.tns.tests.BadEqualsTest(
+				new com.tns.tests.BadEqualsTest.BadEqualsObject(),
+				new com.tns.tests.BadEqualsTest.Callback({
+					onFinish: function(o) {
+						__log(">>o=" + o.toString());
+					}
+				}));
+		}
+
+		var test = getTestObject();
+	
+		// flush LRU cache
+		for (var i=0; i<65536; i++) {
+			new java.lang.Object().hashCode();
+		}
+	
+		gc();
+		java.lang.Runtime.getRuntime().gc();
+		gc();
+		java.lang.Runtime.getRuntime().gc();
+		gc();
+		java.lang.Runtime.getRuntime().gc();
+	
+		test.postCallback();
+	});
 });
