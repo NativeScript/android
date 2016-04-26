@@ -39,7 +39,7 @@ model {
         buildToolsVersion = "23.0.2"
 
         defaultConfig.with {
-            minSdkVersion.apiLevel    = 17
+            minSdkVersion.apiLevel    = 19
             targetSdkVersion.apiLevel = 22
         }
 
@@ -94,6 +94,21 @@ model {
         release {
             minifyEnabled = false
             proguardFiles.add(file('proguard-rules.txt'))
+            
+             ndk {
+                    debuggable false
+             }
+             
+            setRuntimeCommit.dependsOn(setPackageVersion)
+
+            tasks.whenTaskAdded { task ->
+                if (task.getName() == "androidRelease")
+                {
+                    task.dependsOn(setRuntimeCommit)
+                    task.mustRunAfter setRuntimeCommit
+                    task.finalizedBy revertVersionFile
+                } 
+            }
         }
     }
 
@@ -144,6 +159,13 @@ model {
         }
     }
     
+    
+    // android.variantFilter { variant ->
+    //     if (variant.buildType.name == "release") {
+           
+    //     }
+    // }
+    
     repositories {
         prebuilt(PrebuiltLibraries) {
             v8 {
@@ -165,4 +187,53 @@ dependencies {
    compile project(':binding-generator')
 }
 
+task setPackageVersion {
+    onlyIf { 
+        project.hasProperty('packageVersion')
+    }
+	
+    doFirst {
+        println "Setting runtime version ${runtimeVersion}"
+        
+        def versionFile = "$rootDir/src/main/jni//Version.h"
+        String contents = new File(versionFile).getText("UTF-8")
+        contents = contents.replaceAll( /RUNTIME_VERSION_PLACEHOLDER/, packageVersion)
+        new File(versionFile).write(contents, "UTF-8")
+    }
+}
 
+task setRuntimeCommit {
+    onlyIf {
+        project.hasProperty('gitCommitVersion')
+    }
+    
+    doFirst {
+        println "Setting runtime commit ${gitCommitVersion}"
+        
+        def versionFile = "$rootDir/src/main/jni//Version.h"
+        String contents = new File(versionFile).getText("UTF-8")
+        contents = contents.replaceAll(/RUNTIME_COMMIT_SHA_PLACEHOLDER/, gitCommitVersion)
+        new File(versionFile).write(contents, "UTF-8")
+    }
+}
+
+task revertVersionFile (type: Exec) {
+    
+    onlyIf {
+       project.hasProperty('packageVersion') || project.hasProperty('gitCommitVersion')
+    }
+    
+    doFirst {
+        def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
+        def versionFileName = "./src/main/jni//Version.h"
+        def versionFilePath = new File(versionFileName).getAbsolutePath()
+        println "Reverting Version.h file: ${versionFilePath}" 
+        
+        if(isWinOs) {
+            commandLine "cmd", "/c", "git", "checkout", "--", versionFilePath
+        }
+        else {
+            commandLine "git", "checkout", "--", versionFilePath
+        }
+    }
+}

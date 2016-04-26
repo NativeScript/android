@@ -6,7 +6,7 @@ model {
         buildToolsVersion = "23.0.2"
 
         defaultConfig.with {
-            minSdkVersion.apiLevel = 17
+            minSdkVersion.apiLevel = 19
             targetSdkVersion.apiLevel = 22
         }
         

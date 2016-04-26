@@ -1,7 +1,0 @@
-Name: com/tns/
-Specification-Title: NativeScript library
-Specification-Version: RUNTIME_VERSION_PLACEHOLDER
-Specification-Vendor: Telerik
-Implementation-Title: NativeScript
-Implementation-Version: RUNTIME_COMMIT_SHA_PLACEHOLDER
-Implementation-Vendor: Telerik
