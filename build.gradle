@@ -1,16 +1,13 @@
 /*
 *	Test command 
-*			gradlew packar -PtargetSdk=android-23 -PminSdk=17  -PbuildToolsVersion=23.0.2 -PsupportVersion=23.0.1  -PcompileSdk=android-23
+*			gradlew packar
 *	To run: 
 *			gradlew packar
 *
-* 	Options:
-*			-PtargetSdk=[target_sdk]
-*			-PminSdk=[target_sdk]
-*			-PbuildToolsVersion=[build_tools_version]
-*			-PsupportVersion=[support_version]
-*			-PcompileSdk=[compile_sdk_version]
+*			
 */
+
+defaultTasks 'createPackage'
 
 import groovy.json.JsonSlurper //used to parse package.json
 import groovy.json.JsonBuilder
@@ -21,15 +18,6 @@ def localMetadataGen = "../android-metadata-generator/dist/tns-android-metadata-
 def distDir = "$rootDir/dist"
 def pVersion = "no package version was provided by build.gradle build"
 def arVersion = "no commit sha was provided by build.gradle build"
-def commitVersionFile = "commit.txt"
-
-// def compileSdkVer = "";
-// def buildToolsVer = "";
-// def minSdkVer = "";
-// def targetSdkVer = "";
-// def supportVer = "";
-
-//def envVars = new LinkedList<String>()
 
 task checkEnvironmentVariables {
 	if ("$System.env.JAVA_HOME" == "" || "$System.env.JAVA_HOME" == "null") {
@@ -47,31 +35,9 @@ task checkEnvironmentVariables {
 	if(project.hasProperty("metadataGen") && !file("../android-metadata-generator/dist/tns-android-metadata-generator-0.0.1.tgz").exists()) {
 		throw new GradleException("android-metadata-generator build output not found and no metadataGen option specified. Build android-metadata-generator first.\n");
 	}
-
-	// if(project.hasProperty("compileSdk")) {
-	// 	compileSdkVer = "-PcompileSdk=$compileSdk"
-	// 	envVars.add(compileSdkVer)
-	// }
-	// if(project.hasProperty("buildToolsVersion")) {
-	// 	buildToolsVer = "-PbuildToolsVersion=$buildToolsVersion"
-	// 	envVars.add(buildToolsVer)
-	// }
-	// if(project.hasProperty("minSdk")) {
-	// 	minSdkVer = "-PminSdk=$minSdk"
-	// 	envVars.add(minSdkVer)
-	// }
-	// if(project.hasProperty("targetSdk")) {
-	// 	targetSdkVer = "-PtargetSdk=$targetSdk"
-	// 	envVars.add(targetSdkVer)
-	// }
-	// if(project.hasProperty("supportVersion")) {
-	// 	supportVer = "-PsupportVersion=$supportVersion"
-	// 	envVars.add(supportVer)
-	// }
 }
 
 // task checkAndroidCommand(type:Exec) {
-
 // 	if(isWinOs) {
 // 		commandLine "cmd", "/c", "android", "-h"
 // 	}
@@ -90,31 +56,13 @@ task checkEnvironmentVariables {
 // 	}
 // }
 
-//task ndkBuild (type: Exec) {
-//	if(isWinOs) {
-//		commandLine "cmd", "/c", "ndk-build", "--version"
-//	}
-//	else {
-//		commandLine "ndk-build", "--version"
-//	}
-//
-//	ignoreExitValue = true
-//	doLast {
-//		if(execResult.exitValue != 0) {
-//			throw new GradleException("\n--> 'ndk-build' command not found. Set the PATH variable to include the path to Android NDK directory.\n\nError: " + errorOutput + "\nexitValue: " + execResult.exitValue)
-//		}
-//	}
-//}
-
-task cleanDistDir (type: Delete) {
+task cleanDistDir (type: Delete) << {
 	delete distDir
 }
 
-task createDistDir {
-	doLast {
-		def distF = new File(distDir)
-		distF.mkdirs()
-	}
+task createDistDir  << {
+	def distF = new File(distDir)
+	distF.mkdirs()
 }
 
 task copyProjectTemplate (type: Copy) {
@@ -123,11 +71,11 @@ task copyProjectTemplate (type: Copy) {
 }
 
 task copyPackageJson (type: Copy) {
-	from "$rootDir/package.json"
-	into "$rootDir/dist"
+		from "$rootDir/package.json"
+		into "$rootDir/dist"
 }
 
-task getPackageVersion {
+task getPackageVersion << {
 	String content = new File("$rootDir/package.json").getText("UTF-8")
 	def jsonSlurper = new JsonSlurper()
 	def packageJsonMap = jsonSlurper.parseText(content)
@@ -135,49 +83,29 @@ task getPackageVersion {
 	pVersion = packageJsonMap.version
 }
 
-task getCommitVersion {
+task getCommitVersion << {
 	if("$System.env.GIT_COMMIT" != "null") {        
 		String content = "$System.env.GIT_COMMIT"
 		arVersion = content.trim()
 	}
 }
 
-task deleteCommitFile (type: Delete) {
-	delete "$rootDir/$commitVersionFile"
-}
-
 task generateRuntime (type: Exec) {
-    doFirst{
-        workingDir "$rootDir/test-app"
-        //def passParams = new LinkedList<String>()
-        //passParams.addAll(envVars);
-        //command gradlew buildar -PpackageVersion=[from_package.json] -PgitCommitVersion=[from_some_sys_variable]
-        if(isWinOs) {
-            // passParams.addFirst("-PgitCommitVersion=${arVersion}");
-            // passParams.addFirst("-PpackageVersion=${pVersion}");
-            // passParams.addFirst("build");
-            // passParams.addFirst("gradlew");
-            // passParams.addFirst("/c");
-            // passParams.addFirst("cmd");
-			//commandLine passParams.toArray();
-			
-            commandLine ["cmd", "/c", "gradlew", "build", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"]
-        }
-        else {
-            // passParams.addFirst("-PgitCommitVersion=${arVersion}");
-            // passParams.addFirst("-PpackageVersion=${pVersion}");
-            // passParams.addFirst("buildar");
-            // passParams.addFirst("./gradlew");
-            //commandLine passParams.toArray();
-			
-			commandLine ["./gradlew", "build", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"]
-        }
-    }
+	workingDir "$rootDir/runtime"
+	if(isWinOs) {
+		commandLine "cmd", "/c", "gradlew", "build", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"
+	}
+	else {
+		commandLine "./gradlew", "build", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"
+	}
 }
 
-task copyGeneratedRuntime (type: Copy) {
-	from "$rootDir/src/dist"
-	into "$rootDir/dist/framework"
+task copyGeneratedRuntime << {
+	copy {
+		from "$rootDir/runtime/build/outputs/aar/runtime-release.aar"
+		into "$rootDir/dist/framework/libs/"
+		rename "runtime-release.aar", "nativescript.aar"
+	}
 }
 
 task generateMetadataGeneratorJar (type: Exec) {
@@ -191,14 +119,11 @@ task generateMetadataGeneratorJar (type: Exec) {
 	}
 }
 
-task copyGeneratedMetadataGeneratorJar {
-	doLast {
-	
-		copy {
-			from "$rootDir/android-metadata-generator/dist"
-			into "$rootDir/dist/framework/build-tools"
-			rename "android-metadata-generator.jar", "metadata-generator.jar"
-		}
+task copyGeneratedMetadataGeneratorJar << {
+	copy {
+		from "$rootDir/android-metadata-generator/dist"
+		into "$rootDir/dist/framework/build-tools"
+		rename "android-metadata-generator.jar", "metadata-generator.jar"
 	}
 }
 
@@ -214,21 +139,12 @@ task createNpmPackage (type: Exec) {
 }
 
 task setPackageVersionInPackageJsonFile << {
-	if(project.hasProperty("PACKAGE_VERSION")) {
-		def inputFile = new File("./package.json")
+	if (project.hasProperty("PACKAGE_VERSION")) {
+		def inputFile = new File("$rootDir/dist/package.json")
 		def json = new JsonSlurper().parseText(inputFile.text)
 		json.version = json.version + "-" + PACKAGE_VERSION
 		def jb = new JsonBuilder(json);
 		inputFile.text = JsonOutput.prettyPrint(jb.toString())
-	}
-}
-
-task revertPackageJson (type: Exec) {
-	if(isWinOs) {
-		commandLine "cmd", "/c", "git", "checkout", "--", "./package.json"
-	}
-	else {
-		commandLine "git", "checkout", "--", "./package.json"
 	}
 }
 
@@ -242,21 +158,25 @@ createDistDir.dependsOn(cleanDistDir)
 
 
 //copy framework structure
-// cloneSBgeneratorInTemplate.dependsOn(copyLatestWidgetsJar)
 copyProjectTemplate.dependsOn(createDistDir)
-setPackageVersionInPackageJsonFile.dependsOn(copyProjectTemplate)
-copyPackageJson.dependsOn(setPackageVersionInPackageJsonFile)
-revertPackageJson.dependsOn(copyPackageJson)
+copyPackageJson.dependsOn(copyProjectTemplate)
+setPackageVersionInPackageJsonFile.dependsOn(copyPackageJson)
 
 //get version from package json
-getPackageVersion.dependsOn(revertPackageJson)
+getPackageVersion.dependsOn(setPackageVersionInPackageJsonFile)
 getCommitVersion.dependsOn(getPackageVersion)
-deleteCommitFile.dependsOn(getCommitVersion)
 
 //generate runtime and copy into framework structure
-generateRuntime.dependsOn(deleteCommitFile)
+generateRuntime.dependsOn(getCommitVersion)
 
-generateRuntime.dependsOn(build)
+//generateRuntime.dependsOn(build)
+
+tasks.whenTaskAdded { task ->
+                if (task.getName() == "build")
+                {
+                    generateRuntime
+                } 
+            }
 
 copyGeneratedRuntime.dependsOn(generateRuntime)
 
@@ -269,18 +189,18 @@ copyReadme.dependsOn(copyGeneratedMetadataGeneratorJar)
 //pack runtime
 createNpmPackage.dependsOn(copyReadme)
 
-task packar {
+task createPackage {
+	description "Builds the NativeScript Android App Package using an application project template."
 	dependsOn cleanDistDir,
             createDistDir,
             copyProjectTemplate,
 
-            setPackageVersionInPackageJsonFile,
             copyPackageJson,
-            revertPackageJson,
-            getPackageVersion,
+			setPackageVersionInPackageJsonFile,
 
+            getPackageVersion,
             getCommitVersion,
-            deleteCommitFile,
+			
             generateRuntime,
 
             copyGeneratedRuntime,
@@ -288,25 +208,7 @@ task packar {
             copyGeneratedMetadataGeneratorJar,
             copyReadme,
             createNpmPackage
-}
 
-//task runTest(type: Exec) {
-//	if(project.hasProperty("enableTest")) {
-//		workingDir "$rootDir/test-app"
-//
-//		def passParams = new LinkedList<String>()
-//		passParams.addAll(envVars);
-//		if(isWinOs) {
-//			passParams.addFirst("runtest");
-//			passParams.addFirst("gradlew");
-//			passParams.addFirst("/c");
-//			passParams.addFirst("cmd");
-//			commandLine passParams.toArray();
-//		}
-//		else {
-//			passParams.addFirst("runtest");
-//			passParams.addFirst("./gradlew");
-//			commandLine passParams.toArray();
-//		}
-//	}
-//}
+
+	println "Creating NativeScript Android Package"			
+}

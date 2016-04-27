@@ -193,7 +193,7 @@ task setPackageVersion {
     }
 	
     doFirst {
-        println "Setting runtime version ${runtimeVersion}"
+        println "Setting runtime version: '${packageVersion}'"
         
         def versionFile = "$rootDir/src/main/jni//Version.h"
         String contents = new File(versionFile).getText("UTF-8")
@@ -208,7 +208,7 @@ task setRuntimeCommit {
     }
     
     doFirst {
-        println "Setting runtime commit ${gitCommitVersion}"
+        println "Setting runtime commit: '${gitCommitVersion}'"
         
         def versionFile = "$rootDir/src/main/jni//Version.h"
         String contents = new File(versionFile).getText("UTF-8")
