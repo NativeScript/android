@@ -8,6 +8,7 @@
 #include "WeakRef.h"
 #include "ArrayBufferHelper.h"
 #include "Profiler.h"
+#include "File.h"
 
 jobject ConvertJsValueToJavaObject(tns::JEnv& env, const v8::Local<v8::Value>& value, int classReturnType);
 
@@ -58,7 +59,8 @@ namespace tns
 
 			Profiler m_profiler;
 
-			v8::StartupData *m_startupData;
+			v8::StartupData *m_startupData = nullptr;
+			MemoryMappedFile *m_heapSnapshotBlob = nullptr;
 
 			static void PrepareExtendFunction(v8::Isolate *isolate, jstring filesPath);
 			v8::Isolate* PrepareV8Runtime(const std::string& filesPath, jstring packageName, jobject jsDebugger, jstring profilerOutputDir);

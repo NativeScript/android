@@ -17,7 +17,6 @@
 #include "JsDebugger.h"
 #include "SimpleProfiler.h"
 #include "SimpleAllocator.h"
-#include "File.h"
 #include "JType.h"
 #include "Module.h"
 #include "NativeScriptException.h"
@@ -58,7 +57,6 @@ Runtime::Runtime(JNIEnv *env, jobject runtime, int id)
 {
 	m_runtime = m_env.NewGlobalRef(runtime);
 	m_objectManager = new ObjectManager(m_runtime);
-	m_startupData = nullptr;
 	s_id2RuntimeCache.insert(make_pair(id, this));
 }
 
@@ -339,10 +337,8 @@ void Runtime::PassUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, jthrowab
 }
 
 void Runtime::ClearStartupData(JNIEnv *env, jobject obj) {
-	if (m_startupData) {
-		delete m_startupData->data;
-		delete m_startupData;
-	}
+	delete m_heapSnapshotBlob;
+	delete m_startupData;
 }
 
 Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName, jobject jsDebugger, jstring profilerOutputDir)
@@ -377,11 +373,11 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 
 		if (File::Exists(snapshotPath))
 		{
-			int length;
-			m_startupData->data = reinterpret_cast<char*>(File::ReadBinary(snapshotPath, length));
-			m_startupData->raw_size = length;
+			m_heapSnapshotBlob = new MemoryMappedFile(MemoryMappedFile::Open(snapshotPath.c_str()));
+			m_startupData->data = static_cast<const char*>(m_heapSnapshotBlob->memory);
+			m_startupData->raw_size = m_heapSnapshotBlob->size;
 
-			DEBUG_WRITE_FORCE("Snapshot read %s (%dB).", snapshotPath.c_str(), length);
+			DEBUG_WRITE_FORCE("Snapshot read %s (%dB).", snapshotPath.c_str(), m_heapSnapshotBlob->size);
 		}
 		else if(saveSnapshot)
 		{
