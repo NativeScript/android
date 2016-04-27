@@ -23,72 +23,72 @@ def pVersion = "no package version was provided by build.gradle build"
 def arVersion = "no commit sha was provided by build.gradle build"
 def commitVersionFile = "commit.txt"
 
-def compileSdkVer = "";
-def buildToolsVer = "";
-def minSdkVer = "";
-def targetSdkVer = "";
-def supportVer = "";
+// def compileSdkVer = "";
+// def buildToolsVer = "";
+// def minSdkVer = "";
+// def targetSdkVer = "";
+// def supportVer = "";
 
-def envVars = new LinkedList<String>()
+//def envVars = new LinkedList<String>()
 
-//task checkEnvironmentVariables {
-//	if ("$System.env.JAVA_HOME" == "" || "$System.env.JAVA_HOME" == "null") {
-//		throw new GradleException("Set JAVA_HOME to point to the correct Jdk location\n");
-//	}
-//	if ("$System.env.ANDROID_HOME" == "" || "$System.env.ANDROID_HOME" == "null") {
-//		throw new GradleException("Set ANDROID_HOME to point to the correct Android SDK location\n");
-//	}
-//	if ("$System.env.GIT_COMMIT" == "null") {
-//		logger.warn("Warning: The GIT_COMMIT is not set. This NativeScript Android Runtime will not be tagged with the git commit it is build from\n");
-//	}
-//	if(project.hasProperty("devmode") == true && !project.hasProperty("metadataGenSrc") && !file("../android-metadata-generator").exists()) {
-//		throw new GradleException("../android-metadata-generator directory not found and no metadataGenSrc option specified. Clone the android-metadata-generator repo first.\n");
-//	}
-//	if(project.hasProperty("metadataGen") && !file("../android-metadata-generator/dist/tns-android-metadata-generator-0.0.1.tgz").exists()) {
-//		throw new GradleException("android-metadata-generator build output not found and no metadataGen option specified. Build android-metadata-generator first.\n");
-//	}
-//
-//	if(project.hasProperty("compileSdk")) {
-//		compileSdkVer = "-PcompileSdk=$compileSdk"
-//		envVars.add(compileSdkVer)
-//	}
-//	if(project.hasProperty("buildToolsVersion")) {
-//		buildToolsVer = "-PbuildToolsVersion=$buildToolsVersion"
-//		envVars.add(buildToolsVer)
-//	}
-//	if(project.hasProperty("minSdk")) {
-//		minSdkVer = "-PminSdk=$minSdk"
-//		envVars.add(minSdkVer)
-//	}
-//	if(project.hasProperty("targetSdk")) {
-//		targetSdkVer = "-PtargetSdk=$targetSdk"
-//		envVars.add(targetSdkVer)
-//	}
-//	if(project.hasProperty("supportVersion")) {
-//		supportVer = "-PsupportVersion=$supportVersion"
-//		envVars.add(supportVer)
-//	}
-//}
+task checkEnvironmentVariables {
+	if ("$System.env.JAVA_HOME" == "" || "$System.env.JAVA_HOME" == "null") {
+		throw new GradleException("Set JAVA_HOME to point to the correct Jdk location\n");
+	}
+	if ("$System.env.ANDROID_HOME" == "" || "$System.env.ANDROID_HOME" == "null") {
+		throw new GradleException("Set ANDROID_HOME to point to the correct Android SDK location\n");
+	}
+	if ("$System.env.GIT_COMMIT" == "null") {
+		logger.warn("Warning: The GIT_COMMIT is not set. This NativeScript Android Runtime will not be tagged with the git commit it is build from\n");
+	}
+	if(project.hasProperty("devmode") == true && !project.hasProperty("metadataGenSrc") && !file("../android-metadata-generator").exists()) {
+		throw new GradleException("../android-metadata-generator directory not found and no metadataGenSrc option specified. Clone the android-metadata-generator repo first.\n");
+	}
+	if(project.hasProperty("metadataGen") && !file("../android-metadata-generator/dist/tns-android-metadata-generator-0.0.1.tgz").exists()) {
+		throw new GradleException("android-metadata-generator build output not found and no metadataGen option specified. Build android-metadata-generator first.\n");
+	}
 
-//task checkAndroidCommand(type:Exec) {
-//
-//	if(isWinOs) {
-//		commandLine "cmd", "/c", "android", "-h"
-//	}
-//	else {
-//		commandLine "android", "-h"
-//	}
-//
-//	ignoreExitValue = true
-//
-//	doLast {
-//		def successResult = isWinOs ? 0 : 1
-//
-//		if (execResult.exitValue != successResult) {//1 is ok result for android tool
-//			throw new GradleException("\n--> 'android' command not found. Set the PATH variable to include the path to Android SDK Tools directory.\n\nError: " + errorOutput + "\nexitValue: " + execResult.exitValue)
-//		}
-//	}
-//}
+	// if(project.hasProperty("compileSdk")) {
+	// 	compileSdkVer = "-PcompileSdk=$compileSdk"
+	// 	envVars.add(compileSdkVer)
+	// }
+	// if(project.hasProperty("buildToolsVersion")) {
+	// 	buildToolsVer = "-PbuildToolsVersion=$buildToolsVersion"
+	// 	envVars.add(buildToolsVer)
+	// }
+	// if(project.hasProperty("minSdk")) {
+	// 	minSdkVer = "-PminSdk=$minSdk"
+	// 	envVars.add(minSdkVer)
+	// }
+	// if(project.hasProperty("targetSdk")) {
+	// 	targetSdkVer = "-PtargetSdk=$targetSdk"
+	// 	envVars.add(targetSdkVer)
+	// }
+	// if(project.hasProperty("supportVersion")) {
+	// 	supportVer = "-PsupportVersion=$supportVersion"
+	// 	envVars.add(supportVer)
+	// }
+}
+
+// task checkAndroidCommand(type:Exec) {
+
+// 	if(isWinOs) {
+// 		commandLine "cmd", "/c", "android", "-h"
+// 	}
+// 	else {
+// 		commandLine "android", "-h"
+// 	}
+
+// 	ignoreExitValue = true
+
+// 	doLast {
+// 		def successResult = isWinOs ? 0 : 1
+
+// 		if (execResult.exitValue != successResult) {//1 is ok result for android tool
+// 			throw new GradleException("\n--> 'android' command not found. Set the PATH variable to include the path to Android SDK Tools directory.\n\nError: " + errorOutput + "\nexitValue: " + execResult.exitValue)
+// 		}
+// 	}
+// }
 
 //task ndkBuild (type: Exec) {
 //	if(isWinOs) {
@@ -118,7 +118,7 @@ task createDistDir {
 }
 
 task copyProjectTemplate (type: Copy) {
-	from "$rootDir/build/project-template-gradle"
+	from "$rootDir/build-artifacts/project-template-gradle"
 	into "$rootDir/dist/framework"
 }
 
@@ -149,24 +149,28 @@ task deleteCommitFile (type: Delete) {
 task generateRuntime (type: Exec) {
     doFirst{
         workingDir "$rootDir/test-app"
-        def passParams = new LinkedList<String>()
-        passParams.addAll(envVars);
+        //def passParams = new LinkedList<String>()
+        //passParams.addAll(envVars);
         //command gradlew buildar -PpackageVersion=[from_package.json] -PgitCommitVersion=[from_some_sys_variable]
         if(isWinOs) {
-            passParams.addFirst("-PgitCommitVersion=${arVersion}");
-            passParams.addFirst("-PpackageVersion=${pVersion}");
-            passParams.addFirst("build");
-            passParams.addFirst("gradlew");
-            passParams.addFirst("/c");
-            passParams.addFirst("cmd");
-            commandLine passParams.toArray()
+            // passParams.addFirst("-PgitCommitVersion=${arVersion}");
+            // passParams.addFirst("-PpackageVersion=${pVersion}");
+            // passParams.addFirst("build");
+            // passParams.addFirst("gradlew");
+            // passParams.addFirst("/c");
+            // passParams.addFirst("cmd");
+			//commandLine passParams.toArray();
+			
+            commandLine ["cmd", "/c", "gradlew", "build", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"]
         }
         else {
-            passParams.addFirst("-PgitCommitVersion=${arVersion}");
-            passParams.addFirst("-PpackageVersion=${pVersion}");
-            passParams.addFirst("buildar");
-            passParams.addFirst("./gradlew");
-            commandLine passParams.toArray();
+            // passParams.addFirst("-PgitCommitVersion=${arVersion}");
+            // passParams.addFirst("-PpackageVersion=${pVersion}");
+            // passParams.addFirst("buildar");
+            // passParams.addFirst("./gradlew");
+            //commandLine passParams.toArray();
+			
+			commandLine ["./gradlew", "build", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"]
         }
     }
 }
