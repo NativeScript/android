@@ -21,6 +21,7 @@
 #include "JType.h"
 #include "Module.h"
 #include "NativeScriptException.h"
+#include "V8NativeScriptExtension.h"
 #include "Runtime.h"
 #include "ArrayHelper.h"
 #include <sstream>
@@ -345,14 +346,16 @@ void Runtime::ClearStartupData(JNIEnv *env, jobject obj) {
 	}
 }
 
-Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName, jobject jsDebugger, jstring profilerOutputDir)
-{
+static void InitializeV8() {
 	auto platform = v8::platform::CreateDefaultPlatform();
 	V8::InitializePlatform(platform);
 	V8::Initialize();
+}
 
+Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName, jobject jsDebugger, jstring profilerOutputDir)
+{
 	Isolate::CreateParams create_params;
-	string customScript;
+	bool didInitializeV8 = false;
 
 	create_params.array_buffer_allocator = &g_allocator;
 	// prepare the snapshot blob
@@ -385,6 +388,13 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 		}
 		else if(saveSnapshot)
 		{
+			// This should be executed before V8::Initialize, which calls it with false.
+			NativeScriptExtension::Probe(true);
+			InitializeV8();
+			didInitializeV8 = true;
+
+			string customScript;
+
 			// check for custom script to include in the snapshot
 			if(Constants::V8_HEAP_SNAPSHOT_SCRIPT.size() > 0 && File::Exists(Constants::V8_HEAP_SNAPSHOT_SCRIPT))
 			{
@@ -412,6 +422,9 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 		create_params.snapshot_blob = m_startupData;
 	}
 
+	if (!didInitializeV8) {
+		InitializeV8();
+	}
 	auto isolate = Isolate::New(create_params);
 	Isolate::Scope isolate_scope(isolate);
 	HandleScope handleScope(isolate);
