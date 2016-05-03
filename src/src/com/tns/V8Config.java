@@ -11,7 +11,6 @@ class V8Config
 	private static final String AndroidKey = "android";
 	private static final String V8FlagsKey = "v8Flags";
 	private static final String CodeCacheKey = "codeCache";
-	private static final String HeapSnapshotKey = "heapSnapshot";
 	private static final String HeapSnapshotScriptKey = "heapSnapshotScript";
 	private static final String HeapSnapshotBlobKey = "heapSnapshotBlob";
 	private static final String SnapshotFile = "snapshot.blob";
@@ -41,14 +40,10 @@ class V8Config
 				{
 					result[1] = androidObject.getBoolean(CodeCacheKey);
 				}
-				if (androidObject.has(HeapSnapshotKey))
-				{
-					result[2] = androidObject.getBoolean(HeapSnapshotKey);
-				}
 				if(androidObject.has(HeapSnapshotScriptKey))
 				{
 					String value = androidObject.getString(HeapSnapshotScriptKey);
-					result[3] = FileSystem.resolveRelativePath(appDir.getPath(), value, appDir + "/app/");
+					result[2] = FileSystem.resolveRelativePath(appDir.getPath(), value, appDir + "/app/");
 				}
 				if(androidObject.has(HeapSnapshotBlobKey))
 				{
@@ -59,12 +54,12 @@ class V8Config
 					{
 						// this path is expected to be a directory, containing three sub-directories: armeabi-v7a, x86 and arm64-v8a 
 						path = path + "/" + Build.CPU_ABI + "/" + SnapshotFile;
-						result[4] = path;
+						result[3] = path;
 					}
 				}
 				if(androidObject.has(ProfilerOutputDirKey))
 				{
-					result[5] = androidObject.getString(ProfilerOutputDirKey);
+					result[4] = androidObject.getString(ProfilerOutputDirKey);
 				}
 			}
 		}
@@ -82,8 +77,6 @@ class V8Config
 			// v8 startup flags, defaults to --expose_gc due to tns_modules requirement 
 			"--expose_gc",
 			// enable v8 code caching, false by default
-			false,
-			// enable v8 heap snapshot, false by default
 			false,
 			// arbitrary script to be included in the snapshot
 			"",
