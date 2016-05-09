@@ -380,7 +380,12 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 
 			DEBUG_WRITE_FORCE("Snapshot read %s (%dB).", snapshotPath.c_str(), m_heapSnapshotBlob->size);
 		}
-		else if(saveSnapshot)
+		else if (!saveSnapshot)
+		{
+			DEBUG_WRITE_FORCE("No snapshot file found at %s", snapshotPath.c_str());
+
+		}
+		else
 		{
 			// This should be executed before V8::Initialize, which calls it with false.
 			NativeScriptExtension::Probe(true);
@@ -390,7 +395,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 			string customScript;
 
 			// check for custom script to include in the snapshot
-			if(Constants::V8_HEAP_SNAPSHOT_SCRIPT.size() > 0 && File::Exists(Constants::V8_HEAP_SNAPSHOT_SCRIPT))
+			if (Constants::V8_HEAP_SNAPSHOT_SCRIPT.size() > 0 && File::Exists(Constants::V8_HEAP_SNAPSHOT_SCRIPT))
 			{
 				customScript = File::ReadText(Constants::V8_HEAP_SNAPSHOT_SCRIPT);
 			}
@@ -398,14 +403,20 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 			DEBUG_WRITE_FORCE("Creating heap snapshot");
 			*m_startupData = V8::CreateSnapshotDataBlob(customScript.c_str());
 
-			if (m_startupData->raw_size == 0) {
+			if (m_startupData->raw_size == 0)
+			{
 				DEBUG_WRITE_FORCE("Failed to create heap snapshot.");
-			} else {
+			}
+			else
+			{
 				bool writeSuccess = File::WriteBinary(snapshotPath, m_startupData->data, m_startupData->raw_size);
 
-				if (!writeSuccess) {
+				if (!writeSuccess)
+				{
 					DEBUG_WRITE_FORCE("Failed to save created snapshot.");
-				} else {
+				}
+				else
+				{
 					DEBUG_WRITE_FORCE("Saved snapshot of %s (%dB) in %s (%dB)",
 							Constants::V8_HEAP_SNAPSHOT_SCRIPT.c_str(), customScript.size(),
 							snapshotPath.c_str(), m_startupData->raw_size);
