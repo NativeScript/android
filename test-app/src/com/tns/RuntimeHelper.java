@@ -122,22 +122,5 @@ public class RuntimeHelper
 		}
 	}
 	
-/*	public static boolean isDebuggableApp(Context context)
-	{
-		int flags;
-		try
-		{
-			flags = context.getPackageManager().getPackageInfo(context.getPackageName(), 0).applicationInfo.flags;
-		}
-		catch (NameNotFoundException e)
-		{
-			flags = 0;
-			e.printStackTrace();
-		}
-
-		boolean isDebuggableApp = ((flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0);
-		return isDebuggableApp;
-	}*/
-	
 	private final String logTag = "MyApp";
 }
