@@ -130,13 +130,11 @@ void Runtime::Init(jstring filesPath, bool verboseLoggingEnabled, jstring packag
 	Constants::V8_STARTUP_FLAGS = ArgConverter::jstringToString(v8Flags);
 	JniLocalRef cacheCode(m_env.GetObjectArrayElement(args, 1));
 	Constants::V8_CACHE_COMPILED_CODE = (bool) cacheCode;
-	JniLocalRef snapshot(m_env.GetObjectArrayElement(args, 2));
-	Constants::V8_HEAP_SNAPSHOT = (bool)snapshot;
-	JniLocalRef snapshotScript(m_env.GetObjectArrayElement(args, 3));
+	JniLocalRef snapshotScript(m_env.GetObjectArrayElement(args, 2));
 	Constants::V8_HEAP_SNAPSHOT_SCRIPT = ArgConverter::jstringToString(snapshotScript);
-	JniLocalRef snapshotBlob(m_env.GetObjectArrayElement(args, 4));
+	JniLocalRef snapshotBlob(m_env.GetObjectArrayElement(args, 3));
 	Constants::V8_HEAP_SNAPSHOT_BLOB = ArgConverter::jstringToString(snapshotBlob);
-	JniLocalRef profilerOutputDir(m_env.GetObjectArrayElement(args, 5));
+	JniLocalRef profilerOutputDir(m_env.GetObjectArrayElement(args, 4));
 
 	DEBUG_WRITE("Initializing Telerik NativeScript");
 
@@ -355,7 +353,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 
 	create_params.array_buffer_allocator = &g_allocator;
 	// prepare the snapshot blob
-	if (Constants::V8_HEAP_SNAPSHOT)
+	if (!Constants::V8_HEAP_SNAPSHOT_BLOB.empty() || !Constants::V8_HEAP_SNAPSHOT_SCRIPT.empty())
 	{
 		DEBUG_WRITE_FORCE("Snapshot enabled.");
 
