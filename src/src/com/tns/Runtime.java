@@ -159,10 +159,10 @@ public class Runtime
 	
 	public void init()
 	{
-		init(config.application, config.threadScheduler, config.logger, config.appName, config.runtimeLibPath, config.rootDir, config.appDir, config.classLoader, config.dexDir, config.dexThumb);
+		init(config.threadScheduler, config.logger, config.debugger, config.appName, config.runtimeLibPath, config.rootDir, config.appDir, config.classLoader, config.dexDir, config.dexThumb);
 	}
 
-	private void init(Application application, ThreadScheduler threadScheduler, Logger logger, String appName, File runtimeLibPath, File rootDir, File appDir, ClassLoader classLoader, File dexDir, String dexThumb) throws RuntimeException
+	private void init(ThreadScheduler threadScheduler, Logger logger, Debugger debugger, String appName, File runtimeLibPath, File rootDir, File appDir, ClassLoader classLoader, File dexDir, String dexThumb) throws RuntimeException
 	{
 		if (initialized)
 		{
@@ -190,9 +190,9 @@ public class Runtime
 		}
 		Object[] v8Config = V8Config.fromPackageJSON(appDir);
 
-		if (JsDebugger.isDebuggableApp(application))
+		if (debugger != null)//JsDebugger.isDebuggableApp(application))
 		{
-			jsDebugger = new JsDebugger(application, logger, threadScheduler);
+			jsDebugger = new JsDebugger(debugger, threadScheduler);
 		}
 		
 		initNativeScript(getRuntimeId(), Module.getApplicationFilesPath(), logger.isEnabled(), appName, v8Config, jsDebugger);
@@ -201,6 +201,7 @@ public class Runtime
 		{
 			jsDebugger.start();
 		}
+		
 		ClearStartupData(getRuntimeId()); // It's safe to delete the data after the V8 debugger is initialized
 		
 		if (logger.isEnabled())

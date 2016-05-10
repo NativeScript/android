@@ -114,14 +114,14 @@ class ErrorReport
 	{
 		Class<?> errorActivityClass = ErrorReportActivity.class;
 
-		if (JsDebugger.isDebuggableApp(context))		
+		if (AndroidJsDebugger.isDebuggableApp(context))		
 		{		
 			errorActivityClass = ErrorReportActivity.class;
 		}
 		else {
 			return null;
 		}
-
+		
 		Intent intent = new Intent(context, errorActivityClass);
 
 		intent.putExtra(EXTRA_NATIVESCRIPT_ERROR_REPORT, EXTRA_ERROR_REPORT_VALUE);
