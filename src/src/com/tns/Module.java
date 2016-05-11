@@ -249,18 +249,25 @@ class Module
 		// 2. Check for index.js
 		// 3. Check for bootstrap.js
 
-		File bootstrapFile = resolvePathHelper("./", "");
-		if (!bootstrapFile.exists())
-		{
-			bootstrapFile = resolvePathHelper("./bootstrap", "");
+		String notFoundMessage = "Application entry point file not found. Please specify the file in package.json otherwise make sure the file index.js or bootstrap.js exists. \\n If using typescript make sure your entry point file is transpiled to javascript.";
+
+        // resolvePathHelper() never returns a non-existing file. Instead it throws an exception.
+		File bootstrapFile;
+		try {
+			bootstrapFile = resolvePathHelper("./", "");
+		} catch (NativeScriptException ex) {
+			throw new NativeScriptException(notFoundMessage, ex);
 		}
 
-		if (!bootstrapFile.exists())
-		{
-			throw new NativeScriptException("Application entry point file not found. Please specify either package.json with main field, index.js or bootstrap.js!");
+		if(bootstrapFile == null) {
+			try {
+				bootstrapFile = resolvePathHelper("./bootstrap", "");
+				return bootstrapFile.getAbsolutePath();
+			} catch (NativeScriptException ex) {
+				throw new NativeScriptException(notFoundMessage, ex);
+			}
 		}
 
-		String modulePath = bootstrapFile.getAbsolutePath();
-		return modulePath;
+		return bootstrapFile.getAbsolutePath();
 	}
 }
