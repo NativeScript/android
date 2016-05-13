@@ -19,7 +19,7 @@
 */
 
 import groovy.json.JsonSlurper //used to parse package.json
-
+w
 buildscript {
     repositories {
         jcenter()
@@ -227,22 +227,26 @@ def createProductFlavorsContent(flavor, dimensionName, includeAndroidContent = t
 {
 	if (includeAndroidContent)
   	{
-    	def content = """android {
-          productFlavors {
-            "${flavor}" {
-              dimension "${dimensionName}"
-            }
-          }
-        }"""
+    	def content = """
+android {
+    productFlavors {
+        "${flavor}" {
+            dimension "${dimensionName}"
+        }
+    }
+}
+"""
     	return content;
 	}
 	else
 	{
-    	def content = """productFlavors {
-              "${flavor}" {
-                dimension "${dimensionName}"
-              }
-            }"""
+    	def content = """
+    productFlavors {
+        "${flavor}" {
+            dimension "${dimensionName}"
+        }
+    }
+"""
       return content;
 	}
 }
@@ -383,9 +387,11 @@ task createPluginsConfigFile {
 			println "\t Creating product flavors include.gradle file in $configurationsDir folder..."
 			def flavors = flavorNames.join(", ")
 			
-			def content = """android {
-						flavorDimensions ${flavors}
-					}"""
+			def content = """
+android {
+    flavorDimensions ${flavors}
+}
+"""
 			
 			flavorsFile.text =  content
 		}
