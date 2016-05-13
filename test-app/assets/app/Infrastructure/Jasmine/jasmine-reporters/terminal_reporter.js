@@ -20,11 +20,7 @@
         return dupe;
     }
     function log(str) {
-    	__log(str);
-//        var con = global.console || console;
-//        if (con && con.log && str) {
-//            con.log(str);
-//        }
+        android.util.Log.d("TNS.Jasmine", str);
     }
 
 
