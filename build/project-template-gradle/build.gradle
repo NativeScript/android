@@ -19,7 +19,7 @@
 */
 
 import groovy.json.JsonSlurper //used to parse package.json
-w
+
 buildscript {
     repositories {
         jcenter()
