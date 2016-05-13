@@ -9,14 +9,9 @@ public final class LogcatLogger implements Logger
 
 	private boolean enabled;
 
-	public LogcatLogger(boolean isEnabled, Context context)
+	public LogcatLogger(Context context)
 	{
-		this.enabled = isEnabled;
-
-		if (!isEnabled)
-		{
-			this.initLogging(context);
-		}
+		this.initLogging(context);
 	}
 
 	public final boolean isEnabled()

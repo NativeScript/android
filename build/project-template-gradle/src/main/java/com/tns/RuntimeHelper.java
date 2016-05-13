@@ -46,7 +46,7 @@ public class RuntimeHelper
 	{
 		System.loadLibrary("NativeScript");
 		
-		Logger logger = new LogcatLogger(false, app);
+		Logger logger = new LogcatLogger(app);
 		Debugger debugger = new AndroidJsDebugger(app, logger);
 		
 		boolean showErrorIntent = hasErrorIntent();
