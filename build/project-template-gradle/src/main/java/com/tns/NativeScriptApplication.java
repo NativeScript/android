@@ -7,12 +7,17 @@ public class NativeScriptApplication extends android.app.Application implements 
 
     private static NativeScriptApplication thiz;
 
+	private static boolean firstRun = true;
+
     public NativeScriptApplication() {
         thiz = this;
     }
 
     public void onCreate() {
-		new RuntimeHelper(this).initRuntime();
+		if (firstRun) {
+			firstRun = false;
+			new RuntimeHelper(this).initRuntime();
+		}
 		if (Runtime.isInitialized()) {
 	        java.lang.Object[] params = null;
 	        com.tns.Runtime.callJSMethod(this, "onCreate", void.class, params);
