@@ -10,14 +10,14 @@
 ///////////////// CONFIGURATION /////////////////
 
 var disableLogger = true;
-if(process.env.AST_PARSER_DISABLE_LOGGING && process.env.AST_PARSER_DISABLE_LOGGING.trim() === "true") {
+if (process.env.AST_PARSER_DISABLE_LOGGING && process.env.AST_PARSER_DISABLE_LOGGING.trim() === "true") {
 	disableLogger = true;
 }
 
 loggingSettings = {
-	"logPath" : require("path").dirname(require.main.filename) + "/logs/i.txt",
-	"strategy" : "console",
-	"APP_NAME" : "ast_parser",
+	"logPath": require("path").dirname(require.main.filename) + "/logs/i.txt",
+	"strategy": "console",
+	"APP_NAME": "ast_parser",
 	"disable": disableLogger
 };
 
@@ -25,12 +25,11 @@ var fs = require("fs"),
 	babelParser = require("babylon"),
 	traverse = require("babel-traverse"),
 	logger = require('./helpers/logger')(loggingSettings),
-	fileHelpers = require("./helpers/file_helpers")({logger: logger}),
+	fileHelpers = require("./helpers/file_helpers")({ logger: logger }),
 	path = require("path"),
 	stringify = require("./helpers/json_extension"),
 	es5_visitors = require("./visitors/es5-visitors"),
 	t = require("babel-types"),
-	filewalker = require('filewalker'),
 	lazy = require("lazy"),
 	eol = require('os').EOL,
 
@@ -42,28 +41,29 @@ var fs = require("fs"),
 	interfacesNamesFilePath = "../interfaces-names.txt", //default interace_names file path
 	interfaceNames = [];
 
+
 //env variables
-if(process.env.AST_PARSER_OUT_FILE) {
+if (process.env.AST_PARSER_OUT_FILE) {
 	outFile = process.env.AST_PARSER_OUT_FILE.trim();
 }
-if(process.env.AST_PARSER_INPUT_DIR) {
+if (process.env.AST_PARSER_INPUT_DIR) {
 	inputDir = process.env.AST_PARSER_INPUT_DIR.trim();
 }
-if(process.env.AST_PARSER_INTERFACE_FILE_PATH) {
+if (process.env.AST_PARSER_INTERFACE_FILE_PATH) {
 	interfacesNamesFilePath = process.env.AST_PARSER_INTERFACE_FILE_PATH.trim();
 }
 
 
 //console variables have priority
-if(arguments && arguments.length >= 3) {
+if (arguments && arguments.length >= 3) {
 	inputDir = arguments[2]
 	console.log("inputDir: " + inputDir)
 }
-if(arguments && arguments.length >= 4) {
+if (arguments && arguments.length >= 4) {
 	outFile = arguments[3]
 	console.log("outFile: " + outFile)
 }
-if(arguments && arguments.length >= 5) {
+if (arguments && arguments.length >= 5) {
 	interfacesNamesFilePath = arguments[4]
 	console.log("interface names path: " + interfacesNamesFilePath)
 }
@@ -77,29 +77,58 @@ fileHelpers.createFile(outFile)
 *	Traverses a given input directory and attempts to visit every ".js" file.
 *	It passes each found file down the line.
 */
-var traverseFilesDir = function(filesDir) {
-
-	if(!fs.existsSync(filesDir)) {
+var traverseAndAnalyseFilesDir = function (filesDir) {
+	if (!fs.existsSync(filesDir)) {
 		throw "The input dir: " + filesDir + " does not exist!";
 	}
 
-	filewalker(filesDir)
-		.on("file", function (file, info) {
-			if(file.substring(file.length - 3, file.length) === '.js') {
-				var currentFileName = path.join(filesDir, file);
+	traverseDirectory(filesDir);
+}
 
-				readFile(currentFileName)
+function traverseDirectory(dir) {
+	// list all files in directory
+    fs.readdir(dir, function (err, files) {
+		var pJsonFile;
+
+		for (var i = 0; i < files.length; i++) {
+			if (files[i] === "package.json") {
+				pJsonFile = true;
+				break;
+			}
+		}
+
+		if (pJsonFile) {
+			var fullPJsonPath = path.join(dir, "package.json");
+			var pjson = require(fullPJsonPath);
+			if (!pjson.nativescript) {
+				// if (pjson.nativescript.sbgShouldNotVisit && pjson.nativescript.platforms) {
+				// 	return;
+				// }
+				return;
+			}
+		}
+
+        for (var i = 0; i < files.length; i += 1) {
+            var file = path.join(dir, files[i]);
+			
+			if (file.substring(file.length - 3, file.length) === '.js') {
+				console.log(file);
+
+				readFile(file)
 					.then(astFromFileContent)
 					// .then(writeToFile)
 					.then(visitAst)
 					.then(writeToFile)
 					.catch(exceptionHandler)
 			}
-		})
-		.on('error', function(err) {
-			reject(err);
-		})
-		.walk();
+
+            var isDir = fs.statSync(file).isDirectory();
+
+            if (isDir) {
+                traverseDirectory(file);
+            }
+        }
+    });
 }
 
 // ENTRY POINT!
@@ -108,21 +137,21 @@ var traverseFilesDir = function(filesDir) {
 *	After reading interface names runs the visiting api
 */
 function readInterfaceNames() {
-	return new Promise(function (resolve, reject) {		
+	return new Promise(function (resolve, reject) {
 		new lazy(fs.createReadStream(interfacesNamesFilePath))
-		.lines
-		.forEach(function(line){
-			 interfaceNames.push(line.toString());
-			 // console.log(line.toString());
-	    }).on('pipe', function (err) {
-	    	if(err) {
-	    		reject(false);
-	    	}
-	 		resolve(inputDir);
-		});
+			.lines
+			.forEach(function (line) {
+				interfaceNames.push(line.toString());
+				// console.log(line.toString());
+			}).on('pipe', function (err) {
+				if (err) {
+					reject(false);
+				}
+				resolve(inputDir);
+			});
 	})
 }
-readInterfaceNames().then(traverseFilesDir)
+readInterfaceNames().then(traverseAndAnalyseFilesDir)
 
 
 /*
@@ -133,7 +162,7 @@ var readFile = function (filePath, err) {
 
 		fs.readFile(filePath, function (err, data) {
 
-			if(err) {
+			if (err) {
 				logger.warn("+DIDN'T get content of file!");
 				return reject(err);
 			}
@@ -154,17 +183,17 @@ var readFile = function (filePath, err) {
 var astFromFileContent = function (data, err) {
 	return new Promise(function (resolve, reject) {
 
-		if(err) {
+		if (err) {
 			logger.warn("+DIDN'T parse ast from file!");
 			return reject(err);
 		}
-		
+
 		logger.info("+parsing ast from file!");
 		// console.log("data: " + data.data);
 		var ast = babelParser.parse(data.data, {
-						minify: false,
-						plugins: ["decorators"]
-					});
+			minify: false,
+			plugins: ["decorators"]
+		});
 		data.ast = ast;
 		return resolve(data);
 	});
@@ -180,8 +209,8 @@ function onlyUnique(value, index, self) {
 *	Passes the extracted bindings data down the line.
 */
 var visitAst = function (data, err) {
-	return new Promise (function (resolve, reject) {
-		if(err) {
+	return new Promise(function (resolve, reject) {
+		if (err) {
 			logger.warn("+DIDN'T visit ast!");
 			return reject(err);
 		}
@@ -211,26 +240,26 @@ var visitAst = function (data, err) {
 	});
 }
 
-var writeToFile = function(data, err) {
+var writeToFile = function (data, err) {
 
-	return new Promise (function (resolve, reject) {
+	return new Promise(function (resolve, reject) {
 
-		if(data.trim() != "") {
+		if (data.trim() != "") {
 
 			// fs.appendFile(outFile, stringify(data), function (writeFileError) {
 			fs.appendFile(outFile, data + eol, function (writeFileError) {
-				if(err) {
+				if (err) {
 					logger.warn("Error from writeToFile: " + err);
 					return reject(err);
 				}
-				if(writeFileError) {				
+				if (writeFileError) {
 					logger.warn("Error writing file: " + writeFileError);
 					return reject(writeFileError);
 				}
 
 				logger.info("+appended '" + data + "' to file: " + outFile);
 				return resolve(data);
-				
+
 			});
 		}
 	});
@@ -241,7 +270,7 @@ var writeToFile = function(data, err) {
 *	If the error is criticalthe process is exited.
 */
 var exceptionHandler = function (reason) {
-	if(reason.errCode && reason.errCode === 1) {
+	if (reason.errCode && reason.errCode === 1) {
 		logger.error("(*)(*)(*)Error: Exception Handler Caught: " + reason.message);
 		logger.error("PROCESS EXITING...");
 		process.stderr.write(reason.message);
