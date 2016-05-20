@@ -39,7 +39,8 @@ var fs = require("fs"),
 	outFile = "out/out_parsed_typescript.txt", // default out file
 	inputDir = "input_parced_typescript", // default input folder
 	interfacesNamesFilePath = "../interfaces-names.txt", //default interace_names file path
-	interfaceNames = [];
+	interfaceNames = [],
+	rootTraversed = false;
 
 
 //env variables
@@ -91,7 +92,7 @@ function traverseDirectory(dir) {
     fs.readdir(dir, function (err, files) {
 		var pJsonFile;
 
-		if (dir !== inputDir) {
+		if (rootTraversed || dir !== inputDir) {
 			for (var i = 0; i < files.length; i++) {
 				if (files[i] === "package.json") {
 					pJsonFile = true;
@@ -109,6 +110,8 @@ function traverseDirectory(dir) {
 					return;
 				}
 			}
+		} else {
+			rootTraversed = true;
 		}
 
         for (var i = 0; i < files.length; i += 1) {
