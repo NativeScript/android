@@ -36,8 +36,8 @@ var fs = require("fs"),
 	arguments = process.argv,
 	appDir = path.dirname(require.main.filename),
 	extendDecoratorName = "JavaProxy",
-	outFile = "out/out_parsed_typescript.txt", //default out file
-	inputDir = "input_parced_typescript", //default input folder
+	outFile = "out/out_parsed_typescript.txt", // default out file
+	inputDir = "input_parced_typescript", // default input folder
 	interfacesNamesFilePath = "../interfaces-names.txt", //default interace_names file path
 	interfaceNames = [];
 
@@ -87,32 +87,35 @@ var traverseAndAnalyseFilesDir = function (filesDir) {
 
 function traverseDirectory(dir) {
 	// list all files in directory
+
     fs.readdir(dir, function (err, files) {
 		var pJsonFile;
 
-		for (var i = 0; i < files.length; i++) {
-			if (files[i] === "package.json") {
-				pJsonFile = true;
-				break;
+		if (dir !== inputDir) {
+			for (var i = 0; i < files.length; i++) {
+				if (files[i] === "package.json") {
+					pJsonFile = true;
+					break;
+				}
 			}
-		}
 
-		if (pJsonFile) {
-			var fullPJsonPath = path.join(dir, "package.json");
-			var pjson = require(fullPJsonPath);
-			if (!pjson.nativescript) {
-				// if (pjson.nativescript.sbgShouldNotVisit && pjson.nativescript.platforms) {
-				// 	return;
-				// }
-				return;
+			if (pJsonFile) {
+				var fullPJsonPath = path.join(dir, "package.json");
+				var pjson = require(fullPJsonPath);
+				if (!pjson.nativescript) {
+					// if (pjson.nativescript.sbgShouldNotVisit && pjson.nativescript.platforms) {
+					// 	return;
+					// }
+					return;
+				}
 			}
 		}
 
         for (var i = 0; i < files.length; i += 1) {
             var file = path.join(dir, files[i]);
-			
+
 			if (file.substring(file.length - 3, file.length) === '.js') {
-				console.log(file);
+				logger.info("Visiting JavaScript file: " + file);
 
 				readFile(file)
 					.then(astFromFileContent)
@@ -147,6 +150,8 @@ function readInterfaceNames() {
 				if (err) {
 					reject(false);
 				}
+
+				inputDir = path.normalize(inputDir);
 				resolve(inputDir);
 			});
 	})
@@ -163,7 +168,7 @@ var readFile = function (filePath, err) {
 		fs.readFile(filePath, function (err, data) {
 
 			if (err) {
-				logger.warn("+DIDN'T get content of file!");
+				logger.warn("+DIDN'T get content of file: " + filePath);
 				return reject(err);
 			}
 
@@ -214,8 +219,6 @@ var visitAst = function (data, err) {
 			logger.warn("+DIDN'T visit ast!");
 			return reject(err);
 		}
-
-		logger.info("+visiting ast with given visitor library!");
 
 		traverse.default(data.ast, {
 			enter(path) {
