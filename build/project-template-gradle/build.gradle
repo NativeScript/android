@@ -42,6 +42,7 @@ def nodeModulesDir = "../../node_modules/"
 def libDir = "$projectDir/../../lib/Android/"
 def flavorNames = new ArrayList<String>()
 def configDir = file(configurationsDir)
+def dtsFilesDir = System.getenv("TNS_TYPESCRIPT_DECLARATIONS_PATH");
 
 def packageJsonContents = [:]
 def excludedDevDependencies = ['**/.bin/**']
@@ -169,6 +170,9 @@ android {
 		}
 		
 		compileSourcesTask.finalizedBy(buildMetadata)
+		if(dtsFilesDir != null && dtsFilesDir != "") {
+			buildMetadata.finalizedBy(generateDtsFiles)
+		}
 	}
 }
 
@@ -575,6 +579,38 @@ task buildMetadata (type: JavaExec) {
 	}
 }
 
+task generateDtsFiles (type: JavaExec) {
+
+	outputs.upToDateWhen {
+		!buildMetadata.didWork
+	}
+
+	def dtsFiles = new File("$dtsFilesDir")
+	if(dtsFiles.exists()) {
+		delete dtsFiles
+	}
+	dtsFiles.mkdir();
+
+	doFirst {
+		main "-jar"
+
+		def list = [];
+		list.add("$projectDir/build-tools/dts-generator.jar")
+		list.add("$dtsFilesDir")
+
+		metadataParams.each({f -> 
+			if(!f.endsWith("metadata-generator.jar")) {
+
+				if(f.endsWith(".jar") || (new File(f)).isDirectory()) {
+					println f
+					list.add(f);
+				}
+			}
+		})
+
+		args list.toArray()
+	}
+}
 
 task deleteExplodedAarFolder (type: Delete) {
 
