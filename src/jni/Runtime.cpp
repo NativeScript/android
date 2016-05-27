@@ -484,6 +484,9 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 
 	MetadataNode::BuildMetadata(filesPath);
 
+	auto enableProfiler = !outputDir.empty();
+	MetadataNode::EnableProfiler(enableProfiler);
+
 	MetadataNode::CreateTopLevelNamespaces(isolate, global);
 
 	ArrayHelper::Init(context);
