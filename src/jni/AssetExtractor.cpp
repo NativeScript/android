@@ -18,8 +18,6 @@ void AssetExtractor::ExtractAssets(JNIEnv *env, jobject obj, jstring apk, jstrin
 {
 	auto arch = jstringToString(env, architecture);
 
-//	DEBUG_WRITE("DEVICE CPU ARCHITECTURE IS :: %s", arch.c_str());
-
 	auto forceOverwrite = JNI_TRUE == _forceOverwrite;
 	auto strApk = jstringToString(env, apk);
 	auto baseDir = jstringToString(env, outputDir);
@@ -31,7 +29,7 @@ void AssetExtractor::ExtractAssets(JNIEnv *env, jobject obj, jstring apk, jstrin
 	struct zip_file *zf;
 	char buf[65536];
 	auto pathcopy = new char[1024];
-	int snapshotFound = 0;
+	bool snapshotFound = 0;
 
 	for (zip_int64_t i = 0; i < num; i++)
 	{
@@ -53,30 +51,22 @@ void AssetExtractor::ExtractAssets(JNIEnv *env, jobject obj, jstring apk, jstrin
 
 			if(sSpos != std::string::npos) {
 				const std::string ARMEABIV7 = "armeabi-v7a";
-				const std::string ARMEABI = "armeabi";
 				const std::string X86 = "x86";
-				const std::string X86_64 = "x86_64";
 				const std::string ARM64V8 = "arm64_v8a";
 
 				if(snapshotFound) {
 					continue;
 				}
 
-				if (nameStr.find(ARMEABIV7) != std::string::npos) {
-					if(arch == ARMEABIV7 || arch == ARMEABI) {
-						DEBUG_WRITE("EXTRACTED THE armeabi-v7a architecture snapshot blob!");
-						snapshotFound = 1;
-					}
-				} else if (nameStr.find(X86) != std::string::npos) {
-					if(arch == X86 || arch == X86_64) {
-						DEBUG_WRITE("EXTRACTED THE x86 architecture snapshot blob!");
-						snapshotFound = 1;
-					}
-				} else if (nameStr.find(ARM64V8) != std::string::npos) {
-					if(arch == ARM64V8) {
-						DEBUG_WRITE("EXTRACTED THE arm64-v8a architecture snapshot blob!");
-						snapshotFound = 1;
-					}
+				if (nameStr.find(ARMEABIV7) != std::string::npos && arch == ARMEABIV7) {
+					DEBUG_WRITE("EXTRACTED THE armeabi-v7a architecture snapshot blob!");
+					snapshotFound = 1;
+				} else if (nameStr.find(X86) != std::string::npos && arch == X86) {
+					DEBUG_WRITE("EXTRACTED THE x86 architecture snapshot blob!");
+					snapshotFound = 1;
+				} else if (nameStr.find(ARM64V8) != std::string::npos && arch == ARM64V8) {
+					DEBUG_WRITE("EXTRACTED THE arm64-v8a architecture snapshot blob!");
+					snapshotFound = 1;
 				}
 
 				// the snapshot that was found does not satisfy the architecture
@@ -84,7 +74,6 @@ void AssetExtractor::ExtractAssets(JNIEnv *env, jobject obj, jstring apk, jstrin
 					continue;
 				}
 			}
-
 
 			struct stat attrib;
 			auto shouldOverwrite = true;
