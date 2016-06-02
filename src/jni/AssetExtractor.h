@@ -8,7 +8,7 @@ namespace tns
 	class AssetExtractor
 	{
 		public:
-			static void ExtractAssets(JNIEnv *env, jobject obj, jstring apk, jstring outputDir, jboolean _forceOverwrite);
+			static void ExtractAssets(JNIEnv *env, jobject obj, jstring apk, jstring outputDir, jboolean _forceOverwrite, jstring architecture);
 
 		private:
 			static std::string jstringToString(JNIEnv *env, jstring value);

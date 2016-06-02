@@ -4,10 +4,11 @@ import java.io.File;
 
 
 import android.content.Context;
+import android.os.Build;
 
 public class AssetExtractor
 {
-	private native void extractAssets(String apkPath, String outputDir, boolean checkForNewerFiles);
+	private native void extractAssets(String apkPath, String outputDir, boolean checkForNewerFiles, String architecture);
 
 	private final Logger logger;
 
@@ -32,8 +33,12 @@ public class AssetExtractor
 			String appRoot = context.getFilesDir().getPath() + File.separator;
 			String apkPath = context.getPackageCodePath();
 
+			String arch = Build.CPU_ABI; //Build.SUPPORTED_ABIS;
+//			String abi2 = Build.CPU_ABI2;
+			
 			boolean forceOverwrite = extractPolicy.forceOverwrite();
-			extractAssets(apkPath, appRoot, forceOverwrite);
+//			String arch = System.getProperty("os.arch");
+			extractAssets(apkPath, appRoot, forceOverwrite, arch);
 		}
 	}
 }
