@@ -82,7 +82,7 @@ task createDistFolder {
 
 task waitForUnitTestResultFile (type: Exec) {	
 	doFirst {
-		println "---- waiting for tests to finish and get file..."
+		println "Waiting for tests to finish..."
 		
 		if(isWinOs) {
 			commandLine "cmd", "/c", "node", "$rootDir\\tools\\try_to_find_test_result_file.js"
