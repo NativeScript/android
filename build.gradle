@@ -1,10 +1,6 @@
 /*
-*	Test command 
-*			gradlew packar
-*	To run: 
-*			gradlew packar
-*
-*			
+*	Usage: 
+*		gradlew - Builds the NativeScript Android App Package using an application project template.
 */
 
 defaultTasks 'createPackage'
