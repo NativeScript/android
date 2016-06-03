@@ -138,7 +138,7 @@ task setPackageVersionInPackageJsonFile << {
 	if (project.hasProperty("packageVersion")) {
 		def inputFile = new File("$rootDir/dist/package.json")
 		def json = new JsonSlurper().parseText(inputFile.text)
-		json.version = json.version + "-" + PACKAGE_VERSION
+		json.version = json.version + "-" + packageVersion
 		def jb = new JsonBuilder(json);
 		inputFile.text = JsonOutput.prettyPrint(jb.toString())
 	}
