@@ -135,7 +135,7 @@ task createNpmPackage (type: Exec) {
 }
 
 task setPackageVersionInPackageJsonFile << {
-	if (project.hasProperty("PACKAGE_VERSION")) {
+	if (project.hasProperty("packageVersion")) {
 		def inputFile = new File("$rootDir/dist/package.json")
 		def json = new JsonSlurper().parseText(inputFile.text)
 		json.version = json.version + "-" + PACKAGE_VERSION
