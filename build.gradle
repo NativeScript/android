@@ -77,6 +77,8 @@ task getPackageVersion << {
 	def packageJsonMap = jsonSlurper.parseText(content)
 	
 	pVersion = packageJsonMap.version
+	
+	println "The package version from package.json is '${pVersion}'"
 }
 
 task getCommitVersion << {
@@ -86,13 +88,15 @@ task getCommitVersion << {
 	}
 }
 
-task generateRuntime (type: Exec) {
-	workingDir "$rootDir/runtime"
-	if(isWinOs) {
-		commandLine "cmd", "/c", "gradlew", "build", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"
-	}
-	else {
-		commandLine "./gradlew", "build", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"
+task generateRuntime (type: Exec)   {
+	doFirst {
+		workingDir "$rootDir/runtime"
+		if(isWinOs) {
+			commandLine "cmd", "/c", "gradlew", "build", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"
+		}
+		else {
+			commandLine "./gradlew", "build", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"
+		}
 	}
 }
 
@@ -105,13 +109,15 @@ task copyGeneratedRuntime << {
 }
 
 task generateMetadataGeneratorJar (type: Exec) {
-	workingDir "$rootDir/android-metadata-generator"
-	
-	if(isWinOs) {
-		commandLine "cmd", "/c", "gradlew", "jarmg"
-	}
-	else {
-		commandLine "./gradlew", "jarmg"
+	doFirst {
+		workingDir "$rootDir/android-metadata-generator"
+		
+		if(isWinOs) {
+			commandLine "cmd", "/c", "gradlew", "jarmg"
+		}
+		else {
+			commandLine "./gradlew", "jarmg"
+		}
 	}
 }
 
@@ -124,13 +130,15 @@ task copyGeneratedMetadataGeneratorJar << {
 }
 
 task createNpmPackage (type: Exec) {
-	workingDir "$rootDir/dist"
-	
-	if(isWinOs) {
-		commandLine "cmd", "/c", "npm", "pack"
-	}
-	else {
-		commandLine "npm", "pack"
+	doFirst {
+		workingDir "$rootDir/dist"
+		
+		if(isWinOs) {
+			commandLine "cmd", "/c", "npm", "pack"
+		}
+		else {
+			commandLine "npm", "pack"
+		}
 	}
 }
 
