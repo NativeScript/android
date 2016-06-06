@@ -54,25 +54,6 @@ public class RuntimeHelper {
 
 			DefaultExtractPolicy extractPolicy = new DefaultExtractPolicy(logger);
 			boolean skipAssetExtraction = Util.runPlugin(logger, app);
-			if (!skipAssetExtraction) {
-				long startTime = System.currentTimeMillis();
-				AssetExtractor aE = new AssetExtractor(null, logger);
-				
-				String outputDir = app.getFilesDir().getPath() + File.separator;
-				
-				aE.extractAssets(app, "app", outputDir, extractPolicy);
-				aE.extractAssets(app, "internal", outputDir, extractPolicy);
-				aE.extractAssets(app, "metadata", outputDir, extractPolicy);
-
-//				if(true) {
-//					aE.extractAssets(app,  "snapshots/" + Build.CPU_ABI + "/snapshot.blob", outputDir, extractPolicy);
-//				}
-
-				extractPolicy.setAssetsThumb(app);
-				
-				long endTime = System.currentTimeMillis();
-				System.out.println("Total execution time: " + (endTime - startTime) + "ms");
-			}
 
 			String appName = app.getPackageName();
 			File rootDir = new File(app.getApplicationInfo().dataDir);
@@ -83,6 +64,26 @@ public class RuntimeHelper {
 			} catch (IOException e1) {
 			}
 
+			Object[] v8Config = V8Config.fromPackageJSON(appDir);
+			
+			if (!skipAssetExtraction) {
+				AssetExtractor aE = new AssetExtractor(null, logger);
+				
+				String outputDir = app.getFilesDir().getPath() + File.separator;
+				
+				aE.extractAssets(app, "app", outputDir, extractPolicy);
+				aE.extractAssets(app, "internal", outputDir, extractPolicy);
+				aE.extractAssets(app, "metadata", outputDir, extractPolicy);
+
+				boolean shouldExtractSnapshots = !v8Config[3].toString().isEmpty();
+				if(shouldExtractSnapshots) {
+					System.out.println("EXTRACTING A SNAPSHOT!");
+					aE.extractAssets(app,  "snapshots/" + Build.CPU_ABI + "/snapshot.blob", outputDir, extractPolicy);
+				}
+
+				extractPolicy.setAssetsThumb(app);
+			}
+			
 			ClassLoader classLoader = app.getClassLoader();
 			File dexDir = new File(rootDir, "code_cache/secondary-dexes");
 			String dexThumb = null;
@@ -95,7 +96,7 @@ public class RuntimeHelper {
 			}
 			ThreadScheduler workThreadScheduler = new WorkThreadScheduler(new Handler(Looper.getMainLooper()));
 			Configuration config = new Configuration(workThreadScheduler, logger, debugger, appName, null, rootDir,
-					appDir, classLoader, dexDir, dexThumb);
+					appDir, classLoader, dexDir, dexThumb, v8Config);
 			Runtime runtime = new Runtime(config);
 
 			exHandler.setRuntime(runtime);

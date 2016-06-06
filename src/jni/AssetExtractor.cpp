@@ -41,10 +41,6 @@ void AssetExtractor::ExtractAssets(JNIEnv *env, jobject obj, jstring apk, jstrin
 		zip_stat_index(z, i, ZIP_STAT_MTIME, &sb);
 		if (strstr(sb.name, prfx) == sb.name)
 		{
-
-
-			DEBUG_WRITE("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ %s", sb.name);
-
 			auto name = sb.name + prefixLen; // strlen("assets/") == 7
 
 			std::string assetFullname(baseDir);
