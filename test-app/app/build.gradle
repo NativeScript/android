@@ -40,12 +40,6 @@ dependencies {
     compile 'com.android.support:appcompat-v7:23.3.0'
 }
 
-
-
-task clean(type: Delete) {
-    delete rootProject.buildDir
-}
-
 task deleteDist (type: Delete) {
 	doFirst {
         delete "$rootDir/dist"
@@ -63,6 +57,10 @@ task installApk (type: Exec) {
 			commandLine "node", "$rootDir/tools/deploy-apk.js", "$rootDir/app/build/outputs/apk/app-debug.apk"
 		}
 	}
+    
+    doLast {
+        println "Install result:" + execResult
+    }
 }
 
 task deletePreviousResultXml (type: Exec) {
@@ -112,13 +110,12 @@ task waitForUnitTestResultFile (type: Exec) {
 }
 
 task copyResultToDist (type: Copy) {	
-	from "$rootDir/android_unit_test_results.xml"
+	from "$rootDir/app/android_unit_test_results.xml"
 	into "$rootDir/dist"
-	
 }
 
 task deleteRootLevelResult (type: Delete) {
-	delete "$rootDir/android_unit_test_results.xml"
+	delete "$rootDir/app/android_unit_test_results.xml"
 }
 
 deletePreviousResultXml.dependsOn(deleteDist)
@@ -137,8 +134,8 @@ task runtests {
 
 tasks.whenTaskAdded { task ->
 
-    if (task.getName() == "assembleRelease")
+    if (task.getName() == "assembleDebug")
 	{
-		runtests.dependsOn assembleRelease
+		runtests.dependsOn assembleDebug
 	} 
 }

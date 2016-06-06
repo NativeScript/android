@@ -330,7 +330,6 @@ task waitForUnitTestResultFile (type: Exec) {
 task copyResultToDist (type: Copy) {	
 	from "$rootDir/android_unit_test_results.xml"
 	into "$rootDir/dist"
-	
 }
 
 task deleteRootLevelResult (type: Delete) {

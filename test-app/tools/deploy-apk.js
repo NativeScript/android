@@ -18,7 +18,7 @@ var cmd = 'adb install -r ' + apk;
 function timeoutFunction(msg) {
     console.error(msg);
     testrun.kill();
-    process.exit(1);
+    process.exit(-1);
 };
 
 var timeout = setTimeout(function() { timeoutFunction("ERROR: Deploy timeout!"); }, deployTimeout);
@@ -27,5 +27,12 @@ console.log("Executing adb install: " + cmd);
 var testrun = proc.exec(cmd, function(error, stdout, stderr) {
     // If the process exits prematurely kill the timer anyway...
     clearTimeout(timeout);
+    
+    if (error)
+    {
+        console.error("Deply apk failed: " + error);
+        process.exit(-2);
+    }
 });
+testrun.stdout.pipe(process.stdout, { end: false });
 testrun.stderr.pipe(process.stderr, { end: false });
