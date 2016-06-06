@@ -5,7 +5,7 @@
 *		gradlew runtests - Builds and runs the test applciation and pull an test results xml file in /dist/android_unit_test_results.xml
 */
 
-def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
+
 
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 buildscript {
@@ -22,111 +22,4 @@ allprojects {
     repositories {
         jcenter()
     }
-}
-
-task clean(type: Delete) {
-    delete rootProject.buildDir
-}
-
-task deleteDist (type: Delete) {
-	doFirst {
-        delete "$rootDir/dist"
-	}
-}
-
-task installApk (type: Exec) {
-	doFirst {
-		println "Attempting to install buit apk"
-		
-		if(isWinOs) {
-			commandLine "cmd", "/c", "node", "$rootDir\\tools\\deploy-apk.js", "$rootDir\\app\\build\\outputs\\apk\\app-debug.apk"
-		}
-		else {
-			commandLine "node", "$rootDir/tools/deploy-apk.js", "$rootDir/app/build/outputs/apk/app-debug.apk"
-		}
-	}
-}
-
-task deletePreviousResultXml (type: Exec) {
-	doFirst {
-        println "Removing previous android_unit_test_results.xml"
-        
-        if(isWinOs) {
-            commandLine "cmd", "/c", "adb", "shell", "rm", "-rf", "/sdcard/android_unit_test_results.xml"
-        }
-        else {
-            commandLine "adb", "shell", "rm", "-rf", "/sdcard/android_unit_test_results.xml"
-        }
-    }
-}
-
-task startInstalledApk (type: Exec) {
-	doFirst {
-		println "Starting test application"
-		
-		if(isWinOs) {
-			commandLine "cmd", "/c", "adb", "shell", "am", "start", "-n", "com.tns.android_runtime_testapp/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
-		}
-		else {
-			commandLine "adb", "shell", "am", "start", "-n", "com.tns.android_runtime_testapp/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
-		}
-	}
-}
-
-task createDistFolder {
-	doLast {
-		def distDir = file("$rootDir/dist")
-		distDir.mkdirs()
-	}
-}
-
-task waitForUnitTestResultFile (type: Exec) {	
-	doFirst {
-		println "Waiting for tests to finish..."
-		
-		if(isWinOs) {
-			commandLine "cmd", "/c", "node", "$rootDir\\tools\\try_to_find_test_result_file.js"
-		}
-		else {
-			commandLine "node", "$rootDir/tools/try_to_find_test_result_file.js"
-		}
-	}
-}
-
-task copyResultToDist (type: Copy) {	
-	from "$rootDir/android_unit_test_results.xml"
-	into "$rootDir/dist"
-	
-}
-
-task deleteRootLevelResult (type: Delete) {
-	delete "$rootDir/android_unit_test_results.xml"
-}
-
-deletePreviousResultXml.dependsOn(deleteDist)
-installApk.dependsOn(deletePreviousResultXml)
-startInstalledApk.dependsOn(installApk)
-createDistFolder.dependsOn(startInstalledApk)
-waitForUnitTestResultFile.dependsOn(createDistFolder)
-copyResultToDist.dependsOn(waitForUnitTestResultFile)
-deleteRootLevelResult.dependsOn(copyResultToDist)
-
-tasks.whenTaskAdded { task ->
-
-    if (task.getName() == "androidRelease")
-    {
-        deleteDist.dependsOn(task)
-        deleteDist.mustRunAfter task
-        task.finalizedBy deleteDist
-    }
-    else if (task.getName() == "androidDebug")
-    {
-        deleteDist.dependsOn(task)
-        deleteDist.mustRunAfter task
-        task.finalizedBy deleteDist
-    }  
-}
-
-task runtests {
-	dependsOn deleteRootLevelResult
 }
