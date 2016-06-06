@@ -58,13 +58,13 @@ void AssetExtractor::ExtractAssets(JNIEnv *env, jobject obj, jstring apk, jstrin
 					continue;
 				}
 
-				if (nameStr.find(ARMEABIV7) != std::string::npos && arch == ARMEABIV7) {
+				if (arch == ARMEABIV7 && nameStr.find(ARMEABIV7) != std::string::npos) {
 					DEBUG_WRITE("EXTRACTED THE armeabi-v7a architecture snapshot blob!");
 					snapshotFound = 1;
-				} else if (nameStr.find(X86) != std::string::npos && arch == X86) {
+				} else if (arch == X86 && nameStr.find(X86) != std::string::npos) {
 					DEBUG_WRITE("EXTRACTED THE x86 architecture snapshot blob!");
 					snapshotFound = 1;
-				} else if (nameStr.find(ARM64V8) != std::string::npos && arch == ARM64V8) {
+				} else if (arch == ARM64V8 && nameStr.find(ARM64V8) != std::string::npos) {
 					DEBUG_WRITE("EXTRACTED THE arm64-v8a architecture snapshot blob!");
 					snapshotFound = 1;
 				}
