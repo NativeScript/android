@@ -14,66 +14,41 @@ using namespace tns;
 std::string jstringToString(JNIEnv *env, jstring value);
 void mkdir_rec(const char *dir);
 
-void AssetExtractor::ExtractAssets(JNIEnv *env, jobject obj, jstring apk, jstring outputDir, jboolean _forceOverwrite, jstring architecture)
+void AssetExtractor::ExtractAssets(JNIEnv *env, jobject obj, jstring apk, jstring input, jstring outputDir, jboolean _forceOverwrite)
 {
-	auto arch = jstringToString(env, architecture);
-
 	auto forceOverwrite = JNI_TRUE == _forceOverwrite;
 	auto strApk = jstringToString(env, apk);
+
 	auto baseDir = jstringToString(env, outputDir);
+
+	std::string filePrefix("assets/");
+	int prefixLen = filePrefix.length();
+	filePrefix.append(jstringToString(env, input));
+	auto prfx = filePrefix.c_str();
+
 	int err = 0;
 	auto z = zip_open(strApk.c_str(), 0, &err);
+
 	assert(z != nullptr);
 	zip_int64_t num = zip_get_num_entries(z, 0);
 	struct zip_stat sb;
 	struct zip_file *zf;
 	char buf[65536];
 	auto pathcopy = new char[1024];
-	bool snapshotFound = 0;
 
 	for (zip_int64_t i = 0; i < num; i++)
 	{
 		zip_stat_index(z, i, ZIP_STAT_MTIME, &sb);
-		if (strstr(sb.name, "assets/") == sb.name)
+		if (strstr(sb.name, prfx) == sb.name)
 		{
-			auto name = sb.name + 7; // strlen("assets/") == 7
+
+
+			DEBUG_WRITE("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ %s", sb.name);
+
+			auto name = sb.name + prefixLen; // strlen("assets/") == 7
 
 			std::string assetFullname(baseDir);
 			assetFullname.append(name);
-
-
-			auto nameStr = std::string(name);
-
-			/*
-			 * Look for snapshots and extract only those suitable for the current CPU architecture
-			*/
-			auto sSpos = nameStr.find("snapshots/");
-
-			if(sSpos != std::string::npos) {
-				const std::string ARMEABIV7 = "armeabi-v7a";
-				const std::string X86 = "x86";
-				const std::string ARM64V8 = "arm64_v8a";
-
-				if(snapshotFound) {
-					continue;
-				}
-
-				if (arch == ARMEABIV7 && nameStr.find(ARMEABIV7) != std::string::npos) {
-					DEBUG_WRITE("EXTRACTED THE armeabi-v7a architecture snapshot blob!");
-					snapshotFound = 1;
-				} else if (arch == X86 && nameStr.find(X86) != std::string::npos) {
-					DEBUG_WRITE("EXTRACTED THE x86 architecture snapshot blob!");
-					snapshotFound = 1;
-				} else if (arch == ARM64V8 && nameStr.find(ARM64V8) != std::string::npos) {
-					DEBUG_WRITE("EXTRACTED THE arm64-v8a architecture snapshot blob!");
-					snapshotFound = 1;
-				}
-
-				// the snapshot that was found does not satisfy the architecture
-				if(!snapshotFound) {
-					continue;
-				}
-			}
 
 			struct stat attrib;
 			auto shouldOverwrite = true;
