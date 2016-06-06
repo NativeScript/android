@@ -249,7 +249,7 @@ class Module
 		// 2. Check for index.js
 		// 3. Check for bootstrap.js
 
-		String notFoundMessage = "Application entry point file not found. Please specify the file in package.json otherwise make sure the file index.js or bootstrap.js exists. \\n If using typescript make sure your entry point file is transpiled to javascript.";
+		String notFoundMessage = "Application entry point file not found. Please specify the file in package.json otherwise make sure the file index.js or bootstrap.js exists.\\nIf using typescript make sure your entry point file is transpiled to javascript.";
 
         // resolvePathHelper() never returns a non-existing file. Instead it throws an exception.
 		File bootstrapFile;
