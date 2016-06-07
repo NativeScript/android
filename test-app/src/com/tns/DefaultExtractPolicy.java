@@ -35,7 +35,7 @@ public class DefaultExtractPolicy implements ExtractPolicy {
 		if (oldAssetsThumb == null) {
 			return true;
 		} else {
-			String currentThumb = getAssetThumb(context);
+			String currentThumb = getAssetsThumb(context);
 			
 			if(currentThumb != null  && !currentThumb.equals(oldAssetsThumb)) {
 				return true;
@@ -61,7 +61,7 @@ public class DefaultExtractPolicy implements ExtractPolicy {
 		return null;
 	}
 
-	public String getAssetThumb(Context context) {
+	public String getAssetsThumb(Context context) {
 		return generateAssetsThumb(context);
 	}
 

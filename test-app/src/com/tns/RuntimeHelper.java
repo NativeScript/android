@@ -67,22 +67,35 @@ public class RuntimeHelper {
 			Object[] v8Config = V8Config.fromPackageJSON(appDir);
 			
 			if (!skipAssetExtraction) {
+				if(logger.isEnabled()) {
+					logger.write("Extracting assets...");
+				}
+				
 				AssetExtractor aE = new AssetExtractor(null, logger);
 				
 				String outputDir = app.getFilesDir().getPath() + File.separator;
-				
+
+				Log.d("~~~~~~~~", "EXTRACTING LE APP CRAP");
 				aE.extractAssets(app, "app", outputDir, extractPolicy);
 				aE.extractAssets(app, "internal", outputDir, extractPolicy);
 				aE.extractAssets(app, "metadata", outputDir, extractPolicy);
 
-				boolean shouldExtractSnapshots = !v8Config[3].toString().isEmpty();
+				// at earlier point the package.json will not have been extracted, so we now fetch the real, non-default values from the file
+				v8Config = V8Config.fromPackageJSON(appDir);
+				
+				boolean shouldExtractSnapshots = (Boolean)v8Config[5];
 				if(shouldExtractSnapshots) {
-					System.out.println("EXTRACTING A SNAPSHOT!");
+					if(logger.isEnabled()) {
+						logger.write("Extracting snapshot blob");
+					}
+
 					aE.extractAssets(app,  "snapshots/" + Build.CPU_ABI + "/snapshot.blob", outputDir, extractPolicy);
 				}
 
 				extractPolicy.setAssetsThumb(app);
 			}
+			
+			
 			
 			ClassLoader classLoader = app.getClassLoader();
 			File dexDir = new File(rootDir, "code_cache/secondary-dexes");

@@ -11,6 +11,8 @@ class V8Config
 	private static final String AndroidKey = "android";
 	private static final String V8FlagsKey = "v8Flags";
 	private static final String CodeCacheKey = "codeCache";
+	// TODO: EnableHeapSnapshotKey is subject to approval and change
+	private static final String EnableHeapSnapshotKey = "heapSnapshotEnable";
 	private static final String HeapSnapshotScriptKey = "heapSnapshotScript";
 	private static final String HeapSnapshotBlobKey = "heapSnapshotBlob";
 	private static final String SnapshotFile = "snapshot.blob";
@@ -22,6 +24,7 @@ class V8Config
 		File packageInfo = new File(appDir, "/app/package.json");
 		if (!packageInfo.exists())
 		{
+			android.util.Log.d("~~~~~~~~", "A PACKAGE INFO DOES NOT EXIST");
 			return result;
 		}
 
@@ -31,6 +34,8 @@ class V8Config
 			rootObject = FileSystem.readJSONFile(packageInfo);
 			if (rootObject != null && rootObject.has(AndroidKey))
 			{
+				android.util.Log.d("~~~~~~~~", "Getting keys inside android");
+				
 				JSONObject androidObject = rootObject.getJSONObject(AndroidKey);
 				if (androidObject.has(V8FlagsKey))
 				{
@@ -61,6 +66,12 @@ class V8Config
 				{
 					result[4] = androidObject.getString(ProfilerOutputDirKey);
 				}
+				if(androidObject.has(EnableHeapSnapshotKey))
+				{
+
+					android.util.Log.d("~~~~~~~~", "Found thy key");
+					result[5] = androidObject.getBoolean(EnableHeapSnapshotKey);
+				}
 			}
 		}
 		catch (Exception e)
@@ -83,7 +94,9 @@ class V8Config
 			// a binary file containing an already saved snapshot
 			"",
 			// V8 profiler output directory
-			""
+			"",
+			// enable heapsnapshots extraction, false by default 
+			false
 		};
 
 		return result;
