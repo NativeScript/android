@@ -75,7 +75,6 @@ public class RuntimeHelper {
 				
 				String outputDir = app.getFilesDir().getPath() + File.separator;
 
-				Log.d("~~~~~~~~", "EXTRACTING LE APP CRAP");
 				aE.extractAssets(app, "app", outputDir, extractPolicy);
 				aE.extractAssets(app, "internal", outputDir, extractPolicy);
 				aE.extractAssets(app, "metadata", outputDir, extractPolicy);
@@ -94,8 +93,6 @@ public class RuntimeHelper {
 
 				extractPolicy.setAssetsThumb(app);
 			}
-			
-			
 			
 			ClassLoader classLoader = app.getClassLoader();
 			File dexDir = new File(rootDir, "code_cache/secondary-dexes");

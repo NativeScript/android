@@ -36,7 +36,6 @@ public class AssetExtractor
 		}
 		else
 		{
-			Log.d("~~~~~~~~", "SKIPPED EXTRACTION");
 			if (logger.isEnabled())
 			{
 				logger.write("Skipped extraction of assets in " + inputPath);
