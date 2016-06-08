@@ -1,3 +1,10 @@
 rootProject.name = "__PROJECT_NAME__"
 include "asbg"
 project(":asbg").projectDir = file("build-tools/android-static-binding-generator")
+
+include "runtime"
+project(":runtime").projectDir = file("build-tools/runtime-modules/runtime")
+
+
+include "binding-generator"
+project(":binding-generator").projectDir = file("build-tools/runtime-modules/binding-generator")
