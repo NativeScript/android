@@ -24,7 +24,6 @@ class V8Config
 		File packageInfo = new File(appDir, "/app/package.json");
 		if (!packageInfo.exists())
 		{
-			android.util.Log.d("~~~~~~~~", "A PACKAGE INFO DOES NOT EXIST");
 			return result;
 		}
 
@@ -33,9 +32,7 @@ class V8Config
 		{
 			rootObject = FileSystem.readJSONFile(packageInfo);
 			if (rootObject != null && rootObject.has(AndroidKey))
-			{
-				android.util.Log.d("~~~~~~~~", "Getting keys inside android");
-				
+			{				
 				JSONObject androidObject = rootObject.getJSONObject(AndroidKey);
 				if (androidObject.has(V8FlagsKey))
 				{
@@ -68,8 +65,6 @@ class V8Config
 				}
 				if(androidObject.has(EnableHeapSnapshotKey))
 				{
-
-					android.util.Log.d("~~~~~~~~", "Found thy key");
 					result[5] = androidObject.getBoolean(EnableHeapSnapshotKey);
 				}
 			}
