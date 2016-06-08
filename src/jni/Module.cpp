@@ -166,18 +166,9 @@ void Module::RequireCallbackImpl(const v8::FunctionCallbackInfo<v8::Value>& args
 
 	string moduleName = ConvertToString(args[0].As<String>());
 	string callingModuleDirName = ConvertToString(args[1].As<String>());
-
-	JEnv env;
-	JniLocalRef jsModulename(env.NewStringUTF(moduleName.c_str()));
-	JniLocalRef jsCallingModuleDirName(env.NewStringUTF(callingModuleDirName.c_str()));
-	JniLocalRef jsModulePath(env.CallStaticObjectMethod(MODULE_CLASS, RESOLVE_PATH_METHOD_ID, (jstring) jsModulename, (jstring) jsCallingModuleDirName));
-
-	// cache the required modules by full path, not name only, since there might be some collisions with relative paths and names
-	string modulePath = ArgConverter::jstringToString((jstring) jsModulePath);
-
 	auto isData = false;
 
-	auto moduleObj = LoadImpl(isolate, modulePath, isData);
+	auto moduleObj = LoadImpl(isolate, moduleName, callingModuleDirName, isData);
 
 	if (isData)
 	{
@@ -217,40 +208,64 @@ void Module::Load(const string& path)
 	}
 }
 
-Local<Object> Module::LoadImpl(Isolate *isolate, const string& path, bool& isData)
+Local<Object> Module::LoadImpl(Isolate *isolate, const string& moduleName, const string& baseDir, bool& isData)
 {
+	auto pathKind = GetModulePathKind(moduleName);
+	auto cachePathKey = (pathKind == ModulePathKind::Global) ? moduleName : (baseDir + "*" + moduleName);
+
 	Local<Object> result;
 
-	auto it = m_loadedModules.find(path);
+	DEBUG_WRITE(">>LoadImpl cachePathKey=%s", cachePathKey.c_str());
+
+	auto it = m_loadedModules.find(cachePathKey);
 
 	if (it == m_loadedModules.end())
 	{
-		if (Util::EndsWith(path, ".js") || Util::EndsWith(path, ".so"))
+		JEnv env;
+		JniLocalRef jsModulename(env.NewStringUTF(moduleName.c_str()));
+		JniLocalRef jsBaseDir(env.NewStringUTF(baseDir.c_str()));
+		JniLocalRef jsModulePath(env.CallStaticObjectMethod(MODULE_CLASS, RESOLVE_PATH_METHOD_ID, (jstring) jsModulename, (jstring) jsBaseDir));
+
+		auto path = ArgConverter::jstringToString((jstring) jsModulePath);
+
+		auto it2 = m_loadedModules.find(path);
+
+		if (it2 == m_loadedModules.end())
 		{
-			isData = false;
-			result = LoadModule(isolate, path);
-		}
-		else if (Util::EndsWith(path, ".json"))
-		{
-			isData = true;
-			result = LoadData(isolate, path);
+			if (Util::EndsWith(path, ".js") || Util::EndsWith(path, ".so"))
+			{
+				isData = false;
+				result = LoadModule(isolate, path, cachePathKey);
+			}
+			else if (Util::EndsWith(path, ".json"))
+			{
+				isData = true;
+				result = LoadData(isolate, path);
+			}
+			else
+			{
+				string errMsg = "Unsupported file extension: " + path;
+				throw NativeScriptException(errMsg);
+			}
 		}
 		else
 		{
-			string errMsg = "Unsupported file extension: " + path;
-			throw NativeScriptException(errMsg);
+			auto& cacheEntry = it2->second;
+			isData = cacheEntry.isData;
+			result = Local<Object>::New(isolate, *cacheEntry.obj);
 		}
 	}
 	else
 	{
-		isData = Util::EndsWith(path, ".json");
-		result = Local<Object>::New(isolate, *it->second);
+		auto& cacheEntry = it->second;
+		isData = cacheEntry.isData;
+		result = Local<Object>::New(isolate, *cacheEntry.obj);
 	}
 
 	return result;
 }
 
-Local<Object> Module::LoadModule(Isolate *isolate, const string& modulePath)
+Local<Object> Module::LoadModule(Isolate *isolate, const string& modulePath, const string& moduleCacheKey)
 {
 	Local<Object> result;
 
@@ -262,7 +277,7 @@ Local<Object> Module::LoadModule(Isolate *isolate, const string& modulePath)
 	moduleObj->Set(ConvertToV8String("filename"), fullRequiredModulePath);
 
 	auto poModuleObj = new Persistent<Object>(isolate, moduleObj);
-	TempModule tempModule(this, modulePath, poModuleObj);
+	TempModule tempModule(this, modulePath, moduleCacheKey, poModuleObj);
 
 	TryCatch tc;
 
@@ -467,6 +482,18 @@ void Module::SaveScriptCache(const ScriptCompiler::Source& source, const std::st
 	int length = source.GetCachedData()->length;
 	auto cachePath = path + ".cache";
 	File::WriteBinary(cachePath, source.GetCachedData()->data, length);
+}
+
+Module::ModulePathKind Module::GetModulePathKind(const std::string& path)
+{
+	ModulePathKind kind;
+	switch (path[0])
+	{
+		case '.': kind = ModulePathKind::Relative; break;
+		case '/': kind = ModulePathKind::Absolute; break;
+		default: kind = ModulePathKind::Global; break;
+	}
+	return kind;
 }
 
 jclass Module::MODULE_CLASS = nullptr;
