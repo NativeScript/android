@@ -19,70 +19,60 @@ namespace tns
 	class Module
 	{
 		public:
-			static void Init(v8::Isolate *isolate);
+			Module();
 
-			static void Load(const std::string& path);
+			void Init(v8::Isolate *isolate);
 
-			static void RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
+			void Load(const std::string& path);
 
 		private:
-			struct Cache;
-
-			Module() = default;
-
-			static Cache* GetCache(v8::Isolate *isolate);
-
-			static v8::Local<v8::String> WrapModuleContent(const std::string& path);
-
-			static v8::Local<v8::Object> LoadImpl(v8::Isolate *isolate, const std::string& path, bool& isData);
-
-			static v8::Local<v8::Object> LoadModule(v8::Isolate *isolate, const std::string& path);
-
-			static v8::Local<v8::Object> LoadData(v8::Isolate *isolate, const std::string& path);
-
-			static v8::Local<v8::Script> LoadScript(v8::Isolate *isolate, const std::string& modulePath, const v8::Local<v8::String>& fullRequiredModulePath);
+			static void RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 			static void RequireNativeCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-			static v8::Local<v8::Function> GetRequireFunction(v8::Isolate *isolate, const std::string& dirName);
+			void RequireCallbackImpl(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-			static v8::ScriptCompiler::CachedData* TryLoadScriptCache(const std::string& path);
-			static void SaveScriptCache(const v8::ScriptCompiler::Source& source, const std::string& path);
+			v8::Local<v8::String> WrapModuleContent(const std::string& path);
+
+			v8::Local<v8::Object> LoadImpl(v8::Isolate *isolate, const std::string& path, bool& isData);
+
+			v8::Local<v8::Object> LoadModule(v8::Isolate *isolate, const std::string& path);
+
+			v8::Local<v8::Object> LoadData(v8::Isolate *isolate, const std::string& path);
+
+			v8::Local<v8::Script> LoadScript(v8::Isolate *isolate, const std::string& modulePath, const v8::Local<v8::String>& fullRequiredModulePath);
+
+			v8::Local<v8::Function> GetRequireFunction(v8::Isolate *isolate, const std::string& dirName);
+
+			v8::ScriptCompiler::CachedData* TryLoadScriptCache(const std::string& path);
+
+			void SaveScriptCache(const v8::ScriptCompiler::Source& source, const std::string& path);
 
 			static jclass MODULE_CLASS;
 			static jmethodID RESOLVE_PATH_METHOD_ID;
-
 			static const char* MODULE_PROLOGUE;
 			static const char* MODULE_EPILOGUE;
-			static std::map<v8::Isolate*, Cache*> s_cache;
 
-			struct Cache
-			{
-				v8::Persistent<v8::Function> *RequireFunction;
-
-				v8::Persistent<v8::Function> *RequireFactoryFunction;
-
-				std::map<std::string, v8::Persistent<v8::Function>*> RequireCache;
-
-				std::map<std::string, v8::Persistent<v8::Object>*> LoadedModules;
-			};
+			v8::Isolate *m_isolate;
+			v8::Persistent<v8::Function> *m_requireFunction;
+			v8::Persistent<v8::Function> *m_requireFactoryFunction;
+			std::map<std::string, v8::Persistent<v8::Function>*> m_requireCache;
+			std::map<std::string, v8::Persistent<v8::Object>*> m_loadedModules;
 
 			class TempModule
 			{
 				public:
-				TempModule(v8::Isolate *isolate, const std::string& modulePath, v8::Persistent<v8::Object> *poModuleObj)
-				:m_isolate(isolate), m_dispose(true), m_modulePath(modulePath), m_poModuleObj(poModuleObj)
+				TempModule(Module* module, const std::string& modulePath, v8::Persistent<v8::Object> *poModuleObj)
+				:m_module(module), m_dispose(true), m_modulePath(modulePath), m_poModuleObj(poModuleObj)
 				{
-					auto cache = GetCache(isolate);
-					cache->LoadedModules.insert(make_pair(m_modulePath, m_poModuleObj));
+					m_module->m_loadedModules.insert(make_pair(m_modulePath, m_poModuleObj));
 				}
 
 				~TempModule()
 				{
 					if (m_dispose)
 					{
-						auto cache = GetCache(m_isolate);
-						cache->LoadedModules.erase(m_modulePath);
+						m_module->m_loadedModules.erase(m_modulePath);
 					}
 				}
 
@@ -93,7 +83,7 @@ namespace tns
 
 				private:
 				bool m_dispose;
-				v8::Isolate *m_isolate;
+				Module *m_module;
 				std::string m_modulePath;
 				v8::Persistent<v8::Object> *m_poModuleObj;
 			};
