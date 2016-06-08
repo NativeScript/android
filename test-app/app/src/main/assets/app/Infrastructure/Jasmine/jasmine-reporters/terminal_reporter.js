@@ -20,7 +20,9 @@
         return dupe;
     }
     function log(str) {
-    	__log(str);
+    	//__log(str);
+
+        android.util.Log.d("{N} Runtime Tests", str);
 //        var con = global.console || console;
 //        if (con && con.log && str) {
 //            con.log(str);

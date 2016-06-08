@@ -1,13 +1,13 @@
-var 
+var
 	searchForFile = require('child_process').exec,
 	execFindFile = require('child_process').exec,
 	fs = require('fs'),
-	
+
 	isTimeToExit = false,
-	
+
 	processTimeout = 20 * 60 * 1000, // 20 minutes timeout (empirical constant :)) 
 	searchInterval = 10000;
-	
+
 searchForFile("", getFile);
 
 function getFile(error, stdout, stderr) {
@@ -17,26 +17,26 @@ function getFile(error, stdout, stderr) {
 
 function closeProcessAfter(timeout) {
 	//this will force process closed even if the the file is not found
-	setTimeout(function () {isTimeToExit = true;}, timeout); 
+	setTimeout(function () { isTimeToExit = true; }, timeout);
 }
 
 function tryToGetFile() {
 	execFindFile("adb pull /sdcard/android_unit_test_results.xml", checkIfFileExists);
 }
 
-function checkIfFileExists(err,stout,stderr) { 
+function checkIfFileExists(err, stout, stderr) {
 
 	//if you find file in sdcard exit process
-	if(!err) {
+	if (!err) {
 		console.log('Tests results file found file!');
 		process.exit();
 	}
 	else {
 		//if the time to get the file is out exit process
-    if(isTimeToExit) {
-      console.log(err);
-      console.log('Tests results file not found!');
-      process.exit();
-    }
+		if (isTimeToExit) {
+			console.log(err);
+			console.log('Tests results file not found!');
+			process.exit();
+		}
 	}
 }
