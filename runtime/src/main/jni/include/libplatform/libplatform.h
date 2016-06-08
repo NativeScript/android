@@ -8,7 +8,7 @@
 #include "include/v8-platform.h"
 
 #include <unistd.h>
-extern unsigned int __page_size = getpagesize();
+unsigned int __page_size = sysconf(_SC_PAGESIZE);
 
 namespace v8 {
 namespace platform {
