@@ -103,8 +103,16 @@ task generateRuntime (type: Exec)   {
 task copyGeneratedRuntime << {
 	copy {
 		from "$rootDir/runtime/build/outputs/aar/runtime-release.aar"
-		into "$rootDir/dist/framework/libs/"
+		into "$rootDir/dist/framework/libs/runtime-libs/"
 		rename "runtime-release.aar", "nativescript.aar"
+	}
+}
+
+task copyBindingGeneratorLib << {
+	copy {
+		from "$rootDir/binding-generator/build/outputs/aar/binding-generator-release.aar"
+		into "$rootDir/dist/framework/libs/runtime-libs/"
+		rename "binding-generator-release.aar", "binding-generator.aar"
 	}
 }
 
@@ -183,9 +191,10 @@ tasks.whenTaskAdded { task ->
             }
 
 copyGeneratedRuntime.dependsOn(generateRuntime)
+copyBindingGeneratorLib.dependsOn(generateRuntime)
 
 //generate metadata generator and copy into framework structure
-generateMetadataGeneratorJar.dependsOn(copyGeneratedRuntime)
+generateMetadataGeneratorJar.dependsOn(copyGeneratedRuntime, copyBindingGeneratorLib)
 copyGeneratedMetadataGeneratorJar.dependsOn(generateMetadataGeneratorJar)
 
 copyReadme.dependsOn(copyGeneratedMetadataGeneratorJar)
@@ -208,6 +217,7 @@ task createPackage {
             generateRuntime,
 
             copyGeneratedRuntime,
+			copyBindingGeneratorLib,
             generateMetadataGeneratorJar,
             copyGeneratedMetadataGeneratorJar,
             copyReadme,
