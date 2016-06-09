@@ -9,7 +9,7 @@
 
 ///////////////// CONFIGURATION /////////////////
 
-var disableLogger = true;
+var disableLogger = false;
 if (process.env.AST_PARSER_DISABLE_LOGGING && process.env.AST_PARSER_DISABLE_LOGGING.trim() === "true") {
 	disableLogger = true;
 }
@@ -40,7 +40,8 @@ var fs = require("fs"),
 	inputDir = "input_parced_typescript", // default input folder
 	interfacesNamesFilePath = "../interfaces-names.txt", //default interace_names file path
 	interfaceNames = [],
-	rootTraversed = false;
+	rootTraversed = false,
+	explicitTraversalKey = "sbgTraverseChildrenDirs";
 
 
 //env variables
@@ -83,35 +84,43 @@ var traverseAndAnalyseFilesDir = function (filesDir) {
 		throw "The input dir: " + filesDir + " does not exist!";
 	}
 
-	traverseDirectory(filesDir);
+	traverseDirectory(filesDir, false);
 }
 
-function traverseDirectory(dir) {
+function traverseDirectory(dir, traverseExplicitly) {
 	// list all files in directory
 
     fs.readdir(dir, function (err, files) {
 		var pJsonFile;
 
-		if (rootTraversed || dir !== inputDir) {
-			for (var i = 0; i < files.length; i++) {
-				if (files[i] === "package.json") {
-					pJsonFile = true;
-					break;
+		if (!traverseExplicitly) {
+			if (rootTraversed || dir !== inputDir) {
+				for (var i = 0; i < files.length; i++) {
+					if (files[i] === "package.json") {
+						pJsonFile = true;
+						break;
+					}
 				}
-			}
 
-			if (pJsonFile) {
-				var fullPJsonPath = path.join(dir, "package.json");
-				var pjson = require(fullPJsonPath);
-				if (!pjson.nativescript) {
-					// if (pjson.nativescript.sbgShouldNotVisit && pjson.nativescript.platforms) {
-					// 	return;
-					// }
-					return;
+				if (pJsonFile) {
+					var fullPJsonPath = path.join(dir, "package.json");
+					var pjson = require(fullPJsonPath);
+					if (!pjson.nativescript) {
+						// if (pjson.nativescript.sbgShouldNotVisit && pjson.nativescript.platforms) {
+						// 	return;
+						// }
+						logger.info("Skipping traversal of folder " + dir);
+						return;
+					} else {
+						if(pjson.nativescript.sbgTraverseChildrenDirs) {
+							logger.info("Folder will be traversed completely: " + dir);
+							traverseExplicitly = true;
+						}
+					}
 				}
+			} else {
+				rootTraversed = true;
 			}
-		} else {
-			rootTraversed = true;
 		}
 
         for (var i = 0; i < files.length; i += 1) {
@@ -131,7 +140,7 @@ function traverseDirectory(dir) {
             var isDir = fs.statSync(file).isDirectory();
 
             if (isDir) {
-                traverseDirectory(file);
+                traverseDirectory(file, traverseExplicitly);
             }
         }
     });
