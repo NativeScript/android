@@ -9,7 +9,7 @@
 
 ///////////////// CONFIGURATION /////////////////
 
-var disableLogger = false;
+var disableLogger = true;
 if (process.env.AST_PARSER_DISABLE_LOGGING && process.env.AST_PARSER_DISABLE_LOGGING.trim() === "true") {
 	disableLogger = true;
 }
