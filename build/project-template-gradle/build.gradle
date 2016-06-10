@@ -641,3 +641,8 @@ task buildapk {
 	
 	dependsOn deleteExplodedAarFolder
 }
+
+task cleanMetadata(type: Delete) {
+	delete "./metadata"
+}
+clean.dependsOn(cleanMetadata)
