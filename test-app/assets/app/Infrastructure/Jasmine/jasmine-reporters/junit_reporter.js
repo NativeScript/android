@@ -44,11 +44,10 @@
         return path + filename;
     }
     function log(str) {
-    	__log(str);
-//        var con = global.console || console;
-//        if (con && con.log) {
-//            con.log(str);
-//        }
+       var con = global.console || console;
+       if (con && con.log) {
+           con.log(str);
+       }
     }
 
 

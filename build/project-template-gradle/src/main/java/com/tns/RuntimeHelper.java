@@ -37,7 +37,9 @@ public class RuntimeHelper {
 
 		return hasErrorIntent;
 	}
-	public void initRuntime() {
+	
+	public void initRuntime()
+	{
 		if (Runtime.isInitialized()) {
 			return;
 		}

@@ -24,15 +24,23 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
+Module::Module()
+	: m_isolate(nullptr), m_requireFunction(nullptr), m_requireFactoryFunction(nullptr)
+{
+}
+
 void Module::Init(Isolate *isolate)
 {
 	JEnv env;
 
-	MODULE_CLASS = env.FindClass("com/tns/Module");
-	assert(MODULE_CLASS != nullptr);
+	if (MODULE_CLASS == nullptr)
+	{
+		MODULE_CLASS = env.FindClass("com/tns/Module");
+		assert(MODULE_CLASS != nullptr);
 
-	RESOLVE_PATH_METHOD_ID = env.GetStaticMethodID(MODULE_CLASS, "resolvePath", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
-	assert(RESOLVE_PATH_METHOD_ID != nullptr);
+		RESOLVE_PATH_METHOD_ID = env.GetStaticMethodID(MODULE_CLASS, "resolvePath", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
+		assert(RESOLVE_PATH_METHOD_ID != nullptr);
+	}
 
 	string requireFactoryScript =
 	"(function () { "
@@ -53,6 +61,8 @@ void Module::Init(Isolate *isolate)
 	auto source = ConvertToV8String(requireFactoryScript);
 	auto context = isolate->GetCurrentContext();
 
+	auto global = context->Global();
+
 	Local<Script> script;
 	auto maybeScript = Script::Compile(context, source).ToLocal(&script);
 
@@ -65,15 +75,13 @@ void Module::Init(Isolate *isolate)
 
 	auto requireFactoryFunction = result.As<Function>();
 
-	auto cache = GetCache(isolate);
+	m_requireFactoryFunction = new Persistent<Function>(isolate, requireFactoryFunction);
 
-	cache->RequireFactoryFunction = new Persistent<Function>(isolate, requireFactoryFunction);
-
-	auto requireFuncTemplate = FunctionTemplate::New(isolate, RequireCallback);
+	auto requireFuncTemplate = FunctionTemplate::New(isolate, RequireCallback, External::New(isolate, this));
 	auto requireFunc = requireFuncTemplate->GetFunction();
-	cache->RequireFunction = new Persistent<Function>(isolate, requireFunc);
+	global->Set(ConvertToV8String("__nativeRequire"), requireFunc);
+	m_requireFunction = new Persistent<Function>(isolate, requireFunc);
 
-	auto global = isolate->GetCurrentContext()->Global();
 	auto globalRequire = GetRequireFunction(isolate, Constants::APP_ROOT_FOLDER_PATH);
 	global->Set(ConvertToV8String("require"), globalRequire);
 }
@@ -82,25 +90,24 @@ Local<Function> Module::GetRequireFunction(Isolate *isolate, const string& dirNa
 {
 	Local<Function> requireFunc;
 
-	auto cache = GetCache(isolate);
+	auto itFound = m_requireCache.find(dirName);
 
-	auto itFound = cache->RequireCache.find(dirName);
-
-	if (itFound != cache->RequireCache.end())
+	if (itFound != m_requireCache.end())
 	{
 		requireFunc = Local<Function>::New(isolate, *itFound->second);
 	}
 	else
 	{
-		auto requireFuncFactory = Local<Function>::New(isolate, *cache->RequireFactoryFunction);
+		auto requireFuncFactory = Local<Function>::New(isolate, *m_requireFactoryFunction);
 
 		auto context = isolate->GetCurrentContext();
 
-		auto requireInternalFunc = Local<Function>::New(isolate, *cache->RequireFunction);
+		auto requireInternalFunc = Local<Function>::New(isolate, *m_requireFunction);
 
 		Local<Value> args[2]
 		{
-				requireInternalFunc, ConvertToV8String(dirName) };
+			requireInternalFunc, ConvertToV8String(dirName)
+		};
 		Local<Value> result;
 		auto thiz = Object::New(isolate);
 		auto success = requireFuncFactory->Call(context, thiz, 2, args).ToLocal(&result);
@@ -111,7 +118,7 @@ Local<Function> Module::GetRequireFunction(Isolate *isolate, const string& dirNa
 
 		auto poFunc = new Persistent<Function>(isolate, requireFunc);
 
-		cache->RequireCache.insert(make_pair(dirName, poFunc));
+		m_requireCache.insert(make_pair(dirName, poFunc));
 	}
 
 	return requireFunc;
@@ -121,50 +128,8 @@ void Module::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
 	try
 	{
-		auto isolate = args.GetIsolate();
-
-		if (args.Length() != 2)
-		{
-			throw NativeScriptException(string("require should be called with two parameters"));
-		}
-		if (!args[0]->IsString())
-		{
-			throw NativeScriptException(string("require's first parameter should be string"));
-		}
-		if (!args[1]->IsString())
-		{
-			throw NativeScriptException(string("require's second parameter should be string"));
-		}
-
-		string moduleName = ConvertToString(args[0].As<String>());
-		string callingModuleDirName = ConvertToString(args[1].As<String>());
-
-		JEnv env;
-		JniLocalRef jsModulename(env.NewStringUTF(moduleName.c_str()));
-		JniLocalRef jsCallingModuleDirName(env.NewStringUTF(callingModuleDirName.c_str()));
-		JniLocalRef jsModulePath(env.CallStaticObjectMethod(MODULE_CLASS, RESOLVE_PATH_METHOD_ID, (jstring) jsModulename, (jstring) jsCallingModuleDirName));
-
-		// cache the required modules by full path, not name only, since there might be some collisions with relative paths and names
-		string modulePath = ArgConverter::jstringToString((jstring) jsModulePath);
-
-		auto isData = false;
-
-		auto moduleObj = LoadImpl(isolate, modulePath, isData);
-
-		if (isData)
-		{
-			assert(!moduleObj.IsEmpty());
-
-			args.GetReturnValue().Set(moduleObj);
-		}
-		else
-		{
-			auto exportsObj = moduleObj->Get(ConvertToV8String("exports"));
-
-			assert(!exportsObj.IsEmpty());
-
-			args.GetReturnValue().Set(exportsObj);
-		}
+		auto thiz = static_cast<Module*>(args.Data().As<External>()->Value());
+		thiz->RequireCallbackImpl(args);
 	}
 	catch (NativeScriptException& e)
 	{
@@ -179,6 +144,45 @@ void Module::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 	catch (...) {
 		NativeScriptException nsEx(std::string("Error: c++ exception!"));
 		nsEx.ReThrowToV8();
+	}
+}
+
+void Module::RequireCallbackImpl(const v8::FunctionCallbackInfo<v8::Value>& args)
+{
+	auto isolate = args.GetIsolate();
+
+	if (args.Length() != 2)
+	{
+		throw NativeScriptException(string("require should be called with two parameters"));
+	}
+	if (!args[0]->IsString())
+	{
+		throw NativeScriptException(string("require's first parameter should be string"));
+	}
+	if (!args[1]->IsString())
+	{
+		throw NativeScriptException(string("require's second parameter should be string"));
+	}
+
+	string moduleName = ConvertToString(args[0].As<String>());
+	string callingModuleDirName = ConvertToString(args[1].As<String>());
+	auto isData = false;
+
+	auto moduleObj = LoadImpl(isolate, moduleName, callingModuleDirName, isData);
+
+	if (isData)
+	{
+		assert(!moduleObj.IsEmpty());
+
+		args.GetReturnValue().Set(moduleObj);
+	}
+	else
+	{
+		auto exportsObj = moduleObj->Get(ConvertToV8String("exports"));
+
+		assert(!exportsObj.IsEmpty());
+
+		args.GetReturnValue().Set(exportsObj);
 	}
 }
 
@@ -204,42 +208,64 @@ void Module::Load(const string& path)
 	}
 }
 
-Local<Object> Module::LoadImpl(Isolate *isolate, const string& path, bool& isData)
+Local<Object> Module::LoadImpl(Isolate *isolate, const string& moduleName, const string& baseDir, bool& isData)
 {
+	auto pathKind = GetModulePathKind(moduleName);
+	auto cachePathKey = (pathKind == ModulePathKind::Global) ? moduleName : (baseDir + "*" + moduleName);
+
 	Local<Object> result;
 
-	auto cache = GetCache(isolate);
+	DEBUG_WRITE(">>LoadImpl cachePathKey=%s", cachePathKey.c_str());
 
-	auto it = cache->LoadedModules.find(path);
+	auto it = m_loadedModules.find(cachePathKey);
 
-	if (it == cache->LoadedModules.end())
+	if (it == m_loadedModules.end())
 	{
-		if (Util::EndsWith(path, ".js") || Util::EndsWith(path, ".so"))
+		JEnv env;
+		JniLocalRef jsModulename(env.NewStringUTF(moduleName.c_str()));
+		JniLocalRef jsBaseDir(env.NewStringUTF(baseDir.c_str()));
+		JniLocalRef jsModulePath(env.CallStaticObjectMethod(MODULE_CLASS, RESOLVE_PATH_METHOD_ID, (jstring) jsModulename, (jstring) jsBaseDir));
+
+		auto path = ArgConverter::jstringToString((jstring) jsModulePath);
+
+		auto it2 = m_loadedModules.find(path);
+
+		if (it2 == m_loadedModules.end())
 		{
-			isData = false;
-			result = LoadModule(isolate, path);
-		}
-		else if (Util::EndsWith(path, ".json"))
-		{
-			isData = true;
-			result = LoadData(isolate, path);
+			if (Util::EndsWith(path, ".js") || Util::EndsWith(path, ".so"))
+			{
+				isData = false;
+				result = LoadModule(isolate, path, cachePathKey);
+			}
+			else if (Util::EndsWith(path, ".json"))
+			{
+				isData = true;
+				result = LoadData(isolate, path);
+			}
+			else
+			{
+				string errMsg = "Unsupported file extension: " + path;
+				throw NativeScriptException(errMsg);
+			}
 		}
 		else
 		{
-			string errMsg = "Unsupported file extension: " + path;
-			throw NativeScriptException(errMsg);
+			auto& cacheEntry = it2->second;
+			isData = cacheEntry.isData;
+			result = Local<Object>::New(isolate, *cacheEntry.obj);
 		}
 	}
 	else
 	{
-		isData = Util::EndsWith(path, ".json");
-		result = Local<Object>::New(isolate, *it->second);
+		auto& cacheEntry = it->second;
+		isData = cacheEntry.isData;
+		result = Local<Object>::New(isolate, *cacheEntry.obj);
 	}
 
 	return result;
 }
 
-Local<Object> Module::LoadModule(Isolate *isolate, const string& modulePath)
+Local<Object> Module::LoadModule(Isolate *isolate, const string& modulePath, const string& moduleCacheKey)
 {
 	Local<Object> result;
 
@@ -251,7 +277,7 @@ Local<Object> Module::LoadModule(Isolate *isolate, const string& modulePath)
 	moduleObj->Set(ConvertToV8String("filename"), fullRequiredModulePath);
 
 	auto poModuleObj = new Persistent<Object>(isolate, moduleObj);
-	TempModule tempModule(isolate, modulePath, poModuleObj);
+	TempModule tempModule(this, modulePath, moduleCacheKey, poModuleObj);
 
 	TryCatch tc;
 
@@ -458,20 +484,16 @@ void Module::SaveScriptCache(const ScriptCompiler::Source& source, const std::st
 	File::WriteBinary(cachePath, source.GetCachedData()->data, length);
 }
 
-Module::Cache* Module::GetCache(Isolate *isolate)
+Module::ModulePathKind Module::GetModulePathKind(const std::string& path)
 {
-	Cache *cache;
-	auto itFound = s_cache.find(isolate);
-	if (itFound == s_cache.end())
+	ModulePathKind kind;
+	switch (path[0])
 	{
-		cache = new Cache;
-		s_cache.insert(make_pair(isolate, cache));
+		case '.': kind = ModulePathKind::Relative; break;
+		case '/': kind = ModulePathKind::Absolute; break;
+		default: kind = ModulePathKind::Global; break;
 	}
-	else
-	{
-		cache = itFound->second;
-	}
-	return cache;
+	return kind;
 }
 
 jclass Module::MODULE_CLASS = nullptr;
@@ -479,4 +501,3 @@ jmethodID Module::RESOLVE_PATH_METHOD_ID = nullptr;
 
 const char* Module::MODULE_PROLOGUE = "(function(module, exports, require, __filename, __dirname){ ";
 const char* Module::MODULE_EPILOGUE = "\n})";
-map<Isolate*, Module::Cache*> Module::s_cache;

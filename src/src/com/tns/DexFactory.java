@@ -194,12 +194,12 @@ public class DexFactory
 	{
 		String classToProxy = className;
 
-		if (className.startsWith("com.tns.gen"))
+		if (className.startsWith("com.tns.gen."))
 		{
 			classToProxy = className.substring(12);
 		}
 
-		if (classToProxy.startsWith("com.tns.gen"))
+		if (classToProxy.startsWith("com.tns.gen."))
 		{
 			throw new InvalidClassException("Can't generate proxy of proxy");
 		}

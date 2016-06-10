@@ -8,6 +8,7 @@
 #include "WeakRef.h"
 #include "ArrayBufferHelper.h"
 #include "Profiler.h"
+#include "Module.h"
 #include "File.h"
 
 jobject ConvertJsValueToJavaObject(tns::JEnv& env, const v8::Local<v8::Value>& value, int classReturnType);
@@ -52,6 +53,8 @@ namespace tns
 			bool m_logEnabled;
 
 			ObjectManager *m_objectManager;
+
+			Module m_module;
 
 			ArrayBufferHelper m_arrayBufferHelper;
 
