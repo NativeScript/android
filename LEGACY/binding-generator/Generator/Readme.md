@@ -1,1 +1,0 @@
-The Android Binding Generator
