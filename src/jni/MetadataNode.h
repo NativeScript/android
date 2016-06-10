@@ -37,6 +37,8 @@ namespace tns
 
 			static void BuildMetadata(const std::string& filesPath);
 
+			static void EnableProfiler(bool enableProfiler);
+
 			std::string GetName();
 
 			v8::Local<v8::Object> CreateWrapper(v8::Isolate *isolate);
@@ -80,9 +82,10 @@ namespace tns
 			v8::Local<v8::FunctionTemplate> GetConstructorFunctionTemplate(v8::Isolate *isolate, MetadataTreeNode *treeNode);
 			v8::Local<v8::FunctionTemplate> GetConstructorFunctionTemplate(v8::Isolate *isolate, MetadataTreeNode *treeNode, std::vector<MethodCallbackData*>& instanceMethodsCallbackData);
 
-			v8::Local<v8::Function> SetMembers(v8::Isolate *isolate, v8::Local<v8::FunctionTemplate>& ctorFuncTemplate, v8::Local<v8::ObjectTemplate>& prototypeTemplate, std::vector<MethodCallbackData*>& instanceMethodsCallbackData, const std::vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode);
-			v8::Local<v8::Function> SetMembersFromStaticMetadata(v8::Isolate *isolate, v8::Local<v8::FunctionTemplate>& ctorFuncTemplate, v8::Local<v8::ObjectTemplate>& prototypeTemplate, std::vector<MethodCallbackData*>& instanceMethodsCallbackData, const std::vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode);
-			v8::Local<v8::Function> SetMembersFromRuntimeMetadata(v8::Isolate *isolate, v8::Local<v8::FunctionTemplate>& ctorFuncTemplate, v8::Local<v8::ObjectTemplate>& prototypeTemplate, std::vector<MethodCallbackData*>& instanceMethodsCallbackData, const std::vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode);
+			void SetInstanceMembers(v8::Isolate *isolate, v8::Local<v8::FunctionTemplate>& ctorFuncTemplate, v8::Local<v8::ObjectTemplate>& prototypeTemplate, std::vector<MethodCallbackData*>& instanceMethodsCallbackData, const std::vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode);
+			void SetInstanceMembersFromStaticMetadata(v8::Isolate *isolate, v8::Local<v8::FunctionTemplate>& ctorFuncTemplate, v8::Local<v8::ObjectTemplate>& prototypeTemplate, std::vector<MethodCallbackData*>& instanceMethodsCallbackData, const std::vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode);
+			void SetInstanceMembersFromRuntimeMetadata(v8::Isolate *isolate, v8::Local<v8::FunctionTemplate>& ctorFuncTemplate, v8::Local<v8::ObjectTemplate>& prototypeTemplate, std::vector<MethodCallbackData*>& instanceMethodsCallbackData, const std::vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode);
+			void SetStaticMembers(v8::Isolate *isolate, v8::Local<v8::Function>& ctorFunction, MetadataTreeNode *treeNode);
 			void SetInnnerTypes(v8::Isolate *isolate, v8::Local<v8::Function>& ctorFunction, MetadataTreeNode *treeNode);
 
 			static void BuildMetadata(uint32_t nodesLength, uint8_t *nodeData, uint32_t nameLength, uint8_t *nameData, uint32_t valueLength, uint8_t *valueData);
@@ -139,7 +142,12 @@ namespace tns
 			static bool GetExtendLocation(std::string& extendLocation);
 			static ExtendedClassCacheData GetCachedExtendedClassData(v8::Isolate *isolate, const std::string& proxyClassName);
 
+			//
+			v8::Local<v8::Function> Wrap(v8::Isolate* isolate, const v8::Local<v8::Function>& f, const std::string& name, bool isCtorFunc);
+			//
+
 			MetadataTreeNode *m_treeNode;
+			v8::Persistent<v8::Function> *m_poCtorFunc;
 			std::string m_name;
 			std::string m_implType;
 			bool m_isArray;
@@ -152,6 +160,7 @@ namespace tns
 			static std::map<std::string, MetadataTreeNode*> s_name2TreeNodeCache;
 			static std::map<MetadataTreeNode*, MetadataNode*> s_treeNode2NodeCache;
 			static std::map<v8::Isolate*, MetadataNodeCache*> s_cache;
+			static bool s_profilerEnabled;
 
 			enum class MetadataCacheItemType
 			{

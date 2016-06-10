@@ -838,6 +838,7 @@ Local<Object> ObjectManager::GetEmptyObject(Isolate *isolate)
 
 void ObjectManager::JSWrapperConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
+	assert(info.IsConstructCall());
 }
 
 Persistent<Function>* ObjectManager::s_poJsWrapperFunc = nullptr;
