@@ -16,10 +16,11 @@ public class Configuration
 	public final ClassLoader classLoader;
 	public final File dexDir;
 	public final String dexThumb;
+	public final Object[] v8Config;
 	
 	public Configuration(ThreadScheduler threadScheduler, Logger logger,  Debugger debugger,
 			String appName, File runtimeLibPath, File rootDir, File appDir, ClassLoader classLoader,
-			File dexDir, String dexThumb)
+			File dexDir, String dexThumb, Object[] v8Config)
 	{
 		this.threadScheduler = threadScheduler;
 		this.logger = logger;
@@ -31,5 +32,6 @@ public class Configuration
 		this.classLoader = classLoader;
 		this.dexDir = dexDir;
 		this.dexThumb = dexThumb;
+		this.v8Config = v8Config;
 	}
 }

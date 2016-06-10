@@ -30,7 +30,7 @@ class V8Config
 		{
 			rootObject = FileSystem.readJSONFile(packageInfo);
 			if (rootObject != null && rootObject.has(AndroidKey))
-			{
+			{				
 				JSONObject androidObject = rootObject.getJSONObject(AndroidKey);
 				if (androidObject.has(V8FlagsKey))
 				{

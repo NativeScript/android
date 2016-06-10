@@ -2,13 +2,12 @@ package com.tns;
 
 import java.io.File;
 
-
 import android.content.Context;
+import android.util.Log;
 
 public class AssetExtractor
 {
-	private native void extractAssets(String apkPath, String outputDir, boolean checkForNewerFiles);
-
+	private native void extractAssets(String apkPath, String input, String outputDir, boolean checkForNewerFiles);
 	private final Logger logger;
 
 	public AssetExtractor(File libPath, Logger logger)
@@ -16,7 +15,7 @@ public class AssetExtractor
 		this.logger = logger;
 	}
 
-	public void extractAssets(Context context, ExtractPolicy extractPolicy)
+	public void extractAssets(Context context, String inputPath, String outputPath, ExtractPolicy extractPolicy)
 	{
 		FileExtractor extractor = extractPolicy.extractor();
 		if (extractor != null)
@@ -29,11 +28,18 @@ public class AssetExtractor
 		}
 		else if (extractPolicy.shouldExtract(context))
 		{
-			String appRoot = context.getFilesDir().getPath() + File.separator;
 			String apkPath = context.getPackageCodePath();
 
 			boolean forceOverwrite = extractPolicy.forceOverwrite();
-			extractAssets(apkPath, appRoot, forceOverwrite);
+			
+			extractAssets(apkPath, inputPath, outputPath, forceOverwrite);
+		}
+		else
+		{
+			if (logger.isEnabled())
+			{
+				logger.write("Skipped extraction of assets in " + inputPath);
+			}
 		}
 	}
 }
