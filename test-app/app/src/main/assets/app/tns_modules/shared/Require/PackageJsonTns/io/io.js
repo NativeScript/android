@@ -1,1 +1,0 @@
-module.exports.guid = "CD11903C-B38B-4D68-BEB6-D72C3FAD906F";

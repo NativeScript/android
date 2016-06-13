@@ -1,1 +1,0 @@
-TNSLog(' from module folder in index file');
