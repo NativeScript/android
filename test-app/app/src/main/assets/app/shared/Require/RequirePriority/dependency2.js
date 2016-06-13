@@ -1,1 +1,0 @@
-TNSLog(' from root folder');

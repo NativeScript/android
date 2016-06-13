@@ -1,1 +1,0 @@
-exports.title = "submodule file submodule.js title"

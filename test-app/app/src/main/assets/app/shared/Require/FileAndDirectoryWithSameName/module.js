@@ -1,1 +1,0 @@
-exports.title = "file module.js title"

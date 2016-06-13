@@ -1,8 +1,0 @@
-{
-	"name": "foo",
-	"version": "1.2.3",
-	"description": "An io package",
-    "main": "gogoaway.js",
-	"man": "./man/doc.1"
-}
-breaking bad
