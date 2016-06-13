@@ -1,0 +1,1 @@
+TNSLog(require('./file.name'));

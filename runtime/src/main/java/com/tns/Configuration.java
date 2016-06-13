@@ -6,9 +6,9 @@ import android.app.Application;
 
 public class Configuration
 {
-	public final Application application;
 	public final ThreadScheduler threadScheduler;
 	public final Logger logger;
+	public final Debugger debugger;
 	public final String appName;
 	public final File runtimeLibPath;
 	public final File rootDir;
@@ -16,14 +16,15 @@ public class Configuration
 	public final ClassLoader classLoader;
 	public final File dexDir;
 	public final String dexThumb;
+	public final Object[] v8Config;
 	
-	public Configuration(Application application, ThreadScheduler threadScheduler, Logger logger, 
+	public Configuration(ThreadScheduler threadScheduler, Logger logger,  Debugger debugger,
 			String appName, File runtimeLibPath, File rootDir, File appDir, ClassLoader classLoader,
-			File dexDir, String dexThumb)
+			File dexDir, String dexThumb, Object[] v8Config)
 	{
-		this.application = application;
 		this.threadScheduler = threadScheduler;
 		this.logger = logger;
+		this.debugger = debugger;
 		this.appName = appName;
 		this.runtimeLibPath = runtimeLibPath;
 		this.rootDir = rootDir;
@@ -31,5 +32,6 @@ public class Configuration
 		this.classLoader = classLoader;
 		this.dexDir = dexDir;
 		this.dexThumb = dexThumb;
+		this.v8Config = v8Config;
 	}
 }

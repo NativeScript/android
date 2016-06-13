@@ -1,3 +1,38 @@
+2.0.0
+==
+
+## What's New
+
+ - [Android N early developer preview (#378)](https://github.com/NativeScript/android-runtime/issues/378)
+ - [[Proposal] Static binding generator specification. (#363)](https://github.com/NativeScript/android-runtime/issues/363)
+ - [Android Runtime Support for older Android versions (#357)](https://github.com/NativeScript/android-runtime/issues/357)
+ - [Data Marshalling: Support for typed arrays (#65)](https://github.com/NativeScript/android-runtime/issues/65)
+ - [Support Android Widgets](https://github.com/NativeScript/android-runtime/issues/69)
+ - [Add support for caching already compiled JS code](https://github.com/NativeScript/android-runtime/issues/257)
+ - [Additional Intents Crashes app](https://github.com/NativeScript/android-runtime/issues/218)
+ - [Enable Multidex support](https://github.com/NativeScript/android-runtime/issues/344)
+ 
+## Bug Fixes
+
+ - [Wrong object lifecycle management (#382)](https://github.com/NativeScript/android-runtime/issues/382)
+ - [CLI can easily fail and blow project up on windows when you have multiple plugins. (#369)](https://github.com/NativeScript/android-runtime/issues/369)
+ - [Provide method implementations for partially implemented interfaces. (#259)](https://github.com/NativeScript/android-runtime/issues/259)
+ - [Generate metadata for protected interfaces (#236)](https://github.com/NativeScript/android-runtime/issues/236)
+ - [Cannot resolve method/constructor signatures when null is passed (#90)](https://github.com/NativeScript/android-runtime/issues/90)
+ - [App seems to load up with a white screen on run, but works in debug mode #397](https://github.com/NativeScript/android-runtime/issues/397)
+
+## Performance
+
+ - [Wrong object lifecycle management (#382)](https://github.com/NativeScript/android-runtime/issues/382)
+
+1.7.1
+==
+
+## Bug Fixes
+
+ - [Fix application initialization](https://github.com/NativeScript/android-runtime/issues/396)
+ - [Fix error activity](https://github.com/NativeScript/android-runtime/issues/395)
+
 1.7.0
 ==
 

@@ -41,12 +41,12 @@ var es5_visitors = (function () {
 		if(t.isNewExpression(path)) {
 			traverseInterface(path, config);
 		}
+
 	// // Parsed Typescript to ES5 Syntax (normal extend pattern + custom extend pattern)
 	// 	// anchor is __extends
 		if(t.isIdentifier(path) && path.node.name === "__extends") {
 			traverseTsExtend(path, config);
 		}
-
 		// Maybe it's not a good idea to expose this scenario because it can be explicitly covered
 		// //anchor is JavaProxy (optional)
 		// var customDecoratorName = config.extendDecoratorName === undefined ? defaultExtendDecoratorName : config.extendDecoratorName;
@@ -99,7 +99,13 @@ var es5_visitors = (function () {
 	function traverseTsExtend(path, config) {
 
 		//this is the information for a normal extend
-		var extendClass = _getArgumentFromNodeAsString(path, 5, config)
+		var extendClass;
+		try {
+			extendClass = _getArgumentFromNodeAsString(path, 5, config)
+		} catch (e) {
+			config.logger.info(e.message)
+			return;
+		}
 		var overriddenMethodNames = _getOverriddenMethodsTypescript(path, 3)
 		var extendParent = _getParrent(path, 1, config);
 		var declaredClassName = "";
@@ -141,11 +147,10 @@ var es5_visitors = (function () {
 				for(var i in ci.expression.right.arguments[0].elements) {
 					var currentDecorator = ci.expression.right.arguments[0].elements[i]
 
-					if(t.isCallExpression) {
+					if(t.isCallExpression(currentDecorator)) {
 						if(currentDecorator.callee.name === config.extendDecoratorName) {
 							currentDecorator.callee.skipMeOnVisit = true;
 							var customDecoratorName = config.extendDecoratorName === undefined ? defaultExtendDecoratorName : config.extendDecoratorName;
-							
 							traverseJavaProxyExtend(currentDecorator.arguments[0].value, config, customDecoratorName,  extendClass, overriddenMethodNames);
 							return true;
 						}
@@ -362,7 +367,7 @@ var es5_visitors = (function () {
 			}
 			else {
 				throw {
-					message: "Node type is not a call expression. File" + config.filePath,
+					message: "Node type is not a call expression. File=" + config.filePath  + " line=" + path.node.loc.start.line,
 					errCode: 1
 				}
 			}

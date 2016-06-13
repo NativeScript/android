@@ -417,7 +417,8 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
 		int index = hash & (tab.length - 1);
 		for (HashMapEntry<K, V> e = tab[index]; e != null; e = e.next)
 		{
-			if (e.hash == hash && key.equals(e.key))
+			K eKey = e.key;
+			if (eKey == key || (e.hash == hash && key.equals(eKey)))
 			{
 				preModify(e);
 				V oldValue = e.value;
@@ -689,7 +690,8 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
 		int index = hash & (tab.length - 1);
 		for (HashMapEntry<K, V> e = tab[index], prev = null; e != null; prev = e, e = e.next)
 		{
-			if (e.hash == hash && key.equals(e.key))
+			K eKey = e.key;
+			if (eKey == key || (e.hash == hash && key.equals(eKey)))
 			{
 				if (prev == null)
 				{

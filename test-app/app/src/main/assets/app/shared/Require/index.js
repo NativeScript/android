@@ -55,10 +55,12 @@ describe("TNS require", function () {
         expect(TNSGetOutput()).toBe(expected);
     });
 
-    it('deletes module cache on error', function () {
-        require("./ModuleErrorCache");
-        expect(TNSGetOutput()).toBe('did throw1no throw');
-    });
+    if (!global.NSObject) {
+        it('deletes module cache on error', function () {
+            require("./ModuleErrorCache");
+            expect(TNSGetOutput()).toBe('did throw1no throw');
+        });
+    }
 
     it('can export var-s', function () {
         require("./ModuleVariable");
@@ -125,7 +127,7 @@ describe("TNS require", function () {
         require("./RequireModuleFolderConflict");
         expect(TNSGetOutput()).toBe('main started from module folder main ended');
     });
-    
+
     it("when require a tns_module that is a directory name it should load the index js inside it", function () {
         require("shared/Require/RequirePriority/dependency3");
         var expected = ' from module folder in index file';
@@ -250,15 +252,27 @@ describe("TNS require", function () {
     it("should load module through module.require exported function", function () {
         var module1 = require("./ModuleRequireFunction/module1");
         expect(module1.msg).toBe("module1");
-        
+
         var module2 = module1.module.require("./module2");
         expect(module2.msg).toBe("module2");
     });
 
     it("should load module through global.require", function () {
         expect(typeof global.require).toBe("function");
-        
+
         var module3 = global.require("./shared/Require/GlobalRequire/index");
         expect(module3.msg).toBe("module3");
+    });
+
+    it('Case Sensitive', function () {
+        require("./CaseSensitive");
+        // WARNING: The following test is platform specific
+        var expected = global.android ? 'filefolder' : 'file';
+        expect(TNSGetOutput()).toBe(expected);
+    });
+
+    it('File with dots', function () {
+        require("./FileWithDots");
+        expect(TNSGetOutput()).toBe('file.name');
     });
 });

@@ -17,10 +17,10 @@
 #include "JsDebugger.h"
 #include "SimpleProfiler.h"
 #include "SimpleAllocator.h"
-#include "File.h"
 #include "JType.h"
 #include "Module.h"
 #include "NativeScriptException.h"
+#include "V8NativeScriptExtension.h"
 #include "Runtime.h"
 #include "ArrayHelper.h"
 #include <sstream>
@@ -58,7 +58,6 @@ Runtime::Runtime(JNIEnv *env, jobject runtime, int id)
 {
 	m_runtime = m_env.NewGlobalRef(runtime);
 	m_objectManager = new ObjectManager(m_runtime);
-	m_startupData = nullptr;
 	s_id2RuntimeCache.insert(make_pair(id, this));
 }
 
@@ -131,13 +130,11 @@ void Runtime::Init(jstring filesPath, bool verboseLoggingEnabled, jstring packag
 	Constants::V8_STARTUP_FLAGS = ArgConverter::jstringToString(v8Flags);
 	JniLocalRef cacheCode(m_env.GetObjectArrayElement(args, 1));
 	Constants::V8_CACHE_COMPILED_CODE = (bool) cacheCode;
-	JniLocalRef snapshot(m_env.GetObjectArrayElement(args, 2));
-	Constants::V8_HEAP_SNAPSHOT = (bool)snapshot;
-	JniLocalRef snapshotScript(m_env.GetObjectArrayElement(args, 3));
+	JniLocalRef snapshotScript(m_env.GetObjectArrayElement(args, 2));
 	Constants::V8_HEAP_SNAPSHOT_SCRIPT = ArgConverter::jstringToString(snapshotScript);
-	JniLocalRef snapshotBlob(m_env.GetObjectArrayElement(args, 4));
+	JniLocalRef snapshotBlob(m_env.GetObjectArrayElement(args, 3));
 	Constants::V8_HEAP_SNAPSHOT_BLOB = ArgConverter::jstringToString(snapshotBlob);
-	JniLocalRef profilerOutputDir(m_env.GetObjectArrayElement(args, 5));
+	JniLocalRef profilerOutputDir(m_env.GetObjectArrayElement(args, 4));
 
 	DEBUG_WRITE("Initializing Telerik NativeScript");
 
@@ -152,7 +149,7 @@ void Runtime::RunModule(JNIEnv *_env, jobject obj, jstring scriptFile)
 	JEnv env(_env);
 
 	string filePath = ArgConverter::jstringToString(scriptFile);
-	Module::Load(filePath);
+	m_module.Load(filePath);
 }
 
 jobject Runtime::RunScript(JNIEnv *_env, jobject obj, jstring scriptFile)
@@ -339,24 +336,24 @@ void Runtime::PassUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, jthrowab
 }
 
 void Runtime::ClearStartupData(JNIEnv *env, jobject obj) {
-	if (m_startupData) {
-		delete m_startupData->data;
-		delete m_startupData;
-	}
+	delete m_heapSnapshotBlob;
+	delete m_startupData;
+}
+
+static void InitializeV8() {
+	auto platform = v8::platform::CreateDefaultPlatform();
+	V8::InitializePlatform(platform);
+	V8::Initialize();
 }
 
 Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName, jobject jsDebugger, jstring profilerOutputDir)
 {
-	auto platform = v8::platform::CreateDefaultPlatform();
-	V8::InitializePlatform(platform);
-	V8::Initialize();
-
 	Isolate::CreateParams create_params;
-	string customScript;
+	bool didInitializeV8 = false;
 
 	create_params.array_buffer_allocator = &g_allocator;
 	// prepare the snapshot blob
-	if (Constants::V8_HEAP_SNAPSHOT)
+	if (!Constants::V8_HEAP_SNAPSHOT_BLOB.empty() || !Constants::V8_HEAP_SNAPSHOT_SCRIPT.empty())
 	{
 		DEBUG_WRITE_FORCE("Snapshot enabled.");
 
@@ -377,16 +374,28 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 
 		if (File::Exists(snapshotPath))
 		{
-			int length;
-			m_startupData->data = reinterpret_cast<char*>(File::ReadBinary(snapshotPath, length));
-			m_startupData->raw_size = length;
+			m_heapSnapshotBlob = new MemoryMappedFile(MemoryMappedFile::Open(snapshotPath.c_str()));
+			m_startupData->data = static_cast<const char*>(m_heapSnapshotBlob->memory);
+			m_startupData->raw_size = m_heapSnapshotBlob->size;
 
-			DEBUG_WRITE_FORCE("Snapshot read %s (%dB).", snapshotPath.c_str(), length);
+			DEBUG_WRITE_FORCE("Snapshot read %s (%dB).", snapshotPath.c_str(), m_heapSnapshotBlob->size);
 		}
-		else if(saveSnapshot)
+		else if (!saveSnapshot)
 		{
+			DEBUG_WRITE_FORCE("No snapshot file found at %s", snapshotPath.c_str());
+
+		}
+		else
+		{
+			// This should be executed before V8::Initialize, which calls it with false.
+			NativeScriptExtension::Probe(true);
+			InitializeV8();
+			didInitializeV8 = true;
+
+			string customScript;
+
 			// check for custom script to include in the snapshot
-			if(Constants::V8_HEAP_SNAPSHOT_SCRIPT.size() > 0 && File::Exists(Constants::V8_HEAP_SNAPSHOT_SCRIPT))
+			if (Constants::V8_HEAP_SNAPSHOT_SCRIPT.size() > 0 && File::Exists(Constants::V8_HEAP_SNAPSHOT_SCRIPT))
 			{
 				customScript = File::ReadText(Constants::V8_HEAP_SNAPSHOT_SCRIPT);
 			}
@@ -394,14 +403,20 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 			DEBUG_WRITE_FORCE("Creating heap snapshot");
 			*m_startupData = V8::CreateSnapshotDataBlob(customScript.c_str());
 
-			if (m_startupData->raw_size == 0) {
+			if (m_startupData->raw_size == 0)
+			{
 				DEBUG_WRITE_FORCE("Failed to create heap snapshot.");
-			} else {
+			}
+			else
+			{
 				bool writeSuccess = File::WriteBinary(snapshotPath, m_startupData->data, m_startupData->raw_size);
 
-				if (!writeSuccess) {
+				if (!writeSuccess)
+				{
 					DEBUG_WRITE_FORCE("Failed to save created snapshot.");
-				} else {
+				}
+				else
+				{
 					DEBUG_WRITE_FORCE("Saved snapshot of %s (%dB) in %s (%dB)",
 							Constants::V8_HEAP_SNAPSHOT_SCRIPT.c_str(), customScript.size(),
 							snapshotPath.c_str(), m_startupData->raw_size);
@@ -412,6 +427,9 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 		create_params.snapshot_blob = m_startupData;
 	}
 
+	if (!didInitializeV8) {
+		InitializeV8();
+	}
 	auto isolate = Isolate::New(create_params);
 	Isolate::Scope isolate_scope(isolate);
 	HandleScope handleScope(isolate);
@@ -432,7 +450,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 	globalTemplate->Set(ConvertToV8String("__enableVerboseLogging"), FunctionTemplate::New(isolate, CallbackHandlers::EnableVerboseLoggingMethodCallback));
 	globalTemplate->Set(ConvertToV8String("__disableVerboseLogging"), FunctionTemplate::New(isolate, CallbackHandlers::DisableVerboseLoggingMethodCallback));
 	globalTemplate->Set(ConvertToV8String("__exit"), FunctionTemplate::New(isolate, CallbackHandlers::ExitMethodCallback));
-	globalTemplate->Set(ConvertToV8String("__nativeRequire"), FunctionTemplate::New(isolate, Module::RequireCallback));
+	globalTemplate->Set(ConvertToV8String("__runtimeVersion"), ConvertToV8String(NATIVE_SCRIPT_RUNTIME_VERSION), readOnlyFlags);
 
 	m_weakRef.Init(isolate, globalTemplate, m_objectManager);
 
@@ -447,9 +465,9 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 
 	m_objectManager->Init(isolate);
 
-	auto global = context->Global();
+	m_module.Init(isolate);
 
-	Module::Init(isolate);
+	auto global = context->Global();
 
 	global->ForceSet(ConvertToV8String("global"), global, readOnlyFlags);
 	global->ForceSet(ConvertToV8String("__global"), global, readOnlyFlags);
@@ -464,6 +482,9 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 	JsDebugger::Init(isolate, pckName, jsDebugger);
 
 	MetadataNode::BuildMetadata(filesPath);
+
+	auto enableProfiler = !outputDir.empty();
+	MetadataNode::EnableProfiler(enableProfiler);
 
 	MetadataNode::CreateTopLevelNamespaces(isolate, global);
 

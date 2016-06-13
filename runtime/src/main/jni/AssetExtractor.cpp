@@ -14,25 +14,34 @@ using namespace tns;
 std::string jstringToString(JNIEnv *env, jstring value);
 void mkdir_rec(const char *dir);
 
-void AssetExtractor::ExtractAssets(JNIEnv *env, jobject obj, jstring apk, jstring outputDir, jboolean _forceOverwrite)
+void AssetExtractor::ExtractAssets(JNIEnv *env, jobject obj, jstring apk, jstring input, jstring outputDir, jboolean _forceOverwrite)
 {
 	auto forceOverwrite = JNI_TRUE == _forceOverwrite;
 	auto strApk = jstringToString(env, apk);
+
 	auto baseDir = jstringToString(env, outputDir);
+
+	std::string filePrefix("assets/");
+	int prefixLen = filePrefix.length();
+	filePrefix.append(jstringToString(env, input));
+	auto prfx = filePrefix.c_str();
+
 	int err = 0;
 	auto z = zip_open(strApk.c_str(), 0, &err);
+
 	assert(z != nullptr);
 	zip_int64_t num = zip_get_num_entries(z, 0);
 	struct zip_stat sb;
 	struct zip_file *zf;
 	char buf[65536];
 	auto pathcopy = new char[1024];
+
 	for (zip_int64_t i = 0; i < num; i++)
 	{
 		zip_stat_index(z, i, ZIP_STAT_MTIME, &sb);
-		if (strstr(sb.name, "assets/") == sb.name)
+		if (strstr(sb.name, prfx) == sb.name)
 		{
-			auto name = sb.name + 7; // strlen("assets/") == 7
+			auto name = sb.name + prefixLen; // strlen("assets/") == 7
 
 			std::string assetFullname(baseDir);
 			assetFullname.append(name);
