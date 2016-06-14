@@ -13,7 +13,7 @@ var proc = require('child_process');
 
 var deployTimeout = 180000; // 3 minutes to deploy and launch.
 
-var cmd = 'adb install -r ' + apk;
+var cmd = 'adb -e install -r ' + apk;
 
 function timeoutFunction(msg) {
     console.error(msg);
