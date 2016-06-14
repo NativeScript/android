@@ -572,19 +572,6 @@ task buildMetadata (type: JavaExec) {
 	}
 }
 
-
-task deleteExplodedAarFolder (type: Delete) {
-
-	outputs.upToDateWhen {
-		!buildMetadata.didWork
-	}
-	
-	def explodedAarDir = project.buildDir.getAbsolutePath() + "/intermediates/exploded-aar"
-	delete explodedAarDir
-}
-
-
-
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////// OPTIONAL TASKS //////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
@@ -635,7 +622,24 @@ task buildapk {
 	else {
 		dependsOn assembleDebug
 	}
-	
-	dependsOn deleteExplodedAarFolder
 }
+
+//////// custom clean ///////////
+task deleteMetadata (type: Delete){
+	delete "$projectDir/metadata/output"
+}
+
+task deleteFlavors (type: Delete){
+	doLast {
+		def srcDir = new File("$projectDir/src")
+		srcDir.listFiles().each({ f ->
+			if(!f.getName().equals("main"))	{
+				delete f
+			}
+		})
+	}
+}
+
+deleteFlavors.dependsOn(deleteMetadata)
+clean.dependsOn(deleteFlavors)
 
