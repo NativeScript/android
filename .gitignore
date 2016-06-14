@@ -5,6 +5,7 @@ dist/
 /test-app/build
 /test-app/libs
 /test-app/metadata
+/test-app/.idea
 
 local.properties
 
