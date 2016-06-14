@@ -8,12 +8,13 @@ if (process.argv.length < 2) {
 }
 
 var apk = process.argv[2];
+var runOnDeviceOrEmulator = process.argv[3];
 
 var proc = require('child_process');
 
 var deployTimeout = 180000; // 3 minutes to deploy and launch.
 
-var cmd = 'adb -e install -r ' + apk;
+var cmd = 'adb '+ runOnDeviceOrEmulator  +' install -r ' + apk;
 
 function timeoutFunction(msg) {
     console.error(msg);

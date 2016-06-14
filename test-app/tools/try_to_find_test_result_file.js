@@ -10,6 +10,8 @@ var
 
 searchForFile("", getFile);
 
+var runOnDeviceOrEmulator = process.argv[2];
+
 function getFile(error, stdout, stderr) {
 	closeProcessAfter(processTimeout);
 	setInterval(tryToGetFile, searchInterval);
@@ -21,7 +23,7 @@ function closeProcessAfter(timeout) {
 }
 
 function tryToGetFile() {
-	execFindFile("adb pull /sdcard/android_unit_test_results.xml", checkIfFileExists);
+	execFindFile("adb " + runOnDeviceOrEmulator + " pull /sdcard/android_unit_test_results.xml", checkIfFileExists);
 }
 
 function checkIfFileExists(err, stout, stderr) {
