@@ -930,23 +930,6 @@ describe("Tests ", function () {
 		expect(s).toBe("1, test, false");
 	});
 
-	it("TestCanInheritFromClassInAndroidSupportLibrary", function () {
-
-		__log("TEST: TestCanInheritFromClassInAndroidSupportLibrary");
-
-		var MyParcelableCompat = android.support.v4.os.ParcelableCompat.extend("MyParcelableCompat", {
-			toString: function() {
-				return "MyParcelableCompat";
-			}
-		});
-
-		var compat = new MyParcelableCompat();
-
-		var s = compat.toString();
-
-		expect(s).toBe("MyParcelableCompat");
-	});
-
 	it("TestCallMethodWithByteParameter", function () {
 
 		__log("TEST: TestCallMethodWithByteParameter");
