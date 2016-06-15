@@ -135,6 +135,12 @@ public class RuntimeHelper {
 
 			runtime.init();
 			runtime.runScript(new File(appDir, "internal/ts_helpers.js"));
+
+			File javaClassesModule = new File(appDir, "app/tns-java-classes.js");
+			if (javaClassesModule.exists()) {
+				runtime.runModule(javaClassesModule);
+			}
+
 			try {
 				// put this call in a try/catch block because with the latest changes in the modules it is not granted that NativeScriptApplication is extended through JavaScript.
 				Runtime.initInstance(this.app);
