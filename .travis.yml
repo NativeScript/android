@@ -32,13 +32,13 @@ before_install:
   - "rm -rf android-ndk-$NDK_VERSION-linux-x86_64.zip"
   - export ANDROID_NDK_HOME=`pwd`/android-ndk-$NDK_VERSION
   - export PATH=${PATH}:${ANDROID_NDK_HOME}
-before_script:
+script:
+  - "./gradlew createPackage -i -PPACKAGE_VERSION=$PACKAGE_VERSION --stacktrace"
+after_script:
   - echo no | android create avd --force -n Arm21 -t android-21 -b armeabi-v7a -c 12M
   - emulator -avd Arm21 -no-skin -no-audio -no-window &
   - android-wait-for-emulator
-script:
-  - "cat /home/travis/build.sh"
-  - "./gradlew createPackage -i -PPACKAGE_VERSION=$PACKAGE_VERSION --stacktrace && cd test-app && ./gradlew runtest --stacktrace"
+  - "cd test-app && ./gradlew runtest --stacktrace"
 before_deploy:
   - FULL_PACKAGE_VERSION=`sed -n 's/\s*"version":\s*"\([a-zA-Z0-9.\-]\+\)"/\1/p' dist/package.json`
   - mv dist/$PACKAGE_NAME-$FULL_PACKAGE_VERSION.tgz ../.deploymentpackage
