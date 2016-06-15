@@ -1,6 +1,6 @@
 env:
   global:
-  - NDK_VERSION=r10e
+  - NDK_VERSION=r11c
   - DATE=$(date +%Y-%m-%d)
   - PACKAGE_VERSION=$DATE-$TRAVIS_BUILD_NUMBER
   - ANDROID_VERSION=19
@@ -30,9 +30,9 @@ cache:
 before_install:
   - sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules
   - git submodule update --init --recursive
-  - wget http://dl.google.com/android/ndk/android-ndk-$NDK_VERSION-linux-x86_64.bin
-  - chmod +x android-ndk-$NDK_VERSION-linux-x86_64.bin
-  - "./android-ndk-$NDK_VERSION-linux-x86_64.bin | egrep -v ^Extracting"
+  - wget http://dl.google.com/android/repository/android-ndk-$NDK_VERSION-linux-x86_64.zip
+  - chmod +x android-ndk-$NDK_VERSION-linux-x86_64.zip
+  - "unzip android-ndk-$NDK_VERSION-linux-x86_64.zip | egrep -v ^Extracting"
   - export ANDROID_NDK_HOME=`pwd`/android-ndk-$NDK_VERSION
   - export PATH=${PATH}:${ANDROID_NDK_HOME}
 before_script:
@@ -43,7 +43,7 @@ script:
   - "./gradlew createPackage -i -PPACKAGE_VERSION=$PACKAGE_VERSION -PcompileSdk=android-$ANDROID_VERSION
   -PsupportVersion=$ANDROID_SUPPORT_VERSION --stacktrace"
   - "cd test-app && ./gradlew runtest -PenableTest -PcompileSdk=android-$ANDROID_VERSION -PsupportVersion=$ANDROID_SUPPORT_VERSION
-  -PtargetSdk=$ANDROID_VERSION --stacktrace"
+  -PtargetSdk=$ANDROID_VERSION --stacktrace --rerun-tasks"
 before_deploy:
   - FULL_PACKAGE_VERSION=`sed -n 's/\s*"version":\s*"\([a-zA-Z0-9.\-]\+\)"/\1/p' dist/package.json`
   - mv dist/$PACKAGE_NAME-$FULL_PACKAGE_VERSION.tgz ../.deploymentpackage
