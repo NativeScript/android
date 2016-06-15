@@ -40,9 +40,9 @@ before_script:
   - emulator -avd Arm19 -no-skin -no-audio -no-window &
   - android-wait-for-emulator
 script:
-  - "./gradlew packar -i -PPACKAGE_VERSION=$PACKAGE_VERSION -PcompileSdk=android-$ANDROID_VERSION
+  - "./gradlew createPackage -i -PPACKAGE_VERSION=$PACKAGE_VERSION -PcompileSdk=android-$ANDROID_VERSION
   -PsupportVersion=$ANDROID_SUPPORT_VERSION --stacktrace"
-  - "./gradlew runtest -PenableTest -PcompileSdk=android-$ANDROID_VERSION -PsupportVersion=$ANDROID_SUPPORT_VERSION
+  - "cd test-app && ./gradlew runtest -PenableTest -PcompileSdk=android-$ANDROID_VERSION -PsupportVersion=$ANDROID_SUPPORT_VERSION
   -PtargetSdk=$ANDROID_VERSION --stacktrace"
 before_deploy:
   - FULL_PACKAGE_VERSION=`sed -n 's/\s*"version":\s*"\([a-zA-Z0-9.\-]\+\)"/\1/p' dist/package.json`
