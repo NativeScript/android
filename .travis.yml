@@ -34,7 +34,6 @@ before_install:
   - export PATH=${PATH}:${ANDROID_NDK_HOME}
 script:
   - "./gradlew createPackage -i -PPACKAGE_VERSION=$PACKAGE_VERSION --stacktrace"
-after_script:
   - echo no | android create avd --force -n Arm21 -t android-21 -b armeabi-v7a -c 12M
   - emulator -avd Arm21 -no-skin -no-audio -no-window &
   - android-wait-for-emulator
