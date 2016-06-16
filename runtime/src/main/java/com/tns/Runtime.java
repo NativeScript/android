@@ -189,7 +189,7 @@ public class Runtime
 			throw new RuntimeException("Fail to initialize Require class", ex);
 		}
 
-		if (debugger != null)//JsDebugger.isDebuggableApp(application))
+		if (debugger != null)
 		{
 			jsDebugger = new JsDebugger(debugger, threadScheduler);
 		}
