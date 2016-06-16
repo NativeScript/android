@@ -439,9 +439,12 @@ public class AndroidJsDebugger implements Debugger
 		this.registerEnableDisableDebuggerReceiver(handler);
 		
 		boolean shouldDebugBreak = getDebugBreakFlagAndClearIt();
+
+		AndroidJsDebugger.this.debugContext.enableAgent();
+
 		if (shouldDebugBreak)
 		{
-			AndroidJsDebugger.this.debugContext.enableAgent();
+
 			AndroidJsDebugger.this.debugContext.debugBreak();
 		}
 	}
