@@ -62,14 +62,26 @@ public class DexFactory
 	static long totalMultiDexTime = 0;
 	static long totalLoadDexTime = 0;
 
-	public Class<?> resolveClass(String name, String className, String[] methodOverrides) throws ClassNotFoundException, IOException
+	public Class<?> resolveClass(String name, String className, String[] methodOverrides, boolean isInterface) throws ClassNotFoundException, IOException
 	{
-		String fullClassName = className.replace("$", "_") + CLASS_NAME_LOCATION_SEPARATOR + name;
+		String fullClassName = className.replace("$", "_");
+
+		if(!isInterface) {
+			fullClassName += CLASS_NAME_LOCATION_SEPARATOR + name;
+		}
 
 		// try to get pre-generated binding classes
 		try
 		{
+			if(logger.isEnabled()) {
+				logger.write("getting pre-generated proxy class with name:  " + fullClassName.replace("-", "_"));
+			}
+
 			Class<?> pregeneratedClass = classLoader.loadClass(fullClassName.replace("-", "_"));
+
+			if(logger.isEnabled()) {
+				logger.write("Pre-generated class found:  " + fullClassName.replace("-", "_"));
+			}
 
 			return pregeneratedClass;
 		}
@@ -85,7 +97,12 @@ public class DexFactory
 		}
 
 		String classToProxy = this.getClassToProxyName(className);
-		String dexFilePath = classToProxy + CLASS_NAME_LOCATION_SEPARATOR + name;
+		String dexFilePath = classToProxy;
+
+		if(!isInterface) {
+			dexFilePath += CLASS_NAME_LOCATION_SEPARATOR + name;
+		}
+
 		File dexFile = this.getDexFile(dexFilePath);
 
 		// generate dex file
@@ -97,7 +114,7 @@ public class DexFactory
 				logger.write("generating proxy in place");
 			}
 
-			dexFilePath = this.generateDex(name, classToProxy, methodOverrides);
+			dexFilePath = this.generateDex(name, classToProxy, methodOverrides, isInterface);
 			dexFile = new File(dexFilePath);
 			long stopGenTime = System.nanoTime();
 			totalGenTime += stopGenTime - startGenTime;
@@ -139,6 +156,7 @@ public class DexFactory
 			// be directly used.
 			// However, this is the only viable way to get our dynamic classes
 			// loaded within the system class loader
+
 			df = DexFile.loadDex(jarFilePath, new File(this.odexDir, fullClassName).getAbsolutePath(), 0);
 			result = df.loadClass(fullClassName, classLoader);
 		}
@@ -234,7 +252,7 @@ public class DexFactory
 		return null;
 	}
 
-	private String generateDex(String proxyName, String className, String[] methodOverrides) throws ClassNotFoundException, IOException
+	private String generateDex(String proxyName, String className, String[] methodOverrides, boolean isInterface) throws ClassNotFoundException, IOException
 	{
 		Class<?> classToProxy = Class.forName(className);
 
@@ -249,7 +267,7 @@ public class DexFactory
 			}
 		}
 
-		return proxyGenerator.generateProxy(proxyName, classToProxy, methodOverridesSet);
+		return proxyGenerator.generateProxy(proxyName, classToProxy, methodOverridesSet, isInterface);
 	}
 
 	private void updateDexThumbAndPurgeCache()

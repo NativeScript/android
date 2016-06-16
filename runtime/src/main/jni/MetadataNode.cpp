@@ -983,21 +983,9 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
 
 		Local<Object> implementationObject;
 		Local<String> v8ExtendName;
-		string extendLocation;
-		bool extendLocationFound = GetExtendLocation(extendLocation);
+
 		if (info.Length() == 1)
 		{
-			if (!extendLocationFound)
-			{
-				stringstream ss;
-				ss << "(InternalError): Invalid extend() call. No name specified for extend. Location: " << extendLocation.c_str();
-				throw NativeScriptException(ss.str());
-			}
-
-			if (!info[0]->IsObject())
-			{
-				throw NativeScriptException(string("First argument must be implementation object"));
-			}
 			implementationObject = info[0]->ToObject();
 		}
 		else if (info.Length() == 2)
@@ -1021,14 +1009,10 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
 		}
 
 		auto className = node->m_implType;
-		auto extendName = ConvertToString(v8ExtendName);
-		auto extendNameAndLocation = extendLocation + extendName;
 		SetInstanceMetadata(isolate, implementationObject, node);
 
 		//@@@ Refactor
 		thiz->SetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::CallSuper), True(isolate));
-
-		string fullClassName = CreateFullClassName(className, extendNameAndLocation);
 
 		implementationObject->SetPrototype(thiz->GetPrototype());
 		thiz->SetPrototype(implementationObject);
@@ -1036,7 +1020,7 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
 
 		ArgsWrapper argWrapper(info, ArgType::Interface, Local<Object>());
 
-		auto success = CallbackHandlers::RegisterInstance(isolate, thiz, fullClassName, argWrapper, implementationObject, true);
+		auto success = CallbackHandlers::RegisterInstance(isolate, thiz, className, argWrapper, implementationObject, true);
 	}
 	catch (NativeScriptException& e)
 	{
