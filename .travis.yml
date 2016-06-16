@@ -1,10 +1,8 @@
 env:
   global:
-  - NDK_VERSION=r10e
+  - NDK_VERSION=r11c
   - DATE=$(date +%Y-%m-%d)
   - PACKAGE_VERSION=$DATE-$TRAVIS_BUILD_NUMBER
-  - ANDROID_VERSION=19
-  - ANDROID_SUPPORT_VERSION=19.0.0
   - PACKAGE_NAME=tns-android
 sudo: false
 language: android
@@ -16,11 +14,9 @@ android:
   components:
   - platform-tools
   - tools
-  - build-tools-22.0.1
-  - android-19
-  - extra-android-support
-  - extra-android-m2repository
-  - sys-img-armeabi-v7a-android-19
+  - build-tools-23.0.3
+  - android-23
+  - sys-img-armeabi-v7a-android-21
 before_cache:
   - rm -f $HOME/.gradle/caches/modules-2/modules-2.lock
 cache:
@@ -30,20 +26,19 @@ cache:
 before_install:
   - sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules
   - git submodule update --init --recursive
-  - wget http://dl.google.com/android/ndk/android-ndk-$NDK_VERSION-linux-x86_64.bin
-  - chmod +x android-ndk-$NDK_VERSION-linux-x86_64.bin
-  - "./android-ndk-$NDK_VERSION-linux-x86_64.bin | egrep -v ^Extracting"
+  - wget http://dl.google.com/android/repository/android-ndk-$NDK_VERSION-linux-x86_64.zip
+  - chmod +x android-ndk-$NDK_VERSION-linux-x86_64.zip
+  - "unzip -q android-ndk-$NDK_VERSION-linux-x86_64.zip"
+  - "rm -rf android-ndk-$NDK_VERSION-linux-x86_64.zip"
   - export ANDROID_NDK_HOME=`pwd`/android-ndk-$NDK_VERSION
   - export PATH=${PATH}:${ANDROID_NDK_HOME}
-before_script:
-  - echo no | android create avd --force -n Arm19 -t android-19 -b armeabi-v7a -c 12M
-  - emulator -avd Arm19 -no-skin -no-audio -no-window &
-  - android-wait-for-emulator
 script:
-  - "./gradlew packar -i -PPACKAGE_VERSION=$PACKAGE_VERSION -PcompileSdk=android-$ANDROID_VERSION
-  -PsupportVersion=$ANDROID_SUPPORT_VERSION --stacktrace"
-  - "./gradlew runtest -PenableTest -PcompileSdk=android-$ANDROID_VERSION -PsupportVersion=$ANDROID_SUPPORT_VERSION
-  -PtargetSdk=$ANDROID_VERSION --stacktrace"
+  - "./gradlew createPackage -i -PPACKAGE_VERSION=$PACKAGE_VERSION --stacktrace"
+after_script:
+  - echo no | android create avd --force -n Arm21 -t android-21 -b armeabi-v7a -c 12M
+  - emulator -avd Arm21 -no-skin -no-audio -no-window &
+  - android-wait-for-emulator
+  - "cd test-app && ./gradlew runtest --stacktrace"
 before_deploy:
   - FULL_PACKAGE_VERSION=`sed -n 's/\s*"version":\s*"\([a-zA-Z0-9.\-]\+\)"/\1/p' dist/package.json`
   - mv dist/$PACKAGE_NAME-$FULL_PACKAGE_VERSION.tgz ../.deploymentpackage
