@@ -39,6 +39,7 @@ after_script:
   - emulator -avd Arm21 -no-skin -no-audio -no-window &
   - android-wait-for-emulator
   - "cd test-app && ./gradlew runtest --stacktrace"
+  - "cd .."
 before_deploy:
   - FULL_PACKAGE_VERSION=`sed -n 's/\s*"version":\s*"\([a-zA-Z0-9.\-]\+\)"/\1/p' dist/package.json`
   - mv dist/$PACKAGE_NAME-$FULL_PACKAGE_VERSION.tgz ../.deploymentpackage
