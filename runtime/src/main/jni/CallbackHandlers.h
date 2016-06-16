@@ -30,7 +30,7 @@ namespace tns
 
 			static std::string ResolveConstructor(v8::Isolate *isolate, const ArgsWrapper& argWrapper, const std::string& fullClassName, jclass javaClass, bool isInterface);
 
-			static jclass ResolveClass(v8::Isolate *isolate, const std::string& fullClassname, const v8::Local<v8::Object>& implementationObject);
+			static jclass ResolveClass(v8::Isolate *isolate, const std::string& fullClassname, const v8::Local<v8::Object>& implementationObject, bool isInterface);
 
 			static std::string ResolveClassName(v8::Isolate *isolate, const std::string& fullClassname, const v8::Local<v8::Object>& implementationObject);
 

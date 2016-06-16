@@ -36,7 +36,7 @@ void CallbackHandlers::Init(Isolate *isolate, ObjectManager *objectManager)
 	RUNTIME_CLASS = env.FindClass("com/tns/Runtime");
 	assert(RUNTIME_CLASS != nullptr);
 
-	RESOLVE_CLASS_METHOD_ID = env.GetMethodID(RUNTIME_CLASS, "resolveClass", "(Ljava/lang/String;[Ljava/lang/String;)Ljava/lang/Class;");
+	RESOLVE_CLASS_METHOD_ID = env.GetMethodID(RUNTIME_CLASS, "resolveClass", "(Ljava/lang/String;[Ljava/lang/String;Z)Ljava/lang/Class;");
 	assert(RESOLVE_CLASS_METHOD_ID != nullptr);
 
 	CURRENT_OBJECTID_FIELD_ID = env.GetFieldID(RUNTIME_CLASS, "currentObjectId", "I");
@@ -73,7 +73,7 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object>& j
 
 	JEnv env;
 
-	jclass generatedJavaClass = ResolveClass(isolate, fullClassName, implementationObject);
+	jclass generatedJavaClass = ResolveClass(isolate, fullClassName, implementationObject, isInterface);
 
 	int javaObjectID = objectManager->GenerateNewObjectID();
 
@@ -123,7 +123,7 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object>& j
 	return success;
 }
 
-jclass CallbackHandlers::ResolveClass(Isolate *isolate, const string& fullClassname, const Local<Object>& implementationObject)
+jclass CallbackHandlers::ResolveClass(Isolate *isolate, const string& fullClassname, const Local<Object>& implementationObject, bool isInterface)
 {
 	auto itFound = s_classCache.find(fullClassname);
 
@@ -145,7 +145,7 @@ jclass CallbackHandlers::ResolveClass(Isolate *isolate, const string& fullClassn
 		auto runtime = Runtime::GetRuntime(isolate);
 
 		// create or load generated binding (java class)
-		JniLocalRef generatedClass(env.CallObjectMethod(runtime->GetJavaRuntime(), RESOLVE_CLASS_METHOD_ID, (jstring) javaFullClassName, methodOverrides));
+		JniLocalRef generatedClass(env.CallObjectMethod(runtime->GetJavaRuntime(), RESOLVE_CLASS_METHOD_ID, (jstring) javaFullClassName, methodOverrides, isInterface));
 		globalRefToGeneratedClass = static_cast<jclass>(env.NewGlobalRef(generatedClass));
 
 		s_classCache.insert(make_pair(fullClassname, globalRefToGeneratedClass));
@@ -154,9 +154,10 @@ jclass CallbackHandlers::ResolveClass(Isolate *isolate, const string& fullClassn
 	return globalRefToGeneratedClass;
 }
 
+// Called by ExtendCallMethodCallback when extending a class
 string CallbackHandlers::ResolveClassName(Isolate *isolate, const string& fullClassname, const Local<Object>& implementationObject)
 {
-	auto clazz = ResolveClass(isolate, fullClassname, implementationObject);
+	auto clazz = ResolveClass(isolate, fullClassname, implementationObject, false);
 	auto runtime = Runtime::GetRuntime(isolate);
 	auto objectManager = runtime->GetObjectManager();
 	auto className = objectManager->GetClassName(clazz);
