@@ -276,7 +276,7 @@ def updateProductFlavorsContent(flavor, dimensionName, oldContent) {
 		return newContent;
 }
 
-def createProductFlavorsContent(flavor, dimensionName, includeAndroidContent = true, oldContent = "")
+def createProductFlavorsContent(flavor, dimensionName, includeAndroidContent = true)
 {
 	if (includeAndroidContent)
   	{
