@@ -1,7 +1,7 @@
 /*
 * run from dir: test-app/
-* 	run on emulator: ./gradlew :app:runtest //default
-* 	run on device: ./gradlew :app:runtest -PrunOnDevice
+* 	run on emulator: ./gradlew runtests //default
+* 	run on device: ./gradlew runtests -PrunOnDevice
 *
 */
 

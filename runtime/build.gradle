@@ -20,7 +20,7 @@ apply plugin: 'com.android.model.library'
 
 buildscript {
     repositories {
-       jcenter()
+        jcenter()
     }
     dependencies {
         classpath 'com.android.tools.build:gradle-experimental:0.7.0-beta3'
@@ -33,13 +33,27 @@ allprojects {
     }
 }
 
+
+
+def ndkDebuggable = false;
+
+
+List<String> runTasks = gradle.startParameter.getTaskNames();
+for (String runTask : runTasks) {
+    if (!ndkDebuggable && runTask.contains("Debug") && (runTask.contains("assemble") || runTask.contains("compile") || runTask.contains("generate"))) {
+        println "DEBUG build DETECTED. Switching ndk debuggable to true"
+        ndkDebuggable = true;
+    }
+}
+
+
 model {
     android {
         compileSdkVersion = 23
         buildToolsVersion = "23.0.3"
 
         defaultConfig.with {
-            minSdkVersion.apiLevel    = 17
+            minSdkVersion.apiLevel = 17
             targetSdkVersion.apiLevel = 22
         }
 
@@ -50,8 +64,8 @@ model {
 
     android.ndk {
         moduleName = "NativeScript"
-        
-        
+
+
         cppFlags.addAll(["-I${file("src/main/jni")}".toString(),
                          "-I${file("src/main/jni/include")}".toString()
         ])
@@ -65,7 +79,7 @@ model {
 
         abiFilters.addAll(["armeabi-v7a", "x86", "arm64-v8a"])
     }
-    
+
     android.sources {
         main {
             java {
@@ -89,25 +103,24 @@ model {
             }
         }
     }
-    
+
     android.buildTypes {
         release {
             minifyEnabled = false
             proguardFiles.add(file('proguard-rules.txt'))
-            
-             ndk {
-                    debuggable false
-             }
-             
+
+            ndk {
+                debuggable = ndkDebuggable
+            }
+
             setRuntimeCommit.dependsOn(setPackageVersion)
 
             tasks.whenTaskAdded { task ->
-                if (task.getName() == "androidRelease")
-                {
+                if (task.getName() == "androidRelease") {
                     task.dependsOn(setRuntimeCommit)
                     task.mustRunAfter setRuntimeCommit
                     task.finalizedBy revertVersionFile
-                } 
+                }
             }
         }
     }
@@ -115,7 +128,7 @@ model {
     android.abis {
         create("armeabi-v7a") {
             abiFilters.add("armeabi-v7a")
-            
+
             ldLibs.add("${file("src/main/libs/armeabi-v7a/libv8_base.a")}".toString())
             ldLibs.add("${file("src/main/libs/armeabi-v7a/libv8_libplatform.a")}".toString())
             ldLibs.add("${file("src/main/libs/armeabi-v7a/libv8_libbase.a")}".toString())
@@ -125,7 +138,7 @@ model {
 
         create("x86") {
             abiFilters.add("x86")
-            
+
             ldLibs.add("${file("src/main/libs/x86/libv8_base.a")}".toString())
             ldLibs.add("${file("src/main/libs/x86/libv8_libplatform.a")}".toString())
             ldLibs.add("${file("src/main/libs/x86/libv8_libbase.a")}".toString())
@@ -135,22 +148,23 @@ model {
 
         create("arm64-v8a") {
             abiFilters.add("arm64-v8a")
-            
+
             ldFlags.addAll([
-            "-L${file("src/main/libs/arm64-v8a")}".toString(),
-            "-lv8_base",
-            "-lv8_libplatform",
-            "-lv8_libbase",
-            "-lv8_nosnapshot",
-            "-lzip"
+                    "-L${file("src/main/libs/arm64-v8a")}".toString(),
+                    "-lv8_base",
+                    "-lv8_libplatform",
+                    "-lv8_libbase",
+                    "-lv8_nosnapshot",
+                    "-lzip"
             ])
-            
+
+            //The correct way of setting these flags is not working hence the workaround above
             //ldFlags.add("-L ${file("src/main/libs/arm64-v8a")}" -l v8_base".toString())
             //ldFlags.add("-L ${file("src/main/libs/arm64-v8a")}" -l v8_libplatform".toString())
             //ldFlags.add("-L ${file("src/main/libs/arm64-v8a")}" -l v8_libbase".toString())
             //ldFlags.add("-L ${file("src/main/libs/arm64-v8a")}" -l v8_nosnapshot".toString())
             //ldFlags.add("-L ${file("src/main/libs/arm64-v8a")}" -l zip".toString())
-            
+
             //ldLibs.add("${file("src/main/libs/arm64-v8a/libv8_base.a")}".toString())
             //ldLibs.add("${file("src/main/libs/arm64-v8a/libv8_libplatform.a")}".toString())
             //ldLibs.add("${file("src/main/libs/arm64-v8a/libv8_libbase.a")}".toString())
@@ -158,14 +172,7 @@ model {
             //ldLibs.add("${file("src/main/libs/arm64-v8a/libzip.a")}".toString())
         }
     }
-    
-    
-    // android.variantFilter { variant ->
-    //     if (variant.buildType.name == "release") {
-           
-    //     }
-    // }
-    
+
     repositories {
         prebuilt(PrebuiltLibraries) {
             v8 {
@@ -182,22 +189,21 @@ model {
     }
 }
 
-
 dependencies {
-   compile project(':binding-generator')
+    compile project(':binding-generator')
 }
 
 task setPackageVersion {
-    onlyIf { 
+    onlyIf {
         project.hasProperty('packageVersion')
     }
-	
+
     doFirst {
         println "Setting runtime version: '${packageVersion}'"
-        
+
         def versionFile = "$rootDir/src/main/jni//Version.h"
         String contents = new File(versionFile).getText("UTF-8")
-        contents = contents.replaceAll( /0.0.0.0/, packageVersion)
+        contents = contents.replaceAll(/0.0.0.0/, packageVersion)
         new File(versionFile).write(contents, "UTF-8")
     }
 }
@@ -206,10 +212,10 @@ task setRuntimeCommit {
     onlyIf {
         project.hasProperty('gitCommitVersion')
     }
-    
+
     doFirst {
         println "Setting runtime commit: '${gitCommitVersion}'"
-        
+
         def versionFile = "$rootDir/src/main/jni//Version.h"
         String contents = new File(versionFile).getText("UTF-8")
         contents = contents.replaceAll(/RUNTIME_COMMIT_SHA_PLACEHOLDER/, gitCommitVersion)
@@ -217,22 +223,35 @@ task setRuntimeCommit {
     }
 }
 
-task revertVersionFile (type: Exec) {
-    
+//task setNdkDebuggable {
+//    println "Setting ndk debuggable: " + components.android
+//    doFirst {
+//
+//    }
+//}
+//
+//task revertNdkDebuggable {
+//    doFirst {
+//        println "Reverting ndk debuggable: " + components.android
+//    }
+//}
+
+
+task revertVersionFile(type: Exec) {
+
     onlyIf {
-       project.hasProperty('packageVersion') || project.hasProperty('gitCommitVersion')
+        project.hasProperty('packageVersion') || project.hasProperty('gitCommitVersion')
     }
-    
+
     doFirst {
         def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
         def versionFileName = "./src/main/jni//Version.h"
         def versionFilePath = new File(versionFileName).getAbsolutePath()
-        println "Reverting Version.h file: ${versionFilePath}" 
-        
-        if(isWinOs) {
+        println "Reverting Version.h file: ${versionFilePath}"
+
+        if (isWinOs) {
             commandLine "cmd", "/c", "git", "checkout", "--", versionFilePath
-        }
-        else {
+        } else {
             commandLine "git", "checkout", "--", versionFilePath
         }
     }
