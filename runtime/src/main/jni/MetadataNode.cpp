@@ -492,6 +492,8 @@ void MetadataNode::SetInstanceMembersFromStaticMetadata(Isolate *isolate, Local<
 	string lastMethodName;
 	MethodCallbackData *callbackData = nullptr;
 
+    auto origin = Constants::APP_ROOT_FOLDER_PATH + GetOrCreateInternal(treeNode)->m_name;
+
 	for (auto i = 0; i < instanceMethodCout; i++)
 	{
 		auto entry = s_metadataReader.ReadInstanceMethodEntry(&curPtr);
@@ -515,7 +517,7 @@ void MetadataNode::SetInstanceMembersFromStaticMetadata(Isolate *isolate, Local<
 			auto funcTemplate = FunctionTemplate::New(isolate, MethodCallback, funcData);
 			auto func = funcTemplate->GetFunction();
 			auto funcName = ConvertToV8String(entry.name);
-			prototypeTemplate->Set(funcName, Wrap(isolate, func, entry.name, false /* isCtorFunc */));
+			prototypeTemplate->Set(funcName, Wrap(isolate, func, entry.name, origin, false /* isCtorFunc */));
 			lastMethodName = entry.name;
 		}
 
@@ -640,6 +642,8 @@ void MetadataNode::SetStaticMembers(Isolate *isolate, Local<Function>& ctorFunct
 		string lastMethodName;
 		MethodCallbackData *callbackData = nullptr;
 
+        auto origin = Constants::APP_ROOT_FOLDER_PATH + GetOrCreateInternal(treeNode)->m_name;
+
 		//get candidates from static methods metadata
 		auto staticMethodCout = *reinterpret_cast<uint16_t*>(curPtr);
 		curPtr += sizeof(uint16_t);
@@ -653,7 +657,7 @@ void MetadataNode::SetStaticMembers(Isolate *isolate, Local<Function>& ctorFunct
 				auto funcTemplate = FunctionTemplate::New(isolate, MethodCallback, funcData);
 				auto func = funcTemplate->GetFunction();
 				auto funcName = ConvertToV8String(entry.name);
-				ctorFunction->Set(funcName, Wrap(isolate, func, entry.name, false /* isCtorFunc */));
+				ctorFunction->Set(funcName, Wrap(isolate, func, entry.name, origin, false /* isCtorFunc */));
 				lastMethodName = entry.name;
 			}
 			callbackData->candidates.push_back(entry);
@@ -848,7 +852,9 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate *is
 
 	auto ctorFunc = ctorFuncTemplate->GetFunction();
 
-	auto wrappedCtorFunc = Wrap(isolate, ctorFunc, node->m_treeNode->name, true /* isCtorFunc */);
+    auto origin = Constants::APP_ROOT_FOLDER_PATH + node->m_name;
+
+	auto wrappedCtorFunc = Wrap(isolate, ctorFunc, node->m_treeNode->name, origin, true /* isCtorFunc */);
 
 	node->SetStaticMembers(isolate, wrappedCtorFunc, treeNode);
 
@@ -1813,7 +1819,7 @@ void MetadataNode::EnableProfiler(bool enableProfiler)
 	s_profilerEnabled = enableProfiler;
 }
 
-Local<Function> MetadataNode::Wrap(Isolate* isolate, const Local<Function>& f, const string& name, bool isCtorFunc)
+Local<Function> MetadataNode::Wrap(Isolate* isolate, const Local<Function>& f, const string& name, const string& origin,  bool isCtorFunc)
 {
 	if (!s_profilerEnabled)
 	{
@@ -1868,8 +1874,8 @@ Local<Function> MetadataNode::Wrap(Isolate* isolate, const Local<Function>& f, c
 	TryCatch tc;
 
 	Local<Script> script;
-	ScriptOrigin origin(ConvertToV8String(Constants::APP_ROOT_FOLDER_PATH + m_name));
-	auto maybeScript = Script::Compile(context, source, &origin).ToLocal(&script);
+	ScriptOrigin jsOrigin(ConvertToV8String(origin));
+	auto maybeScript = Script::Compile(context, source, &jsOrigin).ToLocal(&script);
 
 	if (tc.HasCaught())
 	{
