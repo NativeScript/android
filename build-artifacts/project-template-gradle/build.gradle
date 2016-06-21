@@ -10,12 +10,12 @@
 *			-Palias=[alias_to_use_from_keystore_file]
 *			-Ppassword=[password_for_alias]
 *
-*			-PtargetSdk=[target_sdk] (default is 22)
-*			-PbuildToolsVersion=[build_tools_version] (default is 22.0.1)
-*			-PsupportVersion=[support_version] (default (22.2.0)
-*			-PcompileSdk=[compile_sdk_version] (default 22)
+*			-PtargetSdk=[target_sdk]
+*			-PbuildToolsVersion=[build_tools_version]
+*			-PsupportVersion=[support_version]
+*			-PcompileSdk=[compile_sdk_version]
 
-*			-PdontRunSbg=[true/false] (default false)
+*			-PdontRunSbg=[true/false]
 */
 
 import groovy.json.JsonSlurper //used to parse package.json
