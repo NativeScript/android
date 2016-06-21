@@ -55,8 +55,6 @@ public class RuntimeHelper {
 
 			Thread.setDefaultUncaughtExceptionHandler(exHandler);
 
-			Async.Http.setApplicationContext(this.app);
-
 			DefaultExtractPolicy extractPolicy = new DefaultExtractPolicy(logger);
 			boolean skipAssetExtraction = Util.runPlugin(logger, app);
 
