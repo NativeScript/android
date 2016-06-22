@@ -986,6 +986,11 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
 
 		if (info.Length() == 1)
 		{
+			if(!info[0]->IsObject())
+			{
+				throw NativeScriptException(string("You must provide an implementation object with overridden methods"));
+			}
+
 			implementationObject = info[0]->ToObject();
 		}
 		else if (info.Length() == 2)
@@ -999,7 +1004,6 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
 				throw NativeScriptException(string("Second argument must be implementation object"));
 			}
 
-			DEBUG_WRITE("InterfaceConstructorCallback: getting extend name");
 			v8ExtendName = info[0]->ToString();
 			implementationObject = info[1]->ToObject();
 		}
