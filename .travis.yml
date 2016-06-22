@@ -2,7 +2,7 @@ env:
   global:
   - NDK_VERSION=r11c
   - DATE=$(date +%Y-%m-%d)
-  - PACKAGE_VERSION=$DATE-$TRAVIS_BUILD_NUMBER
+  - PACKAGE_VERSION=next-$DATE-$TRAVIS_BUILD_NUMBER
   - PACKAGE_NAME=tns-android
 sudo: false
 language: android

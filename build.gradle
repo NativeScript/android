@@ -33,10 +33,6 @@ task checkEnvironmentVariables {
 		logger.warn("Warning: The GIT_COMMIT is not set. This NativeScript Android Runtime will not be tagged with the git commit it is build from\n");
 	}
 	
-	if(project.hasProperty("devmode") == true && !project.hasProperty("metadataGenSrc") && !file("../android-metadata-generator").exists()) {
-		throw new GradleException("../android-metadata-generator directory not found and no metadataGenSrc option specified. Clone the android-metadata-generator repo first.\n");
-	}
-
 	if(project.hasProperty("metadataGen") && !file("../android-metadata-generator/dist/tns-android-metadata-generator-0.0.1.tgz").exists()) {
 		throw new GradleException("android-metadata-generator build output not found and no metadataGen option specified. Build android-metadata-generator first.\n");
 	}
@@ -62,19 +58,29 @@ task copyPackageJson (type: Copy) {
 }
 
 task getPackageVersion << {
-	String content = new File("$rootDir/package.json").getText("UTF-8")
-	def jsonSlurper = new JsonSlurper()
-	def packageJsonMap = jsonSlurper.parseText(content)
+
+	if (project.hasProperty("packageVersion")) {
+		pVersion = packageVersion
+		
+		println "Using packageVersion property '${pVersion}'"
+	}
+	else { 
+		String content = new File("$rootDir/package.json").getText("UTF-8")
+		def jsonSlurper = new JsonSlurper()
+		def packageJsonMap = jsonSlurper.parseText(content)
 	
-	pVersion = packageJsonMap.version
-	
-	println "The package version from package.json is '${pVersion}'"
+		pVersion = packageJsonMap.version
+
+		println "Using runtime version from package.json '${pVersion}'"
+	}
 
 	if (project.hasProperty("preReleaseVersion")) {
 		pVersion += "-" + preReleaseVersion
+
+		println "Adding preReleaseVersion property '${pVersion}' to package version"
 	}
 
-	println "The runtime version is '${pVersion}'"
+	println "The package version is '${pVersion}'"
 }
 
 task getCommitVersion << {
@@ -153,13 +159,12 @@ task createNpmPackage (type: Exec) {
 }
 
 task setPackageVersionInPackageJsonFile << {
-	if (project.hasProperty("packageVersion")) {
+	
 		def inputFile = new File("$rootDir/dist/package.json")
 		def json = new JsonSlurper().parseText(inputFile.text)
-		json.version = json.version + "-" + packageVersion
+		json.version = pVersion
 		def jb = new JsonBuilder(json);
 		inputFile.text = JsonOutput.prettyPrint(jb.toString())
-	}
 }
 
 task copyReadme (type: Copy) {
@@ -174,14 +179,16 @@ createDistDir.dependsOn(cleanDistDir)
 //copy framework structure
 copyProjectTemplate.dependsOn(createDistDir)
 copyPackageJson.dependsOn(copyProjectTemplate)
-setPackageVersionInPackageJsonFile.dependsOn(copyPackageJson)
+
 
 //get version from package json
-getPackageVersion.dependsOn(setPackageVersionInPackageJsonFile)
+getPackageVersion.dependsOn(copyProjectTemplate)
 getCommitVersion.dependsOn(getPackageVersion)
 
 //generate runtime and copy into framework structure
 generateRuntime.dependsOn(getCommitVersion)
+
+setPackageVersionInPackageJsonFile.dependsOn(generateRuntime)
 
 //generateRuntime.dependsOn(build)
 
@@ -202,7 +209,7 @@ copyGeneratedMetadataGeneratorJar.dependsOn(generateMetadataGeneratorJar)
 copyReadme.dependsOn(copyGeneratedMetadataGeneratorJar)
 
 //pack runtime
-createNpmPackage.dependsOn(copyReadme)
+createNpmPackage.dependsOn(copyReadme, setPackageVersionInPackageJsonFile)
 
 task createPackage {
 	description "Builds the NativeScript Android App Package using an application project template."
@@ -211,12 +218,13 @@ task createPackage {
             copyProjectTemplate,
 
             copyPackageJson,
-			setPackageVersionInPackageJsonFile,
 
             getPackageVersion,
             getCommitVersion,
 			
             generateRuntime,
+
+			setPackageVersionInPackageJsonFile,
 
             copyGeneratedRuntime,
 			copyBindingGeneratorLib,
