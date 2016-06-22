@@ -135,21 +135,6 @@ void NativeScriptException::Init(ObjectManager *objectManager)
 	THROWABLE_CLASS = env.FindClass("java/lang/Throwable");
 	assert(THROWABLE_CLASS != nullptr);
 
-	THROWABLE_GET_CAUSE_METHOD_ID = env.GetMethodID(THROWABLE_CLASS, "getCause", "()Ljava/lang/Throwable;");
-	assert(THROWABLE_GET_CAUSE_METHOD_ID != nullptr);
-
-	THROWABLE_GET_STACK_TRACE_METHOD_ID = env.GetMethodID(THROWABLE_CLASS, "getStackTrace", "()[Ljava/lang/StackTraceElement;");
-	assert(THROWABLE_GET_STACK_TRACE_METHOD_ID != nullptr);
-
-	THROWABLE_TO_STRING_METHOD_ID = env.GetMethodID(THROWABLE_CLASS, V8StringConstants::TO_STRING, "()Ljava/lang/String;");
-	assert(THROWABLE_TO_STRING_METHOD_ID != nullptr);
-
-	STACK_TRACE_ELEMENT_CLASS = env.FindClass("java/lang/StackTraceElement");
-	assert(STACK_TRACE_ELEMENT_CLASS != nullptr);
-
-	FRAME_TO_STRING_METHOD_ID = env.GetMethodID(STACK_TRACE_ELEMENT_CLASS, V8StringConstants::TO_STRING, "()Ljava/lang/String;");
-	assert(FRAME_TO_STRING_METHOD_ID != nullptr);
-
 	NATIVESCRIPTEXCEPTION_CLASS = env.FindClass("com/tns/NativeScriptException");
 	assert(NATIVESCRIPTEXCEPTION_CLASS != nullptr);
 
@@ -158,6 +143,9 @@ void NativeScriptException::Init(ObjectManager *objectManager)
 
 	NATIVESCRIPTEXCEPTION_THROWABLE_CTOR_ID = env.GetMethodID(NATIVESCRIPTEXCEPTION_CLASS, "<init>", "(Ljava/lang/String;Ljava/lang/Throwable;)V");
 	assert(NATIVESCRIPTEXCEPTION_THROWABLE_CTOR_ID != nullptr);
+
+	NATIVESCRIPTEXCEPTION_GET_STACK_TRACE_AS_STRING_METHOD_ID = env.GetStaticMethodID(NATIVESCRIPTEXCEPTION_CLASS, "getStackTraceAsString", "(Ljava/lang/Throwable;)Ljava/lang/String;");
+	assert(NATIVESCRIPTEXCEPTION_GET_STACK_TRACE_AS_STRING_METHOD_ID != nullptr);
 }
 
 // ON V8 UNCAUGHT EXCEPTION
@@ -394,62 +382,21 @@ string NativeScriptException::GetErrorStackTrace(const Local<StackTrace>& stackT
 string NativeScriptException::GetExceptionMessage(JEnv& env, jthrowable exception)
 {
 	string errMsg;
-	JniLocalRef frames(env.CallObjectMethod(exception, THROWABLE_GET_STACK_TRACE_METHOD_ID));
+	JniLocalRef msg(env.CallStaticObjectMethod(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_GET_STACK_TRACE_AS_STRING_METHOD_ID, exception));
 
-	jsize framesLength = env.GetArrayLength(frames);
+	const char* msgStr = env.GetStringUTFChars(msg, nullptr);
 
-	if (nullptr != (jobjectArray) frames)
-	{
-		JniLocalRef msg(env.CallObjectMethod(exception, THROWABLE_TO_STRING_METHOD_ID));
+	errMsg.append(msgStr);
 
-		const char* msgStr = env.GetStringUTFChars(msg, nullptr);
+	env.ReleaseStringUTFChars(msg, msgStr);
 
-		if (!errMsg.empty())
-		{
-			errMsg.append("\nCaused by: ");
-			errMsg.append(msgStr);
-		}
-		else
-		{
-			errMsg = msgStr;
-		}
-
-		env.ReleaseStringUTFChars(msg, msgStr);
-	}
-
-	for (jsize i = 0; i < framesLength; i++)
-	{
-		JniLocalRef frame(env.GetObjectArrayElement(frames, i));
-		JniLocalRef msg(env.CallObjectMethod(frame, FRAME_TO_STRING_METHOD_ID));
-
-		const char* msgStr = env.GetStringUTFChars(msg, nullptr);
-
-		errMsg.append("\n    ");
-		errMsg.append(msgStr);
-
-		env.ReleaseStringUTFChars(msg, msgStr);
-	}
-
-	if (nullptr != (jobjectArray) frames)
-	{
-		JniLocalRef cause(env.CallObjectMethod(exception, THROWABLE_GET_CAUSE_METHOD_ID));
-
-		if (nullptr != (jthrowable) cause)
-		{
-			errMsg = GetExceptionMessage(env, cause);
-		}
-	}
 	return errMsg;
 }
 
 ObjectManager* NativeScriptException::objectManager = nullptr;
 jclass NativeScriptException::RUNTIME_CLASS = nullptr;
 jclass NativeScriptException::THROWABLE_CLASS = nullptr;
-jmethodID NativeScriptException::THROWABLE_GET_CAUSE_METHOD_ID = nullptr;
-jmethodID NativeScriptException::THROWABLE_GET_STACK_TRACE_METHOD_ID = nullptr;
-jmethodID NativeScriptException::THROWABLE_TO_STRING_METHOD_ID = nullptr;
-jclass NativeScriptException::STACK_TRACE_ELEMENT_CLASS = nullptr;
-jmethodID NativeScriptException::FRAME_TO_STRING_METHOD_ID = nullptr;
 jclass NativeScriptException::NATIVESCRIPTEXCEPTION_CLASS = nullptr;
 jmethodID NativeScriptException::NATIVESCRIPTEXCEPTION_JSVALUE_CTOR_ID = nullptr;
 jmethodID NativeScriptException::NATIVESCRIPTEXCEPTION_THROWABLE_CTOR_ID = nullptr;
+jmethodID NativeScriptException::NATIVESCRIPTEXCEPTION_GET_STACK_TRACE_AS_STRING_METHOD_ID = nullptr;
