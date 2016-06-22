@@ -437,14 +437,12 @@ public class AndroidJsDebugger implements Debugger
 		Handler handler = new Handler(handlerThread.getLooper());
 		
 		this.registerEnableDisableDebuggerReceiver(handler);
-		
-		boolean shouldDebugBreak = getDebugBreakFlagAndClearIt();
 
 		AndroidJsDebugger.this.debugContext.enableAgent();
 
+		boolean shouldDebugBreak = getDebugBreakFlagAndClearIt();
 		if (shouldDebugBreak)
 		{
-
 			AndroidJsDebugger.this.debugContext.debugBreak();
 		}
 	}
