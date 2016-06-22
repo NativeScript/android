@@ -1,13 +1,14 @@
 var
 	searchForFile = require('child_process').exec,
 	execFindFile = require('child_process').exec,
+	checkIfAppIsRunning = require('child_process').exec,
 	fs = require('fs'),
 	pullfile,
 
 	isTimeToExit = false,
 
 	processTimeout = 20 * 60 * 1000, // 20 minutes timeout (empirical constant :)) 
-	searchInterval = 10000;
+	searchInterval = 10 * 1000;
 
 searchForFile("", getFile);
 
@@ -24,9 +25,21 @@ function closeProcessAfter(timeout) {
 }
 
 function tryToGetFile() {
+	var checkApp = checkIfAppIsRunning("adb " + runOnDeviceOrEmulator + " shell \"ps | grep com.tns.android_runtime_testapp\"", checkIfProcessIsRunning);
 	pullfile = execFindFile("adb " + runOnDeviceOrEmulator + " pull /sdcard/android_unit_test_results.xml", checkIfFileExists);
 	pullfile.stdout.pipe(process.stdout, { end: false });
 	pullfile.stderr.pipe(process.stderr, { end: false });
+}
+
+function checkIfProcessIsRunning(err, stdout, stderr) {
+	if(stdout) {
+		console.log("com.tns.android_runtime_testapp process is running")
+	}
+	else {
+		console.log('com.tns.android_runtime_testapp process died!');
+		process.exit(1);
+	}
+
 }
 
 function checkIfFileExists(err, stout, stderr) {
@@ -41,7 +54,7 @@ function checkIfFileExists(err, stout, stderr) {
 		if (isTimeToExit) {
 			console.log(err);
 			console.log('Tests results file not found!');
-			process.exit();
+			process.exit(1);
 		}
 	}
 }

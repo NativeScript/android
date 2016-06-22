@@ -12,7 +12,7 @@ var runOnDeviceOrEmulator = process.argv[3];
 
 var proc = require('child_process');
 
-var deployTimeout = 180000; // 3 minutes to deploy and launch.
+var deployTimeout = 3 * 60 * 1000; // 3 minutes to deploy and launch.
 
 var cmd = 'adb '+ runOnDeviceOrEmulator  +' install -r ' + apk;
 
