@@ -1,6 +1,9 @@
 /*
 *	Usage: 
 *		gradlew - Builds the NativeScript Android App Package using an application project template.
+		gradlew -PgitCommitVersion - sets the commit version of the build
+		gradlew -PpreReleaseVersion - sets the pre-release version of the build (as per semver spec "-alpha" value results in 1.0.0-alpha)
+
 */
 
 defaultTasks 'createPackage'
@@ -15,42 +18,29 @@ def distDir = "$rootDir/dist"
 def pVersion = "no package version was provided by build.gradle build"
 def arVersion = "no commit sha was provided by build.gradle build"
 
+
+
 task checkEnvironmentVariables {
 	if ("$System.env.JAVA_HOME" == "" || "$System.env.JAVA_HOME" == "null") {
 		throw new GradleException("Set JAVA_HOME to point to the correct Jdk location\n");
 	}
+	
 	if ("$System.env.ANDROID_HOME" == "" || "$System.env.ANDROID_HOME" == "null") {
 		throw new GradleException("Set ANDROID_HOME to point to the correct Android SDK location\n");
 	}
-	if ("$System.env.GIT_COMMIT" == "null") {
+	
+	if ("$System.env.GIT_COMMIT" == "null" && !project.hasProperty("gitCommitVersion")) {
 		logger.warn("Warning: The GIT_COMMIT is not set. This NativeScript Android Runtime will not be tagged with the git commit it is build from\n");
 	}
+	
 	if(project.hasProperty("devmode") == true && !project.hasProperty("metadataGenSrc") && !file("../android-metadata-generator").exists()) {
 		throw new GradleException("../android-metadata-generator directory not found and no metadataGenSrc option specified. Clone the android-metadata-generator repo first.\n");
 	}
+
 	if(project.hasProperty("metadataGen") && !file("../android-metadata-generator/dist/tns-android-metadata-generator-0.0.1.tgz").exists()) {
 		throw new GradleException("android-metadata-generator build output not found and no metadataGen option specified. Build android-metadata-generator first.\n");
 	}
 }
-
-// task checkAndroidCommand(type:Exec) {
-// 	if(isWinOs) {
-// 		commandLine "cmd", "/c", "android", "-h"
-// 	}
-// 	else {
-// 		commandLine "android", "-h"
-// 	}
-
-// 	ignoreExitValue = true
-
-// 	doLast {
-// 		def successResult = isWinOs ? 0 : 1
-
-// 		if (execResult.exitValue != successResult) {//1 is ok result for android tool
-// 			throw new GradleException("\n--> 'android' command not found. Set the PATH variable to include the path to Android SDK Tools directory.\n\nError: " + errorOutput + "\nexitValue: " + execResult.exitValue)
-// 		}
-// 	}
-// }
 
 task cleanDistDir (type: Delete) << {
 	delete distDir
@@ -79,10 +69,22 @@ task getPackageVersion << {
 	pVersion = packageJsonMap.version
 	
 	println "The package version from package.json is '${pVersion}'"
+
+	if (project.hasProperty("preReleaseVersion")) {
+		pVersion += "-" + preReleaseVersion
+	}
+
+	println "The runtime version is '${pVersion}'"
 }
 
 task getCommitVersion << {
-	if("$System.env.GIT_COMMIT" != "null") {        
+
+	if (project.hasProperty("gitCommitVersion")) {
+		println "Using commit version property " + gitCommitVersion
+		arVersion =  gitCommitVersion
+	}
+	else if ("$System.env.GIT_COMMIT" != "null") {        
+		println "Using commit version environment variable " + $System.env.GIT_COMMIT
 		String content = "$System.env.GIT_COMMIT"
 		arVersion = content.trim()
 	}
