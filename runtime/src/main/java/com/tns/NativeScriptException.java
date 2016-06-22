@@ -30,4 +30,30 @@ public class NativeScriptException extends RuntimeException
 		super(detailMessage);
 		this.jsValueAddress = jsValueAddress;
 	}
+
+	@RuntimeCallable
+	public static String getStackTraceAsString(Throwable ex)
+	{
+		String errMessage;
+		try
+		{
+			errMessage = ex.toString();
+			for (StackTraceElement frame: ex.getStackTrace())
+			{
+				errMessage += "\n    ";
+				errMessage += frame;
+			}
+
+			Throwable cause = ex.getCause();
+			if (cause != null) {
+                errMessage += "\nCaused by: ";
+                errMessage += getStackTraceAsString(cause);
+			}
+		}
+		catch (Throwable err)
+		{
+			errMessage = "Unknown error. Cannot get error message.";
+		}
+		return errMessage;
+	}
 }

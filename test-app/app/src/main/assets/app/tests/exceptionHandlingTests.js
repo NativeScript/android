@@ -280,7 +280,6 @@ describe("Tests exception handling ", function () {
 		}
 		
 		expect(exceptionCaught).toBe(true);
-		
 	});
 	
 	it("should not wrap the thrown exception into NativeScriptException", function () {
@@ -311,4 +310,17 @@ describe("Tests exception handling ", function () {
 		expect(e2.getCause().getClass()).toBe(java.io.IOException.class);
 	});
 
+	it("should successfully catch Java exception when getStackTrace fails", function () {
+	    var test = new com.tns.tests.ExceptionHandlingTest();
+	    var exceptionCaught = false;
+	    var errMsg;
+	    try {
+	        test.throwException();
+	    } catch (e) {
+	        exceptionCaught = true;
+	        errMsg = e.toString();
+	    }
+	    expect(exceptionCaught).toBe(true);
+	    expect(errMsg).toBe("Error: Unknown error. Cannot get error message.");
+	});
 });

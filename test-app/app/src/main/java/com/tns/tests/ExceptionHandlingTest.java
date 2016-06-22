@@ -7,6 +7,16 @@ import android.util.Log;
 
 public class ExceptionHandlingTest
 {
+	private static class BadException extends Exception
+	{
+		public BadException() {}
+
+		@Override
+		public StackTraceElement[] getStackTrace() {
+			throw new RuntimeException();
+		}
+	}
+
 	public void triggerEvent1(String s, int n) throws Exception
 	{
 		this.onEvent1(s, n);
@@ -51,4 +61,8 @@ public class ExceptionHandlingTest
 	{
 		this.onGetFile(s, n);
 	}
+
+    public void throwException() throws BadException {
+        throw new BadException();
+    }
 }

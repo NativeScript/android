@@ -10,12 +10,12 @@
 *			-Palias=[alias_to_use_from_keystore_file]
 *			-Ppassword=[password_for_alias]
 *
-*			-PtargetSdk=[target_sdk] (default is 22)
-*			-PbuildToolsVersion=[build_tools_version] (default is 22.0.1)
-*			-PsupportVersion=[support_version] (default (22.2.0)
-*			-PcompileSdk=[compile_sdk_version] (default 22)
+*			-PtargetSdk=[target_sdk]
+*			-PbuildToolsVersion=[build_tools_version]
+*			-PsupportVersion=[support_version]
+*			-PcompileSdk=[compile_sdk_version]
 
-*			-PdontRunSbg=[true/false] (default false)
+*			-PdontRunSbg=[true/false]
 */
 
 import groovy.json.JsonSlurper //used to parse package.json
@@ -222,6 +222,60 @@ task pluginStructureCheck {
 	}
 }
 
+def updateProductFlavorsContent(flavor, dimensionName, oldContent) {
+	def endIndex = oldContent.length() - 1;
+		def index = 0;
+		def newContent = "";
+		def level = -1;
+		def dimensionFound = false;
+
+		while(index <= endIndex) {
+			if(level == 0 && (oldContent[index] == '"' || oldContent[index] == "'")) {
+				def closingQuotes = oldContent.indexOf('"', index + 1);
+				if(closingQuotes == -1) {
+					closingQuotes = oldContent.indexOf("'", index + 1);
+				}
+
+				index = closingQuotes + 1;
+				newContent += "\"${flavor}\"";
+				continue;
+			}
+
+			if(oldContent[index] == "{") {
+				level++;	
+			}
+
+			if(oldContent[index] == "}") {
+				level--;
+			}
+
+			if(level > 0) {
+				if(!dimensionFound && oldContent.indexOf("dimension", index) == index) {
+					newContent += "dimension \"${dimensionName}\"";
+					dimensionFound = true;
+					index += "dimension ".length();
+					def openingQuoutes = oldContent.indexOf('"', index);
+					if(openingQuoutes == -1) {
+						openingQuoutes = oldContent.indexOf("'", index);
+					}
+
+					def closingQuotes = oldContent.indexOf('"', openingQuoutes + 1);
+					if(closingQuotes == -1) {
+						closingQuotes = closingQuotes.indexOf("'", openingQuoutes + 1);
+					}	
+
+					index = closingQuotes + 1;
+				}
+			}
+
+			newContent += oldContent[index];
+
+			index++;
+		}
+
+		return newContent;
+}
+
 def createProductFlavorsContent(flavor, dimensionName, includeAndroidContent = true)
 {
 	if (includeAndroidContent)
@@ -250,7 +304,6 @@ android {
 	}
 }
 
-
 def createIncludeFile (filePath, flavor, dimensionName) {
 	println "\t + creating include.gradle file for ${filePath}" 
 	
@@ -264,39 +317,38 @@ def sanatizeDimensionName(str) {
 
 def replaceProductFlavorInContent(content, dimension, flavor)
 {
-  def indexStart = content.indexOf("productFlavors");
-  def index = indexStart  + "productFlavors".length();
-  def indexEnd = -1;
-  def nestedOpenBraketsCount = 0;
+	def indexStart = content.indexOf("productFlavors");
+	def index = indexStart  + "productFlavors".length();
+	def indexEnd = -1;
+	def nestedOpenBraketsCount = 0;
 
-  while (index < content.length())
-  {
-      print content[index]
-      if (content[index] == "}")
-      {
-          if (nestedOpenBraketsCount == 0)
-          {
-              indexEnd = index;
-              break;
-          }
-          else
-          {
-              nestedOpenBraketsCount--;
-          }
-      }
-      else if (content[index] == "{")
-      {
-          nestedOpenBraketsCount++;
-      }
+	while (index < content.length())
+	{
+		// print content[index];
+		if (content[index] == "}")
+		{
+			nestedOpenBraketsCount--;
 
-      index++;
-  }
+			if (nestedOpenBraketsCount == 0)
+			{
+				indexEnd = index;
+				break;
+			}
+		}
+		else if (content[index] == "{")
+		{
+			nestedOpenBraketsCount++;
+		}
 
-    if (indexEnd != -1)
+		index++;
+	}
+
+	if (indexEnd != -1)
     {
-      def oldProductFlavorsText = content.substring(indexStart, indexEnd - 1);
-      
-      def newProductFlavorsContent = createProductFlavorsContent(flavor, dimension, false);
+		// full content of productFlavors { ... } -> the substring is parenthesis to parenthesis -> { ... }
+      def oldProductFlavorsText = content.substring(indexStart, indexEnd + 1);
+
+      def newProductFlavorsContent = updateProductFlavorsContent(flavor, dimension, oldProductFlavorsText);
       
       return content.replace(oldProductFlavorsText, newProductFlavorsContent);
     }

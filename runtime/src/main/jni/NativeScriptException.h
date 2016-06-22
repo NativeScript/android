@@ -40,14 +40,10 @@ namespace tns
 			static ObjectManager *objectManager;
 			static jclass RUNTIME_CLASS;
 			static jclass THROWABLE_CLASS;
-			static jmethodID THROWABLE_GET_CAUSE_METHOD_ID;
-			static jmethodID THROWABLE_GET_STACK_TRACE_METHOD_ID;
-			static jmethodID THROWABLE_TO_STRING_METHOD_ID;
-			static jclass STACK_TRACE_ELEMENT_CLASS;
-			static jmethodID FRAME_TO_STRING_METHOD_ID;
 			static jclass NATIVESCRIPTEXCEPTION_CLASS;
 			static jmethodID NATIVESCRIPTEXCEPTION_JSVALUE_CTOR_ID;
 			static jmethodID NATIVESCRIPTEXCEPTION_THROWABLE_CTOR_ID;
+			static jmethodID NATIVESCRIPTEXCEPTION_GET_STACK_TRACE_AS_STRING_METHOD_ID;
 	};
 }
 

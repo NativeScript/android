@@ -2,6 +2,7 @@ var
 	searchForFile = require('child_process').exec,
 	execFindFile = require('child_process').exec,
 	fs = require('fs'),
+	pullfile,
 
 	isTimeToExit = false,
 
@@ -23,7 +24,9 @@ function closeProcessAfter(timeout) {
 }
 
 function tryToGetFile() {
-	execFindFile("adb " + runOnDeviceOrEmulator + " pull /sdcard/android_unit_test_results.xml", checkIfFileExists);
+	pullfile = execFindFile("adb " + runOnDeviceOrEmulator + " pull /sdcard/android_unit_test_results.xml", checkIfFileExists);
+	pullfile.stdout.pipe(process.stdout, { end: false });
+	pullfile.stderr.pipe(process.stderr, { end: false });
 }
 
 function checkIfFileExists(err, stout, stderr) {
