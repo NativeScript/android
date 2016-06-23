@@ -29,7 +29,7 @@ public class ProxyGenerator
 	}
 	
 	
-	public String generateProxy(String proxyName, Class<?> classToProxy, String[] methodOverrides) throws IOException
+	public String generateProxy(String proxyName, Class<?> classToProxy, String[] methodOverrides, boolean isInterface) throws IOException
 	{
 		HashSet<String> methodOverridesSet = null;
 	
@@ -42,18 +42,26 @@ public class ProxyGenerator
 				methodOverridesSet.add(methodOverride);
 			}
 		}
-		return generateProxy(proxyName, classToProxy, methodOverridesSet);
+		return generateProxy(proxyName, classToProxy, methodOverridesSet, isInterface);
 	}
 	
-	public String generateProxy(String proxyName, Class<?> classToProxy, HashSet<String> methodOverrides) throws IOException
+	public String generateProxy(String proxyName, Class<?> classToProxy, HashSet<String> methodOverrides, boolean isInterface) throws IOException
 	{
 		ApplicationWriter aw = new ApplicationWriter();
 		aw.visit();
+
 		dump.generateProxy(aw, proxyName, classToProxy, methodOverrides);
+
 		aw.visitEnd();
 		byte[] generatedBytes = aw.toByteArray();
 		
-		String proxyFileName = classToProxy.getName().replace('$', '_') + Dump.CLASS_NAME_LOCATION_SEPARATOR + proxyName;
+		String proxyFileName = classToProxy.getName().replace('$', '_');
+
+		if(!isInterface)
+		{
+			proxyFileName += Dump.CLASS_NAME_LOCATION_SEPARATOR + proxyName;
+		}
+
 		if (proxyThumb != null)
 		{
 			proxyFileName += "-" + proxyThumb;

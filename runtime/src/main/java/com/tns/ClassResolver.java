@@ -5,13 +5,13 @@ import java.io.IOException;
 class ClassResolver
 {
 	private final Runtime runtime;
-	
+
 	public ClassResolver(Runtime runtime)
 	{
 		this.runtime = runtime;
 	}
-	
-	public Class<?> resolveClass(String fullClassName, DexFactory dexFactory, String[] methodOverrides) throws ClassNotFoundException, IOException
+
+	public Class<?> resolveClass(String fullClassName, DexFactory dexFactory, String[] methodOverrides, boolean isInterface) throws ClassNotFoundException, IOException
 	{
 		String cannonicalClassName = fullClassName.replace('/', '.');
 		String name = null;
@@ -32,10 +32,16 @@ class ClassResolver
 		{
 			if (name == null || name == "")
 			{
-				name = "0";
+				if(isInterface)
+                {
+					name = "";
+				} else
+                {
+					name = "0";
+				}
 			}
 
-			clazz = dexFactory.resolveClass(name, className, methodOverrides);
+			clazz = dexFactory.resolveClass(name, className, methodOverrides, isInterface);
 		}
 
 		if (clazz == null)

@@ -305,9 +305,9 @@ public class Runtime
 	}
 
 	@RuntimeCallable
-	private Class<?> resolveClass(String fullClassName, String[] methodOverrides) throws ClassNotFoundException, IOException
+	private Class<?> resolveClass(String fullClassName, String[] methodOverrides, boolean isInterface) throws ClassNotFoundException, IOException
 	{
-		Class<?> javaClass = classResolver.resolveClass(fullClassName, dexFactory, methodOverrides);
+		Class<?> javaClass = classResolver.resolveClass(fullClassName, dexFactory, methodOverrides, isInterface);
 
 		return javaClass;
 	}

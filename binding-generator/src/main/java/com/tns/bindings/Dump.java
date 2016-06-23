@@ -350,9 +350,15 @@ public class Dump
 	{
 		String classSignature = getAsmDescriptor(classTo);
 		//String methodSignature = org.objectweb.asm.Type.getMethodDescriptor(Object.class.getMethods()[0]);
+
 		String tnsClassSignature = LCOM_TNS + 
-				classSignature.substring(1, classSignature.length() - 1).replace("$", "_")
-				+ CLASS_NAME_LOCATION_SEPARATOR + proxyName + ";";
+				classSignature.substring(1, classSignature.length() - 1).replace("$", "_");
+
+		if(!classTo.isInterface()) {
+			tnsClassSignature += CLASS_NAME_LOCATION_SEPARATOR + proxyName;
+		}
+
+		tnsClassSignature += ";";
 		
 		ClassVisitor cv = generateClass(aw, classTo, classSignature, tnsClassSignature);
 		Method[] methods = getSupportedMethods(classTo, methodOverrides);
@@ -723,7 +729,7 @@ public class Dump
 
 	private void generateMethod(ClassVisitor cv, Class<?> classTo, Method method, int methodNumber, String classSignature, String tnsClassSignature, int fieldBit)
 	{
-		if (ProxyGenerator.IsLogEnabled) Log.d("TNS.Rungime.Proxy.Generator", "generatingMethod " + method.getName());
+		if (ProxyGenerator.IsLogEnabled) Log.d("Generator", "generatingMethod " + method.getName());
 		
 		//TODO: handle checked exceptions
 		String methodDexSignature = getDexMethodDescriptor(method);
