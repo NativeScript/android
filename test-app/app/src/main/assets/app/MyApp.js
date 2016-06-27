@@ -5,4 +5,6 @@ var MyApp = android.app.Application.extend("com.tns.NativeScriptApplication",
 	{
 		__log("Hello MyApp::onCreate()");
 	}
+
+
 });

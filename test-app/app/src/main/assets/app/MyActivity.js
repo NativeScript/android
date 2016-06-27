@@ -21,6 +21,7 @@
 		}
 	}
 */
+__enableVerboseLogging();
 var MyActivity = (function (_super) {
     __extends(MyActivity, _super);
     function MyActivity() {
@@ -28,7 +29,7 @@ var MyActivity = (function (_super) {
     }
     MyActivity.prototype.onCreate = function (bundle) {
         _super.prototype.onCreate.call(this, bundle);
-        
+
     	require("./tests/testsWithContext").run(this);
     	execute(); //run jasmine
 
