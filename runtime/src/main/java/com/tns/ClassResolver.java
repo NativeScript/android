@@ -35,7 +35,8 @@ class ClassResolver
 				if(isInterface)
                 {
 					name = "";
-				} else
+				}
+				else
                 {
 					name = "0";
 				}

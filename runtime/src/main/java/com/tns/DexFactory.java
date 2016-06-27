@@ -64,7 +64,6 @@ public class DexFactory
 	static long totalMultiDexTime = 0;
 	static long totalLoadDexTime = 0;
 
-	// TODO: Pete: new param - implementedInterfaces
 	public Class<?> resolveClass(String name, String className, String[] methodOverrides, String[] implementedInterfaces, boolean isInterface) throws ClassNotFoundException, IOException
 	{
 		String fullClassName = className.replace("$", "_");
@@ -189,6 +188,7 @@ public class DexFactory
 		{
 			return existingClass;
 		}
+
 		return classLoader.loadClass(canonicalName);
 	}
 
@@ -252,6 +252,7 @@ public class DexFactory
 		{
 			logger.write("Looking for proxy file: " + dexFilePath + " Result: NOT Found. Proxy Gen needed. ClassName: " + className);
 		}
+
 		return null;
 	}
 

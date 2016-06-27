@@ -927,6 +927,7 @@ public class Dump
 
 	static final String[] classImplentedInterfaces = new String[] { "Lcom/tns/NativeScriptHashCodeProvider;" };
 	static final String[] interfaceImplementedInterfaces = new String[] { "Lcom/tns/NativeScriptHashCodeProvider;", "" };
+
 	private ClassVisitor generateClass(ApplicationWriter aw, ClassDescriptor classTo, String classSignature, String tnsClassSignature, HashSet<ClassDescriptor> implementedInterfaces)
 	{
 		ClassVisitor cv;

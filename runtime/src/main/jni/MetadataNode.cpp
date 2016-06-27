@@ -1345,7 +1345,6 @@ void MetadataNode::PackageGetterCallback(Local<Name> property, const PropertyCal
 	}
 }
 
-// TODO: Pete: Why do we check for validity AND!!! assign objects from outside the method?
 bool MetadataNode::ValidateExtendArguments(const FunctionCallbackInfo<Value>& info, string& extendLocation, v8::Local<v8::String>& extendName, Local<Object>& implementationObject)
 {
 	bool extendLocationFound = GetExtendLocation(extendLocation);

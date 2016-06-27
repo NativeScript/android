@@ -147,21 +147,20 @@ jclass CallbackHandlers::ResolveClass(Isolate *isolate, const string &fullClassn
         // get needed arguments in order to load binding
         JniLocalRef javaFullClassName(env.NewStringUTF(fullClassname.c_str()));
 
-        // TODO: Pete: Split into getMethodOverrides and getImplementedInterfaces
-        // TODO: Pete: ~~1~~
         jobjectArray methodOverrides = GetMethodOverrides(env, implementationObject);
 
-        // TODO: Pete: ~~1~~ - change 1
         jobjectArray implementedInterfaces = GetImplementedInterfaces(env, implementationObject);
 
         auto runtime = Runtime::GetRuntime(isolate);
 
         // create or load generated binding (java class)
-        // TODO: Pete: pass them interface names as param to ResolveClass in Runtime class
-        // TODO: Pete: ~~2~~ - change 1 - pass implementedInterfaces to Runtime
-        JniLocalRef generatedClass(
-                env.CallObjectMethod(runtime->GetJavaRuntime(), RESOLVE_CLASS_METHOD_ID,
-                                     (jstring) javaFullClassName, methodOverrides, implementedInterfaces, isInterface));
+        JniLocalRef generatedClass(env.CallObjectMethod(runtime->GetJavaRuntime(),
+                                     RESOLVE_CLASS_METHOD_ID,
+                                     (jstring) javaFullClassName,
+                                     methodOverrides,
+                                     implementedInterfaces,
+                                     isInterface));
+
         globalRefToGeneratedClass = static_cast<jclass>(env.NewGlobalRef(generatedClass));
 
         s_classCache.insert(make_pair(fullClassname, globalRefToGeneratedClass));
@@ -569,7 +568,6 @@ Local<Object> CallbackHandlers::CreateJSWrapper(Isolate *isolate, jint javaObjec
     return objectManager->CreateJSWrapper(javaObjectID, typeName);
 }
 
-// TODO: Pete: ~~1~~ - change 2
 jobjectArray CallbackHandlers::GetImplementedInterfaces(JEnv &env, const Local<Object> &implementationObject) {
     if (implementationObject.IsEmpty()) {
         return JavaObjectArrayCache::GetJavaStringArray(0);
@@ -659,7 +657,6 @@ jobjectArray CallbackHandlers::GetMethodOverrides(JEnv &env, const Local<Object>
     return methodOverrides;
 }
 
-// TODO: Pete: extract in some utils class
 void CallbackHandlers::replaceAll(std::string& str, const std::string& from, const std::string& to) {
     if(from.empty())
         return;
