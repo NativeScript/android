@@ -611,7 +611,7 @@ public class Dump
 		if (ProxyGenerator.IsLogEnabled) {
 			Log.d("Generator", "generatingMethod " + method.getName());
 		}
-		
+
 		//TODO: handle checked exceptions
 		String methodDexSignature = getDexMethodDescriptor(method);
 		String[] exceptions = new String[0];

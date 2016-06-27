@@ -33,11 +33,11 @@ class ClassResolver
 			if (name == null || name == "")
 			{
 				if(isInterface)
-                {
+				{
 					name = "";
 				}
 				else
-                {
+				{
 					name = "0";
 				}
 			}
