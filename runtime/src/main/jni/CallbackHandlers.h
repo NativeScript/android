@@ -89,8 +89,6 @@ namespace tns
 			{
 			}
 
-		    static void replaceAll(std::string& str, const std::string& from, const std::string& to);
-
 			static int GetCachedConstructorId(JEnv& env, const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& fullClassName, jobjectArray javaArgs, jclass javaClass);
 
 			static int64_t AdjustAmountOfExternalAllocatedMemory(JEnv& env, v8::Isolate *isolate);

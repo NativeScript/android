@@ -598,7 +598,7 @@ jobjectArray CallbackHandlers::GetImplementedInterfaces(JEnv &env, const Local<O
                             if(element->IsFunction()) {
                                 auto node = MetadataNode::GetTypeMetadataName(isolate, element);
 
-                                replaceAll(node, std::string("/"), std::string("."));
+                                Util::ReplaceAll(node, std::string("/"), std::string("."));
 
                                 jstring value = env.NewStringUTF(node.c_str());
                                 interfacesToImplement.push_back(value);
@@ -655,16 +655,6 @@ jobjectArray CallbackHandlers::GetMethodOverrides(JEnv &env, const Local<Object>
     }
 
     return methodOverrides;
-}
-
-void CallbackHandlers::replaceAll(std::string& str, const std::string& from, const std::string& to) {
-    if(from.empty())
-        return;
-    size_t start_pos = 0;
-    while((start_pos = str.find(from, start_pos)) != std::string::npos) {
-        str.replace(start_pos, from.length(), to);
-        start_pos += to.length(); // In case 'to' contains 'from', like replacing 'x' with 'yx'
-    }
 }
 
 void CallbackHandlers::LogMethodCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
