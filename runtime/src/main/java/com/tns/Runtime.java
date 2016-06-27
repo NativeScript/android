@@ -122,7 +122,7 @@ public class Runtime
 		return this.runtimeId;
 	}
 	
-	private static Runtime getCurrentRuntime()
+	public static Runtime getCurrentRuntime()
 	{
 		Runtime runtime = currentRuntime.get();
 				
