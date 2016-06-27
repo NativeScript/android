@@ -10,16 +10,13 @@ import android.os.Looper;
 import android.util.Log;
 import java.io.IOException;
 
-public class RuntimeHelper {
-	private final Application app;
-
-	public RuntimeHelper(Application app) {
-		this.app = app;
+public final class RuntimeHelper {
+	private RuntimeHelper() {
 	}
 
 	// hasErrorIntent tells you if there was an event (with an uncaught
 	// exception) raised from ErrorReport
-	public boolean hasErrorIntent() {
+	private static boolean hasErrorIntent(Application app) {
 		boolean hasErrorIntent = false;
 
 		try {
@@ -38,7 +35,7 @@ public class RuntimeHelper {
 		return hasErrorIntent;
 	}
 	
-	public Runtime initRuntime()
+	public static Runtime initRuntime(Application app)
 	{
 		if (Runtime.isInitialized()) {
 			return Runtime.getCurrentRuntime();
@@ -47,10 +44,10 @@ public class RuntimeHelper {
 		System.loadLibrary("NativeScript");
 
 		Logger logger = new LogcatLogger(app);
-		Debugger debugger = AndroidJsDebugger.isDebuggableApp(this.app) ? new AndroidJsDebugger(app, logger) : null;
+		Debugger debugger = AndroidJsDebugger.isDebuggableApp(app) ? new AndroidJsDebugger(app, logger) : null;
 
 		Runtime runtime = null;
-		boolean showErrorIntent = hasErrorIntent();
+		boolean showErrorIntent = hasErrorIntent(app);
 		if (!showErrorIntent) {
 			NativeScriptUncaughtExceptionHandler exHandler = new NativeScriptUncaughtExceptionHandler(logger, app);
 
@@ -115,8 +112,8 @@ public class RuntimeHelper {
 
 			exHandler.setRuntime(runtime);
 
-			if (NativeScriptSyncService.isSyncEnabled(this.app)) {
-				NativeScriptSyncService syncService = new NativeScriptSyncService(runtime, logger, this.app);
+			if (NativeScriptSyncService.isSyncEnabled(app)) {
+				NativeScriptSyncService syncService = new NativeScriptSyncService(runtime, logger, app);
 
 				syncService.sync();
 				syncService.startServer();
@@ -142,7 +139,7 @@ public class RuntimeHelper {
 
 			try {
 				// put this call in a try/catch block because with the latest changes in the modules it is not granted that NativeScriptApplication is extended through JavaScript.
-				Runtime.initInstance(this.app);
+				Runtime.initInstance(app);
 			}
 			catch (Exception e) {
 				
@@ -151,5 +148,5 @@ public class RuntimeHelper {
 		return runtime;
 	}
 
-	private final String logTag = "MyApp";
+	private static final String logTag = "MyApp";
 }
