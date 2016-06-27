@@ -38,14 +38,15 @@ public class RuntimeHelper {
 		return hasErrorIntent;
 	}
 	
-	public void initRuntime()
+	public Runtime initRuntime()
 	{
 		if (Runtime.isInitialized()) {
-			return;
+			return Runtime.getCurrentRuntime();
 		}
 		
 		System.loadLibrary("NativeScript");
 
+		Runtime runtime = null;
 		Logger logger = new LogcatLogger(app);
 		Debugger debugger = AndroidJsDebugger.isDebuggableApp(this.app) ? new AndroidJsDebugger(app, logger) : null;
 
@@ -110,7 +111,7 @@ public class RuntimeHelper {
 			ThreadScheduler workThreadScheduler = new WorkThreadScheduler(new Handler(Looper.getMainLooper()));
 			Configuration config = new Configuration(workThreadScheduler, logger, debugger, appName, null, rootDir,
 					appDir, classLoader, dexDir, dexThumb, v8Config);
-			Runtime runtime = new Runtime(config);
+			runtime = new Runtime(config);
 
 			exHandler.setRuntime(runtime);
 
@@ -146,8 +147,8 @@ public class RuntimeHelper {
 			catch (Exception e) {
 				
 			}
-			runtime.run();
 		}
+		return runtime;
 	}
 
 	private final String logTag = "MyApp";
