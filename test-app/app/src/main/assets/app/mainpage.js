@@ -1,4 +1,4 @@
-//__disableVerboseLogging();
+__disableVerboseLogging();
 __log("starting tests");
 
 // methods that common tests need to run
