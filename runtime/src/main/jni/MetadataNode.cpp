@@ -986,6 +986,10 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
 
 		if (info.Length() == 1)
 		{
+			if (!info[0]->IsObject())
+			{
+				throw NativeScriptException(string("First argument must be implementation object"));
+			}
 			implementationObject = info[0]->ToObject();
 		}
 		else if (info.Length() == 2)
