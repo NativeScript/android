@@ -12,7 +12,10 @@ public class NativeScriptApplication extends android.app.Application {
 
     public void onCreate() {
 		super.onCreate();
-		new RuntimeHelper(this).initRuntime();
+		com.tns.Runtime runtime = RuntimeHelper.initRuntime(this);
+        if (runtime !=null) {
+            runtime.run();
+        }
     }
 
     public static Application getInstance() {
