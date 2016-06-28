@@ -75,12 +75,13 @@ var es5_visitors = (function () {
 	*	Returns the common extends array generated from visitor
 	*/
 	es5Visitor.getCommonExtendInfo = function () {
-		var res = normalExtendsArr.slice().filter(function (p) {
-			if(p.startsWith("*")) {
-				return false;
+		var res = [];
+		for(var index in normalExtendsArr) {
+			if(normalExtendsArr[index][0] !== "*") {
+				res.push(normalExtendsArr[index]);
 			}
-			return p;
-		});
+		} 
+		
 		normalExtendsArr = [];
 		return res;
 	}
