@@ -168,7 +168,7 @@ task copyGeneratedStaticBindingGeneratorJar << {
 task copyStaticBindingGeneratorProject << {
 	copy {
 		from "$rootDir/android-static-binding-generator/project"
-		exclude "generator", "**/package.json", "*.txt", "**/logs", "**/out", "**/input_parced_typescript"
+		exclude "staticbindinggenerator", "**/package.json", "*.txt", "**/logs", "**/out", "**/input_parced_typescript"
 
 		into "$rootDir/dist/framework/build-tools/android-static-binding-generator"
 	}
