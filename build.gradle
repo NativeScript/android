@@ -14,7 +14,7 @@ import groovy.json.JsonOutput
 
 def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
 def localMetadataGen = "../android-metadata-generator/dist/tns-android-metadata-generator-0.0.1.tgz"
-def distDir = "$rootDir/dist"
+def distDir = "$projectDir/dist"
 def pVersion = "no package version was provided by build.gradle build"
 def arVersion = "no commit sha was provided by build.gradle build"
 
@@ -38,7 +38,7 @@ task checkEnvironmentVariables {
 	}
 }
 
-task cleanDistDir (type: Delete) << {
+task cleanDistDir (type: Delete) {
 	delete distDir
 }
 
@@ -145,6 +145,35 @@ task copyGeneratedMetadataGeneratorJar << {
 	}
 }
 
+task generateStaticBindingGeneratorJar (type: Exec) {
+	doFirst {
+		workingDir "$rootDir/android-static-binding-generator/project/staticbindinggenerator"
+		
+		if(isWinOs) {
+			commandLine "cmd", "/c", "gradlew", "assemble"
+		}
+		else {
+			commandLine "./gradlew", "assemble"
+		}
+	}
+}
+
+task copyGeneratedStaticBindingGeneratorJar << {
+	copy {
+		from "$rootDir/android-static-binding-generator/project/staticbindinggenerator/build/libs"
+		into "$rootDir/dist/framework/build-tools/android-static-binding-generator"
+	}
+}
+
+task copyStaticBindingGeneratorProject << {
+	copy {
+		from "$rootDir/android-static-binding-generator/project"
+		exclude "staticbindinggenerator", "**/package.json", "*.txt", "**/logs", "**/out", "**/input_parced_typescript"
+
+		into "$rootDir/dist/framework/build-tools/android-static-binding-generator"
+	}
+}
+
 task createNpmPackage (type: Exec) {
 	doFirst {
 		workingDir "$rootDir/dist"
@@ -175,11 +204,14 @@ task copyReadme (type: Copy) {
 //clean and set up dirs
 createDistDir.dependsOn(cleanDistDir)
 
-
 //copy framework structure
 copyProjectTemplate.dependsOn(createDistDir)
 copyPackageJson.dependsOn(copyProjectTemplate)
 
+copyStaticBindingGeneratorProject.dependsOn(copyProjectTemplate)
+//generate static binding generator and copy into project template
+generateStaticBindingGeneratorJar.dependsOn(copyStaticBindingGeneratorProject)
+copyGeneratedStaticBindingGeneratorJar.dependsOn(generateStaticBindingGeneratorJar)
 
 //get version from package json
 getPackageVersion.dependsOn(copyProjectTemplate)
@@ -215,9 +247,14 @@ task createPackage {
 	description "Builds the NativeScript Android App Package using an application project template."
 	dependsOn cleanDistDir,
             createDistDir,
+
             copyProjectTemplate,
 
             copyPackageJson,
+
+			copyStaticBindingGeneratorProject,
+			generateStaticBindingGeneratorJar,
+			copyGeneratedStaticBindingGeneratorJar,
 
             getPackageVersion,
             getCommitVersion,
@@ -232,7 +269,6 @@ task createPackage {
             copyGeneratedMetadataGeneratorJar,
             copyReadme,
             createNpmPackage
-
 
 	println "Creating NativeScript Android Package"			
 }
