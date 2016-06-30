@@ -1,3 +1,21 @@
+2.1
+==
+
+## What's New
+
+ - [Implement custom gradle clean (#459)](https://github.com/NativeScript/android-runtime/issues/459)
+
+## Bug Fixes
+
+ - [App crash (#476)](https://github.com/NativeScript/android-runtime/issues/476)
+ - [The static binding generator should clean redundant files (#467)](https://github.com/NativeScript/android-runtime/issues/467)
+ - [Android builds fail on nativescript 2.0  (#460)](https://github.com/NativeScript/android-runtime/issues/460)
+ - [Need to add a Gradle Android.defaultConfig (#454)](https://github.com/NativeScript/android-runtime/issues/454)
+
+## Performance
+
+ - [Initial builds of ng2 apps are slow (#436)](https://github.com/NativeScript/android-runtime/issues/436)
+
 2.0.0
 ==
 
