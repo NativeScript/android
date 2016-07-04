@@ -261,7 +261,7 @@ def updateProductFlavorsContent(flavor, dimensionName, oldContent) {
 
 					def closingQuotes = oldContent.indexOf('"', openingQuoutes + 1);
 					if(closingQuotes == -1) {
-						closingQuotes = closingQuotes.indexOf("'", openingQuoutes + 1);
+						closingQuotes = oldContent.indexOf("'", openingQuoutes + 1);
 					}	
 
 					index = closingQuotes + 1;
