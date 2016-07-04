@@ -59,20 +59,20 @@ task copyPackageJson (type: Copy) {
 
 task getPackageVersion << {
 
+	String content = new File("$rootDir/package.json").getText("UTF-8")
+	def jsonSlurper = new JsonSlurper()
+	def packageJsonMap = jsonSlurper.parseText(content)
+
+	pVersion = packageJsonMap.version
+
+	println "Using runtime version from package.json '${pVersion}'"
+
 	if (project.hasProperty("packageVersion")) {
-		pVersion = packageVersion
+		pVersion += "-" + packageVersion
 		
 		println "Using packageVersion property '${pVersion}'"
 	}
-	else { 
-		String content = new File("$rootDir/package.json").getText("UTF-8")
-		def jsonSlurper = new JsonSlurper()
-		def packageJsonMap = jsonSlurper.parseText(content)
-	
-		pVersion = packageJsonMap.version
 
-		println "Using runtime version from package.json '${pVersion}'"
-	}
 
 	if (project.hasProperty("preReleaseVersion")) {
 		pVersion += "-" + preReleaseVersion
