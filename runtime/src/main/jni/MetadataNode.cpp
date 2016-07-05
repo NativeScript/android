@@ -150,7 +150,7 @@ Local<Object> MetadataNode::CreateWrapper(Isolate *isolate)
 	}
 	else if (s_metadataReader.IsNodeTypePackage(nodeType))
 	{
-		obj = CreatePackageProxy(isolate);
+		obj = CreatePackageObject(isolate);
 	}
 	else
 	{
@@ -228,17 +228,23 @@ Local<Object> MetadataNode::CreateArrayWrapper(Isolate *isolate)
 	return arr;
 }
 
-Local<Object> MetadataNode::CreatePackageProxy(Isolate *isolate)
+Local<Object> MetadataNode::CreatePackageObject(Isolate *isolate)
 {
-	EscapableHandleScope handleScope(isolate);
+	auto packageObj = Object::New(isolate);
+	auto ptrChildren = this->m_treeNode->children;
+	if (ptrChildren != nullptr) {
+		auto ctx = isolate->GetCurrentContext();
+        auto extData = External::New(isolate, this);
+		const auto &children = *ptrChildren;
+		for (auto childNode: children) {
+            packageObj->SetAccessor(ctx, ConvertToV8String(childNode->name),
+                                    PackageGetterCallback,
+                                    nullptr,
+                                    extData);
+		}
+	}
 
-	auto packageTemplate = ObjectTemplate::New();
-	packageTemplate->SetNamedPropertyHandler(MetadataNode::PackageGetterCallback);
-
-	auto package = packageTemplate->NewInstance();
-	SetPackageMetadata(isolate, package, this);
-
-	return handleScope.Escape(package);
+	return packageObj;
 }
 
 void MetadataNode::SetClassAccessor(Local<Function>& ctorFunction)
@@ -913,22 +919,6 @@ void MetadataNode::SetInstanceMetadata(Isolate *isolate, Local<Object> value, Me
 	value->SetHiddenValue(key, External::New(isolate, node));
 }
 
-MetadataNode* MetadataNode::GetPackageMetadata(Isolate *isolate, const Local<Object>& value)
-{
-	MetadataNode *node = nullptr;
-	auto ext = value->GetHiddenValue(ConvertToV8String("tns::PackageMetadata"));
-	if (!ext.IsEmpty())
-	{
-		node = reinterpret_cast<MetadataNode*>(ext.As<External>()->Value());
-	}
-	return node;
-}
-
-void MetadataNode::SetPackageMetadata(Isolate *isolate, Local<Object> value, MetadataNode *node)
-{
-	value->SetHiddenValue(ConvertToV8String("tns::PackageMetadata"), External::New(isolate, node));
-}
-
 void MetadataNode::ExtendedClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
 	try
@@ -1290,25 +1280,30 @@ Local<Object> MetadataNode::GetImplementationObject(const Local<Object>& object)
 	return implementationObject;
 }
 
-void MetadataNode::PackageGetterCallback(Local<String> property, const PropertyCallbackInfo<Value>& info)
+void MetadataNode::PackageGetterCallback(Local<Name> property, const PropertyCallbackInfo<Value>& info)
 {
 	try
 	{
-		string propName = ConvertToString(property);
+        if (property.IsEmpty() || !property->IsString()) {
+            return;
+        }
+
+        auto strProperty = property.As<String>();
+
+		string propName = ConvertToString(strProperty);
 
 		if (propName.empty())
 			return;
 
-		auto isolate = Isolate::GetCurrent();
-		HandleScope handleScope(isolate);
+		auto isolate = info.GetIsolate();
 
 		auto thiz = info.This();
 
-		auto cachedItem = thiz->GetHiddenValue(property);
+		auto cachedItem = thiz->GetHiddenValue(strProperty);
 
 		if (cachedItem.IsEmpty())
 		{
-			auto node = GetPackageMetadata(isolate, thiz);
+			auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value());
 
 			uint8_t nodeType = s_metadataReader.GetNodeType(node->m_treeNode);
 
@@ -1321,7 +1316,7 @@ void MetadataNode::PackageGetterCallback(Local<String> property, const PropertyC
 			{
 				auto childNode = MetadataNode::GetOrCreateInternal(child.treeNode);
 				cachedItem = childNode->CreateWrapper(isolate);
-				thiz->SetHiddenValue(property, cachedItem);
+				thiz->SetHiddenValue(strProperty, cachedItem);
 			}
 		}
 
@@ -1678,15 +1673,13 @@ MetadataEntry MetadataNode::GetChildMetadataForPackage(MetadataNode *node, const
 			child.treeNode = treeNodeChild;
 
 			uint8_t childNodeType = s_metadataReader.GetNodeType(treeNodeChild);
-			if (s_metadataReader.IsNodeTypeInterface(childNodeType))
-			{
-				bool isPrefix;
-				string declaringType = s_metadataReader.ReadInterfaceImplementationTypeName(treeNodeChild, isPrefix);
-				child.declaringType = isPrefix
-						? (declaringType + s_metadataReader.ReadTypeName(child.treeNode))
-								:
-								declaringType;
-			}
+			if (s_metadataReader.IsNodeTypeInterface(childNodeType)) {
+                bool isPrefix;
+                string declaringType = s_metadataReader.ReadInterfaceImplementationTypeName(treeNodeChild, isPrefix);
+                child.declaringType = isPrefix
+                                      ? (declaringType + s_metadataReader.ReadTypeName(child.treeNode))
+                                      : declaringType;
+            }
 		}
 	}
 

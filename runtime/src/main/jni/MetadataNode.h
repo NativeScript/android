@@ -76,7 +76,7 @@ namespace tns
 
 			MetadataNode(MetadataTreeNode *treeNode);
 
-			v8::Local<v8::Object> CreatePackageProxy(v8::Isolate *isolate);
+			v8::Local<v8::Object> CreatePackageObject(v8::Isolate *isolate);
 
 			v8::Local<v8::Function> GetConstructorFunction(v8::Isolate *isolate);
 			v8::Local<v8::FunctionTemplate> GetConstructorFunctionTemplate(v8::Isolate *isolate, MetadataTreeNode *treeNode);
@@ -108,10 +108,6 @@ namespace tns
 
 			static void SetTypeMetadata(v8::Isolate *isolate, v8::Local<v8::Function> value, TypeMetadata *data);
 
-			static MetadataNode* GetPackageMetadata(v8::Isolate *isolate, const v8::Local<v8::Object>& value);
-
-			static void SetPackageMetadata(v8::Isolate *isolate, v8::Local<v8::Object> value, MetadataNode *node);
-
 			static std::string CreateFullClassName(const std::string& className, const std::string& extendNameAndLocation);
 			static void MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 			static void InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
@@ -133,7 +129,7 @@ namespace tns
 			static void SuperAccessorGetterCallback(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
 			static void ArrayLengthGetterCallack(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
 
-			static void PackageGetterCallback(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
+			static void PackageGetterCallback(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info);
 
 			static void ArrayIndexedPropertyGetterCallback(uint32_t index, const v8::PropertyCallbackInfo<v8::Value>& info);
 			static void ArrayIndexedPropertySetterCallback(uint32_t index, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<v8::Value>& info);
