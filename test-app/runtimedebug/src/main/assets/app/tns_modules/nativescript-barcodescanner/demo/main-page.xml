@@ -1,0 +1,35 @@
+<Page xmlns="http://www.nativescript.org/tns.xsd" loaded="pageLoaded">
+  <TabView>
+    <TabView.items>
+      <TabViewItem title="About">
+        <TabViewItem.view>
+          <StackLayout cssClass="tab-content">
+            <Image margin="10" src="~/res/telerik-logo.png" />
+            <Label text="BarcodeScanner plugin demo" cssClass="title"/>
+            <Label text="The BarcodeScanner plugin supports extracting data from a large range of barcodes, including QR codes. Your app will receive the type of barcode and the encode value." textWrap="true"/>
+          </StackLayout>
+        </TabViewItem.view>
+      </TabViewItem>
+      <TabViewItem title="Demo">
+        <TabViewItem.view>
+          <ScrollView>
+            <StackLayout cssClass="tab-content">
+              <Label text="Checking availability" cssClass="title"/>
+              <Label text="It can never hurt to check upfront if a device is capable of scanning a barcode." textWrap="true"/>
+              <Button text="available?" tap="{{ doCheckAvailable }}" />
+
+              <Label text="Camera permission" cssClass="title"/>
+              <Label text="Android 6 requires runtime user consent."/>
+              <Button text="has permission?" tap="{{ doCheckHasCameraPermission }}" />
+              <Button text="request permission" tap="{{ doRequestCameraPermission }}" />
+
+              <Label text="Scanning" cssClass="title"/>
+              <Button text="back camera, with flip" tap="{{ doScanWithBackCamera }}" />
+              <Button text="front camera, no flip (Android)" tap="{{ doScanWithFrontCamera }}" />
+            </StackLayout>
+          </ScrollView>
+        </TabViewItem.view>
+      </TabViewItem>
+    </TabView.items>
+  </TabView>
+</Page>

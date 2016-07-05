@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+  <uses-permission android:name="android.permission.CAMERA"/>
+  <uses-permission android:name="android.permission.FLASHLIGHT"/>
+
+  <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+  <application>
+    <activity
+        android:name="com.google.zxing.client.android.CaptureActivity"
+        android:clearTaskOnLaunch="true"
+			  android:configChanges="keyboardHidden|orientation|screenSize"
+        android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
+        android:windowSoftInputMode="stateAlwaysHidden"
+        android:exported="false">
+      <intent-filter>
+        <action android:name="com.google.zxing.client.android.SCAN"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+      </intent-filter>
+    </activity>
+  </application>
+
+</manifest>

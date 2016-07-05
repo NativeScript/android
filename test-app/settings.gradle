@@ -1,5 +1,4 @@
-include ':binding-generator', ':runtime', ':app'
-
+include ':binding-generator', ':runtime', ':app', ':runtimedebug'
 
 project(':binding-generator').projectDir = new File("../", "binding-generator")
 project(':runtime').projectDir = new File("../", "runtime")

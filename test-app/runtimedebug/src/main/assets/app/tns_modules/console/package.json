@@ -1,0 +1,6 @@
+{
+	"name" : "console",
+  	"main" : "console.js",
+	"nativescript": {}
+}
+
