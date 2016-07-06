@@ -155,9 +155,9 @@ jclass CallbackHandlers::ResolveClass(Isolate *isolate, const string& fullClassn
 }
 
 // Called by ExtendCallMethodCallback when extending a class
-string CallbackHandlers::ResolveClassName(Isolate *isolate, const string& fullClassname, const Local<Object>& implementationObject)
+string CallbackHandlers::ResolveClassName(Isolate *isolate, const string& fullClassname, const Local<Object>& implementationObject, bool isInterface)
 {
-	auto clazz = ResolveClass(isolate, fullClassname, implementationObject, false);
+	auto clazz = ResolveClass(isolate, fullClassname, implementationObject, isInterface);
 	auto runtime = Runtime::GetRuntime(isolate);
 	auto objectManager = runtime->GetObjectManager();
 	auto className = objectManager->GetClassName(clazz);

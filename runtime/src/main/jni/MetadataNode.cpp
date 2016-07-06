@@ -1502,7 +1502,9 @@ void MetadataNode::ExtendCallMethodCallback(const v8::FunctionCallbackInfo<v8::V
 		auto isolate = info.GetIsolate();
 
 		//resolve class (pre-generated or generated runtime from dex generator)
-		auto fullExtendedName = CallbackHandlers::ResolveClassName(isolate, fullClassName, implementationObject);
+		uint8_t nodeType = s_metadataReader.GetNodeType(node->m_treeNode);
+		bool isInterface = s_metadataReader.IsNodeTypeInterface(nodeType);
+		auto fullExtendedName = CallbackHandlers::ResolveClassName(isolate, fullClassName, implementationObject, isInterface);
 		DEBUG_WRITE("ExtendsCallMethodHandler: extend full name %s", fullClassName.c_str());
 
 		auto cachedData = GetCachedExtendedClassData(isolate, fullExtendedName);
