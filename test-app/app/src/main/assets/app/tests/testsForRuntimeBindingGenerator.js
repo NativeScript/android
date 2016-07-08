@@ -136,38 +136,38 @@ describe("Tests for runtime binding generator", function () {
 
     	    __log("TEST: When_generating_a_class_that_implements_interfaces_typescript");
 
-    	    var MyObject = (function (_super) {
-                __extends(MyObject, _super);
-                function MyObject() {
+    	    var MyTSTranspiledObjectThatExtendsInterfaces = (function (_super) {
+                __extends(MyTSTranspiledObjectThatExtendsInterfaces, _super);
+                function MyTSTranspiledObjectThatExtendsInterfaces() {
                     _super.apply(this, arguments);
                     return global.__native(this);
                 }
-                MyObject.prototype.greet = function (greeting) {
+                MyTSTranspiledObjectThatExtendsInterfaces.prototype.greet = function (greeting) {
                     return "Hello, " + greeting;
                 };
-                MyObject.prototype.unpack = function () {
+                MyTSTranspiledObjectThatExtendsInterfaces.prototype.unpack = function () {
                 };
-                MyObject.prototype.properties = function () {
+                MyTSTranspiledObjectThatExtendsInterfaces.prototype.properties = function () {
                 };
-                MyObject.prototype.toString = function () {
+                MyTSTranspiledObjectThatExtendsInterfaces.prototype.toString = function () {
                 };
-                MyObject.prototype.formatTo = function () {
+                MyTSTranspiledObjectThatExtendsInterfaces.prototype.formatTo = function () {
                 };
-                MyObject.prototype.update = function () {
+                MyTSTranspiledObjectThatExtendsInterfaces.prototype.update = function () {
                 };
-                MyObject.prototype.addPropertyChangeListener = function () {
+                MyTSTranspiledObjectThatExtendsInterfaces.prototype.addPropertyChangeListener = function () {
                 };
-                MyObject.prototype.pack = function () {
+                MyTSTranspiledObjectThatExtendsInterfaces.prototype.pack = function () {
                 };
-                MyObject.prototype.removePropertyChangeListener = function () {
+                MyTSTranspiledObjectThatExtendsInterfaces.prototype.removePropertyChangeListener = function () {
                 };
-                MyObject = __decorate([
+                MyTSTranspiledObjectThatExtendsInterfaces = __decorate([
                     Interfaces([java.util.jar.Pack200.Unpacker, java.util.Formattable, java.util.Observer, java.util.jar.Pack200.Packer])
-                ], MyObject);
-                return MyObject;
+                ], MyTSTranspiledObjectThatExtendsInterfaces);
+                return MyTSTranspiledObjectThatExtendsInterfaces;
             }(java.lang.Object));
 
-            var myObject = new MyObject();
+            var myObject = new MyTSTranspiledObjectThatExtendsInterfaces();
 
             var isInstanceOf = myObject instanceof java.lang.Object;
 
@@ -190,89 +190,5 @@ describe("Tests for runtime binding generator", function () {
                     expect(expectedInterfaces.indexOf(interfaceName)).not.toBe(-1);
                 }
             }
-    	});
-
-    it("Test_correct_behavior_when_two_or_more_classes_implement_the_same_interfaces", function() {
-
-        __log("TEST: Test_correct_behavior_when_two_or_more_classes_implement_the_same_interfaces");
-
-        var resultFromMyObject1UnpackCall = "",
-            resultFromMyObject2UnpackCall = "";
-
-        var MyObject1 = (function (_super) {
-                        __extends(MyObject1, _super);
-                        function MyObject1() {
-                            _super.apply(this, arguments);
-                            return global.__native(this);
-                        }
-                        MyObject1.prototype.greet = function (greeting) {
-                            return "Hello, " + greeting;
-                        };
-                        MyObject1.prototype.unpack = function () {
-                            resultFromMyObject1UnpackCall = "Object1";
-                            __log("From MyObject1");
-                        };
-                        MyObject1.prototype.properties = function () {
-                        };
-                        MyObject1.prototype.toString = function () {
-                        };
-                        MyObject1.prototype.formatTo = function () {
-                        };
-                        MyObject1.prototype.update = function () {
-                        };
-                        MyObject1.prototype.addPropertyChangeListener = function () {
-                        };
-                        MyObject1.prototype.pack = function () {
-                        };
-                        MyObject1.prototype.removePropertyChangeListener = function () {
-                        };
-                        MyObject1 = __decorate([
-                            Interfaces([java.util.jar.Pack200.Unpacker, java.util.Formattable, java.util.Observer, java.util.jar.Pack200.Packer])
-                        ], MyObject1);
-                        return MyObject1;
-                    }(java.lang.Object));
-
-        var MyObject2 = (function (_super) {
-                        __extends(MyObject2, _super);
-                        function MyObject2() {
-                            _super.apply(this, arguments);
-                            return global.__native(this);
-                        }
-                        MyObject2.prototype.greet = function (greeting) {
-                            return "Hello, " + greeting;
-                        };
-                        MyObject2.prototype.unpack = function () {
-                            resultFromMyObject2UnpackCall = "Object2";
-                            __log("From MyObject2");
-                        };
-                        MyObject2.prototype.properties = function () {
-                        };
-                        MyObject2.prototype.toString = function () {
-                        };
-                        MyObject2.prototype.formatTo = function () {
-                        };
-                        MyObject2.prototype.update = function () {
-                        };
-                        MyObject2.prototype.addPropertyChangeListener = function () {
-                        };
-                        MyObject2.prototype.pack = function () {
-                        };
-                        MyObject2.prototype.removePropertyChangeListener = function () {
-                        };
-                        MyObject2 = __decorate([
-                            Interfaces([java.util.jar.Pack200.Unpacker, java.util.Formattable, java.util.Observer, java.util.jar.Pack200.Packer])
-                        ], MyObject2);
-                        return MyObject2;
-                    }(java.lang.Object));
-
-
-                    var myObj1 = new MyObject1();
-                        myObj1.unpack();
-
-                    var myObj2 = new MyObject2();
-                        myObj2.unpack();
-
-                    expect(resultFromMyObject1UnpackCall).toBe("Object1");
-                    expect(resultFromMyObject2UnpackCall).toBe("Object2");
     });
 });
