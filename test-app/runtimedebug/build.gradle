@@ -38,6 +38,7 @@ dependencies {
 }
 
 repositories {
+    jcenter()
     flatDir {
         dirs 'src/F0', 'src/F1',
                 'src/F2', 'src/F3',
