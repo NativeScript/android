@@ -702,87 +702,7 @@ void MetadataNode::SetStaticMembers(Isolate *isolate, Local<Function>& ctorFunct
 	}
 }
 
-void MetadataNode::InnerClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info)
-{
-	try
-	{
-		auto thiz = info.This();
-		auto isolate = info.GetIsolate();
-		auto data = reinterpret_cast<InnerClassData*>(info.Data().As<External>()->Value());
-
-		Local<Object> outerThis;
-		string extendName;
-		auto className = data->node->m_name;
-
-		SetInstanceMetadata(info.GetIsolate(), thiz, data->node);
-
-		ArgsWrapper argWrapper(info, ArgType::Class, outerThis);
-
-		string fullClassName = CreateFullClassName(className, extendName);
-		bool success = CallbackHandlers::RegisterInstance(isolate, thiz, fullClassName, argWrapper, outerThis, false);
-	}
-	catch (NativeScriptException& e)
-	{
-		e.ReThrowToV8();
-	}
-	catch (std::exception e) {
-		stringstream ss;
-		ss << "Error: c++ exception: " << e.what() << endl;
-		NativeScriptException nsEx(ss.str());
-		nsEx.ReThrowToV8();
-	}
-	catch (...) {
-		NativeScriptException nsEx(std::string("Error: c++ exception!"));
-		nsEx.ReThrowToV8();
-	}
-}
-
-void MetadataNode::InnerClassAccessorGetterCallback(Local<String> property, const PropertyCallbackInfo<Value>& info)
-{
-	try
-	{
-		auto isolate = info.GetIsolate();
-		auto thiz = info.This();
-		auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value());
-
-		auto innerKey = ConvertToV8String("inner:" + node->m_treeNode->name);
-
-		auto innerTypeCtorFunc = thiz->GetHiddenValue(innerKey).As<Function>();
-		if (innerTypeCtorFunc.IsEmpty())
-		{
-			auto funcTemplate = node->GetConstructorFunctionTemplate(isolate, node->m_treeNode);
-			auto ctorFunc = funcTemplate->GetFunction();
-
-			auto innerClassData = External::New(isolate, new InnerClassData(new Persistent<Object>(isolate, thiz), node));
-			auto innerTypeCtorFuncTemplate = FunctionTemplate::New(isolate, InnerClassConstructorCallback, innerClassData);
-			innerTypeCtorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(static_cast<int>(ObjectManager::MetadataNodeKeys::END));
-			innerTypeCtorFunc = innerTypeCtorFuncTemplate->GetFunction();
-			auto prototypeName = ConvertToV8String("prototype");
-			auto innerTypeCtorFuncPrototype = innerTypeCtorFunc->Get(prototypeName).As<Object>();
-			innerTypeCtorFuncPrototype->SetPrototype(ctorFunc->Get(prototypeName));
-
-			thiz->SetHiddenValue(innerKey, innerTypeCtorFunc);
-		}
-
-		info.GetReturnValue().Set(innerTypeCtorFunc);
-	}
-	catch (NativeScriptException& e)
-	{
-		e.ReThrowToV8();
-	}
-	catch (std::exception e) {
-		stringstream ss;
-		ss << "Error: c++ exception: " << e.what() << endl;
-		NativeScriptException nsEx(ss.str());
-		nsEx.ReThrowToV8();
-	}
-	catch (...) {
-		NativeScriptException nsEx(std::string("Error: c++ exception!"));
-		nsEx.ReThrowToV8();
-	}
-}
-
-void MetadataNode::SetInnnerTypes(Isolate *isolate, Local<Function>& ctorFunction, MetadataTreeNode *treeNode)
+void MetadataNode::SetInnerTypes(Isolate *isolate, Local<Function>& ctorFunction, MetadataTreeNode *treeNode)
 {
 	if (treeNode->children != nullptr)
 	{
@@ -872,7 +792,7 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate *is
 	CtorCacheItem ctorCacheItem(pft, instanceMethodsCallbackData);
 	cache->CtorFuncCache.insert(make_pair(treeNode, ctorCacheItem));
 
-	SetInnnerTypes(isolate, wrappedCtorFunc, treeNode);
+	SetInnerTypes(isolate, wrappedCtorFunc, treeNode);
 
 	SetTypeMetadata(isolate, wrappedCtorFunc, new TypeMetadata(s_metadataReader.ReadTypeName(treeNode)));
 
@@ -937,7 +857,7 @@ void MetadataNode::ExtendedClassConstructorCallback(const v8::FunctionCallbackIn
 		thiz->SetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::CallSuper), True(isolate));
 		thiz->SetHiddenValue(ConvertToV8String("t::implObj"), implementationObject);
 
-		ArgsWrapper argWrapper(info, ArgType::Class, Local<Object>());
+		ArgsWrapper argWrapper(info, ArgType::Class);
 
 		string fullClassName = extData->fullClassName;
 
@@ -1009,7 +929,7 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
 		thiz->SetPrototype(implementationObject);
 		thiz->SetHiddenValue(ConvertToV8String("t::implObj"), implementationObject);
 
-		ArgsWrapper argWrapper(info, ArgType::Interface, Local<Object>());
+		ArgsWrapper argWrapper(info, ArgType::Interface);
 
 		auto success = CallbackHandlers::RegisterInstance(isolate, thiz, className, argWrapper, implementationObject, true);
 	}
@@ -1039,16 +959,15 @@ void MetadataNode::ClassConstructorCallback(const v8::FunctionCallbackInfo<v8::V
 		auto isolate = info.GetIsolate();
 		auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value());
 
-		Local<Object> outerThis;
 		string extendName;
 		auto className = node->m_name;
 
 		SetInstanceMetadata(isolate, thiz, node);
 
-		ArgsWrapper argWrapper(info, ArgType::Class, outerThis);
+		ArgsWrapper argWrapper(info, ArgType::Class);
 
 		string fullClassName = CreateFullClassName(className, extendName);
-		bool success = CallbackHandlers::RegisterInstance(isolate, thiz, fullClassName, argWrapper, outerThis, false);
+		bool success = CallbackHandlers::RegisterInstance(isolate, thiz, fullClassName, argWrapper, Local<Object>(), false);
 	}
 	catch (NativeScriptException& e)
 	{

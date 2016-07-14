@@ -11,7 +11,7 @@ namespace tns
 	class JsArgToArrayConverter
 	{
 		public:
-			JsArgToArrayConverter(const v8::FunctionCallbackInfo<v8::Value>& args, bool hasImplementationObject, const v8::Local<v8::Object>& outerThis = v8::Local<v8::Object>());
+			JsArgToArrayConverter(const v8::FunctionCallbackInfo<v8::Value>& args, bool hasImplementationObject);
 
 			JsArgToArrayConverter(v8::Isolate *isolate, const v8::Local<v8::Value>& arg, bool isImplementationObject, int classReturnType);
 
