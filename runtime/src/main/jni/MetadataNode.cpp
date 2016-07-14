@@ -702,8 +702,6 @@ void MetadataNode::SetStaticMembers(Isolate *isolate, Local<Function>& ctorFunct
 	}
 }
 
-
-
 void MetadataNode::InnerClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info)
 {
 	try
@@ -712,7 +710,7 @@ void MetadataNode::InnerClassConstructorCallback(const v8::FunctionCallbackInfo<
 		auto isolate = info.GetIsolate();
 		auto data = reinterpret_cast<InnerClassData*>(info.Data().As<External>()->Value());
 
-		auto outerThis = Local<Object>::New(isolate, *data->outerThis);
+		Local<Object> outerThis;
 		string extendName;
 		auto className = data->node->m_name;
 
@@ -790,6 +788,7 @@ void MetadataNode::SetInnnerTypes(Isolate *isolate, Local<Function>& ctorFunctio
 	{
 		const auto& children = *treeNode->children;
 
+		// prototype of outer class
 		auto prototypeTemplate2 = ctorFunction->Get(ConvertToV8String("prototype")).As<Object>();
 
 		for (auto curChild : children)
@@ -799,18 +798,10 @@ void MetadataNode::SetInnnerTypes(Isolate *isolate, Local<Function>& ctorFunctio
 			auto type = s_metadataReader.GetNodeType(curChild);
 			auto isStatic = s_metadataReader.IsNodeTypeStatic(type);
 
-			if (isStatic)
-			{
-				auto innerTypeCtorFuncTemplate = childNode->GetConstructorFunctionTemplate(isolate, curChild);
-				auto innerTypeCtorFunc = Local<Function>::New(isolate, *GetOrCreateInternal(curChild)->m_poCtorFunc);
-				auto innerTypeName = ConvertToV8String(curChild->name);
-				ctorFunction->Set(innerTypeName, innerTypeCtorFunc);
-			}
-			else
-			{
-				auto innerTypeName = ConvertToV8String(curChild->name);
-				prototypeTemplate2->SetAccessor(innerTypeName, InnerClassAccessorGetterCallback, nullptr, External::New(isolate, childNode));
-			}
+			auto innerTypeCtorFuncTemplate = childNode->GetConstructorFunctionTemplate(isolate, curChild);
+			auto innerTypeCtorFunc = Local<Function>::New(isolate, *GetOrCreateInternal(curChild)->m_poCtorFunc);
+			auto innerTypeName = ConvertToV8String(curChild->name);
+			ctorFunction->Set(innerTypeName, innerTypeCtorFunc);
 		}
 	}
 }

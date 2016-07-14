@@ -63,8 +63,8 @@ exports.run = function(cntxt)
 			__log("TEST: TestBuiltinNestedClassCreation");
 			
 			var loader = new android.content.Loader(context);
-			
-			var observer = new loader.ForceLoadContentObserver();
+
+			var observer = new android.content.Loader.ForceLoadContentObserver(loader);
 			
 			expect(observer).not.toEqual(null);
 		});
