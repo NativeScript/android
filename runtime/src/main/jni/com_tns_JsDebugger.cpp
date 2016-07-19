@@ -9,7 +9,7 @@
 using namespace tns;
 using namespace std;
 
-extern "C" void Java_com_tns_JsDebugger_processDebugMessages(JNIEnv *env, jobject obj)
+extern "C" JNIEXPORT void Java_com_tns_JsDebugger_processDebugMessages(JNIEnv *env, jobject obj)
 {
 	try
 	{
@@ -31,7 +31,7 @@ extern "C" void Java_com_tns_JsDebugger_processDebugMessages(JNIEnv *env, jobjec
 	}
 }
 
-extern "C" void Java_com_tns_JsDebugger_enable(JNIEnv *env, jobject obj)
+extern "C" JNIEXPORT   void Java_com_tns_JsDebugger_enable(JNIEnv *env, jobject obj)
 {
 	try
 	{
@@ -53,7 +53,7 @@ extern "C" void Java_com_tns_JsDebugger_enable(JNIEnv *env, jobject obj)
 	}
 }
 
-extern "C" void Java_com_tns_JsDebugger_disable(JNIEnv *env, jobject obj)
+extern "C" JNIEXPORT   void Java_com_tns_JsDebugger_disable(JNIEnv *env, jobject obj)
 {
 	try
 	{
@@ -75,7 +75,7 @@ extern "C" void Java_com_tns_JsDebugger_disable(JNIEnv *env, jobject obj)
 	}
 }
 
-extern "C" void Java_com_tns_JsDebugger_debugBreak(JNIEnv *env, jobject obj)
+extern "C" JNIEXPORT   void Java_com_tns_JsDebugger_debugBreak(JNIEnv *env, jobject obj)
 {
 	try
 	{
@@ -97,7 +97,7 @@ extern "C" void Java_com_tns_JsDebugger_debugBreak(JNIEnv *env, jobject obj)
 	}
 }
 
-extern "C" jboolean Java_com_tns_JsDebugger_isDebuggerActive(JNIEnv *env, jobject obj)
+extern "C" JNIEXPORT   jboolean Java_com_tns_JsDebugger_isDebuggerActive(JNIEnv *env, jobject obj)
 {
 	try
 	{
@@ -119,7 +119,7 @@ extern "C" jboolean Java_com_tns_JsDebugger_isDebuggerActive(JNIEnv *env, jobjec
 	}
 }
 
-extern "C" void Java_com_tns_JsDebugger_sendCommand(JNIEnv *_env, jobject obj, jbyteArray command, jint length)
+extern "C" JNIEXPORT   void Java_com_tns_JsDebugger_sendCommand(JNIEnv *_env, jobject obj, jbyteArray command, jint length)
 {
 	try
 	{

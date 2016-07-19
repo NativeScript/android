@@ -39,7 +39,7 @@ model {
         release {
             minifyEnabled = false
             proguardFiles.add(file('proguard-rules.txt'))
-        }
+		}
     }
 }
 

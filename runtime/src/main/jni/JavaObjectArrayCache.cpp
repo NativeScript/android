@@ -58,9 +58,5 @@ jobjectArray JavaObjectArrayCache::GetJavaStringArray(int length)
 	return arr;
 }
 
-__thread jobjectArray JavaObjectArrayCache::s_objArr[MAX_JAVA_PARAMS_COUNT] =
-{
-		nullptr };
-__thread jobjectArray JavaObjectArrayCache::s_strArr[MAX_OVERWRITE_METHOD_COUNT] =
-{
-		nullptr };
+__thread jobjectArray JavaObjectArrayCache::s_objArr[MAX_JAVA_PARAMS_COUNT] = {	nullptr };
+__thread jobjectArray JavaObjectArrayCache::s_strArr[MAX_OVERWRITE_METHOD_COUNT] = { nullptr };

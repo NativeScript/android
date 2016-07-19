@@ -833,7 +833,8 @@ Local<Value> CallbackHandlers::CallJSMethod(Isolate *isolate, JNIEnv *_env, cons
 		auto jsArgs = ArgConverter::ConvertJavaArgsToJsArgs(isolate, args);
 		int argc = jsArgs->Length();
 
-		Local<Value> arguments[argc];
+		//define k Local<Value>;
+		Local<Value>* arguments = new Local<Value>[argc];
 		for (int i = 0; i < argc; i++)
 		{
 			arguments[i] = jsArgs->Get(i);
@@ -847,6 +848,8 @@ Local<Value> CallbackHandlers::CallJSMethod(Isolate *isolate, JNIEnv *_env, cons
 			SET_PROFILER_FRAME();
 			jsResult = jsMethod->Call(jsObject, argc, argc == 0 ? nullptr : arguments);
 		}
+
+		delete [] arguments;
 
 		//TODO: if javaResult is a pure js object create a java object that represents this object in java land
 
