@@ -49,7 +49,7 @@ model {
     android.ndk {
         moduleName = "NativeScript"
 
-        toolchain = "clang"
+        toolchain = "gcc"
         cppFlags.addAll(["-I${file("src/main/jni")}".toString(),
                          "-I${file("src/main/jni/include")}".toString()
         ])
