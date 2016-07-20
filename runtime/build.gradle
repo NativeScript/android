@@ -146,8 +146,7 @@ model {
                     "-lv8_libplatform",
                     "-lv8_libbase",
                     "-lv8_nosnapshot",
-                    "-lzip",
-                    "-Wl,--exclude-libs=ALL"
+                    "-lzip"
             ])
 
             //The correct way of setting these flags is not working hence the workaround above
