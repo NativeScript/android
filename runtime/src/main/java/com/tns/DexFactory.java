@@ -16,6 +16,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 import com.tns.bindings.ProxyGenerator;
+import com.tns.bindings.desc.reflection.ClassInfo;
 
 import dalvik.system.DexClassLoader;
 import dalvik.system.DexFile;
@@ -267,7 +268,7 @@ public class DexFactory
 			}
 		}
 
-		return proxyGenerator.generateProxy(proxyName, classToProxy, methodOverridesSet, isInterface);
+		return proxyGenerator.generateProxy(proxyName, new ClassInfo(classToProxy) , methodOverridesSet, isInterface);
 	}
 
 	private void updateDexThumbAndPurgeCache()

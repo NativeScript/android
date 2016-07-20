@@ -9,6 +9,8 @@ import org.ow2.asmdex.ApplicationWriter;
 
 import android.util.Log;
 
+import com.tns.bindings.desc.ClassDescriptor;
+
 public class ProxyGenerator
 {
 	private String path;
@@ -29,7 +31,7 @@ public class ProxyGenerator
 	}
 	
 	
-	public String generateProxy(String proxyName, Class<?> classToProxy, String[] methodOverrides, boolean isInterface) throws IOException
+	public String generateProxy(String proxyName, ClassDescriptor classToProxy, String[] methodOverrides, boolean isInterface) throws IOException
 	{
 		HashSet<String> methodOverridesSet = null;
 	
@@ -45,7 +47,7 @@ public class ProxyGenerator
 		return generateProxy(proxyName, classToProxy, methodOverridesSet, isInterface);
 	}
 	
-	public String generateProxy(String proxyName, Class<?> classToProxy, HashSet<String> methodOverrides, boolean isInterface) throws IOException
+	public String generateProxy(String proxyName, ClassDescriptor classToProxy, HashSet<String> methodOverrides, boolean isInterface) throws IOException
 	{
 		ApplicationWriter aw = new ApplicationWriter();
 		aw.visit();
