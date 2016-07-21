@@ -140,5 +140,9 @@ tasks.whenTaskAdded { task ->
     if (task.getName() == "assembleDebug")
     {
       runtests.dependsOn assembleDebug
-    } 
+    }
+    else if (task.getName() == "assembleRelease")
+    {
+      runtests.dependsOn assembleRelease
+    }  
 }
