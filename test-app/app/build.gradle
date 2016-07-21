@@ -141,8 +141,4 @@ tasks.whenTaskAdded { task ->
     {
       runtests.dependsOn assembleDebug
     }
-    else if (task.getName() == "assembleRelease")
-    {
-      runtests.dependsOn assembleRelease
-    }  
 }
