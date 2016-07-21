@@ -46,7 +46,7 @@ dependencies {
 	testCompile 'junit:junit:4.12'
 }
 
-task deleteDist << (type: Delete) {
+task deleteDist (type: Delete) << {
 	doFirst {
         delete "$rootDir/dist"
 	}
