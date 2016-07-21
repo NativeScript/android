@@ -2,7 +2,7 @@
 #define SIMPLEPROFILER_H_
 
 #include "v8.h"
-#include <cstdint>
+//#include <cstdint>
 #include <vector>
 
 namespace tns

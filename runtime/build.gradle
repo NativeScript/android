@@ -7,7 +7,7 @@ buildscript {
         jcenter()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle-experimental:0.7.0-beta3'
+        classpath 'com.android.tools.build:gradle-experimental:0.8.0-alpha1'
     }
 }
 
@@ -49,7 +49,7 @@ model {
     android.ndk {
         moduleName = "NativeScript"
 
-
+        toolchain = "gcc"
         cppFlags.addAll(["-I${file("src/main/jni")}".toString(),
                          "-I${file("src/main/jni/include")}".toString()
         ])
@@ -58,6 +58,8 @@ model {
         CFlags.addAll(["-Wno-error=format-security", "-g"])
 
         ldLibs.addAll(["android", "dl", "log", "atomic", "z"])
+
+        ldFlags.addAll(["-Wl,--exclude-libs=ALL", "-Wl,--gc-sections"])
 
         stl = "stlport_static"
 
@@ -95,7 +97,12 @@ model {
 
             ndk {
                 debuggable = ndkDebuggable
+
+                cppFlags.addAll(["-O3", "-fvisibility=hidden", "-ffunction-sections", "-fno-data-sections", "-Wl,--exclude-libs=ALL", "-Wl,--gc-sections"])
+                CFlags.addAll(["-O3", "-fvisibility=hidden", "-ffunction-sections", "-fno-data-sections", "-Wl,--exclude-libs=ALL", "--Wl,-gc-sections"])
             }
+
+
 
             setRuntimeCommit.dependsOn(setPackageVersion)
 

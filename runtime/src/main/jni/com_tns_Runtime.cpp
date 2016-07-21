@@ -31,7 +31,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved)
 	return JNI_VERSION_1_6;
 }
 
-extern "C" void Java_com_tns_Runtime_initNativeScript(JNIEnv *_env, jobject obj, jint runtimeId, jstring filesPath, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jobject jsDebugger)
+extern "C" JNIEXPORT   void Java_com_tns_Runtime_initNativeScript(JNIEnv *_env, jobject obj, jint runtimeId, jstring filesPath, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jobject jsDebugger)
 {
 	try
 	{
@@ -77,7 +77,7 @@ Runtime* TryGetRuntime(int runtimeId)
 	return runtime;
 }
 
-extern "C" void Java_com_tns_Runtime_runModule(JNIEnv *_env, jobject obj, jint runtimeId, jstring scriptFile)
+extern "C" JNIEXPORT   void Java_com_tns_Runtime_runModule(JNIEnv *_env, jobject obj, jint runtimeId, jstring scriptFile)
 {
 	auto runtime = TryGetRuntime(runtimeId);
 	if (runtime == nullptr)
@@ -109,7 +109,7 @@ extern "C" void Java_com_tns_Runtime_runModule(JNIEnv *_env, jobject obj, jint r
 	}
 }
 
-extern "C" jobject Java_com_tns_Runtime_runScript(JNIEnv *_env, jobject obj, jint runtimeId, jstring scriptFile)
+extern "C" JNIEXPORT   jobject Java_com_tns_Runtime_runScript(JNIEnv *_env, jobject obj, jint runtimeId, jstring scriptFile)
 {
 	jobject result = nullptr;
 
@@ -144,7 +144,7 @@ extern "C" jobject Java_com_tns_Runtime_runScript(JNIEnv *_env, jobject obj, jin
 	return result;
 }
 
-extern "C" jobject Java_com_tns_Runtime_callJSMethodNative(JNIEnv *_env, jobject obj, jint runtimeId, jint javaObjectID, jstring methodName, jint retType, jboolean isConstructor, jobjectArray packagedArgs)
+extern "C" JNIEXPORT   jobject Java_com_tns_Runtime_callJSMethodNative(JNIEnv *_env, jobject obj, jint runtimeId, jint javaObjectID, jstring methodName, jint retType, jboolean isConstructor, jobjectArray packagedArgs)
 {
 	jobject result = nullptr;
 
@@ -179,7 +179,7 @@ extern "C" jobject Java_com_tns_Runtime_callJSMethodNative(JNIEnv *_env, jobject
 	return result;
 }
 
-extern "C" void Java_com_tns_Runtime_createJSInstanceNative(JNIEnv *_env, jobject obj, jint runtimeId, jobject javaObject, jint javaObjectID, jstring className)
+extern "C" JNIEXPORT   void Java_com_tns_Runtime_createJSInstanceNative(JNIEnv *_env, jobject obj, jint runtimeId, jobject javaObject, jint javaObjectID, jstring className)
 {
 	auto runtime = TryGetRuntime(runtimeId);
 	if (runtime == nullptr)
@@ -211,7 +211,7 @@ extern "C" void Java_com_tns_Runtime_createJSInstanceNative(JNIEnv *_env, jobjec
 	}
 }
 
-extern "C" jint Java_com_tns_Runtime_generateNewObjectId(JNIEnv *env, jobject obj, jint runtimeId)
+extern "C" JNIEXPORT   jint Java_com_tns_Runtime_generateNewObjectId(JNIEnv *env, jobject obj, jint runtimeId)
 {
 	try
 	{
@@ -238,7 +238,7 @@ extern "C" jint Java_com_tns_Runtime_generateNewObjectId(JNIEnv *env, jobject ob
 	}
 }
 
-extern "C" void Java_com_tns_Runtime_adjustAmountOfExternalAllocatedMemoryNative(JNIEnv *env, jobject obj, jint runtimeId, jlong usedMemory)
+extern "C" JNIEXPORT   void Java_com_tns_Runtime_adjustAmountOfExternalAllocatedMemoryNative(JNIEnv *env, jobject obj, jint runtimeId, jlong usedMemory)
 {
 	auto runtime = TryGetRuntime(runtimeId);
 	if (runtime == nullptr)
@@ -270,7 +270,7 @@ extern "C" void Java_com_tns_Runtime_adjustAmountOfExternalAllocatedMemoryNative
 	}
 }
 
-extern "C" void Java_com_tns_Runtime_passUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, jint runtimeId, jthrowable exception, jstring stackTrace)
+extern "C" JNIEXPORT   void Java_com_tns_Runtime_passUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, jint runtimeId, jthrowable exception, jstring stackTrace)
 {
 	auto runtime = TryGetRuntime(runtimeId);
 	if (runtime == nullptr)
@@ -302,7 +302,7 @@ extern "C" void Java_com_tns_Runtime_passUncaughtExceptionToJsNative(JNIEnv *env
 	}
 }
 
-extern "C" void Java_com_tns_Runtime_ClearStartupData(JNIEnv *env, jobject obj, jint runtimeId)
+extern "C" JNIEXPORT   void Java_com_tns_Runtime_ClearStartupData(JNIEnv *env, jobject obj, jint runtimeId)
 {
 	auto runtime = TryGetRuntime(runtimeId);
 	if (runtime == nullptr)

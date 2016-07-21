@@ -1,13 +1,36 @@
 // This node app deploys apk file on device
 // Parameters:
 //  - Path to APK to deploy
+var fs = require('fs');
+var path = require('path');
+
+function printHelp() {
+    console.error('Usage: deploy-apk.js path-to-apk/myapp.apk <device target>');
+    console.error('                                           -e: target the single available emulator');
+    console.error('                                           -d: target the single available device');
+    console.error('                                           -s device: target a device by its identifier');
+}
 
 if (process.argv.length < 2) {
-    console.error('Expect path to apk file to install');
-    process.exit(1);
+    console.error('Invalid argument no apk file specified.');
+    printHelp();
+    throw new Error("Invalid number of arguments");
 }
 
 var apk = process.argv[2];
+if (!fs.existsSync(apk)) {
+    console.error("Apk file not found at path:" + apk)
+    var parentDir = path.dirname(apk);
+    if (!fs.existsSync(parentDir)) {
+        console.error("Parent dir not found at path:" + parentDir);
+    } else {
+        var parentDirFiles = fs.readdirSync(parentDir);
+        console.error("Apk directory contains" + parentDirFiles);
+    }
+
+    throw new Error("Installation failed");
+}
+
 var runOnDeviceOrEmulator = process.argv[3];
 
 var proc = require('child_process');
@@ -19,7 +42,7 @@ var cmd = 'adb '+ runOnDeviceOrEmulator  +' install -r ' + apk;
 function timeoutFunction(msg) {
     console.error(msg);
     testrun.kill();
-    process.exit(-1);
+    throw new Error("Deploy app timed out");
 };
 
 var timeout = setTimeout(function () { timeoutFunction("ERROR: Deploy timeout!"); }, deployTimeout);
@@ -30,8 +53,7 @@ var testrun = proc.exec(cmd, function (error, stdout, stderr) {
     clearTimeout(timeout);
 
     if (error) {
-        console.error("Deply apk failed: " + error);
-        process.exit(-2);
+        throw new Error("Deply apk failed: " + error);
     }
 });
 testrun.stdout.pipe(process.stdout, { end: false });
