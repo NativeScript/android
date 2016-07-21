@@ -38,8 +38,9 @@ script:
   - "./gradlew createPackage -i -PpreReleaseVersion=$PACKAGE_VERSION -PgitCommitVersion=$TRAVIS_COMMIT --stacktrace"
   - echo no | android create avd --force -n Arm21 -t android-21 -b armeabi-v7a -c 12M
   - emulator -avd Arm21 -no-skin -no-audio -no-window &
+  - "cd test-app && ./gradlew assembleDebug --stacktrace"
   - android-wait-for-emulator
-  - "cd test-app && ./gradlew assembleDebug runtest --stacktrace"
+  - "./gradlew runtest --stacktrace"
   - cd ..
 before_deploy:
   - FULL_PACKAGE_VERSION=`sed -n 's/\s*"version":\s*"\([a-zA-Z0-9\.]*\)"\s*,*/\1/p' dist/package.json`
