@@ -57,6 +57,8 @@ namespace tns
 
 			static MetadataNode* GetOrCreate(const std::string& className);
 
+			static std::string GetTypeMetadataName(v8::Isolate *isolate, v8::Local<v8::Value>& value);
+
 		private:
 			struct MethodCallbackData;
 

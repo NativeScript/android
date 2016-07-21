@@ -74,6 +74,8 @@ namespace tns
 
 			static jobjectArray GetMethodOverrides(JEnv& env, const v8::Local<v8::Object>& implementationObject);
 
+			static jobjectArray GetImplementedInterfaces(JEnv &env, const v8::Local<v8::Object> &implementationObject);
+
 			static std::string LogExceptionStackTrace(const v8::TryCatch& tryCatch);
 
 			static void EnableVerboseLoggingMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args);

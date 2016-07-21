@@ -133,6 +133,13 @@ string MetadataNode::GetName()
 	return m_name;
 }
 
+string MetadataNode::GetTypeMetadataName(Isolate *isolate, Local<Value>& value)
+{
+	auto data = GetTypeMetadata(isolate, value.As<Function>());
+
+	return data->name;
+}
+
 Local<Object> MetadataNode::CreateWrapper(Isolate *isolate)
 {
 	EscapableHandleScope handle_scope(isolate);
@@ -1472,6 +1479,7 @@ void MetadataNode::ExtendCallMethodCallback(const v8::FunctionCallbackInfo<v8::V
 			string strName = ConvertToString(info[0].As<String>());
 			hasDot = strName.find('.') != string::npos;
 		}
+
 		if (hasDot)
 		{
 			extendName = info[0].As<String>();
@@ -1484,6 +1492,7 @@ void MetadataNode::ExtendCallMethodCallback(const v8::FunctionCallbackInfo<v8::V
 			if (!validArgs)
 				return;
 		}
+
 		auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value());
 
 		DEBUG_WRITE("ExtendsCallMethodHandler: called with %s", ConvertToString(extendName).c_str());

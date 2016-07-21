@@ -19,6 +19,8 @@ namespace tns
 			static std::string ConvertFromJniToCanonicalName(const std::string& name);
 
 			static std::string ConvertFromCanonicalToJniName(const std::string& name);
+
+			static void ReplaceAll(std::string& str, const std::string& from, const std::string& to);
 	};
 }
 

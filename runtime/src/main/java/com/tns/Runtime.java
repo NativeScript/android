@@ -304,10 +304,11 @@ public class Runtime
 		return result;
 	}
 
+	// TODO: Pete: new param - implementedInterfaces
 	@RuntimeCallable
-	private Class<?> resolveClass(String fullClassName, String[] methodOverrides, boolean isInterface) throws ClassNotFoundException, IOException
+	private Class<?> resolveClass(String fullClassName, String[] methodOverrides, String[] implementedInterfaces, boolean isInterface) throws ClassNotFoundException, IOException
 	{
-		Class<?> javaClass = classResolver.resolveClass(fullClassName, dexFactory, methodOverrides, isInterface);
+		Class<?> javaClass = classResolver.resolveClass(fullClassName, dexFactory, methodOverrides, implementedInterfaces, isInterface);
 
 		return javaClass;
 	}

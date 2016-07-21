@@ -199,34 +199,36 @@ public class Dump
 			String methodOverride = methodOverrides[i];
 			methodOverridesSet.add(methodOverride);
 		}
-		generateProxy(aw, proxyName, classTo, methodOverridesSet);
-	}
 
-	public void generateProxy(ApplicationWriter aw, ClassDescriptor classTo, String[] methodOverrides, int ignored)
-	{
-		HashSet<String> methodOverridesSet = new HashSet<String>();
+    	generateProxy(aw, proxyName, classTo, methodOverridesSet, null);
+    }
+
+    public void generateProxy(ApplicationWriter aw, ClassDescriptor classTo, String[] methodOverrides, int ignored)
+    {
+    	HashSet<String> methodOverridesSet = new HashSet<String>();
+
 		for (int i = 0; i < methodOverrides.length; i++)
 		{
 			String methodOverride = methodOverrides[i];
 			methodOverridesSet.add(methodOverride);
 		}
-		generateProxy(aw, "0", classTo, methodOverridesSet);
+
+		generateProxy(aw, "0", classTo, methodOverridesSet, null);
 	}
 
 	public void generateProxy(ApplicationWriter aw, String proxyName, ClassDescriptor classTo)
 	{
-		generateProxy(aw, proxyName, classTo, null);
+		generateProxy(aw, proxyName, classTo, null, null);
 	}
 
 	public void generateProxy(ApplicationWriter aw, ClassDescriptor classTo)
 	{
-		generateProxy(aw, "0", classTo, null);
-	}
+    	generateProxy(aw, "0", classTo, null, null);
+    }
 
-	public void generateProxy(ApplicationWriter aw, String proxyName, ClassDescriptor classTo, HashSet<String> methodOverrides)
+    public void generateProxy(ApplicationWriter aw, String proxyName, ClassDescriptor classTo, HashSet<String> methodOverrides, HashSet<ClassDescriptor> implementedInterfaces)
 	{
 		String classSignature = getAsmDescriptor(classTo);
-		//String methodSignature = org.objectweb.asm.Type.getMethodDescriptor(Object.class.getMethods()[0]);
 
 		String tnsClassSignature = LCOM_TNS +
 				classSignature.substring(1, classSignature.length() - 1).replace("$", "_");
@@ -237,8 +239,8 @@ public class Dump
 
 		tnsClassSignature += ";";
 
-		ClassVisitor cv = generateClass(aw, classTo, classSignature, tnsClassSignature);
-		MethodDescriptor[] methods = getSupportedMethods(classTo, methodOverrides);
+		ClassVisitor cv = generateClass(aw, classTo, classSignature, tnsClassSignature, implementedInterfaces);
+		MethodDescriptor[] methods = getSupportedMethods(classTo, methodOverrides, implementedInterfaces);
 
 		methods = groupMethodsByNameAndSignature(methods);
 
@@ -332,11 +334,16 @@ public class Dump
 		}
 	}
 
-	private MethodDescriptor[] getSupportedMethods(ClassDescriptor clazz, HashSet<String> methodOverrides)
+	private MethodDescriptor[] getSupportedMethods(ClassDescriptor clazz, HashSet<String> methodOverrides,  HashSet<ClassDescriptor> interfacesToImplement)
 	{
 		ArrayList<MethodDescriptor> result = new ArrayList<MethodDescriptor>();
 
 		collectInterfaceMethods(clazz, methodOverrides, result);
+
+		for (ClassDescriptor iface : interfacesToImplement)
+		{
+			collectInterfaceMethods(iface, methodOverrides, result);
+		}
 
 		if (!clazz.isInterface())
 		{
@@ -601,13 +608,13 @@ public class Dump
 
 	private void generateMethod(ClassVisitor cv, ClassDescriptor classTo, MethodDescriptor method, int methodNumber, String classSignature, String tnsClassSignature, int fieldBit)
 	{
-		if (ProxyGenerator.IsLogEnabled) Log.d("Generator", "generatingMethod " + method.getName());
+		if (ProxyGenerator.IsLogEnabled) {
+			Log.d("Generator", "generatingMethod " + method.getName());
+		}
 
 		//TODO: handle checked exceptions
 		String methodDexSignature = getDexMethodDescriptor(method);
 		String[] exceptions = new String[0];
-
-
 		MethodVisitor mv;
 		int methodModifiers = getDexModifiers(method);
 
@@ -620,6 +627,7 @@ public class Dump
 		{
 			generateInitializedBlock(mv, thisRegister, classSignature, tnsClassSignature);
 		}
+
 		generateCallOverrideBlock(mv, method, thisRegister, classSignature, tnsClassSignature, methodDexSignature, fieldBit);
 
 		mv.visitEnd();
@@ -919,25 +927,39 @@ public class Dump
 
 	static final String[] classImplentedInterfaces = new String[] { "Lcom/tns/NativeScriptHashCodeProvider;" };
 	static final String[] interfaceImplementedInterfaces = new String[] { "Lcom/tns/NativeScriptHashCodeProvider;", "" };
-	private ClassVisitor generateClass(ApplicationWriter aw, ClassDescriptor classTo, String classSignature, String tnsClassSignature)
+
+	private ClassVisitor generateClass(ApplicationWriter aw, ClassDescriptor classTo, String classSignature, String tnsClassSignature, HashSet<ClassDescriptor> implementedInterfaces)
 	{
 		ClassVisitor cv;
 
 		int classModifiers = getDexModifiers(classTo);
-		String[] implentedInterfaces = classImplentedInterfaces;
+		ArrayList<String> interfacesToImplement = new ArrayList(Arrays.asList(classImplentedInterfaces));
+
 		if (classTo.isInterface())
 		{
 			interfaceImplementedInterfaces[1] = classSignature; //new String[] { "Lcom/tns/NativeScriptHashCodeProvider;", classSignature };
-			implentedInterfaces = interfaceImplementedInterfaces;
+			for(String interfaceToImpl : interfaceImplementedInterfaces) {
+				if(!interfacesToImplement.contains(interfaceToImpl)) {
+					interfacesToImplement.add(interfaceToImpl);
+				}
+			}
+
 			classSignature = objectClass;
 		}
 		else
 		{
-			implentedInterfaces = classImplentedInterfaces;
+			if(implementedInterfaces != null) {
+				for(ClassDescriptor interfaceToImpl : implementedInterfaces) {
+					interfacesToImplement.add(getAsmDescriptor(interfaceToImpl));
+				}
+			}
 		}
 
-		cv = aw.visitClass(classModifiers, tnsClassSignature, null, classSignature, implentedInterfaces);
-		cv.visit(0, classModifiers, tnsClassSignature, null, classSignature, implentedInterfaces);
+		String[] interfacesToImplementArr = new String[interfacesToImplement.size()];
+		interfacesToImplementArr = interfacesToImplement.toArray(interfacesToImplementArr);
+
+		cv = aw.visitClass(classModifiers, tnsClassSignature, null, classSignature, interfacesToImplementArr);
+		cv.visit(0, classModifiers, tnsClassSignature, null, classSignature, interfacesToImplementArr);
 		cv.visitSource(classTo.getName() +  ".java", null);
 		return cv;
 	}
