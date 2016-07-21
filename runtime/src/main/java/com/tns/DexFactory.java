@@ -270,15 +270,15 @@ public class DexFactory
 			{
 				String methodOverride = methodOverrides[i];
 
-					if (implementedInterfaces.length > 0) {
-						for(int j = 0; j < implementedInterfaces.length; j++) {
-							if(!implementedInterfaces[j].isEmpty()) {
-								implementedInterfacesSet.add(new ClassInfo(Class.forName(implementedInterfaces[j])));
-							}
-						}
-					}
-
 				methodOverridesSet.add(methodOverride);
+			}
+		}
+
+		if (implementedInterfaces.length > 0) {
+			for(int j = 0; j < implementedInterfaces.length; j++) {
+				if(!implementedInterfaces[j].isEmpty()) {
+					implementedInterfacesSet.add(new ClassInfo(Class.forName(implementedInterfaces[j])));
+				}
 			}
 		}
 
