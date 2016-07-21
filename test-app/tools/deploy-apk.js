@@ -21,9 +21,13 @@ var apk = process.argv[2];
 if (!fs.existsSync(apk)) {
     console.error("Apk file not found at path:" + apk)
     var parentDir = path.dirname(apk);
-    var parentDirFiles = fs.readdirSync(parentDir);
-    console.error("Apk search directory contains" + parentDirFiles);
-    
+    if (!fs.existsSync(parentDir)) {
+        console.error("Parent dir not found at path:" + parentDir);
+    } else {
+        var parentDirFiles = fs.readdirSync(parentDir);
+        console.error("Apk directory contains" + parentDirFiles);
+    }
+
     console.error("Installation failed");
     process.exit(-4);
 }
