@@ -128,14 +128,6 @@ task copyGeneratedRuntime << {
 	}
 }
 
-task copyBindingGeneratorLib << {
-	copy {
-		from "$rootDir/binding-generator/build/outputs/aar/binding-generator-release.aar"
-		into "$rootDir/dist/framework/libs/runtime-libs/"
-		rename "binding-generator-release.aar", "binding-generator.aar"
-	}
-}
-
 task generateMetadataGeneratorJar (type: Exec) {
 	doFirst {
 		workingDir "$rootDir/android-metadata-generator"
@@ -245,10 +237,9 @@ tasks.whenTaskAdded { task ->
             }
 
 copyGeneratedRuntime.dependsOn(generateRuntime)
-copyBindingGeneratorLib.dependsOn(generateRuntime)
 
 //generate metadata generator and copy into framework structure
-generateMetadataGeneratorJar.dependsOn(copyGeneratedRuntime, copyBindingGeneratorLib)
+generateMetadataGeneratorJar.dependsOn(copyGeneratedRuntime)
 copyGeneratedMetadataGeneratorJar.dependsOn(generateMetadataGeneratorJar)
 
 copyReadme.dependsOn(copyGeneratedMetadataGeneratorJar)
@@ -277,7 +268,6 @@ task createPackage {
 			setPackageVersionInPackageJsonFile,
 
             copyGeneratedRuntime,
-			copyBindingGeneratorLib,
             generateMetadataGeneratorJar,
             copyGeneratedMetadataGeneratorJar,
             copyReadme,
