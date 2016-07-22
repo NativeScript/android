@@ -96,6 +96,18 @@ task getCommitVersion << {
 	}
 }
 
+task generateBindingGenerator (type: Exec)   {
+	doFirst {
+		workingDir "$rootDir/binding-generator"
+		if(isWinOs) {
+			commandLine "cmd", "/c", "gradlew", "jar"
+		}
+		else {
+			commandLine "./gradlew", "jar"
+		}
+	}
+}
+
 task generateRuntime (type: Exec)   {
 	doFirst {
 		workingDir "$rootDir/runtime"
@@ -218,7 +230,8 @@ getPackageVersion.dependsOn(copyProjectTemplate)
 getCommitVersion.dependsOn(getPackageVersion)
 
 //generate runtime and copy into framework structure
-generateRuntime.dependsOn(getCommitVersion)
+generateBindingGenerator.dependsOn(getCommitVersion)
+generateRuntime.dependsOn(generateBindingGenerator)
 
 setPackageVersionInPackageJsonFile.dependsOn(generateRuntime)
 
