@@ -54,6 +54,10 @@ public class Runtime
 
 	private final static HashSet<ClassLoader> classLoaderCache = new HashSet<ClassLoader>();
 
+	private final static String FAILED_CTOR_RESOLUTION_MSG = "Check the number and type of arguments.\n" +
+			"Primitive types need to be manually wrapped in their respective Object wrappers.\n" +
+			"If you are creating an instance of an inner class, make sure to always provide reference to the outer `this` as the first argument.";
+
 	private final SparseArray<Object> strongInstances = new SparseArray<Object>();
 
 	private final SparseArray<WeakReference<Object>> weakInstances = new SparseArray<WeakReference<Object>>();
@@ -791,7 +795,7 @@ public class Runtime
 
 		if (res == null)
 		{
-			throw new Exception("Failed resolving constructor on class " + clazz.getName());
+			throw new Exception("Failed resolving constructor for class \'" + clazz.getName() + "\' with " + (args != null ? args.length : 0) + " parameters. " + FAILED_CTOR_RESOLUTION_MSG);
 		}
 
 		return res;

@@ -211,14 +211,18 @@ class MethodResolver
 	{
 		Constructor<?>[] constructors = clazz.getConstructors();
 
+		int argLen = (args != null) ? args.length : 0;
+
 		if (constructors.length == 1)
 		{
+			if(argLen != constructors[0].getParameterTypes().length) {
+				return null;
+			}
+
 			return constructors[0];
 		}
 
 		ArrayList<Tuple<Constructor<?>, Integer>> candidates = new ArrayList<Tuple<Constructor<?>, Integer>>();
-
-		int argLen = (args != null) ? args.length : 0;
 
 		for (Constructor<?> constructor : constructors)
 		{
@@ -229,11 +233,11 @@ class MethodResolver
 
 			if (args == null)
 			{
-
 				if (paramTypes.length == 0)
 				{
 					return constructor;
 				}
+
 				success = false;
 			}
 			else
@@ -273,6 +277,7 @@ class MethodResolver
 				{
 					return constructor;
 				}
+
 				candidates.add(new Tuple<Constructor<?>, Integer>(constructor, Integer.valueOf(dist)));
 			}
 		}
