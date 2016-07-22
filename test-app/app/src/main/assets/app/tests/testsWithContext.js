@@ -68,6 +68,20 @@ exports.run = function(cntxt)
 			
 			expect(observer).not.toEqual(null);
 		});
+
+		it("When instantiating inner class without passing outer `this` expect exception to be thrown", function () {
+            __log("TEST: When instantiating inner class without passing outer `this` expect exception to be thrown");
+
+            var exceptionCaught = false;
+//            var loader = new android.content.Loader(context);
+            try {
+                var observer = new android.content.Loader.ForceLoadContentObserver();
+            } catch (e) {
+                exceptionCaught = true;
+            }
+
+            expect(exceptionCaught).toBe(true);
+        });
 		
 		it("TestPublicWindowManagerImplWithoutMetadata", function () {
 			
