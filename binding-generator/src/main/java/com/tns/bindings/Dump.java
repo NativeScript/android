@@ -5,8 +5,6 @@ import java.util.*;
 import org.ow2.asmdex.*;
 import org.ow2.asmdex.structureCommon.*;
 
-import android.util.Log;
-
 import com.tns.bindings.desc.ClassDescriptor;
 import com.tns.bindings.desc.Descriptor;
 import com.tns.bindings.desc.MethodDescriptor;
@@ -609,7 +607,7 @@ public class Dump
 	private void generateMethod(ClassVisitor cv, ClassDescriptor classTo, MethodDescriptor method, int methodNumber, String classSignature, String tnsClassSignature, int fieldBit)
 	{
 		if (ProxyGenerator.IsLogEnabled) {
-			Log.d("Generator", "generatingMethod " + method.getName());
+			System.out.println("Generator: generatingMethod " + method.getName());
 		}
 
 		//TODO: handle checked exceptions

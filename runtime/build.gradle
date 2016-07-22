@@ -173,8 +173,14 @@ model {
     }
 }
 
-dependencies {
-    compile project(':binding-generator')
+if (project.hasProperty("embedBindingGenerator")) {
+    dependencies {
+        compile fileTree(dir: (project(':binding-generator').buildDir.toString() + "/libs"), include: ['*.jar'])
+    }
+} else {
+    dependencies {
+        compile project(':binding-generator')
+    }
 }
 
 task setPackageVersion {

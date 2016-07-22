@@ -197,7 +197,6 @@ dependencies {
         // builtBy 'copyAarDependencies'
     // }
 	
-	compile project(':binding-generator')
 	compile project(':runtime')
 }
 

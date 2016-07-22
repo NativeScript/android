@@ -7,8 +7,6 @@ import java.util.HashSet;
 
 import org.ow2.asmdex.ApplicationWriter;
 
-import android.util.Log;
-
 import com.tns.bindings.desc.ClassDescriptor;
 
 public class ProxyGenerator
@@ -70,7 +68,7 @@ public class ProxyGenerator
 			proxyFileName += "-" + proxyThumb;
 		}
 		
-		if (IsLogEnabled) Log.d("Generator", "Saving proxy with file name: " + proxyFileName);
+		if (IsLogEnabled) System.out.println("Generator: Saving proxy with file name: " + proxyFileName);
 		String proxyPath = saveProxy(proxyFileName, generatedBytes);
 		
 		return proxyPath;
