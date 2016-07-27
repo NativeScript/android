@@ -54,8 +54,8 @@ model {
                          "-I${file("src/main/jni/include")}".toString()
         ])
 
-        cppFlags.addAll(["-std=c++11", "-fexceptions"])
-        CFlags.addAll(["-Wno-error=format-security", "-g"])
+        cppFlags.addAll(["-std=c++11", "-fexceptions", "-fno-builtin-stpcpy"])
+        CFlags.addAll(["-Wno-error=format-security", "-g", "-fno-builtin-stpcpy"])
 
         ldLibs.addAll(["android", "dl", "log", "atomic", "z"])
 
