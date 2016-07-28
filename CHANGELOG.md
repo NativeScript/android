@@ -1,3 +1,14 @@
+2.2.0
+==
+
+## What's New
+
+ - [Classes can implement multiple interfaces (#501)](https://github.com/NativeScript/android-runtime/pull/501)
+
+## Performance
+
+ - [Update gradle wrapper version to 2.10, and gradle plugin to 2.1.2 (#516)](https://github.com/NativeScript/android-runtime/pull/516)
+
 2.1
 ==
 

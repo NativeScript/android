@@ -54,8 +54,8 @@ model {
                          "-I${file("src/main/jni/include")}".toString()
         ])
 
-        cppFlags.addAll(["-std=c++11", "-fexceptions"])
-        CFlags.addAll(["-Wno-error=format-security", "-g"])
+        cppFlags.addAll(["-std=c++11", "-fexceptions", "-fno-builtin-stpcpy"])
+        CFlags.addAll(["-Wno-error=format-security", "-g", "-fno-builtin-stpcpy"])
 
         ldLibs.addAll(["android", "dl", "log", "atomic", "z"])
 
@@ -173,8 +173,14 @@ model {
     }
 }
 
-dependencies {
-    compile project(':binding-generator')
+if (project.hasProperty("embedBindingGenerator")) {
+    dependencies {
+        compile fileTree(dir: (project(':binding-generator').buildDir.toString() + "/libs"), include: ['*.jar'])
+    }
+} else {
+    dependencies {
+        compile project(':binding-generator')
+    }
 }
 
 task setPackageVersion {

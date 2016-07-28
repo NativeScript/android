@@ -107,9 +107,18 @@
 	    };
 	}
 
+	function Interfaces(interfacesArr) {
+	    return function (target) {
+            if(interfacesArr instanceof Array) {
+                // attach interfaces: [] to the object
+                target.prototype.interfaces = interfacesArr;
+            }
+	    }
+	}
 	
 	global.__native = __native;
 	global.__extends = __extends;
 	global.__decorate = __decorate;
 	global.JavaProxy = JavaProxy;
+	global.Interfaces = Interfaces;
 })()

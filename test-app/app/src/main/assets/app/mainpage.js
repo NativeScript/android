@@ -44,3 +44,4 @@ require("./tests/java-array-test");
 require("./tests/field-access-test");
 require("./tests/byte-buffer-test");
 require("./tests/dex-interface-implementation");
+require("./tests/testInterfaceImplementation");

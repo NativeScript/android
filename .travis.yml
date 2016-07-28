@@ -2,7 +2,7 @@ env:
   global:
   - NDK_VERSION=r11c
   - DATE=$(date +%Y-%m-%d)
-  - PACKAGE_VERSION=$DATE-$TRAVIS_BUILD_NUMBER
+  - PACKAGE_VERSION=next-$DATE-$TRAVIS_BUILD_NUMBER
   - PACKAGE_NAME=tns-android
 sudo: false
 language: android
@@ -16,6 +16,8 @@ android:
   - tools
   - build-tools-23.0.3
   - android-23
+  - extra-android-support
+  - extra-android-m2repository
   - sys-img-armeabi-v7a-android-21
 before_cache:
   - rm -f $HOME/.gradle/caches/modules-2/modules-2.lock
@@ -37,7 +39,7 @@ script:
   - echo no | android create avd --force -n Arm21 -t android-21 -b armeabi-v7a -c 12M
   - emulator -avd Arm21 -no-skin -no-audio -no-window &
   - android-wait-for-emulator
-  - "cd test-app && ./gradlew runtest --stacktrace"
+  - "cd test-app && ./gradlew runtest -PembedBindingGenerator=true --stacktrace"
   - cd ..
 before_deploy:
   - FULL_PACKAGE_VERSION=`sed -n 's/\s*"version":\s*"\([a-zA-Z0-9\.]*\)"\s*,*/\1/p' dist/package.json`

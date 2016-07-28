@@ -25,7 +25,7 @@ buildscript {
     }
 
 	dependencies {
-		classpath "com.android.tools.build:gradle:1.5.0"
+		classpath "com.android.tools.build:gradle:2.1.2"
 	}
 }
 
@@ -197,7 +197,6 @@ dependencies {
         // builtBy 'copyAarDependencies'
     // }
 	
-	compile project(':binding-generator')
 	compile project(':runtime')
 }
 
@@ -261,7 +260,7 @@ def updateProductFlavorsContent(flavor, dimensionName, oldContent) {
 
 					def closingQuotes = oldContent.indexOf('"', openingQuoutes + 1);
 					if(closingQuotes == -1) {
-						closingQuotes = closingQuotes.indexOf("'", openingQuoutes + 1);
+						closingQuotes = oldContent.indexOf("'", openingQuoutes + 1);
 					}	
 
 					index = closingQuotes + 1;

@@ -111,12 +111,12 @@ extern "C" void Java_com_tns_Runtime_runModule(JNIEnv *_env, jobject obj, jint r
 
 extern "C" jobject Java_com_tns_Runtime_runScript(JNIEnv *_env, jobject obj, jint runtimeId, jstring scriptFile)
 {
-	jobject o = nullptr;
+	jobject result = nullptr;
 
 	auto runtime = TryGetRuntime(runtimeId);
 	if (runtime == nullptr)
 	{
-		return o;
+		return result;
 	}
 
 	auto isolate = runtime->GetIsolate();
@@ -125,7 +125,7 @@ extern "C" jobject Java_com_tns_Runtime_runScript(JNIEnv *_env, jobject obj, jin
 
 	try
 	{
-		o = runtime->RunScript(_env, obj, scriptFile);
+		result = runtime->RunScript(_env, obj, scriptFile);
 	}
 	catch (NativeScriptException& e)
 	{
@@ -141,17 +141,17 @@ extern "C" jobject Java_com_tns_Runtime_runScript(JNIEnv *_env, jobject obj, jin
 		NativeScriptException nsEx(std::string("Error: c++ exception!"));
 		nsEx.ReThrowToJava();
 	}
-	return o;
+	return result;
 }
 
 extern "C" jobject Java_com_tns_Runtime_callJSMethodNative(JNIEnv *_env, jobject obj, jint runtimeId, jint javaObjectID, jstring methodName, jint retType, jboolean isConstructor, jobjectArray packagedArgs)
 {
-	jobject o = nullptr;
+	jobject result = nullptr;
 
 	auto runtime = TryGetRuntime(runtimeId);
 	if (runtime == nullptr)
 	{
-		return o;
+		return result;
 	}
 
 	auto isolate = runtime->GetIsolate();
@@ -160,7 +160,7 @@ extern "C" jobject Java_com_tns_Runtime_callJSMethodNative(JNIEnv *_env, jobject
 
 	try
 	{
-		o = runtime->CallJSMethodNative(_env, obj, javaObjectID, methodName, retType, isConstructor, packagedArgs);
+		result = runtime->CallJSMethodNative(_env, obj, javaObjectID, methodName, retType, isConstructor, packagedArgs);
 	}
 	catch (NativeScriptException& e)
 	{
@@ -176,7 +176,7 @@ extern "C" jobject Java_com_tns_Runtime_callJSMethodNative(JNIEnv *_env, jobject
 		NativeScriptException nsEx(std::string("Error: c++ exception!"));
 		nsEx.ReThrowToJava();
 	}
-	return o;
+	return result;
 }
 
 extern "C" void Java_com_tns_Runtime_createJSInstanceNative(JNIEnv *_env, jobject obj, jint runtimeId, jobject javaObject, jint javaObjectID, jstring className)

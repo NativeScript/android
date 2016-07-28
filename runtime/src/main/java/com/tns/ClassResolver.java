@@ -11,7 +11,7 @@ class ClassResolver
 		this.runtime = runtime;
 	}
 
-	public Class<?> resolveClass(String fullClassName, DexFactory dexFactory, String[] methodOverrides, boolean isInterface) throws ClassNotFoundException, IOException
+	public Class<?> resolveClass(String fullClassName, DexFactory dexFactory, String[] methodOverrides, String[] implementedInterfaces, boolean isInterface) throws ClassNotFoundException, IOException
 	{
 		String cannonicalClassName = fullClassName.replace('/', '.');
 		String name = null;
@@ -33,15 +33,16 @@ class ClassResolver
 			if (name == null || name == "")
 			{
 				if(isInterface)
-                {
+				{
 					name = "";
-				} else
-                {
+				}
+				else
+				{
 					name = "0";
 				}
 			}
 
-			clazz = dexFactory.resolveClass(name, className, methodOverrides, isInterface);
+			clazz = dexFactory.resolveClass(name, className, methodOverrides, implementedInterfaces, isInterface);
 		}
 
 		if (clazz == null)

@@ -14,7 +14,7 @@ import groovy.json.JsonOutput
 
 def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
 def localMetadataGen = "../android-metadata-generator/dist/tns-android-metadata-generator-0.0.1.tgz"
-def distDir = "$rootDir/dist"
+def distDir = "$projectDir/dist"
 def pVersion = "no package version was provided by build.gradle build"
 def arVersion = "no commit sha was provided by build.gradle build"
 
@@ -33,16 +33,12 @@ task checkEnvironmentVariables {
 		logger.warn("Warning: The GIT_COMMIT is not set. This NativeScript Android Runtime will not be tagged with the git commit it is build from\n");
 	}
 	
-	if(project.hasProperty("devmode") == true && !project.hasProperty("metadataGenSrc") && !file("../android-metadata-generator").exists()) {
-		throw new GradleException("../android-metadata-generator directory not found and no metadataGenSrc option specified. Clone the android-metadata-generator repo first.\n");
-	}
-
 	if(project.hasProperty("metadataGen") && !file("../android-metadata-generator/dist/tns-android-metadata-generator-0.0.1.tgz").exists()) {
 		throw new GradleException("android-metadata-generator build output not found and no metadataGen option specified. Build android-metadata-generator first.\n");
 	}
 }
 
-task cleanDistDir (type: Delete) << {
+task cleanDistDir (type: Delete) {
 	delete distDir
 }
 
@@ -62,19 +58,29 @@ task copyPackageJson (type: Copy) {
 }
 
 task getPackageVersion << {
+
 	String content = new File("$rootDir/package.json").getText("UTF-8")
 	def jsonSlurper = new JsonSlurper()
 	def packageJsonMap = jsonSlurper.parseText(content)
-	
+
 	pVersion = packageJsonMap.version
-	
-	println "The package version from package.json is '${pVersion}'"
+
+	println "Using runtime version from package.json '${pVersion}'"
+
+	if (project.hasProperty("packageVersion")) {
+		pVersion += "-" + packageVersion
+		
+		println "Using packageVersion property '${pVersion}'"
+	}
+
 
 	if (project.hasProperty("preReleaseVersion")) {
 		pVersion += "-" + preReleaseVersion
+
+		println "Adding preReleaseVersion property '${pVersion}' to package version"
 	}
 
-	println "The runtime version is '${pVersion}'"
+	println "The package version is '${pVersion}'"
 }
 
 task getCommitVersion << {
@@ -90,14 +96,26 @@ task getCommitVersion << {
 	}
 }
 
+task generateBindingGenerator (type: Exec)   {
+	doFirst {
+		workingDir "$rootDir/binding-generator"
+		if(isWinOs) {
+			commandLine "cmd", "/c", "gradlew", "jar"
+		}
+		else {
+			commandLine "./gradlew", "jar"
+		}
+	}
+}
+
 task generateRuntime (type: Exec)   {
 	doFirst {
 		workingDir "$rootDir/runtime"
 		if(isWinOs) {
-			commandLine "cmd", "/c", "gradlew", "assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"
+			commandLine "cmd", "/c", "gradlew", "assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-PembedBindingGenerator=true"
 		}
 		else {
-			commandLine "./gradlew", "assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"
+			commandLine "./gradlew", "assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-PembedBindingGenerator=true"
 		}
 	}
 }
@@ -107,14 +125,6 @@ task copyGeneratedRuntime << {
 		from "$rootDir/runtime/build/outputs/aar/runtime-release.aar"
 		into "$rootDir/dist/framework/libs/runtime-libs/"
 		rename "runtime-release.aar", "nativescript.aar"
-	}
-}
-
-task copyBindingGeneratorLib << {
-	copy {
-		from "$rootDir/binding-generator/build/outputs/aar/binding-generator-release.aar"
-		into "$rootDir/dist/framework/libs/runtime-libs/"
-		rename "binding-generator-release.aar", "binding-generator.aar"
 	}
 }
 
@@ -139,6 +149,35 @@ task copyGeneratedMetadataGeneratorJar << {
 	}
 }
 
+task generateStaticBindingGeneratorJar (type: Exec) {
+	doFirst {
+		workingDir "$rootDir/android-static-binding-generator/project/staticbindinggenerator"
+		
+		if(isWinOs) {
+			commandLine "cmd", "/c", "gradlew", "assemble"
+		}
+		else {
+			commandLine "./gradlew", "assemble"
+		}
+	}
+}
+
+task copyGeneratedStaticBindingGeneratorJar << {
+	copy {
+		from "$rootDir/android-static-binding-generator/project/staticbindinggenerator/build/libs"
+		into "$rootDir/dist/framework/build-tools/android-static-binding-generator"
+	}
+}
+
+task copyStaticBindingGeneratorProject << {
+	copy {
+		from "$rootDir/android-static-binding-generator/project"
+		exclude "staticbindinggenerator", "**/package.json", "*.txt", "**/logs", "**/out", "**/input_parced_typescript"
+
+		into "$rootDir/dist/framework/build-tools/android-static-binding-generator"
+	}
+}
+
 task createNpmPackage (type: Exec) {
 	doFirst {
 		workingDir "$rootDir/dist"
@@ -153,13 +192,12 @@ task createNpmPackage (type: Exec) {
 }
 
 task setPackageVersionInPackageJsonFile << {
-	if (project.hasProperty("packageVersion")) {
+	
 		def inputFile = new File("$rootDir/dist/package.json")
 		def json = new JsonSlurper().parseText(inputFile.text)
-		json.version = json.version + "-" + packageVersion
+		json.version = pVersion
 		def jb = new JsonBuilder(json);
 		inputFile.text = JsonOutput.prettyPrint(jb.toString())
-	}
 }
 
 task copyReadme (type: Copy) {
@@ -170,18 +208,24 @@ task copyReadme (type: Copy) {
 //clean and set up dirs
 createDistDir.dependsOn(cleanDistDir)
 
-
 //copy framework structure
 copyProjectTemplate.dependsOn(createDistDir)
 copyPackageJson.dependsOn(copyProjectTemplate)
-setPackageVersionInPackageJsonFile.dependsOn(copyPackageJson)
+
+copyStaticBindingGeneratorProject.dependsOn(copyProjectTemplate)
+//generate static binding generator and copy into project template
+generateStaticBindingGeneratorJar.dependsOn(copyStaticBindingGeneratorProject)
+copyGeneratedStaticBindingGeneratorJar.dependsOn(generateStaticBindingGeneratorJar)
 
 //get version from package json
-getPackageVersion.dependsOn(setPackageVersionInPackageJsonFile)
+getPackageVersion.dependsOn(copyProjectTemplate)
 getCommitVersion.dependsOn(getPackageVersion)
 
 //generate runtime and copy into framework structure
-generateRuntime.dependsOn(getCommitVersion)
+generateBindingGenerator.dependsOn(getCommitVersion)
+generateRuntime.dependsOn(generateBindingGenerator)
+
+setPackageVersionInPackageJsonFile.dependsOn(generateRuntime)
 
 //generateRuntime.dependsOn(build)
 
@@ -193,38 +237,41 @@ tasks.whenTaskAdded { task ->
             }
 
 copyGeneratedRuntime.dependsOn(generateRuntime)
-copyBindingGeneratorLib.dependsOn(generateRuntime)
 
 //generate metadata generator and copy into framework structure
-generateMetadataGeneratorJar.dependsOn(copyGeneratedRuntime, copyBindingGeneratorLib)
+generateMetadataGeneratorJar.dependsOn(copyGeneratedRuntime)
 copyGeneratedMetadataGeneratorJar.dependsOn(generateMetadataGeneratorJar)
 
 copyReadme.dependsOn(copyGeneratedMetadataGeneratorJar)
 
 //pack runtime
-createNpmPackage.dependsOn(copyReadme)
+createNpmPackage.dependsOn(copyReadme, setPackageVersionInPackageJsonFile)
 
 task createPackage {
 	description "Builds the NativeScript Android App Package using an application project template."
 	dependsOn cleanDistDir,
             createDistDir,
+
             copyProjectTemplate,
 
             copyPackageJson,
-			setPackageVersionInPackageJsonFile,
+
+			copyStaticBindingGeneratorProject,
+			generateStaticBindingGeneratorJar,
+			copyGeneratedStaticBindingGeneratorJar,
 
             getPackageVersion,
             getCommitVersion,
 			
             generateRuntime,
 
+			setPackageVersionInPackageJsonFile,
+
             copyGeneratedRuntime,
-			copyBindingGeneratorLib,
             generateMetadataGeneratorJar,
             copyGeneratedMetadataGeneratorJar,
             copyReadme,
             createNpmPackage
-
 
 	println "Creating NativeScript Android Package"			
 }

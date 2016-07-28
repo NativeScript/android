@@ -1687,4 +1687,17 @@ describe("Tests ", function () {
 
 		expect(exceptionCaught).toBe(true);
 	});
+
+    it("should implement an interface using extend keyword", function () {
+        var called = false;
+        var R = java.lang.Runnable.extend({
+            run: function() {
+                called = true;
+            }
+        });
+
+        new R().run();
+
+        expect(called).toBe(true);
+    });
 });
