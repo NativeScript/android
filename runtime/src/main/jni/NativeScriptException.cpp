@@ -3,6 +3,7 @@
 #include "V8GlobalHelpers.h"
 #include "NativeScriptAssert.h"
 #include "V8StringConstants.h"
+#include "include/v8.h"
 #include <sstream>
 
 using namespace std;
@@ -43,6 +44,9 @@ void NativeScriptException::ReThrowToV8()
 	if (m_javascriptException != nullptr)
 	{
 		errObj = Local<Value>::New(isolate, *m_javascriptException);
+		if(errObj->IsObject() && !m_message.empty()) {
+			errObj.As<Object>()->Set(ConvertToV8String("fullMessage"), ConvertToV8String(m_message));
+		}
 	}
 	else if (!m_message.empty())
 	{
@@ -151,30 +155,19 @@ void NativeScriptException::Init(ObjectManager *objectManager)
 // ON V8 UNCAUGHT EXCEPTION
 void NativeScriptException::OnUncaughtError(Local<Message> message, Local<Value> error)
 {
-	auto errorMessage = PrintErrorMessage(message, error);
+	string errorMessage;
+	auto v8FullMessage = ConvertToV8String("fullMessage");
 
-	Isolate *isolate = Isolate::GetCurrent();
-	HandleScope scope(isolate);
-
-	Local<Object> errorObject;
-	if (error->IsObject())
-	{
-		errorObject = error.As<Object>();
-		errorObject->Set(ConvertToV8String("message"), ConvertToV8String(errorMessage));
-	}
-	else
-	{
-		errorObject = Exception::Error(ConvertToV8String(errorMessage)).As<Object>();
+	if(error->IsObject() && error.As<Object>()->Has(v8FullMessage)) {
+		errorMessage = ConvertToString(error.As<Object>()->Get(v8FullMessage).As<String>());
 	}
 
-	CallJsFuncWithErr(errorObject);
+	if(errorMessage.size() == 0) {
+		errorMessage = GetErrorMessage(message, error);
+	}
 
-	// check whether the developer marked the error as "Caught"
-	// As per discussion, it is safer to ALWAYS kill the application due to uncaught error(s)
-	// TODO: We may think for some per-thread specific behavior and allow execution to continue for background thread exceptions
-//		if(!returnValue.IsEmpty() && (returnValue->IsBoolean() || returnValue->IsBooleanObject())){
-//			handled = returnValue->BooleanValue();
-//		}
+	NativeScriptException e(errorMessage);
+	e.ReThrowToJava();
 }
 
 void NativeScriptException::CallJsFuncWithErr(Local<Value> errObj)
