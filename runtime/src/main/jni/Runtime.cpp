@@ -248,9 +248,6 @@ void Runtime::CreateJSInstanceNative(JNIEnv *_env, jobject obj, jobject javaObje
 
 	JEnv env(_env);
 
-	// TODO: Do we need a TryCatch here? It is currently not used anywhere
-	TryCatch tc;
-
 	string existingClassName = ArgConverter::jstringToString(className);
 	string jniName = Util::ConvertFromCanonicalToJniName(existingClassName);
 	Local<Object> jsInstance;
@@ -259,9 +256,10 @@ void Runtime::CreateJSInstanceNative(JNIEnv *_env, jobject obj, jobject javaObje
 	auto proxyClassName = m_objectManager->GetClassName(javaObject);
 	DEBUG_WRITE("createJSInstanceNative class %s", proxyClassName.c_str());
 	jsInstance = MetadataNode::CreateExtendedJSWrapper(isolate, m_objectManager, proxyClassName);
+
 	if (jsInstance.IsEmpty())
 	{
-		throw NativeScriptException(string("NativeScript application not initialized correctly. Cannot create extended JS wrapper."));
+		throw NativeScriptException(string("Failed to create JavaScript extend wrapper for class '" + proxyClassName + "'"));
 	}
 
 	implementationObject = MetadataNode::GetImplementationObject(jsInstance);
