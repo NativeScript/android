@@ -23,7 +23,6 @@
 #include "V8NativeScriptExtension.h"
 #include "Runtime.h"
 #include "ArrayHelper.h"
-#include "include/v8.h"
 #include <sstream>
 #include <android/log.h>
 #include <string>
