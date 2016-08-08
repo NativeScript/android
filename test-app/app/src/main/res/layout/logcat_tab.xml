@@ -4,12 +4,40 @@
                 android:layout_height="match_parent"
                 android:orientation="vertical">
 
-    <TextView
-        android:id="@+id/logcattextView"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:id="@+id/logcatLinearLayout"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_centerInParent="true"
-        android:text="the logcat will be contained inside!"
-        android:textAppearance="?android:attr/textAppearanceLarge"/>
+        android:orientation="vertical"
+        android:weightSum="100">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="80">
+
+            <TextView
+                android:id="@+id/logcatMsg"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_centerInParent="true"
+                android:text=""
+                android:textAppearance="?android:attr/textAppearanceSmall" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="20">
+
+            <Button
+                android:id="@+id/btnCopyLogcat"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_alignParentBottom="true"
+                android:text="Copy to sdcard" />
+        </LinearLayout>
+    </LinearLayout>
+
 
 </RelativeLayout>

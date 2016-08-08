@@ -1,18 +1,30 @@
 package com.tns;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
+import android.Manifest;
 import android.app.Activity;
 import android.app.PendingIntent;
 import android.app.PendingIntent.CanceledException;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.os.Environment;
 import android.support.design.widget.TabLayout;
+import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentStatePagerAdapter;
@@ -24,35 +36,60 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.TextView;
+import android.widget.Toast;
 
 
 class ErrorReport implements TabLayout.OnTabSelectedListener {
 	public static final String ERROR_FILE_NAME = "hasError";
-	private final AppCompatActivity activity;
+	private static AppCompatActivity activity;
 
 	private TabLayout tabLayout;
 	private ViewPager viewPager;
 	private Context context;
+
 	private static String exceptionMsg;
+	private static String logcatMsg;
 
 	private final static String EXTRA_NATIVESCRIPT_ERROR_REPORT = "NativeScriptErrorMessage";
 	private final static String EXTRA_ERROR_REPORT_MSG = "msg";
+	private final static String EXTRA_LOGCAT_MSG = "logcat";
 	private final static int EXTRA_ERROR_REPORT_VALUE = 1;
+
+	private static final int REQUEST_EXTERNAL_STORAGE = 1;
+	private static String[] PERMISSIONS_STORAGE = {
+			Manifest.permission.READ_EXTERNAL_STORAGE,
+			Manifest.permission.WRITE_EXTERNAL_STORAGE
+	};
+
+	public static void verifyStoragePermissions(Activity activity) {
+		// Check if we have write permission
+		int permission = ActivityCompat.checkSelfPermission(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE);
+
+		if (permission != PackageManager.PERMISSION_GRANTED) {
+			// We don't have permission so prompt the user
+			ActivityCompat.requestPermissions(
+					activity,
+					PERMISSIONS_STORAGE,
+					REQUEST_EXTERNAL_STORAGE
+			);
+		}
+	}
 
 	public ErrorReport(AppCompatActivity activity) {
 		this.activity = activity;
 		this.context = activity.getApplicationContext();
 	}
 
-	static boolean startActivity(final Context context, String errorMessage) {
+	static boolean startActivity(final Context context, String errorMessage, String logcatMessage) {
 		final Intent intent = getIntent(context);
-
 		if (intent == null) {
 			return false; // (if in release mode) don't do anything
 		}
 
 		intent.putExtra(EXTRA_ERROR_REPORT_MSG, errorMessage);
+		intent.putExtra(EXTRA_LOGCAT_MSG, logcatMessage);
 
 		createErrorFile(context);
 
@@ -105,6 +142,36 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
 		return content;
 	}
 
+	static String getLogcat() {
+		String content;
+		String pId = Integer.toString(android.os.Process.myPid());
+
+		try {
+			String logcatCommand = "logcat -d";
+			Process process = java.lang.Runtime.getRuntime().exec(logcatCommand);
+
+			BufferedReader bufferedReader = new BufferedReader(
+					new InputStreamReader(process.getInputStream()));
+
+			StringBuilder log = new StringBuilder();
+			String line = "";
+			String lineSeparator = System.getProperty("line.separator");
+			while ((line = bufferedReader.readLine()) != null) {
+				if(line.contains(pId)) {
+					log.append(line);
+					log.append(lineSeparator);
+				}
+			}
+
+			content = log.toString();
+		} catch (IOException e) {
+			content = "Failed to read logcat";
+			Log.e("TNS.Android", content);
+		}
+
+		return content;
+	}
+
 	static Intent getIntent(Context context) {
 		Class<?> errorActivityClass = ErrorReportActivity.class;
 
@@ -125,9 +192,9 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
 	void buildUI() {
 		Context context = activity;
 		Intent intent = activity.getIntent();
-		final String msg = intent.getStringExtra(EXTRA_ERROR_REPORT_MSG);
 
-		exceptionMsg = msg;
+		exceptionMsg = intent.getStringExtra(EXTRA_ERROR_REPORT_MSG);
+		logcatMsg = intent.getStringExtra(EXTRA_LOGCAT_MSG);
 
 		int errActivityId = this.context.getResources().getIdentifier("error_activity", "layout", this.context.getPackageName());
 
@@ -212,10 +279,25 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
 		public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
 			int exceptionTabId = this.getContext().getResources().getIdentifier("exception_tab", "layout", this.getContext().getPackageName());
 			View view = inflater.inflate(exceptionTabId, container, false);
+
 			int txtViewId = this.getContext().getResources().getIdentifier("txtErrorMsg", "id", this.getContext().getPackageName());
 			TextView txtErrorMsg = (TextView) view.findViewById(txtViewId);
 			txtErrorMsg.setText(exceptionMsg);
 			txtErrorMsg.setMovementMethod(new ScrollingMovementMethod());
+
+			int btnCopyExceptionId = this.getContext().getResources().getIdentifier("btnCopyException", "id", this.getContext().getPackageName());
+			Button copyToClipboard = (Button) view.findViewById(btnCopyExceptionId);
+			copyToClipboard.setOnClickListener(new View.OnClickListener()
+			{
+				@Override
+				public void onClick(View v)
+				{
+					ClipboardManager clipboard = (ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
+					ClipData clip = ClipData.newPlainText("nsError", exceptionMsg);
+					clipboard.setPrimaryClip(clip);
+				}
+			});
+
 			return view;
 		}
 	}
@@ -225,6 +307,49 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
 		public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
 			int logcatTabId = this.getContext().getResources().getIdentifier("logcat_tab", "layout", this.getContext().getPackageName());
 			View view = inflater.inflate(logcatTabId, container, false);
+
+			int textViewId = this.getContext().getResources().getIdentifier("logcatMsg", "id", this.getContext().getPackageName());
+			TextView txtlogcatMsg = (TextView) view.findViewById(textViewId);
+			txtlogcatMsg.setText(logcatMsg);
+
+			txtlogcatMsg.setMovementMethod(new ScrollingMovementMethod());
+
+			final String logName = "Log-" + new SimpleDateFormat("yyyy-MM-dd-HH-mm-ss").format(new Date());
+
+			int btnCopyLogcatId = this.getContext().getResources().getIdentifier("btnCopyLogcat", "id", this.getContext().getPackageName());
+			Button copyToClipboard = (Button) view.findViewById(btnCopyLogcatId);
+			copyToClipboard.setOnClickListener(new View.OnClickListener()
+			{
+				@Override
+				public void onClick(View v)
+				{
+					verifyStoragePermissions(activity);
+
+					try {
+						File dir = new File(Environment.getExternalStorageDirectory().getPath()+ "/logcat-reports/");
+						dir.mkdirs();
+
+						File logcatReportFile = new File(dir, logName);
+						FileOutputStream stream = new FileOutputStream(logcatReportFile);
+						OutputStreamWriter writer = new OutputStreamWriter(stream, "UTF-8");
+						writer.write(logcatMsg);
+						writer.close();
+
+						String logPath = dir.getPath() + "/" + logName;
+
+						ClipboardManager clipboard = (ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
+						ClipData clip = ClipData.newPlainText("logPath", logPath);
+						clipboard.setPrimaryClip(clip);
+
+						Toast.makeText(activity, "Path copied to clipboard: " + logPath, Toast.LENGTH_LONG).show();
+					} catch (Exception e) {
+						String err = "Could not write logcat report to sdcard. Make sure you have allowed access to external storage!";
+						Toast.makeText(activity, err, Toast.LENGTH_LONG).show();
+						Log.d("ErrorReport", err);
+					}
+				}
+			});
+
 			return view;
 		}
 	}

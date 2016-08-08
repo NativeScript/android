@@ -5,32 +5,38 @@
                 android:orientation="vertical">
 
     <LinearLayout
+        android:id="@+id/linearLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:id="@+id/linearLayout">
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_centerInParent="true"
-            android:text="Unhandled Exception"
-            android:textAppearance="?android:attr/textAppearanceSmall"
-            android:layout_gravity="center_horizontal"
-            android:textAlignment="center"/>
-        <TextView
-            android:id="@+id/txtErrorMsg"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_centerInParent="true"
-            android:text="."
-            android:textAppearance="?android:attr/textAppearanceSmall"/>
+        android:weightSum="100">
 
-        <Button
-            android:id="@+id/btnCopyException"
+        <LinearLayout
+            android:layout_width="fill_parent"
+            android:layout_height="0dp"
+            android:layout_weight="80">
+
+            <TextView
+                android:id="@+id/txtErrorMsg"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_centerInParent="true"
+                android:text=""
+                android:textAppearance="?android:attr/textAppearanceSmall" />
+        </LinearLayout>
+
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Copy to clipboard"
-            android:layout_alignParentBottom="true"/>
+            android:layout_height="0dp"
+            android:layout_weight="20">
+
+            <Button
+                android:id="@+id/btnCopyException"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_alignParentBottom="true"
+                android:text="Copy to clipboard" />
+        </LinearLayout>
     </LinearLayout>
 
 

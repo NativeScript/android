@@ -22,4 +22,6 @@
         <item name="android:windowNoTitle">true</item>
     </style>
 
+    <style name="ExceptionActionBar" parent="Theme.AppCompat.DayNight.DarkActionBar">
+    </style>
 </resources>
