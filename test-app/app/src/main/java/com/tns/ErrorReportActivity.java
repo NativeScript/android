@@ -1,9 +1,9 @@
 package com.tns;
 
-import android.app.Activity;
 import android.os.Bundle;
+import android.support.v7.app.AppCompatActivity;
 
-public class ErrorReportActivity extends Activity
+public class ErrorReportActivity extends AppCompatActivity
 {
 	public void onCreate(Bundle savedInstanceState)
 	{

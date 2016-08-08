@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:id="@+id/linearLayout">
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_centerInParent="true"
+            android:text="Unhandled Exception"
+            android:textAppearance="?android:attr/textAppearanceSmall"
+            android:layout_gravity="center_horizontal"
+            android:textAlignment="center"/>
+        <TextView
+            android:id="@+id/txtErrorMsg"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_centerInParent="true"
+            android:text="."
+            android:textAppearance="?android:attr/textAppearanceSmall"/>
+
+        <Button
+            android:id="@+id/btnCopyException"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Copy to clipboard"
+            android:layout_alignParentBottom="true"/>
+    </LinearLayout>
+
+
+</RelativeLayout>
