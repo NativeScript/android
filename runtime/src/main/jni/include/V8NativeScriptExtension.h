@@ -1,4 +1,5 @@
 #include "v8.h"
+#include "handles.h"
 
 namespace v8 {
 	
@@ -16,9 +17,10 @@ namespace v8 {
 
 		static int GetInternalFieldCount(const v8::Local<v8::Object>& object);
 
-		static void Probe(bool cross_compile);
+        static void CpuFeaturesProbe(bool cross_compile);
 	private:
 		NativeScriptExtension();
+
+		// static v8::internal::Handle<v8::internal::FixedArray> GetEnumPropertyKeys(const v8::internal::Handle<v8::internal::JSObject>& object, bool cache_result);
 	};
 }
-
