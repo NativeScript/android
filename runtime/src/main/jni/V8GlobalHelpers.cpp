@@ -1,5 +1,6 @@
 #include "V8GlobalHelpers.h"
 #include "JEnv.h"
+#include "include/v8.h"
 
 using namespace v8;
 using namespace std;
@@ -44,14 +45,14 @@ Local<String> tns::ConvertToV8String(const char *data, int length)
 	return String::NewFromUtf8(isolate, (const char *) data, String::kNormalString, length);
 }
 
-Local<Value> tns::V8GetHiddenValue(const Local<Object>& obj, const string& propName)
+MaybeLocal<Value> tns::V8GetHiddenValue(Isolate *isolate, const Local<Object>& obj, const string& propName)
 {
-	auto s = tns::ConvertToV8String(propName);
-	return obj->GetHiddenValue(s);
+	auto s = Private::New(isolate, tns::ConvertToV8String(propName));
+	return obj->GetPrivate(isolate->GetCurrentContext(), s);
 }
 
-bool tns::V8SetHiddenValue(const Local<Object>& obj, const string& propName, const Local<Value>& value)
+Maybe<bool> tns::V8SetHiddenValue(Isolate *isolate, const Local<Object>& obj, const string& propName, const Local<Value>& value)
 {
-	auto s = tns::ConvertToV8String(propName);
-	return obj->SetHiddenValue(s, value);
+	auto s = Private::New(isolate, tns::ConvertToV8String(propName));
+	return obj->SetPrivate(isolate->GetCurrentContext(), s, value);
 }

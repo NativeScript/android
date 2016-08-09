@@ -182,7 +182,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 	{
 		auto jsObj = arg->ToObject();
 
-		auto castType = NumericCasts::GetCastType(jsObj);
+		auto castType = NumericCasts::GetCastType(m_isolate, jsObj);
 		Local<Value> castValue;
 		jchar charValue;
 		jbyte byteValue;
@@ -195,6 +195,9 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 
 		auto runtime = Runtime::GetRuntime(m_isolate);
 		auto objectManager = runtime->GetObjectManager();
+
+		// TODO: Pete:
+		MaybeLocal<Value> maybeCastValue;
 
 		switch (castType)
 		{
@@ -294,10 +297,11 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 
 			case CastType::None:
 				obj = objectManager->GetJavaObjectByJsObject(jsObj);
-                
-				castValue = jsObj->GetHiddenValue(V8StringConstants::GetNullNodeName());
 
-				if(!castValue.IsEmpty()) {
+				maybeCastValue = jsObj->GetPrivate(m_isolate->GetCurrentContext(), Private::New(m_isolate, V8StringConstants::GetNullNodeName()));
+
+				if(!maybeCastValue.IsEmpty()) {
+					castValue = maybeCastValue.ToLocalChecked();
 					auto node = reinterpret_cast<MetadataNode*>(castValue.As<External>()->Value());
 
 					if(node == nullptr) {

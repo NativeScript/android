@@ -238,7 +238,7 @@ void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID, jcl
 	auto state = new ObjectWeakCallbackState(this, jsInstanceInfo, objectHandle);
 
 	// subscribe for JS GC event
-	objectHandle->SetWeak(state, JSObjectWeakCallbackStatic);
+	objectHandle->SetWeak(state, JSObjectWeakCallbackStatic, WeakCallbackType::kParameter);
 
 	auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
 
@@ -284,7 +284,7 @@ string ObjectManager::GetClassName(jclass clazz)
 	return className;
 }
 
-void ObjectManager::JSObjectWeakCallbackStatic(const WeakCallbackData<Object, ObjectWeakCallbackState>& data)
+void ObjectManager::JSObjectWeakCallbackStatic(const WeakCallbackInfo<ObjectWeakCallbackState>& data)
 {
 	ObjectWeakCallbackState *callbackState = data.GetParameter();
 
@@ -345,7 +345,7 @@ void ObjectManager::JSObjectWeakCallback(Isolate *isolate, ObjectWeakCallbackSta
 		}
 	}
 
-	po->SetWeak(callbackState, JSObjectWeakCallbackStatic);
+	po->SetWeak(callbackState, JSObjectWeakCallbackStatic, WeakCallbackType::kParameter);
 }
 
 int ObjectManager::GenerateNewObjectID()
@@ -406,13 +406,13 @@ void ObjectManager::ReleaseRegularObjects()
 
 		assert(!obj.IsEmpty());
 
-		auto gcNum = obj->GetHiddenValue(propName);
+		auto gcNum = obj->GetPrivate(isolate->GetCurrentContext(), Private::New(isolate, propName));
 
 		bool isReachableFromImplementationObject = false;
 
 		if (!gcNum.IsEmpty())
 		{
-			int objGcNum = gcNum->Int32Value();
+			int objGcNum = gcNum.ToLocalChecked()->Int32Value();
 
 			// done so we can release only java objects from this GC stack and pass all objects that will be released in parent GC stacks
 			isReachableFromImplementationObject = objGcNum >= numberOfGC;
@@ -436,7 +436,7 @@ void ObjectManager::ReleaseRegularObjects()
 
 bool ObjectManager::HasImplObject(Isolate *isolate, const Local<Object>& obj)
 {
-	auto implObject = MetadataNode::GetImplementationObject(obj);
+	auto implObject = MetadataNode::GetImplementationObject(isolate, obj);
 
 	bool hasImplObj = !implObject.IsEmpty();
 
@@ -486,7 +486,7 @@ void ObjectManager::MarkReachableObjects(Isolate *isolate, const Local<Object>& 
 				// here we are leaving "callback2" object to remain strong in java
 				m_implObjStrong[jsInfo->JavaObjectID] = nullptr;
 			}
-			o->SetHiddenValue(propName, curGCNumValue);
+			o->SetPrivate(isolate->GetCurrentContext(), Private::New(isolate, propName), curGCNumValue);
 		}
 
 		uint8_t *addr = NativeScriptExtension::GetAddress(o);

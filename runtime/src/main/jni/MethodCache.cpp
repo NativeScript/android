@@ -109,6 +109,8 @@ MethodCache::CacheMethodInfo MethodCache::ResolveConstructorSignature(const Args
 string MethodCache::EncodeSignature(const string& className, const string& methodName, const FunctionCallbackInfo<Value>& args, bool isStatic)
 {
 	string sig(className);
+	auto isolate = args.GetIsolate();
+
 	sig.append(".");
 	if (isStatic)
 	{
@@ -128,13 +130,13 @@ string MethodCache::EncodeSignature(const string& className, const string& metho
 	for (int i = 0; i < len; i++)
 	{
 		sig.append(".");
-		sig.append(GetType(args[i]));
+		sig.append(GetType(isolate, args[i]));
 	}
 
 	return sig;
 }
 
-string MethodCache::GetType(const v8::Local<v8::Value>& value)
+string MethodCache::GetType(Isolate *isolate, const v8::Local<v8::Value>& value)
 {
 	string type;
 
@@ -142,9 +144,11 @@ string MethodCache::GetType(const v8::Local<v8::Value>& value)
 	{
 		auto objVal = value->ToObject();
 
-		Local<Value> nullNode = objVal->GetHiddenValue(V8StringConstants::GetNullNodeName());
+		auto maybeNullNode = objVal->GetPrivate(isolate->GetCurrentContext(), Private::New(isolate, V8StringConstants::GetNullNodeName()));
 
-		if(!nullNode.IsEmpty()) {
+		if(!maybeNullNode.IsEmpty()) {
+			Local<Value> nullNode = maybeNullNode.ToLocalChecked();
+
 			auto treeNode = reinterpret_cast<MetadataNode*>(nullNode.As<External>()->Value());
 
 			type = (treeNode != nullptr) ? treeNode->GetName() : "<unknown>";
@@ -200,7 +204,7 @@ string MethodCache::GetType(const v8::Local<v8::Value>& value)
 	else if (value->IsObject())
 	{
 		auto object = value->ToObject();
-		auto castType = NumericCasts::GetCastType(object);
+		auto castType = NumericCasts::GetCastType(isolate, object);
 		MetadataNode *node;
 
 		switch (castType)

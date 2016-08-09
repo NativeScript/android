@@ -7,6 +7,7 @@
 #include "ArgsWrapper.h"
 #include "DirectBuffer.h"
 #include "LRUCache.h"
+#include "include/v8.h"
 #include <map>
 #include <set>
 #include <stack>
@@ -150,7 +151,7 @@ namespace tns
 
 			v8::Local<v8::Object> CreateJSWrapperHelper(jint javaObjectID, const std::string& typeName, jclass clazz);
 
-			static void JSObjectWeakCallbackStatic(const v8::WeakCallbackData<v8::Object, ObjectWeakCallbackState>& data);
+			static void JSObjectWeakCallbackStatic(const v8::WeakCallbackInfo<ObjectWeakCallbackState>& data);
 
 			void JSObjectWeakCallback(v8::Isolate *isolate, ObjectWeakCallbackState *callbackState);
 

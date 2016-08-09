@@ -6,6 +6,7 @@
 #include "JEnv.h"
 #include "v8.h"
 #include "MetadataEntry.h"
+#include "include/v8.h"
 
 namespace tns
 {

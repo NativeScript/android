@@ -3,6 +3,7 @@
 
 #include "jni.h"
 #include "v8.h"
+#include "include/v8.h"
 #include <string>
 
 namespace tns
@@ -17,9 +18,9 @@ namespace tns
 
 	v8::Local<v8::String> ConvertToV8String(const char *data, int length);
 
-	v8::Local<v8::Value> V8GetHiddenValue(const v8::Local<v8::Object>& obj, const std::string& propName);
+	v8::MaybeLocal<v8::Value> V8GetHiddenValue(v8::Isolate *isolate, const v8::Local<v8::Object>& obj, const std::string& propName);
 
-	bool V8SetHiddenValue(const v8::Local<v8::Object>& obj, const std::string& propName, const v8::Local<v8::Value>& value);
+	v8::Maybe<bool> V8SetHiddenValue(v8::Isolate *isolate, const v8::Local<v8::Object>& obj, const std::string& propName, const v8::Local<v8::Value>& value);
 }
 
 #endif /* V8GLOBALHELPERS_H_ */
