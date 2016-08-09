@@ -78,7 +78,7 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
 	}
 
 	public ErrorReport(AppCompatActivity activity) {
-		this.activity = activity;
+		ErrorReport.activity = activity;
 		this.context = activity.getApplicationContext();
 	}
 
@@ -142,6 +142,10 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
 		return content;
 	}
 
+	/*
+	* Gets the process Id of the running app and filters all
+	* output that doesn't belong to that process
+	* */
 	static String getLogcat() {
 		String content;
 		String pId = Integer.toString(android.os.Process.myPid());
@@ -189,8 +193,7 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
 		return value == EXTRA_ERROR_REPORT_VALUE;
 	}
 
-	void buildUI() {
-		Context context = activity;
+	void buildUI(AppCompatActivity activity) {
 		Intent intent = activity.getIntent();
 
 		exceptionMsg = intent.getStringExtra(EXTRA_ERROR_REPORT_MSG);
