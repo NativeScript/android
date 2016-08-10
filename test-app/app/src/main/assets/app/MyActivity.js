@@ -29,8 +29,8 @@ var MyActivity = (function (_super) {
     MyActivity.prototype.onCreate = function (bundle) {
         _super.prototype.onCreate.call(this, bundle);
 
-    	require("./tests/testsWithContext").run(this);
-    	execute(); //run jasmine
+//    	require("./tests/testsWithContext").run(this);
+//    	execute(); //run jasmine
 
     	var layout = new android.widget.LinearLayout(this);
     	layout.setOrientation(1);

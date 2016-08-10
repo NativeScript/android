@@ -30,10 +30,15 @@ CastType NumericCasts::GetCastType(Isolate *isolate, const Local<Object>& object
 	auto ret = CastType::None;
 
 	auto key = Private::New(isolate, Local<String>::New(isolate, *s_castMarker));
-	auto hidden = object->GetPrivate(isolate->GetCurrentContext(), key);
-	if (!hidden.IsEmpty())
+	auto maybeHidden = object->GetPrivate(isolate->GetCurrentContext(), key);
+	Local<Value> hidden;
+	if (!maybeHidden.IsEmpty())
 	{
-		ret = static_cast<CastType>(hidden.ToLocalChecked()->Int32Value());
+		maybeHidden.FromMaybe(hidden);
+		if(!hidden.IsEmpty())
+		{
+			ret = static_cast<CastType>(hidden->Int32Value());
+		}
 	}
 
 	return ret;

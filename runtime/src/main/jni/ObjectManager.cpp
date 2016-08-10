@@ -406,16 +406,20 @@ void ObjectManager::ReleaseRegularObjects()
 
 		assert(!obj.IsEmpty());
 
-		auto gcNum = obj->GetPrivate(isolate->GetCurrentContext(), Private::New(isolate, propName));
+		auto maybeGcNum = obj->GetPrivate(isolate->GetCurrentContext(), Private::New(isolate, propName));
+		Local<Value> gcNum;
 
 		bool isReachableFromImplementationObject = false;
 
-		if (!gcNum.IsEmpty())
+		if (!maybeGcNum.IsEmpty())
 		{
-			int objGcNum = gcNum.ToLocalChecked()->Int32Value();
+			maybeGcNum.FromMaybe(gcNum);
+			if(!gcNum.IsEmpty()) {
+				int objGcNum = gcNum->Int32Value();
 
-			// done so we can release only java objects from this GC stack and pass all objects that will be released in parent GC stacks
-			isReachableFromImplementationObject = objGcNum >= numberOfGC;
+				// done so we can release only java objects from this GC stack and pass all objects that will be released in parent GC stacks
+				isReachableFromImplementationObject = objGcNum >= numberOfGC;
+			}
 		}
 
 		JSInstanceInfo *jsInstanceInfo = GetJSInstanceInfo(obj);

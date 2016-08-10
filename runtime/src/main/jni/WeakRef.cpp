@@ -121,7 +121,11 @@ void WeakRef::WeakHolderCallback(const WeakCallbackInfo<CallbackState>& data)
 		auto isolate = data.GetIsolate();
 		auto holder = Local<Object>::New(isolate, *poHolder);
 
-		auto poTarget = reinterpret_cast<Persistent<Object>*>(holder->GetPrivate(isolate->GetCurrentContext(), Private::New(isolate, V8StringConstants::GetTarget())).ToLocalChecked().As<External>()->Value());
+		auto maybeGetTargetVal = holder->GetPrivate(isolate->GetCurrentContext(), Private::New(isolate, V8StringConstants::GetTarget()));
+		Local<Value> getTargetVal;
+		maybeGetTargetVal.FromMaybe(getTargetVal);
+
+		auto poTarget = reinterpret_cast<Persistent<Object>*>(getTargetVal.As<External>()->Value());
 
 		if (poTarget != nullptr)
 		{
@@ -185,7 +189,12 @@ void WeakRef::GettertCallback(const FunctionCallbackInfo<Value>& args)
 	{
 		auto holder = args.This();
 		auto isolate = args.GetIsolate();
-		auto poTarget = reinterpret_cast<Persistent<Object>*>(holder->GetPrivate(isolate->GetCurrentContext(), Private::New(isolate, V8StringConstants::GetTarget())).ToLocalChecked().As<External>()->Value());
+		auto maybeGetTargetVal =holder->GetPrivate(isolate->GetCurrentContext(), Private::New(isolate, V8StringConstants::GetTarget()));
+		Local<Value> getTargetVal;
+
+		maybeGetTargetVal.FromMaybe(getTargetVal);
+
+		auto poTarget = reinterpret_cast<Persistent<Object>*>(getTargetVal.As<External>()->Value());
 
 		if (poTarget != nullptr)
 		{

@@ -183,6 +183,7 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 		auto runtime = Runtime::GetRuntime(m_isolate);
 		auto objectManager = runtime->GetObjectManager();
 		MaybeLocal<Value> maybeCastValue;
+		Local<Value> valFromMaybe;
 
 		switch (castType)
 		{
@@ -271,9 +272,14 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 				maybeCastValue = jsObject->GetPrivate(m_isolate->GetCurrentContext(), Private::New(m_isolate, ConvertToV8String(V8StringConstants::NULL_NODE_NAME)));
 
 				if(!maybeCastValue.IsEmpty()) {
-					SetConvertedObject(index, nullptr);
-					success = true;
-					break;
+					maybeCastValue.FromMaybe(valFromMaybe);
+
+					if(!valFromMaybe.IsEmpty())
+					{
+						SetConvertedObject(index, nullptr);
+						success = true;
+						break;
+					}
 				}
 
 				success = !obj.IsNull();

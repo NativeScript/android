@@ -198,6 +198,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 
 		// TODO: Pete:
 		MaybeLocal<Value> maybeCastValue;
+		Local<Value> valFromMaybe;
 
 		switch (castType)
 		{
@@ -301,35 +302,38 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 				maybeCastValue = jsObj->GetPrivate(m_isolate->GetCurrentContext(), Private::New(m_isolate, V8StringConstants::GetNullNodeName()));
 
 				if(!maybeCastValue.IsEmpty()) {
-					castValue = maybeCastValue.ToLocalChecked();
-					auto node = reinterpret_cast<MetadataNode*>(castValue.As<External>()->Value());
+					maybeCastValue.FromMaybe(valFromMaybe);
 
-					if(node == nullptr) {
-						s << "Cannot get type of the null argument at index " << index;
-						success = false;
-						break;
+					if(!valFromMaybe.IsEmpty()) {
+						auto node = reinterpret_cast<MetadataNode*>(valFromMaybe.As<External>()->Value());
+
+						if(node == nullptr) {
+							s << "Cannot get type of the null argument at index " << index;
+							success = false;
+							break;
+						}
+
+						auto type = node->GetName();
+						auto nullObjName = "com/tns/NullObject";
+						auto nullObjCtorSig = "(Ljava/lang/Class;)V";
+
+						jclass nullClazz = env.FindClass(nullObjName);
+						jmethodID ctor = env.GetMethodID(nullClazz, "<init>", nullObjCtorSig);
+						jclass clazzToNull = env.FindClass(type.c_str());
+						jobject nullObjType = env.NewObject(nullClazz, ctor, clazzToNull);
+
+						if(nullObjType != nullptr)
+						{
+							SetConvertedObject(env, index, nullObjType, false);
+						}
+						else
+						{
+							SetConvertedObject(env, index, nullptr);
+						}
+
+						success = true;
+						return success;
 					}
-
-					auto type = node->GetName();
-					auto nullObjName = "com/tns/NullObject";
-					auto nullObjCtorSig = "(Ljava/lang/Class;)V";
-
-					jclass nullClazz = env.FindClass(nullObjName);
-					jmethodID ctor = env.GetMethodID(nullClazz, "<init>", nullObjCtorSig);
-					jclass clazzToNull = env.FindClass(type.c_str());
-					jobject nullObjType = env.NewObject(nullClazz, ctor, clazzToNull);
-
-					if(nullObjType != nullptr)
-					{
-						SetConvertedObject(env, index, nullObjType, false);
-					}
-					else
-					{
-						SetConvertedObject(env, index, nullptr);
-					}
-
-					success = true;
-					return success;
 				}
 
 				success = !obj.IsNull();
