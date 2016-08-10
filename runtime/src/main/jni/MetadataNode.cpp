@@ -162,7 +162,7 @@ Local<Object> MetadataNode::CreateJSWrapper(Isolate *isolate, ObjectManager *obj
         obj = objectManager->GetEmptyObject(isolate);
         if (!obj.IsEmpty()) {
             auto ctorFunc = GetConstructorFunction(isolate);
-            
+
             // TODO: Pete: VERIFY THAT OBJECT -> SET(FUNCTION) works
             obj->Set(ConvertToV8String("constructor"), ctorFunc);
             obj->SetPrototype(ctorFunc->Get(ConvertToV8String("prototype")));
@@ -245,7 +245,8 @@ void MetadataNode::ClassAccessorGetterCallback(Local<String> property,
     try {
         auto thiz = info.This();
         auto isolate = info.GetIsolate();
-        auto data = GetTypeMetadata(isolate, thiz.As<Function>());
+        auto func = thiz.As<Function>();
+        auto data = GetTypeMetadata(isolate, func);
 
         auto value = CallbackHandlers::FindClass(isolate, data->name);
         info.GetReturnValue().Set(value);
@@ -480,7 +481,8 @@ void MetadataNode::SetInstanceMembersFromStaticMetadata(Isolate *isolate,
 
     Local<Function> ctorFunction;
 
-     prototypeTemplate->Set(ConvertToV8String(std::string("ctor")), FunctionTemplate::New(isolate, MethodCallback));
+    prototypeTemplate->Set(ConvertToV8String(std::string("ctor")),
+                           FunctionTemplate::New(isolate, MethodCallback));
 
     uint8_t *curPtr = s_metadataReader.GetValueData() + treeNode->offsetValue + 1;
 
@@ -525,7 +527,8 @@ void MetadataNode::SetInstanceMembersFromStaticMetadata(Isolate *isolate,
             auto funcName = ConvertToV8String(entry.name);
             // TODO: Pete: fix the WRAP functionality and reintroduce it
             // TODO: Pete: NEW V8's Set can only take a primitive for a value or a template
-            prototypeTemplate->Set(funcName, funcTemplate); // Wrap(isolate, func, entry.name, origin, false /* isCtorFunc */));
+            prototypeTemplate->Set(funcName,
+                                   funcTemplate); // Wrap(isolate, func, entry.name, origin, false /* isCtorFunc */));
             lastMethodName = entry.name;
         }
 
@@ -663,7 +666,8 @@ void MetadataNode::SetStaticMembers(Isolate *isolate, Local<Function> &ctorFunct
                 auto funcTemplate = FunctionTemplate::New(isolate, MethodCallback, funcData);
                 auto func = funcTemplate->GetFunction();
                 auto funcName = ConvertToV8String(entry.name);
-                ctorFunction->Set(funcName, Wrap(isolate, func, entry.name, origin, false /* isCtorFunc */));
+                ctorFunction->Set(funcName,
+                                  Wrap(isolate, func, entry.name, origin, false /* isCtorFunc */));
                 lastMethodName = entry.name;
             }
             callbackData->candidates.push_back(entry);
@@ -904,17 +908,56 @@ Local<Function> MetadataNode::GetConstructorFunction(Isolate *isolate) {
 
 MetadataNode::TypeMetadata *MetadataNode::GetTypeMetadata(Isolate *isolate,
                                                           const Local<Function> &value) {
-    auto maybeValue = value->GetPrivate(isolate->GetCurrentContext(), Private::New(isolate, tns::ConvertToV8String("typemetadata")));
+    auto maybeValue = value->GetPrivate(isolate->GetCurrentContext(), Private::New(isolate,
+                                                                                   tns::ConvertToV8String(
+                                                                                           "typemetadata")));
     Local<Value> valFromMaybe;
-    maybeValue.FromMaybe(valFromMaybe);
 
-    auto data = reinterpret_cast<TypeMetadata *>(valFromMaybe.As<External>()->Value());
+    if (!maybeValue.IsEmpty()) {
+        maybeValue.FromMaybe(valFromMaybe);
 
-    return data;
+        if (valFromMaybe.IsEmpty()) {
+            stringstream ss;
+            ss << "Failed to GetTypeMetadata: GetPrivate of the function returned nil";
+            NativeScriptException nsEx(ss.str());
+            nsEx.ReThrowToV8();
+        } else {
+            auto data = reinterpret_cast<TypeMetadata *>(valFromMaybe.As<External>()->Value());
+
+            return data;
+        }
+    } else {
+        stringstream ss;
+        ss << "Failed to GetTypeMetadata";
+        NativeScriptException nsEx(ss.str());
+        nsEx.ReThrowToV8();
+    }
 }
 
 void MetadataNode::SetTypeMetadata(Isolate *isolate, Local<Function> value, TypeMetadata *data) {
-    V8SetHiddenValue(isolate, value, "typemetadata", External::New(isolate, data));
+    auto privateKey = Private::New(isolate,tns::ConvertToV8String("typemetadata"));
+    auto res = value->SetPrivate(isolate->GetCurrentContext(),
+                                 privateKey,
+                                 External::New(isolate, data));
+
+    auto hasPrivate = value->HasPrivate(isolate->GetCurrentContext(), privateKey);
+    TypeMetadata* dataa;
+
+    Local<Value> valFromMaybe;
+    value->GetPrivate(isolate->GetCurrentContext(), privateKey).FromMaybe(valFromMaybe);//.ToLocal(valFromMaybe);
+
+
+
+    if (!valFromMaybe->IsEmpty()) {
+        dataa = reinterpret_cast<TypeMetadata *>(valFromMaybe->As<External>()->Value());
+    }
+
+    if (res.IsNothing()) {
+        stringstream ss;
+        ss << "Failed to SetTypeMetadata for: " << data->name.c_str() << endl;
+        NativeScriptException nsEx(ss.str());
+        nsEx.ReThrowToV8();
+    }
 }
 
 MetadataNode *MetadataNode::GetInstanceMetadata(Isolate *isolate, const Local<Object> &value) {
@@ -1276,15 +1319,16 @@ Local<Object> MetadataNode::GetImplementationObject(Isolate *isolate, const Loca
                 return Local<Object>();
             }
             else {
-                auto maybeValue = currentPrototype.As<Object>()->GetPrivate(isolate->GetCurrentContext(),
-                                                                       Private::New(isolate,
-                                                                                    V8StringConstants::GetClassImplementationObject()));
+                auto maybeValue = currentPrototype.As<Object>()->GetPrivate(
+                        isolate->GetCurrentContext(),
+                        Private::New(isolate,
+                                     V8StringConstants::GetClassImplementationObject()));
                 Local<Value> value;
 
                 if (!maybeValue.IsEmpty()) {
                     maybeValue.FromMaybe(value);
 
-                    if(!value.IsEmpty()) {
+                    if (!value.IsEmpty()) {
                         implementationObject = value.As<Object>();
                     }
                 }
