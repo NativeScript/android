@@ -18,9 +18,13 @@ namespace tns
 
 	v8::Local<v8::String> ConvertToV8String(const char *data, int length);
 
-	v8::MaybeLocal<v8::Value> V8GetHiddenValue(v8::Isolate *isolate, const v8::Local<v8::Object>& obj, const std::string& propName);
+	bool V8GetPrivateValue(v8::Isolate *isolate, const v8::Local<v8::Object>& obj, const v8::Local<v8::String>& propName, v8::Local<v8::Value>* out);
 
-	v8::Maybe<bool> V8SetHiddenValue(v8::Isolate *isolate, const v8::Local<v8::Object>& obj, const std::string& propName, const v8::Local<v8::Value>& value);
+	bool V8GetPrivateValue(v8::Isolate *isolate, const v8::Local<v8::Object>& obj, const std::string& propName, v8::Local<v8::Value>* out);
+
+	bool V8SetPrivateValue(v8::Isolate *isolate, const v8::Local<v8::Object>& obj, const v8::Local<v8::String>& propName, const v8::Local<v8::Value>& value);
+
+	bool V8SetPrivateValue(v8::Isolate *isolate, const v8::Local<v8::Object>& obj, const std::string& propName, const v8::Local<v8::Value>& value);
 }
 
 #endif /* V8GLOBALHELPERS_H_ */

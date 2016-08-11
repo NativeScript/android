@@ -163,7 +163,6 @@ Local<Object> MetadataNode::CreateJSWrapper(Isolate *isolate, ObjectManager *obj
         if (!obj.IsEmpty()) {
             auto ctorFunc = GetConstructorFunction(isolate);
 
-            // TODO: Pete: VERIFY THAT OBJECT -> SET(FUNCTION) works
             obj->Set(ConvertToV8String("constructor"), ctorFunc);
             obj->SetPrototype(ctorFunc->Get(ConvertToV8String("prototype")));
             SetInstanceMetadata(isolate, obj, this);
@@ -273,14 +272,17 @@ void MetadataNode::NullObjectAccessorGetterCallback(Local<String> property,
         auto isolate = info.GetIsolate();
 
         auto thiz = info.This();
-        Local<Private> propName = Private::New(isolate, V8StringConstants::GetNullNodeName());
-        auto maybeValue = thiz->GetPrivate(isolate->GetCurrentContext(), propName);
-        Local<Value> hiddenValue;
 
-        maybeValue.FromMaybe(hiddenValue);
-        if (hiddenValue.IsEmpty()) {
+        Local<Value> *hiddenValue;
+        auto hasValue = V8GetPrivateValue(isolate, thiz, V8StringConstants::GetNullNodeName(),
+                                          hiddenValue);
+
+        if (!hasValue) {
             auto node = reinterpret_cast<MetadataNode *>(info.Data().As<External>()->Value());
-            thiz->SetPrivate(isolate->GetCurrentContext(), propName, External::New(isolate, node));
+
+            V8SetPrivateValue(isolate, thiz, V8StringConstants::GetNullNodeName(),
+                              External::New(isolate, node));
+
             auto funcTemplate = FunctionTemplate::New(isolate, MetadataNode::NullValueOfCallback);
             thiz->Delete(V8StringConstants::GetValueOf());
             thiz->Set(V8StringConstants::GetValueOf(), funcTemplate->GetFunction());
@@ -398,37 +400,34 @@ void MetadataNode::SuperAccessorGetterCallback(Local<String> property,
     try {
         auto thiz = info.This();
         auto isolate = info.GetIsolate();
-        auto key = Private::New(isolate, ConvertToV8String("supervalue"));
-        auto maybeSuperValue = thiz->GetPrivate(isolate->GetCurrentContext(), key);
+        std::string key = "supervalue";
+        Local<Value> *superValue;
         Local<Object> superObject;
-        Local<Value> superValue;
 
-        if (!maybeSuperValue.IsEmpty()) {
-            maybeSuperValue.FromMaybe(superValue);
-            superObject = superValue.As<Object>();
+        auto hasValue = V8GetPrivateValue(isolate, thiz, key, superValue);
 
-            if (superValue.IsEmpty()) {
-                auto runtime = Runtime::GetRuntime(isolate);
-                auto objectManager = runtime->GetObjectManager();
+        superObject = superValue->As<Object>();
 
-                superValue = objectManager->GetEmptyObject(isolate);
-                bool d = superObject->Delete(V8StringConstants::GetToString());
-                d = superObject->Delete(V8StringConstants::GetValueOf());
-                superObject->SetInternalField(
-                        static_cast<int>(ObjectManager::MetadataNodeKeys::CallSuper),
-                        True(isolate));
+        if (!hasValue && superObject.IsEmpty()) {
+            auto runtime = Runtime::GetRuntime(isolate);
+            auto objectManager = runtime->GetObjectManager();
 
-                superObject->SetPrototype(
-                        thiz->GetPrototype().As<Object>()->GetPrototype().As<Object>()->GetPrototype());
-                thiz->SetPrivate(isolate->GetCurrentContext(), key, superObject);
-                objectManager->CloneLink(thiz, superObject);
+            superObject = objectManager->GetEmptyObject(isolate);
+            bool d = superObject->Delete(V8StringConstants::GetToString());
+            d = superObject->Delete(V8StringConstants::GetValueOf());
+            superObject->SetInternalField(
+                    static_cast<int>(ObjectManager::MetadataNodeKeys::CallSuper), True(isolate));
 
-                DEBUG_WRITE("superValue.GetPrototype=%d",
-                            superObject->GetPrototype().As<Object>()->GetIdentityHash());
+            superObject->SetPrototype(
+                    thiz->GetPrototype().As<Object>()->GetPrototype().As<Object>()->GetPrototype());
+            V8SetPrivateValue(isolate, thiz, key, superObject);
+            objectManager->CloneLink(thiz, superObject);
 
-                auto node = GetInstanceMetadata(isolate, thiz);
-                SetInstanceMetadata(isolate, superObject, node);
-            }
+            DEBUG_WRITE("superValue.GetPrototype=%d",
+                        superObject->GetPrototype().As<Object>()->GetIdentityHash());
+
+            auto node = GetInstanceMetadata(isolate, thiz);
+            SetInstanceMetadata(isolate, superObject, node);
         }
 
         info.GetReturnValue().Set(superObject);
@@ -465,10 +464,6 @@ void MetadataNode::SetInstanceMembers(Isolate *isolate, Local<FunctionTemplate> 
                                              instanceMethodsCallbackData,
                                              baseInstanceMethodsCallbackData, treeNode);
     }
-}
-
-void MetadataNode::TestCrash(const v8::FunctionCallbackInfo<v8::Value> &info) {
-
 }
 
 void MetadataNode::SetInstanceMembersFromStaticMetadata(Isolate *isolate,
@@ -526,7 +521,7 @@ void MetadataNode::SetInstanceMembersFromStaticMetadata(Isolate *isolate,
             auto func = funcTemplate->GetFunction();
             auto funcName = ConvertToV8String(entry.name);
             // TODO: Pete: fix the WRAP functionality and reintroduce it
-            // TODO: Pete: NEW V8's Set can only take a primitive for a value or a template
+            // TODO: Pete: NEW V8's Template::Set can only take a primitive for a value or a template
             prototypeTemplate->Set(funcName,
                                    funcTemplate); // Wrap(isolate, func, entry.name, origin, false /* isCtorFunc */));
             lastMethodName = entry.name;
@@ -743,38 +738,36 @@ void MetadataNode::InnerClassAccessorGetterCallback(Local<String> property,
         auto thiz = info.This();
         auto node = reinterpret_cast<MetadataNode *>(info.Data().As<External>()->Value());
 
-        auto innerKey = Private::New(isolate, ConvertToV8String("inner:" + node->m_treeNode->name));
+        auto innerKey = "inner:" + node->m_treeNode->name;
+        Local<Value> *value;
+        Local<Function> innerTypeCtorFunc;
 
-        auto maybeInnerTypeCtorFunc = thiz->GetPrivate(isolate->GetCurrentContext(), innerKey);
-        Local<Value> valFromMaybe;
+        V8GetPrivateValue(isolate, thiz, innerKey, value);
 
-        if (!maybeInnerTypeCtorFunc.IsEmpty()) {
-            maybeInnerTypeCtorFunc.FromMaybe(valFromMaybe);
+        innerTypeCtorFunc = value->As<Function>();
 
-            if (valFromMaybe.IsEmpty()) {
-                auto innerTypeCtorFunc = valFromMaybe.As<Function>();
-                auto funcTemplate = node->GetConstructorFunctionTemplate(isolate, node->m_treeNode);
-                auto ctorFunc = funcTemplate->GetFunction();
+        if (innerTypeCtorFunc.IsEmpty()) {
+            auto funcTemplate = node->GetConstructorFunctionTemplate(isolate, node->m_treeNode);
+            auto ctorFunc = funcTemplate->GetFunction();
 
-                auto innerClassData = External::New(isolate, new InnerClassData(
-                        new Persistent<Object>(isolate, thiz), node));
-                auto innerTypeCtorFuncTemplate = FunctionTemplate::New(isolate,
-                                                                       InnerClassConstructorCallback,
-                                                                       innerClassData);
-                innerTypeCtorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(
-                        static_cast<int>(ObjectManager::MetadataNodeKeys::END));
-                innerTypeCtorFunc = innerTypeCtorFuncTemplate->GetFunction();
-                auto prototypeName = ConvertToV8String("prototype");
-                auto innerTypeCtorFuncPrototype = innerTypeCtorFunc->Get(
-                        prototypeName).As<Object>();
-                innerTypeCtorFuncPrototype->SetPrototype(ctorFunc->Get(prototypeName));
+            auto innerClassData = External::New(isolate, new InnerClassData(
+                    new Persistent<Object>(isolate, thiz), node));
+            auto innerTypeCtorFuncTemplate = FunctionTemplate::New(isolate,
+                                                                   InnerClassConstructorCallback,
+                                                                   innerClassData);
+            innerTypeCtorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(
+                    static_cast<int>(ObjectManager::MetadataNodeKeys::END));
+            innerTypeCtorFunc = innerTypeCtorFuncTemplate->GetFunction();
+            auto prototypeName = ConvertToV8String("prototype");
+            auto innerTypeCtorFuncPrototype = innerTypeCtorFunc->Get(prototypeName).As<Object>();
+            innerTypeCtorFuncPrototype->SetPrototype(ctorFunc->Get(prototypeName));
 
-                thiz->SetPrivate(isolate->GetCurrentContext(), innerKey, innerTypeCtorFunc);
-            }
+            V8SetPrivateValue(isolate, thiz, innerKey, innerTypeCtorFunc);
         }
 
-        info.GetReturnValue().Set(valFromMaybe);
+        info.GetReturnValue().Set(innerTypeCtorFunc);
     }
+
     catch (NativeScriptException &e) {
         e.ReThrowToV8();
     }
@@ -809,8 +802,6 @@ void MetadataNode::SetInnnerTypes(Isolate *isolate, Local<Function> &ctorFunctio
                 auto innerTypeCtorFunc = Local<Function>::New(isolate, *GetOrCreateInternal(
                         curChild)->m_poCtorFunc);
                 auto innerTypeName = ConvertToV8String(curChild->name);
-                // TODO: Pete: NEW V8's Set can only take a primitive for a value or a template
-                // TODO: change func to funcTemplate
                 ctorFunction->Set(innerTypeName, innerTypeCtorFunc);
             }
             else {
@@ -908,68 +899,40 @@ Local<Function> MetadataNode::GetConstructorFunction(Isolate *isolate) {
 
 MetadataNode::TypeMetadata *MetadataNode::GetTypeMetadata(Isolate *isolate,
                                                           const Local<Function> &value) {
-    auto maybeValue = value->GetPrivate(isolate->GetCurrentContext(), Private::New(isolate,
-                                                                                   tns::ConvertToV8String(
-                                                                                           "typemetadata")));
-    Local<Value> valFromMaybe;
+    Local<Value> *out;
+    auto success = V8GetPrivateValue(isolate, value, "typemetadata", out);
 
-    if (!maybeValue.IsEmpty()) {
-        maybeValue.FromMaybe(valFromMaybe);
-
-        if (valFromMaybe.IsEmpty()) {
-            stringstream ss;
-            ss << "Failed to GetTypeMetadata: GetPrivate of the function returned nil";
-            NativeScriptException nsEx(ss.str());
-            nsEx.ReThrowToV8();
-        } else {
-            auto data = reinterpret_cast<TypeMetadata *>(valFromMaybe.As<External>()->Value());
-
-            return data;
-        }
-    } else {
+    if (!success) {
         stringstream ss;
-        ss << "Failed to GetTypeMetadata";
-        NativeScriptException nsEx(ss.str());
-        nsEx.ReThrowToV8();
+        ss << "Failed to GetTypeMetadata - no metadata attached to Function Handle" << endl;
+        throw NativeScriptException(ss.str());
     }
+
+    auto data = reinterpret_cast<TypeMetadata *>(out->As<External>()->Value());
+
+    return data;
 }
 
 void MetadataNode::SetTypeMetadata(Isolate *isolate, Local<Function> value, TypeMetadata *data) {
-    auto privateKey = Private::New(isolate,tns::ConvertToV8String("typemetadata"));
-    auto res = value->SetPrivate(isolate->GetCurrentContext(),
-                                 privateKey,
-                                 External::New(isolate, data));
+    auto res = V8SetPrivateValue(isolate, value, "typemetadata", External::New(isolate, data));
 
-    auto hasPrivate = value->HasPrivate(isolate->GetCurrentContext(), privateKey);
-    TypeMetadata* dataa;
-
-    Local<Value> valFromMaybe;
-    value->GetPrivate(isolate->GetCurrentContext(), privateKey).FromMaybe(valFromMaybe);//.ToLocal(valFromMaybe);
-
-
-
-    if (!valFromMaybe->IsEmpty()) {
-        dataa = reinterpret_cast<TypeMetadata *>(valFromMaybe->As<External>()->Value());
-    }
-
-    if (res.IsNothing()) {
+    if (!res) {
         stringstream ss;
         ss << "Failed to SetTypeMetadata for: " << data->name.c_str() << endl;
-        NativeScriptException nsEx(ss.str());
-        nsEx.ReThrowToV8();
+        throw NativeScriptException(ss.str());
     }
 }
 
 MetadataNode *MetadataNode::GetInstanceMetadata(Isolate *isolate, const Local<Object> &value) {
     MetadataNode *node = nullptr;
     auto cache = GetCache(isolate);
-    auto key = Private::New(isolate, Local<String>::New(isolate, *cache->MetadataKey));
-    auto ext = value->GetPrivate(isolate->GetCurrentContext(), key);
-    Local<Value> extFromMaybe;
+    auto key = Local<String>::New(isolate, *cache->MetadataKey);
 
-    if (!ext.IsEmpty()) {
-        ext.FromMaybe(extFromMaybe);
-        node = reinterpret_cast<MetadataNode *>(extFromMaybe.As<External>()->Value());
+    Local<Value>* ext;
+    auto hasValue = V8GetPrivateValue(isolate, value, key, ext);
+
+    if(hasValue) {
+        node = reinterpret_cast<MetadataNode*>(ext->As<External>()->Value());
     }
 
     return node;
@@ -977,8 +940,9 @@ MetadataNode *MetadataNode::GetInstanceMetadata(Isolate *isolate, const Local<Ob
 
 void MetadataNode::SetInstanceMetadata(Isolate *isolate, Local<Object> value, MetadataNode *node) {
     auto cache = GetCache(isolate);
-    auto key = Private::New(isolate, Local<String>::New(isolate, *cache->MetadataKey));
-    value->SetPrivate(isolate->GetCurrentContext(), key, External::New(isolate, node));
+    auto key = Local<String>::New(isolate, *cache->MetadataKey);
+
+    V8SetPrivateValue(isolate, value, key, External::New(isolate, node));
 }
 
 void MetadataNode::ExtendedClassConstructorCallback(
@@ -998,9 +962,8 @@ void MetadataNode::ExtendedClassConstructorCallback(
         SetInstanceMetadata(isolate, thiz, extData->node);
         thiz->SetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::CallSuper),
                                True(isolate));
-        thiz->SetPrivate(isolate->GetCurrentContext(),
-                         Private::New(isolate, ConvertToV8String("t::implObj")),
-                         implementationObject);
+
+        V8SetPrivateValue(isolate, thiz, "t::implObj", implementationObject);
 
         ArgsWrapper argWrapper(info, ArgType::Class, Local<Object>());
 
@@ -1067,9 +1030,8 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
 
         implementationObject->SetPrototype(thiz->GetPrototype());
         thiz->SetPrototype(implementationObject);
-        thiz->SetPrivate(isolate->GetCurrentContext(),
-                         Private::New(isolate, ConvertToV8String("t::implObj")),
-                         implementationObject);
+
+        V8SetPrivateValue(isolate, thiz, "t::implObj", implementationObject );
 
         ArgsWrapper argWrapper(info, ArgType::Interface, Local<Object>());
 
@@ -1257,89 +1219,85 @@ Local<Object> MetadataNode::GetImplementationObject(Isolate *isolate, const Loca
 
     auto target = object;
     Local<Value> currentPrototype = target;
-    Local<Value> implementationObject;
 
-    MaybeLocal<Value> maybeImplementationObject;
+    Local<Value>* outImplementationobject;
+    Local<Object> implementationObject;
 
-    maybeImplementationObject = object->GetPrivate(isolate->GetCurrentContext(),
-                                                   Private::New(isolate,
-                                                                ConvertToV8String("t::implObj")));
-    if (!maybeImplementationObject.IsEmpty()) {
-        maybeImplementationObject.FromMaybe(implementationObject);
+    V8GetPrivateValue(isolate, object, "t::implObj", outImplementationobject);
 
-        if (!implementationObject.IsEmpty()) {
-            return implementationObject.As<Object>();
-        }
+    implementationObject = outImplementationobject->As<Object>();
 
-        if (object->HasOwnProperty(V8StringConstants::GetIsPrototypeImplementationObject())) {
-            auto v8Prototype = V8StringConstants::GetPrototype();
-            if (!object->HasOwnProperty(v8Prototype)) {
-                return Local<Object>();
-            }
-
-            DEBUG_WRITE("GetImplementationObject returning the prototype of the object :%d",
-                        object->GetIdentityHash());
-            return object->Get(v8Prototype).As<Object>();
-        }
-
-        auto maybeObj = V8GetHiddenValue(isolate, object, "t::ActivityImplementationObject");
-        Local<Value> obj;
-
-        if (!obj.IsEmpty()) {
-            maybeObj.FromMaybe(obj);
-
-            if (!obj.IsEmpty()) {
-                DEBUG_WRITE(
-                        "GetImplementationObject returning ActivityImplementationObject property on object: %d",
-                        object->GetIdentityHash());
-                return obj.As<Object>();
-            }
-        }
-
-        Local<Value> lastPrototype;
-        bool prototypeCycleDetected = false;
-        while (implementationObject.IsEmpty()) {
-            //
-            currentPrototype = currentPrototype.As<Object>()->GetPrototype();
-
-            if (currentPrototype->IsNull())
-                break;
-
-            //DEBUG_WRITE("GetImplementationObject currentPrototypeObject:%d", (currentPrototype.IsEmpty() || currentPrototype.As<Object>().IsEmpty()) ? -1 :  currentPrototype.As<Object>()->GetIdentityHash());
-            //DEBUG_WRITE("GetImplementationObject lastPrototypeObject:%d", (lastPrototype.IsEmpty() || lastPrototype.As<Object>().IsEmpty()) ? -1 :  lastPrototype.As<Object>()->GetIdentityHash());
-
-            if (currentPrototype == lastPrototype) {
-                auto abovePrototype = currentPrototype.As<Object>()->GetPrototype();
-                prototypeCycleDetected = abovePrototype == currentPrototype;
-            }
-
-            if (currentPrototype.IsEmpty() || prototypeCycleDetected) {
-                //Local<Value> abovePrototype = currentPrototype.As<Object>()->GetPrototype();
-                //DEBUG_WRITE("GetImplementationObject not found since cycle parents reached abovePrototype:%d", (abovePrototype.IsEmpty() || abovePrototype.As<Object>().IsEmpty()) ? -1 :  abovePrototype.As<Object>()->GetIdentityHash());
-                return Local<Object>();
-            }
-            else {
-                auto maybeValue = currentPrototype.As<Object>()->GetPrivate(
-                        isolate->GetCurrentContext(),
-                        Private::New(isolate,
-                                     V8StringConstants::GetClassImplementationObject()));
-                Local<Value> value;
-
-                if (!maybeValue.IsEmpty()) {
-                    maybeValue.FromMaybe(value);
-
-                    if (!value.IsEmpty()) {
-                        implementationObject = value.As<Object>();
-                    }
-                }
-            }
-
-            lastPrototype = currentPrototype;
-        }
-
+    if (!implementationObject.IsEmpty())
+    {
+        return implementationObject;
     }
 
-    return implementationObject.As<Object>();
+    if (object->HasOwnProperty(V8StringConstants::GetIsPrototypeImplementationObject()))
+    {
+        auto v8Prototype = V8StringConstants::GetPrototype();
+        if (!object->HasOwnProperty(v8Prototype))
+        {
+            return Local<Object>();
+        }
+
+        DEBUG_WRITE("GetImplementationObject returning the prototype of the object :%d", object->GetIdentityHash());
+        return object->Get(v8Prototype).As<Object>();
+    }
+
+    Local<Value>* outObj;
+    Local<Object> obj;
+
+    V8GetPrivateValue(isolate, object, "t::ActivityImplementationObject", outObj);
+    obj = outObj->As<Object>();
+
+    if (!obj.IsEmpty())
+    {
+        DEBUG_WRITE("GetImplementationObject returning ActivityImplementationObject property on object: %d", object->GetIdentityHash());
+        return obj;
+    }
+
+    Local<Value> lastPrototype;
+    bool prototypeCycleDetected = false;
+    while (implementationObject.IsEmpty())
+    {
+        //
+        currentPrototype = currentPrototype.As<Object>()->GetPrototype();
+
+        if (currentPrototype->IsNull())
+            break;
+
+        //DEBUG_WRITE("GetImplementationObject currentPrototypeObject:%d", (currentPrototype.IsEmpty() || currentPrototype.As<Object>().IsEmpty()) ? -1 :  currentPrototype.As<Object>()->GetIdentityHash());
+        //DEBUG_WRITE("GetImplementationObject lastPrototypeObject:%d", (lastPrototype.IsEmpty() || lastPrototype.As<Object>().IsEmpty()) ? -1 :  lastPrototype.As<Object>()->GetIdentityHash());
+
+        if (currentPrototype == lastPrototype)
+        {
+            auto abovePrototype = currentPrototype.As<Object>()->GetPrototype();
+            prototypeCycleDetected = abovePrototype == currentPrototype;
+        }
+
+        if (currentPrototype.IsEmpty() || prototypeCycleDetected)
+        {
+            //Local<Value> abovePrototype = currentPrototype.As<Object>()->GetPrototype();
+            //DEBUG_WRITE("GetImplementationObject not found since cycle parents reached abovePrototype:%d", (abovePrototype.IsEmpty() || abovePrototype.As<Object>().IsEmpty()) ? -1 :  abovePrototype.As<Object>()->GetIdentityHash());
+            return Local<Object>();
+        }
+        else
+        {
+            Local<Value>* value;
+            Local<Object> currentPrototypeAsObj = currentPrototype.As<Object>();
+
+            V8GetPrivateValue(isolate, currentPrototypeAsObj, V8StringConstants::GetClassImplementationObject(), value);
+
+            if (!value->IsEmpty())
+            {
+                implementationObject = currentPrototypeAsObj;
+            }
+        }
+
+        lastPrototype = currentPrototype;
+    }
+
+    return implementationObject;
 }
 
 void MetadataNode::PackageGetterCallback(Local<Name> property,
@@ -1361,46 +1319,51 @@ void MetadataNode::PackageGetterCallback(Local<Name> property,
 
         auto thiz = info.This();
 
-        auto maybeCachedItem = thiz->GetPrivate(isolate->GetCurrentContext(),
-                                                Private::New(isolate, strProperty));
-        Local<Value> cachedItem;
+        Local<Value>* cachedItem;
 
-        if (!maybeCachedItem.IsEmpty()) {
-//			cachedItem = maybeCachedItem.ToLocalChecked();
+        auto hasValue = V8GetPrivateValue(isolate, thiz, propName, cachedItem);
 
-            maybeCachedItem.FromMaybe(cachedItem);
+        if(!hasValue) {
+            auto node = reinterpret_cast<MetadataNode *>(info.Data().As<External>()->Value());
 
-            if (cachedItem.IsEmpty()) {
-                auto node = reinterpret_cast<MetadataNode *>(info.Data().As<External>()->Value());
+            uint8_t nodeType = s_metadataReader.GetNodeType(node->m_treeNode);
 
-                uint8_t nodeType = s_metadataReader.GetNodeType(node->m_treeNode);
+            DEBUG_WRITE(
+                    "MetadataNode::GetterCallback: prop '%s' for node '%s' called, nodeType=%d, hash=%d",
+                    propName.c_str(), node->m_treeNode->name.c_str(), nodeType,
+                    thiz.IsEmpty() ? -42 : thiz->GetIdentityHash());
 
-                DEBUG_WRITE(
-                        "MetadataNode::GetterCallback: prop '%s' for node '%s' called, nodeType=%d, hash=%d",
-                        propName.c_str(), node->m_treeNode->name.c_str(), nodeType,
-                        thiz.IsEmpty() ? -42 : thiz->GetIdentityHash());
+            auto child = GetChildMetadataForPackage(node, propName);
+            auto foundChild = child.treeNode != nullptr;
 
-                auto child = GetChildMetadataForPackage(node, propName);
-                auto foundChild = child.treeNode != nullptr;
+            if (foundChild) {
+                auto childNode = MetadataNode::GetOrCreateInternal(child.treeNode);
+                *cachedItem = childNode->CreateWrapper(isolate);
 
-                auto childName = child.name.c_str();
-
-                if (foundChild) {
-                    auto childNode = MetadataNode::GetOrCreateInternal(child.treeNode);
-                    cachedItem = childNode->CreateWrapper(isolate);
-                    thiz->SetPrivate(isolate->GetCurrentContext(),
-                                     Private::New(isolate, strProperty), cachedItem);
-                }
+                V8SetPrivateValue(isolate, thiz, strProperty, *cachedItem);
             }
         }
-        else {
-            DEBUG_WRITE(">>PackageGetterCallback maybeItem is empty");
 
-            string msg = "Empty handle when getting hidden value";
-            NativeScriptException nsEx(msg.c_str());
-        }
+//        if (cachedItem->IsEmpty()) {
+//            auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value());
+//
+//            uint8_t nodeType = s_metadataReader.GetNodeType(node->m_treeNode);
+//
+//            DEBUG_WRITE("MetadataNode::GetterCallback: prop '%s' for node '%s' called, nodeType=%d, hash=%d", propName.c_str(), node->m_treeNode->name.c_str(), nodeType, thiz.IsEmpty() ? -42 : thiz->GetIdentityHash());
+//
+//            auto child = GetChildMetadataForPackage(node, propName);
+//            auto foundChild = child.treeNode != nullptr;
+//
+//            if (foundChild)
+//            {
+//                auto childNode = MetadataNode::GetOrCreateInternal(child.treeNode);
+//                *cachedItem = childNode->CreateWrapper(isolate);
+//
+//                V8SetPrivateValue(isolate, thiz, strProperty, *cachedItem);
+//            }
+//        }
 
-        info.GetReturnValue().Set(cachedItem);
+        info.GetReturnValue().Set(*cachedItem);
     }
     catch (NativeScriptException &e) {
         e.ReThrowToV8();
@@ -1592,47 +1555,35 @@ void MetadataNode::ExtendCallMethodCallback(const v8::FunctionCallbackInfo<v8::V
             return;
         }
 
-        auto implementationObjectPropertyName = Private::New(isolate,
-                                                             V8StringConstants::GetClassImplementationObject());
+        auto implementationObjectPropertyName = V8StringConstants::GetClassImplementationObject();
         //reuse validation - checks that implementationObject is not reused for different classes
-        auto maybeimplementationObjectProperty = implementationObject->GetPrivate(
-                isolate->GetCurrentContext(), implementationObjectPropertyName);
-        Local<Value> implementationObjectProperty;
 
-        if (!maybeimplementationObjectProperty.IsEmpty()) {
-            maybeimplementationObjectProperty.FromMaybe(implementationObjectProperty);
+        Local<Value>* value;
+        V8GetPrivateValue(isolate, implementationObject, implementationObjectPropertyName, value);
 
-            Local<String> implementationObjectPropertyStr = implementationObjectProperty.As<String>();
-
-            if (implementationObjectPropertyStr.IsEmpty()) {
-                //mark the implementationObject as such and set a pointer to it's class node inside it for reuse validation later
-                implementationObject->SetPrivate(isolate->GetCurrentContext(),
-                                                 implementationObjectPropertyName,
-                                                 String::NewFromUtf8(isolate,
-                                                                     fullExtendedName.c_str()));
-            } else {
-                string usedClassName = ConvertToString(implementationObjectPropertyStr);
-                stringstream s;
-                s << "This object is used to extend another class '" << usedClassName << "'";
-                throw NativeScriptException(s.str());
-            }
+        auto implementationObjectProperty = value->As<String>();
+        if (implementationObjectProperty.IsEmpty())
+        {
+            //mark the implementationObject as such and set a pointer to it's class node inside it for reuse validation later
+            V8SetPrivateValue(isolate, implementationObject, implementationObjectPropertyName, ConvertToV8String(fullExtendedName));
+        }
+        else
+        {
+            string usedClassName = ConvertToString(implementationObjectProperty);
+            stringstream s;
+            s << "This object is used to extend another class '" << usedClassName << "'";
+            throw NativeScriptException(s.str());
         }
 
-
         auto baseClassCtorFunc = node->GetConstructorFunction(isolate);
-        auto extendData = External::New(isolate, new ExtendedClassData(node, extendNameAndLocation,
-                                                                       implementationObject,
-                                                                       fullExtendedName));
-        auto extendFuncTemplate = FunctionTemplate::New(isolate, ExtendedClassConstructorCallback,
-                                                        extendData);
-        extendFuncTemplate->InstanceTemplate()->SetInternalFieldCount(
-                static_cast<int>(ObjectManager::MetadataNodeKeys::END));
+        auto extendData = External::New(isolate, new ExtendedClassData(node, extendNameAndLocation, implementationObject, fullExtendedName));
+        auto extendFuncTemplate = FunctionTemplate::New(isolate, ExtendedClassConstructorCallback, extendData);
+        extendFuncTemplate->InstanceTemplate()->SetInternalFieldCount(static_cast<int>(ObjectManager::MetadataNodeKeys::END));
 
         auto extendFunc = extendFuncTemplate->GetFunction();
         auto prototypeName = ConvertToV8String("prototype");
         implementationObject->SetPrototype(baseClassCtorFunc->Get(prototypeName));
-        implementationObject->SetAccessor(ConvertToV8String("super"), SuperAccessorGetterCallback,
-                                          nullptr, implementationObject);
+        implementationObject->SetAccessor(ConvertToV8String("super"), SuperAccessorGetterCallback, nullptr, implementationObject);
 
         auto extendFuncPrototype = extendFunc->Get(prototypeName).As<Object>();
         auto p = extendFuncPrototype->GetPrototype();
