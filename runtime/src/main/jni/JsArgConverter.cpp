@@ -175,13 +175,15 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 		jlong javaLongValue;
 		auto jsObject = arg->ToObject();
 
-		auto castType = NumericCasts::GetCastType(jsObject);
+		auto castType = NumericCasts::GetCastType(m_isolate, jsObject);
 
 		Local<Value> castValue;
 		JniLocalRef obj;
 
 		auto runtime = Runtime::GetRuntime(m_isolate);
 		auto objectManager = runtime->GetObjectManager();
+		MaybeLocal<Value> maybeCastValue;
+		Local<Value> valFromMaybe;
 
 		switch (castType)
 		{
@@ -267,11 +269,17 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 			case CastType::None:
 				obj = objectManager->GetJavaObjectByJsObject(jsObject);
 
-				castValue = jsObject->GetHiddenValue(ConvertToV8String(V8StringConstants::NULL_NODE_NAME));
-				if(!castValue.IsEmpty()) {
-					SetConvertedObject(index, nullptr);
-					success = true;
-					break;
+				maybeCastValue = jsObject->GetPrivate(m_isolate->GetCurrentContext(), Private::New(m_isolate, ConvertToV8String(V8StringConstants::NULL_NODE_NAME)));
+
+				if(!maybeCastValue.IsEmpty()) {
+					maybeCastValue.FromMaybe(valFromMaybe);
+
+					if(!valFromMaybe.IsEmpty())
+					{
+						SetConvertedObject(index, nullptr);
+						success = true;
+						break;
+					}
 				}
 
 				success = !obj.IsNull();

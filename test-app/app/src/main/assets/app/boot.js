@@ -29,7 +29,7 @@ global.__JUnitSaveResults = function (unitTestResults) {
     }
 };
 
-require('./Infrastructure/Jasmine/jasmine-2.0.1/boot'); //runs jasmine, attaches the junitOutputter
+//require('./Infrastructure/Jasmine/jasmine-2.0.1/boot'); //runs jasmine, attaches the junitOutputter
 
 
 require("./mainpage");

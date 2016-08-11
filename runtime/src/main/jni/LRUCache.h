@@ -43,7 +43,7 @@ namespace tns
 			typedef std::list<key_type> key_tracker_type;
 
 		// Key to value and key history iterator
-			typedef std::tr1::unordered_map< key_type, std::pair<value_type, typename key_tracker_type::iterator> > key_to_value_type;
+			typedef std::unordered_map< key_type, std::pair<value_type, typename key_tracker_type::iterator> > key_to_value_type;
 
 		// Constuctor specifies the cached function and
 		// the maximum number of records to be stored

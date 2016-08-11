@@ -51,7 +51,7 @@ namespace tns
 
 			static v8::Local<v8::Object> CreateExtendedJSWrapper(v8::Isolate *isolate, ObjectManager *objectManager, const std::string& proxyClassName);
 
-			static v8::Local<v8::Object> GetImplementationObject(const v8::Local<v8::Object>& object);
+			static v8::Local<v8::Object> GetImplementationObject(v8::Isolate *isolate, const v8::Local<v8::Object>& object);
 
 			static void CreateTopLevelNamespaces(v8::Isolate *isolate, const v8::Local<v8::Object>& global);
 
@@ -112,6 +112,7 @@ namespace tns
 
 			static std::string CreateFullClassName(const std::string& className, const std::string& extendNameAndLocation);
 			static void MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
+			static void TestCrash(const v8::FunctionCallbackInfo<v8::Value>& info);
 			static void InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 			static void ClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 			static void ExtendCallMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& info);

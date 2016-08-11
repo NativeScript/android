@@ -18,12 +18,10 @@ enum DebugEvent {
   Exception = 2,
   NewFunction = 3,
   BeforeCompile = 4,
-  AfterCompile  = 5,
+  AfterCompile = 5,
   CompileError = 6,
-  PromiseEvent = 7,
-  AsyncTaskEvent = 8,
+  AsyncTaskEvent = 7,
 };
-
 
 class V8_EXPORT Debug {
  public:
@@ -155,8 +153,11 @@ class V8_EXPORT Debug {
    */
   typedef void (*DebugMessageDispatchHandler)();
 
-  static bool SetDebugEventListener(EventCallback that,
+  static bool SetDebugEventListener(Isolate* isolate, EventCallback that,
                                     Local<Value> data = Local<Value>());
+  V8_DEPRECATED("Use version with an Isolate",
+                static bool SetDebugEventListener(
+                    EventCallback that, Local<Value> data = Local<Value>()));
 
   // Schedule a debugger break to happen when JavaScript code is run
   // in the given isolate.
@@ -170,7 +171,9 @@ class V8_EXPORT Debug {
   static bool CheckDebugBreak(Isolate* isolate);
 
   // Message based interface. The message protocol is JSON.
-  static void SetMessageHandler(MessageHandler handler);
+  static void SetMessageHandler(Isolate* isolate, MessageHandler handler);
+  V8_DEPRECATED("Use version with an Isolate",
+                static void SetMessageHandler(MessageHandler handler));
 
   static void SendCommand(Isolate* isolate,
                           const uint16_t* command, int length,
@@ -194,10 +197,9 @@ class V8_EXPORT Debug {
   *   }
   * \endcode
   */
-  static V8_DEPRECATE_SOON(
-      "Use maybe version",
-      Local<Value> Call(v8::Local<v8::Function> fun,
-                        Local<Value> data = Local<Value>()));
+  static V8_DEPRECATED("Use maybe version",
+                       Local<Value> Call(v8::Local<v8::Function> fun,
+                                         Local<Value> data = Local<Value>()));
   // TODO(dcarney): data arg should be a MaybeLocal
   static MaybeLocal<Value> Call(Local<Context> context,
                                 v8::Local<v8::Function> fun,
@@ -206,8 +208,8 @@ class V8_EXPORT Debug {
   /**
    * Returns a mirror object for the given object.
    */
-  static V8_DEPRECATE_SOON("Use maybe version",
-                           Local<Value> GetMirror(v8::Local<v8::Value> obj));
+  static V8_DEPRECATED("Use maybe version",
+                       Local<Value> GetMirror(v8::Local<v8::Value> obj));
   static MaybeLocal<Value> GetMirror(Local<Context> context,
                                      v8::Local<v8::Value> obj);
 
@@ -242,7 +244,9 @@ class V8_EXPORT Debug {
    * "Evaluate" debug command behavior currently is not specified in scope
    * of this method.
    */
-  static void ProcessDebugMessages();
+  static void ProcessDebugMessages(Isolate* isolate);
+  V8_DEPRECATED("Use version with an Isolate",
+                static void ProcessDebugMessages());
 
   /**
    * Debugger is running in its own context which is entered while debugger
@@ -251,7 +255,9 @@ class V8_EXPORT Debug {
    * to change. The Context exists only when the debugger is active, i.e. at
    * least one DebugEventListener or MessageHandler is set.
    */
-  static Local<Context> GetDebugContext();
+  static Local<Context> GetDebugContext(Isolate* isolate);
+  V8_DEPRECATED("Use version with an Isolate",
+                static Local<Context> GetDebugContext());
 
 
   /**
@@ -268,6 +274,14 @@ class V8_EXPORT Debug {
    */
   static MaybeLocal<Array> GetInternalProperties(Isolate* isolate,
                                                  Local<Value> value);
+
+  /**
+   * Defines if the ES2015 tail call elimination feature is enabled or not.
+   * The change of this flag triggers deoptimization of all functions that
+   * contain calls at tail position.
+   */
+  static bool IsTailCallEliminationEnabled(Isolate* isolate);
+  static void SetTailCallEliminationEnabled(Isolate* isolate, bool enabled);
 };
 
 

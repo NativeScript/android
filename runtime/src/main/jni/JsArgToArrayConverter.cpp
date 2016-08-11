@@ -182,7 +182,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 	{
 		auto jsObj = arg->ToObject();
 
-		auto castType = NumericCasts::GetCastType(jsObj);
+		auto castType = NumericCasts::GetCastType(m_isolate, jsObj);
 		Local<Value> castValue;
 		jchar charValue;
 		jbyte byteValue;
@@ -195,6 +195,10 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 
 		auto runtime = Runtime::GetRuntime(m_isolate);
 		auto objectManager = runtime->GetObjectManager();
+
+		// TODO: Pete:
+		MaybeLocal<Value> maybeCastValue;
+		Local<Value> valFromMaybe;
 
 		switch (castType)
 		{
@@ -294,38 +298,42 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 
 			case CastType::None:
 				obj = objectManager->GetJavaObjectByJsObject(jsObj);
-                
-				castValue = jsObj->GetHiddenValue(V8StringConstants::GetNullNodeName());
 
-				if(!castValue.IsEmpty()) {
-					auto node = reinterpret_cast<MetadataNode*>(castValue.As<External>()->Value());
+				maybeCastValue = jsObj->GetPrivate(m_isolate->GetCurrentContext(), Private::New(m_isolate, V8StringConstants::GetNullNodeName()));
 
-					if(node == nullptr) {
-						s << "Cannot get type of the null argument at index " << index;
-						success = false;
-						break;
+				if(!maybeCastValue.IsEmpty()) {
+					maybeCastValue.FromMaybe(valFromMaybe);
+
+					if(!valFromMaybe.IsEmpty()) {
+						auto node = reinterpret_cast<MetadataNode*>(valFromMaybe.As<External>()->Value());
+
+						if(node == nullptr) {
+							s << "Cannot get type of the null argument at index " << index;
+							success = false;
+							break;
+						}
+
+						auto type = node->GetName();
+						auto nullObjName = "com/tns/NullObject";
+						auto nullObjCtorSig = "(Ljava/lang/Class;)V";
+
+						jclass nullClazz = env.FindClass(nullObjName);
+						jmethodID ctor = env.GetMethodID(nullClazz, "<init>", nullObjCtorSig);
+						jclass clazzToNull = env.FindClass(type.c_str());
+						jobject nullObjType = env.NewObject(nullClazz, ctor, clazzToNull);
+
+						if(nullObjType != nullptr)
+						{
+							SetConvertedObject(env, index, nullObjType, false);
+						}
+						else
+						{
+							SetConvertedObject(env, index, nullptr);
+						}
+
+						success = true;
+						return success;
 					}
-
-					auto type = node->GetName();
-					auto nullObjName = "com/tns/NullObject";
-					auto nullObjCtorSig = "(Ljava/lang/Class;)V";
-
-					jclass nullClazz = env.FindClass(nullObjName);
-					jmethodID ctor = env.GetMethodID(nullClazz, "<init>", nullObjCtorSig);
-					jclass clazzToNull = env.FindClass(type.c_str());
-					jobject nullObjType = env.NewObject(nullClazz, ctor, clazzToNull);
-
-					if(nullObjType != nullptr)
-					{
-						SetConvertedObject(env, index, nullObjType, false);
-					}
-					else
-					{
-						SetConvertedObject(env, index, nullptr);
-					}
-
-					success = true;
-					return success;
 				}
 
 				success = !obj.IsNull();

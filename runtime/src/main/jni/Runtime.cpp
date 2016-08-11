@@ -262,7 +262,7 @@ void Runtime::CreateJSInstanceNative(JNIEnv *_env, jobject obj, jobject javaObje
 		throw NativeScriptException(string("Failed to create JavaScript extend wrapper for class '" + proxyClassName + "'"));
 	}
 
-	implementationObject = MetadataNode::GetImplementationObject(jsInstance);
+	implementationObject = MetadataNode::GetImplementationObject(isolate, jsInstance);
 	if (implementationObject.IsEmpty())
 	{
 		string msg("createJSInstanceNative: implementationObject is empty");
@@ -386,7 +386,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 		else
 		{
 			// This should be executed before V8::Initialize, which calls it with false.
-			NativeScriptExtension::Probe(true);
+			NativeScriptExtension::CpuFeaturesProbe(true);
 			InitializeV8();
 			didInitializeV8 = true;
 
