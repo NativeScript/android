@@ -18,7 +18,7 @@ namespace tns
 	class ObjectManager
 	{
 		public:
-			ObjectManager(v8::Isolate *isolate, jobject javaRuntimeObject);
+			ObjectManager(jobject javaRuntimeObject);
 
 			void Init(v8::Isolate *isolate);
 
@@ -57,6 +57,8 @@ namespace tns
 				CallSuper,
 				END
 			};
+
+			void SetInstanceIsolate(v8::Isolate *isolate);
 
 		private:
 

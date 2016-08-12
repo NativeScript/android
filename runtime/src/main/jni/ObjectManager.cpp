@@ -17,8 +17,8 @@ using namespace std;
 using namespace tns;
 
 
-ObjectManager::ObjectManager(Isolate *isolate, jobject javaRuntimeObject)
-	:m_isolate(isolate), m_javaRuntimeObject(javaRuntimeObject), m_env(JEnv()), m_numberOfGC(0), m_currentObjectId(0), m_cache(NewWeakGlobalRefCallback, DeleteWeakGlobalRefCallback, 1000, this)
+ObjectManager::ObjectManager(jobject javaRuntimeObject)
+	:m_isolate(nullptr), m_javaRuntimeObject(javaRuntimeObject), m_env(JEnv()), m_numberOfGC(0), m_currentObjectId(0), m_cache(NewWeakGlobalRefCallback, DeleteWeakGlobalRefCallback, 1000, this)
 {
 	auto runtimeClass = m_env.FindClass("com/tns/Runtime");
 	assert(runtimeClass != nullptr);

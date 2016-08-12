@@ -53,7 +53,7 @@ Runtime::Runtime(JNIEnv *env, jobject runtime, int id)
 	: m_env(env), m_id(id), m_isolate(nullptr)
 {
 	m_runtime = m_env.NewGlobalRef(runtime);
-	m_objectManager = new ObjectManager(m_isolate, m_runtime);
+	m_objectManager = new ObjectManager(m_runtime);
 	s_id2RuntimeCache.insert(make_pair(id, this));
 }
 
