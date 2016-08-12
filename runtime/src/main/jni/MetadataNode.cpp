@@ -533,7 +533,7 @@ void MetadataNode::SetInstanceMembersFromStaticMetadata(Isolate *isolate, Local<
 			auto funcTemplate = FunctionTemplate::New(isolate, MethodCallback, funcData);
 			auto func = funcTemplate->GetFunction();
 			auto funcName = ArgConverter::ConvertToV8String(isolate, entry.name);
-			prototypeTemplate->Set(funcName, Wrap(isolate, func, entry.name, origin, false /* isCtorFunc */));
+			prototypeTemplate->Set(funcName, funcTemplate); //Wrap(isolate, func, entry.name, origin, false /* isCtorFunc */));
 			lastMethodName = entry.name;
 		}
 
