@@ -7,6 +7,7 @@
 #include "NativeScriptException.h"
 #include "Runtime.h"
 #include "MetadataNode.h"
+#include "V8GlobalHelpers.h"
 
 using namespace v8;
 using namespace std;
@@ -155,7 +156,8 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 	{
 		auto jsObj = arg->ToObject();
 
-		auto castType = NumericCasts::GetCastType(jsObj);
+		auto castType = NumericCasts::GetCastType(m_isolate, jsObj);
+
 		Local<Value> castValue;
 		jchar charValue;
 		jbyte byteValue;
@@ -268,7 +270,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 			case CastType::None:
 				obj = objectManager->GetJavaObjectByJsObject(jsObj);
 
-				castValue = jsObj->GetHiddenValue(V8StringConstants::GetNullNodeName(m_isolate));
+				V8GetPrivateValue(m_isolate, jsObj, V8StringConstants::GetNullNodeName(m_isolate), castValue);
 
 				if(!castValue.IsEmpty()) {
 					auto node = reinterpret_cast<MetadataNode*>(castValue.As<External>()->Value());

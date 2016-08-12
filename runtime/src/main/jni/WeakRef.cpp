@@ -2,6 +2,7 @@
 #include "ArgConverter.h"
 #include "V8StringConstants.h"
 #include "NativeScriptException.h"
+#include "V8GlobalHelpers.h"
 #include <sstream>
 
 using namespace v8;
@@ -64,12 +65,12 @@ void WeakRef::ConstructorCallbackImpl(const FunctionCallbackInfo<Value>& args)
 				auto poHolder = new Persistent<Object>(isolate, weakRef);
 				auto callbackState = new CallbackState(poTarget, poHolder);
 
-				poTarget->SetWeak(callbackState, WeakTargetCallback);
-				poHolder->SetWeak(callbackState, WeakHolderCallback);
+				poTarget->SetWeak(callbackState, WeakTargetCallback, WeakCallbackType::kParameter);
+				poHolder->SetWeak(callbackState, WeakHolderCallback, WeakCallbackType::kParameter);
 
 				weakRef->Set(ArgConverter::ConvertToV8String(isolate, "get"), GetGetterFunction(isolate));
 				weakRef->Set(ArgConverter::ConvertToV8String(isolate, "clear"), GetClearFunction(isolate));
-				weakRef->SetHiddenValue(V8StringConstants::GetTarget(isolate), External::New(isolate, poTarget));
+				V8SetPrivateValue(isolate, weakRef, V8StringConstants::GetTarget(isolate), External::New(isolate, poTarget));
 
 				args.GetReturnValue().Set(weakRef);
 			}
@@ -89,7 +90,7 @@ void WeakRef::ConstructorCallbackImpl(const FunctionCallbackInfo<Value>& args)
 	}
 }
 
-void WeakRef::WeakTargetCallback(const WeakCallbackData<Object, CallbackState>& data)
+void WeakRef::WeakTargetCallback(const WeakCallbackInfo<CallbackState>& data)
 {
 	auto callbackState = data.GetParameter();
 	auto poTarget = callbackState->target;
@@ -102,7 +103,7 @@ void WeakRef::WeakTargetCallback(const WeakCallbackData<Object, CallbackState>& 
 	if (poHolder != nullptr)
 	{
 		auto holder = Local<Object>::New(isolate, *poHolder);
-		holder->SetHiddenValue(V8StringConstants::GetTarget(isolate), External::New(isolate, nullptr));
+		V8SetPrivateValue(isolate, holder, V8StringConstants::GetTarget(isolate), External::New(isolate, nullptr));
 	}
 
 	if (callbackState->holder == nullptr)
@@ -111,7 +112,7 @@ void WeakRef::WeakTargetCallback(const WeakCallbackData<Object, CallbackState>& 
 	}
 }
 
-void WeakRef::WeakHolderCallback(const WeakCallbackData<Object, CallbackState>& data)
+void WeakRef::WeakHolderCallback(const WeakCallbackInfo<CallbackState>& data)
 {
 	try
 	{
@@ -120,11 +121,13 @@ void WeakRef::WeakHolderCallback(const WeakCallbackData<Object, CallbackState>& 
 		auto isolate = data.GetIsolate();
 		auto holder = Local<Object>::New(isolate, *poHolder);
 
-		auto poTarget = reinterpret_cast<Persistent<Object>*>(holder->GetHiddenValue(V8StringConstants::GetTarget(isolate)).As<External>()->Value());
+		Local<Value> hiddenVal;
+		V8GetPrivateValue(isolate, holder, V8StringConstants::GetTarget(isolate), hiddenVal);
+		auto poTarget = reinterpret_cast<Persistent<Object>*>(hiddenVal.As<External>()->Value());
 
 		if (poTarget != nullptr)
 		{
-			poHolder->SetWeak(callbackState, WeakHolderCallback);
+			poHolder->SetWeak(callbackState, WeakHolderCallback, WeakCallbackType::kParameter);
 		}
 		else
 		{
@@ -160,7 +163,7 @@ void WeakRef::ClearCallback(const FunctionCallbackInfo<Value>& args)
 		auto holder = args.This();
 		auto isolate = args.GetIsolate();
 
-		holder->SetHiddenValue(V8StringConstants::GetTarget(isolate), External::New(isolate, nullptr));
+		V8SetPrivateValue(isolate, holder, V8StringConstants::GetTarget(isolate), External::New(isolate, nullptr));
 	}
 	catch (NativeScriptException& e)
 	{
@@ -183,8 +186,10 @@ void WeakRef::GettertCallback(const FunctionCallbackInfo<Value>& args)
 	try
 	{
 		auto holder = args.This();
+		Local<Value> hiddenVal;
 		auto isolate = args.GetIsolate();
-		auto poTarget = reinterpret_cast<Persistent<Object>*>(holder->GetHiddenValue(V8StringConstants::GetTarget(isolate)).As<External>()->Value());
+		V8GetPrivateValue(isolate, holder, V8StringConstants::GetTarget(isolate), hiddenVal);
+		auto poTarget = reinterpret_cast<Persistent<Object>*>(hiddenVal.As<External>()->Value());
 
 		if (poTarget != nullptr)
 		{

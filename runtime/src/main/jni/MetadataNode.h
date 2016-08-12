@@ -51,7 +51,7 @@ namespace tns
 
 			static v8::Local<v8::Object> CreateExtendedJSWrapper(v8::Isolate *isolate, ObjectManager *objectManager, const std::string& proxyClassName);
 
-			static v8::Local<v8::Object> GetImplementationObject(const v8::Local<v8::Object>& object);
+			static v8::Local<v8::Object> GetImplementationObject(v8::Isolate *isolate, const v8::Local<v8::Object>& object);
 
 			static void CreateTopLevelNamespaces(v8::Isolate *isolate, const v8::Local<v8::Object>& global);
 

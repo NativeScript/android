@@ -295,10 +295,12 @@ void MetadataNode::NullObjectAccessorGetterCallback(Local<String> property,const
 		auto isolate = info.GetIsolate();
 
 		auto thiz = info.This();
-		if((thiz->GetHiddenValue(V8StringConstants::GetNullNodeName(isolate))).IsEmpty())
+        Local<Value> hiddenVal;
+        V8GetPrivateValue(isolate, thiz, V8StringConstants::GetNullNodeName(isolate), hiddenVal);
+		if(hiddenVal.IsEmpty())
 		{
 			auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value());
-			thiz->SetHiddenValue(V8StringConstants::GetNullNodeName(isolate), External::New(isolate, node));
+            V8SetPrivateValue(isolate, thiz, V8StringConstants::GetNullNodeName(isolate), External::New(isolate, node));
 			auto funcTemplate = FunctionTemplate::New(isolate, MetadataNode::NullValueOfCallback);
 			thiz->Delete(V8StringConstants::GetValueOf(isolate));
 			thiz->Set(V8StringConstants::GetValueOf(isolate), funcTemplate->GetFunction());
@@ -427,7 +429,10 @@ void MetadataNode::SuperAccessorGetterCallback(Local<String> property, const Pro
 		auto thiz = info.This();
 		auto isolate = info.GetIsolate();
 		auto key = ArgConverter::ConvertToV8String(isolate, "supervalue");
-		auto superValue = thiz->GetHiddenValue(key).As<Object>();
+        Local<Value> hidenVal;
+        V8GetPrivateValue(isolate, thiz, key, hidenVal);
+		auto superValue = hidenVal.As<Object>();
+
 		if (superValue.IsEmpty())
 		{
 			auto runtime = Runtime::GetRuntime(isolate);
@@ -439,7 +444,7 @@ void MetadataNode::SuperAccessorGetterCallback(Local<String> property, const Pro
 			superValue->SetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::CallSuper), True(isolate));
 
 			superValue->SetPrototype(thiz->GetPrototype().As<Object>()->GetPrototype().As<Object>()->GetPrototype());
-			thiz->SetHiddenValue(key, superValue);
+            V8SetPrivateValue(isolate, thiz, key, superValue);
 			objectManager->CloneLink(thiz, superValue);
 
 			DEBUG_WRITE("superValue.GetPrototype=%d", superValue->GetPrototype().As<Object>()->GetIdentityHash());
@@ -810,13 +815,16 @@ Local<Function> MetadataNode::GetConstructorFunction(Isolate *isolate)
 
 MetadataNode::TypeMetadata* MetadataNode::GetTypeMetadata(Isolate *isolate, const Local<Function>& value)
 {
-	auto data = reinterpret_cast<TypeMetadata*>(V8GetHiddenValue(value, "typemetadata").As<External>()->Value());
+    Local<Value> hiddenVal;
+    V8GetPrivateValue(isolate, value, String::NewFromUtf8(isolate, "typemetadata"), hiddenVal);
+
+	auto data = reinterpret_cast<TypeMetadata*>(hiddenVal.As<External>()->Value());
 	return data;
 }
 
 void MetadataNode::SetTypeMetadata(Isolate *isolate, Local<Function> value, TypeMetadata *data)
 {
-	V8SetHiddenValue(value, "typemetadata", External::New(isolate, data));
+    V8SetPrivateValue(isolate, value, String::NewFromUtf8(isolate, "typemetadata"),  External::New(isolate, data));
 }
 
 MetadataNode* MetadataNode::GetInstanceMetadata(Isolate *isolate, const Local<Object>& value)
@@ -824,7 +832,9 @@ MetadataNode* MetadataNode::GetInstanceMetadata(Isolate *isolate, const Local<Ob
 	MetadataNode *node = nullptr;
 	auto cache = GetMetadataNodeCache(isolate);
 	auto key = Local<String>::New(isolate, *cache->MetadataKey);
-	auto ext = value->GetHiddenValue(key);
+    Local<Value> hiddenVal;
+    V8GetPrivateValue(isolate, value, key, hiddenVal);
+	auto ext = hiddenVal;
 	if (!ext.IsEmpty())
 	{
 		node = reinterpret_cast<MetadataNode*>(ext.As<External>()->Value());
@@ -836,7 +846,7 @@ void MetadataNode::SetInstanceMetadata(Isolate *isolate, Local<Object> value, Me
 {
 	auto cache = GetMetadataNodeCache(isolate);
 	auto key = Local<String>::New(isolate, *cache->MetadataKey);
-	value->SetHiddenValue(key, External::New(isolate, node));
+    V8SetPrivateValue(isolate, value, key, External::New(isolate, node));
 }
 
 void MetadataNode::ExtendedClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info)
@@ -857,7 +867,7 @@ void MetadataNode::ExtendedClassConstructorCallback(const v8::FunctionCallbackIn
 
 		SetInstanceMetadata(isolate, thiz, extData->node);
 		thiz->SetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::CallSuper), True(isolate));
-		thiz->SetHiddenValue(V8StringConstants::GetImplementationObject(isolate), implementationObject);
+        V8SetPrivateValue(isolate, thiz, V8StringConstants::GetImplementationObject(isolate), implementationObject);
 
 		ArgsWrapper argWrapper(info, ArgType::Class);
 
@@ -929,7 +939,7 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
 
 		implementationObject->SetPrototype(thiz->GetPrototype());
 		thiz->SetPrototype(implementationObject);
-		thiz->SetHiddenValue(V8StringConstants::GetImplementationObject(isolate), implementationObject);
+        V8SetPrivateValue(isolate, thiz, V8StringConstants::GetImplementationObject(isolate), implementationObject);
 
 		ArgsWrapper argWrapper(info, ArgType::Interface);
 
@@ -1124,17 +1134,19 @@ void MetadataNode::ArrayIndexedPropertySetterCallback(uint32_t index, Local<Valu
 	}
 }
 
-Local<Object> MetadataNode::GetImplementationObject(const Local<Object>& object)
+Local<Object> MetadataNode::GetImplementationObject(Isolate* isolate, const Local<Object>& object)
 {
 	DEBUG_WRITE("GetImplementationObject called  on object:%d", object->GetIdentityHash());
 
 	auto target = object;
-	auto isolate = object->GetIsolate();
 	Local<Value> currentPrototype = target;
 
 	Local<Object> implementationObject;
 
-	implementationObject = object->GetHiddenValue(V8StringConstants::GetImplementationObject(isolate)).As<Object>();
+    Local<Value> hiddenVal;
+    V8GetPrivateValue(isolate, object, V8StringConstants::GetImplementationObject(isolate), hiddenVal);
+	implementationObject = hiddenVal.As<Object>();
+
 	if (!implementationObject.IsEmpty())
 	{
 		return implementationObject;
@@ -1152,7 +1164,9 @@ Local<Object> MetadataNode::GetImplementationObject(const Local<Object>& object)
 		return object->Get(v8Prototype).As<Object>();
 	}
 
-	auto obj = V8GetHiddenValue(object, "t::ActivityImplementationObject").As<Object>();
+    Local<Value> hiddenValue;
+    V8GetPrivateValue(isolate, object,  String::NewFromUtf8(isolate, "t::ActivityImplementationObject"), hiddenValue);
+	auto obj = hiddenValue.As<Object>();
 	if (!obj.IsEmpty())
 	{
 		DEBUG_WRITE("GetImplementationObject returning ActivityImplementationObject property on object: %d", object->GetIdentityHash());
@@ -1186,7 +1200,9 @@ Local<Object> MetadataNode::GetImplementationObject(const Local<Object>& object)
 		}
 		else
 		{
-			auto value = currentPrototype.As<Object>()->GetHiddenValue(V8StringConstants::GetClassImplementationObject(isolate));
+			Local<Value> hiddenVal;
+            V8GetPrivateValue(isolate, currentPrototype.As<Object>(), V8StringConstants::GetClassImplementationObject(isolate), hiddenVal);
+			auto value = hiddenVal;
 
 			if (!value.IsEmpty())
 			{
@@ -1219,7 +1235,9 @@ void MetadataNode::PackageGetterCallback(Local<Name> property, const PropertyCal
 
 		auto thiz = info.This();
 
-		auto cachedItem = thiz->GetHiddenValue(strProperty);
+        Local<Value> hiddenVal;
+        V8GetPrivateValue(isolate, thiz, strProperty, hiddenVal);
+		auto cachedItem = hiddenVal;
 
 		if (cachedItem.IsEmpty())
 		{
@@ -1236,7 +1254,7 @@ void MetadataNode::PackageGetterCallback(Local<Name> property, const PropertyCal
 			{
 				auto childNode = MetadataNode::GetOrCreateInternal(child.treeNode);
 				cachedItem = childNode->CreateWrapper(isolate);
-				thiz->SetHiddenValue(strProperty, cachedItem);
+                V8SetPrivateValue(isolate, thiz, strProperty, cachedItem);
 			}
 		}
 
@@ -1440,11 +1458,13 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
 
 		auto implementationObjectPropertyName = V8StringConstants::GetClassImplementationObject(isolate);
 		//reuse validation - checks that implementationObject is not reused for different classes
-		auto implementationObjectProperty = implementationObject->GetHiddenValue(implementationObjectPropertyName).As<String>();
+        Local<Value> hiddenVal;
+        V8GetPrivateValue(isolate, implementationObject, implementationObjectPropertyName, hiddenVal);
+		auto implementationObjectProperty = hiddenVal.As<String>();
 		if (implementationObjectProperty.IsEmpty())
 		{
 			//mark the implementationObject as such and set a pointer to it's class node inside it for reuse validation later
-			implementationObject->SetHiddenValue(implementationObjectPropertyName, String::NewFromUtf8(isolate, fullExtendedName.c_str()));
+            V8SetPrivateValue(isolate, implementationObject, implementationObjectPropertyName, String::NewFromUtf8(isolate, fullExtendedName.c_str()));
 		}
 		else
 		{

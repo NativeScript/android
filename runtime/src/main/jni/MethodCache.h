@@ -47,7 +47,7 @@ namespace tns
 
 			static std::string EncodeSignature(const std::string& className, const std::string& methodName, const v8::FunctionCallbackInfo<v8::Value>& args, bool isStatic);
 
-			static std::string GetType(const v8::Local<v8::Value>& value);
+			static std::string GetType(v8::Isolate *isolate, const v8::Local<v8::Value>& value);
 
 			static std::string ResolveJavaMethod(const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& className, const std::string& methodName);
 
