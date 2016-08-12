@@ -425,15 +425,30 @@ public class AndroidJsDebugger implements Debugger
 			}
 			catch (IOException e)
 			{
-				Log.e("TNS", "Debug break temp file can not be marked as used. Debug sessions may not work correctly. file: " + debugBreakFile.getAbsolutePath());
 				e.printStackTrace();
 			}
-			
 			return true;
 		}
-		
 		return false;
 	}
+
+    private void setDebuggerStartedFlag()
+    {
+        File debugBreakFile = new File("/data/local/tmp", context.getPackageName() + "-debugger-started");
+        if (debugBreakFile.exists() && !debugBreakFile.isDirectory() && debugBreakFile.length() == 0)
+        {
+            try
+            {
+                java.io.FileWriter fileWriter = new java.io.FileWriter(debugBreakFile);
+                fileWriter.write("started");
+                fileWriter.close();
+            }
+            catch (IOException e)
+            {
+                e.printStackTrace();
+            }
+        }
+    }
 
 	public void start()
 	{
@@ -450,6 +465,8 @@ public class AndroidJsDebugger implements Debugger
 		{
 			AndroidJsDebugger.this.debugContext.debugBreak();
 		}
+
+        setDebuggerStartedFlag();
 	}
 
 	
