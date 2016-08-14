@@ -4,7 +4,6 @@
 #include "v8.h"
 #include <set>
 #include "ObjectManager.h"
-#include "include/v8.h"
 
 namespace tns
 {

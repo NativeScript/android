@@ -241,7 +241,7 @@ void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID, jcl
 	auto state = new ObjectWeakCallbackState(this, jsInstanceInfo, objectHandle);
 
 	// subscribe for JS GC event
-	objectHandle->SetWeak(state, JSObjectWeakCallbackStatic, WeakCallbackType::kParameter);
+	objectHandle->SetWeak(state, JSObjectWeakCallbackStatic, WeakCallbackType::kFinalizer);
 
 	auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
 
@@ -348,7 +348,7 @@ void ObjectManager::JSObjectWeakCallback(Isolate *isolate, ObjectWeakCallbackSta
 		}
 	}
 
-	po->SetWeak(callbackState, JSObjectWeakCallbackStatic, WeakCallbackType::kParameter);
+	po->SetWeak(callbackState, JSObjectWeakCallbackStatic, WeakCallbackType::kFinalizer);
 }
 
 int ObjectManager::GenerateNewObjectID()

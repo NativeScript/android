@@ -65,8 +65,8 @@ void WeakRef::ConstructorCallbackImpl(const FunctionCallbackInfo<Value>& args)
 				auto poHolder = new Persistent<Object>(isolate, weakRef);
 				auto callbackState = new CallbackState(poTarget, poHolder);
 
-				poTarget->SetWeak(callbackState, WeakTargetCallback, WeakCallbackType::kParameter);
-				poHolder->SetWeak(callbackState, WeakHolderCallback, WeakCallbackType::kParameter);
+				poTarget->SetWeak(callbackState, WeakTargetCallback, WeakCallbackType::kFinalizer);
+				poHolder->SetWeak(callbackState, WeakHolderCallback, WeakCallbackType::kFinalizer);
 
 				weakRef->Set(ArgConverter::ConvertToV8String(isolate, "get"), GetGetterFunction(isolate));
 				weakRef->Set(ArgConverter::ConvertToV8String(isolate, "clear"), GetClearFunction(isolate));
@@ -127,7 +127,7 @@ void WeakRef::WeakHolderCallback(const WeakCallbackInfo<CallbackState>& data)
 
 		if (poTarget != nullptr)
 		{
-			poHolder->SetWeak(callbackState, WeakHolderCallback, WeakCallbackType::kParameter);
+			poHolder->SetWeak(callbackState, WeakHolderCallback, WeakCallbackType::kFinalizer);
 		}
 		else
 		{
