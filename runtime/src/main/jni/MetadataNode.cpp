@@ -611,9 +611,8 @@ void MetadataNode::SetInstanceMembersFromRuntimeMetadata(Isolate *isolate, Local
 
 				auto funcData = External::New(isolate, callbackData);
 				auto funcTemplate = FunctionTemplate::New(isolate, MethodCallback, funcData);
-				auto func = funcTemplate->GetFunction();
 				auto funcName = ArgConverter::ConvertToV8String(isolate, entry.name);
-				prototypeTemplate->Set(funcName, func);
+				prototypeTemplate->Set(funcName, funcTemplate);
 				lastMethodName = entry.name;
 			}
 			callbackData->candidates.push_back(entry);
