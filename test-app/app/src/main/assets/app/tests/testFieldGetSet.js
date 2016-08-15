@@ -24,4 +24,16 @@ describe("Tests final fields set", function () {
 		
 		expect(s).toBe(null);
 	});
+
+    it("When setting a field with undefined it should return null object", function () {
+
+        var dc = new com.tns.tests.DummyClass();
+
+        dc.nameField = undefined;
+        var s = dc.nameField;
+        var isNull = dc.isNameFieldNull();
+
+        expect(s).toBe(null);
+        expect(isNull).toBe(true);
+    });
 });

@@ -115,6 +115,10 @@ public class DummyClass
 		return nameField;
 	}
 
+	public boolean isNameFieldNull() {
+		return this.nameField == null;
+	}
+
 	public void setName(String value)
 	{
 		nameField = value;

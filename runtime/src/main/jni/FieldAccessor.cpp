@@ -424,7 +424,7 @@ void FieldAccessor::SetJavaField(Isolate *isolate, const Local<Object>& target, 
 		bool isString = fieldTypeName == "java/lang/String";
 		JniLocalRef result;
 
-		if (!value->IsNull())
+		if (!value->IsNull() && !value->IsUndefined())
 		{
 			if (isString)
 			{
