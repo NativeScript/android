@@ -30,7 +30,8 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
 	public void uncaughtException(Thread thread, Throwable ex)
 	{
 		String errorMessage = ErrorReport.getErrorMessage(ex);
-		
+		String logcatMessage = ErrorReport.getLogcat();
+
 		if (Runtime.isInitialized())
 		{
 			try
@@ -57,7 +58,7 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
 			logger.write("Uncaught Exception Message=" + errorMessage);
 		}
 
-		if (!ErrorReport.startActivity(context, errorMessage) && defaultHandler != null)
+		if (!ErrorReport.startActivity(context, errorMessage, logcatMessage) && defaultHandler != null)
 		{
 			defaultHandler.uncaughtException(thread, ex);
 		}

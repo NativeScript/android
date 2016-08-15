@@ -19,4 +19,9 @@
     
 	<style name="NativeScriptToolbarStyle" parent="NativeScriptToolbarStyleBase">
     </style>
+
+    <style name="NoActionBar" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
 </resources> 
