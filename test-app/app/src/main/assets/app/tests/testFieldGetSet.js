@@ -31,7 +31,9 @@ describe("Tests final fields set", function () {
 
         dc.nameField = undefined;
         var s = dc.nameField;
+        var isNull = dc.isNameFieldNull();
 
         expect(s).toBe(null);
+        expect(isNull).toBe(true);
     });
 });
