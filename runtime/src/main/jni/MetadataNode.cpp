@@ -533,13 +533,20 @@ void MetadataNode::SetInstanceMembersFromStaticMetadata(Isolate *isolate, Local<
 
 			auto funcData = External::New(isolate, callbackData);
 			auto funcTemplate = FunctionTemplate::New(isolate, MethodCallback, funcData);
-			auto func = funcTemplate->GetFunction();
-			auto funcName = ArgConverter::ConvertToV8String(isolate, entry.name);
+            auto funcName = ArgConverter::ConvertToV8String(isolate, entry.name);
 
-            Local<Function> wrappedFunc =  Wrap(isolate, func, entry.name, origin, false /* isCtorFunc */);
+            if (s_profilerEnabled)
+            {
+                auto func = funcTemplate->GetFunction();
+                Local<Function> wrappedFunc =  Wrap(isolate, func, entry.name, origin, false /* isCtorFunc */);
+                prototypeTemplate->SetAccessor(funcName, WrappedFunctionGetterCallback, 0, wrappedFunc);
+            }
+            else
+            {
+				prototypeTemplate->Set(funcName, funcTemplate);
+            }
+
             //prototypeTemplate->Set(funcName, Wrap(isolate, func, entry.name, origin, false /* isCtorFunc */));
-
-            prototypeTemplate->SetAccessor(funcName, WrappedFunctionGetterCallback, 0, wrappedFunc);
 
 			lastMethodName = entry.name;
 		}
@@ -1825,17 +1832,10 @@ Local<Function> MetadataNode::Wrap(Isolate* isolate, const Local<Function>& func
 		if (!result.IsEmpty())
 		{
 			ret = result.As<Function>();
-<<<<<<< d0f2ea1b050ce07b3bb9af9956d8400bc13383ea
-			ret->Set(ArgConverter::ConvertToV8String(isolate, "__func"), f);
+			ret->Set(ArgConverter::ConvertToV8String(isolate, "__func"), function);
 
 			auto prototypePropName = V8StringConstants::GetPrototype(isolate);
-			ret->Set(prototypePropName, f->Get(prototypePropName));
-=======
-			ret->Set(ConvertToV8String("__func"), function);
-
-			auto prototypePropName = ConvertToV8String("prototype");
 			ret->Set(prototypePropName, function->Get(prototypePropName));
->>>>>>> return the wrapped function when property func name is get accessed
 		}
 		else
 		{
