@@ -129,7 +129,8 @@ namespace tns
 			static bool GetExtendLocation(std::string& extendLocation);
 			static ExtendedClassCacheData GetCachedExtendedClassData(v8::Isolate *isolate, const std::string& proxyClassName);
 
-			v8::Local<v8::Function> Wrap(v8::Isolate* isolate, const v8::Local<v8::Function>& f, const std::string& name, const std::string& origin, bool isCtorFunc);
+			v8::Local<v8::Function> Wrap(v8::Isolate* isolate, const v8::Local<v8::Function>&function, const std::string& name, const std::string& origin, bool isCtorFunc);
+			static void WrappedFunctionGetterCallback(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
 
 			MetadataTreeNode *m_treeNode;
 			v8::Persistent<v8::Function> *m_poCtorFunc;
