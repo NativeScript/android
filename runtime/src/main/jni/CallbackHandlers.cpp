@@ -27,7 +27,7 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
-void CallbackHandlers::Init(Isolate *isolate, ObjectManager *objectManager) {
+void CallbackHandlers::Init(Isolate *isolate) {
     JEnv env;
 
     JAVA_LANG_STRING = env.FindClass("java/lang/String");

@@ -472,7 +472,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 
 	ArgConverter::Init(isolate);
 
-	CallbackHandlers::Init(isolate, m_objectManager);
+	CallbackHandlers::Init(isolate);
 
 	auto pckName = ArgConverter::jstringToString(packageName);
 	auto outputDir = ArgConverter::jstringToString(profilerOutputDir);
