@@ -1,5 +1,6 @@
 #include "FieldAccessor.h"
 #include "ArgConverter.h"
+#include "Util.h"
 #include "V8GlobalHelpers.h"
 #include "NativeScriptException.h"
 #include "Runtime.h"
