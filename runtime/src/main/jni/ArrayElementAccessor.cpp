@@ -1,12 +1,9 @@
 #include "ArrayElementAccessor.h"
 #include "JsArgToArrayConverter.h"
 #include "ArgConverter.h"
-#include "JniLocalRef.h"
 #include "Util.h"
 #include "V8GlobalHelpers.h"
-#include "NativeScriptAssert.h"
 #include "NativeScriptException.h"
-#include "JType.h"
 #include "Runtime.h"
 
 using namespace v8;

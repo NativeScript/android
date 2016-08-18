@@ -1,10 +1,7 @@
 #include "ArrayHelper.h"
 #include "V8GlobalHelpers.h"
-#include "JEnv.h"
-#include "JniLocalRef.h"
 #include "NativeScriptException.h"
 #include "Runtime.h"
-#include <assert.h>
 #include <sstream>
 
 using namespace v8;

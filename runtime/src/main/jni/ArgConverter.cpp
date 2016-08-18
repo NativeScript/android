@@ -1,15 +1,11 @@
 #include "ArgConverter.h"
 #include "ObjectManager.h"
-#include "JniLocalRef.h"
 #include "Util.h"
 #include "V8GlobalHelpers.h"
 #include "V8StringConstants.h"
-#include "NativeScriptAssert.h"
 #include "NativeScriptException.h"
 #include "NumericCasts.h"
-#include "JType.h"
 #include "Runtime.h"
-#include <assert.h>
 #include <sstream>
 #include <cstdlib>
 

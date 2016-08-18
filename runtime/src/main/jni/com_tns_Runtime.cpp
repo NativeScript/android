@@ -1,7 +1,6 @@
 #include "V8StringConstants.h"
 #include "Runtime.h"
 #include "NativeScriptException.h"
-#include "NativeScriptAssert.h"
 #include <sstream>
 
 using namespace std;

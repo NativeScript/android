@@ -1,6 +1,5 @@
 #include "CallbackHandlers.h"
 #include "MetadataNode.h"
-#include "JniLocalRef.h"
 #include "JsArgConverter.h"
 #include "JsArgToArrayConverter.h"
 #include "ArgConverter.h"
@@ -8,24 +7,19 @@
 #include "V8GlobalHelpers.h"
 #include "V8StringConstants.h"
 #include "Constants.h"
-#include "v8.h"
 #include "libplatform/libplatform.h"
 #include "Version.h"
-#include "JEnv.h"
 #include "WeakRef.h"
 #include "NativeScriptAssert.h"
 #include "JsDebugger.h"
 #include "SimpleProfiler.h"
 #include "SimpleAllocator.h"
-#include "JType.h"
 #include "Module.h"
 #include "NativeScriptException.h"
 #include "V8NativeScriptExtension.h"
 #include "Runtime.h"
 #include "ArrayHelper.h"
 #include <sstream>
-#include <android/log.h>
-#include <string>
 
 using namespace v8;
 using namespace std;

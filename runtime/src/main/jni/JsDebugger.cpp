@@ -3,7 +3,6 @@
 #include "JniLocalRef.h"
 #include "NativeScriptException.h"
 #include "NativeScriptAssert.h"
-#include <assert.h>
 #include <sstream>
 
 using namespace std;

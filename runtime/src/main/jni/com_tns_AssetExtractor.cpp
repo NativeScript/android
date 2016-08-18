@@ -1,7 +1,6 @@
 #include "jni.h"
 #include "AssetExtractor.h"
 #include "NativeScriptException.h"
-#include "NativeScriptAssert.h"
 
 #include <sstream>
 

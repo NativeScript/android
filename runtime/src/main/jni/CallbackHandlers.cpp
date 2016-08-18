@@ -4,17 +4,14 @@
 #include "Util.h"
 #include "V8GlobalHelpers.h"
 #include "V8StringConstants.h"
-#include "JniLocalRef.h"
 #include "JsArgConverter.h"
 #include "JsArgToArrayConverter.h"
 #include "ArgConverter.h"
 #include "v8-profiler.h"
 #include "NativeScriptException.h"
-#include <assert.h>
 #include <iostream>
 #include <sstream>
 #include <fstream>
-#include <sys/time.h>
 #include <cstdio>
 #include "JavaObjectArrayCache.h"
 #include "MethodCache.h"

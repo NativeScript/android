@@ -1,12 +1,8 @@
 #include "JsArgConverter.h"
 #include <sstream>
 #include "ObjectManager.h"
-#include "ArgConverter.h"
-#include "JniLocalRef.h"
 #include "JniSignatureParser.h"
 #include "JsArgToArrayConverter.h"
-#include "JType.h"
-#include "Util.h"
 #include "V8GlobalHelpers.h"
 #include "V8StringConstants.h"
 #include "NumericCasts.h"

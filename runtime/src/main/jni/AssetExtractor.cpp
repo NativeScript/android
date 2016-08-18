@@ -1,10 +1,8 @@
 #include "jni.h"
 #include "zip.h"
 #include "ArgConverter.h"
-#include "NativeScriptAssert.h"
 #include <assert.h>
 #include <libgen.h>
-#include <time.h>
 #include <utime.h>
 #include <sys/stat.h>
 #include "AssetExtractor.h"

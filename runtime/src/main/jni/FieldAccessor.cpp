@@ -1,12 +1,9 @@
 #include "FieldAccessor.h"
-#include "JniLocalRef.h"
 #include "ArgConverter.h"
-#include "NativeScriptAssert.h"
 #include "Util.h"
 #include "V8GlobalHelpers.h"
 #include "NativeScriptException.h"
 #include "Runtime.h"
-#include <assert.h>
 #include <sstream>
 
 using namespace v8;

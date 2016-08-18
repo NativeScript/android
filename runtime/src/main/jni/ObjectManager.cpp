@@ -1,5 +1,4 @@
 #include "ObjectManager.h"
-#include "JniLocalRef.h"
 #include "NativeScriptAssert.h"
 #include "MetadataNode.h"
 #include "ArgConverter.h"
@@ -9,7 +8,6 @@
 #include "V8StringConstants.h"
 #include "NativeScriptException.h"
 #include "Runtime.h"
-#include <assert.h>
 #include <algorithm>
 #include <sstream>
 

@@ -1,15 +1,9 @@
 #include "JsArgToArrayConverter.h"
-#include <limits>
 #include <sstream>
 #include "ObjectManager.h"
-#include "NativeScriptAssert.h"
-#include "ArgConverter.h"
-#include "JniLocalRef.h"
-#include "Util.h"
 #include "V8GlobalHelpers.h"
 #include "V8StringConstants.h"
 #include "JavaObjectArrayCache.h"
-#include "JType.h"
 #include "NumericCasts.h"
 #include "NativeScriptException.h"
 #include "Runtime.h"

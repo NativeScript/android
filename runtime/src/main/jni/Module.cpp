@@ -14,10 +14,7 @@
 #include "NativeScriptException.h"
 #include "Util.h"
 #include "SimpleProfiler.h"
-#include "include/v8.h"
-
 #include <sstream>
-#include <assert.h>
 #include <libgen.h>
 #include <dlfcn.h>
 

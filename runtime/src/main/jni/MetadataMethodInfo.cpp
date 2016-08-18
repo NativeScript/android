@@ -1,5 +1,4 @@
 #include "MetadataMethodInfo.h"
-#include "MetadataReader.h"
 
 using namespace tns;
 

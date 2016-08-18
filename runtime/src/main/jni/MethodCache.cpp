@@ -10,7 +10,6 @@
 #include "NativeScriptException.h"
 #include "Runtime.h"
 #include <sstream>
-#include <assert.h>
 
 using namespace v8;
 using namespace std;

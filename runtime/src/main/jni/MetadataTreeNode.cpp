@@ -1,5 +1,4 @@
 #include "MetadataTreeNode.h"
-#include <algorithm>
 
 using namespace std;
 using namespace tns;

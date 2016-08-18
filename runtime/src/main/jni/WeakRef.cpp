@@ -1,7 +1,6 @@
 #include "WeakRef.h"
 #include "V8GlobalHelpers.h"
 #include "V8StringConstants.h"
-#include "NativeScriptAssert.h"
 #include "NativeScriptException.h"
 #include <sstream>
 

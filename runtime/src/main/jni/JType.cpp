@@ -1,5 +1,4 @@
 #include "JType.h"
-#include "NativeScriptAssert.h"
 
 namespace tns
 {

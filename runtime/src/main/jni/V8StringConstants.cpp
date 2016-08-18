@@ -1,5 +1,4 @@
 #include "V8StringConstants.h"
-#include "NativeScriptAssert.h"
 
 using namespace v8;
 using namespace std;

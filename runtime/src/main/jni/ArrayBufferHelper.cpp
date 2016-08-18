@@ -1,5 +1,4 @@
 #include "ArrayBufferHelper.h"
-#include "JEnv.h"
 #include "V8GlobalHelpers.h"
 #include "NativeScriptException.h"
 #include <sstream>

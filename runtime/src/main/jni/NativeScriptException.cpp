@@ -3,7 +3,6 @@
 #include "V8GlobalHelpers.h"
 #include "NativeScriptAssert.h"
 #include "V8StringConstants.h"
-#include "include/v8.h"
 #include <sstream>
 
 using namespace std;

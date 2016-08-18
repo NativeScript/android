@@ -1,10 +1,7 @@
 #include "JEnv.h"
 #include "JsDebugger.h"
-#include "ArgConverter.h"
 #include "NativeScriptException.h"
-#include "NativeScriptAssert.h"
 #include <sstream>
-#include <string>
 
 using namespace tns;
 using namespace std;

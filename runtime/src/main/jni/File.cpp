@@ -9,9 +9,6 @@
 #include <sstream>
 #include <fstream>
 #include <sys/mman.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
 #include <assert.h>
 
 using namespace std;

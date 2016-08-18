@@ -2,8 +2,6 @@
 #include "V8GlobalHelpers.h"
 #include "prof.h"
 #include "NativeScriptException.h"
-#include "NativeScriptAssert.h"
-#include <stack>
 #include <sstream>
 
 using namespace v8;
