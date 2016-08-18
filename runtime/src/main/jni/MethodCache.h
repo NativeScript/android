@@ -46,7 +46,7 @@ namespace tns
 
 			static std::string ResolveJavaMethod(const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& className, const std::string& methodName);
 
-			static std::string ResolveConstructor(const v8::FunctionCallbackInfo<v8::Value>& args, jclass javaClass, bool isInterface, v8::Local<v8::Object> outerThis);
+			static std::string ResolveConstructor(const v8::FunctionCallbackInfo<v8::Value>& args, jclass javaClass, bool isInterface);
 
 			static jclass RUNTIME_CLASS;
 

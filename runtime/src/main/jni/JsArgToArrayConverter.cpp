@@ -23,7 +23,7 @@ using namespace tns;
  * Converts a single JavaScript (V8) object to its respective Java representation
  */
 JsArgToArrayConverter::JsArgToArrayConverter(Isolate *isolate, const v8::Local<Value>& arg, bool isImplementationObject, int classReturnType)
-	: m_isolate(isolate), m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()), m_return_type(classReturnType)
+		: m_isolate(isolate), m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()), m_return_type(classReturnType)
 {
 	if (!isImplementationObject)
 	{
@@ -38,18 +38,10 @@ JsArgToArrayConverter::JsArgToArrayConverter(Isolate *isolate, const v8::Local<V
 /*
  * Converts an array of JavaScript (V8) objects to a Java array of objects
  */
-JsArgToArrayConverter::JsArgToArrayConverter(const v8::FunctionCallbackInfo<Value>& args, bool hasImplementationObject, const Local<Object>& outerThis)
-	: m_isolate(args.GetIsolate()), m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()), m_return_type(static_cast<int>(Type::Null))
+JsArgToArrayConverter::JsArgToArrayConverter(const v8::FunctionCallbackInfo<Value>& args, bool hasImplementationObject)
+		: m_isolate(args.GetIsolate()), m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()), m_return_type(static_cast<int>(Type::Null))
 {
-	auto isInnerClass = !outerThis.IsEmpty();
-	if (isInnerClass)
-	{
-		m_argsLen = args.Length() + 1;
-	}
-	else
-	{
-		m_argsLen = !hasImplementationObject ? args.Length() : args.Length() - 2;
-	}
+	m_argsLen = !hasImplementationObject ? args.Length() : args.Length() - 2;
 
 	bool success = true;
 
@@ -60,21 +52,7 @@ JsArgToArrayConverter::JsArgToArrayConverter(const v8::FunctionCallbackInfo<Valu
 
 		for (int i = 0; i < m_argsLen; i++)
 		{
-			if (isInnerClass)
-			{
-				if (i == 0)
-				{
-					success = ConvertArg(outerThis, i);
-				}
-				else
-				{
-					success = ConvertArg(args[i - 1], i);
-				}
-			}
-			else
-			{
-				success = ConvertArg(args[i], i);
-			}
+			success = ConvertArg(args[i], i);
 
 			if (!success)
 			{
@@ -294,7 +272,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 
 			case CastType::None:
 				obj = objectManager->GetJavaObjectByJsObject(jsObj);
-                
+
 				castValue = jsObj->GetHiddenValue(V8StringConstants::GetNullNodeName());
 
 				if(!castValue.IsEmpty()) {

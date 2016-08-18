@@ -101,13 +101,15 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
         JavaObjectIdScope objIdScope(env, CURRENT_OBJECTID_FIELD_ID, runtime->GetJavaRuntime(),
                                      javaObjectID);
 
-        if (argWrapper.type == ArgType::Interface) {
-            instance = env.NewObject(generatedJavaClass, mi.mid);
-        }
-        else {
-            // resolve arguments before passing them on to the constructor
-            JsArgConverter argConverter(argWrapper.args, mi.signature, argWrapper.outerThis);
-            auto ctorArgs = argConverter.ToArgs();
+		if(argWrapper.type == ArgType::Interface)
+		{
+			instance = env.NewObject(generatedJavaClass, mi.mid);
+		}
+		else
+		{
+			// resolve arguments before passing them on to the constructor
+			JsArgConverter argConverter(argWrapper.args, mi.signature);
+			auto ctorArgs = argConverter.ToArgs();
 
             instance = env.NewObjectA(generatedJavaClass, mi.mid, ctorArgs);
         }

@@ -747,13 +747,13 @@ describe("Tests ", function () {
 
 		var button1 = new MyButton();
 
-		var innerButton = new button1.InnerButton();
+		var innerButton = new MyButton.InnerButton(button1);
 
 		var s = innerButton.getSomeString();
 
 		expect(s.length).toBeGreaterThan(0);
 
-		var innerButton2 = new new button1.InnerButton().InnerClass2(123)
+		var innerButton2 = new MyButton.InnerButton.InnerClass2(innerButton, 123);
 
 		var s1 = innerButton2.getSomeString2();
 
