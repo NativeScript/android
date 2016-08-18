@@ -5,6 +5,7 @@
 #include "ArgConverter.h"
 #include "Util.h"
 #include "V8GlobalHelpers.h"
+#include "ArgConverter.h"
 #include "V8StringConstants.h"
 #include "Constants.h"
 #include "libplatform/libplatform.h"
@@ -156,12 +157,12 @@ jobject Runtime::RunScript(JNIEnv *_env, jobject obj, jstring scriptFile)
 
 	auto filename = ArgConverter::jstringToString(scriptFile);
 	auto src = File::ReadText(filename);
-	auto source = ConvertToV8String(src);
+	auto source = ArgConverter::ConvertToV8String(src);
 
 	TryCatch tc;
 
 	Local<Script> script;
-	ScriptOrigin origin(ConvertToV8String(filename));
+	ScriptOrigin origin(ArgConverter::ConvertToV8String(filename));
 	auto maybeScript = Script::Compile(context, source, &origin).ToLocal(&script);
 
 	if (tc.HasCaught())
@@ -286,7 +287,7 @@ void Runtime::PassUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, jthrowab
 
 	//create error message
 	string errMsg = "The application crashed because of an uncaught exception. You can look at \"stackTrace\" or \"nativeException\" for more detailed information about the exception.";
-	auto errObj = Exception::Error(ConvertToV8String(errMsg)).As<Object>();
+	auto errObj = Exception::Error(ArgConverter::ConvertToV8String(errMsg)).As<Object>();
 
 	//create a new native exception js object
 	jint javaObjectID = m_objectManager->GetOrCreateObjectId((jobject) exception);
@@ -435,14 +436,14 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 
 	const auto readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
 
-	globalTemplate->Set(ConvertToV8String("__log"), FunctionTemplate::New(isolate, CallbackHandlers::LogMethodCallback));
-	globalTemplate->Set(ConvertToV8String("__dumpReferenceTables"), FunctionTemplate::New(isolate, CallbackHandlers::DumpReferenceTablesMethodCallback));
-	globalTemplate->Set(ConvertToV8String("__debugbreak"), FunctionTemplate::New(isolate, JsDebugger::DebugBreakCallback));
-	globalTemplate->Set(ConvertToV8String("__consoleMessage"), FunctionTemplate::New(isolate, JsDebugger::ConsoleMessageCallback));
-	globalTemplate->Set(ConvertToV8String("__enableVerboseLogging"), FunctionTemplate::New(isolate, CallbackHandlers::EnableVerboseLoggingMethodCallback));
-	globalTemplate->Set(ConvertToV8String("__disableVerboseLogging"), FunctionTemplate::New(isolate, CallbackHandlers::DisableVerboseLoggingMethodCallback));
-	globalTemplate->Set(ConvertToV8String("__exit"), FunctionTemplate::New(isolate, CallbackHandlers::ExitMethodCallback));
-	globalTemplate->Set(ConvertToV8String("__runtimeVersion"), ConvertToV8String(NATIVE_SCRIPT_RUNTIME_VERSION), readOnlyFlags);
+	globalTemplate->Set(ArgConverter::ConvertToV8String("__log"), FunctionTemplate::New(isolate, CallbackHandlers::LogMethodCallback));
+	globalTemplate->Set(ArgConverter::ConvertToV8String("__dumpReferenceTables"), FunctionTemplate::New(isolate, CallbackHandlers::DumpReferenceTablesMethodCallback));
+	globalTemplate->Set(ArgConverter::ConvertToV8String("__debugbreak"), FunctionTemplate::New(isolate, JsDebugger::DebugBreakCallback));
+	globalTemplate->Set(ArgConverter::ConvertToV8String("__consoleMessage"), FunctionTemplate::New(isolate, JsDebugger::ConsoleMessageCallback));
+	globalTemplate->Set(ArgConverter::ConvertToV8String("__enableVerboseLogging"), FunctionTemplate::New(isolate, CallbackHandlers::EnableVerboseLoggingMethodCallback));
+	globalTemplate->Set(ArgConverter::ConvertToV8String("__disableVerboseLogging"), FunctionTemplate::New(isolate, CallbackHandlers::DisableVerboseLoggingMethodCallback));
+	globalTemplate->Set(ArgConverter::ConvertToV8String("__exit"), FunctionTemplate::New(isolate, CallbackHandlers::ExitMethodCallback));
+	globalTemplate->Set(ArgConverter::ConvertToV8String("__runtimeVersion"), ArgConverter::ConvertToV8String(NATIVE_SCRIPT_RUNTIME_VERSION), readOnlyFlags);
 
 	m_weakRef.Init(isolate, globalTemplate, m_objectManager);
 
@@ -461,8 +462,8 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 
 	auto global = context->Global();
 
-	global->ForceSet(ConvertToV8String("global"), global, readOnlyFlags);
-	global->ForceSet(ConvertToV8String("__global"), global, readOnlyFlags);
+	global->ForceSet(ArgConverter::ConvertToV8String("global"), global, readOnlyFlags);
+	global->ForceSet(ArgConverter::ConvertToV8String("__global"), global, readOnlyFlags);
 
 	ArgConverter::Init(isolate);
 

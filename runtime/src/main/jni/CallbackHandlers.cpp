@@ -389,7 +389,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
             JniLocalRef str(env.NewString(&result, 1));
             jboolean bol = true;
             const char *resP = env.GetStringUTFChars(str, &bol);
-            args.GetReturnValue().Set(ConvertToV8String(resP, 1));
+            args.GetReturnValue().Set(ArgConverter::ConvertToV8String(resP, 1));
             env.ReleaseStringUTFChars(str, resP);
             break;
         }
@@ -756,7 +756,7 @@ void CallbackHandlers::DisableVerboseLoggingMethodCallback(
 }
 
 void CallbackHandlers::ExitMethodCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
-    auto msg = ConvertToString(args[0].As<String>());
+    auto msg = ArgConverter::ConvertToString(args[0].As<String>());
     DEBUG_WRITE_FATAL("FORCE EXIT: %s", msg.c_str());
     exit(-1);
 }
@@ -800,7 +800,7 @@ Local<Value> CallbackHandlers::CallJSMethod(Isolate *isolate, JNIEnv *_env,
     JEnv env(_env);
     Local<Value> result;
 
-    auto method = jsObject->Get(ConvertToV8String(methodName));
+    auto method = jsObject->Get(ArgConverter::ConvertToV8String(methodName));
 
     if (method.IsEmpty() || method->IsUndefined()) {
         stringstream ss;

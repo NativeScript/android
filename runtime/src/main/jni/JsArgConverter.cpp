@@ -2,7 +2,7 @@
 #include "ObjectManager.h"
 #include "JniSignatureParser.h"
 #include "JsArgToArrayConverter.h"
-#include "V8GlobalHelpers.h"
+#include "ArgConverter.h"
 #include "V8StringConstants.h"
 #include "NumericCasts.h"
 #include "NativeScriptException.h"
@@ -140,7 +140,7 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 				castValue = NumericCasts::GetCastValue(jsObject);
 				if (castValue->IsString())
 				{
-					string value = ConvertToString(castValue->ToString());
+					string value = ArgConverter::ConvertToString(castValue->ToString());
 					m_args[index].c = (jchar) value[0];
 					success = true;
 				}
@@ -150,7 +150,7 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 				castValue = NumericCasts::GetCastValue(jsObject);
 				if (castValue->IsString())
 				{
-					string strValue = ConvertToString(castValue->ToString());
+					string strValue = ArgConverter::ConvertToString(castValue->ToString());
 					int byteArg = atoi(strValue.c_str());
 					jbyte value = (jbyte) byteArg;
 					success = ConvertFromCastFunctionObject(value, index);
@@ -166,7 +166,7 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 				castValue = NumericCasts::GetCastValue(jsObject);
 				if (castValue->IsString())
 				{
-					string strValue = ConvertToString(castValue->ToString());
+					string strValue = ArgConverter::ConvertToString(castValue->ToString());
 					int shortArg = atoi(strValue.c_str());
 					jshort value = (jshort) shortArg;
 					success = ConvertFromCastFunctionObject(value, index);
@@ -182,7 +182,7 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 				castValue = NumericCasts::GetCastValue(jsObject);
 				if (castValue->IsString())
 				{
-					string strValue = ConvertToString(castValue->ToString());
+					string strValue = ArgConverter::ConvertToString(castValue->ToString());
 					int64_t longArg = atoll(strValue.c_str());
 					jlong value = (jlong) longArg;
 					success = ConvertFromCastFunctionObject(value, index);
@@ -218,7 +218,7 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 			case CastType::None:
 				obj = objectManager->GetJavaObjectByJsObject(jsObject);
 
-				castValue = jsObject->GetHiddenValue(ConvertToV8String(V8StringConstants::NULL_NODE_NAME));
+				castValue = jsObject->GetHiddenValue(ArgConverter::ConvertToV8String(V8StringConstants::NULL_NODE_NAME));
 				if(!castValue.IsEmpty()) {
 					SetConvertedObject(index, nullptr);
 					success = true;
@@ -370,7 +370,7 @@ bool JsArgConverter::ConvertJavaScriptBoolean(const Local<Value>& jsValue, int i
 
 bool JsArgConverter::ConvertJavaScriptString(const Local<Value>& jsValue, int index)
 {
-	jstring stringObject = ConvertToJavaString(jsValue);
+	jstring stringObject = ArgConverter::ConvertToJavaString(jsValue);
 	SetConvertedObject(index, stringObject);
 
 	return true;

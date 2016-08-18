@@ -30,6 +30,17 @@ namespace tns
 
 			static std::string jstringToString(jstring value);
 
+			// from global helpers
+			static std::string ConvertToString(const v8::Local<v8::String>& s);
+
+			static jstring ConvertToJavaString(const v8::Local<v8::Value>& jsValue);
+
+			static v8::Local<v8::String> ConvertToV8String(const jchar* data, int length);
+
+			static v8::Local<v8::String> ConvertToV8String(const std::string& s);
+
+			static v8::Local<v8::String> ConvertToV8String(const char *data, int length);
+
 		private:
 			struct Cache;
 
@@ -47,14 +58,15 @@ namespace tns
 
 			static void NativeScriptLongToStringFunctionCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
+			// TODO: plamen5kov: rewrite logic for java long number operations in javascript (java long -> javascript number operations check)
 			static const long long JS_LONG_LIMIT = ((long long) 1) << 53;
-
 			struct Cache
 			{
 				v8::Persistent<v8::Function> *LongNumberCtorFunc;
 
 				v8::Persistent<v8::NumberObject> *NanNumberObject;
 			};
+			//
 
 			static char *charBuffer;
 			static const int BUFFER_SIZE = 1024 * 64; // 64KB size. TODO: Do we need a larger/smaller buffer?

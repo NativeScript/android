@@ -1,5 +1,6 @@
 #include "JsDebugger.h"
 #include "V8GlobalHelpers.h"
+#include "ArgConverter.h"
 #include "JniLocalRef.h"
 #include "NativeScriptException.h"
 #include "NativeScriptAssert.h"
@@ -165,12 +166,12 @@ void JsDebugger::ConsoleMessage(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
 	if ((args.Length() > 0) && args[0]->IsString())
 	{
-		std::string message = ConvertToString(args[0]->ToString());
+		std::string message = ArgConverter::ConvertToString(args[0]->ToString());
 
 		std:string level = "log";
 		if (args.Length() > 1  && args[1]->IsString())
 		{
-			level = ConvertToString(args[1]->ToString());
+			level = ArgConverter::ConvertToString(args[1]->ToString());
 		}
 
 		string srcFileName = "";
@@ -186,7 +187,7 @@ void JsDebugger::ConsoleMessage(const v8::FunctionCallbackInfo<v8::Value>& args)
 				auto scriptName = frame->GetScriptName();
 				if (!scriptName.IsEmpty())
 				{
-					srcFileName = ConvertToString(scriptName);
+					srcFileName = ArgConverter::ConvertToString(scriptName);
 				}
 
 				lineNumber = frame->GetLineNumber();
@@ -258,7 +259,7 @@ void JsDebugger::MyMessageHandler(const v8::Debug::Message& message)
 	}
 
 	auto json = message.GetJSON();
-	auto str = ConvertToString(json);
+	auto str = ArgConverter::ConvertToString(json);
 
 	JEnv env;
 	JniLocalRef s(env.NewStringUTF(str.c_str()));

@@ -1,7 +1,7 @@
 #include "ArgConverter.h"
 #include "ObjectManager.h"
 #include "Util.h"
-#include "V8GlobalHelpers.h"
+#include "ArgConverter.h"
 #include "V8StringConstants.h"
 #include "NativeScriptException.h"
 #include "NumericCasts.h"
@@ -299,6 +299,48 @@ ArgConverter::Cache* ArgConverter::GetCache(v8::Isolate *isolate)
 	}
 	return cache;
 }
+
+
+string ArgConverter::ConvertToString(const v8::Local<String>& s)
+{
+	if (s.IsEmpty())
+	{
+		return string();
+	}
+	else
+	{
+		String::Utf8Value str(s);
+		return string(*str);
+	}
+}
+
+jstring ArgConverter::ConvertToJavaString(const Local<Value>& value)
+{
+	JEnv env;
+	String::Value stringValue(value);
+	return env.NewString((const jchar*) *stringValue, stringValue.length());
+}
+
+Local<String> ArgConverter::ConvertToV8String(const jchar* data, int length)
+{
+	auto isolate = Isolate::GetCurrent();
+	return String::NewFromTwoByte(isolate, (const uint16_t*) data, String::kNormalString, length);
+}
+
+Local<String> ArgConverter::ConvertToV8String(const string& s)
+{
+	auto isolate = Isolate::GetCurrent();
+	Local<String> str;
+	String::NewFromUtf8(isolate, s.c_str(), NewStringType::kNormal, s.length()).ToLocal(&str);
+	return str;
+}
+
+Local<String> ArgConverter::ConvertToV8String(const char *data, int length)
+{
+	auto isolate = Isolate::GetCurrent();
+	return String::NewFromUtf8(isolate, (const char *) data, String::kNormalString, length);
+}
+
 
 std::map<Isolate*, ArgConverter::Cache*> ArgConverter::s_cache;
 char* ArgConverter::charBuffer = new char[ArgConverter::BUFFER_SIZE];

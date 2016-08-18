@@ -5,6 +5,7 @@
 #include "NativeScriptAssert.h"
 #include "Util.h"
 #include "V8GlobalHelpers.h"
+#include "ArgConverter.h"
 #include "V8StringConstants.h"
 #include "NumericCasts.h"
 #include "NativeScriptException.h"

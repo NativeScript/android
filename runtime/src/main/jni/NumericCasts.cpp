@@ -2,6 +2,7 @@
 #include "NativeScriptAssert.h"
 #include "Util.h"
 #include "V8GlobalHelpers.h"
+#include "ArgConverter.h"
 #include "V8StringConstants.h"
 #include "NativeScriptException.h"
 #include <sstream>
@@ -15,14 +16,14 @@ void NumericCasts::CreateGlobalCastFunctions(const Local<ObjectTemplate>& global
 	auto isolate = Isolate::GetCurrent();
 	auto ext = External::New(isolate, this);
 
-	globalTemplate->Set(ConvertToV8String("long"), FunctionTemplate::New(isolate, NumericCasts::MarkAsLongCallbackStatic, ext));
-	globalTemplate->Set(ConvertToV8String("byte"), FunctionTemplate::New(isolate, NumericCasts::MarkAsByteCallbackStatic, ext));
-	globalTemplate->Set(ConvertToV8String("short"), FunctionTemplate::New(isolate, NumericCasts::MarkAsShortCallbackStatic, ext));
-	globalTemplate->Set(ConvertToV8String("double"), FunctionTemplate::New(isolate, NumericCasts::MarkAsDoubleCallbackStatic, ext));
-	globalTemplate->Set(ConvertToV8String("float"), FunctionTemplate::New(isolate, NumericCasts::MarkAsFloatCallbackStatic, ext));
-	globalTemplate->Set(ConvertToV8String("char"), FunctionTemplate::New(isolate, NumericCasts::MarkAsCharCallbackStatic, ext));
+	globalTemplate->Set(ArgConverter::ConvertToV8String("long"), FunctionTemplate::New(isolate, NumericCasts::MarkAsLongCallbackStatic, ext));
+	globalTemplate->Set(ArgConverter::ConvertToV8String("byte"), FunctionTemplate::New(isolate, NumericCasts::MarkAsByteCallbackStatic, ext));
+	globalTemplate->Set(ArgConverter::ConvertToV8String("short"), FunctionTemplate::New(isolate, NumericCasts::MarkAsShortCallbackStatic, ext));
+	globalTemplate->Set(ArgConverter::ConvertToV8String("double"), FunctionTemplate::New(isolate, NumericCasts::MarkAsDoubleCallbackStatic, ext));
+	globalTemplate->Set(ArgConverter::ConvertToV8String("float"), FunctionTemplate::New(isolate, NumericCasts::MarkAsFloatCallbackStatic, ext));
+	globalTemplate->Set(ArgConverter::ConvertToV8String("char"), FunctionTemplate::New(isolate, NumericCasts::MarkAsCharCallbackStatic, ext));
 
-	s_castMarker = new Persistent<String>(isolate, ConvertToV8String("t::cast"));
+	s_castMarker = new Persistent<String>(isolate, ArgConverter::ConvertToV8String("t::cast"));
 }
 
 CastType NumericCasts::GetCastType(const Local<Object>& object)
@@ -40,7 +41,7 @@ CastType NumericCasts::GetCastType(const Local<Object>& object)
 
 Local<Value> NumericCasts::GetCastValue(const Local<Object>& object)
 {
-	auto value = object->Get(ConvertToV8String("value"));
+	auto value = object->Get(ArgConverter::ConvertToV8String("value"));
 	return value;
 }
 
@@ -457,7 +458,7 @@ void NumericCasts::MarkJsObject(const Local<Object>& object, CastType castType, 
 	auto key = Local<String>::New(isolate, *s_castMarker);
 	auto type = Integer::New(isolate, static_cast<int>(castType));
 	object->SetHiddenValue(key, type);
-	object->Set(ConvertToV8String("value"), value);
+	object->Set(ArgConverter::ConvertToV8String("value"), value);
 	DEBUG_WRITE("MarkJsObject: Marking js object: %d with cast type: %d", object->GetIdentityHash(), castType);
 }
 

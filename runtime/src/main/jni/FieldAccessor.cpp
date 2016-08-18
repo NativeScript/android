@@ -1,6 +1,5 @@
 #include "FieldAccessor.h"
 #include "ArgConverter.h"
-#include "V8GlobalHelpers.h"
 #include "NativeScriptException.h"
 #include "Runtime.h"
 #include <sstream>
@@ -111,7 +110,7 @@ Local<Value> FieldAccessor::GetJavaField(Isolate *isolate, const Local<Object>& 
 				JniLocalRef str(env.NewString(&result, 1));
 				jboolean bol = true;
 				const char* resP = env.GetStringUTFChars(str, &bol);
-				fieldResult = handleScope.Escape(ConvertToV8String(resP, 1));
+				fieldResult = handleScope.Escape(ArgConverter::ConvertToV8String(resP, 1));
 				env.ReleaseStringUTFChars(str, resP);
 				break;
 			}
@@ -425,7 +424,7 @@ void FieldAccessor::SetJavaField(Isolate *isolate, const Local<Object>& target, 
 			if (isString)
 			{
 				//TODO: validate valie is a string;
-				result = ConvertToJavaString(value);
+				result = ArgConverter::ConvertToJavaString(value);
 			}
 			else
 			{

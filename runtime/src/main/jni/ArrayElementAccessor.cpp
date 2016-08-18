@@ -2,7 +2,6 @@
 #include "JsArgToArrayConverter.h"
 #include "ArgConverter.h"
 #include "Util.h"
-#include "V8GlobalHelpers.h"
 #include "NativeScriptException.h"
 #include "Runtime.h"
 
@@ -210,7 +209,7 @@ Local<Value> ArrayElementAccessor::ConvertToJsValue(Isolate *isolate, ObjectMana
 	}
 	else if (elementSignature == "C")
 	{
-		jsValue = ConvertToV8String((const char*) value, 1);
+		jsValue = ArgConverter::ConvertToV8String((const char*) value, 1);
 	}
 	else if (elementSignature == "S")
 	{

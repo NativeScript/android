@@ -1,8 +1,8 @@
 #include "JsArgToArrayConverter.h"
 #include <sstream>
 #include "ObjectManager.h"
-#include "V8GlobalHelpers.h"
 #include "V8StringConstants.h"
+#include "ArgConverter.h"
 #include "JavaObjectArrayCache.h"
 #include "NumericCasts.h"
 #include "NativeScriptException.h"
@@ -84,9 +84,11 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 	{
 		double d = arg->NumberValue();
 		int64_t i = (int64_t) d;
-		bool isInteger = d == i;
 
-		if (isInteger)
+		//if returnType isNumber and this check is true, the number we'll try to convert is whole(integer)
+		bool isWholeNumber = d == i;
+
+		if (isWholeNumber)
 		{
 			jobject obj;
 
@@ -145,7 +147,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 	}
 	else if (arg->IsString() || arg->IsStringObject())
 	{
-		auto stringObject = ConvertToJavaString(arg);
+		auto stringObject = ArgConverter::ConvertToJavaString(arg);
 		SetConvertedObject(env, index, stringObject);
 
 		success = true;
@@ -175,7 +177,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 				charValue = '\0';
 				if (castValue->IsString())
 				{
-					string str = ConvertToString(castValue->ToString());
+					string str = ArgConverter::ConvertToString(castValue->ToString());
 					charValue = (jchar) str[0];
 				}
 				javaObject = JType::NewChar(env, charValue);
@@ -188,7 +190,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 				byteValue = 0;
 				if (castValue->IsString())
 				{
-					string value = ConvertToString(castValue->ToString());
+					string value = ArgConverter::ConvertToString(castValue->ToString());
 					int byteArg = atoi(value.c_str());
 					byteValue = (jbyte) byteArg;
 				}
@@ -207,7 +209,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 				shortValue = 0;
 				if (castValue->IsString())
 				{
-					string value = ConvertToString(castValue->ToString());
+					string value = ArgConverter::ConvertToString(castValue->ToString());
 					int shortArg = atoi(value.c_str());
 					shortValue = (jshort) shortArg;
 				}
@@ -226,7 +228,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 				longValue = 0;
 				if (castValue->IsString())
 				{
-					auto strValue = ConvertToString(castValue->ToString());
+					auto strValue = ArgConverter::ConvertToString(castValue->ToString());
 					longValue = atoll(strValue.c_str());
 				}
 				else if (castValue->IsInt32())
