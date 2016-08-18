@@ -7,8 +7,6 @@
 using namespace tns;
 using namespace std;
 
-void mkdir_rec(const char *dir);
-
 extern "C" void Java_com_tns_AssetExtractor_extractAssets(JNIEnv *env, jobject obj, jstring apk, jstring inputDir, jstring outputDir, jboolean _forceOverwrite)
 {
 	try

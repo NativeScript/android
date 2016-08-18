@@ -9,9 +9,6 @@
 
 using namespace tns;
 
-std::string jstringToString(JNIEnv *env, jstring value);
-void mkdir_rec(const char *dir);
-
 void AssetExtractor::ExtractAssets(JNIEnv *env, jobject obj, jstring apk, jstring input, jstring outputDir, jboolean _forceOverwrite)
 {
 	auto forceOverwrite = JNI_TRUE == _forceOverwrite;
@@ -80,7 +77,7 @@ void AssetExtractor::ExtractAssets(JNIEnv *env, jobject obj, jstring apk, jstrin
 					fclose(fd);
 					utimbuf t;
 					t.modtime = sb.mtime;
-					ret = utime(assetFullname.c_str(), &t);
+					utime(assetFullname.c_str(), &t);
 				}
 
 				zip_fclose(zf);

@@ -115,7 +115,7 @@ void Runtime::Init(JNIEnv *_env, jobject obj, int runtimeId, jstring filesPath, 
 
 void Runtime::Init(jstring filesPath, bool verboseLoggingEnabled, jstring packageName, jobjectArray args, jobject jsDebugger)
 {
-	LogEnabled = m_logEnabled = verboseLoggingEnabled;
+	LogEnabled = verboseLoggingEnabled;
 
 	auto filesRoot = ArgConverter::jstringToString(filesPath);
 	Constants::APP_ROOT_FOLDER_PATH = filesRoot + "/app/";
@@ -498,47 +498,6 @@ jobject Runtime::ConvertJsValueToJavaObject(JEnv& env, const Local<Value>& value
 	}
 
 	return javaResult;
-}
-
-void Runtime::PrepareExtendFunction(Isolate *isolate, jstring filesPath)
-{
-	string fullPath = ArgConverter::jstringToString(filesPath);
-	fullPath.append("/internal/prepareExtend.js");
-
-	int length;
-	bool isNew;
-	const char* content = File::ReadText(fullPath, length, isNew);
-
-	TryCatch tc;
-	auto cmd = ConvertToV8String(content, length);
-
-	if (isNew)
-	{
-		delete[] content;
-	}
-
-	auto origin = ConvertToV8String(fullPath);
-	DEBUG_WRITE("Compiling prepareExtend.js script");
-
-	auto script = Script::Compile(cmd, origin);
-	DEBUG_WRITE("Compile prepareExtend.js script");
-
-	if (script.IsEmpty() || tc.HasCaught())
-	{
-		DEBUG_WRITE("Cannot compile prepareExtend.js script");
-		return;
-	}
-
-	DEBUG_WRITE("Compiled prepareExtend.js script");
-
-	script->Run();
-
-	if (tc.HasCaught())
-	{
-		throw NativeScriptException(tc);
-	}
-
-	DEBUG_WRITE("Executed prepareExtend.js script");
 }
 
 JavaVM* Runtime::s_jvm = nullptr;

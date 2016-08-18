@@ -1,5 +1,4 @@
 #include "JsArgConverter.h"
-#include <sstream>
 #include "ObjectManager.h"
 #include "JniSignatureParser.h"
 #include "JsArgToArrayConverter.h"
@@ -127,7 +126,6 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 	}
 	else if (arg->IsObject())
 	{
-		jlong javaLongValue;
 		auto jsObject = arg->ToObject();
 
 		auto castType = NumericCasts::GetCastType(jsObject);

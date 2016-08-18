@@ -1,6 +1,5 @@
 #include "FieldAccessor.h"
 #include "ArgConverter.h"
-#include "Util.h"
 #include "V8GlobalHelpers.h"
 #include "NativeScriptException.h"
 #include "Runtime.h"
@@ -57,7 +56,7 @@ Local<Value> FieldAccessor::GetJavaField(Isolate *isolate, const Local<Object>& 
 		if (targetJavaObject.IsNull())
 		{
 			stringstream ss;
-			ss << "Cannot access property '" << fieldData->name << "' because there is no corresponding Java object";
+			ss << "Cannot access property '" << fieldData->name.c_str() << "' because there is no corresponding Java object";
 			throw NativeScriptException(ss.str());
 		}
 	}
@@ -288,7 +287,7 @@ void FieldAccessor::SetJavaField(Isolate *isolate, const Local<Object>& target, 
 		if (targetJavaObject.IsNull())
 		{
 			stringstream ss;
-			ss << "Cannot access property '" << fieldData->name << "' because there is no corresponding Java object";
+			ss << "Cannot access property '" << fieldData->name.c_str() << "' because there is no corresponding Java object";
 			throw NativeScriptException(ss.str());
 		}
 	}
@@ -330,8 +329,8 @@ void FieldAccessor::SetJavaField(Isolate *isolate, const Local<Object>& target, 
 			{
 				//TODO: validate value is a single char
 				String::Utf8Value stringValue(value->ToString());
-				JniLocalRef value(env.NewStringUTF(*stringValue));
-				const char* chars = env.GetStringUTFChars(value, 0);
+				JniLocalRef strValue(env.NewStringUTF(*stringValue));
+				const char* chars = env.GetStringUTFChars(strValue, 0);
 
 				if (isStatic)
 				{
@@ -341,7 +340,7 @@ void FieldAccessor::SetJavaField(Isolate *isolate, const Local<Object>& target, 
 				{
 					env.SetCharField(targetJavaObject, fieldId, chars[0]);
 				}
-				env.ReleaseStringUTFChars(value, chars);
+				env.ReleaseStringUTFChars(strValue, chars);
 				break;
 			}
 			case 'S': //short

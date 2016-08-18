@@ -50,7 +50,6 @@ namespace tns
 			int m_id;
 			jobject m_runtime;
 			v8::Isolate *m_isolate;
-			bool m_logEnabled;
 
 			ObjectManager *m_objectManager;
 
@@ -65,7 +64,6 @@ namespace tns
 			v8::StartupData *m_startupData = nullptr;
 			MemoryMappedFile *m_heapSnapshotBlob = nullptr;
 
-			static void PrepareExtendFunction(v8::Isolate *isolate, jstring filesPath);
 			v8::Isolate* PrepareV8Runtime(const std::string& filesPath, jstring packageName, jobject jsDebugger, jstring profilerOutputDir);
 			jobject ConvertJsValueToJavaObject(JEnv& env, const v8::Local<v8::Value>& value, int classReturnType);
 

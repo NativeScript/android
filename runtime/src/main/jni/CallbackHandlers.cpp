@@ -18,7 +18,6 @@
 #include "JsDebugger.h"
 #include "SimpleProfiler.h"
 #include "Runtime.h"
-#include "include/v8.h"
 
 using namespace v8;
 using namespace std;
@@ -185,7 +184,6 @@ Local<Value> CallbackHandlers::GetArrayElement(Isolate *isolate, const Local<Obj
 
 void CallbackHandlers::SetArrayElement(Isolate *isolate, const Local<Object> &array, uint32_t index,
                                        const string &arraySignature, Local<Value> &value) {
-    JEnv env;
 
     arrayElementAccessor.SetArrayElement(isolate, array, index, arraySignature, value);
 }

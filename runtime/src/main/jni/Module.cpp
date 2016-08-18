@@ -436,7 +436,6 @@ Local<String> Module::WrapModuleContent(const string& path)
 	string content = File::ReadText(path);
 
 	auto separatorIndex = path.find_last_of("/");
-	string dirName = path.substr(0, separatorIndex);
 
 	// TODO: Use statically allocated buffer for better performance
 	string result(MODULE_PROLOGUE);

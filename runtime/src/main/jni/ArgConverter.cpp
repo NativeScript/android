@@ -7,7 +7,6 @@
 #include "NumericCasts.h"
 #include "Runtime.h"
 #include <sstream>
-#include <cstdlib>
 
 using namespace v8;
 using namespace std;
@@ -121,7 +120,6 @@ Local<Array> ArgConverter::ConvertJavaArgsToJsArgs(Isolate *isolate, jobjectArra
 		JniLocalRef arg(env.GetObjectArrayElement(args, jArrayIndex++));
 		JniLocalRef argJavaClassPath(env.GetObjectArrayElement(args, jArrayIndex++));
 
-		jint length;
 		Type argTypeID = (Type) JType::IntValue(env, argTypeIDObj);
 
 		Local<Value> jsArg;

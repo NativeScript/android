@@ -16,7 +16,6 @@ JsDebugger::JsDebugger()
 void JsDebugger::Init(v8::Isolate *isolate, const string& packageName, jobject jsDebugger)
 {
 	s_isolate = isolate;
-	s_packageName = packageName;
 
 	JEnv env;
 	s_jsDebugger = env.NewGlobalRef(jsDebugger);
@@ -33,11 +32,6 @@ void JsDebugger::Init(v8::Isolate *isolate, const string& packageName, jobject j
 
 	s_EnableAgent = env.GetMethodID(s_JsDebuggerClass, "enableAgent", "()V");
 	assert(s_EnableAgent != nullptr);
-}
-
-string JsDebugger::GetPackageName()
-{
-	return s_packageName;
 }
 
 /* *
@@ -274,7 +268,6 @@ void JsDebugger::MyMessageHandler(const v8::Debug::Message& message)
 bool JsDebugger::enabled = false;
 v8::Isolate* JsDebugger::s_isolate = nullptr;
 jobject JsDebugger::s_jsDebugger = nullptr;
-string JsDebugger::s_packageName = "";
 jclass JsDebugger::s_JsDebuggerClass = nullptr;
 jmethodID JsDebugger::s_EnqueueMessage = nullptr;
 jmethodID JsDebugger::s_EnqueueConsoleMessage = nullptr;

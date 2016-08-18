@@ -31,7 +31,6 @@ namespace tns
 	{
 		public:
 			static v8::Local<v8::String> GetClassImplementationObject();
-			static v8::Local<v8::String> GetDebugName();
 			static v8::Local<v8::String> GetExtend();
 			static v8::Local<v8::String> GetNullObject();
 			static v8::Local<v8::String> GetNullNodeName();

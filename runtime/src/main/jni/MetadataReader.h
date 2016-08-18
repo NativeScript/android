@@ -49,8 +49,6 @@ namespace tns
 
 			MetadataTreeNode* GetNodeById(uint16_t nodeId);
 
-			bool IsPrimitive(uint8_t type);
-
 			bool IsNodeTypeArray(uint8_t type);
 
 			bool IsNodeTypeStatic(uint8_t type);

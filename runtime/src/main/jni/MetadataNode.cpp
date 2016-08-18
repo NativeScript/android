@@ -5,13 +5,11 @@
 #include "V8GlobalHelpers.h"
 #include "V8StringConstants.h"
 #include "SimpleProfiler.h"
-#include "JniLocalRef.h"
 #include "CallbackHandlers.h"
 #include "NativeScriptException.h"
 #include "Runtime.h"
 #include <sstream>
 #include <cctype>
-#include <assert.h>
 
 using namespace v8;
 using namespace std;
@@ -434,8 +432,8 @@ void MetadataNode::SuperAccessorGetterCallback(Local<String> property, const Pro
 			auto objectManager = runtime->GetObjectManager();
 
 			superValue = objectManager->GetEmptyObject(isolate);
-			bool d = superValue->Delete(V8StringConstants::GetToString());
-			d = superValue->Delete(V8StringConstants::GetValueOf());
+			superValue->Delete(V8StringConstants::GetToString());
+			superValue->Delete(V8StringConstants::GetValueOf());
 			superValue->SetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::CallSuper), True(isolate));
 
 			superValue->SetPrototype(thiz->GetPrototype().As<Object>()->GetPrototype().As<Object>()->GetPrototype());
@@ -483,8 +481,6 @@ void MetadataNode::SetInstanceMembers(Isolate *isolate, Local<FunctionTemplate>&
 void MetadataNode::SetInstanceMembersFromStaticMetadata(Isolate *isolate, Local<FunctionTemplate>& ctorFuncTemplate, Local<ObjectTemplate>& prototypeTemplate, vector<MethodCallbackData*>& instanceMethodsCallbackData, const vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode)
 {
 	SET_PROFILER_FRAME();
-
-	Local<Function> ctorFunction;
 
 	uint8_t *curPtr = s_metadataReader.GetValueData() + treeNode->offsetValue + 1;
 

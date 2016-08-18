@@ -1,6 +1,5 @@
 #include "MetadataReader.h"
 #include "MetadataMethodInfo.h"
-#include "NativeScriptAssert.h"
 #include "Util.h"
 #include <sstream>
 #include <assert.h>
@@ -360,13 +359,6 @@ bool MetadataReader::IsNodeTypePackage(uint8_t type)
 	return isPackage;
 }
 
-bool MetadataReader::IsPrimitive(uint8_t type)
-{
-	bool isPrimitive = (type & MetadataTreeNode::PRIMITIVE) == MetadataTreeNode::PRIMITIVE;
-
-	return isPrimitive;
-}
-
 uint8_t* MetadataReader::GetValueData() const
 {
 	return m_valueData;
@@ -501,8 +493,6 @@ MetadataTreeNode* MetadataReader::GetOrCreateTreeNodeByName(const string& classN
 		return treeNode;
 	}
 
-	MetadataTreeNode *newType = nullptr;
-
 	int curIdx = 0;
 	for (auto it = names.begin(); it != names.end(); ++it)
 	{
@@ -566,7 +556,7 @@ MetadataTreeNode* MetadataReader::GetOrCreateTreeNodeByName(const string& classN
 				m_v.push_back(child);
 				children->push_back(child);
 
-				newType = treeNode = child;
+				treeNode = child;
 			}
 
 			return treeNode;

@@ -203,9 +203,6 @@ Local<Value> NativeScriptException::WrapJavaToJsException()
 		jfieldID fieldID = env.GetFieldID(env.GetObjectClass(m_javaException), "jsValueAddress", "J");
 		jlong addr = env.GetLongField(m_javaException, fieldID);
 
-		jmethodID gmId = env.GetMethodID(env.GetObjectClass(m_javaException), "getMessage", "()Ljava/lang/String;");
-		jobject javaMessage = env.CallObjectMethod(m_javaException, gmId);
-
 		if (addr != 0)
 		{
 			auto pv = (Persistent<Value> *) addr;

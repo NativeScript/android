@@ -38,21 +38,13 @@ namespace tns
 
 			static int GetArrayLength(v8::Isolate *isolate, const v8::Local<v8::Object>& arr);
 
-			//
-
 			static void CallJavaMethod(const v8::Local<v8::Object>& caller, const std::string& className, const std::string& methodName, MetadataEntry *entry, bool isStatic, bool isSuper, const v8::FunctionCallbackInfo<v8::Value>& args);
 
 			static v8::Local<v8::Value> CallJSMethod(v8::Isolate *isolate, JNIEnv *_env, const v8::Local<v8::Object>& jsObject, const std::string& methodName, jobjectArray args);
 
-			//
-
 			static v8::Local<v8::Value> GetJavaField(v8::Isolate *isolate, const v8::Local<v8::Object>& caller, FieldCallbackData *fieldData);
 
 			static void SetJavaField(v8::Isolate *isolate, const v8::Local<v8::Object>& target, const v8::Local<v8::Value>& value, FieldCallbackData *fieldData);
-
-			//
-
-			static void OverridesMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 			static void LogMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
@@ -62,10 +54,6 @@ namespace tns
 
 			static void ExitMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-			static void OverridesWeakCallback(v8::Isolate* isolate, v8::Persistent<v8::Object>* target, void* arg);
-
-			static v8::Local<v8::Object> GetImplementationObjectFromArg(const v8::FunctionCallbackInfo<v8::Value>& args);
-
 			static void CreateGlobalCastFunctions(const v8::Local<v8::ObjectTemplate>& globalTemplate);
 
 			static std::vector<std::string> GetTypeMetadata(const std::string& name, int index);
@@ -73,8 +61,6 @@ namespace tns
 			static jobjectArray GetMethodOverrides(JEnv& env, const v8::Local<v8::Object>& implementationObject);
 
 			static jobjectArray GetImplementedInterfaces(JEnv &env, const v8::Local<v8::Object> &implementationObject);
-
-			static std::string LogExceptionStackTrace(const v8::TryCatch& tryCatch);
 
 			static void EnableVerboseLoggingMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
@@ -87,11 +73,7 @@ namespace tns
 			{
 			}
 
-			static int GetCachedConstructorId(JEnv& env, const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& fullClassName, jobjectArray javaArgs, jclass javaClass);
-
 			static int64_t AdjustAmountOfExternalAllocatedMemory(JEnv& env, v8::Isolate *isolate);
-
-			static v8::Persistent<v8::Object>* MarkJsObject(const v8::Local<v8::Object>& object, std::string mark, const v8::Local<v8::Value>& value);
 
 			static jclass RUNTIME_CLASS;
 
