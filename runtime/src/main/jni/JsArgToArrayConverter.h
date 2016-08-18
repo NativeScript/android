@@ -3,6 +3,7 @@
 
 #include "JEnv.h"
 #include "v8.h"
+#include "JniLocalRef.h"
 #include <vector>
 #include <string>
 
@@ -60,6 +61,8 @@ namespace tns
 			jobject *m_argsAsObject;
 
 			jobjectArray m_arr;
+
+			short MAX_JAVA_PARAMS_COUNT = 256;
 	};
 }
 

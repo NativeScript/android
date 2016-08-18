@@ -10,30 +10,6 @@ JavaObjectArrayCache::JavaObjectArrayCache()
 {
 }
 
-jobjectArray JavaObjectArrayCache::GetJavaObjectArray(int length)
-{
-	bool supportedLength = length < MAX_JAVA_PARAMS_COUNT;
-
-	if (!supportedLength)
-	{
-		stringstream ss;
-		ss << "You are trying to override more than the MAX_JAVA_PARAMS_COUNT: " << MAX_JAVA_PARAMS_COUNT;
-		throw NativeScriptException(ss.str());
-	}
-
-	jobjectArray arr = s_objArr[length];
-
-	if (arr == nullptr)
-	{
-		JEnv env;
-		jclass objectClass = env.FindClass("java/lang/Object");
-		JniLocalRef tmpArr(env.NewObjectArray(length, objectClass, nullptr));
-		s_objArr[length] = arr = (jobjectArray) env.NewGlobalRef(tmpArr);
-	}
-
-	return arr;
-}
-
 jobjectArray JavaObjectArrayCache::GetJavaStringArray(int length)
 {
 	bool supportedLength = length < MAX_OVERWRITE_METHOD_COUNT;
@@ -58,9 +34,6 @@ jobjectArray JavaObjectArrayCache::GetJavaStringArray(int length)
 	return arr;
 }
 
-__thread jobjectArray JavaObjectArrayCache::s_objArr[MAX_JAVA_PARAMS_COUNT] =
-{
-		nullptr };
 __thread jobjectArray JavaObjectArrayCache::s_strArr[MAX_OVERWRITE_METHOD_COUNT] =
 {
 		nullptr };

@@ -370,12 +370,19 @@ jobjectArray JsArgToArrayConverter::ToJavaArray()
 {
 	if ((m_arr == nullptr) && (m_argsLen > 0))
 	{
-		m_arr = JavaObjectArrayCache::GetJavaObjectArray(m_argsLen);
-	}
+		if (m_argsLen >= JsArgToArrayConverter::MAX_JAVA_PARAMS_COUNT)
+		{
+			stringstream ss;
+			ss << "You are trying to override more than the MAX_JAVA_PARAMS_COUNT: " << JsArgToArrayConverter::MAX_JAVA_PARAMS_COUNT;
+			throw NativeScriptException(ss.str());
+		}
 
-	if (m_argsLen > 0)
-	{
 		JEnv env;
+		jclass objectClass = env.FindClass("java/lang/Object");
+
+		// TODO: Pete: Verify that no memory leak will occur when the time comes to release the array
+		JniLocalRef tmpArr(env.NewObjectArray(m_argsLen, objectClass, nullptr));
+		m_arr = (jobjectArray) env.NewGlobalRef(tmpArr);
 
 		for (int i = 0; i < m_argsLen; i++)
 		{
@@ -391,6 +398,8 @@ JsArgToArrayConverter::~JsArgToArrayConverter()
 	if (m_argsLen > 0)
 	{
 		JEnv env;
+
+		env.DeleteGlobalRef(m_arr);
 
 		int length = m_storedIndexes.size();
 		for (int i = 0; i < length; i++)
