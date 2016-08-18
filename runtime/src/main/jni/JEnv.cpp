@@ -1,7 +1,5 @@
 #include "JEnv.h"
 #include <assert.h>
-#include <sstream>
-#include <unistd.h>
 #include "Util.h"
 #include "NativeScriptException.h"
 
