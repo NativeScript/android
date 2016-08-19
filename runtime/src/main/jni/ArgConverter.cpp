@@ -284,13 +284,13 @@ int64_t ArgConverter::ConvertToJavaLong(const Local<Value>& value)
 	return longValue;
 }
 
-ArgConverter::Cache* ArgConverter::GetCache(v8::Isolate *isolate)
+ArgConverter::TypeLongOperationsCache * ArgConverter::GetCache(v8::Isolate *isolate)
 {
-	Cache *cache;
+	TypeLongOperationsCache *cache;
 	auto itFound = s_cache.find(isolate);
 	if (itFound == s_cache.end())
 	{
-		cache = new Cache;
+		cache = new TypeLongOperationsCache;
 		s_cache.insert(make_pair(isolate, cache));
 	}
 	else
@@ -342,5 +342,5 @@ Local<String> ArgConverter::ConvertToV8String(const char *data, int length)
 }
 
 
-std::map<Isolate*, ArgConverter::Cache*> ArgConverter::s_cache;
+std::map<Isolate*, ArgConverter::TypeLongOperationsCache *> ArgConverter::s_cache;
 char* ArgConverter::charBuffer = new char[ArgConverter::BUFFER_SIZE];

@@ -675,7 +675,7 @@ void MetadataNode::SetStaticMembers(Isolate *isolate, Local<Function>& ctorFunct
 
 		//attach .extend function
 		auto extendFuncName = V8StringConstants::GetExtend();
-		auto extendFuncTemplate = FunctionTemplate::New(isolate, ExtendCallMethodCallback, External::New(isolate, this));
+		auto extendFuncTemplate = FunctionTemplate::New(isolate, ExtendMethodCallback, External::New(isolate, this));
 		ctorFunction->Set(extendFuncName, extendFuncTemplate->GetFunction());
 
 		//get candidates from static fields metadata
@@ -786,7 +786,7 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate *is
 	}
 
 	auto pft = new Persistent<FunctionTemplate>(isolate, ctorFuncTemplate);
-	CtorCacheItem ctorCacheItem(pft, instanceMethodsCallbackData);
+	CtorCacheData ctorCacheItem(pft, instanceMethodsCallbackData);
 	cache->CtorFuncCache.insert(make_pair(treeNode, ctorCacheItem));
 
 	SetInnerTypes(isolate, wrappedCtorFunc, treeNode);
@@ -844,7 +844,7 @@ void MetadataNode::ExtendedClassConstructorCallback(const v8::FunctionCallbackIn
 
 		auto isolate = info.GetIsolate();
 		auto thiz = info.This();
-		auto extData = reinterpret_cast<ExtendedClassData*>(info.Data().As<External>()->Value());
+		auto extData = reinterpret_cast<ExtendedClassCallbackData *>(info.Data().As<External>()->Value());
 
 		auto implementationObject = Local<Object>::New(isolate, *extData->implementationObject);
 
@@ -1348,7 +1348,7 @@ string MetadataNode::CreateFullClassName(const std::string& className, const std
 	return fullClassName;
 }
 
-void MetadataNode::ExtendCallMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& info)
+void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value> &info)
 {
 	try
 	{
@@ -1420,7 +1420,8 @@ void MetadataNode::ExtendCallMethodCallback(const v8::FunctionCallbackInfo<v8::V
 		//resolve class (pre-generated or generated runtime from dex generator)
 		uint8_t nodeType = s_metadataReader.GetNodeType(node->m_treeNode);
 		bool isInterface = s_metadataReader.IsNodeTypeInterface(nodeType);
-		auto fullExtendedName = CallbackHandlers::ResolveClassName(isolate, fullClassName, implementationObject, isInterface);
+		auto clazz = CallbackHandlers::ResolveClass(isolate, fullClassName, implementationObject, isInterface);
+		auto fullExtendedName = CallbackHandlers::ResolveClassName(isolate, clazz);
 		DEBUG_WRITE("ExtendsCallMethodHandler: extend full name %s", fullClassName.c_str());
 
 		auto cachedData = GetCachedExtendedClassData(isolate, fullExtendedName);
@@ -1448,7 +1449,7 @@ void MetadataNode::ExtendCallMethodCallback(const v8::FunctionCallbackInfo<v8::V
 		}
 
 		auto baseClassCtorFunc = node->GetConstructorFunction(isolate);
-		auto extendData = External::New(isolate, new ExtendedClassData(node, extendNameAndLocation, implementationObject, fullExtendedName));
+		auto extendData = External::New(isolate, new ExtendedClassCallbackData(node, extendNameAndLocation, implementationObject, fullExtendedName));
 		auto extendFuncTemplate = FunctionTemplate::New(isolate, ExtendedClassConstructorCallback, extendData);
 		extendFuncTemplate->InstanceTemplate()->SetInternalFieldCount(static_cast<int>(ObjectManager::MetadataNodeKeys::END));
 

@@ -62,13 +62,11 @@ namespace tns
 		private:
 			struct MethodCallbackData;
 
-			struct ExtendedClassData;
+			struct ExtendedClassCallbackData;
 
 			struct ExtendedClassCacheData;
 
 			struct TypeMetadata;
-
-			struct InnerClassData;
 
 			struct MetadataCacheItem;
 
@@ -110,7 +108,7 @@ namespace tns
 			static void MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 			static void InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 			static void ClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
-			static void ExtendCallMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
+			static void ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value> &info);
 			static bool ValidateExtendArguments(const v8::FunctionCallbackInfo<v8::Value>& info, std::string& extendLocation, v8::Local<v8::String>& extendName, v8::Local<v8::Object>& implementationObject);
 			static void ExtendedClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 
@@ -149,18 +147,6 @@ namespace tns
 			static std::map<v8::Isolate*, MetadataNodeCache*> s_cache;
 			static bool s_profilerEnabled;
 
-			struct CtorCacheItem
-			{
-					CtorCacheItem(v8::Persistent<v8::FunctionTemplate>* _ft, std::vector<MethodCallbackData*> _instanceMethodCallbacks)
-					:
-							ft(_ft), instanceMethodCallbacks(_instanceMethodCallbacks)
-					{
-					}
-
-					v8::Persistent<v8::FunctionTemplate>* ft;
-					std::vector<MethodCallbackData*> instanceMethodCallbacks;
-			};
-
 			struct MethodCallbackData
 			{
 					MethodCallbackData()
@@ -181,9 +167,9 @@ namespace tns
 					bool isSuper;
 			};
 
-			struct ExtendedClassData
+			struct ExtendedClassCallbackData
 			{
-					ExtendedClassData(MetadataNode *_node, const std::string& _extendedName, const v8::Local<v8::Object>& _implementationObject, std::string _fullClassName)
+					ExtendedClassCallbackData(MetadataNode *_node, const std::string& _extendedName, const v8::Local<v8::Object>& _implementationObject, std::string _fullClassName)
 					:
 							node(_node), extendedName(_extendedName), fullClassName(_fullClassName)
 					{
@@ -197,24 +183,6 @@ namespace tns
 					std::string fullClassName;
 			};
 
-			struct ExtendedClassCacheData
-			{
-					ExtendedClassCacheData()
-					:
-							extendedCtorFunction(nullptr), node(nullptr)
-					{
-					}
-					ExtendedClassCacheData(const v8::Local<v8::Function>& extCtorFunc, const std::string& _extendedName, MetadataNode *_node)
-					:
-							extendedName(_extendedName), node(_node)
-					{
-						extendedCtorFunction = new v8::Persistent<v8::Function>(v8::Isolate::GetCurrent(), extCtorFunc);
-					}
-					v8::Persistent<v8::Function> *extendedCtorFunction;
-					std::string extendedName;
-					MetadataNode *node;
-			};
-
 			struct TypeMetadata
 			{
 					TypeMetadata(const std::string& _name)
@@ -226,23 +194,41 @@ namespace tns
 					std::string name;
 			};
 
-			struct InnerClassData
+			struct CtorCacheData
 			{
-					InnerClassData(v8::Persistent<v8::Object> *_outerThis, MetadataNode *_node)
-					:
-							outerThis(_outerThis), node(_node)
-					{
-					}
+				CtorCacheData(v8::Persistent<v8::FunctionTemplate>* _ft, std::vector<MethodCallbackData*> _instanceMethodCallbacks)
+						:
+						ft(_ft), instanceMethodCallbacks(_instanceMethodCallbacks)
+				{
+				}
 
-					v8::Persistent<v8::Object> *outerThis;
-					MetadataNode *node;
+				v8::Persistent<v8::FunctionTemplate>* ft;
+				std::vector<MethodCallbackData*> instanceMethodCallbacks;
+			};
+
+			struct ExtendedClassCacheData
+			{
+				ExtendedClassCacheData()
+						:
+						extendedCtorFunction(nullptr), node(nullptr)
+				{
+				}
+				ExtendedClassCacheData(const v8::Local<v8::Function>& extCtorFunc, const std::string& _extendedName, MetadataNode *_node)
+						:
+						extendedName(_extendedName), node(_node)
+				{
+					extendedCtorFunction = new v8::Persistent<v8::Function>(v8::Isolate::GetCurrent(), extCtorFunc);
+				}
+				v8::Persistent<v8::Function> *extendedCtorFunction;
+				std::string extendedName;
+				MetadataNode *node;
 			};
 
 			struct MetadataNodeCache
 			{
 				v8::Persistent<v8::String> *MetadataKey;
 
-				std::map<MetadataTreeNode*, CtorCacheItem> CtorFuncCache;
+				std::map<MetadataTreeNode*, CtorCacheData> CtorFuncCache;
 
 				std::map<std::string, MetadataNode::ExtendedClassCacheData> ExtendedCtorFuncCache;
 			};

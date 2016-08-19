@@ -167,10 +167,9 @@ jclass CallbackHandlers::ResolveClass(Isolate *isolate, const string &fullClassn
     return globalRefToGeneratedClass;
 }
 
-// Called by ExtendCallMethodCallback when extending a class
-string CallbackHandlers::ResolveClassName(Isolate *isolate, const string& fullClassname, const Local<Object>& implementationObject, bool isInterface)
+// Called by ExtendMethodCallback when extending a class
+string CallbackHandlers::ResolveClassName(Isolate *isolate, jclass &clazz)
 {
-	auto clazz = ResolveClass(isolate, fullClassname, implementationObject, isInterface);
 	auto runtime = Runtime::GetRuntime(isolate);
 	auto objectManager = runtime->GetObjectManager();
 	auto className = objectManager->GetClassName(clazz);
