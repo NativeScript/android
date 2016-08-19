@@ -63,6 +63,8 @@ namespace tns
 			jobjectArray m_arr;
 
 			short MAX_JAVA_PARAMS_COUNT = 256;
+
+			static jclass JAVA_LANG_OBJECT_CLASS;
 	};
 }
 

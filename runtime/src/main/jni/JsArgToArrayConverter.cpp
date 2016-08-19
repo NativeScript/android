@@ -3,7 +3,6 @@
 #include "ObjectManager.h"
 #include "V8StringConstants.h"
 #include "ArgConverter.h"
-#include "JavaObjectArrayCache.h"
 #include "NumericCasts.h"
 #include "NativeScriptException.h"
 #include "Runtime.h"
@@ -378,10 +377,12 @@ jobjectArray JsArgToArrayConverter::ToJavaArray()
 		}
 
 		JEnv env;
-		jclass objectClass = env.FindClass("java/lang/Object");
 
-		// TODO: Pete: Verify that no memory leak will occur when the time comes to release the array
-		JniLocalRef tmpArr(env.NewObjectArray(m_argsLen, objectClass, nullptr));
+		if(JsArgToArrayConverter::JAVA_LANG_OBJECT_CLASS == nullptr) {
+			JsArgToArrayConverter::JAVA_LANG_OBJECT_CLASS = env.FindClass("java/lang/Object");
+		}
+
+		JniLocalRef tmpArr(env.NewObjectArray(m_argsLen, JsArgToArrayConverter::JAVA_LANG_OBJECT_CLASS, nullptr));
 		m_arr = (jobjectArray) env.NewGlobalRef(tmpArr);
 
 		for (int i = 0; i < m_argsLen; i++)
@@ -411,3 +412,5 @@ JsArgToArrayConverter::~JsArgToArrayConverter()
 		delete[] m_argsAsObject;
 	}
 }
+
+jclass JsArgToArrayConverter::JAVA_LANG_OBJECT_CLASS = nullptr;

@@ -13,7 +13,6 @@
 #include <sstream>
 #include <fstream>
 #include <cstdio>
-#include "JavaObjectArrayCache.h"
 #include "MethodCache.h"
 #include "JsDebugger.h"
 #include "SimpleProfiler.h"
@@ -163,6 +162,9 @@ jclass CallbackHandlers::ResolveClass(Isolate *isolate, const string &fullClassn
         globalRefToGeneratedClass = static_cast<jclass>(env.NewGlobalRef(generatedClass));
 
         s_classCache.insert(make_pair(fullClassname, globalRefToGeneratedClass));
+
+        env.DeleteGlobalRef(methodOverrides);
+        env.DeleteGlobalRef(implementedInterfaces);
     }
 
     return globalRefToGeneratedClass;
@@ -565,9 +567,10 @@ Local<Object> CallbackHandlers::CreateJSWrapper(Isolate *isolate, jint javaObjec
     return objectManager->CreateJSWrapper(javaObjectID, typeName);
 }
 
+
 jobjectArray CallbackHandlers::GetImplementedInterfaces(JEnv &env, const Local<Object> &implementationObject) {
     if (implementationObject.IsEmpty()) {
-        return JavaObjectArrayCache::GetJavaStringArray(0);
+        return CallbackHandlers::GetJavaStringArray(env, 0);
     }
 
     vector <jstring> interfacesToImplement;
@@ -580,7 +583,6 @@ jobjectArray CallbackHandlers::GetImplementedInterfaces(JEnv &env, const Local<O
 
         if (arrFound) {
                 v8::String::Utf8Value propName(name);
-                // convert it to string
                 std::string arrNameC = std::string(*propName);
                 if (arrNameC == "interfaces") {
                     auto interfacesArr = prop->ToObject();
@@ -608,7 +610,7 @@ jobjectArray CallbackHandlers::GetImplementedInterfaces(JEnv &env, const Local<O
 
     int interfacesCount = interfacesToImplement.size();
 
-    jobjectArray implementedInterfaces = JavaObjectArrayCache::GetJavaStringArray(interfacesCount);
+    jobjectArray implementedInterfaces = CallbackHandlers::GetJavaStringArray(env, interfacesCount);
     for (int i = 0; i < interfacesCount; i++) {
         env.SetObjectArrayElement(implementedInterfaces, i, interfacesToImplement[i]);
     }
@@ -622,7 +624,7 @@ jobjectArray CallbackHandlers::GetImplementedInterfaces(JEnv &env, const Local<O
 
 jobjectArray CallbackHandlers::GetMethodOverrides(JEnv &env, const Local<Object> &implementationObject) {
     if (implementationObject.IsEmpty()) {
-        return JavaObjectArrayCache::GetJavaStringArray(0);
+        return CallbackHandlers::GetJavaStringArray(env, 0);
     }
 
     vector <jstring> methodNames;
@@ -642,7 +644,7 @@ jobjectArray CallbackHandlers::GetMethodOverrides(JEnv &env, const Local<Object>
 
     int methodCount = methodNames.size();
 
-    jobjectArray methodOverrides = JavaObjectArrayCache::GetJavaStringArray(methodCount);
+    jobjectArray methodOverrides = CallbackHandlers::GetJavaStringArray(env, methodCount);
     for (int i = 0; i < methodCount; i++) {
         env.SetObjectArrayElement(methodOverrides, i, methodNames[i]);
     }
@@ -880,6 +882,21 @@ int CallbackHandlers::GetArrayLength(Isolate *isolate, const Local<Object> &arr)
     return length;
 }
 
+jobjectArray CallbackHandlers::GetJavaStringArray(JEnv& env, int length) {
+    if (length > CallbackHandlers::MAX_JAVA_STRING_ARRAY_LENGTH)
+    {
+        stringstream ss;
+        ss << "You are trying to override more methods than the limit of " <<  CallbackHandlers::MAX_JAVA_STRING_ARRAY_LENGTH;
+        throw NativeScriptException(ss.str());
+    }
+
+    JniLocalRef tmpArr(env.NewObjectArray(length, JAVA_LANG_STRING, nullptr));
+    return (jobjectArray) env.NewGlobalRef(tmpArr);
+}
+
+
+
+short CallbackHandlers::MAX_JAVA_STRING_ARRAY_LENGTH = 100;
 jclass CallbackHandlers::RUNTIME_CLASS = nullptr;
 jclass CallbackHandlers::JAVA_LANG_STRING = nullptr;
 jfieldID CallbackHandlers::CURRENT_OBJECTID_FIELD_ID = nullptr;
@@ -889,9 +906,7 @@ jmethodID CallbackHandlers::GET_TYPE_METADATA = nullptr;
 jmethodID CallbackHandlers::ENABLE_VERBOSE_LOGGING_METHOD_ID = nullptr;
 jmethodID CallbackHandlers::DISABLE_VERBOSE_LOGGING_METHOD_ID = nullptr;
 jmethodID CallbackHandlers::GET_CHANGE_IN_BYTES_OF_USED_MEMORY_METHOD_ID = nullptr;
-MetadataTreeNode *CallbackHandlers::metadataRoot = nullptr;
 NumericCasts CallbackHandlers::castFunctions;
 ArrayElementAccessor CallbackHandlers::arrayElementAccessor;
 FieldAccessor CallbackHandlers::fieldAccessor;
-map<string, int> CallbackHandlers::s_constructorCache;
 map <std::string, jclass> CallbackHandlers::s_classCache;

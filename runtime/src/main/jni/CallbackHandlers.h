@@ -58,8 +58,18 @@ namespace tns
 
 			static std::vector<std::string> GetTypeMetadata(const std::string& name, int index);
 
+			/*
+			 * Gets all methods in the implementation object, and packs them in a jobjectArray
+			 * to pass them to Java Land, so that their corresponding Java callbacks are written when
+			 * the dexFactory generates the class
+			 */
 			static jobjectArray GetMethodOverrides(JEnv& env, const v8::Local<v8::Object>& implementationObject);
 
+			/*
+			 * Gets all interfaces declared in the 'interfaces' array inside the implementation object,
+			 * and packs them in a jobjectArray to pass them to Java Land, so that they may be
+			 * implemented when the dexFactory generates the corresponding class
+			 */
 			static jobjectArray GetImplementedInterfaces(JEnv &env, const v8::Local<v8::Object> &implementationObject);
 
 			static void EnableVerboseLoggingMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
@@ -74,6 +84,13 @@ namespace tns
 			}
 
 			static int64_t AdjustAmountOfExternalAllocatedMemory(JEnv& env, v8::Isolate *isolate);
+
+			/*
+			 * Helper method that creates a java string array for sending strings over JNI
+			 */
+			static jobjectArray GetJavaStringArray(JEnv& env, int length);
+
+			static short MAX_JAVA_STRING_ARRAY_LENGTH;
 
 			static jclass RUNTIME_CLASS;
 
