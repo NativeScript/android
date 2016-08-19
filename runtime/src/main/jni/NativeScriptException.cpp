@@ -338,6 +338,7 @@ string NativeScriptException::GetErrorMessage(const Local<Message>& message, con
 	{
 		ss << "File: \"<unknown>";
 	}
+
 	ss << ", line: " << message->GetLineNumber() << ", column: " << message->GetStartColumn() << endl << endl;
 
 	string stackTraceMessage = GetErrorStackTrace(message->GetStackTrace());

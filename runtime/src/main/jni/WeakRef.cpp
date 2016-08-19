@@ -1,5 +1,4 @@
 #include "WeakRef.h"
-#include "V8GlobalHelpers.h"
 #include "ArgConverter.h"
 #include "V8StringConstants.h"
 #include "NativeScriptException.h"

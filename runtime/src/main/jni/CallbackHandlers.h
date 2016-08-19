@@ -116,10 +116,6 @@ namespace tns
 
 			static FieldAccessor fieldAccessor;
 
-			static MetadataTreeNode *metadataRoot;
-
-			static std::map<std::string, int> s_constructorCache;
-
 			static std::map<std::string, jclass> s_classCache;
 
 			struct JavaObjectIdScope

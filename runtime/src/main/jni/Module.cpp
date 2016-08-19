@@ -9,7 +9,6 @@
 #include "JniLocalRef.h"
 #include "ArgConverter.h"
 #include "V8GlobalHelpers.h"
-#include "ArgConverter.h"
 #include "NativeScriptAssert.h"
 #include "Constants.h"
 #include "NativeScriptException.h"

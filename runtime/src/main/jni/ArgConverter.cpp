@@ -1,7 +1,6 @@
 #include "ArgConverter.h"
 #include "ObjectManager.h"
 #include "Util.h"
-#include "ArgConverter.h"
 #include "V8StringConstants.h"
 #include "NativeScriptException.h"
 #include "NumericCasts.h"
