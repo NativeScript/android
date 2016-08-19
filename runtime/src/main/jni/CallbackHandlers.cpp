@@ -140,6 +140,7 @@ jclass CallbackHandlers::ResolveClass(Isolate *isolate, const string &fullClassn
         globalRefToGeneratedClass = itFound->second;
     }
     else {
+        // TODO: plamen5kov: lock on insert in "s_classCache"
         JEnv env;
 
         // get needed arguments in order to load binding

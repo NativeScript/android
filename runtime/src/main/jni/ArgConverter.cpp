@@ -13,7 +13,7 @@ using namespace tns;
 
 void ArgConverter::Init(Isolate *isolate)
 {
-	auto cache = GetCache(isolate);
+	auto cache = GetTypeLongCache(isolate);
 
 	auto ft = FunctionTemplate::New(isolate, ArgConverter::NativeScriptLongFunctionCallback);
 	ft->SetClassName(V8StringConstants::GetLongNumber());
@@ -76,7 +76,7 @@ void ArgConverter::NativeScriptLongFunctionCallback(const v8::FunctionCallbackIn
 	{
 		auto isolate = args.GetIsolate();
 		auto thiz = args.This();
-		auto cache = GetCache(isolate);
+		auto cache = GetTypeLongCache(isolate);
 		thiz->SetHiddenValue(V8StringConstants::GetJavaLong(), Boolean::New(isolate, true));
 		NumericCasts::MarkAsLong(thiz, args[0]);
 		thiz->SetPrototype(Local<NumberObject>::New(isolate, *cache->NanNumberObject));
@@ -254,7 +254,7 @@ Local<Value> ArgConverter::ConvertFromJavaLong(Isolate *isolate, jlong value)
 	}
 	else
 	{
-		auto cache = GetCache(isolate);
+		auto cache = GetTypeLongCache(isolate);
 		char strNumber[24];
 		sprintf(strNumber, "%lld", longValue);
 		Local<Value> strValue = ConvertToV8String(strNumber);
@@ -283,14 +283,14 @@ int64_t ArgConverter::ConvertToJavaLong(const Local<Value>& value)
 	return longValue;
 }
 
-ArgConverter::TypeLongOperationsCache * ArgConverter::GetCache(v8::Isolate *isolate)
+ArgConverter::TypeLongOperationsCache * ArgConverter::GetTypeLongCache(v8::Isolate *isolate)
 {
 	TypeLongOperationsCache *cache;
-	auto itFound = s_cache.find(isolate);
-	if (itFound == s_cache.end())
+	auto itFound = s_type_long_operations_cache.find(isolate);
+	if (itFound == s_type_long_operations_cache.end())
 	{
 		cache = new TypeLongOperationsCache;
-		s_cache.insert(make_pair(isolate, cache));
+		s_type_long_operations_cache.insert(make_pair(isolate, cache));
 	}
 	else
 	{
@@ -341,5 +341,5 @@ Local<String> ArgConverter::ConvertToV8String(const char *data, int length)
 }
 
 
-std::map<Isolate*, ArgConverter::TypeLongOperationsCache *> ArgConverter::s_cache;
+std::map<Isolate*, ArgConverter::TypeLongOperationsCache *> ArgConverter::s_type_long_operations_cache;
 char* ArgConverter::charBuffer = new char[ArgConverter::BUFFER_SIZE];

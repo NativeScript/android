@@ -53,7 +53,7 @@ namespace tns
 			};
 			//
 
-			static TypeLongOperationsCache * GetCache(v8::Isolate *isolate);
+			static TypeLongOperationsCache *GetTypeLongCache(v8::Isolate *isolate);
 
 			static bool ReadJStringInBuffer(jstring value, jsize& utfLength);
 
@@ -69,7 +69,12 @@ namespace tns
 
 			static char *charBuffer;
 			static const int BUFFER_SIZE = 1024 * 64; // 64KB size. TODO: Do we need a larger/smaller buffer?
-			static std::map<v8::Isolate*, TypeLongOperationsCache *> s_cache;
+
+			/*
+			 * "s_type_long_operations_cache" used to keep function
+			 * dealing with operations concerning java long -> javascript number.
+			 */
+			static std::map<v8::Isolate*, TypeLongOperationsCache *> s_type_long_operations_cache;
 	};
 }
 

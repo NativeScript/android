@@ -60,8 +60,9 @@ namespace tns
 			static jmethodID RESOLVE_CONSTRUCTOR_SIGNATURE_ID;
 
 			/*
-			 * parameter: s_mthod_ctor_signature_cache holding all resolved CacheMethodInfo against an encoded_signature string.
-			 * Encoded signature: <className>.S/I.<methodName>.<argsCount>.<arg1class>.<...>
+			 * "s_mthod_ctor_signature_cache" holding all resolved CacheMethodInfo against an encoded_signature string.
+			 *  Used for caching the resolved constructor or method signature.
+			 * The encoded signature has template: <className>.S/I.<methodName>.<argsCount>.<arg1class>.<...>
 			 */
 			static std::map<std::string, CacheMethodInfo> s_mthod_ctor_signature_cache;
 	};

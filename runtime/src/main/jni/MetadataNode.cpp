@@ -19,7 +19,7 @@ using namespace tns;
 void MetadataNode::Init(Isolate *isolate)
 {
 	auto key = ArgConverter::ConvertToV8String("tns::MetadataKey");
-	auto cache = GetCache(isolate);
+	auto cache = GetMetadataNodeCache(isolate);
 	cache->MetadataKey = new Persistent<String>(isolate, key);
 }
 
@@ -736,8 +736,9 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate *is
 {
 	SET_PROFILER_FRAME();
 
+	//try get cached "ctorFuncTemplate"
 	Local<FunctionTemplate> ctorFuncTemplate;
-	auto cache = GetCache(isolate);
+	auto cache = GetMetadataNodeCache(isolate);
 	auto itFound = cache->CtorFuncCache.find(treeNode);
 	if (itFound != cache->CtorFuncCache.end())
 	{
@@ -746,6 +747,7 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate *is
 		ctorFuncTemplate = Local<FunctionTemplate>::New(isolate, *ctorCacheItem.ft);
 		return ctorFuncTemplate;
 	}
+	//
 
 	auto node = GetOrCreateInternal(treeNode);
 	auto ctorCallbackData = External::New(isolate, node);
@@ -785,9 +787,11 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate *is
 		wrappedCtorFunc->SetPrototype(baseCtorFunc);
 	}
 
+	//cache "ctorFuncTemplate"
 	auto pft = new Persistent<FunctionTemplate>(isolate, ctorFuncTemplate);
 	CtorCacheData ctorCacheItem(pft, instanceMethodsCallbackData);
 	cache->CtorFuncCache.insert(make_pair(treeNode, ctorCacheItem));
+	//
 
 	SetInnerTypes(isolate, wrappedCtorFunc, treeNode);
 
@@ -817,7 +821,7 @@ void MetadataNode::SetTypeMetadata(Isolate *isolate, Local<Function> value, Type
 MetadataNode* MetadataNode::GetInstanceMetadata(Isolate *isolate, const Local<Object>& value)
 {
 	MetadataNode *node = nullptr;
-	auto cache = GetCache(isolate);
+	auto cache = GetMetadataNodeCache(isolate);
 	auto key = Local<String>::New(isolate, *cache->MetadataKey);
 	auto ext = value->GetHiddenValue(key);
 	if (!ext.IsEmpty())
@@ -829,7 +833,7 @@ MetadataNode* MetadataNode::GetInstanceMetadata(Isolate *isolate, const Local<Ob
 
 void MetadataNode::SetInstanceMetadata(Isolate *isolate, Local<Object> value, MetadataNode *node)
 {
-	auto cache = GetCache(isolate);
+	auto cache = GetMetadataNodeCache(isolate);
 	auto key = Local<String>::New(isolate, *cache->MetadataKey);
 	value->SetHiddenValue(key, External::New(isolate, node));
 }
@@ -1325,7 +1329,7 @@ bool MetadataNode::ValidateExtendArguments(const FunctionCallbackInfo<Value>& in
 
 MetadataNode::ExtendedClassCacheData MetadataNode::GetCachedExtendedClassData(Isolate *isolate, const string& proxyClassName)
 {
-	auto cache = GetCache(isolate);
+	auto cache = GetMetadataNodeCache(isolate);
 	ExtendedClassCacheData cacheData;
 	auto itFound = cache->ExtendedCtorFuncCache.find(proxyClassName);
 	if (itFound != cache->ExtendedCtorFuncCache.end())
@@ -1470,7 +1474,7 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
 		s_name2NodeCache.insert(make_pair(fullExtendedName, node));
 
 		ExtendedClassCacheData cacheData(extendFunc, fullExtendedName, node);
-		auto cache = GetCache(isolate);
+		auto cache = GetMetadataNodeCache(isolate);
 		cache->ExtendedCtorFuncCache.insert(make_pair(fullExtendedName, cacheData));
 	}
 	catch (NativeScriptException& e)
@@ -1697,14 +1701,14 @@ void MetadataNode::CreateTopLevelNamespaces(Isolate *isolate, const Local<Object
 	}
 }
 
-MetadataNode::MetadataNodeCache* MetadataNode::GetCache(Isolate *isolate)
+MetadataNode::MetadataNodeCache* MetadataNode::GetMetadataNodeCache(Isolate *isolate)
 {
 	MetadataNodeCache *cache;
-	auto itFound = s_cache.find(isolate);
-	if (itFound == s_cache.end())
+	auto itFound = s_metadata_node_cache.find(isolate);
+	if (itFound == s_metadata_node_cache.end())
 	{
 		cache = new MetadataNodeCache;
-		s_cache.insert(make_pair(isolate, cache));
+		s_metadata_node_cache.insert(make_pair(isolate, cache));
 	}
 	else
 	{
@@ -1812,5 +1816,5 @@ MetadataReader MetadataNode::s_metadataReader;
 std::map<std::string, MetadataNode*> MetadataNode::s_name2NodeCache;
 std::map<std::string, MetadataTreeNode*> MetadataNode::s_name2TreeNodeCache;
 std::map<MetadataTreeNode*, MetadataNode*> MetadataNode::s_treeNode2NodeCache;
-map<Isolate*, MetadataNode::MetadataNodeCache*> MetadataNode::s_cache;
+map<Isolate*, MetadataNode::MetadataNodeCache*> MetadataNode::s_metadata_node_cache;
 bool MetadataNode::s_profilerEnabled = false;

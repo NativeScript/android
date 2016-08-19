@@ -86,7 +86,7 @@ namespace tns
 
 			static void BuildMetadata(uint32_t nodesLength, uint8_t *nodeData, uint32_t nameLength, uint8_t *nameData, uint32_t valueLength, uint8_t *valueData);
 
-			static MetadataNodeCache* GetCache(v8::Isolate *isolate);
+			static MetadataNodeCache*GetMetadataNodeCache(v8::Isolate *isolate);
 
 			static MetadataNode* GetOrCreateInternal(MetadataTreeNode *treeNode);
 
@@ -142,7 +142,7 @@ namespace tns
 			static std::map<std::string, MetadataNode*> s_name2NodeCache;
 			static std::map<std::string, MetadataTreeNode*> s_name2TreeNodeCache;
 			static std::map<MetadataTreeNode*, MetadataNode*> s_treeNode2NodeCache;
-			static std::map<v8::Isolate*, MetadataNodeCache*> s_cache;
+			static std::map<v8::Isolate*, MetadataNodeCache*> s_metadata_node_cache;
 			static bool s_profilerEnabled;
 
 			struct MethodCallbackData
