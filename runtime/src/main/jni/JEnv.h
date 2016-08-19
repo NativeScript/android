@@ -177,6 +177,19 @@ namespace tns
 
 			jclass FindClass(const std::string& className);
 
+			/*
+			 * The "CheckForClassInCache" will check if a class is loaded into the cache
+			 * if it is: it returns a global reference of it
+			 * if it is not: it will return "nullptr".
+			 */
+			jclass CheckForClassInCache(const std::string& className);
+
+			/*
+			 * "InsertClassIntoCache" will take care of deleting the LocalReference of passed "jclass& tmp".
+			 * A new GlobalReference object will be created from "tmp". The function returns the global object.
+			 */
+			jclass InsertClassIntoCache(const std::string& className, jclass& tmp);
+
 			jobject NewDirectByteBuffer(void* address, jlong capacity);
 			void* GetDirectBufferAddress(jobject buf);
 			jlong GetDirectBufferCapacity(jobject buf);

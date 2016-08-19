@@ -116,8 +116,6 @@ namespace tns
 
 			static FieldAccessor fieldAccessor;
 
-			static std::map<std::string, jclass> s_classCache;
-
 			struct JavaObjectIdScope
 			{
 				JavaObjectIdScope(JEnv& env, jfieldID fieldId, jobject runtime, int javaObjectId)

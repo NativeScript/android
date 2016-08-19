@@ -132,16 +132,10 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
 
 jclass CallbackHandlers::ResolveClass(Isolate *isolate, const string &fullClassname,
                                       const Local<Object> &implementationObject, bool isInterface) {
-    auto itFound = s_classCache.find(fullClassname);
+    JEnv env;
+    jclass globalRefToGeneratedClass = env.CheckForClassInCache(fullClassname);
 
-    jclass globalRefToGeneratedClass;
-
-    if (itFound != s_classCache.end()) {
-        globalRefToGeneratedClass = itFound->second;
-    }
-    else {
-        // TODO: plamen5kov: lock on insert in "s_classCache"
-        JEnv env;
+    if (globalRefToGeneratedClass == nullptr) {
 
         // get needed arguments in order to load binding
         JniLocalRef javaFullClassName(env.NewStringUTF(fullClassname.c_str()));
@@ -153,16 +147,14 @@ jclass CallbackHandlers::ResolveClass(Isolate *isolate, const string &fullClassn
         auto runtime = Runtime::GetRuntime(isolate);
 
         // create or load generated binding (java class)
-        JniLocalRef generatedClass(env.CallObjectMethod(runtime->GetJavaRuntime(),
+        jclass generatedClass = (jclass)env.CallObjectMethod(runtime->GetJavaRuntime(),
                                      RESOLVE_CLASS_METHOD_ID,
                                      (jstring) javaFullClassName,
                                      methodOverrides,
                                      implementedInterfaces,
-                                     isInterface));
+                                     isInterface);
 
-        globalRefToGeneratedClass = static_cast<jclass>(env.NewGlobalRef(generatedClass));
-
-        s_classCache.insert(make_pair(fullClassname, globalRefToGeneratedClass));
+        globalRefToGeneratedClass = env.InsertClassIntoCache(fullClassname, generatedClass);
 
         env.DeleteGlobalRef(methodOverrides);
         env.DeleteGlobalRef(implementedInterfaces);
@@ -910,4 +902,3 @@ jmethodID CallbackHandlers::GET_CHANGE_IN_BYTES_OF_USED_MEMORY_METHOD_ID = nullp
 NumericCasts CallbackHandlers::castFunctions;
 ArrayElementAccessor CallbackHandlers::arrayElementAccessor;
 FieldAccessor CallbackHandlers::fieldAccessor;
-map <std::string, jclass> CallbackHandlers::s_classCache;

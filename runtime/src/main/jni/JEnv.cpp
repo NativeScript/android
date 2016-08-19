@@ -748,15 +748,9 @@ void JEnv::SetDoubleArrayRegion(jdoubleArray array, jsize start, jsize len, cons
 
 jclass JEnv::FindClass(const string& className)
 {
-	jclass klass;
+	jclass global_class = CheckForClassInCache(className);
 
-	auto itFound = s_classCache.find(className);
-
-	if (itFound != s_classCache.end())
-	{
-		klass = itFound->second;
-	}
-	else
+	if (global_class == nullptr)
 	{
 		jclass tmp = m_env->FindClass(className.c_str());
 
@@ -770,12 +764,30 @@ jclass JEnv::FindClass(const string& className)
 			m_env->DeleteLocalRef(s);
 		}
 
-		klass = reinterpret_cast<jclass>(m_env->NewGlobalRef(tmp));
-		s_classCache.insert(make_pair(className, klass));
-		m_env->DeleteLocalRef(tmp);
+		global_class = InsertClassIntoCache(className, tmp);
 	}
 
-	return klass;
+	return global_class;
+}
+
+jclass JEnv::CheckForClassInCache(const string& className) {
+	jclass global_class = nullptr;
+	auto itFound = s_classCache.find(className);
+
+	if (itFound != s_classCache.end())
+	{
+		global_class = itFound->second;
+	}
+
+	return global_class;
+}
+
+jclass JEnv::InsertClassIntoCache(const string& className, jclass& tmp) {
+	auto global_class= reinterpret_cast<jclass>(m_env->NewGlobalRef(tmp));
+	s_classCache.insert(make_pair(className, global_class));
+	m_env->DeleteLocalRef(tmp);
+
+	return global_class;
 }
 
 jobject JEnv::NewDirectByteBuffer(void* address, jlong capacity)
