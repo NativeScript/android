@@ -68,8 +68,6 @@ namespace tns
 
 			struct TypeMetadata;
 
-			struct MetadataCacheItem;
-
 			struct MetadataNodeCache;
 
 			MetadataNode(MetadataTreeNode *treeNode);

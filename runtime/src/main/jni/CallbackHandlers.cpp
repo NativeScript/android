@@ -91,8 +91,9 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
     auto mi = MethodCache::ResolveConstructorSignature(argWrapper, fullClassName,
                                                        generatedJavaClass, isInterface);
 
+    // while the "instance" is being created, if an exception is thrown during the construction
+    // this scope will guarantee the "javaObjectID" will be set to -1 and won't have an invalid value
     jobject instance;
-
     {
         JavaObjectIdScope objIdScope(env, CURRENT_OBJECTID_FIELD_ID, runtime->GetJavaRuntime(),
                                      javaObjectID);
