@@ -26,7 +26,7 @@ namespace tns
 
 			static int64_t ConvertToJavaLong(const v8::Local<v8::Value>& value);
 
-			static v8::Local<v8::Value> jstringToV8String(jstring value);
+			static v8::Local<v8::Value> jstringToV8String(v8::Isolate *isolate, jstring value);
 
 			static std::string jstringToString(jstring value);
 
@@ -34,11 +34,11 @@ namespace tns
 
 			static jstring ConvertToJavaString(const v8::Local<v8::Value>& jsValue);
 
-			static v8::Local<v8::String> ConvertToV8String(const jchar* data, int length);
+			static v8::Local<v8::String> ConvertToV8String(v8::Isolate *isolate, const jchar* data, int length);
 
-			static v8::Local<v8::String> ConvertToV8String(const std::string& s);
+			static v8::Local<v8::String> ConvertToV8String(v8::Isolate *isolate, const std::string& s);
 
-			static v8::Local<v8::String> ConvertToV8String(const char *data, int length);
+			static v8::Local<v8::String> ConvertToV8String(v8::Isolate *isolate, const char *data, int length);
 
 		private:
 
@@ -59,7 +59,7 @@ namespace tns
 
 			static jstring ObjectToString(jobject object);
 
-			static v8::Local<v8::String> jcharToV8String(jchar value);
+			static v8::Local<v8::String> jcharToV8String(v8::Isolate *isolate, jchar value);
 
 			static void NativeScriptLongFunctionCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 

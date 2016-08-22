@@ -22,8 +22,9 @@ void ArrayHelper::Init(const Local<Context>& context)
 	CREATE_ARRAY_HELPER = env.GetStaticMethodID(RUNTIME_CLASS, "createArrayHelper", "(Ljava/lang/String;I)Ljava/lang/Object;");
 	assert(CREATE_ARRAY_HELPER != nullptr);
 
+	auto isolate = context->GetIsolate();
 	auto global = context->Global();
-	auto arr = global->Get(context, ArgConverter::ConvertToV8String("Array"));
+	auto arr = global->Get(context, ArgConverter::ConvertToV8String(isolate, "Array"));
 
 	if (!arr.IsEmpty())
 	{
@@ -31,9 +32,8 @@ void ArrayHelper::Init(const Local<Context>& context)
 		auto success = arr.ToLocal(&arrVal);
 		if (success)
 		{
-			auto isolate = context->GetIsolate();
 			auto arrayObj = arrVal.As<Object>();
-			arrayObj->Set(context, ArgConverter::ConvertToV8String("create"), FunctionTemplate::New(isolate, CreateJavaArrayCallback)->GetFunction());
+			arrayObj->Set(context, ArgConverter::ConvertToV8String(isolate, "create"), FunctionTemplate::New(isolate, CreateJavaArrayCallback)->GetFunction());
 		}
 	}
 }
@@ -114,7 +114,7 @@ void ArrayHelper::CreateJavaArray(const v8::FunctionCallbackInfo<v8::Value>& inf
 
 		auto func = type.As<Function>();
 
-		auto clazz = func->Get(ArgConverter::ConvertToV8String("class"));
+		auto clazz = func->Get(ArgConverter::ConvertToV8String(isolate, "class"));
 
 		if (clazz.IsEmpty())
 		{
@@ -140,7 +140,7 @@ void ArrayHelper::CreateJavaArray(const v8::FunctionCallbackInfo<v8::Value>& inf
 
 void ArrayHelper::Throw(Isolate *isolate, const std::string& errorMessage)
 {
-	auto errMsg = ArgConverter::ConvertToV8String(errorMessage.c_str());
+	auto errMsg = ArgConverter::ConvertToV8String(isolate, errorMessage.c_str());
 	auto err = Exception::Error(errMsg);
 	isolate->ThrowException(err);
 }

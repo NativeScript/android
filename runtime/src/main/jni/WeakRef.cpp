@@ -17,7 +17,7 @@ void WeakRef::Init(v8::Isolate *isolate, Local<ObjectTemplate>& globalObjectTemp
 {
 	m_objectManager = objectManager;
 	auto extData = External::New(isolate, this);
-	globalObjectTemplate->Set(ArgConverter::ConvertToV8String("WeakRef"), FunctionTemplate::New(isolate, ConstructorCallback, extData));
+	globalObjectTemplate->Set(ArgConverter::ConvertToV8String(isolate, "WeakRef"), FunctionTemplate::New(isolate, ConstructorCallback, extData));
 }
 
 void WeakRef::ConstructorCallback(const FunctionCallbackInfo<Value>& args)
@@ -67,8 +67,8 @@ void WeakRef::ConstructorCallbackImpl(const FunctionCallbackInfo<Value>& args)
 				poTarget->SetWeak(callbackState, WeakTargetCallback);
 				poHolder->SetWeak(callbackState, WeakHolderCallback);
 
-				weakRef->Set(ArgConverter::ConvertToV8String("get"), GetGetterFunction(isolate));
-				weakRef->Set(ArgConverter::ConvertToV8String("clear"), GetClearFunction(isolate));
+				weakRef->Set(ArgConverter::ConvertToV8String(isolate, "get"), GetGetterFunction(isolate));
+				weakRef->Set(ArgConverter::ConvertToV8String(isolate, "clear"), GetClearFunction(isolate));
 				weakRef->SetHiddenValue(V8StringConstants::GetTarget(), External::New(isolate, poTarget));
 
 				args.GetReturnValue().Set(weakRef);

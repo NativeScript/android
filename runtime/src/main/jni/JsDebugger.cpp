@@ -178,7 +178,7 @@ void JsDebugger::ConsoleMessage(const v8::FunctionCallbackInfo<v8::Value>& args)
 		int lineNumber = 0;
 		int columnNumber = 0;
 
-		auto stackTrace = StackTrace::CurrentStackTrace(Isolate::GetCurrent(), 2, StackTrace::kOverview);
+		auto stackTrace = StackTrace::CurrentStackTrace(args.GetIsolate(), 2, StackTrace::kOverview);
 		if (!stackTrace.IsEmpty())
 		{
 			auto frame = stackTrace->GetFrame(1);

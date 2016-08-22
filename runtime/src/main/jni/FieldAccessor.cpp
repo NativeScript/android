@@ -110,7 +110,7 @@ Local<Value> FieldAccessor::GetJavaField(Isolate *isolate, const Local<Object>& 
 				JniLocalRef str(env.NewString(&result, 1));
 				jboolean bol = true;
 				const char* resP = env.GetStringUTFChars(str, &bol);
-				fieldResult = handleScope.Escape(ArgConverter::ConvertToV8String(resP, 1));
+				fieldResult = handleScope.Escape(ArgConverter::ConvertToV8String(isolate, resP, 1));
 				env.ReleaseStringUTFChars(str, resP);
 				break;
 			}
@@ -212,7 +212,7 @@ Local<Value> FieldAccessor::GetJavaField(Isolate *isolate, const Local<Object>& 
 			bool isString = fieldTypeName == "java/lang/String";
 			if (isString)
 			{
-				auto resultV8Value = ArgConverter::jstringToV8String((jstring) result);
+				auto resultV8Value = ArgConverter::jstringToV8String(isolate, (jstring) result);
 				fieldResult = handleScope.Escape(resultV8Value);
 			}
 			else

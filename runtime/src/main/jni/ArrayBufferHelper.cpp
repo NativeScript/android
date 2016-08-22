@@ -15,12 +15,11 @@ ArrayBufferHelper::ArrayBufferHelper()
 void ArrayBufferHelper::CreateConvertFunctions(Isolate *isolate, const Local<Object>& global, ObjectManager *objectManager)
 {
 	m_objectManager = objectManager;
-
 	auto extData = External::New(isolate, this);
 	auto fromFunc = FunctionTemplate::New(isolate, CreateFromCallbackStatic, extData)->GetFunction();
 	auto ctx = isolate->GetCurrentContext();
-	auto arrBufferCtorFunc = global->Get(ArgConverter::ConvertToV8String("ArrayBuffer")).As<Function>();
-	arrBufferCtorFunc->Set(ctx, ArgConverter::ConvertToV8String("from"), fromFunc);
+	auto arrBufferCtorFunc = global->Get(ArgConverter::ConvertToV8String(isolate, "ArrayBuffer")).As<Function>();
+	arrBufferCtorFunc->Set(ctx, ArgConverter::ConvertToV8String(isolate, "from"), fromFunc);
 }
 
 void ArrayBufferHelper::CreateFromCallbackStatic(const FunctionCallbackInfo<Value>& info)
@@ -108,7 +107,7 @@ void ArrayBufferHelper::CreateFromCallbackImpl(const FunctionCallbackInfo<Value>
 
 	auto arrayBuffer = ArrayBuffer::New(isolate, data, size);
 	auto ctx = isolate->GetCurrentContext();
-	arrayBuffer->Set(ctx, ArgConverter::ConvertToV8String("nativeObject"), argObj);
+	arrayBuffer->Set(ctx, ArgConverter::ConvertToV8String(isolate, "nativeObject"), argObj);
 
 	info.GetReturnValue().Set(arrayBuffer);
 }

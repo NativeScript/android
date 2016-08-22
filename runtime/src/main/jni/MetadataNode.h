@@ -171,7 +171,7 @@ namespace tns
 					:
 							node(_node), extendedName(_extendedName), fullClassName(_fullClassName)
 					{
-						implementationObject = new v8::Persistent<v8::Object>(v8::Isolate::GetCurrent(), _implementationObject);
+						implementationObject = new v8::Persistent<v8::Object>(_implementationObject->GetIsolate(), _implementationObject);
 					}
 
 					MetadataNode *node;
@@ -215,7 +215,7 @@ namespace tns
 						:
 						extendedName(_extendedName), node(_node)
 				{
-					extendedCtorFunction = new v8::Persistent<v8::Function>(v8::Isolate::GetCurrent(), extCtorFunc);
+					extendedCtorFunction = new v8::Persistent<v8::Function>(extCtorFunc->GetIsolate(), extCtorFunc);
 				}
 				v8::Persistent<v8::Function> *extendedCtorFunction;
 				std::string extendedName;

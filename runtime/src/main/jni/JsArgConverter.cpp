@@ -218,7 +218,7 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 			case CastType::None:
 				obj = objectManager->GetJavaObjectByJsObject(jsObject);
 
-				castValue = jsObject->GetHiddenValue(ArgConverter::ConvertToV8String(V8StringConstants::NULL_NODE_NAME));
+				castValue = jsObject->GetHiddenValue(ArgConverter::ConvertToV8String(m_isolate, V8StringConstants::NULL_NODE_NAME));
 				if(!castValue.IsEmpty()) {
 					SetConvertedObject(index, nullptr);
 					success = true;

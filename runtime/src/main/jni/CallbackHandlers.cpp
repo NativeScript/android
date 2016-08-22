@@ -384,7 +384,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
             JniLocalRef str(env.NewString(&result, 1));
             jboolean bol = true;
             const char *resP = env.GetStringUTFChars(str, &bol);
-            args.GetReturnValue().Set(ArgConverter::ConvertToV8String(resP, 1));
+            args.GetReturnValue().Set(ArgConverter::ConvertToV8String(isolate, resP, 1));
             env.ReleaseStringUTFChars(str, resP);
             break;
         }
@@ -475,7 +475,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
             }
 
             if (result != nullptr) {
-                auto objectResult = ArgConverter::jstringToV8String(static_cast<jstring>(result));
+                auto objectResult = ArgConverter::jstringToV8String(isolate, static_cast<jstring>(result));
                 args.GetReturnValue().Set(objectResult);
                 env.DeleteLocalRef(result);
             }
@@ -504,7 +504,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
 
                 Local<Value> objectResult;
                 if (isString) {
-                    objectResult = ArgConverter::jstringToV8String((jstring) result);
+                    objectResult = ArgConverter::jstringToV8String(isolate, (jstring) result);
                 }
                 else {
                     jint javaObjectID = objectManager->GetOrCreateObjectId(result);
@@ -580,7 +580,7 @@ jobjectArray CallbackHandlers::GetImplementedInterfaces(JEnv &env, const Local<O
                 if (arrNameC == "interfaces") {
                     auto interfacesArr = prop->ToObject();
 
-                    auto isolate = Isolate::GetCurrent();
+                    auto isolate = implementationObject->GetIsolate();
                     int length = interfacesArr->Get(v8::String::NewFromUtf8(isolate, "length"))->ToObject()->Uint32Value();
 
                     if(length > 0) {
@@ -756,8 +756,8 @@ void CallbackHandlers::ExitMethodCallback(const v8::FunctionCallbackInfo<v8::Val
     exit(-1);
 }
 
-void CallbackHandlers::CreateGlobalCastFunctions(const Local<ObjectTemplate> &globalTemplate) {
-    castFunctions.CreateGlobalCastFunctions(globalTemplate);
+void CallbackHandlers::CreateGlobalCastFunctions(Isolate *isolate, const Local<ObjectTemplate> &globalTemplate) {
+    castFunctions.CreateGlobalCastFunctions(isolate, globalTemplate);
 }
 
 vector <string> CallbackHandlers::GetTypeMetadata(const string &name, int index) {
@@ -795,7 +795,7 @@ Local<Value> CallbackHandlers::CallJSMethod(Isolate *isolate, JNIEnv *_env,
     JEnv env(_env);
     Local<Value> result;
 
-    auto method = jsObject->Get(ArgConverter::ConvertToV8String(methodName));
+    auto method = jsObject->Get(ArgConverter::ConvertToV8String(isolate, methodName));
 
     if (method.IsEmpty() || method->IsUndefined()) {
         stringstream ss;

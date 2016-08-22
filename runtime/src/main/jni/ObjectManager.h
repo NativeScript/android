@@ -47,6 +47,8 @@ namespace tns
 
 			int GenerateNewObjectID();
 
+			void SetInstanceIsolate(v8::Isolate *isolate);
+
 			v8::Local<v8::Object> GetEmptyObject(v8::Isolate *isolate);
 
 			enum class MetadataNodeKeys
@@ -181,6 +183,8 @@ namespace tns
 			int m_numberOfGC;
 
 			JEnv m_env;
+
+			v8::Isolate *m_isolate;
 
 			std::stack<GarbageCollectionInfo> m_markedForGC;
 

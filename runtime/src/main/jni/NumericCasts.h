@@ -20,7 +20,7 @@ namespace tns
 	class NumericCasts
 	{
 		public:
-			void CreateGlobalCastFunctions(const v8::Local<v8::ObjectTemplate>& globalTemplate);
+			void CreateGlobalCastFunctions(v8::Isolate *isolate, const v8::Local<v8::ObjectTemplate>& globalTemplate);
 
 			static CastType GetCastType(const v8::Local<v8::Object>& object);
 

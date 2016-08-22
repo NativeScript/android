@@ -45,12 +45,12 @@ void NativeScriptException::ReThrowToV8()
 	{
 		errObj = Local<Value>::New(isolate, *m_javascriptException);
 		if(errObj->IsObject() && !m_message.empty()) {
-			errObj.As<Object>()->Set(ArgConverter::ConvertToV8String("fullMessage"), ArgConverter::ConvertToV8String(m_message));
+			errObj.As<Object>()->Set(ArgConverter::ConvertToV8String(isolate, "fullMessage"), ArgConverter::ConvertToV8String(isolate, m_message));
 		}
 	}
 	else if (!m_message.empty())
 	{
-		errObj = Exception::Error(ArgConverter::ConvertToV8String(m_message));
+		errObj = Exception::Error(ArgConverter::ConvertToV8String(isolate, m_message));
 	}
 	else if (!m_javaException.IsNull())
 	{
@@ -58,7 +58,7 @@ void NativeScriptException::ReThrowToV8()
 	}
 	else
 	{
-		errObj = Exception::Error(ArgConverter::ConvertToV8String("No javascript exception or message provided."));
+		errObj = Exception::Error(ArgConverter::ConvertToV8String(isolate, "No javascript exception or message provided."));
 	}
 
 	isolate->ThrowException(errObj);
@@ -155,8 +155,9 @@ void NativeScriptException::Init(ObjectManager *objectManager)
 // ON V8 UNCAUGHT EXCEPTION
 void NativeScriptException::OnUncaughtError(Local<Message> message, Local<Value> error)
 {
+	auto isolate = Isolate::GetCurrent();
 	string errorMessage;
-	auto v8FullMessage = ArgConverter::ConvertToV8String("fullMessage");
+	auto v8FullMessage = ArgConverter::ConvertToV8String(isolate, "fullMessage");
 
 	if(error->IsObject() && error.As<Object>()->Has(v8FullMessage)) {
 		errorMessage = ArgConverter::ConvertToString(error.As<Object>()->Get(v8FullMessage).As<String>());
@@ -228,7 +229,9 @@ Local<Value> NativeScriptException::GetJavaExceptionFromEnv(const JniLocalRef& e
 	auto errMsg = GetExceptionMessage(env, exc);
 	DEBUG_WRITE("Error during java interop errorMessage %s", errMsg.c_str());
 
-	auto msg = ArgConverter::ConvertToV8String(errMsg);
+	auto isolate = Isolate::GetCurrent();
+
+	auto msg = ArgConverter::ConvertToV8String(isolate, errMsg);
 	auto errObj = Exception::Error(msg).As<Object>();
 
 	jint javaObjectID = objectManager->GetOrCreateObjectId((jobject) exc);

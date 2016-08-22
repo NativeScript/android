@@ -17,11 +17,11 @@ void Profiler::Init(Isolate *isolate, const Local<Object>& globalObj, const stri
 	m_appName = appName;
 	m_outputDir = outputDir;
 	auto extData = External::New(isolate, this);
-	globalObj->Set(ArgConverter::ConvertToV8String("__startCPUProfiler"), FunctionTemplate::New(isolate, Profiler::StartCPUProfilerCallback, extData)->GetFunction());
-	globalObj->Set(ArgConverter::ConvertToV8String("__stopCPUProfiler"), FunctionTemplate::New(isolate, Profiler::StopCPUProfilerCallback, extData)->GetFunction());
-	globalObj->Set(ArgConverter::ConvertToV8String("__heapSnapshot"), FunctionTemplate::New(isolate, Profiler::HeapSnapshotMethodCallback, extData)->GetFunction());
-	globalObj->Set(ArgConverter::ConvertToV8String("__startNDKProfiler"), FunctionTemplate::New(isolate, Profiler::StartNDKProfilerCallback, extData)->GetFunction());
-	globalObj->Set(ArgConverter::ConvertToV8String("__stopNDKProfiler"), FunctionTemplate::New(isolate, Profiler::StopNDKProfilerCallback, extData)->GetFunction());
+	globalObj->Set(ArgConverter::ConvertToV8String(isolate, "__startCPUProfiler"), FunctionTemplate::New(isolate, Profiler::StartCPUProfilerCallback, extData)->GetFunction());
+	globalObj->Set(ArgConverter::ConvertToV8String(isolate, "__stopCPUProfiler"), FunctionTemplate::New(isolate, Profiler::StopCPUProfilerCallback, extData)->GetFunction());
+	globalObj->Set(ArgConverter::ConvertToV8String(isolate, "__heapSnapshot"), FunctionTemplate::New(isolate, Profiler::HeapSnapshotMethodCallback, extData)->GetFunction());
+	globalObj->Set(ArgConverter::ConvertToV8String(isolate, "__startNDKProfiler"), FunctionTemplate::New(isolate, Profiler::StartNDKProfilerCallback, extData)->GetFunction());
+	globalObj->Set(ArgConverter::ConvertToV8String(isolate, "__stopNDKProfiler"), FunctionTemplate::New(isolate, Profiler::StopNDKProfilerCallback, extData)->GetFunction());
 }
 
 void Profiler::StartCPUProfilerCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
