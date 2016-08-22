@@ -42,7 +42,7 @@ CastType NumericCasts::GetCastType(const Local<Object>& object)
 Local<Value> NumericCasts::GetCastValue(const Local<Object>& object)
 {
 	auto isolate = object->GetIsolate();
-	auto value = object->Get(ArgConverter::ConvertToV8String(isolate, "value"));
+	auto value = object->Get(V8StringConstants::GetValue(isolate));
 	return value;
 }
 
@@ -208,7 +208,7 @@ void NumericCasts::MarkAsLongCallback(const v8::FunctionCallbackInfo<Value>& arg
 {
 	try
 	{
-		auto isolate = Isolate::GetCurrent();
+		auto isolate = args.GetIsolate();
 
 		if (args.Length() != 1)
 		{
@@ -253,7 +253,7 @@ void NumericCasts::MarkAsByteCallback(const v8::FunctionCallbackInfo<Value>& arg
 {
 	try
 	{
-		auto isolate = Isolate::GetCurrent();
+		auto isolate = args.GetIsolate();
 
 		if (args.Length() != 1)
 		{
@@ -298,7 +298,7 @@ void NumericCasts::MarkAsShortCallback(const v8::FunctionCallbackInfo<Value>& ar
 {
 	try
 	{
-		auto isolate = Isolate::GetCurrent();
+		auto isolate = args.GetIsolate();
 
 		if (args.Length() != 1)
 		{
@@ -344,7 +344,7 @@ void NumericCasts::MarkAsCharCallback(const v8::FunctionCallbackInfo<Value>& arg
 {
 	try
 	{
-		auto isolate = Isolate::GetCurrent();
+		auto isolate = args.GetIsolate();
 
 		if (args.Length() != 1)
 		{
@@ -385,7 +385,7 @@ void NumericCasts::MarkAsFloatCallback(const v8::FunctionCallbackInfo<Value>& ar
 {
 	try
 	{
-		auto isolate = Isolate::GetCurrent();
+		auto isolate = args.GetIsolate();
 
 		if (args.Length() != 1)
 		{
@@ -460,7 +460,7 @@ void NumericCasts::MarkJsObject(const Local<Object>& object, CastType castType, 
 	auto type = Integer::New(isolate, static_cast<int>(castType));
 
 	object->SetHiddenValue(key, type);
-	object->Set(ArgConverter::ConvertToV8String(isolate, "value"), value);
+	object->Set(V8StringConstants::GetValue(isolate), value);
 	DEBUG_WRITE("MarkJsObject: Marking js object: %d with cast type: %d", object->GetIdentityHash(), castType);
 }
 

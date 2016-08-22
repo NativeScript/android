@@ -430,10 +430,9 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 
 	m_objectManager->SetInstanceIsolate(isolate);
 
-	// TODO: Pete: Will set a structure with constants on the isolate object at slot 1
-	V8StringConstants::PerIsolateV8Constants* consts = new V8StringConstants::PerIsolateV8Constants();
-	zip_uint32_t slot = 1;
-	isolate->SetData(slot, consts);
+	// Sets a structure with v8 String constants on the isolate object at slot 1
+	V8StringConstants::PerIsolateV8Constants* consts = new V8StringConstants::PerIsolateV8Constants(isolate);
+	isolate->SetData((uint32_t)Runtime::IsolateData::CONSTANTS, consts);
 
 	V8::SetFlagsFromString(Constants::V8_STARTUP_FLAGS.c_str(), Constants::V8_STARTUP_FLAGS.size());
 	V8::SetCaptureStackTraceForUncaughtExceptions(true, 100, StackTrace::kOverview);

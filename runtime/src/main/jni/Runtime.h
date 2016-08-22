@@ -18,6 +18,11 @@ namespace tns
 	class Runtime
 	{
 		public:
+		    enum IsolateData {
+		    	RUNTIME = 0,
+		    	CONSTANTS = 1
+		    };
+
 			static Runtime *GetRuntime(int runtimeId);
 
 			static Runtime *GetRuntime(v8::Isolate *isolate);
