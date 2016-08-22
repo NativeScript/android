@@ -147,7 +147,7 @@ void ArrayElementAccessor::SetArrayElement(Isolate *isolate, const Local<Object>
 		jlong longElementValue;
 		if (value->IsObject())
 		{
-			longElementValue = (jlong) ArgConverter::ConvertToJavaLong(value);
+			longElementValue = (jlong) ArgConverter::ConvertToJavaLong(isolate, value);
 		}
 		else
 		{

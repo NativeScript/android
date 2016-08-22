@@ -179,7 +179,7 @@ void NativeScriptException::CallJsFuncWithErr(Local<Value> errObj)
 	auto context = isolate->GetCurrentContext();
 	auto globalHandle = context->Global();
 
-	auto handler = globalHandle->Get(V8StringConstants::GetUncaughtError());
+	auto handler = globalHandle->Get(V8StringConstants::GetUncaughtError(isolate));
 	auto isEmpty = handler.IsEmpty();
 	auto isFunction = handler->IsFunction();
 
@@ -243,7 +243,7 @@ Local<Value> NativeScriptException::GetJavaExceptionFromEnv(const JniLocalRef& e
 		nativeExceptionObject = objectManager->CreateJSWrapper(javaObjectID, className);
 	}
 
-	errObj->Set(V8StringConstants::GetNativeException(), nativeExceptionObject);
+	errObj->Set(V8StringConstants::GetNativeException(isolate), nativeExceptionObject);
 
 	return errObj;
 }
@@ -287,7 +287,8 @@ JniLocalRef NativeScriptException::TryGetJavaThrowableObject(JEnv& env, const Lo
 	}
 	else
 	{
-		auto nativeEx = jsObj->Get(V8StringConstants::GetNativeException());
+		auto isolate = jsObj->GetIsolate();
+		auto nativeEx = jsObj->Get(V8StringConstants::GetNativeException(isolate));
 		if (!nativeEx.IsEmpty() && nativeEx->IsObject())
 		{
 			javaObj = objectManager->GetJavaObjectByJsObject(nativeEx.As<Object>());

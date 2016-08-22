@@ -24,7 +24,7 @@ namespace tns
 
 			static v8::Local<v8::Value> ConvertFromJavaLong(v8::Isolate *isolate, jlong value);
 
-			static int64_t ConvertToJavaLong(const v8::Local<v8::Value>& value);
+			static int64_t ConvertToJavaLong(v8::Isolate *isolate, const v8::Local<v8::Value>& value);
 
 			static v8::Local<v8::Value> jstringToV8String(v8::Isolate *isolate, jstring value);
 

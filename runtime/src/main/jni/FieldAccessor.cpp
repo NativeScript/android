@@ -371,7 +371,7 @@ void FieldAccessor::SetJavaField(Isolate *isolate, const Local<Object>& target, 
 			}
 			case 'J': //long
 			{
-				jlong longValue = static_cast<jlong>(ArgConverter::ConvertToJavaLong(value));
+				jlong longValue = static_cast<jlong>(ArgConverter::ConvertToJavaLong(isolate, value));
 				if (isStatic)
 				{
 					env.SetStaticLongField(clazz, fieldId, longValue);

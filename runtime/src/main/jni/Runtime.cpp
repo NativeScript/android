@@ -19,6 +19,8 @@
 #include "V8NativeScriptExtension.h"
 #include "Runtime.h"
 #include "ArrayHelper.h"
+#include "include/libplatform/libplatform.h"
+#include "include/zipconf.h"
 #include <sstream>
 
 using namespace v8;
@@ -307,9 +309,8 @@ void Runtime::PassUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, jthrowab
 	errMsg += "\n" + stackTraceText;
 
 	//create a JS error object
-	errObj->Set(V8StringConstants::GetNativeException(), nativeExceptionObject);
-	errObj->Set(V8StringConstants::GetStackTrace(), ArgConverter::jstringToV8String(isolate, stackTrace));
-
+	errObj->Set(V8StringConstants::GetNativeException(isolate), nativeExceptionObject);
+	errObj->Set(V8StringConstants::GetStackTrace(isolate), ArgConverter::jstringToV8String(isolate, stackTrace));
 
 	if (JsDebugger::IsDebuggerActive())
 	{
@@ -428,6 +429,11 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 	HandleScope handleScope(isolate);
 
 	m_objectManager->SetInstanceIsolate(isolate);
+
+	// TODO: Pete: Will set a structure with constants on the isolate object at slot 1
+	V8StringConstants::PerIsolateV8Constants* consts = new V8StringConstants::PerIsolateV8Constants();
+	zip_uint32_t slot = 1;
+	isolate->SetData(slot, consts);
 
 	V8::SetFlagsFromString(Constants::V8_STARTUP_FLAGS.c_str(), Constants::V8_STARTUP_FLAGS.size());
 	V8::SetCaptureStackTraceForUncaughtExceptions(true, 100, StackTrace::kOverview);

@@ -295,13 +295,13 @@ void MetadataNode::NullObjectAccessorGetterCallback(Local<String> property,const
 		auto isolate = info.GetIsolate();
 
 		auto thiz = info.This();
-		if((thiz->GetHiddenValue(V8StringConstants::GetNullNodeName())).IsEmpty())
+		if((thiz->GetHiddenValue(V8StringConstants::GetNullNodeName(isolate))).IsEmpty())
 		{
 			auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value());
-			thiz->SetHiddenValue(V8StringConstants::GetNullNodeName(), External::New(isolate, node));
+			thiz->SetHiddenValue(V8StringConstants::GetNullNodeName(isolate), External::New(isolate, node));
 			auto funcTemplate = FunctionTemplate::New(isolate, MetadataNode::NullValueOfCallback);
-			thiz->Delete(V8StringConstants::GetValueOf());
-			thiz->Set(V8StringConstants::GetValueOf(), funcTemplate->GetFunction());
+			thiz->Delete(V8StringConstants::GetValueOf(isolate));
+			thiz->Set(V8StringConstants::GetValueOf(isolate), funcTemplate->GetFunction());
 		}
 
 		info.GetReturnValue().Set(thiz);
@@ -434,8 +434,8 @@ void MetadataNode::SuperAccessorGetterCallback(Local<String> property, const Pro
 			auto objectManager = runtime->GetObjectManager();
 
 			superValue = objectManager->GetEmptyObject(isolate);
-			superValue->Delete(V8StringConstants::GetToString());
-			superValue->Delete(V8StringConstants::GetValueOf());
+			superValue->Delete(V8StringConstants::GetToString(isolate));
+			superValue->Delete(V8StringConstants::GetValueOf(isolate));
 			superValue->SetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::CallSuper), True(isolate));
 
 			superValue->SetPrototype(thiz->GetPrototype().As<Object>()->GetPrototype().As<Object>()->GetPrototype());
@@ -675,7 +675,7 @@ void MetadataNode::SetStaticMembers(Isolate *isolate, Local<Function>& ctorFunct
 		}
 
 		//attach .extend function
-		auto extendFuncName = V8StringConstants::GetExtend();
+		auto extendFuncName = V8StringConstants::GetExtend(isolate);
 		auto extendFuncTemplate = FunctionTemplate::New(isolate, ExtendMethodCallback, External::New(isolate, this));
 		ctorFunction->Set(extendFuncName, extendFuncTemplate->GetFunction());
 
@@ -691,7 +691,7 @@ void MetadataNode::SetStaticMembers(Isolate *isolate, Local<Function>& ctorFunct
 			ctorFunction->SetAccessor(fieldName, FieldAccessorGetterCallback, FieldAccessorSetterCallback, fieldData, AccessControl::DEFAULT, PropertyAttribute::DontDelete);
 		}
 
-		auto nullObjectName = V8StringConstants::GetNullObject();
+		auto nullObjectName = V8StringConstants::GetNullObject(isolate);
 
 		Local<Value> nullObjectData = External::New(isolate, this);
 		ctorFunction->SetAccessor(nullObjectName, NullObjectAccessorGetterCallback, nullptr, nullObjectData);
@@ -1140,9 +1140,9 @@ Local<Object> MetadataNode::GetImplementationObject(const Local<Object>& object)
 		return implementationObject;
 	}
 
-	if (object->HasOwnProperty(V8StringConstants::GetIsPrototypeImplementationObject()))
+	if (object->HasOwnProperty(V8StringConstants::GetIsPrototypeImplementationObject(isolate)))
 	{
-		auto v8Prototype = V8StringConstants::GetPrototype();
+		auto v8Prototype = V8StringConstants::GetPrototype(isolate);
 		if (!object->HasOwnProperty(v8Prototype))
 		{
 			return Local<Object>();
@@ -1186,7 +1186,7 @@ Local<Object> MetadataNode::GetImplementationObject(const Local<Object>& object)
 		}
 		else
 		{
-			auto value = currentPrototype.As<Object>()->GetHiddenValue(V8StringConstants::GetClassImplementationObject());
+			auto value = currentPrototype.As<Object>()->GetHiddenValue(V8StringConstants::GetClassImplementationObject(isolate));
 
 			if (!value.IsEmpty())
 			{
@@ -1438,7 +1438,7 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
 			return;
 		}
 
-		auto implementationObjectPropertyName = V8StringConstants::GetClassImplementationObject();
+		auto implementationObjectPropertyName = V8StringConstants::GetClassImplementationObject(isolate);
 		//reuse validation - checks that implementationObject is not reused for different classes
 		auto implementationObjectProperty = implementationObject->GetHiddenValue(implementationObjectPropertyName).As<String>();
 		if (implementationObjectProperty.IsEmpty())

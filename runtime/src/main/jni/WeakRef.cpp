@@ -69,7 +69,7 @@ void WeakRef::ConstructorCallbackImpl(const FunctionCallbackInfo<Value>& args)
 
 				weakRef->Set(ArgConverter::ConvertToV8String(isolate, "get"), GetGetterFunction(isolate));
 				weakRef->Set(ArgConverter::ConvertToV8String(isolate, "clear"), GetClearFunction(isolate));
-				weakRef->SetHiddenValue(V8StringConstants::GetTarget(), External::New(isolate, poTarget));
+				weakRef->SetHiddenValue(V8StringConstants::GetTarget(isolate), External::New(isolate, poTarget));
 
 				args.GetReturnValue().Set(weakRef);
 			}
@@ -102,7 +102,7 @@ void WeakRef::WeakTargetCallback(const WeakCallbackData<Object, CallbackState>& 
 	if (poHolder != nullptr)
 	{
 		auto holder = Local<Object>::New(isolate, *poHolder);
-		holder->SetHiddenValue(V8StringConstants::GetTarget(), External::New(isolate, nullptr));
+		holder->SetHiddenValue(V8StringConstants::GetTarget(isolate), External::New(isolate, nullptr));
 	}
 
 	if (callbackState->holder == nullptr)
@@ -120,7 +120,7 @@ void WeakRef::WeakHolderCallback(const WeakCallbackData<Object, CallbackState>& 
 		auto isolate = data.GetIsolate();
 		auto holder = Local<Object>::New(isolate, *poHolder);
 
-		auto poTarget = reinterpret_cast<Persistent<Object>*>(holder->GetHiddenValue(V8StringConstants::GetTarget()).As<External>()->Value());
+		auto poTarget = reinterpret_cast<Persistent<Object>*>(holder->GetHiddenValue(V8StringConstants::GetTarget(isolate)).As<External>()->Value());
 
 		if (poTarget != nullptr)
 		{
@@ -160,7 +160,7 @@ void WeakRef::ClearCallback(const FunctionCallbackInfo<Value>& args)
 		auto holder = args.This();
 		auto isolate = args.GetIsolate();
 
-		holder->SetHiddenValue(V8StringConstants::GetTarget(), External::New(isolate, nullptr));
+		holder->SetHiddenValue(V8StringConstants::GetTarget(isolate), External::New(isolate, nullptr));
 	}
 	catch (NativeScriptException& e)
 	{
@@ -183,8 +183,8 @@ void WeakRef::GettertCallback(const FunctionCallbackInfo<Value>& args)
 	try
 	{
 		auto holder = args.This();
-		auto poTarget = reinterpret_cast<Persistent<Object>*>(holder->GetHiddenValue(V8StringConstants::GetTarget()).As<External>()->Value());
 		auto isolate = args.GetIsolate();
+		auto poTarget = reinterpret_cast<Persistent<Object>*>(holder->GetHiddenValue(V8StringConstants::GetTarget(isolate)).As<External>()->Value());
 
 		if (poTarget != nullptr)
 		{

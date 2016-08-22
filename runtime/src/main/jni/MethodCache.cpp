@@ -138,7 +138,8 @@ string MethodCache::GetType(const v8::Local<v8::Value>& value)
 	{
 		auto objVal = value->ToObject();
 
-		Local<Value> nullNode = objVal->GetHiddenValue(V8StringConstants::GetNullNodeName());
+		auto isolate = objVal->GetIsolate();
+		Local<Value> nullNode = objVal->GetHiddenValue(V8StringConstants::GetNullNodeName(isolate));
 
 		if(!nullNode.IsEmpty()) {
 			auto treeNode = reinterpret_cast<MetadataNode*>(nullNode.As<External>()->Value());

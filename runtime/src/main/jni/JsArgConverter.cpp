@@ -346,7 +346,7 @@ bool JsArgConverter::ConvertJavaScriptBoolean(const Local<Value>& jsValue, int i
 		else
 		{
 			auto boolObj = Local<BooleanObject>::Cast(jsValue);
-			auto val = boolObj->Get(V8StringConstants::GetValueOf());
+			auto val = boolObj->Get(V8StringConstants::GetValueOf(m_isolate));
 			if (!val.IsEmpty() && val->IsFunction())
 			{
 				argValue = val.As<Function>()->Call(boolObj, 0, nullptr)->BooleanValue();
@@ -356,6 +356,7 @@ bool JsArgConverter::ConvertJavaScriptBoolean(const Local<Value>& jsValue, int i
 				argValue = false;
 			}
 		}
+
 		jboolean value = argValue ? JNI_TRUE : JNI_FALSE;
 		m_args[index].z = value;
 		success = true;

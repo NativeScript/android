@@ -16,9 +16,9 @@ void ArgConverter::Init(Isolate *isolate)
 	auto cache = GetTypeLongCache(isolate);
 
 	auto ft = FunctionTemplate::New(isolate, ArgConverter::NativeScriptLongFunctionCallback);
-	ft->SetClassName(V8StringConstants::GetLongNumber());
-	ft->InstanceTemplate()->Set(V8StringConstants::GetValueOf(), FunctionTemplate::New(isolate, ArgConverter::NativeScriptLongValueOfFunctionCallback));
-	ft->InstanceTemplate()->Set(V8StringConstants::GetToString(), FunctionTemplate::New(isolate, ArgConverter::NativeScriptLongToStringFunctionCallback));
+	ft->SetClassName(V8StringConstants::GetLongNumber(isolate));
+	ft->InstanceTemplate()->Set(V8StringConstants::GetValueOf(isolate), FunctionTemplate::New(isolate, ArgConverter::NativeScriptLongValueOfFunctionCallback));
+	ft->InstanceTemplate()->Set(V8StringConstants::GetToString(isolate), FunctionTemplate::New(isolate, ArgConverter::NativeScriptLongToStringFunctionCallback));
 	cache->LongNumberCtorFunc = new Persistent<Function>(isolate, ft->GetFunction());
 
 	auto nanObject = Number::New(isolate, numeric_limits<double>::quiet_NaN()).As<NumberObject>();
@@ -52,7 +52,8 @@ void ArgConverter::NativeScriptLongToStringFunctionCallback(const v8::FunctionCa
 {
 	try
 	{
-		args.GetReturnValue().Set(args.This()->Get(V8StringConstants::GetValue()));
+		auto isolate = args.GetIsolate();
+		args.GetReturnValue().Set(args.This()->Get(V8StringConstants::GetValue(isolate)));
 	}
 	catch (NativeScriptException& e)
 	{
@@ -77,7 +78,7 @@ void ArgConverter::NativeScriptLongFunctionCallback(const v8::FunctionCallbackIn
 		auto isolate = args.GetIsolate();
 		auto thiz = args.This();
 		auto cache = GetTypeLongCache(isolate);
-		thiz->SetHiddenValue(V8StringConstants::GetJavaLong(), Boolean::New(isolate, true));
+		thiz->SetHiddenValue(V8StringConstants::GetJavaLong(isolate), Boolean::New(isolate, true));
 		NumericCasts::MarkAsLong(thiz, args[0]);
 		thiz->SetPrototype(Local<NumberObject>::New(isolate, *cache->NanNumberObject));
 	}
@@ -264,7 +265,7 @@ Local<Value> ArgConverter::ConvertFromJavaLong(Isolate *isolate, jlong value)
 	return convertedValue;
 }
 
-int64_t ArgConverter::ConvertToJavaLong(const Local<Value>& value)
+int64_t ArgConverter::ConvertToJavaLong(Isolate *isolate, const Local<Value>& value)
 {
 	assert(!value.IsEmpty());
 
@@ -272,7 +273,7 @@ int64_t ArgConverter::ConvertToJavaLong(const Local<Value>& value)
 
 	assert(!obj.IsEmpty());
 
-	auto valueProp = obj->Get(V8StringConstants::GetValue());
+	auto valueProp = obj->Get(V8StringConstants::GetValue(isolate));
 
 	assert(!valueProp.IsEmpty());
 
