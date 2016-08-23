@@ -229,7 +229,7 @@ Local<Object> MetadataNode::CreateArrayWrapper(Isolate *isolate)
 	arrayObjectTemplate->SetIndexedPropertyHandler(ArrayIndexedPropertyGetterCallback, ArrayIndexedPropertySetterCallback);
 
 	auto arr = arrayObjectTemplate->NewInstance();
-	arr->SetPrototype(auto c->Get(V8StringConstants::GetPrototype(isolate)));
+	arr->SetPrototype(ctorFunc->Get(V8StringConstants::GetPrototype(isolate)));
 	arr->SetAccessor(ArgConverter::ConvertToV8String(isolate, "length"), ArrayLengthGetterCallack, nullptr, Local<Value>(), AccessControl::ALL_CAN_READ, PropertyAttribute::DontDelete);
 
 	SetInstanceMetadata(isolate, arr, this);
