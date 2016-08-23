@@ -20,11 +20,6 @@ namespace tns
 			void Reset();
 			bool Write(int value);
 
-			bool Dirty() const
-			{
-				return m_pos != m_data;
-			}
-
 		private:
 			jobject m_buff;
 			int *m_data;

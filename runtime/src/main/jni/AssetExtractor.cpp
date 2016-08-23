@@ -1,18 +1,12 @@
 #include "jni.h"
 #include "zip.h"
-#include "ArgConverter.h"
-#include "NativeScriptAssert.h"
 #include <assert.h>
 #include <libgen.h>
-#include <time.h>
 #include <utime.h>
 #include <sys/stat.h>
 #include "AssetExtractor.h"
 
 using namespace tns;
-
-std::string jstringToString(JNIEnv *env, jstring value);
-void mkdir_rec(const char *dir);
 
 void AssetExtractor::ExtractAssets(JNIEnv *env, jobject obj, jstring apk, jstring input, jstring outputDir, jboolean _forceOverwrite)
 {
@@ -82,7 +76,7 @@ void AssetExtractor::ExtractAssets(JNIEnv *env, jobject obj, jstring apk, jstrin
 					fclose(fd);
 					utimbuf t;
 					t.modtime = sb.mtime;
-					ret = utime(assetFullname.c_str(), &t);
+					utime(assetFullname.c_str(), &t);
 				}
 
 				zip_fclose(zf);

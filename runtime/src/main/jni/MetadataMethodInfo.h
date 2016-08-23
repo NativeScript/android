@@ -15,11 +15,9 @@ namespace tns
 	{
 		public:
 			MethodInfo(uint8_t *pValue, MetadataReader *reader)
-			:
-					m_pData(pValue), m_pStartData(pValue), m_reader(reader), m_signatureLength(0)
+			: m_pData(pValue), m_pStartData(pValue), m_reader(reader), m_signatureLength(0)
 			{
 			}
-			;
 
 			std::string GetName();
 			uint8_t CheckIsResolved();

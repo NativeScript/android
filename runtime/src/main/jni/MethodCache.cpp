@@ -5,12 +5,12 @@
 #include "NativeScriptAssert.h"
 #include "Util.h"
 #include "V8GlobalHelpers.h"
+#include "ArgConverter.h"
 #include "V8StringConstants.h"
 #include "NumericCasts.h"
 #include "NativeScriptException.h"
 #include "Runtime.h"
 #include <sstream>
-#include <assert.h>
 
 using namespace v8;
 using namespace std;
@@ -32,77 +32,73 @@ void MethodCache::Init()
 
 MethodCache::CacheMethodInfo MethodCache::ResolveMethodSignature(const string& className, const string& methodName, const FunctionCallbackInfo<Value>& args, bool isStatic)
 {
-	CacheMethodInfo mi;
+	CacheMethodInfo method_info;
 
-	// TODO: Possible improvement
-	auto key = EncodeSignature(className, methodName, args, isStatic);
+	auto encoded_method_signature= EncodeSignature(className, methodName, args, isStatic);
+	auto it = s_mthod_ctor_signature_cache.find(encoded_method_signature);
 
-	auto it = s_cache.find(key);
-
-	if (it == s_cache.end())
+	if (it == s_mthod_ctor_signature_cache.end())
 	{
 		auto signature = ResolveJavaMethod(args, className, methodName);
 
-		DEBUG_WRITE("ResolveMethodSignature %s='%s'", key.c_str(), signature.c_str());
+		DEBUG_WRITE("ResolveMethodSignature %s='%s'", encoded_method_signature.c_str(), signature.c_str());
 
 		if (!signature.empty())
 		{
 			JEnv env;
 			auto clazz = env.FindClass(className);
 			assert(clazz != nullptr);
-			mi.clazz = clazz;
-			mi.signature = signature;
-			mi.returnType = MetadataReader::ParseReturnType(mi.signature);
-			mi.retType = MetadataReader::GetReturnType(mi.returnType);
-			mi.isStatic = isStatic;
-			mi.mid = isStatic
+			method_info.clazz = clazz;
+			method_info.signature = signature;
+			method_info.returnType = MetadataReader::ParseReturnType(method_info.signature);
+			method_info.retType = MetadataReader::GetReturnType(method_info.returnType);
+			method_info.isStatic = isStatic;
+			method_info.mid = isStatic
 					? env.GetStaticMethodID(clazz, methodName, signature)
 							:
-							env.GetMethodID(clazz, methodName, signature);
+							  env.GetMethodID(clazz, methodName, signature);
 
-			s_cache.insert(make_pair(key, mi));
+			s_mthod_ctor_signature_cache.insert(make_pair(encoded_method_signature, method_info));
 		}
 	}
 	else
 	{
-		mi = (*it).second;
+		method_info = (*it).second;
 	}
 
-	return mi;
+	return method_info;
 }
 
 MethodCache::CacheMethodInfo MethodCache::ResolveConstructorSignature(const ArgsWrapper& argWrapper, const string& fullClassName, jclass javaClass, bool isInterface)
 {
+	CacheMethodInfo constructor_info;
+
 	auto& args = argWrapper.args;
+	auto encoded_ctor_signature = EncodeSignature(fullClassName, "<init>", args, false);
+	auto it = s_mthod_ctor_signature_cache.find(encoded_ctor_signature);
 
-	CacheMethodInfo mi;
-
-	auto key = EncodeSignature(fullClassName, "<init>", args, false);
-
-	auto it = s_cache.find(key);
-
-	if (it == s_cache.end())
+	if (it == s_mthod_ctor_signature_cache.end())
 	{
 		auto signature = ResolveConstructor(args, javaClass, isInterface);
 
-		DEBUG_WRITE("ResolveConstructorSignature %s='%s'", key.c_str(), signature.c_str());
+		DEBUG_WRITE("ResolveConstructorSignature %s='%s'", encoded_ctor_signature.c_str(), signature.c_str());
 
 		if (!signature.empty())
 		{
 			JEnv env;
-			mi.clazz = javaClass;
-			mi.signature = signature;
-			mi.mid = env.GetMethodID(javaClass, "<init>", signature);
+			constructor_info.clazz = javaClass;
+			constructor_info.signature = signature;
+			constructor_info.mid = env.GetMethodID(javaClass, "<init>", signature);
 
-			s_cache.insert(make_pair(key, mi));
+			s_mthod_ctor_signature_cache.insert(make_pair(encoded_ctor_signature, constructor_info));
 		}
 	}
 	else
 	{
-		mi = (*it).second;
+		constructor_info = (*it).second;
 	}
 
-	return mi;
+	return constructor_info;
 }
 
 // Encoded signature <className>.S/I.<methodName>.<argsCount>.<arg1class>.<...>
@@ -142,7 +138,8 @@ string MethodCache::GetType(const v8::Local<v8::Value>& value)
 	{
 		auto objVal = value->ToObject();
 
-		Local<Value> nullNode = objVal->GetHiddenValue(V8StringConstants::GetNullNodeName());
+		auto isolate = objVal->GetIsolate();
+		Local<Value> nullNode = objVal->GetHiddenValue(V8StringConstants::GetNullNodeName(isolate));
 
 		if(!nullNode.IsEmpty()) {
 			auto treeNode = reinterpret_cast<MetadataNode*>(nullNode.As<External>()->Value());
@@ -296,7 +293,7 @@ string MethodCache::ResolveConstructor(const FunctionCallbackInfo<Value>& args, 
 	return resolvedSignature;
 }
 
-map<string, MethodCache::CacheMethodInfo> MethodCache::s_cache;
+map<string, MethodCache::CacheMethodInfo> MethodCache::s_mthod_ctor_signature_cache;
 jclass MethodCache::RUNTIME_CLASS = nullptr;
 jmethodID MethodCache::RESOLVE_METHOD_OVERLOAD_METHOD_ID = nullptr;
 jmethodID MethodCache::RESOLVE_CONSTRUCTOR_SIGNATURE_ID = nullptr;

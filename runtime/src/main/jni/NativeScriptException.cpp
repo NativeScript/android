@@ -1,9 +1,9 @@
 #include "Util.h"
 #include "NativeScriptException.h"
 #include "V8GlobalHelpers.h"
+#include "ArgConverter.h"
 #include "NativeScriptAssert.h"
 #include "V8StringConstants.h"
-#include "include/v8.h"
 #include <sstream>
 
 using namespace std;
@@ -45,12 +45,12 @@ void NativeScriptException::ReThrowToV8()
 	{
 		errObj = Local<Value>::New(isolate, *m_javascriptException);
 		if(errObj->IsObject() && !m_message.empty()) {
-			errObj.As<Object>()->Set(ConvertToV8String("fullMessage"), ConvertToV8String(m_message));
+			errObj.As<Object>()->Set(ArgConverter::ConvertToV8String(isolate, "fullMessage"), ArgConverter::ConvertToV8String(isolate, m_message));
 		}
 	}
 	else if (!m_message.empty())
 	{
-		errObj = Exception::Error(ConvertToV8String(m_message));
+		errObj = Exception::Error(ArgConverter::ConvertToV8String(isolate, m_message));
 	}
 	else if (!m_javaException.IsNull())
 	{
@@ -58,7 +58,7 @@ void NativeScriptException::ReThrowToV8()
 	}
 	else
 	{
-		errObj = Exception::Error(ConvertToV8String("No javascript exception or message provided."));
+		errObj = Exception::Error(ArgConverter::ConvertToV8String(isolate, "No javascript exception or message provided."));
 	}
 
 	isolate->ThrowException(errObj);
@@ -155,11 +155,12 @@ void NativeScriptException::Init(ObjectManager *objectManager)
 // ON V8 UNCAUGHT EXCEPTION
 void NativeScriptException::OnUncaughtError(Local<Message> message, Local<Value> error)
 {
+	auto isolate = Isolate::GetCurrent();
 	string errorMessage;
-	auto v8FullMessage = ConvertToV8String("fullMessage");
+	auto v8FullMessage = ArgConverter::ConvertToV8String(isolate, "fullMessage");
 
 	if(error->IsObject() && error.As<Object>()->Has(v8FullMessage)) {
-		errorMessage = ConvertToString(error.As<Object>()->Get(v8FullMessage).As<String>());
+		errorMessage = ArgConverter::ConvertToString(error.As<Object>()->Get(v8FullMessage).As<String>());
 	}
 
 	if(errorMessage.size() == 0) {
@@ -178,7 +179,7 @@ void NativeScriptException::CallJsFuncWithErr(Local<Value> errObj)
 	auto context = isolate->GetCurrentContext();
 	auto globalHandle = context->Global();
 
-	auto handler = globalHandle->Get(V8StringConstants::GetUncaughtError());
+	auto handler = globalHandle->Get(V8StringConstants::GetUncaughtError(isolate));
 	auto isEmpty = handler.IsEmpty();
 	auto isFunction = handler->IsFunction();
 
@@ -204,9 +205,6 @@ Local<Value> NativeScriptException::WrapJavaToJsException()
 		jfieldID fieldID = env.GetFieldID(env.GetObjectClass(m_javaException), "jsValueAddress", "J");
 		jlong addr = env.GetLongField(m_javaException, fieldID);
 
-		jmethodID gmId = env.GetMethodID(env.GetObjectClass(m_javaException), "getMessage", "()Ljava/lang/String;");
-		jobject javaMessage = env.CallObjectMethod(m_javaException, gmId);
-
 		if (addr != 0)
 		{
 			auto pv = (Persistent<Value> *) addr;
@@ -231,7 +229,9 @@ Local<Value> NativeScriptException::GetJavaExceptionFromEnv(const JniLocalRef& e
 	auto errMsg = GetExceptionMessage(env, exc);
 	DEBUG_WRITE("Error during java interop errorMessage %s", errMsg.c_str());
 
-	auto msg = ConvertToV8String(errMsg);
+	auto isolate = Isolate::GetCurrent();
+
+	auto msg = ArgConverter::ConvertToV8String(isolate, errMsg);
 	auto errObj = Exception::Error(msg).As<Object>();
 
 	jint javaObjectID = objectManager->GetOrCreateObjectId((jobject) exc);
@@ -243,7 +243,7 @@ Local<Value> NativeScriptException::GetJavaExceptionFromEnv(const JniLocalRef& e
 		nativeExceptionObject = objectManager->CreateJSWrapper(javaObjectID, className);
 	}
 
-	errObj->Set(V8StringConstants::GetNativeException(), nativeExceptionObject);
+	errObj->Set(V8StringConstants::GetNativeException(isolate), nativeExceptionObject);
 
 	return errObj;
 }
@@ -287,7 +287,8 @@ JniLocalRef NativeScriptException::TryGetJavaThrowableObject(JEnv& env, const Lo
 	}
 	else
 	{
-		auto nativeEx = jsObj->Get(V8StringConstants::GetNativeException());
+		auto isolate = jsObj->GetIsolate();
+		auto nativeEx = jsObj->Get(V8StringConstants::GetNativeException(isolate));
 		if (!nativeEx.IsEmpty() && nativeEx->IsObject())
 		{
 			javaObj = objectManager->GetJavaObjectByJsObject(nativeEx.As<Object>());
@@ -335,12 +336,13 @@ string NativeScriptException::GetErrorMessage(const Local<Message>& message, con
 	auto scriptResName = message->GetScriptResourceName();
 	if (!scriptResName.IsEmpty() && scriptResName->IsString())
 	{
-		ss << "File: \"" << ConvertToString(scriptResName.As<String>());
+		ss << "File: \"" << ArgConverter::ConvertToString(scriptResName.As<String>());
 	}
 	else
 	{
 		ss << "File: \"<unknown>";
 	}
+
 	ss << ", line: " << message->GetLineNumber() << ", column: " << message->GetStartColumn() << endl << endl;
 
 	string stackTraceMessage = GetErrorStackTrace(message->GetStackTrace());
@@ -361,8 +363,8 @@ string NativeScriptException::GetErrorStackTrace(const Local<StackTrace>& stackT
 	for (int i = 0; i < frameCount; i++)
 	{
 		auto frame = stackTrace->GetFrame(i);
-		auto funcName = ConvertToString(frame->GetFunctionName());
-		auto srcName = ConvertToString(frame->GetScriptName());
+		auto funcName = ArgConverter::ConvertToString(frame->GetFunctionName());
+		auto srcName = ArgConverter::ConvertToString(frame->GetScriptName());
 		auto lineNumber = frame->GetLineNumber();
 		auto column = frame->GetColumn();
 

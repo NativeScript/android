@@ -14,10 +14,7 @@
 #include "NativeScriptException.h"
 #include "Util.h"
 #include "SimpleProfiler.h"
-#include "include/v8.h"
-
 #include <sstream>
-#include <assert.h>
 #include <libgen.h>
 #include <dlfcn.h>
 
@@ -43,6 +40,8 @@ void Module::Init(Isolate *isolate)
 		assert(RESOLVE_PATH_METHOD_ID != nullptr);
 	}
 
+	m_isolate = isolate;
+
 	string requireFactoryScript =
 	"(function () { "
 	"	function require_factory(requireInternal, dirName) { "
@@ -59,7 +58,7 @@ void Module::Init(Isolate *isolate)
 	"	return require_factory; "
 	"})()";
 
-	auto source = ConvertToV8String(requireFactoryScript);
+	auto source = ArgConverter::ConvertToV8String(isolate, requireFactoryScript);
 	auto context = isolate->GetCurrentContext();
 
 	auto global = context->Global();
@@ -80,11 +79,11 @@ void Module::Init(Isolate *isolate)
 
 	auto requireFuncTemplate = FunctionTemplate::New(isolate, RequireCallback, External::New(isolate, this));
 	auto requireFunc = requireFuncTemplate->GetFunction();
-	global->Set(ConvertToV8String("__nativeRequire"), requireFunc);
+	global->Set(ArgConverter::ConvertToV8String(isolate, "__nativeRequire"), requireFunc);
 	m_requireFunction = new Persistent<Function>(isolate, requireFunc);
 
 	auto globalRequire = GetRequireFunction(isolate, Constants::APP_ROOT_FOLDER_PATH);
-	global->Set(ConvertToV8String("require"), globalRequire);
+	global->Set(ArgConverter::ConvertToV8String(isolate, "require"), globalRequire);
 }
 
 Local<Function> Module::GetRequireFunction(Isolate *isolate, const string& dirName)
@@ -107,7 +106,7 @@ Local<Function> Module::GetRequireFunction(Isolate *isolate, const string& dirNa
 
 		Local<Value> args[2]
 		{
-			requireInternalFunc, ConvertToV8String(dirName)
+			requireInternalFunc, ArgConverter::ConvertToV8String(isolate, dirName)
 		};
 		Local<Value> result;
 		auto thiz = Object::New(isolate);
@@ -165,8 +164,8 @@ void Module::RequireCallbackImpl(const v8::FunctionCallbackInfo<v8::Value>& args
 		throw NativeScriptException(string("require's second parameter should be string"));
 	}
 
-	string moduleName = ConvertToString(args[0].As<String>());
-	string callingModuleDirName = ConvertToString(args[1].As<String>());
+	string moduleName = ArgConverter::ConvertToString(args[0].As<String>());
+	string callingModuleDirName = ArgConverter::ConvertToString(args[1].As<String>());
 	auto isData = false;
 
 	auto moduleObj = LoadImpl(isolate, moduleName, callingModuleDirName, isData);
@@ -179,7 +178,7 @@ void Module::RequireCallbackImpl(const v8::FunctionCallbackInfo<v8::Value>& args
 	}
 	else
 	{
-		auto exportsObj = moduleObj->Get(ConvertToV8String("exports"));
+		auto exportsObj = moduleObj->Get(ArgConverter::ConvertToV8String(isolate, "exports"));
 
 		assert(!exportsObj.IsEmpty());
 
@@ -196,11 +195,11 @@ void Module::RequireNativeCallback(const v8::FunctionCallbackInfo<v8::Value>& ar
 
 void Module::Load(const string& path)
 {
-	auto isolate = Isolate::GetCurrent();
+	auto isolate = m_isolate;
 	auto context = isolate->GetCurrentContext();
 	auto globalObject = context->Global();
-	auto require = globalObject->Get(context, ConvertToV8String("require")).ToLocalChecked().As<Function>();
-	Local<Value> args[] = { ConvertToV8String(path) };
+	auto require = globalObject->Get(context, ArgConverter::ConvertToV8String(isolate, "require")).ToLocalChecked().As<Function>();
+	Local<Value> args[] = { ArgConverter::ConvertToV8String(isolate, path) };
 	require->Call(context, globalObject, 1, args);
 }
 
@@ -267,10 +266,10 @@ Local<Object> Module::LoadModule(Isolate *isolate, const string& modulePath, con
 
 	auto moduleObj = Object::New(isolate);
 	auto exportsObj = Object::New(isolate);
-	auto exportsPropName = ConvertToV8String("exports");
+	auto exportsPropName = ArgConverter::ConvertToV8String(isolate, "exports");
 	moduleObj->Set(exportsPropName, exportsObj);
-	auto fullRequiredModulePath = ConvertToV8String(modulePath);
-	moduleObj->Set(ConvertToV8String("filename"), fullRequiredModulePath);
+	auto fullRequiredModulePath = ArgConverter::ConvertToV8String(isolate, modulePath);
+	moduleObj->Set(ArgConverter::ConvertToV8String(isolate, "filename"), fullRequiredModulePath);
 
 	auto poModuleObj = new Persistent<Object>(isolate, moduleObj);
 	TempModule tempModule(this, modulePath, moduleCacheKey, poModuleObj);
@@ -321,20 +320,20 @@ Local<Object> Module::LoadModule(Isolate *isolate, const string& modulePath, con
 
 	SET_PROFILER_FRAME();
 
-	auto fileName = ConvertToV8String(modulePath);
+	auto fileName = ArgConverter::ConvertToV8String(isolate, modulePath);
 	char pathcopy[1024];
 	strcpy(pathcopy, modulePath.c_str());
 	string strDirName(dirname(pathcopy));
-	auto dirName = ConvertToV8String(strDirName);
+	auto dirName = ArgConverter::ConvertToV8String(isolate, strDirName);
 	auto require = GetRequireFunction(isolate, strDirName);
 	Local<Value> requireArgs[5]
 	{
 		moduleObj, exportsObj, require, fileName, dirName
 	};
 
-	moduleObj->Set(ConvertToV8String("require"), require);
+	moduleObj->Set(ArgConverter::ConvertToV8String(isolate, "require"), require);
 
-	auto moduleIdProp = ConvertToV8String("id");
+	auto moduleIdProp = ArgConverter::ConvertToV8String(isolate, "id");
 	const auto readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
 	Maybe<bool> success = moduleObj->DefineOwnProperty(isolate->GetCurrentContext(), moduleIdProp, fileName, readOnlyFlags);
 	if(success.IsNothing()) {
@@ -342,7 +341,7 @@ Local<Object> Module::LoadModule(Isolate *isolate, const string& modulePath, con
 	}
 
 	auto thiz = Object::New(isolate);
-	auto extendsName = ConvertToV8String("__extends");
+	auto extendsName = ArgConverter::ConvertToV8String(isolate, "__extends");
 	thiz->Set(extendsName, isolate->GetCurrentContext()->Global()->Get(extendsName));
 	moduleFunc->Call(thiz, sizeof(requireArgs) / sizeof(Local<Value> ), requireArgs);
 
@@ -411,7 +410,7 @@ Local<Object> Module::LoadData(Isolate *isolate, const string& path)
 
 	TryCatch tc;
 
-	auto jsonStr = ConvertToV8String(jsonData);
+	auto jsonStr = ArgConverter::ConvertToV8String(isolate, jsonData);
 
 	auto maybeValue = JSON::Parse(isolate, jsonStr);
 
@@ -439,7 +438,6 @@ Local<String> Module::WrapModuleContent(const string& path)
 	string content = File::ReadText(path);
 
 	auto separatorIndex = path.find_last_of("/");
-	string dirName = path.substr(0, separatorIndex);
 
 	// TODO: Use statically allocated buffer for better performance
 	string result(MODULE_PROLOGUE);
@@ -447,7 +445,7 @@ Local<String> Module::WrapModuleContent(const string& path)
 	result += content;
 	result += MODULE_EPILOGUE;
 
-	return ConvertToV8String(result);
+	return ArgConverter::ConvertToV8String(m_isolate, result);
 }
 
 ScriptCompiler::CachedData* Module::TryLoadScriptCache(const std::string& path)

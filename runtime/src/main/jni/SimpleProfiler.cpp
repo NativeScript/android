@@ -2,8 +2,6 @@
 #include "NativeScriptException.h"
 #include "NativeScriptAssert.h"
 #include <algorithm>
-#include <time.h>
-#include <android/log.h>
 #include <sstream>
 
 using namespace tns;

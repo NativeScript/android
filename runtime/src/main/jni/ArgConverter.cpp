@@ -1,17 +1,11 @@
 #include "ArgConverter.h"
 #include "ObjectManager.h"
-#include "JniLocalRef.h"
 #include "Util.h"
-#include "V8GlobalHelpers.h"
 #include "V8StringConstants.h"
-#include "NativeScriptAssert.h"
 #include "NativeScriptException.h"
 #include "NumericCasts.h"
-#include "JType.h"
 #include "Runtime.h"
-#include <assert.h>
 #include <sstream>
-#include <cstdlib>
 
 using namespace v8;
 using namespace std;
@@ -19,12 +13,12 @@ using namespace tns;
 
 void ArgConverter::Init(Isolate *isolate)
 {
-	auto cache = GetCache(isolate);
+	auto cache = GetTypeLongCache(isolate);
 
 	auto ft = FunctionTemplate::New(isolate, ArgConverter::NativeScriptLongFunctionCallback);
-	ft->SetClassName(V8StringConstants::GetLongNumber());
-	ft->InstanceTemplate()->Set(V8StringConstants::GetValueOf(), FunctionTemplate::New(isolate, ArgConverter::NativeScriptLongValueOfFunctionCallback));
-	ft->InstanceTemplate()->Set(V8StringConstants::GetToString(), FunctionTemplate::New(isolate, ArgConverter::NativeScriptLongToStringFunctionCallback));
+	ft->SetClassName(V8StringConstants::GetLongNumber(isolate));
+	ft->InstanceTemplate()->Set(V8StringConstants::GetValueOf(isolate), FunctionTemplate::New(isolate, ArgConverter::NativeScriptLongValueOfFunctionCallback));
+	ft->InstanceTemplate()->Set(V8StringConstants::GetToString(isolate), FunctionTemplate::New(isolate, ArgConverter::NativeScriptLongToStringFunctionCallback));
 	cache->LongNumberCtorFunc = new Persistent<Function>(isolate, ft->GetFunction());
 
 	auto nanObject = Number::New(isolate, numeric_limits<double>::quiet_NaN()).As<NumberObject>();
@@ -58,7 +52,8 @@ void ArgConverter::NativeScriptLongToStringFunctionCallback(const v8::FunctionCa
 {
 	try
 	{
-		args.GetReturnValue().Set(args.This()->Get(V8StringConstants::GetValue()));
+		auto isolate = args.GetIsolate();
+		args.GetReturnValue().Set(args.This()->Get(V8StringConstants::GetValue(isolate)));
 	}
 	catch (NativeScriptException& e)
 	{
@@ -82,8 +77,8 @@ void ArgConverter::NativeScriptLongFunctionCallback(const v8::FunctionCallbackIn
 	{
 		auto isolate = args.GetIsolate();
 		auto thiz = args.This();
-		auto cache = GetCache(isolate);
-		thiz->SetHiddenValue(V8StringConstants::GetJavaLong(), Boolean::New(isolate, true));
+		auto cache = GetTypeLongCache(isolate);
+		thiz->SetHiddenValue(V8StringConstants::GetJavaLong(isolate), Boolean::New(isolate, true));
 		NumericCasts::MarkAsLong(thiz, args[0]);
 		thiz->SetPrototype(Local<NumberObject>::New(isolate, *cache->NanNumberObject));
 	}
@@ -125,7 +120,6 @@ Local<Array> ArgConverter::ConvertJavaArgsToJsArgs(Isolate *isolate, jobjectArra
 		JniLocalRef arg(env.GetObjectArrayElement(args, jArrayIndex++));
 		JniLocalRef argJavaClassPath(env.GetObjectArrayElement(args, jArrayIndex++));
 
-		jint length;
 		Type argTypeID = (Type) JType::IntValue(env, argTypeIDObj);
 
 		Local<Value> jsArg;
@@ -135,7 +129,7 @@ Local<Array> ArgConverter::ConvertJavaArgsToJsArgs(Isolate *isolate, jobjectArra
 				jsArg = Boolean::New(isolate, JType::BooleanValue(env, arg));
 				break;
 			case Type::Char:
-				jsArg = jcharToV8String(JType::CharValue(env, arg));
+				jsArg = jcharToV8String(isolate, JType::CharValue(env, arg));
 				break;
 			case Type::Byte:
 				jsArg = Number::New(isolate, JType::ByteValue(env, arg));
@@ -156,7 +150,7 @@ Local<Array> ArgConverter::ConvertJavaArgsToJsArgs(Isolate *isolate, jobjectArra
 				jsArg = Number::New(isolate, JType::DoubleValue(env, arg));
 				break;
 			case Type::String:
-				jsArg = jstringToV8String((jstring) arg);
+				jsArg = jstringToV8String(isolate, (jstring) arg);
 				break;
 			case Type::JsObject:
 				{
@@ -207,17 +201,17 @@ std::string ArgConverter::jstringToString(jstring value)
 	return s;
 }
 
-Local<Value> ArgConverter::jstringToV8String(jstring value)
+Local<Value> ArgConverter::jstringToV8String(Isolate *isolate, jstring value)
 {
 	if (value == nullptr)
 	{
-		return Null(Isolate::GetCurrent());
+		return Null(isolate);
 	}
 
 	JEnv env;
 	auto chars = env.GetStringChars(value, NULL);
 	auto length = env.GetStringLength(value);
-	auto v8String = ConvertToV8String(chars, length);
+	auto v8String = ConvertToV8String(isolate, chars, length);
 	env.ReleaseStringChars(value, chars);
 
 	return v8String;
@@ -244,9 +238,9 @@ bool ArgConverter::ReadJStringInBuffer(jstring value, jsize& utfLength)
 	return true;
 }
 
-Local<String> ArgConverter::jcharToV8String(jchar value)
+Local<String> ArgConverter::jcharToV8String(Isolate *isolate, jchar value)
 {
-	auto v8String = ConvertToV8String(&value, 1);
+	auto v8String = ConvertToV8String(isolate, &value, 1);
 	return v8String;
 }
 
@@ -261,17 +255,17 @@ Local<Value> ArgConverter::ConvertFromJavaLong(Isolate *isolate, jlong value)
 	}
 	else
 	{
-		auto cache = GetCache(isolate);
+		auto cache = GetTypeLongCache(isolate);
 		char strNumber[24];
 		sprintf(strNumber, "%lld", longValue);
-		Local<Value> strValue = ConvertToV8String(strNumber);
+		Local<Value> strValue = ConvertToV8String(isolate, strNumber);
 		convertedValue = Local<Function>::New(isolate, *cache->LongNumberCtorFunc)->CallAsConstructor(1, &strValue);
 	}
 
 	return convertedValue;
 }
 
-int64_t ArgConverter::ConvertToJavaLong(const Local<Value>& value)
+int64_t ArgConverter::ConvertToJavaLong(Isolate *isolate, const Local<Value>& value)
 {
 	assert(!value.IsEmpty());
 
@@ -279,7 +273,7 @@ int64_t ArgConverter::ConvertToJavaLong(const Local<Value>& value)
 
 	assert(!obj.IsEmpty());
 
-	auto valueProp = obj->Get(V8StringConstants::GetValue());
+	auto valueProp = obj->Get(V8StringConstants::GetValue(isolate));
 
 	assert(!valueProp.IsEmpty());
 
@@ -290,21 +284,61 @@ int64_t ArgConverter::ConvertToJavaLong(const Local<Value>& value)
 	return longValue;
 }
 
-ArgConverter::Cache* ArgConverter::GetCache(v8::Isolate *isolate)
+ArgConverter::TypeLongOperationsCache * ArgConverter::GetTypeLongCache(v8::Isolate *isolate)
 {
-	Cache *cache;
-	auto itFound = s_cache.find(isolate);
-	if (itFound == s_cache.end())
+	TypeLongOperationsCache *cache;
+	auto itFound = s_type_long_operations_cache.find(isolate);
+	if (itFound == s_type_long_operations_cache.end())
 	{
-		cache = new Cache;
-		s_cache.insert(make_pair(isolate, cache));
+		cache = new TypeLongOperationsCache;
+		s_type_long_operations_cache.insert(make_pair(isolate, cache));
 	}
 	else
 	{
 		cache = itFound->second;
 	}
+
 	return cache;
 }
 
-std::map<Isolate*, ArgConverter::Cache*> ArgConverter::s_cache;
+
+string ArgConverter::ConvertToString(const v8::Local<String>& s)
+{
+	if (s.IsEmpty())
+	{
+		return string();
+	}
+	else
+	{
+		String::Utf8Value str(s);
+		return string(*str);
+	}
+}
+
+jstring ArgConverter::ConvertToJavaString(const Local<Value>& value)
+{
+	JEnv env;
+	String::Value stringValue(value);
+	return env.NewString((const jchar*) *stringValue, stringValue.length());
+}
+
+Local<String> ArgConverter::ConvertToV8String(Isolate *isolate, const jchar* data, int length)
+{
+	return String::NewFromTwoByte(isolate, (const uint16_t*) data, String::kNormalString, length);
+}
+
+Local<String> ArgConverter::ConvertToV8String(Isolate *isolate, const string& s)
+{
+	Local<String> str;
+	String::NewFromUtf8(isolate, s.c_str(), NewStringType::kNormal, s.length()).ToLocal(&str);
+	return str;
+}
+
+Local<String> ArgConverter::ConvertToV8String(Isolate *isolate, const char *data, int length)
+{
+	return String::NewFromUtf8(isolate, (const char *) data, String::kNormalString, length);
+}
+
+
+std::map<Isolate*, ArgConverter::TypeLongOperationsCache *> ArgConverter::s_type_long_operations_cache;
 char* ArgConverter::charBuffer = new char[ArgConverter::BUFFER_SIZE];

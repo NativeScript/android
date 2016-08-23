@@ -22,17 +22,15 @@ namespace tns
 	{
 		public:
 
-			static void Init(v8::Isolate *isolate, ObjectManager *objectManager);
+			static void Init(v8::Isolate *isolate);
 
 			static v8::Local<v8::Object> CreateJSWrapper(v8::Isolate *isolate, jint javaObjectID, const std::string& typeName);
 
 			static bool RegisterInstance(v8::Isolate *isolate, const v8::Local<v8::Object>& jsObject, const std::string& fullClassName, const ArgsWrapper& argWrapper, const v8::Local<v8::Object>& implementationObject, bool isInterface);
 
-			static std::string ResolveConstructor(v8::Isolate *isolate, const ArgsWrapper& argWrapper, const std::string& fullClassName, jclass javaClass, bool isInterface);
-
 			static jclass ResolveClass(v8::Isolate *isolate, const std::string& fullClassname, const v8::Local<v8::Object>& implementationObject, bool isInterface);
 
-			static std::string ResolveClassName(v8::Isolate *isolate, const std::string& fullClassname, const v8::Local<v8::Object>& implementationObject, bool isInterface);
+			static std::string ResolveClassName(v8::Isolate *isolate, jclass& clazz);
 
 			static v8::Local<v8::Value> GetArrayElement(v8::Isolate *isolate, const v8::Local<v8::Object>& array, uint32_t index, const std::string& arraySignature);
 
@@ -40,21 +38,13 @@ namespace tns
 
 			static int GetArrayLength(v8::Isolate *isolate, const v8::Local<v8::Object>& arr);
 
-			//
-
 			static void CallJavaMethod(const v8::Local<v8::Object>& caller, const std::string& className, const std::string& methodName, MetadataEntry *entry, bool isStatic, bool isSuper, const v8::FunctionCallbackInfo<v8::Value>& args);
 
 			static v8::Local<v8::Value> CallJSMethod(v8::Isolate *isolate, JNIEnv *_env, const v8::Local<v8::Object>& jsObject, const std::string& methodName, jobjectArray args);
 
-			//
-
 			static v8::Local<v8::Value> GetJavaField(v8::Isolate *isolate, const v8::Local<v8::Object>& caller, FieldCallbackData *fieldData);
 
 			static void SetJavaField(v8::Isolate *isolate, const v8::Local<v8::Object>& target, const v8::Local<v8::Value>& value, FieldCallbackData *fieldData);
-
-			//
-
-			static void OverridesMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 			static void LogMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
@@ -64,19 +54,23 @@ namespace tns
 
 			static void ExitMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-			static void OverridesWeakCallback(v8::Isolate* isolate, v8::Persistent<v8::Object>* target, void* arg);
-
-			static v8::Local<v8::Object> GetImplementationObjectFromArg(const v8::FunctionCallbackInfo<v8::Value>& args);
-
-			static void CreateGlobalCastFunctions(const v8::Local<v8::ObjectTemplate>& globalTemplate);
+			static void CreateGlobalCastFunctions(v8::Isolate *isolate, const v8::Local<v8::ObjectTemplate>& globalTemplate);
 
 			static std::vector<std::string> GetTypeMetadata(const std::string& name, int index);
 
+			/*
+			 * Gets all methods in the implementation object, and packs them in a jobjectArray
+			 * to pass them to Java Land, so that their corresponding Java callbacks are written when
+			 * the dexFactory generates the class
+			 */
 			static jobjectArray GetMethodOverrides(JEnv& env, const v8::Local<v8::Object>& implementationObject);
 
+			/*
+			 * Gets all interfaces declared in the 'interfaces' array inside the implementation object,
+			 * and packs them in a jobjectArray to pass them to Java Land, so that they may be
+			 * implemented when the dexFactory generates the corresponding class
+			 */
 			static jobjectArray GetImplementedInterfaces(JEnv &env, const v8::Local<v8::Object> &implementationObject);
-
-			static std::string LogExceptionStackTrace(const v8::TryCatch& tryCatch);
 
 			static void EnableVerboseLoggingMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
@@ -89,11 +83,14 @@ namespace tns
 			{
 			}
 
-			static int GetCachedConstructorId(JEnv& env, const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& fullClassName, jobjectArray javaArgs, jclass javaClass);
-
 			static int64_t AdjustAmountOfExternalAllocatedMemory(JEnv& env, v8::Isolate *isolate);
 
-			static v8::Persistent<v8::Object>* MarkJsObject(const v8::Local<v8::Object>& object, std::string mark, const v8::Local<v8::Value>& value);
+			/*
+			 * Helper method that creates a java string array for sending strings over JNI
+			 */
+			static jobjectArray GetJavaStringArray(JEnv& env, int length);
+
+			static short MAX_JAVA_STRING_ARRAY_LENGTH;
 
 			static jclass RUNTIME_CLASS;
 
@@ -118,12 +115,6 @@ namespace tns
 			static ArrayElementAccessor arrayElementAccessor;
 
 			static FieldAccessor fieldAccessor;
-
-			static MetadataTreeNode *metadataRoot;
-
-			static std::map<std::string, int> s_constructorCache;
-
-			static std::map<std::string, jclass> s_classCache;
 
 			struct JavaObjectIdScope
 			{

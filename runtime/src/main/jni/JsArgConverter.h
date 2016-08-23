@@ -68,8 +68,7 @@ namespace tns
 
 			std::string m_methodSignature;
 
-			std::vector<std::string> *m_tokens;
-			std::vector<std::string> m_tokens2;
+			std::vector<std::string> m_tokens;
 
 			std::vector<int> m_storedObjects;
 

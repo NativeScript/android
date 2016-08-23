@@ -1,13 +1,8 @@
 #include "JsArgConverter.h"
-#include <sstream>
 #include "ObjectManager.h"
-#include "ArgConverter.h"
-#include "JniLocalRef.h"
 #include "JniSignatureParser.h"
 #include "JsArgToArrayConverter.h"
-#include "JType.h"
-#include "Util.h"
-#include "V8GlobalHelpers.h"
+#include "ArgConverter.h"
 #include "V8StringConstants.h"
 #include "NumericCasts.h"
 #include "NativeScriptException.h"
@@ -18,7 +13,7 @@ using namespace std;
 using namespace tns;
 
 JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value>& args, bool hasImplementationObject, const string& methodSignature, MetadataEntry *entry)
-		: m_isolate(args.GetIsolate()), m_env(JEnv()), m_methodSignature(methodSignature), m_isValid(true), m_error(Error()), m_tokens(nullptr)
+: m_isolate(args.GetIsolate()), m_env(JEnv()), m_methodSignature(methodSignature), m_isValid(true), m_error(Error())
 {
 	m_argsLen = !hasImplementationObject ? args.Length() : args.Length() - 1;
 
@@ -31,13 +26,12 @@ JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value>& args, bool
 				JniSignatureParser parser(m_methodSignature);
 				entry->parsedSig = parser.Parse();
 			}
-			m_tokens = &entry->parsedSig;
+			m_tokens = entry->parsedSig;
 		}
 		else
 		{
 			JniSignatureParser parser(m_methodSignature);
-			m_tokens2 = parser.Parse();
-			m_tokens = &m_tokens2;
+			m_tokens = parser.Parse();
 		}
 
 		for (int i = 0; i < m_argsLen; i++)
@@ -53,13 +47,12 @@ JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value>& args, bool
 }
 
 JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value>& args, const string& methodSignature)
-		: m_isolate(args.GetIsolate()), m_env(JEnv()), m_methodSignature(methodSignature), m_isValid(true), m_error(Error()), m_tokens(nullptr)
+: m_isolate(args.GetIsolate()), m_env(JEnv()), m_methodSignature(methodSignature), m_isValid(true), m_error(Error())
 {
 	m_argsLen = args.Length();
 
 	JniSignatureParser parser(m_methodSignature);
-	m_tokens2 = parser.Parse();
-	m_tokens = &m_tokens2;
+	m_tokens = parser.Parse();
 
 	for (int i = 0; i < m_argsLen; i++)
 	{
@@ -79,7 +72,7 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 
 	char buff[1024];
 
-	const auto& typeSignature = m_tokens->at(index);
+	const auto& typeSignature = m_tokens.at(index);
 
 	if (arg.IsEmpty())
 	{
@@ -131,7 +124,6 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 	}
 	else if (arg->IsObject())
 	{
-		jlong javaLongValue;
 		auto jsObject = arg->ToObject();
 
 		auto castType = NumericCasts::GetCastType(jsObject);
@@ -148,7 +140,7 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 				castValue = NumericCasts::GetCastValue(jsObject);
 				if (castValue->IsString())
 				{
-					string value = ConvertToString(castValue->ToString());
+					string value = ArgConverter::ConvertToString(castValue->ToString());
 					m_args[index].c = (jchar) value[0];
 					success = true;
 				}
@@ -158,7 +150,7 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 				castValue = NumericCasts::GetCastValue(jsObject);
 				if (castValue->IsString())
 				{
-					string strValue = ConvertToString(castValue->ToString());
+					string strValue = ArgConverter::ConvertToString(castValue->ToString());
 					int byteArg = atoi(strValue.c_str());
 					jbyte value = (jbyte) byteArg;
 					success = ConvertFromCastFunctionObject(value, index);
@@ -174,7 +166,7 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 				castValue = NumericCasts::GetCastValue(jsObject);
 				if (castValue->IsString())
 				{
-					string strValue = ConvertToString(castValue->ToString());
+					string strValue = ArgConverter::ConvertToString(castValue->ToString());
 					int shortArg = atoi(strValue.c_str());
 					jshort value = (jshort) shortArg;
 					success = ConvertFromCastFunctionObject(value, index);
@@ -190,7 +182,7 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 				castValue = NumericCasts::GetCastValue(jsObject);
 				if (castValue->IsString())
 				{
-					string strValue = ConvertToString(castValue->ToString());
+					string strValue = ArgConverter::ConvertToString(castValue->ToString());
 					int64_t longArg = atoll(strValue.c_str());
 					jlong value = (jlong) longArg;
 					success = ConvertFromCastFunctionObject(value, index);
@@ -226,7 +218,7 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 			case CastType::None:
 				obj = objectManager->GetJavaObjectByJsObject(jsObject);
 
-				castValue = jsObject->GetHiddenValue(ConvertToV8String(V8StringConstants::NULL_NODE_NAME));
+				castValue = jsObject->GetHiddenValue(ArgConverter::ConvertToV8String(m_isolate, V8StringConstants::NULL_NODE_NAME));
 				if(!castValue.IsEmpty()) {
 					SetConvertedObject(index, nullptr);
 					success = true;
@@ -286,7 +278,7 @@ bool JsArgConverter::ConvertJavaScriptNumber(const Local<Value>& jsValue, int in
 			{
 					0 };
 
-	const auto& typeSignature = m_tokens->at(index);
+	const auto& typeSignature = m_tokens.at(index);
 
 	const char typePrefix = typeSignature[0];
 
@@ -342,7 +334,7 @@ bool JsArgConverter::ConvertJavaScriptBoolean(const Local<Value>& jsValue, int i
 {
 	bool success;
 
-	const auto& typeSignature = m_tokens->at(index);
+	const auto& typeSignature = m_tokens.at(index);
 
 	if (typeSignature == "Z")
 	{
@@ -354,7 +346,7 @@ bool JsArgConverter::ConvertJavaScriptBoolean(const Local<Value>& jsValue, int i
 		else
 		{
 			auto boolObj = Local<BooleanObject>::Cast(jsValue);
-			auto val = boolObj->Get(V8StringConstants::GetValueOf());
+			auto val = boolObj->Get(V8StringConstants::GetValueOf(m_isolate));
 			if (!val.IsEmpty() && val->IsFunction())
 			{
 				argValue = val.As<Function>()->Call(boolObj, 0, nullptr)->BooleanValue();
@@ -364,6 +356,7 @@ bool JsArgConverter::ConvertJavaScriptBoolean(const Local<Value>& jsValue, int i
 				argValue = false;
 			}
 		}
+
 		jboolean value = argValue ? JNI_TRUE : JNI_FALSE;
 		m_args[index].z = value;
 		success = true;
@@ -378,7 +371,7 @@ bool JsArgConverter::ConvertJavaScriptBoolean(const Local<Value>& jsValue, int i
 
 bool JsArgConverter::ConvertJavaScriptString(const Local<Value>& jsValue, int index)
 {
-	jstring stringObject = ConvertToJavaString(jsValue);
+	jstring stringObject = ArgConverter::ConvertToJavaString(jsValue);
 	SetConvertedObject(index, stringObject);
 
 	return true;
@@ -392,7 +385,7 @@ bool JsArgConverter::ConvertJavaScriptArray(const Local<Array>& jsArr, int index
 
 	jsize arrLength = jsArr->Length();
 
-	const auto& arraySignature = m_tokens->at(index);
+	const auto& arraySignature = m_tokens.at(index);
 
 	string elementType = arraySignature.substr(1);
 
@@ -501,7 +494,7 @@ bool JsArgConverter::ConvertFromCastFunctionObject(T value, int index)
 {
 	bool success = false;
 
-	const auto& typeSignature = m_tokens->at(index);
+	const auto& typeSignature = m_tokens.at(index);
 
 	const char typeSignaturePrefix = typeSignature[0];
 

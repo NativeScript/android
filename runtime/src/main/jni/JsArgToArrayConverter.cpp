@@ -1,15 +1,8 @@
 #include "JsArgToArrayConverter.h"
-#include <limits>
 #include <sstream>
 #include "ObjectManager.h"
-#include "NativeScriptAssert.h"
-#include "ArgConverter.h"
-#include "JniLocalRef.h"
-#include "Util.h"
-#include "V8GlobalHelpers.h"
 #include "V8StringConstants.h"
-#include "JavaObjectArrayCache.h"
-#include "JType.h"
+#include "ArgConverter.h"
 #include "NumericCasts.h"
 #include "NativeScriptException.h"
 #include "Runtime.h"
@@ -90,9 +83,11 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 	{
 		double d = arg->NumberValue();
 		int64_t i = (int64_t) d;
-		bool isInteger = d == i;
 
-		if (isInteger)
+		//if returnType isNumber and this check is true, the number we'll try to convert is whole(integer)
+		bool isWholeNumber = d == i;
+
+		if (isWholeNumber)
 		{
 			jobject obj;
 
@@ -151,7 +146,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 	}
 	else if (arg->IsString() || arg->IsStringObject())
 	{
-		auto stringObject = ConvertToJavaString(arg);
+		auto stringObject = ArgConverter::ConvertToJavaString(arg);
 		SetConvertedObject(env, index, stringObject);
 
 		success = true;
@@ -181,7 +176,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 				charValue = '\0';
 				if (castValue->IsString())
 				{
-					string str = ConvertToString(castValue->ToString());
+					string str = ArgConverter::ConvertToString(castValue->ToString());
 					charValue = (jchar) str[0];
 				}
 				javaObject = JType::NewChar(env, charValue);
@@ -194,7 +189,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 				byteValue = 0;
 				if (castValue->IsString())
 				{
-					string value = ConvertToString(castValue->ToString());
+					string value = ArgConverter::ConvertToString(castValue->ToString());
 					int byteArg = atoi(value.c_str());
 					byteValue = (jbyte) byteArg;
 				}
@@ -213,7 +208,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 				shortValue = 0;
 				if (castValue->IsString())
 				{
-					string value = ConvertToString(castValue->ToString());
+					string value = ArgConverter::ConvertToString(castValue->ToString());
 					int shortArg = atoi(value.c_str());
 					shortValue = (jshort) shortArg;
 				}
@@ -232,7 +227,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 				longValue = 0;
 				if (castValue->IsString())
 				{
-					auto strValue = ConvertToString(castValue->ToString());
+					auto strValue = ArgConverter::ConvertToString(castValue->ToString());
 					longValue = atoll(strValue.c_str());
 				}
 				else if (castValue->IsInt32())
@@ -273,7 +268,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index)
 			case CastType::None:
 				obj = objectManager->GetJavaObjectByJsObject(jsObj);
 
-				castValue = jsObj->GetHiddenValue(V8StringConstants::GetNullNodeName());
+				castValue = jsObj->GetHiddenValue(V8StringConstants::GetNullNodeName(m_isolate));
 
 				if(!castValue.IsEmpty()) {
 					auto node = reinterpret_cast<MetadataNode*>(castValue.As<External>()->Value());
@@ -374,12 +369,21 @@ jobjectArray JsArgToArrayConverter::ToJavaArray()
 {
 	if ((m_arr == nullptr) && (m_argsLen > 0))
 	{
-		m_arr = JavaObjectArrayCache::GetJavaObjectArray(m_argsLen);
-	}
+		if (m_argsLen >= JsArgToArrayConverter::MAX_JAVA_PARAMS_COUNT)
+		{
+			stringstream ss;
+			ss << "You are trying to override more than the MAX_JAVA_PARAMS_COUNT: " << JsArgToArrayConverter::MAX_JAVA_PARAMS_COUNT;
+			throw NativeScriptException(ss.str());
+		}
 
-	if (m_argsLen > 0)
-	{
 		JEnv env;
+
+		if(JsArgToArrayConverter::JAVA_LANG_OBJECT_CLASS == nullptr) {
+			JsArgToArrayConverter::JAVA_LANG_OBJECT_CLASS = env.FindClass("java/lang/Object");
+		}
+
+		JniLocalRef tmpArr(env.NewObjectArray(m_argsLen, JsArgToArrayConverter::JAVA_LANG_OBJECT_CLASS, nullptr));
+		m_arr = (jobjectArray) env.NewGlobalRef(tmpArr);
 
 		for (int i = 0; i < m_argsLen; i++)
 		{
@@ -396,6 +400,8 @@ JsArgToArrayConverter::~JsArgToArrayConverter()
 	{
 		JEnv env;
 
+		env.DeleteGlobalRef(m_arr);
+
 		int length = m_storedIndexes.size();
 		for (int i = 0; i < length; i++)
 		{
@@ -406,3 +412,5 @@ JsArgToArrayConverter::~JsArgToArrayConverter()
 		delete[] m_argsAsObject;
 	}
 }
+
+jclass JsArgToArrayConverter::JAVA_LANG_OBJECT_CLASS = nullptr;
