@@ -61,7 +61,14 @@ model {
 
         stl = "c++_static"
 
-        abiFilters.addAll(["armeabi-v7a", "x86", "arm64-v8a"])
+        if (ndkDebuggable)
+        {
+            abiFilters.addAll(["armeabi-v7a"])
+        }
+        else
+        {
+            abiFilters.addAll(["armeabi-v7a", "x86", "arm64-v8a"])
+        }
     }
 
     android.sources {

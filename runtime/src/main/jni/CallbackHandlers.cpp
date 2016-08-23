@@ -815,7 +815,8 @@ Local<Value> CallbackHandlers::CallJSMethod(Isolate *isolate, JNIEnv *_env,
         int argc = jsArgs->Length();
 
         Local<Value> arguments[argc];
-        for (int i = 0; i < argc; i++) {
+        for (int i = 0; i < argc; i++)
+        {
             arguments[i] = jsArgs->Get(i);
         }
 
@@ -830,7 +831,8 @@ Local<Value> CallbackHandlers::CallJSMethod(Isolate *isolate, JNIEnv *_env,
 
         //TODO: if javaResult is a pure js object create a java object that represents this object in java land
 
-        if (tc.HasCaught()) {
+        if (tc.HasCaught())
+        {
             stringstream ss;
             ss << "Calling js method " << methodName << " failed";
             string exceptionMessage = ss.str();
