@@ -58,8 +58,6 @@ namespace tns
 				END
 			};
 
-			void SetInstanceIsolate(v8::Isolate *isolate);
-
 		private:
 
 			struct JSInstanceInfo

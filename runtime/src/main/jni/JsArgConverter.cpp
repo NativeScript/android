@@ -8,6 +8,7 @@
 #include "NativeScriptException.h"
 #include "Runtime.h"
 #include "V8GlobalHelpers.h"
+#include <cstdlib>
 
 using namespace v8;
 using namespace std;
