@@ -748,7 +748,7 @@ void MetadataNode::SetInnerTypes(Isolate *isolate, Local<Function>& ctorFunction
 
 Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate *isolate, MetadataTreeNode *treeNode)
 {
-	vector<MethodCallbackData*> instanceMethodsCallbackData;
+	std::vector<MethodCallbackData*> instanceMethodsCallbackData;
 
 	auto ft = GetConstructorFunctionTemplate(isolate, treeNode, instanceMethodsCallbackData);
 
