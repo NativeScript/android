@@ -198,33 +198,10 @@ public class Dump
 			methodOverridesSet.add(methodOverride);
 		}
 
-    	generateProxy(aw, proxyName, classTo, methodOverridesSet, null);
+    	generateProxy(aw, proxyName, classTo, methodOverridesSet, null, null);
     }
 
-    public void generateProxy(ApplicationWriter aw, ClassDescriptor classTo, String[] methodOverrides, int ignored)
-    {
-    	HashSet<String> methodOverridesSet = new HashSet<String>();
-
-		for (int i = 0; i < methodOverrides.length; i++)
-		{
-			String methodOverride = methodOverrides[i];
-			methodOverridesSet.add(methodOverride);
-		}
-
-		generateProxy(aw, "0", classTo, methodOverridesSet, null);
-	}
-
-	public void generateProxy(ApplicationWriter aw, String proxyName, ClassDescriptor classTo)
-	{
-		generateProxy(aw, proxyName, classTo, null, null);
-	}
-
-	public void generateProxy(ApplicationWriter aw, ClassDescriptor classTo)
-	{
-    	generateProxy(aw, "0", classTo, null, null);
-    }
-
-    public void generateProxy(ApplicationWriter aw, String proxyName, ClassDescriptor classTo, HashSet<String> methodOverrides, HashSet<ClassDescriptor> implementedInterfaces)
+    public void generateProxy(ApplicationWriter aw, String proxyName, ClassDescriptor classTo, HashSet<String> methodOverrides, HashSet<ClassDescriptor> implementedInterfaces, AnnotationDescriptor[] annotations)
 	{
 		String classSignature = getAsmDescriptor(classTo);
 
@@ -237,7 +214,7 @@ public class Dump
 
 		tnsClassSignature += ";";
 
-		ClassVisitor cv = generateClass(aw, classTo, classSignature, tnsClassSignature, implementedInterfaces);
+		ClassVisitor cv = generateClass(aw, classTo, classSignature, tnsClassSignature, implementedInterfaces, annotations);
 		MethodDescriptor[] methods = getSupportedMethods(classTo, methodOverrides, implementedInterfaces);
 
 		methods = groupMethodsByNameAndSignature(methods);
@@ -926,7 +903,7 @@ public class Dump
 	static final String[] classImplentedInterfaces = new String[] { "Lcom/tns/NativeScriptHashCodeProvider;" };
 	static final String[] interfaceImplementedInterfaces = new String[] { "Lcom/tns/NativeScriptHashCodeProvider;", "" };
 
-	private ClassVisitor generateClass(ApplicationWriter aw, ClassDescriptor classTo, String classSignature, String tnsClassSignature, HashSet<ClassDescriptor> implementedInterfaces)
+	private ClassVisitor generateClass(ApplicationWriter aw, ClassDescriptor classTo, String classSignature, String tnsClassSignature, HashSet<ClassDescriptor> implementedInterfaces, AnnotationDescriptor[] annotations)
 	{
 		ClassVisitor cv;
 
@@ -958,8 +935,26 @@ public class Dump
 
 		cv = aw.visitClass(classModifiers, tnsClassSignature, null, classSignature, interfacesToImplementArr);
 		cv.visit(0, classModifiers, tnsClassSignature, null, classSignature, interfacesToImplementArr);
+		if ((annotations !=  null) && (annotations.length > 0)) {
+			for (AnnotationDescriptor ad: annotations) {
+				String annotationClassname = ad.getAnnotationClassname();
+				boolean isVisible = ad.isRuntimeVisible();
+				AnnotationVisitor av = cv.visitAnnotation(annotationClassname, isVisible);
+				setAnnotationFields(av, ad);
+				av.visitEnd();
+			}
+		}
 		cv.visitSource(classTo.getName() +  ".java", null);
 		return cv;
+	}
+
+	private void setAnnotationFields(AnnotationVisitor av, AnnotationDescriptor ad) {
+		AnnotationDescriptor.Parameter[] params = ad.getParams();
+		if (params.length > 0) {
+			for (AnnotationDescriptor.Parameter p: params) {
+				av.visit(p.getName(), p.getValue());
+			}
+		}
 	}
 
 	private int getDexModifiers(Descriptor descriptor)

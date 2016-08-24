@@ -15,6 +15,7 @@ import java.util.HashSet;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
+import com.tns.bindings.AnnotationDescriptor;
 import com.tns.bindings.ProxyGenerator;
 import com.tns.bindings.desc.ClassDescriptor;
 import com.tns.bindings.desc.reflection.ClassInfo;
@@ -282,7 +283,8 @@ public class DexFactory
 			}
 		}
 
-		return proxyGenerator.generateProxy(proxyName, new ClassInfo(classToProxy) , methodOverridesSet, implementedInterfacesSet, isInterface);
+		AnnotationDescriptor[] annotations = null;
+		return proxyGenerator.generateProxy(proxyName, new ClassInfo(classToProxy) , methodOverridesSet, implementedInterfacesSet, isInterface, annotations);
 	}
 
 	private void updateDexThumbAndPurgeCache()
