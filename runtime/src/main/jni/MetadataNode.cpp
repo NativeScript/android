@@ -484,13 +484,16 @@ void MetadataNode::SetInstanceMembers(Isolate *isolate, Local<FunctionTemplate>&
 	}
 	else
 	{
-		SetInstanceMembersFromStaticMetadata(isolate, ctorFuncTemplate, prototypeTemplate, instanceMethodsCallbackData, baseInstanceMethodsCallbackData, treeNode);
+		SetInstanceFieldsFromStaticMetadata(isolate, ctorFuncTemplate, prototypeTemplate, instanceMethodsCallbackData, baseInstanceMethodsCallbackData, treeNode);
+		SetInstanceMethodsFromStaticMetadata(isolate, ctorFuncTemplate, prototypeTemplate, instanceMethodsCallbackData, baseInstanceMethodsCallbackData, treeNode);
 	}
 }
 
-void MetadataNode::SetInstanceMembersFromStaticMetadata(Isolate *isolate, Local<FunctionTemplate>& ctorFuncTemplate, Local<ObjectTemplate>& prototypeTemplate, vector<MethodCallbackData*>& instanceMethodsCallbackData, const vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode)
+void MetadataNode::SetInstanceMethodsFromStaticMetadata(Isolate *isolate, Local<FunctionTemplate>& ctorFuncTemplate, Local<ObjectTemplate>& prototypeTemplate, vector<MethodCallbackData*>& instanceMethodsCallbackData, const vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode)
 {
 	SET_PROFILER_FRAME();
+
+	Local<Function> ctorFunction;
 
 	uint8_t *curPtr = s_metadataReader.GetValueData() + treeNode->offsetValue + 1;
 
@@ -511,8 +514,7 @@ void MetadataNode::SetInstanceMembersFromStaticMetadata(Isolate *isolate, Local<
 	string lastMethodName;
 	MethodCallbackData *callbackData = nullptr;
 
-    auto origin = Constants::APP_ROOT_FOLDER_PATH + GetOrCreateInternal(treeNode)->m_name;
-
+	auto origin = Constants::APP_ROOT_FOLDER_PATH + GetOrCreateInternal(treeNode)->m_name;
 	for (auto i = 0; i < instanceMethodCout; i++)
 	{
 		auto entry = s_metadataReader.ReadInstanceMethodEntry(&curPtr);
@@ -526,7 +528,7 @@ void MetadataNode::SetInstanceMembersFromStaticMetadata(Isolate *isolate, Local<
 			auto itBegin = baseInstanceMethodsCallbackData.begin();
 			auto itEnd = baseInstanceMethodsCallbackData.end();
 			auto itFound = find_if(itBegin, itEnd, [&entry] (MethodCallbackData *x)
-					{	return x->candidates.front().name == entry.name;});
+			{	return x->candidates.front().name == entry.name;});
 			if (itFound != itEnd)
 			{
 				callbackData->parent = *itFound;
@@ -534,31 +536,59 @@ void MetadataNode::SetInstanceMembersFromStaticMetadata(Isolate *isolate, Local<
 
 			auto funcData = External::New(isolate, callbackData);
 			auto funcTemplate = FunctionTemplate::New(isolate, MethodCallback, funcData);
-            auto funcName = ArgConverter::ConvertToV8String(isolate, entry.name);
 
-            if (s_profilerEnabled && (entry.name != "<init>"))
-            {
-                auto func = funcTemplate->GetFunction();
-                Local<Function> wrapperFunc = Wrap(isolate, func, entry.name, origin, false /* isCtorFunc */);
-                //prototypeTemplate->SetAccessor(funcName, WrapperFunctionGetterCallback, 0, func /*wrapperFunc*/ );
+			auto funcName = ConvertToV8String(entry.name);
 
-
-                Local<Function> ctorFunc = ctorFuncTemplate->GetFunction();
-                Local<Object> protoObject = ctorFunc->Get(ConvertToV8String("prototype")).As<Object>();
-                if (!protoObject.IsEmpty() && !protoObject->IsUndefined() && !protoObject->IsNull())
-                {
-                    protoObject->Set(funcName, wrapperFunc);
-                }
-            }
-            else
-            {
+			if (s_profilerEnabled)
+			{
+				auto func = funcTemplate->GetFunction();
+				Local<Function> wrapperFunc = Wrap(isolate, func, entry.name, origin, false /* isCtorFunc */);
+				Local<Function> ctorFunc = ctorFuncTemplate->GetFunction();
+				Local<Object> protoObject = ctorFunc->Get(ConvertToV8String("prototype")).As<Object>();
+				if (!protoObject.IsEmpty() && !protoObject->IsUndefined() && !protoObject->IsNull())
+				{
+					protoObject->Set(funcName, wrapperFunc);
+				}
+			}
+			else
+			{
 				prototypeTemplate->Set(funcName, funcTemplate);
-            }
+			}
 
 			lastMethodName = entry.name;
 		}
 
 		callbackData->candidates.push_back(entry);
+	}
+}
+
+void MetadataNode::SetInstanceFieldsFromStaticMetadata(Isolate *isolate, Local<FunctionTemplate>& ctorFuncTemplate, Local<ObjectTemplate>& prototypeTemplate, vector<MethodCallbackData*>& instanceMethodsCallbackData, const vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode)
+{
+	SET_PROFILER_FRAME();
+
+	Local<Function> ctorFunction;
+
+	uint8_t *curPtr = s_metadataReader.GetValueData() + treeNode->offsetValue + 1;
+
+	auto nodeType = s_metadataReader.GetNodeType(treeNode);
+
+	auto curType = s_metadataReader.ReadTypeName(treeNode);
+
+	curPtr += sizeof(uint16_t /* baseClassId */);
+
+	if (s_metadataReader.IsNodeTypeInterface(nodeType))
+	{
+		curPtr += sizeof(uint8_t) + sizeof(uint32_t);
+	}
+
+	//get candidates from instance methods metadata
+	auto instanceMethodCout = *reinterpret_cast<uint16_t*>(curPtr);
+	curPtr += sizeof(uint16_t);
+
+	//skip metadata methods -- advance the pointer only
+	for (auto i = 0; i < instanceMethodCout; i++)
+	{
+		auto entry = s_metadataReader.ReadInstanceMethodEntry(&curPtr);
 	}
 
 	//get candidates from instance fields metadata
@@ -568,7 +598,7 @@ void MetadataNode::SetInstanceMembersFromStaticMetadata(Isolate *isolate, Local<
 	{
 		auto entry = s_metadataReader.ReadInstanceFieldEntry(&curPtr);
 
-		auto fieldName = ArgConverter::ConvertToV8String(isolate, entry.name);
+		auto fieldName = ConvertToV8String(entry.name);
 		auto fieldInfo = new FieldCallbackData(entry);
 		fieldInfo->declaringType = curType;
 		auto fieldData = External::New(isolate, fieldInfo);
@@ -731,8 +761,8 @@ void MetadataNode::SetInnerTypes(Isolate *isolate, Local<Function>& ctorFunction
 	{
 		const auto& children = *treeNode->children;
 
-		// prototype of outer class
-		auto prototypeTemplate2 = ctorFunction->Get(V8StringConstants::GetPrototype(isolate)).As<Object>();
+//		// prototype of outer class
+//		auto prototypeTemplate2 = ctorFunction->Get(V8StringConstants::GetPrototype(isolate)).As<Object>();
 
 		for (auto curChild : children)
 		{
