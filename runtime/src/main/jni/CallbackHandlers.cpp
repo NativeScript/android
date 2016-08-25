@@ -814,11 +814,12 @@ Local<Value> CallbackHandlers::CallJSMethod(Isolate *isolate, JNIEnv *_env,
         auto jsArgs = ArgConverter::ConvertJavaArgsToJsArgs(isolate, args);
         int argc = jsArgs->Length();
 
-        Local<Value> arguments[argc];
+        Local<Value>* arguments = new Local<Value>[argc];
         for (int i = 0; i < argc; i++)
         {
             arguments[i] = jsArgs->Get(i);
         }
+        delete [] arguments;
 
         DEBUG_WRITE("implementationObject->GetIdentityHash()=%d", jsObject->GetIdentityHash());
 

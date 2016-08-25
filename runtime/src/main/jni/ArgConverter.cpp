@@ -330,8 +330,7 @@ Local<String> ArgConverter::ConvertToV8String(Isolate *isolate, const jchar* dat
 
 Local<String> ArgConverter::ConvertToV8String(Isolate *isolate, const string& s)
 {
-	Local<String> str;
-	String::NewFromUtf8(isolate, s.c_str(), NewStringType::kNormal, s.length()).ToLocal(&str);
+	Local<String> str =	String::NewFromUtf8(isolate, s.c_str(), NewStringType::kNormal, s.length()).ToLocalChecked();
 	return str;
 }
 

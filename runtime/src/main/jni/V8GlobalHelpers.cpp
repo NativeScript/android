@@ -33,8 +33,7 @@ Local<String> tns::ConvertToV8String(const jchar *data, int length) {
 
 Local<String> tns::ConvertToV8String(const string &s) {
     auto isolate = Isolate::GetCurrent();
-    Local<String> str;
-    String::NewFromUtf8(isolate, s.c_str(), NewStringType::kNormal, s.length()).ToLocal(&str);
+    Local<v8::String> str = String::NewFromUtf8(isolate, s.c_str(), NewStringType::kNormal, s.length()).ToLocalChecked();
     return str;
 }
 
