@@ -4,7 +4,6 @@ env:
   - DATE=$(date +%Y-%m-%d)
   - PACKAGE_VERSION=next-$DATE-$TRAVIS_BUILD_NUMBER
   - PACKAGE_NAME=tns-android
-  - MALLOC_ARENA_MAX=2
 sudo: true
 language: android
 jdk:
