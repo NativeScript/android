@@ -1,6 +1,6 @@
 env:
   global:
-  - NDK_VERSION=r11c
+  - NDK_VERSION=r12b
   - DATE=$(date +%Y-%m-%d)
   - PACKAGE_VERSION=next-$DATE-$TRAVIS_BUILD_NUMBER
   - PACKAGE_NAME=tns-android
