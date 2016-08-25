@@ -5,7 +5,7 @@ env:
   - PACKAGE_VERSION=next-$DATE-$TRAVIS_BUILD_NUMBER
   - PACKAGE_NAME=tns-android
   - MALLOC_ARENA_MAX=2
-sudo: false
+sudo: true
 language: android
 jdk:
   - oraclejdk8
