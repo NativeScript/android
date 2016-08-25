@@ -112,10 +112,10 @@ task generateRuntime (type: Exec)   {
 	doFirst {
 		workingDir "$rootDir/runtime"
 		if(isWinOs) {
-			commandLine "cmd", "/c", "gradlew", "assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-PembedBindingGenerator=true", "--debug"
+			commandLine "cmd", "/c", "gradlew", "assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-PembedBindingGenerator=true"
 		}
 		else {
-			commandLine "./gradlew", "assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-PembedBindingGenerator=true", "--debug"
+			commandLine "./gradlew", "assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-PembedBindingGenerator=true"
 		}
 	}
 }
