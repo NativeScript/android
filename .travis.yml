@@ -39,7 +39,7 @@ script:
   - echo no | android create avd --force -n Arm21 -t android-21 -b armeabi-v7a -c 12M
   - emulator -avd Arm21 -no-skin -no-audio -no-window &
   - android-wait-for-emulator
-  - "cd test-app && ./gradlew runtest -PembedBindingGenerator=true --stacktrace"
+  - "cd test-app && ./gradlew assembleDebug runtest -PembedBindingGenerator=true --stacktrace"
   - cd ..
 before_deploy:
   - FULL_PACKAGE_VERSION=`sed -n 's/\s*"version":\s*"\([a-zA-Z0-9\.]*\)"\s*,*/\1/p' dist/package.json`
