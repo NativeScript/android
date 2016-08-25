@@ -56,16 +56,18 @@ public class ProxyGenerator
 		aw.visitEnd();
 		byte[] generatedBytes = aw.toByteArray();
 		
-		String proxyFileName = classToProxy.getName().replace('$', '_');
+		String proxyFileName;
 
-		if(!isInterface)
-		{
-			proxyFileName += Dump.CLASS_NAME_LOCATION_SEPARATOR + proxyName;
-		}
-
-		if (proxyThumb != null)
-		{
-			proxyFileName += "-" + proxyThumb;
+		if (proxyName.contains(".")) {
+			proxyFileName = proxyName;
+		} else {
+			proxyFileName = classToProxy.getName().replace('$', '_');
+			if (!isInterface) {
+				proxyFileName += Dump.CLASS_NAME_LOCATION_SEPARATOR + proxyName;
+			}
+			if (proxyThumb != null) {
+				proxyFileName += "-" + proxyThumb;
+			}
 		}
 		
 		if (IsLogEnabled) System.out.println("Generator: Saving proxy with file name: " + proxyFileName);

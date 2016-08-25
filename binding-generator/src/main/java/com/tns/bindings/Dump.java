@@ -189,30 +189,23 @@ public class Dump
 		return buf.toString();
 	}
 
-	public void generateProxy(ApplicationWriter aw, String proxyName, ClassDescriptor classTo, String[] methodOverrides, int ignored)
-	{
-		HashSet<String> methodOverridesSet = new HashSet<String>();
-		for (int i = 0; i < methodOverrides.length; i++)
-		{
-			String methodOverride = methodOverrides[i];
-			methodOverridesSet.add(methodOverride);
-		}
-
-    	generateProxy(aw, proxyName, classTo, methodOverridesSet, null, null);
-    }
-
     public void generateProxy(ApplicationWriter aw, String proxyName, ClassDescriptor classTo, HashSet<String> methodOverrides, HashSet<ClassDescriptor> implementedInterfaces, AnnotationDescriptor[] annotations)
 	{
 		String classSignature = getAsmDescriptor(classTo);
 
-		String tnsClassSignature = LCOM_TNS +
-				classSignature.substring(1, classSignature.length() - 1).replace("$", "_");
+		String tnsClassSignature;
+		if (proxyName.contains(".")) {
+			tnsClassSignature = "L" + proxyName.replace('.', '/') + ";";
+		} else {
+			tnsClassSignature = LCOM_TNS +
+					classSignature.substring(1, classSignature.length() - 1).replace("$", "_");
 
-		if(!classTo.isInterface()) {
-			tnsClassSignature += CLASS_NAME_LOCATION_SEPARATOR + proxyName;
+			if (!classTo.isInterface()) {
+				tnsClassSignature += CLASS_NAME_LOCATION_SEPARATOR + proxyName;
+			}
+
+			tnsClassSignature += ";";
 		}
-
-		tnsClassSignature += ";";
 
 		ClassVisitor cv = generateClass(aw, classTo, classSignature, tnsClassSignature, implementedInterfaces, annotations);
 		MethodDescriptor[] methods = getSupportedMethods(classTo, methodOverrides, implementedInterfaces);
