@@ -5,8 +5,6 @@ import java.io.File;
 import android.app.Application;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.os.Build;
-import android.os.Handler;
-import android.os.Looper;
 import android.util.Log;
 import java.io.IOException;
 

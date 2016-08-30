@@ -17,7 +17,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 
-import android.app.Application;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.SparseArray;
