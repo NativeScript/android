@@ -32,7 +32,7 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
 		String currentThreadMessage = "An uncaught Exception occurred on \"" + thread.getName() + "\" thread.\n";
 
 		String errorMessage = currentThreadMessage + ErrorReport.getErrorMessage(ex);
-		
+
 		if (Runtime.isInitialized())
 		{
 			try

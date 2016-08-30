@@ -104,6 +104,8 @@ public class Runtime
 	
 	private final StaticConfiguration config;
 	private static StaticConfiguration staticConfiguration;
+
+	private final DynamicConfiguration dynamicConfig;
 	
 	private final int runtimeId;
 	private static int nextRuntimeId = 0;
@@ -121,6 +123,7 @@ public class Runtime
 			}
 			this.runtimeId = nextRuntimeId++;
 			this.config = config;
+			this.dynamicConfig = dynamicConfiguration;
 			this.threadScheduler = dynamicConfiguration.getHandler();
 			classResolver = new ClassResolver(this);
 			currentRuntime.set(this);
@@ -155,7 +158,11 @@ public class Runtime
 				
 		return runtime;
 	}
-	
+
+	public DynamicConfiguration getDynamicConfig() {
+		return dynamicConfig;
+	}
+
 	public static boolean isInitialized()
 	{
 		Runtime runtime = Runtime.getCurrentRuntime();
@@ -173,26 +180,32 @@ public class Runtime
 	private static class WorkerThread extends HandlerThread {
 
 		private Integer workerId;
+		private ThreadScheduler mainThreadScheduler;
 
 		public WorkerThread(String name) {
 			super(name);
 		}
 
-		public WorkerThread(String name, Integer workerId) {
+		public WorkerThread(String name, Integer workerId, ThreadScheduler mainThreadScheduler) {
 			super("W: " + name);
 			this.workerId = workerId;
+			this.mainThreadScheduler = mainThreadScheduler;
 		}
 
 		@Override
 		public void run() {
 			super.run();
 			WorkThreadScheduler workThreadScheduler = new WorkThreadScheduler(new WorkerThreadHandler());
-			DynamicConfiguration dynamicConfiguration = new DynamicConfiguration(this.workerId, workThreadScheduler);
+			DynamicConfiguration dynamicConfiguration = new DynamicConfiguration(this.workerId, workThreadScheduler, this.mainThreadScheduler);
 			initRuntime(dynamicConfiguration);
 		}
 	}
 
 	private static class MainThreadHandler extends Handler {
+		public MainThreadHandler(Looper looper) {
+			super(looper);
+		}
+
 		@Override
 		public void handleMessage(Message msg) {
 			//todo: plamen5kov: implement main handle message
@@ -206,8 +219,8 @@ public class Runtime
 	 */
 	public static Runtime initializeRuntimeWithConfiguration(StaticConfiguration config) {
 		staticConfiguration = config;
-		WorkThreadScheduler workThreadScheduler = new WorkThreadScheduler(new MainThreadHandler());
-		DynamicConfiguration dynamicConfiguration = new DynamicConfiguration(0, workThreadScheduler);
+		WorkThreadScheduler mainThreadScheduler = new WorkThreadScheduler(new MainThreadHandler(Looper.myLooper()));
+		DynamicConfiguration dynamicConfiguration = new DynamicConfiguration(0, mainThreadScheduler, null);
 		Runtime runtime = initRuntime(dynamicConfiguration);
 
 		return runtime;
@@ -219,7 +232,10 @@ public class Runtime
 	 */
 	@RuntimeCallable
 	public static void initWorker (String jsFileName, int id) {
-		HandlerThread worker = new WorkerThread(jsFileName, id);
+		Runtime runtime = Runtime.getCurrentRuntime();
+		ThreadScheduler mainThreadScheduler = runtime.getDynamicConfig().getHandler();
+
+		HandlerThread worker = new WorkerThread(jsFileName, id, mainThreadScheduler);
 		worker.start();
 	}
 
