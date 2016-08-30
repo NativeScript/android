@@ -6,7 +6,6 @@ import android.app.Application;
 
 public class Configuration
 {
-	public final ThreadScheduler threadScheduler;
 	public final Logger logger;
 	public final Debugger debugger;
 	public final String appName;
@@ -18,11 +17,10 @@ public class Configuration
 	public final String dexThumb;
 	public final Object[] v8Config;
 	
-	public Configuration(ThreadScheduler threadScheduler, Logger logger,  Debugger debugger,
+	public Configuration(Logger logger,  Debugger debugger,
 			String appName, File runtimeLibPath, File rootDir, File appDir, ClassLoader classLoader,
 			File dexDir, String dexThumb, Object[] v8Config)
 	{
-		this.threadScheduler = threadScheduler;
 		this.logger = logger;
 		this.debugger = debugger;
 		this.appName = appName;

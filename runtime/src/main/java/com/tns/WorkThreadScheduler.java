@@ -6,9 +6,9 @@ public final class WorkThreadScheduler implements ThreadScheduler
 {
 	private final Handler threadHandler;
 
-	public WorkThreadScheduler(Handler threadHandler)
+	public WorkThreadScheduler(Handler handler)
 	{
-		this.threadHandler = threadHandler;
+		this.threadHandler = handler;
 	}
 
 	@Override
