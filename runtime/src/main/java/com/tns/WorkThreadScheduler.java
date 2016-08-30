@@ -4,22 +4,27 @@ import android.os.Handler;
 
 public final class WorkThreadScheduler implements ThreadScheduler
 {
-	private final Handler threadHandler;
+	private final Handler myHandler;
 
 	public WorkThreadScheduler(Handler handler)
 	{
-		this.threadHandler = handler;
+		this.myHandler = handler;
 	}
 
 	@Override
 	public final boolean post(Runnable r)
 	{
-		return threadHandler.post(r);
+		return myHandler.post(r);
 	}
 
 	@Override
 	public final Thread getThread()
 	{
-		return threadHandler.getLooper().getThread();
+		return myHandler.getLooper().getThread();
+	}
+
+	@Override
+	public Handler getHandler() {
+		return this.myHandler;
 	}
 }

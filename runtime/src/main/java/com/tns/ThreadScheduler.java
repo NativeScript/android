@@ -7,4 +7,6 @@ public interface ThreadScheduler
 	boolean post(Runnable r);
 
 	Thread getThread();
+
+	Handler getHandler();
 }

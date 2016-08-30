@@ -18,7 +18,9 @@ import java.util.HashSet;
 import java.util.Map;
 
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.Looper;
+import android.os.Message;
 import android.util.SparseArray;
 
 import com.tns.bindings.ProxyGenerator;
@@ -100,15 +102,15 @@ public class Runtime
 		}
 	};
 	
-	private final Configuration config;
-	private static Configuration staticConfiguration;
+	private final StaticConfiguration config;
+	private static StaticConfiguration staticConfiguration;
 	
 	private final int runtimeId;
 	private static int nextRuntimeId = 0;
 	private final static ThreadLocal<Runtime> currentRuntime = new ThreadLocal<Runtime>();
 	private final static Map<Integer, Runtime> runtimeCache = new HashMap<Integer, Runtime>();
 	
-	public Runtime(Configuration config, ThreadScheduler threadScheduler)
+	public Runtime(StaticConfiguration config, DynamicConfiguration dynamicConfiguration)
 	{
 		synchronized(Runtime.currentRuntime)
 		{
@@ -119,7 +121,7 @@ public class Runtime
 			}
 			this.runtimeId = nextRuntimeId++;
 			this.config = config;
-			this.threadScheduler = threadScheduler;
+			this.threadScheduler = dynamicConfiguration.getHandler();
 			classResolver = new ClassResolver(this);
 			currentRuntime.set(this);
 			runtimeCache.put(this.runtimeId, this);
@@ -161,13 +163,53 @@ public class Runtime
 		return (runtime != null) ? runtime.isInitializedImpl() : false;
 	}
 
+	private static class WorkerThreadHandler extends Handler {
+		@Override
+		public void handleMessage(Message msg) {
+			//todo: plamen5kov: implement worker handle message
+		}
+	}
+
+	private static class WorkerThread extends HandlerThread {
+
+		private Integer workerId;
+
+		public WorkerThread(String name) {
+			super(name);
+		}
+
+		public WorkerThread(String name, Integer workerId) {
+			super(name);
+			this.workerId = workerId;
+		}
+
+		@Override
+		public void run() {
+			super.run();
+			WorkThreadScheduler workThreadScheduler = new WorkThreadScheduler(new WorkerThreadHandler());
+			DynamicConfiguration dynamicConfiguration = new DynamicConfiguration(this.workerId, workThreadScheduler);
+			initRuntime(dynamicConfiguration);
+		}
+	}
+
+	private static class MainThreadHandler extends Handler {
+		@Override
+		public void handleMessage(Message msg) {
+			//todo: plamen5kov: implement main handle message
+		}
+	}
+
+
 	/*
 		This method initializes the runtime and should always be called first and through the main thread
 		in order to set static configuration that all following workers can use
 	 */
-	public static Runtime initializeWithConfiguration(Configuration config) {
+	public static Runtime initializeRuntimeWithConfiguration(StaticConfiguration config) {
 		staticConfiguration = config;
-		Runtime runtime = initialize();
+		WorkThreadScheduler workThreadScheduler = new WorkThreadScheduler(new MainThreadHandler());
+		DynamicConfiguration dynamicConfiguration = new DynamicConfiguration(0, workThreadScheduler);
+		Runtime runtime = initRuntime(dynamicConfiguration);
+
 		return runtime;
 	}
 
@@ -176,12 +218,17 @@ public class Runtime
 		It will use the static configuration for all following calls to initialize a new runtime.
 	 */
 	@RuntimeCallable
-	public static Runtime initialize() {
+	public static void initWorker (String jsFileName, int id) {
+		HandlerThread worker = new WorkerThread(jsFileName, id);
+		worker.start();
+	}
 
-		//setting handler operation needs to happen in Runtime.java
-		ThreadScheduler workThreadScheduler = new WorkThreadScheduler(new Handler(Looper.myLooper()));
-
-		Runtime runtime = new Runtime(staticConfiguration, workThreadScheduler);
+	/*
+		This method deals with initializing the runtime with given configuration
+		Does it both for workers and for the main thread
+	 */
+	private static Runtime initRuntime(DynamicConfiguration dynamicConfiguration) {
+		Runtime runtime = new Runtime(staticConfiguration, dynamicConfiguration);
 		runtime.init();
 
 		return runtime;
