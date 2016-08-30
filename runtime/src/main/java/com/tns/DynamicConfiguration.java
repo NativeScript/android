@@ -16,6 +16,11 @@ public class DynamicConfiguration {
         this.mainThreadScheduler = mainThreadScheduler;
     }
 
+    public DynamicConfiguration(Integer workerId, ThreadScheduler threadScheduler, Handler mainThreadhandler) {
+        this(workerId, threadScheduler);
+        this.mainThreadhandler = mainThreadhandler;
+    }
+
     public Integer getWorkerId() {
         return workerId;
     }
@@ -26,5 +31,9 @@ public class DynamicConfiguration {
 
     public ThreadScheduler getMainHandler() {
         return mainThreadScheduler;
+    }
+
+    public Handler getMainThreadhandler() {
+        return mainThreadhandler;
     }
 }

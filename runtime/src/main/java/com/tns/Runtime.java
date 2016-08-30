@@ -108,9 +108,26 @@ public class Runtime
 	private final DynamicConfiguration dynamicConfig;
 	
 	private final int runtimeId;
+
+	/*
+		Used to map to Handler, for messaging between Main and the other Workers
+	 */
+	private final int workerId;
+
+	/*
+		Used by all Worker threads to communicate with the Main thread
+	 */
+	private Handler mainThreadHandler;
+
 	private static int nextRuntimeId = 0;
 	private final static ThreadLocal<Runtime> currentRuntime = new ThreadLocal<Runtime>();
 	private final static Map<Integer, Runtime> runtimeCache = new HashMap<Integer, Runtime>();
+
+	/*
+		Holds reference to all Worker Threads' handlers
+		Note: Should only be used on the main thread
+	 */
+	private Map<Integer, Handler> workerIdToHandler = new HashMap<>();
 	
 	public Runtime(StaticConfiguration config, DynamicConfiguration dynamicConfiguration)
 	{
@@ -121,10 +138,13 @@ public class Runtime
 			{
 				throw new NativeScriptException("There is an existing runtime on this thread with id=" + existingRuntime.getRuntimeId());
 			}
+
 			this.runtimeId = nextRuntimeId++;
 			this.config = config;
 			this.dynamicConfig = dynamicConfiguration;
 			this.threadScheduler = dynamicConfiguration.getHandler();
+			this.workerId = dynamicConfiguration.getWorkerId();
+			this.mainThreadHandler = dynamicConfiguration.getMainThreadhandler();
 			classResolver = new ClassResolver(this);
 			currentRuntime.set(this);
 			runtimeCache.put(this.runtimeId, this);
@@ -170,10 +190,20 @@ public class Runtime
 		return (runtime != null) ? runtime.isInitializedImpl() : false;
 	}
 
+	public int getWorkerId() {
+		return workerId;
+	}
+
 	private static class WorkerThreadHandler extends Handler {
 		@Override
 		public void handleMessage(Message msg) {
 			//todo: plamen5kov: implement worker handle message
+			/*
+				Handle messages coming from the Main thread
+			 */
+			if(msg.arg1 == MessageType.ToWorkerThread) {
+
+			}
 		}
 	}
 
@@ -189,15 +219,25 @@ public class Runtime
 		public WorkerThread(String name, Integer workerId, ThreadScheduler mainThreadScheduler) {
 			super("W: " + name);
 			this.workerId = workerId;
-			this.mainThreadScheduler = mainThreadScheduler;
 		}
 
 		@Override
 		public void run() {
 			super.run();
 			WorkThreadScheduler workThreadScheduler = new WorkThreadScheduler(new WorkerThreadHandler());
-			DynamicConfiguration dynamicConfiguration = new DynamicConfiguration(this.workerId, workThreadScheduler, this.mainThreadScheduler);
-			initRuntime(dynamicConfiguration);
+
+			DynamicConfiguration dynamicConfiguration = new DynamicConfiguration(this.workerId, workThreadScheduler, mainThreadScheduler);
+			Runtime runtime = initRuntime(dynamicConfiguration);
+
+			/*
+				Send a message to the Main Thread to `shake hands`,
+				Main Thread will cache the Worker Handler for later use
+			 */
+			Message msg = Message.obtain();
+			msg.arg1 = MessageType.Handshake;
+			msg.arg2 = runtime.runtimeId;
+
+			runtime.mainThreadHandler.sendMessage(msg);
 		}
 	}
 
@@ -209,6 +249,29 @@ public class Runtime
 		@Override
 		public void handleMessage(Message msg) {
 			//todo: plamen5kov: implement main handle message
+			/*
+				Handle messages coming from a Worker thread
+			 */
+			if(msg.arg1 == MessageType.ToMainThread) {
+
+			}
+			/*
+				Handle a 'Handshake' message sent from a new Worker,
+				so that the Main may cache it and send messages to it later
+			 */
+			else if(msg.arg1 == MessageType.Handshake) {
+				int senderRuntimeId = msg.arg2;
+				Runtime workerRuntime = runtimeCache.get(senderRuntimeId);
+				Runtime mainRuntime = Runtime.getCurrentRuntime();
+
+				/*
+					Main thread now has a reference to the Worker's handler,
+					so messaging between the two threads can begin
+				 */
+				mainRuntime.workerIdToHandler.put(workerRuntime.getWorkerId(), workerRuntime.threadScheduler.getHandler());
+
+				mainRuntime.logger.write("A new Worker thread shook hands with the main thread!");
+			}
 		}
 	}
 
@@ -400,7 +463,6 @@ public class Runtime
 		return result;
 	}
 
-	// TODO: Pete: new param - implementedInterfaces
 	@RuntimeCallable
 	private Class<?> resolveClass(String fullClassName, String[] methodOverrides, String[] implementedInterfaces, boolean isInterface) throws ClassNotFoundException, IOException
 	{
