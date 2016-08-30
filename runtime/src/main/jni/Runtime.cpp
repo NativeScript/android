@@ -436,7 +436,9 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 
 	V8::SetFlagsFromString(Constants::V8_STARTUP_FLAGS.c_str(), Constants::V8_STARTUP_FLAGS.size());
 	V8::SetCaptureStackTraceForUncaughtExceptions(true, 100, StackTrace::kOverview);
-	V8::AddMessageListener(NativeScriptException::OnUncaughtError);
+
+	isolate->AddMessageListener(NativeScriptException::OnUncaughtError);
+	
 	__android_log_print(ANDROID_LOG_DEBUG, "TNS.Native", "V8 version %s", V8::GetVersion());
 
 	auto globalTemplate = ObjectTemplate::New();

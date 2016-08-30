@@ -21,15 +21,13 @@ void NumericCasts::CreateGlobalCastFunctions(Isolate *isolate, const Local<Objec
 	globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "double"), FunctionTemplate::New(isolate, NumericCasts::MarkAsDoubleCallbackStatic, ext));
 	globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "float"), FunctionTemplate::New(isolate, NumericCasts::MarkAsFloatCallbackStatic, ext));
 	globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "char"), FunctionTemplate::New(isolate, NumericCasts::MarkAsCharCallbackStatic, ext));
-
-	s_castMarker = new Persistent<String>(isolate, ArgConverter::ConvertToV8String(isolate, "t::cast"));
 }
 
 CastType NumericCasts::GetCastType(const Local<Object>& object)
 {
 	auto ret = CastType::None;
 	auto isolate = object->GetIsolate();
-	auto key = Local<String>::New(isolate, *s_castMarker);
+	auto key = ArgConverter::ConvertToV8String(isolate, s_castMarker);
 	auto hidden = object->GetHiddenValue(key);
 	if (!hidden.IsEmpty())
 	{
@@ -456,7 +454,7 @@ void NumericCasts::MarkAsDoubleCallback(const v8::FunctionCallbackInfo<Value>& a
 void NumericCasts::MarkJsObject(const Local<Object>& object, CastType castType, const Local<Value>& value)
 {
 	auto isolate = object->GetIsolate();
-	auto key = Local<String>::New(isolate, *s_castMarker);
+	auto key = ArgConverter::ConvertToV8String(isolate, s_castMarker);
 	auto type = Integer::New(isolate, static_cast<int>(castType));
 
 	object->SetHiddenValue(key, type);
@@ -464,4 +462,4 @@ void NumericCasts::MarkJsObject(const Local<Object>& object, CastType castType, 
 	DEBUG_WRITE("MarkJsObject: Marking js object: %d with cast type: %d", object->GetIdentityHash(), castType);
 }
 
-Persistent<String> *NumericCasts::s_castMarker = nullptr;
+std::string NumericCasts::s_castMarker = "t::cast";
