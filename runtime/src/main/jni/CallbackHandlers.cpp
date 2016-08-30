@@ -17,6 +17,7 @@
 #include "JsDebugger.h"
 #include "SimpleProfiler.h"
 #include "Runtime.h"
+#include "Constants.h"
 
 using namespace v8;
 using namespace std;
@@ -58,6 +59,10 @@ void CallbackHandlers::Init(Isolate *isolate) {
                                                                    "getChangeInBytesOfUsedMemory",
                                                                    "()J");
     assert(GET_CHANGE_IN_BYTES_OF_USED_MEMORY_METHOD_ID != nullptr);
+
+    INIT_WORKER_METHOD_ID = env.GetStaticMethodID(RUNTIME_CLASS, "initWorker", "(Ljava/lang/String;I)V");
+
+    assert(INIT_WORKER_METHOD_ID != nullptr);
 
     MetadataNode::Init(isolate);
 
@@ -892,7 +897,50 @@ jobjectArray CallbackHandlers::GetJavaStringArray(JEnv& env, int length) {
     return (jobjectArray) env.NewGlobalRef(tmpArr);
 }
 
+void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    try {
+        if (!args.IsConstructCall()) {
+            throw NativeScriptException("Worker should be called as a constructor!");
+        }
 
+        if (args.Length() > 1 || !args[0]->IsString()) {
+            throw NativeScriptException("Worker should be called with one string parameter (name of file to load)!");
+        }
+
+        auto thiz = args.This();
+        auto isolate = thiz->GetIsolate();
+
+        auto workerId = nextWorkerId++;
+        V8SetHiddenValue(thiz, "workerId", Number::New(isolate, workerId));
+
+        auto persistentWorker = new Persistent<Object>(isolate, thiz);
+
+        id2WorkerMap.insert(make_pair(workerId, persistentWorker));
+
+        DEBUG_WRITE("Called Worker constructor id=%d", workerId);
+
+        JEnv env;
+        JniLocalRef filePath(ArgConverter::ConvertToJavaString(args[0]));
+
+        env.CallStaticVoidMethod(RUNTIME_CLASS, INIT_WORKER_METHOD_ID, (jstring) filePath, workerId);
+    } catch (NativeScriptException &e) {
+        e.ReThrowToV8();
+    }
+    catch (std::exception e) {
+        stringstream ss;
+        ss << "Error: c exception: " << e.what() << endl;
+        NativeScriptException nsEx(ss.str());
+        nsEx.ReThrowToV8();
+    }
+    catch (...) {
+        NativeScriptException nsEx(std::string("Error: c exception!"));
+        nsEx.ReThrowToV8();
+    }
+}
+
+
+int CallbackHandlers::nextWorkerId = 0;
+std::map<int, Persistent<Object>*> CallbackHandlers::id2WorkerMap;
 
 short CallbackHandlers::MAX_JAVA_STRING_ARRAY_LENGTH = 100;
 jclass CallbackHandlers::RUNTIME_CLASS = nullptr;
@@ -904,6 +952,7 @@ jmethodID CallbackHandlers::GET_TYPE_METADATA = nullptr;
 jmethodID CallbackHandlers::ENABLE_VERBOSE_LOGGING_METHOD_ID = nullptr;
 jmethodID CallbackHandlers::DISABLE_VERBOSE_LOGGING_METHOD_ID = nullptr;
 jmethodID CallbackHandlers::GET_CHANGE_IN_BYTES_OF_USED_MEMORY_METHOD_ID = nullptr;
+jmethodID CallbackHandlers::INIT_WORKER_METHOD_ID = nullptr;
 NumericCasts CallbackHandlers::castFunctions;
 ArrayElementAccessor CallbackHandlers::arrayElementAccessor;
 FieldAccessor CallbackHandlers::fieldAccessor;

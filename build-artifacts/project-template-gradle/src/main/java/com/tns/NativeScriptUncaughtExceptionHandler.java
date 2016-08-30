@@ -29,8 +29,10 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
 	@Override
 	public void uncaughtException(Thread thread, Throwable ex)
 	{
-		String errorMessage = getErrorMessage(ex);
-
+		String currentThreadMessage = "An uncaught Exception occurred on \"" + thread.getName() + "\" thread.\n";
+		
+		String errorMessage = currentThreadMessage + ErrorReport.getErrorMessage(ex);
+		
 		if (Runtime.isInitialized())
 		{
 			try

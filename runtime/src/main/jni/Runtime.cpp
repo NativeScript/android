@@ -108,7 +108,9 @@ ObjectManager* Runtime::GetObjectManager() const
 
 void Runtime::Init(JNIEnv *_env, jobject obj, int runtimeId, jstring filesPath, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jobject jsDebugger)
 {
-	auto runtime = new Runtime(_env, obj, runtimeId);
+	JEnv env(_env);
+
+	auto runtime = new Runtime(env, obj, runtimeId);
 
 	auto enableLog = verboseLoggingEnabled == JNI_TRUE;
 
@@ -279,7 +281,7 @@ jint Runtime::GenerateNewObjectId(JNIEnv *env, jobject obj)
 
 void Runtime::AdjustAmountOfExternalAllocatedMemoryNative(JNIEnv *env, jobject obj, jlong usedMemory)
 {
-	Isolate::GetCurrent()->AdjustAmountOfExternalAllocatedMemory(usedMemory);
+	m_isolate->AdjustAmountOfExternalAllocatedMemory(usedMemory);
 }
 
 void Runtime::PassUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, jthrowable exception, jstring stackTrace)
@@ -420,7 +422,11 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 		create_params.snapshot_blob = m_startupData;
 	}
 
-	if (!didInitializeV8) {
+	/*
+	 * Setup the V8Platform only once per process - once for the application lifetime
+	 * Don't execute again if main thread has already been initialized
+	 */
+	if (!didInitializeV8 && !s_mainThreadInitialized) {
 		InitializeV8();
 	}
 
@@ -453,6 +459,22 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 	globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__disableVerboseLogging"), FunctionTemplate::New(isolate, CallbackHandlers::DisableVerboseLoggingMethodCallback));
 	globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__exit"), FunctionTemplate::New(isolate, CallbackHandlers::ExitMethodCallback));
 	globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__runtimeVersion"), ArgConverter::ConvertToV8String(isolate, NATIVE_SCRIPT_RUNTIME_VERSION), readOnlyFlags);
+
+	/*
+	 * Attach `Worker` object constructor only to the main thread (isolate)'s global object
+	 * Workers should not be created from within other Workers
+	 */
+	if(!s_mainThreadInitialized) {
+		globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "Worker"),
+							FunctionTemplate::New(isolate, CallbackHandlers::NewThreadCallback));
+	}
+	/*
+	 * Attach postMessage, onmessage, onerror to the global object
+	 * Will only happen for non-main threads - Workers
+	 */
+	else {
+
+	}
 
 	m_weakRef.Init(isolate, globalTemplate, m_objectManager);
 
@@ -494,6 +516,8 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 
 	m_arrayBufferHelper.CreateConvertFunctions(isolate, global, m_objectManager);
 
+	s_mainThreadInitialized = true;
+
 	return isolate;
 }
 
@@ -513,3 +537,4 @@ jobject Runtime::ConvertJsValueToJavaObject(JEnv& env, const Local<Value>& value
 JavaVM* Runtime::s_jvm = nullptr;
 map<int, Runtime*> Runtime::s_id2RuntimeCache;
 map<Isolate*, Runtime*> Runtime::s_isolate2RuntimesCache;
+bool Runtime::s_mainThreadInitialized = false;

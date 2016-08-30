@@ -77,6 +77,8 @@ namespace tns
 			static std::map<v8::Isolate*, Runtime*> s_isolate2RuntimesCache;
 
 			static JavaVM *s_jvm;
+
+			static bool s_mainThreadInitialized;
 	};
 }
 

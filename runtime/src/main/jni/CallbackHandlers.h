@@ -4,7 +4,6 @@
 #include <string>
 #include <map>
 #include <vector>
-#include "v8.h"
 #include "v8-debug.h"
 #include "JEnv.h"
 #include "ArgsWrapper.h"
@@ -15,12 +14,21 @@
 #include "FieldAccessor.h"
 #include "ArrayElementAccessor.h"
 #include "ObjectManager.h"
+#include "include/v8.h"
 
 namespace tns
 {
 	class CallbackHandlers
 	{
 		public:
+
+			/*
+			 * Stores persistent handles of all 'Worker' objects initialized on the main thread
+			 * Note: No isolates different than that of the main thread should access this map
+			 */
+			static std::map<int, v8::Persistent<v8::Object>*> id2WorkerMap;
+
+			static int nextWorkerId;
 
 			static void Init(v8::Isolate *isolate);
 
@@ -78,6 +86,8 @@ namespace tns
 
 			static v8::Local<v8::Object> FindClass(v8::Isolate *isolate, const std::string& className);
 
+			static void NewThreadCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
+
 		private:
 			CallbackHandlers()
 			{
@@ -109,6 +119,8 @@ namespace tns
 			static jmethodID DISABLE_VERBOSE_LOGGING_METHOD_ID;
 
 			static jmethodID GET_CHANGE_IN_BYTES_OF_USED_MEMORY_METHOD_ID;
+
+			static jmethodID INIT_WORKER_METHOD_ID;
 
 			static NumericCasts castFunctions;
 
