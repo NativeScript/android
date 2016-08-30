@@ -116,6 +116,7 @@ public class Runtime
 			}
 			this.runtimeId = nextRuntimeId++;
 			this.config = config;
+			this.threadScheduler = threadScheduler;
 			classResolver = new ClassResolver(this);
 			currentRuntime.set(this);
 			runtimeCache.put(this.runtimeId, this);
@@ -199,8 +200,6 @@ public class Runtime
 		{
 			throw new RuntimeException("NativeScriptApplication already initialized");
 		}
-
-		this.threadScheduler = threadScheduler;
 
 		this.logger = logger;
 
