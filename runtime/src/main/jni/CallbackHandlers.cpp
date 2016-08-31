@@ -951,6 +951,7 @@ void CallbackHandlers::WorkerObjectPostMessageCallback(const v8::FunctionCallbac
     Local<Value> jsId = V8GetHiddenValue(thiz, "workerId");
 
     // get worker's ID that is associated on the other side - in Java
+    // TODO: Pete: Ensure that the passed argument is a string
     Local<String> msg = Local<String>::New(isolate, args[0]->ToString());
     auto id = jsId->Int32Value();
 
@@ -965,7 +966,6 @@ void CallbackHandlers::WorkerObjectPostMessageCallback(const v8::FunctionCallbac
 }
 
 void CallbackHandlers::OnMessageWorkerThreadCallback(Isolate *isolate, jstring message) {
-    auto currI = Isolate::GetCurrent();
     auto context = isolate->GetCurrentContext();
     auto globalObject = context->Global();
 
@@ -985,6 +985,51 @@ void CallbackHandlers::OnMessageWorkerThreadCallback(Isolate *isolate, jstring m
     }
 }
 
+void CallbackHandlers::WorkerThreadPostMessageCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+
+    HandleScope scope(isolate);
+    
+    // TODO: Pete: Ensure that the passed argument is a string
+    Local<String> msg = Local<String>::New(args.GetIsolate(), args[0]->ToString());
+
+    JEnv env;
+    auto mId = env.GetStaticMethodID(RUNTIME_CLASS, "sendMessageFromWorkerToMain",
+                                     "(Ljava/lang/String;)V");
+
+    auto jmsg = ArgConverter::ConvertToJavaString(msg);
+
+    env.CallStaticVoidMethod(RUNTIME_CLASS, mId, jmsg);
+}
+
+void CallbackHandlers::OnMessageWorkerObjectCallback(Isolate *isolate, jint workerId, jstring message) {
+    auto workerFound = CallbackHandlers::id2WorkerMap.find(workerId);
+
+    if(workerFound == CallbackHandlers::id2WorkerMap.end()) {
+        // TODO: Pete: Throw exception
+        DEBUG_WRITE("MAIN: OnMessageWorkerObjectCallback no worker instance was found with workerId=%d !", workerId);
+        return;
+    }
+
+    auto workerPersistent = workerFound->second;
+
+    auto worker = Local<Object>::New(isolate, *workerPersistent);
+
+    auto callback = worker->Get(ArgConverter::ConvertToV8String(isolate, "onmessage"));
+    auto isEmpty = callback.IsEmpty();
+    auto isFunction = callback->IsFunction();
+
+    if(!isEmpty && isFunction) {
+        auto msg = ArgConverter::jstringToV8String(isolate, message);
+        Local<Value> args1[] = { msg };
+
+        auto func = callback.As<Function>();
+
+        func->Call(Undefined(isolate), 1, args1);
+    } else {
+        DEBUG_WRITE("MAIN: OnMessageWorkerObjectCallback couldn't fire a worker(id=%d) object's `onmessage` callback because it isn't implemented!", workerId);
+    }
+}
 
 int CallbackHandlers::nextWorkerId = 0;
 std::map<int, Persistent<Object>*> CallbackHandlers::id2WorkerMap;

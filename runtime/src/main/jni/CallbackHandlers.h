@@ -95,6 +95,13 @@ namespace tns
 
 			static void OnMessageWorkerThreadCallback(v8::Isolate *isolate, jstring message);
 
+			/*
+ 			 * Fired when a Worker script's postMessage is called (worker -> main thread messaging)
+ 			 */
+			static void WorkerThreadPostMessageCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+			static void OnMessageWorkerObjectCallback(v8::Isolate *isolate, jint workerId, jstring message);
+
 		private:
 			CallbackHandlers()
 			{

@@ -46,6 +46,8 @@ public class Runtime {
 
     private static native void OnMessageWorkerThreadCallback(int runtimeId, String message);
 
+    private static native void OnMessageWorkerObjectCallback(int runtimeId, int workerId, String message);
+
     void passUncaughtExceptionToJs(Throwable ex, String stackTrace) {
         passUncaughtExceptionToJsNative(getRuntimeId(), ex, stackTrace);
     }
@@ -196,13 +198,11 @@ public class Runtime {
             /*
 				Handle messages coming from the Main thread
 			 */
-            if (msg.arg1 == MessageType.ToWorkerThread) {
-                Runtime currentRuntime = Runtime.getCurrentRuntime();
-
+            if (msg.arg1 == MessageType.FromMainThread) {
                 /*
                     Calls the Worker script's onmessage implementation with arg -> msg.obj.toString()
                  */
-                OnMessageWorkerThreadCallback(currentRuntime.runtimeId, msg.obj.toString());
+                OnMessageWorkerThreadCallback(Runtime.getCurrentRuntime().runtimeId, msg.obj.toString());
             }
         }
     }
@@ -214,7 +214,7 @@ public class Runtime {
         private String filePath;
 
         public WorkerThread(String name, Integer workerId, ThreadScheduler mainThreadScheduler) {
-            super("W: " + name);
+            super("W" + workerId + ": " + name);
             this.filePath = name;
             this.workerId = workerId;
             this.mainThreadScheduler = mainThreadScheduler;
@@ -254,12 +254,14 @@ public class Runtime {
 
         @Override
         public void handleMessage(Message msg) {
-            //todo: plamen5kov: implement main handle message
 			/*
 				Handle messages coming from a Worker thread
 			 */
-            if (msg.arg1 == MessageType.ToMainThread) {
-
+            if (msg.arg1 == MessageType.FromWorkerThread) {
+                /*
+                    Calls the Worker (with id - workerId) object's onmessage implementation with arg -> msg.obj.toString()
+                */
+                OnMessageWorkerObjectCallback(Runtime.getCurrentRuntime().runtimeId, msg.arg2, msg.obj.toString());
             }
 			/*
 				Handle a 'Handshake' message sent from a new Worker,
@@ -277,7 +279,7 @@ public class Runtime {
 
                 mainRuntime.workerIdToHandler.put(workerRuntime.getWorkerId(), workerRuntime.getHandler());
 
-                mainRuntime.logger.write("A new Worker thread shook hands with the main thread!");
+                mainRuntime.logger.write("Worker thread (workerId:" + workerRuntime.getWorkerId() + ") shook hands with the main thread!");
             }
         }
     }
@@ -994,12 +996,30 @@ public class Runtime {
      */
     @RuntimeCallable
     public static void sendMessageFromMainToWorker(int workerId, String message) {
+        Runtime currentRuntime = Runtime.getCurrentRuntime();
+
         Message msg = Message.obtain();
-        msg.arg1 = MessageType.ToWorkerThread;
+        msg.arg1 = MessageType.FromMainThread;
         msg.obj = message;
 
         // TODO: Pete: Ensure that the worker thread has been completely setup and has a Handler before trying to send a message;
-        Handler workerHandler = Runtime.getCurrentRuntime().workerIdToHandler.get(workerId);
+        Handler workerHandler = currentRuntime.workerIdToHandler.get(workerId);
         workerHandler.sendMessage(msg);
+    }
+
+    @RuntimeCallable
+    public static void sendMessageFromWorkerToMain(String message) {
+        Runtime currentRuntime = Runtime.getCurrentRuntime();
+
+        Message msg = Message.obtain();
+        msg.arg1 = MessageType.FromWorkerThread;
+
+        /*
+            Send the workerId associated with the JavaScript Worker object
+         */
+        msg.arg2 = currentRuntime.getWorkerId();
+        msg.obj = message;
+
+        currentRuntime.mainThreadHandler.sendMessage(msg);
     }
 }

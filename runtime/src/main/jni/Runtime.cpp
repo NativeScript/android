@@ -473,7 +473,8 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 	 * Will only happen for non-main threads - Workers
 	 */
 	else {
-
+		auto postMessageFuncTemplate = FunctionTemplate::New(isolate, CallbackHandlers::WorkerThreadPostMessageCallback);
+		globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "postMessage"), postMessageFuncTemplate);
 	}
 
 	m_weakRef.Init(isolate, globalTemplate, m_objectManager);

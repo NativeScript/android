@@ -334,3 +334,20 @@ extern "C" void Java_com_tns_Runtime_OnMessageWorkerThreadCallback(JNIEnv *env, 
 
 	CallbackHandlers::OnMessageWorkerThreadCallback(isolate, msg);
 }
+
+extern "C" void Java_com_tns_Runtime_OnMessageWorkerObjectCallback(JNIEnv *env, jobject obj, jint runtimeId, jint workerId, jstring msg)
+{
+	// Main Thread runtime
+	auto runtime = TryGetRuntime(runtimeId);
+	if(runtime == nullptr)
+	{
+		// TODO: Pete: Log message informing the developer of the failure
+	}
+
+	auto isolate = runtime->GetIsolate();
+
+	v8::Isolate::Scope isolate_scope(isolate);
+	v8::HandleScope handleScope(isolate);
+
+	CallbackHandlers::OnMessageWorkerObjectCallback(isolate, workerId, msg);
+}
