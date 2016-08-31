@@ -122,8 +122,6 @@ public final class RuntimeHelper {
 
 			runtime = Runtime.initializeWithConfiguration(config);
 
-			exHandler.setRuntime(runtime);
-
 			// runtime needs to be initialized before the NativeScriptSyncService is enabled because it uses runtime.runScript(...)
 			if (NativeScriptSyncService.isSyncEnabled(app)) {
 				NativeScriptSyncService syncService = new NativeScriptSyncService(runtime, logger, app);

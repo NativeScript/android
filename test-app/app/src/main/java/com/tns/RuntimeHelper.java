@@ -42,6 +42,7 @@ public final class RuntimeHelper {
 		System.loadLibrary("NativeScript");
 
 		Logger logger = new LogcatLogger(app);
+
 		Debugger debugger = AndroidJsDebugger.isDebuggableApp(app) ? new AndroidJsDebugger(app, logger) : null;
 
 		Runtime runtime = null;
@@ -108,8 +109,6 @@ public final class RuntimeHelper {
 					appDir, classLoader, dexDir, dexThumb, v8Config);
 
 			runtime = Runtime.initializeRuntimeWithConfiguration(config);
-
-			exHandler.setRuntime(runtime);
 
 			// runtime needs to be initialized before the NativeScriptSyncService is enabled because it uses runtime.runScript(...)
 			if (NativeScriptSyncService.isSyncEnabled(app)) {
