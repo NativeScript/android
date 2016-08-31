@@ -281,6 +281,14 @@ public class Runtime {
 
                 mainRuntime.logger.write("Worker thread (workerId:" + workerRuntime.getWorkerId() + ") shook hands with the main thread!");
             }
+            /*
+                Handle resending a main -> worker message with a delay
+                If a new worker is still initializing and does not have a messageHandler setup
+                we requeue the message to be sent from main to worker
+             */
+            else if (msg.arg1 == MessageType.ResendToMain) {
+                sendMessageFromMainToWorker(msg.arg2, msg.obj.toString());
+            }
         }
     }
 
@@ -996,14 +1004,31 @@ public class Runtime {
      */
     @RuntimeCallable
     public static void sendMessageFromMainToWorker(int workerId, String message) {
+        final long ResendDelay = 1000;
+
         Runtime currentRuntime = Runtime.getCurrentRuntime();
 
         Message msg = Message.obtain();
         msg.arg1 = MessageType.FromMainThread;
         msg.obj = message;
 
-        // TODO: Pete: Ensure that the worker thread has been completely setup and has a Handler before trying to send a message;
         Handler workerHandler = currentRuntime.workerIdToHandler.get(workerId);
+
+        // TODO: Pete: Ensure that we won't end up in an endless loop. Can we get an invalid workerId?
+        /*
+            If workHandler is null then the new Worker Thread still hasn't completed initializing
+            Requeue the same message with a delay of `1000ms` to again try sending the message to the worker
+         */
+        if(workerHandler == null) {
+            msg.arg1 = MessageType.ResendToMain;
+            msg.arg2 = workerId;
+
+            Runtime.getCurrentRuntime().logger.write("Worker(id=" + msg.arg2 + "'s handler still not initialized. Resending message from Main to Worker(id=" + msg.arg2 + ")");
+
+            currentRuntime.getHandler().sendMessageDelayed(msg, ResendDelay);
+            return;
+        }
+
         workerHandler.sendMessage(msg);
     }
 
