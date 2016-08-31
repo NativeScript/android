@@ -93,7 +93,7 @@ namespace tns
 			 */
 			static void WorkerObjectPostMessageCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
 
-			static void OnMessageWorkerThreadCallback(JNIEnv *env, v8::Isolate *isolate, jstring message);
+			static void OnMessageWorkerThreadCallback(v8::Isolate *isolate, jstring message);
 
 		private:
 			CallbackHandlers()

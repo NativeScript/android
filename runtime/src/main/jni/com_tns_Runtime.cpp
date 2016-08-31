@@ -332,5 +332,5 @@ extern "C" void Java_com_tns_Runtime_OnMessageWorkerThreadCallback(JNIEnv *env, 
 	v8::Isolate::Scope isolate_scope(isolate);
 	v8::HandleScope handleScope(isolate);
 
-	CallbackHandlers::OnMessageWorkerThreadCallback(env, isolate, msg);
+	CallbackHandlers::OnMessageWorkerThreadCallback(isolate, msg);
 }

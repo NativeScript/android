@@ -964,16 +964,25 @@ void CallbackHandlers::WorkerObjectPostMessageCallback(const v8::FunctionCallbac
     env.CallStaticVoidMethod(RUNTIME_CLASS, mId, id, jmsg);
 }
 
-void CallbackHandlers::OnMessageWorkerThreadCallback(JNIEnv *env, Isolate *isolate, jstring message) {
+void CallbackHandlers::OnMessageWorkerThreadCallback(Isolate *isolate, jstring message) {
+    auto currI = Isolate::GetCurrent();
     auto context = isolate->GetCurrentContext();
     auto globalObject = context->Global();
-    
-    // TODO: Pete: Ensure the global object has the `onmessage` callback implemented in the first place; else -> return
-    auto callback = globalObject->Get(ArgConverter::ConvertToV8String(isolate, "onmessage")).As<Function>();
-    auto msg = ArgConverter::jstringToV8String(isolate, message);
-    Local<Value> args1[] = { msg };
 
-    callback->Call(context, Undefined(isolate), 1, args1);
+    auto callback = globalObject->Get(ArgConverter::ConvertToV8String(isolate, "onmessage"));
+    auto isEmpty = callback.IsEmpty();
+    auto isFunction = callback->IsFunction();
+
+    if(!isEmpty && isFunction) {
+        auto msg = ArgConverter::jstringToV8String(isolate, message);
+        Local<Value> args1[] = { msg };
+
+        auto func = callback.As<Function>();
+
+        func->Call(Undefined(isolate), 1, args1);
+    } else {
+        DEBUG_WRITE("WORKER: OnMessageWorkerThreadCallback couldn't fire a worker's `onmessage` callback because it isn't implemented!");
+    }
 }
 
 

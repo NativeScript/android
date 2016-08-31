@@ -211,9 +211,11 @@ public class Runtime {
 
         private Integer workerId;
         private ThreadScheduler mainThreadScheduler;
+        private String filePath;
 
         public WorkerThread(String name, Integer workerId, ThreadScheduler mainThreadScheduler) {
             super("W: " + name);
+            this.filePath = name;
             this.workerId = workerId;
             this.mainThreadScheduler = mainThreadScheduler;
         }
@@ -238,6 +240,8 @@ public class Runtime {
                     msg.arg2 = runtime.runtimeId;
 
                     runtime.mainThreadHandler.sendMessage(msg);
+
+                    runtime.runModule(runtime.runtimeId, filePath);
                 }
             }));
         }
