@@ -44,6 +44,8 @@ public class Runtime {
 
     private native void clearStartupData(int runtimeId);
 
+    private static native void OnMessageWorkerThreadCallback(int runtimeId, String message);
+
     void passUncaughtExceptionToJs(Throwable ex, String stackTrace) {
         passUncaughtExceptionToJsNative(getRuntimeId(), ex, stackTrace);
     }
@@ -191,12 +193,16 @@ public class Runtime {
     private static class WorkerThreadHandler extends Handler {
         @Override
         public void handleMessage(Message msg) {
-            //todo: plamen5kov: implement worker handle message
             /*
 				Handle messages coming from the Main thread
 			 */
             if (msg.arg1 == MessageType.ToWorkerThread) {
+                Runtime currentRuntime = Runtime.getCurrentRuntime();
 
+                /*
+                    Calls the Worker script's onmessage implementation with arg -> msg.obj.toString()
+                 */
+                OnMessageWorkerThreadCallback(currentRuntime.runtimeId, msg.obj.toString());
             }
         }
     }
@@ -205,10 +211,6 @@ public class Runtime {
 
         private Integer workerId;
         private ThreadScheduler mainThreadScheduler;
-
-        public WorkerThread(String name) {
-            super(name);
-        }
 
         public WorkerThread(String name, Integer workerId, ThreadScheduler mainThreadScheduler) {
             super("W: " + name);
@@ -977,5 +979,23 @@ public class Runtime {
         int JELLY_BEAN = 16;
         boolean useGlobalRefs = android.os.Build.VERSION.SDK_INT >= JELLY_BEAN;
         return useGlobalRefs;
+    }
+
+    /*
+        ======================================================================
+        ======================================================================
+                            Workers messaging callbacks
+        ======================================================================
+        ======================================================================
+     */
+    @RuntimeCallable
+    public static void sendMessageFromMainToWorker(int workerId, String message) {
+        Message msg = Message.obtain();
+        msg.arg1 = MessageType.ToWorkerThread;
+        msg.obj = message;
+
+        // TODO: Pete: Ensure that the worker thread has been completely setup and has a Handler before trying to send a message;
+        Handler workerHandler = Runtime.getCurrentRuntime().workerIdToHandler.get(workerId);
+        workerHandler.sendMessage(msg);
     }
 }

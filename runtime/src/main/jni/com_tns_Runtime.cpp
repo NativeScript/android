@@ -1,6 +1,7 @@
 #include "V8StringConstants.h"
 #include "Runtime.h"
 #include "NativeScriptException.h"
+#include "CallbackHandlers.h"
 #include <sstream>
 
 using namespace std;
@@ -314,5 +315,22 @@ extern "C" void Java_com_tns_Runtime_clearStartupData(JNIEnv *env, jobject obj, 
 
 extern "C" jint Java_com_tns_Runtime_getPointerSize(JNIEnv *env, jobject obj)
 {
-	return sizeof(void*);
+	return sizeof(void *);
+}
+
+extern "C" void Java_com_tns_Runtime_OnMessageWorkerThreadCallback(JNIEnv *env, jobject obj, jint runtimeId, jstring msg)
+{
+	// Worker Thread runtime
+	auto runtime = TryGetRuntime(runtimeId);
+	if(runtime == nullptr)
+	{
+		// TODO: Pete: Log message informing the developer of the failure
+	}
+
+	auto isolate = runtime->GetIsolate();
+
+	v8::Isolate::Scope isolate_scope(isolate);
+	v8::HandleScope handleScope(isolate);
+
+	CallbackHandlers::OnMessageWorkerThreadCallback(env, isolate, msg);
 }

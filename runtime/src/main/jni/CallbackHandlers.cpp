@@ -910,6 +910,9 @@ void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Valu
         auto thiz = args.This();
         auto isolate = thiz->GetIsolate();
 
+        auto postMessageFuncTemplate = FunctionTemplate::New(isolate, CallbackHandlers::WorkerObjectPostMessageCallback);
+        thiz->Set(ArgConverter::ConvertToV8String(isolate, "postMessage"), postMessageFuncTemplate->GetFunction());
+
         auto workerId = nextWorkerId++;
         V8SetHiddenValue(thiz, "workerId", Number::New(isolate, workerId));
 
@@ -936,6 +939,41 @@ void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Valu
         NativeScriptException nsEx(std::string("Error: c exception!"));
         nsEx.ReThrowToV8();
     }
+}
+
+void CallbackHandlers::WorkerObjectPostMessageCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+
+    HandleScope scope(isolate);
+
+    auto thiz = args.This(); // Worker instance
+
+    Local<Value> jsId = V8GetHiddenValue(thiz, "workerId");
+
+    // get worker's ID that is associated on the other side - in Java
+    Local<String> msg = Local<String>::New(isolate, args[0]->ToString());
+    auto id = jsId->Int32Value();
+
+    // TODO: Pete: Local refs, these should be released after the call to Java
+    JEnv env;
+    auto mId = env.GetStaticMethodID(RUNTIME_CLASS, "sendMessageFromMainToWorker",
+                                     "(ILjava/lang/String;)V");
+
+    auto jmsg = ArgConverter::ConvertToJavaString(msg);
+
+    env.CallStaticVoidMethod(RUNTIME_CLASS, mId, id, jmsg);
+}
+
+void CallbackHandlers::OnMessageWorkerThreadCallback(JNIEnv *env, Isolate *isolate, jstring message) {
+    auto context = isolate->GetCurrentContext();
+    auto globalObject = context->Global();
+    
+    // TODO: Pete: Ensure the global object has the `onmessage` callback implemented in the first place; else -> return
+    auto callback = globalObject->Get(ArgConverter::ConvertToV8String(isolate, "onmessage")).As<Function>();
+    auto msg = ArgConverter::jstringToV8String(isolate, message);
+    Local<Value> args1[] = { msg };
+
+    callback->Call(context, Undefined(isolate), 1, args1);
 }
 
 

@@ -88,6 +88,13 @@ namespace tns
 
 			static void NewThreadCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
+			/*
+			 * Fired when a Worker instance's postMessage is called (main -> worker thread messaging)
+			 */
+			static void WorkerObjectPostMessageCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+			static void OnMessageWorkerThreadCallback(JNIEnv *env, v8::Isolate *isolate, jstring message);
+
 		private:
 			CallbackHandlers()
 			{
