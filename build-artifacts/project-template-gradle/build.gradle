@@ -41,6 +41,7 @@ def nodeModulesDir = "../../node_modules/"
 def libDir = "$projectDir/../../lib/Android/"
 def flavorNames = new ArrayList<String>()
 def configDir = file(configurationsDir)
+def dexTask
 
 def packageJsonContents = [:]
 def excludedDevDependencies = ['**/.bin/**']
@@ -158,10 +159,12 @@ android {
 		def compileSourcesTaskName = "compile${variantName}Sources"
 		def compileSourcesTask = project.tasks.findByName(compileSourcesTaskName)
 		//
-		def dexTask = project.tasks.findByName("transformClassesWithDexFor${variantName}")
-		dexTask.finalizedBy(myMergeDex)
+		if ((project.ext.selectedBuildType.equals("release") && variantName.endsWith("Release"))
+				|| (project.ext.selectedBuildType.equals("debug") && variantName.endsWith("Debug"))) {
+			dexTask = project.tasks.findByName("transformClassesWithDexFor${variantName}")
+			dexTask.finalizedBy(myMergeDex)
+		}
 		//
-
 		
 		def generateBuildConfigTask = variant.generateBuildConfig;
 		generateBuildConfigTask.finalizedBy(collectAllJars)
@@ -631,7 +634,6 @@ task buildMetadata (type: JavaExec) {
 task myMergeDex {
 	doLast {
 		def prefix = "${buildDir}".replace('\\', '/') + "/intermediates/transforms/dex/"
-		def dexTask = project.tasks.findByName("transformClassesWithDexForF0Debug")
 		def paths = dexTask.getOutputs().getFiles().getAsPath().split(";")
 		for (def f: dexTask.getOutputs().getFiles().getAsFileTree().getFiles()) {
 			def canonPath = f.getAbsolutePath().replace('\\', '/')
