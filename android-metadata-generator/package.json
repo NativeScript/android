@@ -1,0 +1,21 @@
+{
+  "name": "tns-android-metadata-generator",
+  "description": "Telerik NativeScript Android Runtime Metadata Generator",
+  "version": "0.0.1",
+  "bin": {
+    "generate-metadata": "./bin/generate-metadata.sh",
+    "generate-metadatajs": "./bin/generate-metadata.js"
+  },
+  "files": [
+    "classes/**/*.class",
+    "bin/**"
+  ],
+  "private": true,
+  "devDependencies": {
+    "grunt": "0.4.5",
+    "grunt-contrib-clean": "0.5.0",
+    "grunt-contrib-copy": "0.5.0",
+    "grunt-exec": "0.4.6",
+    "node-fs" : "0.1.7"
+  }
+}
