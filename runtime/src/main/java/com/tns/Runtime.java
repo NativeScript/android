@@ -260,7 +260,7 @@ public class Runtime {
             if (msg.arg1 == MessageType.FromWorkerThread) {
                 /*
                     Calls the Worker (with id - workerId) object's onmessage implementation with arg -> msg.obj.toString()
-                */
+                 */
                 OnMessageWorkerObjectCallback(Runtime.getCurrentRuntime().runtimeId, msg.arg2, msg.obj.toString());
             }
 			/*
@@ -1012,18 +1012,29 @@ public class Runtime {
         msg.arg1 = MessageType.FromMainThread;
         msg.obj = message;
 
+        boolean hasKey = currentRuntime.workerIdToHandler.containsKey(workerId);
         Handler workerHandler = currentRuntime.workerIdToHandler.get(workerId);
 
         // TODO: Pete: Ensure that we won't end up in an endless loop. Can we get an invalid workerId?
         /*
             If workHandler is null then the new Worker Thread still hasn't completed initializing
             Requeue the same message with a delay of `1000ms` to again try sending the message to the worker
+
+            OR
+
+            The workHandler is null because it has been closed; Check if its key is still in the map
          */
         if(workerHandler == null) {
+            // We attempt to send a message to a closed worker, throw error or just log a message
+            if(hasKey) {
+                Runtime.getCurrentRuntime().logger.write("Worker(id=" + msg.arg2 + ") that you are trying to send a message to has been terminated. No message will be sent.");
+                return;
+            }
+
             msg.arg1 = MessageType.ResendToMain;
             msg.arg2 = workerId;
 
-            Runtime.getCurrentRuntime().logger.write("Worker(id=" + msg.arg2 + "'s handler still not initialized. Resending message from Main to Worker(id=" + msg.arg2 + ")");
+            Runtime.getCurrentRuntime().logger.write("Worker(id=" + msg.arg2 + ")'s handler still not initialized. Resending message from Main to Worker(id=" + msg.arg2 + ")");
 
             currentRuntime.getHandler().sendMessageDelayed(msg, ResendDelay);
             return;

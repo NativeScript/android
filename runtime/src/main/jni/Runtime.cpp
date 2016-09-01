@@ -469,8 +469,8 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 							FunctionTemplate::New(isolate, CallbackHandlers::NewThreadCallback));
 	}
 	/*
+	 * Emulate a `WorkerGlobalScope`
 	 * Attach postMessage, onmessage, onerror to the global object
-	 * Will only happen for non-main threads - Workers
 	 */
 	else {
 		auto postMessageFuncTemplate = FunctionTemplate::New(isolate, CallbackHandlers::WorkerThreadPostMessageCallback);
