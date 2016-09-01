@@ -1,0 +1,3 @@
+android.view.ViewGroup11111**MyClassMethod11111,MyClassMethod1111111*asd.asd.As11111
+android.view.ViewGroup3333**MyClassMethod33333,MyClassMethod33333*asd.asd.As33333
+android.view.ViewGroup222222**MyClassMethod22222,MyClassMethod2222*asd.asd.As22222

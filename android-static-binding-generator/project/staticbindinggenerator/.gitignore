@@ -1,0 +1,8 @@
+/build
+*.iml
+.gradle
+/local.properties
+/.idea
+!/.idea/misc.xml
+/a
+!.gitignore

@@ -1,0 +1,12 @@
+{
+  "name": "tns-core-modules",
+  "nativescript": {
+    "platforms": {
+      "android": "2.0.0",
+      "ios": "2.0.0"
+    }
+  },
+  "scripts": {},
+  "typings": "tns-core-modules.d.ts",
+  "version": "2.0.1"
+}

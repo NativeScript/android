@@ -1,0 +1,8 @@
+node_modules
+.vscode
+project/staticbindinggenerator/.idea
+project/staticbindinggenerator/gradle
+project/staticbindinggenerator/gradlew
+project/staticbindinggenerator/gradlew.bat
+project/staticbindinggenerator/local.properties
+project/interfaces-names.txt
