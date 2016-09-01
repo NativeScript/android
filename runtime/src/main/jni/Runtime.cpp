@@ -473,7 +473,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 	 * Attach postMessage, onmessage, onerror to the global object
 	 */
 	else {
-		auto postMessageFuncTemplate = FunctionTemplate::New(isolate, CallbackHandlers::WorkerThreadPostMessageCallback);
+		auto postMessageFuncTemplate = FunctionTemplate::New(isolate, CallbackHandlers::WorkerGlobalPostMessageCallback);
 		globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "postMessage"), postMessageFuncTemplate);
 	}
 

@@ -89,18 +89,30 @@ namespace tns
 			static void NewThreadCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 			/*
-			 * Fired when a Worker instance's postMessage is called (main -> worker thread messaging)
+			 * main -> worker messaging
+			 * Fired when a Worker instance's postMessage is called
 			 */
 			static void WorkerObjectPostMessageCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
 
-			static void OnMessageWorkerThreadCallback(v8::Isolate *isolate, jstring message);
+			/*
+			 * main -> worker messaging
+         	 * Fired when worker object has "postMessage" and the worker has implemented "onMessage" handler
+         	 * In case "onMessage" handler isn't implemented no exception is thrown
+			 */
+			static void WorkerGlobalOnMessageCallback(v8::Isolate *isolate, jstring message);
 
 			/*
- 			 * Fired when a Worker script's postMessage is called (worker -> main thread messaging)
+			 * worker -> main thread messaging
+ 			 * Fired when a Worker script's "postMessage" is called
  			 */
-			static void WorkerThreadPostMessageCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
+			static void WorkerGlobalPostMessageCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
 
-			static void OnMessageWorkerObjectCallback(v8::Isolate *isolate, jint workerId, jstring message);
+			/*
+         	 * worker -> main messaging
+         	 * Fired when worker has sent a message to main and the worker object has implemented "onMessage" handler
+         	 * In case "onMessage" handler isn't implemented no exception is thrown
+          	 */
+			static void WorkerObjectOnMessageCallback(v8::Isolate *isolate, jint workerId, jstring message);
 
 		private:
 			CallbackHandlers()

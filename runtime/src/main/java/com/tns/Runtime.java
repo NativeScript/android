@@ -44,9 +44,9 @@ public class Runtime {
 
     private native void clearStartupData(int runtimeId);
 
-    private static native void OnMessageWorkerThreadCallback(int runtimeId, String message);
+    private static native void WorkerGlobalOnMessageCallback(int runtimeId, String message);
 
-    private static native void OnMessageWorkerObjectCallback(int runtimeId, int workerId, String message);
+    private static native void WorkerObjectOnMessageCallback(int runtimeId, int workerId, String message);
 
     void passUncaughtExceptionToJs(Throwable ex, String stackTrace) {
         passUncaughtExceptionToJsNative(getRuntimeId(), ex, stackTrace);
@@ -198,11 +198,11 @@ public class Runtime {
             /*
 				Handle messages coming from the Main thread
 			 */
-            if (msg.arg1 == MessageType.FromMainThread) {
+            if (msg.arg1 == MessageType.MainToWorker) {
                 /*
                     Calls the Worker script's onmessage implementation with arg -> msg.obj.toString()
                  */
-                OnMessageWorkerThreadCallback(Runtime.getCurrentRuntime().runtimeId, msg.obj.toString());
+                WorkerGlobalOnMessageCallback(Runtime.getCurrentRuntime().runtimeId, msg.obj.toString());
             }
         }
     }
@@ -257,11 +257,11 @@ public class Runtime {
 			/*
 				Handle messages coming from a Worker thread
 			 */
-            if (msg.arg1 == MessageType.FromWorkerThread) {
+            if (msg.arg1 == MessageType.WorkerToMain) {
                 /*
                     Calls the Worker (with id - workerId) object's onmessage implementation with arg -> msg.obj.toString()
                  */
-                OnMessageWorkerObjectCallback(Runtime.getCurrentRuntime().runtimeId, msg.arg2, msg.obj.toString());
+                WorkerObjectOnMessageCallback(Runtime.getCurrentRuntime().runtimeId, msg.arg2, msg.obj.toString());
             }
 			/*
 				Handle a 'Handshake' message sent from a new Worker,
@@ -1009,8 +1009,6 @@ public class Runtime {
         Runtime currentRuntime = Runtime.getCurrentRuntime();
 
         Message msg = Message.obtain();
-        msg.arg1 = MessageType.FromMainThread;
-        msg.obj = message;
 
         boolean hasKey = currentRuntime.workerIdToHandler.containsKey(workerId);
         Handler workerHandler = currentRuntime.workerIdToHandler.get(workerId);
@@ -1039,6 +1037,10 @@ public class Runtime {
             currentRuntime.getHandler().sendMessageDelayed(msg, ResendDelay);
             return;
         }
+		else {
+			msg.arg1 = MessageType.MainToWorker;
+			msg.obj = message;
+		}
 
         workerHandler.sendMessage(msg);
     }
@@ -1048,7 +1050,7 @@ public class Runtime {
         Runtime currentRuntime = Runtime.getCurrentRuntime();
 
         Message msg = Message.obtain();
-        msg.arg1 = MessageType.FromWorkerThread;
+        msg.arg1 = MessageType.WorkerToMain;
 
         /*
             Send the workerId associated with the JavaScript Worker object

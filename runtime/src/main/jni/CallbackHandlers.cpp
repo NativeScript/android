@@ -965,7 +965,7 @@ void CallbackHandlers::WorkerObjectPostMessageCallback(const v8::FunctionCallbac
     env.CallStaticVoidMethod(RUNTIME_CLASS, mId, id, jmsg);
 }
 
-void CallbackHandlers::OnMessageWorkerThreadCallback(Isolate *isolate, jstring message) {
+void CallbackHandlers::WorkerGlobalOnMessageCallback(Isolate *isolate, jstring message) {
     auto context = isolate->GetCurrentContext();
     auto globalObject = context->Global();
 
@@ -981,11 +981,11 @@ void CallbackHandlers::OnMessageWorkerThreadCallback(Isolate *isolate, jstring m
 
         func->Call(Undefined(isolate), 1, args1);
     } else {
-        DEBUG_WRITE("WORKER: OnMessageWorkerThreadCallback couldn't fire a worker's `onmessage` callback because it isn't implemented!");
+        DEBUG_WRITE("WORKER: WorkerGlobalOnMessageCallback couldn't fire a worker's `onmessage` callback because it isn't implemented!");
     }
 }
 
-void CallbackHandlers::WorkerThreadPostMessageCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
+void CallbackHandlers::WorkerGlobalPostMessageCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
     auto isolate = args.GetIsolate();
 
     HandleScope scope(isolate);
@@ -1002,12 +1002,12 @@ void CallbackHandlers::WorkerThreadPostMessageCallback(const v8::FunctionCallbac
     env.CallStaticVoidMethod(RUNTIME_CLASS, mId, jmsg);
 }
 
-void CallbackHandlers::OnMessageWorkerObjectCallback(Isolate *isolate, jint workerId, jstring message) {
+void CallbackHandlers::WorkerObjectOnMessageCallback(Isolate *isolate, jint workerId, jstring message) {
     auto workerFound = CallbackHandlers::id2WorkerMap.find(workerId);
 
     if(workerFound == CallbackHandlers::id2WorkerMap.end()) {
         // TODO: Pete: Throw exception
-        DEBUG_WRITE("MAIN: OnMessageWorkerObjectCallback no worker instance was found with workerId=%d !", workerId);
+        DEBUG_WRITE("MAIN: WorkerObjectOnMessageCallback no worker instance was found with workerId=%d !", workerId);
         return;
     }
 
@@ -1027,7 +1027,7 @@ void CallbackHandlers::OnMessageWorkerObjectCallback(Isolate *isolate, jint work
 
         func->Call(Undefined(isolate), 1, args1);
     } else {
-        DEBUG_WRITE("MAIN: OnMessageWorkerObjectCallback couldn't fire a worker(id=%d) object's `onmessage` callback because it isn't implemented!", workerId);
+        DEBUG_WRITE("MAIN: WorkerObjectOnMessageCallback couldn't fire a worker(id=%d) object's `onmessage` callback because it isn't implemented!", workerId);
     }
 }
 
