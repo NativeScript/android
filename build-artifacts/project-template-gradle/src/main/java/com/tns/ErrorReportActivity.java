@@ -7,7 +7,7 @@ import android.support.v7.app.AppCompatActivity;
 public class ErrorReportActivity extends AppCompatActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        new ErrorReport(this).buildUI(this);
+        new ErrorReport(this).buildUI();
     }
 
     @Override

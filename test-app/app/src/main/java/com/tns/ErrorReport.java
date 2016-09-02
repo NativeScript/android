@@ -51,10 +51,10 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
 
 	private static String exceptionMsg;
 	private static String logcatMsg;
+	private static String pID;
 
 	private final static String EXTRA_NATIVESCRIPT_ERROR_REPORT = "NativeScriptErrorMessage";
 	private final static String EXTRA_ERROR_REPORT_MSG = "msg";
-	private final static String EXTRA_LOGCAT_MSG = "logcat";
 	private final static int EXTRA_ERROR_REPORT_VALUE = 1;
 
 	private static final int REQUEST_EXTERNAL_STORAGE = 1;
@@ -82,14 +82,16 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
 		this.context = activity.getApplicationContext();
 	}
 
-	static boolean startActivity(final Context context, String errorMessage, String logcatMessage) {
+	static boolean startActivity(final Context context, String errorMessage) {
 		final Intent intent = getIntent(context);
 		if (intent == null) {
 			return false; // (if in release mode) don't do anything
 		}
 
 		intent.putExtra(EXTRA_ERROR_REPORT_MSG, errorMessage);
-		intent.putExtra(EXTRA_LOGCAT_MSG, logcatMessage);
+
+		String PID = Integer.toString(android.os.Process.myPid());
+		intent.putExtra(pID, PID);
 
 		createErrorFile(context);
 
@@ -146,9 +148,8 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
 	* Gets the process Id of the running app and filters all
 	* output that doesn't belong to that process
 	* */
-	static String getLogcat() {
+	public static String getLogcat(String pId) {
 		String content;
-		String pId = Integer.toString(android.os.Process.myPid());
 
 		try {
 			String logcatCommand = "logcat -d";
@@ -193,11 +194,13 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
 		return value == EXTRA_ERROR_REPORT_VALUE;
 	}
 
-	void buildUI(AppCompatActivity activity) {
+	void buildUI() {
 		Intent intent = activity.getIntent();
 
 		exceptionMsg = intent.getStringExtra(EXTRA_ERROR_REPORT_MSG);
-		logcatMsg = intent.getStringExtra(EXTRA_LOGCAT_MSG);
+
+		String processId = intent.getStringExtra(pID);
+		logcatMsg = getLogcat(processId);
 
 		int errActivityId = this.context.getResources().getIdentifier("error_activity", "layout", this.context.getPackageName());
 
