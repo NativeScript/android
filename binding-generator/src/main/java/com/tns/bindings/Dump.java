@@ -252,6 +252,9 @@ public class Dump
 	}
 
 	private void collectInterfaceMethods(ClassDescriptor clazz, HashSet<String> methodOverrides, List<MethodDescriptor> result) {
+		if (!clazz.isInterface()) {
+			return;
+		}
 		Set<String> objectMethods = new HashSet<String>();
         // TODO refactor this
         ClassDescriptor objCD = new ClassInfo(Object.class);
