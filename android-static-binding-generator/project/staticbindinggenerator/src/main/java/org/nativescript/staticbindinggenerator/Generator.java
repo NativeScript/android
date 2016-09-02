@@ -55,10 +55,7 @@ public class Generator {
                 if (hasSpecifiedName) {
                     dexFilename = row.getFilename();
                 } else {
-                    dexFilename = getSimpleClassname(clazz.getClassName());
-                    if (!clazz.isInterface()) {
-                        dexFilename += row.getSuffix();
-                    }
+                    dexFilename = clazz.isInterface() ? "" : row.getSuffix();
                 }
 
                 AnnotationDescriptor[] annotations = null;
