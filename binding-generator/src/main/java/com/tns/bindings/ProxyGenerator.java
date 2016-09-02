@@ -63,7 +63,7 @@ public class ProxyGenerator
 		} else {
 			proxyFileName = classToProxy.getName().replace('$', '_');
 			if (!isInterface) {
-				proxyFileName += proxyName;
+				proxyFileName += Dump.CLASS_NAME_LOCATION_SEPARATOR + proxyName;
 			}
 			if (proxyThumb != null) {
 				proxyFileName += "-" + proxyThumb;
