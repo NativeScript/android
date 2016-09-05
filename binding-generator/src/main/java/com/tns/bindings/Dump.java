@@ -251,56 +251,56 @@ public class Dump
 		return m.getName() + sig.substring(nameIdx, endSigIdx);
 	}
 
-	private void collectInterfaceMethods(ClassDescriptor clazz, HashSet<String> methodOverrides, List<MethodDescriptor> result) {
-		if (!clazz.isInterface()) {
+	private void collectAbstractMethods(final ClassDescriptor clazz, List<MethodDescriptor> result) {
+		if (!clazz.isAbstract()) {
 			return;
 		}
-		Set<String> objectMethods = new HashSet<String>();
+		Set<String> alreadyAddedMethods = new HashSet<String>();
+		for (MethodDescriptor md: result) {
+			String sig = getMethodSignature(md);
+			alreadyAddedMethods.add(sig);
+		}
+
+		Set<String> concreteMethods = new HashSet<String>();
         // TODO refactor this
-        ClassDescriptor objCD = new ClassInfo(Object.class);
-		for (MethodDescriptor objMethod: objCD.getDeclaredMethods())
-		{
-			if (!objMethod.isStatic())
-			{
+        ClassDescriptor startingConcreteClassDesc = clazz.isInterface() ? new ClassInfo(Object.class) : clazz;
+		for (MethodDescriptor objMethod: startingConcreteClassDesc.getDeclaredMethods()) {
+			if (!objMethod.isStatic()) {
 				String sig = getMethodSignature(objMethod);
-				objectMethods.add(sig);
+				concreteMethods.add(sig);
 			}
 		}
 
-		Deque<ClassDescriptor> extendedInterfaces = new ArrayDeque<ClassDescriptor>();
+		Deque<ClassDescriptor> typesToProcess = new ArrayDeque<ClassDescriptor>();
+		typesToProcess.add(startingConcreteClassDesc);
 		if (clazz.isInterface()) {
-			extendedInterfaces.add(clazz);
-		} else {
-			extendedInterfaces.addAll(Arrays.asList(clazz.getInterfaces()));
+			typesToProcess.add(clazz);
 		}
 
-		Set<MethodDescriptor> notImplementedObjectMethods = new HashSet<MethodDescriptor>();
-
-		while (!extendedInterfaces.isEmpty()) {
-			ClassDescriptor currentInterface = extendedInterfaces.pollFirst();
-			MethodDescriptor[] ifaceMethods = currentInterface.getDeclaredMethods();
-			for (MethodDescriptor ifaceMethod: ifaceMethods)
-			{
-				if (!ifaceMethod.isStatic())
-				{
-					String sig = getMethodSignature(ifaceMethod);
-					if (objectMethods.contains(sig) && !methodOverrides.contains(ifaceMethod.getName()))
-					{
-						notImplementedObjectMethods.add(ifaceMethod);
+		while (!typesToProcess.isEmpty()) {
+			ClassDescriptor currentType = typesToProcess.pollFirst();
+			MethodDescriptor[] methods = currentType.getDeclaredMethods();
+			for (MethodDescriptor m: methods) {
+				if (m.isStatic()) {
+					continue;
+				}
+				String sig = getMethodSignature(m);
+				if (m.isAbstract()) {
+					if (!concreteMethods.contains(sig) && !alreadyAddedMethods.contains(sig)) {
+						result.add(m);
+						alreadyAddedMethods.add(sig);
 					}
+				} else if (!concreteMethods.contains(sig)) {
+					concreteMethods.add(sig);
 				}
 			}
 
-			for (MethodDescriptor ifaceMethod: ifaceMethods)
-			{
-				if (!notImplementedObjectMethods.contains(ifaceMethod))
-				{
-					result.add(ifaceMethod);
-				}
+			if (!currentType.isInterface() && !currentType.getName().equals("java.lang.Object")) {
+				typesToProcess.addFirst(currentType.getSuperclass());
 			}
 
-			for (ClassDescriptor iface: currentInterface.getInterfaces()) {
-				extendedInterfaces.add(iface);
+			for (ClassDescriptor iface: currentType.getInterfaces()) {
+				typesToProcess.add(iface);
 			}
 		}
 	}
@@ -309,11 +309,10 @@ public class Dump
 	{
 		ArrayList<MethodDescriptor> result = new ArrayList<MethodDescriptor>();
 
-		collectInterfaceMethods(clazz, methodOverrides, result);
+		collectAbstractMethods(clazz, result);
 
-		for (ClassDescriptor iface : interfacesToImplement)
-		{
-			collectInterfaceMethods(iface, methodOverrides, result);
+		for (ClassDescriptor iface : interfacesToImplement) {
+			collectAbstractMethods(iface, result);
 		}
 
 		if (!clazz.isInterface())

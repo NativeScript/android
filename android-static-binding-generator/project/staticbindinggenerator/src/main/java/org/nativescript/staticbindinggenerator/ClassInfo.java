@@ -164,6 +164,11 @@ class ClassInfo implements com.tns.bindings.desc.ClassDescriptor {
         return (isArray() || isPrimitive()) ? false : clazz.isFinal();
     }
 
+    @Override
+    public boolean isAbstract() {
+        return (isArray() || isPrimitive()) ? false : clazz.isAbstract();
+    }
+
     static ClassDescriptor fromPrimitive(ClassDescriptor primitiveType, int rank) {
         return (rank == 0) ? primitiveType : new ClassInfo(primitiveType, rank);
     }

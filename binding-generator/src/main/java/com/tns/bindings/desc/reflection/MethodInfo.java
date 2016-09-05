@@ -14,6 +14,7 @@ public class MethodInfo implements MethodDescriptor {
     private final boolean m_isPublic;
     private final boolean m_isProtected;
     private final boolean m_isFinal;
+    private final boolean m_isAbstract;
     private Class<?>[] m_parameterTypes;
     private Class<?> m_retType;
     private String m_name;
@@ -43,6 +44,7 @@ public class MethodInfo implements MethodDescriptor {
         m_isPublic = Modifier.isPublic(modifiers);
         m_isProtected = Modifier.isProtected(modifiers);
         m_isFinal = Modifier.isFinal(modifiers);
+        m_isAbstract = Modifier.isAbstract(modifiers);
     }
 
     @Override
@@ -97,5 +99,10 @@ public class MethodInfo implements MethodDescriptor {
     @Override
     public boolean isFinal() {
         return m_isFinal;
+    }
+
+    @Override
+    public boolean isAbstract() {
+        return m_isAbstract;
     }
 }

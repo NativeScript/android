@@ -71,6 +71,11 @@ class MethodInfo implements com.tns.bindings.desc.MethodDescriptor
         return m.isFinal();
     }
 
+    @Override
+    public boolean isAbstract() {
+        return m.isAbstract();
+    }
+
     private ClassDescriptor convertType(Type t) {
         ClassDescriptor desc;
         String sig = t.getSignature();
