@@ -88,6 +88,11 @@ public interface ClassDescriptor extends Descriptor{
             return false;
         }
 
+        @Override
+        public boolean isAbstract() {
+            return false;
+        }
+
         public static String getBoxedTypeName(ClassDescriptor c) {
             String name = null;
             if (c.isPrimitive()) {

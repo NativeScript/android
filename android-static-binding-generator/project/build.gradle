@@ -1,0 +1,93 @@
+/*
+*	The android static binding generator will generate bindings for the Javascript code you specify.
+*/
+
+def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
+
+def astParserDir = "$projectDir/parser"
+def interfaceNamesFilePath = "$projectDir/interfaces-names.txt"
+def bindingsFilePath = "$projectDir/bindings.txt"
+def cachedJarsFilePath = "$projectDir/cached.txt"
+
+def shouldRun = true
+def absoluteOutDir = project.outDir
+if (!absoluteOutDir.exists()) {
+	absoluteOutDir.mkdirs()
+}
+def absoluteJsCodeDir = project.jsCodeDir
+def utf8 = java.nio.charset.StandardCharsets.UTF_8
+def current = ""
+
+// depends on passed jars and generated interface-names
+task generateInterfaceNamesList() {
+	doFirst {
+		current = project.jarFiles
+		def cache = new File(cachedJarsFilePath)
+		
+		if (cache.exists()) {
+			def contents = new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(cachedJarsFilePath)), utf8).trim()
+			shouldRun = !contents.equals(current.toString())
+		}
+
+		if (shouldRun) {
+			javaexec {
+				main "-jar"
+
+				def jarsAsStr = current.toString();
+				def jarsArr = jarsAsStr.replaceAll(/[\[\]]/, "").split(", ")
+
+				def str = new LinkedList <String> ();
+				str.add("interfacenamegenerator.jar")
+				str.addAll(jarsArr)
+
+				args str.toArray()
+			}
+			java.nio.file.Files.write(java.nio.file.Paths.get(cachedJarsFilePath), [current.toString()], utf8)
+		}
+	}
+}
+
+// if there are new dependencies the parser will run again
+task runAstParser () {
+	inputs.files fileTree(dir: absoluteJsCodeDir)
+	outputs.files(bindingsFilePath)
+
+	doFirst {
+		exec {
+			workingDir astParserDir
+
+			if(isWinOs) {
+				commandLine "cmd", "/c", "node", "js_parser.js" , absoluteJsCodeDir, "../bindings.txt"
+			}
+			else {
+				commandLine "node", "js_parser.js", absoluteJsCodeDir, "../bindings.txt"
+			}
+		}
+	}
+}
+// run the static binding generator
+task generateBindings() {
+
+	inputs.files(bindingsFilePath)
+	outputs.dir(absoluteOutDir)
+	outputs.upToDateWhen({
+		return !shouldRun
+	})
+
+	doFirst {
+		javaexec {
+			main "-jar"
+
+			def str = new LinkedList <String> ();
+			str.add("staticbindinggenerator.jar")
+			str.add(bindingsFilePath)
+			str.add(absoluteOutDir)
+			str.addAll(project.jarFiles)
+
+			args str.toArray()
+		}
+	}
+}
+
+runAstParser.dependsOn(generateInterfaceNamesList)
+generateBindings.dependsOn(runAstParser)
