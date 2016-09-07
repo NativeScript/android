@@ -30,7 +30,7 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
 	public void uncaughtException(Thread thread, Throwable ex)
 	{
 		String errorMessage = ErrorReport.getErrorMessage(ex);
-		
+
 		if (Runtime.isInitialized())
 		{
 			try

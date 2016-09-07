@@ -26,7 +26,8 @@
         </activity>
         <activity
             android:name="com.tns.ErrorReportActivity"
-            android:label="TestApp">
+            android:label="ErrorActivity"
+            android:theme="@style/NoActionBar">
         </activity>
     </application>
     
