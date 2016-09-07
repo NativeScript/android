@@ -593,14 +593,42 @@ public class Dump
 
 		int thisRegister = generateMaxStackSize(mv, method);
 
-		if (!classTo.isInterface())
-		{
-			generateInitializedBlock(mv, thisRegister, classSignature, tnsClassSignature);
+		if (!classTo.isInterface()) {
+			if (isApplicationClass(classTo) && method.getName().equals("onCreate")) {
+				generateRuntimeInitializedBlock(mv, thisRegister, classSignature, tnsClassSignature, classTo.getName());
+			} else {
+				generateInitializedBlock(mv, thisRegister, classSignature, tnsClassSignature);
+			}
 		}
 
 		generateCallOverrideBlock(mv, method, thisRegister, classSignature, tnsClassSignature, methodDexSignature, fieldBit);
 
 		mv.visitEnd();
+	}
+
+	private boolean isApplicationClass(ClassDescriptor clazz) {
+		boolean isApplicationClass = false;
+		String applicationClassName = "android.app.Application";
+		ClassDescriptor currentClass = clazz;
+		while ((currentClass != null) && !isApplicationClass) {
+			isApplicationClass = currentClass.getName().equals(applicationClassName);
+			if (!isApplicationClass) {
+				currentClass = currentClass.getSuperclass();
+			}
+		}
+		return isApplicationClass;
+	}
+
+	private void generateRuntimeInitializedBlock(MethodVisitor mv, int thisRegister, String classSignature, String tnsClassSignature, String superClassname) {
+		String name = "L" + superClassname.replace('.', '/') + ";";
+
+		mv.visitMethodInsn(Opcodes.INSN_INVOKE_SUPER, name, "onCreate", "V", new int[] { thisRegister });
+		mv.visitMethodInsn(Opcodes.INSN_INVOKE_STATIC, "Lcom/tns/RuntimeHelper;", "initRuntime", "Lcom/tns/Runtime;Landroid/app/Application;", new int[] { thisRegister });
+		mv.visitIntInsn(org.ow2.asmdex.Opcodes.INSN_MOVE_RESULT_OBJECT, 0);
+		Label label = new Label();
+		mv.visitJumpInsn(Opcodes.INSN_IF_EQZ, label, 0, 0);
+		mv.visitMethodInsn(Opcodes.INSN_INVOKE_VIRTUAL, LCOM_TNS_RUNTIME, "run", "V", new int[] { 0 });
+		mv.visitLabel(label);
 	}
 
 	private int generateMaxStackSize(MethodVisitor mv, MethodDescriptor method)
