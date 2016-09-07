@@ -7,7 +7,6 @@ import java.lang.ref.WeakReference;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
@@ -53,6 +52,10 @@ public class Runtime
 	private final static HashMap<String, Class<?>> classCache = new HashMap<String, Class<?>>();
 
 	private final static HashSet<ClassLoader> classLoaderCache = new HashSet<ClassLoader>();
+
+	private final static String FAILED_CTOR_RESOLUTION_MSG = "Check the number and type of arguments.\n" +
+			"Primitive types need to be manually wrapped in their respective Object wrappers.\n" +
+			"If you are creating an instance of an inner class, make sure to always provide reference to the outer `this` as the first argument.";
 
 	private final SparseArray<Object> strongInstances = new SparseArray<Object>();
 
@@ -791,7 +794,7 @@ public class Runtime
 
 		if (res == null)
 		{
-			throw new Exception("Failed resolving constructor on class " + clazz.getName());
+			throw new Exception("Failed resolving constructor for class \'" + clazz.getName() + "\' with " + (args != null ? args.length : 0) + " parameters. " + FAILED_CTOR_RESOLUTION_MSG);
 		}
 
 		return res;

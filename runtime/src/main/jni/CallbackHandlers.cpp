@@ -4,30 +4,25 @@
 #include "Util.h"
 #include "V8GlobalHelpers.h"
 #include "V8StringConstants.h"
-#include "JniLocalRef.h"
 #include "JsArgConverter.h"
 #include "JsArgToArrayConverter.h"
 #include "ArgConverter.h"
 #include "v8-profiler.h"
 #include "NativeScriptException.h"
-#include <assert.h>
 #include <iostream>
 #include <sstream>
 #include <fstream>
-#include <sys/time.h>
 #include <cstdio>
-#include "JavaObjectArrayCache.h"
 #include "MethodCache.h"
 #include "JsDebugger.h"
 #include "SimpleProfiler.h"
 #include "Runtime.h"
-#include "include/v8.h"
 
 using namespace v8;
 using namespace std;
 using namespace tns;
 
-void CallbackHandlers::Init(Isolate *isolate, ObjectManager *objectManager) {
+void CallbackHandlers::Init(Isolate *isolate) {
     JEnv env;
 
     JAVA_LANG_STRING = env.FindClass("java/lang/String");
@@ -95,19 +90,22 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
     auto mi = MethodCache::ResolveConstructorSignature(argWrapper, fullClassName,
                                                        generatedJavaClass, isInterface);
 
+    // while the "instance" is being created, if an exception is thrown during the construction
+    // this scope will guarantee the "javaObjectID" will be set to -1 and won't have an invalid value
     jobject instance;
-
     {
         JavaObjectIdScope objIdScope(env, CURRENT_OBJECTID_FIELD_ID, runtime->GetJavaRuntime(),
                                      javaObjectID);
 
-        if (argWrapper.type == ArgType::Interface) {
-            instance = env.NewObject(generatedJavaClass, mi.mid);
-        }
-        else {
-            // resolve arguments before passing them on to the constructor
-            JsArgConverter argConverter(argWrapper.args, mi.signature, argWrapper.outerThis);
-            auto ctorArgs = argConverter.ToArgs();
+		if(argWrapper.type == ArgType::Interface)
+		{
+			instance = env.NewObject(generatedJavaClass, mi.mid);
+		}
+		else
+		{
+			// resolve arguments before passing them on to the constructor
+			JsArgConverter argConverter(argWrapper.args, mi.signature);
+			auto ctorArgs = argConverter.ToArgs();
 
             instance = env.NewObjectA(generatedJavaClass, mi.mid, ctorArgs);
         }
@@ -134,15 +132,10 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
 
 jclass CallbackHandlers::ResolveClass(Isolate *isolate, const string &fullClassname,
                                       const Local<Object> &implementationObject, bool isInterface) {
-    auto itFound = s_classCache.find(fullClassname);
+    JEnv env;
+    jclass globalRefToGeneratedClass = env.CheckForClassInCache(fullClassname);
 
-    jclass globalRefToGeneratedClass;
-
-    if (itFound != s_classCache.end()) {
-        globalRefToGeneratedClass = itFound->second;
-    }
-    else {
-        JEnv env;
+    if (globalRefToGeneratedClass == nullptr) {
 
         // get needed arguments in order to load binding
         JniLocalRef javaFullClassName(env.NewStringUTF(fullClassname.c_str()));
@@ -154,25 +147,25 @@ jclass CallbackHandlers::ResolveClass(Isolate *isolate, const string &fullClassn
         auto runtime = Runtime::GetRuntime(isolate);
 
         // create or load generated binding (java class)
-        JniLocalRef generatedClass(env.CallObjectMethod(runtime->GetJavaRuntime(),
+        jclass generatedClass = (jclass)env.CallObjectMethod(runtime->GetJavaRuntime(),
                                      RESOLVE_CLASS_METHOD_ID,
                                      (jstring) javaFullClassName,
                                      methodOverrides,
                                      implementedInterfaces,
-                                     isInterface));
+                                     isInterface);
 
-        globalRefToGeneratedClass = static_cast<jclass>(env.NewGlobalRef(generatedClass));
+        globalRefToGeneratedClass = env.InsertClassIntoCache(fullClassname, generatedClass);
 
-        s_classCache.insert(make_pair(fullClassname, globalRefToGeneratedClass));
+        env.DeleteGlobalRef(methodOverrides);
+        env.DeleteGlobalRef(implementedInterfaces);
     }
 
     return globalRefToGeneratedClass;
 }
 
-// Called by ExtendCallMethodCallback when extending a class
-string CallbackHandlers::ResolveClassName(Isolate *isolate, const string& fullClassname, const Local<Object>& implementationObject, bool isInterface)
+// Called by ExtendMethodCallback when extending a class
+string CallbackHandlers::ResolveClassName(Isolate *isolate, jclass &clazz)
 {
-	auto clazz = ResolveClass(isolate, fullClassname, implementationObject, isInterface);
 	auto runtime = Runtime::GetRuntime(isolate);
 	auto objectManager = runtime->GetObjectManager();
 	auto className = objectManager->GetClassName(clazz);
@@ -186,7 +179,6 @@ Local<Value> CallbackHandlers::GetArrayElement(Isolate *isolate, const Local<Obj
 
 void CallbackHandlers::SetArrayElement(Isolate *isolate, const Local<Object> &array, uint32_t index,
                                        const string &arraySignature, Local<Value> &value) {
-    JEnv env;
 
     arrayElementAccessor.SetArrayElement(isolate, array, index, arraySignature, value);
 }
@@ -392,7 +384,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
             JniLocalRef str(env.NewString(&result, 1));
             jboolean bol = true;
             const char *resP = env.GetStringUTFChars(str, &bol);
-            args.GetReturnValue().Set(ConvertToV8String(resP, 1));
+            args.GetReturnValue().Set(ArgConverter::ConvertToV8String(isolate, resP, 1));
             env.ReleaseStringUTFChars(str, resP);
             break;
         }
@@ -483,7 +475,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
             }
 
             if (result != nullptr) {
-                auto objectResult = ArgConverter::jstringToV8String(static_cast<jstring>(result));
+                auto objectResult = ArgConverter::jstringToV8String(isolate, static_cast<jstring>(result));
                 args.GetReturnValue().Set(objectResult);
                 env.DeleteLocalRef(result);
             }
@@ -512,7 +504,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
 
                 Local<Value> objectResult;
                 if (isString) {
-                    objectResult = ArgConverter::jstringToV8String((jstring) result);
+                    objectResult = ArgConverter::jstringToV8String(isolate, (jstring) result);
                 }
                 else {
                     jint javaObjectID = objectManager->GetOrCreateObjectId(result);
@@ -568,9 +560,10 @@ Local<Object> CallbackHandlers::CreateJSWrapper(Isolate *isolate, jint javaObjec
     return objectManager->CreateJSWrapper(javaObjectID, typeName);
 }
 
+
 jobjectArray CallbackHandlers::GetImplementedInterfaces(JEnv &env, const Local<Object> &implementationObject) {
     if (implementationObject.IsEmpty()) {
-        return JavaObjectArrayCache::GetJavaStringArray(0);
+        return CallbackHandlers::GetJavaStringArray(env, 0);
     }
 
     vector <jstring> interfacesToImplement;
@@ -583,12 +576,11 @@ jobjectArray CallbackHandlers::GetImplementedInterfaces(JEnv &env, const Local<O
 
         if (arrFound) {
                 v8::String::Utf8Value propName(name);
-                // convert it to string
                 std::string arrNameC = std::string(*propName);
                 if (arrNameC == "interfaces") {
                     auto interfacesArr = prop->ToObject();
 
-                    auto isolate = Isolate::GetCurrent();
+                    auto isolate = implementationObject->GetIsolate();
                     int length = interfacesArr->Get(v8::String::NewFromUtf8(isolate, "length"))->ToObject()->Uint32Value();
 
                     if(length > 0) {
@@ -611,7 +603,7 @@ jobjectArray CallbackHandlers::GetImplementedInterfaces(JEnv &env, const Local<O
 
     int interfacesCount = interfacesToImplement.size();
 
-    jobjectArray implementedInterfaces = JavaObjectArrayCache::GetJavaStringArray(interfacesCount);
+    jobjectArray implementedInterfaces = CallbackHandlers::GetJavaStringArray(env, interfacesCount);
     for (int i = 0; i < interfacesCount; i++) {
         env.SetObjectArrayElement(implementedInterfaces, i, interfacesToImplement[i]);
     }
@@ -625,7 +617,7 @@ jobjectArray CallbackHandlers::GetImplementedInterfaces(JEnv &env, const Local<O
 
 jobjectArray CallbackHandlers::GetMethodOverrides(JEnv &env, const Local<Object> &implementationObject) {
     if (implementationObject.IsEmpty()) {
-        return JavaObjectArrayCache::GetJavaStringArray(0);
+        return CallbackHandlers::GetJavaStringArray(env, 0);
     }
 
     vector <jstring> methodNames;
@@ -645,7 +637,7 @@ jobjectArray CallbackHandlers::GetMethodOverrides(JEnv &env, const Local<Object>
 
     int methodCount = methodNames.size();
 
-    jobjectArray methodOverrides = JavaObjectArrayCache::GetJavaStringArray(methodCount);
+    jobjectArray methodOverrides = CallbackHandlers::GetJavaStringArray(env, methodCount);
     for (int i = 0; i < methodCount; i++) {
         env.SetObjectArrayElement(methodOverrides, i, methodNames[i]);
     }
@@ -759,13 +751,13 @@ void CallbackHandlers::DisableVerboseLoggingMethodCallback(
 }
 
 void CallbackHandlers::ExitMethodCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
-    auto msg = ConvertToString(args[0].As<String>());
+    auto msg = ArgConverter::ConvertToString(args[0].As<String>());
     DEBUG_WRITE_FATAL("FORCE EXIT: %s", msg.c_str());
     exit(-1);
 }
 
-void CallbackHandlers::CreateGlobalCastFunctions(const Local<ObjectTemplate> &globalTemplate) {
-    castFunctions.CreateGlobalCastFunctions(globalTemplate);
+void CallbackHandlers::CreateGlobalCastFunctions(Isolate *isolate, const Local<ObjectTemplate> &globalTemplate) {
+    castFunctions.CreateGlobalCastFunctions(isolate, globalTemplate);
 }
 
 vector <string> CallbackHandlers::GetTypeMetadata(const string &name, int index) {
@@ -803,7 +795,7 @@ Local<Value> CallbackHandlers::CallJSMethod(Isolate *isolate, JNIEnv *_env,
     JEnv env(_env);
     Local<Value> result;
 
-    auto method = jsObject->Get(ConvertToV8String(methodName));
+    auto method = jsObject->Get(ArgConverter::ConvertToV8String(isolate, methodName));
 
     if (method.IsEmpty() || method->IsUndefined()) {
         stringstream ss;
@@ -883,6 +875,21 @@ int CallbackHandlers::GetArrayLength(Isolate *isolate, const Local<Object> &arr)
     return length;
 }
 
+jobjectArray CallbackHandlers::GetJavaStringArray(JEnv& env, int length) {
+    if (length > CallbackHandlers::MAX_JAVA_STRING_ARRAY_LENGTH)
+    {
+        stringstream ss;
+        ss << "You are trying to override more methods than the limit of " <<  CallbackHandlers::MAX_JAVA_STRING_ARRAY_LENGTH;
+        throw NativeScriptException(ss.str());
+    }
+
+    JniLocalRef tmpArr(env.NewObjectArray(length, JAVA_LANG_STRING, nullptr));
+    return (jobjectArray) env.NewGlobalRef(tmpArr);
+}
+
+
+
+short CallbackHandlers::MAX_JAVA_STRING_ARRAY_LENGTH = 100;
 jclass CallbackHandlers::RUNTIME_CLASS = nullptr;
 jclass CallbackHandlers::JAVA_LANG_STRING = nullptr;
 jfieldID CallbackHandlers::CURRENT_OBJECTID_FIELD_ID = nullptr;
@@ -892,9 +899,6 @@ jmethodID CallbackHandlers::GET_TYPE_METADATA = nullptr;
 jmethodID CallbackHandlers::ENABLE_VERBOSE_LOGGING_METHOD_ID = nullptr;
 jmethodID CallbackHandlers::DISABLE_VERBOSE_LOGGING_METHOD_ID = nullptr;
 jmethodID CallbackHandlers::GET_CHANGE_IN_BYTES_OF_USED_MEMORY_METHOD_ID = nullptr;
-MetadataTreeNode *CallbackHandlers::metadataRoot = nullptr;
 NumericCasts CallbackHandlers::castFunctions;
 ArrayElementAccessor CallbackHandlers::arrayElementAccessor;
 FieldAccessor CallbackHandlers::fieldAccessor;
-map<string, int> CallbackHandlers::s_constructorCache;
-map <std::string, jclass> CallbackHandlers::s_classCache;

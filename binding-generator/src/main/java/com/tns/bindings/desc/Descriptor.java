@@ -12,4 +12,6 @@ public interface Descriptor {
     boolean isProtected();
 
     boolean isFinal();
+
+    boolean isAbstract();
 }

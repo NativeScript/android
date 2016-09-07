@@ -1,12 +1,7 @@
 #include "FieldAccessor.h"
-#include "JniLocalRef.h"
 #include "ArgConverter.h"
-#include "NativeScriptAssert.h"
-#include "Util.h"
-#include "V8GlobalHelpers.h"
 #include "NativeScriptException.h"
 #include "Runtime.h"
-#include <assert.h>
 #include <sstream>
 
 using namespace v8;
@@ -60,7 +55,7 @@ Local<Value> FieldAccessor::GetJavaField(Isolate *isolate, const Local<Object>& 
 		if (targetJavaObject.IsNull())
 		{
 			stringstream ss;
-			ss << "Cannot access property '" << fieldData->name << "' because there is no corresponding Java object";
+			ss << "Cannot access property '" << fieldData->name.c_str() << "' because there is no corresponding Java object";
 			throw NativeScriptException(ss.str());
 		}
 	}
@@ -115,7 +110,7 @@ Local<Value> FieldAccessor::GetJavaField(Isolate *isolate, const Local<Object>& 
 				JniLocalRef str(env.NewString(&result, 1));
 				jboolean bol = true;
 				const char* resP = env.GetStringUTFChars(str, &bol);
-				fieldResult = handleScope.Escape(ConvertToV8String(resP, 1));
+				fieldResult = handleScope.Escape(ArgConverter::ConvertToV8String(isolate, resP, 1));
 				env.ReleaseStringUTFChars(str, resP);
 				break;
 			}
@@ -217,7 +212,7 @@ Local<Value> FieldAccessor::GetJavaField(Isolate *isolate, const Local<Object>& 
 			bool isString = fieldTypeName == "java/lang/String";
 			if (isString)
 			{
-				auto resultV8Value = ArgConverter::jstringToV8String((jstring) result);
+				auto resultV8Value = ArgConverter::jstringToV8String(isolate, (jstring) result);
 				fieldResult = handleScope.Escape(resultV8Value);
 			}
 			else
@@ -291,7 +286,7 @@ void FieldAccessor::SetJavaField(Isolate *isolate, const Local<Object>& target, 
 		if (targetJavaObject.IsNull())
 		{
 			stringstream ss;
-			ss << "Cannot access property '" << fieldData->name << "' because there is no corresponding Java object";
+			ss << "Cannot access property '" << fieldData->name.c_str() << "' because there is no corresponding Java object";
 			throw NativeScriptException(ss.str());
 		}
 	}
@@ -333,8 +328,8 @@ void FieldAccessor::SetJavaField(Isolate *isolate, const Local<Object>& target, 
 			{
 				//TODO: validate value is a single char
 				String::Utf8Value stringValue(value->ToString());
-				JniLocalRef value(env.NewStringUTF(*stringValue));
-				const char* chars = env.GetStringUTFChars(value, 0);
+				JniLocalRef strValue(env.NewStringUTF(*stringValue));
+				const char* chars = env.GetStringUTFChars(strValue, 0);
 
 				if (isStatic)
 				{
@@ -344,7 +339,7 @@ void FieldAccessor::SetJavaField(Isolate *isolate, const Local<Object>& target, 
 				{
 					env.SetCharField(targetJavaObject, fieldId, chars[0]);
 				}
-				env.ReleaseStringUTFChars(value, chars);
+				env.ReleaseStringUTFChars(strValue, chars);
 				break;
 			}
 			case 'S': //short
@@ -376,7 +371,7 @@ void FieldAccessor::SetJavaField(Isolate *isolate, const Local<Object>& target, 
 			}
 			case 'J': //long
 			{
-				jlong longValue = static_cast<jlong>(ArgConverter::ConvertToJavaLong(value));
+				jlong longValue = static_cast<jlong>(ArgConverter::ConvertToJavaLong(isolate, value));
 				if (isStatic)
 				{
 					env.SetStaticLongField(clazz, fieldId, longValue);
@@ -424,12 +419,12 @@ void FieldAccessor::SetJavaField(Isolate *isolate, const Local<Object>& target, 
 		bool isString = fieldTypeName == "java/lang/String";
 		JniLocalRef result;
 
-		if (!value->IsNull())
+		if (!value->IsNull() && !value->IsUndefined())
 		{
 			if (isString)
 			{
 				//TODO: validate valie is a string;
-				result = ConvertToJavaString(value);
+				result = ArgConverter::ConvertToJavaString(value);
 			}
 			else
 			{

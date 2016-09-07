@@ -1,9 +1,9 @@
 #include "JsDebugger.h"
 #include "V8GlobalHelpers.h"
+#include "ArgConverter.h"
 #include "JniLocalRef.h"
 #include "NativeScriptException.h"
 #include "NativeScriptAssert.h"
-#include <assert.h>
 #include <sstream>
 
 using namespace std;
@@ -17,7 +17,6 @@ JsDebugger::JsDebugger()
 void JsDebugger::Init(v8::Isolate *isolate, const string& packageName, jobject jsDebugger)
 {
 	s_isolate = isolate;
-	s_packageName = packageName;
 
 	JEnv env;
 	s_jsDebugger = env.NewGlobalRef(jsDebugger);
@@ -34,11 +33,6 @@ void JsDebugger::Init(v8::Isolate *isolate, const string& packageName, jobject j
 
 	s_EnableAgent = env.GetMethodID(s_JsDebuggerClass, "enableAgent", "()V");
 	assert(s_EnableAgent != nullptr);
-}
-
-string JsDebugger::GetPackageName()
-{
-	return s_packageName;
 }
 
 /* *
@@ -172,19 +166,19 @@ void JsDebugger::ConsoleMessage(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
 	if ((args.Length() > 0) && args[0]->IsString())
 	{
-		std::string message = ConvertToString(args[0]->ToString());
+		std::string message = ArgConverter::ConvertToString(args[0]->ToString());
 
 		std:string level = "log";
 		if (args.Length() > 1  && args[1]->IsString())
 		{
-			level = ConvertToString(args[1]->ToString());
+			level = ArgConverter::ConvertToString(args[1]->ToString());
 		}
 
 		string srcFileName = "";
 		int lineNumber = 0;
 		int columnNumber = 0;
 
-		auto stackTrace = StackTrace::CurrentStackTrace(Isolate::GetCurrent(), 2, StackTrace::kOverview);
+		auto stackTrace = StackTrace::CurrentStackTrace(args.GetIsolate(), 2, StackTrace::kOverview);
 		if (!stackTrace.IsEmpty())
 		{
 			auto frame = stackTrace->GetFrame(1);
@@ -193,7 +187,7 @@ void JsDebugger::ConsoleMessage(const v8::FunctionCallbackInfo<v8::Value>& args)
 				auto scriptName = frame->GetScriptName();
 				if (!scriptName.IsEmpty())
 				{
-					srcFileName = ConvertToString(scriptName);
+					srcFileName = ArgConverter::ConvertToString(scriptName);
 				}
 
 				lineNumber = frame->GetLineNumber();
@@ -265,7 +259,7 @@ void JsDebugger::MyMessageHandler(const v8::Debug::Message& message)
 	}
 
 	auto json = message.GetJSON();
-	auto str = ConvertToString(json);
+	auto str = ArgConverter::ConvertToString(json);
 
 	JEnv env;
 	JniLocalRef s(env.NewStringUTF(str.c_str()));
@@ -275,7 +269,6 @@ void JsDebugger::MyMessageHandler(const v8::Debug::Message& message)
 bool JsDebugger::enabled = false;
 v8::Isolate* JsDebugger::s_isolate = nullptr;
 jobject JsDebugger::s_jsDebugger = nullptr;
-string JsDebugger::s_packageName = "";
 jclass JsDebugger::s_JsDebuggerClass = nullptr;
 jmethodID JsDebugger::s_EnqueueMessage = nullptr;
 jmethodID JsDebugger::s_EnqueueConsoleMessage = nullptr;

@@ -1,13 +1,6 @@
-[submodule "android-metadata-generator"]
-	path = android-metadata-generator
-	url = https://github.com/NativeScript/android-metadata-generator.git
-	branch = master
 [submodule "test-app/assets/app/shared"]
 	path = test-app/app/src/main/assets/app/shared
 	url = git@github.com:NativeScript/common-runtime-tests-app.git
 [submodule "test-app/assets/app/tns_modules/shared"]
 	path = test-app/app/src/main/assets/app/tns_modules/shared
 	url = git@github.com:NativeScript/common-runtime-tests-modules.git
-[submodule "android-static-binding-generator"]
-	path = android-static-binding-generator
-	url = https://github.com/NativeScript/android-static-binding-generator

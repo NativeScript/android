@@ -16,8 +16,6 @@ namespace tns
 
 			JsArgConverter(const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& methodSignature);
 
-			JsArgConverter(const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& methodSignature, const v8::Local<v8::Object>& outerThis);
-
 			~JsArgConverter();
 
 			jvalue* ToArgs();
@@ -70,8 +68,7 @@ namespace tns
 
 			std::string m_methodSignature;
 
-			std::vector<std::string> *m_tokens;
-			std::vector<std::string> m_tokens2;
+			std::vector<std::string> m_tokens;
 
 			std::vector<int> m_storedObjects;
 

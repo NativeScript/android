@@ -1,0 +1,21 @@
+{
+  "name": "static_analysis",
+  "version": "1.0.0",
+  "description": "",
+  "main": "project/parse.js",
+  "scripts": {
+    "test": "node node_modules/jasmine-node/lib/jasmine-node/cli.js tests/specs --verbose"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "babel-traverse": "^6.4.5",
+    "babel-types": "^6.4.5",
+    "babylon": "^6.4.5",
+    "filewalker": "^0.1.2",
+    "lazy": "^1.0.11"
+  },
+  "devDependencies": {
+    "jasmine-node": "^1.14.5"
+  }
+}

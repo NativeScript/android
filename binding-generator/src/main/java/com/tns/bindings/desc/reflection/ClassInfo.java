@@ -140,4 +140,9 @@ public class ClassInfo implements ClassDescriptor {
     public boolean isFinal() {
         return Modifier.isFinal(clazz.getModifiers());
     }
+
+    @Override
+    public boolean isAbstract() {
+        return Modifier.isAbstract(clazz.getModifiers());
+    }
 }

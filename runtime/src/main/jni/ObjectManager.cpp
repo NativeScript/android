@@ -1,5 +1,4 @@
 #include "ObjectManager.h"
-#include "JniLocalRef.h"
 #include "NativeScriptAssert.h"
 #include "MetadataNode.h"
 #include "ArgConverter.h"
@@ -9,7 +8,7 @@
 #include "V8StringConstants.h"
 #include "NativeScriptException.h"
 #include "Runtime.h"
-#include <assert.h>
+#include "include/v8.h"
 #include <algorithm>
 #include <sstream>
 
@@ -47,6 +46,10 @@ ObjectManager::ObjectManager(jobject javaRuntimeObject)
 
 	auto useGlobalRefs = m_env.CallStaticBooleanMethod(runtimeClass, useGlobalRefsMethodID);
 	m_useGlobalRefs = useGlobalRefs == JNI_TRUE;
+}
+
+void ObjectManager::SetInstanceIsolate(Isolate *isolate) {
+	m_isolate = isolate;
 }
 
 void ObjectManager::Init(Isolate *isolate)
@@ -87,7 +90,7 @@ ObjectManager::JSInstanceInfo* ObjectManager::GetJSInstanceInfo(const Local<Obje
 	DEBUG_WRITE("ObjectManager::GetJSInstanceInfo: called");
 	JSInstanceInfo *jsInstanceInfo = nullptr;
 
-	auto isolate = Isolate::GetCurrent();
+	auto isolate = m_isolate;
 	HandleScope handleScope(isolate);
 
 	if (IsJsRuntimeObject(object))
@@ -170,7 +173,7 @@ int ObjectManager::GetOrCreateObjectId(jobject object)
 
 Local<Object> ObjectManager::GetJsObjectByJavaObject(int javaObjectID)
 {
-	auto isolate = Isolate::GetCurrent();
+	auto isolate = m_isolate;
 	EscapableHandleScope handleScope(isolate);
 
 	auto it = idToObject.find(javaObjectID);
@@ -200,7 +203,7 @@ Local<Object> ObjectManager::CreateJSWrapper(jint javaObjectID, const string& ty
 
 Local<Object> ObjectManager::CreateJSWrapperHelper(jint javaObjectID, const string& typeName, jclass clazz)
 {
-	auto isolate = Isolate::GetCurrent();
+	auto isolate = m_isolate;
 
 	auto className = (clazz != nullptr) ? GetClassName(clazz) : typeName;
 
@@ -228,7 +231,7 @@ void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID, jcl
 		throw NativeScriptException(errMsg);
 	}
 
-	auto isolate = Isolate::GetCurrent();
+	auto isolate = m_isolate;
 
 	DEBUG_WRITE("Linking js object: %d and java instance id: %d", object->GetIdentityHash(), javaObjectID);
 
@@ -387,7 +390,7 @@ void ObjectManager::ReleaseJSInstance(Persistent<Object> *po, JSInstanceInfo *js
  * */
 void ObjectManager::ReleaseRegularObjects()
 {
-	Isolate *isolate = Isolate::GetCurrent();
+	auto isolate = m_isolate;
 
 	HandleScope handleScope(isolate);
 
@@ -566,6 +569,7 @@ void ObjectManager::MarkReachableObjects(Isolate *isolate, const Local<Object>& 
 								s.push(curV);
 							}
 						}
+
 						NativeScriptExtension::ReleaseClosureObjects(setterClosureObjects);
 					}
 				}
@@ -646,7 +650,7 @@ void ObjectManager::OnGcFinished(GCType type, GCCallbackFlags flags)
 	assert(!m_markedForGC.empty());
 
 	//deal with all "callback" objects
-	auto isolate = Isolate::GetCurrent();
+	auto isolate = m_isolate;
 	for (auto weakObj : m_implObjWeak)
 	{
 		auto obj = Local<Object>::New(isolate, *weakObj.po);

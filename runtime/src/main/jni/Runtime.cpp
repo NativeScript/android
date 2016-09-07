@@ -1,6 +1,5 @@
 #include "CallbackHandlers.h"
 #include "MetadataNode.h"
-#include "JniLocalRef.h"
 #include "JsArgConverter.h"
 #include "JsArgToArrayConverter.h"
 #include "ArgConverter.h"
@@ -8,24 +7,21 @@
 #include "V8GlobalHelpers.h"
 #include "V8StringConstants.h"
 #include "Constants.h"
-#include "v8.h"
 #include "libplatform/libplatform.h"
 #include "Version.h"
-#include "JEnv.h"
 #include "WeakRef.h"
 #include "NativeScriptAssert.h"
 #include "JsDebugger.h"
 #include "SimpleProfiler.h"
 #include "SimpleAllocator.h"
-#include "JType.h"
 #include "Module.h"
 #include "NativeScriptException.h"
 #include "V8NativeScriptExtension.h"
 #include "Runtime.h"
 #include "ArrayHelper.h"
+#include "include/libplatform/libplatform.h"
+#include "include/zipconf.h"
 #include <sstream>
-#include <android/log.h>
-#include <string>
 
 using namespace v8;
 using namespace std;
@@ -121,7 +117,7 @@ void Runtime::Init(JNIEnv *_env, jobject obj, int runtimeId, jstring filesPath, 
 
 void Runtime::Init(jstring filesPath, bool verboseLoggingEnabled, jstring packageName, jobjectArray args, jobject jsDebugger)
 {
-	LogEnabled = m_logEnabled = verboseLoggingEnabled;
+	LogEnabled = verboseLoggingEnabled;
 
 	auto filesRoot = ArgConverter::jstringToString(filesPath);
 	Constants::APP_ROOT_FOLDER_PATH = filesRoot + "/app/";
@@ -162,12 +158,12 @@ jobject Runtime::RunScript(JNIEnv *_env, jobject obj, jstring scriptFile)
 
 	auto filename = ArgConverter::jstringToString(scriptFile);
 	auto src = File::ReadText(filename);
-	auto source = ConvertToV8String(src);
+	auto source = ArgConverter::ConvertToV8String(isolate, src);
 
 	TryCatch tc;
 
 	Local<Script> script;
-	ScriptOrigin origin(ConvertToV8String(filename));
+	ScriptOrigin origin(ArgConverter::ConvertToV8String(isolate, filename));
 	auto maybeScript = Script::Compile(context, source, &origin).ToLocal(&script);
 
 	if (tc.HasCaught())
@@ -292,7 +288,7 @@ void Runtime::PassUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, jthrowab
 
 	//create error message
 	string errMsg = "The application crashed because of an uncaught exception. You can look at \"stackTrace\" or \"nativeException\" for more detailed information about the exception.";
-	auto errObj = Exception::Error(ConvertToV8String(errMsg)).As<Object>();
+	auto errObj = Exception::Error(ArgConverter::ConvertToV8String(isolate, errMsg)).As<Object>();
 
 	//create a new native exception js object
 	jint javaObjectID = m_objectManager->GetOrCreateObjectId((jobject) exception);
@@ -313,9 +309,8 @@ void Runtime::PassUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, jthrowab
 	errMsg += "\n" + stackTraceText;
 
 	//create a JS error object
-	errObj->Set(V8StringConstants::GetNativeException(), nativeExceptionObject);
-	errObj->Set(V8StringConstants::GetStackTrace(), ArgConverter::jstringToV8String(stackTrace));
-
+	errObj->Set(V8StringConstants::GetNativeException(isolate), nativeExceptionObject);
+	errObj->Set(V8StringConstants::GetStackTrace(isolate), ArgConverter::jstringToV8String(isolate, stackTrace));
 
 	if (JsDebugger::IsDebuggerActive())
 	{
@@ -428,33 +423,42 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 	if (!didInitializeV8) {
 		InitializeV8();
 	}
+
 	auto isolate = Isolate::New(create_params);
 	Isolate::Scope isolate_scope(isolate);
 	HandleScope handleScope(isolate);
 
+	m_objectManager->SetInstanceIsolate(isolate);
+
+	// Sets a structure with v8 String constants on the isolate object at slot 1
+	V8StringConstants::PerIsolateV8Constants* consts = new V8StringConstants::PerIsolateV8Constants(isolate);
+	isolate->SetData((uint32_t)Runtime::IsolateData::CONSTANTS, consts);
+
 	V8::SetFlagsFromString(Constants::V8_STARTUP_FLAGS.c_str(), Constants::V8_STARTUP_FLAGS.size());
 	V8::SetCaptureStackTraceForUncaughtExceptions(true, 100, StackTrace::kOverview);
-	V8::AddMessageListener(NativeScriptException::OnUncaughtError);
+
+	isolate->AddMessageListener(NativeScriptException::OnUncaughtError);
+	
 	__android_log_print(ANDROID_LOG_DEBUG, "TNS.Native", "V8 version %s", V8::GetVersion());
 
 	auto globalTemplate = ObjectTemplate::New();
 
 	const auto readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
 
-	globalTemplate->Set(ConvertToV8String("__log"), FunctionTemplate::New(isolate, CallbackHandlers::LogMethodCallback));
-	globalTemplate->Set(ConvertToV8String("__dumpReferenceTables"), FunctionTemplate::New(isolate, CallbackHandlers::DumpReferenceTablesMethodCallback));
-	globalTemplate->Set(ConvertToV8String("__debugbreak"), FunctionTemplate::New(isolate, JsDebugger::DebugBreakCallback));
-	globalTemplate->Set(ConvertToV8String("__consoleMessage"), FunctionTemplate::New(isolate, JsDebugger::ConsoleMessageCallback));
-	globalTemplate->Set(ConvertToV8String("__enableVerboseLogging"), FunctionTemplate::New(isolate, CallbackHandlers::EnableVerboseLoggingMethodCallback));
-	globalTemplate->Set(ConvertToV8String("__disableVerboseLogging"), FunctionTemplate::New(isolate, CallbackHandlers::DisableVerboseLoggingMethodCallback));
-	globalTemplate->Set(ConvertToV8String("__exit"), FunctionTemplate::New(isolate, CallbackHandlers::ExitMethodCallback));
-	globalTemplate->Set(ConvertToV8String("__runtimeVersion"), ConvertToV8String(NATIVE_SCRIPT_RUNTIME_VERSION), readOnlyFlags);
+	globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__log"), FunctionTemplate::New(isolate, CallbackHandlers::LogMethodCallback));
+	globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__dumpReferenceTables"), FunctionTemplate::New(isolate, CallbackHandlers::DumpReferenceTablesMethodCallback));
+	globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__debugbreak"), FunctionTemplate::New(isolate, JsDebugger::DebugBreakCallback));
+	globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__consoleMessage"), FunctionTemplate::New(isolate, JsDebugger::ConsoleMessageCallback));
+	globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__enableVerboseLogging"), FunctionTemplate::New(isolate, CallbackHandlers::EnableVerboseLoggingMethodCallback));
+	globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__disableVerboseLogging"), FunctionTemplate::New(isolate, CallbackHandlers::DisableVerboseLoggingMethodCallback));
+	globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__exit"), FunctionTemplate::New(isolate, CallbackHandlers::ExitMethodCallback));
+	globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__runtimeVersion"), ArgConverter::ConvertToV8String(isolate, NATIVE_SCRIPT_RUNTIME_VERSION), readOnlyFlags);
 
 	m_weakRef.Init(isolate, globalTemplate, m_objectManager);
 
 	SimpleProfiler::Init(isolate, globalTemplate);
 
-	CallbackHandlers::CreateGlobalCastFunctions(globalTemplate);
+	CallbackHandlers::CreateGlobalCastFunctions(isolate, globalTemplate);
 
 	Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
 	PrimaryContext = new Persistent<Context>(isolate, context);
@@ -467,12 +471,12 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 
 	auto global = context->Global();
 
-	global->ForceSet(ConvertToV8String("global"), global, readOnlyFlags);
-	global->ForceSet(ConvertToV8String("__global"), global, readOnlyFlags);
+	global->ForceSet(ArgConverter::ConvertToV8String(isolate, "global"), global, readOnlyFlags);
+	global->ForceSet(ArgConverter::ConvertToV8String(isolate, "__global"), global, readOnlyFlags);
 
 	ArgConverter::Init(isolate);
 
-	CallbackHandlers::Init(isolate, m_objectManager);
+	CallbackHandlers::Init(isolate);
 
 	auto pckName = ArgConverter::jstringToString(packageName);
 	auto outputDir = ArgConverter::jstringToString(profilerOutputDir);
@@ -504,47 +508,6 @@ jobject Runtime::ConvertJsValueToJavaObject(JEnv& env, const Local<Value>& value
 	}
 
 	return javaResult;
-}
-
-void Runtime::PrepareExtendFunction(Isolate *isolate, jstring filesPath)
-{
-	string fullPath = ArgConverter::jstringToString(filesPath);
-	fullPath.append("/internal/prepareExtend.js");
-
-	int length;
-	bool isNew;
-	const char* content = File::ReadText(fullPath, length, isNew);
-
-	TryCatch tc;
-	auto cmd = ConvertToV8String(content, length);
-
-	if (isNew)
-	{
-		delete[] content;
-	}
-
-	auto origin = ConvertToV8String(fullPath);
-	DEBUG_WRITE("Compiling prepareExtend.js script");
-
-	auto script = Script::Compile(cmd, origin);
-	DEBUG_WRITE("Compile prepareExtend.js script");
-
-	if (script.IsEmpty() || tc.HasCaught())
-	{
-		DEBUG_WRITE("Cannot compile prepareExtend.js script");
-		return;
-	}
-
-	DEBUG_WRITE("Compiled prepareExtend.js script");
-
-	script->Run();
-
-	if (tc.HasCaught())
-	{
-		throw NativeScriptException(tc);
-	}
-
-	DEBUG_WRITE("Executed prepareExtend.js script");
 }
 
 JavaVM* Runtime::s_jvm = nullptr;

@@ -1,9 +1,7 @@
 #include "Profiler.h"
-#include "V8GlobalHelpers.h"
+#include "ArgConverter.h"
 #include "prof.h"
 #include "NativeScriptException.h"
-#include "NativeScriptAssert.h"
-#include <stack>
 #include <sstream>
 
 using namespace v8;
@@ -19,11 +17,11 @@ void Profiler::Init(Isolate *isolate, const Local<Object>& globalObj, const stri
 	m_appName = appName;
 	m_outputDir = outputDir;
 	auto extData = External::New(isolate, this);
-	globalObj->Set(ConvertToV8String("__startCPUProfiler"), FunctionTemplate::New(isolate, Profiler::StartCPUProfilerCallback, extData)->GetFunction());
-	globalObj->Set(ConvertToV8String("__stopCPUProfiler"), FunctionTemplate::New(isolate, Profiler::StopCPUProfilerCallback, extData)->GetFunction());
-	globalObj->Set(ConvertToV8String("__heapSnapshot"), FunctionTemplate::New(isolate, Profiler::HeapSnapshotMethodCallback, extData)->GetFunction());
-	globalObj->Set(ConvertToV8String("__startNDKProfiler"), FunctionTemplate::New(isolate, Profiler::StartNDKProfilerCallback, extData)->GetFunction());
-	globalObj->Set(ConvertToV8String("__stopNDKProfiler"), FunctionTemplate::New(isolate, Profiler::StopNDKProfilerCallback, extData)->GetFunction());
+	globalObj->Set(ArgConverter::ConvertToV8String(isolate, "__startCPUProfiler"), FunctionTemplate::New(isolate, Profiler::StartCPUProfilerCallback, extData)->GetFunction());
+	globalObj->Set(ArgConverter::ConvertToV8String(isolate, "__stopCPUProfiler"), FunctionTemplate::New(isolate, Profiler::StopCPUProfilerCallback, extData)->GetFunction());
+	globalObj->Set(ArgConverter::ConvertToV8String(isolate, "__heapSnapshot"), FunctionTemplate::New(isolate, Profiler::HeapSnapshotMethodCallback, extData)->GetFunction());
+	globalObj->Set(ArgConverter::ConvertToV8String(isolate, "__startNDKProfiler"), FunctionTemplate::New(isolate, Profiler::StartNDKProfilerCallback, extData)->GetFunction());
+	globalObj->Set(ArgConverter::ConvertToV8String(isolate, "__stopNDKProfiler"), FunctionTemplate::New(isolate, Profiler::StopNDKProfilerCallback, extData)->GetFunction());
 }
 
 void Profiler::StartCPUProfilerCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -133,7 +131,7 @@ bool Profiler::Write(CpuProfile *cpuProfile)
 	auto usec = static_cast<unsigned long>(now % 1000000);
 
 	char filename[256];
-	auto profileName = ConvertToString(cpuProfile->GetTitle());
+	auto profileName = ArgConverter::ConvertToString(cpuProfile->GetTitle());
 	snprintf(filename, sizeof(filename), "%s/%s-%s-%lu.%lu.cpuprofile", m_outputDir.c_str(), m_appName.c_str(), profileName.c_str(), sec, usec);
 
 	auto fp = fopen(filename, "w");
@@ -166,9 +164,9 @@ bool Profiler::Write(CpuProfile *cpuProfile)
 		else
 		{
 			snprintf(buff, sizeof(buff), "{\"functionName\":\"%s\",\"scriptId\":%d,\"url\":\"%s\",\"lineNumber\":%d,\"columnNumber\":%d,\"hitCount\":%u,\"callUID\":%u,\"deoptReason\":\"%s\",\"id\":%u,\"children\":[",
-					ConvertToString(node->GetFunctionName()).c_str(),
+					 ArgConverter::ConvertToString(node->GetFunctionName()).c_str(),
 					node->GetScriptId(),
-					ConvertToString(node->GetScriptResourceName()).c_str(),
+					 ArgConverter::ConvertToString(node->GetScriptResourceName()).c_str(),
 					node->GetLineNumber(),
 					node->GetColumnNumber(),
 					node->GetHitCount(),

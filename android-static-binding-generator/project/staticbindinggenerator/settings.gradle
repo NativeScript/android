@@ -1,0 +1,2 @@
+include ':binding-generator'
+project(':binding-generator').projectDir = new File("../../../", "binding-generator")

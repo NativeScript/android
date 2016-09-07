@@ -23,8 +23,6 @@ namespace tns
 
 			static bool IsDebuggerActive();
 
-			static std::string GetPackageName();
-
 			static void SendCommand(JNIEnv *_env, jobject obj, jbyteArray command, jint length);
 
 			static void DebugBreakCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
@@ -44,7 +42,6 @@ namespace tns
 			static void ConsoleMessage(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 			static bool enabled;
-			static std::string s_packageName;
 			static jclass s_JsDebuggerClass;
 			static jobject s_jsDebugger;
 			static jmethodID s_EnqueueMessage;
@@ -52,8 +49,6 @@ namespace tns
 			static jmethodID s_EnableAgent;
 			static v8::Isolate *s_isolate;
 			static bool s_processedCommands;
-
-			static const int INVALID_PORT = -1;
 	};
 }
 

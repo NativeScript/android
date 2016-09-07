@@ -1,0 +1,1 @@
+java.lang.Object**coolMethod,unpack,properties,toString,formatTo,update,addPropertyChangeListener,pack,removePropertyChangeListener*com.tns.ComplexClass*app.js*java.util.jar.Pack200.Unpacker,java.util.Formattable,java.util.Observer,java.util.jar.Pack200.Packer

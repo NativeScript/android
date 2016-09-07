@@ -3,6 +3,7 @@
 
 #include "JEnv.h"
 #include "v8.h"
+#include "JniLocalRef.h"
 #include <vector>
 #include <string>
 
@@ -11,7 +12,7 @@ namespace tns
 	class JsArgToArrayConverter
 	{
 		public:
-			JsArgToArrayConverter(const v8::FunctionCallbackInfo<v8::Value>& args, bool hasImplementationObject, const v8::Local<v8::Object>& outerThis = v8::Local<v8::Object>());
+			JsArgToArrayConverter(const v8::FunctionCallbackInfo<v8::Value>& args, bool hasImplementationObject);
 
 			JsArgToArrayConverter(v8::Isolate *isolate, const v8::Local<v8::Value>& arg, bool isImplementationObject, int classReturnType);
 
@@ -60,6 +61,10 @@ namespace tns
 			jobject *m_argsAsObject;
 
 			jobjectArray m_arr;
+
+			short MAX_JAVA_PARAMS_COUNT = 256;
+
+			static jclass JAVA_LANG_OBJECT_CLASS;
 	};
 }
 

@@ -10,9 +10,15 @@
 
 namespace tns
 {
+	/*
+	 * MethodCache: class dealing with method/constructor resolution.
+	 */
 	class MethodCache
 	{
 		public:
+			/*
+			 * CacheMethodInfo: struct holding resolved methods/constructor resolution
+			 */
 			struct CacheMethodInfo
 			{
 					CacheMethodInfo()
@@ -30,23 +36,22 @@ namespace tns
 
 			static void Init();
 
-			//static std::string ResolveMethodSignature(const std::string& className, const std::string& methodName, const v8::FunctionCallbackInfo<v8::Value>& args);
 			static CacheMethodInfo ResolveMethodSignature(const std::string& className, const std::string& methodName, const v8::FunctionCallbackInfo<v8::Value>& args, bool isStatic);
 
 			static CacheMethodInfo ResolveConstructorSignature(const ArgsWrapper& argWrapper, const std::string& fullClassName, jclass javaClass, bool isInterface);
-
-			static std::string EncodeSignature(const std::string& className, const std::string& methodName, const v8::FunctionCallbackInfo<v8::Value>& args, bool isStatic);
 
 		private:
 			MethodCache()
 			{
 			}
 
+			static std::string EncodeSignature(const std::string& className, const std::string& methodName, const v8::FunctionCallbackInfo<v8::Value>& args, bool isStatic);
+
 			static std::string GetType(const v8::Local<v8::Value>& value);
 
 			static std::string ResolveJavaMethod(const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& className, const std::string& methodName);
 
-			static std::string ResolveConstructor(const v8::FunctionCallbackInfo<v8::Value>& args, jclass javaClass, bool isInterface, v8::Local<v8::Object> outerThis);
+			static std::string ResolveConstructor(const v8::FunctionCallbackInfo<v8::Value>& args, jclass javaClass, bool isInterface);
 
 			static jclass RUNTIME_CLASS;
 
@@ -54,8 +59,12 @@ namespace tns
 
 			static jmethodID RESOLVE_CONSTRUCTOR_SIGNATURE_ID;
 
-			//static std::map<std::string, std::string> s_cache;
-			static std::map<std::string, CacheMethodInfo> s_cache;
+			/*
+			 * "s_mthod_ctor_signature_cache" holding all resolved CacheMethodInfo against an encoded_signature string.
+			 *  Used for caching the resolved constructor or method signature.
+			 * The encoded signature has template: <className>.S/I.<methodName>.<argsCount>.<arg1class>.<...>
+			 */
+			static std::map<std::string, CacheMethodInfo> s_mthod_ctor_signature_cache;
 	};
 }
 
