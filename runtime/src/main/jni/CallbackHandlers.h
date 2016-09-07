@@ -114,6 +114,13 @@ namespace tns
           	 */
 			static void WorkerObjectOnMessageCallback(v8::Isolate *isolate, jint workerId, jstring message);
 
+			/*
+ 			 * Fired when a Worker instance's terminate is called (immediately stops execution of the thread)
+ 			 */
+			static void WorkerObjectTerminateCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+			static void TerminateWorkerObject(v8::Isolate *isolate);
+
 		private:
 			CallbackHandlers()
 			{

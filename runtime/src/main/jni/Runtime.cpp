@@ -535,6 +535,11 @@ jobject Runtime::ConvertJsValueToJavaObject(JEnv& env, const Local<Value>& value
 	return javaResult;
 }
 
+void Runtime::DestroyRuntime(JNIEnv *env) {
+	s_id2RuntimeCache.erase(m_id);
+	s_isolate2RuntimesCache.erase(m_isolate);
+}
+
 JavaVM* Runtime::s_jvm = nullptr;
 map<int, Runtime*> Runtime::s_id2RuntimeCache;
 map<Isolate*, Runtime*> Runtime::s_isolate2RuntimesCache;

@@ -47,6 +47,7 @@ namespace tns
 			void AdjustAmountOfExternalAllocatedMemoryNative(JNIEnv *env, jobject obj, jlong usedMemory);
 			void PassUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, jthrowable exception, jstring stackTrace);
 			void ClearStartupData(JNIEnv *env, jobject obj);
+			void DestroyRuntime(JNIEnv *env);
 
 		private:
 			Runtime(JNIEnv *env, jobject runtime, int id);

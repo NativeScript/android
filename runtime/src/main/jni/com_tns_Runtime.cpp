@@ -351,3 +351,22 @@ extern "C" void Java_com_tns_Runtime_WorkerObjectOnMessageCallback(JNIEnv *env, 
 
 	CallbackHandlers::WorkerObjectOnMessageCallback(isolate, workerId, msg);
 }
+
+extern "C" void Java_com_tns_Runtime_TerminateWorkerCallback(JNIEnv *env, jobject obj, jint runtimeId)
+{
+	// Worker Thread runtime
+	auto runtime = TryGetRuntime(runtimeId);
+	if(runtime == nullptr)
+	{
+		// TODO: Pete: Log message informing the developer of the failure
+	}
+
+	auto isolate = runtime->GetIsolate();
+
+	v8::Isolate::Scope isolate_scope(isolate);
+	v8::HandleScope handleScope(isolate);
+
+	CallbackHandlers::TerminateWorkerObject(isolate);
+
+	runtime->DestroyRuntime(env);
+}

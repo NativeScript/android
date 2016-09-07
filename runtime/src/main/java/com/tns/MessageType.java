@@ -8,4 +8,7 @@ public class MessageType {
     public static int MainToWorker = 1;
     public static int WorkerToMain = 2;
     public static int ResendToMain = 3;
+    public static int TerminateThread = 4;
+    public static int ResendTerminate = 5;
+    public static int CloseWorker = 6;
 }

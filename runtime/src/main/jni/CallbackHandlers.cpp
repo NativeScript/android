@@ -910,8 +910,13 @@ void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Valu
         auto thiz = args.This();
         auto isolate = thiz->GetIsolate();
 
+        /*
+         * Attach methods from the EventTarget interface (postMessage, terminate) to the Worker object
+         */
         auto postMessageFuncTemplate = FunctionTemplate::New(isolate, CallbackHandlers::WorkerObjectPostMessageCallback);
         thiz->Set(ArgConverter::ConvertToV8String(isolate, "postMessage"), postMessageFuncTemplate->GetFunction());
+        auto terminateWorkerFuncTemplate = FunctionTemplate::New(isolate, CallbackHandlers::WorkerObjectTerminateCallback);
+        thiz->Set(ArgConverter::ConvertToV8String(isolate, "terminate"), terminateWorkerFuncTemplate->GetFunction());
 
         auto workerId = nextWorkerId++;
         V8SetHiddenValue(thiz, "workerId", Number::New(isolate, workerId));
@@ -1029,6 +1034,48 @@ void CallbackHandlers::WorkerObjectOnMessageCallback(Isolate *isolate, jint work
     } else {
         DEBUG_WRITE("MAIN: WorkerObjectOnMessageCallback couldn't fire a worker(id=%d) object's `onmessage` callback because it isn't implemented!", workerId);
     }
+}
+
+void CallbackHandlers::WorkerObjectTerminateCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+
+    HandleScope scope(isolate);
+
+    auto thiz = args.This(); // Worker instance
+
+    Local<Value> jsId = V8GetHiddenValue(thiz, "workerId");
+
+    // get worker's ID that is associated on the other side - in Java
+    auto id = jsId->Int32Value();
+
+    JEnv env;
+    auto mId = env.GetStaticMethodID(RUNTIME_CLASS, "terminateWorkerObject",
+                                     "(I)V");
+
+    env.CallStaticVoidMethod(RUNTIME_CLASS, mId, id);
+
+    // Remove persistent handle from id2WorkerMap
+    auto workerFound = CallbackHandlers::id2WorkerMap.find(id);
+
+    if(workerFound == CallbackHandlers::id2WorkerMap.end()) {
+        // TODO: Pete: Throw exception?
+        DEBUG_WRITE("MAIN: WorkerObjectTerminateCallback no worker instance was found with workerId=%d ! The worker may already be terminated!", id);
+        return;
+    }
+
+    auto workerPersistent = workerFound->second;
+    workerPersistent->Reset();
+
+    id2WorkerMap.erase(id);
+
+    args.GetReturnValue().SetUndefined();
+}
+
+void CallbackHandlers::TerminateWorkerObject(Isolate *isolate) {
+    auto context = isolate->GetCurrentContext();
+    context->Exit();
+
+    isolate->TerminateExecution();
 }
 
 int CallbackHandlers::nextWorkerId = 0;
