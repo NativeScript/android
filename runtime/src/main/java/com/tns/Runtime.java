@@ -50,6 +50,8 @@ public class Runtime {
 
     private static native void TerminateWorkerCallback(int runtimeId);
 
+    private static native void ClearWorkerPersistent(int runtimeId, int workerId);
+
     void passUncaughtExceptionToJs(Throwable ex, String stackTrace) {
         passUncaughtExceptionToJsNative(getRuntimeId(), ex, stackTrace);
     }
@@ -316,7 +318,15 @@ public class Runtime {
                the message is requeued to be sent again from main to worker
             */
             else if (msg.arg1 == MessageType.ResendTerminate) {
-               terminateWorkerObject(msg.arg2);
+                workerObjectTerminate(msg.arg2);
+            }
+            else if (msg.arg1 == MessageType.CloseWorker) {
+                Runtime currentRuntime = Runtime.getCurrentRuntime();
+
+                // remove reference to a Worker thread's handler that is in the process of closing
+                currentRuntime.workerIdToHandler.put(msg.arg2, null);
+
+                ClearWorkerPersistent(currentRuntime.runtimeId, msg.arg2);
             }
         }
     }
@@ -1096,7 +1106,7 @@ public class Runtime {
     }
 
     @RuntimeCallable
-    public static void terminateWorkerObject(int workerId) {
+    public static void workerObjectTerminate(int workerId) {
         // Thread should always be main here
         Runtime currentRuntime = Runtime.getCurrentRuntime();
         final long ResendDelay = 1000;
@@ -1137,14 +1147,34 @@ public class Runtime {
             }
         }
 
-        msg.arg2 = workerId;
+        // Worker was closed during this 'terminate' call, nothing to do here
+        if(!workerHandler.getLooper().getThread().isAlive()) {
+            return;
+        }
 
-        workerHandler.getLooper().getThread().interrupt();
+        msg.arg2 = workerId;
 
         // 'terminate' message must be executed immediately
         workerHandler.sendMessageAtFrontOfQueue(msg);
 
         // Set value for workerId key to null
         currentRuntime.workerIdToHandler.put(workerId, null);
+    }
+
+    @RuntimeCallable
+    public static void workerScopeClose() {
+        // Thread should always be a worker
+        Runtime currentRuntime = Runtime.getCurrentRuntime();
+
+        Message msgToMain = Message.obtain();
+        msgToMain.arg1 = MessageType.CloseWorker;
+        msgToMain.arg2 = currentRuntime.workerId;
+
+        currentRuntime.mainThreadHandler.sendMessageAtFrontOfQueue(msgToMain);
+
+        Message msgToWorker = Message.obtain();
+        msgToWorker.arg1 = MessageType.TerminateThread;
+
+        currentRuntime.getHandler().sendMessageAtFrontOfQueue(msgToWorker);
     }
 }

@@ -960,7 +960,6 @@ void CallbackHandlers::WorkerObjectPostMessageCallback(const v8::FunctionCallbac
     Local<String> msg = Local<String>::New(isolate, args[0]->ToString());
     auto id = jsId->Int32Value();
 
-    // TODO: Pete: Local refs, these should be released after the call to Java
     JEnv env;
     auto mId = env.GetStaticMethodID(RUNTIME_CLASS, "sendMessageFromMainToWorker",
                                      "(ILjava/lang/String;)V");
@@ -1048,30 +1047,78 @@ void CallbackHandlers::WorkerObjectTerminateCallback(const v8::FunctionCallbackI
     // get worker's ID that is associated on the other side - in Java
     auto id = jsId->Int32Value();
 
+    auto isTerminated = thiz->GetHiddenValue(ArgConverter::ConvertToV8String(isolate, "isTerminated"));
+
+    if(!isTerminated.IsEmpty() && isTerminated->BooleanValue()) {
+        DEBUG_WRITE("Main: WorkerObjectTerminateCallback - Worker(id=%d)'s terminate has already been called.", id);
+        return;
+    }
+
+    thiz->SetHiddenValue(ArgConverter::ConvertToV8String(isolate, "isTerminated"), Boolean::New(isolate, true));
+
     JEnv env;
-    auto mId = env.GetStaticMethodID(RUNTIME_CLASS, "terminateWorkerObject",
+    auto mId = env.GetStaticMethodID(RUNTIME_CLASS, "workerObjectTerminate",
                                      "(I)V");
 
     env.CallStaticVoidMethod(RUNTIME_CLASS, mId, id);
 
     // Remove persistent handle from id2WorkerMap
-    auto workerFound = CallbackHandlers::id2WorkerMap.find(id);
+    CallbackHandlers::ClearWorkerPersistent(id);
+}
+
+void CallbackHandlers::WorkerGlobalCloseCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto isolate = args.GetIsolate();
+
+    HandleScope scope(isolate);
+
+    auto context = isolate->GetCurrentContext();
+    auto globalObject = context->Global();
+
+    auto isTerminating = globalObject->Get(ArgConverter::ConvertToV8String(isolate, "isTerminating"));
+
+    if(!isTerminating.IsEmpty() && isTerminating->BooleanValue()) {
+        DEBUG_WRITE("WORKER: WorkerThreadCloseCallback - Worker is currently terminating...");
+        return;
+    }
+
+    globalObject->Set(ArgConverter::ConvertToV8String(isolate, "isTerminating"), Boolean::New(isolate, true));
+
+    // execute onclose handler if one is implemented
+    auto callback = globalObject->Get(ArgConverter::ConvertToV8String(isolate, "onclose"));
+    auto isEmpty = callback.IsEmpty();
+    auto isFunction = callback->IsFunction();
+
+    if(!isEmpty && isFunction) {
+        Local<Value> args1[] = { };
+
+        auto func = callback.As<Function>();
+
+        func->Call(Undefined(isolate), 0, args1);
+    }
+
+    JEnv env;
+    auto mId = env.GetStaticMethodID(RUNTIME_CLASS, "workerScopeClose",
+                                     "()V");
+
+    env.CallStaticVoidMethod(RUNTIME_CLASS, mId);
+}
+
+void CallbackHandlers::ClearWorkerPersistent(int workerId) {
+    auto workerFound = CallbackHandlers::id2WorkerMap.find(workerId);
 
     if(workerFound == CallbackHandlers::id2WorkerMap.end()) {
         // TODO: Pete: Throw exception?
-        DEBUG_WRITE("MAIN: WorkerObjectTerminateCallback no worker instance was found with workerId=%d ! The worker may already be terminated!", id);
+        DEBUG_WRITE("MAIN | WORKER: ClearWorkerPersistent no worker instance was found with workerId=%d ! The worker may already be terminated!", workerId);
         return;
     }
 
     auto workerPersistent = workerFound->second;
     workerPersistent->Reset();
 
-    id2WorkerMap.erase(id);
-
-    args.GetReturnValue().SetUndefined();
+    id2WorkerMap.erase(workerId);
 }
 
-void CallbackHandlers::TerminateWorkerObject(Isolate *isolate) {
+void CallbackHandlers::TerminateWorkerThread(Isolate *isolate) {
     auto context = isolate->GetCurrentContext();
     context->Exit();
 

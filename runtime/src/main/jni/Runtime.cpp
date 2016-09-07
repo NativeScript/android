@@ -470,11 +470,13 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 	}
 	/*
 	 * Emulate a `WorkerGlobalScope`
-	 * Attach postMessage, onmessage, onerror to the global object
+	 * Attach postMessage, close to the global object
 	 */
 	else {
 		auto postMessageFuncTemplate = FunctionTemplate::New(isolate, CallbackHandlers::WorkerGlobalPostMessageCallback);
 		globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "postMessage"), postMessageFuncTemplate);
+		auto closeFuncTemplate = FunctionTemplate::New(isolate, CallbackHandlers::WorkerGlobalCloseCallback);
+		globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "close"), closeFuncTemplate);
 	}
 
 	m_weakRef.Init(isolate, globalTemplate, m_objectManager);
@@ -535,7 +537,7 @@ jobject Runtime::ConvertJsValueToJavaObject(JEnv& env, const Local<Value>& value
 	return javaResult;
 }
 
-void Runtime::DestroyRuntime(JNIEnv *env) {
+void Runtime::DestroyRuntime() {
 	s_id2RuntimeCache.erase(m_id);
 	s_isolate2RuntimesCache.erase(m_isolate);
 }

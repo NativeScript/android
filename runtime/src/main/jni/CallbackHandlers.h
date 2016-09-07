@@ -119,7 +119,23 @@ namespace tns
  			 */
 			static void WorkerObjectTerminateCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
 
-			static void TerminateWorkerObject(v8::Isolate *isolate);
+			/*
+        	 * Fired when a Worker script's close is called
+        	 */
+			static void WorkerGlobalCloseCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
+
+			/*
+        	 * Clears the persistent Worker object handle associated with a workerId
+        	 * Occurs when calling a worker object's `terminate` or a worker thread's global scope `close`
+        	 */
+			static void ClearWorkerPersistent(int workerId);
+
+			/*
+        	 * Terminates the currently executing Isolate. No scripts can be executed after this call
+        	 */
+			static void TerminateWorkerThread(v8::Isolate *isolate);
+
+
 
 		private:
 			CallbackHandlers()

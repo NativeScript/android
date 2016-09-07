@@ -366,7 +366,24 @@ extern "C" void Java_com_tns_Runtime_TerminateWorkerCallback(JNIEnv *env, jobjec
 	v8::Isolate::Scope isolate_scope(isolate);
 	v8::HandleScope handleScope(isolate);
 
-	CallbackHandlers::TerminateWorkerObject(isolate);
+	CallbackHandlers::TerminateWorkerThread(isolate);
 
-	runtime->DestroyRuntime(env);
+	runtime->DestroyRuntime();
+}
+
+extern "C" void Java_com_tns_Runtime_ClearWorkerPersistent(JNIEnv *env, jobject obj, jint runtimeId, jint workerId)
+{
+	// Worker Thread runtime
+	auto runtime = TryGetRuntime(runtimeId);
+	if(runtime == nullptr)
+	{
+		// TODO: Pete: Log message informing the developer of the failure
+	}
+
+	auto isolate = runtime->GetIsolate();
+
+	v8::Isolate::Scope isolate_scope(isolate);
+	v8::HandleScope handleScope(isolate);
+
+	CallbackHandlers::ClearWorkerPersistent(workerId);
 }
