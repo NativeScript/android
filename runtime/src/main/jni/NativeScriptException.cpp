@@ -155,17 +155,7 @@ void NativeScriptException::Init(ObjectManager *objectManager)
 // ON V8 UNCAUGHT EXCEPTION
 void NativeScriptException::OnUncaughtError(Local<Message> message, Local<Value> error)
 {
-	auto isolate = Isolate::GetCurrent();
-	string errorMessage;
-	auto v8FullMessage = ArgConverter::ConvertToV8String(isolate, "fullMessage");
-
-	if(error->IsObject() && error.As<Object>()->Has(v8FullMessage)) {
-		errorMessage = ArgConverter::ConvertToString(error.As<Object>()->Get(v8FullMessage).As<String>());
-	}
-
-	if(errorMessage.size() == 0) {
-		errorMessage = GetErrorMessage(message, error);
-	}
+	string errorMessage = GetErrorMessage(message, error);
 
 	NativeScriptException e(errorMessage);
 	e.ReThrowToJava();
@@ -252,17 +242,18 @@ string NativeScriptException::GetFullMessage(const TryCatch& tc, bool isExceptio
 {
 	auto ex = tc.Exception();
 
-	string message;
+	string jsExeptionMessage;
+
 	if (!isExceptionEmpty && !isMessageEmpty)
 	{
-		message = PrintErrorMessage(tc.Message(), ex);
+		jsExeptionMessage = GetErrorMessage(tc.Message(), ex);
 	}
 
 	stringstream ss;
-	ss << endl << prependMessage << message;
+	ss << endl << prependMessage << jsExeptionMessage;
 	string loggedMessage = ss.str();
 
-	DEBUG_WRITE("Error: %s", loggedMessage.c_str());
+	PrintErrorMessage(loggedMessage);
 
 	if (!tc.CanContinue())
 	{
@@ -306,10 +297,7 @@ JniLocalRef NativeScriptException::TryGetJavaThrowableObject(JEnv& env, const Lo
 	return javaThrowableObject;
 }
 
-string NativeScriptException::PrintErrorMessage(const Local<Message>& message, const Local<Value>& error)
-{
-	string errorMessage = GetErrorMessage(message, error);
-
+void NativeScriptException::PrintErrorMessage(const string &errorMessage) {
 	// split the message by new lines to workaround the LogCat's maximum characters in a single message
 	stringstream ss(errorMessage);
 	string line;
@@ -318,22 +306,34 @@ string NativeScriptException::PrintErrorMessage(const Local<Message>& message, c
 		// TODO: Log in the V8's Console as well?
 		DEBUG_WRITE("%s", line.c_str());
 	}
-
-	return errorMessage;
 }
 
-string NativeScriptException::GetErrorMessage(const Local<Message>& message, const Local<Value>& error)
+string NativeScriptException::GetErrorMessage(const Local<Message>& message, Local<Value>& error)
 {
-	stringstream ss;
+	//get whole error message from previous stack
+	string errMessage;
+	auto v8FullMessage = ArgConverter::ConvertToV8String(Isolate::GetCurrent(), "fullMessage");
+	if(error->IsObject() && error.As<Object>()->Has(v8FullMessage)) {
+		errMessage = ArgConverter::ConvertToString(error.As<Object>()->Get(v8FullMessage).As<String>());
+	}
 
+	//get current message
 	auto str = error->ToDetailString();
 	if (str.IsEmpty())
 	{
 		str = String::NewFromUtf8(Isolate::GetCurrent(), "");
 	}
 	String::Utf8Value utfError(str);
-	ss << endl << endl << *utfError << endl;
+
+	//get script name
 	auto scriptResName = message->GetScriptResourceName();
+
+	//get stack trace
+	string stackTraceMessage = GetErrorStackTrace(message->GetStackTrace());
+
+	stringstream ss;
+	ss << endl << errMessage;
+	ss << endl << *utfError << endl;
 	if (!scriptResName.IsEmpty() && scriptResName->IsString())
 	{
 		ss << "File: \"" << ArgConverter::ConvertToString(scriptResName.As<String>());
@@ -342,10 +342,7 @@ string NativeScriptException::GetErrorMessage(const Local<Message>& message, con
 	{
 		ss << "File: \"<unknown>";
 	}
-
 	ss << ", line: " << message->GetLineNumber() << ", column: " << message->GetStartColumn() << endl << endl;
-
-	string stackTraceMessage = GetErrorStackTrace(message->GetStackTrace());
 	ss << "StackTrace: " << endl << stackTraceMessage << endl;
 
 	return ss.str();
