@@ -323,4 +323,23 @@ describe("Tests exception handling ", function () {
 	    expect(exceptionCaught).toBe(true);
 	    expect(errMsg).toBe("Error: Unknown error. Cannot get error message.");
 	});
+
+	it("should successfully catch syntax errors", function () {
+
+	    var exceptionCaught = false;
+	    var errMsg;
+	    try {
+	        require("./syntaxErrors.js");
+	    } catch (e) {
+	        exceptionCaught = true;
+	        errMsg = e.fullMessage
+	    }
+	    expect(exceptionCaught).toBe(true);
+	    expect(errMsg).toContain("Cannot compile /data/data/com.tns.android_runtime_testapp/files/app/tests/syntaxErrors.js");
+	    expect(errMsg).toContain("SyntaxError: Block-scoped declarations (let, const, function, class) not yet supported outside strict mode");
+	    expect(errMsg).toContain("File: \"/data/data/com.tns.android_runtime_testapp/files/app/tests/syntaxErrors.js, line: 4, column: 0");
+
+
+
+	});
 });
