@@ -910,14 +910,6 @@ void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Valu
         auto thiz = args.This();
         auto isolate = thiz->GetIsolate();
 
-        /*
-         * Attach methods from the EventTarget interface (postMessage, terminate) to the Worker object
-         */
-        auto postMessageFuncTemplate = FunctionTemplate::New(isolate, CallbackHandlers::WorkerObjectPostMessageCallback);
-        thiz->Set(ArgConverter::ConvertToV8String(isolate, "postMessage"), postMessageFuncTemplate->GetFunction());
-        auto terminateWorkerFuncTemplate = FunctionTemplate::New(isolate, CallbackHandlers::WorkerObjectTerminateCallback);
-        thiz->Set(ArgConverter::ConvertToV8String(isolate, "terminate"), terminateWorkerFuncTemplate->GetFunction());
-
         auto workerId = nextWorkerId++;
         V8SetHiddenValue(thiz, "workerId", Number::New(isolate, workerId));
 

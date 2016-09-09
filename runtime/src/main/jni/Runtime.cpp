@@ -465,8 +465,19 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 	 * Workers should not be created from within other Workers
 	 */
 	if(!s_mainThreadInitialized) {
-		globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "Worker"),
-							FunctionTemplate::New(isolate, CallbackHandlers::NewThreadCallback));
+		Local<FunctionTemplate> workerFuncTemplate = FunctionTemplate::New(isolate, CallbackHandlers::NewThreadCallback);
+		Local<ObjectTemplate> prototype = workerFuncTemplate->PrototypeTemplate();
+
+		/*
+		 * Attach methods from the EventTarget interface (postMessage, terminate) to the Worker object prototype
+		 */
+		auto postMessageFuncTemplate = FunctionTemplate::New(isolate, CallbackHandlers::WorkerObjectPostMessageCallback);
+		auto terminateWorkerFuncTemplate = FunctionTemplate::New(isolate, CallbackHandlers::WorkerObjectTerminateCallback);
+
+		prototype->Set(ArgConverter::ConvertToV8String(isolate, "postMessage"), postMessageFuncTemplate);
+		prototype->Set(ArgConverter::ConvertToV8String(isolate, "terminate"), terminateWorkerFuncTemplate);
+
+		globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "Worker"), workerFuncTemplate);
 	}
 	/*
 	 * Emulate a `WorkerGlobalScope`
