@@ -18,7 +18,7 @@ using namespace tns;
 
 
 ObjectManager::ObjectManager(jobject javaRuntimeObject)
-	:m_isolate(nullptr), m_javaRuntimeObject(javaRuntimeObject), m_env(JEnv()), m_numberOfGC(0), m_currentObjectId(0), m_cache(NewWeakGlobalRefCallback, DeleteWeakGlobalRefCallback, 1000, this)
+		: m_javaRuntimeObject(javaRuntimeObject), m_env(JEnv()), m_numberOfGC(0), m_currentObjectId(0), m_cache(NewWeakGlobalRefCallback, DeleteWeakGlobalRefCallback, 1000, this)
 {
 	auto runtimeClass = m_env.FindClass("com/tns/Runtime");
 	assert(runtimeClass != nullptr);
@@ -57,7 +57,7 @@ void ObjectManager::Init(Isolate *isolate)
 	auto jsWrapperFuncTemplate = FunctionTemplate::New(isolate, JSWrapperConstructorCallback);
 	jsWrapperFuncTemplate->InstanceTemplate()->SetInternalFieldCount(static_cast<int>(MetadataNodeKeys::END));
 	auto jsWrapperFunc = jsWrapperFuncTemplate->GetFunction();
-	s_poJsWrapperFunc = new Persistent<Function>(isolate, jsWrapperFunc);
+	m_poJsWrapperFunc = new Persistent<Function>(isolate, jsWrapperFunc);
 
 	isolate->AddGCPrologueCallback(ObjectManager::OnGcStartedStatic, kGCTypeAll);
 	isolate->AddGCEpilogueCallback(ObjectManager::OnGcFinishedStatic, kGCTypeAll);
@@ -829,7 +829,7 @@ void ObjectManager::DeleteWeakGlobalRefCallback(const jweak& object, void *state
 
 Local<Object> ObjectManager::GetEmptyObject(Isolate *isolate)
 {
-	auto emptyObjCtorFunc = Local<Function>::New(isolate, *s_poJsWrapperFunc);
+	auto emptyObjCtorFunc = Local<Function>::New(isolate, *m_poJsWrapperFunc);
 	auto val = emptyObjCtorFunc->CallAsConstructor(0, nullptr);
 	if (val.IsEmpty())
 	{
@@ -844,5 +844,3 @@ void ObjectManager::JSWrapperConstructorCallback(const v8::FunctionCallbackInfo<
 {
 	assert(info.IsConstructCall());
 }
-
-Persistent<Function>* ObjectManager::s_poJsWrapperFunc = nullptr;
