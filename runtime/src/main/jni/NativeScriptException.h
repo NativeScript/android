@@ -5,6 +5,7 @@
 #include "JEnv.h"
 #include "JniLocalRef.h"
 #include "ObjectManager.h"
+#include "include/v8.h"
 
 namespace tns
 {

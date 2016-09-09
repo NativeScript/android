@@ -14,6 +14,8 @@
 #include "NativeScriptException.h"
 #include "Util.h"
 #include "SimpleProfiler.h"
+#include "include/v8.h"
+#include "CallbackHandlers.h"
 #include <sstream>
 #include <libgen.h>
 #include <dlfcn.h>
@@ -201,6 +203,21 @@ void Module::Load(const string& path)
 	auto require = globalObject->Get(context, ArgConverter::ConvertToV8String(isolate, "require")).ToLocalChecked().As<Function>();
 	Local<Value> args[] = { ArgConverter::ConvertToV8String(isolate, path) };
 	require->Call(context, globalObject, 1, args);
+}
+
+void Module::LoadWorker(const string& path)
+{
+	auto isolate = m_isolate;
+	TryCatch tc;
+
+	Load(path);
+
+	if(tc.HasCaught()) {
+		// This will handle any errors that occur when first loading a script (new worker)
+		// Check if `onerror` handle is implemented
+		// Web behaviour - if onerror handle comes before exception throw - execute it, else - bubble up to main's worker object
+		CallbackHandlers::CallWorkerScopeOnErrorHandle(isolate, tc);
+	}
 }
 
 Local<Object> Module::LoadImpl(Isolate *isolate, const string& moduleName, const string& baseDir, bool& isData)

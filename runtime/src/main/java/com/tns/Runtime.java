@@ -30,6 +30,8 @@ public class Runtime {
 
     private native void runModule(int runtimeId, String filePath) throws NativeScriptException;
 
+    private native void runWorker(int runtimeId, String filePath) throws NativeScriptException;
+
     private native Object runScript(int runtimeId, String filePath) throws NativeScriptException;
 
     private native Object callJSMethodNative(int runtimeId, int javaObjectID, String methodName, int retType, boolean isConstructor, Object... packagedArgs) throws NativeScriptException;
@@ -51,6 +53,8 @@ public class Runtime {
     private static native void TerminateWorkerCallback(int runtimeId);
 
     private static native void ClearWorkerPersistent(int runtimeId, int workerId);
+
+    private static native void CallWorkerObjectOnErrorHandleMain(int runtimeId, int workerId, String message, String filename, int lineno, String threadName) throws NativeScriptException;
 
     void passUncaughtExceptionToJs(Throwable ex, String stackTrace) {
         passUncaughtExceptionToJsNative(getRuntimeId(), ex, stackTrace);
@@ -262,7 +266,7 @@ public class Runtime {
 
                     runtime.mainThreadHandler.sendMessage(msg);
 
-                    runtime.runModule(runtime.runtimeId, filePath);
+                    runtime.runWorker(runtime.runtimeId, filePath);
                 }
             }));
         }
@@ -327,6 +331,17 @@ public class Runtime {
                 currentRuntime.workerIdToHandler.put(msg.arg2, null);
 
                 ClearWorkerPersistent(currentRuntime.runtimeId, msg.arg2);
+            }
+            /*
+               Handle unhandled exceptions/errors coming from the worker thread
+            */
+            else if (msg.arg1 == MessageType.BubbleUpException) {
+                Runtime currentRuntime = Runtime.getCurrentRuntime();
+
+                int workerId = msg.arg2;
+                JavaScriptErrorMessage errorMessage = (JavaScriptErrorMessage) msg.obj;
+
+                CallWorkerObjectOnErrorHandleMain(currentRuntime.runtimeId, workerId, errorMessage.getMessage(), errorMessage.getFilename(), errorMessage.getLineno(), errorMessage.getThreadName());
             }
         }
     }
@@ -1176,5 +1191,23 @@ public class Runtime {
         msgToWorker.arg1 = MessageType.TerminateThread;
 
         currentRuntime.getHandler().sendMessageAtFrontOfQueue(msgToWorker);
+    }
+
+    @RuntimeCallable
+    public static void passUncaughtExceptionFromWorkerToMain(String message, String filename, int lineno) {
+        // Thread should always be a worker
+        Runtime currentRuntime = Runtime.getCurrentRuntime();
+
+        Message msg = Message.obtain();
+        msg.arg1 = MessageType.BubbleUpException;
+        msg.arg2 = currentRuntime.workerId;
+
+        String threadName = currentRuntime.getHandler().getLooper().getThread().getName();
+        JavaScriptErrorMessage error = new JavaScriptErrorMessage(message, filename, lineno, threadName);
+
+        msg.obj = error;
+
+        // TODO: Pete: Should we treat the message with higher priority?
+        currentRuntime.mainThreadHandler.sendMessage(msg);
     }
 }

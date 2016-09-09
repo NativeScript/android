@@ -40,12 +40,14 @@ namespace tns
 			ObjectManager* GetObjectManager() const;
 
 			void RunModule(JNIEnv *_env, jobject obj, jstring scriptFile);
+			void RunWorker(jstring scriptFile);
 			jobject RunScript(JNIEnv *_env, jobject obj, jstring scriptFile);
 			jobject CallJSMethodNative(JNIEnv *_env, jobject obj, jint javaObjectID, jstring methodName, jint retType, jboolean isConstructor, jobjectArray packagedArgs);
 			void CreateJSInstanceNative(JNIEnv *_env, jobject obj, jobject javaObject, jint javaObjectID, jstring className);
 			jint GenerateNewObjectId(JNIEnv *env, jobject obj);
 			void AdjustAmountOfExternalAllocatedMemoryNative(JNIEnv *env, jobject obj, jlong usedMemory);
 			void PassUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, jthrowable exception, jstring stackTrace);
+			void PassUncaughtExceptionFromWorkerToMainHandler(v8::Local<v8::String> message, v8::Local<v8::String> filename, int lineno);
 			void ClearStartupData(JNIEnv *env, jobject obj);
 			void DestroyRuntime();
 

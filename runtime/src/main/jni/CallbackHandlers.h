@@ -135,7 +135,9 @@ namespace tns
         	 */
 			static void TerminateWorkerThread(v8::Isolate *isolate);
 
+			static void CallWorkerScopeOnErrorHandle(v8::Isolate* isolate, v8::TryCatch& tc);
 
+			static void CallWorkerObjectOnErrorHandle(v8::Isolate *isolate, jint workerId, jstring message, jstring filename, jint lineno, jstring threadName);
 
 		private:
 			CallbackHandlers()

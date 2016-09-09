@@ -4,6 +4,7 @@
 #include "ArgConverter.h"
 #include "NativeScriptAssert.h"
 #include "V8StringConstants.h"
+#include "Runtime.h"
 #include <sstream>
 
 using namespace std;

@@ -150,6 +150,12 @@ void Runtime::RunModule(JNIEnv *_env, jobject obj, jstring scriptFile)
 	m_module.Load(filePath);
 }
 
+void Runtime::RunWorker(jstring scriptFile)
+{
+	string filePath = ArgConverter::jstringToString(scriptFile);
+	m_module.LoadWorker(filePath);
+}
+
 jobject Runtime::RunScript(JNIEnv *_env, jobject obj, jstring scriptFile)
 {
 	JEnv env(_env);
@@ -328,6 +334,22 @@ void Runtime::PassUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, jthrowab
 		//pass err to JS
 		NativeScriptException::CallJsFuncWithErr(errObj);
 	}
+}
+
+void Runtime::PassUncaughtExceptionFromWorkerToMainHandler(Local<String> message, Local<String> filename, int lineno) {
+	JEnv env;
+	auto runtimeClass = env.GetObjectClass(m_runtime);
+
+	auto mId = env.GetStaticMethodID(runtimeClass, "passUncaughtExceptionFromWorkerToMain",
+									 "(Ljava/lang/String;Ljava/lang/String;I)V");
+
+	auto jMsg = ArgConverter::ConvertToJavaString(message);
+	auto jfileName = ArgConverter::ConvertToJavaString(filename);
+
+	JniLocalRef jMsgLocal(jMsg);
+	JniLocalRef jfileNameLocal(jfileName);
+
+	env.CallStaticVoidMethod(runtimeClass, mId, (jstring) jMsgLocal, (jstring) jfileNameLocal, lineno);
 }
 
 void Runtime::ClearStartupData(JNIEnv *env, jobject obj) {
