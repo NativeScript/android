@@ -135,8 +135,19 @@ namespace tns
         	 */
 			static void TerminateWorkerThread(v8::Isolate *isolate);
 
+			/*
+			 * Is called when an unhandled exception is thrown inside the worker
+			 * Will execute 'onerror' if one is provided inside the Worker Scope
+			 * Will make the exception "bubble up" through to main, to be handled by the Worker Object
+			 * if 'onerror' isn't implemented or returns false
+			 */
 			static void CallWorkerScopeOnErrorHandle(v8::Isolate* isolate, v8::TryCatch& tc);
 
+			/*
+			 * Is called when an unhandled exception bubbles up from the worker scope to the main thread Worker Object
+			 * Will execute `onerror` if one is implemented for the Worker Object instance
+			 * Will throw a NativeScript Exception if 'onerror' isn't implemented or returns false
+			 */
 			static void CallWorkerObjectOnErrorHandle(v8::Isolate *isolate, jint workerId, jstring message, jstring filename, jint lineno, jstring threadName);
 
 		private:

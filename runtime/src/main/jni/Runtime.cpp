@@ -484,7 +484,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 
 	/*
 	 * Attach `Worker` object constructor only to the main thread (isolate)'s global object
-	 * Workers should not be created from within other Workers
+	 * Workers should not be created from within other Workers, for now
 	 */
 	if(!s_mainThreadInitialized) {
 		Local<FunctionTemplate> workerFuncTemplate = FunctionTemplate::New(isolate, CallbackHandlers::NewThreadCallback);
