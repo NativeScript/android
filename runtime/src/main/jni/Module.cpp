@@ -214,10 +214,21 @@ void Module::LoadWorker(const string& path)
 
 	if(tc.HasCaught()) {
 		// This will handle any errors that occur when first loading a script (new worker)
+		// exceptions include: syntax errors, throw statements, access of properties of undefined objects
 		// Check if `onerror` handle is implemented
 		// Web behaviour - if onerror handle comes before exception throw - execute it, else - bubble up to main's worker object
 		CallbackHandlers::CallWorkerScopeOnErrorHandle(isolate, tc);
 	}
+}
+
+void Module::CheckFileExists(const std::string &path) {
+	auto baseDir = Constants::APP_ROOT_FOLDER_PATH;
+
+	JEnv env;
+	JniLocalRef jsModulename(env.NewStringUTF(path.c_str()));
+	JniLocalRef jsBaseDir(env.NewStringUTF(baseDir.c_str()));
+
+	env.CallStaticObjectMethod(MODULE_CLASS, RESOLVE_PATH_METHOD_ID, (jstring) jsModulename, (jstring) jsBaseDir);
 }
 
 Local<Object> Module::LoadImpl(Isolate *isolate, const string& moduleName, const string& baseDir, bool& isData)

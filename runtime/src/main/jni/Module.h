@@ -31,6 +31,11 @@ namespace tns
 			 */
 			void LoadWorker(const std::string& path);
 
+			/*
+			 * Checks if target script exists, will throw if negative
+			 * Used before initializing workers, to ensure a thread will not be created, when the file doesn't exist
+			 */
+			static void CheckFileExists(const std::string& path);
 		private:
 			enum class ModulePathKind;
 

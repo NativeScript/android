@@ -904,11 +904,14 @@ void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Valu
         }
 
         if (args.Length() > 1 || !args[0]->IsString()) {
-            throw NativeScriptException("Worker should be called with one string parameter (name of file to load)!");
+            throw NativeScriptException("Worker should be called with one string parameter (name of file to run)!");
         }
 
         auto thiz = args.This();
         auto isolate = thiz->GetIsolate();
+
+        auto workerPath = ArgConverter::ConvertToString(args[0]->ToString(isolate));
+        Module::CheckFileExists(workerPath);
 
         auto workerId = nextWorkerId++;
         V8SetHiddenValue(thiz, "workerId", Number::New(isolate, workerId));
