@@ -107,7 +107,7 @@ public final class RuntimeHelper {
 			Configuration config = new Configuration(logger, debugger, appName, null, rootDir,
 					appDir, classLoader, dexDir, dexThumb, v8Config);
 
-			runtime = Runtime.initializeRuntimeWithConfiguration(config);
+			runtime = Runtime.initializeWithConfiguration(config);
 
 			exHandler.setRuntime(runtime);
 

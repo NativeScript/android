@@ -162,9 +162,9 @@ public class Runtime
 		This method initializes the runtime and should always be called first and through the main thread
 		in order to set static configuration that all following workers can use
 	 */
-	public static Runtime initializeRuntimeWithConfiguration(Configuration config) {
+	public static Runtime initializeWithConfiguration(Configuration config) {
 		staticConfiguration = config;
-		Runtime runtime = initRuntime();
+		Runtime runtime = initialize();
 		return runtime;
 	}
 
@@ -173,7 +173,7 @@ public class Runtime
 		It will use the static configuration for all following calls to initialize a new runtime.
 	 */
 	@RuntimeCallable
-	public static Runtime initRuntime() {
+	public static Runtime initialize() {
 
 		//setting handler operation needs to happen in Runtime.java
 		ThreadScheduler workThreadScheduler = new WorkThreadScheduler(new Handler(Looper.myLooper()));
