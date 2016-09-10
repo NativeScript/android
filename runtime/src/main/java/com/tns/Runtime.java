@@ -17,7 +17,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 
-import android.app.Application;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.SparseArray;
 
 import com.tns.bindings.ProxyGenerator;
@@ -97,13 +98,14 @@ public class Runtime
 	};
 	
 	private final Configuration config;
+	private static Configuration staticConfiguration;
 	
 	private final int runtimeId;
 	private static int nextRuntimeId = 0;
 	private final static ThreadLocal<Runtime> currentRuntime = new ThreadLocal<Runtime>();
 	private final static Map<Integer, Runtime> runtimeCache = new HashMap<Integer, Runtime>();
 	
-	public Runtime(Configuration config)
+	public Runtime(Configuration config, ThreadScheduler threadScheduler)
 	{
 		synchronized(Runtime.currentRuntime)
 		{
@@ -114,6 +116,7 @@ public class Runtime
 			}
 			this.runtimeId = nextRuntimeId++;
 			this.config = config;
+			this.threadScheduler = threadScheduler;
 			classResolver = new ClassResolver(this);
 			currentRuntime.set(this);
 			runtimeCache.put(this.runtimeId, this);
@@ -155,6 +158,32 @@ public class Runtime
 		return (runtime != null) ? runtime.isInitializedImpl() : false;
 	}
 
+	/*
+		This method initializes the runtime and should always be called first and through the main thread
+		in order to set static configuration that all following workers can use
+	 */
+	public static Runtime initializeWithConfiguration(Configuration config) {
+		staticConfiguration = config;
+		Runtime runtime = initialize();
+		return runtime;
+	}
+
+	/*
+		This method should be called via native code only after the static configuration has been initialized.
+		It will use the static configuration for all following calls to initialize a new runtime.
+	 */
+	@RuntimeCallable
+	public static Runtime initialize() {
+
+		//setting handler operation needs to happen in Runtime.java
+		ThreadScheduler workThreadScheduler = new WorkThreadScheduler(new Handler(Looper.myLooper()));
+
+		Runtime runtime = new Runtime(staticConfiguration, workThreadScheduler);
+		runtime.init();
+
+		return runtime;
+	}
+
 	private boolean isInitializedImpl()
 	{
 		return initialized;
@@ -162,17 +191,15 @@ public class Runtime
 	
 	public void init()
 	{
-		init(config.threadScheduler, config.logger, config.debugger, config.appName, config.runtimeLibPath, config.rootDir, config.appDir, config.classLoader, config.dexDir, config.dexThumb, config.v8Config);
+		init(config.logger, config.debugger, config.appName, config.runtimeLibPath, config.rootDir, config.appDir, config.classLoader, config.dexDir, config.dexThumb, config.v8Config);
 	}
 
-	private void init(ThreadScheduler threadScheduler, Logger logger, Debugger debugger, String appName, File runtimeLibPath, File rootDir, File appDir, ClassLoader classLoader, File dexDir, String dexThumb, Object[] v8Config) throws RuntimeException
+	private void init(Logger logger, Debugger debugger, String appName, File runtimeLibPath, File rootDir, File appDir, ClassLoader classLoader, File dexDir, String dexThumb, Object[] v8Config) throws RuntimeException
 	{
 		if (initialized)
 		{
 			throw new RuntimeException("NativeScriptApplication already initialized");
 		}
-
-		this.threadScheduler = threadScheduler;
 
 		this.logger = logger;
 

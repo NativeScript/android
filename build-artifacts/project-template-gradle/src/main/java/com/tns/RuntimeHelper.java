@@ -104,13 +104,15 @@ public final class RuntimeHelper {
 					logger.write("Error while getting current proxy thumb");
 				e.printStackTrace();
 			}
-			ThreadScheduler workThreadScheduler = new WorkThreadScheduler(new Handler(Looper.getMainLooper()));
-			Configuration config = new Configuration(workThreadScheduler, logger, debugger, appName, null, rootDir,
+
+			Configuration config = new Configuration(logger, debugger, appName, null, rootDir,
 					appDir, classLoader, dexDir, dexThumb, v8Config);
-			runtime = new Runtime(config);
+
+			runtime = Runtime.initializeRuntimeWithConfiguration(config);
 
 			exHandler.setRuntime(runtime);
 
+			// runtime needs to be initialized before the NativeScriptSyncService is enabled because it uses runtime.runScript(...)
 			if (NativeScriptSyncService.isSyncEnabled(app)) {
 				NativeScriptSyncService syncService = new NativeScriptSyncService(runtime, logger, app);
 
@@ -128,7 +130,7 @@ public final class RuntimeHelper {
 				}
 			}
 
-			runtime.init();
+
 			runtime.runScript(new File(appDir, "internal/ts_helpers.js"));
 
 			File javaClassesModule = new File(appDir, "app/tns-java-classes.js");
