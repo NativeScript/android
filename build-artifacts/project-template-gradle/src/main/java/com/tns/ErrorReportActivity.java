@@ -17,8 +17,8 @@ public class ErrorReportActivity extends AppCompatActivity {
         ErrorReport.killProcess(this);
     }
 
-    @Override
+    // @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        //        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        // super.onRequestPermissionsResult(requestCode, permissions, grantResults);
     }
 }

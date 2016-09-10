@@ -20,11 +20,11 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.PackageManager;
+import android.graphics.Color;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.support.design.widget.TabLayout;
-import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentStatePagerAdapter;
@@ -51,10 +51,10 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
 
 	private static String exceptionMsg;
 	private static String logcatMsg;
-	private static String pID;
 
 	private final static String EXTRA_NATIVESCRIPT_ERROR_REPORT = "NativeScriptErrorMessage";
 	private final static String EXTRA_ERROR_REPORT_MSG = "msg";
+	private final static String EXTRA_PID = "pID";
 	private final static int EXTRA_ERROR_REPORT_VALUE = 1;
 
 	private static final int REQUEST_EXTERNAL_STORAGE = 1;
@@ -63,7 +63,8 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
 			Manifest.permission.WRITE_EXTERNAL_STORAGE
 	};
 
-	public static void verifyStoragePermissions(Activity activity) {
+	// The following will not compile if uncommented with compileSdk lower than 23
+	/*	public static void verifyStoragePermissions(Activity activity) {
 		// Check if we have write permission
 		int permission = ActivityCompat.checkSelfPermission(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE);
 
@@ -75,7 +76,7 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
 					REQUEST_EXTERNAL_STORAGE
 			);
 		}
-	}
+	}*/
 
 	public ErrorReport(AppCompatActivity activity) {
 		ErrorReport.activity = activity;
@@ -91,7 +92,7 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
 		intent.putExtra(EXTRA_ERROR_REPORT_MSG, errorMessage);
 
 		String PID = Integer.toString(android.os.Process.myPid());
-		intent.putExtra(pID, PID);
+		intent.putExtra(EXTRA_PID, PID);
 
 		createErrorFile(context);
 
@@ -178,7 +179,13 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
 	}
 
 	static Intent getIntent(Context context) {
-		Class<?> errorActivityClass = ErrorReportActivity.class;
+		Class<?> errorActivityClass;
+
+		if(AndroidJsDebugger.isDebuggableApp(context)) {
+			errorActivityClass = ErrorReportActivity.class;
+		} else {
+			return null;
+		}
 
 		Intent intent = new Intent(context, errorActivityClass);
 
@@ -199,7 +206,7 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
 
 		exceptionMsg = intent.getStringExtra(EXTRA_ERROR_REPORT_MSG);
 
-		String processId = intent.getStringExtra(pID);
+		String processId = intent.getStringExtra(EXTRA_PID);
 		logcatMsg = getLogcat(processId);
 
 		int errActivityId = this.context.getResources().getIdentifier("error_activity", "layout", this.context.getPackageName());
@@ -211,13 +218,13 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
 		Toolbar toolbar = (Toolbar) activity.findViewById(toolBarId);
 		activity.setSupportActionBar(toolbar);
 
-		int tabLayoutId = this.context.getResources().getIdentifier("tabLayout", "id", this.context.getPackageName());
+		final int tabLayoutId = this.context.getResources().getIdentifier("tabLayout", "id", this.context.getPackageName());
 
 		tabLayout = (TabLayout) activity.findViewById(tabLayoutId);
 		tabLayout.addTab(tabLayout.newTab().setText("Exception"));
 		tabLayout.addTab(tabLayout.newTab().setText("Logcat"));
 		tabLayout.setTabGravity(TabLayout.GRAVITY_FILL);
-
+		tabLayout.setBackgroundColor(Color.parseColor("#bbbbbb"));
 		int pagerId = this.context.getResources().getIdentifier("pager", "id", this.context.getPackageName());
 
 		viewPager = (ViewPager) activity.findViewById(pagerId);
@@ -225,6 +232,23 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
 		Pager adapter = new Pager(activity.getSupportFragmentManager(), tabLayout.getTabCount());
 
 		viewPager.setAdapter(adapter);
+		viewPager.addOnPageChangeListener(new ViewPager.OnPageChangeListener() {
+			@Override
+			public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {
+
+			}
+
+			@Override
+			public void onPageSelected(int position) {
+				tabLayout.getTabAt(position).select();
+				viewPager.setCurrentItem(position);
+			}
+
+			@Override
+			public void onPageScrollStateChanged(int state) {
+
+			}
+		});
 
 		tabLayout.setOnTabSelectedListener(this);
 	}
@@ -283,15 +307,15 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
 	public static class ExceptionTab extends Fragment {
 		@Override
 		public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-			int exceptionTabId = this.getContext().getResources().getIdentifier("exception_tab", "layout", this.getContext().getPackageName());
+			int exceptionTabId = container.getContext().getResources().getIdentifier("exception_tab", "layout", container.getContext().getPackageName());
 			View view = inflater.inflate(exceptionTabId, container, false);
 
-			int txtViewId = this.getContext().getResources().getIdentifier("txtErrorMsg", "id", this.getContext().getPackageName());
+			int txtViewId = container.getContext().getResources().getIdentifier("txtErrorMsg", "id", container.getContext().getPackageName());
 			TextView txtErrorMsg = (TextView) view.findViewById(txtViewId);
 			txtErrorMsg.setText(exceptionMsg);
 			txtErrorMsg.setMovementMethod(new ScrollingMovementMethod());
 
-			int btnCopyExceptionId = this.getContext().getResources().getIdentifier("btnCopyException", "id", this.getContext().getPackageName());
+			int btnCopyExceptionId = container.getContext().getResources().getIdentifier("btnCopyException", "id", container.getContext().getPackageName());
 			Button copyToClipboard = (Button) view.findViewById(btnCopyExceptionId);
 			copyToClipboard.setOnClickListener(new View.OnClickListener()
 			{
@@ -311,10 +335,10 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
 	public static class LogcatTab extends Fragment {
 		@Override
 		public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-			int logcatTabId = this.getContext().getResources().getIdentifier("logcat_tab", "layout", this.getContext().getPackageName());
+			int logcatTabId = container.getContext().getResources().getIdentifier("logcat_tab", "layout", container.getContext().getPackageName());
 			View view = inflater.inflate(logcatTabId, container, false);
 
-			int textViewId = this.getContext().getResources().getIdentifier("logcatMsg", "id", this.getContext().getPackageName());
+			int textViewId = container.getContext().getResources().getIdentifier("logcatMsg", "id", container.getContext().getPackageName());
 			TextView txtlogcatMsg = (TextView) view.findViewById(textViewId);
 			txtlogcatMsg.setText(logcatMsg);
 
@@ -322,14 +346,16 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
 
 			final String logName = "Log-" + new SimpleDateFormat("yyyy-MM-dd-HH-mm-ss").format(new Date());
 
-			int btnCopyLogcatId = this.getContext().getResources().getIdentifier("btnCopyLogcat", "id", this.getContext().getPackageName());
+			int btnCopyLogcatId = container.getContext().getResources().getIdentifier("btnCopyLogcat", "id", container.getContext().getPackageName());
 			Button copyToClipboard = (Button) view.findViewById(btnCopyLogcatId);
 			copyToClipboard.setOnClickListener(new View.OnClickListener()
 			{
 				@Override
 				public void onClick(View v)
 				{
-					verifyStoragePermissions(activity);
+					if(Build.VERSION.SDK_INT >= 23) {
+						//verifyStoragePermissions(activity);
+					}
 
 					try {
 						File dir = new File(Environment.getExternalStorageDirectory().getPath()+ "/logcat-reports/");
