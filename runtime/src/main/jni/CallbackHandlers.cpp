@@ -978,8 +978,9 @@ void CallbackHandlers::WorkerObjectPostMessageCallback(const v8::FunctionCallbac
                                      "(ILjava/lang/String;)V");
 
     auto jmsg = ArgConverter::ConvertToJavaString(msg);
+    JniLocalRef jmsgRef(jmsg);
 
-    env.CallStaticVoidMethod(RUNTIME_CLASS, mId, id, jmsg);
+    env.CallStaticVoidMethod(RUNTIME_CLASS, mId, id, (jstring) jmsgRef);
 }
 
 void CallbackHandlers::WorkerGlobalOnMessageCallback(Isolate *isolate, jstring message) {
@@ -1037,8 +1038,9 @@ void CallbackHandlers::WorkerGlobalPostMessageCallback(const v8::FunctionCallbac
                                      "(Ljava/lang/String;)V");
 
     auto jmsg = ArgConverter::ConvertToJavaString(msg);
+    JniLocalRef jmsgRef(jmsg);
 
-    env.CallStaticVoidMethod(RUNTIME_CLASS, mId, jmsg);
+    env.CallStaticVoidMethod(RUNTIME_CLASS, mId, (jstring) jmsgRef);
 }
 
 void CallbackHandlers::WorkerObjectOnMessageCallback(Isolate *isolate, jint workerId, jstring message) {
