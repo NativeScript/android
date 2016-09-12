@@ -221,9 +221,7 @@ void Module::LoadWorker(const string& path)
 	}
 }
 
-void Module::CheckFileExists(const std::string &path) {
-	auto baseDir = Constants::APP_ROOT_FOLDER_PATH;
-
+void Module::CheckFileExists(Isolate* isolate, const std::string &path, const std::string &baseDir) {
 	JEnv env;
 	JniLocalRef jsModulename(env.NewStringUTF(path.c_str()));
 	JniLocalRef jsBaseDir(env.NewStringUTF(baseDir.c_str()));

@@ -152,6 +152,7 @@ void Runtime::RunModule(JNIEnv *_env, jobject obj, jstring scriptFile)
 
 void Runtime::RunWorker(jstring scriptFile)
 {
+	// TODO: Pete: Why do I crash here with a JNI error (accessing bad jni)
 	string filePath = ArgConverter::jstringToString(scriptFile);
 	m_module.LoadWorker(filePath);
 }

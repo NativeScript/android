@@ -264,9 +264,9 @@ public class Runtime {
                     msg.arg1 = MessageType.Handshake;
                     msg.arg2 = runtime.runtimeId;
 
-                    runtime.mainThreadHandler.sendMessage(msg);
-
                     runtime.runWorker(runtime.runtimeId, filePath);
+
+                    runtime.mainThreadHandler.sendMessage(msg);
                 }
             }));
         }

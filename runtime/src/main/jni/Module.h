@@ -35,7 +35,7 @@ namespace tns
 			 * Checks if target script exists, will throw if negative
 			 * Used before initializing workers, to ensure a thread will not be created, when the file doesn't exist
 			 */
-			static void CheckFileExists(const std::string& path);
+			static void CheckFileExists(v8::Isolate* isolate, const std::string& path, const std::string& baseDir);
 		private:
 			enum class ModulePathKind;
 

@@ -847,7 +847,6 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate *is
 	auto pft = new Persistent<FunctionTemplate>(isolate, ctorFuncTemplate);
 	CtorCacheData ctorCacheItem(pft, instanceMethodsCallbackData);
 	cache->CtorFuncCache.insert(make_pair(treeNode, ctorCacheItem));
-	//
 
 	SetInnerTypes(isolate, wrappedCtorFunc, treeNode);
 

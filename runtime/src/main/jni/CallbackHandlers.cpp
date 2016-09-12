@@ -910,8 +910,18 @@ void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Valu
         auto thiz = args.This();
         auto isolate = thiz->GetIsolate();
 
+        auto currentExecutingScriptName = StackTrace::CurrentStackTrace(isolate, 1, StackTrace::kScriptName)->GetFrame(0)->GetScriptName();
+
+        auto currentExecutingScriptNameStr = ArgConverter::ConvertToString(currentExecutingScriptName);
+
+        auto lastForwardSlash = currentExecutingScriptNameStr.find_last_of("/");
+
+        auto currentDir = currentExecutingScriptNameStr.substr(0, lastForwardSlash + 1);
+
         auto workerPath = ArgConverter::ConvertToString(args[0]->ToString(isolate));
-        Module::CheckFileExists(workerPath);
+
+        // Will throw if path is invalid or doesn't exist
+        Module::CheckFileExists(isolate, workerPath, currentDir);
 
         auto workerId = nextWorkerId++;
         V8SetHiddenValue(thiz, "workerId", Number::New(isolate, workerId));
@@ -946,12 +956,20 @@ void CallbackHandlers::WorkerObjectPostMessageCallback(const v8::FunctionCallbac
 
     HandleScope scope(isolate);
 
+    // TODO: Pete:
+    if(args.Length() != 1) {
+        isolate->ThrowException(ArgConverter::ConvertToV8String(isolate, "Failed to execute 'postMessage' on 'Worker': 1 argument required."));
+        return;
+    } else if(!args[0]->IsString()) {
+        isolate->ThrowException(ArgConverter::ConvertToV8String(isolate, "Failed to execute 'postMessage' on 'Worker': You can send messages of type String only."));
+        return;
+    }
+
     auto thiz = args.This(); // Worker instance
 
     Local<Value> jsId = V8GetHiddenValue(thiz, "workerId");
 
     // get worker's ID that is associated on the other side - in Java
-    // TODO: Pete: Ensure that the passed argument is a string
     Local<String> msg = Local<String>::New(isolate, args[0]->ToString());
     auto id = jsId->Int32Value();
 
@@ -986,6 +1004,7 @@ void CallbackHandlers::WorkerGlobalOnMessageCallback(Isolate *isolate, jstring m
     }
 
     if(tc.HasCaught()) {
+        // TODO: Pete: Will catch exceptions thrown artificially in postMessage callbacks inside of 'onmessage' implementation
         CallWorkerScopeOnErrorHandle(isolate, tc);
     }
 }
@@ -994,8 +1013,23 @@ void CallbackHandlers::WorkerGlobalPostMessageCallback(const v8::FunctionCallbac
     auto isolate = args.GetIsolate();
 
     HandleScope scope(isolate);
-    
-    // TODO: Pete: Ensure that the passed argument is a string
+
+    TryCatch tc;
+
+    // TODO: Pete: Discuss whether this is the way to go
+    if (args.Length() != 1) {
+        isolate->ThrowException(ArgConverter::ConvertToV8String(isolate,
+                                                                "Failed to execute 'postMessage' on WorkerGlobalScope: 1 argument required."));
+    } else if (!args[0]->IsString()) {
+        isolate->ThrowException(ArgConverter::ConvertToV8String(isolate,
+                                                                "Failed to execute 'postMessage' on WorkerGlobalScope: You can send messages of type String only."));
+    }
+
+    if (tc.HasCaught()) {
+        CallWorkerScopeOnErrorHandle(isolate, tc);
+        return;
+    }
+
     Local<String> msg = Local<String>::New(args.GetIsolate(), args[0]->ToString());
 
     JEnv env;
