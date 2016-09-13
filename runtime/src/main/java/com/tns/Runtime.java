@@ -224,7 +224,7 @@ public class Runtime {
                 TerminateWorkerCallback(currentRuntime.runtimeId);
 
                 if(currentRuntime.logger.isEnabled()) {
-                    currentRuntime.logger.write("Worker(id=" + currentRuntime.workerId + ") has terminated execution. Don't make further function calls to it.");
+                    currentRuntime.logger.write("Worker(id=" + currentRuntime.workerId + ", name=\"" + Thread.currentThread().getName() +"\") has terminated execution. Don't make further function calls to it.");
                 }
 
                 this.getLooper().quit();
@@ -266,9 +266,9 @@ public class Runtime {
                     msg.arg1 = MessageType.Handshake;
                     msg.arg2 = runtime.runtimeId;
 
-                    runtime.runWorker(runtime.runtimeId, filePath);
-
                     runtime.mainThreadHandler.sendMessage(msg);
+
+                    runtime.runWorker(runtime.runtimeId, filePath);
                 }
             }));
         }
@@ -1155,7 +1155,7 @@ public class Runtime {
                 msg.arg2 = workerId;
 
                 if(currentRuntime.logger.isEnabled()) {
-                    currentRuntime.logger.write("Worker(id=" + msg.arg2 + ")'s handler still not initialized. Resending message from Main to Worker(id=" + msg.arg2 + ")");
+                    currentRuntime.logger.write("Worker(id=" + msg.arg2 + ")'s handler still not initialized. Resending terminate() message from Main to Worker(id=" + msg.arg2 + ")");
                 }
 
                 currentRuntime.getHandler().sendMessageDelayed(msg, ResendDelay);
