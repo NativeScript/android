@@ -31,11 +31,11 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved)
 	return JNI_VERSION_1_6;
 }
 
-extern "C" void Java_com_tns_Runtime_initNativeScript(JNIEnv *_env, jobject obj, jint runtimeId, jstring filesPath, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jobject jsDebugger)
+extern "C" void Java_com_tns_Runtime_initNativeScript(JNIEnv *_env, jobject obj, jint runtimeId, jstring filesPath, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jstring callingDir, jobject jsDebugger)
 {
 	try
 	{
-		Runtime::Init(_env, obj, runtimeId, filesPath, verboseLoggingEnabled, packageName, args, jsDebugger);
+		Runtime::Init(_env, obj, runtimeId, filesPath, verboseLoggingEnabled, packageName, args, callingDir, jsDebugger);
 	}
 	catch (NativeScriptException& e)
 	{

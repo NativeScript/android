@@ -82,7 +82,6 @@ namespace tns
 			JniLocalRef m_javaException;
 			std::string m_message;
 
-			static ObjectManager *objectManager;
 			static jclass RUNTIME_CLASS;
 			static jclass THROWABLE_CLASS;
 			static jclass NATIVESCRIPTEXCEPTION_CLASS;

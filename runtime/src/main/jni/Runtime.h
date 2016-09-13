@@ -23,15 +23,17 @@ namespace tns
 		    	CONSTANTS = 1
 		    };
 
-			static Runtime *GetRuntime(int runtimeId);
+			static Runtime* GetRuntime(int runtimeId);
 
-			static Runtime *GetRuntime(v8::Isolate *isolate);
+			static Runtime* GetRuntime(v8::Isolate *isolate);
+
+			static ObjectManager* GetObjectManager(v8::Isolate *isolate);
 
 			static void Init(JavaVM *vm, void *reserved);
 
-			static void Init(JNIEnv *_env, jobject obj, int runtimeId, jstring filesPath, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jobject jsDebugger);
+			static void Init(JNIEnv *_env, jobject obj, int runtimeId, jstring filesPath, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jstring callingDir, jobject jsDebugger);
 
-			void Init(jstring filesPath, bool verboseLoggingEnabled, jstring packageName, jobjectArray args, jobject jsDebugger);
+			void Init(jstring filesPath, bool verboseLoggingEnabled, jstring packageName, jobjectArray args, jstring callingDir, jobject jsDebugger);
 
 			v8::Isolate* GetIsolate() const;
 
@@ -72,7 +74,7 @@ namespace tns
 			v8::StartupData *m_startupData = nullptr;
 			MemoryMappedFile *m_heapSnapshotBlob = nullptr;
 
-			v8::Isolate* PrepareV8Runtime(const std::string& filesPath, jstring packageName, jobject jsDebugger, jstring profilerOutputDir);
+			v8::Isolate* PrepareV8Runtime(const std::string& filesPath, jstring packageName, jstring callingDir, jobject jsDebugger, jstring profilerOutputDir);
 			jobject ConvertJsValueToJavaObject(JEnv& env, const v8::Local<v8::Value>& value, int classReturnType);
 
 			static std::map<int, Runtime*> s_id2RuntimeCache;

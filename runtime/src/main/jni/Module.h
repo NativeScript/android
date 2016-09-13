@@ -21,7 +21,7 @@ namespace tns
 		public:
 			Module();
 
-			void Init(v8::Isolate *isolate);
+			void Init(v8::Isolate *isolate, const std::string& baseDir = "");
 
 			void Load(const std::string& path);
 

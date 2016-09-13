@@ -91,6 +91,23 @@ Runtime* Runtime::GetRuntime(v8::Isolate *isolate)
 	return runtime;
 }
 
+ObjectManager* Runtime::GetObjectManager(v8::Isolate *isolate)
+{
+	auto itFound = s_isolate2RuntimesCache.find(isolate);
+	auto runtime = (itFound != s_isolate2RuntimesCache.end())
+				   ? itFound->second
+				   : nullptr;
+
+	if (runtime == nullptr)
+	{
+		stringstream ss;
+		ss << "Cannot find runtime for isolate: " << isolate;
+		throw NativeScriptException(ss.str());
+	}
+
+	return runtime->GetObjectManager();
+}
+
 Isolate* Runtime::GetIsolate() const
 {
 	return m_isolate;
@@ -106,7 +123,7 @@ ObjectManager* Runtime::GetObjectManager() const
 	return m_objectManager;
 }
 
-void Runtime::Init(JNIEnv *_env, jobject obj, int runtimeId, jstring filesPath, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jobject jsDebugger)
+void Runtime::Init(JNIEnv *_env, jobject obj, int runtimeId, jstring filesPath, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jstring callingDir, jobject jsDebugger)
 {
 	JEnv env(_env);
 
@@ -114,10 +131,10 @@ void Runtime::Init(JNIEnv *_env, jobject obj, int runtimeId, jstring filesPath, 
 
 	auto enableLog = verboseLoggingEnabled == JNI_TRUE;
 
-	runtime->Init(filesPath, enableLog, packageName, args, jsDebugger);
+	runtime->Init(filesPath, enableLog, packageName, args, callingDir, jsDebugger);
 }
 
-void Runtime::Init(jstring filesPath, bool verboseLoggingEnabled, jstring packageName, jobjectArray args, jobject jsDebugger)
+void Runtime::Init(jstring filesPath, bool verboseLoggingEnabled, jstring packageName, jobjectArray args, jstring callingDir, jobject jsDebugger)
 {
 	LogEnabled = verboseLoggingEnabled;
 
@@ -137,7 +154,7 @@ void Runtime::Init(jstring filesPath, bool verboseLoggingEnabled, jstring packag
 	DEBUG_WRITE("Initializing Telerik NativeScript");
 
 	NativeScriptException::Init(m_objectManager);
-	m_isolate = PrepareV8Runtime(filesRoot, packageName, jsDebugger, profilerOutputDir);
+	m_isolate = PrepareV8Runtime(filesRoot, packageName, callingDir, jsDebugger, profilerOutputDir);
 
 	s_isolate2RuntimesCache.insert(make_pair(m_isolate, this));
 }
@@ -364,7 +381,7 @@ static void InitializeV8() {
 	V8::Initialize();
 }
 
-Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName, jobject jsDebugger, jstring profilerOutputDir)
+Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName, jstring callingDir, jobject jsDebugger, jstring profilerOutputDir)
 {
 	Isolate::CreateParams create_params;
 	bool didInitializeV8 = false;
@@ -526,7 +543,9 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 
 	m_objectManager->Init(isolate);
 
-	m_module.Init(isolate);
+	auto baseCallingDir = ArgConverter::jstringToString(callingDir);
+
+	m_module.Init(isolate, baseCallingDir);
 
 	auto global = context->Global();
 

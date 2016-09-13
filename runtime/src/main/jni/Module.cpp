@@ -29,7 +29,7 @@ Module::Module()
 {
 }
 
-void Module::Init(Isolate *isolate)
+void Module::Init(Isolate *isolate, const string& baseDir)
 {
 	JEnv env;
 
@@ -84,7 +84,13 @@ void Module::Init(Isolate *isolate)
 	global->Set(ArgConverter::ConvertToV8String(isolate, "__nativeRequire"), requireFunc);
 	m_requireFunction = new Persistent<Function>(isolate, requireFunc);
 
-	auto globalRequire = GetRequireFunction(isolate, Constants::APP_ROOT_FOLDER_PATH);
+	Local<Function> globalRequire;
+
+	if(!baseDir.empty()) {
+		globalRequire = GetRequireFunction(isolate, baseDir);
+	} else {
+		globalRequire = GetRequireFunction(isolate, Constants::APP_ROOT_FOLDER_PATH);
+	}
 	global->Set(ArgConverter::ConvertToV8String(isolate, "require"), globalRequire);
 }
 

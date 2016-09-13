@@ -60,7 +60,7 @@ void CallbackHandlers::Init(Isolate *isolate) {
                                                                    "()J");
     assert(GET_CHANGE_IN_BYTES_OF_USED_MEMORY_METHOD_ID != nullptr);
 
-    INIT_WORKER_METHOD_ID = env.GetStaticMethodID(RUNTIME_CLASS, "initWorker", "(Ljava/lang/String;I)V");
+    INIT_WORKER_METHOD_ID = env.GetStaticMethodID(RUNTIME_CLASS, "initWorker", "(Ljava/lang/String;Ljava/lang/String;I)V");
 
     assert(INIT_WORKER_METHOD_ID != nullptr);
 
@@ -934,8 +934,9 @@ void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Valu
 
         JEnv env;
         JniLocalRef filePath(ArgConverter::ConvertToJavaString(args[0]));
+        JniLocalRef dirPath(env.NewStringUTF(currentDir.c_str()));
 
-        env.CallStaticVoidMethod(RUNTIME_CLASS, INIT_WORKER_METHOD_ID, (jstring) filePath, workerId);
+        env.CallStaticVoidMethod(RUNTIME_CLASS, INIT_WORKER_METHOD_ID, (jstring) filePath, (jstring) dirPath, workerId);
     } catch (NativeScriptException &e) {
         e.ReThrowToV8();
     }

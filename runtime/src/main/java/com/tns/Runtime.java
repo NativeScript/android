@@ -26,7 +26,7 @@ import android.util.SparseArray;
 import com.tns.bindings.ProxyGenerator;
 
 public class Runtime {
-    private native void initNativeScript(int runtimeId, String filesPath, boolean verboseLoggingEnabled, String packageName, Object[] v8Options, JsDebugger jsDebugger);
+    private native void initNativeScript(int runtimeId, String filesPath, boolean verboseLoggingEnabled, String packageName, Object[] v8Options, String callingDir, JsDebugger jsDebugger);
 
     private native void runModule(int runtimeId, String filePath) throws NativeScriptException;
 
@@ -146,10 +146,10 @@ public class Runtime {
             this.runtimeId = nextRuntimeId++;
             this.config = config;
             this.dynamicConfig = dynamicConfiguration;
-            this.threadScheduler = dynamicConfiguration.getHandler();
-            this.workerId = dynamicConfiguration.getWorkerId();
-            if (dynamicConfiguration.getMainHandler() != null) {
-                this.mainThreadHandler = dynamicConfiguration.getMainHandler().getHandler();
+            this.threadScheduler = dynamicConfiguration.myThreadScheduler;
+            this.workerId = dynamicConfiguration.workerId;
+            if (dynamicConfiguration.mainThreadScheduler != null) {
+                this.mainThreadHandler = dynamicConfiguration.mainThreadScheduler.getHandler();
             }
 
             classResolver = new ClassResolver(this);
@@ -237,12 +237,14 @@ public class Runtime {
         private Integer workerId;
         private ThreadScheduler mainThreadScheduler;
         private String filePath;
+        private String callingJsDir;
 
-        public WorkerThread(String name, Integer workerId, ThreadScheduler mainThreadScheduler) {
+        public WorkerThread(String name, Integer workerId, ThreadScheduler mainThreadScheduler, String callingJsDir) {
             super("W" + workerId + ": " + name);
             this.filePath = name;
             this.workerId = workerId;
             this.mainThreadScheduler = mainThreadScheduler;
+            this.callingJsDir = callingJsDir;
         }
 
         public void startRuntime() {
@@ -253,7 +255,7 @@ public class Runtime {
                 public void run() {
                     WorkThreadScheduler workThreadScheduler = new WorkThreadScheduler(new WorkerThreadHandler());
 
-                    DynamicConfiguration dynamicConfiguration = new DynamicConfiguration(workerId, workThreadScheduler, mainThreadScheduler);
+                    DynamicConfiguration dynamicConfiguration = new DynamicConfiguration(workerId, workThreadScheduler, mainThreadScheduler, callingJsDir);
                     Runtime runtime = initRuntime(dynamicConfiguration);
 
 					/*
@@ -365,19 +367,19 @@ public class Runtime {
         It will use the static configuration for all following calls to initialize a new runtime.
      */
     @RuntimeCallable
-    public static void initWorker(String jsFileName, int id) {
+    public static void initWorker(String jsFileName, String callingJsDir, int id) {
         // This method will always be called from the Main thread
         Runtime runtime = Runtime.getCurrentRuntime();
-        ThreadScheduler mainThreadScheduler = runtime.getDynamicConfig().getHandler();
+        ThreadScheduler mainThreadScheduler = runtime.getDynamicConfig().myThreadScheduler;
 
-        WorkerThread worker = new WorkerThread(jsFileName, id, mainThreadScheduler);
+        WorkerThread worker = new WorkerThread(jsFileName, id, mainThreadScheduler, callingJsDir);
         worker.start();
         worker.startRuntime();
     }
 
     /*
         This method deals with initializing the runtime with given configuration
-        Does it both for workers and for the main thread
+        Does it for both workers and for the main thread
      */
     private static Runtime initRuntime(DynamicConfiguration dynamicConfiguration) {
         Runtime runtime = new Runtime(staticConfiguration, dynamicConfiguration);
@@ -391,10 +393,10 @@ public class Runtime {
     }
 
     public void init() {
-        init(config.logger, config.debugger, config.appName, config.runtimeLibPath, config.rootDir, config.appDir, config.classLoader, config.dexDir, config.dexThumb, config.v8Config);
+        init(config.logger, config.debugger, config.appName, config.runtimeLibPath, config.rootDir, config.appDir, config.classLoader, config.dexDir, config.dexThumb, config.v8Config, dynamicConfig.callingJsDir);
     }
 
-    private void init(Logger logger, Debugger debugger, String appName, File runtimeLibPath, File rootDir, File appDir, ClassLoader classLoader, File dexDir, String dexThumb, Object[] v8Config) throws RuntimeException {
+    private void init(Logger logger, Debugger debugger, String appName, File runtimeLibPath, File rootDir, File appDir, ClassLoader classLoader, File dexDir, String dexThumb, Object[] v8Config, String callingJsDir) throws RuntimeException {
         if (initialized) {
             throw new RuntimeException("NativeScriptApplication already initialized");
         }
@@ -417,10 +419,10 @@ public class Runtime {
             jsDebugger = new JsDebugger(debugger, threadScheduler);
         }
 
-        initNativeScript(getRuntimeId(), Module.getApplicationFilesPath(), logger.isEnabled(), appName, v8Config, jsDebugger);
+        initNativeScript(getRuntimeId(), Module.getApplicationFilesPath(), logger.isEnabled(), appName, v8Config, callingJsDir, jsDebugger);
 
         if (jsDebugger != null) {
-            jsDebugger.start();
+            // jsDebugger.start();
         }
 
         clearStartupData(getRuntimeId()); // It's safe to delete the data after the V8 debugger is initialized
