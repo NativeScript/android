@@ -52,4 +52,30 @@ describe("Test Method Resolution", function () {
         expect(exceptionCaught).toBe(false);
         expect(d).not.toEqual(null);
     });
+
+    it("Should call correct base method overload", function () {
+
+        var d = new com.tns.tests.DerivedClass();
+        var i1 = new com.tns.tests.InterfaceOne({});
+        var i2 = new com.tns.tests.InterfaceTwo({});
+
+        var res1 = d.overloadMethod(i1)
+        var res2 = d.overloadMethod(i2)
+
+        expect(res1).toBe(1);
+        expect(res2).toBe(2);
+    });
+
+    it("Should call correct method overloads", function () {
+
+        var d = new com.tns.tests.BaseClass();
+        var i1 = new com.tns.tests.InterfaceOne({});
+        var i2 = new com.tns.tests.InterfaceTwo({});
+
+        var res1 = d.overloadMethod(i1)
+        var res2 = d.overloadMethod(i2)
+
+        expect(res1).toBe(1);
+        expect(res2).toBe(2);
+    });
 });
