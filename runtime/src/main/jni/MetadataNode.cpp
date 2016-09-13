@@ -922,7 +922,7 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
 		}
 
 		auto className = node->m_implType;
-		SetInstanceMetadata(isolate, implementationObject, node);
+		SetInstanceMetadata(isolate, thiz, node);
 
 		//@@@ Refactor
 		thiz->SetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::CallSuper), True(isolate));
