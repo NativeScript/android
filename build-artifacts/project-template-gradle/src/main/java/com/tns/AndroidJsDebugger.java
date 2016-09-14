@@ -229,7 +229,9 @@ public class AndroidJsDebugger implements Debugger
 							state = State.Header;
 							headers.clear();
 
-							AndroidJsDebugger.this.debugContext.sendMessage(message);
+							if (!message.equals("FLUSH BUFFERS")) {
+								AndroidJsDebugger.this.debugContext.sendMessage(message);
+							}
 						}
 						else
 						{
