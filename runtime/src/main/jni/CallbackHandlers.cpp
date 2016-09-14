@@ -17,7 +17,6 @@
 #include "JsDebugger.h"
 #include "SimpleProfiler.h"
 #include "Runtime.h"
-#include "Constants.h"
 
 using namespace v8;
 using namespace std;
@@ -63,6 +62,13 @@ void CallbackHandlers::Init(Isolate *isolate) {
     INIT_WORKER_METHOD_ID = env.GetStaticMethodID(RUNTIME_CLASS, "initWorker", "(Ljava/lang/String;Ljava/lang/String;I)V");
 
     assert(INIT_WORKER_METHOD_ID != nullptr);
+
+    Local<Object> json = isolate->GetCurrentContext()->Global()->Get(String::NewFromUtf8(isolate, "JSON"))->ToObject();
+    Local<Function> stringify = json->Get(String::NewFromUtf8(isolate, "stringify")).As<Function>();
+
+    auto persistentStringify = new Persistent<Function>(isolate, stringify);
+
+    isolateToJsonStringify.insert(make_pair(isolate, persistentStringify));
 
     MetadataNode::Init(isolate);
 
@@ -961,17 +967,14 @@ void CallbackHandlers::WorkerObjectPostMessageCallback(const v8::FunctionCallbac
     if(args.Length() != 1) {
         isolate->ThrowException(ArgConverter::ConvertToV8String(isolate, "Failed to execute 'postMessage' on 'Worker': 1 argument required."));
         return;
-    } else if(!args[0]->IsString()) {
-        isolate->ThrowException(ArgConverter::ConvertToV8String(isolate, "Failed to execute 'postMessage' on 'Worker': You can send messages of type String only."));
-        return;
     }
 
     auto thiz = args.This(); // Worker instance
 
     Local<Value> jsId = V8GetHiddenValue(thiz, "workerId");
 
+    Local<String> msg = tns::JsonStringifyObject(isolate, args[0])->ToString();
     // get worker's ID that is associated on the other side - in Java
-    Local<String> msg = Local<String>::New(isolate, args[0]->ToString());
     auto id = jsId->Int32Value();
 
     JEnv env;
@@ -995,7 +998,10 @@ void CallbackHandlers::WorkerGlobalOnMessageCallback(Isolate *isolate, jstring m
     auto isFunction = callback->IsFunction();
 
     if(!isEmpty && isFunction) {
-        auto msg = ArgConverter::jstringToV8String(isolate, message);
+        auto msgString = ArgConverter::jstringToV8String(isolate, message).As<String>();
+        Local<Value> msg;
+        JSON::Parse(isolate, msgString).ToLocal(&msg);
+
         Local<Value> args1[] = { msg };
 
         auto func = callback.As<Function>();
@@ -1022,9 +1028,6 @@ void CallbackHandlers::WorkerGlobalPostMessageCallback(const v8::FunctionCallbac
     if (args.Length() != 1) {
         isolate->ThrowException(ArgConverter::ConvertToV8String(isolate,
                                                                 "Failed to execute 'postMessage' on WorkerGlobalScope: 1 argument required."));
-    } else if (!args[0]->IsString()) {
-        isolate->ThrowException(ArgConverter::ConvertToV8String(isolate,
-                                                                "Failed to execute 'postMessage' on WorkerGlobalScope: You can send messages of type String only."));
     }
 
     if (tc.HasCaught()) {
@@ -1032,7 +1035,7 @@ void CallbackHandlers::WorkerGlobalPostMessageCallback(const v8::FunctionCallbac
         return;
     }
 
-    Local<String> msg = Local<String>::New(args.GetIsolate(), args[0]->ToString());
+    Local<String> msg = tns::JsonStringifyObject(isolate, args[0])->ToString();
 
     JEnv env;
     auto mId = env.GetStaticMethodID(RUNTIME_CLASS, "sendMessageFromWorkerToMain",
@@ -1062,7 +1065,10 @@ void CallbackHandlers::WorkerObjectOnMessageCallback(Isolate *isolate, jint work
     auto isFunction = callback->IsFunction();
 
     if(!isEmpty && isFunction) {
-        auto msg = ArgConverter::jstringToV8String(isolate, message);
+        auto msgString = ArgConverter::jstringToV8String(isolate, message).As<String>();
+        Local<Value> msg;
+        JSON::Parse(isolate, msgString).ToLocal(&msg);
+
         Local<Value> args1[] = { msg };
 
         auto func = callback.As<Function>();
@@ -1253,6 +1259,8 @@ void CallbackHandlers::TerminateWorkerThread(Isolate *isolate) {
 
 int CallbackHandlers::nextWorkerId = 0;
 std::map<int, Persistent<Object>*> CallbackHandlers::id2WorkerMap;
+
+std::map<Isolate*, Persistent<Function>*> CallbackHandlers::isolateToJsonStringify;
 
 short CallbackHandlers::MAX_JAVA_STRING_ARRAY_LENGTH = 100;
 jclass CallbackHandlers::RUNTIME_CLASS = nullptr;

@@ -1,5 +1,6 @@
 #include "V8GlobalHelpers.h"
 #include "ArgConverter.h"
+#include "CallbackHandlers.h"
 #include "include/v8.h"
 #include "JEnv.h"
 #include "NativeScriptException.h"
@@ -8,16 +9,19 @@
 using namespace v8;
 using namespace std;
 
-string tns::ConvertToString(const v8::Local<String> &s) {
-    if (s.IsEmpty())
-    {
-        return string();
-    }
-    else
-    {
-        String::Utf8Value str(s);
-        return string(*str);
-    }
+Local<String> tns::JsonStringifyObject(Isolate* isolate, Handle<v8::Value> value)
+{
+	if (value.IsEmpty()) {
+		return String::Empty(isolate);
+	}
+
+	auto stringifyFunction = CallbackHandlers::isolateToJsonStringify.find(isolate)->second;
+	auto func = Local<Function>::New(isolate, *stringifyFunction);
+	Local<Value> args[] = { value };
+
+	auto result = func->Call(Undefined(isolate), 1, args);
+
+	return result->ToString(isolate);
 }
 
 jstring tns::ConvertToJavaString(const Local<Value> &value) {
