@@ -1,3 +1,16 @@
+2.3.0
+==
+
+## What's New
+
+ - [Extend is not working as previous versions in all cases. (#514)](https://github.com/NativeScript/android-runtime/issues/514)
+ - [JS: Binding: Run-time error occured in file: undefined at line: undefined and column: undefined (#443)](https://github.com/NativeScript/android-runtime/issues/443)
+
+## Bug Fixes
+
+ - [Crash when invoking a second (different) signature of an overloaded method (meta generator cache?) (#555)](https://github.com/NativeScript/android-runtime/issues/555)
+ - [App crashes when set undefined to reference type field (#306)](https://github.com/NativeScript/android-runtime/issues/306)
+
 2.2.0
 ==
 
