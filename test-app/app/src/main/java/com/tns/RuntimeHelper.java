@@ -128,7 +128,6 @@ public final class RuntimeHelper {
 				}
 			}
 
-
 			runtime.runScript(new File(appDir, "internal/ts_helpers.js"));
 
 			File javaClassesModule = new File(appDir, "app/tns-java-classes.js");

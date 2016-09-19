@@ -9,6 +9,18 @@
 using namespace v8;
 using namespace std;
 
+string tns::ConvertToString(const v8::Local<String> &s) {
+    if (s.IsEmpty())
+    {
+        return string();
+    }
+    else
+    {
+        String::Utf8Value str(s);
+        return string(*str);
+    }
+}
+
 Local<String> tns::JsonStringifyObject(Isolate* isolate, Handle<v8::Value> value)
 {
 	if (value.IsEmpty()) {

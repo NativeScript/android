@@ -46,6 +46,8 @@ public class Runtime {
 
     private native void clearStartupData(int runtimeId);
 
+    public static native int getPointerSize();
+
     private static native void WorkerGlobalOnMessageCallback(int runtimeId, String message);
 
     private static native void WorkerObjectOnMessageCallback(int runtimeId, int workerId, String message);
@@ -194,6 +196,10 @@ public class Runtime {
 	public int getWorkerId() {
 		return workerId;
 	}
+
+    public Handler getHandler() {
+        return this.threadScheduler.getHandler();
+    }
 
     private static class WorkerThreadHandler extends Handler {
         @Override

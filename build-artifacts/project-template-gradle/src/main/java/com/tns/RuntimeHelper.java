@@ -5,17 +5,16 @@ import java.io.File;
 import android.app.Application;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.os.Build;
-import android.os.Handler;
-import android.os.Looper;
 import android.util.Log;
 import java.io.IOException;
 
 public final class RuntimeHelper {
-	private RuntimeHelper() {}
+	private RuntimeHelper() {
+	}
 
 	// hasErrorIntent tells you if there was an event (with an uncaught
 	// exception) raised from ErrorReport
-	public static boolean hasErrorIntent(Application app) {
+	private static boolean hasErrorIntent(Application app) {
 		boolean hasErrorIntent = false;
 
 		try {
@@ -54,10 +53,11 @@ public final class RuntimeHelper {
 		
 		System.loadLibrary("NativeScript");
 
-		Runtime runtime = null;
 		Logger logger = new LogcatLogger(app);
+
 		Debugger debugger = AndroidJsDebugger.isDebuggableApp(app) ? new AndroidJsDebugger(app, logger) : null;
 
+		Runtime runtime = null;
 		boolean showErrorIntent = hasErrorIntent(app);
 		if (!showErrorIntent) {
 			NativeScriptUncaughtExceptionHandler exHandler = new NativeScriptUncaughtExceptionHandler(logger, app);
@@ -117,10 +117,10 @@ public final class RuntimeHelper {
 				e.printStackTrace();
 			}
 
-			Configuration config = new Configuration(logger, debugger, appName, null, rootDir,
+			StaticConfiguration config = new StaticConfiguration(logger, debugger, appName, null, rootDir,
 					appDir, classLoader, dexDir, dexThumb, v8Config);
 
-			runtime = Runtime.initializeWithConfiguration(config);
+			runtime = Runtime.initializeRuntimeWithConfiguration(config);
 
 			// runtime needs to be initialized before the NativeScriptSyncService is enabled because it uses runtime.runScript(...)
 			if (NativeScriptSyncService.isSyncEnabled(app)) {
@@ -139,7 +139,6 @@ public final class RuntimeHelper {
 					logger.write("NativeScript LiveSync is not enabled.");
 				}
 			}
-
 
 			runtime.runScript(new File(appDir, "internal/ts_helpers.js"));
 

@@ -930,7 +930,7 @@ void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Valu
         Module::CheckFileExists(isolate, workerPath, currentDir);
 
         auto workerId = nextWorkerId++;
-        V8SetHiddenValue(thiz, "workerId", Number::New(isolate, workerId));
+        V8SetPrivateValue(isolate, thiz, ArgConverter::ConvertToV8String(isolate, "workerId"), Number::New(isolate, workerId));
 
         auto persistentWorker = new Persistent<Object>(isolate, thiz);
 
@@ -971,7 +971,9 @@ void CallbackHandlers::WorkerObjectPostMessageCallback(const v8::FunctionCallbac
 
     auto thiz = args.This(); // Worker instance
 
-    Local<Value> jsId = V8GetHiddenValue(thiz, "workerId");
+    Local<Value> jsId;
+
+    auto maybejsId = V8GetPrivateValue(isolate, thiz, ArgConverter::ConvertToV8String(isolate, "workerId"), jsId);
 
     Local<String> msg = tns::JsonStringifyObject(isolate, args[0])->ToString();
     // get worker's ID that is associated on the other side - in Java
@@ -1086,19 +1088,22 @@ void CallbackHandlers::WorkerObjectTerminateCallback(const v8::FunctionCallbackI
 
     auto thiz = args.This(); // Worker instance
 
-    Local<Value> jsId = V8GetHiddenValue(thiz, "workerId");
+    Local<Value> jsId;
+
+    auto maybejsId = V8GetPrivateValue(isolate, thiz, ArgConverter::ConvertToV8String(isolate, "workerId"), jsId);
 
     // get worker's ID that is associated on the other side - in Java
     auto id = jsId->Int32Value();
 
-    auto isTerminated = thiz->GetHiddenValue(ArgConverter::ConvertToV8String(isolate, "isTerminated"));
+    Local<Value> isTerminated;
+    V8GetPrivateValue(isolate, thiz, ArgConverter::ConvertToV8String(isolate, "isTerminated"), isTerminated);
 
     if(!isTerminated.IsEmpty() && isTerminated->BooleanValue()) {
         DEBUG_WRITE("Main: WorkerObjectTerminateCallback - Worker(id=%d)'s terminate has already been called.", id);
         return;
     }
 
-    thiz->SetHiddenValue(ArgConverter::ConvertToV8String(isolate, "isTerminated"), Boolean::New(isolate, true));
+    V8SetPrivateValue(isolate, thiz, ArgConverter::ConvertToV8String(isolate, "isTerminated"), Boolean::New(isolate, true));
 
     JEnv env;
     auto mId = env.GetStaticMethodID(RUNTIME_CLASS, "workerObjectTerminate",
