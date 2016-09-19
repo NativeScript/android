@@ -325,7 +325,6 @@ describe("Tests exception handling ", function () {
 	});
 
 	it("should successfully catch syntax errors", function () {
-
 	    var exceptionCaught = false;
 	    var errMsg;
 	    try {
@@ -336,8 +335,8 @@ describe("Tests exception handling ", function () {
 	    }
 	    expect(exceptionCaught).toBe(true);
 	    expect(errMsg).toContain("Cannot compile /data/data/com.tns.android_runtime_testapp/files/app/tests/syntaxErrors.js");
-	    expect(errMsg).toContain("SyntaxError: Block-scoped declarations (let, const, function, class) not yet supported outside strict mode");
-	    expect(errMsg).toContain("File: \"/data/data/com.tns.android_runtime_testapp/files/app/tests/syntaxErrors.js, line: 4, column: 0");
+	    expect(errMsg).toContain("SyntaxError: Unexpected token =");
+	    expect(errMsg).toContain("File: \"/data/data/com.tns.android_runtime_testapp/files/app/tests/syntaxErrors.js, line: 3, column: 10");
 
 
 

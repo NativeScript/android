@@ -41,7 +41,10 @@ public class Runtime
 
 	private native void passUncaughtExceptionToJsNative(int runtimeId, Throwable ex, String stackTrace);
 	
-	private native void ClearStartupData(int runtimeId);
+	private native void clearStartupData(int runtimeId);
+
+	// Used to determine the bitness of the current process (32 vs 64)
+	public static native int getPointerSize();
 	
 	void passUncaughtExceptionToJs(Throwable ex, String stackTrace)
 	{
@@ -231,7 +234,7 @@ public class Runtime
 			jsDebugger.start();
 		}
 		
-		ClearStartupData(getRuntimeId()); // It's safe to delete the data after the V8 debugger is initialized
+		clearStartupData(getRuntimeId()); // It's safe to delete the data after the V8 debugger is initialized
 		
 		if (logger.isEnabled())
 		{

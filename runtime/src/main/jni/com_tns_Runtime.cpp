@@ -301,7 +301,7 @@ extern "C" void Java_com_tns_Runtime_passUncaughtExceptionToJsNative(JNIEnv *env
 	}
 }
 
-extern "C" void Java_com_tns_Runtime_ClearStartupData(JNIEnv *env, jobject obj, jint runtimeId)
+extern "C" void Java_com_tns_Runtime_clearStartupData(JNIEnv *env, jobject obj, jint runtimeId)
 {
 	auto runtime = TryGetRuntime(runtimeId);
 	if (runtime == nullptr)
@@ -310,4 +310,9 @@ extern "C" void Java_com_tns_Runtime_ClearStartupData(JNIEnv *env, jobject obj, 
 	}
 
 	runtime->ClearStartupData(env, obj);
+}
+
+extern "C" jint Java_com_tns_Runtime_getPointerSize(JNIEnv *env, jobject obj)
+{
+	return sizeof(void*);
 }
