@@ -21,6 +21,7 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.Message;
+import android.os.Process;
 import android.util.SparseArray;
 
 import com.tns.bindings.ProxyGenerator;
@@ -259,6 +260,8 @@ public class Runtime {
             handler.post((new Runnable() {
                 @Override
                 public void run() {
+                    Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND);
+
                     WorkThreadScheduler workThreadScheduler = new WorkThreadScheduler(new WorkerThreadHandler());
 
                     DynamicConfiguration dynamicConfiguration = new DynamicConfiguration(workerId, workThreadScheduler, mainThreadScheduler, callingJsDir);
