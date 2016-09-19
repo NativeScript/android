@@ -1233,11 +1233,14 @@ void CallbackHandlers::CallWorkerObjectOnErrorHandle(Isolate *isolate, jint work
     auto strFilename = ArgConverter::jstringToString(filename);
     auto strThreadname = ArgConverter::jstringToString(threadName);
 
-    stringstream ss;
-    ss << endl << "Unhandled exception in '" << strThreadname << "' thread. file: " << strFilename <<
-    ", line: " << lineno << endl << strMessage << endl;
-    NativeScriptException ex(ss.str());
-    throw ex;
+    DEBUG_WRITE("Unhandled exception in '%s' thread. file: %s, line %d\n", strThreadname.c_str(), strFilename.c_str(), lineno, strMessage.c_str());
+
+    // Do not throw exception?
+//    stringstream ss;
+//    ss << endl << "Unhandled exception in '" << strThreadname << "' thread. file: " << strFilename <<
+//    ", line: " << lineno << endl << strMessage << endl;
+//    NativeScriptException ex(ss.str());
+//    throw ex;
 }
 
 void CallbackHandlers::ClearWorkerPersistent(int workerId) {
