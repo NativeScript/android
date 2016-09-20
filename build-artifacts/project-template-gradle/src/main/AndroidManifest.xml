@@ -34,7 +34,7 @@
             </intent-filter>
         </activity>
         <activity android:name="com.tns.ErrorReportActivity"
-                  android:theme="@style/NoActionBar" />
+				  android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
     </application>
 
 </manifest>

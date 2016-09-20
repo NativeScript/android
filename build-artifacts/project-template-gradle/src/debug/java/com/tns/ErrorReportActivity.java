@@ -6,7 +6,10 @@ import android.support.v7.app.AppCompatActivity;
 
 public class ErrorReportActivity extends AppCompatActivity {
     public void onCreate(Bundle savedInstanceState) {
+        setTheme(android.support.v7.appcompat.R.style.Theme_AppCompat_NoActionBar);
+
         super.onCreate(savedInstanceState);
+
         new ErrorReport(this).buildUI();
     }
 

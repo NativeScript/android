@@ -192,7 +192,7 @@ dependencies {
 	
     compile "com.android.support:support-v4:$suppotVer"
     compile "com.android.support:appcompat-v7:$suppotVer"
-	compile "com.android.support:design:$suppotVer"
+	debugCompile "com.android.support:design:$suppotVer"
 
     // take all jars within the libs dir
 	compile fileTree(dir: "$projectDir/libs", include: ["**/*.jar"])
