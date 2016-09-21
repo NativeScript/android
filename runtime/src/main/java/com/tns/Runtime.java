@@ -291,6 +291,10 @@ public class Runtime {
 
     private void processPendingMessages() {
         Queue<Message> messages = Runtime.pendingWorkerMessages.get(this.getWorkerId());
+        if(messages == null) {
+            return;
+        }
+
         while(!messages.isEmpty()) {
             this.getHandler().sendMessage(messages.poll());
         }
