@@ -552,6 +552,11 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 	global->ForceSet(ArgConverter::ConvertToV8String(isolate, "global"), global, readOnlyFlags);
 	global->ForceSet(ArgConverter::ConvertToV8String(isolate, "__global"), global, readOnlyFlags);
 
+	// Do not set 'self' accessor to main thread JavaScript
+	if(s_mainThreadInitialized) {
+		global->ForceSet(ArgConverter::ConvertToV8String(isolate, "self"), global, readOnlyFlags);
+	}
+
 	ArgConverter::Init(isolate);
 
 	CallbackHandlers::Init(isolate);
