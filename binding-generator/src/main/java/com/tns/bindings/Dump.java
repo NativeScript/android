@@ -214,10 +214,11 @@ public class Dump
 
 		generateFields(cv);
 
-		MethodDescriptor[] ctors = classTo.getConstructors();
-
-		boolean hasOverridenCtor = ((methodOverrides != null) && methodOverrides.contains("init"));
-		generateCtors(cv, classTo, ctors, classSignature, tnsClassSignature, hasOverridenCtor);
+		if (!isApplicationClass(classTo)) {
+			MethodDescriptor[] ctors = classTo.getConstructors();
+			boolean hasOverridenCtor = ((methodOverrides != null) && methodOverrides.contains("init"));
+			generateCtors(cv, classTo, ctors, classSignature, tnsClassSignature, hasOverridenCtor);
+		}
 		generateMethods(cv, classTo, methods, classSignature, tnsClassSignature);
 
 		cv.visitEnd();
@@ -305,7 +306,7 @@ public class Dump
 		}
 	}
 
-	private MethodDescriptor[] getSupportedMethods(ClassDescriptor clazz, HashSet<String> methodOverrides,  HashSet<ClassDescriptor> interfacesToImplement)
+	private MethodDescriptor[] getSupportedMethods(ClassDescriptor clazz, HashSet<String> methodOverrides, HashSet<ClassDescriptor> interfacesToImplement)
 	{
 		ArrayList<MethodDescriptor> result = new ArrayList<MethodDescriptor>();
 
@@ -314,6 +315,8 @@ public class Dump
 		for (ClassDescriptor iface : interfacesToImplement) {
 			collectAbstractMethods(iface, result);
 		}
+
+		boolean isApplicationClass = isApplicationClass(clazz);
 
 		if (!clazz.isInterface())
 		{
@@ -327,12 +330,16 @@ public class Dump
 				for (int i = 0; i < methods.length; i++)
 				{
 					MethodDescriptor candidateMethod = methods[i];
+					if (isApplicationClass && candidateMethod.getName().equals("attachBaseContext")) {
+						// this is the only Application method called before onCreate (where we initialize the runtime, so we skip this method)
+						continue;
+					}
 					if (methodOverrides != null && !methodOverrides.contains(candidateMethod.getName()))
 					{
 						continue;
 					}
 
-					methodz.add(methods[i]);
+					methodz.add(candidateMethod);
 				}
 
 				for (int i = 0; i < methodz.size(); i++)
@@ -912,13 +919,7 @@ public class Dump
 		}
 	}
 
-	private void generateFields(ClassVisitor cv)
-	{
-		generateInitializedField(cv);
-	}
-
-	private void generateInitializedField(ClassVisitor cv)
-	{
+	private void generateFields(ClassVisitor cv) {
 		FieldVisitor fv = cv.visitField(org.ow2.asmdex.Opcodes.ACC_PRIVATE, "__initialized", "Z", null, null);
 		fv.visitEnd();
 	}
