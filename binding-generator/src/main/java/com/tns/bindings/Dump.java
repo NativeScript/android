@@ -214,11 +214,11 @@ public class Dump
 
 		generateFields(cv);
 
-		if (!isApplicationClass(classTo)) {
-			MethodDescriptor[] ctors = classTo.getConstructors();
-			boolean hasOverridenCtor = ((methodOverrides != null) && methodOverrides.contains("init"));
-			generateCtors(cv, classTo, ctors, classSignature, tnsClassSignature, hasOverridenCtor);
-		}
+
+		MethodDescriptor[] ctors = classTo.getConstructors();
+		boolean hasOverridenCtor = ((methodOverrides != null) && methodOverrides.contains("init"));
+		generateCtors(cv, classTo, ctors, classSignature, tnsClassSignature, hasOverridenCtor);
+
 		generateMethods(cv, classTo, methods, classSignature, tnsClassSignature);
 
 		cv.visitEnd();
@@ -264,7 +264,8 @@ public class Dump
 
 		Set<String> concreteMethods = new HashSet<String>();
         // TODO refactor this
-        ClassDescriptor startingConcreteClassDesc = clazz.isInterface() ? new ClassInfo(Object.class) : clazz;
+        boolean isInterfaceClass = clazz.isInterface();
+        ClassDescriptor startingConcreteClassDesc = isInterfaceClass ? new ClassInfo(Object.class) : clazz;
 		for (MethodDescriptor objMethod: startingConcreteClassDesc.getDeclaredMethods()) {
 			if (!objMethod.isStatic()) {
 				String sig = getMethodSignature(objMethod);
@@ -288,6 +289,9 @@ public class Dump
 				String sig = getMethodSignature(m);
 				if (m.isAbstract()) {
 					if (!concreteMethods.contains(sig) && !alreadyAddedMethods.contains(sig)) {
+                        if(isInterfaceClass) {
+                            m.setAsInterfaceMethod();
+                        }
 						result.add(m);
 						alreadyAddedMethods.add(sig);
 					}
@@ -503,11 +507,14 @@ public class Dump
 			mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_DIRECT_RANGE, objectClass, "<init>", ctorSignature, args);
 		}
 
-		generateInitializedBlock(mv, thisRegister, classSignature, tnsClassSignature);
-		if (hasOverridenCtor)
-		{
-			generateCtorOverridenBlock(mv, thisRegister, ctor, classSignature, tnsClassSignature);
-		}
+		if (!isApplicationClass(classTo)) {
+			generateInitializedBlock(mv, thisRegister, classSignature, tnsClassSignature);
+        }
+
+        if (hasOverridenCtor) {
+            generateCtorOverridenBlock(mv, thisRegister, ctor, classSignature, tnsClassSignature);
+        }
+		
 		generateReturnVoid(mv);
 	}
 
@@ -604,7 +611,9 @@ public class Dump
 			if (isApplicationClass(classTo) && method.getName().equals("onCreate")) {
 				generateRuntimeInitializedBlock(mv, thisRegister, classSignature, tnsClassSignature, classTo.getName());
 			} else {
-				generateInitializedBlock(mv, thisRegister, classSignature, tnsClassSignature);
+				if(!method.isInterfaceMethod()) { //interface methods do not need an initialized block
+					generateInitializedBlock(mv, thisRegister, classSignature, tnsClassSignature);
+				}
 			}
 		}
 

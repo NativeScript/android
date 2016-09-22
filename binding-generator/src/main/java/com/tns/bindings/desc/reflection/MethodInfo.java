@@ -19,6 +19,7 @@ public class MethodInfo implements MethodDescriptor {
     private Class<?> m_retType;
     private String m_name;
     private String m_genericSig;
+    private boolean m_isInterface;
 
     public MethodInfo(Method method) {
         this(method.getModifiers());
@@ -27,6 +28,7 @@ public class MethodInfo implements MethodDescriptor {
         m_retType = method.getReturnType();
         m_name = method.getName();
         m_genericSig = method.toGenericString();
+        m_isInterface = false;
     }
 
     public MethodInfo(Constructor<?> ctor) {
@@ -36,6 +38,7 @@ public class MethodInfo implements MethodDescriptor {
         m_retType = void.class;
         m_name = ctor.getName();
         m_genericSig = ctor.toGenericString();
+        m_isInterface = false;
     }
 
     private MethodInfo(int modifiers) {
@@ -69,6 +72,16 @@ public class MethodInfo implements MethodDescriptor {
     @Override
     public String toGenericString() {
         return m_genericSig;
+    }
+
+    @Override
+    public boolean isInterfaceMethod() {
+        return m_isInterface;
+    }
+
+    @Override
+    public void setAsInterfaceMethod() {
+        this.m_isInterface = true;
     }
 
     @Override
