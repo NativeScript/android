@@ -615,6 +615,7 @@ public class Dump
 
 	private boolean isApplicationClass(ClassDescriptor clazz) {
 		boolean isApplicationClass = false;
+		//TODO: plamen5kov: improve check for application class include MultidexApplication and other common scenarios
 		String applicationClassName = "android.app.Application";
 		ClassDescriptor currentClass = clazz;
 		while ((currentClass != null) && !isApplicationClass) {
