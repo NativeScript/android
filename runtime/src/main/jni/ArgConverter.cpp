@@ -5,6 +5,7 @@
 #include "NativeScriptException.h"
 #include "NumericCasts.h"
 #include "Runtime.h"
+#include "V8GlobalHelpers.h"
 #include <sstream>
 
 using namespace v8;
@@ -78,8 +79,8 @@ void ArgConverter::NativeScriptLongFunctionCallback(const v8::FunctionCallbackIn
 		auto isolate = args.GetIsolate();
 		auto thiz = args.This();
 		auto cache = GetTypeLongCache(isolate);
-		thiz->SetHiddenValue(V8StringConstants::GetJavaLong(isolate), Boolean::New(isolate, true));
-		NumericCasts::MarkAsLong(thiz, args[0]);
+		V8SetPrivateValue(isolate, thiz, V8StringConstants::GetJavaLong(isolate), Boolean::New(isolate, true));
+		NumericCasts::MarkAsLong(isolate, thiz, args[0]);
 		thiz->SetPrototype(Local<NumberObject>::New(isolate, *cache->NanNumberObject));
 	}
 	catch (NativeScriptException& e)
@@ -329,8 +330,7 @@ Local<String> ArgConverter::ConvertToV8String(Isolate *isolate, const jchar* dat
 
 Local<String> ArgConverter::ConvertToV8String(Isolate *isolate, const string& s)
 {
-	Local<String> str;
-	String::NewFromUtf8(isolate, s.c_str(), NewStringType::kNormal, s.length()).ToLocal(&str);
+	Local<String> str =	String::NewFromUtf8(isolate, s.c_str(), NewStringType::kNormal, s.length()).ToLocalChecked();
 	return str;
 }
 

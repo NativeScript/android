@@ -7,7 +7,7 @@ buildscript {
         jcenter()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle-experimental:0.7.0-beta3'
+        classpath 'com.android.tools.build:gradle-experimental:0.8.0-beta2'
     }
 }
 
@@ -59,9 +59,16 @@ model {
 
         ldLibs.addAll(["android", "dl", "log", "atomic", "z"])
 
-        stl = "stlport_static"
+        stl = "c++_static"
 
-        abiFilters.addAll(["armeabi-v7a", "x86", "arm64-v8a"])
+        if (ndkDebuggable)
+        {
+            abiFilters.addAll(["armeabi-v7a"])
+        }
+        else
+        {
+            abiFilters.addAll(["armeabi-v7a", "x86", "arm64-v8a"])
+        }
     }
 
     android.sources {

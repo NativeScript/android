@@ -38,9 +38,9 @@ namespace tns
 
 			v8::Local<v8::Function> GetGetterFunction(v8::Isolate *isolate);
 
-			static void WeakTargetCallback(const v8::WeakCallbackData<v8::Object, CallbackState>& data);
+			static void WeakTargetCallback(const v8::WeakCallbackInfo<CallbackState>& data);
 
-			static void WeakHolderCallback(const v8::WeakCallbackData<v8::Object, CallbackState>& data);
+			static void WeakHolderCallback(const v8::WeakCallbackInfo<CallbackState>& data);
 
 			ObjectManager *m_objectManager;
 

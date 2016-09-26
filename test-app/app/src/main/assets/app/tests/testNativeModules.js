@@ -1,16 +1,16 @@
 describe("Tests native modules)", function () {
-	
+
 	it("should load native module", function () {
 		var x = 12;
 		var y = 34;
 		
 		var arch;
-		var sysArch = java.lang.System.getProperty("os.arch");
+		var sysArch = java.lang.System.getProperty("os.arch"); // ro.product.cpu.abi
 		var lcArch = sysArch.toLowerCase();
 		if (lcArch.indexOf("arm") > -1) {
 			arch = "arm";
 		} else if (lcArch.indexOf("aarch64") > -1) {
-			arch = "arm64";
+		    arch = (com.tns.Runtime.getPointerSize() == 4) ? "arm" : "arm64";
 		} else if (lcArch.indexOf("i686") > -1) {
 			arch = "x86";
 		} else {
@@ -23,5 +23,4 @@ describe("Tests native modules)", function () {
 		
 		expect(sum).toBe(46);
 	});
-
 });

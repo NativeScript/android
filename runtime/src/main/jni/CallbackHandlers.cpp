@@ -814,10 +814,12 @@ Local<Value> CallbackHandlers::CallJSMethod(Isolate *isolate, JNIEnv *_env,
         auto jsArgs = ArgConverter::ConvertJavaArgsToJsArgs(isolate, args);
         int argc = jsArgs->Length();
 
-        Local<Value> arguments[argc];
-        for (int i = 0; i < argc; i++) {
+        Local<Value>* arguments = new Local<Value>[argc];
+        for (int i = 0; i < argc; i++)
+        {
             arguments[i] = jsArgs->Get(i);
         }
+
 
         DEBUG_WRITE("implementationObject->GetIdentityHash()=%d", jsObject->GetIdentityHash());
 
@@ -828,9 +830,12 @@ Local<Value> CallbackHandlers::CallJSMethod(Isolate *isolate, JNIEnv *_env,
             jsResult = jsMethod->Call(jsObject, argc, argc == 0 ? nullptr : arguments);
         }
 
+        delete [] arguments;
+
         //TODO: if javaResult is a pure js object create a java object that represents this object in java land
 
-        if (tc.HasCaught()) {
+        if (tc.HasCaught())
+        {
             stringstream ss;
             ss << "Calling js method " << methodName << " failed";
             string exceptionMessage = ss.str();

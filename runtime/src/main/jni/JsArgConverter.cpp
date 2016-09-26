@@ -7,6 +7,8 @@
 #include "NumericCasts.h"
 #include "NativeScriptException.h"
 #include "Runtime.h"
+#include "V8GlobalHelpers.h"
+#include <cstdlib>
 
 using namespace v8;
 using namespace std;
@@ -126,7 +128,7 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 	{
 		auto jsObject = arg->ToObject();
 
-		auto castType = NumericCasts::GetCastType(jsObject);
+		auto castType = NumericCasts::GetCastType(m_isolate, jsObject);
 
 		Local<Value> castValue;
 		JniLocalRef obj;
@@ -218,7 +220,8 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index)
 			case CastType::None:
 				obj = objectManager->GetJavaObjectByJsObject(jsObject);
 
-				castValue = jsObject->GetHiddenValue(ArgConverter::ConvertToV8String(m_isolate, V8StringConstants::NULL_NODE_NAME));
+				V8GetPrivateValue(m_isolate, jsObject, ArgConverter::ConvertToV8String(m_isolate, V8StringConstants::NULL_NODE_NAME), castValue);
+
 				if(!castValue.IsEmpty()) {
 					SetConvertedObject(index, nullptr);
 					success = true;
