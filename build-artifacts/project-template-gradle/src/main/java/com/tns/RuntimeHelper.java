@@ -21,11 +21,23 @@ public final class RuntimeHelper {
 		try {
 			// empty file just to check if there was a raised uncaught error by
 			// ErrorReport
-			File errFile = new File(app.getFilesDir(), ErrorReport.ERROR_FILE_NAME);
+			if (AndroidJsDebugger.isDebuggableApp(app)) {
+				String fileName = "";
 
-			if (errFile.exists()) {
-				errFile.delete();
-				hasErrorIntent = true;
+				try {
+					java.lang.Class ErrReport = java.lang.Class.forName("com.tns.ErrorReport");
+					java.lang.reflect.Field field = ErrReport.getDeclaredField("ERROR_FILE_NAME");
+					fileName = (String)field.get(null);
+				} catch (Exception e) {
+					return false;
+				}
+
+				File errFile = new File(app.getFilesDir(), fileName);
+
+				if (errFile.exists()) {
+					errFile.delete();
+					hasErrorIntent = true;
+				}
 			}
 		} catch (Exception e) {
 			Log.d(logTag, e.getMessage());
