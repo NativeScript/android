@@ -77,6 +77,7 @@ namespace tns
 			v8::Local<v8::Function> GetConstructorFunction(v8::Isolate *isolate);
 			v8::Local<v8::FunctionTemplate> GetConstructorFunctionTemplate(v8::Isolate *isolate, MetadataTreeNode *treeNode);
 			v8::Local<v8::FunctionTemplate> GetConstructorFunctionTemplate(v8::Isolate *isolate, MetadataTreeNode *treeNode, std::vector<MethodCallbackData*>& instanceMethodsCallbackData);
+			v8::Persistent<v8::Function>* GetPersistentConstructorFunction(v8::Isolate *isolate);
 
 			void SetInstanceMembers(v8::Isolate *isolate, v8::Local<v8::FunctionTemplate>& ctorFuncTemplate, v8::Local<v8::ObjectTemplate>& prototypeTemplate, std::vector<MethodCallbackData*>& instanceMethodsCallbackData, const std::vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode);
 			void SetInstanceMethodsFromStaticMetadata(v8::Isolate *isolate, v8::Local<v8::FunctionTemplate>& ctorFuncTemplate, v8::Local<v8::ObjectTemplate>& prototypeTemplate, std::vector<MethodCallbackData*>& instanceMethodsCallbackData, const std::vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode);
@@ -133,7 +134,7 @@ namespace tns
 			v8::Local<v8::Function> Wrap(v8::Isolate* isolate, const v8::Local<v8::Function>&function, const std::string& name, const std::string& origin, bool isCtorFunc);
 
 			MetadataTreeNode *m_treeNode;
-			v8::Persistent<v8::Function> *m_poCtorFunc;
+			std::map<v8::Isolate*, v8::Persistent<v8::Function>*> m_poCtorCachePerIsolate;
 			std::string m_name;
 			std::string m_implType;
 			bool m_isArray;
