@@ -1000,7 +1000,9 @@ void CallbackHandlers::WorkerGlobalOnMessageCallback(Isolate *isolate, jstring m
         Local<Value> msg;
         JSON::Parse(isolate, msgString).ToLocal(&msg);
 
-        Local<Value> args1[] = { msg };
+        auto obj = Object::New(isolate);
+        obj->DefineOwnProperty(isolate->GetCurrentContext(), ArgConverter::ConvertToV8String(isolate, "data"), msg, PropertyAttribute::ReadOnly);
+        Local<Value> args1[] = { obj };
 
         auto func = callback.As<Function>();
 
@@ -1067,7 +1069,9 @@ void CallbackHandlers::WorkerObjectOnMessageCallback(Isolate *isolate, jint work
         Local<Value> msg;
         JSON::Parse(isolate, msgString).ToLocal(&msg);
 
-        Local<Value> args1[] = { msg };
+        auto obj = Object::New(isolate);
+        obj->DefineOwnProperty(isolate->GetCurrentContext(), ArgConverter::ConvertToV8String(isolate, "data"), msg, PropertyAttribute::ReadOnly);
+        Local<Value> args1[] = { obj };
 
         auto func = callback.As<Function>();
 
