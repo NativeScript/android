@@ -29,8 +29,6 @@ using namespace tns;
 
 //TODO: Lubo: properly release this jni global ref on shutdown
 
-Persistent<Context> *PrimaryContext = nullptr;
-Context::Scope *context_scope = nullptr;
 bool tns::LogEnabled = true;
 SimpleAllocator g_allocator;
 
@@ -537,9 +535,8 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 	CallbackHandlers::CreateGlobalCastFunctions(isolate, globalTemplate);
 
 	Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
-	PrimaryContext = new Persistent<Context>(isolate, context);
 
-	context_scope = new Context::Scope(context);
+	new Context::Scope(context);
 
 	m_objectManager->Init(isolate);
 

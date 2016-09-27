@@ -188,7 +188,7 @@ namespace tns
 
 		std::stack<GarbageCollectionInfo> m_markedForGC;
 
-		std::map<int, v8::Persistent<v8::Object>*> idToObject;
+		std::map<int, v8::Persistent<v8::Object>*> m_idToObject;
 
 		PersistentObjectIdSet m_released;
 
