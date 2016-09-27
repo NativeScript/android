@@ -825,12 +825,11 @@ Local<Value> CallbackHandlers::CallJSMethod(Isolate *isolate, JNIEnv *_env,
         auto jsArgs = ArgConverter::ConvertJavaArgsToJsArgs(isolate, args);
         int argc = jsArgs->Length();
 
-        Local<Value>* arguments = new Local<Value>[argc];
+        std::vector<Local<Value>> arguments(argc);
         for (int i = 0; i < argc; i++)
         {
             arguments[i] = jsArgs->Get(i);
         }
-
 
         DEBUG_WRITE("implementationObject->GetIdentityHash()=%d", jsObject->GetIdentityHash());
 
@@ -838,10 +837,8 @@ Local<Value> CallbackHandlers::CallJSMethod(Isolate *isolate, JNIEnv *_env,
         Local<Value> jsResult;
         {
             SET_PROFILER_FRAME();
-            jsResult = jsMethod->Call(jsObject, argc, argc == 0 ? nullptr : arguments);
+            jsResult = jsMethod->Call(jsObject, argc, argc == 0 ? nullptr : arguments.data());
         }
-
-        delete [] arguments;
 
         //TODO: if javaResult is a pure js object create a java object that represents this object in java land
 
@@ -849,7 +846,6 @@ Local<Value> CallbackHandlers::CallJSMethod(Isolate *isolate, JNIEnv *_env,
         {
             stringstream ss;
             ss << "Calling js method " << methodName << " failed";
-            string exceptionMessage = ss.str();
             throw NativeScriptException(tc, ss.str());
         }
 
