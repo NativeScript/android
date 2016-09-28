@@ -143,6 +143,30 @@ public class CustomClassesTest {
         Assert.assertEquals(true, classDefExists);
     }
 
+    @Test
+    public void assertImplementedInterfaceMethodsArePresentAndDoNotHaveInitializeBlock() throws IOException {
+        File bindingsFile = Utils.getBindingsFile("datarow-implemented-interface-methods.txt");
+
+        runGeneratorWithFile(bindingsFile);
+
+        List<String> methodsFromGeneratedDex = getMethodsFromDex("com.tns.NativeScriptApplication.dex");
+        List<String> expectedMethods = getOverriddenMethodsFromBindings(bindingsFile);
+
+        boolean containsInitializeBlock = false;
+        if(methodsFromGeneratedDex.contains("initInstance")) {
+            containsInitializeBlock = true;
+        }
+        int currentMethodCount = 0;
+        for(String expectedName: expectedMethods) {
+            if(methodsFromGeneratedDex.contains(expectedName)) {
+                currentMethodCount++;
+            }
+        }
+        Assert.assertEquals(false, containsInitializeBlock);
+        Assert.assertEquals(expectedMethods.size(), currentMethodCount);
+    }
+
+
     /// ACTIVITY
     @Test
     public void assertAllExpectedActivityMethodsAreGenerated() throws IOException {
