@@ -5,6 +5,7 @@ import org.apache.commons.io.IOUtils;
 import java.io.File;
 import java.io.IOException;
 import java.io.StringReader;
+import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -25,12 +26,9 @@ public class Utils {
         return lines;
     }
 
-    static File getBindingsFile(String resourceName) {
-
-        Path resourcePath = Paths.get(projectPath, packageName, resourceName);
-        List<String> lines = new ArrayList<>();
-        String resPath = resourcePath.toString();
-        File resFile = new File(resPath);
+    static File getBindingsFile(String resourceName) throws IOException {
+        URL url = Utils.class.getResource(resourceName);
+        File resFile = new File(url.getFile());
         return resFile;
     }
 }

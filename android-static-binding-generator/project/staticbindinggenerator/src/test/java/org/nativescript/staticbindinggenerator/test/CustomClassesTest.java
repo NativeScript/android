@@ -188,6 +188,25 @@ public class CustomClassesTest {
     }
 
     @Test
+    public void assertInitializedBlockIsPresent() throws IOException {
+        File bindingsFile = Utils.getBindingsFile("datarow-all-activity-methods.txt");
+
+        runGeneratorWithFile(bindingsFile);
+
+        List<String> methodsFromGeneratedDex = getMethodsFromDex("com.tns.NativeScriptActivity.dex");
+        List<String> expectedMethods = getOverriddenMethodsFromBindings(bindingsFile);
+
+        int currentMethodCount = 0;
+        for(String expectedName: expectedMethods) {
+            if(methodsFromGeneratedDex.contains(expectedName)) {
+                currentMethodCount++;
+            }
+        }
+
+        Assert.assertEquals(expectedMethods.size(), currentMethodCount);
+    }
+
+    @Test
     public void assertFinalActivityMethodsAreNotGenerated() throws IOException {
         File bindingsFile = Utils.getBindingsFile("datarow-final-activity-methods.txt");
 
