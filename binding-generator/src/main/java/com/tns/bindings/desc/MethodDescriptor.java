@@ -8,4 +8,7 @@ public interface MethodDescriptor extends Descriptor {
     ClassDescriptor getReturnType();
 
     String toGenericString();
+
+    boolean isInterfaceMethod();
+    void setAsInterfaceMethod();
 }

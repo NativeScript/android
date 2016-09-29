@@ -214,10 +214,11 @@ public class Dump
 
 		generateFields(cv);
 
-		MethodDescriptor[] ctors = classTo.getConstructors();
 
+		MethodDescriptor[] ctors = classTo.getConstructors();
 		boolean hasOverridenCtor = ((methodOverrides != null) && methodOverrides.contains("init"));
 		generateCtors(cv, classTo, ctors, classSignature, tnsClassSignature, hasOverridenCtor);
+
 		generateMethods(cv, classTo, methods, classSignature, tnsClassSignature);
 
 		cv.visitEnd();
@@ -263,7 +264,8 @@ public class Dump
 
 		Set<String> concreteMethods = new HashSet<String>();
         // TODO refactor this
-        ClassDescriptor startingConcreteClassDesc = clazz.isInterface() ? new ClassInfo(Object.class) : clazz;
+        boolean isInterfaceClass = clazz.isInterface();
+        ClassDescriptor startingConcreteClassDesc = isInterfaceClass ? new ClassInfo(Object.class) : clazz;
 		for (MethodDescriptor objMethod: startingConcreteClassDesc.getDeclaredMethods()) {
 			if (!objMethod.isStatic()) {
 				String sig = getMethodSignature(objMethod);
@@ -287,6 +289,9 @@ public class Dump
 				String sig = getMethodSignature(m);
 				if (m.isAbstract()) {
 					if (!concreteMethods.contains(sig) && !alreadyAddedMethods.contains(sig)) {
+                        if(isInterfaceClass) {
+                            m.setAsInterfaceMethod();
+                        }
 						result.add(m);
 						alreadyAddedMethods.add(sig);
 					}
@@ -305,7 +310,7 @@ public class Dump
 		}
 	}
 
-	private MethodDescriptor[] getSupportedMethods(ClassDescriptor clazz, HashSet<String> methodOverrides,  HashSet<ClassDescriptor> interfacesToImplement)
+	private MethodDescriptor[] getSupportedMethods(ClassDescriptor clazz, HashSet<String> methodOverrides, HashSet<ClassDescriptor> interfacesToImplement)
 	{
 		ArrayList<MethodDescriptor> result = new ArrayList<MethodDescriptor>();
 
@@ -314,6 +319,8 @@ public class Dump
 		for (ClassDescriptor iface : interfacesToImplement) {
 			collectAbstractMethods(iface, result);
 		}
+
+		boolean isApplicationClass = isApplicationClass(clazz);
 
 		if (!clazz.isInterface())
 		{
@@ -327,12 +334,16 @@ public class Dump
 				for (int i = 0; i < methods.length; i++)
 				{
 					MethodDescriptor candidateMethod = methods[i];
+					if (isApplicationClass && candidateMethod.getName().equals("attachBaseContext")) {
+						// this is the only Application method called before onCreate (where we initialize the runtime, so we skip this method)
+						continue;
+					}
 					if (methodOverrides != null && !methodOverrides.contains(candidateMethod.getName()))
 					{
 						continue;
 					}
 
-					methodz.add(methods[i]);
+					methodz.add(candidateMethod);
 				}
 
 				for (int i = 0; i < methodz.size(); i++)
@@ -496,11 +507,14 @@ public class Dump
 			mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_DIRECT_RANGE, objectClass, "<init>", ctorSignature, args);
 		}
 
-		generateInitializedBlock(mv, thisRegister, classSignature, tnsClassSignature);
-		if (hasOverridenCtor)
-		{
-			generateCtorOverridenBlock(mv, thisRegister, ctor, classSignature, tnsClassSignature);
-		}
+		if (!isApplicationClass(classTo)) {
+			generateInitializedBlock(mv, thisRegister, classSignature, tnsClassSignature);
+        }
+
+        if (hasOverridenCtor) {
+            generateCtorOverridenBlock(mv, thisRegister, ctor, classSignature, tnsClassSignature);
+        }
+		
 		generateReturnVoid(mv);
 	}
 
@@ -597,7 +611,9 @@ public class Dump
 			if (isApplicationClass(classTo) && method.getName().equals("onCreate")) {
 				generateRuntimeInitializedBlock(mv, thisRegister, classSignature, tnsClassSignature, classTo.getName());
 			} else {
-				generateInitializedBlock(mv, thisRegister, classSignature, tnsClassSignature);
+				if(!method.isInterfaceMethod()) { //interface methods do not need an initialized block
+					generateInitializedBlock(mv, thisRegister, classSignature, tnsClassSignature);
+				}
 			}
 		}
 
@@ -608,6 +624,7 @@ public class Dump
 
 	private boolean isApplicationClass(ClassDescriptor clazz) {
 		boolean isApplicationClass = false;
+		//TODO: plamen5kov: improve check for application class include MultidexApplication and other common scenarios
 		String applicationClassName = "android.app.Application";
 		ClassDescriptor currentClass = clazz;
 		while ((currentClass != null) && !isApplicationClass) {
@@ -912,13 +929,7 @@ public class Dump
 		}
 	}
 
-	private void generateFields(ClassVisitor cv)
-	{
-		generateInitializedField(cv);
-	}
-
-	private void generateInitializedField(ClassVisitor cv)
-	{
+	private void generateFields(ClassVisitor cv) {
 		FieldVisitor fv = cv.visitField(org.ow2.asmdex.Opcodes.ACC_PRIVATE, "__initialized", "Z", null, null);
 		fv.visitEnd();
 	}

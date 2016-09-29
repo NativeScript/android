@@ -9,11 +9,13 @@ class MethodInfo implements com.tns.bindings.desc.MethodDescriptor
 {
     private final Method m;
     private final Generator generator;
+    private boolean isInterface;
 
     public MethodInfo(Method m, Generator generator)
     {
         this.m = m;
         this.generator = generator;
+        this.isInterface = false;
     }
 
     @Override
@@ -39,6 +41,16 @@ class MethodInfo implements com.tns.bindings.desc.MethodDescriptor
     @Override
     public String toGenericString() {
         return m.getSignature();
+    }
+
+    @Override
+    public boolean isInterfaceMethod() {
+        return this.isInterface;
+    }
+
+    @Override
+    public void setAsInterfaceMethod() {
+        this.isInterface = true;
     }
 
     @Override
