@@ -2,6 +2,7 @@ package org.nativescript.staticbindinggenerator;
 
 import com.tns.bindings.AnnotationDescriptor;
 import com.tns.bindings.ProxyGenerator;
+import com.tns.bindings.desc.ClassDescriptor;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -11,7 +12,10 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.jar.JarInputStream;
@@ -47,6 +51,8 @@ public class Generator {
                 ProxyGenerator proxyGenerator = new ProxyGenerator(outputDir);
 
                 String[] methodOverrides = row.getMethods();
+                HashSet<String> mOverridesAsList = new HashSet<String>();
+                Collections.addAll(mOverridesAsList, methodOverrides);
                 JavaClass clazz = classes.get(javaClassname);
                 ClassInfo classInfo = new ClassInfo(clazz, this);
 
@@ -65,8 +71,20 @@ public class Generator {
                     };
                 }
 
-                String dexFile = proxyGenerator.generateProxy(dexFilename, classInfo, methodOverrides, clazz.isInterface(), annotations);
-                //System.out.println(dexFile);
+                HashSet<ClassDescriptor> interfaces = new HashSet<>();
+                int interfacesArrLen = row.getInterfaces().length;
+                for (int i = 0; i < interfacesArrLen; i++) {
+
+                    String ifaceName= row.getInterfaces()[i];
+
+                    JavaClass ifaceClass = classes.get(ifaceName);
+                    if(ifaceClass != null) {
+                        ClassDescriptor cd = new ClassInfo(ifaceClass, this);
+                        interfaces.add(cd);
+                    }
+                }
+
+                String dexFile = proxyGenerator.generateProxy(dexFilename, classInfo, mOverridesAsList, interfaces, clazz.isInterface(), annotations);
             }
         }
     }

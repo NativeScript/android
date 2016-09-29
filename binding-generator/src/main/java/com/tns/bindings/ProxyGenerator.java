@@ -27,25 +27,7 @@ public class ProxyGenerator
 	{
 		this.proxyThumb = proxyThumb;
 	}
-	
-	
-	public String generateProxy(String proxyName, ClassDescriptor classToProxy, String[] methodOverrides, boolean isInterface, AnnotationDescriptor[] annotations) throws IOException
-	{
-		HashSet<String> methodOverridesSet = null;
-	
-		if (methodOverrides != null)
-		{
-			methodOverridesSet = new HashSet<String>();
-			for (int i = 0; i < methodOverrides.length; i++)
-			{
-				String methodOverride = methodOverrides[i];
-				methodOverridesSet.add(methodOverride);
-			}
-		}
 
-		return generateProxy(proxyName, classToProxy, methodOverridesSet, new HashSet<ClassDescriptor>(), isInterface, annotations);
-	}
-	
 	public String generateProxy(String proxyName, ClassDescriptor classToProxy, HashSet<String> methodOverrides, HashSet<ClassDescriptor> implementedInterfaces, boolean isInterface, AnnotationDescriptor[] annotations) throws IOException
 	{
 		ApplicationWriter aw = new ApplicationWriter();

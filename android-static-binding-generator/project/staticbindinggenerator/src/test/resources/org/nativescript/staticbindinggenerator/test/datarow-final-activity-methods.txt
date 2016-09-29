@@ -1,0 +1,1 @@
+android.app.Activity**getApplication,getMediaController,getParent*com.tns.NativeScriptActivity*a/b/c/MyActivity.js*
