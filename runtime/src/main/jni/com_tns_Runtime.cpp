@@ -1,6 +1,7 @@
 #include "V8StringConstants.h"
 #include "Runtime.h"
 #include "NativeScriptException.h"
+#include "CallbackHandlers.h"
 #include <sstream>
 
 using namespace std;
@@ -30,11 +31,11 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved)
 	return JNI_VERSION_1_6;
 }
 
-extern "C" void Java_com_tns_Runtime_initNativeScript(JNIEnv *_env, jobject obj, jint runtimeId, jstring filesPath, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jobject jsDebugger)
+extern "C" void Java_com_tns_Runtime_initNativeScript(JNIEnv *_env, jobject obj, jint runtimeId, jstring filesPath, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jstring callingDir, jobject jsDebugger)
 {
 	try
 	{
-		Runtime::Init(_env, obj, runtimeId, filesPath, verboseLoggingEnabled, packageName, args, jsDebugger);
+		Runtime::Init(_env, obj, runtimeId, filesPath, verboseLoggingEnabled, packageName, args, callingDir, jsDebugger);
 	}
 	catch (NativeScriptException& e)
 	{
@@ -91,6 +92,38 @@ extern "C" void Java_com_tns_Runtime_runModule(JNIEnv *_env, jobject obj, jint r
 	try
 	{
 		runtime->RunModule(_env, obj, scriptFile);
+	}
+	catch (NativeScriptException& e)
+	{
+		e.ReThrowToJava();
+	}
+	catch (std::exception e) {
+		stringstream ss;
+		ss << "Error: c++ exception: " << e.what() << endl;
+		NativeScriptException nsEx(ss.str());
+		nsEx.ReThrowToJava();
+	}
+	catch (...) {
+		NativeScriptException nsEx(std::string("Error: c++ exception!"));
+		nsEx.ReThrowToJava();
+	}
+}
+
+extern "C" void Java_com_tns_Runtime_runWorker(JNIEnv *_env, jobject obj, jint runtimeId, jstring scriptFile)
+{
+	auto runtime = TryGetRuntime(runtimeId);
+	if (runtime == nullptr)
+	{
+		return;
+	}
+
+	auto isolate = runtime->GetIsolate();
+	v8::Isolate::Scope isolate_scope(isolate);
+	v8::HandleScope handleScope(isolate);
+
+	try
+	{
+		runtime->RunWorker(scriptFile);
 	}
 	catch (NativeScriptException& e)
 	{
@@ -314,5 +347,98 @@ extern "C" void Java_com_tns_Runtime_clearStartupData(JNIEnv *env, jobject obj, 
 
 extern "C" jint Java_com_tns_Runtime_getPointerSize(JNIEnv *env, jobject obj)
 {
-	return sizeof(void*);
+	return sizeof(void *);
+}
+
+extern "C" void Java_com_tns_Runtime_WorkerGlobalOnMessageCallback(JNIEnv *env, jobject obj, jint runtimeId, jstring msg)
+{
+	// Worker Thread runtime
+	auto runtime = TryGetRuntime(runtimeId);
+	if(runtime == nullptr)
+	{
+		// TODO: Pete: Log message informing the developer of the failure
+	}
+
+	auto isolate = runtime->GetIsolate();
+
+	v8::Isolate::Scope isolate_scope(isolate);
+	v8::HandleScope handleScope(isolate);
+
+	CallbackHandlers::WorkerGlobalOnMessageCallback(isolate, msg);
+}
+
+extern "C" void Java_com_tns_Runtime_WorkerObjectOnMessageCallback(JNIEnv *env, jobject obj, jint runtimeId, jint workerId, jstring msg)
+{
+	// Main Thread runtime
+	auto runtime = TryGetRuntime(runtimeId);
+	if(runtime == nullptr)
+	{
+		// TODO: Pete: Log message informing the developer of the failure
+	}
+
+	auto isolate = runtime->GetIsolate();
+
+	v8::Isolate::Scope isolate_scope(isolate);
+	v8::HandleScope handleScope(isolate);
+
+	CallbackHandlers::WorkerObjectOnMessageCallback(isolate, workerId, msg);
+}
+
+extern "C" void Java_com_tns_Runtime_TerminateWorkerCallback(JNIEnv *env, jobject obj, jint runtimeId)
+{
+	// Worker Thread runtime
+	auto runtime = TryGetRuntime(runtimeId);
+	if(runtime == nullptr)
+	{
+		// TODO: Pete: Log message informing the developer of the failure
+	}
+
+	auto isolate = runtime->GetIsolate();
+
+	v8::Isolate::Scope isolate_scope(isolate);
+	v8::HandleScope handleScope(isolate);
+
+	CallbackHandlers::TerminateWorkerThread(isolate);
+
+	runtime->DestroyRuntime();
+}
+
+extern "C" void Java_com_tns_Runtime_ClearWorkerPersistent(JNIEnv *env, jobject obj, jint runtimeId, jint workerId)
+{
+	// Worker Thread runtime
+	auto runtime = TryGetRuntime(runtimeId);
+	if(runtime == nullptr)
+	{
+		// TODO: Pete: Log message informing the developer of the failure
+	}
+
+	auto isolate = runtime->GetIsolate();
+
+	v8::Isolate::Scope isolate_scope(isolate);
+	v8::HandleScope handleScope(isolate);
+
+	CallbackHandlers::ClearWorkerPersistent(workerId);
+}
+
+extern "C" void Java_com_tns_Runtime_CallWorkerObjectOnErrorHandleMain(JNIEnv *env, jobject obj, jint runtimeId, jint workerId, jstring message, jstring filename, jint lineno, jstring threadName)
+{
+	// Main Thread runtime
+	auto runtime = TryGetRuntime(runtimeId);
+	if(runtime == nullptr)
+	{
+		// TODO: Pete: Log message informing the developer of the failure
+	}
+
+	auto isolate = runtime->GetIsolate();
+	v8::Isolate::Scope isolate_scope(isolate);
+	v8::HandleScope handleScope(isolate);
+
+	try
+	{
+		CallbackHandlers::CallWorkerObjectOnErrorHandle(isolate, workerId, message, filename, lineno, threadName);
+	}
+	catch (NativeScriptException& e)
+	{
+		e.ReThrowToJava();
+	}
 }

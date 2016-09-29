@@ -4,6 +4,7 @@
 #include "ArgConverter.h"
 #include "NativeScriptAssert.h"
 #include "V8StringConstants.h"
+#include "Runtime.h"
 #include <sstream>
 
 using namespace std;
@@ -69,6 +70,9 @@ void NativeScriptException::ReThrowToJava()
 	jthrowable ex = nullptr;
 	JEnv env;
 
+	auto isolate = Isolate::GetCurrent();
+	auto objectManager = Runtime::GetObjectManager(isolate);
+
 	if (!m_javaException.IsNull())
 	{
 		auto excClassName = objectManager->GetClassName((jobject) m_javaException);
@@ -128,9 +132,6 @@ void NativeScriptException::ReThrowToJava()
 
 void NativeScriptException::Init(ObjectManager *objectManager)
 {
-	NativeScriptException::objectManager = objectManager;
-	assert(NativeScriptException::objectManager != nullptr);
-
 	JEnv env;
 
 	RUNTIME_CLASS = env.FindClass("com/tns/Runtime");
@@ -187,7 +188,9 @@ Local<Value> NativeScriptException::WrapJavaToJsException()
 	Local<Value> errObj;
 
 	JEnv env;
+
 	auto isolate = Isolate::GetCurrent();
+	auto objectManager = Runtime::GetObjectManager(isolate);
 
 	string excClassName = objectManager->GetClassName((jobject) m_javaException);
 	if (excClassName == "com/tns/NativeScriptException")
@@ -220,6 +223,7 @@ Local<Value> NativeScriptException::GetJavaExceptionFromEnv(const JniLocalRef& e
 	DEBUG_WRITE("Error during java interop errorMessage %s", errMsg.c_str());
 
 	auto isolate = Isolate::GetCurrent();
+	auto objectManager = Runtime::GetObjectManager(isolate);
 
 	auto msg = ArgConverter::ConvertToV8String(isolate, errMsg);
 	auto errObj = Exception::Error(msg).As<Object>();
@@ -268,6 +272,9 @@ string NativeScriptException::GetFullMessage(const TryCatch& tc, bool isExceptio
 JniLocalRef NativeScriptException::TryGetJavaThrowableObject(JEnv& env, const Local<Object>& jsObj)
 {
 	JniLocalRef javaThrowableObject;
+
+	auto isolate = Isolate::GetCurrent();
+	auto objectManager = Runtime::GetObjectManager(isolate);
 
 	auto javaObj = objectManager->GetJavaObjectByJsObject(jsObj);
 	JniLocalRef objClass;
@@ -385,7 +392,6 @@ string NativeScriptException::GetExceptionMessage(JEnv& env, jthrowable exceptio
 	return errMsg;
 }
 
-ObjectManager* NativeScriptException::objectManager = nullptr;
 jclass NativeScriptException::RUNTIME_CLASS = nullptr;
 jclass NativeScriptException::THROWABLE_CLASS = nullptr;
 jclass NativeScriptException::NATIVESCRIPTEXCEPTION_CLASS = nullptr;

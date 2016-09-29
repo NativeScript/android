@@ -12,30 +12,28 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
 
 	private final Logger logger;
 	
-	private Runtime runtime;
-	
 	public NativeScriptUncaughtExceptionHandler(Logger logger, Context context)
 	{
 		this.logger = logger;
 		this.context = context;
 		defaultHandler = Thread.getDefaultUncaughtExceptionHandler();
 	}
-	
-	public void setRuntime(Runtime runtime)
-	{
-		this.runtime = runtime;
-	}
 
 	@Override
 	public void uncaughtException(Thread thread, Throwable ex)
 	{
-		String errorMessage = ErrorReport.getErrorMessage(ex);
+		String currentThreadMessage = "An uncaught Exception occurred on \"" + thread.getName() + "\" thread.\n";
+
+		String errorMessage = currentThreadMessage + ErrorReport.getErrorMessage(ex);
 
 		if (Runtime.isInitialized())
 		{
 			try
 			{
 				ex.printStackTrace();
+				
+				Runtime runtime = Runtime.getCurrentRuntime();
+
 				if (runtime != null)
 				{
 					runtime.passUncaughtExceptionToJs(ex, errorMessage);

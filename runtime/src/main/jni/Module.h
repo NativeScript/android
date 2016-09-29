@@ -21,10 +21,21 @@ namespace tns
 		public:
 			Module();
 
-			void Init(v8::Isolate *isolate);
+			void Init(v8::Isolate *isolate, const std::string& baseDir = "");
 
 			void Load(const std::string& path);
 
+			/*
+			 * Reuses `Load` logic and adds TryCatch exception handling to push any unhandled exceptions
+			 * during script's initial load through the worker scope's `onerror` handler (if implemented before the exception was thrown)
+			 */
+			void LoadWorker(const std::string& path);
+
+			/*
+			 * Checks if target script exists, will throw if negative
+			 * Used before initializing workers, to ensure a thread will not be created, when the file doesn't exist
+			 */
+			static void CheckFileExists(v8::Isolate* isolate, const std::string& path, const std::string& baseDir);
 		private:
 			enum class ModulePathKind;
 

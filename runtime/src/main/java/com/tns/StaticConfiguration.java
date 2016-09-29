@@ -4,7 +4,7 @@ import java.io.File;
 
 import android.app.Application;
 
-public class Configuration
+public class StaticConfiguration
 {
 	public final Logger logger;
 	public final Debugger debugger;
@@ -17,9 +17,9 @@ public class Configuration
 	public final String dexThumb;
 	public final Object[] v8Config;
 	
-	public Configuration(Logger logger,  Debugger debugger,
-			String appName, File runtimeLibPath, File rootDir, File appDir, ClassLoader classLoader,
-			File dexDir, String dexThumb, Object[] v8Config)
+	public StaticConfiguration(Logger logger, Debugger debugger,
+							   String appName, File runtimeLibPath, File rootDir, File appDir, ClassLoader classLoader,
+							   File dexDir, String dexThumb, Object[] v8Config)
 	{
 		this.logger = logger;
 		this.debugger = debugger;

@@ -18,7 +18,7 @@ using namespace tns;
 
 
 ObjectManager::ObjectManager(jobject javaRuntimeObject)
-	:m_isolate(nullptr), m_javaRuntimeObject(javaRuntimeObject), m_env(JEnv()), m_numberOfGC(0), m_currentObjectId(0), m_cache(NewWeakGlobalRefCallback, DeleteWeakGlobalRefCallback, 1000, this)
+		: m_javaRuntimeObject(javaRuntimeObject), m_env(JEnv()), m_numberOfGC(0), m_currentObjectId(0), m_cache(NewWeakGlobalRefCallback, DeleteWeakGlobalRefCallback, 1000, this)
 {
 	auto runtimeClass = m_env.FindClass("com/tns/Runtime");
 	assert(runtimeClass != nullptr);
@@ -57,7 +57,7 @@ void ObjectManager::Init(Isolate *isolate)
 	auto jsWrapperFuncTemplate = FunctionTemplate::New(isolate, JSWrapperConstructorCallback);
 	jsWrapperFuncTemplate->InstanceTemplate()->SetInternalFieldCount(static_cast<int>(MetadataNodeKeys::END));
 	auto jsWrapperFunc = jsWrapperFuncTemplate->GetFunction();
-	s_poJsWrapperFunc = new Persistent<Function>(isolate, jsWrapperFunc);
+	m_poJsWrapperFunc = new Persistent<Function>(isolate, jsWrapperFunc);
 
 	isolate->AddGCPrologueCallback(ObjectManager::OnGcStartedStatic, kGCTypeAll);
 	isolate->AddGCEpilogueCallback(ObjectManager::OnGcFinishedStatic, kGCTypeAll);
@@ -176,8 +176,8 @@ Local<Object> ObjectManager::GetJsObjectByJavaObject(int javaObjectID)
 	auto isolate = m_isolate;
 	EscapableHandleScope handleScope(isolate);
 
-	auto it = idToObject.find(javaObjectID);
-	if (it == idToObject.end())
+	auto it = m_idToObject.find(javaObjectID);
+	if (it == m_idToObject.end())
 	{
 		return handleScope.Escape(Local<Object>());
 	}
@@ -250,7 +250,7 @@ void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID, jcl
 	//link
 	object->SetInternalField(jsInfoIdx, jsInfo);
 
-	idToObject.insert(make_pair(javaObjectID, objectHandle));
+	m_idToObject.insert(make_pair(javaObjectID, objectHandle));
 }
 
 bool ObjectManager::CloneLink(const Local<Object>& src, const Local<Object>& dest)
@@ -365,9 +365,9 @@ void ObjectManager::ReleaseJSInstance(Persistent<Object> *po, JSInstanceInfo *js
 
 	int javaObjectID = jsInstanceInfo->JavaObjectID;
 
-	auto it = idToObject.find(javaObjectID);
+	auto it = m_idToObject.find(javaObjectID);
 
-	if (it == idToObject.end())
+	if (it == m_idToObject.end())
 	{
 		stringstream ss;
 		ss << "(InternalError): Js object with id: " << javaObjectID << " not found";
@@ -376,7 +376,7 @@ void ObjectManager::ReleaseJSInstance(Persistent<Object> *po, JSInstanceInfo *js
 
 	assert(po == it->second);
 
-	idToObject.erase(it);
+	m_idToObject.erase(it);
 	m_released.insert(po, javaObjectID);
 	po->Reset();
 	delete po;
@@ -451,7 +451,7 @@ bool ObjectManager::HasImplObject(Isolate *isolate, const Local<Object>& obj)
  * */
 void ObjectManager::MarkReachableObjects(Isolate *isolate, const Local<Object>& obj)
 {
-	stack<Local<Value> > s;
+	stack<Local<Value>> s;
 
 	s.push(obj);
 
@@ -829,7 +829,7 @@ void ObjectManager::DeleteWeakGlobalRefCallback(const jweak& object, void *state
 
 Local<Object> ObjectManager::GetEmptyObject(Isolate *isolate)
 {
-	auto emptyObjCtorFunc = Local<Function>::New(isolate, *s_poJsWrapperFunc);
+	auto emptyObjCtorFunc = Local<Function>::New(isolate, *m_poJsWrapperFunc);
 	auto val = emptyObjCtorFunc->CallAsConstructor(0, nullptr);
 	if (val.IsEmpty())
 	{
@@ -844,5 +844,3 @@ void ObjectManager::JSWrapperConstructorCallback(const v8::FunctionCallbackInfo<
 {
 	assert(info.IsConstructCall());
 }
-
-Persistent<Function>* ObjectManager::s_poJsWrapperFunc = nullptr;

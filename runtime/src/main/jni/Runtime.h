@@ -23,15 +23,17 @@ namespace tns
 		    	CONSTANTS = 1
 		    };
 
-			static Runtime *GetRuntime(int runtimeId);
+			static Runtime* GetRuntime(int runtimeId);
 
-			static Runtime *GetRuntime(v8::Isolate *isolate);
+			static Runtime* GetRuntime(v8::Isolate *isolate);
+
+			static ObjectManager* GetObjectManager(v8::Isolate *isolate);
 
 			static void Init(JavaVM *vm, void *reserved);
 
-			static void Init(JNIEnv *_env, jobject obj, int runtimeId, jstring filesPath, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jobject jsDebugger);
+			static void Init(JNIEnv *_env, jobject obj, int runtimeId, jstring filesPath, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jstring callingDir, jobject jsDebugger);
 
-			void Init(jstring filesPath, bool verboseLoggingEnabled, jstring packageName, jobjectArray args, jobject jsDebugger);
+			void Init(jstring filesPath, bool verboseLoggingEnabled, jstring packageName, jobjectArray args, jstring callingDir, jobject jsDebugger);
 
 			v8::Isolate* GetIsolate() const;
 
@@ -40,13 +42,16 @@ namespace tns
 			ObjectManager* GetObjectManager() const;
 
 			void RunModule(JNIEnv *_env, jobject obj, jstring scriptFile);
+			void RunWorker(jstring scriptFile);
 			jobject RunScript(JNIEnv *_env, jobject obj, jstring scriptFile);
 			jobject CallJSMethodNative(JNIEnv *_env, jobject obj, jint javaObjectID, jstring methodName, jint retType, jboolean isConstructor, jobjectArray packagedArgs);
 			void CreateJSInstanceNative(JNIEnv *_env, jobject obj, jobject javaObject, jint javaObjectID, jstring className);
 			jint GenerateNewObjectId(JNIEnv *env, jobject obj);
 			void AdjustAmountOfExternalAllocatedMemoryNative(JNIEnv *env, jobject obj, jlong usedMemory);
 			void PassUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, jthrowable exception, jstring stackTrace);
+			void PassUncaughtExceptionFromWorkerToMainHandler(v8::Local<v8::String> message, v8::Local<v8::String> filename, int lineno);
 			void ClearStartupData(JNIEnv *env, jobject obj);
+			void DestroyRuntime();
 
 		private:
 			Runtime(JNIEnv *env, jobject runtime, int id);
@@ -69,7 +74,7 @@ namespace tns
 			v8::StartupData *m_startupData = nullptr;
 			MemoryMappedFile *m_heapSnapshotBlob = nullptr;
 
-			v8::Isolate* PrepareV8Runtime(const std::string& filesPath, jstring packageName, jobject jsDebugger, jstring profilerOutputDir);
+			v8::Isolate* PrepareV8Runtime(const std::string& filesPath, jstring packageName, jstring callingDir, jobject jsDebugger, jstring profilerOutputDir);
 			jobject ConvertJsValueToJavaObject(JEnv& env, const v8::Local<v8::Value>& value, int classReturnType);
 
 			static std::map<int, Runtime*> s_id2RuntimeCache;
@@ -77,6 +82,8 @@ namespace tns
 			static std::map<v8::Isolate*, Runtime*> s_isolate2RuntimesCache;
 
 			static JavaVM *s_jvm;
+
+			static bool s_mainThreadInitialized;
 	};
 }
 

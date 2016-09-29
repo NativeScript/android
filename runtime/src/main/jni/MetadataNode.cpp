@@ -26,7 +26,7 @@ void MetadataNode::Init(Isolate *isolate)
 }
 
 MetadataNode::MetadataNode(MetadataTreeNode *treeNode) :
-						m_treeNode(treeNode), m_poCtorFunc(nullptr)
+						m_treeNode(treeNode)
 {
 	uint8_t nodeType = s_metadataReader.GetNodeType(treeNode);
 
@@ -772,7 +772,7 @@ void MetadataNode::SetInnerTypes(Isolate *isolate, Local<Function>& ctorFunction
 			auto isStatic = s_metadataReader.IsNodeTypeStatic(type);
 
 			auto innerTypeCtorFuncTemplate = childNode->GetConstructorFunctionTemplate(isolate, curChild);
-			auto innerTypeCtorFunc = Local<Function>::New(isolate, *GetOrCreateInternal(curChild)->m_poCtorFunc);
+			auto innerTypeCtorFunc = Local<Function>::New(isolate, *GetOrCreateInternal(curChild)->GetPersistentConstructorFunction(isolate));
 			auto innerTypeName = ArgConverter::ConvertToV8String(isolate, curChild->name);
 			ctorFunction->Set(innerTypeName, innerTypeCtorFunc);
 		}
@@ -814,14 +814,14 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate *is
 
 	auto baseTreeNode = s_metadataReader.GetBaseClassNode(treeNode);
 	Local<Function> baseCtorFunc;
-	vector<MethodCallbackData*> baseInstanceMethodsCallbackData;
+	std::vector<MethodCallbackData*> baseInstanceMethodsCallbackData;
 	if ((baseTreeNode != treeNode) && (baseTreeNode != nullptr) && (baseTreeNode->offsetValue > 0))
 	{
 		auto baseFuncTemplate = GetConstructorFunctionTemplate(isolate, baseTreeNode, baseInstanceMethodsCallbackData);
 		if (!baseFuncTemplate.IsEmpty())
 		{
 			ctorFuncTemplate->Inherit(baseFuncTemplate);
-			baseCtorFunc = Local<Function>::New(isolate, *GetOrCreateInternal(baseTreeNode)->m_poCtorFunc);
+			baseCtorFunc = Local<Function>::New(isolate, *GetOrCreateInternal(baseTreeNode)->GetPersistentConstructorFunction(isolate));
 		}
 	}
 
@@ -837,7 +837,8 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate *is
 
 	node->SetStaticMembers(isolate, wrappedCtorFunc, treeNode);
 
-	node->m_poCtorFunc = new Persistent<Function>(isolate, wrappedCtorFunc);
+	// insert isolate-specific persistent function handle
+	node->m_poCtorCachePerIsolate.insert({isolate, new Persistent<Function>(isolate, wrappedCtorFunc)});
 	if (!baseCtorFunc.IsEmpty())
 	{
 		wrappedCtorFunc->SetPrototype(baseCtorFunc);
@@ -847,7 +848,6 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate *is
 	auto pft = new Persistent<FunctionTemplate>(isolate, ctorFuncTemplate);
 	CtorCacheData ctorCacheItem(pft, instanceMethodsCallbackData);
 	cache->CtorFuncCache.insert(make_pair(treeNode, ctorCacheItem));
-	//
 
 	SetInnerTypes(isolate, wrappedCtorFunc, treeNode);
 
@@ -858,10 +858,25 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate *is
 
 Local<Function> MetadataNode::GetConstructorFunction(Isolate *isolate)
 {
-	auto ctorFuncTemplate = GetConstructorFunctionTemplate(isolate, m_treeNode);
-	auto ctorFunc = Local<Function>::New(isolate, *m_poCtorFunc);
+	GetConstructorFunctionTemplate(isolate, m_treeNode);
+	auto ctorFunc = Local<Function>::New(isolate, *GetPersistentConstructorFunction(isolate));
 
 	return ctorFunc;
+}
+
+Persistent<Function>* MetadataNode::GetPersistentConstructorFunction(Isolate *isolate)
+{
+	auto itFound = m_poCtorCachePerIsolate.find(isolate);
+	if (itFound != m_poCtorCachePerIsolate.end())
+	{
+		auto& constrFunction = itFound->second;
+
+		return constrFunction;
+	}
+	else
+	{
+		throw NativeScriptException("Constructor function not found for node: " + this->m_name);
+	}
 }
 
 MetadataNode::TypeMetadata* MetadataNode::GetTypeMetadata(Isolate *isolate, const Local<Function>& value)
@@ -890,6 +905,7 @@ MetadataNode* MetadataNode::GetInstanceMetadata(Isolate *isolate, const Local<Ob
 	{
 		node = reinterpret_cast<MetadataNode*>(ext.As<External>()->Value());
 	}
+
 	return node;
 }
 

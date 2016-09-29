@@ -42,6 +42,7 @@ public final class RuntimeHelper {
 		System.loadLibrary("NativeScript");
 
 		Logger logger = new LogcatLogger(app);
+
 		Debugger debugger = AndroidJsDebugger.isDebuggableApp(app) ? new AndroidJsDebugger(app, logger) : null;
 
 		Runtime runtime = null;
@@ -104,12 +105,10 @@ public final class RuntimeHelper {
 				e.printStackTrace();
 			}
 
-			Configuration config = new Configuration(logger, debugger, appName, null, rootDir,
+			StaticConfiguration config = new StaticConfiguration(logger, debugger, appName, null, rootDir,
 					appDir, classLoader, dexDir, dexThumb, v8Config);
 
-			runtime = Runtime.initializeWithConfiguration(config);
-
-			exHandler.setRuntime(runtime);
+			runtime = Runtime.initializeRuntimeWithConfiguration(config);
 
 			// runtime needs to be initialized before the NativeScriptSyncService is enabled because it uses runtime.runScript(...)
 			if (NativeScriptSyncService.isSyncEnabled(app)) {
@@ -128,7 +127,6 @@ public final class RuntimeHelper {
 					logger.write("NativeScript LiveSync is not enabled.");
 				}
 			}
-
 
 			runtime.runScript(new File(appDir, "internal/ts_helpers.js"));
 

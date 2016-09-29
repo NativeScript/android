@@ -3,11 +3,14 @@
 
 #include "jni.h"
 #include "v8.h"
+#include "include/v8.h"
 #include <string>
 
 namespace tns
 {
 	std::string ConvertToString(const v8::Local<v8::String>& s);
+
+	v8::Local<v8::String> JsonStringifyObject(v8::Isolate* isolate, v8::Handle<v8::Value> value);
 
 	jstring ConvertToJavaString(const v8::Local<v8::Value>& jsValue);
 

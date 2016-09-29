@@ -29,8 +29,6 @@ using namespace tns;
 
 //TODO: Lubo: properly release this jni global ref on shutdown
 
-Persistent<Context> *PrimaryContext = nullptr;
-Context::Scope *context_scope = nullptr;
 bool tns::LogEnabled = true;
 SimpleAllocator g_allocator;
 
@@ -91,6 +89,23 @@ Runtime* Runtime::GetRuntime(v8::Isolate *isolate)
 	return runtime;
 }
 
+ObjectManager* Runtime::GetObjectManager(v8::Isolate *isolate)
+{
+	auto itFound = s_isolate2RuntimesCache.find(isolate);
+	auto runtime = (itFound != s_isolate2RuntimesCache.end())
+				   ? itFound->second
+				   : nullptr;
+
+	if (runtime == nullptr)
+	{
+		stringstream ss;
+		ss << "Cannot find runtime for isolate: " << isolate;
+		throw NativeScriptException(ss.str());
+	}
+
+	return runtime->GetObjectManager();
+}
+
 Isolate* Runtime::GetIsolate() const
 {
 	return m_isolate;
@@ -106,16 +121,18 @@ ObjectManager* Runtime::GetObjectManager() const
 	return m_objectManager;
 }
 
-void Runtime::Init(JNIEnv *_env, jobject obj, int runtimeId, jstring filesPath, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jobject jsDebugger)
+void Runtime::Init(JNIEnv *_env, jobject obj, int runtimeId, jstring filesPath, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jstring callingDir, jobject jsDebugger)
 {
-	auto runtime = new Runtime(_env, obj, runtimeId);
+	JEnv env(_env);
+
+	auto runtime = new Runtime(env, obj, runtimeId);
 
 	auto enableLog = verboseLoggingEnabled == JNI_TRUE;
 
-	runtime->Init(filesPath, enableLog, packageName, args, jsDebugger);
+	runtime->Init(filesPath, enableLog, packageName, args, callingDir, jsDebugger);
 }
 
-void Runtime::Init(jstring filesPath, bool verboseLoggingEnabled, jstring packageName, jobjectArray args, jobject jsDebugger)
+void Runtime::Init(jstring filesPath, bool verboseLoggingEnabled, jstring packageName, jobjectArray args, jstring callingDir, jobject jsDebugger)
 {
 	LogEnabled = verboseLoggingEnabled;
 
@@ -135,7 +152,7 @@ void Runtime::Init(jstring filesPath, bool verboseLoggingEnabled, jstring packag
 	DEBUG_WRITE("Initializing Telerik NativeScript");
 
 	NativeScriptException::Init(m_objectManager);
-	m_isolate = PrepareV8Runtime(filesRoot, packageName, jsDebugger, profilerOutputDir);
+	m_isolate = PrepareV8Runtime(filesRoot, packageName, callingDir, jsDebugger, profilerOutputDir);
 
 	s_isolate2RuntimesCache.insert(make_pair(m_isolate, this));
 }
@@ -146,6 +163,13 @@ void Runtime::RunModule(JNIEnv *_env, jobject obj, jstring scriptFile)
 
 	string filePath = ArgConverter::jstringToString(scriptFile);
 	m_module.Load(filePath);
+}
+
+void Runtime::RunWorker(jstring scriptFile)
+{
+	// TODO: Pete: Why do I crash here with a JNI error (accessing bad jni)
+	string filePath = ArgConverter::jstringToString(scriptFile);
+	m_module.LoadWorker(filePath);
 }
 
 jobject Runtime::RunScript(JNIEnv *_env, jobject obj, jstring scriptFile)
@@ -279,7 +303,7 @@ jint Runtime::GenerateNewObjectId(JNIEnv *env, jobject obj)
 
 void Runtime::AdjustAmountOfExternalAllocatedMemoryNative(JNIEnv *env, jobject obj, jlong usedMemory)
 {
-	Isolate::GetCurrent()->AdjustAmountOfExternalAllocatedMemory(usedMemory);
+	m_isolate->AdjustAmountOfExternalAllocatedMemory(usedMemory);
 }
 
 void Runtime::PassUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, jthrowable exception, jstring stackTrace)
@@ -328,6 +352,22 @@ void Runtime::PassUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, jthrowab
 	}
 }
 
+void Runtime::PassUncaughtExceptionFromWorkerToMainHandler(Local<String> message, Local<String> filename, int lineno) {
+	JEnv env;
+	auto runtimeClass = env.GetObjectClass(m_runtime);
+
+	auto mId = env.GetStaticMethodID(runtimeClass, "passUncaughtExceptionFromWorkerToMain",
+									 "(Ljava/lang/String;Ljava/lang/String;I)V");
+
+	auto jMsg = ArgConverter::ConvertToJavaString(message);
+	auto jfileName = ArgConverter::ConvertToJavaString(filename);
+
+	JniLocalRef jMsgLocal(jMsg);
+	JniLocalRef jfileNameLocal(jfileName);
+
+	env.CallStaticVoidMethod(runtimeClass, mId, (jstring) jMsgLocal, (jstring) jfileNameLocal, lineno);
+}
+
 void Runtime::ClearStartupData(JNIEnv *env, jobject obj) {
 	delete m_heapSnapshotBlob;
 	delete m_startupData;
@@ -339,7 +379,7 @@ static void InitializeV8() {
 	V8::Initialize();
 }
 
-Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName, jobject jsDebugger, jstring profilerOutputDir)
+Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName, jstring callingDir, jobject jsDebugger, jstring profilerOutputDir)
 {
 	Isolate::CreateParams create_params;
 	bool didInitializeV8 = false;
@@ -420,7 +460,11 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 		create_params.snapshot_blob = m_startupData;
 	}
 
-	if (!didInitializeV8) {
+	/*
+	 * Setup the V8Platform only once per process - once for the application lifetime
+	 * Don't execute again if main thread has already been initialized
+	 */
+	if (!didInitializeV8 && !s_mainThreadInitialized) {
 		InitializeV8();
 	}
 
@@ -454,6 +498,36 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 	globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__exit"), FunctionTemplate::New(isolate, CallbackHandlers::ExitMethodCallback));
 	globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__runtimeVersion"), ArgConverter::ConvertToV8String(isolate, NATIVE_SCRIPT_RUNTIME_VERSION), readOnlyFlags);
 
+	/*
+	 * Attach `Worker` object constructor only to the main thread (isolate)'s global object
+	 * Workers should not be created from within other Workers, for now
+	 */
+	if(!s_mainThreadInitialized) {
+		Local<FunctionTemplate> workerFuncTemplate = FunctionTemplate::New(isolate, CallbackHandlers::NewThreadCallback);
+		Local<ObjectTemplate> prototype = workerFuncTemplate->PrototypeTemplate();
+
+		/*
+		 * Attach methods from the EventTarget interface (postMessage, terminate) to the Worker object prototype
+		 */
+		auto postMessageFuncTemplate = FunctionTemplate::New(isolate, CallbackHandlers::WorkerObjectPostMessageCallback);
+		auto terminateWorkerFuncTemplate = FunctionTemplate::New(isolate, CallbackHandlers::WorkerObjectTerminateCallback);
+
+		prototype->Set(ArgConverter::ConvertToV8String(isolate, "postMessage"), postMessageFuncTemplate);
+		prototype->Set(ArgConverter::ConvertToV8String(isolate, "terminate"), terminateWorkerFuncTemplate);
+
+		globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "Worker"), workerFuncTemplate);
+	}
+	/*
+	 * Emulate a `WorkerGlobalScope`
+	 * Attach postMessage, close to the global object
+	 */
+	else {
+		auto postMessageFuncTemplate = FunctionTemplate::New(isolate, CallbackHandlers::WorkerGlobalPostMessageCallback);
+		globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "postMessage"), postMessageFuncTemplate);
+		auto closeFuncTemplate = FunctionTemplate::New(isolate, CallbackHandlers::WorkerGlobalCloseCallback);
+		globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "close"), closeFuncTemplate);
+	}
+
 	m_weakRef.Init(isolate, globalTemplate, m_objectManager);
 
 	SimpleProfiler::Init(isolate, globalTemplate);
@@ -461,18 +535,24 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 	CallbackHandlers::CreateGlobalCastFunctions(isolate, globalTemplate);
 
 	Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
-	PrimaryContext = new Persistent<Context>(isolate, context);
 
-	context_scope = new Context::Scope(context);
+	new Context::Scope(context);
 
 	m_objectManager->Init(isolate);
 
-	m_module.Init(isolate);
+	auto baseCallingDir = ArgConverter::jstringToString(callingDir);
+
+	m_module.Init(isolate, baseCallingDir);
 
 	auto global = context->Global();
 
 	global->ForceSet(ArgConverter::ConvertToV8String(isolate, "global"), global, readOnlyFlags);
 	global->ForceSet(ArgConverter::ConvertToV8String(isolate, "__global"), global, readOnlyFlags);
+
+	// Do not set 'self' accessor to main thread JavaScript
+	if(s_mainThreadInitialized) {
+		global->ForceSet(ArgConverter::ConvertToV8String(isolate, "self"), global, readOnlyFlags);
+	}
 
 	ArgConverter::Init(isolate);
 
@@ -494,6 +574,8 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 
 	m_arrayBufferHelper.CreateConvertFunctions(isolate, global, m_objectManager);
 
+	s_mainThreadInitialized = true;
+
 	return isolate;
 }
 
@@ -510,6 +592,12 @@ jobject Runtime::ConvertJsValueToJavaObject(JEnv& env, const Local<Value>& value
 	return javaResult;
 }
 
+void Runtime::DestroyRuntime() {
+	s_id2RuntimeCache.erase(m_id);
+	s_isolate2RuntimesCache.erase(m_isolate);
+}
+
 JavaVM* Runtime::s_jvm = nullptr;
 map<int, Runtime*> Runtime::s_id2RuntimeCache;
 map<Isolate*, Runtime*> Runtime::s_isolate2RuntimesCache;
+bool Runtime::s_mainThreadInitialized = false;
