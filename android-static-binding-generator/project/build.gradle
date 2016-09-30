@@ -61,6 +61,9 @@ task generateInterfaceNamesList() {
 	}
 }
 
+// traverses the javascript code input directory
+// 1. traverses all root directory files
+// 2. all subdirectories that do not have a package.json containing a "nativescript" key are skipped
 task traverseJsFiles () {
 	def traverseDirectory
 
@@ -113,9 +116,10 @@ task traverseJsFiles () {
 	traverseDirectory(jsCodeAbsolutePath, false)
 }
 
+// runs the ast parser only with changed js files
 task runAstParser(type: RunAstParserTask) {
 	outputFiles = files(bindingsFileP)
-    inputFiles = files(inputJsFiles)
+    	inputFiles = files(inputJsFiles)
 
 	//ast parser configuration
 	jsParserPath = jsParserP
@@ -125,6 +129,7 @@ task runAstParser(type: RunAstParserTask) {
 
 }
 
+// custom incremental task that runs the ast parser
 class RunAstParserTask extends DefaultTask {
 	@InputFiles
 	def FileCollection inputFiles
@@ -176,7 +181,7 @@ class RunAstParserTask extends DefaultTask {
 		runCommand(list)
 
 		// inputs.removed { change ->
-		// implement later (pass information to dex generator)
+			// implement later (pass information to dex generator)
 		// }
 	}
 }
