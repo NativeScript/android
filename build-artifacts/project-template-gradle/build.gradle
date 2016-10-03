@@ -192,7 +192,7 @@ dependencies {
 	
     compile "com.android.support:support-v4:$suppotVer"
     compile "com.android.support:appcompat-v7:$suppotVer"
-	/*debug*/compile "com.android.support:design:$suppotVer"
+	debugCompile "com.android.support:design:$suppotVer"
 
     // take all jars within the libs dir
 	compile fileTree(dir: "$projectDir/libs", include: ["**/*.jar"])
@@ -732,7 +732,9 @@ task deleteFlavors (type: Delete){
 	doLast {
 		def srcDir = new File("$projectDir/src")
 		srcDir.listFiles().each({ f ->
-			if(!f.getName().equals("main"))	{
+			if(!f.getName().equals("main") &&
+				!f.getName().equals("debug") &&
+				!f.getName().equals("release"))	{
 				delete f
 			}
 		})
