@@ -41,8 +41,7 @@ var fs = require("fs"),
 	inputDir = "input_parced_typescript", // default input folder
 	interfacesNamesFilePath = "../interfaces-names.txt", //default interace_names file path
 	interfaceNames = [],
-	rootTraversed = false,
-	explicitTraversalKey = "recursive-static-bindings";
+	inputFiles = [];
 
 
 //env variables
@@ -68,11 +67,16 @@ if (arguments && arguments.length >= 4) {
 }
 if (arguments && arguments.length >= 5) {
 	interfacesNamesFilePath = arguments[4]
-	console.log("interface names path: " + interfacesNamesFilePath)
+	console.log("interfacesNamesFilePath: " + interfacesNamesFilePath)
+}
+if (arguments && arguments.length >= 6) {
+	for(var i = 5; i < arguments.length; i += 1) {
+		inputFiles.push(arguments[i])
+	}
 }
 
 /////////////// PREPARATION ////////////////
-fileHelpers.createFile(outFile)
+// fileHelpers.createFile(outFile)
 
 /////////////// EXECUTE ////////////////
 
@@ -85,13 +89,12 @@ getFileAst(tsHelpersFilePath)
 	.catch(exceptionHandler);
 
 
-
 /*
 *	Get line and column of the __extends function from ts_helpers file
 */
 function getFileAst(tsHelpersFilePath) {
 	return new Promise(function (resolve, reject) {
-		fs. readFile(tsHelpersFilePath, 'utf8', function(err, fileContent) {
+		fs.readFile(tsHelpersFilePath, 'utf8', function(err, fileContent) {
 			if (err) {
 				logger.warn("+DIDN'T parse ast from file " + tsHelpersFilePath);
 				return reject(err);
@@ -132,7 +135,7 @@ function getExtendsLineColumn(ast) {
 		})
 
 		es5_visitors.setLineAndColumn(tsHelpersInfo);
-		resolve(true);
+		return resolve(true);
 	});
 };
 
@@ -148,11 +151,12 @@ function readInterfaceNames(data, err) {
 				interfaceNames.push(line.toString());
 			}).on('pipe', function (err) {
 				if (err) {
-					reject(false);
+					return reject(false);
 				}
 
 				inputDir = path.normalize(inputDir);
-				resolve(inputDir);
+
+				return resolve(inputDir);
 			});
 	})
 }
@@ -161,69 +165,28 @@ function readInterfaceNames(data, err) {
 *	Traverses a given input directory and attempts to visit every ".js" file.
 *	It passes each found file down the line.
 */
-function traverseAndAnalyseFilesDir(inputDir) {
+function traverseAndAnalyseFilesDir(inputDir, err) {
 	if (!fs.existsSync(inputDir)) {
 		throw "The input dir: " + inputDir + " does not exist!";
 	}
-
-	traverseDirectory(inputDir, false/*traverseExplicitly*/);
+	traverseFiles(inputFiles);
 }
 
+function traverseFiles(filesToTraverse) {
 
-function traverseDirectory(dir, traverseExplicitly) {
-	// list all files in directory
+	var filesLength = filesToTraverse.length;
+	for(var i = 0; i < filesLength; i += 1) {
 
-    fs.readdir(dir, function (err, files) {
-		var pJsonFile;
+		var fp = filesToTraverse[i];
+		logger.info("Visiting JavaScript file: " + fp);
 
-		if (!traverseExplicitly) {
-			if (rootTraversed || dir !== inputDir) {
-				for (var i = 0; i < files.length; i++) {
-					if (files[i] === "package.json") {
-						pJsonFile = true;
-						break;
-					}
-				}
-
-				if (pJsonFile) {
-					var fullPJsonPath = path.join(dir, "package.json");
-					var pjson = require(fullPJsonPath);
-					if (!pjson.nativescript) {
-
-						logger.info("Skipping traversal of folder " + dir);
-						return;
-					} else {
-						if (pjson.nativescript[explicitTraversalKey]) {
-							logger.info("Folder will be traversed completely: " + dir);
-							traverseExplicitly = true;
-						}
-					}
-				}
-			} else {
-				rootTraversed = true;
-			}
-		}
-
-        for (var i = 0; i < files.length; i += 1) {
-            var file = path.join(dir, files[i]);
-
-			if (file.substring(file.length - 3, file.length) === '.js') {
-				logger.info("Visiting JavaScript file: " + file);
-				readFile(file)
-					.then(astFromFileContent)
-					// .then(writeToFile)
-					.then(visitAst)
-					.then(writeToFile)
-					.catch(exceptionHandler)
-			}
-
-            var isDir = fs.statSync(file).isDirectory();
-
-            if (isDir) {
-                traverseDirectory(file, traverseExplicitly);
-            }
-        }
-    });
+		readFile(fp)
+		.then(astFromFileContent)
+		// .then(writeToFile)
+		.then(visitAst)
+		.then(writeToFile)
+		.catch(exceptionHandler)
+	}
 }
 
 /*
@@ -231,9 +194,7 @@ function traverseDirectory(dir, traverseExplicitly) {
 */
 var readFile = function (filePath, err) {
 	return new Promise(function (resolve, reject) {
-
 		fs.readFile(filePath, function (err, data) {
-
 			if (err) {
 				logger.warn("+DIDN'T get content of file: " + filePath);
 				return reject(err);
@@ -313,9 +274,7 @@ var visitAst = function (data, err) {
 var writeToFile = function (data, err) {
 
 	return new Promise(function (resolve, reject) {
-
 		if (data.trim() != "") {
-
 			// fs.appendFile(outFile, stringify(data), function (writeFileError) {
 			fs.appendFile(outFile, data + eol, function (writeFileError) {
 				if (err) {
@@ -331,6 +290,9 @@ var writeToFile = function (data, err) {
 				return resolve(data);
 
 			});
+		}
+		else {
+			logger.info("No need to generate anything. (UP-TO-DATE)");
 		}
 	});
 }
