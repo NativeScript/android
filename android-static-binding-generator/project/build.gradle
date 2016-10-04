@@ -12,6 +12,7 @@ def interfaceNamesFileP = "$projectDir/interfaces-names.txt"
 def bindingsFileP = "$projectDir/bindings.txt"
 def cachedJarsFilePath = "$projectDir/cached.txt"
 def jsParserP = "$projectDir/parser/js_parser.js"
+def jsFilesParametersP = "$projectDir/jsFilesParameters.txt"
 
 
 
@@ -126,6 +127,7 @@ task runAstParser(type: RunAstParserTask) {
 	jsCodeDir = jsCodeAbsolutePath
 	bindingsFilePath = bindingsFileP
 	interfaceNamesFilePath = interfaceNamesFileP
+	jsFilesParametersPath = jsFilesParametersP
 
 }
 
@@ -149,6 +151,9 @@ class RunAstParserTask extends DefaultTask {
 	@Input
 	def interfaceNamesFilePath
 
+	@Input
+	jsFilesParametersPath
+
 	@TaskAction
 	void execute(IncrementalTaskInputs inputs) {
 		println inputs.incremental ? "Running incremental build" : "Running full build"
@@ -166,17 +171,24 @@ class RunAstParserTask extends DefaultTask {
 			}
 			// assert !proc.exitValue()
 		}
+
+		def jarDependencies = new ArrayList<String>();
+		inputs.outOfDate { change ->
+			jarDependencies.add(change.getFile().getAbsolutePath())
+			// println change.getFile();
+		}
+		new File(jsFilesParametersPath).withWriter { out ->
+			jarDependencies.each {out.println it}
+		}
+
 		def list = new ArrayList<String>();
 		list.add("node")
 		list.add(jsParserPath)
 		list.add(jsCodeDir)
 		list.add(bindingsFilePath)
 		list.add(interfaceNamesFilePath)
+		list.add(jsFilesParametersPath)
 
-		inputs.outOfDate { change ->
-			list.add(change.getFile().getAbsolutePath())
-			// println change.getFile();
-		}
 
 		runCommand(list)
 

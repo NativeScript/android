@@ -59,34 +59,55 @@ if (process.env.AST_PARSER_INTERFACE_FILE_PATH) {
 //console variables have priority
 if (arguments && arguments.length >= 3) {
 	inputDir = arguments[2]
-	console.log("inputDir: " + inputDir)
+	// console.log("inputDir: " + inputDir)
 }
 if (arguments && arguments.length >= 4) {
 	outFile = arguments[3]
-	console.log("outFile: " + outFile)
+	// console.log("outFile: " + outFile)
 }
 if (arguments && arguments.length >= 5) {
 	interfacesNamesFilePath = arguments[4]
-	console.log("interfacesNamesFilePath: " + interfacesNamesFilePath)
+	// console.log("interfacesNamesFilePath: " + interfacesNamesFilePath)
 }
 if (arguments && arguments.length >= 6) {
-	for(var i = 5; i < arguments.length; i += 1) {
-		inputFiles.push(arguments[i])
-	}
+	inputFilesPath = arguments[5]
 }
+
+
 
 /////////////// PREPARATION ////////////////
 // fileHelpers.createFile(outFile)
 
 /////////////// EXECUTE ////////////////
+var tsHelpersFilePath = path.join(inputDir, "..", "internal", "ts_helpers.js");
 
 // ENTRY POINT!
-var tsHelpersFilePath = path.join(inputDir, "..", "internal", "ts_helpers.js");
-getFileAst(tsHelpersFilePath)
+readLinesFromFile(inputFilesPath, inputFiles, tsHelpersFilePath)
+	.then(getFileAst)
 	.then(getExtendsLineColumn) //config
 	.then(readInterfaceNames) //config
 	.then(traverseAndAnalyseFilesDir) //start
 	.catch(exceptionHandler);
+
+/*
+*	Get's the javascript files that need traversing
+*/
+function readLinesFromFile(filePath, outArr, resolveParameter) {
+	return new Promise(function (resolve, reject) {
+		new lazy(fs.createReadStream(filePath))
+			.lines
+			.forEach(function (line) {
+				outArr.push(line.toString());
+			}).on('pipe', function (err) {
+				if (err) {
+					return reject(err);
+				}
+				console.log("finished with reading lines with js files")
+
+				return resolve(resolveParameter)
+			});
+	});
+}
 
 
 /*
