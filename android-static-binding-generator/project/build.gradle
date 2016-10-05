@@ -90,10 +90,10 @@ task traverseJsFiles () {
 				if (!pjson.nativescript) {
 					return;
 				} else {
-					// if (pjson.nativescript['recursive-static-bindings']) {
-					// 	// println "Folder will be traversed completely: " + dir
-					// }
-					traverseExplicitly = true;
+					if (pjson.nativescript['recursive-static-bindings']) {
+						// println "Folder will be traversed completely: " + dir
+						traverseExplicitly = true;
+					}
 				}
 			}
 		}
@@ -172,13 +172,13 @@ class RunAstParserTask extends DefaultTask {
 			// assert !proc.exitValue()
 		}
 
-		def jarDependencies = new ArrayList<String>();
+		def jsDependencies = new ArrayList<String>();
 		inputs.outOfDate { change ->
-			jarDependencies.add(change.getFile().getAbsolutePath())
+			jsDependencies.add(change.getFile().getAbsolutePath())
 			// println change.getFile();
 		}
 		new File(jsFilesParametersPath).withWriter { out ->
-			jarDependencies.each {out.println it}
+			jsDependencies.each {out.println it}
 		}
 
 		def list = new ArrayList<String>();
