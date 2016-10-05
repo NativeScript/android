@@ -214,22 +214,6 @@ dependencies {
 ///////////////////////////// CONFIGURATION PHASE //////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
 
-task pluginStructureCheck {
-	def ft = fileTree(dir: nodeModulesDir, include: ["**/platforms/android/**/*.*"], exclude: '**/.bin/**')
-	ft.files.each { f ->
-		def fileName = f.getName();
-		if(
-				!fileName.endsWith(".aar")
-				&&
-				!fileName.equals("include.gradle")
-				&&
-				!fileName.endsWith(".jar")
-			){
-			println "WARNING: The file: " + f + " is depricated, you can read more about what will be the expected plugin structure here: https://www.nativescript.org/blog/migrating-n-android-plugins-from-version-1.7-to-2.0" 
-		}
-	}
-}
-
 def updateProductFlavorsContent(flavor, dimensionName, oldContent) {
 	def endIndex = oldContent.length() - 1;
 		def index = 0;
