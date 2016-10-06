@@ -15,10 +15,8 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.Map;
 import java.util.Queue;
-import java.util.Stack;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -164,6 +162,7 @@ public class Runtime {
 
             classResolver = new ClassResolver(this);
             currentRuntime.set(this);
+
             runtimeCache.put(this.runtimeId, this);
         }
     }
@@ -231,7 +230,18 @@ public class Runtime {
                  */
                 WorkerGlobalOnMessageCallback(currentRuntime.runtimeId, msg.obj.toString());
             } else if (msg.arg1 == MessageType.TerminateThread) {
+                currentRuntime.isTerminating = true;
 
+                runtimeCache.remove(currentRuntime.runtimeId);
+
+                TerminateWorkerCallback(currentRuntime.runtimeId);
+
+                if(currentRuntime.logger.isEnabled()) {
+                    currentRuntime.logger.write("Worker(id=" + currentRuntime.workerId + ", name=\"" + Thread.currentThread().getName() +"\") has terminated execution. Don't make further function calls to it.");
+                }
+
+                this.getLooper().quit();
+            } else if (msg.arg1 == MessageType.TerminateAndCloseThread) {
                 Message msgToMain = Message.obtain();
                 msgToMain.arg1 = MessageType.CloseWorker;
                 msgToMain.arg2 = currentRuntime.workerId;
@@ -281,10 +291,6 @@ public class Runtime {
                     DynamicConfiguration dynamicConfiguration = new DynamicConfiguration(workerId, workThreadScheduler, mainThreadScheduler, callingJsDir);
                     Runtime runtime = initRuntime(dynamicConfiguration);
 
-                    runtime.runWorker(runtime.runtimeId, filePath);
-
-                    runtime.processPendingMessages();
-
 					/*
 						Send a message to the Main Thread to `shake hands`,
 						Main Thread will cache the Worker Handler for later use
@@ -294,6 +300,9 @@ public class Runtime {
                     msg.arg2 = runtime.runtimeId;
 
                     runtime.mainThreadHandler.sendMessage(msg);
+                    runtime.runWorker(runtime.runtimeId, filePath);
+
+                    runtime.processPendingMessages();
                 }
             }));
         }
@@ -305,8 +314,9 @@ public class Runtime {
             return;
         }
 
+        Handler handler = this.getHandler();
         while(!messages.isEmpty()) {
-            this.getHandler().sendMessage(messages.poll());
+            handler.sendMessage(messages.poll());
         }
     }
 
@@ -335,11 +345,19 @@ public class Runtime {
                 Runtime workerRuntime = runtimeCache.get(senderRuntimeId);
                 Runtime mainRuntime = Runtime.getCurrentRuntime();
 
+                // If worker has had its close/terminate called before the threads could shake hands
+                if(workerRuntime == null) {
+                    if(mainRuntime.logger.isEnabled()) {
+                        mainRuntime.logger.write("Main thread couldn't shake hands with worker (runtimeId: " + workerRuntime +") because it has been terminated!");
+                    }
+
+                    return;
+                }
+
 				/*
 					Main thread now has a reference to the Worker's handler,
 					so messaging between the two threads can begin
 				 */
-
                 mainRuntime.workerIdToHandler.put(workerRuntime.getWorkerId(), workerRuntime.getHandler());
 
                 if(mainRuntime.logger.isEnabled()) {
@@ -1201,7 +1219,7 @@ public class Runtime {
         Runtime currentRuntime = Runtime.getCurrentRuntime();
 
         Message msgToWorker = Message.obtain();
-        msgToWorker.arg1 = MessageType.TerminateThread;
+        msgToWorker.arg1 = MessageType.TerminateAndCloseThread;
 
         currentRuntime.getHandler().sendMessageAtFrontOfQueue(msgToWorker);
     }
