@@ -1,5 +1,7 @@
 println "Build.gradle running"
 
+import org.gradle.internal.os.OperatingSystem;
+
 apply plugin: 'com.android.model.library'
 
 buildscript {
@@ -17,8 +19,6 @@ allprojects {
     }
 }
 
-
-
 def ndkDebuggable = false;
 
 
@@ -28,6 +28,162 @@ for (String runTask : runTasks) {
         println "DEBUG build DETECTED. Switching ndk debuggable to true"
         ndkDebuggable = true;
     }
+}
+
+
+def ndkDir = System.getenv("ANDROID_NDK_HOME")
+def propertiesFile = project.rootProject.file('local.properties')
+if (propertiesFile.exists()) {
+    Properties properties = new Properties()
+    properties.load(propertiesFile.newDataInputStream())
+    ndkDir = properties.getProperty('ndk.dir')
+}
+project.ext.ndkDir = ndkDir;
+
+
+class StripSymbolsTaskExecutionListener implements TaskExecutionListener
+{
+    @Override
+    void beforeExecute(Task task)
+    {
+    }
+
+    String getMachineName()
+    {
+        if (OperatingSystem.current().isWindows())
+        {
+            return "windows";
+        }
+        else if (OperatingSystem.current().isMacOsX())
+        {
+            return "darwin";
+        }
+        else
+        {
+            return "linux";
+        }
+    }
+
+    String getStripToolName(String stripTaskName)
+    {
+        stripTaskName = stripTaskName.toLowerCase();
+        def stripToolName = ""
+        if (stripTaskName.contains("arm64"))
+        {
+            stripToolName = "aarch64-linux-android-strip";
+        }
+        else if (stripTaskName.contains("arm"))
+        {
+            stripToolName = "arm-linux-androideabi-strip";
+        }
+        else if (stripTaskName.contains("mips64"))
+        {
+            stripToolName = "mips64el-linux-android-strip";
+        }
+        else if (stripTaskName.contains("mips"))
+        {
+            stripToolName = "mipsel-linux-android-strip";
+        }
+        else if (stripTaskName.contains("x86_64"))
+        {
+            stripToolName = "x86_64-linux-android-strip";
+        }
+        else if (stripTaskName.contains("x86"))
+        {
+            stripToolName = "i686-linux-android-strip";
+        }
+        else
+        {
+            throw new IllegalArgumentException("NOT SUPPORTED ARCHITECTURE NAME: ${stripTaskName}");
+        }
+
+        if (OperatingSystem.current().isWindows())
+        {
+            stripToolName += ".exe";
+        }
+
+        return stripToolName;
+    }
+
+    String getStripToolDirectory(String stripTaskName)
+    {
+        stripTaskName = stripTaskName.toLowerCase();
+        def stripToolDirectory = ""
+        if (stripTaskName.contains("arm64"))
+        {
+            stripToolDirectory = "aarch64-linux-android-4.9";
+        }
+        else if (stripTaskName.contains("arm"))
+        {
+            stripToolDirectory = "arm-linux-androideabi-4.9";
+        }
+        else if (stripTaskName.contains("mips64"))
+        {
+            stripToolDirectory = "mips64el-linux-android-4.9";
+        }
+        else if (stripTaskName.contains("mips"))
+        {
+            stripToolDirectory = "mipsel-linux-android-4.9";
+        }
+        else if (stripTaskName.contains("x86_64"))
+        {
+            stripToolDirectory = "x86_64-4.9";
+        }
+        else if (stripTaskName.contains("x86"))
+        {
+            stripToolDirectory = "x86-4.9";
+        }
+        else
+        {
+            throw new IllegalArgumentException("NOT SUPPORTED ARCHITECTURE: ${stripTaskName}");
+        }
+
+        return stripToolDirectory;
+    }
+
+    void afterExecute(Task task, TaskState taskState)
+    {
+        if (task.getName().contains("stripSymbols") && !taskState.failure)
+        {
+            println "Found STRIP COMMAND: ${task.getName()}"
+            println "input file " + task.getInputs().getFiles().getAsPath();
+            println "output dir " + task.getOutputs().getFiles().getAsPath();
+            def _ndkDir = task.project.ext.ndkDir;
+
+            def libName = new File(task.getInputs().getFiles().getAsPath()).getName();
+            def libToStripPath = new File(task.getOutputs().getFiles().getAsPath(), libName).getAbsolutePath();
+
+            println "output file ${libToStripPath}";
+
+            def stripToolName = getStripToolName(task.getName());
+            def machineName = getMachineName();
+            def stripToolDirectory = getStripToolDirectory(task.getName());
+            def s = File.separatorChar;
+            def stripToolPath = "${_ndkDir}${s}toolchains${s}${stripToolDirectory}${s}prebuilt${s}${machineName}-x86_64${s}bin${s}${stripToolName}"
+
+            println "Library to strip: ${libToStripPath}"
+            println "Strip tool: ${stripToolPath}"
+
+            def command = "";
+            if (OperatingSystem.current().isWindows())
+            {
+                command =  "cmd /c ${stripToolPath} ${libToStripPath}";
+            }
+            else
+            {
+                command = "${stripToolPath} ${libToStripPath}";
+            }
+
+            println "Executing strip command: ${command}"
+            def result = command.execute();
+            println result.text;
+        }
+    }
+}
+
+if (!ndkDebuggable)
+{
+    project.gradle.addListener(new StripSymbolsTaskExecutionListener())
 }
 
 
@@ -101,11 +257,16 @@ model {
             setRuntimeCommit.dependsOn(setPackageVersion)
 
             tasks.whenTaskAdded { task ->
-                if (task.getName() == "androidRelease") {
+                if (task.getName() == "androidRelease")
+                {
                     task.dependsOn(setRuntimeCommit)
                     task.mustRunAfter setRuntimeCommit
                     task.finalizedBy revertVersionFile
                 }
+//                else if (task.getName().contains("stripSymbols")
+//                {
+//
+//                }
             }
         }
     }
@@ -217,6 +378,24 @@ task setRuntimeCommit {
         new File(versionFile).write(contents, "UTF-8")
     }
 }
+
+//task stripArmBinary(type: Exec) {
+//    onlyIf {
+//        ndkDebuggable == false
+//    }
+//
+//    doFirst {
+//        def binaryPath = "$rootDir/build/intermediates/binaries/release/lib/armeabi-v7a/libNativeScript.so"
+//        println "Striping ARM binary  ${binaryPath}"
+//
+//        if (isWinOs) {
+//            commandLine "cmd", "/c", "git", "checkout", "--", versionFilePath
+//        } else {
+//            commandLine "git", "checkout", "--", versionFilePath
+//        }
+//
+//    }
+//}
 
 task revertVersionFile(type: Exec) {
 
