@@ -932,6 +932,8 @@ void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Valu
 
         id2WorkerMap.insert(make_pair(workerId, persistentWorker));
 
+        persistentWorker->SetWeak();
+
         DEBUG_WRITE("Called Worker constructor id=%d", workerId);
 
         JEnv env;
@@ -1058,6 +1060,12 @@ void CallbackHandlers::WorkerObjectOnMessageCallback(Isolate *isolate, jint work
 
     auto workerPersistent = workerFound->second;
 
+    if(workerPersistent->IsEmpty()) {// Object has been collected
+        DEBUG_WRITE("MAIN: WorkerObjectOnMessageCallback couldn't fire a worker(id=%d) object's `onmessage` callback because the worker has been Garbage Collected!", workerId);
+        CallbackHandlers::id2WorkerMap.erase(workerId);
+        return;
+    }
+
     auto worker = Local<Object>::New(isolate, *workerPersistent);
 
     auto callback = worker->Get(ArgConverter::ConvertToV8String(isolate, "onmessage"));
@@ -1086,33 +1094,43 @@ void CallbackHandlers::WorkerObjectTerminateCallback(const v8::FunctionCallbackI
 
     HandleScope scope(isolate);
 
-    auto thiz = args.This(); // Worker instance
+    try {
+        auto thiz = args.This(); // Worker instance
 
-    Local<Value> jsId;
+        Local<Value> jsId;
 
-    auto maybejsId = V8GetPrivateValue(isolate, thiz, ArgConverter::ConvertToV8String(isolate, "workerId"), jsId);
+        auto maybejsId = V8GetPrivateValue(isolate, thiz,
+                                           ArgConverter::ConvertToV8String(isolate, "workerId"),
+                                           jsId);
 
-    // get worker's ID that is associated on the other side - in Java
-    auto id = jsId->Int32Value();
+        // get worker's ID that is associated on the other side - in Java
+        auto id = jsId->Int32Value();
 
-    Local<Value> isTerminated;
-    V8GetPrivateValue(isolate, thiz, ArgConverter::ConvertToV8String(isolate, "isTerminated"), isTerminated);
+        Local<Value> isTerminated;
+        V8GetPrivateValue(isolate, thiz, ArgConverter::ConvertToV8String(isolate, "isTerminated"),
+                          isTerminated);
 
-    if(!isTerminated.IsEmpty() && isTerminated->BooleanValue()) {
-        DEBUG_WRITE("Main: WorkerObjectTerminateCallback - Worker(id=%d)'s terminate has already been called.", id);
-        return;
+        if (!isTerminated.IsEmpty() && isTerminated->BooleanValue()) {
+            DEBUG_WRITE(
+                    "Main: WorkerObjectTerminateCallback - Worker(id=%d)'s terminate has already been called.",
+                    id);
+            return;
+        }
+
+        V8SetPrivateValue(isolate, thiz, ArgConverter::ConvertToV8String(isolate, "isTerminated"),
+                          Boolean::New(isolate, true));
+
+        JEnv env;
+        auto mId = env.GetStaticMethodID(RUNTIME_CLASS, "workerObjectTerminate",
+                                         "(I)V");
+
+        env.CallStaticVoidMethod(RUNTIME_CLASS, mId, id);
+
+        // Remove persistent handle from id2WorkerMap
+        CallbackHandlers::ClearWorkerPersistent(id);
+    } catch (NativeScriptException &ex) {
+        ex.ReThrowToV8();
     }
-
-    V8SetPrivateValue(isolate, thiz, ArgConverter::ConvertToV8String(isolate, "isTerminated"), Boolean::New(isolate, true));
-
-    JEnv env;
-    auto mId = env.GetStaticMethodID(RUNTIME_CLASS, "workerObjectTerminate",
-                                     "(I)V");
-
-    env.CallStaticVoidMethod(RUNTIME_CLASS, mId, id);
-
-    // Remove persistent handle from id2WorkerMap
-    CallbackHandlers::ClearWorkerPersistent(id);
 }
 
 void CallbackHandlers::WorkerGlobalCloseCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
@@ -1203,6 +1221,12 @@ void CallbackHandlers::CallWorkerObjectOnErrorHandle(Isolate *isolate, jint work
     }
 
     auto workerPersistent = workerFound->second;
+
+    if(workerPersistent->IsEmpty()) {// Object has been collected
+        DEBUG_WRITE("MAIN: WorkerObjectOnMessageCallback couldn't fire a worker(id=%d) object's `onmessage` callback because the worker has been Garbage Collected!", workerId);
+        CallbackHandlers::id2WorkerMap.erase(workerId);
+        return;
+    }
 
     auto worker = Local<Object>::New(isolate, *workerPersistent);
 

@@ -19,6 +19,9 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Stack;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -132,10 +135,10 @@ public class Runtime {
      */
     private Handler mainThreadHandler;
 
-    private static int nextRuntimeId = 0;
+    private static AtomicInteger nextRuntimeId = new AtomicInteger(0);
     private final static ThreadLocal<Runtime> currentRuntime = new ThreadLocal<Runtime>();
-    private final static Map<Integer, Runtime> runtimeCache = new HashMap<Integer, Runtime>();
-    public static Map<Integer, Queue<Message>> pendingWorkerMessages = new HashMap<>();
+    private final static Map<Integer, Runtime> runtimeCache = new ConcurrentHashMap<>();
+    public static Map<Integer, ConcurrentLinkedQueue<Message>> pendingWorkerMessages = new ConcurrentHashMap<>();
 
     /*
         Holds reference to all Worker Threads' handlers
@@ -150,7 +153,7 @@ public class Runtime {
                 throw new NativeScriptException("There is an existing runtime on this thread with id=" + existingRuntime.getRuntimeId());
             }
 
-            this.runtimeId = nextRuntimeId++;
+            this.runtimeId = nextRuntimeId.getAndIncrement();
             this.config = config;
             this.dynamicConfig = dynamicConfiguration;
             this.threadScheduler = dynamicConfiguration.myThreadScheduler;
@@ -228,6 +231,13 @@ public class Runtime {
                  */
                 WorkerGlobalOnMessageCallback(currentRuntime.runtimeId, msg.obj.toString());
             } else if (msg.arg1 == MessageType.TerminateThread) {
+
+                Message msgToMain = Message.obtain();
+                msgToMain.arg1 = MessageType.CloseWorker;
+                msgToMain.arg2 = currentRuntime.workerId;
+
+                currentRuntime.mainThreadHandler.sendMessageAtFrontOfQueue(msgToMain);
+
                 currentRuntime.isTerminating = true;
 
                 runtimeCache.remove(currentRuntime.runtimeId);
@@ -1101,7 +1111,7 @@ public class Runtime {
             }
 
             if(pendingWorkerMessages.get(workerId) == null) {
-                pendingWorkerMessages.put(workerId, new LinkedList<Message>());
+                pendingWorkerMessages.put(workerId, new ConcurrentLinkedQueue<Message>());
             }
 
             Queue<Message> messages = pendingWorkerMessages.get(workerId);
@@ -1164,11 +1174,12 @@ public class Runtime {
                 }
 
                 if(pendingWorkerMessages.get(workerId) == null) {
-                    pendingWorkerMessages.put(workerId, new LinkedList<Message>());
+                    pendingWorkerMessages.put(workerId, new ConcurrentLinkedQueue<Message>());
                 }
 
                 Queue<Message> messages = pendingWorkerMessages.get(workerId);
                 messages.add(msg);
+                return;
             }
         }
 
@@ -1188,12 +1199,6 @@ public class Runtime {
     public static void workerScopeClose() {
         // Thread should always be a worker
         Runtime currentRuntime = Runtime.getCurrentRuntime();
-
-        Message msgToMain = Message.obtain();
-        msgToMain.arg1 = MessageType.CloseWorker;
-        msgToMain.arg2 = currentRuntime.workerId;
-
-        currentRuntime.mainThreadHandler.sendMessageAtFrontOfQueue(msgToMain);
 
         Message msgToWorker = Message.obtain();
         msgToWorker.arg1 = MessageType.TerminateThread;
