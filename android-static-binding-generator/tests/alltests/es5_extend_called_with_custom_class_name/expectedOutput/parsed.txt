@@ -1,1 +1,0 @@
-android.widget.Button**onClick1,onClick2*my.custom.ClassName

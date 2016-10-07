@@ -1,17 +1,13 @@
 /*
-*	Code takes care of static analysis and generates "out_parsed_typescript.txt"
-*	The output file consists of information about custom and common bindings that should be generated.
-* 	
-*	test command:
-*		node transpiled_ts_parser.js "input\dir\path" "output\file\path" "interface\names\file\path"
-*		node transpiled_ts_parser.js "D:\work\android-static-binding-generator\project\input_parced_typescript" "D:\work\android-static-binding-generator\project\out\out_parsed_typescript.txt" "D:\work\android-static-binding-generator\project\interface-name-generator\interfaces-names.txt"
-*/
+ *	Code takes care of static analysis and generates "out_parsed_typescript.txt"
+ *	The output file consists of information about custom and common bindings that should be generated.
+ */
 
 ///////////////// CONFIGURATION /////////////////
 
 var disableLogger = true;
 if (process.env.AST_PARSER_DISABLE_LOGGING && process.env.AST_PARSER_DISABLE_LOGGING.trim() === "true") {
-	disableLogger = true;
+	disableLogger = false;
 }
 
 loggingSettings = {
@@ -74,7 +70,6 @@ if (arguments && arguments.length >= 6) {
 }
 
 
-
 /////////////// PREPARATION ////////////////
 // fileHelpers.createFile(outFile)
 
@@ -97,12 +92,13 @@ function readLinesFromFile(filePath, outArr, resolveParameter) {
 		new lazy(fs.createReadStream(filePath))
 			.lines
 			.forEach(function (line) {
-				outArr.push(line.toString());
+				outArr.push(line.toString().trim());
 			}).on('pipe', function (err) {
 				if (err) {
 					return reject(err);
 				}
-				console.log("finished with reading lines with js files")
+
+				console.log("finished with reading lines with js files");
 
 				return resolve(resolveParameter)
 			});
@@ -113,10 +109,10 @@ function readLinesFromFile(filePath, outArr, resolveParameter) {
 /*
 *	Get line and column of the __extends function from ts_helpers file
 */
-function getFileAst(tsHelpersFilePath) {
+function getFileAst(tsHelpersFilePath) {	
 	return new Promise(function (resolve, reject) {
 		fs.readFile(tsHelpersFilePath, 'utf8', function(err, fileContent) {
-			if (err) {
+			if (err) {				
 				logger.warn("+DIDN'T parse ast from file " + tsHelpersFilePath);
 				return reject(err);
 			}
@@ -126,7 +122,7 @@ function getFileAst(tsHelpersFilePath) {
 			var ast = babelParser.parse(fileContent, {
 				minify: false,
 				plugins: ["decorators"]
-			});
+			});			
 
 			return resolve(ast);
 		});
@@ -190,6 +186,7 @@ function traverseAndAnalyseFilesDir(inputDir, err) {
 	if (!fs.existsSync(inputDir)) {
 		throw "The input dir: " + inputDir + " does not exist!";
 	}
+
 	traverseFiles(inputFiles);
 }
 
@@ -214,6 +211,7 @@ function traverseFiles(filesToTraverse) {
 *	Gets the file content as text and passes it down the line.
 */
 var readFile = function (filePath, err) {
+	
 	return new Promise(function (resolve, reject) {
 		fs.readFile(filePath, function (err, data) {
 			if (err) {
@@ -235,8 +233,7 @@ var readFile = function (filePath, err) {
 *	Get's the AST (https://en.wikipedia.org/wiki/Abstract_syntax_tree) from the file content and passes it down the line.
 */
 var astFromFileContent = function (data, err) {
-	return new Promise(function (resolve, reject) {
-
+	return new Promise(function (resolve, reject) {		
 		if (err) {
 			logger.warn("+DIDN'T parse ast from file!");
 			return reject(err);
@@ -292,8 +289,7 @@ var visitAst = function (data, err) {
 	});
 }
 
-var writeToFile = function (data, err) {
-
+var writeToFile = function (data, err) {	
 	return new Promise(function (resolve, reject) {
 		if (data.trim() != "") {
 			// fs.appendFile(outFile, stringify(data), function (writeFileError) {

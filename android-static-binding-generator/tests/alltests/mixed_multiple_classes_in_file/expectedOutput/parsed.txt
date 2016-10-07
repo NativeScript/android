@@ -1,4 +1,0 @@
-android.view.ViewGroup333333**MyClassMethod3333,MyClassMethod33333333*asd.asd.As3333
-android.widget.Button44444444**onClick4444,onClick4444444*my.custom.ClassFromOrigina44444
-android.view.ViewGroup1111*_frnal_prepareExtend_l62_c37__MyClass*MyClassMethod111,MyClassMethod1111*
-android.widget.Button22222222*_fparsed_l12_c46__ClassFromOrigina2222222222*onClick222222,onClick222222222*

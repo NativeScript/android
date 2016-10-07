@@ -4,7 +4,7 @@
   "description": "",
   "main": "project/parse.js",
   "scripts": {
-    "test": "node node_modules/jasmine-node/lib/jasmine-node/cli.js tests/specs --verbose"
+    "test": "jasmine JASMINE_CONFIG_PATH=jasmine.json"
   },
   "author": "",
   "license": "ISC",
