@@ -45,7 +45,7 @@ public class Runtime {
 
     private native int generateNewObjectId(int runtimeId);
 
-    private native void adjustAmountOfExternalAllocatedMemoryNative(int runtimeId, long changeInBytes);
+    private native boolean notifyGc(int runtimeId);
 
     private native void passUncaughtExceptionToJsNative(int runtimeId, Throwable ex, String stackTrace);
 
@@ -94,8 +94,6 @@ public class Runtime {
 
 	private ExtractPolicy extractPolicy;
 
-	private long lastUsedMemory = 0;
-
 	private ArrayList<Constructor<?>> ctorCache = new ArrayList<Constructor<?>>();
 
 	private Logger logger;
@@ -107,6 +105,8 @@ public class Runtime {
     private DexFactory dexFactory;
 
     private final ClassResolver classResolver;
+
+    private final GcListener gcListener;
 
     private final static Comparator<Method> methodComparator = new Comparator<Method>() {
         public int compare(Method lhs, Method rhs) {
@@ -164,6 +164,8 @@ public class Runtime {
             currentRuntime.set(this);
 
             runtimeCache.put(this.runtimeId, this);
+
+            gcListener = GcListener.getInstance(config.appConfig.getGcThrottleTime(), config.appConfig.getMemoryCheckInterval(), config.appConfig.getFreeMemoryRatio());
         }
     }
 
@@ -430,10 +432,10 @@ public class Runtime {
     }
 
     public void init() {
-        init(config.logger, config.debugger, config.appName, config.runtimeLibPath, config.rootDir, config.appDir, config.classLoader, config.dexDir, config.dexThumb, config.v8Config, dynamicConfig.callingJsDir);
+        init(config.logger, config.debugger, config.appName, config.runtimeLibPath, config.rootDir, config.appDir, config.classLoader, config.dexDir, config.dexThumb, config.appConfig, dynamicConfig.callingJsDir);
     }
 
-    private void init(Logger logger, Debugger debugger, String appName, File runtimeLibPath, File rootDir, File appDir, ClassLoader classLoader, File dexDir, String dexThumb, Object[] v8Config, String callingJsDir) throws RuntimeException {
+    private void init(Logger logger, Debugger debugger, String appName, File runtimeLibPath, File rootDir, File appDir, ClassLoader classLoader, File dexDir, String dexThumb, AppConfig appConfig, String callingJsDir) throws RuntimeException {
         if (initialized) {
             throw new RuntimeException("NativeScriptApplication already initialized");
         }
@@ -456,7 +458,7 @@ public class Runtime {
             jsDebugger = new JsDebugger(debugger, threadScheduler);
         }
 
-        initNativeScript(getRuntimeId(), Module.getApplicationFilesPath(), logger.isEnabled(), appName, v8Config, callingJsDir, jsDebugger);
+        initNativeScript(getRuntimeId(), Module.getApplicationFilesPath(), logger.isEnabled(), appName, appConfig.getAsArray(), callingJsDir, jsDebugger);
 
         if (jsDebugger != null) {
             // jsDebugger.start();
@@ -471,6 +473,8 @@ public class Runtime {
             Date lastModDate = new Date(f.lastModified());
             logger.write("init time=" + (d.getTime() - lastModDate.getTime()));
         }
+
+        gcListener.subscribe(this);
 
         initialized = true;
     }
@@ -551,16 +555,13 @@ public class Runtime {
     }
 
     @RuntimeCallable
-    private long getChangeInBytesOfUsedMemory() {
+    private long getUsedMemory() {
         long usedMemory = dalvikRuntime.totalMemory() - dalvikRuntime.freeMemory();
-        long changeInBytes = usedMemory - lastUsedMemory;
-        lastUsedMemory = usedMemory;
-        return changeInBytes;
+        return usedMemory;
     }
 
-    private void adjustAmountOfExternalAllocatedMemory() {
-        long changeInBytes = getChangeInBytesOfUsedMemory();
-        adjustAmountOfExternalAllocatedMemoryNative(getRuntimeId(), changeInBytes);
+    public void notifyGc() {
+        notifyGc(runtimeId);
     }
 
     public static void initInstance(Object instance) {

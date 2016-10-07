@@ -48,11 +48,19 @@ void Runtime::Init(JavaVM *vm, void *reserved)
 }
 
 Runtime::Runtime(JNIEnv *env, jobject runtime, int id)
-	: m_env(env), m_id(id), m_isolate(nullptr)
+	: m_env(env), m_id(id), m_isolate(nullptr), m_lastUsedMemory(0), m_gcFunc(nullptr), m_runGC(false)
 {
 	m_runtime = m_env.NewGlobalRef(runtime);
 	m_objectManager = new ObjectManager(m_runtime);
 	s_id2RuntimeCache.insert(make_pair(id, this));
+
+	if (GET_USED_MEMORY_METHOD_ID == nullptr) {
+		auto RUNTIME_CLASS = m_env.FindClass("com/tns/Runtime");
+		assert(RUNTIME_CLASS != nullptr);
+
+		GET_USED_MEMORY_METHOD_ID = m_env.GetMethodID(RUNTIME_CLASS, "getUsedMemory", "()J");
+		assert(GET_USED_MEMORY_METHOD_ID != nullptr);
+	}
 }
 
 Runtime* Runtime::GetRuntime(int runtimeId)
@@ -301,9 +309,39 @@ jint Runtime::GenerateNewObjectId(JNIEnv *env, jobject obj)
 	return objectId;
 }
 
-void Runtime::AdjustAmountOfExternalAllocatedMemoryNative(JNIEnv *env, jobject obj, jlong usedMemory)
+void Runtime::AdjustAmountOfExternalAllocatedMemory() {
+	int64_t usedMemory = m_env.CallLongMethod(m_runtime, GET_USED_MEMORY_METHOD_ID);
+	int64_t changeInBytes = usedMemory - m_lastUsedMemory;
+	int64_t externalMemory = 0;
+
+	if (changeInBytes != 0) {
+		externalMemory = m_isolate->AdjustAmountOfExternalAllocatedMemory(changeInBytes);
+	}
+
+	DEBUG_WRITE("usedMemory=%" PRId64 " changeInBytes=%" PRId64 " externalMemory=%" PRId64, usedMemory, changeInBytes, externalMemory);
+
+	m_lastUsedMemory = usedMemory;
+}
+
+bool Runtime::NotifyGC(JNIEnv *env, jobject obj)
 {
-	m_isolate->AdjustAmountOfExternalAllocatedMemory(usedMemory);
+	bool success = __sync_bool_compare_and_swap(&m_runGC, false, true);
+	return success;
+}
+
+bool Runtime::TryCallGC() {
+	auto success = m_gcFunc != nullptr;
+	if (success) {
+		success = __sync_bool_compare_and_swap(&m_runGC, true, false);
+		if (success) {
+			auto ctx = m_isolate->GetCurrentContext();
+			auto globalObject = ctx->Global();
+			auto gcFunc = Local<Function>::New(m_isolate, *m_gcFunc);
+			auto maybeResult = gcFunc.As<Function>()->Call(ctx, globalObject, 0, nullptr);
+			DEBUG_WRITE("Induced GC runtimeId=%d", m_id);
+		}
+	}
+	return success;
 }
 
 void Runtime::PassUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, jthrowable exception, jstring stackTrace)
@@ -535,8 +573,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 	CallbackHandlers::CreateGlobalCastFunctions(isolate, globalTemplate);
 
 	Local<Context> context = Context::New(isolate, nullptr, globalTemplate);
-
-	new Context::Scope(context);
+	context->Enter();
 
 	m_objectManager->Init(isolate);
 
@@ -545,6 +582,11 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 	m_module.Init(isolate, baseCallingDir);
 
 	auto global = context->Global();
+
+	auto gcFunc = global->Get(ConvertToV8String("gc"));
+	if (!gcFunc.IsEmpty() && gcFunc->IsFunction()) {
+		m_gcFunc = new Persistent<Function>(isolate, gcFunc.As<Function>());
+	}
 
 	global->ForceSet(ArgConverter::ConvertToV8String(isolate, "global"), global, readOnlyFlags);
 	global->ForceSet(ArgConverter::ConvertToV8String(isolate, "__global"), global, readOnlyFlags);
@@ -598,6 +640,7 @@ void Runtime::DestroyRuntime() {
 }
 
 JavaVM* Runtime::s_jvm = nullptr;
+jmethodID Runtime::GET_USED_MEMORY_METHOD_ID = nullptr;
 map<int, Runtime*> Runtime::s_id2RuntimeCache;
 map<Isolate*, Runtime*> Runtime::s_isolate2RuntimesCache;
 bool Runtime::s_mainThreadInitialized = false;

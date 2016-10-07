@@ -47,7 +47,9 @@ namespace tns
 			jobject CallJSMethodNative(JNIEnv *_env, jobject obj, jint javaObjectID, jstring methodName, jint retType, jboolean isConstructor, jobjectArray packagedArgs);
 			void CreateJSInstanceNative(JNIEnv *_env, jobject obj, jobject javaObject, jint javaObjectID, jstring className);
 			jint GenerateNewObjectId(JNIEnv *env, jobject obj);
-			void AdjustAmountOfExternalAllocatedMemoryNative(JNIEnv *env, jobject obj, jlong usedMemory);
+			void AdjustAmountOfExternalAllocatedMemory();
+			bool NotifyGC(JNIEnv *env, jobject obj);
+			bool TryCallGC();
 			void PassUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, jthrowable exception, jstring stackTrace);
 			void PassUncaughtExceptionFromWorkerToMainHandler(v8::Local<v8::String> message, v8::Local<v8::String> filename, int lineno);
 			void ClearStartupData(JNIEnv *env, jobject obj);
@@ -74,6 +76,11 @@ namespace tns
 			v8::StartupData *m_startupData = nullptr;
 			MemoryMappedFile *m_heapSnapshotBlob = nullptr;
 
+			int64_t m_lastUsedMemory;
+
+			v8::Persistent<v8::Function> *m_gcFunc;
+			volatile bool m_runGC;
+
 			v8::Isolate* PrepareV8Runtime(const std::string& filesPath, jstring packageName, jstring callingDir, jobject jsDebugger, jstring profilerOutputDir);
 			jobject ConvertJsValueToJavaObject(JEnv& env, const v8::Local<v8::Value>& value, int classReturnType);
 
@@ -82,6 +89,8 @@ namespace tns
 			static std::map<v8::Isolate*, Runtime*> s_isolate2RuntimesCache;
 
 			static JavaVM *s_jvm;
+
+			static jmethodID GET_USED_MEMORY_METHOD_ID;
 
 			static bool s_mainThreadInitialized;
 	};

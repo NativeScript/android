@@ -157,7 +157,7 @@ namespace tns
 			{
 			}
 
-			static int64_t AdjustAmountOfExternalAllocatedMemory(JEnv& env, v8::Isolate *isolate);
+			static void AdjustAmountOfExternalAllocatedMemory(JEnv& env, v8::Isolate *isolate);
 
 			/*
 			 * Helper method that creates a java string array for sending strings over JNI
@@ -181,8 +181,6 @@ namespace tns
 			static jmethodID ENABLE_VERBOSE_LOGGING_METHOD_ID;
 
 			static jmethodID DISABLE_VERBOSE_LOGGING_METHOD_ID;
-
-			static jmethodID GET_CHANGE_IN_BYTES_OF_USED_MEMORY_METHOD_ID;
 
 			static jmethodID INIT_WORKER_METHOD_ID;
 

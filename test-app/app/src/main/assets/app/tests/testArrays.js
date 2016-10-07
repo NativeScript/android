@@ -9,7 +9,6 @@ describe("Tests array operations", function () {
 	});
 
 	it("TestWorkingWithJavaArrayDoesNotMakeMemoryLeak", function () {
-
 		__log("TEST: TestWorkingWithJavaArrayDoesNotMakeMemoryLeak");
 		
 		var size = 10 * 1024 * 1024;
@@ -27,9 +26,6 @@ describe("Tests array operations", function () {
 			var el = arr[0];
 			
 			expect(el).toEqual(123);
-		
-			gc();
-			java.lang.System.gc();
 		}
 	});
 
