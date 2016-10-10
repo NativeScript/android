@@ -1,1 +1,0 @@
-android.widget.Button2222**onClick222222,onClick222222222222*my.custom.ClassFromOriginalTest

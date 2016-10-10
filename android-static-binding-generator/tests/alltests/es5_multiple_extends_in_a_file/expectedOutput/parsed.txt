@@ -1,4 +1,0 @@
-android.widget.Button22222222**onClick222222,onClick222222222*my.custom.ClassFromOrigina2222222222
-android.widget.Button333333**onClick33333,onClick333333333*my.custom.ClassFromOrigina3333333333
-android.widget.Button1111111111*_fparsed_l2_c52__ClassFromOrigina1111111*onClick111111*
-android.widget.Button44444444*_fparsed_l25_c50__ClassFromOrigina44444*onClick4444,onClick4444444*

@@ -18,14 +18,24 @@ def jsFilesParametersP = "$projectDir/jsFilesParameters.txt"
 
 //def absoluteOutDir = new File("./outDir")//project.outDir
 
-def absoluteOutDir = project.outDir
-if (!absoluteOutDir.exists()) {
-	absoluteOutDir.mkdirs()
+def absoluteOutDir;
+if (project.hasProperty("outDir")) {
+	absoluteOutDir = project.outDir;
+	
+	if (!absoluteOutDir.exists()) {
+		absoluteOutDir.mkdirs()
+	}
 }
 
+
 // def absoluteJsCodeDir = new File("./jsCodeDir").getAbsolutePath()//project.jsCodeDir
-def absoluteJsCodeDir = project.jsCodeDir
-def jsCodeAbsolutePath = absoluteJsCodeDir.getAbsolutePath()
+def absoluteJsCodeDir;
+def jsCodeAbsolutePath;
+if (!project.hasProperty("test")) {
+	absoluteJsCodeDir = project.jsCodeDir
+	jsCodeAbsolutePath = absoluteJsCodeDir.getAbsolutePath()
+}
+
 def utf8 = java.nio.charset.StandardCharsets.UTF_8
 def current = ""
 
@@ -35,92 +45,116 @@ def inputJsFiles = new LinkedList <String> ();
 
 // depends on passed jars and generated interface-names
 task generateInterfaceNamesList() {
+
 	doFirst {
-		current = project.jarFiles
-		def cache = new File(cachedJarsFilePath)
-		
-		if (cache.exists()) {
-			def contents = new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(cachedJarsFilePath)), utf8).trim()
-			shouldRun = !contents.equals(current.toString())
-		}
-
-		if (shouldRun) {
-			javaexec {
-				main "-jar"
-
-				def jarsAsStr = current.toString();
-				def jarsArr = jarsAsStr.replaceAll(/[\[\]]/, "").split(", ")
-
-				def str = new LinkedList <String> ();
-				str.add("interfacenamegenerator.jar")
-				str.addAll(jarsArr)
-
-				args str.toArray()
+		if(!project.hasProperty("test")) {
+			current = project.jarFiles
+			def cache = new File(cachedJarsFilePath)
+			
+			if (cache.exists()) {
+				def contents = new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(cachedJarsFilePath)), utf8).trim()
+				shouldRun = !contents.equals(current.toString())
 			}
-			java.nio.file.Files.write(java.nio.file.Paths.get(cachedJarsFilePath), [current.toString()], utf8)
+
+			if (shouldRun) {
+				javaexec {
+					main "-jar"
+
+					def jarsAsStr = current.toString();
+					def jarsArr = jarsAsStr.replaceAll(/[\[\]]/, "").split(", ")
+
+					def str = new LinkedList <String> ();
+					str.add("interfacenamegenerator.jar")
+					str.addAll(jarsArr)
+
+					args str.toArray()
+				}
+				java.nio.file.Files.write(java.nio.file.Paths.get(cachedJarsFilePath), [current.toString()], utf8)
+			}
 		}
 	}
 }
 
-// traverses the javascript code input directory
-// 1. traverses all root directory files
-// 2. all subdirectories that do not have a package.json containing a "nativescript" key are skipped
-task traverseJsFiles () {
-	def traverseDirectory
+def traverseDirectory
 
-	traverseDirectory = { dir, traverseExplicitly ->
+traverseDirectory = { dir, traverseExplicitly ->
 
-		def currentDir = new File(dir)
-		def pJsonFile = false;
+	def currentDir = new File(dir)
+	def pJsonFile = false;
 
-		if (!traverseExplicitly) {
-			if (rootTraversed || !dir.equals(jsCodeAbsolutePath)) {
-				currentDir.eachFile(FileType.FILES) { File f ->
-					if (f.getName().equals("package.json")) {
-						pJsonFile = true;
-						return true; //break
-					}
+	if (!traverseExplicitly) {
+		if (rootTraversed || !dir.equals(jsCodeAbsolutePath)) {
+			currentDir.eachFile(FileType.FILES) { File f ->
+				if (f.getName().equals("package.json")) {
+					pJsonFile = true;
+					return true; //break
 				}
 			}
 
-			if (pJsonFile) {
-				def jsonFile = new File(dir, "package.json");
-				def pjson = new JsonSlurper().parseText(jsonFile.text)
+		if (pJsonFile) {
+			def jsonFile = new File(dir, "package.json");
+			def pjson = new JsonSlurper().parseText(jsonFile.text)
 
-				if (!pjson.nativescript) {
-					return;
-				} else {
-					if (pjson.nativescript['recursive-static-bindings']) {
-						// println "Folder will be traversed completely: " + dir
-						traverseExplicitly = true;
-					}
+			if (pjson.nativescript == null) {
+				return;
+			} else {
+				if (pjson.nativescript['recursive-static-bindings']) {
+					// println "Folder will be traversed completely: " + dir
+					traverseExplicitly = true;
 				}
 			}
 		}
-		else {
+	} else {
 			rootTraversed = true;
 		}
 
-		currentDir.eachFile(FileType.FILES) { File f ->
-			def file = f.getAbsolutePath();
-			if(file.substring(file.length() - 3, file.length()).equals(".js")) {
-				// println "Visiting JavaScript file: " + f.getName()
-				inputJsFiles.add(f.getAbsolutePath())
-			}
-		}
+	}
 
-		currentDir.eachFile FileType.DIRECTORIES, { d ->
-			traverseDirectory(d.getAbsolutePath(), traverseExplicitly)
+	currentDir.eachFile(FileType.FILES) { File f ->
+		def file = f.getAbsolutePath();
+		if (file.substring(file.length() - 3, file.length()).equals(".js")) {
+			// println "Visiting JavaScript file: " + f.getName()
+			inputJsFiles.add(f.getAbsolutePath())
 		}
 	}
 
-	traverseDirectory(jsCodeAbsolutePath, false)
+	currentDir.eachFile FileType.DIRECTORIES, { d ->
+		traverseDirectory(d.getAbsolutePath(), traverseExplicitly)
+	}
+}
+
+task traverseJsFilesArgs << { //(jsCodeDir, bindingsFilePath, interfaceNamesFilePath, jsParserPath, jsFilesParameter) {
+	jsCodeAbsolutePath = jsCodeDir;
+	inputJsFiles = new LinkedList<String>();
+	traverseDirectory(jsCodeDir, false);
+
+	new File(jsFilesParameter).withWriter { out ->
+		inputJsFiles.each {out.println it}
+	}
+
+	def list = new ArrayList<String>();
+	list.add("node")
+	list.add(jsParserPath)
+	list.add(jsCodeDir)
+	list.add(bindingsFilePath)
+	list.add(interfaceNamesFilePath)
+	list.add(jsFilesParameter)
+
+	def proc = list.execute()
+	proc.in.eachLine { line -> println line }
+	proc.out.close()
+	proc.waitFor()
+
+	if (proc.exitValue()) {
+		println "gave the following error: "
+		println "[ERROR] ${proc.getErrorStream()}"
+	}
 }
 
 // runs the ast parser only with changed js files
 task runAstParser(type: RunAstParserTask) {
 	outputFiles = files(bindingsFileP)
-    	inputFiles = files(inputJsFiles)
+    inputFiles = files(inputJsFiles)
 
 	//ast parser configuration
 	jsParserPath = jsParserP
@@ -129,6 +163,15 @@ task runAstParser(type: RunAstParserTask) {
 	interfaceNamesFilePath = interfaceNamesFileP
 	jsFilesParametersPath = jsFilesParametersP
 
+}
+
+// traverses the javascript code input directory
+// 1. traverses all root directory files
+// 2. all subdirectories that do not have a package.json containing a "nativescript" key are skipped
+task traverseJsFiles () {
+	doFirst {
+		traverseDirectory(jsCodeAbsolutePath, false)
+	}
 }
 
 // custom incremental task that runs the ast parser
@@ -188,7 +231,6 @@ class RunAstParserTask extends DefaultTask {
 		list.add(bindingsFilePath)
 		list.add(interfaceNamesFilePath)
 		list.add(jsFilesParametersPath)
-
 
 		runCommand(list)
 
