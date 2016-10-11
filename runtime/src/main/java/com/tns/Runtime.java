@@ -452,14 +452,16 @@ public class Runtime {
             throw new RuntimeException("Fail to initialize Require class", ex);
         }
 
-        if (debugger != null) {
+        // TODO: Pete: this.runtimeId == 0 is a temporary patching of jsDebugger not attaching on app start
+        // TODO: Pete: Debugger should not be created when a worker is created
+        if (debugger != null && this.runtimeId == 0) {
             jsDebugger = new JsDebugger(debugger, threadScheduler);
         }
 
         initNativeScript(getRuntimeId(), Module.getApplicationFilesPath(), logger.isEnabled(), appName, v8Config, callingJsDir, jsDebugger);
 
-        if (jsDebugger != null) {
-            // jsDebugger.start();
+        if (jsDebugger != null && this.runtimeId == 0) {
+             jsDebugger.start();
         }
 
         clearStartupData(getRuntimeId()); // It's safe to delete the data after the V8 debugger is initialized
