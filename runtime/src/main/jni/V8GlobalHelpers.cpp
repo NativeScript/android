@@ -9,7 +9,7 @@
 using namespace v8;
 using namespace std;
 
-string tns::ConvertToString(const v8::Local<String> &s) {
+string tns::ConvertToString(const Local<v8::String> &s) {
     if (s.IsEmpty())
     {
         return string();

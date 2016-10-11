@@ -68,7 +68,7 @@ void CallbackHandlers::Init(Isolate *isolate) {
 
     auto persistentStringify = new Persistent<Function>(isolate, stringify);
 
-    isolateToJsonStringify.insert(make_pair(isolate, persistentStringify));
+    isolateToJsonStringify.insert({isolate, persistentStringify});
 
     MetadataNode::Init(isolate);
 
@@ -986,6 +986,8 @@ void CallbackHandlers::WorkerObjectPostMessageCallback(const v8::FunctionCallbac
         JniLocalRef jmsgRef(jmsg);
 
         env.CallStaticVoidMethod(RUNTIME_CLASS, mId, id, (jstring) jmsgRef);
+
+        DEBUG_WRITE("MAIN: WorkerObjectPostMessageCallback called postMessage on Worker object(id=%d)", id);
     } catch (NativeScriptException &ex) {
         ex.ReThrowToV8();
     } catch (std::exception e) {
@@ -1076,6 +1078,8 @@ void CallbackHandlers::WorkerGlobalPostMessageCallback(const v8::FunctionCallbac
         JniLocalRef jmsgRef(jmsg);
 
         env.CallStaticVoidMethod(RUNTIME_CLASS, mId, (jstring) jmsgRef);
+
+        DEBUG_WRITE("WORKER: WorkerGlobalPostMessageCallback called.");
     } catch (NativeScriptException &ex) {
         ex.ReThrowToV8();
     } catch (std::exception e) {
@@ -1096,7 +1100,7 @@ void CallbackHandlers::WorkerObjectOnMessageCallback(Isolate *isolate, jint work
         if (workerFound == CallbackHandlers::id2WorkerMap.end()) {
             // TODO: Pete: Throw exception
             DEBUG_WRITE(
-                    "MAIN: WorkerObjectOnMessageCallback no worker instance was found with workerId=%d !",
+                    "MAIN: WorkerObjectOnMessageCallback no worker instance was found with workerId=%d.",
                     workerId);
             return;
         }
@@ -1105,7 +1109,7 @@ void CallbackHandlers::WorkerObjectOnMessageCallback(Isolate *isolate, jint work
 
         if (workerPersistent->IsEmpty()) {// Object has been collected
             DEBUG_WRITE(
-                    "MAIN: WorkerObjectOnMessageCallback couldn't fire a worker(id=%d) object's `onmessage` callback because the worker has been Garbage Collected!",
+                    "MAIN: WorkerObjectOnMessageCallback couldn't fire a worker(id=%d) object's `onmessage` callback because the worker has been Garbage Collected.",
                     workerId);
             CallbackHandlers::id2WorkerMap.erase(workerId);
             return;
@@ -1133,7 +1137,7 @@ void CallbackHandlers::WorkerObjectOnMessageCallback(Isolate *isolate, jint work
             func->Call(Undefined(isolate), 1, args1);
         } else {
             DEBUG_WRITE(
-                    "MAIN: WorkerObjectOnMessageCallback couldn't fire a worker(id=%d) object's `onmessage` callback because it isn't implemented!",
+                    "MAIN: WorkerObjectOnMessageCallback couldn't fire a worker(id=%d) object's `onmessage` callback because it isn't implemented.",
                     workerId);
         }
     } catch (NativeScriptException &ex) {
@@ -1152,9 +1156,11 @@ void CallbackHandlers::WorkerObjectOnMessageCallback(Isolate *isolate, jint work
 void CallbackHandlers::WorkerObjectTerminateCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
     auto isolate = args.GetIsolate();
 
-    HandleScope scope(isolate);
+    DEBUG_WRITE("WORKER: WorkerObjectTerminateCallback called.");
 
     try {
+        HandleScope scope(isolate);
+
         auto thiz = args.This(); // Worker instance
 
         Local<Value> jsId;
@@ -1204,6 +1210,8 @@ void CallbackHandlers::WorkerObjectTerminateCallback(const v8::FunctionCallbackI
 void CallbackHandlers::WorkerGlobalCloseCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
     auto isolate = args.GetIsolate();
 
+    DEBUG_WRITE("WORKER: WorkerThreadCloseCallback called.");
+
     try {
         HandleScope scope(isolate);
 
@@ -1233,7 +1241,9 @@ void CallbackHandlers::WorkerGlobalCloseCallback(const v8::FunctionCallbackInfo<
 
             auto func = callback.As<Function>();
 
+            DEBUG_WRITE("WORKER: WorketThreadCloseCallback onclose handle is being called.");
             func->Call(Undefined(isolate), 0, args1);
+            DEBUG_WRITE("WORKER: WorketThreadCloseCallback onclose handle was called.");
         }
 
         if (tc.HasCaught()) {
@@ -1261,6 +1271,8 @@ void CallbackHandlers::WorkerGlobalCloseCallback(const v8::FunctionCallbackInfo<
 void CallbackHandlers::CallWorkerScopeOnErrorHandle(Isolate* isolate, TryCatch& tc)
 {
     try {
+        TryCatch innerTc;
+
         // See if `onerror` handle is implemented
         auto context = isolate->GetCurrentContext();
         auto globalObject = context->Global();
@@ -1283,6 +1295,16 @@ void CallbackHandlers::CallWorkerScopeOnErrorHandle(Isolate* isolate, TryCatch& 
                 // Do nothing, exception has been handled
                 return;
             }
+        }
+
+        // will account for exceptions thrown inside the error handler
+        if(innerTc.HasCaught()) {
+            auto lno = innerTc.Message()->GetLineNumber();
+            auto msg = innerTc.Message()->Get();
+            auto source = innerTc.Message()->GetScriptResourceName()->ToString(isolate);
+
+            auto runtime = Runtime::GetRuntime(isolate);
+            runtime->PassUncaughtExceptionFromWorkerToMainHandler(msg, source, lno);
         }
 
         // throw so that it may bubble up to main
@@ -1312,7 +1334,7 @@ void CallbackHandlers::CallWorkerObjectOnErrorHandle(Isolate *isolate, jint work
         if (workerFound == CallbackHandlers::id2WorkerMap.end()) {
             // TODO: Pete: Throw exception
             DEBUG_WRITE(
-                    "MAIN: CallWorkerObjectOnErrorHandle no worker instance was found with workerId=%d !",
+                    "MAIN: CallWorkerObjectOnErrorHandle no worker instance was found with workerId=%d.",
                     workerId);
             return;
         }
@@ -1321,7 +1343,7 @@ void CallbackHandlers::CallWorkerObjectOnErrorHandle(Isolate *isolate, jint work
 
         if (workerPersistent->IsEmpty()) {// Object has been collected
             DEBUG_WRITE(
-                    "MAIN: WorkerObjectOnMessageCallback couldn't fire a worker(id=%d) object's `onmessage` callback because the worker has been Garbage Collected!",
+                    "MAIN: WorkerObjectOnMessageCallback couldn't fire a worker(id=%d) object's `onmessage` callback because the worker has been Garbage Collected.",
                     workerId);
             CallbackHandlers::id2WorkerMap.erase(workerId);
             return;
@@ -1382,11 +1404,12 @@ void CallbackHandlers::CallWorkerObjectOnErrorHandle(Isolate *isolate, jint work
 }
 
 void CallbackHandlers::ClearWorkerPersistent(int workerId) {
+    DEBUG_WRITE("ClearWorkerPersistent called for workerId=%d", workerId);
+
     auto workerFound = CallbackHandlers::id2WorkerMap.find(workerId);
 
     if(workerFound == CallbackHandlers::id2WorkerMap.end()) {
-        // TODO: Pete: Throw exception?
-        DEBUG_WRITE("MAIN | WORKER: ClearWorkerPersistent no worker instance was found with workerId=%d ! The worker may already be terminated!", workerId);
+        DEBUG_WRITE("MAIN | WORKER: ClearWorkerPersistent no worker instance was found with workerId=%d ! The worker may already be terminated.", workerId);
         return;
     }
 
