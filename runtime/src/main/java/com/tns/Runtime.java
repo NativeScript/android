@@ -246,7 +246,7 @@ public class Runtime {
                 msgToMain.arg1 = MessageType.CloseWorker;
                 msgToMain.arg2 = currentRuntime.workerId;
 
-                currentRuntime.mainThreadHandler.sendMessageAtFrontOfQueue(msgToMain);
+                currentRuntime.mainThreadHandler.sendMessage(msgToMain);
 
                 currentRuntime.isTerminating = true;
 
@@ -1137,6 +1137,10 @@ public class Runtime {
             Queue<Message> messages = pendingWorkerMessages.get(workerId);
             messages.add(msg);
 
+            return;
+        }
+
+        if(!workerHandler.getLooper().getThread().isAlive()) {
             return;
         }
 
