@@ -547,21 +547,11 @@ public class Dump
 	private void generateMethods(ClassVisitor cv, ClassDescriptor classTo, MethodDescriptor[] methods, String classSignature, String tnsClassSignature)
 	{
 		//for (Method method : methods)
-		int fieldNameCounter = 0;
-		int bitCounter = 1;
 		for (int i = 0; i < methods.length; i++)
 		{
-			if (bitCounter == 128)
-			{
-				bitCounter = 1;
-				fieldNameCounter++;
-			}
-
 			MethodDescriptor sourceMethod = methods[i];
 
-			generateMethod(cv, classTo, sourceMethod, i, classSignature, tnsClassSignature, bitCounter);
-
-			bitCounter *= 2;
+			generateMethod(cv, classTo, sourceMethod, i, classSignature, tnsClassSignature);
 		}
 
 		generateEqualsSuper(cv);
@@ -590,7 +580,7 @@ public class Dump
 		mv.visitEnd();
 	}
 
-	private void generateMethod(ClassVisitor cv, ClassDescriptor classTo, MethodDescriptor method, int methodNumber, String classSignature, String tnsClassSignature, int fieldBit)
+	private void generateMethod(ClassVisitor cv, ClassDescriptor classTo, MethodDescriptor method, int methodNumber, String classSignature, String tnsClassSignature)
 	{
 		if (ProxyGenerator.IsLogEnabled) {
 			System.out.println("Generator: generatingMethod " + method.getName());
@@ -609,7 +599,7 @@ public class Dump
 
 		if (!classTo.isInterface()) {
 			if (isApplicationClass(classTo) && method.getName().equals("onCreate")) {
-				generateRuntimeInitializedBlock(mv, thisRegister, classSignature, tnsClassSignature, classTo.getName());
+				generateRuntimeInitializedBlock(mv, method, thisRegister, classSignature, tnsClassSignature, classTo.getName());
 			} else {
 				if(!method.isInterfaceMethod()) { //interface methods do not need an initialized block
 					generateInitializedBlock(mv, thisRegister, classSignature, tnsClassSignature);
@@ -617,7 +607,10 @@ public class Dump
 			}
 		}
 
-		generateCallOverrideBlock(mv, method, thisRegister, classSignature, tnsClassSignature, methodDexSignature, fieldBit);
+		if (!isApplicationClass(classTo) || !method.getName().equals("onCreate")) {
+			generateCallOverrideBlock(mv, method, thisRegister, classSignature, tnsClassSignature);
+		}
+		generateReturnFromObject(mv, method.getReturnType(), thisRegister, 1);
 
 		mv.visitEnd();
 	}
@@ -636,7 +629,7 @@ public class Dump
 		return isApplicationClass;
 	}
 
-	private void generateRuntimeInitializedBlock(MethodVisitor mv, int thisRegister, String classSignature, String tnsClassSignature, String superClassname) {
+	private void generateRuntimeInitializedBlock(MethodVisitor mv, MethodDescriptor method, int thisRegister, String classSignature, String tnsClassSignature, String superClassname) {
 		String name = "L" + superClassname.replace('.', '/') + ";";
 
 		mv.visitMethodInsn(Opcodes.INSN_INVOKE_SUPER, name, "onCreate", "V", new int[] { thisRegister });
@@ -645,6 +638,7 @@ public class Dump
 		Label label = new Label();
 		mv.visitJumpInsn(Opcodes.INSN_IF_EQZ, label, 0, 0);
 		mv.visitMethodInsn(Opcodes.INSN_INVOKE_VIRTUAL, LCOM_TNS_RUNTIME, "run", "V", new int[] { 0 });
+		generateCallOverrideBlock(mv, method, thisRegister, classSignature, tnsClassSignature);
 		mv.visitLabel(label);
 	}
 
@@ -677,7 +671,7 @@ public class Dump
 		return thisRegister;
 	}
 
-	private void generateCallOverrideBlock(MethodVisitor mv, MethodDescriptor method, int thisRegister, String classSignature, String tnsClassSignature, String methodDexSignature, int fieldBit)
+	private void generateCallOverrideBlock(MethodVisitor mv, MethodDescriptor method, int thisRegister, String classSignature, String tnsClassSignature)
 	{
 		//call the override
 		int argCount = generateArrayForCallJsArguments(mv, method.getParameterTypes() , thisRegister, classSignature, tnsClassSignature);
@@ -698,7 +692,6 @@ public class Dump
 
 		//Label returnLabel = new Label();
 		//mv.visitLabel(returnLabel);
-		generateReturnFromObject(mv, method.getReturnType(), thisRegister, 1);
 	}
 
 	private int[] generateArgsArray(int thisRegister, int argCount, MethodDescriptor ctor)
