@@ -1,6 +1,7 @@
 package com.tns;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.HashMap;
 
@@ -33,7 +34,7 @@ class Module
 
 		ModulesFilesPath = "/app/";
 
-		NativeScriptModulesFilesPath = "/app/tns_modules/";
+		NativeScriptModulesFilesPath = "/app/tns_modules/tns_modules_core";
 
 		// Support previous tns_modules location for now
 		// NOTE: This functionality is temporary and is to be deleted within
@@ -91,6 +92,116 @@ class Module
 		return true;
 	}
 
+	private static String possibleError = "";
+
+	private static File resolveRequire(String baseDir, String path) throws NativeScriptException { //think about special require exception inheriting NativeScriptException
+
+		File foundModule = null;
+
+		// relative or absolute path
+		if (path.startsWith("./") || path.startsWith("../") || path.startsWith("~/")) {
+			foundModule = resolveFromFileOrDirectory(baseDir, path);
+
+			if(foundModule != null) {
+				return foundModule;
+			}
+		}
+		else { //native modules or traverse node_modules possiblilities
+			foundModule = resolveFromFileOrDirectory(NativeScriptModulesFilesPath, path);
+
+			if(foundModule != null) {
+				return foundModule;
+			}
+
+			// resolve through node_modules
+			String[] possibleSearchDirs = nodeModulesPaths(baseDir);
+			for(String possibleDir : possibleSearchDirs) {
+				foundModule = resolveFromFileOrDirectory(possibleDir, path);
+				if(foundModule != null) {
+					return foundModule;
+				}
+			}
+		}
+
+		// throw error if file could not be resolved
+		if(foundModule == null) {
+			throw new NativeScriptException("Could not load module: " + path + " " + possibleError);
+		}
+
+		return foundModule;
+	}
+
+	private static File resolveFromFileOrDirectory(String baseDir, String path) {
+		File foundModule = null;
+
+		foundModule = loadAsFile(baseDir, path);
+		if(foundModule != null) {
+			return foundModule;
+		}
+
+		foundModule = loadAsDirectory(baseDir, path);
+
+		return foundModule;
+	}
+
+	//tries to load the path as a file, returns null if that's not possible
+	private static File loadAsFile(String baseDir, String path) {
+//		1. If X is a file, load X as JavaScript text.  STOP
+//		2. If X.js is a file, load X.js as JavaScript text.  STOP
+//		3. If X.json is a file, parse X.json to a JavaScript Object.  STOP
+//		4. If X.node is a file, load X.node as binary addon.  STOP
+		String fallbackExtension;
+
+		boolean isJSFile = path.endsWith(".js");
+		boolean isSOFile = path.endsWith(".so");
+		boolean isJSONFile = path.endsWith(".json");
+
+		if (isJSFile || isJSONFile || isSOFile)
+		{
+			fallbackExtension = "";
+		}
+		else
+		{
+			fallbackExtension = ".js";
+		}
+
+		File file = new File(baseDir, path + fallbackExtension);
+
+		return file;
+	}
+
+	private static File loadAsDirectory(String baseDir, String path) {
+//		1. If X/package.json is a file,
+//			a. Parse X/package.json, and look for "main" field.
+//			b. let M = X + (json main field)
+//		c. LOAD_AS_FILE(M)
+//		2. If X/index.js is a file, load X/index.js as JavaScript text.  STOP
+//		3. If X/index.json is a file, parse X/index.json to a JavaScript object. STOP
+//		4. If X/index.node is a file, load X/index.node as binary addon.  STOP
+		return null;
+	}
+
+	private static File loadNodeModules(String baseDir, String path) {
+//		1. let DIRS=NODE_MODULES_PATHS(START)
+//		2. for each DIR in DIRS:
+//			a. LOAD_AS_FILE(DIR/X)
+//			b. LOAD_AS_DIRECTORY(DIR/X)
+		return null;
+	}
+
+	private static String[] nodeModulesPaths(String startDir) {
+//		1. let PARTS = path split(START)
+//		2. let I = count of PARTS - 1
+//		3. let DIRS = []
+//		4. while I >= 0,
+//				a. if PARTS[I] = "node_modules" CONTINUE
+//				c. DIR = path join(PARTS[0 .. I] + "node_modules")
+//				b. DIRS = DIRS + DIR
+//				c. let I = I - 1
+//		5. return DIRS
+		return null;
+	}
+
 	private static File resolvePathHelper(String path, String baseDir)
 	{
 		File directory = null;
@@ -101,7 +212,8 @@ class Module
 		{
 			baseDir = ApplicationFilesPath + ModulesFilesPath;
 		}
-
+		// ourModule/file
+		// file resolution
 		if (path.startsWith("/"))
 		{
 			// absolute path
@@ -112,7 +224,7 @@ class Module
 				possibleException = "Failed to find module with absolute path: \"" + path + "\".";
 			}
 		}
-		else if (path.startsWith("./") || path.startsWith("../") || path.startsWith("~/"))
+		else if (path.startsWith("./") || path.startsWith("../") || path.startsWith("~/") || path.startsWith("/"))
 		{
 			// same or up directory
 			String resolvedPath = FileSystem.resolveRelativePath(ApplicationFilesPath, path, baseDir);
@@ -146,6 +258,7 @@ class Module
 			}
 		}
 
+		// directory resolution
 		if (!file.exists() && directory.exists() && directory.isDirectory())
 		{
 			// We are pointing to a directory, check for already resolved file
