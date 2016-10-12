@@ -108,7 +108,26 @@ task generateBindingGenerator (type: Exec)   {
 	}
 }
 
-task generateRuntime (type: Exec)   {
+task generateRuntime {
+	doFirst {
+		tasks.generateOptimizedRuntimeAar.execute();
+		tasks.generateRuntimeAar.execute();
+	}
+}
+
+task generateOptimizedRuntimeAar(type: Exec) {
+	doFirst {
+		workingDir "$rootDir/runtime"
+		if(isWinOs) {
+			commandLine "cmd", "/c", "gradlew", "assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-PembedBindingGenerator=true", "-Poptimized"
+		}
+		else {
+			commandLine "./gradlew", "assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-PembedBindingGenerator=true", "-Poptimized"
+		}
+	}
+}
+
+task generateRuntimeAar(type: Exec) {
 	doFirst {
 		workingDir "$rootDir/runtime"
 		if(isWinOs) {
@@ -116,7 +135,7 @@ task generateRuntime (type: Exec)   {
 		}
 		else {
 			commandLine "./gradlew", "assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-PembedBindingGenerator=true"
-		}
+		}	
 	}
 }
 
@@ -125,6 +144,12 @@ task copyGeneratedRuntime << {
 		from "$rootDir/runtime/build/outputs/aar/runtime-release.aar"
 		into "$rootDir/dist/framework/libs/runtime-libs/"
 		rename "runtime-release.aar", "nativescript.aar"
+	}
+
+	copy {
+		from "$rootDir/runtime/build/outputs/aar/runtime-optimized-release.aar"
+		into "$rootDir/dist/framework/libs/runtime-libs/"
+		rename "runtime-optimized-release.aar", "nativescript-optimized.aar"
 	}
 }
 
