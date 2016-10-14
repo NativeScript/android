@@ -38,7 +38,7 @@ class Module
 
 		ModulesFilesPath = "/app/";
 
-		RootDirsCount = (ApplicationFilesPath + "/app/tns_modules").split("/").length + 1;
+		RootDirsCount = (ApplicationFilesPath + "/app").split("/").length;
 
 		NativeScriptModulesFilesPath = ApplicationFilesPath + "/app/tns_modules/tns-core-modules";
 
