@@ -40,7 +40,7 @@ class Module
 
 		RootDirsCount = (ApplicationFilesPath + "/app").split("/").length;
 
-		NativeScriptModulesFilesPath = ApplicationFilesPath + "/app/tns_modules/tns-core-modules";
+		NativeScriptModulesFilesPath = ApplicationFilesPath + "/app/node_modules/tns-core-modules";
 
 		initialized = true;
 	}
@@ -266,11 +266,11 @@ class Module
 		}
 
 		List<String> possibleDirectories = new ArrayList<String>();
-		int currentSize = dirs.size();
-		while (currentSize >= RootDirsCount) {
+		while (dirs.size() >= RootDirsCount) {
 
-			String lastDir = dirs.get(currentSize - 1);
+			String lastDir = dirs.get(dirs.size() - 1);
 			if(lastDir.equals("node_modules") || lastDir.equals("tns_modules")) {
+				dirs.remove(dirs.size() -1);
 				continue;
 			}
 
@@ -278,8 +278,7 @@ class Module
 			currentDir += "/node_modules";
 			possibleDirectories.add(currentDir);
 
-			currentSize--;
-			dirs.remove(currentSize);
+			dirs.remove(dirs.size() -1);
 		}
 
 		return possibleDirectories;
