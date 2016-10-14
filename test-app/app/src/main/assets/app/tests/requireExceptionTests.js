@@ -55,11 +55,11 @@ describe("Tests require exceptions ", function () {
 	it("when requiring a relative (../) non existing module and error should be thrown", function () {
 		
 		var exceptionCaught = false;
-		var partialMessage = "Error: com.tns.NativeScriptException: Failed to find module: \"../a.js\", relative to: /app/";
+		var partialMessage = "Error: com.tns.NativeScriptException: Failed to find module: \"../aaa.js\", relative to: app/tests/";
 		var thrownException;
 		try
 		{
-			require("../a.js");
+			require("../aaa.js");
 		}
 		catch(e)
 		{
@@ -93,7 +93,7 @@ describe("Tests require exceptions ", function () {
 	it("when requiring a relative (./) non existing module and error should be thrown", function () {
 		
 		var exceptionCaught = false;
-		var partialMessage = "Error: com.tns.NativeScriptException: Failed to find module: \"./a.js\", relative to: /app/";
+		var partialMessage = "Error: com.tns.NativeScriptException: Failed to find module: \"./a.js\", relative to: app/tests";
 		var thrownException;
 		try
 		{
@@ -112,7 +112,7 @@ describe("Tests require exceptions ", function () {
 	it("when requiring a relative non existing tns_module an error should be thrown", function () {
 		
 		var exceptionCaught = false;
-		var partialMessage = "Error: com.tns.NativeScriptException: Failed to find module: \"a.js\", relative to: /app/tns_modules";
+		var partialMessage = "Error: com.tns.NativeScriptException: Failed to find module: \"a.js\", relative to: app/tns_modules/";
 		var thrownException;
 		try
 		{
@@ -131,7 +131,7 @@ describe("Tests require exceptions ", function () {
 	it("when requiring a relative non existing tns_module from folder an error should be thrown", function () {
 		
 		var exceptionCaught = false;
-		var partialMessage = "Error: com.tns.NativeScriptException: Failed to find module: \"a/a.js\", relative to: /app/tns_modules";
+		var partialMessage = "Error: com.tns.NativeScriptException: Failed to find module: \"a/a.js\", relative to: app/tns_modules/";
 		var thrownException;
 		try
 		{
