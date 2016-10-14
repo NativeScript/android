@@ -202,6 +202,8 @@ model {
         defaultConfig.with {
             if(optimized) {
                 project.archivesBaseName = "${archivesBaseName}-optimized"
+            } else {
+                project.archivesBaseName = "${archivesBaseName}-regular"
             }
 
             minSdkVersion.apiLevel = 17
@@ -264,10 +266,6 @@ model {
         release {
             minifyEnabled = false
             proguardFiles.add(file('proguard-rules.txt'))
-
-            if(optimized) {
-                versionNameSuffix '-optimized'
-            }
 
             ndk {
                 debuggable = ndkDebuggable

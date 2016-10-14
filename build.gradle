@@ -141,9 +141,9 @@ task generateRuntimeAar(type: Exec) {
 
 task copyGeneratedRuntime << {
 	copy {
-		from "$rootDir/runtime/build/outputs/aar/runtime-release.aar"
+		from "$rootDir/runtime/build/outputs/aar/runtime-regular-release.aar"
 		into "$rootDir/dist/framework/libs/runtime-libs/"
-		rename "runtime-release.aar", "nativescript.aar"
+		rename "runtime-regular-release.aar", "nativescript-regular.aar"
 	}
 
 	copy {

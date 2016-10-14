@@ -205,10 +205,21 @@ dependencies {
 	// compile files("$rootDir/libs/aar") {
         // builtBy 'copyAarDependencies'
     // }
-	
+	copyNativeScriptAar()
+
 	compile project(':runtime')
 }
 
+
+def copyNativeScriptAar() {
+	def runtimeAarType = project.hasProperty("nooptimize") ? "regular" : "optimized";
+
+	copy {
+		from "$projectDir/libs/runtime-libs/nativescript-${runtimeAarType}.aar"
+		into "$projectDir/libs/runtime-libs/"
+		rename "nativescript-${runtimeAarType}.aar", "nativescript.aar"
+	}
+}
 
 ////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////// CONFIGURATION PHASE //////////////////////////////////
