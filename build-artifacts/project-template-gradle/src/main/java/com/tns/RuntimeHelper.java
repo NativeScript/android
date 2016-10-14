@@ -152,7 +152,10 @@ public final class RuntimeHelper {
 				Runtime.initInstance(app);
 			}
 			catch (Exception e) {
-				
+				if (logger.isEnabled()) {
+					logger.write("Cannot initialize application instance.");
+				}
+				e.printStackTrace();
 			}
 		}
 		return runtime;
