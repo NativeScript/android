@@ -3,27 +3,24 @@ package com.tns;
 import android.text.TextUtils;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Queue;
-import java.util.Stack;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
 class Module
 {
-	private static Logger logger;
 	private static String RootPackageDir;
 	private static String ApplicationFilesPath;
 	private static String ModulesFilesPath;
 	private static String NativeScriptModulesFilesPath;
 	private static int RootDirsCount;
 	private static boolean initialized = false;
+	private static String possibleException = null;
 
 	// cache the already resolved absolute paths to folder modules to prevent JSON parsing each time
 	private static final HashMap<String, String> folderAsModuleCache = new HashMap<String, String>();
@@ -31,7 +28,6 @@ class Module
 
 	public static void init(Logger logger, File rootPackageDir, File applicationFilesDir) throws IOException
 	{
-		Module.logger = logger;
 		if (initialized)
 		{
 			return;
@@ -42,18 +38,9 @@ class Module
 
 		ModulesFilesPath = "/app/";
 
-		RootDirsCount = ApplicationFilesPath.split("/").length + 1;
+		RootDirsCount = (ApplicationFilesPath + "/app/tns_modules").split("/").length + 1;
 
-		NativeScriptModulesFilesPath = "/app/tns_modules/tns_modules_core";
-
-		// Support previous tns_modules location for now
-		// NOTE: This functionality is temporary and is to be deleted within
-		// several months
-		File file = new File(ApplicationFilesPath + NativeScriptModulesFilesPath);
-		if (!file.exists())
-		{
-			NativeScriptModulesFilesPath = "/tns_modules/";
-		}
+		NativeScriptModulesFilesPath = ApplicationFilesPath + "/app/tns_modules/tns-core-modules";
 
 		initialized = true;
 	}
@@ -102,36 +89,37 @@ class Module
 		return true;
 	}
 
-	private static String possibleError = "";
-
 	private static File resolvePathHelper(String path, String baseDir) throws NativeScriptException { //think about special require exception inheriting NativeScriptException
 
 		File foundModule = null;
-		if (baseDir == null || baseDir.isEmpty())
+		if (baseDir == null || baseDir.isEmpty() || path.startsWith("~/"))
 		{
 			baseDir = ApplicationFilesPath + ModulesFilesPath;
 		}
 
 		// relative or absolute path
-		if (path.startsWith("./") || path.startsWith("../") || path.startsWith("~/")) {
+		if (path.startsWith("./") || path.startsWith("../") || path.startsWith("~/") || path.startsWith("/")) {
 
-			foundModule = resolveFromFileOrDirectory(baseDir, path);
-			if(foundModule != null) {
-				return foundModule;
+			File possibleRelativeAbsoluteModule = prepareRelativeOrAbsoluteDir(path, baseDir);
+			if(possibleRelativeAbsoluteModule != null) {
+				foundModule = resolveFromFileOrDirectory(baseDir, path, possibleRelativeAbsoluteModule);
+				if(foundModule != null) {
+					return foundModule;
+				}
 			}
 		}
 		else { //native modules or traverse node_modules possiblilities
-
-			foundModule = resolveFromFileOrDirectory(NativeScriptModulesFilesPath, path);
+			File possibleNativeModule = new File(NativeScriptModulesFilesPath, path);
+			foundModule = resolveFromFileOrDirectory(NativeScriptModulesFilesPath, path, possibleNativeModule);
 			if(foundModule != null) {
 				return foundModule;
 			}
 
 			// resolve through node_modules
-			List<String> possibleSearchDirs = nodeModulesPaths(baseDir + path);
+			List<String> possibleSearchDirs = nodeModulesPaths(baseDir);
 			for(String possibleDir : possibleSearchDirs) {
-
-				foundModule = resolveFromFileOrDirectory(possibleDir, path);
+				File possibleRelativeModule = new File(possibleDir, path);
+				foundModule = resolveFromFileOrDirectory(possibleDir, path, possibleRelativeModule);
 				if(foundModule != null) {
 					return foundModule;
 				}
@@ -139,35 +127,55 @@ class Module
 		}
 
 		// throw error if file could not be resolved
-		if(foundModule == null) {
-			throw new NativeScriptException("Could not load module: " + path + " " + possibleError);
-		}
-
-		return foundModule;
+		throw new NativeScriptException(possibleException);
 	}
 
-	private static File resolveFromFileOrDirectory(String baseDir, String path) {
+	private static File prepareRelativeOrAbsoluteDir(String path, String baseDir) {
+		File fileOrDirectory = null;
+
+		if(path.startsWith("/")) {
+			fileOrDirectory = new File(path);
+		}
+		else if(path.startsWith("~/")) {
+			fileOrDirectory = new File(ApplicationFilesPath + ModulesFilesPath, path.substring(2));
+		}
+		else if(path.startsWith("./") || path.startsWith("../")) {
+			fileOrDirectory = new File(baseDir, path);
+		}
+
+		return fileOrDirectory;
+	}
+
+	private static File resolveFromFileOrDirectory(String baseDir, String path, File fileOrDirectory) {
 		File foundModule = null;
 
-		foundModule = loadAsFile(baseDir, path);
+		foundModule = loadAsFile(fileOrDirectory);
 		if(foundModule != null) {
 			return foundModule;
 		}
+		else {
+			if (path.startsWith("~/"))
+			{
+				possibleException = "Failed to find module: \"" + path + "\", relative to: " + ModulesFilesPath;
+			}
+			else
+			{
+				possibleException = "Failed to find module: \"" + path + "\", relative to: " + baseDir.substring(ApplicationFilesPath.length() + 1) + "/";
+			}
+		}
 
-		foundModule = loadAsDirectory(baseDir, path);
+		foundModule = loadAsDirectory(fileOrDirectory);
 
 		return foundModule;
 	}
 
 	//tries to load the path as a file, returns null if that's not possible
-	private static File loadAsFile(String baseDir, String path) {
+	private static File loadAsFile(File path) {
 		String fallbackExtension;
 
-//		If X.js is a file, load X.js as JavaScript text.
-//		If X.json is a file, parse X.json to a JavaScript Object.
-		boolean isJSFile = path.endsWith(".js");
-		boolean isSOFile = path.endsWith(".so");
-		boolean isJSONFile = path.endsWith(".json");
+		boolean isJSFile = path.getName().endsWith(".js");
+		boolean isSOFile = path.getName().endsWith(".so");
+		boolean isJSONFile = path.getName().endsWith(".json");
 
 		if (isJSFile || isJSONFile || isSOFile)
 		{
@@ -178,28 +186,26 @@ class Module
 			fallbackExtension = ".js";
 		}
 
-		File foundFile = new File(baseDir, path + fallbackExtension);
-		if(foundFile.isFile()) {
-			return foundFile;
+		File foundFile = new File(path.getAbsolutePath() + fallbackExtension);
+		try {
+			if(foundFile.getCanonicalFile().exists()) {
+                return foundFile;
+            }
+		} catch (IOException e) {
+			// return null
 		}
-		else {
-			return null;
-		}
+
+		return null;
 
 		//TODO: plamen5kov: implement later if necessary
 //		If X is a file, load X as JavaScript text.  STOP
 //		If X.node is a file, load X.node as binary addon.  STOP
 	}
 
-	private static File loadAsDirectory(String baseDir, String path) {
-		File packageFile = new File(baseDir, path + "/package.json");
-		File foundFile = null; // /a/b/c /d/e
-		boolean found = false;
+	private static File loadAsDirectory(File path) {
+		File packageFile = new File(path, "/package.json");
+		File foundFile = null;
 
-//		If X/package.json is a file,
-//			a. Parse X/package.json, and look for "main" field.
-//			b. let M = X + (json main field)
-//			c. LOAD_AS_FILE(M)
 		if (packageFile.exists())
 		{
 			try
@@ -212,7 +218,9 @@ class Module
 					{
 						mainFile += ".js";
 					}
-					foundFile = loadAsFile(baseDir, path + mainFile);
+
+					File pathFromMain = new File(path, mainFile);
+					foundFile = loadAsFile(pathFromMain);
 
 					if(foundFile != null) {
 						return foundFile;
@@ -225,33 +233,41 @@ class Module
 			}
 			catch (JSONException e)
 			{
-				throw new NativeScriptException(e.getMessage());
+				if(!e.getMessage().contains("No value for main")) {
+					throw new NativeScriptException(e.getMessage());
+				}
 			}
 		}
 
-//		If X/index.js is a file, load X/index.js as JavaScript text.
-		foundFile = new File(baseDir, path + "/index.js");
-		if(foundFile.isFile()) {
-			return foundFile;
+		//fallback to index js
+		foundFile = new File(path, "index.js");
+		try {
+			if(foundFile.getCanonicalFile().exists()) {
+                return foundFile;
+            }
+		} catch (IOException e) {
+			return null;
 		}
 
 		//TODO: plamen5kov: add later if necessary
 //		If X/index.json is a file, parse X/index.json to a JavaScript object. STOP
 //		4. If X/index.node is a file, load X/index.node as binary addon.  STOP
-		return foundFile;
+		return null;
 	}
 
 	private static List<String> nodeModulesPaths(String startDir) {
 
-		String[] pathParts = startDir.split("/");
+		File startFile = new File(startDir);
+
+		String[] startDirParts = startFile.getAbsolutePath().split("/");
 		List<String> dirs = new LinkedList<String>();
-		for(String part : pathParts) {
+		for(String part : startDirParts) {
 			dirs.add(part);
 		}
-		List<String> possibleDirectories = new ArrayList<String>();
 
+		List<String> possibleDirectories = new ArrayList<String>();
 		int currentSize = dirs.size();
-		while (currentSize >= RootDirsCount) { //don't go out of files/app path
+		while (currentSize >= RootDirsCount) {
 
 			String lastDir = dirs.get(currentSize - 1);
 			if(lastDir.equals("node_modules") || lastDir.equals("tns_modules")) {
@@ -269,137 +285,136 @@ class Module
 		return possibleDirectories;
 	}
 
-//	private static File resolvePathHelper(String path, String baseDir)
-//	{
-//		File directory = null;
-//		File file = null;
-//		String possibleException = null;
-//
-//		if (baseDir == null || baseDir.isEmpty())
-//		{
-//			baseDir = ApplicationFilesPath + ModulesFilesPath;
-//		}
-//		// ourModule/file
-//		// file resolution
-//		if (path.startsWith("/"))
-//		{
-//			// absolute path
-//			directory = new File(path);
-//			file = getFileWithExtension(path);
-//			if (!file.exists())
-//			{
-//				possibleException = "Failed to find module with absolute path: \"" + path + "\".";
-//			}
-//		}
-//		else if (path.startsWith("./") || path.startsWith("../") || path.startsWith("~/") || path.startsWith("/"))
-//		{
-//			// same or up directory
-//			String resolvedPath = FileSystem.resolveRelativePath(ApplicationFilesPath, path, baseDir);
-//			directory = new File(resolvedPath);
-//			file = getFileWithExtension(directory.getAbsolutePath());
-//
-//			if (!file.exists())
-//			{
-//				if (path.startsWith("~/"))
-//				{
-//					possibleException = "Failed to find module: \"" + path + "\", relative to: " + ModulesFilesPath;
-//				}
-//				else
-//				{
-//					String paretnFolderPath = file.getParentFile().getAbsolutePath();
-//					if (ApplicationFilesPath.length() <= paretnFolderPath.length())
-//					{
-//						possibleException = "Failed to find module: \"" + path + "\", relative to: " + paretnFolderPath.substring(ApplicationFilesPath.length()) + "/";
-//					}
-//				}
-//			}
-//		}
-//		else
-//		{
-//			// search for tns_module
-//			directory = new File(ApplicationFilesPath + NativeScriptModulesFilesPath, path);
-//			file = getFileWithExtension(directory.getPath());
-//			if (!file.exists())
-//			{
-//				possibleException = "Failed to find module: \"" + path + "\", relative to: " + NativeScriptModulesFilesPath;
-//			}
-//		}
-//
-//		// directory resolution
-//		if (!file.exists() && directory.exists() && directory.isDirectory())
-//		{
-//			// We are pointing to a directory, check for already resolved file
-//			String folderPath = directory.getAbsolutePath();
-//			String cachedPath = folderAsModuleCache.get(folderPath);
-//			boolean found = false;
-//
-//			if (cachedPath == null)
-//			{
-//				// Search for package.json or index.js
-//				File packageFile = new File(directory.getPath() + "/package.json");
-//				if (packageFile.exists())
-//				{
-//					try
-//					{
-//						JSONObject object = FileSystem.readJSONFile(packageFile);
-//						if (object != null)
-//						{
-//							String mainFile = object.getString("main");
-//							if (!mainFile.endsWith(".js"))
-//							{
-//								mainFile += ".js";
-//							}
-//							file = new File(directory.getAbsolutePath(), mainFile);
-//							found = true;
-//						}
-//					}
-//					catch (IOException e)
-//					{
-//						throw new NativeScriptException(e.getMessage());
-//					}
-//					catch (JSONException e)
-//					{
-//						file = null;
-//					}
-//				}
-//
-//				if (!found)
-//				{
-//					// search for index.js
-//					file = new File(directory.getPath() + "/index.js");
-//				}
-//
-//				// TODO: search for <folderName>.js ?
-//
-//				if (file != null)
-//				{
-//					// cache the main file for later use
-//					folderAsModuleCache.put(folderPath, file.getAbsolutePath());
-//				}
-//			}
-//			else
-//			{
-//				// do not check whether this path is external for the application - it is already checked
-//				checkForExternalPath = false;
-//				file = new File(cachedPath);
-//			}
-//		}
-//
-//		File projectRootDir = new File(ApplicationFilesPath);
-//		if (checkForExternalPath && isFileExternal(file, projectRootDir))
-//		{
-//			throw new NativeScriptException("Module " + path + " is an external path. You can only load modules inside the application!");
-//		}
-//
-//		if (file.exists())
-//		{
-//			return file;
-//		}
-//		else
-//		{
-//			throw new NativeScriptException(possibleException);
-//		}
-//	}
+	////////// REMOVE WITH DEPENDENCIES /////////////
+	private static File a(String path, String baseDir)
+	{
+		File directory = null;
+		File file = null;
+
+		if (baseDir == null || baseDir.isEmpty())
+		{
+			baseDir = ApplicationFilesPath + ModulesFilesPath;
+		}
+
+		// absolute path
+		if (path.startsWith("/"))
+		{
+			directory = new File(path);
+			file = getFileWithExtension(path);
+			if (!file.exists())
+			{
+				possibleException = "Failed to find module with absolute path: \"" + path + "\".";
+			}
+		}
+		//relative path
+		else if (path.startsWith("./") || path.startsWith("../") || path.startsWith("~/") || path.startsWith("/")) {
+			// same or up directory
+			String resolvedPath = FileSystem.resolveRelativePath(ApplicationFilesPath, path, baseDir);
+			directory = new File(resolvedPath);
+			file = getFileWithExtension(directory.getAbsolutePath());
+
+			if (!file.exists())
+			{
+				if (path.startsWith("~/"))
+				{
+					possibleException = "Failed to find module: \"" + path + "\", relative to: " + ModulesFilesPath;
+				}
+				else
+				{
+					String paretnFolderPath = file.getParentFile().getAbsolutePath();
+					if (ApplicationFilesPath.length() <= paretnFolderPath.length())
+					{
+						possibleException = "Failed to find module: \"" + path + "\", relative to: " + paretnFolderPath.substring(ApplicationFilesPath.length() + 1) + "/";
+					}
+				}
+			}
+		}
+		// search for tns_module
+		else
+		{
+			directory = new File(ApplicationFilesPath + NativeScriptModulesFilesPath, path);
+			file = getFileWithExtension(directory.getPath());
+			if (!file.exists())
+			{
+				possibleException = "Failed to find module: \"" + path + "\", relative to: " + NativeScriptModulesFilesPath;
+			}
+		}
+
+		// directory resolution
+		if (!file.exists() && directory.exists() && directory.isDirectory())
+		{
+			// We are pointing to a directory, check for already resolved file
+			String folderPath = directory.getAbsolutePath();
+			String cachedPath = folderAsModuleCache.get(folderPath);
+			boolean found = false;
+
+			if (cachedPath == null)
+			{
+				// Search for package.json or index.js
+				File packageFile = new File(directory.getPath() + "/package.json");
+				if (packageFile.exists())
+				{
+					try
+					{
+						JSONObject object = FileSystem.readJSONFile(packageFile);
+						if (object != null)
+						{
+							String mainFile = object.getString("main");
+							if (!mainFile.endsWith(".js"))
+							{
+								mainFile += ".js";
+							}
+							file = new File(directory.getAbsolutePath(), mainFile);
+							found = true;
+						}
+					}
+					catch (IOException e)
+					{
+						throw new NativeScriptException(e.getMessage());
+					}
+					catch (JSONException e)
+					{
+						file = null;
+					}
+				}
+
+				if (!found)
+				{
+					// search for index.js
+					file = new File(directory.getPath() + "/index.js");
+				}
+
+				// TODO: search for <folderName>.js ?
+
+				if (file != null)
+				{
+					// cache the main file for later use
+					folderAsModuleCache.put(folderPath, file.getAbsolutePath());
+				}
+			}
+			else
+			{
+				// do not check whether this path is external for the application - it is already checked
+				checkForExternalPath = false;
+				file = new File(cachedPath);
+			}
+		}
+
+		File projectRootDir = new File(ApplicationFilesPath);
+		if (checkForExternalPath && isFileExternal(file, projectRootDir))
+		{
+			throw new NativeScriptException("Module " + path + " is an external path. You can only load modules inside the application!");
+		}
+
+		if (file.exists())
+		{
+			return file;
+		}
+		else
+		{
+			throw new NativeScriptException(possibleException);
+		}
+	}
 
 	private static File getFileWithExtension(String path)
 	{
