@@ -40,7 +40,7 @@ class Module
 
 		RootDirsCount = (ApplicationFilesPath + "/app").split("/").length;
 
-		NativeScriptModulesFilesPath = ApplicationFilesPath + "/app/node_modules/tns-core-modules";
+		NativeScriptModulesFilesPath = ApplicationFilesPath + "/app/tns_modules/tns-core-modules";
 
 		initialized = true;
 	}
@@ -275,8 +275,14 @@ class Module
 			}
 
 			String currentDir = TextUtils.join("/", dirs);
-			currentDir += "/node_modules";
-			possibleDirectories.add(currentDir);
+			String finalDir = currentDir + "/node_modules";
+
+			//TODO: plamen5kov revisit this if we decide to get rid of tns_modules folder
+			if(lastDir.equals("app")) {
+				finalDir = currentDir + "/tns_modules";
+			}
+
+			possibleDirectories.add(finalDir);
 
 			dirs.remove(dirs.size() -1);
 		}
