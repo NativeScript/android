@@ -164,7 +164,7 @@ class Module
 			}
 		}
 
-		foundModule = loadAsDirectory(fileOrDirectory);
+		foundModule = loadAsDirectory(baseDir, path, fileOrDirectory);
 
 		return foundModule;
 	}
@@ -202,7 +202,7 @@ class Module
 //		If X.node is a file, load X.node as binary addon.  STOP
 	}
 
-	private static File loadAsDirectory(File path) {
+	private static File loadAsDirectory(String baseDir, String currentPath, File path) {
 		File packageFile = new File(path, "/package.json");
 		File foundFile = null;
 
@@ -214,14 +214,10 @@ class Module
 				if (object != null)
 				{
 					String mainFile = object.getString("main");
-					if (!mainFile.endsWith(".js"))
-					{
-						mainFile += ".js";
-					}
 
 					File pathFromMain = new File(path, mainFile);
-					foundFile = loadAsFile(pathFromMain);
-
+//					foundFile = loadAsFile(pathFromMain);
+					foundFile = resolveFromFileOrDirectory(baseDir, currentPath, pathFromMain);
 					if(foundFile != null) {
 						return foundFile;
 					}
