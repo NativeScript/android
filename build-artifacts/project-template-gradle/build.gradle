@@ -212,7 +212,12 @@ dependencies {
 
 
 def copyNativeScriptAar() {
-	def runtimeAarType = project.hasProperty("nooptimize") ? "regular" : "optimized";
+	def useV8SymbolsFlag = new File("$projectDir/build-tools/useV8");
+	def runtimeAarType = "optimized";
+	if (useV8SymbolsFlag.exists() && !useV8SymbolsFlag.isDirectory()) {
+		println "Using less-optimized runtime bundle.";
+		runtimeAarType = "regular";
+	}
 
 	copy {
 		from "$projectDir/libs/runtime-libs/nativescript-${runtimeAarType}.aar"
