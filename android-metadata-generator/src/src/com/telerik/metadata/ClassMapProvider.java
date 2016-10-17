@@ -1,11 +1,11 @@
 package com.telerik.metadata;
 
+import com.telerik.metadata.desc.ClassDescriptor;
+
 import java.util.Map;
 
-import org.apache.bcel.classfile.JavaClass;
-
 public interface ClassMapProvider {
-	Map<String, JavaClass> getClassMap();
+	Map<String, ClassDescriptor> getClassMap();
 	
 	String getPath();
 }
