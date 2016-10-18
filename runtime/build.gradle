@@ -219,10 +219,20 @@ model {
         moduleName = "NativeScript"
 
         cppFlags.addAll(["-I${file("src/main/jni")}".toString(),
-                         "-I${file("src/main/jni/include")}".toString()
+                         "-I${file("src/main/jni/include")}".toString(),
+                         "-I${file("src/main/jni/v8_inspector/")}".toString(),
+                         "-I${file("src/main/jni/v8_inspector/platform/inspector_protocol/")}".toString(),
         ])
 
-        cppFlags.addAll(["-std=c++11", "-fexceptions", "-fno-builtin-stpcpy"])
+        CFlags.addAll(["-I${file("src/main/jni")}".toString(),
+                       "-I${file("src/main/jni/include")}".toString(),
+                       "-I${file("src/main/jni/v8_inspector")}".toString(),
+                       "-I${file("src/main/jni/v8_inspector/platform/inspector_protocol/")}".toString(),
+                       ])
+
+        cppFlags.addAll(["-std=c++11", "-fexceptions", "-fno-builtin-stpcpy", "-DHAVE_INSPECTOR"]) //, "-DV8_INSPECTOR_USE_STL=1", "-D__GXX_EXPERIMENTAL_CXX0X__=1"
+
+
         CFlags.addAll(["-Wno-error=format-security", "-g", "-fno-builtin-stpcpy"])
 
         ldLibs.addAll(["android", "dl", "log", "atomic", "z"])
