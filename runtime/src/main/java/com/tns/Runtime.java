@@ -291,7 +291,16 @@ public class Runtime {
                     WorkThreadScheduler workThreadScheduler = new WorkThreadScheduler(new WorkerThreadHandler());
 
                     DynamicConfiguration dynamicConfiguration = new DynamicConfiguration(workerId, workThreadScheduler, mainThreadScheduler, callingJsDir);
+
+                    if(staticConfiguration.logger.isEnabled()) {
+                        staticConfiguration.logger.write("Worker (id=" + workerId + ")'s Runtime is initializing!");
+                    }
+
                     Runtime runtime = initRuntime(dynamicConfiguration);
+
+                    if(staticConfiguration.logger.isEnabled()) {
+                        staticConfiguration.logger.write("Worker (id=" + workerId + ")'s Runtime initialized!");
+                    }
 
 					/*
 						Send a message to the Main Thread to `shake hands`,
