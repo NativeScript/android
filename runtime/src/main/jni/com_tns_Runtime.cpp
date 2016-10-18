@@ -270,36 +270,15 @@ extern "C" jint Java_com_tns_Runtime_generateNewObjectId(JNIEnv *env, jobject ob
 	}
 }
 
-extern "C" void Java_com_tns_Runtime_adjustAmountOfExternalAllocatedMemoryNative(JNIEnv *env, jobject obj, jint runtimeId, jlong usedMemory)
+extern "C" jboolean Java_com_tns_Runtime_notifyGc(JNIEnv *env, jobject obj, jint runtimeId)
 {
 	auto runtime = TryGetRuntime(runtimeId);
-	if (runtime == nullptr)
-	{
-		return;
+	if (runtime == nullptr) {
+		return JNI_FALSE;
 	}
 
-	auto isolate = runtime->GetIsolate();
-	v8::Isolate::Scope isolate_scope(isolate);
-	v8::HandleScope handleScope(isolate);
-
-	try
-	{
-		runtime->AdjustAmountOfExternalAllocatedMemoryNative(env, obj, usedMemory);
-	}
-	catch (NativeScriptException& e)
-	{
-		e.ReThrowToJava();
-	}
-	catch (std::exception e) {
-		stringstream ss;
-		ss << "Error: c++ exception: " << e.what() << endl;
-		NativeScriptException nsEx(ss.str());
-		nsEx.ReThrowToJava();
-	}
-	catch (...) {
-		NativeScriptException nsEx(std::string("Error: c++ exception!"));
-		nsEx.ReThrowToJava();
-	}
+	jboolean success = runtime->NotifyGC(env, obj) ? JNI_TRUE : JNI_FALSE;
+	return success;
 }
 
 extern "C" void Java_com_tns_Runtime_passUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, jint runtimeId, jthrowable exception, jstring stackTrace)

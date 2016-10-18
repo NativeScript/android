@@ -104,8 +104,8 @@ public final class RuntimeHelper {
 				extractPolicy.setAssetsThumb(app);
 			}
 
-			Object[] v8Config = V8Config.fromPackageJSON(appDir);
-			
+			AppConfig appConfig = new AppConfig(appDir);
+
 			ClassLoader classLoader = app.getClassLoader();
 			File dexDir = new File(rootDir, "code_cache/secondary-dexes");
 			String dexThumb = null;
@@ -118,7 +118,7 @@ public final class RuntimeHelper {
 			}
 
 			StaticConfiguration config = new StaticConfiguration(logger, debugger, appName, null, rootDir,
-					appDir, classLoader, dexDir, dexThumb, v8Config);
+					appDir, classLoader, dexDir, dexThumb, appConfig);
 
 			runtime = Runtime.initializeRuntimeWithConfiguration(config);
 

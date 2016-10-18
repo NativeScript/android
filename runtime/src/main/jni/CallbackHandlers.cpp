@@ -54,11 +54,6 @@ void CallbackHandlers::Init(Isolate *isolate) {
                                                         "()V");
     assert(ENABLE_VERBOSE_LOGGING_METHOD_ID != nullptr);
 
-    GET_CHANGE_IN_BYTES_OF_USED_MEMORY_METHOD_ID = env.GetMethodID(RUNTIME_CLASS,
-                                                                   "getChangeInBytesOfUsedMemory",
-                                                                   "()J");
-    assert(GET_CHANGE_IN_BYTES_OF_USED_MEMORY_METHOD_ID != nullptr);
-
     INIT_WORKER_METHOD_ID = env.GetStaticMethodID(RUNTIME_CLASS, "initWorker", "(Ljava/lang/String;Ljava/lang/String;I)V");
 
     assert(INIT_WORKER_METHOD_ID != nullptr);
@@ -549,18 +544,10 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
     }
 }
 
-int64_t CallbackHandlers::AdjustAmountOfExternalAllocatedMemory(JEnv &env, Isolate *isolate) {
+void CallbackHandlers::AdjustAmountOfExternalAllocatedMemory(JEnv &env, Isolate *isolate) {
     auto runtime = Runtime::GetRuntime(isolate);
-
-    int64_t changeInBytes = env.CallLongMethod(runtime->GetJavaRuntime(),
-                                               GET_CHANGE_IN_BYTES_OF_USED_MEMORY_METHOD_ID);
-
-    int64_t adjustedValue = (changeInBytes != 0)
-                            ? isolate->AdjustAmountOfExternalAllocatedMemory(changeInBytes)
-                            :
-                            0;
-
-    return adjustedValue;
+    runtime->AdjustAmountOfExternalAllocatedMemory();
+    runtime->TryCallGC();
 }
 
 Local<Object> CallbackHandlers::CreateJSWrapper(Isolate *isolate, jint javaObjectID,
@@ -1440,7 +1427,6 @@ jmethodID CallbackHandlers::MAKE_INSTANCE_STRONG_ID = nullptr;
 jmethodID CallbackHandlers::GET_TYPE_METADATA = nullptr;
 jmethodID CallbackHandlers::ENABLE_VERBOSE_LOGGING_METHOD_ID = nullptr;
 jmethodID CallbackHandlers::DISABLE_VERBOSE_LOGGING_METHOD_ID = nullptr;
-jmethodID CallbackHandlers::GET_CHANGE_IN_BYTES_OF_USED_MEMORY_METHOD_ID = nullptr;
 jmethodID CallbackHandlers::INIT_WORKER_METHOD_ID = nullptr;
 NumericCasts CallbackHandlers::castFunctions;
 ArrayElementAccessor CallbackHandlers::arrayElementAccessor;

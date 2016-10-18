@@ -2,6 +2,9 @@
 	"main": "boot.js",
 	"android": {
 		"v8Flags": "--expose_gc",
-		"profilerOutputDir": ""
+		"profilerOutputDir": "",
+		"gcThrottleTime": 500,
+		"memoryCheckInterval": 10,
+		"freeMemoryRatio": 0.50
 	}
 }
