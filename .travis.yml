@@ -4,6 +4,7 @@ env:
   - DATE=$(date +%Y-%m-%d)
   - PACKAGE_VERSION=next-$DATE-$TRAVIS_BUILD_NUMBER
   - PACKAGE_NAME=tns-android
+  - ANDROID_HOME=/usr/local/android-sdk
 sudo: true
 language: android
 jdk:

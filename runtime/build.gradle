@@ -31,6 +31,7 @@ for (String runTask : runTasks) {
 }
 
 
+project.ext.sdkDir = System.getenv("ANDROID_HOME")
 def ndkDir = System.getenv("ANDROID_NDK_HOME")
 def propertiesFile = project.rootProject.file('local.properties')
 if (propertiesFile.exists()) {
@@ -187,10 +188,12 @@ if (!ndkDebuggable)
 }
 
 
+project.ext._buildToolsVersion = "23.0.3"
+
 model {
     android {
         compileSdkVersion = 23
-        buildToolsVersion = "23.0.3"
+        buildToolsVersion = project.ext._buildToolsVersion
 
         defaultConfig.with {
             minSdkVersion.apiLevel = 17
@@ -257,11 +260,15 @@ model {
             setRuntimeCommit.dependsOn(setPackageVersion)
 
             tasks.whenTaskAdded { task ->
-                if (task.getName() == "androidRelease")
+                def taskName = task.getName()
+                if (taskName == "androidRelease")
                 {
                     task.dependsOn(setRuntimeCommit)
                     task.mustRunAfter setRuntimeCommit
                     task.finalizedBy revertVersionFile
+                }
+                if ((taskName == "bundleDebug") || (taskName == "bundleRelease")) {
+                    task.finalizedBy createPackageConfigFileTask(taskName)
                 }
 //                else if (task.getName().contains("stripSymbols")
 //                {
@@ -413,6 +420,42 @@ task revertVersionFile(type: Exec) {
             commandLine "cmd", "/c", "git", "checkout", "--", versionFilePath
         } else {
             commandLine "git", "checkout", "--", versionFilePath
+        }
+    }
+}
+
+def createPackageConfigFileTask(taskName) {
+    def mode = (taskName == "bundleDebug") ? "debug" : "release"
+
+    return tasks.create(name: "packageConfigFileTaskFor${mode}",) {
+        onlyIf {
+            project.ext.sdkDir != null && !project.ext.sdkDir.isEmpty()
+        }
+
+        doFirst {
+            def pathToAAR = "${buildDir}/outputs/aar/runtime-${mode}.aar"
+
+            if (new File(pathToAAR).exists()) {
+                def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
+
+                def aaptCommand = new File(project.ext.sdkDir, "/build-tools/$project.ext._buildToolsVersion/aapt").getAbsolutePath()
+                if (isWinOs) {
+                    aaptCommand += ".exe"
+                }
+
+                def removeCmdParams = new ArrayList<String>([aaptCommand, "remove", pathToAAR, "config.json"])
+                exec {
+                    ignoreExitValue true
+                    workingDir "$projectDir/src/main"
+                    commandLine removeCmdParams.toArray()
+                }
+
+                def addCmdParams = new ArrayList<String>([aaptCommand, "add", pathToAAR, "config.json"])
+                exec {
+                    workingDir "$projectDir/src/main"
+                    commandLine addCmdParams.toArray()
+                }
+            }
         }
     }
 }
