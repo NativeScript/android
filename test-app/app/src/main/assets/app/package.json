@@ -3,8 +3,8 @@
 	"android": {
 		"v8Flags": "--expose_gc",
 		"profilerOutputDir": "",
-		"gcThrottleTime": 500,
-		"memoryCheckInterval": 1,
-		"freeMemoryRatio": 0.50
+		"gcThrottleTime": 0,
+		"memoryCheckInterval": 0,
+		"freeMemoryRatio": 0.0
 	}
 }

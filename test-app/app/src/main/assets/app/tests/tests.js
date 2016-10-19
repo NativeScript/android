@@ -640,6 +640,9 @@ describe("Tests ", function () {
 			var el = arr[0];
 
 			expect(el).toEqual(123);
+
+			gc();
+            java.lang.System.gc();
 		}
 	});
 
