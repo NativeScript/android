@@ -622,27 +622,6 @@ describe("Tests ", function () {
 		expect(file).toBe(file2);
 	});
 
-	it("TestWorkingWithJavaArrayDoesNotMakeMemoryLeak", function () {
-		__log("TEST: TestWorkingWithJavaArrayDoesNotMakeMemoryLeak");
-
-		var size = 10 * 1024 * 1024;
-
-		for (var i = 0; i < 100; i++) {
-
-			var arr = java.lang.reflect.Array.newInstance(java.lang.Byte.class.getField("TYPE").get(null), size);
-
-			var length = arr.length;
-
-			expect(length).toEqual(size);
-
-			arr[0] = 123;
-
-			var el = arr[0];
-
-			expect(el).toEqual(123);
-		}
-	});
-
 	it("TestConstructorOverride", function () {
 
 
