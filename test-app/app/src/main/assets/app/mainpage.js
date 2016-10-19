@@ -19,7 +19,7 @@ var shared = require("./shared");
 shared.runRequireTests();
 shared.runWeakRefTests();
 shared.runRuntimeTests();
-//shared.runWorkerTests();
+shared.runWorkerTests();
 
 require("./tests/testMetadata");
 require("./tests/testAsserts");
