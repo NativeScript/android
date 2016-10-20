@@ -63,7 +63,6 @@ void JsDebugger::Disable()
 
 /* *
  * schedule a debugger break to happen when JavaScript code is run in the given isolate
- * (cli command: tns debug android --debug-brk) ?
  */
 void JsDebugger::DebugBreak()
 {
