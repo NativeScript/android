@@ -26,6 +26,8 @@ import android.util.Log;
 
 public class AndroidJsDebugger implements Debugger
 {
+	private AndroidJsV8Inspector v8Inspector;
+
 	@Override
 	public void onConnect(JsDebugger context)
 	{
@@ -453,6 +455,17 @@ public class AndroidJsDebugger implements Debugger
 	public void start()
 	{
 		AndroidJsDebugger.this.debugContext.enableAgent();
+
+		v8Inspector = new AndroidJsV8Inspector(context, logger);
+		try
+		{
+			v8Inspector.start();
+		}
+		catch (IOException e)
+		{
+			e.printStackTrace();
+		}
+
 
 		handlerThread = new HandlerThread("debugAgentBroadCastReceiverHandler");
 		handlerThread.start();

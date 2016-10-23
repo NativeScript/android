@@ -382,7 +382,7 @@ void Runtime::PassUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, jthrowab
 
 		JsDebugger::ConsoleMessage(errMsg, "error");
 		//throwing unhandled error to debugger so catch all and catch unhandled exceptions setting on client can be triggered
-		DEBUG_WRITE_FORCE("throwing unhandled error to debugger");
+		DEBUG_WRITE("throwing unhandled error to debugger");
 		NativeScriptException(errMsg).ReThrowToV8();
 	}
 	else
@@ -427,6 +427,11 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring nativeLibDir
 {
 	Isolate::CreateParams create_params;
 	bool didInitializeV8 = false;
+
+	auto pckName = ArgConverter::jstringToString(packageName);
+	__android_log_print(ANDROID_LOG_INFO, pckName.c_str(), "NativeScript Runtime Version %s, commit %s", NATIVE_SCRIPT_RUNTIME_VERSION, NATIVE_SCRIPT_RUNTIME_COMMIT_SHA);
+	__android_log_print(ANDROID_LOG_DEBUG, pckName.c_str(), "V8 version %s", V8::GetVersion());
+
 
 	create_params.array_buffer_allocator = &g_allocator;
 
@@ -484,11 +489,11 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring nativeLibDir
 			m_startupData->data = static_cast<const char*>(m_heapSnapshotBlob->memory);
 			m_startupData->raw_size = m_heapSnapshotBlob->size;
 
-			DEBUG_WRITE_FORCE("Snapshot read %s (%dB).", snapshotPath.c_str(), m_heapSnapshotBlob->size);
+            DEBUG_WRITE("Snapshot read %s (%dB).", snapshotPath.c_str(), m_heapSnapshotBlob->size);
 		}
 		else if (!saveSnapshot)
 		{
-			DEBUG_WRITE_FORCE("No snapshot file found at %s", snapshotPath.c_str());
+			DEBUG_WRITE("No snapshot file found at %s", snapshotPath.c_str());
 
 		}
 		else
@@ -506,12 +511,12 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring nativeLibDir
 				customScript = File::ReadText(Constants::V8_HEAP_SNAPSHOT_SCRIPT);
 			}
 
-			DEBUG_WRITE_FORCE("Creating heap snapshot");
+			DEBUG_WRITE("Creating heap snapshot");
 			*m_startupData = V8::CreateSnapshotDataBlob(customScript.c_str());
 
 			if (m_startupData->raw_size == 0)
 			{
-				DEBUG_WRITE_FORCE("Failed to create heap snapshot.");
+				DEBUG_WRITE("Failed to create heap snapshot.");
 			}
 			else
 			{
@@ -519,11 +524,11 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring nativeLibDir
 
 				if (!writeSuccess)
 				{
-					DEBUG_WRITE_FORCE("Failed to save created snapshot.");
+					__android_log_print(ANDROID_LOG_ERROR, pckName.c_str(), "Failed to save created snapshot.");
 				}
 				else
 				{
-					DEBUG_WRITE_FORCE("Saved snapshot of %s (%dB) in %s (%dB)",
+					DEBUG_WRITE("Saved snapshot of %s (%dB) in %s (%dB)",
 							Constants::V8_HEAP_SNAPSHOT_SCRIPT.c_str(), customScript.size(),
 							snapshotPath.c_str(), m_startupData->raw_size);
 				}
@@ -555,8 +560,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring nativeLibDir
 	V8::SetCaptureStackTraceForUncaughtExceptions(true, 100, StackTrace::kOverview);
 
 	isolate->AddMessageListener(NativeScriptException::OnUncaughtError);
-
-	__android_log_print(ANDROID_LOG_DEBUG, "TNS.Native", "V8 version %s", V8::GetVersion());
 
 	auto globalTemplate = ObjectTemplate::New();
 

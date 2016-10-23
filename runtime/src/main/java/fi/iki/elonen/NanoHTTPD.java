@@ -265,7 +265,8 @@ public abstract class NanoHTTPD
                 outputStream = this.acceptSocket.getOutputStream();
                 TempFileManager tempFileManager = NanoHTTPD.this.tempFileManagerFactory.create();
                 HTTPSession session = new HTTPSession(tempFileManager, this.inputStream, outputStream, InetAddress.getLocalHost());
-                while (!this.acceptSocket.isClosed())
+                //while (!this.acceptSocket.isClosed())
+                while(true)
                 {
                     session.execute();
                 }
