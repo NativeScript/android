@@ -15,7 +15,11 @@ TNSGetOutput = function () {
 }
 __approot = __dirname.substr(0, __dirname.length - 4);
 
-require("./shared");
+var shared = require("./shared");
+shared.runRequireTests();
+shared.runWeakRefTests();
+shared.runRuntimeTests();
+shared.runWorkerTests();
 
 require("./tests/testMetadata");
 require("./tests/testAsserts");

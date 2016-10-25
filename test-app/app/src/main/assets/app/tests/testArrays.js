@@ -8,7 +8,7 @@ describe("Tests array operations", function () {
 		jasmine.addCustomEqualityTester(myCustomEquality);
 	});
 
-	it("TestWorkingWithJavaArrayDoesNotMakeMemoryLeak", function () {
+	xit("TestWorkingWithJavaArrayDoesNotMakeMemoryLeak", function () {
 		__log("TEST: TestWorkingWithJavaArrayDoesNotMakeMemoryLeak");
 		
 		var size = 10 * 1024 * 1024;
