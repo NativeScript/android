@@ -233,6 +233,7 @@ public class Runtime {
                 WorkerGlobalOnMessageCallback(currentRuntime.runtimeId, msg.obj.toString());
             } else if (msg.arg1 == MessageType.TerminateThread) {
                 currentRuntime.isTerminating = true;
+                currentRuntime.gcListener.unsubscribe(currentRuntime);
 
                 runtimeCache.remove(currentRuntime.runtimeId);
 
@@ -251,6 +252,7 @@ public class Runtime {
                 currentRuntime.mainThreadHandler.sendMessage(msgToMain);
 
                 currentRuntime.isTerminating = true;
+                currentRuntime.gcListener.unsubscribe(currentRuntime);
 
                 runtimeCache.remove(currentRuntime.runtimeId);
 
