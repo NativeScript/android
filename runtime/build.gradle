@@ -20,7 +20,11 @@ allprojects {
 }
 
 def ndkDebuggable = false;
+def optimized = project.hasProperty("optimized")
 
+if(optimized) {
+    println "Optimized build triggered."
+}
 
 List<String> runTasks = gradle.startParameter.getTaskNames();
 for (String runTask : runTasks) {
@@ -196,6 +200,12 @@ model {
         buildToolsVersion = project.ext._buildToolsVersion
 
         defaultConfig.with {
+            if(optimized) {
+                project.archivesBaseName = "${archivesBaseName}-optimized"
+            } else {
+                project.archivesBaseName = "${archivesBaseName}-regular"
+            }
+
             minSdkVersion.apiLevel = 17
             targetSdkVersion.apiLevel = 22
         }
@@ -218,6 +228,10 @@ model {
         CFlags.addAll(["-Wno-error=format-security", "-g", "-fno-builtin-stpcpy"])
 
         ldLibs.addAll(["android", "dl", "log", "atomic", "z"])
+
+        if(optimized) {
+            ldFlags.addAll(["-Wl,--exclude-libs=ALL", "-Wl,--gc-sections"])
+        }
 
         stl = "c++_static"
 
@@ -255,6 +269,11 @@ model {
 
             ndk {
                 debuggable = ndkDebuggable
+
+                if (optimized) {
+                    cppFlags.addAll(["-O3", "-fvisibility=hidden", "-ffunction-sections", "-fno-data-sections", "-Wl,--exclude-libs=ALL", "-Wl,--gc-sections"])
+                    CFlags.addAll(["-O3", "-fvisibility=hidden", "-ffunction-sections", "-fno-data-sections", "-Wl,--exclude-libs=ALL", "--Wl,-gc-sections"])
+                }
             }
 
             setRuntimeCommit.dependsOn(setPackageVersion)

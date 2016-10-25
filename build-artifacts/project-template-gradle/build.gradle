@@ -205,10 +205,26 @@ dependencies {
 	// compile files("$rootDir/libs/aar") {
         // builtBy 'copyAarDependencies'
     // }
-	
+	copyNativeScriptAar()
+
 	compile project(':runtime')
 }
 
+
+def copyNativeScriptAar() {
+	def useV8SymbolsFlag = new File("$projectDir/build-tools/useV8");
+	def runtimeAarType = "optimized";
+	if (useV8SymbolsFlag.exists() && !useV8SymbolsFlag.isDirectory()) {
+		println "Using less-optimized runtime bundle.";
+		runtimeAarType = "regular";
+	}
+
+	copy {
+		from "$projectDir/libs/runtime-libs/nativescript-${runtimeAarType}.aar"
+		into "$projectDir/libs/runtime-libs/"
+		rename "nativescript-${runtimeAarType}.aar", "nativescript.aar"
+	}
+}
 
 ////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////// CONFIGURATION PHASE //////////////////////////////////
