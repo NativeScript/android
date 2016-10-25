@@ -268,3 +268,8 @@ task generateBindings() {
 traverseJsFiles.dependsOn(generateInterfaceNamesList)
 runAstParser.dependsOn(traverseJsFiles)
 generateBindings.dependsOn(runAstParser)
+
+///////// CUSTOM CLEAN ////////////
+task clean(type: Delete) {
+	delete files(["$projectDir/bindings.txt", "$projectDir/cached.txt", "$projectDir/interfaces-names.txt", "$projectDir/jsFilesParameters.txt"])
+}
