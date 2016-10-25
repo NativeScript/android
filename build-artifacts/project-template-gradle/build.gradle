@@ -741,6 +741,7 @@ task deleteFlavors (type: Delete){
 	}
 }
 
+deleteMetadata.dependsOn(":asbg:clean")
 deleteFlavors.dependsOn(deleteMetadata)
 clean.dependsOn(deleteFlavors)
 
