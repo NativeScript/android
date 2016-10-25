@@ -417,6 +417,8 @@ static void InitializeV8() {
 	V8::Initialize();
 }
 
+bool x = false;
+
 Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName, jstring callingDir, jobject jsDebugger, jstring profilerOutputDir)
 {
 	Isolate::CreateParams create_params;
@@ -605,7 +607,10 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 	m_profiler.Init(isolate, global, pckName, outputDir);
 	JsDebugger::Init(isolate, pckName, jsDebugger);
 
-	MetadataNode::BuildMetadata(filesPath);
+	// Do not build metadata (which should be static for the process) for non-main threads
+	if (!s_mainThreadInitialized) {
+		MetadataNode::BuildMetadata(filesPath);
+	}
 
 	auto enableProfiler = !outputDir.empty();
 	MetadataNode::EnableProfiler(enableProfiler);
