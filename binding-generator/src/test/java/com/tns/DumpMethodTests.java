@@ -201,7 +201,14 @@ public class DumpMethodTests {
         boolean isSupportedMethod = (boolean)m.invoke(Dump.class, params);
         Assert.assertTrue(isSupportedMethod);
 
-        params[0] = new MethodInfo(AbstractClass.class.getDeclaredMethods()[1]); //PrivateMethod
+        MethodInfo mi = null;
+        for (Method m1: AbstractClass.class.getDeclaredMethods()) {
+            if (m1.getName().equals("PrivateMethod")) {
+                mi = new MethodInfo(m1);
+                break;
+            }
+        }
+        params[0] = mi;
         isSupportedMethod = (boolean)m.invoke(Dump.class, params);
         Assert.assertFalse(isSupportedMethod);
     }
