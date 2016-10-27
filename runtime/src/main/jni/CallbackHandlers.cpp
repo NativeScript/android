@@ -919,8 +919,6 @@ void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Valu
 
         id2WorkerMap.insert(make_pair(workerId, persistentWorker));
 
-        persistentWorker->SetWeak();
-
         DEBUG_WRITE("Called Worker constructor id=%d", workerId);
 
         JEnv env;
