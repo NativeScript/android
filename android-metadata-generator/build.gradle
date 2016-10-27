@@ -32,7 +32,8 @@ sourceSets {
 }
 
 dependencies {
-   compile files("./src/libs/bcel-5.2.jar")
+    compile files("./src/libs/bcel-5.2.jar")
+    compile files("./src/libs/dx.jar")
 }
 
 task makeDistDir {

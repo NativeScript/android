@@ -1,9 +1,9 @@
 package com.telerik.metadata;
 
+import com.telerik.metadata.desc.ClassDescriptor;
+
 import java.util.ArrayList;
 import java.util.Arrays;
-
-import org.apache.bcel.classfile.JavaClass;
 
 public class ClassRepo {
 	private ClassRepo() {
@@ -14,7 +14,7 @@ public class ClassRepo {
 	public static void cacheJarFile(ClassMapProvider classMapProvider) {
 		for (String className : classMapProvider.getClassMap().keySet()) {
 			for (ClassMapProvider cachedProvider : cachedProviders) {
-				JavaClass clazz = cachedProvider.getClassMap().get(className);
+				ClassDescriptor clazz = cachedProvider.getClassMap().get(className);
 				if (clazz != null) {
 					String errMsg = "Class " + className + " conflict: "
 							+ classMapProvider.getPath() + " and " + cachedProvider.getPath();
@@ -25,8 +25,8 @@ public class ClassRepo {
 		cachedProviders.add(classMapProvider);
 	}
 
-	public static JavaClass findClass(String className) {
-		JavaClass clazz = null;
+	public static ClassDescriptor findClass(String className) {
+		ClassDescriptor clazz = null;
 		for (ClassMapProvider classMapProvider : cachedProviders) {
 			clazz = classMapProvider.getClassMap().get(className);
 			if (clazz != null) {

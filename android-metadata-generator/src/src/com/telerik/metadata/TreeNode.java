@@ -1,14 +1,14 @@
 package com.telerik.metadata;
 
-import java.util.ArrayList;
+import com.telerik.metadata.desc.ClassDescriptor;
+import com.telerik.metadata.desc.MethodDescriptor;
+import com.telerik.metadata.desc.TypeDescriptor;
 
-import org.apache.bcel.classfile.JavaClass;
-import org.apache.bcel.classfile.Method;
-import org.apache.bcel.generic.Type;
+import java.util.ArrayList;
 
 public class TreeNode {
 	public static class MethodInfo {
-		public MethodInfo(Method m) {
+		public MethodInfo(MethodDescriptor m) {
 			this.name = m.getName();
 			this.sig = m.getSignature();
 			this.isResolved = false;
@@ -75,35 +75,35 @@ public class TreeNode {
 	public static final TreeNode BOOLEAN = getPrimitive("Z", (byte) 7);
 	public static final TreeNode CHAR = getPrimitive("C", (byte) 8);
 
-	public static TreeNode getPrimitive(Type type) throws Exception {
+	public static TreeNode getPrimitive(TypeDescriptor type) throws Exception {
 		if (!ClassUtil.isPrimitive(type)) {
 			throw new Exception("type must be primitive");
 		}
 
-		if (type.equals(Type.BYTE)) {
+		if (type.equals(TypeDescriptor.BYTE)) {
 			return TreeNode.BYTE;
-		} else if (type.equals(Type.SHORT)) {
+		} else if (type.equals(TypeDescriptor.SHORT)) {
 			return TreeNode.SHORT;
-		} else if (type.equals(Type.INT)) {
+		} else if (type.equals(TypeDescriptor.INT)) {
 			return TreeNode.INTEGER;
-		} else if (type.equals(Type.LONG)) {
+		} else if (type.equals(TypeDescriptor.LONG)) {
 			return TreeNode.LONG;
-		} else if (type.equals(Type.FLOAT)) {
+		} else if (type.equals(TypeDescriptor.FLOAT)) {
 			return TreeNode.FLOAT;
-		} else if (type.equals(Type.DOUBLE)) {
+		} else if (type.equals(TypeDescriptor.DOUBLE)) {
 			return TreeNode.DOUBLE;
-		} else if (type.equals(Type.BOOLEAN)) {
+		} else if (type.equals(TypeDescriptor.BOOLEAN)) {
 			return TreeNode.BOOLEAN;
-		} else if (type.equals(Type.CHAR)) {
+		} else if (type.equals(TypeDescriptor.CHAR)) {
 			return TreeNode.CHAR;
-		} else if (type.equals(Type.VOID)) {
+		} else if (type.equals(TypeDescriptor.VOID)) {
 			return null;
 		} else {
 			throw new Exception("unknown type=" + type.toString());
 		}
 	}
 
-	public static TreeNode getPrimitive(JavaClass clazz) throws Exception {
+	public static TreeNode getPrimitive(ClassDescriptor clazz) throws Exception {
 		if (!ClassUtil.isPrimitive(clazz)) {
 			throw new Exception("clazz must be primitive");
 		}
@@ -217,7 +217,7 @@ public class TreeNode {
 		return child;
 	}
 
-	public TreeNode attachChild(JavaClass clazz) throws Exception {
+	public TreeNode attachChild(ClassDescriptor clazz) throws Exception {
 		TreeNode child = getPrimitive(clazz);
 		children.add(child);
 		return child;

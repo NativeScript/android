@@ -1,27 +1,29 @@
 package com.telerik.metadata;
 
+import com.telerik.metadata.desc.ClassDescriptor;
+import com.telerik.metadata.desc.MethodDescriptor;
+import com.telerik.metadata.desc.TypeDescriptor;
+
 import java.util.ArrayList;
 
-import org.apache.bcel.classfile.JavaClass;
-import org.apache.bcel.classfile.Method;
 import org.apache.bcel.generic.Type;
 
-class ClassUtil {
+public class ClassUtil {
 	private ClassUtil() {
 	}
 
-	public static boolean isPrimitive(JavaClass clazz) {
+	public static boolean isPrimitive(ClassDescriptor clazz) {
 		boolean isPrimitive = !clazz.isClass() && !clazz.isEnum()
 				&& !clazz.isInterface();
 		return isPrimitive;
 	}
 
-	public static boolean isPrimitive(Type type) {
-		boolean isPrimitive = type.equals(Type.BOOLEAN)
-				|| type.equals(Type.CHAR) || type.equals(Type.BYTE)
-				|| type.equals(Type.SHORT) || type.equals(Type.INT)
-				|| type.equals(Type.LONG) || type.equals(Type.FLOAT)
-				|| type.equals(Type.DOUBLE) || type.equals(Type.VOID);
+	public static boolean isPrimitive(TypeDescriptor type) {
+		boolean isPrimitive = type.equals(TypeDescriptor.BOOLEAN)
+				|| type.equals(TypeDescriptor.CHAR) || type.equals(TypeDescriptor.BYTE)
+				|| type.equals(TypeDescriptor.SHORT) || type.equals(TypeDescriptor.INT)
+				|| type.equals(TypeDescriptor.LONG) || type.equals(TypeDescriptor.FLOAT)
+				|| type.equals(TypeDescriptor.DOUBLE) || type.equals(TypeDescriptor.VOID);
 
 		return isPrimitive;
 	}
@@ -34,7 +36,7 @@ class ClassUtil {
 		return isPrimitive;
 	}
 
-	public static boolean isArray(JavaClass clazz) {
+	public static boolean isArray(ClassDescriptor clazz) {
 		boolean isArray = isArray(clazz.getClassName());
 		return isArray;
 	}
@@ -44,8 +46,8 @@ class ClassUtil {
 		return isArray;
 	}
 
-	public static JavaClass getEnclosingClass(JavaClass clazz) {
-		JavaClass enclosingClass = null;
+	public static ClassDescriptor getEnclosingClass(ClassDescriptor clazz) {
+		ClassDescriptor enclosingClass = null;
 
 		String className = clazz.getClassName();
 		int idx = className.lastIndexOf("$");
@@ -57,7 +59,7 @@ class ClassUtil {
 		return enclosingClass;
 	}
 
-	public static String getSimpleName(JavaClass clazz) {
+	public static String getSimpleName(ClassDescriptor clazz) {
 		String className = clazz.getClassName();
 		int idx = className.lastIndexOf("$");
 		if (idx < 0) {
@@ -67,19 +69,19 @@ class ClassUtil {
 		return simpleName;
 	}
 
-	public static Method[] getAllMethods(JavaClass clazz) {
-		ArrayList<Method> methods = new ArrayList<Method>();
-		JavaClass currentClass = clazz;
+	public static MethodDescriptor[] getAllMethods(ClassDescriptor clazz) {
+		ArrayList<MethodDescriptor> methods = new ArrayList<MethodDescriptor>();
+		ClassDescriptor currentClass = clazz;
 		while (currentClass != null) {
-			Method[] currentClassMethods = currentClass.getMethods();
-			for (Method m : currentClassMethods) {
+			MethodDescriptor[] currentClassMethods = currentClass.getMethods();
+			for (MethodDescriptor m : currentClassMethods) {
 				if ((m.isPublic() || m.isProtected()) && !m.isSynthetic()) {
 					methods.add(m);
 				}
 			}
 			currentClass = getSuperclass(currentClass);
 		}
-		return methods.toArray(new Method[methods.size()]);
+		return methods.toArray(new MethodDescriptor[methods.size()]);
 	}
 
 	public static String getCanonicalName(String className) {
@@ -93,8 +95,8 @@ class ClassUtil {
 		return canonicalName;
 	}
 
-	public static JavaClass getSuperclass(JavaClass clazz) {
-		JavaClass superClass = null;
+	public static ClassDescriptor getSuperclass(ClassDescriptor clazz) {
+		ClassDescriptor superClass = null;
 		if (!clazz.getClassName().equals("java.lang.Object")) {
 			String superClassName = clazz.getSuperclassName();
 			superClass = ClassRepo.findClass(superClassName);
@@ -102,8 +104,8 @@ class ClassUtil {
 		return superClass;
 	}
 
-	public static JavaClass getClassByName(String className) {
-		JavaClass clazz = ClassRepo.findClass(className);
+	public static ClassDescriptor getClassByName(String className) {
+		ClassDescriptor clazz = ClassRepo.findClass(className);
 		return clazz;
 	}
 

@@ -1,5 +1,8 @@
 package com.telerik.metadata;
 
+import com.telerik.metadata.bcl.ClassInfo;
+import com.telerik.metadata.desc.ClassDescriptor;
+
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.HashMap;
@@ -9,23 +12,22 @@ import java.util.zip.ZipEntry;
 
 import org.apache.bcel.classfile.ClassFormatException;
 import org.apache.bcel.classfile.ClassParser;
-import org.apache.bcel.classfile.JavaClass;
 
 public class JarFile implements ClassMapProvider {
 	private final String path;
-	private final Map<String, JavaClass> classMap;
+	private final Map<String, ClassDescriptor> classMap;
 	private static final String CLASS_EXT = ".class";
 
 	private JarFile(String path) {
 		this.path = path;
-		this.classMap = new HashMap<String, JavaClass>();
+		this.classMap = new HashMap<String, ClassDescriptor>();
 	}
 
 	public String getPath() {
 		return path;
 	}
 
-	public Map<String, JavaClass> getClassMap() {
+	public Map<String, ClassDescriptor> getClassMap() {
 		return classMap;
 	}
 
@@ -46,7 +48,7 @@ public class JarFile implements ClassMapProvider {
 							.substring(0, name.length() - CLASS_EXT.length())
 							.replace('/', '.');
 					ClassParser cp = new ClassParser(jis, name);
-					JavaClass clazz = cp.parse();
+					ClassDescriptor clazz = new ClassInfo(cp.parse());
 					jar.classMap.put(name, clazz);
 				}
 			}
