@@ -55,8 +55,6 @@ namespace tns
 
 			static TypeLongOperationsCache *GetTypeLongCache(v8::Isolate *isolate);
 
-			static bool ReadJStringInBuffer(jstring value, jsize& utfLength);
-
 			static jstring ObjectToString(jobject object);
 
 			static v8::Local<v8::String> jcharToV8String(v8::Isolate *isolate, jchar value);
@@ -66,9 +64,6 @@ namespace tns
 			static void NativeScriptLongValueOfFunctionCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 			static void NativeScriptLongToStringFunctionCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
-
-			static char *charBuffer;
-			static const int BUFFER_SIZE = 1024 * 64; // 64KB size. TODO: Do we need a larger/smaller buffer?
 
 			/*
 			 * "s_type_long_operations_cache" used to keep function

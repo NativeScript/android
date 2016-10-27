@@ -184,18 +184,10 @@ std::string ArgConverter::jstringToString(jstring value)
 		return string();
 	}
 
-	jsize utfLength;
-	bool readInBuffer = ReadJStringInBuffer(value, utfLength);
-	if (readInBuffer)
-	{
-		string s(charBuffer, utfLength);
-		return s;
-	}
-
 	JEnv env;
 
-	jboolean f = false;
-	const char* chars = env.GetStringUTFChars(value, &f);
+	jboolean f = JNI_FALSE;
+	auto chars = env.GetStringUTFChars(value, &f);
 	string s(chars);
 	env.ReleaseStringUTFChars(value, chars);
 
@@ -216,27 +208,6 @@ Local<Value> ArgConverter::jstringToV8String(Isolate *isolate, jstring value)
 	env.ReleaseStringChars(value, chars);
 
 	return v8String;
-}
-
-bool ArgConverter::ReadJStringInBuffer(jstring value, jsize& utfLength)
-{
-	if (value == nullptr)
-	{
-		return false;
-	}
-
-	JEnv env;
-	utfLength = env.GetStringUTFLength(value);
-	if (utfLength > BUFFER_SIZE)
-	{
-		return false;
-	}
-
-	jsize strLength = env.GetStringLength(value);
-	// use existing buffer to prevent extensive memory allocation
-	env.GetStringUTFRegion(value, (jsize) 0, strLength, charBuffer);
-
-	return true;
 }
 
 Local<String> ArgConverter::jcharToV8String(Isolate *isolate, jchar value)
@@ -341,4 +312,3 @@ Local<String> ArgConverter::ConvertToV8String(Isolate *isolate, const char *data
 
 
 std::map<Isolate*, ArgConverter::TypeLongOperationsCache *> ArgConverter::s_type_long_operations_cache;
-char* ArgConverter::charBuffer = new char[ArgConverter::BUFFER_SIZE];
