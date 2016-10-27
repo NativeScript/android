@@ -452,7 +452,7 @@ def createPackageConfigFileTask(taskName) {
         }
 
         doFirst {
-            def pathToAAR = "${buildDir}/outputs/aar/runtime-${mode}.aar"
+            def pathToAAR = "${buildDir}/outputs/aar/${project.archivesBaseName}-${mode}.aar"
 
             if (new File(pathToAAR).exists()) {
                 def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
