@@ -42,8 +42,11 @@ public class ClassInfo implements ClassDescriptor{
 
                         ConstantUtf8 cname = (ConstantUtf8) clazz
                                 .getConstantPool().getConstant(ic.getInnerNameIndex());
-                        String innerClassname = cname.getBytes();
+                        if(cname == null) {
+                            continue;
+                        }
 
+                        String innerClassname = cname.getBytes();
                         if (name.equals(innerClassname)) {
                             int flags = ic.getInnerAccessFlags();
                             clazz.setAccessFlags(flags);
