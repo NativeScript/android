@@ -632,6 +632,63 @@ task buildMetadata (type: JavaExec) {
 	}
 }
 
+task generateTypescriptDefinitions (type: JavaExec) {
+	def paramz = new ArrayList<String>();
+	def includeDirs = ["com.android.support", "/platforms/" + android.compileSdkVersion]
+
+	doFirst {
+		delete "build-tools/typings"
+
+		workingDir "build-tools"
+
+		main "-jar"
+
+		paramz.add("dts-generator.jar");
+		paramz.add("-input");
+
+		for (String jarPath: project.jarFiles) {
+			// don't generate typings for runtime jars and classes
+			if (shouldIncludeDirForTypings(jarPath, includeDirs)) {
+				paramz.add(jarPath);
+			}
+		}
+
+		paramz.add("-output");
+		paramz.add("typings");
+
+		args paramz.toArray();
+	}
+}
+
+generateTypescriptDefinitions.onlyIf {
+	project.hasProperty("generateTypings") && Boolean.parseBoolean(project.generateTypings)
+}
+
+def shouldIncludeDirForTypings(path, includeDirs) {
+	for (String p: includeDirs) {
+		if (path.indexOf(p) > -1) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+task copyTypings {
+	doLast {
+		println "Copied generated typings to application root level."
+
+		copy {
+			from "$projectDir/build-tools/typings"
+			into "$projectDir/../../"
+		}
+	}
+}
+
+copyTypings.onlyIf({
+	generateTypescriptDefinitions.didWork;
+})
+
 task myMergeDex {
 	doLast {
 		def prefix = "${buildDir}".replace('\\', '/') + "/intermediates/transforms/dex/"
@@ -687,7 +744,7 @@ task setProperties {
 	}
 } 
 
-setProperties.finalizedBy("asbg:generateBindings")
+setProperties.finalizedBy("asbg:generateBindings", generateTypescriptDefinitions)
 
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////// EXECUTION ORDER /////////////////////////////////////
@@ -704,6 +761,7 @@ setProperties.finalizedBy("asbg:generateBindings")
 ensureMetadataOutDir.dependsOn(cleanLocalAarFiles)
 collectAllJars.dependsOn(ensureMetadataOutDir)
 buildMetadata.dependsOn(collectAllJars)
+generateTypescriptDefinitions.finalizedBy(copyTypings)
 
 //DO NOT UNCOMMENT
 // mergeAssets.dependsOn(copyMetadata) -> look in CONFIGURATIONS(top) in android.applicationVariants to see how it's done
