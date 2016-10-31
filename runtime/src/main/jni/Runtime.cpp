@@ -22,6 +22,7 @@
 #include "include/libplatform/libplatform.h"
 #include "include/zipconf.h"
 #include <sstream>
+#include <dlfcn.h>
 
 using namespace v8;
 using namespace std;
@@ -425,12 +426,19 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 	bool didInitializeV8 = false;
 
 	create_params.array_buffer_allocator = &g_allocator;
-	// prepare the snapshot blob
-	if (!Constants::V8_HEAP_SNAPSHOT_BLOB.empty() || !Constants::V8_HEAP_SNAPSHOT_SCRIPT.empty())
+
+	m_startupData = new StartupData();
+
+	void* snapshotPtr = dlopen("libsnapshot.so", RTLD_LAZY | RTLD_LOCAL);
+	if (snapshotPtr)
+	{
+		m_startupData->data = static_cast<const char *>(dlsym(snapshotPtr, "TNSSnapshot_blob"));
+		m_startupData->raw_size = *static_cast<const unsigned int *>(dlsym(snapshotPtr, "TNSSnapshot_blob_len"));
+		DEBUG_WRITE_FORCE("Snapshot library read %p (%dB).", m_startupData->data, m_startupData->raw_size);
+	}
+	else if (!Constants::V8_HEAP_SNAPSHOT_BLOB.empty() || !Constants::V8_HEAP_SNAPSHOT_SCRIPT.empty())
 	{
 		DEBUG_WRITE_FORCE("Snapshot enabled.");
-
-		m_startupData = new StartupData();
 
 		string snapshotPath;
 		bool saveSnapshot = true;
@@ -496,9 +504,9 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 				}
 			}
 		}
-
-		create_params.snapshot_blob = m_startupData;
 	}
+
+	create_params.snapshot_blob = m_startupData;
 
 	/*
 	 * Setup the V8Platform only once per process - once for the application lifetime
