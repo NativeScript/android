@@ -208,7 +208,7 @@ void V8ProfilerAgentImpl::enable(ErrorString*) {
   if (m_enabled) return;
   m_enabled = true;
   DCHECK(!m_profiler);
-  m_profiler = v8::CpuProfiler::New(m_isolate);
+  m_profiler = m_isolate->GetCpuProfiler();
   m_state->setBoolean(ProfilerAgentState::profilerEnabled, true);
 }
 
@@ -218,8 +218,9 @@ void V8ProfilerAgentImpl::disable(ErrorString* errorString) {
     stopProfiling(m_startedProfiles[i - 1].m_id, false);
   m_startedProfiles.clear();
   stop(nullptr, nullptr);
-  m_profiler->Dispose();
+
   m_profiler = nullptr;
+
   m_enabled = false;
   m_state->setBoolean(ProfilerAgentState::profilerEnabled, false);
 }
@@ -240,7 +241,7 @@ void V8ProfilerAgentImpl::restore() {
     return;
   m_enabled = true;
   DCHECK(!m_profiler);
-  m_profiler = v8::CpuProfiler::New(m_isolate);
+  m_profiler = m_isolate->GetCpuProfiler();
   int interval = 0;
   m_state->getInteger(ProfilerAgentState::samplingInterval, &interval);
   if (interval) m_profiler->SetSamplingInterval(interval);
@@ -282,8 +283,10 @@ void V8ProfilerAgentImpl::stop(
 }
 
 String16 V8ProfilerAgentImpl::nextProfileId() {
-  return String16::fromInteger(
-      v8::base::NoBarrier_AtomicIncrement(&s_lastProfileId, 1));
+  const int one = 1;
+  int oldValue = __sync_fetch_and_add(&s_lastProfileId, one);
+
+  return String16::fromInteger(s_lastProfileId);
 }
 
 void V8ProfilerAgentImpl::startProfiling(const String16& title) {
