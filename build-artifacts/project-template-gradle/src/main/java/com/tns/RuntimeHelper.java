@@ -149,7 +149,10 @@ public final class RuntimeHelper {
 
 			try {
 				// put this call in a try/catch block because with the latest changes in the modules it is not granted that NativeScriptApplication is extended through JavaScript.
-				Runtime.initInstance(app);
+				JavaScriptImplementation jsImpl = app.getClass().getAnnotation(JavaScriptImplementation.class);
+				if (jsImpl != null) {
+					Runtime.initInstance(app);
+				}
 			}
 			catch (Exception e) {
 				if (logger.isEnabled()) {
