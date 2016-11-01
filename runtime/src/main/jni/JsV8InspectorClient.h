@@ -5,16 +5,18 @@
 #include "v8.h"
 #include "v8-debug.h"
 #include "JEnv.h"
-#include "v8_inspector/platform/v8_inspector/public/V8InspectorClient.h"
-#include "v8_inspector/platform/v8_inspector/public/V8InspectorSession.h"
-#include "v8_inspector/platform/v8_inspector/public/V8Inspector.h"
+#include "src/inspector/v8-inspector-impl.h"
+#include "src/inspector/v8-inspector-session-impl.h"
+#include "v8-inspector.h"
+#include "src/inspector/protocol/Forward.h"
+#include "src/inspector/string-16.h"
+
 
 using namespace v8_inspector;
 
-
 namespace tns
 {
-	class JsV8InspectorClient : V8InspectorClient, blink::protocol::FrontendChannel
+	class JsV8InspectorClient : V8InspectorClient //,  InspectorClientImpl::FrontendChannel
 	{
 		public:
             static JsV8InspectorClient* GetInstance();
@@ -23,9 +25,9 @@ namespace tns
 			void connect(jobject connection);
 			void disconnect();
             void dispatchMessage(const std::string& message);
-            void sendProtocolResponse(int callId, const String16& message) override;
-            void sendProtocolNotification(const String16& message) override;
-            void flushProtocolNotifications() override;
+            //void sendProtocolResponse(int callId, const String16& message) override;
+            //void sendProtocolNotification(const String16& message) override;
+            //void flushProtocolNotifications() override;
 
 		private:
             JsV8InspectorClient(v8::Isolate *isolate);

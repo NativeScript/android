@@ -6,8 +6,8 @@
 //#include "NativeScriptAssert.h"
 #include <sstream>
 #include <assert.h>
-#include "v8_inspector/platform/v8_inspector/String16STL.h"
 #include "Runtime.h"
+#include "src/inspector/string-16.h"
 
 using namespace std;
 using namespace tns;
@@ -37,7 +37,7 @@ void JsV8InspectorClient::connect(jobject connection)
     v8::Isolate::Scope isolate_scope(isolate_);
     v8::HandleScope handleScope(isolate_);
 
-    session_ = inspector_->connect(1, this, nullptr);
+    //session_ = inspector_->connect(1, this, nullptr);
 
     JEnv env;
     this->connection = env.NewGlobalRef(connection);
@@ -61,31 +61,31 @@ void JsV8InspectorClient::dispatchMessage(const std::string &message)
     v8::HandleScope handleScope(isolate_);
 
     assert(session_ != nullptr);
-    const String16 protocolMessage(message.c_str());
-    session_->dispatchProtocolMessage(protocolMessage);
+    //const String16 protocolMessage(message.c_str());
+    //session_->dispatchProtocolMessage(protocolMessage);
 }
 
-void JsV8InspectorClient::sendProtocolResponse(int callId, const String16 &message)
-{
-    sendProtocolNotification(message);
-}
-
-void JsV8InspectorClient::sendProtocolNotification(const String16 &message)
-{
-    if (inspectorClass == nullptr || this->connection == nullptr)
-    {
-        return;
-    }
-
-
-    JEnv env;
-    JniLocalRef string(env.NewStringUTF(message.utf8().c_str()));
-    env.CallStaticVoidMethod(inspectorClass, sendMethod,  this->connection, (jstring) string);
-}
-
-void JsV8InspectorClient::flushProtocolNotifications()
-{
-}
+//void JsV8InspectorClient::sendProtocolResponse(int callId, const String16 &message)
+//{
+//    sendProtocolNotification(message);
+//}
+//
+//void JsV8InspectorClient::sendProtocolNotification(const String16 &message)
+//{
+//    if (inspectorClass == nullptr || this->connection == nullptr)
+//    {
+//        return;
+//    }
+//
+//
+//    JEnv env;
+//    JniLocalRef string(env.NewStringUTF(message.utf8().c_str()));
+//    env.CallStaticVoidMethod(inspectorClass, sendMethod,  this->connection, (jstring) string);
+//}
+//
+//void JsV8InspectorClient::flushProtocolNotifications()
+//{
+//}
 
 void JsV8InspectorClient::init()
 {
@@ -98,7 +98,7 @@ void JsV8InspectorClient::init()
     v8::HandleScope handleScope(isolate_);
 
     inspector_ = V8Inspector::create(isolate_, this);
-    inspector_->contextCreated(v8_inspector::V8ContextInfo(isolate_->GetCurrentContext(), 1, "{N} Context"));
+    //inspector_->contextCreated(v8_inspector::V8ContextInfo(isolate_->GetCurrentContext(), 1, "{N} Context"));
 }
 
 JsV8InspectorClient *JsV8InspectorClient::GetInstance()
