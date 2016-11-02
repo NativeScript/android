@@ -462,6 +462,10 @@ Local<Object> Module::LoadData(Isolate *isolate, const string& path)
 
 	json = value.As<Object>();
 
+	auto poObj = new Persistent<Object>(isolate, json);
+
+	m_loadedModules.insert(make_pair(path, ModuleCacheEntry(poObj, true /* isData */)));
+
 	return json;
 }
 
