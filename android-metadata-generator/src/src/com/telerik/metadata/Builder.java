@@ -10,10 +10,12 @@ import java.util.Map;
 
 import com.telerik.metadata.TreeNode.FieldInfo;
 import com.telerik.metadata.TreeNode.MethodInfo;
+import com.telerik.metadata.bcl.JarFile;
 import com.telerik.metadata.desc.ClassDescriptor;
 import com.telerik.metadata.desc.FieldDescriptor;
 import com.telerik.metadata.desc.MethodDescriptor;
 import com.telerik.metadata.desc.TypeDescriptor;
+import com.telerik.metadata.dx.DexFile;
 
 public class Builder {
 	private static class MethodNameComparator implements Comparator<MethodDescriptor> {
@@ -29,12 +31,17 @@ public class Builder {
 		for (String path : paths) {
 			File file = new File(path);
 			if (file.exists()) {
-				if (file.isFile() && path.endsWith(".jar")) {
-					JarFile jar = JarFile.readJar(path);
-					ClassRepo.cacheJarFile(jar);
+				if (file.isFile()) {
+					if (path.endsWith(".jar")) {
+						JarFile jar = JarFile.readJar(path);
+						ClassRepo.addToCache(jar);
+					} else if (path.endsWith(".dex")) {
+						DexFile dex = DexFile.readDex(path);
+						ClassRepo.addToCache(dex);
+					}
 				} else if (file.isDirectory()) {
 					ClassDirectory dir = ClassDirectory.readDirectory(path);
-					ClassRepo.cacheJarFile(dir);
+					ClassRepo.addToCache(dir);
 				}
 			}
 		}
@@ -56,6 +63,7 @@ public class Builder {
 			} catch (Throwable e) {
 				System.out.println("Skip " + className);
 				System.out.println("\tError: " + e.toString());
+				//e.printStackTrace();
 			}
 		}
 

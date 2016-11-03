@@ -1,6 +1,6 @@
-package com.telerik.metadata;
+package com.telerik.metadata.bcl;
 
-import com.telerik.metadata.bcl.ClassInfo;
+import com.telerik.metadata.ClassMapProvider;
 import com.telerik.metadata.desc.ClassDescriptor;
 
 import java.io.FileInputStream;

@@ -32,7 +32,6 @@ buildscript {
 apply plugin: "com.android.application"
 
 def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
-def metadataParams = new LinkedList <String> ()
 def allJarPaths = new LinkedList <String> ()
 def configurationsDir = "$projectDir/configurations"
 def createPluginConfigFile = false
@@ -156,23 +155,20 @@ android {
 	
 	applicationVariants.all { variant ->
 		def variantName = variant.name.capitalize()
-		def compileSourcesTaskName = "compile${variantName}Sources"
-		def compileSourcesTask = project.tasks.findByName(compileSourcesTaskName)
-		//
+
 		if ((project.ext.selectedBuildType.equals("release") && variantName.endsWith("Release"))
 				|| (project.ext.selectedBuildType.equals("debug") && variantName.endsWith("Debug"))) {
 			dexTask = project.tasks.findByName("transformClassesWithDexFor${variantName}")
 			dexTask.finalizedBy(myMergeDex)
 		}
-		//
-		
+
 		def generateBuildConfigTask = variant.generateBuildConfig;
 		generateBuildConfigTask.finalizedBy(collectAllJars)
 		if(!dontRunSbg) {
 			collectAllJars.finalizedBy(setProperties)
 		}
 		
-		compileSourcesTask.finalizedBy(buildMetadata)
+		myMergeDex.finalizedBy(buildMetadata)
 	}
 }
 
@@ -540,11 +536,8 @@ task collectAllJars {
 			allJarPaths.add(currentJarFile.getAbsolutePath())
 		}
 		
-		metadataParams.add("metadata-generator.jar")
-		metadataParams.add("$projectDir/metadata/output/assets/metadata")
 		def jars = new LinkedList<File>()
 		for(def i = 0; i < allJarPaths.size(); i++) {
-			metadataParams.add(allJarPaths.get(i));
 			def f = new File(allJarPaths.get(i))
 			if (f.getName().endsWith(".jar")) {
 				jars.add(f)
@@ -558,37 +551,27 @@ task buildMetadata (type: JavaExec) {
 	description "builds metadata with provided jar dependencies"
 	
 	inputs.files(allJarPaths)
-	inputs.dir("$buildDir/intermediates/classes")
+	inputs.dir("$buildDir/intermediates/transforms/dex")
+	inputs.dir("$buildDir/nativescript-bindings")
 
 	outputs.files("metadata/output/assets/metadata/treeNodeStream.dat", "metadata/output/assets/metadata/treeStringsStream.dat", "metadata/output/assets/metadata/treeValueStream.dat")
 
 	doFirst {
+		def metadataParams = new LinkedList <String> ()
+		metadataParams.add("metadata-generator.jar")
+		metadataParams.add("$projectDir/metadata/output/assets/metadata")
+
+		def sdkPath = android.sdkDirectory.getAbsolutePath();
+		def androidJar = sdkPath + "/platforms/" + android.compileSdkVersion + "/android.jar"
+		metadataParams.add(androidJar)
+
+		def ft = fileTree(dir: "$buildDir/intermediates/transforms/dex", include: "**/*.dex")
+		ft.each { currentDexFile ->
+			metadataParams.add(currentDexFile.getAbsolutePath())
+		}
+
 		workingDir "build-tools"
-
 		main "-jar"
-
-		// get compiled classes to pass to metadata generator
-		// these need to be called after the classes have compiled
-		def classesDir = "$buildDir/intermediates/classes"
-
-		def classesSubDirs = new File(classesDir).listFiles()
-
-		def selectedBuildType = project.ext.selectedBuildType
-
-		for (File subDir: classesSubDirs) {
-			if (!subDir.getName().equals(selectedBuildType)) {
-				def subDirBuildType = new File(subDir, selectedBuildType)
-				if (subDirBuildType.exists()) {
-					metadataParams.add(subDirBuildType.getAbsolutePath());
-				}
-			}
-		}
-
-		def classesDirBuildType = new File(classesDir, selectedBuildType)
-		if (classesDirBuildType.exists()) {
-			metadataParams.add(classesDirBuildType.getAbsolutePath())
-		}
-
 		args metadataParams.toArray()
 	}
 	

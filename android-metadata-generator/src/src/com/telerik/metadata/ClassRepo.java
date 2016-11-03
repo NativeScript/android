@@ -11,7 +11,7 @@ public class ClassRepo {
 
 	private static ArrayList<ClassMapProvider> cachedProviders = new ArrayList<ClassMapProvider>();
 
-	public static void cacheJarFile(ClassMapProvider classMapProvider) {
+	public static void addToCache(ClassMapProvider classMapProvider) {
 		for (String className : classMapProvider.getClassMap().keySet()) {
 			for (ClassMapProvider cachedProvider : cachedProviders) {
 				ClassDescriptor clazz = cachedProvider.getClassMap().get(className);
