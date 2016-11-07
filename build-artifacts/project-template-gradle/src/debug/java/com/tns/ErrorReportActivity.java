@@ -3,6 +3,12 @@ package com.tns;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
+import android.widget.Toast;
+
+import java.lang.reflect.Method;
+
+import static com.tns.ErrorReport.isCheckingForPermissions;
+import static com.tns.ErrorReport.resetCheckingForPermissions;
 
 public class ErrorReportActivity extends AppCompatActivity {
     public void onCreate(Bundle savedInstanceState) {
@@ -14,14 +20,25 @@ public class ErrorReportActivity extends AppCompatActivity {
     }
 
     @Override
-    protected void onPause() {
-        // the moment the error activity is not in the foreground we want to kill the process
-        super.onPause();
-        ErrorReport.killProcess(this);
+    protected void onUserLeaveHint() {
+        super.onUserLeaveHint();
+
+        if(!isCheckingForPermissions()) {
+            ErrorReport.killProcess(this);
+        }
     }
 
     // @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        // super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        try {
+            Method onRequestPermissionsResultMethod = AppCompatActivity.class.getMethod("onRequestPermissionsResult", int.class, permissions.getClass(), grantResults.getClass());
+            onRequestPermissionsResultMethod.invoke(new AppCompatActivity() /* never do this */, requestCode, permissions, grantResults);
+
+            resetCheckingForPermissions();
+        } catch (Exception e) {
+            e.printStackTrace();
+            Toast.makeText(this, "Couldn't resolve permissions", Toast.LENGTH_LONG).show();
+            resetCheckingForPermissions();
+        }
     }
 }
