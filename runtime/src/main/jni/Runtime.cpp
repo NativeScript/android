@@ -430,6 +430,9 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 	m_startupData = new StartupData();
 
 	void* snapshotPtr = dlopen("libsnapshot.so", RTLD_LAZY | RTLD_LOCAL);
+	if (snapshotPtr == nullptr) {
+		DEBUG_WRITE_FORCE("snapshot error=%s", dlerror());
+	}
 	if (snapshotPtr)
 	{
 		m_startupData->data = static_cast<const char *>(dlsym(snapshotPtr, "TNSSnapshot_blob"));
