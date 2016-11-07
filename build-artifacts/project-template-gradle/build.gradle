@@ -569,8 +569,12 @@ task buildMetadata (type: JavaExec) {
 		metadataParams.add(androidJar)
 
 		def ft = fileTree(dir: "$buildDir/intermediates/transforms/dex", include: "**/*.dex")
+		def buildDirPattern = File.separator + project.ext.selectedBuildType + File.separator
 		ft.each { currentDexFile ->
-			metadataParams.add(currentDexFile.getAbsolutePath())
+			def dexFilepath = currentDexFile.getAbsolutePath()
+			if (dexFilepath.contains(buildDirPattern)) {
+				metadataParams.add(dexFilepath)
+			}
 		}
 
 		workingDir "build-tools"
