@@ -662,7 +662,7 @@ def shouldIncludeDirForTypings(path, includeDirs) {
 
 task copyTypings {
 	doLast {
-		println "Copied generated typings to application root level."
+		println "Copied generated typings to application root level. Make sure to import android.d.ts in reference.d.ts"
 
 		copy {
 			from "$projectDir/build-tools/typings"
