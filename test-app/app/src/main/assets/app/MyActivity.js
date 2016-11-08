@@ -49,10 +49,9 @@ var MyActivity = (function (_super) {
     	var colors = [Color.BLUE, Color.RED, Color.MAGENTA, Color.YELLOW, Color.parseColor("#FF7F50")];
     	var taps = 0;
 
-    	var dum = com.tns.tests.DummyClass.null;
-
     	button.setOnClickListener(new android.view.View.OnClickListener("AppClickListener", {
     		onClick:  function() {
+    		    __dumpTraceFile();
     			button.setBackgroundColor(colors[taps % colors.length]);
 
     			taps++;

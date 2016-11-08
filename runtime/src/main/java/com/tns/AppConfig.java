@@ -15,7 +15,9 @@ class AppConfig {
 		ProfilerOutputDirKey("profilerOutputDir", ""),
 		GcThrottleTime("gcThrottleTime", 0),
 		MemoryCheckInterval("memoryCheckInterval", 0),
-		FreeMemoryRatio("freeMemoryRatio", 0.0);
+		FreeMemoryRatio("freeMemoryRatio", 0.0),
+		EnableTracing("diagnosticTracing", false),
+		EnableBenchmarking("diagnosticBenchmarking", false);
 
 		public static final KnownKeys[] asArray = {
 				V8FlagsKey,
@@ -25,7 +27,9 @@ class AppConfig {
 				ProfilerOutputDirKey,
 				GcThrottleTime,
 				MemoryCheckInterval,
-				FreeMemoryRatio
+				FreeMemoryRatio,
+				EnableTracing,
+				EnableBenchmarking
 		};
 
 		private final String name;
@@ -73,6 +77,12 @@ class AppConfig {
 				JSONObject androidObject = rootObject.getJSONObject(AndroidKey);
 				if (androidObject.has(KnownKeys.V8FlagsKey.getName())) {
 					values[KnownKeys.V8FlagsKey.getIndex()] = androidObject.getString(KnownKeys.V8FlagsKey.getName());
+				}
+				if (androidObject.has(KnownKeys.EnableTracing.getName())) {
+					values[KnownKeys.EnableTracing.getIndex()] = androidObject.getBoolean(KnownKeys.EnableTracing.getName());
+				}
+				if (androidObject.has(KnownKeys.EnableTracing.getName())) {
+					values[KnownKeys.EnableBenchmarking.getIndex()] = androidObject.getBoolean(KnownKeys.EnableBenchmarking.getName());
 				}
 				if (androidObject.has(KnownKeys.CodeCacheKey.getName())) {
 					values[KnownKeys.CodeCacheKey.getIndex()] = androidObject.getBoolean(KnownKeys.CodeCacheKey.getName());
@@ -132,5 +142,13 @@ class AppConfig {
 
 	public double getFreeMemoryRatio() {
 		return (double)values[KnownKeys.FreeMemoryRatio.getIndex()];
+	}
+
+	public boolean getEnableTracing() {
+		return (boolean)values[KnownKeys.EnableTracing.getIndex()];
+	}
+
+	public boolean getEnableBenchmarking() {
+		return (boolean)values[KnownKeys.EnableBenchmarking.getIndex()];
 	}
 }

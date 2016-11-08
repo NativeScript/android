@@ -9,6 +9,7 @@
 #include "NativeScriptException.h"
 #include "Runtime.h"
 #include "include/v8.h"
+#include "Stackity.h"
 #include <algorithm>
 #include <sstream>
 
@@ -158,8 +159,7 @@ jclass ObjectManager::GetJavaClass(const Local<Object>& instance)
 
 void ObjectManager::SetJavaClass(const Local<Object>& instance, jclass clazz)
 {
-	DEBUG_WRITE("SetClass called");
-
+	Stackity::FrameEntry fe("ObjectManager::SetJavaClass");
 	JSInstanceInfo *jsInfo = GetJSInstanceInfo(instance);
 	jsInfo->ObjectClazz = clazz;
 }

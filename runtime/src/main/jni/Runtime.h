@@ -31,9 +31,9 @@ namespace tns
 
 			static void Init(JavaVM *vm, void *reserved);
 
-			static void Init(JNIEnv *_env, jobject obj, int runtimeId, jstring filesPath, jstring nativeLibsDir, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jstring callingDir, jobject jsDebugger);
+			static void Init(JNIEnv *_env, jobject obj, int runtimeId, jstring filesPath, jstring nativeLibsDir, jstring packageName, jobjectArray args, jstring callingDir, jobject jsDebugger);
 
-			void Init(jstring filesPath, jstring nativeLibsDir, bool verboseLoggingEnabled, jstring packageName, jobjectArray args, jstring callingDir, jobject jsDebugger);
+			void Init(jstring filesPath, jstring nativeLibsDir, jstring packageName, jobjectArray args, jstring callingDir, jobject jsDebugger);
 
 			v8::Isolate* GetIsolate() const;
 
