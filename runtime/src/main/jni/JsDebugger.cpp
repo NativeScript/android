@@ -44,7 +44,7 @@ void JsDebugger::Enable()
 	v8::Isolate::Scope isolate_scope(isolate);
 	v8::HandleScope handleScope(isolate);
 
-	v8::Debug::SetMessageHandler(isolate, MyMessageHandler);
+	//v8::Debug::SetMessageHandler(MyMessageHandler);
 	enabled = true;
 }
 

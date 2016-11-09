@@ -89,7 +89,7 @@ public class AndroidJsV8Inspector
         protected void onMessage(NanoWSD.WebSocketFrame message)
         {
             Log.d("V8Inspector", "onMessage");
-            Log.d("V8Inspector", "onMessage TextPayload" + message.getTextPayload());
+            Log.d("V8Inspector", "onMessage TextPayload" + message.getTextPayload() + " ThreadId:" + Thread.currentThread().getId());
             dispatchMessage(message.getTextPayload());
         }
 

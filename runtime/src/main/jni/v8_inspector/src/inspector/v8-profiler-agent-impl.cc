@@ -286,7 +286,7 @@ String16 V8ProfilerAgentImpl::nextProfileId() {
   const int one = 1;
   int oldValue = __sync_fetch_and_add(&s_lastProfileId, one);
 
-  return String16::fromInteger(s_lastProfileId);
+  return String16::fromInteger(oldValue);
 }
 
 void V8ProfilerAgentImpl::startProfiling(const String16& title) {

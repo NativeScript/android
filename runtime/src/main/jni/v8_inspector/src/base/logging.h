@@ -15,5 +15,6 @@
 #define USE(x) //
 #define CHECK(condition)      //
 #define DCHECK(condition)      ((void) 0)
+#define CHECK_EQ //
 
 #endif  // V8_BASE_LOGGING_H_

@@ -7,6 +7,9 @@
 
 #include <stdint.h>
 #include "src/base/logging.h"
+
+
+
 // A macro to disallow the evil copy constructor and operator= functions
 // This should be used in the private: declarations for a class
 #define DISALLOW_COPY_AND_ASSIGN(TypeName) \
@@ -23,28 +26,31 @@
 // This template function declaration is used in defining arraysize.
 // Note that the function doesn't need an implementation, as we only
 // use its type.
-template <typename T, size_t N>
+template<typename T, size_t N>
 char (&ArraySizeHelper(T (&array)[N]))[N];
 
 
-
-namespace v8 {
-namespace base {
+namespace v8
+{
+    namespace base
+    {
 
 
 // TODO(yangguo): This is a poor man's replacement for std::is_fundamental,
 // which requires C++11. Switch to std::is_fundamental once possible.
-template <typename T>
-inline bool is_fundamental() {
-  return false;
-}
+        template<typename T>
+        inline bool is_fundamental()
+        {
+            return false;
+        }
 
-template <>
-inline bool is_fundamental<uint8_t>() {
-  return true;
-}
+        template<>
+        inline bool is_fundamental<uint8_t>()
+        {
+            return true;
+        }
 
-}  // namespace base
+    }  // namespace base
 }  // namespace v8
 
 #endif   // V8_BASE_MACROS_H_

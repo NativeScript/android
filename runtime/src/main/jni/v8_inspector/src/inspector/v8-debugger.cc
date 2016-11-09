@@ -65,7 +65,10 @@ void V8Debugger::enable() {
   v8::HandleScope scope(m_isolate);
   v8::Debug::SetDebugEventListener(m_isolate, &V8Debugger::v8DebugEventCallback,
                                    v8::External::New(m_isolate, this));
-  m_debuggerContext.Reset(m_isolate, v8::Debug::GetDebugContext(m_isolate));
+  v8::Local<v8::Context> dbgContext = v8::Debug::GetDebugContext(m_isolate);
+  bool isEmpty = dbgContext.IsEmpty();
+
+  m_debuggerContext.Reset(m_isolate, dbgContext);
   compileDebuggerScript();
 }
 
@@ -673,20 +676,33 @@ V8StackTraceImpl* V8Debugger::currentAsyncCallChain() {
 }
 
 void V8Debugger::compileDebuggerScript() {
+
+  bool m_DebuggerIsEmpty = m_debuggerScript.IsEmpty();
+
   if (!m_debuggerScript.IsEmpty()) {
     UNREACHABLE();
     return;
   }
 
   v8::HandleScope scope(m_isolate);
-  v8::Context::Scope contextScope(debuggerContext());
+  v8::Local<v8::Context> debugContext = debuggerContext();
+
+    //v8::Local<v8::Value> obj;
+    //m_isolate->GetCurrentContext()->Global()->Get(m_isolate, toV8String(m_isolate, String16("DebuggerScript"))).ToLocal(&obj);
+    //m_debuggerScript.Reset(m_isolate, obj.As<v8::Object>());
+
+
+    bool isEmpty = debugContext.IsEmpty();
+  v8::Context::Scope contextScope(debugContext);
 
   v8::Local<v8::String> scriptValue =
       v8::String::NewFromUtf8(m_isolate, DebuggerScript_js,
                               v8::NewStringType::kInternalized,
                               sizeof(DebuggerScript_js))
           .ToLocalChecked();
-  v8::Local<v8::Value> value;
+
+
+    v8::Local<v8::Value> value;
   if (!m_inspector->compileAndRunInternalScript(debuggerContext(), scriptValue)
            .ToLocal(&value)) {
     UNREACHABLE();

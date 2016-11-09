@@ -232,7 +232,7 @@ model {
                        //"-I${file("src/main/jni/v8_inspector/protocol/")}".toString(),
                        ])
 
-        cppFlags.addAll(["-std=c++11", "-fexceptions", "-fno-builtin-stpcpy", "-DHAVE_INSPECTOR"]) //, "-DV8_INSPECTOR_USE_STL=1", "-D__GXX_EXPERIMENTAL_CXX0X__=1"
+        cppFlags.addAll(["-std=c++11", "-fexceptions", "-fno-builtin-stpcpy", "-DHAVE_INSPECTOR", "-D__ANDROID__"]) //, "-DV8_INSPECTOR_USE_STL=1", "-D__GXX_EXPERIMENTAL_CXX0X__=1"
 
 
         CFlags.addAll(["-Wno-error=format-security", "-g", "-fno-builtin-stpcpy"])
@@ -247,7 +247,25 @@ model {
         toolchain = "clang"
         stl = "c++_static"
 
-        abiFilters.addAll(["armeabi-v7a", "x86", "arm64-v8a"])
+        abiFilters.addAll(["armeabi-v7a"])
+
+        if (System.getProperties()['idea.platform.prefix'] != null)
+        {
+            // Built from AndroidStudio
+            println "Build from AndroidStudio"
+
+            if (!ndkDebuggable)
+            {
+                abiFilters.addAll(["x86", "arm64-v8a"])
+            }
+        }
+        else
+        {
+            // Built from command line
+            abiFilters.addAll(["x86", "arm64-v8a"])
+
+            println "Build from Command Line"
+        }
     }
 
     android.sources {
