@@ -7,7 +7,7 @@ public class StaticConfiguration
 	public final Logger logger;
 	public final Debugger debugger;
 	public final String appName;
-	public final File runtimeLibPath;
+	public final String nativeLibDir;
 	public final File rootDir;
 	public final File appDir;
 	public final ClassLoader classLoader;
@@ -16,12 +16,12 @@ public class StaticConfiguration
 	public final AppConfig appConfig;
 
 	public StaticConfiguration(Logger logger, Debugger debugger,
-							   String appName, File runtimeLibPath, File rootDir, File appDir, ClassLoader classLoader,
+							   String appName, String nativeLibDir, File rootDir, File appDir, ClassLoader classLoader,
 							   File dexDir, String dexThumb, AppConfig appConfig) {
 		this.logger = logger;
 		this.debugger = debugger;
 		this.appName = appName;
-		this.runtimeLibPath = runtimeLibPath;
+		this.nativeLibDir = nativeLibDir;
 		this.rootDir = rootDir;
 		this.appDir = appDir;
 		this.classLoader = classLoader;

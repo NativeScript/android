@@ -23,6 +23,7 @@
 #include "include/zipconf.h"
 #include <sstream>
 #include <dlfcn.h>
+#include "sys/system_properties.h"
 
 using namespace v8;
 using namespace std;
@@ -130,7 +131,7 @@ ObjectManager* Runtime::GetObjectManager() const
 	return m_objectManager;
 }
 
-void Runtime::Init(JNIEnv *_env, jobject obj, int runtimeId, jstring filesPath, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jstring callingDir, jobject jsDebugger)
+void Runtime::Init(JNIEnv *_env, jobject obj, int runtimeId, jstring filesPath, jstring nativeLibDir, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jstring callingDir, jobject jsDebugger)
 {
 	JEnv env(_env);
 
@@ -138,10 +139,10 @@ void Runtime::Init(JNIEnv *_env, jobject obj, int runtimeId, jstring filesPath, 
 
 	auto enableLog = verboseLoggingEnabled == JNI_TRUE;
 
-	runtime->Init(filesPath, enableLog, packageName, args, callingDir, jsDebugger);
+	runtime->Init(filesPath, nativeLibDir, enableLog, packageName, args, callingDir, jsDebugger);
 }
 
-void Runtime::Init(jstring filesPath, bool verboseLoggingEnabled, jstring packageName, jobjectArray args, jstring callingDir, jobject jsDebugger)
+void Runtime::Init(jstring filesPath, jstring nativeLibDir, bool verboseLoggingEnabled, jstring packageName, jobjectArray args, jstring callingDir, jobject jsDebugger)
 {
 	LogEnabled = verboseLoggingEnabled;
 
@@ -161,7 +162,7 @@ void Runtime::Init(jstring filesPath, bool verboseLoggingEnabled, jstring packag
 	DEBUG_WRITE("Initializing Telerik NativeScript");
 
 	NativeScriptException::Init(m_objectManager);
-	m_isolate = PrepareV8Runtime(filesRoot, packageName, callingDir, jsDebugger, profilerOutputDir);
+	m_isolate = PrepareV8Runtime(filesRoot, nativeLibDir, packageName, callingDir, jsDebugger, profilerOutputDir);
 
 	s_isolate2RuntimesCache.insert(make_pair(m_isolate, this));
 }
@@ -420,7 +421,7 @@ static void InitializeV8() {
 
 bool x = false;
 
-Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName, jstring callingDir, jobject jsDebugger, jstring profilerOutputDir)
+Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring nativeLibDir, jstring packageName, jstring callingDir, jobject jsDebugger, jstring profilerOutputDir)
 {
 	Isolate::CreateParams create_params;
 	bool didInitializeV8 = false;
@@ -429,8 +430,30 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 
 	m_startupData = new StartupData();
 
-	void* snapshotPtr = dlopen("libsnapshot.so", RTLD_LAZY | RTLD_LOCAL);
-	if (snapshotPtr)
+    // Retrieve the device android Sdk version
+    char sdkVersion[PROP_VALUE_MAX];
+    __system_property_get("ro.build.version.sdk", sdkVersion);
+
+    auto pckName = ArgConverter::jstringToString(packageName);
+
+    void* snapshotPtr;
+
+    // If device isn't running on Sdk 17
+    if (strcmp(sdkVersion, string("17").c_str()) != 0) {
+        snapshotPtr = dlopen("libsnapshot.so", RTLD_LAZY | RTLD_LOCAL);
+    } else {
+        // If device is running on android Sdk 17
+        // dlopen reads relative path to dynamic libraries or reads from folder different than the nativeLibsDirs on the android device
+        string libDir = ArgConverter::jstringToString(nativeLibDir);
+        string snapshotPath = libDir + "/libsnapshot.so";
+        snapshotPtr = dlopen(snapshotPath.c_str(), RTLD_LAZY | RTLD_LOCAL);
+    }
+
+    if(snapshotPtr == nullptr) {
+        DEBUG_WRITE_FORCE("Failed to load snapshot: %s", dlerror());
+    }
+
+    if (snapshotPtr)
 	{
 		m_startupData->data = static_cast<const char *>(dlsym(snapshotPtr, "TNSSnapshot_blob"));
 		m_startupData->raw_size = *static_cast<const unsigned int *>(dlsym(snapshotPtr, "TNSSnapshot_blob_len"));
@@ -530,7 +553,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 	V8::SetCaptureStackTraceForUncaughtExceptions(true, 100, StackTrace::kOverview);
 
 	isolate->AddMessageListener(NativeScriptException::OnUncaughtError);
-	
+
 	__android_log_print(ANDROID_LOG_DEBUG, "TNS.Native", "V8 version %s", V8::GetVersion());
 
 	auto globalTemplate = ObjectTemplate::New();
@@ -610,7 +633,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring packageName,
 
 	CallbackHandlers::Init(isolate);
 
-	auto pckName = ArgConverter::jstringToString(packageName);
 	auto outputDir = ArgConverter::jstringToString(profilerOutputDir);
 	m_profiler.Init(isolate, global, pckName, outputDir);
 	JsDebugger::Init(isolate, pckName, jsDebugger);

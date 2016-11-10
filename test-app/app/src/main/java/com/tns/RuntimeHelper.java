@@ -6,145 +6,169 @@ import android.app.Application;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.os.Build;
 import android.util.Log;
+
 import java.io.IOException;
 
 public final class RuntimeHelper {
-	private RuntimeHelper() {
-	}
+    private RuntimeHelper() {
+    }
 
-	// hasErrorIntent tells you if there was an event (with an uncaught
-	// exception) raised from ErrorReport
-	private static boolean hasErrorIntent(Application app) {
-		boolean hasErrorIntent = false;
+    // hasErrorIntent tells you if there was an event (with an uncaught
+    // exception) raised from ErrorReport
+    private static boolean hasErrorIntent(Application app) {
+        boolean hasErrorIntent = false;
 
-		try {
-			// empty file just to check if there was a raised uncaught error by
-			// ErrorReport
-			File errFile = new File(app.getFilesDir(), ErrorReport.ERROR_FILE_NAME);
+        try {
+            // empty file just to check if there was a raised uncaught error by
+            // ErrorReport
+            if (AndroidJsDebugger.isDebuggableApp(app)) {
+                String fileName = "";
 
-			if (errFile.exists()) {
-				errFile.delete();
-				hasErrorIntent = true;
-			}
-		} catch (Exception e) {
-			Log.d(logTag, e.getMessage());
-		}
+                try {
+                    java.lang.Class ErrReport = java.lang.Class.forName("com.tns.ErrorReport");
+                    java.lang.reflect.Field field = ErrReport.getDeclaredField("ERROR_FILE_NAME");
+                    fileName = (String) field.get(null);
+                } catch (Exception e) {
+                    return false;
+                }
 
-		return hasErrorIntent;
-	}
-	
-	public static Runtime initRuntime(Application app)
-	{
-		if (Runtime.isInitialized()) {
-			return Runtime.getCurrentRuntime();
-		}
-		
-		System.loadLibrary("NativeScript");
+                File errFile = new File(app.getFilesDir(), fileName);
 
-		Logger logger = new LogcatLogger(app);
+                if (errFile.exists()) {
+                    errFile.delete();
+                    hasErrorIntent = true;
+                }
+            }
+        } catch (Exception e) {
+            Log.d(logTag, e.getMessage());
+        }
 
-		Debugger debugger = AndroidJsDebugger.isDebuggableApp(app) ? new AndroidJsDebugger(app, logger) : null;
+        return hasErrorIntent;
+    }
 
-		Runtime runtime = null;
-		boolean showErrorIntent = hasErrorIntent(app);
-		if (!showErrorIntent) {
-			NativeScriptUncaughtExceptionHandler exHandler = new NativeScriptUncaughtExceptionHandler(logger, app);
+    public static Runtime initRuntime(Application app) {
+        if (Runtime.isInitialized()) {
+            return Runtime.getCurrentRuntime();
+        }
 
-			Thread.setDefaultUncaughtExceptionHandler(exHandler);
+        System.loadLibrary("NativeScript");
 
-			DefaultExtractPolicy extractPolicy = new DefaultExtractPolicy(logger);
-			boolean skipAssetExtraction = Util.runPlugin(logger, app);
+        Logger logger = new LogcatLogger(app);
 
-			String appName = app.getPackageName();
-			File rootDir = new File(app.getApplicationInfo().dataDir);
-			File appDir = app.getFilesDir();
+        Debugger debugger = AndroidJsDebugger.isDebuggableApp(app) ? new AndroidJsDebugger(app, logger) : null;
 
-			try {
-				appDir = appDir.getCanonicalFile();
-			} catch (IOException e1) {
-			}
+        Runtime runtime = null;
+        boolean showErrorIntent = hasErrorIntent(app);
+        if (!showErrorIntent) {
+            NativeScriptUncaughtExceptionHandler exHandler = new NativeScriptUncaughtExceptionHandler(logger, app);
 
-			if (!skipAssetExtraction) {
-				if(logger.isEnabled()) {
-					logger.write("Extracting assets...");
-				}
-				
-				AssetExtractor aE = new AssetExtractor(null, logger);
-				
-				String outputDir = app.getFilesDir().getPath() + File.separator;
+            Thread.setDefaultUncaughtExceptionHandler(exHandler);
 
-				aE.extractAssets(app, "app", outputDir, extractPolicy);
-				aE.extractAssets(app, "internal", outputDir, extractPolicy);
-				aE.extractAssets(app, "metadata", outputDir, extractPolicy);
+            DefaultExtractPolicy extractPolicy = new DefaultExtractPolicy(logger);
+            boolean skipAssetExtraction = Util.runPlugin(logger, app);
 
-				// enable with flags?
-				boolean shouldExtractSnapshots = true;
-				
-				// will extract snapshot of the device appropriate architecture
-				if(shouldExtractSnapshots) {
-					if(logger.isEnabled()) {
-						logger.write("Extracting snapshot blob");
-					}
+            String appName = app.getPackageName();
+            File rootDir = new File(app.getApplicationInfo().dataDir);
+            File appDir = app.getFilesDir();
 
-					aE.extractAssets(app,  "snapshots/" + Build.CPU_ABI, outputDir, extractPolicy);
-				}
+            try {
+                appDir = appDir.getCanonicalFile();
+            } catch (IOException e1) {
+            }
 
-				extractPolicy.setAssetsThumb(app);
-			}
+            if (!skipAssetExtraction) {
+                if (logger.isEnabled()) {
+                    logger.write("Extracting assets...");
+                }
 
-			AppConfig appConfig = new AppConfig(appDir);
+                AssetExtractor aE = new AssetExtractor(null, logger);
 
-			ClassLoader classLoader = app.getClassLoader();
-			File dexDir = new File(rootDir, "code_cache/secondary-dexes");
-			String dexThumb = null;
-			try {
-				dexThumb = Util.getDexThumb(app);
-			} catch (NameNotFoundException e) {
-				if (logger.isEnabled())
-					logger.write("Error while getting current proxy thumb");
-				e.printStackTrace();
-			}
+                String outputDir = app.getFilesDir().getPath() + File.separator;
 
-			StaticConfiguration config = new StaticConfiguration(logger, debugger, appName, null, rootDir,
-					appDir, classLoader, dexDir, dexThumb, appConfig);
+                aE.extractAssets(app, "app", outputDir, extractPolicy);
+                aE.extractAssets(app, "internal", outputDir, extractPolicy);
+                aE.extractAssets(app, "metadata", outputDir, extractPolicy);
 
-			runtime = Runtime.initializeRuntimeWithConfiguration(config);
+                // enable with flags?
+                boolean shouldExtractSnapshots = true;
 
-			// runtime needs to be initialized before the NativeScriptSyncService is enabled because it uses runtime.runScript(...)
-			if (NativeScriptSyncService.isSyncEnabled(app)) {
-				NativeScriptSyncService syncService = new NativeScriptSyncService(runtime, logger, app);
+                // will extract snapshot of the device appropriate architecture
+                if (shouldExtractSnapshots) {
+                    if (logger.isEnabled()) {
+                        logger.write("Extracting snapshot blob");
+                    }
 
-				syncService.sync();
-				syncService.startServer();
+                    aE.extractAssets(app, "snapshots/" + Build.CPU_ABI, outputDir, extractPolicy);
+                }
 
-				// preserve this instance as strong reference
-				// do not preserve in NativeScriptApplication field inorder to
-				// make the code more portable
-				// @@@
-				// Runtime.getOrCreateJavaObjectID(syncService);
-			} else {
-				if (logger.isEnabled()) {
-					logger.write("NativeScript LiveSync is not enabled.");
-				}
-			}
+                extractPolicy.setAssetsThumb(app);
+            }
 
-			runtime.runScript(new File(appDir, "internal/ts_helpers.js"));
+            AppConfig appConfig = new AppConfig(appDir);
 
-			File javaClassesModule = new File(appDir, "app/tns-java-classes.js");
-			if (javaClassesModule.exists()) {
-				runtime.runModule(javaClassesModule);
-			}
+            ClassLoader classLoader = app.getClassLoader();
+            File dexDir = new File(rootDir, "code_cache/secondary-dexes");
+            String dexThumb = null;
+            try {
+                dexThumb = Util.getDexThumb(app);
+            } catch (NameNotFoundException e) {
+                if (logger.isEnabled())
+                    logger.write("Error while getting current proxy thumb");
+                e.printStackTrace();
+            }
 
-			try {
-				// put this call in a try/catch block because with the latest changes in the modules it is not granted that NativeScriptApplication is extended through JavaScript.
-				Runtime.initInstance(app);
-			}
-			catch (Exception e) {
-				
-			}
-		}
-		return runtime;
-	}
+            String nativeLibDir = null;
+            try {
+                nativeLibDir = app.getPackageManager().getApplicationInfo(appName, 0).nativeLibraryDir;
+            } catch (android.content.pm.PackageManager.NameNotFoundException e) {
+                e.printStackTrace();
+            }
 
-	private static final String logTag = "MyApp";
+            StaticConfiguration config = new StaticConfiguration(logger, debugger, appName, nativeLibDir, rootDir,
+                    appDir, classLoader, dexDir, dexThumb, appConfig);
+
+            runtime = Runtime.initializeRuntimeWithConfiguration(config);
+
+            // runtime needs to be initialized before the NativeScriptSyncService is enabled because it uses runtime.runScript(...)
+            if (NativeScriptSyncService.isSyncEnabled(app)) {
+                NativeScriptSyncService syncService = new NativeScriptSyncService(runtime, logger, app);
+
+                syncService.sync();
+                syncService.startServer();
+
+                // preserve this instance as strong reference
+                // do not preserve in NativeScriptApplication field inorder to
+                // make the code more portable
+                // @@@
+                // Runtime.getOrCreateJavaObjectID(syncService);
+            } else {
+                if (logger.isEnabled()) {
+                    logger.write("NativeScript LiveSync is not enabled.");
+                }
+            }
+
+            runtime.runScript(new File(appDir, "internal/ts_helpers.js"));
+
+            File javaClassesModule = new File(appDir, "app/tns-java-classes.js");
+            if (javaClassesModule.exists()) {
+                runtime.runModule(javaClassesModule);
+            }
+
+            try {
+                // put this call in a try/catch block because with the latest changes in the modules it is not granted that NativeScriptApplication is extended through JavaScript.
+                JavaScriptImplementation jsImpl = app.getClass().getAnnotation(JavaScriptImplementation.class);
+                if (jsImpl != null) {
+                    Runtime.initInstance(app);
+                }
+            } catch (Exception e) {
+                if (logger.isEnabled()) {
+                    logger.write("Cannot initialize application instance.");
+                }
+                e.printStackTrace();
+            }
+        }
+        return runtime;
+    }
+
+    private static final String logTag = "MyApp";
 }
