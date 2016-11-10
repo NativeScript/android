@@ -117,8 +117,15 @@ public final class RuntimeHelper {
 				e.printStackTrace();
 			}
 
-			StaticConfiguration config = new StaticConfiguration(logger, debugger, appName, null, rootDir,
-					appDir, classLoader, dexDir, dexThumb, appConfig);
+            String nativeLibDir = null;
+            try {
+                nativeLibDir = app.getPackageManager().getApplicationInfo(appName, 0).nativeLibraryDir;
+            } catch (android.content.pm.PackageManager.NameNotFoundException e) {
+                e.printStackTrace();
+            }
+
+            StaticConfiguration config = new StaticConfiguration(logger, debugger, appName, nativeLibDir, rootDir,
+                    appDir, classLoader, dexDir, dexThumb, appConfig);
 
 			runtime = Runtime.initializeRuntimeWithConfiguration(config);
 
