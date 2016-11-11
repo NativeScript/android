@@ -31,7 +31,7 @@ import android.util.SparseArray;
 import com.tns.bindings.ProxyGenerator;
 
 public class Runtime {
-    private native void initNativeScript(int runtimeId, String filesPath, boolean verboseLoggingEnabled, String packageName, Object[] v8Options, String callingDir, JsDebugger jsDebugger);
+    private native void initNativeScript(int runtimeId, String filesPath, String nativeLibDir, boolean verboseLoggingEnabled, String packageName, Object[] v8Options, String callingDir, JsDebugger jsDebugger);
 
     private native void runModule(int runtimeId, String filePath) throws NativeScriptException;
 
@@ -443,10 +443,10 @@ public class Runtime {
     }
 
     public void init() {
-        init(config.logger, config.debugger, config.appName, config.runtimeLibPath, config.rootDir, config.appDir, config.classLoader, config.dexDir, config.dexThumb, config.appConfig, dynamicConfig.callingJsDir);
+        init(config.logger, config.debugger, config.appName, config.nativeLibDir, config.rootDir, config.appDir, config.classLoader, config.dexDir, config.dexThumb, config.appConfig, dynamicConfig.callingJsDir);
     }
 
-    private void init(Logger logger, Debugger debugger, String appName, File runtimeLibPath, File rootDir, File appDir, ClassLoader classLoader, File dexDir, String dexThumb, AppConfig appConfig, String callingJsDir) throws RuntimeException {
+    private void init(Logger logger, Debugger debugger, String appName, String nativeLibDir, File rootDir, File appDir, ClassLoader classLoader, File dexDir, String dexThumb, AppConfig appConfig, String callingJsDir) throws RuntimeException {
         if (initialized) {
             throw new RuntimeException("NativeScriptApplication already initialized");
         }
@@ -471,7 +471,7 @@ public class Runtime {
             jsDebugger = new JsDebugger(debugger, threadScheduler);
         }
 
-        initNativeScript(getRuntimeId(), Module.getApplicationFilesPath(), logger.isEnabled(), appName, appConfig.getAsArray(), callingJsDir, jsDebugger);
+        initNativeScript(getRuntimeId(), Module.getApplicationFilesPath(), nativeLibDir, logger.isEnabled(), appName, appConfig.getAsArray(), callingJsDir, jsDebugger);
 
         if (jsDebugger != null && this.runtimeId == 0) {
              jsDebugger.start();
