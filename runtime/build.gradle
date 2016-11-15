@@ -206,7 +206,7 @@ model {
                 project.archivesBaseName = "${archivesBaseName}-regular"
             }
 
-            minSdkVersion.apiLevel = 17
+            minSdkVersion.apiLevel = 14
             targetSdkVersion.apiLevel = 22
         }
 

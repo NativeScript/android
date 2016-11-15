@@ -20,7 +20,7 @@ model {
 
         defaultConfig.with {
             applicationId = "com.tns.android_runtime_testapp"
-            minSdkVersion.apiLevel = 17
+            minSdkVersion.apiLevel = 14
             targetSdkVersion.apiLevel = 22
             versionCode = 1
             versionName = "1.0"
