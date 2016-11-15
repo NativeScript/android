@@ -118,7 +118,7 @@ android {
     buildToolsVersion computeBuildToolsVersion()
 	
 	defaultConfig {
-		minSdkVersion 17
+		minSdkVersion 14
 		targetSdkVersion computeTargetSdkVersion()
 		ndk {
             		abiFilters "armeabi-v7a", "x86"
