@@ -61,7 +61,7 @@ public class Runtime {
 
     private static native void ClearWorkerPersistent(int runtimeId, int workerId);
 
-    private static native void CallWorkerObjectOnErrorHandleMain(int runtimeId, int workerId, String message, String filename, int lineno, String threadName) throws NativeScriptException;
+    private static native void CallWorkerObjectOnErrorHandleMain(int runtimeId, int workerId, String message, String stackTrace, String filename, int lineno, String threadName) throws NativeScriptException;
 
     void passUncaughtExceptionToJs(Throwable ex, String stackTrace) {
         passUncaughtExceptionToJsNative(getRuntimeId(), ex, stackTrace);
@@ -393,7 +393,7 @@ public class Runtime {
                 int workerId = msg.arg2;
                 JavaScriptErrorMessage errorMessage = (JavaScriptErrorMessage) msg.obj;
 
-                CallWorkerObjectOnErrorHandleMain(currentRuntime.runtimeId, workerId, errorMessage.getMessage(), errorMessage.getFilename(), errorMessage.getLineno(), errorMessage.getThreadName());
+                CallWorkerObjectOnErrorHandleMain(currentRuntime.runtimeId, workerId, errorMessage.getMessage(), errorMessage.getStackTrace(), errorMessage.getFilename(), errorMessage.getLineno(), errorMessage.getThreadName());
             }
         }
     }
@@ -1243,7 +1243,7 @@ public class Runtime {
     }
 
     @RuntimeCallable
-    public static void passUncaughtExceptionFromWorkerToMain(String message, String filename, int lineno) {
+    public static void passUncaughtExceptionFromWorkerToMain(String message, String filename, String stackTrace, int lineno) {
         // Thread should always be a worker
         Runtime currentRuntime = Runtime.getCurrentRuntime();
 
@@ -1252,7 +1252,7 @@ public class Runtime {
         msg.arg2 = currentRuntime.workerId;
 
         String threadName = currentRuntime.getHandler().getLooper().getThread().getName();
-        JavaScriptErrorMessage error = new JavaScriptErrorMessage(message, filename, lineno, threadName);
+        JavaScriptErrorMessage error = new JavaScriptErrorMessage(message, stackTrace, filename, lineno, threadName);
 
         msg.obj = error;
 
