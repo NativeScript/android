@@ -1,3 +1,28 @@
+2.4.0
+==
+
+## What's New
+
+ - [Update the V8 JavaScript Engine to 5.2.361 (97% ES6 support)](http://v8project.blogspot.bg/2016/06/release-52.html)
+ - [[Experimental] Generate typings for android.jar and android support libs (--androidTypings) (#605)](https://github.com/NativeScript/android-runtime/pull/605)
+ - [[Experimental] Multithreading support enabled with Web Workers API (#532)](https://github.com/NativeScript/android-runtime/issues/532)
+ - [Enable enableProguardInReleaseBuilds in build.gradle (#567)](https://github.com/NativeScript/android-runtime/issues/567)
+ - [Optimized default apk size (#529)](https://github.com/NativeScript/android-runtime/issues/529)
+ - [Improved debug Error Activity (#293)](https://github.com/NativeScript/android-runtime/issues/293)
+
+## Bug Fixes
+
+ - [Build for armv7 and x86 only by default (#614)](https://github.com/NativeScript/android-runtime/issues/614)
+ - [Make javascript parsing during build incremental (#572)](https://github.com/NativeScript/android-runtime/issues/572)
+ - [App won't launch on Android 22 device (#592)](https://github.com/NativeScript/android-runtime/issues/592)
+ - [Metadata isn't created for generated dex files (#552)](https://github.com/NativeScript/android-runtime/issues/552)
+ - [App doesn't load with the new custom Application\Activity support (#546)](https://github.com/NativeScript/android-runtime/issues/546)
+
+## Performance
+
+ - [Enable enableProguardInReleaseBuilds in build.gradle (#567)](https://github.com/NativeScript/android-runtime/issues/567)
+ - [Optimize default apk size  (#529)](https://github.com/NativeScript/android-runtime/issues/529)
+
 2.3.0
 ==
 
