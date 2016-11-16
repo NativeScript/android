@@ -150,7 +150,7 @@ namespace tns
 			 * Will execute `onerror` if one is implemented for the Worker Object instance
 			 * Will throw a NativeScript Exception if 'onerror' isn't implemented or returns false
 			 */
-			static void CallWorkerObjectOnErrorHandle(v8::Isolate *isolate, jint workerId, jstring message, jstring filename, jint lineno, jstring threadName);
+			static void CallWorkerObjectOnErrorHandle(v8::Isolate *isolate, jint workerId, jstring message, jstring stackTrace, jstring filename, jint lineno, jstring threadName);
 
 		private:
 			CallbackHandlers()

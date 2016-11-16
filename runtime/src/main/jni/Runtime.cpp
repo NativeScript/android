@@ -392,20 +392,22 @@ void Runtime::PassUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, jthrowab
 	}
 }
 
-void Runtime::PassUncaughtExceptionFromWorkerToMainHandler(Local<String> message, Local<String> filename, int lineno) {
+void Runtime::PassUncaughtExceptionFromWorkerToMainHandler(Local<String> message, Local<String> stackTrace, Local<String> filename, int lineno) {
 	JEnv env;
 	auto runtimeClass = env.GetObjectClass(m_runtime);
 
 	auto mId = env.GetStaticMethodID(runtimeClass, "passUncaughtExceptionFromWorkerToMain",
-									 "(Ljava/lang/String;Ljava/lang/String;I)V");
+									 "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)V");
 
 	auto jMsg = ArgConverter::ConvertToJavaString(message);
 	auto jfileName = ArgConverter::ConvertToJavaString(filename);
+	auto stckTrace = ArgConverter::ConvertToJavaString(stackTrace);
 
 	JniLocalRef jMsgLocal(jMsg);
 	JniLocalRef jfileNameLocal(jfileName);
+	JniLocalRef stTrace(stckTrace);
 
-	env.CallStaticVoidMethod(runtimeClass, mId, (jstring) jMsgLocal, (jstring) jfileNameLocal, lineno);
+	env.CallStaticVoidMethod(runtimeClass, mId, (jstring) jMsgLocal, (jstring) jfileNameLocal, (jstring) stTrace, lineno);
 }
 
 void Runtime::ClearStartupData(JNIEnv *env, jobject obj) {

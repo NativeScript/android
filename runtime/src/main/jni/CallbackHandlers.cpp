@@ -1286,19 +1286,29 @@ void CallbackHandlers::CallWorkerScopeOnErrorHandle(Isolate* isolate, TryCatch& 
         if(innerTc.HasCaught()) {
             auto lno = innerTc.Message()->GetLineNumber();
             auto msg = innerTc.Message()->Get();
+            Local<Value> outStackTrace = innerTc.StackTrace(context).FromMaybe(Local<Value>());
+            Local<String> stackTrace;
+            if(!outStackTrace.IsEmpty()) {
+                stackTrace = outStackTrace->ToDetailString();
+            }
             auto source = innerTc.Message()->GetScriptResourceName()->ToString(isolate);
 
             auto runtime = Runtime::GetRuntime(isolate);
-            runtime->PassUncaughtExceptionFromWorkerToMainHandler(msg, source, lno);
+            runtime->PassUncaughtExceptionFromWorkerToMainHandler(msg, stackTrace, source, lno);
         }
 
         // throw so that it may bubble up to main
         auto lno = tc.Message()->GetLineNumber();
         auto msg = tc.Message()->Get();
         auto source = tc.Message()->GetScriptResourceName()->ToString(isolate);
+        Local<Value> outStackTrace = tc.StackTrace(context).FromMaybe(Local<Value>());
+        Local<String> stackTrace;
+        if(!outStackTrace.IsEmpty()) {
+            stackTrace = outStackTrace->ToDetailString();
+        }
 
         auto runtime = Runtime::GetRuntime(isolate);
-        runtime->PassUncaughtExceptionFromWorkerToMainHandler(msg, source, lno);
+        runtime->PassUncaughtExceptionFromWorkerToMainHandler(msg, stackTrace, source, lno);
     } catch (NativeScriptException &ex) {
         ex.ReThrowToV8();
     } catch (std::exception e) {
@@ -1312,7 +1322,7 @@ void CallbackHandlers::CallWorkerScopeOnErrorHandle(Isolate* isolate, TryCatch& 
     }
 }
 
-void CallbackHandlers::CallWorkerObjectOnErrorHandle(Isolate *isolate, jint workerId, jstring message, jstring filename, jint lineno, jstring threadName) {
+void CallbackHandlers::CallWorkerObjectOnErrorHandle(Isolate *isolate, jint workerId, jstring message, jstring stackTrace, jstring filename, jint lineno, jstring threadName) {
     try {
         auto workerFound = CallbackHandlers::id2WorkerMap.find(workerId);
 
@@ -1344,6 +1354,8 @@ void CallbackHandlers::CallWorkerObjectOnErrorHandle(Isolate *isolate, jint work
             auto errEvent = Object::New(isolate);
             errEvent->Set(ArgConverter::ConvertToV8String(isolate, "message"),
                           ArgConverter::jstringToV8String(isolate, message));
+            errEvent->Set(ArgConverter::ConvertToV8String(isolate, "stackTrace"),
+                          ArgConverter::jstringToV8String(isolate, stackTrace));
             errEvent->Set(ArgConverter::ConvertToV8String(isolate, "filename"),
                           ArgConverter::jstringToV8String(isolate, filename));
             errEvent->Set(ArgConverter::ConvertToV8String(isolate, "lineno"),
@@ -1365,9 +1377,10 @@ void CallbackHandlers::CallWorkerObjectOnErrorHandle(Isolate *isolate, jint work
         auto strMessage = ArgConverter::jstringToString(message);
         auto strFilename = ArgConverter::jstringToString(filename);
         auto strThreadname = ArgConverter::jstringToString(threadName);
+        auto strStackTrace = ArgConverter::jstringToString(stackTrace);
 
-        DEBUG_WRITE("Unhandled exception in '%s' thread. file: %s, line %d\n",
-                    strThreadname.c_str(), strFilename.c_str(), lineno, strMessage.c_str());
+        DEBUG_WRITE("Unhandled exception in '%s' thread. file: %s, line %d\nStackTrace: %s",
+                    strThreadname.c_str(), strFilename.c_str(), lineno, strMessage.c_str(), strStackTrace.c_str());
 
         // Do not throw exception?
 //    stringstream ss;
