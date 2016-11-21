@@ -829,8 +829,6 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate *is
 
 	node->SetInstanceMembers(isolate, ctorFuncTemplate, prototypeTemplate, instanceMethodsCallbackData, baseInstanceMethodsCallbackData, treeNode);
 
-	ctorFuncTemplate->SetClassName(ConvertToV8String(node->m_treeNode->name));
-
 	auto ctorFunc = ctorFuncTemplate->GetFunction();
 
     auto origin = Constants::APP_ROOT_FOLDER_PATH + node->m_name;
