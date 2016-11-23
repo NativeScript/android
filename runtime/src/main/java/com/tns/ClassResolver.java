@@ -23,6 +23,13 @@ class ClassResolver
 			className = cannonicalClassName.substring(0, classExtendSeparatorIndex);
 			name = cannonicalClassName.substring(classExtendSeparatorIndex + 1);
 		}
+		else {
+			classExtendSeparatorIndex = cannonicalClassName.indexOf("_unknown_location");
+			if (classExtendSeparatorIndex != -1) {
+				className = cannonicalClassName.substring(0, classExtendSeparatorIndex);
+				name = cannonicalClassName.substring(classExtendSeparatorIndex + 1);
+			}
+		}
 
 		Class<?> clazz = null;
 		boolean isBindingClass = cannonicalClassName.startsWith("com.tns.gen") && !cannonicalClassName.startsWith("com.tns.tests.");
