@@ -1614,9 +1614,9 @@ bool MetadataNode::GetExtendLocation(string& extendLocation)
 			auto scriptName = frame->GetScriptName();
 			if (scriptName.IsEmpty())
 			{
-				extendLocationStream << "unkown location";
+				extendLocationStream << "unknown_location";
 				extendLocation = extendLocationStream.str();
-				return false;
+				return true;
 			}
 
 			string srcFileName = ArgConverter::ConvertToString(scriptName);

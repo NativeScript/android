@@ -1695,4 +1695,17 @@ describe("Tests ", function () {
 
         expect(called).toBe(true);
     });
+
+    it("should extend Java class in eval", function () {
+        var source='global.MyObj = java.lang.Object.extend(\
+                {\
+                        hashCode: function () {\
+                                return 1234;\
+                        }\
+                }\
+        )';
+        eval('('+source+')')
+        var o = new MyObj();
+        expect(o.hashCode()).toBe(1234);
+    });
 });
