@@ -22,6 +22,9 @@ namespace tns
 		public:
             static JsV8InspectorClient* GetInstance();
 
+			template <class TypeName>
+			static v8::Local<TypeName> PersistentToLocal(v8::Isolate* isolate, const v8::Persistent<TypeName>& persistent);
+
             void init();
 			void connect(jobject connection);
 			void doConnect(v8::Isolate *isolate, const v8::Local<v8::Context>& context);
@@ -29,13 +32,13 @@ namespace tns
 			void dispatchMessage(const std::string& message);
 			void doDispatchMessage(v8::Isolate *isolate, const std::string& message);
 
-			//void sendProtocolResponse(int callId, const String16& message) override;
-            //void sendProtocolNotification(const String16& message) override;
-            //void flushProtocolNotifications() override;
-
 			void sendProtocolResponse(int callId, const v8_inspector::StringView &message) override;
 			void sendProtocolNotification(const v8_inspector::StringView &message) override;
 			void flushProtocolNotifications() override;
+
+			void runMessageLoopOnPause(int context_group_id) override;
+			void quitMessageLoopOnPause() override;
+			v8::Local<v8::Context> ensureDefaultContextInGroup(int contextGroupId) override;
 
 		private:
             JsV8InspectorClient(v8::Isolate *isolate);
@@ -44,12 +47,16 @@ namespace tns
             static JsV8InspectorClient* instance;
             static jclass inspectorClass;
             static jmethodID sendMethod;
+			static jmethodID getInspectorMessageMethod;
 
 			TaskRunner* backend_runner;
             v8::Isolate* isolate_;
+			v8::Persistent<v8::Context> context_;
             std::unique_ptr<V8Inspector> inspector_;
             std::unique_ptr<V8InspectorSession> session_;
             jobject connection;
+			bool running_nested_loop_;
+			bool terminated_;
 	};
 }
 

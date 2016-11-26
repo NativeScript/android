@@ -4,6 +4,7 @@
 
 #include "task-runner.h"
 #include <unistd.h>
+#include <include/v8-debug.h>
 #include "../SimpleAllocator.h"
 
 namespace
@@ -24,14 +25,15 @@ namespace
 
 TaskRunner::TaskRunner(v8::ExtensionConfiguration *extensions,
                        bool catch_exceptions,
-                       v8::base_copied::Semaphore *ready_semaphore)
+                       v8::base_copied::Semaphore *ready_semaphore, v8::Isolate* isolate)
         : Thread(Options("Task Runner")),
           extensions_(extensions),
           catch_exceptions_(catch_exceptions),
           ready_semaphore_(ready_semaphore),
-          isolate_(nullptr),
+          //isolate_(nullptr),
           process_queue_semaphore_(0),
-          nested_loop_count_(0)
+          nested_loop_count_(0),
+          isolate_(isolate)
 {
     Start();
 }
@@ -44,17 +46,23 @@ TaskRunner::~TaskRunner()
 
 void TaskRunner::InitializeContext()
 {
-    v8::Isolate::CreateParams params;
-    //params.array_buffer_allocator = v8::ArrayBuffer::Allocator::NewDefaultAllocator();
-    tns::SimpleAllocator g_allocator;
-    params.array_buffer_allocator = &g_allocator;
-    isolate_ = v8::Isolate::New(params);
-    isolate_->SetMicrotasksPolicy(v8::MicrotasksPolicy::kScoped);
-    v8::Isolate::Scope isolate_scope(isolate_);
+    //v8::Isolate::CreateParams params;
+    //tns::SimpleAllocator g_allocator;
+    //params.array_buffer_allocator = &g_allocator;
+    //isolate_ = v8::Isolate::New(params);
+
+    //isolate_->SetMicrotasksPolicy(v8::MicrotasksPolicy::kScoped);
+    //v8::Isolate::Scope isolate_scope(isolate_);
     v8::HandleScope handle_scope(isolate_);
 
-    v8::Local<v8::ObjectTemplate> global_template = v8::ObjectTemplate::New(isolate_);
-    v8::Local<v8::Context> context = v8::Context::New(isolate_, extensions_, global_template);
+    //v8::Local<v8::ObjectTemplate> global_template = v8::ObjectTemplate::New(isolate_);
+
+    //v8::Local<v8::Context> context = v8::Context::New(isolate_, extensions_, global_template);
+    //v8::Local<v8::Context> context = v8::Context::New(isolate_);
+
+    v8::Local<v8::Context> context = isolate_->GetCurrentContext();
+
+
     context->SetAlignedPointerInEmbedderData(kTaskRunnerIndex, this);
     context_.Reset(isolate_, context);
 

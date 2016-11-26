@@ -20,12 +20,10 @@ class TaskRunner : public v8::base::Thread {
    public:
     virtual ~Task() {}
     virtual bool is_inspector_task() = 0;
-    virtual void Run(v8::Isolate* isolate,
-                     const v8::Global<v8::Context>& context) = 0;
+    virtual void Run(v8::Isolate* isolate, const v8::Global<v8::Context>& context) = 0;
   };
 
-  TaskRunner(v8::ExtensionConfiguration* extensions, bool catch_exceptions,
-             v8::base_copied::Semaphore* ready_semaphore);
+  TaskRunner(v8::ExtensionConfiguration* extensions, bool catch_exceptions, v8::base_copied::Semaphore* ready_semaphore, v8::Isolate* isolate);
   virtual ~TaskRunner();
 
   // Thread implementation.

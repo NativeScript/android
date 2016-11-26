@@ -158,8 +158,8 @@ namespace v8_inspector
         v8::ScriptOrigin origin(toV8String(m_isolate, fileName));
         v8::ScriptCompiler::Source source(code, origin);
 
-        v8::String::Utf8Value str(code);
-        std::string stdString = std::string(*str);
+        //v8::String::Utf8Value str(code);
+        //std::string stdString = std::string(*str);
 
         v8::Local<v8::Script> script;
 
@@ -429,7 +429,11 @@ namespace v8_inspector
     V8InspectorSessionImpl *V8InspectorImpl::sessionForContextGroup(
             int contextGroupId)
     {
-        if (!contextGroupId) return nullptr;
+//        if (!contextGroupId)
+//        {
+//            return nullptr;
+//        }
+
         SessionMap::iterator iter = m_sessions.find(contextGroupId);
         return iter == m_sessions.end() ? nullptr : iter->second;
     }

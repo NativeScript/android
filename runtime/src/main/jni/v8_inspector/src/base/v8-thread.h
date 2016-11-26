@@ -52,7 +52,7 @@ namespace v8
             virtual ~Thread();
 
             // Start new thread by calling the Run() method on the new thread.
-            void Start();
+            void  Start();
 
             // Start new thread and wait until Run() method is called on the new thread.
             void StartSynchronously()

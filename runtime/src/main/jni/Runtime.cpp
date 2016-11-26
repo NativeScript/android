@@ -416,8 +416,8 @@ void Runtime::ClearStartupData(JNIEnv *env, jobject obj) {
 }
 
 static void InitializeV8() {
-	auto platform = v8::platform::CreateDefaultPlatform();
-	V8::InitializePlatform(platform);
+    Runtime::platform = v8::platform::CreateDefaultPlatform();
+	V8::InitializePlatform(Runtime::platform);
 	V8::Initialize();
 }
 
@@ -684,3 +684,4 @@ jmethodID Runtime::GET_USED_MEMORY_METHOD_ID = nullptr;
 map<int, Runtime*> Runtime::s_id2RuntimeCache;
 map<Isolate*, Runtime*> Runtime::s_isolate2RuntimesCache;
 bool Runtime::s_mainThreadInitialized = false;
+v8::Platform* Runtime::platform = nullptr;

@@ -1,3 +1,5 @@
+//debugger;
+
 global.__onUncaughtError = function(error){
 	if(error.nativeException){
 		__log("err.message: " + error.message);

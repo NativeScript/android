@@ -247,7 +247,7 @@ model {
         toolchain = "clang"
         stl = "c++_static"
 
-        abiFilters.addAll(["armeabi-v7a"])
+        abiFilters.addAll(["armeabi-v7a", "x86"])
 
         if (System.getProperties()['idea.platform.prefix'] != null)
         {
@@ -257,6 +257,7 @@ model {
             if (!ndkDebuggable)
             {
                 abiFilters.addAll(["x86", "arm64-v8a"])
+
             }
         }
         else
