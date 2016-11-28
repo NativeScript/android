@@ -474,26 +474,26 @@ void MetadataNode::SuperAccessorGetterCallback(Local<String> property, const Pro
 	}
 }
 
-void MetadataNode::SetInstanceMembers(Isolate *isolate, Local<FunctionTemplate>& ctorFuncTemplate, Local<ObjectTemplate>& prototypeTemplate, vector<MethodCallbackData*>& instanceMethodsCallbackData, const vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode)
+std::vector<MetadataNode::MethodCallbackData*> MetadataNode::SetInstanceMembers(Isolate *isolate, Local<FunctionTemplate>& ctorFuncTemplate, Local<ObjectTemplate>& prototypeTemplate, vector<MethodCallbackData*>& instanceMethodsCallbackData, const vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode)
 {
 	auto hasCustomMetadata = treeNode->metadata != nullptr;
 
 	if (hasCustomMetadata)
 	{
-		SetInstanceMembersFromRuntimeMetadata(isolate, ctorFuncTemplate, prototypeTemplate, instanceMethodsCallbackData, baseInstanceMethodsCallbackData, treeNode);
+		return SetInstanceMembersFromRuntimeMetadata(isolate, ctorFuncTemplate, prototypeTemplate, instanceMethodsCallbackData, baseInstanceMethodsCallbackData, treeNode);
 	}
 	else
 	{
 		SetInstanceFieldsFromStaticMetadata(isolate, ctorFuncTemplate, prototypeTemplate, instanceMethodsCallbackData, baseInstanceMethodsCallbackData, treeNode);
-		SetInstanceMethodsFromStaticMetadata(isolate, ctorFuncTemplate, prototypeTemplate, instanceMethodsCallbackData, baseInstanceMethodsCallbackData, treeNode);
+		return SetInstanceMethodsFromStaticMetadata(isolate, ctorFuncTemplate, prototypeTemplate, instanceMethodsCallbackData, baseInstanceMethodsCallbackData, treeNode);
 	}
 }
 
-void MetadataNode::SetInstanceMethodsFromStaticMetadata(Isolate *isolate, Local<FunctionTemplate>& ctorFuncTemplate, Local<ObjectTemplate>& prototypeTemplate, vector<MethodCallbackData*>& instanceMethodsCallbackData, const vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode)
+vector<MetadataNode::MethodCallbackData*> MetadataNode::SetInstanceMethodsFromStaticMetadata(Isolate *isolate, Local<FunctionTemplate>& ctorFuncTemplate, Local<ObjectTemplate>& prototypeTemplate, vector<MethodCallbackData*>& instanceMethodsCallbackData, const vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode)
 {
 	SET_PROFILER_FRAME();
 
-	Local<Function> ctorFunction;
+	std::vector<MethodCallbackData*> instanceMethodData;
 
 	uint8_t *curPtr = s_metadataReader.GetValueData() + treeNode->offsetValue + 1;
 
@@ -509,13 +509,13 @@ void MetadataNode::SetInstanceMethodsFromStaticMetadata(Isolate *isolate, Local<
 	}
 
 	//get candidates from instance methods metadata
-	auto instanceMethodCout = *reinterpret_cast<uint16_t*>(curPtr);
+	auto instanceMethodCount = *reinterpret_cast<uint16_t*>(curPtr);
 	curPtr += sizeof(uint16_t);
 	string lastMethodName;
 	MethodCallbackData *callbackData = nullptr;
 
 	auto origin = Constants::APP_ROOT_FOLDER_PATH + GetOrCreateInternal(treeNode)->m_name;
-	for (auto i = 0; i < instanceMethodCout; i++)
+	for (auto i = 0; i < instanceMethodCount; i++)
 	{
 		auto entry = s_metadataReader.ReadInstanceMethodEntry(&curPtr);
 
@@ -523,6 +523,7 @@ void MetadataNode::SetInstanceMethodsFromStaticMetadata(Isolate *isolate, Local<
 		if (entry.name != lastMethodName)
 		{
 			callbackData = new MethodCallbackData(this);
+			instanceMethodData.push_back(callbackData);
 
 			instanceMethodsCallbackData.push_back(callbackData);
 			auto itBegin = baseInstanceMethodsCallbackData.begin();
@@ -560,6 +561,7 @@ void MetadataNode::SetInstanceMethodsFromStaticMetadata(Isolate *isolate, Local<
 
 		callbackData->candidates.push_back(entry);
 	}
+	return instanceMethodData;
 }
 
 void MetadataNode::SetInstanceFieldsFromStaticMetadata(Isolate *isolate, Local<FunctionTemplate>& ctorFuncTemplate, Local<ObjectTemplate>& prototypeTemplate, vector<MethodCallbackData*>& instanceMethodsCallbackData, const vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode)
@@ -606,11 +608,13 @@ void MetadataNode::SetInstanceFieldsFromStaticMetadata(Isolate *isolate, Local<F
 	}
 }
 
-void MetadataNode::SetInstanceMembersFromRuntimeMetadata(Isolate *isolate, Local<FunctionTemplate>& ctorFuncTemplate, Local<ObjectTemplate>& prototypeTemplate, vector<MethodCallbackData*>& instanceMethodsCallbackData, const vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode)
+vector<MetadataNode::MethodCallbackData*> MetadataNode::SetInstanceMembersFromRuntimeMetadata(Isolate *isolate, Local<FunctionTemplate>& ctorFuncTemplate, Local<ObjectTemplate>& prototypeTemplate, vector<MethodCallbackData*>& instanceMethodsCallbackData, const vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode)
 {
 	SET_PROFILER_FRAME();
 
 	assert(treeNode->metadata != nullptr);
+
+	std::vector<MethodCallbackData*> instanceMethodData;
 
 	string line;
 	const string& metadata = *treeNode->metadata;
@@ -649,6 +653,7 @@ void MetadataNode::SetInstanceMembersFromRuntimeMetadata(Isolate *isolate, Local
 			if (entry.name != lastMethodName)
 			{
 				callbackData = new MethodCallbackData(this);
+				instanceMethodData.push_back(callbackData);
 
 				instanceMethodsCallbackData.push_back(callbackData);
 				auto itBegin = baseInstanceMethodsCallbackData.begin();
@@ -676,6 +681,7 @@ void MetadataNode::SetInstanceMembersFromRuntimeMetadata(Isolate *isolate, Local
 			prototypeTemplate->SetAccessor(fieldName, FieldAccessorGetterCallback, FieldAccessorSetterCallback, fieldData, access, PropertyAttribute::DontDelete);
 		}
 	}
+	return instanceMethodData;
 }
 
 void MetadataNode::SetStaticMembers(Isolate *isolate, Local<Function>& ctorFunction, MetadataTreeNode *treeNode)
@@ -812,22 +818,34 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate *is
 	ctorFuncTemplate = FunctionTemplate::New(isolate, funcCallback, ctorCallbackData);
 	ctorFuncTemplate->InstanceTemplate()->SetInternalFieldCount(static_cast<int>(ObjectManager::MetadataNodeKeys::END));
 
-	auto baseTreeNode = s_metadataReader.GetBaseClassNode(treeNode);
 	Local<Function> baseCtorFunc;
-	std::vector<MethodCallbackData*> baseInstanceMethodsCallbackData;
-	if ((baseTreeNode != treeNode) && (baseTreeNode != nullptr) && (baseTreeNode->offsetValue > 0))
-	{
-		auto baseFuncTemplate = GetConstructorFunctionTemplate(isolate, baseTreeNode, baseInstanceMethodsCallbackData);
-		if (!baseFuncTemplate.IsEmpty())
-		{
-			ctorFuncTemplate->Inherit(baseFuncTemplate);
-			baseCtorFunc = Local<Function>::New(isolate, *GetOrCreateInternal(baseTreeNode)->GetPersistentConstructorFunction(isolate));
+	std::vector<MethodCallbackData *> baseInstanceMethodsCallbackData;
+	auto tmpTreeNode = treeNode;
+	JEnv env;
+	auto currentClass = env.FindClass(node->m_name);
+	std::vector<MetadataTreeNode*> skippedBaseTypes;
+	while (true) {
+		auto baseTreeNode = s_metadataReader.GetBaseClassNode(tmpTreeNode);
+		if (CheckClassHierarchy(env, currentClass, treeNode, baseTreeNode, skippedBaseTypes)) {
+			tmpTreeNode = baseTreeNode;
+			continue;
 		}
+		if ((baseTreeNode != treeNode) && (baseTreeNode != nullptr) && (baseTreeNode->offsetValue > 0)) {
+			auto baseFuncTemplate = GetConstructorFunctionTemplate(isolate, baseTreeNode, baseInstanceMethodsCallbackData);
+			if (!baseFuncTemplate.IsEmpty()) {
+				ctorFuncTemplate->Inherit(baseFuncTemplate);
+				baseCtorFunc = Local<Function>::New(isolate, *GetOrCreateInternal(baseTreeNode)->GetPersistentConstructorFunction(isolate));
+			}
+		}
+		break;
 	}
 
 	auto prototypeTemplate = ctorFuncTemplate->PrototypeTemplate();
 
-	node->SetInstanceMembers(isolate, ctorFuncTemplate, prototypeTemplate, instanceMethodsCallbackData, baseInstanceMethodsCallbackData, treeNode);
+	auto instanceMethodData = node->SetInstanceMembers(isolate, ctorFuncTemplate, prototypeTemplate, instanceMethodsCallbackData, baseInstanceMethodsCallbackData, treeNode);
+	if (!skippedBaseTypes.empty()) {
+		node->SetMissingBaseMethods(isolate, skippedBaseTypes, instanceMethodData, prototypeTemplate);
+	}
 
 	auto ctorFunc = ctorFuncTemplate->GetFunction();
 
@@ -1509,6 +1527,7 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
 
 		auto isolate = info.GetIsolate();
 
+
 		//resolve class (pre-generated or generated runtime from dex generator)
 		uint8_t nodeType = s_metadataReader.GetNodeType(node->m_treeNode);
 		bool isInterface = s_metadataReader.IsNodeTypeInterface(nodeType);
@@ -1896,6 +1915,87 @@ Local<Function> MetadataNode::Wrap(Isolate* isolate, const Local<Function>& func
 
 	return ret;
 }
+
+bool MetadataNode::CheckClassHierarchy(JEnv& env, jclass currentClass, MetadataTreeNode *curentTreeNode, MetadataTreeNode *baseTreeNode, std::vector<MetadataTreeNode*>& skippedBaseTypes) {
+	auto shouldSkipBaseClass = false;
+	if ((currentClass != nullptr) && (baseTreeNode != curentTreeNode) && (baseTreeNode != nullptr) &&
+		(baseTreeNode->offsetValue > 0)) {
+		auto baseNode = GetOrCreateInternal(baseTreeNode);
+		auto baseClass = env.FindClass(baseNode->m_name);
+		if (baseClass != nullptr) {
+			auto isBaseClass = env.IsAssignableFrom(currentClass, baseClass) == JNI_TRUE;
+			if (!isBaseClass) {
+				skippedBaseTypes.push_back(baseTreeNode);
+				shouldSkipBaseClass = true;
+			}
+		}
+	}
+	return shouldSkipBaseClass;
+}
+
+/*
+ * This method handles scenrios like Bundle/BaseBundle class hierarchy change in API level 21.
+ * See https://github.com/NativeScript/android-runtime/issues/628
+ */
+void MetadataNode::SetMissingBaseMethods(Isolate *isolate, const vector<MetadataTreeNode*>& skippedBaseTypes, const vector<MethodCallbackData*>& instanceMethodData, Local<ObjectTemplate>& prototypeTemplate)
+{
+	for (auto treeNode: skippedBaseTypes) {
+		uint8_t *curPtr = s_metadataReader.GetValueData() + treeNode->offsetValue + 1;
+
+		auto nodeType = s_metadataReader.GetNodeType(treeNode);
+
+		auto curType = s_metadataReader.ReadTypeName(treeNode);
+
+		curPtr += sizeof(uint16_t /* baseClassId */);
+
+		if (s_metadataReader.IsNodeTypeInterface(nodeType)) {
+			curPtr += sizeof(uint8_t) + sizeof(uint32_t);
+		}
+
+		//get candidates from instance methods metadata
+		auto instanceMethodCount = *reinterpret_cast<uint16_t*>(curPtr);
+		curPtr += sizeof(uint16_t);
+		MethodCallbackData *callbackData = nullptr;
+
+		for (auto i = 0; i < instanceMethodCount; i++) {
+			auto entry = s_metadataReader.ReadInstanceMethodEntry(&curPtr);
+
+			auto isConstructor = entry.name == "<init>";
+			if (isConstructor) {
+				continue;
+			}
+
+			for (auto data: instanceMethodData) {
+				if (data->candidates.front().name == entry.name) {
+					callbackData = data;
+					break;
+				}
+			}
+
+			if (callbackData == nullptr) {
+				callbackData = new MethodCallbackData(this);
+
+				auto funcData = External::New(isolate, callbackData);
+				auto funcTemplate = FunctionTemplate::New(isolate, MethodCallback, funcData);
+				auto funcName = ConvertToV8String(entry.name);
+				prototypeTemplate->Set(funcName, funcTemplate);
+			}
+
+			bool foundSameSig = false;
+			for (auto m: callbackData->candidates) {
+				foundSameSig = m.sig == entry.sig;
+				if (foundSameSig) {
+					break;
+				}
+			}
+
+			if (!foundSameSig) {
+				callbackData->candidates.push_back(entry);
+			}
+		}
+	}
+}
+
 
 string MetadataNode::TNS_PREFIX = "com/tns/gen/";
 MetadataReader MetadataNode::s_metadataReader;

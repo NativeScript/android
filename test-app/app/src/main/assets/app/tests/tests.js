@@ -1708,4 +1708,12 @@ describe("Tests ", function () {
         var o = new MyObj();
         expect(o.hashCode()).toBe(1234);
     });
+
+    it("should call method on a newly introduced class in the class hierarchy", function () {
+        /* this test simulates android.os.Bundle class hierarchy change in API level 21
+           which cause app crash on Xiaomi Redmi devices
+        */
+        var b = new com.tns.tests.Bundle();
+        expect(b.getMyInt()).toBe(456);
+    });
 });

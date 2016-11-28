@@ -1,13 +1,13 @@
 package com.telerik.metadata.dx;
 
+import com.android.dex.Annotation;
 import com.android.dex.ClassData;
 import com.android.dex.ClassDef;
 import com.android.dex.Dex;
-import com.android.dex.MethodId;
-import com.android.dex.ProtoId;
 import com.android.dx.rop.code.AccessFlags;
 import com.android.dx.rop.cst.CstType;
 import com.android.dx.rop.type.Type;
+import com.telerik.metadata.desc.MetadataInfoAnnotationDescriptor;
 import com.telerik.metadata.desc.ClassDescriptor;
 import com.telerik.metadata.desc.FieldDescriptor;
 import com.telerik.metadata.desc.MethodDescriptor;
@@ -100,6 +100,43 @@ public class ClassInfo implements ClassDescriptor {
         }
 
         return fields;
+    }
+
+    @Override
+    public MetadataInfoAnnotationDescriptor getMetadataInfoAnnotation() {
+        int annotationsOffset = classDef.getAnnotationsOffset();
+        if (annotationsOffset == 0) {
+            return null;
+        }
+
+        Dex dex = dexFile.getDex();
+
+        int classDefIndex = dex.findClassDefIndexFromTypeIndex(classDef.getTypeIndex());
+        int dexAnnotationDirectoryOffset = dex.annotationDirectoryOffsetFromClassDefIndex(classDefIndex);
+        if (dexAnnotationDirectoryOffset == 0) {
+            return null;
+        }
+        Dex.Section dirSection = dex.open(dexAnnotationDirectoryOffset);
+        int classSetOffset = dirSection.readInt();
+
+        int annotationSetOffset = classSetOffset;
+
+        if (annotationSetOffset == 0) {
+            return null;
+        }
+
+        Dex.Section annSetSection = dex.open(annotationSetOffset);
+        int size = annSetSection.readInt();
+        for (int i = 0; i < size; i++) {
+            int annotationOffset = annSetSection.readInt();
+            Dex.Section annSection = dex.open(annotationOffset);
+            Annotation annotation = annSection.readAnnotation();
+            String annotationName = dex.strings().get(dex.typeIds().get(annotation.getTypeIndex()));
+            if (annotationName.equals("Lcom/telerik/metadata/MetadataInfo;")) {
+                return new MetadataInfoAnnotationInfo(dexFile, annotation);
+            }
+        }
+        return null;
     }
 
     @Override
