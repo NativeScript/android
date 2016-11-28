@@ -13,6 +13,8 @@ public interface ClassDescriptor {
 
     FieldDescriptor[] getFields();
 
+    MetadataInfoAnnotationDescriptor getMetadataInfoAnnotation();
+
     String[] getInterfaceNames();
 
     String getPackageName();
