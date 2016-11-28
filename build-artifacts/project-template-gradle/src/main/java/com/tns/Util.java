@@ -42,7 +42,7 @@ public final class Util
 		return isDebuggableApp;
 	}
 
-	static boolean runPlugin(Logger logger, Context context)
+	static boolean runPlugin(Context context)
 	{
 		boolean success = false;
 		String pluginClassName = "org.nativescript.livesync.LiveSyncPlugin";
@@ -57,8 +57,7 @@ public final class Util
 		}
 		catch (Exception e)
 		{
-			if (logger.isEnabled())
-				e.printStackTrace();
+			e.printStackTrace();
 		}
 
 		try
@@ -69,9 +68,9 @@ public final class Util
 		}
 		catch (Exception e)
 		{
-			if (logger.isEnabled())
-				e.printStackTrace();
+			e.printStackTrace();
 		}
+
 		return success;
 	}
 	
@@ -103,6 +102,7 @@ public final class Util
 		{
 			return;
 		}
+		
 		try
 		{
 			closeable.close();

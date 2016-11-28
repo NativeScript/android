@@ -1,4 +1,3 @@
-//__disableVerboseLogging();
 __log("starting tests");
 
 // methods that common tests need to run
@@ -20,7 +19,7 @@ shared.runRequireTests();
 shared.runWeakRefTests();
 shared.runRuntimeTests();
 shared.runWorkerTests();
-//
+
 require("./tests/testMetadata");
 require("./tests/testAsserts");
 require("./tests/testWeakRef");

@@ -34,7 +34,6 @@ public class AndroidJsDebugger implements Debugger
 
 	public static boolean enableDebuggingOverride;
 
-	private Logger logger;
 	private Context context;
 	private DebugLocalServerSocketThread debugServerThread;
 	private JsDebugger debugContext;
@@ -45,10 +44,9 @@ public class AndroidJsDebugger implements Debugger
 
 	private HandlerThread handlerThread;
 
-	public AndroidJsDebugger(Context context, Logger logger)
+	public AndroidJsDebugger(Context context)
 	{
 		this.context = context;
-		this.logger = logger;
 		LINE_END_BYTES = new byte[2];
 		LINE_END_BYTES[0] = (byte) '\r';
 		LINE_END_BYTES[1] = (byte) '\n';
@@ -107,7 +105,7 @@ public class AndroidJsDebugger implements Debugger
 	    				{
 	                		LocalSocket socket = serverSocket.accept();
 
-	                		logger.write("NativeScript Debugger new connection on: " + socket.getFileDescriptor().toString());
+	                		DefaultTracer.trace(Tracer.Descriptor.DEBUGGER, "NativeScript Debugger new connection on: " + socket.getFileDescriptor().toString());
 	                		
 	    					//out (send messages to node inspector)
 	    					this.responseHandler = new ResponseHandler(socket, requestHandlerCloseable);
@@ -229,9 +227,7 @@ public class AndroidJsDebugger implements Debugger
 							state = State.Header;
 							headers.clear();
 
-							if (!message.equals("FLUSH BUFFERS")) {
-								AndroidJsDebugger.this.debugContext.sendMessage(message);
-							}
+							AndroidJsDebugger.this.debugContext.sendMessage(message);
 						}
 						else
 						{
@@ -264,7 +260,7 @@ public class AndroidJsDebugger implements Debugger
 			finally
 			{
 				this.stop = true;
-				//logger.write("sending disconnect to v8 debugger");
+				DefaultTracer.trace(Tracer.Descriptor.DEBUGGER, "Sending disconnect message to v8 debugger");
 				AndroidJsDebugger.this.debugContext.sendMessage("{\"seq\":0,\"type\":\"request\",\"command\":\"disconnect\"}");
 				
 				scanner.close();
@@ -302,9 +298,9 @@ public class AndroidJsDebugger implements Debugger
 					{
 						break;
 					}
-					
-					//Log.d("TNS.JAVA.JsDebugger", "Sending message to inspector:" + message);
-					
+
+					DefaultTracer.trace(Tracer.Descriptor.DEBUGGER, "Sending message to inspector: " + message);
+
 					this.sendMessageToInspector(message);
 				}
 				catch (InterruptedException e)
@@ -369,7 +365,7 @@ public class AndroidJsDebugger implements Debugger
 
 	public void enableAgent()
 	{
-		logger.write("Enabling NativeScript Debugger Agent");
+		DefaultTracer.trace(Tracer.Descriptor.DEBUGGER, "Enabling NativeScript Debugger Agent");
 
 		if (debugServerThread == null)
 		{
@@ -380,7 +376,7 @@ public class AndroidJsDebugger implements Debugger
 
 	public void disableAgent()
 	{
-		logger.write("Disabling NativeScript Debugger Agent");
+		DefaultTracer.trace(Tracer.Descriptor.DEBUGGER, "Disabling NativeScript Debugger Agent");
 		String message = "{\"seq\":0,\"type\":\"request\",\"command\":\"disconnect\"}";
 		
 		AndroidJsDebugger.this.debugContext.sendMessage(message);

@@ -2,7 +2,7 @@
 	"main": "boot.js",
 	"android": {
 		"v8Flags": "--expose_gc",
-		"diagnosticTracing": true,
+		"diagnosticTracing": false,
 		"diagnosticBenchmarking": false,
 		"profilerOutputDir": "",
 		"gcThrottleTime": 500,

@@ -44,13 +44,13 @@ public final class RuntimeHelper {
 
 		return hasErrorIntent;
 	}
-	
+
 	public static Runtime initRuntime(Application app)
 	{
 		if (Runtime.isInitialized()) {
 			return Runtime.getCurrentRuntime();
 		}
-		
+
 		System.loadLibrary("NativeScript");
 
 		Debugger debugger = AndroidJsDebugger.isDebuggableApp(app) ? new AndroidJsDebugger(app) : null;
@@ -75,10 +75,10 @@ public final class RuntimeHelper {
 			}
 
 			if (!skipAssetExtraction) {
-                DefaultTracer.trace(Tracer.Descriptor.INFO, "Extracting assets...");
-				
+				DefaultTracer.trace(Tracer.Descriptor.INFO, "Extracting assets...");
+
 				AssetExtractor aE = new AssetExtractor(null);
-				
+
 				String outputDir = app.getFilesDir().getPath() + File.separator;
 
 				aE.extractAssets(app, "app", outputDir, extractPolicy);
@@ -87,10 +87,10 @@ public final class RuntimeHelper {
 
 				// enable with flags?
 				boolean shouldExtractSnapshots = true;
-				
+
 				// will extract snapshot of the device appropriate architecture
 				if(shouldExtractSnapshots) {
-                    DefaultTracer.trace(Tracer.Descriptor.INFO, "Extracting snapshot blob");
+					DefaultTracer.trace(Tracer.Descriptor.INFO, "Extracting snapshot blob");
 
 					aE.extractAssets(app,  "snapshots/" + Build.CPU_ABI, outputDir, extractPolicy);
 				}
@@ -100,13 +100,15 @@ public final class RuntimeHelper {
 
 			AppConfig appConfig = new AppConfig(appDir);
 
-			if(appConfig.getEnableTracing()) {
-                DefaultTracer.start();
-            }
+			if(AndroidJsDebugger.isDebuggableApp(app)) {
+				if(appConfig.getEnableTracing()) {
+					DefaultTracer.start();
+				}
 
-            if(appConfig.getEnableBenchmarking()) {
-                DefaultTracer.startBenchmarking();
-            }
+				if(appConfig.getEnableBenchmarking()) {
+					DefaultTracer.startBenchmarking();
+				}
+			}
 
 			ClassLoader classLoader = app.getClassLoader();
 			File dexDir = new File(rootDir, "code_cache/secondary-dexes");
@@ -114,11 +116,18 @@ public final class RuntimeHelper {
 			try {
 				dexThumb = Util.getDexThumb(app);
 			} catch (NameNotFoundException e) {
-                DefaultTracer.trace(Tracer.Descriptor.EXCEPTION, "Error while getting current proxy thumb");
+				DefaultTracer.trace(Tracer.Descriptor.EXCEPTION, "Error while getting current proxy thumb");
 				e.printStackTrace();
 			}
 
-			StaticConfiguration config = new StaticConfiguration(debugger, appName, null, rootDir,
+			String nativeLibDir = null;
+			try {
+				nativeLibDir = app.getPackageManager().getApplicationInfo(appName, 0).nativeLibraryDir;
+			} catch (android.content.pm.PackageManager.NameNotFoundException e) {
+				e.printStackTrace();
+			}
+
+			StaticConfiguration config = new StaticConfiguration(debugger, appName, nativeLibDir, rootDir,
 					appDir, classLoader, dexDir, dexThumb, appConfig);
 
 			runtime = Runtime.initializeRuntimeWithConfiguration(config);
@@ -136,8 +145,8 @@ public final class RuntimeHelper {
 				// @@@
 				// Runtime.getOrCreateJavaObjectID(syncService);
 			} else {
-                Tracer.trace(Tracer.Descriptor.INFO, "NativeScript LiveSync is not enabled.");
-            }
+				Tracer.trace(Tracer.Descriptor.INFO, "NativeScript LiveSync is not enabled.");
+			}
 
 			runtime.runScript(new File(appDir, "internal/ts_helpers.js"));
 
@@ -154,7 +163,7 @@ public final class RuntimeHelper {
 				}
 			}
 			catch (Exception e) {
-                Tracer.trace(Tracer.Descriptor.INFO, "Cannot initialize application instance.");
+				Tracer.trace(Tracer.Descriptor.INFO, "Cannot initialize application instance.");
 				e.printStackTrace();
 			}
 		}

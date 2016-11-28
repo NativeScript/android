@@ -59,12 +59,11 @@ public final class DefaultTracer {
                     final long tid = message.threadId;
                     final String logMessage = message.message;
                     final String tag = entry.getValue();
-                    final int tNameLen = tName.length();
 
                     StringBuilder sb = new StringBuilder();
                     sb.append("[");
-                    sb.append(tName, 0, tNameLen >= 10 ? 10 : tNameLen); // limit Thread Name to 10 symbols in log
-                    sb.append(String.format("%" + (tNameLen >= 10 ? 0 : 10 - tNameLen) + "s", " "));
+                    sb.append(tName, 0, tName.length() >= 10 ? 10 : tName.length()); // limit Thread Name to 10 symbols in log
+                    sb.append(String.format("%" + (10 - tName.length()) + "s", " "));
                     sb.append(" | ");
                     sb.append(tid + "]: ");
 
