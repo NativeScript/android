@@ -90,6 +90,9 @@ public class Tracer {
         long tid = android.os.Process.myTid();
         String tName = Thread.currentThread().getName();
 
+        // Pete: TODO: should normally print thread name, but it slows down drastically when other threads are up
+        // String tName = "app";
+
         TraceMessage message = new TraceMessage(messageStr, tName, tid);
 
         return message;

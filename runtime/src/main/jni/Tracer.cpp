@@ -30,6 +30,11 @@ void Tracer::Trace(const int descriptor, const char *format, ...) {
 
     JEnv env;
 
+    if (env.ExceptionCheck() == JNI_TRUE) {
+        // an exception is pending, don't do JNI calls to Java
+        return;
+    }
+
     char buffer[1024];
     va_list args;
     va_start (args, format);
