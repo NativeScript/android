@@ -44,7 +44,7 @@ void JsDebugger::Enable()
 	v8::Isolate::Scope isolate_scope(isolate);
 	v8::HandleScope handleScope(isolate);
 
-	v8::Debug::SetMessageHandler(MyMessageHandler);
+	v8::Debug::SetMessageHandler(isolate, MyMessageHandler);
 	enabled = true;
 }
 
@@ -58,7 +58,7 @@ void JsDebugger::Disable()
 	v8::Isolate::Scope isolate_scope(isolate);
 	v8::HandleScope handleScope(isolate);
 
-	v8::Debug::SetMessageHandler(nullptr);
+	v8::Debug::SetMessageHandler(isolate, nullptr);
 }
 
 /* *
@@ -85,7 +85,7 @@ void JsDebugger::ProcessDebugMessages()
 	v8::Isolate::Scope isolate_scope(isolate);
 	v8::HandleScope handleScope(isolate);
 
-	v8::Debug::ProcessDebugMessages();
+	v8::Debug::ProcessDebugMessages(isolate);
 }
 
 void JsDebugger::SendCommand(JNIEnv *_env, jobject obj, jbyteArray command, jint length)

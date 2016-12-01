@@ -1,5 +1,4 @@
 #include "v8.h"
-#include "handles.h"
 
 namespace v8 {
 	
