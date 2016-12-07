@@ -81,7 +81,7 @@ class AppConfig {
 				if (androidObject.has(KnownKeys.EnableTracing.getName())) {
 					values[KnownKeys.EnableTracing.getIndex()] = androidObject.getBoolean(KnownKeys.EnableTracing.getName());
 				}
-				if (androidObject.has(KnownKeys.EnableTracing.getName())) {
+				if (androidObject.has(KnownKeys.EnableBenchmarking.getName())) {
 					values[KnownKeys.EnableBenchmarking.getIndex()] = androidObject.getBoolean(KnownKeys.EnableBenchmarking.getName());
 				}
 				if (androidObject.has(KnownKeys.CodeCacheKey.getName())) {

@@ -106,7 +106,7 @@ public final class RuntimeHelper {
 				}
 
 				if(appConfig.getEnableBenchmarking()) {
-					DefaultTracer.startBenchmarking();
+					DefaultTracer.startBenchmarking(app);
 				}
 			}
 

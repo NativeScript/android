@@ -22,9 +22,9 @@ public final class DefaultTracer {
         removeListener(Tracer.Descriptor.BENCHMARK);
     }
 
-    public static void startBenchmarking() {
+    public static void startBenchmarking(final android.content.Context ctx) {
         enable();
-        addSpecialListener(Tracer.Descriptor.BENCHMARK);
+        addSpecialListener(Tracer.Descriptor.BENCHMARK, ctx);
     }
 
     public static void stop() {
@@ -59,12 +59,11 @@ public final class DefaultTracer {
                     final long tid = message.threadId;
                     final String logMessage = message.message;
                     final String tag = entry.getValue();
-                    final int tNameLen = tName.length();
 
                     StringBuilder sb = new StringBuilder();
                     sb.append("[");
-                    sb.append(tName, 0, tNameLen >= 10 ? 10 : tNameLen); // limit Thread Name to 10 symbols in log
-                    sb.append(String.format("%" + (tNameLen >= 10 ? 0 : 10 - tNameLen) + "s", " "));
+                    sb.append(tName, 0, tName.length() >= 10 ? 10 : tName.length()); // limit Thread Name to 10 symbols in log
+                    sb.append(String.format("%" + (10 - tName.length()) + "s", " "));
                     sb.append(" | ");
                     sb.append(tid + "]: ");
 
@@ -80,14 +79,20 @@ public final class DefaultTracer {
         }
     }
 
-    public static void addSpecialListener(final int descriptor) {
+    public static void addSpecialListener(final int descriptor, final android.content.Context ctx) {
         LogListener fileWriterListener = new LogListener() {
             private List<String> logs = new ArrayList<>();
 
             @Override
             public void dumpToFile() {
                 try {
-                    File externalStorage = Environment.getExternalStorageDirectory();
+                    File externalStorage = null;
+                    if (android.os.Build.VERSION.SDK_INT >= 21) {
+                        externalStorage = ctx.getExternalFilesDir(null);
+                    } else {
+                        externalStorage = Environment.getExternalStorageDirectory();
+                    }
+
                     File file = new File(externalStorage, Tracer.getDescriptors().get(descriptor) + "-log.xml");
                     if (!file.exists()) {
                         file.createNewFile();
@@ -104,8 +109,10 @@ public final class DefaultTracer {
                     }
 
                     pw.close();
-                } catch (IOException ioe) {
 
+                    android.util.Log.v("JS", "Trace file dumped in " + file.getAbsolutePath());
+                } catch (IOException ioe) {
+                    ioe.printStackTrace();
                 }
             }
 
