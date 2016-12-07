@@ -306,6 +306,7 @@ model {
             ldLibs.add("${file("src/main/libs/armeabi-v7a/libv8_libbase.a")}".toString())
             ldLibs.add("${file("src/main/libs/armeabi-v7a/libv8_libsampler.a")}".toString())
             ldLibs.add("${file("src/main/libs/armeabi-v7a/libv8_nosnapshot.a")}".toString())
+            ldLibs.add("${file("src/main/libs/armeabi-v7a/libinspector.a")}".toString())
             ldLibs.add("${file("src/main/libs/armeabi-v7a/libzip.a")}".toString())
         }
 
@@ -317,6 +318,7 @@ model {
             ldLibs.add("${file("src/main/libs/x86/libv8_libbase.a")}".toString())
             ldLibs.add("${file("src/main/libs/x86/libv8_libsampler.a")}".toString())
             ldLibs.add("${file("src/main/libs/x86/libv8_nosnapshot.a")}".toString())
+            ldLibs.add("${file("src/main/libs/x86/libinspector.a")}".toString())
             ldLibs.add("${file("src/main/libs/x86/libzip.a")}".toString())
         }
 
@@ -330,6 +332,7 @@ model {
                     "-lv8_libbase",
                     "-lv8_libsampler",
                     "-lv8_nosnapshot",
+                    "-linspector",
                     "-lzip"
             ])
 
