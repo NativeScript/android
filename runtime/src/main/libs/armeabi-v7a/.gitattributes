@@ -1,3 +1,4 @@
+libinspector.a filter=lfs diff=lfs merge=lfs -text
 libv8_base.a filter=lfs diff=lfs merge=lfs -text
 libv8_libbase.a filter=lfs diff=lfs merge=lfs -text
 libv8_libplatform.a filter=lfs diff=lfs merge=lfs -text
