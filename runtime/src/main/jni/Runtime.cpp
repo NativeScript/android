@@ -14,7 +14,7 @@
 #include "JsDebugger.h"
 #include "SimpleProfiler.h"
 #include "SimpleAllocator.h"
-#include "Module.h"
+#include "ModuleInternal.h"
 #include "NativeScriptException.h"
 #include "V8NativeScriptExtension.h"
 #include "Runtime.h"
