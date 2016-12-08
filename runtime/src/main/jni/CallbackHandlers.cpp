@@ -910,7 +910,7 @@ void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Valu
         auto workerPath = ArgConverter::ConvertToString(args[0]->ToString(isolate));
 
         // Will throw if path is invalid or doesn't exist
-        Module::CheckFileExists(isolate, workerPath, currentDir);
+        ModuleInternal::CheckFileExists(isolate, workerPath, currentDir);
 
         auto workerId = nextWorkerId++;
         V8SetPrivateValue(isolate, thiz, ArgConverter::ConvertToV8String(isolate, "workerId"), Number::New(isolate, workerId));

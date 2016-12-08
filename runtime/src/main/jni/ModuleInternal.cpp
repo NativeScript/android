@@ -4,7 +4,7 @@
  *  Created on: Jun 24, 2015
  *      Author: gatanasov
  */
-#include "Module.h"
+#include "ModuleInternal.h"
 #include "File.h"
 #include "JniLocalRef.h"
 #include "ArgConverter.h"
@@ -24,12 +24,12 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
-Module::Module()
+ModuleInternal::ModuleInternal()
 	: m_isolate(nullptr), m_requireFunction(nullptr), m_requireFactoryFunction(nullptr)
 {
 }
 
-void Module::Init(Isolate *isolate, const string& baseDir)
+void ModuleInternal::Init(Isolate *isolate, const string& baseDir)
 {
 	JEnv env;
 
@@ -94,7 +94,7 @@ void Module::Init(Isolate *isolate, const string& baseDir)
 	global->Set(ArgConverter::ConvertToV8String(isolate, "require"), globalRequire);
 }
 
-Local<Function> Module::GetRequireFunction(Isolate *isolate, const string& dirName)
+Local<Function> ModuleInternal::GetRequireFunction(Isolate *isolate, const string& dirName)
 {
 	Local<Function> requireFunc;
 
@@ -132,11 +132,11 @@ Local<Function> Module::GetRequireFunction(Isolate *isolate, const string& dirNa
 	return requireFunc;
 }
 
-void Module::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
+void ModuleInternal::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
 	try
 	{
-		auto thiz = static_cast<Module*>(args.Data().As<External>()->Value());
+		auto thiz = static_cast<ModuleInternal*>(args.Data().As<External>()->Value());
 		thiz->RequireCallbackImpl(args);
 	}
 	catch (NativeScriptException& e)
@@ -155,7 +155,7 @@ void Module::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 	}
 }
 
-void Module::RequireCallbackImpl(const v8::FunctionCallbackInfo<v8::Value>& args)
+void ModuleInternal::RequireCallbackImpl(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
 	auto isolate = args.GetIsolate();
 
@@ -194,14 +194,14 @@ void Module::RequireCallbackImpl(const v8::FunctionCallbackInfo<v8::Value>& args
 	}
 }
 
-void Module::RequireNativeCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
+void ModuleInternal::RequireNativeCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
 	auto ext = args.Data().As<External>();
 	auto funcPtr = reinterpret_cast<FunctionCallback>(ext->Value());
 	funcPtr(args);
 }
 
-void Module::Load(const string& path)
+void ModuleInternal::Load(const string& path)
 {
 	auto isolate = m_isolate;
 	auto context = isolate->GetCurrentContext();
@@ -211,7 +211,7 @@ void Module::Load(const string& path)
 	require->Call(context, globalObject, 1, args);
 }
 
-void Module::LoadWorker(const string& path)
+void ModuleInternal::LoadWorker(const string& path)
 {
 	auto isolate = m_isolate;
 	TryCatch tc;
@@ -227,7 +227,7 @@ void Module::LoadWorker(const string& path)
 	}
 }
 
-void Module::CheckFileExists(Isolate* isolate, const std::string &path, const std::string &baseDir) {
+void ModuleInternal::CheckFileExists(Isolate* isolate, const std::string &path, const std::string &baseDir) {
 	JEnv env;
 	JniLocalRef jsModulename(env.NewStringUTF(path.c_str()));
 	JniLocalRef jsBaseDir(env.NewStringUTF(baseDir.c_str()));
@@ -235,7 +235,7 @@ void Module::CheckFileExists(Isolate* isolate, const std::string &path, const st
 	env.CallStaticObjectMethod(MODULE_CLASS, RESOLVE_PATH_METHOD_ID, (jstring) jsModulename, (jstring) jsBaseDir);
 }
 
-Local<Object> Module::LoadImpl(Isolate *isolate, const string& moduleName, const string& baseDir, bool& isData)
+Local<Object> ModuleInternal::LoadImpl(Isolate *isolate, const string& moduleName, const string& baseDir, bool& isData)
 {
 	auto pathKind = GetModulePathKind(moduleName);
 	auto cachePathKey = (pathKind == ModulePathKind::Global) ? moduleName : (baseDir + "*" + moduleName);
@@ -292,7 +292,7 @@ Local<Object> Module::LoadImpl(Isolate *isolate, const string& moduleName, const
 	return result;
 }
 
-Local<Object> Module::LoadModule(Isolate *isolate, const string& modulePath, const string& moduleCacheKey)
+Local<Object> ModuleInternal::LoadModule(Isolate *isolate, const string& modulePath, const string& moduleCacheKey)
 {
 	Local<Object> result;
 
@@ -388,13 +388,13 @@ Local<Object> Module::LoadModule(Isolate *isolate, const string& modulePath, con
 	return result;
 }
 
-Local<Script> Module::LoadScript(Isolate *isolate, const string& path, const Local<String>& fullRequiredModulePath)
+Local<Script> ModuleInternal::LoadScript(Isolate *isolate, const string& path, const Local<String>& fullRequiredModulePath)
 {
 	Local<Script> script;
 
 	TryCatch tc;
 
-	auto scriptText = Module::WrapModuleContent(path);
+	auto scriptText = ModuleInternal::WrapModuleContent(path);
 
 	DEBUG_WRITE("Compiling script (module %s)", path.c_str());
 	//
@@ -434,7 +434,7 @@ Local<Script> Module::LoadScript(Isolate *isolate, const string& path, const Loc
 	return script;
 }
 
-Local<Object> Module::LoadData(Isolate *isolate, const string& path)
+Local<Object> ModuleInternal::LoadData(Isolate *isolate, const string& path)
 {
 	Local<Object> json;
 
@@ -469,7 +469,7 @@ Local<Object> Module::LoadData(Isolate *isolate, const string& path)
 	return json;
 }
 
-Local<String> Module::WrapModuleContent(const string& path)
+Local<String> ModuleInternal::WrapModuleContent(const string& path)
 {
 	string content = File::ReadText(path);
 
@@ -484,7 +484,7 @@ Local<String> Module::WrapModuleContent(const string& path)
 	return ArgConverter::ConvertToV8String(m_isolate, result);
 }
 
-ScriptCompiler::CachedData* Module::TryLoadScriptCache(const std::string& path)
+ScriptCompiler::CachedData* ModuleInternal::TryLoadScriptCache(const std::string& path)
 {
 	if (!Constants::V8_CACHE_COMPILED_CODE)
 	{
@@ -502,7 +502,7 @@ ScriptCompiler::CachedData* Module::TryLoadScriptCache(const std::string& path)
 	return new ScriptCompiler::CachedData(reinterpret_cast<uint8_t*>(data), length, ScriptCompiler::CachedData::BufferOwned);
 }
 
-void Module::SaveScriptCache(const ScriptCompiler::Source& source, const std::string& path)
+void ModuleInternal::SaveScriptCache(const ScriptCompiler::Source& source, const std::string& path)
 {
 	if (!Constants::V8_CACHE_COMPILED_CODE)
 	{
@@ -514,7 +514,7 @@ void Module::SaveScriptCache(const ScriptCompiler::Source& source, const std::st
 	File::WriteBinary(cachePath, source.GetCachedData()->data, length);
 }
 
-Module::ModulePathKind Module::GetModulePathKind(const std::string& path)
+ModuleInternal::ModulePathKind ModuleInternal::GetModulePathKind(const std::string& path)
 {
 	ModulePathKind kind;
 	switch (path[0])
@@ -526,8 +526,8 @@ Module::ModulePathKind Module::GetModulePathKind(const std::string& path)
 	return kind;
 }
 
-jclass Module::MODULE_CLASS = nullptr;
-jmethodID Module::RESOLVE_PATH_METHOD_ID = nullptr;
+jclass ModuleInternal::MODULE_CLASS = nullptr;
+jmethodID ModuleInternal::RESOLVE_PATH_METHOD_ID = nullptr;
 
-const char* Module::MODULE_PROLOGUE = "(function(module, exports, require, __filename, __dirname){ ";
-const char* Module::MODULE_EPILOGUE = "\n})";
+const char* ModuleInternal::MODULE_PROLOGUE = "(function(module, exports, require, __filename, __dirname){ ";
+const char* ModuleInternal::MODULE_EPILOGUE = "\n})";
