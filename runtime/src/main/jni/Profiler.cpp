@@ -148,6 +148,7 @@ bool Profiler::Write(CpuProfile *cpuProfile)
 	char buff[1024];
 	auto COMMA_NODE = reinterpret_cast<const CpuProfileNode*>(1);
 	auto CLOSE_NODE = reinterpret_cast<const CpuProfileNode*>(2);
+	auto PREFIX = string("RegExp:");
 
 	while (!s.empty())
 	{
@@ -163,12 +164,21 @@ bool Profiler::Write(CpuProfile *cpuProfile)
 		}
 		else
 		{
+			auto funcName = ArgConverter::ConvertToString(node->GetFunctionName());
+			auto scriptName = ArgConverter::ConvertToString(node->GetScriptResourceName());
+			auto lineNumber = node->GetLineNumber();
+			auto columnNumber = node->GetColumnNumber();
+			if (funcName.compare(0, PREFIX.size(), PREFIX) == 0) {
+				stringstream ss;
+				ss << "RegExp_" << scriptName << "_" << lineNumber << "_" << columnNumber;
+				funcName = ss.str();
+			}
 			snprintf(buff, sizeof(buff), "{\"functionName\":\"%s\",\"scriptId\":%d,\"url\":\"%s\",\"lineNumber\":%d,\"columnNumber\":%d,\"hitCount\":%u,\"callUID\":%u,\"deoptReason\":\"%s\",\"id\":%u,\"children\":[",
-					 ArgConverter::ConvertToString(node->GetFunctionName()).c_str(),
+					 funcName.c_str(),
 					node->GetScriptId(),
-					 ArgConverter::ConvertToString(node->GetScriptResourceName()).c_str(),
-					node->GetLineNumber(),
-					node->GetColumnNumber(),
+					 scriptName.c_str(),
+					lineNumber,
+					columnNumber,
 					node->GetHitCount(),
 					node->GetCallUid(),
 					node->GetBailoutReason(),
