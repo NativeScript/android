@@ -1,4 +1,3 @@
-__disableVerboseLogging();
 __log("starting tests");
 
 // methods that common tests need to run
@@ -23,19 +22,19 @@ shared.runWorkerTests();
 
 require("./tests/testMetadata");
 require("./tests/testAsserts");
-require("./tests/testWeakRef"); 
+require("./tests/testWeakRef");
 require("./tests/tests");
 require("./tests/testMethodResolution");
 require("./tests/testMethodResolutionWithNulls");
 require("./tests/testArrays");
 require("./tests/testsForRuntimeBindingGenerator");
 require("./tests/testPrimitiveTypeConversion");
-require("./tests/numericConversionTests"); 
-require("./tests/inheritanceChainResolutionTest"); 
+require("./tests/numericConversionTests");
+require("./tests/inheritanceChainResolutionTest");
 require("./tests/exceptionHandlingTests");
 require("./tests/dispatchCallbacksOnUiThreadTests");
 require("./tests/stringConversionTests");
-require("./tests/testsForTypescript"); 
+require("./tests/testsForTypescript");
 require("./tests/testGC");
 require("./tests/testsMemoryManagement");
 require("./tests/testFieldGetSet");

@@ -19,8 +19,9 @@
 #include "V8NativeScriptExtension.h"
 #include "Runtime.h"
 #include "ArrayHelper.h"
-#include "include/libplatform/libplatform.h"
 #include "include/zipconf.h"
+#include "Tracer.h"
+#include "Stackity.h"
 #include <sstream>
 #include <dlfcn.h>
 #include "sys/system_properties.h"
@@ -37,7 +38,6 @@ SimpleAllocator g_allocator;
 void Runtime::Init(JavaVM *vm, void *reserved)
 {
 	__android_log_print(ANDROID_LOG_INFO, "TNS.Native", "NativeScript Runtime Version %s, commit %s", NATIVE_SCRIPT_RUNTIME_VERSION, NATIVE_SCRIPT_RUNTIME_COMMIT_SHA);
-	DEBUG_WRITE("JNI_ONLoad");
 
 	if (Runtime::s_jvm == nullptr)
 	{
@@ -46,7 +46,7 @@ void Runtime::Init(JavaVM *vm, void *reserved)
 		JEnv::Init(s_jvm);
 	}
 
-	DEBUG_WRITE("JNI_ONLoad END");
+	Tracer::Trace(Tracer::Descriptors::APPLICATION, "JNI_ONLoad END");
 }
 
 Runtime::Runtime(JNIEnv *env, jobject runtime, int id)
@@ -131,21 +131,16 @@ ObjectManager* Runtime::GetObjectManager() const
 	return m_objectManager;
 }
 
-void Runtime::Init(JNIEnv *_env, jobject obj, int runtimeId, jstring filesPath, jstring nativeLibDir, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jstring callingDir, jobject jsDebugger)
-{
+void Runtime::Init(JNIEnv *_env, jobject obj, int runtimeId, jstring filesPath, jstring nativeLibDir, jstring packageName, jobjectArray args, jstring callingDir, jobject jsDebugger) {
+	Stackity::FrameEntry fe("Runtime::Init");
 	JEnv env(_env);
 
 	auto runtime = new Runtime(env, obj, runtimeId);
 
-	auto enableLog = verboseLoggingEnabled == JNI_TRUE;
-
-	runtime->Init(filesPath, nativeLibDir, enableLog, packageName, args, callingDir, jsDebugger);
+	runtime->Init(filesPath, nativeLibDir, packageName, args, callingDir, jsDebugger);
 }
 
-void Runtime::Init(jstring filesPath, jstring nativeLibDir, bool verboseLoggingEnabled, jstring packageName, jobjectArray args, jstring callingDir, jobject jsDebugger)
-{
-	LogEnabled = verboseLoggingEnabled;
-
+void Runtime::Init(jstring filesPath, jstring nativeLibDir, jstring packageName, jobjectArray args, jstring callingDir, jobject jsDebugger) {
 	auto filesRoot = ArgConverter::jstringToString(filesPath);
 	Constants::APP_ROOT_FOLDER_PATH = filesRoot + "/app/";
 	// read config options passed from Java
@@ -177,7 +172,6 @@ void Runtime::RunModule(JNIEnv *_env, jobject obj, jstring scriptFile)
 
 void Runtime::RunWorker(jstring scriptFile)
 {
-	// TODO: Pete: Why do I crash here with a JNI error (accessing bad jni)
 	string filePath = ArgConverter::jstringToString(scriptFile);
 	m_module.LoadWorker(filePath);
 }
@@ -233,13 +227,9 @@ jobject Runtime::RunScript(JNIEnv *_env, jobject obj, jstring scriptFile)
 
 jobject Runtime::CallJSMethodNative(JNIEnv *_env, jobject obj, jint javaObjectID, jstring methodName, jint retType, jboolean isConstructor, jobjectArray packagedArgs)
 {
-	SET_PROFILER_FRAME();
-
-	auto isolate = m_isolate;
+	Stackity::FrameEntry fe("Runtime::CallJSMethodNative");
 
 	JEnv env(_env);
-
-	DEBUG_WRITE("CallJSMethodNative called javaObjectID=%d", javaObjectID);
 
 	auto jsObject = m_objectManager->GetJsObjectByJavaObject(javaObjectID);
 	if (jsObject.IsEmpty())
@@ -253,12 +243,9 @@ jobject Runtime::CallJSMethodNative(JNIEnv *_env, jobject obj, jint javaObjectID
 
 	if (isConstructor)
 	{
-		DEBUG_WRITE("CallJSMethodNative: Updating linked instance with its real class");
 		jclass instanceClass = env.GetObjectClass(obj);
 		m_objectManager->SetJavaClass(jsObject, instanceClass);
 	}
-
-	DEBUG_WRITE("CallJSMethodNative called jsObject=%d", jsObject->GetIdentityHash());
 
 	string method_name = ArgConverter::jstringToString(methodName);
 	auto jsResult = CallbackHandlers::CallJSMethod(m_isolate, env, jsObject, method_name, packagedArgs);
@@ -270,10 +257,6 @@ jobject Runtime::CallJSMethodNative(JNIEnv *_env, jobject obj, jint javaObjectID
 
 void Runtime::CreateJSInstanceNative(JNIEnv *_env, jobject obj, jobject javaObject, jint javaObjectID, jstring className)
 {
-	SET_PROFILER_FRAME();
-
-	DEBUG_WRITE("createJSInstanceNative called");
-
 	auto isolate = m_isolate;
 
 	JEnv env(_env);
@@ -284,7 +267,7 @@ void Runtime::CreateJSInstanceNative(JNIEnv *_env, jobject obj, jobject javaObje
 	Local<Object> implementationObject;
 
 	auto proxyClassName = m_objectManager->GetClassName(javaObject);
-	DEBUG_WRITE("createJSInstanceNative class %s", proxyClassName.c_str());
+//	DEBUG_WRITE("createJSInstanceNative class %s", proxyClassName.c_str());
 	jsInstance = MetadataNode::CreateExtendedJSWrapper(isolate, m_objectManager, proxyClassName);
 
 	if (jsInstance.IsEmpty())
@@ -298,7 +281,8 @@ void Runtime::CreateJSInstanceNative(JNIEnv *_env, jobject obj, jobject javaObje
 		string msg("createJSInstanceNative: implementationObject is empty");
 		throw NativeScriptException(msg);
 	}
-	DEBUG_WRITE("createJSInstanceNative: implementationObject :%d", implementationObject->GetIdentityHash());
+
+//	DEBUG_WRITE("createJSInstanceNative: implementationObject :%d", implementationObject->GetIdentityHash());
 
 	jclass clazz = env.FindClass(jniName);
 	m_objectManager->Link(jsInstance, javaObjectID, clazz);
@@ -567,6 +551,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring nativeLibDir
 	globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__debugbreak"), FunctionTemplate::New(isolate, JsDebugger::DebugBreakCallback));
 	globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__consoleMessage"), FunctionTemplate::New(isolate, JsDebugger::ConsoleMessageCallback));
 	globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__enableVerboseLogging"), FunctionTemplate::New(isolate, CallbackHandlers::EnableVerboseLoggingMethodCallback));
+	globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__dumpTraceFile"), FunctionTemplate::New(isolate, CallbackHandlers::DumpAllTraceToFile));
 	globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__disableVerboseLogging"), FunctionTemplate::New(isolate, CallbackHandlers::DisableVerboseLoggingMethodCallback));
 	globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__exit"), FunctionTemplate::New(isolate, CallbackHandlers::ExitMethodCallback));
 	globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__runtimeVersion"), ArgConverter::ConvertToV8String(isolate, NATIVE_SCRIPT_RUNTIME_VERSION), readOnlyFlags);

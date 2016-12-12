@@ -26,12 +26,13 @@ import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.Message;
 import android.os.Process;
+import android.os.Trace;
 import android.util.SparseArray;
 
 import com.tns.bindings.ProxyGenerator;
 
 public class Runtime {
-    private native void initNativeScript(int runtimeId, String filesPath, String nativeLibDir, boolean verboseLoggingEnabled, String packageName, Object[] v8Options, String callingDir, JsDebugger jsDebugger);
+    private native void initNativeScript(int runtimeId, String filesPath, String nativeLibDir, String packageName, Object[] v8Options, String callingDir, JsDebugger jsDebugger);
 
     private native void runModule(int runtimeId, String filePath) throws NativeScriptException;
 
@@ -53,6 +54,8 @@ public class Runtime {
 
     public static native int getPointerSize();
 
+    public static native void enableTracer(boolean enable);
+
     private static native void WorkerGlobalOnMessageCallback(int runtimeId, String message);
 
     private static native void WorkerObjectOnMessageCallback(int runtimeId, int workerId, String message);
@@ -69,38 +72,36 @@ public class Runtime {
 
     private boolean initialized;
 
-	private final static HashMap<String, Class<?>> classCache = new HashMap<String, Class<?>>();
+    private final static HashMap<String, Class<?>> classCache = new HashMap<String, Class<?>>();
 
-	private final static HashSet<ClassLoader> classLoaderCache = new HashSet<ClassLoader>();
+    private final static HashSet<ClassLoader> classLoaderCache = new HashSet<ClassLoader>();
 
-	private final static String FAILED_CTOR_RESOLUTION_MSG = "Check the number and type of arguments.\n" +
-			"Primitive types need to be manually wrapped in their respective Object wrappers.\n" +
-			"If you are creating an instance of an inner class, make sure to always provide reference to the outer `this` as the first argument.";
+    private final static String FAILED_CTOR_RESOLUTION_MSG = "Check the number and type of arguments.\n" +
+            "Primitive types need to be manually wrapped in their respective Object wrappers.\n" +
+            "If you are creating an instance of an inner class, make sure to always provide reference to the outer `this` as the first argument.";
 
-	private final SparseArray<Object> strongInstances = new SparseArray<Object>();
+    private final SparseArray<Object> strongInstances = new SparseArray<Object>();
 
-	private final SparseArray<WeakReference<Object>> weakInstances = new SparseArray<WeakReference<Object>>();
+    private final SparseArray<WeakReference<Object>> weakInstances = new SparseArray<WeakReference<Object>>();
 
-	private final NativeScriptHashMap<Object, Integer> strongJavaObjectToID = new NativeScriptHashMap<Object, Integer>();
+    private final NativeScriptHashMap<Object, Integer> strongJavaObjectToID = new NativeScriptHashMap<Object, Integer>();
 
-	private final NativeScriptWeakHashMap<Object, Integer> weakJavaObjectToID = new NativeScriptWeakHashMap<Object, Integer>();
-	
-	private final Map<Class<?>, JavaScriptImplementation> loadedJavaScriptExtends = new HashMap<Class<?>, JavaScriptImplementation>();
+    private final NativeScriptWeakHashMap<Object, Integer> weakJavaObjectToID = new NativeScriptWeakHashMap<Object, Integer>();
 
-	private final java.lang.Runtime dalvikRuntime = java.lang.Runtime.getRuntime();
+    private final Map<Class<?>, JavaScriptImplementation> loadedJavaScriptExtends = new HashMap<Class<?>, JavaScriptImplementation>();
 
-	private final Object keyNotFoundObject = new Object();
-	private int currentObjectId = -1;
+    private final java.lang.Runtime dalvikRuntime = java.lang.Runtime.getRuntime();
 
-	private ExtractPolicy extractPolicy;
+    private final Object keyNotFoundObject = new Object();
+    private int currentObjectId = -1;
 
-	private ArrayList<Constructor<?>> ctorCache = new ArrayList<Constructor<?>>();
+    private ExtractPolicy extractPolicy;
 
-	private Logger logger;
+    private ArrayList<Constructor<?>> ctorCache = new ArrayList<Constructor<?>>();
 
-	private ThreadScheduler threadScheduler;
+    private ThreadScheduler threadScheduler;
 
-	private JsDebugger jsDebugger;
+    private JsDebugger jsDebugger;
 
     private DexFactory dexFactory;
 
@@ -198,13 +199,13 @@ public class Runtime {
 
     public static boolean isInitialized() {
         Runtime runtime = Runtime.getCurrentRuntime();
-		
-		return (runtime != null) ? runtime.isInitializedImpl() : false;
-	}
 
-	public int getWorkerId() {
-		return workerId;
-	}
+        return (runtime != null) ? runtime.isInitializedImpl() : false;
+    }
+
+    public int getWorkerId() {
+        return workerId;
+    }
 
     public Handler getHandler() {
         return this.threadScheduler.getHandler();
@@ -215,16 +216,14 @@ public class Runtime {
         public void handleMessage(Message msg) {
             Runtime currentRuntime = Runtime.getCurrentRuntime();
 
-            if(currentRuntime.isTerminating) {
-                if(currentRuntime.logger.isEnabled()) {
-                    currentRuntime.logger.write("Worker(id=" + currentRuntime.workerId + ") is terminating, it will not process the message.");
-                }
+            if (currentRuntime.isTerminating) {
+                Tracer.trace(Tracer.Descriptor.WORKERS, "Worker(id=" + currentRuntime.workerId + ") is terminating, it will not process the message.");
 
                 return;
             }
 
             /*
-				Handle messages coming from the Main thread
+                Handle messages coming from the Main thread
 			 */
             if (msg.arg1 == MessageType.MainToWorker) {
                 /*
@@ -239,9 +238,7 @@ public class Runtime {
 
                 TerminateWorkerCallback(currentRuntime.runtimeId);
 
-                if(currentRuntime.logger.isEnabled()) {
-                    currentRuntime.logger.write("Worker(id=" + currentRuntime.workerId + ", name=\"" + Thread.currentThread().getName() +"\") has terminated execution. Don't make further function calls to it.");
-                }
+                Tracer.trace(Tracer.Descriptor.WORKERS, "Worker(id=" + currentRuntime.workerId + ", name=\"" + Thread.currentThread().getName() + "\") has terminated execution. Don't make further function calls to it.");
 
                 this.getLooper().quit();
             } else if (msg.arg1 == MessageType.TerminateAndCloseThread) {
@@ -258,9 +255,7 @@ public class Runtime {
 
                 TerminateWorkerCallback(currentRuntime.runtimeId);
 
-                if(currentRuntime.logger.isEnabled()) {
-                    currentRuntime.logger.write("Worker(id=" + currentRuntime.workerId + ", name=\"" + Thread.currentThread().getName() +"\") has terminated execution. Don't make further function calls to it.");
-                }
+                Tracer.trace(Tracer.Descriptor.WORKERS, "Worker(id=" + currentRuntime.workerId + ", name=\"" + Thread.currentThread().getName() + "\") has terminated execution. Don't make further function calls to it.");
 
                 this.getLooper().quit();
             }
@@ -294,18 +289,14 @@ public class Runtime {
 
                     DynamicConfiguration dynamicConfiguration = new DynamicConfiguration(workerId, workThreadScheduler, mainThreadScheduler, callingJsDir);
 
-                    if(staticConfiguration.logger.isEnabled()) {
-                        staticConfiguration.logger.write("Worker (id=" + workerId + ")'s Runtime is initializing!");
-                    }
+                    Tracer.trace(Tracer.Descriptor.WORKERS, "Worker (id=" + workerId + ")'s Runtime is initializing!");
 
                     Runtime runtime = initRuntime(dynamicConfiguration);
 
-                    if(staticConfiguration.logger.isEnabled()) {
-                        staticConfiguration.logger.write("Worker (id=" + workerId + ")'s Runtime initialized!");
-                    }
+                    Tracer.trace(Tracer.Descriptor.WORKERS, "Worker (id=" + workerId + ")'s Runtime initialized!");
 
 					/*
-						Send a message to the Main Thread to `shake hands`,
+                        Send a message to the Main Thread to `shake hands`,
 						Main Thread will cache the Worker Handler for later use
 					 */
                     Message msg = Message.obtain();
@@ -323,12 +314,14 @@ public class Runtime {
 
     private void processPendingMessages() {
         Queue<Message> messages = Runtime.pendingWorkerMessages.get(this.getWorkerId());
-        if(messages == null) {
+        if (messages == null) {
             return;
         }
 
+        Tracer.trace(Tracer.Descriptor.WORKERS, "Processing " + messages.size() + " pending messages on the worker.");
+
         Handler handler = this.getHandler();
-        while(!messages.isEmpty()) {
+        while (!messages.isEmpty()) {
             handler.sendMessage(messages.poll());
         }
     }
@@ -340,7 +333,7 @@ public class Runtime {
 
         @Override
         public void handleMessage(Message msg) {
-			/*
+            /*
 				Handle messages coming from a Worker thread
 			 */
             if (msg.arg1 == MessageType.WorkerToMain) {
@@ -359,10 +352,8 @@ public class Runtime {
                 Runtime mainRuntime = Runtime.getCurrentRuntime();
 
                 // If worker has had its close/terminate called before the threads could shake hands
-                if(workerRuntime == null) {
-                    if(mainRuntime.logger.isEnabled()) {
-                        mainRuntime.logger.write("Main thread couldn't shake hands with worker (runtimeId: " + workerRuntime +") because it has been terminated!");
-                    }
+                if (workerRuntime == null) {
+                    Tracer.trace(Tracer.Descriptor.WORKERS, "Main thread couldn't shake hands with worker (runtimeId: " + workerRuntime + ") because it has been terminated!");
 
                     return;
                 }
@@ -373,9 +364,8 @@ public class Runtime {
 				 */
                 mainRuntime.workerIdToHandler.put(workerRuntime.getWorkerId(), workerRuntime.getHandler());
 
-                if(mainRuntime.logger.isEnabled()) {
-                    mainRuntime.logger.write("Worker thread (workerId:" + workerRuntime.getWorkerId() + ") shook hands with the main thread!");
-                }
+                Tracer.trace(Tracer.Descriptor.WORKERS, "Worker thread (workerId:" + workerRuntime.getWorkerId() + ") shook hands with the main thread!");
+
             } else if (msg.arg1 == MessageType.CloseWorker) {
                 Runtime currentRuntime = Runtime.getCurrentRuntime();
 
@@ -433,6 +423,7 @@ public class Runtime {
      */
     private static Runtime initRuntime(DynamicConfiguration dynamicConfiguration) {
         Runtime runtime = new Runtime(staticConfiguration, dynamicConfiguration);
+
         runtime.init();
 
         return runtime;
@@ -443,24 +434,20 @@ public class Runtime {
     }
 
     public void init() {
-        init(config.logger, config.debugger, config.appName, config.nativeLibDir, config.rootDir, config.appDir, config.classLoader, config.dexDir, config.dexThumb, config.appConfig, dynamicConfig.callingJsDir);
+        init(config.debugger, config.appName, config.nativeLibDir, config.rootDir, config.appDir, config.classLoader, config.dexDir, config.dexThumb, config.appConfig, dynamicConfig.callingJsDir);
     }
 
-    private void init(Logger logger, Debugger debugger, String appName, String nativeLibDir, File rootDir, File appDir, ClassLoader classLoader, File dexDir, String dexThumb, AppConfig appConfig, String callingJsDir) throws RuntimeException {
+    private void init(Debugger debugger, String appName, String nativeLibDir, File rootDir, File appDir, ClassLoader classLoader, File dexDir, String dexThumb, AppConfig appConfig, String callingJsDir) throws RuntimeException {
         if (initialized) {
             throw new RuntimeException("NativeScriptApplication already initialized");
         }
 
-        this.logger = logger;
+        this.dexFactory = new DexFactory(classLoader, dexDir, dexThumb);
 
-        this.dexFactory = new DexFactory(logger, classLoader, dexDir, dexThumb);
-
-        if (logger.isEnabled()) {
-            logger.write("Initializing NativeScript JAVA");
-        }
+        Tracer.trace(Tracer.Descriptor.APPLICATION, "Initializing NativeScript JAVA");
 
         try {
-            Module.init(logger, rootDir, appDir);
+            Module.init(rootDir, appDir);
         } catch (IOException ex) {
             throw new RuntimeException("Fail to initialize Require class", ex);
         }
@@ -471,21 +458,21 @@ public class Runtime {
             jsDebugger = new JsDebugger(debugger, threadScheduler);
         }
 
-        initNativeScript(getRuntimeId(), Module.getApplicationFilesPath(), nativeLibDir, logger.isEnabled(), appName, appConfig.getAsArray(), callingJsDir, jsDebugger);
+        initNativeScript(getRuntimeId(), Module.getApplicationFilesPath(), nativeLibDir, appName, appConfig.getAsArray(), callingJsDir, jsDebugger);
 
         if (jsDebugger != null && this.runtimeId == 0) {
-             jsDebugger.start();
+            jsDebugger.start();
         }
 
         clearStartupData(getRuntimeId()); // It's safe to delete the data after the V8 debugger is initialized
 
-        if (logger.isEnabled()) {
+/*        if (logger.isEnabled()) {
             Date d = new Date();
             int pid = android.os.Process.myPid();
             File f = new File("/proc/" + pid);
             Date lastModDate = new Date(f.lastModified());
             logger.write("init time=" + (d.getTime() - lastModDate.getTime()));
-        }
+        }*/
 
         gcListener.subscribe(this);
 
@@ -494,13 +481,13 @@ public class Runtime {
 
     @RuntimeCallable
     public void enableVerboseLogging() {
-        logger.setEnabled(true);
+        Tracer.setEnabled(true);
         ProxyGenerator.IsLogEnabled = true;
     }
 
     @RuntimeCallable
     public void disableVerboseLogging() {
-        logger.setEnabled(false);
+//        Tracer.setEnabled(false);
         ProxyGenerator.IsLogEnabled = false;
     }
 
@@ -609,8 +596,7 @@ public class Runtime {
 
         createJSInstanceNative(getRuntimeId(), instance, javaObjectID, className);
 
-        if (logger.isEnabled())
-            logger.write("JSInstance for " + instance.getClass().toString() + " created with overrides");
+//        Tracer.trace(Tracer.Descriptor.CLASS, "[Runtime.createJsInstance] JSInstance for " + instance.getClass().toString() + " created with overrides");
     }
 
     @RuntimeCallable
@@ -760,15 +746,9 @@ public class Runtime {
                 classLoaderCache.add(clazzloader);
             }
         }
-
-        if (logger != null && logger.isEnabled()) {
-            logger.write("MakeInstanceStrong (" + key + ", " + instance.getClass().toString() + ")");
-        }
     }
 
     private void makeInstanceWeak(int javaObjectID, boolean keepAsWeak) {
-        if (logger.isEnabled())
-            logger.write("makeInstanceWeak instance " + javaObjectID + " keepAsWeak=" + keepAsWeak);
         Object instance = strongInstances.get(javaObjectID);
 
         if (keepAsWeak) {
@@ -819,9 +799,6 @@ public class Runtime {
 
     @RuntimeCallable
     private Object getJavaObjectByID(int javaObjectID) throws Exception {
-        if (logger.isEnabled())
-            logger.write("Platform.getJavaObjectByID:" + javaObjectID);
-
         Object instance = strongInstances.get(javaObjectID, keyNotFoundObject);
 
         if (instance == keyNotFoundObject) {
@@ -836,9 +813,6 @@ public class Runtime {
             }
         }
 
-        // Log.d(DEFAULT_LOG_TAG,
-        // "Platform.getJavaObjectByID found strong object with id:" +
-        // javaObjectID);
         return instance;
     }
 
@@ -901,8 +875,7 @@ public class Runtime {
             throw new NativeScriptException("Cannot find object id for instance=" + ((javaObject == null) ? "null" : javaObject));
         }
 
-        if (logger.isEnabled())
-            logger.write("Platform.CallJSMethod: calling js method " + methodName + " with javaObjectID " + javaObjectID + " type=" + ((javaObject != null) ? javaObject.getClass().getName() : "null"));
+        Tracer.trace(Tracer.Descriptor.CLASS, "[Runtime.callJSMethodImpl] " + ((javaObject != null) ? javaObject.getClass().getName() : null) + "." + methodName + " with javaObjectID " + javaObjectID);
 
         Object result = dispatchCallJSMethodNative(javaObjectID, methodName, isConstructor, delay, retType, args);
 
@@ -957,8 +930,7 @@ public class Runtime {
     private String resolveConstructorSignature(Class<?> clazz, Object[] args) throws Exception {
         // Pete: cache stuff here, or in the cpp part
 
-        if (logger.isEnabled())
-            logger.write("resolveConstructorSignature: Resolving constructor for class " + clazz.getName());
+        Tracer.trace(Tracer.Descriptor.CLASS, "[Runtime.resolveConstructorSignature] Resolving constructor for class " + clazz.getName() + " with " + (args != null ? args.length : 0) + " parameters.");
 
         String res = MethodResolver.resolveConstructorSignature(clazz, args);
 
@@ -971,17 +943,17 @@ public class Runtime {
 
     @RuntimeCallable
     private String resolveMethodOverload(String className, String methodName, Object[] args) throws Exception {
-        if (logger.isEnabled())
-            logger.write("resolveMethodOverload: Resolving method " + methodName + " on class " + className);
+        Tracer.trace(Tracer.Descriptor.CLASS, "[Runtime.resolveMethodOverload] methodName " + methodName + " on class " + className + " with " + (args != null ? args.length : 0) + " parameters.");
 
         Class<?> clazz = getClassForName(className);
 
         String res = MethodResolver.resolveMethodOverload(clazz, methodName, args);
-        if (logger.isEnabled())
-            logger.write("resolveMethodOverload: method found :" + res);
+
         if (res == null) {
             throw new Exception("Failed resolving method " + methodName + " on class " + className);
         }
+
+        Tracer.trace(Tracer.Descriptor.CLASS, "[Runtime.resolveMethodOverload] method overload found : " + res);
 
         return res;
     }
@@ -1128,21 +1100,17 @@ public class Runtime {
 
             The workHandler is null because it has been closed; Check if its key is still in the map
          */
-        if(workerHandler == null) {
+        if (workerHandler == null) {
             // Attempt to send a message to a closed worker, throw error or just log a message
-            if(hasKey) {
-                if(currentRuntime.logger.isEnabled()) {
-                    currentRuntime.logger.write("Worker(id=" + msg.arg2 + ") that you are trying to send a message to has been terminated. No message will be sent.");
-                }
+            if (hasKey) {
+                Tracer.trace(Tracer.Descriptor.WORKERS, "Worker(id=" + msg.arg2 + ") that you are trying to send a message to has been terminated. No message will be sent.");
 
                 return;
             }
 
-            if(currentRuntime.logger.isEnabled()) {
-                currentRuntime.logger.write("Worker(id=" + msg.arg2 + ")'s handler still not initialized. Requeueing message for Worker(id=" + msg.arg2 + ")");
-            }
+            Tracer.trace(Tracer.Descriptor.WORKERS, "Worker(id=" + msg.arg2 + ")'s handler still not initialized. Requeueing message for Worker(id=" + msg.arg2 + ")");
 
-            if(pendingWorkerMessages.get(workerId) == null) {
+            if (pendingWorkerMessages.get(workerId) == null) {
                 pendingWorkerMessages.put(workerId, new ConcurrentLinkedQueue<Message>());
             }
 
@@ -1152,7 +1120,7 @@ public class Runtime {
             return;
         }
 
-        if(!workerHandler.getLooper().getThread().isAlive()) {
+        if (!workerHandler.getLooper().getThread().isAlive()) {
             return;
         }
 
@@ -1196,20 +1164,16 @@ public class Runtime {
 
             The workHandler is null because it has been closed; Check if its key is still in the map
          */
-        if(workerHandler == null) {
+        if (workerHandler == null) {
             // Attempt to send a message to a closed worker, throw error or just log a message
-            if(hasKey) {
-                if(currentRuntime.logger.isEnabled()) {
-                    currentRuntime.logger.write("Worker(id=" + msg.arg2 + ") is already terminated. No message will be sent.");
-                }
+            if (hasKey) {
+                Tracer.trace(Tracer.Descriptor.WORKERS, "Worker(id=" + msg.arg2 + ") is already terminated. No message will be sent.");
 
                 return;
             } else {
-                if(currentRuntime.logger.isEnabled()) {
-                    currentRuntime.logger.write("Worker(id=" + msg.arg2 + ")'s handler still not initialized. Requeueing terminate() message for Worker(id=" + msg.arg2 + ")");
-                }
+                Tracer.trace(Tracer.Descriptor.WORKERS, "Worker(id=" + msg.arg2 + ")'s handler still not initialized. Requeueing terminate() message for Worker(id=" + msg.arg2 + ")");
 
-                if(pendingWorkerMessages.get(workerId) == null) {
+                if (pendingWorkerMessages.get(workerId) == null) {
                     pendingWorkerMessages.put(workerId, new ConcurrentLinkedQueue<Message>());
                 }
 
@@ -1220,7 +1184,7 @@ public class Runtime {
         }
 
         // Worker was closed during this 'terminate' call, nothing to do here
-        if(!workerHandler.getLooper().getThread().isAlive()) {
+        if (!workerHandler.getLooper().getThread().isAlive()) {
             return;
         }
 

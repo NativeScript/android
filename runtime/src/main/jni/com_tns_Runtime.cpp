@@ -2,6 +2,9 @@
 #include "Runtime.h"
 #include "NativeScriptException.h"
 #include "CallbackHandlers.h"
+#include "Tracer.h"
+#include "ArgConverter.h"
+#include "Stackity.h"
 #include <sstream>
 
 using namespace std;
@@ -31,11 +34,11 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved)
 	return JNI_VERSION_1_6;
 }
 
-extern "C" JNIEXPORT void Java_com_tns_Runtime_initNativeScript(JNIEnv *_env, jobject obj, jint runtimeId, jstring filesPath, jstring nativeLibDir, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jstring callingDir, jobject jsDebugger)
+extern "C" JNIEXPORT void Java_com_tns_Runtime_initNativeScript(JNIEnv *_env, jobject obj, jint runtimeId, jstring filesPath, jstring nativeLibDir, jstring packageName, jobjectArray args, jstring callingDir, jobject jsDebugger)
 {
 	try
 	{
-		Runtime::Init(_env, obj, runtimeId, filesPath, nativeLibDir, verboseLoggingEnabled, packageName, args, callingDir, jsDebugger);
+		Runtime::Init(_env, obj, runtimeId, filesPath, nativeLibDir, packageName, args, callingDir, jsDebugger);
 	}
 	catch (NativeScriptException& e)
 	{
@@ -75,6 +78,11 @@ Runtime* TryGetRuntime(int runtimeId)
 		nsEx.ReThrowToJava();
 	}
 	return runtime;
+}
+
+extern "C" JNIEXPORT void Java_com_tns_Runtime_enableTracer(JNIEnv *_env, jclass type, jboolean enable)
+{
+	Tracer::setEnabled(enable);
 }
 
 extern "C" JNIEXPORT void Java_com_tns_Runtime_runModule(JNIEnv *_env, jobject obj, jint runtimeId, jstring scriptFile)
@@ -178,6 +186,9 @@ extern "C" JNIEXPORT jobject Java_com_tns_Runtime_runScript(JNIEnv *_env, jobjec
 
 extern "C" JNIEXPORT jobject Java_com_tns_Runtime_callJSMethodNative(JNIEnv *_env, jobject obj, jint runtimeId, jint javaObjectID, jstring methodName, jint retType, jboolean isConstructor, jobjectArray packagedArgs)
 {
+	auto m = ArgConverter::jstringToString(methodName);
+
+	Stackity::FrameEntry fe("Runtime::callJSMethodNative", m);
 	jobject result = nullptr;
 
 	auto runtime = TryGetRuntime(runtimeId);

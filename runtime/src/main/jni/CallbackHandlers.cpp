@@ -17,6 +17,8 @@
 #include "JsDebugger.h"
 #include "SimpleProfiler.h"
 #include "Runtime.h"
+#include "Tracer.h"
+#include "Stackity.h"
 
 using namespace v8;
 using namespace std;
@@ -50,8 +52,6 @@ void CallbackHandlers::Init(Isolate *isolate) {
                                                        "()V");
     assert(ENABLE_VERBOSE_LOGGING_METHOD_ID != nullptr);
 
-    DISABLE_VERBOSE_LOGGING_METHOD_ID = env.GetMethodID(RUNTIME_CLASS, "disableVerboseLogging",
-                                                        "()V");
     assert(ENABLE_VERBOSE_LOGGING_METHOD_ID != nullptr);
 
     INIT_WORKER_METHOD_ID = env.GetStaticMethodID(RUNTIME_CLASS, "initWorker", "(Ljava/lang/String;Ljava/lang/String;I)V");
@@ -203,7 +203,8 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
                                       const string &methodName, MetadataEntry *entry, bool isStatic,
                                       bool isSuper,
                                       const v8::FunctionCallbackInfo<v8::Value> &args) {
-    SET_PROFILER_FRAME();
+
+    Stackity::FrameEntry fe("CallbackHandlers::CallJavaMethod", className + "." + methodName);
 
     JEnv env;
 
@@ -223,8 +224,9 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
                 MetadataNode *callerNode = MetadataNode::GetNodeFromHandle(caller);
                 const string callerClassName = callerNode->GetName();
 
-                DEBUG_WRITE("Cannot resolve class: %s while calling method: %s callerClassName: %s",
+                Tracer::Trace(Tracer::Descriptors::CLASS, "Cannot resolve class: %s while calling method: %s callerClassName: %s",
                             className.c_str(), methodName.c_str(), callerClassName.c_str());
+
                 clazz = env.FindClass(callerClassName);
                 if (clazz == nullptr) {
                     //todo: plamen5kov: throw exception here
@@ -269,6 +271,8 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
 
         clazz = env.FindClass(className);
         if (clazz != nullptr) {
+
+            Stackity::FrameEntry fe("CallbackHandlers::CallJavaMethod", "Runtime.resolveMethodOverload");
             mi = MethodCache::ResolveMethodSignature(className, methodName, args, isStatic);
             if (mi.mid == nullptr) {
                 DEBUG_WRITE("Cannot resolve class=%s, method=%s, isStatic=%d, isSuper=%d",
@@ -281,6 +285,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
             const string callerClassName = callerNode->GetName();
             DEBUG_WRITE("Resolving method on caller class: %s.%s on className %s",
                         callerClassName.c_str(), methodName.c_str(), className.c_str());
+            Stackity::FrameEntry fe("CallbackHandlers::CallJavaMethod", "Runtime.resolveMethodOverload");
             mi = MethodCache::ResolveMethodSignature(callerClassName, methodName, args, isStatic);
             if (mi.mid == nullptr) {
                 DEBUG_WRITE(
@@ -558,7 +563,6 @@ Local<Object> CallbackHandlers::CreateJSWrapper(Isolate *isolate, jint javaObjec
     return objectManager->CreateJSWrapper(javaObjectID, typeName);
 }
 
-
 jobjectArray CallbackHandlers::GetImplementedInterfaces(JEnv &env, const Local<Object> &implementationObject) {
     if (implementationObject.IsEmpty()) {
         return CallbackHandlers::GetJavaStringArray(env, 0);
@@ -700,6 +704,28 @@ void CallbackHandlers::DumpReferenceTablesMethod() {
     }
 }
 
+void CallbackHandlers::DumpAllTraceToFile(
+        const v8::FunctionCallbackInfo<v8::Value> &args) {
+    try {
+        for(int i = 0; i < Tracer::Descriptors::Count; i++) {
+            Tracer::dumpToFileForDescriptor(i);
+        }
+    }
+    catch (NativeScriptException &e) {
+        e.ReThrowToV8();
+    }
+    catch (std::exception e) {
+        stringstream ss;
+        ss << "Error: c++ exception: " << e.what() << endl;
+        NativeScriptException nsEx(ss.str());
+        nsEx.ReThrowToV8();
+    }
+    catch (...) {
+        NativeScriptException nsEx(std::string("Error: c++ exception!"));
+        nsEx.ReThrowToV8();
+    }
+}
+
 void CallbackHandlers::EnableVerboseLoggingMethodCallback(
         const v8::FunctionCallbackInfo<v8::Value> &args) {
     try {
@@ -788,7 +814,8 @@ vector <string> CallbackHandlers::GetTypeMetadata(const string &name, int index)
 Local<Value> CallbackHandlers::CallJSMethod(Isolate *isolate, JNIEnv *_env,
                                             const Local<Object> &jsObject, const string &methodName,
                                             jobjectArray args) {
-    SET_PROFILER_FRAME();
+
+    Stackity::FrameEntry fe("CallbackHandlers::CallJSMethod", methodName);
 
     JEnv env(_env);
     Local<Value> result;
@@ -823,7 +850,7 @@ Local<Value> CallbackHandlers::CallJSMethod(Isolate *isolate, JNIEnv *_env,
         TryCatch tc;
         Local<Value> jsResult;
         {
-            SET_PROFILER_FRAME();
+            Stackity::FrameEntry fe("CallbackHandlers::CallJSMethod", "JS Function call");
             jsResult = jsMethod->Call(jsObject, argc, argc == 0 ? nullptr : arguments.data());
         }
 
@@ -955,7 +982,7 @@ void CallbackHandlers::WorkerObjectPostMessageCallback(const v8::FunctionCallbac
 
         Local<Value> jsId;
 
-        auto maybejsId = V8GetPrivateValue(isolate, thiz,
+        V8GetPrivateValue(isolate, thiz,
                                            ArgConverter::ConvertToV8String(isolate, "workerId"),
                                            jsId);
 
@@ -972,7 +999,7 @@ void CallbackHandlers::WorkerObjectPostMessageCallback(const v8::FunctionCallbac
 
         env.CallStaticVoidMethod(RUNTIME_CLASS, mId, id, (jstring) jmsgRef);
 
-        DEBUG_WRITE("MAIN: WorkerObjectPostMessageCallback called postMessage on Worker object(id=%d)", id);
+        Tracer::Trace(Tracer::Descriptors::WORKERS, "[CallbackHandlers::WorkerObjectPostMessageCallback] called postMessage on Worker object(id=%d)", id);
     } catch (NativeScriptException &ex) {
         ex.ReThrowToV8();
     } catch (std::exception e) {
@@ -1013,8 +1040,7 @@ void CallbackHandlers::WorkerGlobalOnMessageCallback(Isolate *isolate, jstring m
 
             func->Call(Undefined(isolate), 1, args1);
         } else {
-            DEBUG_WRITE(
-                    "WORKER: WorkerGlobalOnMessageCallback couldn't fire a worker's `onmessage` callback because it isn't implemented!");
+            Tracer::Trace(Tracer::Descriptors::WORKERS, "[CallbackHandlers::WorkerGlobalOnMessageCallback] couldn't fire a worker's `onmessage` callback because it isn't implemented!");
         }
 
         if (tc.HasCaught()) {
@@ -1064,7 +1090,7 @@ void CallbackHandlers::WorkerGlobalPostMessageCallback(const v8::FunctionCallbac
 
         env.CallStaticVoidMethod(RUNTIME_CLASS, mId, (jstring) jmsgRef);
 
-        DEBUG_WRITE("WORKER: WorkerGlobalPostMessageCallback called.");
+        Tracer::Trace(Tracer::Descriptors::WORKERS, "[CallbackHandlers::WorkerGlobalPostMessageCallback] called.");
     } catch (NativeScriptException &ex) {
         ex.ReThrowToV8();
     } catch (std::exception e) {
@@ -1083,19 +1109,15 @@ void CallbackHandlers::WorkerObjectOnMessageCallback(Isolate *isolate, jint work
         auto workerFound = CallbackHandlers::id2WorkerMap.find(workerId);
 
         if (workerFound == CallbackHandlers::id2WorkerMap.end()) {
-            // TODO: Pete: Throw exception
-            DEBUG_WRITE(
-                    "MAIN: WorkerObjectOnMessageCallback no worker instance was found with workerId=%d.",
-                    workerId);
+            Tracer::Trace(Tracer::Descriptors::WORKERS, "[CallbackHandlers::WorkerObjectOnMessageCallback] no worker instance was found with workerId=%d", workerId);
             return;
         }
 
         auto workerPersistent = workerFound->second;
 
         if (workerPersistent->IsEmpty()) {// Object has been collected
-            DEBUG_WRITE(
-                    "MAIN: WorkerObjectOnMessageCallback couldn't fire a worker(id=%d) object's `onmessage` callback because the worker has been Garbage Collected.",
-                    workerId);
+            Tracer::Trace(Tracer::Descriptors::WORKERS, "[CallbackHandlers::WorkerObjectOnMessageCallback] couldn't fire a worker(id=%d) object's `onmessage` callback because the worker has been gc'd", workerId);
+
             CallbackHandlers::id2WorkerMap.erase(workerId);
             return;
         }
@@ -1121,9 +1143,7 @@ void CallbackHandlers::WorkerObjectOnMessageCallback(Isolate *isolate, jint work
 
             func->Call(Undefined(isolate), 1, args1);
         } else {
-            DEBUG_WRITE(
-                    "MAIN: WorkerObjectOnMessageCallback couldn't fire a worker(id=%d) object's `onmessage` callback because it isn't implemented.",
-                    workerId);
+            Tracer::Trace(Tracer::Descriptors::WORKERS, "[CallbackHandlers::WorkerObjectOnMessageCallback] couldn't fire a worker(id=%d) object's `onmessage` callback because it isn't implemented.", workerId);
         }
     } catch (NativeScriptException &ex) {
         ex.ReThrowToV8();
@@ -1141,7 +1161,7 @@ void CallbackHandlers::WorkerObjectOnMessageCallback(Isolate *isolate, jint work
 void CallbackHandlers::WorkerObjectTerminateCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
     auto isolate = args.GetIsolate();
 
-    DEBUG_WRITE("WORKER: WorkerObjectTerminateCallback called.");
+    Tracer::Trace(Tracer::Descriptors::WORKERS, "[CallbackHandlers::WorkerObjectTerminateCallback] called");
 
     try {
         HandleScope scope(isolate);
@@ -1150,7 +1170,7 @@ void CallbackHandlers::WorkerObjectTerminateCallback(const v8::FunctionCallbackI
 
         Local<Value> jsId;
 
-        auto maybejsId = V8GetPrivateValue(isolate, thiz,
+        V8GetPrivateValue(isolate, thiz,
                                            ArgConverter::ConvertToV8String(isolate, "workerId"),
                                            jsId);
 
@@ -1162,9 +1182,7 @@ void CallbackHandlers::WorkerObjectTerminateCallback(const v8::FunctionCallbackI
                           isTerminated);
 
         if (!isTerminated.IsEmpty() && isTerminated->BooleanValue()) {
-            DEBUG_WRITE(
-                    "Main: WorkerObjectTerminateCallback - Worker(id=%d)'s terminate has already been called.",
-                    id);
+            Tracer::Trace(Tracer::Descriptors::WORKERS, "[CallbackHandlers::WorkerObjectTerminateCallback] Worker(id=%d)'s terminate has already been called");
             return;
         }
 
@@ -1195,7 +1213,7 @@ void CallbackHandlers::WorkerObjectTerminateCallback(const v8::FunctionCallbackI
 void CallbackHandlers::WorkerGlobalCloseCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
     auto isolate = args.GetIsolate();
 
-    DEBUG_WRITE("WORKER: WorkerThreadCloseCallback called.");
+    Tracer::Trace(Tracer::Descriptors::WORKERS, "[CallbackHandlers::WorkerGlobalCloseCallback] called");
 
     try {
         HandleScope scope(isolate);
@@ -1207,7 +1225,7 @@ void CallbackHandlers::WorkerGlobalCloseCallback(const v8::FunctionCallbackInfo<
                 ArgConverter::ConvertToV8String(isolate, "isTerminating"));
 
         if (!isTerminating.IsEmpty() && isTerminating->BooleanValue()) {
-            DEBUG_WRITE("WORKER: WorkerThreadCloseCallback - Worker is currently terminating...");
+            Tracer::Trace(Tracer::Descriptors::WORKERS, "[CallbackHandlers::WorkerGlobalCloseCallback] Worker is currently terminating...");
             return;
         }
 
@@ -1226,9 +1244,9 @@ void CallbackHandlers::WorkerGlobalCloseCallback(const v8::FunctionCallbackInfo<
 
             auto func = callback.As<Function>();
 
-            DEBUG_WRITE("WORKER: WorketThreadCloseCallback onclose handle is being called.");
+            Tracer::Trace(Tracer::Descriptors::WORKERS, "[CallbackHandlers::WorkerGlobalCloseCallback] onclose handle is being called.");
             func->Call(Undefined(isolate), 0, args1);
-            DEBUG_WRITE("WORKER: WorketThreadCloseCallback onclose handle was called.");
+            Tracer::Trace(Tracer::Descriptors::WORKERS, "[CallbackHandlers::WorkerGlobalCloseCallback] onclose handle was called.");
         }
 
         if (tc.HasCaught()) {
@@ -1327,19 +1345,14 @@ void CallbackHandlers::CallWorkerObjectOnErrorHandle(Isolate *isolate, jint work
         auto workerFound = CallbackHandlers::id2WorkerMap.find(workerId);
 
         if (workerFound == CallbackHandlers::id2WorkerMap.end()) {
-            // TODO: Pete: Throw exception
-            DEBUG_WRITE(
-                    "MAIN: CallWorkerObjectOnErrorHandle no worker instance was found with workerId=%d.",
-                    workerId);
+            Tracer::Trace(Tracer::Descriptors::WORKERS, "[CallbackHandlers::CallWorkerObjectOnErrorHandle] no worker instance was found with workerId=%d");
             return;
         }
 
         auto workerPersistent = workerFound->second;
 
         if (workerPersistent->IsEmpty()) {// Object has been collected
-            DEBUG_WRITE(
-                    "MAIN: WorkerObjectOnMessageCallback couldn't fire a worker(id=%d) object's `onmessage` callback because the worker has been Garbage Collected.",
-                    workerId);
+            Tracer::Trace(Tracer::Descriptors::WORKERS, "[CallbackHandlers::CallWorkerObjectOnErrorHandle] couldn't fire a worker(id=%d) object's `onmessage` callback because the worker has been gc'd.");
             CallbackHandlers::id2WorkerMap.erase(workerId);
             return;
         }
@@ -1382,12 +1395,7 @@ void CallbackHandlers::CallWorkerObjectOnErrorHandle(Isolate *isolate, jint work
         DEBUG_WRITE("Unhandled exception in '%s' thread. file: %s, line %d\nStackTrace: %s",
                     strThreadname.c_str(), strFilename.c_str(), lineno, strMessage.c_str(), strStackTrace.c_str());
 
-        // Do not throw exception?
-//    stringstream ss;
-//    ss << endl << "Unhandled exception in '" << strThreadname << "' thread. file: " << strFilename <<
-//    ", line: " << lineno << endl << strMessage << endl;
-//    NativeScriptException ex(ss.str());
-//    throw ex;
+        Tracer::Trace(Tracer::Descriptors::WORKERS, "[CallbackHandlers::CallWorkerObjectOnErrorHandle] unhandled exception in file: %s, line: %d, message: %s\n", strFilename.c_str(), lineno, strMessage.c_str());
     } catch (NativeScriptException &ex) {
         ex.ReThrowToV8();
     } catch (std::exception e) {
@@ -1402,12 +1410,12 @@ void CallbackHandlers::CallWorkerObjectOnErrorHandle(Isolate *isolate, jint work
 }
 
 void CallbackHandlers::ClearWorkerPersistent(int workerId) {
-    DEBUG_WRITE("ClearWorkerPersistent called for workerId=%d", workerId);
+    Tracer::Trace(Tracer::Descriptors::WORKERS, "[CallbackHandlers::ClearWorkerPersistent] called for workerId=%d", workerId);
 
     auto workerFound = CallbackHandlers::id2WorkerMap.find(workerId);
 
     if(workerFound == CallbackHandlers::id2WorkerMap.end()) {
-        DEBUG_WRITE("MAIN | WORKER: ClearWorkerPersistent no worker instance was found with workerId=%d ! The worker may already be terminated.", workerId);
+        Tracer::Trace(Tracer::Descriptors::WORKERS, "[CallbackHandlers::ClearWorkerPersistent] no worker instance was found with workerId=%d ! The worker may already be terminated.", workerId);
         return;
     }
 

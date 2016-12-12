@@ -13,20 +13,10 @@ import java.io.OutputStreamWriter;
 import android.content.Context;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
-import android.content.pm.PackageManager.NameNotFoundException;
-
-import com.tns.Logger;
-import com.tns.ExtractPolicy;
-import com.tns.FileExtractor;
 
 public class DefaultExtractPolicy implements ExtractPolicy {
-	private final Logger logger;
 
 	private final static String ASSETS_THUMB_FILENAME = "assetsThumb";
-
-	public DefaultExtractPolicy(Logger logger) {
-		this.logger = logger;
-	}
 
 	public boolean shouldExtract(Context context)
 	{			
@@ -72,7 +62,7 @@ public class DefaultExtractPolicy implements ExtractPolicy {
 			long updateTime = packageInfo.lastUpdateTime;
 			return String.valueOf(updateTime) + "-" + String.valueOf(code);
 		} catch (PackageManager.NameNotFoundException e) {
-			logger.write("Error while getting current assets thumb");
+			DefaultTracer.trace(Tracer.Descriptor.EXCEPTION, "[generateAssetsThumb] Error while getting current assets thumb");
 			e.printStackTrace();
 		}
 
@@ -91,10 +81,10 @@ public class DefaultExtractPolicy implements ExtractPolicy {
 				return cachedThumb;
 			}
 		} catch (FileNotFoundException e) {
-			logger.write("Error while getting current assets thumb");
+			DefaultTracer.trace(Tracer.Descriptor.EXCEPTION, "[getCachedAssetsThumb] Error while getting current assets thumb");
 			e.printStackTrace();
 		} catch (IOException e) {
-			logger.write("Error while getting current asstes thumb");
+			DefaultTracer.trace(Tracer.Descriptor.EXCEPTION, "[getCachedAssetsThumb] Error while getting current asstes thumb");
 			e.printStackTrace();
 		}
 
@@ -115,10 +105,10 @@ public class DefaultExtractPolicy implements ExtractPolicy {
 				out.close();
 			}
 		} catch (FileNotFoundException e) {
-			logger.write("Error while writting current assets thumb");
+			DefaultTracer.trace(Tracer.Descriptor.EXCEPTION, "[saveNewAssetsThumb] Error while writing current assets thumb");
 			e.printStackTrace();
 		} catch (IOException e) {
-			logger.write("Error while writting current assets thumb");
+			DefaultTracer.trace(Tracer.Descriptor.EXCEPTION, "[saveNewAssetsThumb] Error while writing current assets thumb");
 			e.printStackTrace();
 		}
 	}

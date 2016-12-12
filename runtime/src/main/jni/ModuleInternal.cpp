@@ -16,6 +16,8 @@
 #include "SimpleProfiler.h"
 #include "include/v8.h"
 #include "CallbackHandlers.h"
+#include "Tracer.h"
+#include "Stackity.h"
 #include <sstream>
 #include <libgen.h>
 #include <dlfcn.h>
@@ -136,6 +138,8 @@ void ModuleInternal::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& 
 {
 	try
 	{
+		string moduleName = ArgConverter::ConvertToString(args[0].As<String>());
+		Stackity::FrameEntry fe("Module::RequireCallback", moduleName);
 		auto thiz = static_cast<ModuleInternal*>(args.Data().As<External>()->Value());
 		thiz->RequireCallbackImpl(args);
 	}
@@ -157,6 +161,8 @@ void ModuleInternal::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& 
 
 void ModuleInternal::RequireCallbackImpl(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
+
+	Stackity::FrameEntry fe("Module::RequireCallbackImpl");
 	auto isolate = args.GetIsolate();
 
 	if (args.Length() != 2)
@@ -237,12 +243,11 @@ void ModuleInternal::CheckFileExists(Isolate* isolate, const std::string &path, 
 
 Local<Object> ModuleInternal::LoadImpl(Isolate *isolate, const string& moduleName, const string& baseDir, bool& isData)
 {
+	Stackity::FrameEntry fe("Module::LoadImpl");
 	auto pathKind = GetModulePathKind(moduleName);
 	auto cachePathKey = (pathKind == ModulePathKind::Global) ? moduleName : (baseDir + "*" + moduleName);
 
 	Local<Object> result;
-
-	DEBUG_WRITE(">>LoadImpl cachePathKey=%s", cachePathKey.c_str());
 
 	auto it = m_loadedModules.find(cachePathKey);
 
@@ -251,9 +256,16 @@ Local<Object> ModuleInternal::LoadImpl(Isolate *isolate, const string& moduleNam
 		JEnv env;
 		JniLocalRef jsModulename(env.NewStringUTF(moduleName.c_str()));
 		JniLocalRef jsBaseDir(env.NewStringUTF(baseDir.c_str()));
-		JniLocalRef jsModulePath(env.CallStaticObjectMethod(MODULE_CLASS, RESOLVE_PATH_METHOD_ID, (jstring) jsModulename, (jstring) jsBaseDir));
+		std::string path;
 
-		auto path = ArgConverter::jstringToString((jstring) jsModulePath);
+		{
+			Stackity::FrameEntry fe("Module::LoadImpl","Module.resolvePath");
+			JniLocalRef jsModulePath(
+					env.CallStaticObjectMethod(MODULE_CLASS, RESOLVE_PATH_METHOD_ID,
+											   (jstring) jsModulename, (jstring) jsBaseDir));
+
+			path = ArgConverter::jstringToString((jstring) jsModulePath);
+		}
 
 		auto it2 = m_loadedModules.find(path);
 
@@ -294,6 +306,8 @@ Local<Object> ModuleInternal::LoadImpl(Isolate *isolate, const string& moduleNam
 
 Local<Object> ModuleInternal::LoadModule(Isolate *isolate, const string& modulePath, const string& moduleCacheKey)
 {
+
+	Stackity::FrameEntry fe("Module::LoadModule");
 	Local<Object> result;
 
 	auto moduleObj = Object::New(isolate);
@@ -312,6 +326,7 @@ Local<Object> ModuleInternal::LoadModule(Isolate *isolate, const string& moduleP
 
 	if (Util::EndsWith(modulePath, ".js"))
 	{
+		Stackity::FrameEntry fe("Module::LoadModule", "Compilation");
 		auto script = LoadScript(isolate, modulePath, fullRequiredModulePath);
 
 		moduleFunc = script->Run().As<Function>();
@@ -350,8 +365,6 @@ Local<Object> ModuleInternal::LoadModule(Isolate *isolate, const string& moduleP
 		throw NativeScriptException(errMsg);
 	}
 
-	SET_PROFILER_FRAME();
-
 	auto fileName = ArgConverter::ConvertToV8String(isolate, modulePath);
 	char pathcopy[1024];
 	strcpy(pathcopy, modulePath.c_str());
@@ -375,6 +388,8 @@ Local<Object> ModuleInternal::LoadModule(Isolate *isolate, const string& moduleP
 	auto thiz = Object::New(isolate);
 	auto extendsName = ArgConverter::ConvertToV8String(isolate, "__extends");
 	thiz->Set(extendsName, isolate->GetCurrentContext()->Global()->Get(extendsName));
+
+	Stackity::FrameEntry fe1("Module::LoadModule", "Execution");
 	moduleFunc->Call(thiz, sizeof(requireArgs) / sizeof(Local<Value> ), requireArgs);
 
 	if (tc.HasCaught())
@@ -397,7 +412,7 @@ Local<Script> ModuleInternal::LoadScript(Isolate *isolate, const string& path, c
 	auto scriptText = ModuleInternal::WrapModuleContent(path);
 
 	DEBUG_WRITE("Compiling script (module %s)", path.c_str());
-	//
+	
 	auto cacheData = TryLoadScriptCache(path);
 
 	ScriptOrigin origin(fullRequiredModulePath);
@@ -428,8 +443,6 @@ Local<Script> ModuleInternal::LoadScript(Isolate *isolate, const string& path, c
 		script = maybeScript.ToLocalChecked();
 		SaveScriptCache(source, path);
 	}
-
-	DEBUG_WRITE("Compiled script (module %s)", path.c_str());
 
 	return script;
 }

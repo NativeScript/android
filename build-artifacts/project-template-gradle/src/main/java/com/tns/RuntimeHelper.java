@@ -53,19 +53,17 @@ public final class RuntimeHelper {
 		
 		System.loadLibrary("NativeScript");
 
-		Logger logger = new LogcatLogger(app);
-
-		Debugger debugger = AndroidJsDebugger.isDebuggableApp(app) ? new AndroidJsDebugger(app, logger) : null;
+		Debugger debugger = AndroidJsDebugger.isDebuggableApp(app) ? new AndroidJsDebugger(app) : null;
 
 		Runtime runtime = null;
 		boolean showErrorIntent = hasErrorIntent(app);
 		if (!showErrorIntent) {
-			NativeScriptUncaughtExceptionHandler exHandler = new NativeScriptUncaughtExceptionHandler(logger, app);
+			NativeScriptUncaughtExceptionHandler exHandler = new NativeScriptUncaughtExceptionHandler(app);
 
 			Thread.setDefaultUncaughtExceptionHandler(exHandler);
 
-			DefaultExtractPolicy extractPolicy = new DefaultExtractPolicy(logger);
-			boolean skipAssetExtraction = Util.runPlugin(logger, app);
+			DefaultExtractPolicy extractPolicy = new DefaultExtractPolicy();
+			boolean skipAssetExtraction = Util.runPlugin(app);
 
 			String appName = app.getPackageName();
 			File rootDir = new File(app.getApplicationInfo().dataDir);
@@ -77,11 +75,9 @@ public final class RuntimeHelper {
 			}
 
 			if (!skipAssetExtraction) {
-				if(logger.isEnabled()) {
-					logger.write("Extracting assets...");
-				}
+                DefaultTracer.trace(Tracer.Descriptor.INFO, "Extracting assets...");
 				
-				AssetExtractor aE = new AssetExtractor(null, logger);
+				AssetExtractor aE = new AssetExtractor(null);
 				
 				String outputDir = app.getFilesDir().getPath() + File.separator;
 
@@ -94,9 +90,7 @@ public final class RuntimeHelper {
 				
 				// will extract snapshot of the device appropriate architecture
 				if(shouldExtractSnapshots) {
-					if(logger.isEnabled()) {
-						logger.write("Extracting snapshot blob");
-					}
+                    DefaultTracer.trace(Tracer.Descriptor.INFO, "Extracting snapshot blob");
 
 					aE.extractAssets(app,  "snapshots/" + Build.CPU_ABI, outputDir, extractPolicy);
 				}
@@ -106,14 +100,23 @@ public final class RuntimeHelper {
 
 			AppConfig appConfig = new AppConfig(appDir);
 
+			if(AndroidJsDebugger.isDebuggableApp(app)) {
+				if(appConfig.getEnableTracing()) {
+					DefaultTracer.start();
+				}
+
+				if(appConfig.getEnableBenchmarking()) {
+					DefaultTracer.startBenchmarking(app);
+				}
+			}
+
 			ClassLoader classLoader = app.getClassLoader();
 			File dexDir = new File(rootDir, "code_cache/secondary-dexes");
 			String dexThumb = null;
 			try {
 				dexThumb = Util.getDexThumb(app);
 			} catch (NameNotFoundException e) {
-				if (logger.isEnabled())
-					logger.write("Error while getting current proxy thumb");
+                DefaultTracer.trace(Tracer.Descriptor.EXCEPTION, "Error while getting current proxy thumb");
 				e.printStackTrace();
 			}
 
@@ -124,14 +127,14 @@ public final class RuntimeHelper {
                 e.printStackTrace();
             }
 
-            StaticConfiguration config = new StaticConfiguration(logger, debugger, appName, nativeLibDir, rootDir,
-                    appDir, classLoader, dexDir, dexThumb, appConfig);
+			StaticConfiguration config = new StaticConfiguration(debugger, appName, nativeLibDir, rootDir,
+					appDir, classLoader, dexDir, dexThumb, appConfig);
 
 			runtime = Runtime.initializeRuntimeWithConfiguration(config);
 
 			// runtime needs to be initialized before the NativeScriptSyncService is enabled because it uses runtime.runScript(...)
 			if (NativeScriptSyncService.isSyncEnabled(app)) {
-				NativeScriptSyncService syncService = new NativeScriptSyncService(runtime, logger, app);
+				NativeScriptSyncService syncService = new NativeScriptSyncService(runtime, app);
 
 				syncService.sync();
 				syncService.startServer();
@@ -142,10 +145,8 @@ public final class RuntimeHelper {
 				// @@@
 				// Runtime.getOrCreateJavaObjectID(syncService);
 			} else {
-				if (logger.isEnabled()) {
-					logger.write("NativeScript LiveSync is not enabled.");
-				}
-			}
+                Tracer.trace(Tracer.Descriptor.INFO, "NativeScript LiveSync is not enabled.");
+            }
 
 			runtime.runScript(new File(appDir, "internal/ts_helpers.js"));
 
@@ -162,9 +163,7 @@ public final class RuntimeHelper {
 				}
 			}
 			catch (Exception e) {
-				if (logger.isEnabled()) {
-					logger.write("Cannot initialize application instance.");
-				}
+                Tracer.trace(Tracer.Descriptor.INFO, "Cannot initialize application instance.");
 				e.printStackTrace();
 			}
 		}

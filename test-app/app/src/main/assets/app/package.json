@@ -2,6 +2,8 @@
 	"main": "boot.js",
 	"android": {
 		"v8Flags": "--expose_gc",
+		"diagnosticTracing": false,
+		"diagnosticBenchmarking": false,
 		"profilerOutputDir": "",
 		"gcThrottleTime": 500,
 		"memoryCheckInterval": 10,
