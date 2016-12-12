@@ -194,13 +194,11 @@ function traverseFiles(filesToTraverse) {
 
 	var filesLength = filesToTraverse.length;
 	for(var i = 0; i < filesLength; i += 1) {
-
 		var fp = filesToTraverse[i];
 		logger.info("Visiting JavaScript file: " + fp);
 
 		readFile(fp)
 		.then(astFromFileContent)
-		// .then(writeToFile)
 		.then(visitAst)
 		.then(writeToFile)
 		.catch(exceptionHandler)
