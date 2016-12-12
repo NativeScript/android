@@ -50,7 +50,8 @@ v8::MaybeLocal<v8::Value> V8Debugger::callDebuggerMethod(
 V8Debugger::V8Debugger(v8::Isolate* isolate, V8InspectorImpl* inspector)
     : m_isolate(isolate),
       m_inspector(inspector),
-      m_lastContextId(0),
+
+      m_lastContextId(-1),
       m_enableCount(0),
       m_breakpointsActivated(true),
       m_runningNestedMessageLoop(false),

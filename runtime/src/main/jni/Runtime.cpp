@@ -29,8 +29,6 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
-//TODO: Lubo: properly release this jni global ref on shutdown
-
 bool tns::LogEnabled = true;
 SimpleAllocator g_allocator;
 
