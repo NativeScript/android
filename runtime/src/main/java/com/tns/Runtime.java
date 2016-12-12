@@ -498,7 +498,7 @@ public class Runtime
         init(config.logger, config.debugger, config.appName, config.nativeLibDir, config.rootDir, config.appDir, config.classLoader, config.dexDir, config.dexThumb, config.appConfig, dynamicConfig.callingJsDir);
     }
 
-    private void init(Logger logger, Debugger debugger, String appName, String nativeLibDir, File rootDir, File appDir, ClassLoader classLoader, File dexDir, String dexThumb, AppConfig appConfig, String callingJsDir) throws RuntimeException {
+    private void init(Logger logger, Debugger debugger, String appName, String nativeLibDir, File rootDir, File appDir, ClassLoader classLoader, File dexDir, String dexThumb, AppConfig appConfig, String callingJsDir) throws RuntimeException
     {
         if (initialized)
         {
@@ -554,11 +554,12 @@ public class Runtime
     }
 
     @RuntimeCallable
-    public void enableVerboseLogging()
-    {
+    public void enableVerboseLogging() {
+
         logger.setEnabled(true);
         ProxyGenerator.IsLogEnabled = true;
     }
+
 
     @RuntimeCallable
     public void disableVerboseLogging()
@@ -651,7 +652,7 @@ public class Runtime
     }
 
     @RuntimeCallable
-    private long getUsedMemory() {
+    private long getUsedMemory()
     {
         long usedMemory = dalvikRuntime.totalMemory() - dalvikRuntime.freeMemory();
         return usedMemory;
@@ -1459,7 +1460,7 @@ public class Runtime
     }
 
     @RuntimeCallable
-    public static void passUncaughtExceptionFromWorkerToMain(String message, String filename, String stackTrace, int lineno) {
+    public static void passUncaughtExceptionFromWorkerToMain(String message, String filename, String stackTrace, int lineno)
     {
         // Thread should always be a worker
         Runtime currentRuntime = Runtime.getCurrentRuntime();

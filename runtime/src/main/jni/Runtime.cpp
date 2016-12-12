@@ -426,39 +426,34 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring nativeLibDir
 	Isolate::CreateParams create_params;
 	bool didInitializeV8 = false;
 
-	auto pckName = ArgConverter::jstringToString(packageName);
-	__android_log_print(ANDROID_LOG_INFO, pckName.c_str(), "NativeScript Runtime Version %s, commit %s", NATIVE_SCRIPT_RUNTIME_VERSION, NATIVE_SCRIPT_RUNTIME_COMMIT_SHA);
-	__android_log_print(ANDROID_LOG_DEBUG, pckName.c_str(), "V8 version %s", V8::GetVersion());
-
-
 	create_params.array_buffer_allocator = &g_allocator;
 
 	m_startupData = new StartupData();
 
-    // Retrieve the device android Sdk version
-    char sdkVersion[PROP_VALUE_MAX];
-    __system_property_get("ro.build.version.sdk", sdkVersion);
+	// Retrieve the device android Sdk version
+	char sdkVersion[PROP_VALUE_MAX];
+	__system_property_get("ro.build.version.sdk", sdkVersion);
 
-    auto pckName = ArgConverter::jstringToString(packageName);
+	auto pckName = ArgConverter::jstringToString(packageName);
 
-    void* snapshotPtr;
+	void* snapshotPtr;
 
-    // If device isn't running on Sdk 17
-    if (strcmp(sdkVersion, string("17").c_str()) != 0) {
-        snapshotPtr = dlopen("libsnapshot.so", RTLD_LAZY | RTLD_LOCAL);
-    } else {
-        // If device is running on android Sdk 17
-        // dlopen reads relative path to dynamic libraries or reads from folder different than the nativeLibsDirs on the android device
-        string libDir = ArgConverter::jstringToString(nativeLibDir);
-        string snapshotPath = libDir + "/libsnapshot.so";
-        snapshotPtr = dlopen(snapshotPath.c_str(), RTLD_LAZY | RTLD_LOCAL);
-    }
+	// If device isn't running on Sdk 17
+	if (strcmp(sdkVersion, string("17").c_str()) != 0) {
+		snapshotPtr = dlopen("libsnapshot.so", RTLD_LAZY | RTLD_LOCAL);
+	} else {
+		// If device is running on android Sdk 17
+		// dlopen reads relative path to dynamic libraries or reads from folder different than the nativeLibsDirs on the android device
+		string libDir = ArgConverter::jstringToString(nativeLibDir);
+		string snapshotPath = libDir + "/libsnapshot.so";
+		snapshotPtr = dlopen(snapshotPath.c_str(), RTLD_LAZY | RTLD_LOCAL);
+	}
 
-    if(snapshotPtr == nullptr) {
-        DEBUG_WRITE_FORCE("Failed to load snapshot: %s", dlerror());
-    }
+	if(snapshotPtr == nullptr) {
+		DEBUG_WRITE_FORCE("Failed to load snapshot: %s", dlerror());
+	}
 
-    if (snapshotPtr)
+	if (snapshotPtr)
 	{
 		m_startupData->data = static_cast<const char *>(dlsym(snapshotPtr, "TNSSnapshot_blob"));
 		m_startupData->raw_size = *static_cast<const unsigned int *>(dlsym(snapshotPtr, "TNSSnapshot_blob_len"));
@@ -487,11 +482,11 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring nativeLibDir
 			m_startupData->data = static_cast<const char*>(m_heapSnapshotBlob->memory);
 			m_startupData->raw_size = m_heapSnapshotBlob->size;
 
-            DEBUG_WRITE("Snapshot read %s (%dB).", snapshotPath.c_str(), m_heapSnapshotBlob->size);
+			DEBUG_WRITE_FORCE("Snapshot read %s (%dB).", snapshotPath.c_str(), m_heapSnapshotBlob->size);
 		}
 		else if (!saveSnapshot)
 		{
-			DEBUG_WRITE("No snapshot file found at %s", snapshotPath.c_str());
+			DEBUG_WRITE_FORCE("No snapshot file found at %s", snapshotPath.c_str());
 
 		}
 		else
@@ -509,12 +504,12 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring nativeLibDir
 				customScript = File::ReadText(Constants::V8_HEAP_SNAPSHOT_SCRIPT);
 			}
 
-			DEBUG_WRITE("Creating heap snapshot");
+			DEBUG_WRITE_FORCE("Creating heap snapshot");
 			*m_startupData = V8::CreateSnapshotDataBlob(customScript.c_str());
 
 			if (m_startupData->raw_size == 0)
 			{
-				DEBUG_WRITE("Failed to create heap snapshot.");
+				DEBUG_WRITE_FORCE("Failed to create heap snapshot.");
 			}
 			else
 			{
@@ -522,13 +517,13 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring nativeLibDir
 
 				if (!writeSuccess)
 				{
-					__android_log_print(ANDROID_LOG_ERROR, pckName.c_str(), "Failed to save created snapshot.");
+					DEBUG_WRITE_FORCE("Failed to save created snapshot.");
 				}
 				else
 				{
-					DEBUG_WRITE("Saved snapshot of %s (%dB) in %s (%dB)",
-							Constants::V8_HEAP_SNAPSHOT_SCRIPT.c_str(), customScript.size(),
-							snapshotPath.c_str(), m_startupData->raw_size);
+					DEBUG_WRITE_FORCE("Saved snapshot of %s (%dB) in %s (%dB)",
+									  Constants::V8_HEAP_SNAPSHOT_SCRIPT.c_str(), customScript.size(),
+									  snapshotPath.c_str(), m_startupData->raw_size);
 				}
 			}
 		}
@@ -558,6 +553,8 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring nativeLibDir
 	V8::SetCaptureStackTraceForUncaughtExceptions(true, 100, StackTrace::kOverview);
 
 	isolate->AddMessageListener(NativeScriptException::OnUncaughtError);
+
+	__android_log_print(ANDROID_LOG_DEBUG, "TNS.Native", "V8 version %s", V8::GetVersion());
 
 	auto globalTemplate = ObjectTemplate::New();
 
@@ -591,10 +588,10 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring nativeLibDir
 
 		globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "Worker"), workerFuncTemplate);
 	}
-	/*
-	 * Emulate a `WorkerGlobalScope`
-	 * Attach postMessage, close to the global object
-	 */
+		/*
+         * Emulate a `WorkerGlobalScope`
+         * Attach postMessage, close to the global object
+         */
 	else {
 		auto postMessageFuncTemplate = FunctionTemplate::New(isolate, CallbackHandlers::WorkerGlobalPostMessageCallback);
 		globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "postMessage"), postMessageFuncTemplate);
@@ -661,16 +658,17 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring nativeLibDir
 
 jobject Runtime::ConvertJsValueToJavaObject(JEnv& env, const Local<Value>& value, int classReturnType)
 {
-	JsArgToArrayConverter argConverter(m_isolate, value, false/*is implementation object*/, classReturnType);
-	jobject jr = argConverter.GetConvertedArg();
-	jobject javaResult = nullptr;
-	if (jr != nullptr)
-	{
-		javaResult = env.NewLocalRef(jr);
-	}
+    JsArgToArrayConverter argConverter(m_isolate, value, false/*is implementation object*/, classReturnType);
+    jobject jr = argConverter.GetConvertedArg();
+    jobject javaResult = nullptr;
+    if (jr != nullptr)
+    {
+        javaResult = env.NewLocalRef(jr);
+    }
 
-	return javaResult;
+    return javaResult;
 }
+
 
 void Runtime::DestroyRuntime() {
 	s_id2RuntimeCache.erase(m_id);
