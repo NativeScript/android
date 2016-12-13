@@ -10,7 +10,6 @@
 #include "Runtime.h"
 #include "src/inspector/string-16.h"
 
-#include "src/inspector/task-runner.h"
 #include "ArgConverter.h"
 
 using namespace std;
@@ -19,82 +18,11 @@ using namespace v8;
 
 using namespace v8_inspector;
 
-class ConnectTask : public TaskRunner::Task
-{
-public:
-    ConnectTask(JsV8InspectorClient *client, v8::base_copied::Semaphore *ready_semaphore)
-            : client_(client), ready_semaphore_(ready_semaphore)
-    {
-
-    }
-
-    ~ConnectTask() = default;
-
-    bool is_inspector_task() final
-    {
-        return true;
-    }
-
-    void Run(v8::Isolate *isolate, const v8::Global<v8::Context> &global_context)
-    {
-        v8::HandleScope handle_scope(isolate);
-        v8::Local<v8::Context> context = global_context.Get(isolate);
-        client_->doConnect(isolate, context);
-        if (ready_semaphore_ != nullptr)
-        {
-            ready_semaphore_->Signal();
-        }
-    }
-
-private:
-    JsV8InspectorClient *client_;
-    v8::base_copied::Semaphore *ready_semaphore_;
-};
-
-
-class SendMessageToBackendTask : public TaskRunner::Task
-{
-public:
-    explicit SendMessageToBackendTask(JsV8InspectorClient *client, const std::string &message)
-            : client_(client), message_(message)
-    {
-
-    }
-
-    bool is_inspector_task() final
-    {
-        return true;
-    }
-
-    void Run(v8::Isolate *isolate, const v8::Global<v8::Context> &global_context) override
-    {
-//        v8_inspector::V8InspectorSession *session = nullptr;
-//        {
-//            v8::HandleScope handle_scope(isolate);
-//            v8::Local<v8::Context> context = global_context.Get(isolate);
-//            session = InspectorClientImpl::SessionFromContext(context);
-//            CHECK(session);
-//        }
-//
-//        v8_inspector::StringView message_view(reinterpret_cast<const uint16_t *>(message_.characters16()), message_.length());
-//        session->dispatchProtocolMessage(message_view);
-
-        v8::HandleScope handle_scope(isolate);
-        v8::Local<v8::Context> context = global_context.Get(isolate);
-        client_->doDispatchMessage(isolate, message_);
-    }
-
-private:
-    JsV8InspectorClient *client_;
-    std::string message_;
-};
-
 JsV8InspectorClient::JsV8InspectorClient(v8::Isolate *isolate)
         : isolate_(isolate),
           inspector_(nullptr),
           session_(nullptr),
           connection(nullptr),
-          backend_runner(nullptr),
           context_()
 {
     JEnv env;
@@ -110,20 +38,12 @@ JsV8InspectorClient::JsV8InspectorClient(v8::Isolate *isolate)
     assert(getInspectorMessageMethod != nullptr);
 }
 
-JsV8InspectorClient::~JsV8InspectorClient()
-{
-    if (backend_runner != nullptr)
-    {
-        delete backend_runner;
-    }
-}
-
 void JsV8InspectorClient::connect(jobject connection)
 {
     //Isolate::Scope isolate_scope(isolate_);
     //v8::HandleScope handleScope(isolate_);
 
-    v8::base_copied::Semaphore ready_semaphore(0);
+    //v8::base_copied::Semaphore ready_semaphore(0);
 
     JEnv env;
     this->connection = env.NewGlobalRef(connection);
@@ -351,17 +271,7 @@ void JsV8InspectorClient::init()
         return;
     }
 
-    v8::base_copied::Semaphore ready_semaphore(0);
-
-    this->backend_runner = new TaskRunner(nullptr, false, &ready_semaphore, isolate_);
-    ready_semaphore.Wait();
-
-
     v8::HandleScope handle_scope(isolate_);
-
-    v8::Local<Context> entered = isolate_->GetEnteredContext();
-    v8::Local<Context> calling = isolate_->GetCallingContext();
-    v8::Local<Context> current = isolate_->GetCurrentContext();
 
     v8::Local<Context> context = Context::New(isolate_);
     v8::Context::Scope context_scope(context);

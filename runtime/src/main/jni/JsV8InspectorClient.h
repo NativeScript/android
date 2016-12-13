@@ -2,7 +2,6 @@
 #define JSV8INSPECTORCLIENT_H_
 
 #include <string>
-#include <v8_inspector/src/inspector/task-runner.h>
 #include "v8.h"
 #include "v8-debug.h"
 #include "JEnv.h"
@@ -42,14 +41,12 @@ namespace tns
 
 		private:
             JsV8InspectorClient(v8::Isolate *isolate);
-			~JsV8InspectorClient();
 
             static JsV8InspectorClient* instance;
             static jclass inspectorClass;
             static jmethodID sendMethod;
 			static jmethodID getInspectorMessageMethod;
 
-			TaskRunner* backend_runner;
             v8::Isolate* isolate_;
 			v8::Persistent<v8::Context> context_;
             std::unique_ptr<V8Inspector> inspector_;
