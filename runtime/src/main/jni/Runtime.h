@@ -55,6 +55,8 @@ namespace tns
 			void ClearStartupData(JNIEnv *env, jobject obj);
 			void DestroyRuntime();
 
+			static v8::Platform *platform;
+
 		private:
 			Runtime(JNIEnv *env, jobject runtime, int id);
 
@@ -93,6 +95,8 @@ namespace tns
 			static jmethodID GET_USED_MEMORY_METHOD_ID;
 
 			static bool s_mainThreadInitialized;
+
+
 	};
 }
 

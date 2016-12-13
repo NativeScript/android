@@ -44,7 +44,7 @@ void JsDebugger::Enable()
 	v8::Isolate::Scope isolate_scope(isolate);
 	v8::HandleScope handleScope(isolate);
 
-	v8::Debug::SetMessageHandler(isolate, MyMessageHandler);
+	//v8::Debug::SetMessageHandler(MyMessageHandler);
 	enabled = true;
 }
 
@@ -58,12 +58,11 @@ void JsDebugger::Disable()
 	v8::Isolate::Scope isolate_scope(isolate);
 	v8::HandleScope handleScope(isolate);
 
-	v8::Debug::SetMessageHandler(isolate, nullptr);
+	//v8::Debug::SetMessageHandler(nullptr);
 }
 
 /* *
  * schedule a debugger break to happen when JavaScript code is run in the given isolate
- * (cli command: tns debug android --debug-brk) ?
  */
 void JsDebugger::DebugBreak()
 {
@@ -71,7 +70,7 @@ void JsDebugger::DebugBreak()
 	v8::Isolate::Scope isolate_scope(isolate);
 	v8::HandleScope handleScope(isolate);
 
-	v8::Debug::DebugBreak(isolate);
+	//v8::Debug::DebugBreak(isolate);
 }
 
 bool JsDebugger::IsDebuggerActive()
@@ -85,7 +84,7 @@ void JsDebugger::ProcessDebugMessages()
 	v8::Isolate::Scope isolate_scope(isolate);
 	v8::HandleScope handleScope(isolate);
 
-	v8::Debug::ProcessDebugMessages(isolate);
+	//v8::Debug::ProcessDebugMessages();
 }
 
 void JsDebugger::SendCommand(JNIEnv *_env, jobject obj, jbyteArray command, jint length)
@@ -242,7 +241,7 @@ void JsDebugger::SendCommandToV8(uint16_t *cmd, int length)
 {
 	auto isolate = s_isolate;
 
-	v8::Debug::SendCommand(isolate, cmd, length, nullptr);
+	//v8::Debug::SendCommand(isolate, cmd, length, nullptr);
 
 	s_processedCommands = true;
 }

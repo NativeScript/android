@@ -29,8 +29,6 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
-//TODO: Lubo: properly release this jni global ref on shutdown
-
 bool tns::LogEnabled = true;
 SimpleAllocator g_allocator;
 
@@ -382,7 +380,7 @@ void Runtime::PassUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, jthrowab
 
 		JsDebugger::ConsoleMessage(errMsg, "error");
 		//throwing unhandled error to debugger so catch all and catch unhandled exceptions setting on client can be triggered
-		DEBUG_WRITE_FORCE("throwing unhandled error to debugger");
+		DEBUG_WRITE("throwing unhandled error to debugger");
 		NativeScriptException(errMsg).ReThrowToV8();
 	}
 	else
@@ -416,8 +414,8 @@ void Runtime::ClearStartupData(JNIEnv *env, jobject obj) {
 }
 
 static void InitializeV8() {
-	auto platform = v8::platform::CreateDefaultPlatform();
-	V8::InitializePlatform(platform);
+    Runtime::platform = v8::platform::CreateDefaultPlatform();
+	V8::InitializePlatform(Runtime::platform);
 	V8::Initialize();
 }
 
@@ -432,30 +430,30 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring nativeLibDir
 
 	m_startupData = new StartupData();
 
-    // Retrieve the device android Sdk version
-    char sdkVersion[PROP_VALUE_MAX];
-    __system_property_get("ro.build.version.sdk", sdkVersion);
+	// Retrieve the device android Sdk version
+	char sdkVersion[PROP_VALUE_MAX];
+	__system_property_get("ro.build.version.sdk", sdkVersion);
 
-    auto pckName = ArgConverter::jstringToString(packageName);
+	auto pckName = ArgConverter::jstringToString(packageName);
 
-    void* snapshotPtr;
+	void* snapshotPtr;
 
-    // If device isn't running on Sdk 17
-    if (strcmp(sdkVersion, string("17").c_str()) != 0) {
-        snapshotPtr = dlopen("libsnapshot.so", RTLD_LAZY | RTLD_LOCAL);
-    } else {
-        // If device is running on android Sdk 17
-        // dlopen reads relative path to dynamic libraries or reads from folder different than the nativeLibsDirs on the android device
-        string libDir = ArgConverter::jstringToString(nativeLibDir);
-        string snapshotPath = libDir + "/libsnapshot.so";
-        snapshotPtr = dlopen(snapshotPath.c_str(), RTLD_LAZY | RTLD_LOCAL);
-    }
+	// If device isn't running on Sdk 17
+	if (strcmp(sdkVersion, string("17").c_str()) != 0) {
+		snapshotPtr = dlopen("libsnapshot.so", RTLD_LAZY | RTLD_LOCAL);
+	} else {
+		// If device is running on android Sdk 17
+		// dlopen reads relative path to dynamic libraries or reads from folder different than the nativeLibsDirs on the android device
+		string libDir = ArgConverter::jstringToString(nativeLibDir);
+		string snapshotPath = libDir + "/libsnapshot.so";
+		snapshotPtr = dlopen(snapshotPath.c_str(), RTLD_LAZY | RTLD_LOCAL);
+	}
 
-    if(snapshotPtr == nullptr) {
-        DEBUG_WRITE_FORCE("Failed to load snapshot: %s", dlerror());
-    }
+	if(snapshotPtr == nullptr) {
+		DEBUG_WRITE_FORCE("Failed to load snapshot: %s", dlerror());
+	}
 
-    if (snapshotPtr)
+	if (snapshotPtr)
 	{
 		m_startupData->data = static_cast<const char *>(dlsym(snapshotPtr, "TNSSnapshot_blob"));
 		m_startupData->raw_size = *static_cast<const unsigned int *>(dlsym(snapshotPtr, "TNSSnapshot_blob_len"));
@@ -524,8 +522,8 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring nativeLibDir
 				else
 				{
 					DEBUG_WRITE_FORCE("Saved snapshot of %s (%dB) in %s (%dB)",
-							Constants::V8_HEAP_SNAPSHOT_SCRIPT.c_str(), customScript.size(),
-							snapshotPath.c_str(), m_startupData->raw_size);
+									  Constants::V8_HEAP_SNAPSHOT_SCRIPT.c_str(), customScript.size(),
+									  snapshotPath.c_str(), m_startupData->raw_size);
 				}
 			}
 		}
@@ -590,10 +588,10 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring nativeLibDir
 
 		globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "Worker"), workerFuncTemplate);
 	}
-	/*
-	 * Emulate a `WorkerGlobalScope`
-	 * Attach postMessage, close to the global object
-	 */
+		/*
+         * Emulate a `WorkerGlobalScope`
+         * Attach postMessage, close to the global object
+         */
 	else {
 		auto postMessageFuncTemplate = FunctionTemplate::New(isolate, CallbackHandlers::WorkerGlobalPostMessageCallback);
 		globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "postMessage"), postMessageFuncTemplate);
@@ -660,16 +658,17 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring nativeLibDir
 
 jobject Runtime::ConvertJsValueToJavaObject(JEnv& env, const Local<Value>& value, int classReturnType)
 {
-	JsArgToArrayConverter argConverter(m_isolate, value, false/*is implementation object*/, classReturnType);
-	jobject jr = argConverter.GetConvertedArg();
-	jobject javaResult = nullptr;
-	if (jr != nullptr)
-	{
-		javaResult = env.NewLocalRef(jr);
-	}
+    JsArgToArrayConverter argConverter(m_isolate, value, false/*is implementation object*/, classReturnType);
+    jobject jr = argConverter.GetConvertedArg();
+    jobject javaResult = nullptr;
+    if (jr != nullptr)
+    {
+        javaResult = env.NewLocalRef(jr);
+    }
 
-	return javaResult;
+    return javaResult;
 }
+
 
 void Runtime::DestroyRuntime() {
 	s_id2RuntimeCache.erase(m_id);
@@ -681,3 +680,4 @@ jmethodID Runtime::GET_USED_MEMORY_METHOD_ID = nullptr;
 map<int, Runtime*> Runtime::s_id2RuntimeCache;
 map<Isolate*, Runtime*> Runtime::s_isolate2RuntimesCache;
 bool Runtime::s_mainThreadInitialized = false;
+v8::Platform* Runtime::platform = nullptr;
