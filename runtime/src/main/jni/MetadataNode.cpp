@@ -13,6 +13,7 @@
 #include <cctype>
 
 #include "v8.h"
+#include "Tracer.h"
 
 using namespace v8;
 using namespace std;
@@ -294,7 +295,6 @@ void MetadataNode::NullObjectAccessorGetterCallback(Local<String> property,const
 {
 	try
 	{
-		DEBUG_WRITE("NullObjectAccessorGetterCallback called");
 		auto isolate = info.GetIsolate();
 
 		auto thiz = info.This();
@@ -449,8 +449,6 @@ void MetadataNode::SuperAccessorGetterCallback(Local<String> property, const Pro
 			superValue->SetPrototype(thiz->GetPrototype().As<Object>()->GetPrototype().As<Object>()->GetPrototype());
             V8SetPrivateValue(isolate, thiz, key, superValue);
 			objectManager->CloneLink(thiz, superValue);
-
-			DEBUG_WRITE("superValue.GetPrototype=%d", superValue->GetPrototype().As<Object>()->GetIdentityHash());
 
 			auto node = GetInstanceMetadata(isolate, thiz);
 			SetInstanceMetadata(isolate, superValue, node);
@@ -1116,7 +1114,6 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
 				if (found)
 				{
 					entry = &c;
-					DEBUG_WRITE("MetaDataEntry Method %s's signature is: %s", entry->name.c_str(), entry->sig.c_str());
 					break;
 				}
 			}
@@ -1222,8 +1219,6 @@ void MetadataNode::ArrayIndexedPropertySetterCallback(uint32_t index, Local<Valu
 
 Local<Object> MetadataNode::GetImplementationObject(Isolate* isolate, const Local<Object>& object)
 {
-	DEBUG_WRITE("GetImplementationObject called  on object:%d", object->GetIdentityHash());
-
 	auto target = object;
 	Local<Value> currentPrototype = target;
 
@@ -1246,7 +1241,6 @@ Local<Object> MetadataNode::GetImplementationObject(Isolate* isolate, const Loca
 			return Local<Object>();
 		}
 
-		DEBUG_WRITE("GetImplementationObject returning the prototype of the object :%d", object->GetIdentityHash());
 		return object->Get(v8Prototype).As<Object>();
 	}
 
@@ -1255,7 +1249,6 @@ Local<Object> MetadataNode::GetImplementationObject(Isolate* isolate, const Loca
 	auto obj = hiddenValue.As<Object>();
 	if (!obj.IsEmpty())
 	{
-		DEBUG_WRITE("GetImplementationObject returning ActivityImplementationObject property on object: %d", object->GetIdentityHash());
 		return obj;
 	}
 
@@ -1328,10 +1321,6 @@ void MetadataNode::PackageGetterCallback(Local<Name> property, const PropertyCal
 		if (cachedItem.IsEmpty())
 		{
 			auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value());
-
-			uint8_t nodeType = s_metadataReader.GetNodeType(node->m_treeNode);
-
-			DEBUG_WRITE("MetadataNode::GetterCallback: prop '%s' for node '%s' called, nodeType=%d, hash=%d", propName.c_str(), node->m_treeNode->name.c_str(), nodeType, thiz.IsEmpty() ? -42 : thiz->GetIdentityHash());
 
 			auto child = GetChildMetadataForPackage(node, propName);
 			auto foundChild = child.treeNode != nullptr;
@@ -1408,7 +1397,6 @@ bool MetadataNode::ValidateExtendArguments(const FunctionCallbackInfo<Value>& in
 			throw NativeScriptException(exceptionMessage);
 		}
 
-		DEBUG_WRITE("ExtendsCallMethodHandler: getting extend name");
 		extendName = info[0]->ToString();
 		bool isValidExtendName = IsValidExtendName(extendName);
 		if (!isValidExtendName)
@@ -1512,7 +1500,7 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
 
 		auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value());
 
-		DEBUG_WRITE("ExtendsCallMethodHandler: called with %s", ArgConverter::ConvertToString(extendName).c_str());
+		Tracer::Trace(Tracer::Descriptors::CLASS, "[MetadataNode::ExtendMethodCallback] called with %s", ArgConverter::ConvertToString(extendName).c_str());
 
 		string extendNameAndLocation = extendLocation + ArgConverter::ConvertToString(extendName);
 		string fullClassName;
@@ -1533,7 +1521,7 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
 		bool isInterface = s_metadataReader.IsNodeTypeInterface(nodeType);
 		auto clazz = CallbackHandlers::ResolveClass(isolate, fullClassName, implementationObject, isInterface);
 		auto fullExtendedName = CallbackHandlers::ResolveClassName(isolate, clazz);
-		DEBUG_WRITE("ExtendsCallMethodHandler: extend full name %s", fullClassName.c_str());
+		Tracer::Trace(Tracer::Descriptors::CLASS, "[MetadataNode::ExtendMethodCallback] extend full name %s", fullClassName.c_str());
 
 		auto cachedData = GetCachedExtendedClassData(isolate, fullExtendedName);
 		if (cachedData.extendedCtorFunction != nullptr)
@@ -1675,7 +1663,6 @@ bool MetadataNode::GetExtendLocation(string& extendLocation)
 			}
 
 			extendLocationStream << "f" << fullPathToFile.c_str() << "_l" << lineNumber << "_c" << column << "__";
-			//DEBUG_WRITE("EXTEND_LOCATION %s", extendLocationStream.str().c_str());
 		}
 	}
 

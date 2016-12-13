@@ -411,7 +411,7 @@ Local<Script> ModuleInternal::LoadScript(Isolate *isolate, const string& path, c
 
 	auto scriptText = ModuleInternal::WrapModuleContent(path);
 
-	DEBUG_WRITE("Compiling script (module %s)", path.c_str());
+	Tracer::Trace(Tracer::Descriptors::REQUIRE_COMPILATION, "Compiling script (module %s)", path.c_str());
 	
 	auto cacheData = TryLoadScriptCache(path);
 

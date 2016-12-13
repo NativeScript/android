@@ -10,6 +10,7 @@
 #include "NumericCasts.h"
 #include "NativeScriptException.h"
 #include "Runtime.h"
+#include "Tracer.h"
 #include <sstream>
 
 using namespace v8;
@@ -41,7 +42,7 @@ MethodCache::CacheMethodInfo MethodCache::ResolveMethodSignature(const string& c
 	{
 		auto signature = ResolveJavaMethod(args, className, methodName);
 
-		DEBUG_WRITE("ResolveMethodSignature %s='%s'", encoded_method_signature.c_str(), signature.c_str());
+		Tracer::Trace(Tracer::Descriptors::CLASS, "[MethodCache::ResolveMethodSignature] %s='%s'", encoded_method_signature.c_str(), signature.c_str());
 
 		if (!signature.empty())
 		{

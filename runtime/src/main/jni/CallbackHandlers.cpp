@@ -77,8 +77,6 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
                                         bool isInterface) {
     bool success;
 
-    DEBUG_WRITE("RegisterInstance called for '%s'", fullClassName.c_str());
-
     auto runtime = Runtime::GetRuntime(isolate);
     auto objectManager = runtime->GetObjectManager();
 
@@ -89,7 +87,6 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
 
     int javaObjectID = objectManager->GenerateNewObjectID();
 
-    DEBUG_WRITE("RegisterInstance: Linking new instance");
     objectManager->Link(jsObject, javaObjectID, nullptr);
 
     // resolve constructor
@@ -125,12 +122,11 @@ bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &j
     success = !localInstance.IsNull();
 
     if (success) {
-        DEBUG_WRITE("RegisterInstance: Updating linked instance with its real class");
         jclass instanceClass = env.FindClass(fullClassName);
         objectManager->SetJavaClass(jsObject, instanceClass);
     }
     else {
-        DEBUG_WRITE("RegisterInstance failed with null new instance");
+        Tracer::Trace(Tracer::Descriptors::CLASS, "[CallbackHandlers::RegisterInstance] failed with null new instance.");
     }
 
     return success;
@@ -230,7 +226,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
                 clazz = env.FindClass(callerClassName);
                 if (clazz == nullptr) {
                     //todo: plamen5kov: throw exception here
-                    DEBUG_WRITE("Cannot resolve caller's class name: %s", callerClassName.c_str());
+                    Tracer::Trace(Tracer::Descriptors::CLASS, "[CallbackHandlers::CallJavaMethod] Cannot resolve caller's class name: %s", callerClassName.c_str());
                     return;
                 }
 
@@ -240,8 +236,8 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
 
                 if (entry->memberId == nullptr) {
                     //todo: plamen5kov: throw exception here
-                    DEBUG_WRITE("Cannot resolve a method %s on caller class: %s",
-                                methodName.c_str(), callerClassName.c_str());
+                    Tracer::Trace(Tracer::Descriptors::CLASS, "[CallbackHandlers::CallJavaMethod] Cannot resolve a method %s on caller class: %s",
+                                  methodName.c_str(), callerClassName.c_str());
                     return;
                 }
             }
@@ -252,8 +248,8 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
 
                 if (entry->memberId == nullptr) {
                     //todo: plamen5kov: throw exception here
-                    DEBUG_WRITE("Cannot resolve a method %s on class: %s", methodName.c_str(),
-                                className.c_str());
+                    Tracer::Trace(Tracer::Descriptors::CLASS, "[CallbackHandlers::CallJavaMethod] Cannot resolve a method %s on class: %s", methodName.c_str(),
+                                  className.c_str());
                     return;
                 }
             }
@@ -267,30 +263,25 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
         retType = entry->retType;
     }
     else {
-        DEBUG_WRITE("Resolving method: %s on className %s", methodName.c_str(), className.c_str());
-
         clazz = env.FindClass(className);
         if (clazz != nullptr) {
 
             Stackity::FrameEntry fe("CallbackHandlers::CallJavaMethod", "Runtime.resolveMethodOverload");
             mi = MethodCache::ResolveMethodSignature(className, methodName, args, isStatic);
             if (mi.mid == nullptr) {
-                DEBUG_WRITE("Cannot resolve class=%s, method=%s, isStatic=%d, isSuper=%d",
-                            className.c_str(), methodName.c_str(), isStatic, isSuper);
+                Tracer::Trace(Tracer::Descriptors::CLASS, "[CallbackHandlers::CallJavaMethod] Cannot resolve class=%s, method=%s, isStatic=%d, isSuper=%d.",
+                              className.c_str(), methodName.c_str(), isStatic, isSuper);
                 return;
             }
         }
         else {
             MetadataNode *callerNode = MetadataNode::GetNodeFromHandle(caller);
             const string callerClassName = callerNode->GetName();
-            DEBUG_WRITE("Resolving method on caller class: %s.%s on className %s",
-                        callerClassName.c_str(), methodName.c_str(), className.c_str());
             Stackity::FrameEntry fe("CallbackHandlers::CallJavaMethod", "Runtime.resolveMethodOverload");
             mi = MethodCache::ResolveMethodSignature(callerClassName, methodName, args, isStatic);
             if (mi.mid == nullptr) {
-                DEBUG_WRITE(
-                        "Cannot resolve class=%s, method=%s, isStatic=%d, isSuper=%d, callerClass=%s",
-                        className.c_str(), methodName.c_str(), isStatic, isSuper,
+                Tracer::Trace(Tracer::Descriptors::CLASS, "[CallbackHandlers::CallJavaMethod] Cannot resolve class=%s, method=%s, isStatic=%d, isSuper=%d, callerClass=%s",
+                className.c_str(), methodName.c_str(), isStatic, isSuper,
                         callerClassName.c_str());
                 return;
             }
@@ -301,16 +292,6 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
         sig = &mi.signature;
         returnType = &mi.returnType;
         retType = mi.retType;
-    }
-
-    if (!isStatic) {
-        DEBUG_WRITE("CallJavaMethod called %s.%s. Instance id: %d, isSuper=%d", className.c_str(),
-                    methodName.c_str(), caller.IsEmpty() ? -42 : caller->GetIdentityHash(),
-                    isSuper);
-    }
-    else {
-        DEBUG_WRITE("CallJavaMethod called %s.%s. static method", className.c_str(),
-                    methodName.c_str());
     }
 
     JsArgConverter argConverter(args, false, *sig, entry);
@@ -473,7 +454,6 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
         }
         case MethodReturnType::String: {
             jobject result = nullptr;
-            bool exceptionOccurred;
 
             if (isStatic) {
                 result = env.CallStaticObjectMethodA(clazz, mid, javaArgs);
@@ -498,7 +478,6 @@ void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string 
         }
         case MethodReturnType::Object: {
             jobject result = nullptr;
-            bool exceptionOccurred;
 
             if (isStatic) {
                 result = env.CallStaticObjectMethodA(clazz, mid, javaArgs);
@@ -655,7 +634,7 @@ void CallbackHandlers::LogMethodCallback(const v8::FunctionCallbackInfo<v8::Valu
     try {
         if ((args.Length() > 0) && args[0]->IsString()) {
             String::Utf8Value message(args[0]->ToString());
-            DEBUG_WRITE("%s", *message);
+            Tracer::Trace(Tracer::Descriptors::INFO, "%s", *message);
         }
     }
     catch (NativeScriptException &e) {
@@ -704,12 +683,14 @@ void CallbackHandlers::DumpReferenceTablesMethod() {
     }
 }
 
-void CallbackHandlers::DumpAllTraceToFile(
+void CallbackHandlers::EnableVerboseLoggingMethodCallback(
         const v8::FunctionCallbackInfo<v8::Value> &args) {
     try {
-        for(int i = 0; i < Tracer::Descriptors::Count; i++) {
-            Tracer::dumpToFileForDescriptor(i);
-        }
+        auto isolate = args.GetIsolate();
+        auto runtume = Runtime::GetRuntime(isolate);
+        tns::LogEnabled = true;
+        JEnv env;
+        env.CallVoidMethod(runtume->GetJavaRuntime(), ENABLE_VERBOSE_LOGGING_METHOD_ID);
     }
     catch (NativeScriptException &e) {
         e.ReThrowToV8();
@@ -726,14 +707,11 @@ void CallbackHandlers::DumpAllTraceToFile(
     }
 }
 
-void CallbackHandlers::EnableVerboseLoggingMethodCallback(
-        const v8::FunctionCallbackInfo<v8::Value> &args) {
+void CallbackHandlers::DumpAllTraceToFile(const v8::FunctionCallbackInfo<v8::Value> &args) {
     try {
-        auto isolate = args.GetIsolate();
-        auto runtume = Runtime::GetRuntime(isolate);
-        tns::LogEnabled = true;
-        JEnv env;
-        env.CallVoidMethod(runtume->GetJavaRuntime(), ENABLE_VERBOSE_LOGGING_METHOD_ID);
+        for(int i = 0; i < Tracer::Descriptors::Count; i++) {
+            Tracer::dumpToFileForDescriptor(i);
+        }
     }
     catch (NativeScriptException &e) {
         e.ReThrowToV8();
@@ -845,8 +823,6 @@ Local<Value> CallbackHandlers::CallJSMethod(Isolate *isolate, JNIEnv *_env,
             arguments[i] = jsArgs->Get(i);
         }
 
-        DEBUG_WRITE("implementationObject->GetIdentityHash()=%d", jsObject->GetIdentityHash());
-
         TryCatch tc;
         Local<Value> jsResult;
         {
@@ -855,7 +831,6 @@ Local<Value> CallbackHandlers::CallJSMethod(Isolate *isolate, JNIEnv *_env,
         }
 
         //TODO: if javaResult is a pure js object create a java object that represents this object in java land
-
         if (tc.HasCaught())
         {
             stringstream ss;
@@ -946,7 +921,7 @@ void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Valu
 
         id2WorkerMap.insert(make_pair(workerId, persistentWorker));
 
-        DEBUG_WRITE("Called Worker constructor id=%d", workerId);
+        Tracer::Trace(Tracer::Descriptors::WORKERS, "[CallbackHandlers::NewThreadCallback] called Worker constructor id=%d", workerId);
 
         JEnv env;
         JniLocalRef filePath(ArgConverter::ConvertToJavaString(args[0]));
@@ -1392,7 +1367,7 @@ void CallbackHandlers::CallWorkerObjectOnErrorHandle(Isolate *isolate, jint work
         auto strThreadname = ArgConverter::jstringToString(threadName);
         auto strStackTrace = ArgConverter::jstringToString(stackTrace);
 
-        DEBUG_WRITE("Unhandled exception in '%s' thread. file: %s, line %d\nStackTrace: %s",
+        DEBUG_WRITE_FORCE("Unhandled exception in '%s' thread. file: %s, line %d\nStackTrace: %s",
                     strThreadname.c_str(), strFilename.c_str(), lineno, strMessage.c_str(), strStackTrace.c_str());
 
         Tracer::Trace(Tracer::Descriptors::WORKERS, "[CallbackHandlers::CallWorkerObjectOnErrorHandle] unhandled exception in file: %s, line: %d, message: %s\n", strFilename.c_str(), lineno, strMessage.c_str());
