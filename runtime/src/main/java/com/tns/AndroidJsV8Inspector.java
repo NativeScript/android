@@ -46,7 +46,7 @@ public class AndroidJsV8Inspector
             this.server = new JsV8InspectorServer(context.getPackageName() + "-inspectorServer");
             this.server.start(-1);
 
-            Log.d("V8Inspector", "init ThreadId:" + Thread.currentThread().getId());
+            //Log.d("V8Inspector", "init ThreadId:" + Thread.currentThread().getId());
 
             init();
         }
@@ -72,7 +72,7 @@ public class AndroidJsV8Inspector
         @Override
         protected Response serveHttp(IHTTPSession session)
         {
-            Log.d("{N}.v8-inspector", "http request for " + session.getUri());
+            //Log.d("{N}.v8-inspector", "http request for " + session.getUri());
             return super.serveHttp(session);
         }
 
@@ -94,7 +94,7 @@ public class AndroidJsV8Inspector
         @Override
         protected void onOpen()
         {
-            Log.d("V8Inspector", "onOpen: ThreadID:  " + Thread.currentThread().getId());
+            //Log.d("V8Inspector", "onOpen: ThreadID:  " + Thread.currentThread().getId());
 
             final Object waitObject = new Object();
 
@@ -105,7 +105,7 @@ public class AndroidJsV8Inspector
                 {
                     try
                     {
-                        Log.d("V8Inspector", "onOpen: runnable ThreadID :  " + Thread.currentThread().getId());
+                        //Log.d("V8Inspector", "onOpen: runnable ThreadID :  " + Thread.currentThread().getId());
                         connect(JsV8InspectorWebSocket.this);
                     }
                     finally
@@ -134,7 +134,7 @@ public class AndroidJsV8Inspector
         @Override
         protected void onClose(NanoWSD.WebSocketFrame.CloseCode code, String reason, boolean initiatedByRemote)
         {
-            Log.d("V8Inspector", "onClose");
+            //Log.d("V8Inspector", "onClose");
             mainHandler.post(new Runnable()
             {
                 @Override
@@ -150,8 +150,8 @@ public class AndroidJsV8Inspector
         @Override
         protected void onMessage(final NanoWSD.WebSocketFrame message)
         {
-            Log.d("V8Inspector", "onMessage");
-            Log.d("V8Inspector", "onMessage TextPayload" + message.getTextPayload() + " ThreadId:" + Thread.currentThread().getId());
+            //Log.d("V8Inspector", "onMessage");
+            //Log.d("V8Inspector", "onMessage TextPayload" + message.getTextPayload() + " ThreadId:" + Thread.currentThread().getId());
             inspectorMessages.offer(message.getTextPayload());
 
             mainHandler.post(new Runnable()
@@ -167,22 +167,12 @@ public class AndroidJsV8Inspector
                     }
                 }
             });
-
-//            mainHandler.post(new Runnable()
-//            {
-//                @Override
-//                public void run()
-//                {
-//
-//                    dispatchMessage(message.getTextPayload());
-//                }
-//            });
         }
 
         @Override
         public void send(String payload) throws IOException
         {
-            Log.d("V8Inspector", "send " + payload);
+            //Log.d("V8Inspector", "send " + payload);
             super.send(payload);
         }
 
@@ -212,7 +202,7 @@ public class AndroidJsV8Inspector
         @Override
         protected void onPong(NanoWSD.WebSocketFrame pong)
         {
-            Log.d("V8Inspector", "onPong");
+            //Log.d("V8Inspector", "onPong");
         }
 
         @Override

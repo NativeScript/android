@@ -39,41 +39,15 @@ JsV8InspectorClient::JsV8InspectorClient(v8::Isolate *isolate)
 
 void JsV8InspectorClient::connect(jobject connection)
 {
-    //Isolate::Scope isolate_scope(isolate_);
-    //v8::HandleScope handleScope(isolate_);
-
-    //v8::base_copied::Semaphore ready_semaphore(0);
-
     JEnv env;
     this->connection = env.NewGlobalRef(connection);
 
-    //this->backend_runner->Append(new ConnectTask(this, &ready_semaphore));
-
-    //ready_semaphore.Wait();
-
     this->doConnect(isolate_, JsV8InspectorClient::PersistentToLocal(isolate_, context_));
-
-
-    //inspector_ = V8Inspector::create(isolate_, this);
-
-    //session_ = inspector_->connect(1, this, v8_inspector::StringView());
-
-    //inspector_->contextCreated(v8_inspector::V8ContextInfo(isolate_->GetCurrentContext(), 1, v8_inspector::StringView()));
-
-
 }
 
 void JsV8InspectorClient::doConnect(v8::Isolate *isolate, const v8::Local<v8::Context> &context)
 {
-//    Isolate::Scope isolate_scope(isolate_);
-//    v8::HandleScope handleScope(isolate_);
-
-
-    //inspector_ = V8Inspector::create(isolate, this);
-
     session_ = inspector_->connect(0, this, v8_inspector::StringView());
-
-    //inspector_->contextCreated(v8_inspector::V8ContextInfo(/*isolate->GetCurrentContext()*/ context, 1, v8_inspector::StringView()));
 }
 
 void JsV8InspectorClient::disconnect()
@@ -96,42 +70,9 @@ void JsV8InspectorClient::disconnect()
 
 void JsV8InspectorClient::dispatchMessage(const std::string &message)
 {
-    //Isolate::Scope isolate_scope(isolate_);
-    //v8::HandleScope handleScope(isolate_);
-
-//    assert(session_ != nullptr);
-//
-//    const String16 msg(message.c_str());
-//    v8_inspector::StringView message_view(reinterpret_cast<const uint16_t *>(msg.characters16()), msg.length());
-//    session_->dispatchProtocolMessage(message_view);
-
-    //this->backend_runner->Append(new SendMessageToBackendTask(this, message));
-
     this->doDispatchMessage(isolate_, message);
 
 }
-
-//void JsV8InspectorClient::runMessageLoopOnPause(int context_group_id) override
-//{
-//    if (running_nested_loop_)
-//    {
-//        return;
-//    }
-//
-//    terminated_ = false;
-//    running_nested_loop_ = true;
-//    while (!terminated_)
-//    {
-//        agent_->WaitForFrontendMessage();
-//        while (v8::platform::PumpMessageLoop(platform_, env_->isolate()))
-//        {
-//
-//        }
-//    }
-//    terminated_ = false;
-//    running_nested_loop_ = false;
-//}
-
 
 void JsV8InspectorClient::runMessageLoopOnPause(int context_group_id)
 {
@@ -148,19 +89,6 @@ void JsV8InspectorClient::runMessageLoopOnPause(int context_group_id)
     running_nested_loop_ = true;
     while (!terminated_)
     {
-        //agent_->WaitForFrontendMessage();
-
-//        string errMsg;
-//        JniLocalRef msg(env.CallStaticObjectMethod(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_GET_STACK_TRACE_AS_STRING_METHOD_ID, exception));
-//
-//        const char* msgStr = env.GetStringUTFChars(msg, nullptr);
-//
-//        errMsg.append(msgStr);
-//
-//        env.ReleaseStringUTFChars(msg, msgStr);
-//
-//        return errMsg;
-
         JniLocalRef msg(env.CallStaticObjectMethod(inspectorClass, getInspectorMessageMethod, this->connection));
         if (!msg.IsNull())
         {
@@ -185,15 +113,10 @@ v8::Local<v8::Context> JsV8InspectorClient::ensureDefaultContextInGroup(int cont
 {
     v8::Local<v8::Context> context = PersistentToLocal(isolate_, context_);
     return context;
-    //return env_->context();
-    //return v8::Local<v8::Context>();
 }
 
 void JsV8InspectorClient::doDispatchMessage(v8::Isolate *isolate, const std::string &message)
 {
-    //Isolate::Scope isolate_scope(isolate_);
-    //v8::HandleScope handleScope(isolate_);
-
     assert(session_ != nullptr);
 
     const String16 msg(message.c_str());
@@ -203,7 +126,6 @@ void JsV8InspectorClient::doDispatchMessage(v8::Isolate *isolate, const std::str
 
 void JsV8InspectorClient::sendProtocolResponse(int callId, const v8_inspector::StringView &message)
 {
-    //frontend_channel_->SendMessageToFrontend(message);
     sendProtocolNotification(message);
 }
 
@@ -219,8 +141,6 @@ static v8_inspector::String16 ToString16(const v8_inspector::StringView &string)
 
 void JsV8InspectorClient::sendProtocolNotification(const v8_inspector::StringView &message)
 {
-    //frontend_channel_->SendMessageToFrontend(message);
-
     if (inspectorClass == nullptr || this->connection == nullptr)
     {
         return;
@@ -294,11 +214,10 @@ JsV8InspectorClient *JsV8InspectorClient::GetInstance()
     return instance;
 }
 
-void MessageHandler(v8::Local<v8::Message> message,
-                    v8::Local<v8::Value> exception)
+void MessageHandler(v8::Local<v8::Message> message, v8::Local<v8::Value> exception)
 {
-    v8::Isolate *isolate = v8::Isolate::GetCurrent();
-    v8::Local<v8::Context> context = isolate->GetEnteredContext();
+//    v8::Isolate *isolate = v8::Isolate::GetCurrent();
+//    v8::Local<v8::Context> context = isolate->GetEnteredContext();
 //    if (context.IsEmpty()) return;
 //    v8_inspector::V8Inspector *inspector = InspectorClientImpl::InspectorFromContext(context);
 //
