@@ -27,7 +27,6 @@ JsV8InspectorClient::JsV8InspectorClient(v8::Isolate *isolate)
 {
     JEnv env;
 
-
     inspectorClass = env.FindClass("com/tns/AndroidJsV8Inspector");
     assert(inspectorClass != nullptr);
 
