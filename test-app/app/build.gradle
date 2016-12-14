@@ -99,10 +99,10 @@ task deletePreviousResultXml (type: Exec) {
 		println "Removing previous android_unit_test_results.xml"
 
 		if(isWinOs) {
-		    commandLine "cmd", "/c", "%ANDROID_HOME%/platform-tools/adb", runOnDeviceOrEmulator , "shell", "rm", "-rf", "/sdcard/android_unit_test_results.xml"
+		    commandLine "cmd", "/c", "$System.env.ANDROID_HOME/platform-tools/adb", runOnDeviceOrEmulator , "shell", "rm", "-rf", "/sdcard/android_unit_test_results.xml"
 		}
 		else {
-		    commandLine "$ANDROID_HOME/platform-tools/adb", runOnDeviceOrEmulator, "shell", "rm", "-rf", "/sdcard/android_unit_test_results.xml"
+		    commandLine "$System.env.ANDROID_HOME/platform-tools/adb", runOnDeviceOrEmulator, "shell", "rm", "-rf", "/sdcard/android_unit_test_results.xml"
 		}
 	}
 }
