@@ -26,11 +26,11 @@ function startEmulator() {
 
     wrapedExec(adb + " start-server");
     var emulator = "Emulator-Api19-Default"
-    if(process.argv.length < 4) {
+    if(!process.argv[3]) {
         console.log("You didn't specify emulator so we'll start the default one: " + emulator)
     }
     else {
-        emulator = process.argv[3];
+        emulator = process.argv[3].trim();
     }
     console.log("Starting emulator " + emulator)
     var out = exec("$ANDROID_HOME/tools/emulator -avd " + emulator + " -wipe-data -gpu on -no-window &")
