@@ -358,10 +358,14 @@ task testStaticBindingGenerator (type: Exec){
 
 task runTests (type: Exec){
         workingDir "$projectDir/test-app"
+	def emulator = ""
+	if(project.hasProperty("emulatorName")){
+		emulator = emulatorName
+	}
         if (isWinOs) {
-            commandLine "cmd", "/c", "gradlew.bat", "assembleDebug", "runtest", "--rerun-tasks", "-PembedBindingGenerator=true"
+            commandLine "cmd", "/c", "gradlew.bat", "assembleDebug", "runtest", "--rerun-tasks", "-PembedBindingGenerator=true", "-PemulatorName=$emulator"
         } else {
-            commandLine "./gradlew", "assembleDebug", "runtest", "--rerun-tasks", "-PembedBindingGenerator=true"
+            commandLine "./gradlew", "assembleDebug", "runtest", "--rerun-tasks", "-PembedBindingGenerator=true", "-PemulatorName=$emulator"
         }
 }
 

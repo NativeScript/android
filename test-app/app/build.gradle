@@ -2,6 +2,7 @@
 * run from dir: test-app/
 * 	run on emulator: ./gradlew runtests //default
 * 	run on device: ./gradlew runtests -PrunOnDevice
+*	emulatorName: -PemulatorName
 *
 */
 
@@ -55,9 +56,24 @@ dependencies {
 	testCompile 'junit:junit:4.12'
 }
 
+task startEmulator(type: Exec) {
+	doFirst {
+		def emulator = "";
+		if(project.hasProperty("emulatorName")) {
+			emulator = emulatorName
+		}
+		if(isWinOs) {
+			commandLine "cmd", "/c", "node", "$rootDir\\tools\\start-kill-emulator.js", "start", emulator
+		}
+		else {
+			commandLine "node", "$rootDir/tools/start-kill-emulator.js", "start", emulator
+		}
+	}
+}
+
 task deleteDist (type: Delete) {
 	doFirst {
-        delete "$rootDir/dist"
+		delete "$rootDir/dist"
 	}
 }
 
@@ -80,15 +96,15 @@ task installApk (type: Exec) {
 
 task deletePreviousResultXml (type: Exec) {
 	doFirst {
-        println "Removing previous android_unit_test_results.xml"
+		println "Removing previous android_unit_test_results.xml"
 
-        if(isWinOs) {
-            commandLine "cmd", "/c", "adb", runOnDeviceOrEmulator , "shell", "rm", "-rf", "/sdcard/android_unit_test_results.xml"
-        }
-        else {
-            commandLine "adb", runOnDeviceOrEmulator, "shell", "rm", "-rf", "/sdcard/android_unit_test_results.xml"
-        }
-    }
+		if(isWinOs) {
+		    commandLine "cmd", "/c", "adb", runOnDeviceOrEmulator , "shell", "rm", "-rf", "/sdcard/android_unit_test_results.xml"
+		}
+		else {
+		    commandLine "adb", runOnDeviceOrEmulator, "shell", "rm", "-rf", "/sdcard/android_unit_test_results.xml"
+		}
+	}
 }
 
 task startInstalledApk (type: Exec) {
@@ -96,10 +112,10 @@ task startInstalledApk (type: Exec) {
 		println "Starting test application"
 		
 		if(isWinOs) {
-			commandLine "cmd", "/c", "adb", runOnDeviceOrEmulator, "shell", "am", "start", "-n", "com.tns.android_runtime_testapp/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
+			commandLine "node", "$rootDir\\tools\\start-installed-apk.js"
 		}
 		else {
-			commandLine "adb", runOnDeviceOrEmulator, "shell", "am", "start", "-n", "com.tns.android_runtime_testapp/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
+			commandLine "node", "$rootDir/tools/start-installed-apk.js"
 		}
 	}
 }
@@ -133,6 +149,18 @@ task deleteRootLevelResult (type: Delete) {
 	delete "$rootDir/app/android_unit_test_results.xml"
 }
 
+task killEmulators(type: Exec) {
+	doFirst {
+		if(isWinOs) {
+			commandLine "cmd", "/c", "node", "$rootDir\\tools\\start-kill-emulator.js", "kill"
+		}
+		else {
+			commandLine "node", "$rootDir/tools/start-kill-emulator.js", "kill"
+		}
+	}
+}
+
+deleteDist.dependsOn(startEmulator)
 deletePreviousResultXml.dependsOn(deleteDist)
 installApk.dependsOn(deletePreviousResultXml)
 startInstalledApk.dependsOn(installApk)
@@ -140,9 +168,10 @@ createDistFolder.dependsOn(startInstalledApk)
 waitForUnitTestResultFile.dependsOn(createDistFolder)
 copyResultToDist.dependsOn(waitForUnitTestResultFile)
 deleteRootLevelResult.dependsOn(copyResultToDist)
+killEmulators.dependsOn(deleteRootLevelResult)
 
 task runtests {
-	dependsOn deleteRootLevelResult
+	dependsOn killEmulators
 }
 
 tasks.whenTaskAdded { task ->
