@@ -1,7 +1,7 @@
-var runner = require("./interval-runner-with-timeout.js")
-
-var	execSync = require('child_process').execSync,
-    exec = require('child_process').exec;
+var runner = require("./interval-runner-with-timeout.js"),
+    execSync = require('child_process').execSync,
+    exec = require('child_process').exec,
+    adb = process.env.ANDROID_HOME + "/platform-tools/adb ";
 
 if(process.argv.length <= 2) {
     console.log("You need to pass 'kill' or 'start'");
@@ -24,7 +24,7 @@ function startEmulator() {
     console.log("Stopping previous emulators if any")
     stopEmulators();
 
-    wrapedExec("$ANDROID_HOME/platform-tools/adb start-server");
+    wrapedExec(adb + " start-server");
     var emulator = "Emulator-Api19-Default"
     if(process.argv.length < 4) {
         console.log("You didn't specify emulator so we'll start the default one: " + emulator)
@@ -38,6 +38,12 @@ function startEmulator() {
         console.log(data)
         runner.runFunctionWithIntervalAndTimeout(checkAvailable, 1000, 10 * 1000);
     })
+    if(out.stderr) {
+        out.stderr.on("data", function (data) {
+            console.log("Error while launching emulator: " + data);
+            process.exit(-1)
+        })
+    }
 }
 
 function stopEmulatorsAndExit() {
@@ -46,14 +52,14 @@ function stopEmulatorsAndExit() {
 }
 
 function stopEmulators() {
-    var out = wrapedExec("$ANDROID_HOME/platform-tools/adb devices | grep emulator | cut -f1 | while read line; do $ANDROID_HOME/platform-tools/adb -s $line emu kill; done");
+    var out = wrapedExec(adb + " devices | grep emulator | cut -f1 | while read line; do " + adb + " -s $line emu kill; done");
     if(!out.stderr) {
         console.log("Killed emulators!")
     }
 }
 
 function checkAvailable() {
-    var out = exec("$ANDROID_HOME/platform-tools/adb devices")
+    var out = exec(adb + " devices")
     out.stdout.on("data", function (data) {
         if(data.indexOf("offline") === -1) {
             console.log("Emulator is online")

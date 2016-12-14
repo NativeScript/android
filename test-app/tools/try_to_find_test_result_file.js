@@ -3,6 +3,7 @@ var execFindFile = require('child_process').exec,
 	exec = require('child_process').exec,
 	fs = require('fs'),
 	pullfile,
+	adb = process.env.ANDROID_HOME + "/platform-tools/adb ",
 	processTimeout = 20 * 60 * 1000, // 20 minutes timeout (empirical constant :)) 
 	searchInterval = 10 * 1000;
 
@@ -15,7 +16,7 @@ runner.runFunctionWithIntervalAndTimeout(checkIfAppIsRunning, searchInterval, pr
 runner.runFunctionWithIntervalAndTimeout(tryToGetFile, searchInterval, processTimeout);
 
 function checkIfAppIsRunning() {
-	exec("$ANDROID_HOME/platform-tools/adb " + runOnDeviceOrEmulator + " shell \"ps | grep com.tns.android_runtime_testapp\"", checkIfProcessIsRunning);
+	exec(adb + runOnDeviceOrEmulator + " shell \"ps | grep com.tns.android_runtime_testapp\"", checkIfProcessIsRunning);
 }
 
 function checkIfProcessIsRunning(err, stdout, stderr) {
@@ -29,7 +30,7 @@ function checkIfProcessIsRunning(err, stdout, stderr) {
 }
 
 function tryToGetFile() {
-	pullfile = execFindFile("$ANDROID_HOME/platform-tools/adb " + runOnDeviceOrEmulator + " pull /sdcard/android_unit_test_results.xml", checkIfFileExists);
+	pullfile = execFindFile(adb + runOnDeviceOrEmulator + " pull /sdcard/android_unit_test_results.xml", checkIfFileExists);
 	pullfile.stdout.pipe(process.stdout, { end: false });
 	pullfile.stderr.pipe(process.stderr, { end: false });
 }
