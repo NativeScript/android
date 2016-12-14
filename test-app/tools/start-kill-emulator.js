@@ -46,14 +46,14 @@ function stopEmulatorsAndExit() {
 }
 
 function stopEmulators() {
-    var out = wrapedExec("adb devices | grep emulator | cut -f1 | while read line; do adb -s $line emu kill; done");
+    var out = wrapedExec("$ANDROID_HOME/platform-tools/adb devices | grep emulator | cut -f1 | while read line; do $ANDROID_HOME/platform-tools/adb -s $line emu kill; done");
     if(!out.stderr) {
         console.log("Killed emulators!")
     }
 }
 
 function checkAvailable() {
-    var out = exec("adb devices")
+    var out = exec("$ANDROID_HOME/platform-tools/adb devices")
     out.stdout.on("data", function (data) {
         if(data.indexOf("offline") === -1) {
             console.log("Emulator is online")

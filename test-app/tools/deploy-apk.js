@@ -7,7 +7,7 @@ var apk = process.argv[2],
     runOnDeviceOrEmulator = process.argv[3],
     exec = require('child_process').exec,
     deployTimeout = 3 * 60 * 1000, // 3 minutes to deploy and launch.
-    cmd = 'adb '+ runOnDeviceOrEmulator  +' install -r ' + apk,
+    cmd = '$ANDROID_HOME/platform-tools/adb '+ runOnDeviceOrEmulator  +' install -r ' + apk,
     runner = require("./interval-runner-with-timeout.js");
 
 if (process.argv.length < 2) {
@@ -18,7 +18,7 @@ if (process.argv.length < 2) {
 runner.runFunctionWithIntervalAndTimeout(checkIfEmulatorFullyStarted, 10 * 1000, 60 * 10 * 1000)
 
 function checkIfEmulatorFullyStarted() {
-    var res = exec("adb shell getprop init.svc.bootanim");
+    var res = exec("$ANDROID_HOME/platform-tools/adb shell getprop init.svc.bootanim");
     res.stdout.on("data", function (data) {
         if(data.indexOf("stopped") !== -1) {
             console.log("emulator annimation has stopped");
