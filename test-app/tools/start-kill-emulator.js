@@ -1,7 +1,10 @@
 var runner = require("./interval-runner-with-timeout.js"),
     execSync = require('child_process').execSync,
     exec = require('child_process').exec,
-    adb = process.env.ANDROID_HOME + "/platform-tools/adb ";
+    em = process.env.ANDROID_HOME + "/tools/emulator",
+    adb = process.env.ANDROID_HOME + "/platform-tools/adb ",
+    defaultPort = require("./config.json")["emulator-port"],
+    emulatorName = "emulator-" + defaultPort + " ";
 
 if(process.argv.length <= 2) {
     console.log("You need to pass 'kill' or 'start'");
@@ -33,7 +36,7 @@ function startEmulator() {
         emulator = process.argv[3].trim();
     }
     console.log("Starting emulator " + emulator)
-    var out = exec("$ANDROID_HOME/tools/emulator -avd " + emulator + " -wipe-data -gpu on -no-window &")
+    var out = exec(em + " -avd " + emulator + " -wipe-data -gpu on -no-window -port " + defaultPort + " &")
     out.stdout.on("data", function (data) {
         console.log(data)
         runner.runFunctionWithIntervalAndTimeout(checkAvailable, 1000, 10 * 1000);
@@ -52,14 +55,15 @@ function stopEmulatorsAndExit() {
 }
 
 function stopEmulators() {
-    var out = wrapedExec(adb + " devices | grep emulator | cut -f1 | while read line; do " + adb + " -s $line emu kill; done");
+    // var out = wrapedExec(adb + " devices | grep emulator | cut -f1 | while read line; do " + adb + " -s $line emu kill; done"); //kill all emulators
+    var out = wrapedExec(adb + " -s " + emulatorName + " emu kill"); //kill default emulator
     if(!out.stderr) {
-        console.log("Killed emulators!")
+        console.log("Killed emulator: " + emulatorName)
     }
 }
 
 function checkAvailable() {
-    var out = exec(adb + " devices")
+    var out = exec(adb + " devices | grep " + emulatorName)
     out.stdout.on("data", function (data) {
         if(data.indexOf("offline") === -1) {
             console.log("Emulator is online")
