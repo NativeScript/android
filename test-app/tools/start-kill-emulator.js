@@ -57,7 +57,7 @@ function stopEmulatorsAndExit() {
 function stopEmulators() {
     // var out = wrapedExec(adb + " devices | grep emulator | cut -f1 | while read line; do " + adb + " -s $line emu kill; done"); //kill all emulators
     var out = wrapedExec(adb + " -s " + emulatorName + " emu kill"); //kill default emulator
-    if(!out.stderr) {
+    if(out && !out.stderr) {
         console.log("Killed emulator: " + emulatorName)
     }
 }
