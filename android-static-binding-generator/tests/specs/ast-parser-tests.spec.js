@@ -165,40 +165,6 @@ describe("parser/js_parser tests", function () {
             });
         });
 
-
-        it("Generated metadata for bindings should return proper JavaClass name despite emitted TS ES5 code",
-            function (done) {
-                let input = path.normalize(prefix + "/decorated_extends_ts/app"),
-                    jsFilesParameter = path.normalize(prefix + "/decorated_extends_ts/jsFiles.txt"),
-                    output = prefix + "/decorated_extends_ts/bindings.txt";
-
-                const newClassName = "org.nativescript.a.MyCustomActivity";
-
-                clearOutput(output, jsFilesParameter);
-
-                execGradle(input, output, jsFilesParameter, function (error, stdout, stderr) {
-                    if (error) {
-                        console.error(`exec error: ${error}`);
-                        return;
-                    }
-
-                    logExecResult(stdout, stderr)
-
-                    let bindingsContent = fs.readFileSync(output, "utf-8").toString().trim().split('\n');
-
-                    for (let line of bindingsContent) {
-                        var lineParts = line.split("*");
-                        var tsExtendsPart = lineParts[1];
-                        expect(tsExtendsPart).toBeFalsy();
-
-                        var newClassNamePart = lineParts[3];
-                        expect(newClassNamePart).toBe(newClassName);
-                    }
-
-                    done();
-                });
-            });
-
         it("Generate valid metadata for bindings where multiple interfaces are implemented using array", function (done) {
             let input = path.normalize(prefix + "/extends_with_interfaces/app"),
                 jsFilesParameter = path.normalize(prefix + "/extends_with_interfaces/jsFiles.txt"),
