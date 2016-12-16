@@ -171,22 +171,27 @@ var es5_visitors = (function () {
         }
     }
 
-    function traverseForDecorate(path, config, depth) {
-        var iifeRoot = _getParrent(path, depth)
-        var body = iifeRoot.node.body;
-        for (var index in body) {
-            var ci = body[index];
-            if (isDecorateStatement(ci)) {
-                // returns the node of the decorate (node.expression.right.callee)
-                // __decorate([..])
-                return ci.expression.right.arguments[0].elements;
-            }
-        }
+	function traverseForDecorate(path, config, depth) {
+		var iifeRoot = _getParrent(path, depth)
+		var body = iifeRoot.node.body;
+		for (var index in body) {
+			var ci = body[index];
+			if (t.isExpressionStatement(ci) &&
+				t.isAssignmentExpression(ci.expression) &&
+				ci.expression.right.callee &&
+				ci.expression.right.callee.name === "__decorate" &&
+				ci.expression.right.arguments &&
+				t.isArrayExpression(ci.expression.right.arguments[0])) {
+				// returns the node of the decorate (node.expression.right.callee)
+				// __decorate([..])
+				return ci.expression.right.arguments[0].elements;
+			}
+		}
 
-        return null;
-    }
+		return null;
+	}
 
-    function traverseForDecorateSpecial(path, config, depth, classIndex) {
+    function traverseForDecorateSpecial(path, config, depth) {
         var iifeRoot = _getParrent(path, depth);
 
         var sibling = iifeRoot.getSibling(iifeRoot.key + 1);
