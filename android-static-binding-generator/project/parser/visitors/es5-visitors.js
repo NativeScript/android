@@ -176,12 +176,7 @@ var es5_visitors = (function () {
 		var body = iifeRoot.node.body;
 		for (var index in body) {
 			var ci = body[index];
-			if (t.isExpressionStatement(ci) &&
-				t.isAssignmentExpression(ci.expression) &&
-				ci.expression.right.callee &&
-				ci.expression.right.callee.name === "__decorate" &&
-				ci.expression.right.arguments &&
-				t.isArrayExpression(ci.expression.right.arguments[0])) {
+			if (isDecorateStatement(ci)) {
 				// returns the node of the decorate (node.expression.right.callee)
 				// __decorate([..])
 				return ci.expression.right.arguments[0].elements;
@@ -194,12 +189,12 @@ var es5_visitors = (function () {
     function traverseForDecorateSpecial(path, config, depth) {
         var iifeRoot = _getParrent(path, depth);
 
-        var sibling = iifeRoot.getSibling(iifeRoot.key + 1);
-        if (ci) {
-            if (isDecorateStatement(ci)) {
+        var sibling = iifeRoot.getSibling(iifeRoot.key + 1).node;
+        if (sibling) {
+            if (isDecorateStatement(sibling)) {
                 // returns the node of the decorate (node.expression.right.callee)
                 // __decorate([..])
-                return ci.expression.right.arguments[0].elements;
+                return sibling.expression.right.arguments[0].elements;
             }
         }
 

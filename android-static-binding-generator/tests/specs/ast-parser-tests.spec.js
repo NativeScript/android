@@ -186,6 +186,8 @@ describe("parser/js_parser tests", function () {
 
                     let bindingsContent = fs.readFileSync(output, "utf-8").toString().trim().split('\n');
 
+                    expect(bindingsContent.length).toBe(2);
+
                     for (let line of bindingsContent) {
                         var lineParts = line.split("*");
                         var tsExtendsPart = lineParts[1];
