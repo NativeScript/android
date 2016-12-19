@@ -56,7 +56,11 @@ function stopEmulatorsAndExit() {
 
 function stopEmulators() {
     // var out = wrapedExec(adb + " devices | grep emulator | cut -f1 | while read line; do " + adb + " -s $line emu kill; done"); //kill all emulators
-    var out = wrapedExec(adb + " -s " + emulatorName + " emu kill"); //kill default emulator
+    var out = wrapedExec(adb + " -s " + emulatorName + " emu kill", function (err) {
+        if(err.toString().indexOf("Connection refused") !== -1) {
+            console.log("No emulators to kill");
+        }
+    }); //kill default emulator
     if(out && !out.stderr) {
         console.log("Killed emulator: " + emulatorName)
     }
@@ -73,10 +77,11 @@ function checkAvailable() {
     })
 }
 
-function wrapedExec(command) {
+function wrapedExec(command, errMessageCallback) {
     try {
         return execSync(command);
     } catch(e) {
+        errMessageCallback(e);
         console.log("err: " + e);
     }
 }
