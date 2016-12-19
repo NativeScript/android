@@ -58,7 +58,7 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
 		boolean res = false;
 
 		if (AndroidJsDebugger.isDebuggableApp(context)) {
-			Class ErrReport = null;
+			Class<?> ErrReport = null;
 			java.lang.reflect.Method startActivity = null;
 
 			try {
