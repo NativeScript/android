@@ -789,7 +789,11 @@ task deleteFlavors (type: Delete){
 	}
 }
 
+task deleteConfigurations (type: Delete) {
+	delete "$projectDir/configurations"
+}
+
 deleteMetadata.dependsOn(":asbg:clean")
 deleteFlavors.dependsOn(deleteMetadata)
-clean.dependsOn(deleteFlavors)
-
+deleteConfigurations.dependsOn(deleteFlavors)
+clean.dependsOn(deleteConfigurations)
