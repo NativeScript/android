@@ -179,6 +179,7 @@ class Module
 		File foundModule = null;
 
 		foundModule = loadAsFile(fileOrDirectory);
+
 		if(foundModule != null) {
 			return foundModule;
 		}
@@ -198,6 +199,8 @@ class Module
 		//cache resolved directory
 		if(foundModule != null) {
 			folderAsModuleCache.put(fileOrDirectory.getCanonicalPath(), foundModule.getCanonicalPath());
+
+			return foundModule;
 		}
 
 		return foundModule;
@@ -222,7 +225,8 @@ class Module
 
 		File foundFile = new File(path.getAbsolutePath() + fallbackExtension);
 		try {
-			if(foundFile.getCanonicalFile().exists()) {
+			File canonicalFile = foundFile.getCanonicalFile();
+			if (canonicalFile.exists() && canonicalFile.isFile()) {
                 return foundFile;
             }
 		} catch (IOException e) {
