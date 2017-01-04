@@ -41,8 +41,6 @@ void JsV8InspectorClient::connect(jobject connection)
 {
     JEnv env;
     this->connection = env.NewGlobalRef(connection);
-
-    this->doConnect(isolate_, JsV8InspectorClient::PersistentToLocal(isolate_, context_));
 }
 
 void JsV8InspectorClient::doConnect(v8::Isolate *isolate, const v8::Local<v8::Context> &context)
@@ -117,7 +115,10 @@ v8::Local<v8::Context> JsV8InspectorClient::ensureDefaultContextInGroup(int cont
 
 void JsV8InspectorClient::doDispatchMessage(v8::Isolate *isolate, const std::string &message)
 {
-    assert(session_ != nullptr);
+    if (session_ == nullptr)
+    {
+        return;
+    }
 
     const String16 msg(message.c_str());
     v8_inspector::StringView message_view(reinterpret_cast<const uint16_t *>(msg.characters16()), msg.length());
@@ -202,6 +203,8 @@ void JsV8InspectorClient::init()
 
     v8::Persistent<v8::Context> persistentContext(context->GetIsolate(), context);
     context_.Reset(isolate_, persistentContext);
+
+    this->doConnect(isolate_, JsV8InspectorClient::PersistentToLocal(isolate_, context_));
 }
 
 JsV8InspectorClient *JsV8InspectorClient::GetInstance()
