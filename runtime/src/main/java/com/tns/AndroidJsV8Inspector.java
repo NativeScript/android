@@ -14,6 +14,8 @@ import fi.iki.elonen.NanoWSD;
 
 public class AndroidJsV8Inspector
 {
+    private static boolean DEBUG_LOG_ENABLED = false;
+
     public static final String DISCONNECT_MESSAGE = "nativescript-inspector-disconnect";
     private JsV8InspectorServer server;
     private Logger logger;
@@ -46,7 +48,10 @@ public class AndroidJsV8Inspector
             this.server = new JsV8InspectorServer(context.getPackageName() + "-inspectorServer");
             this.server.start(-1);
 
-            //Log.d("V8Inspector", "init ThreadId:" + Thread.currentThread().getId());
+            if (DEBUG_LOG_ENABLED)
+            {
+                Log.d("V8Inspector", "start debugger ThreadId:" + Thread.currentThread().getId());
+            }
 
             init();
         }
@@ -72,7 +77,10 @@ public class AndroidJsV8Inspector
         @Override
         protected Response serveHttp(IHTTPSession session)
         {
-            //Log.d("{N}.v8-inspector", "http request for " + session.getUri());
+            if (DEBUG_LOG_ENABLED)
+            {
+                Log.d("{N}.v8-inspector", "http request for " + session.getUri());
+            }
             return super.serveHttp(session);
         }
 
@@ -94,7 +102,10 @@ public class AndroidJsV8Inspector
         @Override
         protected void onOpen()
         {
-            //Log.d("V8Inspector", "onOpen: ThreadID:  " + Thread.currentThread().getId());
+            if (DEBUG_LOG_ENABLED)
+            {
+                Log.d("V8Inspector", "onOpen: ThreadID:  " + Thread.currentThread().getId());
+            }
 
             final Object waitObject = new Object();
 
@@ -103,38 +114,24 @@ public class AndroidJsV8Inspector
                 @Override
                 public void run()
                 {
-                    try
+                    if (DEBUG_LOG_ENABLED)
                     {
-                        //Log.d("V8Inspector", "onOpen: runnable ThreadID :  " + Thread.currentThread().getId());
-                        connect(JsV8InspectorWebSocket.this);
+                        Log.d("V8Inspector", "onOpen: runnable ThreadID :  " + Thread.currentThread().getId());
                     }
-                    finally
-                    {
-                        synchronized (waitObject)
-                        {
-                            waitObject.notify();
-                        }
-                    }
+
+                    connect(JsV8InspectorWebSocket.this);
                 }
             });
-
-            try
-            {
-                synchronized (waitObject)
-                {
-                    waitObject.wait();
-                }
-            }
-            catch (InterruptedException e)
-            {
-                e.printStackTrace();
-            }
         }
 
         @Override
         protected void onClose(NanoWSD.WebSocketFrame.CloseCode code, String reason, boolean initiatedByRemote)
         {
-            //Log.d("V8Inspector", "onClose");
+            if (DEBUG_LOG_ENABLED)
+            {
+                Log.d("V8Inspector", "onClose");
+            }
+
             mainHandler.post(new Runnable()
             {
                 @Override
@@ -150,8 +147,10 @@ public class AndroidJsV8Inspector
         @Override
         protected void onMessage(final NanoWSD.WebSocketFrame message)
         {
-            //Log.d("V8Inspector", "onMessage");
-            //Log.d("V8Inspector", "onMessage TextPayload" + message.getTextPayload() + " ThreadId:" + Thread.currentThread().getId());
+            if (DEBUG_LOG_ENABLED)
+            {
+                Log.d("V8Inspector", "To dbg backend: " + message.getTextPayload() + " ThreadId:" + Thread.currentThread().getId());
+            }
             inspectorMessages.offer(message.getTextPayload());
 
             mainHandler.post(new Runnable()
@@ -172,7 +171,11 @@ public class AndroidJsV8Inspector
         @Override
         public void send(String payload) throws IOException
         {
-            //Log.d("V8Inspector", "send " + payload);
+            if (DEBUG_LOG_ENABLED)
+            {
+                Log.d("V8Inspector", "To dbg client: " + payload);
+            }
+
             super.send(payload);
         }
 
@@ -184,6 +187,10 @@ public class AndroidJsV8Inspector
 
                 if (message != null && message.equalsIgnoreCase(DISCONNECT_MESSAGE))
                 {
+                    if (DEBUG_LOG_ENABLED)
+                    {
+                        Log.d("V8Inspector", "disconecting");
+                    }
                     disconnect();
                     return null;
                 }
@@ -198,11 +205,9 @@ public class AndroidJsV8Inspector
             return null;
         }
 
-
         @Override
         protected void onPong(NanoWSD.WebSocketFrame pong)
         {
-            //Log.d("V8Inspector", "onPong");
         }
 
         @Override
