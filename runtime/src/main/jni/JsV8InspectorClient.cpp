@@ -43,7 +43,7 @@ void JsV8InspectorClient::connect(jobject connection)
     this->connection = env.NewGlobalRef(connection);
 }
 
-void JsV8InspectorClient::doConnect(v8::Isolate *isolate, const v8::Local<v8::Context> &context)
+void JsV8InspectorClient::createInspectorSession(v8::Isolate *isolate, const v8::Local<v8::Context> &context)
 {
     session_ = inspector_->connect(0, this, v8_inspector::StringView());
 }
@@ -58,11 +58,14 @@ void JsV8InspectorClient::disconnect()
     Isolate::Scope isolate_scope(isolate_);
     v8::HandleScope handleScope(isolate_);
 
+    session_->resume();
     session_.reset();
 
     JEnv env;
     env.DeleteGlobalRef(this->connection);
     this->connection = nullptr;
+
+    this->createInspectorSession(isolate_, JsV8InspectorClient::PersistentToLocal(isolate_, context_));
 }
 
 
@@ -74,8 +77,6 @@ void JsV8InspectorClient::dispatchMessage(const std::string &message)
 
 void JsV8InspectorClient::runMessageLoopOnPause(int context_group_id)
 {
-
-
     if (running_nested_loop_)
     {
         return;
@@ -204,7 +205,7 @@ void JsV8InspectorClient::init()
     v8::Persistent<v8::Context> persistentContext(context->GetIsolate(), context);
     context_.Reset(isolate_, persistentContext);
 
-    this->doConnect(isolate_, JsV8InspectorClient::PersistentToLocal(isolate_, context_));
+    this->createInspectorSession(isolate_, JsV8InspectorClient::PersistentToLocal(isolate_, context_));
 }
 
 JsV8InspectorClient *JsV8InspectorClient::GetInstance()

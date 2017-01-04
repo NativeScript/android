@@ -26,7 +26,7 @@ namespace tns
 
             void init();
 			void connect(jobject connection);
-			void doConnect(v8::Isolate *isolate, const v8::Local<v8::Context>& context);
+			void createInspectorSession(v8::Isolate *isolate, const v8::Local<v8::Context> &context);
 			void disconnect();
 			void dispatchMessage(const std::string& message);
 			void doDispatchMessage(v8::Isolate *isolate, const std::string& message);

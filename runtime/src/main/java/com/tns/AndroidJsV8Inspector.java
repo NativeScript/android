@@ -16,7 +16,6 @@ public class AndroidJsV8Inspector
 {
     private static boolean DEBUG_LOG_ENABLED = false;
 
-    public static final String DISCONNECT_MESSAGE = "nativescript-inspector-disconnect";
     private JsV8InspectorServer server;
     private Logger logger;
     private Context context;
@@ -107,8 +106,6 @@ public class AndroidJsV8Inspector
                 Log.d("V8Inspector", "onOpen: ThreadID:  " + Thread.currentThread().getId());
             }
 
-            final Object waitObject = new Object();
-
             mainHandler.post(new Runnable()
             {
                 @Override
@@ -116,7 +113,7 @@ public class AndroidJsV8Inspector
                 {
                     if (DEBUG_LOG_ENABLED)
                     {
-                        Log.d("V8Inspector", "onOpen: runnable ThreadID :  " + Thread.currentThread().getId());
+                        Log.d("V8Inspector", "Connecting. threadID :  " + Thread.currentThread().getId());
                     }
 
                     connect(JsV8InspectorWebSocket.this);
@@ -137,11 +134,13 @@ public class AndroidJsV8Inspector
                 @Override
                 public void run()
                 {
+                    if (DEBUG_LOG_ENABLED)
+                    {
+                        Log.d("V8Inspector", "Disconnecting");
+                    }
                     disconnect();
                 }
             });
-
-            inspectorMessages.offer(DISCONNECT_MESSAGE);
         }
 
         @Override
@@ -151,6 +150,7 @@ public class AndroidJsV8Inspector
             {
                 Log.d("V8Inspector", "To dbg backend: " + message.getTextPayload() + " ThreadId:" + Thread.currentThread().getId());
             }
+
             inspectorMessages.offer(message.getTextPayload());
 
             mainHandler.post(new Runnable()
@@ -184,17 +184,6 @@ public class AndroidJsV8Inspector
             try
             {
                 String message = inspectorMessages.take();
-
-                if (message != null && message.equalsIgnoreCase(DISCONNECT_MESSAGE))
-                {
-                    if (DEBUG_LOG_ENABLED)
-                    {
-                        Log.d("V8Inspector", "disconecting");
-                    }
-                    disconnect();
-                    return null;
-                }
-
                 return message;
             }
             catch (InterruptedException e)
