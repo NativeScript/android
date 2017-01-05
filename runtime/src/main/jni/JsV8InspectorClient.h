@@ -35,6 +35,8 @@ namespace tns
 			void sendProtocolNotification(const v8_inspector::StringView &message) override;
 			void flushProtocolNotifications() override;
 
+			static void sendToFrontEndCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
+
 			void runMessageLoopOnPause(int context_group_id) override;
 			void quitMessageLoopOnPause() override;
 			v8::Local<v8::Context> ensureDefaultContextInGroup(int contextGroupId) override;
@@ -46,6 +48,7 @@ namespace tns
             static jclass inspectorClass;
             static jmethodID sendMethod;
 			static jmethodID getInspectorMessageMethod;
+			static jmethodID sendToDevToolsConsoleMethod;
 
             v8::Isolate* isolate_;
 			v8::Persistent<v8::Context> context_;
