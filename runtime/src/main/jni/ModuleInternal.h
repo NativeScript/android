@@ -16,10 +16,10 @@
 
 namespace tns
 {
-	class Module
+	class ModuleInternal
 	{
 		public:
-			Module();
+			ModuleInternal();
 
 			void Init(v8::Isolate *isolate, const std::string& baseDir = "");
 
@@ -79,7 +79,7 @@ namespace tns
 			class TempModule
 			{
 				public:
-				TempModule(Module* module, const std::string& modulePath, const std::string& cacheKey, v8::Persistent<v8::Object> *poModuleObj)
+				TempModule(ModuleInternal* module, const std::string& modulePath, const std::string& cacheKey, v8::Persistent<v8::Object> *poModuleObj)
 				:m_module(module), m_dispose(true), m_modulePath(modulePath), m_cacheKey(cacheKey), m_poModuleObj(poModuleObj)
 				{
 					m_module->m_loadedModules.insert(make_pair(m_modulePath, ModuleCacheEntry(m_poModuleObj)));
@@ -102,7 +102,7 @@ namespace tns
 
 				private:
 				bool m_dispose;
-				Module *m_module;
+				ModuleInternal *m_module;
 				std::string m_modulePath;
 				std::string m_cacheKey;
 				v8::Persistent<v8::Object> *m_poModuleObj;

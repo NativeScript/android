@@ -54,8 +54,10 @@ var MyActivity = (function (_super) {
     	button.setOnClickListener(new android.view.View.OnClickListener("AppClickListener", {
     		onClick:  function() {
     			button.setBackgroundColor(colors[taps % colors.length]);
-
     			taps++;
+                taps++;
+                taps++;
+                taps++;
     		}}));
     };
     MyActivity = __decorate([

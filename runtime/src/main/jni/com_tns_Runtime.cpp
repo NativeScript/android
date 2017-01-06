@@ -399,7 +399,7 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_ClearWorkerPersistent(JNIEnv *env
 	CallbackHandlers::ClearWorkerPersistent(workerId);
 }
 
-extern "C" JNIEXPORT void Java_com_tns_Runtime_CallWorkerObjectOnErrorHandleMain(JNIEnv *env, jobject obj, jint runtimeId, jint workerId, jstring message, jstring filename, jint lineno, jstring threadName)
+extern "C" JNIEXPORT void Java_com_tns_Runtime_CallWorkerObjectOnErrorHandleMain(JNIEnv *env, jobject obj, jint runtimeId, jint workerId, jstring message, jstring stackTrace, jstring filename, jint lineno, jstring threadName)
 {
 	// Main Thread runtime
 	auto runtime = TryGetRuntime(runtimeId);
@@ -414,7 +414,7 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_CallWorkerObjectOnErrorHandleMain
 
 	try
 	{
-		CallbackHandlers::CallWorkerObjectOnErrorHandle(isolate, workerId, message, filename, lineno, threadName);
+		CallbackHandlers::CallWorkerObjectOnErrorHandle(isolate, workerId, message, stackTrace, filename, lineno, threadName);
 	}
 	catch (NativeScriptException& e)
 	{

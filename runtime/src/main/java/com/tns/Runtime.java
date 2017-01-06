@@ -30,7 +30,8 @@ import android.util.SparseArray;
 
 import com.tns.bindings.ProxyGenerator;
 
-public class Runtime {
+public class Runtime
+{
     private native void initNativeScript(int runtimeId, String filesPath, String nativeLibDir, boolean verboseLoggingEnabled, String packageName, Object[] v8Options, String callingDir, JsDebugger jsDebugger);
 
     private native void runModule(int runtimeId, String filePath) throws NativeScriptException;
@@ -61,46 +62,47 @@ public class Runtime {
 
     private static native void ClearWorkerPersistent(int runtimeId, int workerId);
 
-    private static native void CallWorkerObjectOnErrorHandleMain(int runtimeId, int workerId, String message, String filename, int lineno, String threadName) throws NativeScriptException;
+    private static native void CallWorkerObjectOnErrorHandleMain(int runtimeId, int workerId, String message, String stackTrace, String filename, int lineno, String threadName) throws NativeScriptException;
 
-    void passUncaughtExceptionToJs(Throwable ex, String stackTrace) {
+    void passUncaughtExceptionToJs(Throwable ex, String stackTrace)
+    {
         passUncaughtExceptionToJsNative(getRuntimeId(), ex, stackTrace);
     }
 
     private boolean initialized;
 
-	private final static HashMap<String, Class<?>> classCache = new HashMap<String, Class<?>>();
+    private final static HashMap<String, Class<?>> classCache = new HashMap<String, Class<?>>();
 
-	private final static HashSet<ClassLoader> classLoaderCache = new HashSet<ClassLoader>();
+    private final static HashSet<ClassLoader> classLoaderCache = new HashSet<ClassLoader>();
 
-	private final static String FAILED_CTOR_RESOLUTION_MSG = "Check the number and type of arguments.\n" +
-			"Primitive types need to be manually wrapped in their respective Object wrappers.\n" +
-			"If you are creating an instance of an inner class, make sure to always provide reference to the outer `this` as the first argument.";
+    private final static String FAILED_CTOR_RESOLUTION_MSG = "Check the number and type of arguments.\n" +
+            "Primitive types need to be manually wrapped in their respective Object wrappers.\n" +
+            "If you are creating an instance of an inner class, make sure to always provide reference to the outer `this` as the first argument.";
 
-	private final SparseArray<Object> strongInstances = new SparseArray<Object>();
+    private final SparseArray<Object> strongInstances = new SparseArray<Object>();
 
-	private final SparseArray<WeakReference<Object>> weakInstances = new SparseArray<WeakReference<Object>>();
+    private final SparseArray<WeakReference<Object>> weakInstances = new SparseArray<WeakReference<Object>>();
 
-	private final NativeScriptHashMap<Object, Integer> strongJavaObjectToID = new NativeScriptHashMap<Object, Integer>();
+    private final NativeScriptHashMap<Object, Integer> strongJavaObjectToID = new NativeScriptHashMap<Object, Integer>();
 
-	private final NativeScriptWeakHashMap<Object, Integer> weakJavaObjectToID = new NativeScriptWeakHashMap<Object, Integer>();
-	
-	private final Map<Class<?>, JavaScriptImplementation> loadedJavaScriptExtends = new HashMap<Class<?>, JavaScriptImplementation>();
+    private final NativeScriptWeakHashMap<Object, Integer> weakJavaObjectToID = new NativeScriptWeakHashMap<Object, Integer>();
 
-	private final java.lang.Runtime dalvikRuntime = java.lang.Runtime.getRuntime();
+    private final Map<Class<?>, JavaScriptImplementation> loadedJavaScriptExtends = new HashMap<Class<?>, JavaScriptImplementation>();
 
-	private final Object keyNotFoundObject = new Object();
-	private int currentObjectId = -1;
+    private final java.lang.Runtime dalvikRuntime = java.lang.Runtime.getRuntime();
 
-	private ExtractPolicy extractPolicy;
+    private final Object keyNotFoundObject = new Object();
+    private int currentObjectId = -1;
 
-	private ArrayList<Constructor<?>> ctorCache = new ArrayList<Constructor<?>>();
+    private ExtractPolicy extractPolicy;
 
-	private Logger logger;
+    private ArrayList<Constructor<?>> ctorCache = new ArrayList<Constructor<?>>();
 
-	private ThreadScheduler threadScheduler;
+    private Logger logger;
 
-	private JsDebugger jsDebugger;
+    private ThreadScheduler threadScheduler;
+
+    private JsDebugger jsDebugger;
 
     private DexFactory dexFactory;
 
@@ -108,8 +110,10 @@ public class Runtime {
 
     private final GcListener gcListener;
 
-    private final static Comparator<Method> methodComparator = new Comparator<Method>() {
-        public int compare(Method lhs, Method rhs) {
+    private final static Comparator<Method> methodComparator = new Comparator<Method>()
+    {
+        public int compare(Method lhs, Method rhs)
+        {
             return lhs.getName().compareTo(rhs.getName());
         }
     };
@@ -144,10 +148,13 @@ public class Runtime {
      */
     private Map<Integer, Handler> workerIdToHandler = new HashMap<>();
 
-    public Runtime(StaticConfiguration config, DynamicConfiguration dynamicConfiguration) {
-        synchronized (Runtime.currentRuntime) {
+    public Runtime(StaticConfiguration config, DynamicConfiguration dynamicConfiguration)
+    {
+        synchronized (Runtime.currentRuntime)
+        {
             Runtime existingRuntime = currentRuntime.get();
-            if (existingRuntime != null) {
+            if (existingRuntime != null)
+            {
                 throw new NativeScriptException("There is an existing runtime on this thread with id=" + existingRuntime.getRuntimeId());
             }
 
@@ -156,7 +163,8 @@ public class Runtime {
             this.dynamicConfig = dynamicConfiguration;
             this.threadScheduler = dynamicConfiguration.myThreadScheduler;
             this.workerId = dynamicConfiguration.workerId;
-            if (dynamicConfiguration.mainThreadScheduler != null) {
+            if (dynamicConfiguration.mainThreadScheduler != null)
+            {
                 this.mainThreadHandler = dynamicConfiguration.mainThreadScheduler.getHandler();
             }
 
@@ -169,21 +177,26 @@ public class Runtime {
         }
     }
 
-    public int getRuntimeId() {
+    public int getRuntimeId()
+    {
         return this.runtimeId;
     }
 
-    public static Runtime getCurrentRuntime() {
+    public static Runtime getCurrentRuntime()
+    {
         Runtime runtime = currentRuntime.get();
 
         return runtime;
     }
 
-    private static Runtime getObjectRuntime(Object object) {
+    private static Runtime getObjectRuntime(Object object)
+    {
         Runtime runtime = null;
 
-        for (Runtime r : runtimeCache.values()) {
-            if (r.getJavaObjectID(object) != null) {
+        for (Runtime r : runtimeCache.values())
+        {
+            if (r.getJavaObjectID(object) != null)
+            {
                 runtime = r;
                 break;
             }
@@ -192,31 +205,39 @@ public class Runtime {
         return runtime;
     }
 
-    public DynamicConfiguration getDynamicConfig() {
+    public DynamicConfiguration getDynamicConfig()
+    {
         return dynamicConfig;
     }
 
-    public static boolean isInitialized() {
+    public static boolean isInitialized()
+    {
         Runtime runtime = Runtime.getCurrentRuntime();
-		
-		return (runtime != null) ? runtime.isInitializedImpl() : false;
-	}
 
-	public int getWorkerId() {
-		return workerId;
-	}
+        return (runtime != null) ? runtime.isInitializedImpl() : false;
+    }
 
-    public Handler getHandler() {
+    public int getWorkerId()
+    {
+        return workerId;
+    }
+
+    public Handler getHandler()
+    {
         return this.threadScheduler.getHandler();
     }
 
-    private static class WorkerThreadHandler extends Handler {
+    private static class WorkerThreadHandler extends Handler
+    {
         @Override
-        public void handleMessage(Message msg) {
+        public void handleMessage(Message msg)
+        {
             Runtime currentRuntime = Runtime.getCurrentRuntime();
 
-            if(currentRuntime.isTerminating) {
-                if(currentRuntime.logger.isEnabled()) {
+            if (currentRuntime.isTerminating)
+            {
+                if (currentRuntime.logger.isEnabled())
+                {
                     currentRuntime.logger.write("Worker(id=" + currentRuntime.workerId + ") is terminating, it will not process the message.");
                 }
 
@@ -224,14 +245,17 @@ public class Runtime {
             }
 
             /*
-				Handle messages coming from the Main thread
+                Handle messages coming from the Main thread
 			 */
-            if (msg.arg1 == MessageType.MainToWorker) {
+            if (msg.arg1 == MessageType.MainToWorker)
+            {
                 /*
                     Calls the Worker script's onmessage implementation with arg -> msg.obj.toString()
                  */
                 WorkerGlobalOnMessageCallback(currentRuntime.runtimeId, msg.obj.toString());
-            } else if (msg.arg1 == MessageType.TerminateThread) {
+            }
+            else if (msg.arg1 == MessageType.TerminateThread)
+            {
                 currentRuntime.isTerminating = true;
                 currentRuntime.gcListener.unsubscribe(currentRuntime);
 
@@ -239,12 +263,15 @@ public class Runtime {
 
                 TerminateWorkerCallback(currentRuntime.runtimeId);
 
-                if(currentRuntime.logger.isEnabled()) {
-                    currentRuntime.logger.write("Worker(id=" + currentRuntime.workerId + ", name=\"" + Thread.currentThread().getName() +"\") has terminated execution. Don't make further function calls to it.");
+                if (currentRuntime.logger.isEnabled())
+                {
+                    currentRuntime.logger.write("Worker(id=" + currentRuntime.workerId + ", name=\"" + Thread.currentThread().getName() + "\") has terminated execution. Don't make further function calls to it.");
                 }
 
                 this.getLooper().quit();
-            } else if (msg.arg1 == MessageType.TerminateAndCloseThread) {
+            }
+            else if (msg.arg1 == MessageType.TerminateAndCloseThread)
+            {
                 Message msgToMain = Message.obtain();
                 msgToMain.arg1 = MessageType.CloseWorker;
                 msgToMain.arg2 = currentRuntime.workerId;
@@ -258,8 +285,9 @@ public class Runtime {
 
                 TerminateWorkerCallback(currentRuntime.runtimeId);
 
-                if(currentRuntime.logger.isEnabled()) {
-                    currentRuntime.logger.write("Worker(id=" + currentRuntime.workerId + ", name=\"" + Thread.currentThread().getName() +"\") has terminated execution. Don't make further function calls to it.");
+                if (currentRuntime.logger.isEnabled())
+                {
+                    currentRuntime.logger.write("Worker(id=" + currentRuntime.workerId + ", name=\"" + Thread.currentThread().getName() + "\") has terminated execution. Don't make further function calls to it.");
                 }
 
                 this.getLooper().quit();
@@ -267,14 +295,16 @@ public class Runtime {
         }
     }
 
-    private static class WorkerThread extends HandlerThread {
+    private static class WorkerThread extends HandlerThread
+    {
 
         private Integer workerId;
         private ThreadScheduler mainThreadScheduler;
         private String filePath;
         private String callingJsDir;
 
-        public WorkerThread(String name, Integer workerId, ThreadScheduler mainThreadScheduler, String callingJsDir) {
+        public WorkerThread(String name, Integer workerId, ThreadScheduler mainThreadScheduler, String callingJsDir)
+        {
             super("W" + workerId + ": " + name);
             this.filePath = name;
             this.workerId = workerId;
@@ -282,12 +312,15 @@ public class Runtime {
             this.callingJsDir = callingJsDir;
         }
 
-        public void startRuntime() {
+        public void startRuntime()
+        {
             Handler handler = new Handler(this.getLooper());
 
-            handler.post((new Runnable() {
+            handler.post((new Runnable()
+            {
                 @Override
-                public void run() {
+                public void run()
+                {
                     Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND);
 
                     WorkThreadScheduler workThreadScheduler = new WorkThreadScheduler(new WorkerThreadHandler());
@@ -321,29 +354,36 @@ public class Runtime {
         }
     }
 
-    private void processPendingMessages() {
+    private void processPendingMessages()
+    {
         Queue<Message> messages = Runtime.pendingWorkerMessages.get(this.getWorkerId());
-        if(messages == null) {
+        if (messages == null)
+        {
             return;
         }
 
         Handler handler = this.getHandler();
-        while(!messages.isEmpty()) {
+        while (!messages.isEmpty())
+        {
             handler.sendMessage(messages.poll());
         }
     }
 
-    private static class MainThreadHandler extends Handler {
-        public MainThreadHandler(Looper looper) {
+    private static class MainThreadHandler extends Handler
+    {
+        public MainThreadHandler(Looper looper)
+        {
             super(looper);
         }
 
         @Override
-        public void handleMessage(Message msg) {
+        public void handleMessage(Message msg)
+        {
 			/*
 				Handle messages coming from a Worker thread
 			 */
-            if (msg.arg1 == MessageType.WorkerToMain) {
+            if (msg.arg1 == MessageType.WorkerToMain)
+            {
                 /*
                     Calls the Worker (with id - workerId) object's onmessage implementation with arg -> msg.obj.toString()
                  */
@@ -353,15 +393,18 @@ public class Runtime {
 				Handle a 'Handshake' message sent from a new Worker,
 				so that the Main may cache it and send messages to it later
 			 */
-            else if (msg.arg1 == MessageType.Handshake) {
+            else if (msg.arg1 == MessageType.Handshake)
+            {
                 int senderRuntimeId = msg.arg2;
                 Runtime workerRuntime = runtimeCache.get(senderRuntimeId);
                 Runtime mainRuntime = Runtime.getCurrentRuntime();
 
                 // If worker has had its close/terminate called before the threads could shake hands
-                if(workerRuntime == null) {
-                    if(mainRuntime.logger.isEnabled()) {
-                        mainRuntime.logger.write("Main thread couldn't shake hands with worker (runtimeId: " + workerRuntime +") because it has been terminated!");
+                if (workerRuntime == null)
+                {
+                    if (mainRuntime.logger.isEnabled())
+                    {
+                        mainRuntime.logger.write("Main thread couldn't shake hands with worker (runtimeId: " + workerRuntime + ") because it has been terminated!");
                     }
 
                     return;
@@ -373,10 +416,13 @@ public class Runtime {
 				 */
                 mainRuntime.workerIdToHandler.put(workerRuntime.getWorkerId(), workerRuntime.getHandler());
 
-                if(mainRuntime.logger.isEnabled()) {
+                if (mainRuntime.logger.isEnabled())
+                {
                     mainRuntime.logger.write("Worker thread (workerId:" + workerRuntime.getWorkerId() + ") shook hands with the main thread!");
                 }
-            } else if (msg.arg1 == MessageType.CloseWorker) {
+            }
+            else if (msg.arg1 == MessageType.CloseWorker)
+            {
                 Runtime currentRuntime = Runtime.getCurrentRuntime();
 
                 // remove reference to a Worker thread's handler that is in the process of closing
@@ -387,13 +433,14 @@ public class Runtime {
             /*
                Handle unhandled exceptions/errors coming from the worker thread
             */
-            else if (msg.arg1 == MessageType.BubbleUpException) {
+            else if (msg.arg1 == MessageType.BubbleUpException)
+            {
                 Runtime currentRuntime = Runtime.getCurrentRuntime();
 
                 int workerId = msg.arg2;
                 JavaScriptErrorMessage errorMessage = (JavaScriptErrorMessage) msg.obj;
 
-                CallWorkerObjectOnErrorHandleMain(currentRuntime.runtimeId, workerId, errorMessage.getMessage(), errorMessage.getFilename(), errorMessage.getLineno(), errorMessage.getThreadName());
+                CallWorkerObjectOnErrorHandleMain(currentRuntime.runtimeId, workerId, errorMessage.getMessage(), errorMessage.getStackTrace(), errorMessage.getFilename(), errorMessage.getLineno(), errorMessage.getThreadName());
             }
         }
     }
@@ -403,7 +450,8 @@ public class Runtime {
         This method initializes the runtime and should always be called first and through the main thread
         in order to set static configuration that all following workers can use
      */
-    public static Runtime initializeRuntimeWithConfiguration(StaticConfiguration config) {
+    public static Runtime initializeRuntimeWithConfiguration(StaticConfiguration config)
+    {
         staticConfiguration = config;
         WorkThreadScheduler mainThreadScheduler = new WorkThreadScheduler(new MainThreadHandler(Looper.myLooper()));
         DynamicConfiguration dynamicConfiguration = new DynamicConfiguration(0, mainThreadScheduler, null);
@@ -417,7 +465,8 @@ public class Runtime {
         It will use the static configuration for all following calls to initialize a new runtime.
      */
     @RuntimeCallable
-    public static void initWorker(String jsFileName, String callingJsDir, int id) {
+    public static void initWorker(String jsFileName, String callingJsDir, int id)
+    {
         // This method will always be called from the Main thread
         Runtime runtime = Runtime.getCurrentRuntime();
         ThreadScheduler mainThreadScheduler = runtime.getDynamicConfig().myThreadScheduler;
@@ -431,23 +480,28 @@ public class Runtime {
         This method deals with initializing the runtime with given configuration
         Does it for both workers and for the main thread
      */
-    private static Runtime initRuntime(DynamicConfiguration dynamicConfiguration) {
+    private static Runtime initRuntime(DynamicConfiguration dynamicConfiguration)
+    {
         Runtime runtime = new Runtime(staticConfiguration, dynamicConfiguration);
         runtime.init();
 
         return runtime;
     }
 
-    private boolean isInitializedImpl() {
+    private boolean isInitializedImpl()
+    {
         return initialized;
     }
 
-    public void init() {
+    public void init()
+    {
         init(config.logger, config.debugger, config.appName, config.nativeLibDir, config.rootDir, config.appDir, config.classLoader, config.dexDir, config.dexThumb, config.appConfig, dynamicConfig.callingJsDir);
     }
 
-    private void init(Logger logger, Debugger debugger, String appName, String nativeLibDir, File rootDir, File appDir, ClassLoader classLoader, File dexDir, String dexThumb, AppConfig appConfig, String callingJsDir) throws RuntimeException {
-        if (initialized) {
+    private void init(Logger logger, Debugger debugger, String appName, String nativeLibDir, File rootDir, File appDir, ClassLoader classLoader, File dexDir, String dexThumb, AppConfig appConfig, String callingJsDir) throws RuntimeException
+    {
+        if (initialized)
+        {
             throw new RuntimeException("NativeScriptApplication already initialized");
         }
 
@@ -455,31 +509,38 @@ public class Runtime {
 
         this.dexFactory = new DexFactory(logger, classLoader, dexDir, dexThumb);
 
-        if (logger.isEnabled()) {
+        if (logger.isEnabled())
+        {
             logger.write("Initializing NativeScript JAVA");
         }
 
-        try {
+        try
+        {
             Module.init(logger, rootDir, appDir);
-        } catch (IOException ex) {
+        }
+        catch (IOException ex)
+        {
             throw new RuntimeException("Fail to initialize Require class", ex);
         }
 
         // TODO: Pete: this.runtimeId == 0 is a temporary patching of jsDebugger not attaching on app start
         // TODO: Pete: Debugger should not be created when a worker is created
-        if (debugger != null && this.runtimeId == 0) {
+        if (debugger != null && this.runtimeId == 0)
+        {
             jsDebugger = new JsDebugger(debugger, threadScheduler);
         }
 
         initNativeScript(getRuntimeId(), Module.getApplicationFilesPath(), nativeLibDir, logger.isEnabled(), appName, appConfig.getAsArray(), callingJsDir, jsDebugger);
 
-        if (jsDebugger != null && this.runtimeId == 0) {
-             jsDebugger.start();
+        if (jsDebugger != null && this.runtimeId == 0)
+        {
+            jsDebugger.start();
         }
 
         clearStartupData(getRuntimeId()); // It's safe to delete the data after the V8 debugger is initialized
 
-        if (logger.isEnabled()) {
+        if (logger.isEnabled())
+        {
             Date d = new Date();
             int pid = android.os.Process.myPid();
             File f = new File("/proc/" + pid);
@@ -494,46 +555,62 @@ public class Runtime {
 
     @RuntimeCallable
     public void enableVerboseLogging() {
+
         logger.setEnabled(true);
         ProxyGenerator.IsLogEnabled = true;
     }
 
+
     @RuntimeCallable
-    public void disableVerboseLogging() {
+    public void disableVerboseLogging()
+    {
         logger.setEnabled(false);
         ProxyGenerator.IsLogEnabled = false;
     }
 
-    public void run() throws NativeScriptException {
+    public void run() throws NativeScriptException
+    {
         String mainModule = Module.bootstrapApp();
         runModule(new File(mainModule));
     }
 
-    public void runModule(File jsFile) throws NativeScriptException {
+    public void runModule(File jsFile) throws NativeScriptException
+    {
         String filePath = jsFile.getPath();
         runModule(getRuntimeId(), filePath);
     }
 
-    public Object runScript(File jsFile) throws NativeScriptException {
+    public Object runScript(File jsFile) throws NativeScriptException
+    {
         Object result = null;
 
-        if (jsFile.exists() && jsFile.isFile()) {
+        if (jsFile.exists() && jsFile.isFile())
+        {
             final String filePath = jsFile.getAbsolutePath();
 
             boolean isWorkThread = threadScheduler.getThread().equals(Thread.currentThread());
 
-            if (isWorkThread) {
+            if (isWorkThread)
+            {
                 result = runScript(getRuntimeId(), filePath);
-            } else {
+            }
+            else
+            {
                 final Object[] arr = new Object[2];
 
-                Runnable r = new Runnable() {
+                Runnable r = new Runnable()
+                {
                     @Override
-                    public void run() {
-                        synchronized (this) {
-                            try {
+                    public void run()
+                    {
+                        synchronized (this)
+                        {
+                            try
+                            {
                                 arr[0] = runScript(getRuntimeId(), filePath);
-                            } finally {
+                            }
+                            finally
+                            {
                                 this.notify();
                                 arr[1] = Boolean.TRUE;
                             }
@@ -543,13 +620,19 @@ public class Runtime {
 
                 boolean success = threadScheduler.post(r);
 
-                if (success) {
-                    synchronized (r) {
-                        try {
-                            if (arr[1] == null) {
+                if (success)
+                {
+                    synchronized (r)
+                    {
+                        try
+                        {
+                            if (arr[1] == null)
+                            {
                                 r.wait();
                             }
-                        } catch (InterruptedException e) {
+                        }
+                        catch (InterruptedException e)
+                        {
                             result = e;
                         }
                     }
@@ -561,14 +644,16 @@ public class Runtime {
     }
 
     @RuntimeCallable
-    private Class<?> resolveClass(String fullClassName, String[] methodOverrides, String[] implementedInterfaces, boolean isInterface) throws ClassNotFoundException, IOException {
+    private Class<?> resolveClass(String fullClassName, String[] methodOverrides, String[] implementedInterfaces, boolean isInterface) throws ClassNotFoundException, IOException
+    {
         Class<?> javaClass = classResolver.resolveClass(fullClassName, dexFactory, methodOverrides, implementedInterfaces, isInterface);
 
         return javaClass;
     }
 
     @RuntimeCallable
-    private long getUsedMemory() {
+    private long getUsedMemory()
+    {
         long usedMemory = dalvikRuntime.totalMemory() - dalvikRuntime.freeMemory();
         return usedMemory;
     }
@@ -577,28 +662,35 @@ public class Runtime {
         notifyGc(runtimeId);
     }
 
-    public static void initInstance(Object instance) {
+    public static void initInstance(Object instance)
+    {
         Runtime runtime = Runtime.getCurrentRuntime();
 
         int objectId = runtime.currentObjectId;
 
-        if (objectId != -1) {
+        if (objectId != -1)
+        {
             runtime.makeInstanceStrong(instance, objectId);
-        } else {
+        }
+        else
+        {
             runtime.createJSInstance(instance);
         }
     }
 
-    private void createJSInstance(Object instance) {
+    private void createJSInstance(Object instance)
+    {
         int javaObjectID = generateNewObjectId(getRuntimeId());
 
         makeInstanceStrong(instance, javaObjectID);
 
         Class<?> clazz = instance.getClass();
 
-        if (!loadedJavaScriptExtends.containsKey(clazz)) {
+        if (!loadedJavaScriptExtends.containsKey(clazz))
+        {
             JavaScriptImplementation jsImpl = clazz.getAnnotation(JavaScriptImplementation.class);
-            if (jsImpl != null) {
+            if (jsImpl != null)
+            {
                 File jsFile = new File(jsImpl.javaScriptFile());
                 runModule(jsFile);
             }
@@ -614,22 +706,30 @@ public class Runtime {
     }
 
     @RuntimeCallable
-    private static String[] getTypeMetadata(String className, int index) throws ClassNotFoundException {
+    private static String[] getTypeMetadata(String className, int index) throws ClassNotFoundException
+    {
         Class<?> clazz = classCache.get(className);
 
-        if (clazz == null) {
-            for (ClassLoader classLoader : classLoaderCache) {
-                try {
+        if (clazz == null)
+        {
+            for (ClassLoader classLoader : classLoaderCache)
+            {
+                try
+                {
                     clazz = classLoader.loadClass(className);
-                    if (clazz != null) {
+                    if (clazz != null)
+                    {
                         classCache.put(className, clazz);
                         break;
                     }
-                } catch (Exception e1) {
+                }
+                catch (Exception e1)
+                {
                     e1.printStackTrace();
                 }
             }
-            if (clazz == null) {
+            if (clazz == null)
+            {
                 clazz = Class.forName(className);
                 classCache.put(className, clazz);
             }
@@ -640,10 +740,12 @@ public class Runtime {
         return result;
     }
 
-    private static String[] getTypeMetadata(Class<?> clazz, int index) {
+    private static String[] getTypeMetadata(Class<?> clazz, int index)
+    {
         Class<?> mostOuterClass = clazz.getEnclosingClass();
         ArrayList<Class<?>> outerClasses = new ArrayList<Class<?>>();
-        while (mostOuterClass != null) {
+        while (mostOuterClass != null)
+        {
             outerClasses.add(0, mostOuterClass);
             Class<?> nextOuterClass = mostOuterClass.getEnclosingClass();
             if (nextOuterClass == null)
@@ -657,7 +759,8 @@ public class Runtime {
 
         int packageCount = 1;
         String pname = p.getName();
-        for (int i = 0; i < pname.length(); i++) {
+        for (int i = 0; i < pname.length(); i++)
+        {
             if (pname.charAt(i) == '.')
                 ++packageCount;
         }
@@ -671,13 +774,20 @@ public class Runtime {
 
         int endOuterTypeIdx = packageCount + outerClasses.size();
 
-        for (int i = index; i < endIdx; i++) {
-            if (i < packageCount) {
+        for (int i = index; i < endIdx; i++)
+        {
+            if (i < packageCount)
+            {
                 result[i - index] = "P";
-            } else {
-                if (i < endOuterTypeIdx) {
+            }
+            else
+            {
+                if (i < endOuterTypeIdx)
+                {
                     result[i - index] = getTypeMetadata(outerClasses.get(i - packageCount));
-                } else {
+                }
+                else
+                {
                     result[i - index] = getTypeMetadata(clazz);
                 }
             }
@@ -686,18 +796,25 @@ public class Runtime {
         return result;
     }
 
-    private static String getTypeMetadata(Class<?> clazz) {
+    private static String getTypeMetadata(Class<?> clazz)
+    {
         StringBuilder sb = new StringBuilder();
 
-        if (clazz.isInterface()) {
+        if (clazz.isInterface())
+        {
             sb.append("I ");
-        } else {
+        }
+        else
+        {
             sb.append("C ");
         }
 
-        if (Modifier.isStatic(clazz.getModifiers())) {
+        if (Modifier.isStatic(clazz.getModifiers()))
+        {
             sb.append("S\n");
-        } else {
+        }
+        else
+        {
             sb.append("I\n");
         }
 
@@ -707,9 +824,11 @@ public class Runtime {
         Method[] methods = clazz.getDeclaredMethods();
         Arrays.sort(methods, methodComparator);
 
-        for (Method m : methods) {
+        for (Method m : methods)
+        {
             int modifiers = m.getModifiers();
-            if (!Modifier.isStatic(modifiers) && (Modifier.isPublic(modifiers) || Modifier.isProtected(modifiers))) {
+            if (!Modifier.isStatic(modifiers) && (Modifier.isPublic(modifiers) || Modifier.isProtected(modifiers)))
+            {
                 sb.append("M ");
                 sb.append(m.getName());
                 Class<?>[] params = m.getParameterTypes();
@@ -724,9 +843,11 @@ public class Runtime {
         }
 
         Field[] fields = clazz.getDeclaredFields();
-        for (Field f : fields) {
+        for (Field f : fields)
+        {
             int modifiers = f.getModifiers();
-            if (!Modifier.isStatic(modifiers) && (Modifier.isPublic(modifiers) || Modifier.isProtected(modifiers))) {
+            if (!Modifier.isStatic(modifiers) && (Modifier.isPublic(modifiers) || Modifier.isProtected(modifiers)))
+            {
                 sb.append("F ");
                 sb.append(f.getName());
                 sb.append(" ");
@@ -742,8 +863,10 @@ public class Runtime {
     }
 
     @RuntimeCallable
-    private void makeInstanceStrong(Object instance, int objectId) {
-        if (instance == null) {
+    private void makeInstanceStrong(Object instance, int objectId)
+    {
+        if (instance == null)
+        {
             throw new IllegalArgumentException("instance cannot be null");
         }
 
@@ -753,25 +876,30 @@ public class Runtime {
 
         Class<?> clazz = instance.getClass();
         String className = clazz.getName();
-        if (!classCache.containsKey(className)) {
+        if (!classCache.containsKey(className))
+        {
             classCache.put(className, clazz);
             ClassLoader clazzloader = clazz.getClassLoader();
-            if (!classLoaderCache.contains(clazzloader)) {
+            if (!classLoaderCache.contains(clazzloader))
+            {
                 classLoaderCache.add(clazzloader);
             }
         }
 
-        if (logger != null && logger.isEnabled()) {
+        if (logger != null && logger.isEnabled())
+        {
             logger.write("MakeInstanceStrong (" + key + ", " + instance.getClass().toString() + ")");
         }
     }
 
-    private void makeInstanceWeak(int javaObjectID, boolean keepAsWeak) {
+    private void makeInstanceWeak(int javaObjectID, boolean keepAsWeak)
+    {
         if (logger.isEnabled())
             logger.write("makeInstanceWeak instance " + javaObjectID + " keepAsWeak=" + keepAsWeak);
         Object instance = strongInstances.get(javaObjectID);
 
-        if (keepAsWeak) {
+        if (keepAsWeak)
+        {
             weakJavaObjectToID.put(instance, Integer.valueOf(javaObjectID));
             weakInstances.put(javaObjectID, new WeakReference<Object>(instance));
         }
@@ -781,35 +909,45 @@ public class Runtime {
     }
 
     @RuntimeCallable
-    private void makeInstanceWeak(ByteBuffer buff, int length, boolean keepAsWeak) {
+    private void makeInstanceWeak(ByteBuffer buff, int length, boolean keepAsWeak)
+    {
         buff.position(0);
-        for (int i = 0; i < length; i++) {
+        for (int i = 0; i < length; i++)
+        {
             int javaObjectId = buff.getInt();
             makeInstanceWeak(javaObjectId, keepAsWeak);
         }
     }
 
     @RuntimeCallable
-    private void checkWeakObjectAreAlive(ByteBuffer input, ByteBuffer output, int length) {
+    private void checkWeakObjectAreAlive(ByteBuffer input, ByteBuffer output, int length)
+    {
         input.position(0);
         output.position(0);
-        for (int i = 0; i < length; i++) {
+        for (int i = 0; i < length; i++)
+        {
             int javaObjectId = input.getInt();
 
             WeakReference<Object> weakRef = weakInstances.get(javaObjectId);
 
             int isReleased;
 
-            if (weakRef != null) {
+            if (weakRef != null)
+            {
                 Object instance = weakRef.get();
 
-                if (instance == null) {
+                if (instance == null)
+                {
                     isReleased = 1;
                     weakInstances.delete(javaObjectId);
-                } else {
+                }
+                else
+                {
                     isReleased = 0;
                 }
-            } else {
+            }
+            else
+            {
                 isReleased = (strongInstances.get(javaObjectId) == null) ? 1 : 0;
             }
 
@@ -818,20 +956,24 @@ public class Runtime {
     }
 
     @RuntimeCallable
-    private Object getJavaObjectByID(int javaObjectID) throws Exception {
+    private Object getJavaObjectByID(int javaObjectID) throws Exception
+    {
         if (logger.isEnabled())
             logger.write("Platform.getJavaObjectByID:" + javaObjectID);
 
         Object instance = strongInstances.get(javaObjectID, keyNotFoundObject);
 
-        if (instance == keyNotFoundObject) {
+        if (instance == keyNotFoundObject)
+        {
             WeakReference<Object> wr = weakInstances.get(javaObjectID);
-            if (wr == null) {
+            if (wr == null)
+            {
                 throw new NativeScriptException("No weak reference found. Attempt to use cleared object reference id=" + javaObjectID);
             }
 
             instance = wr.get();
-            if (instance == null) {
+            if (instance == null)
+            {
                 throw new NativeScriptException("Attempt to use cleared object reference id=" + javaObjectID);
             }
         }
@@ -842,9 +984,11 @@ public class Runtime {
         return instance;
     }
 
-    private Integer getJavaObjectID(Object obj) {
+    private Integer getJavaObjectID(Object obj)
+    {
         Integer id = strongJavaObjectToID.get(obj);
-        if (id == null) {
+        if (id == null)
+        {
             id = weakJavaObjectToID.get(obj);
         }
 
@@ -852,10 +996,12 @@ public class Runtime {
     }
 
     @RuntimeCallable
-    private int getOrCreateJavaObjectID(Object obj) {
+    private int getOrCreateJavaObjectID(Object obj)
+    {
         Integer result = getJavaObjectID(obj);
 
-        if (result == null) {
+        if (result == null)
+        {
             int objectId = generateNewObjectId(getRuntimeId());
             makeInstanceStrong(obj, objectId);
 
@@ -867,37 +1013,45 @@ public class Runtime {
 
     // sends args in pairs (typeID, value, null) except for objects where its
     // (typeid, javaObjectID, javaJNIClassPath)
-    public static Object callJSMethod(Object javaObject, String methodName, Class<?> retType, Object... args) throws NativeScriptException {
+    public static Object callJSMethod(Object javaObject, String methodName, Class<?> retType, Object... args) throws NativeScriptException
+    {
         return callJSMethod(javaObject, methodName, retType, false /* isConstructor */, args);
     }
 
-    public static Object callJSMethodWithDelay(Object javaObject, String methodName, Class<?> retType, long delay, Object... args) throws NativeScriptException {
+    public static Object callJSMethodWithDelay(Object javaObject, String methodName, Class<?> retType, long delay, Object... args) throws NativeScriptException
+    {
         return callJSMethod(javaObject, methodName, retType, false /* isConstructor */, delay, args);
     }
 
-    public static Object callJSMethod(Object javaObject, String methodName, Class<?> retType, boolean isConstructor, Object... args) throws NativeScriptException {
+    public static Object callJSMethod(Object javaObject, String methodName, Class<?> retType, boolean isConstructor, Object... args) throws NativeScriptException
+    {
         Object ret = callJSMethod(javaObject, methodName, retType, isConstructor, 0, args);
 
         return ret;
     }
 
-    public static Object callJSMethod(Object javaObject, String methodName, boolean isConstructor, Object... args) throws NativeScriptException {
+    public static Object callJSMethod(Object javaObject, String methodName, boolean isConstructor, Object... args) throws NativeScriptException
+    {
         return callJSMethod(javaObject, methodName, void.class, isConstructor, 0, args);
     }
 
-    public static Object callJSMethod(Object javaObject, String methodName, Class<?> retType, boolean isConstructor, long delay, Object... args) throws NativeScriptException {
+    public static Object callJSMethod(Object javaObject, String methodName, Class<?> retType, boolean isConstructor, long delay, Object... args) throws NativeScriptException
+    {
         Runtime runtime = Runtime.getCurrentRuntime();
 
-        if (runtime == null) {
+        if (runtime == null)
+        {
             runtime = getObjectRuntime(javaObject);
         }
 
         return runtime.callJSMethodImpl(javaObject, methodName, retType, isConstructor, delay, args);
     }
 
-    private Object callJSMethodImpl(Object javaObject, String methodName, Class<?> retType, boolean isConstructor, long delay, Object... args) throws NativeScriptException {
+    private Object callJSMethodImpl(Object javaObject, String methodName, Class<?> retType, boolean isConstructor, long delay, Object... args) throws NativeScriptException
+    {
         Integer javaObjectID = getJavaObjectID(javaObject);
-        if (javaObjectID == null) {
+        if (javaObjectID == null)
+        {
             throw new NativeScriptException("Cannot find object id for instance=" + ((javaObject == null) ? "null" : javaObject));
         }
 
@@ -913,19 +1067,23 @@ public class Runtime {
     // (typeid, javaObjectID, canonicalName)
     // if javaObject has no javaObjecID meaning javascript object does not
     // exists for this object we assign one.
-    private Object[] packageArgs(Object... args) {
+    private Object[] packageArgs(Object... args)
+    {
         int len = (args != null) ? (args.length * 3) : 0;
         Object[] packagedArgs = new Object[len];
 
-        if (len > 0) {
+        if (len > 0)
+        {
             int jsArgsIndex = 0;
 
-            for (int i = 0; i < args.length; i++) {
+            for (int i = 0; i < args.length; i++)
+            {
                 Object value = args[i];
                 int typeId = TypeIDs.GetObjectTypeId(value);
                 String javaClassPath = null;
 
-                if (typeId == TypeIDs.JsObject) {
+                if (typeId == TypeIDs.JsObject)
+                {
                     javaClassPath = value.getClass().getName();
                     value = getOrCreateJavaObjectID(value);
                 }
@@ -941,11 +1099,14 @@ public class Runtime {
         return packagedArgs;
     }
 
-    static Class<?> getClassForName(String className) throws ClassNotFoundException {
+    static Class<?> getClassForName(String className) throws ClassNotFoundException
+    {
         Class<?> clazz = classCache.get(className);
-        if (clazz == null) {
+        if (clazz == null)
+        {
             clazz = Class.forName(className);
-            if (clazz != null) {
+            if (clazz != null)
+            {
                 classCache.put(className, clazz);
             }
         }
@@ -954,7 +1115,8 @@ public class Runtime {
     }
 
     @RuntimeCallable
-    private String resolveConstructorSignature(Class<?> clazz, Object[] args) throws Exception {
+    private String resolveConstructorSignature(Class<?> clazz, Object[] args) throws Exception
+    {
         // Pete: cache stuff here, or in the cpp part
 
         if (logger.isEnabled())
@@ -962,7 +1124,8 @@ public class Runtime {
 
         String res = MethodResolver.resolveConstructorSignature(clazz, args);
 
-        if (res == null) {
+        if (res == null)
+        {
             throw new Exception("Failed resolving constructor for class \'" + clazz.getName() + "\' with " + (args != null ? args.length : 0) + " parameters. " + FAILED_CTOR_RESOLUTION_MSG);
         }
 
@@ -970,7 +1133,8 @@ public class Runtime {
     }
 
     @RuntimeCallable
-    private String resolveMethodOverload(String className, String methodName, Object[] args) throws Exception {
+    private String resolveMethodOverload(String className, String methodName, Object[] args) throws Exception
+    {
         if (logger.isEnabled())
             logger.write("resolveMethodOverload: Resolving method " + methodName + " on class " + className);
 
@@ -979,37 +1143,47 @@ public class Runtime {
         String res = MethodResolver.resolveMethodOverload(clazz, methodName, args);
         if (logger.isEnabled())
             logger.write("resolveMethodOverload: method found :" + res);
-        if (res == null) {
+        if (res == null)
+        {
             throw new Exception("Failed resolving method " + methodName + " on class " + className);
         }
 
         return res;
     }
 
-    private Object[] extendConstructorArgs(String methodName, boolean isConstructor, Object[] args) {
+    private Object[] extendConstructorArgs(String methodName, boolean isConstructor, Object[] args)
+    {
         Object[] arr = null;
 
-        if (methodName.equals("init")) {
-            if (args == null) {
+        if (methodName.equals("init"))
+        {
+            if (args == null)
+            {
                 arr = new Object[]
                         {isConstructor};
-            } else {
+            }
+            else
+            {
                 arr = new Object[args.length + 1];
                 System.arraycopy(args, 0, arr, 0, args.length);
                 arr[arr.length - 1] = isConstructor;
             }
-        } else {
+        }
+        else
+        {
             arr = args;
         }
 
         return arr;
     }
 
-    private Object dispatchCallJSMethodNative(final int javaObjectID, final String methodName, boolean isConstructor, Class<?> retType, final Object[] args) throws NativeScriptException {
+    private Object dispatchCallJSMethodNative(final int javaObjectID, final String methodName, boolean isConstructor, Class<?> retType, final Object[] args) throws NativeScriptException
+    {
         return dispatchCallJSMethodNative(javaObjectID, methodName, isConstructor, 0, retType, args);
     }
 
-    private Object dispatchCallJSMethodNative(final int javaObjectID, final String methodName, boolean isConstructor, long delay, Class<?> retType, final Object[] args) throws NativeScriptException {
+    private Object dispatchCallJSMethodNative(final int javaObjectID, final String methodName, boolean isConstructor, long delay, Class<?> retType, final Object[] args) throws NativeScriptException
+    {
         final int returnType = TypeIDs.GetObjectTypeId(retType);
         Object ret = null;
 
@@ -1017,21 +1191,30 @@ public class Runtime {
 
         final Object[] tmpArgs = extendConstructorArgs(methodName, isConstructor, args);
 
-        if (isWorkThread) {
+        if (isWorkThread)
+        {
             Object[] packagedArgs = packageArgs(tmpArgs);
             ret = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, isConstructor, packagedArgs);
-        } else {
+        }
+        else
+        {
             final Object[] arr = new Object[2];
 
             final boolean isCtor = isConstructor;
-            Runnable r = new Runnable() {
+            Runnable r = new Runnable()
+            {
                 @Override
-                public void run() {
-                    synchronized (this) {
-                        try {
+                public void run()
+                {
+                    synchronized (this)
+                    {
+                        try
+                        {
                             final Object[] packagedArgs = packageArgs(tmpArgs);
                             arr[0] = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, isCtor, packagedArgs);
-                        } finally {
+                        }
+                        finally
+                        {
                             this.notify();
                             arr[1] = Boolean.TRUE;
                         }
@@ -1039,22 +1222,32 @@ public class Runtime {
                 }
             };
 
-            if (delay > 0) {
-                try {
+            if (delay > 0)
+            {
+                try
+                {
                     Thread.sleep(delay);
-                } catch (InterruptedException e) {
+                }
+                catch (InterruptedException e)
+                {
                 }
             }
 
             boolean success = threadScheduler.post(r);
 
-            if (success) {
-                synchronized (r) {
-                    try {
-                        if (arr[1] == null) {
+            if (success)
+            {
+                synchronized (r)
+                {
+                    try
+                    {
+                        if (arr[1] == null)
+                        {
                             r.wait();
                         }
-                    } catch (InterruptedException e) {
+                    }
+                    catch (InterruptedException e)
+                    {
                         ret = e;
                     }
                 }
@@ -1067,19 +1260,23 @@ public class Runtime {
     }
 
     @RuntimeCallable
-    private static Class<?> getCachedClass(String className) {
+    private static Class<?> getCachedClass(String className)
+    {
         Class<?> clazz = classCache.get(className);
         return clazz;
     }
 
     @RuntimeCallable
-    private Class<?> findClass(String className) throws ClassNotFoundException {
+    private Class<?> findClass(String className) throws ClassNotFoundException
+    {
         Class<?> clazz = dexFactory.findClass(className);
         return clazz;
     }
 
-    private void purgeAllProxies() {
-        if (dexFactory == null) {
+    private void purgeAllProxies()
+    {
+        if (dexFactory == null)
+        {
             return;
         }
 
@@ -1087,7 +1284,8 @@ public class Runtime {
     }
 
     @RuntimeCallable
-    private static Object createArrayHelper(String arrayClassName, int size) throws ClassNotFoundException {
+    private static Object createArrayHelper(String arrayClassName, int size) throws ClassNotFoundException
+    {
         Class<?> clazz = getClassForName(arrayClassName);
 
         Object arr = Array.newInstance(clazz, size);
@@ -1096,7 +1294,8 @@ public class Runtime {
     }
 
     @RuntimeCallable
-    private static boolean useGlobalRefs() {
+    private static boolean useGlobalRefs()
+    {
         int JELLY_BEAN = 16;
         boolean useGlobalRefs = android.os.Build.VERSION.SDK_INT >= JELLY_BEAN;
         return useGlobalRefs;
@@ -1110,7 +1309,8 @@ public class Runtime {
         ======================================================================
      */
     @RuntimeCallable
-    public static void sendMessageFromMainToWorker(int workerId, String message) {
+    public static void sendMessageFromMainToWorker(int workerId, String message)
+    {
         Runtime currentRuntime = Runtime.getCurrentRuntime();
 
         Message msg = Message.obtain();
@@ -1128,21 +1328,26 @@ public class Runtime {
 
             The workHandler is null because it has been closed; Check if its key is still in the map
          */
-        if(workerHandler == null) {
+        if (workerHandler == null)
+        {
             // Attempt to send a message to a closed worker, throw error or just log a message
-            if(hasKey) {
-                if(currentRuntime.logger.isEnabled()) {
+            if (hasKey)
+            {
+                if (currentRuntime.logger.isEnabled())
+                {
                     currentRuntime.logger.write("Worker(id=" + msg.arg2 + ") that you are trying to send a message to has been terminated. No message will be sent.");
                 }
 
                 return;
             }
 
-            if(currentRuntime.logger.isEnabled()) {
+            if (currentRuntime.logger.isEnabled())
+            {
                 currentRuntime.logger.write("Worker(id=" + msg.arg2 + ")'s handler still not initialized. Requeueing message for Worker(id=" + msg.arg2 + ")");
             }
 
-            if(pendingWorkerMessages.get(workerId) == null) {
+            if (pendingWorkerMessages.get(workerId) == null)
+            {
                 pendingWorkerMessages.put(workerId, new ConcurrentLinkedQueue<Message>());
             }
 
@@ -1152,7 +1357,8 @@ public class Runtime {
             return;
         }
 
-        if(!workerHandler.getLooper().getThread().isAlive()) {
+        if (!workerHandler.getLooper().getThread().isAlive())
+        {
             return;
         }
 
@@ -1160,7 +1366,8 @@ public class Runtime {
     }
 
     @RuntimeCallable
-    public static void sendMessageFromWorkerToMain(String message) {
+    public static void sendMessageFromWorkerToMain(String message)
+    {
         Runtime currentRuntime = Runtime.getCurrentRuntime();
 
         Message msg = Message.obtain();
@@ -1176,7 +1383,8 @@ public class Runtime {
     }
 
     @RuntimeCallable
-    public static void workerObjectTerminate(int workerId) {
+    public static void workerObjectTerminate(int workerId)
+    {
         // Thread should always be main here
         Runtime currentRuntime = Runtime.getCurrentRuntime();
         final long ResendDelay = 1000;
@@ -1196,20 +1404,27 @@ public class Runtime {
 
             The workHandler is null because it has been closed; Check if its key is still in the map
          */
-        if(workerHandler == null) {
+        if (workerHandler == null)
+        {
             // Attempt to send a message to a closed worker, throw error or just log a message
-            if(hasKey) {
-                if(currentRuntime.logger.isEnabled()) {
+            if (hasKey)
+            {
+                if (currentRuntime.logger.isEnabled())
+                {
                     currentRuntime.logger.write("Worker(id=" + msg.arg2 + ") is already terminated. No message will be sent.");
                 }
 
                 return;
-            } else {
-                if(currentRuntime.logger.isEnabled()) {
+            }
+            else
+            {
+                if (currentRuntime.logger.isEnabled())
+                {
                     currentRuntime.logger.write("Worker(id=" + msg.arg2 + ")'s handler still not initialized. Requeueing terminate() message for Worker(id=" + msg.arg2 + ")");
                 }
 
-                if(pendingWorkerMessages.get(workerId) == null) {
+                if (pendingWorkerMessages.get(workerId) == null)
+                {
                     pendingWorkerMessages.put(workerId, new ConcurrentLinkedQueue<Message>());
                 }
 
@@ -1220,7 +1435,8 @@ public class Runtime {
         }
 
         // Worker was closed during this 'terminate' call, nothing to do here
-        if(!workerHandler.getLooper().getThread().isAlive()) {
+        if (!workerHandler.getLooper().getThread().isAlive())
+        {
             return;
         }
 
@@ -1232,7 +1448,8 @@ public class Runtime {
     }
 
     @RuntimeCallable
-    public static void workerScopeClose() {
+    public static void workerScopeClose()
+    {
         // Thread should always be a worker
         Runtime currentRuntime = Runtime.getCurrentRuntime();
 
@@ -1243,7 +1460,8 @@ public class Runtime {
     }
 
     @RuntimeCallable
-    public static void passUncaughtExceptionFromWorkerToMain(String message, String filename, int lineno) {
+    public static void passUncaughtExceptionFromWorkerToMain(String message, String filename, String stackTrace, int lineno)
+    {
         // Thread should always be a worker
         Runtime currentRuntime = Runtime.getCurrentRuntime();
 
@@ -1252,7 +1470,7 @@ public class Runtime {
         msg.arg2 = currentRuntime.workerId;
 
         String threadName = currentRuntime.getHandler().getLooper().getThread().getName();
-        JavaScriptErrorMessage error = new JavaScriptErrorMessage(message, filename, lineno, threadName);
+        JavaScriptErrorMessage error = new JavaScriptErrorMessage(message, stackTrace, filename, lineno, threadName);
 
         msg.obj = error;
 

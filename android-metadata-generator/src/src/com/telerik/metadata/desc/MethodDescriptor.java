@@ -11,4 +11,6 @@ public interface MethodDescriptor {
 
     TypeDescriptor[] getArgumentTypes();
     TypeDescriptor getReturnType();
+
+    MetadataInfoAnnotationDescriptor getMetadataInfoAnnotation();
 }

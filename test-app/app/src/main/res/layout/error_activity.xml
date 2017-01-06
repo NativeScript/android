@@ -12,7 +12,6 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:minHeight="?attr/actionBarSize"
-        android:background="?android:attr/statusBarColor"
         android:layout_alignBottom="@+id/tabLayout"/>
 
     <android.support.v4.view.ViewPager
@@ -31,7 +30,6 @@
         android:background="?attr/colorPrimary"
         android:minHeight="?attr/actionBarSize"
         app:tabIndicatorColor="@color/nativescript_blue"
-        app:tabBackground="?android:attr/statusBarColor"
         android:layout_alignParentTop="true"
         android:layout_alignParentStart="true"
         android:scrollbarStyle="insideOverlay"
