@@ -1695,4 +1695,25 @@ describe("Tests ", function () {
 
         expect(called).toBe(true);
     });
+
+    it("should extend Java class in eval", function () {
+        var source='global.MyObj = java.lang.Object.extend(\
+                {\
+                        hashCode: function () {\
+                                return 1234;\
+                        }\
+                }\
+        )';
+        eval('('+source+')')
+        var o = new MyObj();
+        expect(o.hashCode()).toBe(1234);
+    });
+
+    it("should call method on a newly introduced class in the class hierarchy", function () {
+        /* this test simulates android.os.Bundle class hierarchy change in API level 21
+           which cause app crash on Xiaomi Redmi devices
+        */
+        var b = new com.tns.tests.Bundle();
+        expect(b.getMyInt()).toBe(456);
+    });
 });

@@ -8,7 +8,7 @@
 #include "WeakRef.h"
 #include "ArrayBufferHelper.h"
 #include "Profiler.h"
-#include "Module.h"
+#include "ModuleInternal.h"
 #include "File.h"
 
 jobject ConvertJsValueToJavaObject(tns::JEnv& env, const v8::Local<v8::Value>& value, int classReturnType);
@@ -51,9 +51,11 @@ namespace tns
 			bool NotifyGC(JNIEnv *env, jobject obj);
 			bool TryCallGC();
 			void PassUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, jthrowable exception, jstring stackTrace);
-			void PassUncaughtExceptionFromWorkerToMainHandler(v8::Local<v8::String> message, v8::Local<v8::String> filename, int lineno);
+			void PassUncaughtExceptionFromWorkerToMainHandler(v8::Local<v8::String> message, v8::Local<v8::String> stackTrace, v8::Local<v8::String> filename, int lineno);
 			void ClearStartupData(JNIEnv *env, jobject obj);
 			void DestroyRuntime();
+
+			static v8::Platform *platform;
 
 		private:
 			Runtime(JNIEnv *env, jobject runtime, int id);
@@ -65,7 +67,7 @@ namespace tns
 
 			ObjectManager *m_objectManager;
 
-			Module m_module;
+			ModuleInternal m_module;
 
 			ArrayBufferHelper m_arrayBufferHelper;
 
@@ -93,6 +95,8 @@ namespace tns
 			static jmethodID GET_USED_MEMORY_METHOD_ID;
 
 			static bool s_mainThreadInitialized;
+
+
 	};
 }
 

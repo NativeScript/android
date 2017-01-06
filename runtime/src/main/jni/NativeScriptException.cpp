@@ -317,18 +317,27 @@ void NativeScriptException::PrintErrorMessage(const string &errorMessage) {
 
 string NativeScriptException::GetErrorMessage(const Local<Message>& message, Local<Value>& error)
 {
+
+	Local<String> message_text_string = message->Get();
+	auto mes = ArgConverter::ConvertToString(message_text_string);
+
+    v8::Isolate *isolate = v8::Isolate::GetCurrent();
+	v8::Local<v8::Context> context = isolate->GetEnteredContext();
+    int line_number = message->GetLineNumber(context).FromMaybe(0);
+
 	//get whole error message from previous stack
 	string errMessage;
-	auto v8FullMessage = ArgConverter::ConvertToV8String(Isolate::GetCurrent(), "fullMessage");
+	auto v8FullMessage = ArgConverter::ConvertToV8String(isolate, "fullMessage");
 	if(error->IsObject() && error.As<Object>()->Has(v8FullMessage)) {
 		errMessage = ArgConverter::ConvertToString(error.As<Object>()->Get(v8FullMessage).As<String>());
 	}
+
 
 	//get current message
 	auto str = error->ToDetailString();
 	if (str.IsEmpty())
 	{
-		str = String::NewFromUtf8(Isolate::GetCurrent(), "");
+		str = String::NewFromUtf8(isolate, "");
 	}
 	String::Utf8Value utfError(str);
 

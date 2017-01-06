@@ -79,10 +79,10 @@ namespace tns
 			v8::Local<v8::FunctionTemplate> GetConstructorFunctionTemplate(v8::Isolate *isolate, MetadataTreeNode *treeNode, std::vector<MethodCallbackData*>& instanceMethodsCallbackData);
 			v8::Persistent<v8::Function>* GetPersistentConstructorFunction(v8::Isolate *isolate);
 
-			void SetInstanceMembers(v8::Isolate *isolate, v8::Local<v8::FunctionTemplate>& ctorFuncTemplate, v8::Local<v8::ObjectTemplate>& prototypeTemplate, std::vector<MethodCallbackData*>& instanceMethodsCallbackData, const std::vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode);
-			void SetInstanceMethodsFromStaticMetadata(v8::Isolate *isolate, v8::Local<v8::FunctionTemplate>& ctorFuncTemplate, v8::Local<v8::ObjectTemplate>& prototypeTemplate, std::vector<MethodCallbackData*>& instanceMethodsCallbackData, const std::vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode);
+			std::vector<MethodCallbackData*> SetInstanceMembers(v8::Isolate *isolate, v8::Local<v8::FunctionTemplate>& ctorFuncTemplate, v8::Local<v8::ObjectTemplate>& prototypeTemplate, std::vector<MethodCallbackData*>& instanceMethodsCallbackData, const std::vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode);
+			std::vector<MethodCallbackData*> SetInstanceMethodsFromStaticMetadata(v8::Isolate *isolate, v8::Local<v8::FunctionTemplate>& ctorFuncTemplate, v8::Local<v8::ObjectTemplate>& prototypeTemplate, std::vector<MethodCallbackData*>& instanceMethodsCallbackData, const std::vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode);
 			void SetInstanceFieldsFromStaticMetadata(v8::Isolate *isolate, v8::Local<v8::FunctionTemplate>& ctorFuncTemplate, v8::Local<v8::ObjectTemplate>& prototypeTemplate, std::vector<MethodCallbackData*>& instanceMethodsCallbackData, const std::vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode);
-			void SetInstanceMembersFromRuntimeMetadata(v8::Isolate *isolate, v8::Local<v8::FunctionTemplate>& ctorFuncTemplate, v8::Local<v8::ObjectTemplate>& prototypeTemplate, std::vector<MethodCallbackData*>& instanceMethodsCallbackData, const std::vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode);
+			std::vector<MethodCallbackData*> SetInstanceMembersFromRuntimeMetadata(v8::Isolate *isolate, v8::Local<v8::FunctionTemplate>& ctorFuncTemplate, v8::Local<v8::ObjectTemplate>& prototypeTemplate, std::vector<MethodCallbackData*>& instanceMethodsCallbackData, const std::vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode *treeNode);
 			void SetStaticMembers(v8::Isolate *isolate, v8::Local<v8::Function>& ctorFunction, MetadataTreeNode *treeNode);
 			void SetInnerTypes(v8::Isolate *isolate, v8::Local<v8::Function>& ctorFunction, MetadataTreeNode *treeNode);
 
@@ -132,6 +132,9 @@ namespace tns
 			static ExtendedClassCacheData GetCachedExtendedClassData(v8::Isolate *isolate, const std::string& proxyClassName);
 
 			v8::Local<v8::Function> Wrap(v8::Isolate* isolate, const v8::Local<v8::Function>&function, const std::string& name, const std::string& origin, bool isCtorFunc);
+
+			bool CheckClassHierarchy(JEnv& env, jclass currentClass, MetadataTreeNode *curentTreeNode, MetadataTreeNode *baseTreeNode, std::vector<MetadataTreeNode*>& skippedBaseTypes);
+			void SetMissingBaseMethods(v8::Isolate *isolate, const std::vector<MetadataTreeNode*>& skippedBaseTypes, const std::vector<MethodCallbackData*>& instanceMethodData, v8::Local<v8::ObjectTemplate>& prototypeTemplate);
 
 			MetadataTreeNode *m_treeNode;
 			std::map<v8::Isolate*, v8::Persistent<v8::Function>*> m_poCtorCachePerIsolate;

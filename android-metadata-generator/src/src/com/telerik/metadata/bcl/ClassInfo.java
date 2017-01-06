@@ -1,6 +1,7 @@
 package com.telerik.metadata.bcl;
 
 import com.telerik.metadata.ClassUtil;
+import com.telerik.metadata.desc.MetadataInfoAnnotationDescriptor;
 import com.telerik.metadata.desc.ClassDescriptor;
 import com.telerik.metadata.desc.FieldDescriptor;
 import com.telerik.metadata.desc.MethodDescriptor;
@@ -109,6 +110,11 @@ public class ClassInfo implements ClassDescriptor{
             fields[i] = new FieldInfo(fs[i]);
         }
         return fields;
+    }
+
+    @Override
+    public MetadataInfoAnnotationDescriptor getMetadataInfoAnnotation() {
+        return null;
     }
 
     @Override

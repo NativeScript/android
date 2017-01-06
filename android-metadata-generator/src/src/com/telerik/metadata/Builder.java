@@ -11,6 +11,7 @@ import java.util.Map;
 import com.telerik.metadata.TreeNode.FieldInfo;
 import com.telerik.metadata.TreeNode.MethodInfo;
 import com.telerik.metadata.bcl.JarFile;
+import com.telerik.metadata.desc.MetadataInfoAnnotationDescriptor;
 import com.telerik.metadata.desc.ClassDescriptor;
 import com.telerik.metadata.desc.FieldDescriptor;
 import com.telerik.metadata.desc.MethodDescriptor;
@@ -94,12 +95,24 @@ public class Builder {
 		if (!isClassPublic(clazz)) {
 			return;
 		}
-		TreeNode node = getOrCreateNode(root, clazz);
 
-		setNodeMembers(clazz, node, root);
+		MetadataInfoAnnotationDescriptor metadataInfo = clazz.getMetadataInfoAnnotation();
+		boolean hasClassMetadataInfo = metadataInfo != null;
+		String predefinedSuperClassname = null;
+		if (hasClassMetadataInfo) {
+			if (metadataInfo.skip()) {
+				return;
+			} else {
+				predefinedSuperClassname = metadataInfo.getSuperClassname();
+			}
+		}
+
+		TreeNode node = getOrCreateNode(root, clazz, predefinedSuperClassname);
+
+		setNodeMembers(clazz, node, root, hasClassMetadataInfo);
 	}
 
-	private static void setNodeMembers(ClassDescriptor clazz, TreeNode node, TreeNode root) throws Exception {
+	private static void setNodeMembers(ClassDescriptor clazz, TreeNode node, TreeNode root, boolean hasClassMetadataInfo) throws Exception {
 		Map<String, MethodInfo> existingMethods = new HashMap<String, MethodInfo>();
 		for (MethodInfo mi : node.instanceMethods) {
 			existingMethods.put(mi.name + mi.sig, mi);
@@ -113,6 +126,13 @@ public class Builder {
 		for (MethodDescriptor m : methods) {
 			if (m.isSynthetic())
 				continue;
+
+			if (hasClassMetadataInfo && !m.getName().equals("<init>")) {
+				MetadataInfoAnnotationDescriptor metadataInfo = m.getMetadataInfoAnnotation();
+				if ((metadataInfo != null) && metadataInfo.skip()) {
+					continue;
+				}
+			}
 
 			if (m.isPublic() || m.isProtected()) {
 				boolean isStatic = m.isStatic();
@@ -139,7 +159,7 @@ public class Builder {
 
 				if (mi.signature != null) {
 					if (isStatic) {
-						mi.declaringType = getOrCreateNode(root, clazz);
+						mi.declaringType = getOrCreateNode(root, clazz, null);
 						node.staticMethods.add(mi);
 					} else {
 						String sig = m.getName() + m.getSignature();
@@ -174,10 +194,10 @@ public class Builder {
 				if (f.isStatic()) {
 					if(interfaceClass != null) {
 						// changes declaring type of static fields from implementing class to interface
-						fi.declaringType = getOrCreateNode(root, interfaceClass);	
+						fi.declaringType = getOrCreateNode(root, interfaceClass, null);
 					}
 					else {
-						fi.declaringType = getOrCreateNode(root, clazz);
+						fi.declaringType = getOrCreateNode(root, clazz, null);
 					}
 					node.staticFields.add(fi);
 				} else {
@@ -224,13 +244,13 @@ public class Builder {
 		} else {
 			String name = ClassUtil.getCanonicalName(type.getSignature());
 			ClassDescriptor clazz = ClassRepo.findClass(name);
-			node = getOrCreateNode(root, clazz);
+			node = getOrCreateNode(root, clazz, null);
 		}
 
 		return node;
 	}
 
-	private static TreeNode getOrCreateNode(TreeNode root, ClassDescriptor clazz) throws Exception {
+	private static TreeNode getOrCreateNode(TreeNode root, ClassDescriptor clazz, String predefinedSuperClassname) throws Exception {
 		if (ClassUtil.isPrimitive(clazz)) {
 			return TreeNode.getPrimitive(clazz);
 		}
@@ -297,11 +317,16 @@ public class Builder {
 		}
 		node = child;
 		if (node.baseClassNode == null) {
-			ClassDescriptor baseClass = clazz.isInterface() ? ClassUtil
-					.getClassByName("java.lang.Object") : ClassUtil
-					.getSuperclass(clazz);
+			ClassDescriptor baseClass = null;
+			if (predefinedSuperClassname != null) {
+				baseClass = ClassUtil.getClassByName(predefinedSuperClassname);
+			} else {
+				baseClass = clazz.isInterface()
+						? ClassUtil.getClassByName("java.lang.Object")
+						: ClassUtil.getSuperclass(clazz);
+			}
 			if (baseClass != null) {
-				node.baseClassNode = getOrCreateNode(root, baseClass);
+				node.baseClassNode = getOrCreateNode(root, baseClass, null);
 				copyBasePublicApi(baseClass, node, root);
 			}
 		}
@@ -312,7 +337,7 @@ public class Builder {
 	private static void copyBasePublicApi(ClassDescriptor baseClass, TreeNode node,
 			TreeNode root) throws Exception {
 		while ((baseClass != null) && !baseClass.isPublic()) {
-			setNodeMembers(baseClass, node, root);
+			setNodeMembers(baseClass, node, root, false);
 			baseClass = ClassUtil.getSuperclass(baseClass);
 		}
 	}
@@ -349,7 +374,7 @@ public class Builder {
 				if (clazz.isStatic()) {
 					child.nodeType |= TreeNode.Static;
 				}
-				child.arrayElement = getOrCreateNode(root, clazz);
+				child.arrayElement = getOrCreateNode(root, clazz, null);
 			}
 		}
 

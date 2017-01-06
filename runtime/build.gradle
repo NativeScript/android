@@ -219,10 +219,22 @@ model {
         moduleName = "NativeScript"
 
         cppFlags.addAll(["-I${file("src/main/jni")}".toString(),
-                         "-I${file("src/main/jni/include")}".toString()
+                         "-I${file("src/main/jni/include")}".toString(),
+                         "-I${file("src/main/jni/v8_inspector/")}".toString(),
+                         //"-I${file("src/main/jni/v8_inspector/platform/inspector_protocol/")}".toString(),
+                         //"-I${file("src/main/jni/v8_inspector/protocol/")}".toString(),
         ])
 
-        cppFlags.addAll(["-std=c++11", "-fexceptions", "-fno-builtin-stpcpy"])
+        CFlags.addAll(["-I${file("src/main/jni")}".toString(),
+                       "-I${file("src/main/jni/include")}".toString(),
+                       "-I${file("src/main/jni/v8_inspector")}".toString(),
+                       //"-I${file("src/main/jni/v8_inspector/platform/inspector_protocol/")}".toString(),
+                       //"-I${file("src/main/jni/v8_inspector/protocol/")}".toString(),
+                       ])
+
+        cppFlags.addAll(["-std=c++11", "-fexceptions", "-fno-builtin-stpcpy", "-DHAVE_INSPECTOR", "-D__ANDROID__"]) //, "-DV8_INSPECTOR_USE_STL=1", "-D__GXX_EXPERIMENTAL_CXX0X__=1"
+
+
         CFlags.addAll(["-Wno-error=format-security", "-g", "-fno-builtin-stpcpy"])
 
         ldLibs.addAll(["android", "dl", "log", "atomic", "z"])
@@ -230,10 +242,31 @@ model {
         if(optimized) {
             ldFlags.addAll(["-Wl,--exclude-libs=ALL", "-Wl,--gc-sections"])
         }
+        ldFlags.addAll(["-Wl,--allow-multiple-definition"])
 
+        toolchain = "clang"
         stl = "c++_static"
 
-        abiFilters.addAll(["armeabi-v7a", "x86", "arm64-v8a"])
+        abiFilters.addAll(["armeabi-v7a", "x86"])
+
+        if (System.getProperties()['idea.platform.prefix'] != null)
+        {
+            // Built from AndroidStudio
+            println "Build from AndroidStudio"
+
+            if (!ndkDebuggable)
+            {
+                abiFilters.addAll(["x86", "arm64-v8a"])
+
+            }
+        }
+        else
+        {
+            // Built from command line
+            abiFilters.addAll(["x86", "arm64-v8a"])
+
+            println "Build from Command Line"
+        }
     }
 
     android.sources {
@@ -299,11 +332,12 @@ model {
         create("armeabi-v7a") {
             abiFilters.add("armeabi-v7a")
 
-            //ldLibs.add("${file("src/main/libs/x86/libv8_external_snapshot.a")}".toString())
             ldLibs.add("${file("src/main/libs/armeabi-v7a/libv8_base.a")}".toString())
             ldLibs.add("${file("src/main/libs/armeabi-v7a/libv8_libplatform.a")}".toString())
             ldLibs.add("${file("src/main/libs/armeabi-v7a/libv8_libbase.a")}".toString())
+            ldLibs.add("${file("src/main/libs/armeabi-v7a/libv8_libsampler.a")}".toString())
             ldLibs.add("${file("src/main/libs/armeabi-v7a/libv8_nosnapshot.a")}".toString())
+            ldLibs.add("${file("src/main/libs/armeabi-v7a/libinspector.a")}".toString())
             ldLibs.add("${file("src/main/libs/armeabi-v7a/libzip.a")}".toString())
         }
 
@@ -313,7 +347,9 @@ model {
             ldLibs.add("${file("src/main/libs/x86/libv8_base.a")}".toString())
             ldLibs.add("${file("src/main/libs/x86/libv8_libplatform.a")}".toString())
             ldLibs.add("${file("src/main/libs/x86/libv8_libbase.a")}".toString())
+            ldLibs.add("${file("src/main/libs/x86/libv8_libsampler.a")}".toString())
             ldLibs.add("${file("src/main/libs/x86/libv8_nosnapshot.a")}".toString())
+            ldLibs.add("${file("src/main/libs/x86/libinspector.a")}".toString())
             ldLibs.add("${file("src/main/libs/x86/libzip.a")}".toString())
         }
 
@@ -325,7 +361,9 @@ model {
                     "-lv8_base",
                     "-lv8_libplatform",
                     "-lv8_libbase",
+                    "-lv8_libsampler",
                     "-lv8_nosnapshot",
+                    "-linspector",
                     "-lzip"
             ])
 
@@ -352,6 +390,7 @@ model {
                     staticLibraryFile = file("src/main/libs/${targetPlatform.getName()}/libv8_base.a")
                     staticLibraryFile = file("src/main/libs/${targetPlatform.getName()}/libv8_libplatform.a")
                     staticLibraryFile = file("src/main/libs/${targetPlatform.getName()}/libv8_libbase.a")
+                    staticLibraryFile = file("src/main/libs/${targetPlatform.getName()}/libv8_libsampler.a")
                     staticLibraryFile = file("src/main/libs/${targetPlatform.getName()}/libv8_nosnapshot.a")
                     staticLibraryFile = file("src/main/libs/${targetPlatform.getName()}/libzip.a")
                 }

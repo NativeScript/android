@@ -1,6 +1,7 @@
 package com.tns;
 
 import android.app.Application;
+import android.os.Debug;
 
 public class NativeScriptApplication extends android.app.Application {
 
@@ -11,7 +12,7 @@ public class NativeScriptApplication extends android.app.Application {
     }
 
     public void onCreate() {
-		super.onCreate();
+        super.onCreate();
 		com.tns.Runtime runtime = RuntimeHelper.initRuntime(this);
         if (runtime !=null) {
             runtime.run();

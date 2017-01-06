@@ -27,6 +27,9 @@ cache:
   - "$HOME/.gradle/caches/"
   - "$HOME/.gradle/wrapper/"
 before_install:
+  - curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.deb.sh | sudo bash
+  - sudo apt-get install git-lfs
+  - git lfs install
   - sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules
   - git submodule update --init --recursive
   - wget http://dl.google.com/android/repository/android-ndk-$NDK_VERSION-linux-x86_64.zip
@@ -36,6 +39,7 @@ before_install:
   - export ANDROID_NDK_HOME=`pwd`/android-ndk-$NDK_VERSION
   - export PATH=${PATH}:${ANDROID_NDK_HOME}
 script:
+  - git lfs pull
   - "./gradlew createPackage -i -PpreReleaseVersion=$PACKAGE_VERSION -PgitCommitVersion=$TRAVIS_COMMIT --stacktrace"
   - echo no | android create avd --force -n Arm21 -t android-21 -b armeabi-v7a -c 12M
   - emulator -avd Arm21 -no-skin -no-audio -no-window &

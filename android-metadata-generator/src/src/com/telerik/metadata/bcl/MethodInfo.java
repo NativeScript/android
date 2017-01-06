@@ -1,5 +1,6 @@
 package com.telerik.metadata.bcl;
 
+import com.telerik.metadata.desc.MetadataInfoAnnotationDescriptor;
 import com.telerik.metadata.desc.MethodDescriptor;
 import com.telerik.metadata.desc.TypeDescriptor;
 import org.apache.bcel.classfile.Method;
@@ -55,5 +56,10 @@ public class MethodInfo implements MethodDescriptor {
     @Override
     public TypeDescriptor getReturnType() {
         return new TypeInfo(m.getReturnType());
+    }
+
+    @Override
+    public MetadataInfoAnnotationDescriptor getMetadataInfoAnnotation() {
+        return null;
     }
 }
