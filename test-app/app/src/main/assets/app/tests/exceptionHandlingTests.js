@@ -336,7 +336,7 @@ describe("Tests exception handling ", function () {
 	    expect(exceptionCaught).toBe(true);
 	    expect(errMsg).toContain("Cannot compile /data/data/com.tns.android_runtime_testapp/files/app/tests/syntaxErrors.js");
 	    expect(errMsg).toContain("SyntaxError: Unexpected token =");
-	    expect(errMsg).toContain("File: \"/data/data/com.tns.android_runtime_testapp/files/app/tests/syntaxErrors.js, line: 3, column: 10");
+	    expect(errMsg).toContain("File: \"file:///data/data/com.tns.android_runtime_testapp/files/app/tests/syntaxErrors.js, line: 3, column: 10");
 
 
 
