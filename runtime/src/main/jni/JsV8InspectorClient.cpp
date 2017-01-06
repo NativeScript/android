@@ -222,6 +222,11 @@ JsV8InspectorClient *JsV8InspectorClient::GetInstance()
 
 
 void JsV8InspectorClient::sendToFrontEndCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
+
+    if(instance->connection == nullptr) {
+        return;
+    }
+
     try
     {
         if ((args.Length() > 0) && args[0]->IsString())
