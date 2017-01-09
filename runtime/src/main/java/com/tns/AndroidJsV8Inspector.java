@@ -60,7 +60,6 @@ public class AndroidJsV8Inspector
 
     @RuntimeCallable
     private static void sendToDevToolsConsole(Object connection, String message, String level) {
-        //{"method":"Runtime.consoleAPICalled","params":{"type":"log","args":["asdjasdkljasd"],"executionContextId":0,"timestamp":0.000000000000000}}
         try {
             JSONObject consoleMessage = new JSONObject();
 
