@@ -40,10 +40,10 @@ class ClassInfo implements com.tns.bindings.desc.ClassDescriptor {
     @Override
     public boolean isPrimitive() {
         return isArray()
-                ? false
-                : ((primitiveType != null)
-                    ? true
-                    : (!(clazz.isClass() || clazz.isEnum() || clazz.isInterface())));
+               ? false
+               : ((primitiveType != null)
+                  ? true
+                  : (!(clazz.isClass() || clazz.isEnum() || clazz.isInterface())));
     }
 
     @Override
@@ -54,8 +54,8 @@ class ClassInfo implements com.tns.bindings.desc.ClassDescriptor {
     @Override
     public boolean isInterface() {
         return isArray()
-                ? false
-                : (isPrimitive() ? false : clazz.isInterface());
+               ? false
+               : (isPrimitive() ? false : clazz.isInterface());
     }
 
     @Override
@@ -94,10 +94,10 @@ class ClassInfo implements com.tns.bindings.desc.ClassDescriptor {
     @Override
     public ClassDescriptor getComponentType() {
         return isArray()
-                ? ((primitiveType != null)
-                    ? ((rank > 1) ? new ClassInfo(primitiveType, rank-1) : primitiveType)
-                    : new ClassInfo(clazz, rank-1, generator))
-                : null;
+               ? ((primitiveType != null)
+                  ? ((rank > 1) ? new ClassInfo(primitiveType, rank-1) : primitiveType)
+                  : new ClassInfo(clazz, rank-1, generator))
+               : null;
     }
 
     @Override

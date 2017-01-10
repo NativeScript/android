@@ -53,8 +53,8 @@ public class CustomClassesTest {
 
         boolean methodIsGenerated = false;
 
-        if(methodsFromGeneratedDex.contains("attachBaseContext")) {
-           methodIsGenerated = true;
+        if (methodsFromGeneratedDex.contains("attachBaseContext")) {
+            methodIsGenerated = true;
         }
 
         Assert.assertEquals(false, methodIsGenerated);
@@ -71,7 +71,7 @@ public class CustomClassesTest {
 
         boolean methodIsGenerated = false;
 
-        if(methodsFromGeneratedDex.contains("initInstance")) {
+        if (methodsFromGeneratedDex.contains("initInstance")) {
             methodIsGenerated = true;
         }
 
@@ -89,8 +89,8 @@ public class CustomClassesTest {
         List<String> expectedMethods = getOverriddenMethodsFromBindings(bindingsFile);
 
         int currentMethodCount = 0;
-        for(String expectedName: expectedMethods) {
-            if(methodsFromGeneratedDex.contains(expectedName)) {
+        for (String expectedName: expectedMethods) {
+            if (methodsFromGeneratedDex.contains(expectedName)) {
                 currentMethodCount++;
             }
         }
@@ -112,8 +112,8 @@ public class CustomClassesTest {
         expectedMethods.add("equals");
 
         int currentMethodCount = 0;
-        for(String expectedMethod: expectedMethods) {
-            if(methodsFromGeneratedDex.contains(expectedMethod)) {
+        for (String expectedMethod: expectedMethods) {
+            if (methodsFromGeneratedDex.contains(expectedMethod)) {
                 currentMethodCount++;
             }
         }
@@ -153,12 +153,12 @@ public class CustomClassesTest {
         List<String> expectedMethods = getOverriddenMethodsFromBindings(bindingsFile);
 
         boolean containsInitializeBlock = false;
-        if(methodsFromGeneratedDex.contains("initInstance")) {
+        if (methodsFromGeneratedDex.contains("initInstance")) {
             containsInitializeBlock = true;
         }
         int currentMethodCount = 0;
-        for(String expectedName: expectedMethods) {
-            if(methodsFromGeneratedDex.contains(expectedName)) {
+        for (String expectedName: expectedMethods) {
+            if (methodsFromGeneratedDex.contains(expectedName)) {
                 currentMethodCount++;
             }
         }
@@ -178,8 +178,8 @@ public class CustomClassesTest {
         List<String> expectedMethods = getOverriddenMethodsFromBindings(bindingsFile);
 
         int currentMethodCount = 0;
-        for(String expectedName: expectedMethods) {
-            if(methodsFromGeneratedDex.contains(expectedName)) {
+        for (String expectedName: expectedMethods) {
+            if (methodsFromGeneratedDex.contains(expectedName)) {
                 currentMethodCount++;
             }
         }
@@ -197,8 +197,8 @@ public class CustomClassesTest {
         List<String> expectedMethods = getOverriddenMethodsFromBindings(bindingsFile);
 
         int currentMethodCount = 0;
-        for(String expectedName: expectedMethods) {
-            if(methodsFromGeneratedDex.contains(expectedName)) {
+        for (String expectedName: expectedMethods) {
+            if (methodsFromGeneratedDex.contains(expectedName)) {
                 currentMethodCount++;
             }
         }
@@ -216,8 +216,8 @@ public class CustomClassesTest {
         List<String> expectedMethods = getOverriddenMethodsFromBindings(bindingsFile);
 
         int currentMethodCount = 0;
-        for(String expectedName: expectedMethods) {
-            if(methodsFromGeneratedDex.contains(expectedName)) {
+        for (String expectedName: expectedMethods) {
+            if (methodsFromGeneratedDex.contains(expectedName)) {
                 currentMethodCount++;
             }
         }
@@ -229,10 +229,10 @@ public class CustomClassesTest {
     private List<String> getOverriddenMethodsFromBindings(File bindingsFile) throws FileNotFoundException {
         List<String> expectedMethods = new ArrayList<>();
         Scanner scanner = new Scanner(bindingsFile);
-        while(scanner.hasNextLine()) {
+        while (scanner.hasNextLine()) {
             DataRow row = new DataRow(scanner.nextLine());
             String[] allMethods = row.getMethods();
-            if(allMethods.length > 0 && !allMethods[0].equals("")) {
+            if (allMethods.length > 0 && !allMethods[0].equals("")) {
                 expectedMethods.addAll(Arrays.asList(allMethods));
             }
         }
@@ -251,7 +251,7 @@ public class CustomClassesTest {
         List<String> namesTable = dex.strings();
         List<String> methodsFromGeneratedDex = new ArrayList<String>();
 
-        for(MethodId mId: methodTable) {
+        for (MethodId mId: methodTable) {
             int nameIndex = mId.getNameIndex();
             methodsFromGeneratedDex.add(namesTable.get(nameIndex));
         }
@@ -260,7 +260,7 @@ public class CustomClassesTest {
 
     private boolean checkIfStringExistsInDex(String dexName, String what) throws IOException {
         Dex dex = new Dex(new File(outputDir, dexName));
-        if(dex.findStringIndex(what) > 0) {
+        if (dex.findStringIndex(what) > 0) {
             return true;
         }
         return false;

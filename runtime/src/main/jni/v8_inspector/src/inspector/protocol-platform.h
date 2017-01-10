@@ -13,7 +13,7 @@ namespace v8_inspector {
 
 template <typename T>
 std::unique_ptr<T> wrapUnique(T* ptr) {
-  return std::unique_ptr<T>(ptr);
+    return std::unique_ptr<T>(ptr);
 }
 
 }  // namespace v8_inspector

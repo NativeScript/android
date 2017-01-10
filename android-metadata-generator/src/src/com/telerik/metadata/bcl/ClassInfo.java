@@ -14,7 +14,7 @@ import org.apache.bcel.classfile.InnerClasses;
 import org.apache.bcel.classfile.JavaClass;
 import org.apache.bcel.classfile.Method;
 
-public class ClassInfo implements ClassDescriptor{
+public class ClassInfo implements ClassDescriptor {
     private final JavaClass clazz;
 
     public ClassInfo(JavaClass clazz) {
@@ -42,8 +42,8 @@ public class ClassInfo implements ClassDescriptor{
                     for (InnerClass ic : i) {
 
                         ConstantUtf8 cname = (ConstantUtf8) clazz
-                                .getConstantPool().getConstant(ic.getInnerNameIndex());
-                        if(cname == null) {
+                                             .getConstantPool().getConstant(ic.getInnerNameIndex());
+                        if (cname == null) {
                             continue;
                         }
 
@@ -56,8 +56,9 @@ public class ClassInfo implements ClassDescriptor{
                         }
                     }
                 }
-                if (found)
+                if (found) {
                     break;
+                }
             }
         }
     }

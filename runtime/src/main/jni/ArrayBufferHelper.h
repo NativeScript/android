@@ -4,27 +4,25 @@
 #include "v8.h"
 #include "ObjectManager.h"
 
-namespace tns
-{
-	class ArrayBufferHelper
-	{
-		public:
-			ArrayBufferHelper();
+namespace tns {
+class ArrayBufferHelper {
+    public:
+        ArrayBufferHelper();
 
-			void CreateConvertFunctions(v8::Isolate *isolate, const v8::Local<v8::Object>& global, ObjectManager *objectManager);
+        void CreateConvertFunctions(v8::Isolate* isolate, const v8::Local<v8::Object>& global, ObjectManager* objectManager);
 
-		private:
+    private:
 
-			static void CreateFromCallbackStatic(const v8::FunctionCallbackInfo<v8::Value>& info);
+        static void CreateFromCallbackStatic(const v8::FunctionCallbackInfo<v8::Value>& info);
 
-			void CreateFromCallbackImpl(const v8::FunctionCallbackInfo<v8::Value>& info);
+        void CreateFromCallbackImpl(const v8::FunctionCallbackInfo<v8::Value>& info);
 
-			ObjectManager *m_objectManager;
+        ObjectManager* m_objectManager;
 
-			jclass m_ByteBufferClass;
+        jclass m_ByteBufferClass;
 
-			jmethodID m_isDirectMethodID;
-	};
+        jmethodID m_isDirectMethodID;
+};
 }
 
 

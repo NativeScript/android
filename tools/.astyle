@@ -17,8 +17,10 @@
 --exclude="runtime/src/main/jni/include" 
 
 # Allow processing to continue if there are errors in the "exclude=###" options.
--i
+-xi
 
 # Do not retain a backup of the original file. The original file is purged after it is formatted.
 -n
 
+# Java style uses attached brackets.
+--style=java

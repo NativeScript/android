@@ -1,1 +1,1 @@
-./tools/astyle --recursive -H -k1 -j -C -s4 -xi -n --exclude="runtime/src/main/jni/include" test-app/*.java runtime/*.java runtime/*.h runtime/*.cpp build-artifacts/*.java android-metadata-generator/*.java android-static-binding-generator/*.java
+./tools/astyle --style=java --recursive -H -k1 -j -C -s4 -xi -n --exclude="runtime/src/main/jni/include" test-app/*.java runtime/*.java runtime/*.h runtime/*.cpp build-artifacts/*.java android-metadata-generator/*.java android-static-binding-generator/*.java

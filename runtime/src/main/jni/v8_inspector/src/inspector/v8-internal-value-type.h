@@ -16,7 +16,7 @@ bool markAsInternal(v8::Local<v8::Context>, v8::Local<v8::Object>,
 bool markArrayEntriesAsInternal(v8::Local<v8::Context>, v8::Local<v8::Array>,
                                 V8InternalValueType);
 v8::Local<v8::Value> v8InternalValueTypeFrom(v8::Local<v8::Context>,
-                                             v8::Local<v8::Object>);
+        v8::Local<v8::Object>);
 
 }  // namespace v8_inspector
 
