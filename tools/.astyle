@@ -1,0 +1,24 @@
+# Insert space padding between a header (e.g. 'if', 'for', 'while'...) and the following paren. Any end of line comments will remain in the original column, if possible. This can be used with unpad-paren to remove unwanted spaces.
+-H 
+
+# Attach a pointer or reference operator (*, &, or ^) to either the variable type (left) or variable name (right), or place it between the type and name (middle). The spacing between the type and name will be preserved, if possible. This option is for C/C++, C++/CLI, and C# files.
+-k1 
+
+# Add brackets to unbracketed one line conditional statements (e.g. 'if', 'for', 'while'...). The statement must be on a single line. The brackets will be added according to the currently requested predefined style or bracket type. If no style or bracket type is requested the brackets will be attached. If --add-one-line-brackets is also used the result will be one line brackets.
+-j 
+
+# Converts tabs into spaces in the non-indentation part of the line. The number of spaces inserted will maintain the spacing of the tab. The current setting for spaces per tab is used. It may not produce the expected results if convert-tabs is used when changing spaces per tab. Tabs are not replaced in quotes.
+-C 
+
+# Indent 4 spaces
+-s4 
+
+# Specify a file or sub directory #### to be excluded from processing. 
+--exclude="runtime/src/main/jni/include" 
+
+# Allow processing to continue if there are errors in the "exclude=###" options.
+-i
+
+# Do not retain a backup of the original file. The original file is purged after it is formatted.
+-n
+
