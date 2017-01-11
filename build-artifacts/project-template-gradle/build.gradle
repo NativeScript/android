@@ -25,7 +25,7 @@ buildscript {
     }
 
 	dependencies {
-		classpath "com.android.tools.build:gradle:2.1.2"
+		classpath "com.android.tools.build:gradle:2.2.3"
 	}
 }
 
@@ -701,7 +701,7 @@ task myMergeDex {
 					dexArr[dexArrLen-1] = new com.android.dex.Dex(f)
 				}
 
-				def dexMerger = new com.android.dx.merge.DexMerger(dexArr, com.android.dx.merge.CollisionPolicy.FAIL)
+				def dexMerger = new com.android.dx.merge.DexMerger(dexArr, com.android.dx.merge.CollisionPolicy.FAIL, new com.android.dx.command.dexer.DxContext())
 				def merged = dexMerger.merge()
 				def newDex = shouldMergeInMainDex ? f : new File(dexOutputDir, "/classes${lastDexIndex}.dex")
 
@@ -764,10 +764,10 @@ task buildapk {
 
 	//done to build only necessary apk
 	if(project.hasProperty("release")) {
-		dependsOn assembleRelease
+		dependsOn "assembleRelease"
 	}
 	else {
-		dependsOn assembleDebug
+		dependsOn "assembleDebug"
 	}
 }
 
