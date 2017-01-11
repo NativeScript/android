@@ -81,16 +81,9 @@ project.ext.selectedBuildType = project.hasProperty("release") ? "release" : "de
 def renameResultApks (variant) {
 	def name
 	variant.outputs.each { output ->
-
 		def apkDirectory = output.packageApplication.outputFile.parentFile
 		def apkNamePrefix = rootProject.name + "-" + variant.buildType.name
-
-		if (output.zipAlign) {
-			name = apkNamePrefix + ".apk"
-			output.outputFile = new File(apkDirectory, name);
-		}
-
-		name = apkNamePrefix + "-unaligned.apk"
+		name = apkNamePrefix + ".apk"
 		output.packageApplication.outputFile = new File(apkDirectory, name);
 	}    
 }
