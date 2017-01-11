@@ -129,7 +129,10 @@ class ClassInfo implements com.tns.bindings.desc.ClassDescriptor {
     public ClassDescriptor getSuperclass() {
         ClassDescriptor superClass = null;
         if (!isArray() && !isPrimitive() && !getName().equals("java.lang.Object")) {
-            superClass = new ClassInfo(generator.getClasses().get(clazz.getSuperclassName()), generator);
+            String javaClassName = clazz.getSuperclassName().replace('$', '.');
+            JavaClass javaClass = generator.getClasses().get(javaClassName);
+
+            superClass = new ClassInfo(javaClass, generator);
         }
         return superClass;
     }
