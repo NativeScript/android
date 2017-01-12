@@ -23,50 +23,52 @@ class V8InspectorSessionImpl;
 using protocol::ErrorString;
 
 class V8ProfilerAgentImpl : public protocol::Profiler::Backend {
- public:
-  V8ProfilerAgentImpl(V8InspectorSessionImpl*, protocol::FrontendChannel*,
-                      protocol::DictionaryValue* state);
-  ~V8ProfilerAgentImpl() override;
+    public:
+        V8ProfilerAgentImpl(V8InspectorSessionImpl*, protocol::FrontendChannel*,
+                            protocol::DictionaryValue* state);
+        ~V8ProfilerAgentImpl() override;
 
-  bool enabled() const { return m_enabled; }
-  void restore();
+        bool enabled() const {
+            return m_enabled;
+        }
+        void restore();
 
-  void enable(ErrorString*) override;
-  void disable(ErrorString*) override;
-  void setSamplingInterval(ErrorString*, int) override;
-  void start(ErrorString*) override;
-  void stop(ErrorString*,
-            std::unique_ptr<protocol::Profiler::Profile>*) override;
+        void enable(ErrorString*) override;
+        void disable(ErrorString*) override;
+        void setSamplingInterval(ErrorString*, int) override;
+        void start(ErrorString*) override;
+        void stop(ErrorString*,
+                  std::unique_ptr<protocol::Profiler::Profile>*) override;
 
-  void consoleProfile(const String16& title);
-  void consoleProfileEnd(const String16& title);
+        void consoleProfile(const String16& title);
+        void consoleProfileEnd(const String16& title);
 
-  bool idleStarted();
-  bool idleFinished();
+        bool idleStarted();
+        bool idleFinished();
 
-  void collectSample();
+        void collectSample();
 
- private:
-  String16 nextProfileId();
+    private:
+        String16 nextProfileId();
 
-  void startProfiling(const String16& title);
-  std::unique_ptr<protocol::Profiler::Profile> stopProfiling(
-      const String16& title, bool serialize);
+        void startProfiling(const String16& title);
+        std::unique_ptr<protocol::Profiler::Profile> stopProfiling(
+            const String16& title, bool serialize);
 
-  bool isRecording() const;
+        bool isRecording() const;
 
-  V8InspectorSessionImpl* m_session;
-  v8::Isolate* m_isolate;
-  v8::CpuProfiler* m_profiler;
-  protocol::DictionaryValue* m_state;
-  protocol::Profiler::Frontend m_frontend;
-  bool m_enabled;
-  bool m_recordingCPUProfile;
-  class ProfileDescriptor;
-  std::vector<ProfileDescriptor> m_startedProfiles;
-  String16 m_frontendInitiatedProfileId;
+        V8InspectorSessionImpl* m_session;
+        v8::Isolate* m_isolate;
+        v8::CpuProfiler* m_profiler;
+        protocol::DictionaryValue* m_state;
+        protocol::Profiler::Frontend m_frontend;
+        bool m_enabled;
+        bool m_recordingCPUProfile;
+        class ProfileDescriptor;
+        std::vector<ProfileDescriptor> m_startedProfiles;
+        String16 m_frontendInitiatedProfileId;
 
-  DISALLOW_COPY_AND_ASSIGN(V8ProfilerAgentImpl);
+        DISALLOW_COPY_AND_ASSIGN(V8ProfilerAgentImpl);
 };
 
 }  // namespace v8_inspector

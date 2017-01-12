@@ -8,18 +8,18 @@ package fi.iki.elonen;
  * %%
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
- * 
+ *
  * 1. Redistributions of source code must retain the above copyright notice, this
  *    list of conditions and the following disclaimer.
- * 
+ *
  * 2. Redistributions in binary form must reproduce the above copyright notice,
  *    this list of conditions and the following disclaimer in the documentation
  *    and/or other materials provided with the distribution.
- * 
+ *
  * 3. Neither the name of the nanohttpd nor the names of its contributors
  *    may be used to endorse or promote products derived from this software without
  *    specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
@@ -52,11 +52,9 @@ import fi.iki.elonen.NanoWSD.WebSocketFrame.CloseCode;
 import fi.iki.elonen.NanoWSD.WebSocketFrame.CloseFrame;
 import fi.iki.elonen.NanoWSD.WebSocketFrame.OpCode;
 
-public abstract class NanoWSD extends NanoHTTPD
-{
+public abstract class NanoWSD extends NanoHTTPD {
 
-    public static enum State
-    {
+    public static enum State {
         UNCONNECTED,
         CONNECTING,
         OPEN,
@@ -64,8 +62,7 @@ public abstract class NanoWSD extends NanoHTTPD
         CLOSED
     }
 
-    public static abstract class WebSocket
-    {
+    public static abstract class WebSocket {
 
         private final InputStream in;
 
@@ -79,12 +76,10 @@ public abstract class NanoWSD extends NanoHTTPD
 
         private final NanoHTTPD.IHTTPSession handshakeRequest;
 
-        private final NanoHTTPD.Response handshakeResponse = new NanoHTTPD.Response(NanoHTTPD.Response.Status.SWITCH_PROTOCOL, null, (InputStream) null, 0)
-        {
+        private final NanoHTTPD.Response handshakeResponse = new NanoHTTPD.Response(NanoHTTPD.Response.Status.SWITCH_PROTOCOL, null, (InputStream) null, 0) {
 
             @Override
-            protected void send(OutputStream out)
-            {
+            protected void send(OutputStream out) {
                 WebSocket.this.out = out;
                 WebSocket.this.state = State.CONNECTING;
                 super.send(out);
@@ -94,8 +89,7 @@ public abstract class NanoWSD extends NanoHTTPD
             }
         };
 
-        public WebSocket(NanoHTTPD.IHTTPSession handshakeRequest)
-        {
+        public WebSocket(NanoHTTPD.IHTTPSession handshakeRequest) {
             this.handshakeRequest = handshakeRequest;
             this.in = handshakeRequest.getInputStream();
 
@@ -103,8 +97,7 @@ public abstract class NanoWSD extends NanoHTTPD
             this.handshakeResponse.addHeader(NanoWSD.HEADER_CONNECTION, NanoWSD.HEADER_CONNECTION_VALUE);
         }
 
-        public boolean isOpen()
-        {
+        public boolean isOpen() {
             return state == State.OPEN;
         }
 
@@ -123,8 +116,7 @@ public abstract class NanoWSD extends NanoHTTPD
          *
          * @param frame The received WebSocket Frame.
          */
-        protected void debugFrameReceived(WebSocketFrame frame)
-        {
+        protected void debugFrameReceived(WebSocketFrame frame) {
         }
 
         /**
@@ -133,49 +125,34 @@ public abstract class NanoWSD extends NanoHTTPD
          *
          * @param frame The sent WebSocket Frame.
          */
-        protected void debugFrameSent(WebSocketFrame frame)
-        {
+        protected void debugFrameSent(WebSocketFrame frame) {
         }
 
-        public void close(CloseCode code, String reason, boolean initiatedByRemote) throws IOException
-        {
+        public void close(CloseCode code, String reason, boolean initiatedByRemote) throws IOException {
             State oldState = this.state;
             this.state = State.CLOSING;
-            if (oldState == State.OPEN)
-            {
+            if (oldState == State.OPEN) {
                 sendFrame(new CloseFrame(code, reason));
-            }
-            else
-            {
+            } else {
                 doClose(code, reason, initiatedByRemote);
             }
         }
 
-        private void doClose(CloseCode code, String reason, boolean initiatedByRemote)
-        {
-            if (this.state == State.CLOSED)
-            {
+        private void doClose(CloseCode code, String reason, boolean initiatedByRemote) {
+            if (this.state == State.CLOSED) {
                 return;
             }
-            if (this.in != null)
-            {
-                try
-                {
+            if (this.in != null) {
+                try {
                     this.in.close();
-                }
-                catch (IOException e)
-                {
+                } catch (IOException e) {
                     NanoWSD.LOG.log(Level.FINE, "close failed", e);
                 }
             }
-            if (this.out != null)
-            {
-                try
-                {
+            if (this.out != null) {
+                try {
                     this.out.close();
-                }
-                catch (IOException e)
-                {
+                } catch (IOException e) {
                     NanoWSD.LOG.log(Level.FINE, "close failed", e);
                 }
             }
@@ -185,163 +162,117 @@ public abstract class NanoWSD extends NanoHTTPD
 
         // --------------------------------IO--------------------------------------
 
-        public NanoHTTPD.IHTTPSession getHandshakeRequest()
-        {
+        public NanoHTTPD.IHTTPSession getHandshakeRequest() {
             return this.handshakeRequest;
         }
 
-        public NanoHTTPD.Response getHandshakeResponse()
-        {
+        public NanoHTTPD.Response getHandshakeResponse() {
             return this.handshakeResponse;
         }
 
-        private void handleCloseFrame(WebSocketFrame frame) throws IOException
-        {
+        private void handleCloseFrame(WebSocketFrame frame) throws IOException {
             CloseCode code = CloseCode.NormalClosure;
             String reason = "";
-            if (frame instanceof CloseFrame)
-            {
+            if (frame instanceof CloseFrame) {
                 code = ((CloseFrame) frame).getCloseCode();
                 reason = ((CloseFrame) frame).getCloseReason();
             }
-            if (this.state == State.CLOSING)
-            {
+            if (this.state == State.CLOSING) {
                 // Answer for my requested close
                 doClose(code, reason, false);
-            }
-            else
-            {
+            } else {
                 close(code, reason, true);
             }
         }
 
-        private void handleFrameFragment(WebSocketFrame frame) throws IOException
-        {
-            if (frame.getOpCode() != OpCode.Continuation)
-            {
+        private void handleFrameFragment(WebSocketFrame frame) throws IOException {
+            if (frame.getOpCode() != OpCode.Continuation) {
                 // First
-                if (this.continuousOpCode != null)
-                {
+                if (this.continuousOpCode != null) {
                     throw new WebSocketException(CloseCode.ProtocolError, "Previous continuous frame sequence not completed.");
                 }
                 this.continuousOpCode = frame.getOpCode();
                 this.continuousFrames.clear();
                 this.continuousFrames.add(frame);
-            }
-            else if (frame.isFin())
-            {
+            } else if (frame.isFin()) {
                 // Last
-                if (this.continuousOpCode == null)
-                {
+                if (this.continuousOpCode == null) {
                     throw new WebSocketException(CloseCode.ProtocolError, "Continuous frame sequence was not started.");
                 }
                 this.continuousFrames.add(frame);
                 onMessage(new WebSocketFrame(this.continuousOpCode, this.continuousFrames));
                 this.continuousOpCode = null;
                 this.continuousFrames.clear();
-            }
-            else if (this.continuousOpCode == null)
-            {
+            } else if (this.continuousOpCode == null) {
                 // Unexpected
                 throw new WebSocketException(CloseCode.ProtocolError, "Continuous frame sequence was not started.");
-            }
-            else
-            {
+            } else {
                 // Intermediate
                 this.continuousFrames.add(frame);
             }
         }
 
-        private void handleWebsocketFrame(WebSocketFrame frame) throws IOException
-        {
+        private void handleWebsocketFrame(WebSocketFrame frame) throws IOException {
             debugFrameReceived(frame);
-            if (frame.getOpCode() == OpCode.Close)
-            {
+            if (frame.getOpCode() == OpCode.Close) {
                 handleCloseFrame(frame);
-            }
-            else if (frame.getOpCode() == OpCode.Ping)
-            {
+            } else if (frame.getOpCode() == OpCode.Ping) {
                 sendFrame(new WebSocketFrame(OpCode.Pong, true, frame.getBinaryPayload()));
-            }
-            else if (frame.getOpCode() == OpCode.Pong)
-            {
+            } else if (frame.getOpCode() == OpCode.Pong) {
                 onPong(frame);
-            }
-            else if (!frame.isFin() || frame.getOpCode() == OpCode.Continuation)
-            {
+            } else if (!frame.isFin() || frame.getOpCode() == OpCode.Continuation) {
                 handleFrameFragment(frame);
-            }
-            else if (this.continuousOpCode != null)
-            {
+            } else if (this.continuousOpCode != null) {
                 throw new WebSocketException(CloseCode.ProtocolError, "Continuous frame sequence not completed.");
-            }
-            else if (frame.getOpCode() == OpCode.Text || frame.getOpCode() == OpCode.Binary)
-            {
+            } else if (frame.getOpCode() == OpCode.Text || frame.getOpCode() == OpCode.Binary) {
                 onMessage(frame);
-            }
-            else
-            {
+            } else {
                 throw new WebSocketException(CloseCode.ProtocolError, "Non control or continuous frame expected.");
             }
         }
 
         // --------------------------------Close-----------------------------------
 
-        public void ping(byte[] payload) throws IOException
-        {
+        public void ping(byte[] payload) throws IOException {
             sendFrame(new WebSocketFrame(OpCode.Ping, true, payload));
         }
 
         // --------------------------------Public
         // Facade---------------------------
 
-        private void readWebsocket()
-        {
-            try
-            {
-                while (this.state == State.OPEN)
-                {
+        private void readWebsocket() {
+            try {
+                while (this.state == State.OPEN) {
                     handleWebsocketFrame(WebSocketFrame.read(this.in));
                 }
-            }
-            catch (CharacterCodingException e)
-            {
+            } catch (CharacterCodingException e) {
                 onException(e);
                 doClose(CloseCode.InvalidFramePayloadData, e.toString(), false);
-            }
-            catch (IOException e)
-            {
+            } catch (IOException e) {
                 onException(e);
-                if (e instanceof WebSocketException)
-                {
+                if (e instanceof WebSocketException) {
                     doClose(((WebSocketException) e).getCode(), ((WebSocketException) e).getReason(), false);
                 }
-            }
-            finally
-            {
+            } finally {
                 doClose(CloseCode.InternalServerError, "Handler terminated without closing the connection.", false);
             }
         }
 
-        public void send(byte[] payload) throws IOException
-        {
+        public void send(byte[] payload) throws IOException {
             sendFrame(new WebSocketFrame(OpCode.Binary, true, payload));
         }
 
-        public void send(String payload) throws IOException
-        {
+        public void send(String payload) throws IOException {
             sendFrame(new WebSocketFrame(OpCode.Text, true, payload));
         }
 
-        public synchronized void sendFrame(WebSocketFrame frame) throws IOException
-        {
+        public synchronized void sendFrame(WebSocketFrame frame) throws IOException {
             debugFrameSent(frame);
             frame.write(this.out);
         }
     }
 
-    public static class WebSocketException extends IOException
-    {
+    public static class WebSocketException extends IOException {
 
         private static final long serialVersionUID = 1L;
 
@@ -349,39 +280,32 @@ public abstract class NanoWSD extends NanoHTTPD
 
         private final String reason;
 
-        public WebSocketException(CloseCode code, String reason)
-        {
+        public WebSocketException(CloseCode code, String reason) {
             this(code, reason, null);
         }
 
-        public WebSocketException(CloseCode code, String reason, Exception cause)
-        {
+        public WebSocketException(CloseCode code, String reason, Exception cause) {
             super(code + ": " + reason, cause);
             this.code = code;
             this.reason = reason;
         }
 
-        public WebSocketException(Exception cause)
-        {
+        public WebSocketException(Exception cause) {
             this(CloseCode.InternalServerError, cause.toString(), cause);
         }
 
-        public CloseCode getCode()
-        {
+        public CloseCode getCode() {
             return this.code;
         }
 
-        public String getReason()
-        {
+        public String getReason() {
             return this.reason;
         }
     }
 
-    public static class WebSocketFrame
-    {
+    public static class WebSocketFrame {
 
-        public static enum CloseCode
-        {
+        public static enum CloseCode {
             NormalClosure(1000),
             GoingAway(1001),
             ProtocolError(1002),
@@ -395,12 +319,9 @@ public abstract class NanoWSD extends NanoHTTPD
             InternalServerError(1011),
             TLSHandshake(1015);
 
-            public static CloseCode find(int value)
-            {
-                for (CloseCode code : values())
-                {
-                    if (code.getValue() == value)
-                    {
+            public static CloseCode find(int value) {
+                for (CloseCode code : values()) {
+                    if (code.getValue() == value) {
                         return code;
                     }
                 }
@@ -409,33 +330,26 @@ public abstract class NanoWSD extends NanoHTTPD
 
             private final int code;
 
-            private CloseCode(int code)
-            {
+            private CloseCode(int code) {
                 this.code = code;
             }
 
-            public int getValue()
-            {
+            public int getValue() {
                 return this.code;
             }
         }
 
-        public static class CloseFrame extends WebSocketFrame
-        {
+        public static class CloseFrame extends WebSocketFrame {
 
-            private static byte[] generatePayload(CloseCode code, String closeReason) throws CharacterCodingException
-            {
-                if (code != null)
-                {
+            private static byte[] generatePayload(CloseCode code, String closeReason) throws CharacterCodingException {
+                if (code != null) {
                     byte[] reasonBytes = text2Binary(closeReason);
                     byte[] payload = new byte[reasonBytes.length + 2];
                     payload[0] = (byte) (code.getValue() >> 8 & 0xFF);
                     payload[1] = (byte) (code.getValue() & 0xFF);
                     System.arraycopy(reasonBytes, 0, payload, 2, reasonBytes.length);
                     return payload;
-                }
-                else
-                {
+                } else {
                     return new byte[0];
                 }
             }
@@ -444,35 +358,29 @@ public abstract class NanoWSD extends NanoHTTPD
 
             private String _closeReason;
 
-            public CloseFrame(CloseCode code, String closeReason) throws CharacterCodingException
-            {
+            public CloseFrame(CloseCode code, String closeReason) throws CharacterCodingException {
                 super(OpCode.Close, true, generatePayload(code, closeReason));
             }
 
-            private CloseFrame(WebSocketFrame wrap) throws CharacterCodingException
-            {
+            private CloseFrame(WebSocketFrame wrap) throws CharacterCodingException {
                 super(wrap);
                 assert wrap.getOpCode() == OpCode.Close;
-                if (wrap.getBinaryPayload().length >= 2)
-                {
+                if (wrap.getBinaryPayload().length >= 2) {
                     this._closeCode = CloseCode.find((wrap.getBinaryPayload()[0] & 0xFF) << 8 | wrap.getBinaryPayload()[1] & 0xFF);
                     this._closeReason = binary2Text(getBinaryPayload(), 2, getBinaryPayload().length - 2);
                 }
             }
 
-            public CloseCode getCloseCode()
-            {
+            public CloseCode getCloseCode() {
                 return this._closeCode;
             }
 
-            public String getCloseReason()
-            {
+            public String getCloseReason() {
                 return this._closeReason;
             }
         }
 
-        public static enum OpCode
-        {
+        public static enum OpCode {
             Continuation(0),
             Text(1),
             Binary(2),
@@ -480,12 +388,9 @@ public abstract class NanoWSD extends NanoHTTPD
             Ping(9),
             Pong(10);
 
-            public static OpCode find(byte value)
-            {
-                for (OpCode opcode : values())
-                {
-                    if (opcode.getValue() == value)
-                    {
+            public static OpCode find(byte value) {
+                for (OpCode opcode : values()) {
+                    if (opcode.getValue() == value) {
                         return opcode;
                     }
                 }
@@ -494,76 +399,60 @@ public abstract class NanoWSD extends NanoHTTPD
 
             private final byte code;
 
-            private OpCode(int code)
-            {
+            private OpCode(int code) {
                 this.code = (byte) code;
             }
 
-            public byte getValue()
-            {
+            public byte getValue() {
                 return this.code;
             }
 
-            public boolean isControlFrame()
-            {
+            public boolean isControlFrame() {
                 return this == Close || this == Ping || this == Pong;
             }
         }
 
         public static final Charset TEXT_CHARSET = Charset.forName("UTF-8");
 
-        public static String binary2Text(byte[] payload) throws CharacterCodingException
-        {
+        public static String binary2Text(byte[] payload) throws CharacterCodingException {
             return new String(payload, WebSocketFrame.TEXT_CHARSET);
         }
 
-        public static String binary2Text(byte[] payload, int offset, int length) throws CharacterCodingException
-        {
+        public static String binary2Text(byte[] payload, int offset, int length) throws CharacterCodingException {
             return new String(payload, offset, length, WebSocketFrame.TEXT_CHARSET);
         }
 
-        private static int checkedRead(int read) throws IOException
-        {
-            if (read < 0)
-            {
+        private static int checkedRead(int read) throws IOException {
+            if (read < 0) {
                 throw new EOFException();
             }
             return read;
         }
 
-        public static WebSocketFrame read(InputStream in) throws IOException
-        {
+        public static WebSocketFrame read(InputStream in) throws IOException {
             byte head = (byte) checkedRead(in.read());
             boolean fin = (head & 0x80) != 0;
             OpCode opCode = OpCode.find((byte) (head & 0x0F));
-            if ((head & 0x70) != 0)
-            {
+            if ((head & 0x70) != 0) {
                 throw new WebSocketException(CloseCode.ProtocolError, "The reserved bits (" + Integer.toBinaryString(head & 0x70) + ") must be 0.");
             }
-            if (opCode == null)
-            {
+            if (opCode == null) {
                 throw new WebSocketException(CloseCode.ProtocolError, "Received frame with reserved/unknown opcode " + (head & 0x0F) + ".");
-            }
-            else if (opCode.isControlFrame() && !fin)
-            {
+            } else if (opCode.isControlFrame() && !fin) {
                 throw new WebSocketException(CloseCode.ProtocolError, "Fragmented control frame.");
             }
 
             WebSocketFrame frame = new WebSocketFrame(opCode, fin);
             frame.readPayloadInfo(in);
             frame.readPayload(in);
-            if (frame.getOpCode() == OpCode.Close)
-            {
+            if (frame.getOpCode() == OpCode.Close) {
                 return new CloseFrame(frame);
-            }
-            else
-            {
+            } else {
                 return frame;
             }
         }
 
-        public static byte[] text2Binary(String payload) throws CharacterCodingException
-        {
+        public static byte[] text2Binary(String payload) throws CharacterCodingException {
             return payload.getBytes(WebSocketFrame.TEXT_CHARSET);
         }
 
@@ -581,143 +470,111 @@ public abstract class NanoWSD extends NanoHTTPD
 
         private transient String _payloadString;
 
-        private WebSocketFrame(OpCode opCode, boolean fin)
-        {
+        private WebSocketFrame(OpCode opCode, boolean fin) {
             setOpCode(opCode);
             setFin(fin);
         }
 
-        public WebSocketFrame(OpCode opCode, boolean fin, byte[] payload)
-        {
+        public WebSocketFrame(OpCode opCode, boolean fin, byte[] payload) {
             this(opCode, fin, payload, null);
         }
 
-        public WebSocketFrame(OpCode opCode, boolean fin, byte[] payload, byte[] maskingKey)
-        {
+        public WebSocketFrame(OpCode opCode, boolean fin, byte[] payload, byte[] maskingKey) {
             this(opCode, fin);
             setMaskingKey(maskingKey);
             setBinaryPayload(payload);
         }
 
-        public WebSocketFrame(OpCode opCode, boolean fin, String payload) throws CharacterCodingException
-        {
+        public WebSocketFrame(OpCode opCode, boolean fin, String payload) throws CharacterCodingException {
             this(opCode, fin, payload, null);
         }
 
-        public WebSocketFrame(OpCode opCode, boolean fin, String payload, byte[] maskingKey) throws CharacterCodingException
-        {
+        public WebSocketFrame(OpCode opCode, boolean fin, String payload, byte[] maskingKey) throws CharacterCodingException {
             this(opCode, fin);
             setMaskingKey(maskingKey);
             setTextPayload(payload);
         }
 
-        public WebSocketFrame(OpCode opCode, List<WebSocketFrame> fragments) throws WebSocketException
-        {
+        public WebSocketFrame(OpCode opCode, List<WebSocketFrame> fragments) throws WebSocketException {
             setOpCode(opCode);
             setFin(true);
 
             long _payloadLength = 0;
-            for (WebSocketFrame inter : fragments)
-            {
+            for (WebSocketFrame inter : fragments) {
                 _payloadLength += inter.getBinaryPayload().length;
             }
-            if (_payloadLength < 0 || _payloadLength > Integer.MAX_VALUE)
-            {
+            if (_payloadLength < 0 || _payloadLength > Integer.MAX_VALUE) {
                 throw new WebSocketException(CloseCode.MessageTooBig, "Max frame length has been exceeded.");
             }
             this._payloadLength = (int) _payloadLength;
             byte[] payload = new byte[this._payloadLength];
             int offset = 0;
-            for (WebSocketFrame inter : fragments)
-            {
+            for (WebSocketFrame inter : fragments) {
                 System.arraycopy(inter.getBinaryPayload(), 0, payload, offset, inter.getBinaryPayload().length);
                 offset += inter.getBinaryPayload().length;
             }
             setBinaryPayload(payload);
         }
 
-        public WebSocketFrame(WebSocketFrame clone)
-        {
+        public WebSocketFrame(WebSocketFrame clone) {
             setOpCode(clone.getOpCode());
             setFin(clone.isFin());
             setBinaryPayload(clone.getBinaryPayload());
             setMaskingKey(clone.getMaskingKey());
         }
 
-        public byte[] getBinaryPayload()
-        {
+        public byte[] getBinaryPayload() {
             return this.payload;
         }
 
-        public byte[] getMaskingKey()
-        {
+        public byte[] getMaskingKey() {
             return this.maskingKey;
         }
 
-        public OpCode getOpCode()
-        {
+        public OpCode getOpCode() {
             return this.opCode;
         }
 
         // --------------------------------SERIALIZATION---------------------------
 
-        public String getTextPayload()
-        {
-            if (this._payloadString == null)
-            {
-                try
-                {
+        public String getTextPayload() {
+            if (this._payloadString == null) {
+                try {
                     this._payloadString = binary2Text(getBinaryPayload());
-                }
-                catch (CharacterCodingException e)
-                {
+                } catch (CharacterCodingException e) {
                     throw new RuntimeException("Undetected CharacterCodingException", e);
                 }
             }
             return this._payloadString;
         }
 
-        public boolean isFin()
-        {
+        public boolean isFin() {
             return this.fin;
         }
 
-        public boolean isMasked()
-        {
+        public boolean isMasked() {
             return this.maskingKey != null && this.maskingKey.length == 4;
         }
 
-        private String payloadToString()
-        {
-            if (this.payload == null)
-            {
+        private String payloadToString() {
+            if (this.payload == null) {
                 return "null";
-            }
-            else
-            {
+            } else {
                 final StringBuilder sb = new StringBuilder();
                 sb.append('[').append(this.payload.length).append("b] ");
-                if (getOpCode() == OpCode.Text)
-                {
+                if (getOpCode() == OpCode.Text) {
                     String text = getTextPayload();
-                    if (text.length() > 100)
-                    {
+                    if (text.length() > 100) {
                         sb.append(text.substring(0, 100)).append("...");
-                    }
-                    else
-                    {
+                    } else {
                         sb.append(text);
                     }
-                }
-                else
-                {
+                } else {
                     sb.append("0x");
-                    for (int i = 0; i < Math.min(this.payload.length, 50); ++i)
-                    {
+                    for (int i = 0; i < Math.min(this.payload.length, 50); ++i) {
                         sb.append(Integer.toHexString(this.payload[i] & 0xFF));
                     }
-                    if (this.payload.length > 50)
-                    {
+                    if (this.payload.length > 50) {
                         sb.append("...");
                     }
                 }
@@ -725,114 +582,91 @@ public abstract class NanoWSD extends NanoHTTPD
             }
         }
 
-        private void readPayload(InputStream in) throws IOException
-        {
+        private void readPayload(InputStream in) throws IOException {
             this.payload = new byte[this._payloadLength];
             int read = 0;
-            while (read < this._payloadLength)
-            {
+            while (read < this._payloadLength) {
                 read += checkedRead(in.read(this.payload, read, this._payloadLength - read));
             }
 
-            if (isMasked())
-            {
-                for (int i = 0; i < this.payload.length; i++)
-                {
+            if (isMasked()) {
+                for (int i = 0; i < this.payload.length; i++) {
                     this.payload[i] ^= this.maskingKey[i % 4];
                 }
             }
 
             // Test for Unicode errors
-            if (getOpCode() == OpCode.Text)
-            {
+            if (getOpCode() == OpCode.Text) {
                 this._payloadString = binary2Text(getBinaryPayload());
             }
         }
 
         // --------------------------------ENCODING--------------------------------
 
-        private void readPayloadInfo(InputStream in) throws IOException
-        {
+        private void readPayloadInfo(InputStream in) throws IOException {
             byte b = (byte) checkedRead(in.read());
             boolean masked = (b & 0x80) != 0;
 
             this._payloadLength = (byte) (0x7F & b);
-            if (this._payloadLength == 126)
-            {
+            if (this._payloadLength == 126) {
                 // checkedRead must return int for this to work
                 this._payloadLength = (checkedRead(in.read()) << 8 | checkedRead(in.read())) & 0xFFFF;
-                if (this._payloadLength < 126)
-                {
+                if (this._payloadLength < 126) {
                     throw new WebSocketException(CloseCode.ProtocolError, "Invalid data frame 2byte length. (not using minimal length encoding)");
                 }
-            }
-            else if (this._payloadLength == 127)
-            {
+            } else if (this._payloadLength == 127) {
                 long _payloadLength =
-                        (long) checkedRead(in.read()) << 56 | (long) checkedRead(in.read()) << 48 | (long) checkedRead(in.read()) << 40 | (long) checkedRead(in.read()) << 32
-                                | checkedRead(in.read()) << 24 | checkedRead(in.read()) << 16 | checkedRead(in.read()) << 8 | checkedRead(in.read());
-                if (_payloadLength < 65536)
-                {
+                    (long) checkedRead(in.read()) << 56 | (long) checkedRead(in.read()) << 48 | (long) checkedRead(in.read()) << 40 | (long) checkedRead(in.read()) << 32
+                    | checkedRead(in.read()) << 24 | checkedRead(in.read()) << 16 | checkedRead(in.read()) << 8 | checkedRead(in.read());
+                if (_payloadLength < 65536) {
                     throw new WebSocketException(CloseCode.ProtocolError, "Invalid data frame 4byte length. (not using minimal length encoding)");
                 }
-                if (_payloadLength < 0 || _payloadLength > Integer.MAX_VALUE)
-                {
+                if (_payloadLength < 0 || _payloadLength > Integer.MAX_VALUE) {
                     throw new WebSocketException(CloseCode.MessageTooBig, "Max frame length has been exceeded.");
                 }
                 this._payloadLength = (int) _payloadLength;
             }
 
-            if (this.opCode.isControlFrame())
-            {
-                if (this._payloadLength > 125)
-                {
+            if (this.opCode.isControlFrame()) {
+                if (this._payloadLength > 125) {
                     throw new WebSocketException(CloseCode.ProtocolError, "Control frame with payload length > 125 bytes.");
                 }
-                if (this.opCode == OpCode.Close && this._payloadLength == 1)
-                {
+                if (this.opCode == OpCode.Close && this._payloadLength == 1) {
                     throw new WebSocketException(CloseCode.ProtocolError, "Received close frame with payload len 1.");
                 }
             }
 
-            if (masked)
-            {
+            if (masked) {
                 this.maskingKey = new byte[4];
                 int read = 0;
-                while (read < this.maskingKey.length)
-                {
+                while (read < this.maskingKey.length) {
                     read += checkedRead(in.read(this.maskingKey, read, this.maskingKey.length - read));
                 }
             }
         }
 
-        public void setBinaryPayload(byte[] payload)
-        {
+        public void setBinaryPayload(byte[] payload) {
             this.payload = payload;
             this._payloadLength = payload.length;
             this._payloadString = null;
         }
 
-        public void setFin(boolean fin)
-        {
+        public void setFin(boolean fin) {
             this.fin = fin;
         }
 
-        public void setMaskingKey(byte[] maskingKey)
-        {
-            if (maskingKey != null && maskingKey.length != 4)
-            {
+        public void setMaskingKey(byte[] maskingKey) {
+            if (maskingKey != null && maskingKey.length != 4) {
                 throw new IllegalArgumentException("MaskingKey " + Arrays.toString(maskingKey) + " hasn't length 4");
             }
             this.maskingKey = maskingKey;
         }
 
-        public void setOpCode(OpCode opcode)
-        {
+        public void setOpCode(OpCode opcode) {
             this.opCode = opcode;
         }
 
-        public void setTextPayload(String payload) throws CharacterCodingException
-        {
+        public void setTextPayload(String payload) throws CharacterCodingException {
             this.payload = text2Binary(payload);
             this._payloadLength = payload.length();
             this._payloadString = payload;
@@ -840,14 +674,12 @@ public abstract class NanoWSD extends NanoHTTPD
 
         // --------------------------------CONSTANTS-------------------------------
 
-        public void setUnmasked()
-        {
+        public void setUnmasked() {
             setMaskingKey(null);
         }
 
         @Override
-        public String toString()
-        {
+        public String toString() {
             final StringBuilder sb = new StringBuilder("WS[");
             sb.append(getOpCode());
             sb.append(", ").append(isFin() ? "fin" : "inter");
@@ -859,29 +691,22 @@ public abstract class NanoWSD extends NanoHTTPD
 
         // ------------------------------------------------------------------------
 
-        public void write(OutputStream out) throws IOException
-        {
+        public void write(OutputStream out) throws IOException {
             byte header = 0;
-            if (this.fin)
-            {
+            if (this.fin) {
                 header |= 0x80;
             }
             header |= this.opCode.getValue() & 0x0F;
             out.write(header);
 
             this._payloadLength = getBinaryPayload().length;
-            if (this._payloadLength <= 125)
-            {
+            if (this._payloadLength <= 125) {
                 out.write(isMasked() ? 0x80 | (byte) this._payloadLength : (byte) this._payloadLength);
-            }
-            else if (this._payloadLength <= 0xFFFF)
-            {
+            } else if (this._payloadLength <= 0xFFFF) {
                 out.write(isMasked() ? 0xFE : 126);
                 out.write(this._payloadLength >>> 8);
                 out.write(this._payloadLength);
-            }
-            else
-            {
+            } else {
                 out.write(isMasked() ? 0xFF : 127);
                 out.write(this._payloadLength >>> 56 & 0); // integer only
                 // contains
@@ -895,16 +720,12 @@ public abstract class NanoWSD extends NanoHTTPD
                 out.write(this._payloadLength);
             }
 
-            if (isMasked())
-            {
+            if (isMasked()) {
                 out.write(this.maskingKey);
-                for (int i = 0; i < this._payloadLength; i++)
-                {
+                for (int i = 0; i < this._payloadLength; i++) {
                     out.write(getBinaryPayload()[i] ^ this.maskingKey[i % 4]);
                 }
-            }
-            else
-            {
+            } else {
                 out.write(getBinaryPayload());
             }
             out.flush();
@@ -949,14 +770,12 @@ public abstract class NanoWSD extends NanoHTTPD
      * @param buf the byte array (not null)
      * @return the translated Base64 string (not null)
      */
-    private static String encodeBase64(byte[] buf)
-    {
+    private static String encodeBase64(byte[] buf) {
         int size = buf.length;
         char[] ar = new char[(size + 2) / 3 * 4];
         int a = 0;
         int i = 0;
-        while (i < size)
-        {
+        while (i < size) {
             byte b0 = buf[i++];
             byte b1 = i < size ? buf[i++] : 0;
             byte b2 = i < size ? buf[i++] : 0;
@@ -967,18 +786,16 @@ public abstract class NanoWSD extends NanoHTTPD
             ar[a++] = NanoWSD.ALPHABET[(b1 << 2 | (b2 & 0xFF) >> 6) & mask];
             ar[a++] = NanoWSD.ALPHABET[b2 & mask];
         }
-        switch (size % 3)
-        {
-            case 1:
-                ar[--a] = '=';
-            case 2:
-                ar[--a] = '=';
+        switch (size % 3) {
+        case 1:
+            ar[--a] = '=';
+        case 2:
+            ar[--a] = '=';
         }
         return new String(ar);
     }
 
-    public static String makeAcceptKey(String key) throws NoSuchAlgorithmException
-    {
+    public static String makeAcceptKey(String key) throws NoSuchAlgorithmException {
         MessageDigest md = MessageDigest.getInstance("SHA-1");
         String text = key + NanoWSD.WEBSOCKET_KEY_MAGIC;
         md.update(text.getBytes(), 0, text.length());
@@ -986,29 +803,24 @@ public abstract class NanoWSD extends NanoHTTPD
         return encodeBase64(sha1hash);
     }
 
-    public NanoWSD(int port)
-    {
+    public NanoWSD(int port) {
         super(port);
     }
 
-    public NanoWSD(String hostname, int port)
-    {
+    public NanoWSD(String hostname, int port) {
         super(hostname, port, null);
     }
 
-    public NanoWSD(String localSocketAddress)
-    {
+    public NanoWSD(String localSocketAddress) {
         super(localSocketAddress);
     }
 
-    private boolean isWebSocketConnectionHeader (Map < String, String > headers)
-    {
+    private boolean isWebSocketConnectionHeader (Map < String, String > headers) {
         String connection = headers.get(NanoWSD.HEADER_CONNECTION);
         return connection != null && connection.toLowerCase().contains(NanoWSD.HEADER_CONNECTION_VALUE.toLowerCase());
     }
 
-    protected boolean isWebsocketRequested(IHTTPSession session)
-    {
+    protected boolean isWebsocketRequested(IHTTPSession session) {
         Map<String, String> headers = session.getHeaders();
         String upgrade = headers.get(NanoWSD.HEADER_UPGRADE);
         boolean isCorrectConnection = isWebSocketConnectionHeader(headers);
@@ -1021,49 +833,38 @@ public abstract class NanoWSD extends NanoHTTPD
     protected abstract WebSocket openWebSocket(IHTTPSession handshake);
 
     @Override
-    public Response serve(final IHTTPSession session)
-    {
+    public Response serve(final IHTTPSession session) {
         Map<String, String> headers = session.getHeaders();
-        if (isWebsocketRequested(session))
-        {
-            if (!NanoWSD.HEADER_WEBSOCKET_VERSION_VALUE.equalsIgnoreCase(headers.get(NanoWSD.HEADER_WEBSOCKET_VERSION)))
-            {
+        if (isWebsocketRequested(session)) {
+            if (!NanoWSD.HEADER_WEBSOCKET_VERSION_VALUE.equalsIgnoreCase(headers.get(NanoWSD.HEADER_WEBSOCKET_VERSION))) {
                 return newFixedLengthResponse(Response.Status.BAD_REQUEST, NanoHTTPD.MIME_PLAINTEXT,
-                        "Invalid Websocket-Version " + headers.get(NanoWSD.HEADER_WEBSOCKET_VERSION));
+                                              "Invalid Websocket-Version " + headers.get(NanoWSD.HEADER_WEBSOCKET_VERSION));
             }
 
-            if (!headers.containsKey(NanoWSD.HEADER_WEBSOCKET_KEY))
-            {
+            if (!headers.containsKey(NanoWSD.HEADER_WEBSOCKET_KEY)) {
                 return newFixedLengthResponse(Response.Status.BAD_REQUEST, NanoHTTPD.MIME_PLAINTEXT, "Missing Websocket-Key");
             }
 
             WebSocket webSocket = openWebSocket(session);
             Response handshakeResponse = webSocket.getHandshakeResponse();
-            try
-            {
+            try {
                 handshakeResponse.addHeader(NanoWSD.HEADER_WEBSOCKET_ACCEPT, makeAcceptKey(headers.get(NanoWSD.HEADER_WEBSOCKET_KEY)));
-            }
-            catch (NoSuchAlgorithmException e)
-            {
+            } catch (NoSuchAlgorithmException e) {
                 return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, NanoHTTPD.MIME_PLAINTEXT,
-                        "The SHA-1 Algorithm required for websockets is not available on the server.");
+                                              "The SHA-1 Algorithm required for websockets is not available on the server.");
             }
 
-            if (headers.containsKey(NanoWSD.HEADER_WEBSOCKET_PROTOCOL))
-            {
+            if (headers.containsKey(NanoWSD.HEADER_WEBSOCKET_PROTOCOL)) {
                 handshakeResponse.addHeader(NanoWSD.HEADER_WEBSOCKET_PROTOCOL, headers.get(NanoWSD.HEADER_WEBSOCKET_PROTOCOL).split(",")[0]);
             }
 
             return handshakeResponse;
-        }
-        else
-        {
+        } else {
             return serveHttp(session);
         }
     }
 
-    protected Response serveHttp(final IHTTPSession session)
-    {
+    protected Response serveHttp(final IHTTPSession session) {
         return super.serve(session);
     }
 
@@ -1071,8 +872,7 @@ public abstract class NanoWSD extends NanoHTTPD
      * not all websockets implementations accept gzip compression.
      */
     @Override
-    protected boolean useGzipWhenAccepted(Response r)
-    {
+    protected boolean useGzipWhenAccepted(Response r) {
         return false;
     }
 }

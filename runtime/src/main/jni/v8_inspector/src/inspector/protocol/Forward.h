@@ -73,11 +73,11 @@ namespace v8_inspector {
 namespace protocol {
 
 class  FrontendChannel {
-public:
-    virtual ~FrontendChannel() { }
-    virtual void sendProtocolResponse(int callId, const String& message) = 0;
-    virtual void sendProtocolNotification(const String& message) = 0;
-    virtual void flushProtocolNotifications() = 0;
+    public:
+        virtual ~FrontendChannel() { }
+        virtual void sendProtocolResponse(int callId, const String& message) = 0;
+        virtual void sendProtocolNotification(const String& message) = 0;
+        virtual void flushProtocolNotifications() = 0;
 };
 
 } // namespace v8_inspector

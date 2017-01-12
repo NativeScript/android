@@ -35,16 +35,16 @@
 namespace v8_inspector {
 
 struct ScriptBreakpoint {
-  ScriptBreakpoint() : ScriptBreakpoint(0, 0, String16()) {}
+    ScriptBreakpoint() : ScriptBreakpoint(0, 0, String16()) {}
 
-  ScriptBreakpoint(int lineNumber, int columnNumber, const String16& condition)
-      : lineNumber(lineNumber),
-        columnNumber(columnNumber),
-        condition(condition) {}
+    ScriptBreakpoint(int lineNumber, int columnNumber, const String16& condition)
+        : lineNumber(lineNumber),
+          columnNumber(columnNumber),
+          condition(condition) {}
 
-  int lineNumber;
-  int columnNumber;
-  String16 condition;
+    int lineNumber;
+    int columnNumber;
+    String16 condition;
 };
 
 }  // namespace v8_inspector

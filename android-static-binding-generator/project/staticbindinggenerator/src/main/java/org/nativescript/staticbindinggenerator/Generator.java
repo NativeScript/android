@@ -67,7 +67,7 @@ public class Generator {
                 AnnotationDescriptor[] annotations = null;
                 if (hasSpecifiedName) {
                     annotations = new AnnotationDescriptor[] {
-                        new AnnotationDescriptor("Lcom/tns/JavaScriptImplementation;", new AnnotationDescriptor.Parameter[]{new AnnotationDescriptor.Parameter("javaScriptFile", "./" + row.getJsFilename())}, true)
+                    new AnnotationDescriptor("Lcom/tns/JavaScriptImplementation;", new AnnotationDescriptor.Parameter[]{new AnnotationDescriptor.Parameter("javaScriptFile", "./" + row.getJsFilename())}, true)
                     };
                 }
 
@@ -78,7 +78,7 @@ public class Generator {
                     String ifaceName= row.getInterfaces()[i];
 
                     JavaClass ifaceClass = classes.get(ifaceName);
-                    if(ifaceClass != null) {
+                    if (ifaceClass != null) {
                         ClassDescriptor cd = new ClassInfo(ifaceClass, this);
                         interfaces.add(cd);
                     }

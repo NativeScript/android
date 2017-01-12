@@ -25,368 +25,321 @@ using namespace std;
 using namespace tns;
 
 ModuleInternal::ModuleInternal()
-	: m_isolate(nullptr), m_requireFunction(nullptr), m_requireFactoryFunction(nullptr)
-{
+    : m_isolate(nullptr), m_requireFunction(nullptr), m_requireFactoryFunction(nullptr) {
 }
 
-void ModuleInternal::Init(Isolate *isolate, const string& baseDir)
-{
-	JEnv env;
+void ModuleInternal::Init(Isolate* isolate, const string& baseDir) {
+    JEnv env;
 
-	if (MODULE_CLASS == nullptr)
-	{
-		MODULE_CLASS = env.FindClass("com/tns/Module");
-		assert(MODULE_CLASS != nullptr);
+    if (MODULE_CLASS == nullptr) {
+        MODULE_CLASS = env.FindClass("com/tns/Module");
+        assert(MODULE_CLASS != nullptr);
 
-		RESOLVE_PATH_METHOD_ID = env.GetStaticMethodID(MODULE_CLASS, "resolvePath", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
-		assert(RESOLVE_PATH_METHOD_ID != nullptr);
-	}
+        RESOLVE_PATH_METHOD_ID = env.GetStaticMethodID(MODULE_CLASS, "resolvePath", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
+        assert(RESOLVE_PATH_METHOD_ID != nullptr);
+    }
 
-	m_isolate = isolate;
+    m_isolate = isolate;
 
-	string requireFactoryScript =
-	"(function () { "
-	"	function require_factory(requireInternal, dirName) { "
-	"		return function require(modulePath) { "
-	"			if(global.__requireOverride) { "
-	"				var result = global.__requireOverride(modulePath, dirName); "
-	"				if(result) { "
-	"					return result; "
-	"				} "
-	"			} "
-	"			return requireInternal(modulePath, dirName); "
-	"		} "
-	"	} "
-	"	return require_factory; "
-	"})()";
+    string requireFactoryScript =
+        "(function () { "
+        "	function require_factory(requireInternal, dirName) { "
+        "		return function require(modulePath) { "
+        "			if(global.__requireOverride) { "
+        "				var result = global.__requireOverride(modulePath, dirName); "
+        "				if(result) { "
+        "					return result; "
+        "				} "
+        "			} "
+        "			return requireInternal(modulePath, dirName); "
+        "		} "
+        "	} "
+        "	return require_factory; "
+        "})()";
 
-	auto source = ArgConverter::ConvertToV8String(isolate, requireFactoryScript);
-	auto context = isolate->GetCurrentContext();
+    auto source = ArgConverter::ConvertToV8String(isolate, requireFactoryScript);
+    auto context = isolate->GetCurrentContext();
 
-	auto global = context->Global();
+    auto global = context->Global();
 
-	Local<Script> script;
-	auto maybeScript = Script::Compile(context, source).ToLocal(&script);
+    Local<Script> script;
+    auto maybeScript = Script::Compile(context, source).ToLocal(&script);
 
-	assert(!script.IsEmpty());
+    assert(!script.IsEmpty());
 
-	Local<Value> result;
-	auto maybeResult = script->Run(context).ToLocal(&result);
+    Local<Value> result;
+    auto maybeResult = script->Run(context).ToLocal(&result);
 
-	assert(!result.IsEmpty() && result->IsFunction());
+    assert(!result.IsEmpty() && result->IsFunction());
 
-	auto requireFactoryFunction = result.As<Function>();
+    auto requireFactoryFunction = result.As<Function>();
 
-	m_requireFactoryFunction = new Persistent<Function>(isolate, requireFactoryFunction);
+    m_requireFactoryFunction = new Persistent<Function>(isolate, requireFactoryFunction);
 
-	auto requireFuncTemplate = FunctionTemplate::New(isolate, RequireCallback, External::New(isolate, this));
-	auto requireFunc = requireFuncTemplate->GetFunction();
-	global->Set(ArgConverter::ConvertToV8String(isolate, "__nativeRequire"), requireFunc);
-	m_requireFunction = new Persistent<Function>(isolate, requireFunc);
+    auto requireFuncTemplate = FunctionTemplate::New(isolate, RequireCallback, External::New(isolate, this));
+    auto requireFunc = requireFuncTemplate->GetFunction();
+    global->Set(ArgConverter::ConvertToV8String(isolate, "__nativeRequire"), requireFunc);
+    m_requireFunction = new Persistent<Function>(isolate, requireFunc);
 
-	Local<Function> globalRequire;
+    Local<Function> globalRequire;
 
-	if(!baseDir.empty()) {
-		globalRequire = GetRequireFunction(isolate, baseDir);
-	} else {
-		globalRequire = GetRequireFunction(isolate, Constants::APP_ROOT_FOLDER_PATH);
-	}
-	global->Set(ArgConverter::ConvertToV8String(isolate, "require"), globalRequire);
+    if (!baseDir.empty()) {
+        globalRequire = GetRequireFunction(isolate, baseDir);
+    } else {
+        globalRequire = GetRequireFunction(isolate, Constants::APP_ROOT_FOLDER_PATH);
+    }
+    global->Set(ArgConverter::ConvertToV8String(isolate, "require"), globalRequire);
 }
 
-Local<Function> ModuleInternal::GetRequireFunction(Isolate *isolate, const string& dirName)
-{
-	Local<Function> requireFunc;
+Local<Function> ModuleInternal::GetRequireFunction(Isolate* isolate, const string& dirName) {
+    Local<Function> requireFunc;
 
-	auto itFound = m_requireCache.find(dirName);
+    auto itFound = m_requireCache.find(dirName);
 
-	if (itFound != m_requireCache.end())
-	{
-		requireFunc = Local<Function>::New(isolate, *itFound->second);
-	}
-	else
-	{
-		auto requireFuncFactory = Local<Function>::New(isolate, *m_requireFactoryFunction);
+    if (itFound != m_requireCache.end()) {
+        requireFunc = Local<Function>::New(isolate, *itFound->second);
+    } else {
+        auto requireFuncFactory = Local<Function>::New(isolate, *m_requireFactoryFunction);
 
-		auto context = isolate->GetCurrentContext();
+        auto context = isolate->GetCurrentContext();
 
-		auto requireInternalFunc = Local<Function>::New(isolate, *m_requireFunction);
+        auto requireInternalFunc = Local<Function>::New(isolate, *m_requireFunction);
 
-		Local<Value> args[2]
-		{
-			requireInternalFunc, ArgConverter::ConvertToV8String(isolate, dirName)
-		};
-		Local<Value> result;
-		auto thiz = Object::New(isolate);
-		auto success = requireFuncFactory->Call(context, thiz, 2, args).ToLocal(&result);
+        Local<Value> args[2] {
+            requireInternalFunc, ArgConverter::ConvertToV8String(isolate, dirName)
+        };
+        Local<Value> result;
+        auto thiz = Object::New(isolate);
+        auto success = requireFuncFactory->Call(context, thiz, 2, args).ToLocal(&result);
 
-		assert(success && !result.IsEmpty() && result->IsFunction());
+        assert(success && !result.IsEmpty() && result->IsFunction());
 
-		requireFunc = result.As<Function>();
+        requireFunc = result.As<Function>();
 
-		auto poFunc = new Persistent<Function>(isolate, requireFunc);
+        auto poFunc = new Persistent<Function>(isolate, requireFunc);
 
-		m_requireCache.insert(make_pair(dirName, poFunc));
-	}
+        m_requireCache.insert(make_pair(dirName, poFunc));
+    }
 
-	return requireFunc;
+    return requireFunc;
 }
 
-void ModuleInternal::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
-{
-	try
-	{
-		auto thiz = static_cast<ModuleInternal*>(args.Data().As<External>()->Value());
-		thiz->RequireCallbackImpl(args);
-	}
-	catch (NativeScriptException& e)
-	{
-		e.ReThrowToV8();
-	}
-	catch (std::exception e) {
-				stringstream ss;
-		ss << "Error: c++ exception: " << e.what() << endl;
-		NativeScriptException nsEx(ss.str());
-		nsEx.ReThrowToV8();
-	}
-	catch (...) {
-		NativeScriptException nsEx(std::string("Error: c++ exception!"));
-		nsEx.ReThrowToV8();
-	}
+void ModuleInternal::RequireCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
+    try {
+        auto thiz = static_cast<ModuleInternal*>(args.Data().As<External>()->Value());
+        thiz->RequireCallbackImpl(args);
+    } catch (NativeScriptException& e) {
+        e.ReThrowToV8();
+    } catch (std::exception e) {
+        stringstream ss;
+        ss << "Error: c++ exception: " << e.what() << endl;
+        NativeScriptException nsEx(ss.str());
+        nsEx.ReThrowToV8();
+    } catch (...) {
+        NativeScriptException nsEx(std::string("Error: c++ exception!"));
+        nsEx.ReThrowToV8();
+    }
 }
 
-void ModuleInternal::RequireCallbackImpl(const v8::FunctionCallbackInfo<v8::Value>& args)
-{
-	auto isolate = args.GetIsolate();
+void ModuleInternal::RequireCallbackImpl(const v8::FunctionCallbackInfo<v8::Value>& args) {
+    auto isolate = args.GetIsolate();
 
-	if (args.Length() != 2)
-	{
-		throw NativeScriptException(string("require should be called with two parameters"));
-	}
-	if (!args[0]->IsString())
-	{
-		throw NativeScriptException(string("require's first parameter should be string"));
-	}
-	if (!args[1]->IsString())
-	{
-		throw NativeScriptException(string("require's second parameter should be string"));
-	}
+    if (args.Length() != 2) {
+        throw NativeScriptException(string("require should be called with two parameters"));
+    }
+    if (!args[0]->IsString()) {
+        throw NativeScriptException(string("require's first parameter should be string"));
+    }
+    if (!args[1]->IsString()) {
+        throw NativeScriptException(string("require's second parameter should be string"));
+    }
 
-	string moduleName = ArgConverter::ConvertToString(args[0].As<String>());
-	string callingModuleDirName = ArgConverter::ConvertToString(args[1].As<String>());
-	auto isData = false;
+    string moduleName = ArgConverter::ConvertToString(args[0].As<String>());
+    string callingModuleDirName = ArgConverter::ConvertToString(args[1].As<String>());
+    auto isData = false;
 
-	auto moduleObj = LoadImpl(isolate, moduleName, callingModuleDirName, isData);
+    auto moduleObj = LoadImpl(isolate, moduleName, callingModuleDirName, isData);
 
-	if (isData)
-	{
-		assert(!moduleObj.IsEmpty());
+    if (isData) {
+        assert(!moduleObj.IsEmpty());
 
-		args.GetReturnValue().Set(moduleObj);
-	}
-	else
-	{
-		auto exportsObj = moduleObj->Get(ArgConverter::ConvertToV8String(isolate, "exports"));
+        args.GetReturnValue().Set(moduleObj);
+    } else {
+        auto exportsObj = moduleObj->Get(ArgConverter::ConvertToV8String(isolate, "exports"));
 
-		assert(!exportsObj.IsEmpty());
+        assert(!exportsObj.IsEmpty());
 
-		args.GetReturnValue().Set(exportsObj);
-	}
+        args.GetReturnValue().Set(exportsObj);
+    }
 }
 
-void ModuleInternal::RequireNativeCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
-{
-	auto ext = args.Data().As<External>();
-	auto funcPtr = reinterpret_cast<FunctionCallback>(ext->Value());
-	funcPtr(args);
+void ModuleInternal::RequireNativeCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
+    auto ext = args.Data().As<External>();
+    auto funcPtr = reinterpret_cast<FunctionCallback>(ext->Value());
+    funcPtr(args);
 }
 
-void ModuleInternal::Load(const string& path)
-{
-	auto isolate = m_isolate;
-	auto context = isolate->GetCurrentContext();
-	auto globalObject = context->Global();
-	auto require = globalObject->Get(context, ArgConverter::ConvertToV8String(isolate, "require")).ToLocalChecked().As<Function>();
-	Local<Value> args[] = { ArgConverter::ConvertToV8String(isolate, path) };
-	require->Call(context, globalObject, 1, args);
+void ModuleInternal::Load(const string& path) {
+    auto isolate = m_isolate;
+    auto context = isolate->GetCurrentContext();
+    auto globalObject = context->Global();
+    auto require = globalObject->Get(context, ArgConverter::ConvertToV8String(isolate, "require")).ToLocalChecked().As<Function>();
+    Local<Value> args[] = { ArgConverter::ConvertToV8String(isolate, path) };
+    require->Call(context, globalObject, 1, args);
 }
 
-void ModuleInternal::LoadWorker(const string& path)
-{
-	auto isolate = m_isolate;
-	TryCatch tc;
+void ModuleInternal::LoadWorker(const string& path) {
+    auto isolate = m_isolate;
+    TryCatch tc;
 
-	Load(path);
+    Load(path);
 
-	if(tc.HasCaught()) {
-		// This will handle any errors that occur when first loading a script (new worker)
-		// exceptions include: syntax errors, throw statements, access of properties of undefined objects
-		// Check if `onerror` handle is implemented
-		// Web behaviour - if onerror handle comes before exception throw - execute it, else - bubble up to main's worker object
-		CallbackHandlers::CallWorkerScopeOnErrorHandle(isolate, tc);
-	}
+    if (tc.HasCaught()) {
+        // This will handle any errors that occur when first loading a script (new worker)
+        // exceptions include: syntax errors, throw statements, access of properties of undefined objects
+        // Check if `onerror` handle is implemented
+        // Web behaviour - if onerror handle comes before exception throw - execute it, else - bubble up to main's worker object
+        CallbackHandlers::CallWorkerScopeOnErrorHandle(isolate, tc);
+    }
 }
 
-void ModuleInternal::CheckFileExists(Isolate* isolate, const std::string &path, const std::string &baseDir) {
-	JEnv env;
-	JniLocalRef jsModulename(env.NewStringUTF(path.c_str()));
-	JniLocalRef jsBaseDir(env.NewStringUTF(baseDir.c_str()));
+void ModuleInternal::CheckFileExists(Isolate* isolate, const std::string& path, const std::string& baseDir) {
+    JEnv env;
+    JniLocalRef jsModulename(env.NewStringUTF(path.c_str()));
+    JniLocalRef jsBaseDir(env.NewStringUTF(baseDir.c_str()));
 
-	env.CallStaticObjectMethod(MODULE_CLASS, RESOLVE_PATH_METHOD_ID, (jstring) jsModulename, (jstring) jsBaseDir);
+    env.CallStaticObjectMethod(MODULE_CLASS, RESOLVE_PATH_METHOD_ID, (jstring) jsModulename, (jstring) jsBaseDir);
 }
 
-Local<Object> ModuleInternal::LoadImpl(Isolate *isolate, const string& moduleName, const string& baseDir, bool& isData)
-{
-	auto pathKind = GetModulePathKind(moduleName);
-	auto cachePathKey = (pathKind == ModulePathKind::Global) ? moduleName : (baseDir + "*" + moduleName);
+Local<Object> ModuleInternal::LoadImpl(Isolate* isolate, const string& moduleName, const string& baseDir, bool& isData) {
+    auto pathKind = GetModulePathKind(moduleName);
+    auto cachePathKey = (pathKind == ModulePathKind::Global) ? moduleName : (baseDir + "*" + moduleName);
 
-	Local<Object> result;
+    Local<Object> result;
 
-	DEBUG_WRITE(">>LoadImpl cachePathKey=%s", cachePathKey.c_str());
+    DEBUG_WRITE(">>LoadImpl cachePathKey=%s", cachePathKey.c_str());
 
-	auto it = m_loadedModules.find(cachePathKey);
+    auto it = m_loadedModules.find(cachePathKey);
 
-	if (it == m_loadedModules.end())
-	{
-		JEnv env;
-		JniLocalRef jsModulename(env.NewStringUTF(moduleName.c_str()));
-		JniLocalRef jsBaseDir(env.NewStringUTF(baseDir.c_str()));
-		JniLocalRef jsModulePath(env.CallStaticObjectMethod(MODULE_CLASS, RESOLVE_PATH_METHOD_ID, (jstring) jsModulename, (jstring) jsBaseDir));
+    if (it == m_loadedModules.end()) {
+        JEnv env;
+        JniLocalRef jsModulename(env.NewStringUTF(moduleName.c_str()));
+        JniLocalRef jsBaseDir(env.NewStringUTF(baseDir.c_str()));
+        JniLocalRef jsModulePath(env.CallStaticObjectMethod(MODULE_CLASS, RESOLVE_PATH_METHOD_ID, (jstring) jsModulename, (jstring) jsBaseDir));
 
-		auto path = ArgConverter::jstringToString((jstring) jsModulePath);
+        auto path = ArgConverter::jstringToString((jstring) jsModulePath);
 
-		auto it2 = m_loadedModules.find(path);
+        auto it2 = m_loadedModules.find(path);
 
-		if (it2 == m_loadedModules.end())
-		{
-			if (Util::EndsWith(path, ".js") || Util::EndsWith(path, ".so"))
-			{
-				isData = false;
-				result = LoadModule(isolate, path, cachePathKey);
-			}
-			else if (Util::EndsWith(path, ".json"))
-			{
-				isData = true;
-				result = LoadData(isolate, path);
-			}
-			else
-			{
-				string errMsg = "Unsupported file extension: " + path;
-				throw NativeScriptException(errMsg);
-			}
-		}
-		else
-		{
-			auto& cacheEntry = it2->second;
-			isData = cacheEntry.isData;
-			result = Local<Object>::New(isolate, *cacheEntry.obj);
-		}
-	}
-	else
-	{
-		auto& cacheEntry = it->second;
-		isData = cacheEntry.isData;
-		result = Local<Object>::New(isolate, *cacheEntry.obj);
-	}
+        if (it2 == m_loadedModules.end()) {
+            if (Util::EndsWith(path, ".js") || Util::EndsWith(path, ".so")) {
+                isData = false;
+                result = LoadModule(isolate, path, cachePathKey);
+            } else if (Util::EndsWith(path, ".json")) {
+                isData = true;
+                result = LoadData(isolate, path);
+            } else {
+                string errMsg = "Unsupported file extension: " + path;
+                throw NativeScriptException(errMsg);
+            }
+        } else {
+            auto& cacheEntry = it2->second;
+            isData = cacheEntry.isData;
+            result = Local<Object>::New(isolate, *cacheEntry.obj);
+        }
+    } else {
+        auto& cacheEntry = it->second;
+        isData = cacheEntry.isData;
+        result = Local<Object>::New(isolate, *cacheEntry.obj);
+    }
 
-	return result;
+    return result;
 }
 
-Local<Object> ModuleInternal::LoadModule(Isolate *isolate, const string& modulePath, const string& moduleCacheKey)
-{
-	Local<Object> result;
+Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& modulePath, const string& moduleCacheKey) {
+    Local<Object> result;
 
-	auto moduleObj = Object::New(isolate);
-	auto exportsObj = Object::New(isolate);
-	auto exportsPropName = ArgConverter::ConvertToV8String(isolate, "exports");
-	moduleObj->Set(exportsPropName, exportsObj);
-	auto fullRequiredModulePath = ArgConverter::ConvertToV8String(isolate, modulePath);
-	moduleObj->Set(ArgConverter::ConvertToV8String(isolate, "filename"), fullRequiredModulePath);
+    auto moduleObj = Object::New(isolate);
+    auto exportsObj = Object::New(isolate);
+    auto exportsPropName = ArgConverter::ConvertToV8String(isolate, "exports");
+    moduleObj->Set(exportsPropName, exportsObj);
+    auto fullRequiredModulePath = ArgConverter::ConvertToV8String(isolate, modulePath);
+    moduleObj->Set(ArgConverter::ConvertToV8String(isolate, "filename"), fullRequiredModulePath);
 
-	auto poModuleObj = new Persistent<Object>(isolate, moduleObj);
-	TempModule tempModule(this, modulePath, moduleCacheKey, poModuleObj);
+    auto poModuleObj = new Persistent<Object>(isolate, moduleObj);
+    TempModule tempModule(this, modulePath, moduleCacheKey, poModuleObj);
 
-	TryCatch tc;
+    TryCatch tc;
 
-	Local<Function> moduleFunc;
+    Local<Function> moduleFunc;
 
-	if (Util::EndsWith(modulePath, ".js"))
-	{
-		auto script = LoadScript(isolate, modulePath, fullRequiredModulePath);
+    if (Util::EndsWith(modulePath, ".js")) {
+        auto script = LoadScript(isolate, modulePath, fullRequiredModulePath);
 
-		moduleFunc = script->Run().As<Function>();
-		if (tc.HasCaught())
-		{
-			throw NativeScriptException(tc, "Error running script " + modulePath);
-		}
-	}
-	else if (Util::EndsWith(modulePath, ".so"))
-	{
-		auto handle = dlopen(modulePath.c_str(), RTLD_LAZY);
-		if (handle == nullptr)
-		{
-			auto error = dlerror();
-			string errMsg(error);
-			throw NativeScriptException(errMsg);
-		}
-		auto func = dlsym(handle, "NSMain");
-		if (func == nullptr)
-		{
-			string errMsg("Cannot find 'NSMain' in " + modulePath);
-			throw NativeScriptException(errMsg);
-		}
-		auto extFunc = External::New(isolate, func);
-		auto ft = FunctionTemplate::New(isolate, RequireNativeCallback, extFunc);
-		auto maybeFunc = ft->GetFunction(isolate->GetCurrentContext());
-		if (maybeFunc.IsEmpty() || tc.HasCaught())
-		{
-			throw NativeScriptException(tc, "Cannot create native module function callback");
-		}
-		moduleFunc = maybeFunc.ToLocalChecked();
-	}
-	else
-	{
-		string errMsg = "Unsupported file extension: " + modulePath;
-		throw NativeScriptException(errMsg);
-	}
+        moduleFunc = script->Run().As<Function>();
+        if (tc.HasCaught()) {
+            throw NativeScriptException(tc, "Error running script " + modulePath);
+        }
+    } else if (Util::EndsWith(modulePath, ".so")) {
+        auto handle = dlopen(modulePath.c_str(), RTLD_LAZY);
+        if (handle == nullptr) {
+            auto error = dlerror();
+            string errMsg(error);
+            throw NativeScriptException(errMsg);
+        }
+        auto func = dlsym(handle, "NSMain");
+        if (func == nullptr) {
+            string errMsg("Cannot find 'NSMain' in " + modulePath);
+            throw NativeScriptException(errMsg);
+        }
+        auto extFunc = External::New(isolate, func);
+        auto ft = FunctionTemplate::New(isolate, RequireNativeCallback, extFunc);
+        auto maybeFunc = ft->GetFunction(isolate->GetCurrentContext());
+        if (maybeFunc.IsEmpty() || tc.HasCaught()) {
+            throw NativeScriptException(tc, "Cannot create native module function callback");
+        }
+        moduleFunc = maybeFunc.ToLocalChecked();
+    } else {
+        string errMsg = "Unsupported file extension: " + modulePath;
+        throw NativeScriptException(errMsg);
+    }
 
-	SET_PROFILER_FRAME();
+    SET_PROFILER_FRAME();
 
-	auto fileName = ArgConverter::ConvertToV8String(isolate, modulePath);
-	char pathcopy[1024];
-	strcpy(pathcopy, modulePath.c_str());
-	string strDirName(dirname(pathcopy));
-	auto dirName = ArgConverter::ConvertToV8String(isolate, strDirName);
-	auto require = GetRequireFunction(isolate, strDirName);
-	Local<Value> requireArgs[5]
-	{
-		moduleObj, exportsObj, require, fileName, dirName
-	};
+    auto fileName = ArgConverter::ConvertToV8String(isolate, modulePath);
+    char pathcopy[1024];
+    strcpy(pathcopy, modulePath.c_str());
+    string strDirName(dirname(pathcopy));
+    auto dirName = ArgConverter::ConvertToV8String(isolate, strDirName);
+    auto require = GetRequireFunction(isolate, strDirName);
+    Local<Value> requireArgs[5] {
+        moduleObj, exportsObj, require, fileName, dirName
+    };
 
-	moduleObj->Set(ArgConverter::ConvertToV8String(isolate, "require"), require);
+    moduleObj->Set(ArgConverter::ConvertToV8String(isolate, "require"), require);
 
-	auto moduleIdProp = ArgConverter::ConvertToV8String(isolate, "id");
-	const auto readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
-	Maybe<bool> success = moduleObj->DefineOwnProperty(isolate->GetCurrentContext(), moduleIdProp, fileName, readOnlyFlags);
-	if(success.IsNothing()) {
-		throw NativeScriptException(string("Couldn't execute method 'DefineOwnProperty' on 'moduleObj' in 'Module::LoadModule'."));
-	}
+    auto moduleIdProp = ArgConverter::ConvertToV8String(isolate, "id");
+    const auto readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
+    Maybe<bool> success = moduleObj->DefineOwnProperty(isolate->GetCurrentContext(), moduleIdProp, fileName, readOnlyFlags);
+    if (success.IsNothing()) {
+        throw NativeScriptException(string("Couldn't execute method 'DefineOwnProperty' on 'moduleObj' in 'Module::LoadModule'."));
+    }
 
-	auto thiz = Object::New(isolate);
-	auto extendsName = ArgConverter::ConvertToV8String(isolate, "__extends");
-	thiz->Set(extendsName, isolate->GetCurrentContext()->Global()->Get(extendsName));
-	moduleFunc->Call(thiz, sizeof(requireArgs) / sizeof(Local<Value> ), requireArgs);
+    auto thiz = Object::New(isolate);
+    auto extendsName = ArgConverter::ConvertToV8String(isolate, "__extends");
+    thiz->Set(extendsName, isolate->GetCurrentContext()->Global()->Get(extendsName));
+    moduleFunc->Call(thiz, sizeof(requireArgs) / sizeof(Local<Value> ), requireArgs);
 
-	if (tc.HasCaught())
-	{
-		throw NativeScriptException(tc, "Error calling module function ");
-	}
+    if (tc.HasCaught()) {
+        throw NativeScriptException(tc, "Error calling module function ");
+    }
 
-	tempModule.SaveToCache();
-	result = moduleObj;
+    tempModule.SaveToCache();
+    result = moduleObj;
 
-	return result;
+    return result;
 }
+
 
 Local<Script> ModuleInternal::LoadScript(Isolate *isolate, const string& path, const Local<String>& fullRequiredModulePath)
 {
@@ -435,96 +388,91 @@ Local<Script> ModuleInternal::LoadScript(Isolate *isolate, const string& path, c
 	return script;
 }
 
-Local<Object> ModuleInternal::LoadData(Isolate *isolate, const string& path)
-{
-	Local<Object> json;
+Local<Object> ModuleInternal::LoadData(Isolate* isolate, const string& path) {
+    Local<Object> json;
 
-	auto jsonData = File::ReadText(path);
+    auto jsonData = File::ReadText(path);
 
-	TryCatch tc;
+    TryCatch tc;
 
-	auto jsonStr = ArgConverter::ConvertToV8String(isolate, jsonData);
+    auto jsonStr = ArgConverter::ConvertToV8String(isolate, jsonData);
 
-	auto maybeValue = JSON::Parse(isolate, jsonStr);
+    auto maybeValue = JSON::Parse(isolate, jsonStr);
 
-	if (maybeValue.IsEmpty() || tc.HasCaught())
-	{
-		string errMsg = "Cannot parse JSON file " + path;
-		throw NativeScriptException(tc, errMsg);
-	}
+    if (maybeValue.IsEmpty() || tc.HasCaught()) {
+        string errMsg = "Cannot parse JSON file " + path;
+        throw NativeScriptException(tc, errMsg);
+    }
 
-	auto value = maybeValue.ToLocalChecked();
+    auto value = maybeValue.ToLocalChecked();
 
-	if (!value->IsObject())
-	{
-		string errMsg = "JSON is not valid, file=" + path;
-		throw NativeScriptException(errMsg);
-	}
+    if (!value->IsObject()) {
+        string errMsg = "JSON is not valid, file=" + path;
+        throw NativeScriptException(errMsg);
+    }
 
-	json = value.As<Object>();
+    json = value.As<Object>();
 
-	auto poObj = new Persistent<Object>(isolate, json);
+    auto poObj = new Persistent<Object>(isolate, json);
 
-	m_loadedModules.insert(make_pair(path, ModuleCacheEntry(poObj, true /* isData */)));
+    m_loadedModules.insert(make_pair(path, ModuleCacheEntry(poObj, true /* isData */)));
 
-	return json;
+    return json;
 }
 
-Local<String> ModuleInternal::WrapModuleContent(const string& path)
-{
-	string content = File::ReadText(path);
+Local<String> ModuleInternal::WrapModuleContent(const string& path) {
+    string content = File::ReadText(path);
 
-	auto separatorIndex = path.find_last_of("/");
+    auto separatorIndex = path.find_last_of("/");
 
-	// TODO: Use statically allocated buffer for better performance
-	string result(MODULE_PROLOGUE);
-	result.reserve(content.length() + 1024);
-	result += content;
-	result += MODULE_EPILOGUE;
+    // TODO: Use statically allocated buffer for better performance
+    string result(MODULE_PROLOGUE);
+    result.reserve(content.length() + 1024);
+    result += content;
+    result += MODULE_EPILOGUE;
 
-	return ArgConverter::ConvertToV8String(m_isolate, result);
+    return ArgConverter::ConvertToV8String(m_isolate, result);
 }
 
-ScriptCompiler::CachedData* ModuleInternal::TryLoadScriptCache(const std::string& path)
-{
-	if (!Constants::V8_CACHE_COMPILED_CODE)
-	{
-		return nullptr;
-	}
+ScriptCompiler::CachedData* ModuleInternal::TryLoadScriptCache(const std::string& path) {
+    if (!Constants::V8_CACHE_COMPILED_CODE) {
+        return nullptr;
+    }
 
-	auto cachePath = path + ".cache";
-	int length = 0;
-	auto data = File::ReadBinary(cachePath, length);
-	if (!data)
-	{
-		return nullptr;
-	}
+    auto cachePath = path + ".cache";
+    int length = 0;
+    auto data = File::ReadBinary(cachePath, length);
+    if (!data) {
+        return nullptr;
+    }
 
-	return new ScriptCompiler::CachedData(reinterpret_cast<uint8_t*>(data), length, ScriptCompiler::CachedData::BufferOwned);
+    return new ScriptCompiler::CachedData(reinterpret_cast<uint8_t*>(data), length, ScriptCompiler::CachedData::BufferOwned);
 }
 
-void ModuleInternal::SaveScriptCache(const ScriptCompiler::Source& source, const std::string& path)
-{
-	if (!Constants::V8_CACHE_COMPILED_CODE)
-	{
-		return;
-	}
+void ModuleInternal::SaveScriptCache(const ScriptCompiler::Source& source, const std::string& path) {
+    if (!Constants::V8_CACHE_COMPILED_CODE) {
+        return;
+    }
 
-	int length = source.GetCachedData()->length;
-	auto cachePath = path + ".cache";
-	File::WriteBinary(cachePath, source.GetCachedData()->data, length);
+    int length = source.GetCachedData()->length;
+    auto cachePath = path + ".cache";
+    File::WriteBinary(cachePath, source.GetCachedData()->data, length);
 }
 
-ModuleInternal::ModulePathKind ModuleInternal::GetModulePathKind(const std::string& path)
-{
-	ModulePathKind kind;
-	switch (path[0])
-	{
-		case '.': kind = ModulePathKind::Relative; break;
-		case '/': kind = ModulePathKind::Absolute; break;
-		default: kind = ModulePathKind::Global; break;
-	}
-	return kind;
+ModuleInternal::ModulePathKind ModuleInternal::GetModulePathKind(const std::string& path) {
+    ModulePathKind kind;
+    switch (path[0]) {
+    case '.':
+        kind = ModulePathKind::Relative;
+        break;
+    case '/':
+        kind = ModulePathKind::Absolute;
+        break;
+    default:
+        kind = ModulePathKind::Global;
+        break;
+    }
+    return kind;
 }
 
 jclass ModuleInternal::MODULE_CLASS = nullptr;

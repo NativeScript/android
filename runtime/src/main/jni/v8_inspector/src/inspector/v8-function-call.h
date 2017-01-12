@@ -40,24 +40,24 @@ namespace v8_inspector {
 class V8InspectorImpl;
 
 class V8FunctionCall {
- public:
-  V8FunctionCall(V8InspectorImpl*, v8::Local<v8::Context>, v8::Local<v8::Value>,
-                 const String16& name);
+    public:
+        V8FunctionCall(V8InspectorImpl*, v8::Local<v8::Context>, v8::Local<v8::Value>,
+                       const String16& name);
 
-  void appendArgument(v8::Local<v8::Value>);
-  void appendArgument(const String16&);
-  void appendArgument(int);
-  void appendArgument(bool);
+        void appendArgument(v8::Local<v8::Value>);
+        void appendArgument(const String16&);
+        void appendArgument(int);
+        void appendArgument(bool);
 
-  v8::Local<v8::Value> call(bool& hadException, bool reportExceptions = true);
-  v8::Local<v8::Value> callWithoutExceptionHandling();
+        v8::Local<v8::Value> call(bool& hadException, bool reportExceptions = true);
+        v8::Local<v8::Value> callWithoutExceptionHandling();
 
- protected:
-  V8InspectorImpl* m_inspector;
-  v8::Local<v8::Context> m_context;
-  std::vector<v8::Local<v8::Value>> m_arguments;
-  v8::Local<v8::String> m_name;
-  v8::Local<v8::Value> m_value;
+    protected:
+        V8InspectorImpl* m_inspector;
+        v8::Local<v8::Context> m_context;
+        std::vector<v8::Local<v8::Value>> m_arguments;
+        v8::Local<v8::String> m_name;
+        v8::Local<v8::Value> m_value;
 };
 
 }  // namespace v8_inspector

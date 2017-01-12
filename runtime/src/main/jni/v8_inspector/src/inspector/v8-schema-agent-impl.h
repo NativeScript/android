@@ -16,20 +16,20 @@ class V8InspectorSessionImpl;
 using protocol::ErrorString;
 
 class V8SchemaAgentImpl : public protocol::Schema::Backend {
- public:
-  V8SchemaAgentImpl(V8InspectorSessionImpl*, protocol::FrontendChannel*,
-                    protocol::DictionaryValue* state);
-  ~V8SchemaAgentImpl() override;
+    public:
+        V8SchemaAgentImpl(V8InspectorSessionImpl*, protocol::FrontendChannel*,
+                          protocol::DictionaryValue* state);
+        ~V8SchemaAgentImpl() override;
 
-  void getDomains(
-      ErrorString*,
-      std::unique_ptr<protocol::Array<protocol::Schema::Domain>>*) override;
+        void getDomains(
+            ErrorString*,
+            std::unique_ptr<protocol::Array<protocol::Schema::Domain>>*) override;
 
- private:
-  V8InspectorSessionImpl* m_session;
-  protocol::Schema::Frontend m_frontend;
+    private:
+        V8InspectorSessionImpl* m_session;
+        protocol::Schema::Frontend m_frontend;
 
-  DISALLOW_COPY_AND_ASSIGN(V8SchemaAgentImpl);
+        DISALLOW_COPY_AND_ASSIGN(V8SchemaAgentImpl);
 };
 
 }  // namespace v8_inspector

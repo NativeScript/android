@@ -4,60 +4,49 @@ import java.lang.Thread.UncaughtExceptionHandler;
 
 import android.content.Context;
 
-public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHandler
-{
-	private final Context context;
+public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHandler {
+    private final Context context;
 
-	private final UncaughtExceptionHandler defaultHandler;
+    private final UncaughtExceptionHandler defaultHandler;
 
-	private final Logger logger;
-	
-	public NativeScriptUncaughtExceptionHandler(Logger logger, Context context)
-	{
-		this.logger = logger;
-		this.context = context;
-		defaultHandler = Thread.getDefaultUncaughtExceptionHandler();
-	}
+    private final Logger logger;
 
-	@Override
-	public void uncaughtException(Thread thread, Throwable ex)
-	{
-		String currentThreadMessage = "An uncaught Exception occurred on \"" + thread.getName() + "\" thread.\n";
+    public NativeScriptUncaughtExceptionHandler(Logger logger, Context context) {
+        this.logger = logger;
+        this.context = context;
+        defaultHandler = Thread.getDefaultUncaughtExceptionHandler();
+    }
 
-		String errorMessage = currentThreadMessage + ErrorReport.getErrorMessage(ex);
+    @Override
+    public void uncaughtException(Thread thread, Throwable ex) {
+        String currentThreadMessage = "An uncaught Exception occurred on \"" + thread.getName() + "\" thread.\n";
 
-		if (Runtime.isInitialized())
-		{
-			try
-			{
-				ex.printStackTrace();
-				
-				Runtime runtime = Runtime.getCurrentRuntime();
+        String errorMessage = currentThreadMessage + ErrorReport.getErrorMessage(ex);
 
-				if (runtime != null)
-				{
-					runtime.passUncaughtExceptionToJs(ex, errorMessage);
-				}
-				
-				if (JsDebugger.isJsDebuggerActive())
-				{
-					return;
-				}
-			}
-			catch (Throwable t)
-			{
-				t.printStackTrace();
-			}
-		}
+        if (Runtime.isInitialized()) {
+            try {
+                ex.printStackTrace();
 
-		if (logger.isEnabled())
-		{
-			logger.write("Uncaught Exception Message=" + errorMessage);
-		}
+                Runtime runtime = Runtime.getCurrentRuntime();
 
-		if (!ErrorReport.startActivity(context, errorMessage) && defaultHandler != null)
-		{
-			defaultHandler.uncaughtException(thread, ex);
-		}
-	}
+                if (runtime != null) {
+                    runtime.passUncaughtExceptionToJs(ex, errorMessage);
+                }
+
+                if (JsDebugger.isJsDebuggerActive()) {
+                    return;
+                }
+            } catch (Throwable t) {
+                t.printStackTrace();
+            }
+        }
+
+        if (logger.isEnabled()) {
+            logger.write("Uncaught Exception Message=" + errorMessage);
+        }
+
+        if (!ErrorReport.startActivity(context, errorMessage) && defaultHandler != null) {
+            defaultHandler.uncaughtException(thread, ex);
+        }
+    }
 }

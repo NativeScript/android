@@ -11,24 +11,23 @@
 
 namespace tns {
 
-    class ReadWriteLock
-    {
-        public:
-            ReadWriteLock();
+class ReadWriteLock {
+    public:
+        ReadWriteLock();
 
-            void AquireReadLock();
-            void ReleaseReadUnlock();
-            void AquireWriteLock();
-            void ReleaseWriteUnlock();
+        void AquireReadLock();
+        void ReleaseReadUnlock();
+        void AquireWriteLock();
+        void ReleaseWriteUnlock();
 
-        private:
-            std::mutex shared;
-            std::condition_variable reader_gate;
-            std::condition_variable writer_gate;
-            int active_readers;
-            int active_writers;
-            int waiting_writers;
-        };
+    private:
+        std::mutex shared;
+        std::condition_variable reader_gate;
+        std::condition_variable writer_gate;
+        int active_readers;
+        int active_writers;
+        int waiting_writers;
+};
 }
 
 #endif //READWRITELOCK_H

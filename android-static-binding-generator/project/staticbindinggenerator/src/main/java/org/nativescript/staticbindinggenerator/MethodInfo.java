@@ -93,7 +93,9 @@ class MethodInfo implements com.tns.bindings.desc.MethodDescriptor
         String sig = t.getSignature();
         String className;
         int rank = 0;
-        while (sig.charAt(rank) == '[') ++rank;
+        while (sig.charAt(rank) == '[') {
+            ++rank;
+        }
         if (rank > 0) {
             sig = sig.substring(rank);
         }
@@ -103,36 +105,36 @@ class MethodInfo implements com.tns.bindings.desc.MethodDescriptor
             className = sig;
         }
         switch (className) {
-            case "V":
-                desc = ClassInfo.fromPrimitive(ClassDescriptor.VOID, rank);
-                break;
-            case "Z":
-                desc = ClassInfo.fromPrimitive(ClassDescriptor.BOOLEAN, rank);
-                break;
-            case "C":
-                desc = ClassInfo.fromPrimitive(ClassDescriptor.CHAR, rank);
-                break;
-            case "B":
-                desc = ClassInfo.fromPrimitive(ClassDescriptor.BYTE, rank);
-                break;
-            case "S":
-                desc = ClassInfo.fromPrimitive(ClassDescriptor.SHORT, rank);
-                break;
-            case "I":
-                desc = ClassInfo.fromPrimitive(ClassDescriptor.INT, rank);
-                break;
-            case "J":
-                desc = ClassInfo.fromPrimitive(ClassDescriptor.LONG, rank);
-                break;
-            case "F":
-                desc = ClassInfo.fromPrimitive(ClassDescriptor.FLOAT, rank);
-                break;
-            case "D":
-                desc = ClassInfo.fromPrimitive(ClassDescriptor.DOUBLE, rank);
-                break;
-            default:
-                desc = new ClassInfo(generator.getClasses().get(className), rank, generator);
-                break;
+        case "V":
+            desc = ClassInfo.fromPrimitive(ClassDescriptor.VOID, rank);
+            break;
+        case "Z":
+            desc = ClassInfo.fromPrimitive(ClassDescriptor.BOOLEAN, rank);
+            break;
+        case "C":
+            desc = ClassInfo.fromPrimitive(ClassDescriptor.CHAR, rank);
+            break;
+        case "B":
+            desc = ClassInfo.fromPrimitive(ClassDescriptor.BYTE, rank);
+            break;
+        case "S":
+            desc = ClassInfo.fromPrimitive(ClassDescriptor.SHORT, rank);
+            break;
+        case "I":
+            desc = ClassInfo.fromPrimitive(ClassDescriptor.INT, rank);
+            break;
+        case "J":
+            desc = ClassInfo.fromPrimitive(ClassDescriptor.LONG, rank);
+            break;
+        case "F":
+            desc = ClassInfo.fromPrimitive(ClassDescriptor.FLOAT, rank);
+            break;
+        case "D":
+            desc = ClassInfo.fromPrimitive(ClassDescriptor.DOUBLE, rank);
+            break;
+        default:
+            desc = new ClassInfo(generator.getClasses().get(className), rank, generator);
+            break;
         }
         return desc;
     }
