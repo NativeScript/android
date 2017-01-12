@@ -582,38 +582,6 @@ task buildMetadata (type: JavaExec) {
 			from "$projectDir/metadata/output/assets/metadata"
 			into "$projectDir/src/main/assets/metadata"
 		}
-		
-		def files = new File("${buildDir}/intermediates/res").listFiles()
-		def tmpResourceAPK = null
-		for (File f: files) {
-			def name = f.getName();
-			if (name.endsWith(".ap_")) {
-				tmpResourceAPK = f;
-				break;
-			}
-		}
-		
-		def aaptCommand = "${android.getSdkDirectory().getAbsolutePath()}/build-tools/${android.buildToolsVersion}/aapt"
-		if (isWinOs) {
-			aaptCommand += ".exe"
-		}
-		
-		def tmpAPKPath = tmpResourceAPK.getPath()
-		
-		def removeCmdParams = new ArrayList<String>([aaptCommand, "remove", tmpAPKPath, "assets/metadata/treeNodeStream.dat", "assets/metadata/treeStringsStream.dat", "assets/metadata/treeValueStream.dat"])
-		
-		exec {
-			ignoreExitValue true
-			workingDir "$projectDir/metadata/output"
-			commandLine removeCmdParams.toArray()
-		}
-		
-		def addCmdParams = new ArrayList<String>([aaptCommand, "add", tmpAPKPath, "assets/metadata/treeNodeStream.dat", "assets/metadata/treeStringsStream.dat", "assets/metadata/treeValueStream.dat"])
-		
-		exec {
-			workingDir "$projectDir/metadata/output"
-			commandLine addCmdParams.toArray()
-		}
 	}
 }
 
