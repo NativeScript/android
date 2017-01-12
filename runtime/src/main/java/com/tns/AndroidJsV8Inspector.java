@@ -4,6 +4,10 @@ import android.content.Context;
 import android.os.Handler;
 import android.util.Log;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.IOException;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -27,19 +31,17 @@ public class AndroidJsV8Inspector
     protected static native final void disconnect();
 
     protected native final void dispatchMessage(String message);
+
     protected Handler mainHandler;
     private LinkedBlockingQueue<String> inspectorMessages = new LinkedBlockingQueue<String>();
 
-    public AndroidJsV8Inspector(Context context, Logger logger)
-    {
+    public AndroidJsV8Inspector(Context context, Logger logger) {
         this.context = context;
         this.logger = logger;
     }
 
-    public void start() throws IOException
-    {
-        if (this.server == null)
-        {
+    public void start() throws IOException {
+        if (this.server == null) {
             Runtime currentRuntime = Runtime.getCurrentRuntime();
 
             mainHandler = currentRuntime.getHandler();
@@ -56,20 +58,45 @@ public class AndroidJsV8Inspector
         }
     }
 
-    private static void send(Object connection, String payload) throws IOException
-    {
+    @RuntimeCallable
+    private static void sendToDevToolsConsole(Object connection, String message, String level) {
+        try {
+            JSONObject consoleMessage = new JSONObject();
+
+            JSONObject params = new JSONObject();
+            params.put("type", level);
+            params.put("executionContextId", 0);
+            params.put("timestamp", 0.000000000000000);
+
+            JSONArray args = new JSONArray();
+            args.put(message);
+            params.put("args", args);
+
+            consoleMessage.put("method", "Runtime.consoleAPICalled");
+            consoleMessage.put("params", params);
+
+            String sendingText = consoleMessage.toString();
+            AndroidJsV8Inspector.send(connection, sendingText);
+
+        } catch (JSONException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @RuntimeCallable
+    private static void send(Object connection, String payload) throws IOException {
         ((JsV8InspectorWebSocket) connection).send(payload);
     }
 
-    private static String getInspectorMessage(Object connection)
-    {
+    @RuntimeCallable
+    private static String getInspectorMessage(Object connection) {
         return ((JsV8InspectorWebSocket) connection).getInspectorMessage();
     }
 
-    class JsV8InspectorServer extends NanoWSD
-    {
-        public JsV8InspectorServer(String name)
-        {
+    class JsV8InspectorServer extends NanoWSD {
+        public JsV8InspectorServer(String name) {
             super(name);
         }
 
@@ -84,17 +111,14 @@ public class AndroidJsV8Inspector
         }
 
         @Override
-        protected WebSocket openWebSocket(IHTTPSession handshake)
-        {
+        protected WebSocket openWebSocket(IHTTPSession handshake) {
             return new JsV8InspectorWebSocket(handshake);
         }
     }
 
-    class JsV8InspectorWebSocket extends NanoWSD.WebSocket
-    {
+    class JsV8InspectorWebSocket extends NanoWSD.WebSocket {
 
-        public JsV8InspectorWebSocket(NanoHTTPD.IHTTPSession handshakeRequest)
-        {
+        public JsV8InspectorWebSocket(NanoHTTPD.IHTTPSession handshakeRequest) {
             super(handshakeRequest);
         }
 
@@ -106,8 +130,7 @@ public class AndroidJsV8Inspector
                 Log.d("V8Inspector", "onOpen: ThreadID:  " + Thread.currentThread().getId());
             }
 
-            mainHandler.post(new Runnable()
-            {
+            mainHandler.post(new Runnable() {
                 @Override
                 public void run()
                 {
@@ -153,14 +176,11 @@ public class AndroidJsV8Inspector
 
             inspectorMessages.offer(message.getTextPayload());
 
-            mainHandler.post(new Runnable()
-            {
+            mainHandler.post(new Runnable() {
                 @Override
-                public void run()
-                {
+                public void run() {
                     String nextMessage = inspectorMessages.poll();
-                    while (nextMessage != null)
-                    {
+                    while (nextMessage != null) {
                         dispatchMessage(nextMessage);
                         nextMessage = inspectorMessages.poll();
                     }
@@ -179,15 +199,11 @@ public class AndroidJsV8Inspector
             super.send(payload);
         }
 
-        public String getInspectorMessage()
-        {
-            try
-            {
+        public String getInspectorMessage() {
+            try {
                 String message = inspectorMessages.take();
                 return message;
-            }
-            catch (InterruptedException e)
-            {
+            } catch (InterruptedException e) {
                 e.printStackTrace();
             }
 
@@ -200,8 +216,7 @@ public class AndroidJsV8Inspector
         }
 
         @Override
-        protected void onException(IOException exception)
-        {
+        protected void onException(IOException exception) {
             exception.printStackTrace();
             disconnect();
         }
