@@ -340,43 +340,52 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& moduleP
     return result;
 }
 
-Local<Script> ModuleInternal::LoadScript(Isolate* isolate, const string& path, const Local<String>& fullRequiredModulePath) {
-    Local<Script> script;
 
-    TryCatch tc;
+Local<Script> ModuleInternal::LoadScript(Isolate *isolate, const string& path, const Local<String>& fullRequiredModulePath)
+{
+	Local<Script> script;
 
-    auto scriptText = ModuleInternal::WrapModuleContent(path);
+	TryCatch tc;
 
-    DEBUG_WRITE("Compiling script (module %s)", path.c_str());
-    //
-    auto cacheData = TryLoadScriptCache(path);
+	auto scriptText = ModuleInternal::WrapModuleContent(path);
 
-    ScriptOrigin origin(fullRequiredModulePath);
-    ScriptCompiler::Source source(scriptText, origin, cacheData);
-    ScriptCompiler::CompileOptions option = ScriptCompiler::kNoCompileOptions;
+	DEBUG_WRITE("Compiling script (module %s)", path.c_str());
+	//
+	auto cacheData = TryLoadScriptCache(path);
 
-    if (cacheData != nullptr) {
-        option = ScriptCompiler::kConsumeCodeCache;
-        auto maybeScript = ScriptCompiler::Compile(isolate->GetCurrentContext(), &source, option);
-        if (maybeScript.IsEmpty() || tc.HasCaught()) {
-            throw NativeScriptException(tc, "Cannot compile " + path);
-        }
-        script = maybeScript.ToLocalChecked();
-    } else {
-        if (Constants::V8_CACHE_COMPILED_CODE) {
-            option = ScriptCompiler::kProduceCodeCache;
-        }
-        auto maybeScript = ScriptCompiler::Compile(isolate->GetCurrentContext(), &source, option);
-        if (maybeScript.IsEmpty() || tc.HasCaught()) {
-            throw NativeScriptException(tc, "Cannot compile " + path);
-        }
-        script = maybeScript.ToLocalChecked();
-        SaveScriptCache(source, path);
-    }
+	auto fullRequiredModulePathWithSchema = ArgConverter::ConvertToV8String(isolate, "file://" + path);
+	ScriptOrigin origin(fullRequiredModulePathWithSchema);
+	ScriptCompiler::Source source(scriptText, origin, cacheData);
+	ScriptCompiler::CompileOptions option = ScriptCompiler::kNoCompileOptions;
 
-    DEBUG_WRITE("Compiled script (module %s)", path.c_str());
+	if (cacheData != nullptr)
+	{
+		option = ScriptCompiler::kConsumeCodeCache;
+		auto maybeScript = ScriptCompiler::Compile(isolate->GetCurrentContext(), &source, option);
+		if (maybeScript.IsEmpty() || tc.HasCaught())
+		{
+			throw NativeScriptException(tc, "Cannot compile " + path);
+		}
+		script = maybeScript.ToLocalChecked();
+	}
+	else
+	{
+		if (Constants::V8_CACHE_COMPILED_CODE)
+		{
+			option = ScriptCompiler::kProduceCodeCache;
+		}
+		auto maybeScript = ScriptCompiler::Compile(isolate->GetCurrentContext(), &source, option);
+		if (maybeScript.IsEmpty() || tc.HasCaught())
+		{
+			throw NativeScriptException(tc, "Cannot compile " + path);
+		}
+		script = maybeScript.ToLocalChecked();
+		SaveScriptCache(source, path);
+	}
 
-    return script;
+	DEBUG_WRITE("Compiled script (module %s)", path.c_str());
+
+	return script;
 }
 
 Local<Object> ModuleInternal::LoadData(Isolate* isolate, const string& path) {

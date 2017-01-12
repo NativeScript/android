@@ -849,12 +849,13 @@ void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Valu
         auto isolate = thiz->GetIsolate();
 
         auto currentExecutingScriptName = StackTrace::CurrentStackTrace(isolate, 1, StackTrace::kScriptName)->GetFrame(0)->GetScriptName();
-
         auto currentExecutingScriptNameStr = ArgConverter::ConvertToString(currentExecutingScriptName);
-
         auto lastForwardSlash = currentExecutingScriptNameStr.find_last_of("/");
-
         auto currentDir = currentExecutingScriptNameStr.substr(0, lastForwardSlash + 1);
+        string fileSchema("file://");
+        if (currentDir.compare(0, fileSchema.length(), fileSchema) == 0) {
+            currentDir = currentDir.substr(fileSchema.length());
+        }
 
         auto workerPath = ArgConverter::ConvertToString(args[0]->ToString(isolate));
 
