@@ -89,17 +89,19 @@ def renameResultApks (variant) {
 }
 
 // gets the devDependencies declared in the package.json and excludes them from the build
-task getDevDependencies << {
-	println "$configStage getDevDependencies"
+task getDevDependencies {
+	doLast {
+		println "$configStage getDevDependencies"
 	
-	String content = new File("$projectDir/../../package.json").getText("UTF-8")
-	def jsonSlurper = new JsonSlurper()
-	def packageJsonMap = jsonSlurper.parseText(content)
+		String content = new File("$projectDir/../../package.json").getText("UTF-8")
+		def jsonSlurper = new JsonSlurper()
+		def packageJsonMap = jsonSlurper.parseText(content)
 	
-	packageJsonContents = packageJsonMap.devDependencies;
+		packageJsonContents = packageJsonMap.devDependencies;
 	
-	packageJsonContents.each { entry ->
-		excludedDevDependencies.add(entry.key + '/platforms/android/**/*.jar')
+		packageJsonContents.each { entry ->
+			excludedDevDependencies.add(entry.key + '/platforms/android/**/*.jar')
+		}
 	}
 }
 ////////////////////////////////////////////////////////////////////////////////////
@@ -480,16 +482,18 @@ task copyAarDependencies (type: Copy) {
 	into "$projectDir/libs/aar"
 }
 
-task addAarDependencies <<  {
-	println "$configStage addAarDependencies"
-	// manually traverse all the locally copied AAR files and add them to the project compilation dependencies list
-	FileTree tree = fileTree(dir: "$projectDir/libs/aar", include: ["**/*.aar"])
-	tree.each { File file ->
-		// remove the extension of the file (.aar)
-		def length = file.name.length() - 4
-		def fileName = file.name[0..<length]
-		println "\t+adding dependency: " + file.getAbsolutePath()
-		project.dependencies.add("compile", [name: fileName, ext: "aar"])
+task addAarDependencies {
+	doLast {
+		println "$configStage addAarDependencies"
+		// manually traverse all the locally copied AAR files and add them to the project compilation dependencies list
+		FileTree tree = fileTree(dir: "$projectDir/libs/aar", include: ["**/*.aar"])
+		tree.each { File file ->
+			// remove the extension of the file (.aar)
+			def length = file.name.length() - 4
+			def fileName = file.name[0..<length]
+			println "\t+adding dependency: " + file.getAbsolutePath()
+			project.dependencies.add("compile", [name: fileName, ext: "aar"])
+		}
 	}
 }
 
