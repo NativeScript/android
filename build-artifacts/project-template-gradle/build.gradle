@@ -25,7 +25,7 @@ buildscript {
     }
 
 	dependencies {
-		classpath "com.android.tools.build:gradle:2.1.2"
+		classpath "com.android.tools.build:gradle:2.3.0-beta2"
 	}
 }
 
@@ -81,16 +81,9 @@ project.ext.selectedBuildType = project.hasProperty("release") ? "release" : "de
 def renameResultApks (variant) {
 	def name
 	variant.outputs.each { output ->
-
 		def apkDirectory = output.packageApplication.outputFile.parentFile
 		def apkNamePrefix = rootProject.name + "-" + variant.buildType.name
-
-		if (output.zipAlign) {
-			name = apkNamePrefix + ".apk"
-			output.outputFile = new File(apkDirectory, name);
-		}
-
-		name = apkNamePrefix + "-unaligned.apk"
+		name = apkNamePrefix + ".apk"
 		output.packageApplication.outputFile = new File(apkDirectory, name);
 	}    
 }
@@ -701,7 +694,7 @@ task myMergeDex {
 					dexArr[dexArrLen-1] = new com.android.dex.Dex(f)
 				}
 
-				def dexMerger = new com.android.dx.merge.DexMerger(dexArr, com.android.dx.merge.CollisionPolicy.FAIL)
+				def dexMerger = new com.android.dx.merge.DexMerger(dexArr, com.android.dx.merge.CollisionPolicy.FAIL, new com.android.dx.command.dexer.DxContext())
 				def merged = dexMerger.merge()
 				def newDex = shouldMergeInMainDex ? f : new File(dexOutputDir, "/classes${lastDexIndex}.dex")
 
@@ -764,10 +757,10 @@ task buildapk {
 
 	//done to build only necessary apk
 	if(project.hasProperty("release")) {
-		dependsOn assembleRelease
+		dependsOn "assembleRelease"
 	}
 	else {
-		dependsOn assembleDebug
+		dependsOn "assembleDebug"
 	}
 }
 
