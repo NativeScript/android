@@ -14,7 +14,6 @@
 #include <fstream>
 #include <cstdio>
 #include "MethodCache.h"
-#include "JsDebugger.h"
 #include "SimpleProfiler.h"
 #include "Runtime.h"
 

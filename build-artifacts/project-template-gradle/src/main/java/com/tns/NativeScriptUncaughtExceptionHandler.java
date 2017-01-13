@@ -38,11 +38,6 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
 				{
 					runtime.passUncaughtExceptionToJs(ex, errorMessage);
 				}
-				
-				if (JsDebugger.isJsDebuggerActive())
-				{
-					return;
-				}
 			}
 			catch (Throwable t)
 			{
@@ -57,7 +52,7 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
 
 		boolean res = false;
 
-		if (AndroidJsDebugger.isDebuggableApp(context)) {
+		if (Util.isDebuggableApp(context)) {
 			Class<?> ErrReport = null;
 			java.lang.reflect.Method startActivity = null;
 

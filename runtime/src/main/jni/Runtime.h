@@ -31,9 +31,9 @@ namespace tns
 
 			static void Init(JavaVM *vm, void *reserved);
 
-			static void Init(JNIEnv *_env, jobject obj, int runtimeId, jstring filesPath, jstring nativeLibsDir, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jstring callingDir, jobject jsDebugger);
+			static void Init(JNIEnv *_env, jobject obj, int runtimeId, jstring filesPath, jstring nativeLibsDir, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jstring callingDir);
 
-			void Init(jstring filesPath, jstring nativeLibsDir, bool verboseLoggingEnabled, jstring packageName, jobjectArray args, jstring callingDir, jobject jsDebugger);
+			void Init(jstring filesPath, jstring nativeLibsDir, bool verboseLoggingEnabled, jstring packageName, jobjectArray args, jstring callingDir);
 
 			v8::Isolate* GetIsolate() const;
 
@@ -83,7 +83,7 @@ namespace tns
 			v8::Persistent<v8::Function> *m_gcFunc;
 			volatile bool m_runGC;
 
-			v8::Isolate* PrepareV8Runtime(const std::string& filesPath, jstring nativeLibsDir, jstring packageName, jstring callingDir, jobject jsDebugger, jstring profilerOutputDir);
+			v8::Isolate* PrepareV8Runtime(const std::string& filesPath, jstring nativeLibsDir, jstring packageName, jstring callingDir, jstring profilerOutputDir);
 			jobject ConvertJsValueToJavaObject(JEnv& env, const v8::Local<v8::Value>& value, int classReturnType);
 
 			static std::map<int, Runtime*> s_id2RuntimeCache;

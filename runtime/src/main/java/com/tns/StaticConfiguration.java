@@ -5,7 +5,6 @@ import java.io.File;
 public class StaticConfiguration
 {
 	public final Logger logger;
-	public final Debugger debugger;
 	public final String appName;
 	public final String nativeLibDir;
 	public final File rootDir;
@@ -15,11 +14,10 @@ public class StaticConfiguration
 	public final String dexThumb;
 	public final AppConfig appConfig;
 
-	public StaticConfiguration(Logger logger, Debugger debugger,
+	public StaticConfiguration(Logger logger,
 							   String appName, String nativeLibDir, File rootDir, File appDir, ClassLoader classLoader,
 							   File dexDir, String dexThumb, AppConfig appConfig) {
 		this.logger = logger;
-		this.debugger = debugger;
 		this.appName = appName;
 		this.nativeLibDir = nativeLibDir;
 		this.rootDir = rootDir;

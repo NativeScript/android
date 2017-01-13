@@ -13,6 +13,8 @@ public final class RuntimeHelper {
     private RuntimeHelper() {
     }
 
+    private static AndroidJsV8Inspector v8Inspector;
+
     // hasErrorIntent tells you if there was an event (with an uncaught
     // exception) raised from ErrorReport
     private static boolean hasErrorIntent(Application app) {
@@ -21,7 +23,7 @@ public final class RuntimeHelper {
         try {
             // empty file just to check if there was a raised uncaught error by
             // ErrorReport
-            if (AndroidJsDebugger.isDebuggableApp(app)) {
+            if (Util.isDebuggableApp(app)) {
                 String fileName = "";
 
                 try {
@@ -54,8 +56,6 @@ public final class RuntimeHelper {
         System.loadLibrary("NativeScript");
 
         Logger logger = new LogcatLogger(app);
-
-        Debugger debugger = AndroidJsDebugger.isDebuggableApp(app) ? new AndroidJsDebugger(app, logger) : null;
 
         Runtime runtime = null;
         boolean showErrorIntent = hasErrorIntent(app);
@@ -124,10 +124,18 @@ public final class RuntimeHelper {
                 e.printStackTrace();
             }
 
-            StaticConfiguration config = new StaticConfiguration(logger, debugger, appName, nativeLibDir, rootDir,
+            StaticConfiguration config = new StaticConfiguration(logger, appName, nativeLibDir, rootDir,
                     appDir, classLoader, dexDir, dexThumb, appConfig);
 
             runtime = Runtime.initializeRuntimeWithConfiguration(config);
+            if (Util.isDebuggableApp(app)) {
+                try {
+                    v8Inspector = new AndroidJsV8Inspector(app, logger);
+                    v8Inspector.start();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
 
             // runtime needs to be initialized before the NativeScriptSyncService is enabled because it uses runtime.runScript(...)
             if (NativeScriptSyncService.isSyncEnabled(app)) {
