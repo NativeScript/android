@@ -23,7 +23,8 @@ JsV8InspectorClient::JsV8InspectorClient(v8::Isolate *isolate)
           inspector_(nullptr),
           session_(nullptr),
           connection(nullptr),
-          context_()
+          context_(),
+          running_nested_loop_(false)
 {
     JEnv env;
 
@@ -223,7 +224,7 @@ JsV8InspectorClient *JsV8InspectorClient::GetInstance()
 
 void JsV8InspectorClient::sendToFrontEndCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
-    if(instance->connection == nullptr) {
+    if ((instance == nullptr) || (instance->connection == nullptr)) {
         return;
     }
 
