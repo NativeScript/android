@@ -568,7 +568,7 @@ task buildMetadata (type: JavaExec) {
 		def androidJar = sdkPath + "/platforms/" + android.compileSdkVersion + "/android.jar"
 		metadataParams.add(androidJar)
 
-		def ft = fileTree(dir: "$buildDir/intermediates/transforms/dex", include: "**/*.dex")
+		def ft = fileTree(dir: "$buildDir/intermediates/transforms/dex", include: "**/${project.ext.selectedBuildType}/*.dex")
 		def buildDirPattern = File.separator + project.ext.selectedBuildType + File.separator
 		ft.each { currentDexFile ->
 			def dexFilepath = currentDexFile.getAbsolutePath()
