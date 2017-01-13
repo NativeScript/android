@@ -13,16 +13,10 @@ allprojects {
 }
 
 dependencies {
-    sourceCompatibility = 1.7
-    targetCompatibility = 1.7
-
+    compile 'org.apache.bcel:bcel:5.2'
     compile fileTree(dir: 'libs', include: ['*.jar'])
     testCompile 'junit:junit:4.+'
     testCompile 'commons-io:commons-io:2.5'
-    compile 'junit:junit:4.12'
-    compile 'org.apache.bcel:bcel:5.2'
-    testCompile files("./lib/dx.jar")
-    compile project(':binding-generator')
 }
 
 jar {

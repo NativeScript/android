@@ -1,1 +1,0 @@
-android.app.Application***com.tns.NativeScriptApplication*a/b/c/MyApplication.js*
