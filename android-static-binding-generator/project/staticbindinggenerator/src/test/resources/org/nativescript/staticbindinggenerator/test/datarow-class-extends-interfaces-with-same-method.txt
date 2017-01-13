@@ -1,1 +1,0 @@
-java.lang.Object**present*com.tns.MyClassWithPresent*main-view-model.js*com.example.Gift,com.example.Guest

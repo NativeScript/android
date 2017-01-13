@@ -1,1 +1,0 @@
-android.app.Application**onCreate,onLowMemory,onTerminate,onTrimMemory,registerActivityLifecycleCallbacks,registerComponentCallbacks,registerOnProvideAssistDataListener,unregisterActivityLifecycleCallbacks,unregisterComponentCallbacks,unregisterOnProvideAssistDataListener*com.tns.NativeScriptApplication*a/b/c/MyApplication.js*
