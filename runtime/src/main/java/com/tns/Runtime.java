@@ -32,7 +32,7 @@ import com.tns.bindings.ProxyGenerator;
 
 public class Runtime
 {
-    private native void initNativeScript(int runtimeId, String filesPath, String nativeLibDir, boolean verboseLoggingEnabled, String packageName, Object[] v8Options, String callingDir, JsDebugger jsDebugger);
+    private native void initNativeScript(int runtimeId, String filesPath, String nativeLibDir, boolean verboseLoggingEnabled, String packageName, Object[] v8Options, String callingDir);
 
     private native void runModule(int runtimeId, String filePath) throws NativeScriptException;
 
@@ -101,8 +101,6 @@ public class Runtime
     private Logger logger;
 
     private ThreadScheduler threadScheduler;
-
-    private JsDebugger jsDebugger;
 
     private DexFactory dexFactory;
 
@@ -495,10 +493,10 @@ public class Runtime
 
     public void init()
     {
-        init(config.logger, config.debugger, config.appName, config.nativeLibDir, config.rootDir, config.appDir, config.classLoader, config.dexDir, config.dexThumb, config.appConfig, dynamicConfig.callingJsDir);
+        init(config.logger, config.appName, config.nativeLibDir, config.rootDir, config.appDir, config.classLoader, config.dexDir, config.dexThumb, config.appConfig, dynamicConfig.callingJsDir);
     }
 
-    private void init(Logger logger, Debugger debugger, String appName, String nativeLibDir, File rootDir, File appDir, ClassLoader classLoader, File dexDir, String dexThumb, AppConfig appConfig, String callingJsDir) throws RuntimeException
+    private void init(Logger logger, String appName, String nativeLibDir, File rootDir, File appDir, ClassLoader classLoader, File dexDir, String dexThumb, AppConfig appConfig, String callingJsDir) throws RuntimeException
     {
         if (initialized)
         {
@@ -523,19 +521,7 @@ public class Runtime
             throw new RuntimeException("Fail to initialize Require class", ex);
         }
 
-        // TODO: Pete: this.runtimeId == 0 is a temporary patching of jsDebugger not attaching on app start
-        // TODO: Pete: Debugger should not be created when a worker is created
-        if (debugger != null && this.runtimeId == 0)
-        {
-            jsDebugger = new JsDebugger(debugger, threadScheduler);
-        }
-
-        initNativeScript(getRuntimeId(), Module.getApplicationFilesPath(), nativeLibDir, logger.isEnabled(), appName, appConfig.getAsArray(), callingJsDir, jsDebugger);
-
-        if (jsDebugger != null && this.runtimeId == 0)
-        {
-            jsDebugger.start();
-        }
+        initNativeScript(getRuntimeId(), Module.getApplicationFilesPath(), nativeLibDir, logger.isEnabled(), appName, appConfig.getAsArray(), callingJsDir);
 
         clearStartupData(getRuntimeId()); // It's safe to delete the data after the V8 debugger is initialized
 

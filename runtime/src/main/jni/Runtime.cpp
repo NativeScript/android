@@ -11,7 +11,6 @@
 #include "Version.h"
 #include "WeakRef.h"
 #include "NativeScriptAssert.h"
-#include "JsDebugger.h"
 #include "SimpleProfiler.h"
 #include "SimpleAllocator.h"
 #include "ModuleInternal.h"
@@ -130,7 +129,7 @@ ObjectManager* Runtime::GetObjectManager() const
 	return m_objectManager;
 }
 
-void Runtime::Init(JNIEnv *_env, jobject obj, int runtimeId, jstring filesPath, jstring nativeLibDir, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jstring callingDir, jobject jsDebugger)
+void Runtime::Init(JNIEnv *_env, jobject obj, int runtimeId, jstring filesPath, jstring nativeLibDir, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jstring callingDir)
 {
 	JEnv env(_env);
 
@@ -138,10 +137,10 @@ void Runtime::Init(JNIEnv *_env, jobject obj, int runtimeId, jstring filesPath, 
 
 	auto enableLog = verboseLoggingEnabled == JNI_TRUE;
 
-	runtime->Init(filesPath, nativeLibDir, enableLog, packageName, args, callingDir, jsDebugger);
+	runtime->Init(filesPath, nativeLibDir, enableLog, packageName, args, callingDir);
 }
 
-void Runtime::Init(jstring filesPath, jstring nativeLibDir, bool verboseLoggingEnabled, jstring packageName, jobjectArray args, jstring callingDir, jobject jsDebugger)
+void Runtime::Init(jstring filesPath, jstring nativeLibDir, bool verboseLoggingEnabled, jstring packageName, jobjectArray args, jstring callingDir)
 {
 	LogEnabled = verboseLoggingEnabled;
 
@@ -161,7 +160,7 @@ void Runtime::Init(jstring filesPath, jstring nativeLibDir, bool verboseLoggingE
 	DEBUG_WRITE("Initializing Telerik NativeScript");
 
 	NativeScriptException::Init(m_objectManager);
-	m_isolate = PrepareV8Runtime(filesRoot, nativeLibDir, packageName, callingDir, jsDebugger, profilerOutputDir);
+	m_isolate = PrepareV8Runtime(filesRoot, nativeLibDir, packageName, callingDir, profilerOutputDir);
 
 	s_isolate2RuntimesCache.insert(make_pair(m_isolate, this));
 }
@@ -375,20 +374,8 @@ void Runtime::PassUncaughtExceptionToJsNative(JNIEnv *env, jobject obj, jthrowab
 	errObj->Set(V8StringConstants::GetNativeException(isolate), nativeExceptionObject);
 	errObj->Set(V8StringConstants::GetStackTrace(isolate), ArgConverter::jstringToV8String(isolate, stackTrace));
 
-	if (JsDebugger::IsDebuggerActive())
-	{
-		__android_log_print(ANDROID_LOG_DEBUG, "TNS.Native", "debuger active throwing exception with message %s", errMsg.c_str());
-
-		JsDebugger::ConsoleMessage(errMsg, "error");
-		//throwing unhandled error to debugger so catch all and catch unhandled exceptions setting on client can be triggered
-		DEBUG_WRITE("throwing unhandled error to debugger");
-		NativeScriptException(errMsg).ReThrowToV8();
-	}
-	else
-	{
-		//pass err to JS
-		NativeScriptException::CallJsFuncWithErr(errObj);
-	}
+	//pass err to JS
+	NativeScriptException::CallJsFuncWithErr(errObj);
 }
 
 void Runtime::PassUncaughtExceptionFromWorkerToMainHandler(Local<String> message, Local<String> stackTrace, Local<String> filename, int lineno) {
@@ -422,7 +409,7 @@ static void InitializeV8() {
 
 bool x = false;
 
-Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring nativeLibDir, jstring packageName, jstring callingDir, jobject jsDebugger, jstring profilerOutputDir)
+Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring nativeLibDir, jstring packageName, jstring callingDir, jstring profilerOutputDir)
 {
 	Isolate::CreateParams create_params;
 	bool didInitializeV8 = false;
@@ -563,7 +550,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring nativeLibDir
 
 	globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__log"), FunctionTemplate::New(isolate, CallbackHandlers::LogMethodCallback));
 	globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__dumpReferenceTables"), FunctionTemplate::New(isolate, CallbackHandlers::DumpReferenceTablesMethodCallback));
-	globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__debugbreak"), FunctionTemplate::New(isolate, JsDebugger::DebugBreakCallback));
 	globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__consoleMessage"), FunctionTemplate::New(isolate, JsV8InspectorClient::sendToFrontEndCallback));
 	globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__enableVerboseLogging"), FunctionTemplate::New(isolate, CallbackHandlers::EnableVerboseLoggingMethodCallback));
 	globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__disableVerboseLogging"), FunctionTemplate::New(isolate, CallbackHandlers::DisableVerboseLoggingMethodCallback));
@@ -636,7 +622,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring nativeLibDir
 
 	auto outputDir = ArgConverter::jstringToString(profilerOutputDir);
 	m_profiler.Init(isolate, global, pckName, outputDir);
-	JsDebugger::Init(isolate, pckName, jsDebugger);
 
 	// Do not build metadata (which should be static for the process) for non-main threads
 	if (!s_mainThreadInitialized) {

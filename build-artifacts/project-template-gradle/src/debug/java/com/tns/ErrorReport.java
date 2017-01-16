@@ -214,7 +214,7 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
     static Intent getIntent(Context context) {
         Class<?> errorActivityClass;
 
-        if (AndroidJsDebugger.isDebuggableApp(context)) {
+        if (Util.isDebuggableApp(context)) {
             errorActivityClass = ErrorReportActivity.class;
         } else {
             return null;

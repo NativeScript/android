@@ -38,11 +38,6 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
 				{
 					runtime.passUncaughtExceptionToJs(ex, errorMessage);
 				}
-				
-				if (JsDebugger.isJsDebuggerActive())
-				{
-					return;
-				}
 			}
 			catch (Throwable t)
 			{
