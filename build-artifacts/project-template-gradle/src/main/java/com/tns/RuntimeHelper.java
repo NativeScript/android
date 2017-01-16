@@ -132,8 +132,13 @@ public final class RuntimeHelper {
 				try {
 					v8Inspector = new AndroidJsV8Inspector(app, logger);
 					v8Inspector.start();
-				}
-				catch (IOException e) {
+					File debugBreakFile = new File("/data/local/tmp", app.getPackageName() + "-debugger-started");
+					if (debugBreakFile.exists() && !debugBreakFile.isDirectory() && debugBreakFile.length() == 0) {
+						java.io.FileWriter fileWriter = new java.io.FileWriter(debugBreakFile);
+						fileWriter.write("started");
+						fileWriter.close();
+					}
+				} catch (IOException e) {
 					e.printStackTrace();
 				}
 			}
