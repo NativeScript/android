@@ -8,7 +8,7 @@ const validFiles = ['c', 'cpp', 'h', 'java'];
 // let dateString = `${date.getDay() + 1}-${date.getMonth() + 1}-${date.getFullYear()}--${date.getHours()}:${date.getMinutes()}`
 // let backupDir = `formatbackup-${dateString}`;
 
-let astyleOptions = "-H -k1 -j -C -s4 -i -n" // "--options=tools\\.astyle"
+let astyleOptions = "--style=java -H -k1 -j -C -s4 -xi -n" // "--options=tools\\.astyle"
 let astyle = "astyle";
 
 if (process.platform.indexOf("win") === 0) {
