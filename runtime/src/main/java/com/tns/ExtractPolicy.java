@@ -1,11 +1,10 @@
 package com.tns;
 
 
-public interface ExtractPolicy
-{
-	boolean shouldExtract(android.content.Context context);
+public interface ExtractPolicy {
+    boolean shouldExtract(android.content.Context context);
 
-	boolean forceOverwrite();
+    boolean forceOverwrite();
 
-	FileExtractor extractor();
+    FileExtractor extractor();
 }

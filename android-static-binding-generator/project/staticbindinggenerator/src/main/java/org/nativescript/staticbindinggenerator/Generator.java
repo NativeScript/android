@@ -83,12 +83,12 @@ public class Generator {
         } else {
             name = getSimpleClassname(clazz.getClassName());
 
-            if(!isInterface) {
+            if (!isInterface) {
                 name += dataRow.getSuffix();
             }
         }
 
-        if(isInterface && interfaceNames.contains(name)) {
+        if (isInterface && interfaceNames.contains(name)) {
             return null;
         } else if (isInterface) {
             interfaceNames.add(name);
@@ -137,7 +137,7 @@ public class Generator {
             if (isJavaExtend) {
                 Binding binding = generateBinding(dataRow, interfaceNames);
 
-                if(binding != null) {
+                if (binding != null) {
                     bindings.add(binding);
                 }
             }
@@ -315,7 +315,7 @@ public class Generator {
         w.writeln();
 
         boolean isApplicationClass = isApplicationClass(clazz, classes);
-        if(isApplicationClass && !packageName.equals("com.tns")) {
+        if (isApplicationClass && !packageName.equals("com.tns")) {
             w.writeln("import com.tns.RuntimeHelper;");
             w.writeln("import com.tns.Runtime;");
             w.writeln();
@@ -419,7 +419,7 @@ public class Generator {
                     List<Method> methodGroup = api.get(methodName);
                     for (Method m : methodGroup) {
                         boolean isInterfaceMethod = false;
-                        if(interfaceMethods.contains(m)) {
+                        if (interfaceMethods.contains(m)) {
                             isInterfaceMethod = true;
                         }
                         writeMethodBody(m, w, isApplicationClass, isInterfaceMethod);
@@ -448,8 +448,8 @@ public class Generator {
     private boolean isClassApplication(JavaClass clazz) {
         String className = clazz.getClassName();
         return className.equals("android.app.Application") ||
-                className.equals("android.support.multidex.MultiDexApplication") ||
-                className.equals("android.test.mock.MockApplication");
+               className.equals("android.support.multidex.MultiDexApplication") ||
+               className.equals("android.test.mock.MockApplication");
     }
 
     private void writeMethodBody(Method m, Writer w, boolean isApplicationClass, boolean isInterfaceMethod) {

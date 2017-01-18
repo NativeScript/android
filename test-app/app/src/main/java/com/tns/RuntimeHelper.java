@@ -112,8 +112,9 @@ public final class RuntimeHelper {
             try {
                 dexThumb = Util.getDexThumb(app);
             } catch (NameNotFoundException e) {
-                if (logger.isEnabled())
+                if (logger.isEnabled()) {
                     logger.write("Error while getting current proxy thumb");
+                }
                 e.printStackTrace();
             }
 

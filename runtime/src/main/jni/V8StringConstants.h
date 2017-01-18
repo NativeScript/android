@@ -7,41 +7,41 @@
 using namespace v8;
 
 namespace tns {
-    class V8StringConstants {
+class V8StringConstants {
     public:
-        static v8::Local<v8::String> GetClassImplementationObject(v8::Isolate *isolate);
+        static v8::Local<v8::String> GetClassImplementationObject(v8::Isolate* isolate);
 
-        static v8::Local<v8::String> GetExtend(v8::Isolate *isolate);
+        static v8::Local<v8::String> GetExtend(v8::Isolate* isolate);
 
-        static v8::Local<v8::String> GetNullObject(v8::Isolate *isolate);
+        static v8::Local<v8::String> GetNullObject(v8::Isolate* isolate);
 
-        static v8::Local<v8::String> GetNullNodeName(v8::Isolate *isolate);
+        static v8::Local<v8::String> GetNullNodeName(v8::Isolate* isolate);
 
-        static v8::Local<v8::String> GetIsPrototypeImplementationObject(v8::Isolate *isolate);
+        static v8::Local<v8::String> GetIsPrototypeImplementationObject(v8::Isolate* isolate);
 
-        static v8::Local<v8::String> GetNativeException(v8::Isolate *isolate);
+        static v8::Local<v8::String> GetNativeException(v8::Isolate* isolate);
 
-        static v8::Local<v8::String> GetStackTrace(v8::Isolate *isolate);
+        static v8::Local<v8::String> GetStackTrace(v8::Isolate* isolate);
 
-        static v8::Local<v8::String> GetLongNumber(v8::Isolate *isolate);
+        static v8::Local<v8::String> GetLongNumber(v8::Isolate* isolate);
 
-        static v8::Local<v8::String> GetPrototype(v8::Isolate *isolate);
+        static v8::Local<v8::String> GetPrototype(v8::Isolate* isolate);
 
-        static v8::Local<v8::String> GetSuper(v8::Isolate *isolate);
+        static v8::Local<v8::String> GetSuper(v8::Isolate* isolate);
 
-        static v8::Local<v8::String> GetTarget(v8::Isolate *isolate);
+        static v8::Local<v8::String> GetTarget(v8::Isolate* isolate);
 
-        static v8::Local<v8::String> GetToString(v8::Isolate *isolate);
+        static v8::Local<v8::String> GetToString(v8::Isolate* isolate);
 
-        static v8::Local<v8::String> GetJavaLong(v8::Isolate *isolate);
+        static v8::Local<v8::String> GetJavaLong(v8::Isolate* isolate);
 
-        static v8::Local<v8::String> GetValueOf(v8::Isolate *isolate);
+        static v8::Local<v8::String> GetValueOf(v8::Isolate* isolate);
 
-        static v8::Local<v8::String> GetValue(v8::Isolate *isolate);
+        static v8::Local<v8::String> GetValue(v8::Isolate* isolate);
 
-        static v8::Local<v8::String> GetUncaughtError(v8::Isolate *isolate);
+        static v8::Local<v8::String> GetUncaughtError(v8::Isolate* isolate);
 
-        static v8::Local<v8::String> GetImplementationObject(v8::Isolate *isolate);
+        static v8::Local<v8::String> GetImplementationObject(v8::Isolate* isolate);
 
         static const std::string CLASS_IMPLEMENTATION_OBJECT;
         static const std::string DEBUG_NAME;
@@ -68,7 +68,7 @@ namespace tns {
          * The same PerIsolateV8Constants struct should only be used on the thread the isolated is created in
          */
         struct PerIsolateV8Constants {
-            PerIsolateV8Constants(v8::Isolate *isolate) {
+            PerIsolateV8Constants(v8::Isolate* isolate) {
                 auto str = String::NewFromUtf8(isolate, CLASS_IMPLEMENTATION_OBJECT.c_str());
                 CLASS_IMPLEMENTATION_OBJECT_PERSISTENT = new Persistent<String>(isolate, str);
 
@@ -87,7 +87,7 @@ namespace tns {
 
                 str = String::NewFromUtf8(isolate, IS_PROTOTYPE_IMPLEMENTATION_OBJECT.c_str());
                 IS_PROTOTYPE_IMPLEMENTATION_OBJECT_PERSISTENT = new Persistent<String>(isolate,
-                                                                                       str);
+                        str);
 
 
                 str = String::NewFromUtf8(isolate, NATIVE_EXCEPTION.c_str());
@@ -158,34 +158,34 @@ namespace tns {
                 IMPLEMENTATION_OBJECT_PERSISTENT->Reset();
             }
 
-            v8::Persistent<v8::String> *CLASS_IMPLEMENTATION_OBJECT_PERSISTENT;
-            v8::Persistent<v8::String> *DEBUG_NAME_PERSISTENT;
-            v8::Persistent<v8::String> *EXTEND_PERSISTENT;
-            v8::Persistent<v8::String> *NULL_OBJECT_PERSISTENT;
-            v8::Persistent<v8::String> *NULL_NODE_NAME_PERSISTENT;
-            v8::Persistent<v8::String> *IS_PROTOTYPE_IMPLEMENTATION_OBJECT_PERSISTENT;
-            v8::Persistent<v8::String> *NATIVE_EXCEPTION_PERSISTENT;
-            v8::Persistent<v8::String> *STACK_TRACE_PERSISTENT;
-            v8::Persistent<v8::String> *LONG_NUMBER_PERSISTENT;
-            v8::Persistent<v8::String> *PROTOTYPE_PERSISTENT;
-            v8::Persistent<v8::String> *SUPER_PERSISTENT;
-            v8::Persistent<v8::String> *TARGET_PERSISTENT;
-            v8::Persistent<v8::String> *TO_STRING_PERSISTENT;
-            v8::Persistent<v8::String> *JAVA_LONG_PERSISTENT;
-            v8::Persistent<v8::String> *VALUE_OF_PERSISTENT;
-            v8::Persistent<v8::String> *VALUE_PERSISTENT;
-            v8::Persistent<v8::String> *UNCAUGHT_ERROR_PERSISTENT;
-            v8::Persistent<v8::String> *IMPLEMENTATION_OBJECT_PERSISTENT;
+            v8::Persistent<v8::String>* CLASS_IMPLEMENTATION_OBJECT_PERSISTENT;
+            v8::Persistent<v8::String>* DEBUG_NAME_PERSISTENT;
+            v8::Persistent<v8::String>* EXTEND_PERSISTENT;
+            v8::Persistent<v8::String>* NULL_OBJECT_PERSISTENT;
+            v8::Persistent<v8::String>* NULL_NODE_NAME_PERSISTENT;
+            v8::Persistent<v8::String>* IS_PROTOTYPE_IMPLEMENTATION_OBJECT_PERSISTENT;
+            v8::Persistent<v8::String>* NATIVE_EXCEPTION_PERSISTENT;
+            v8::Persistent<v8::String>* STACK_TRACE_PERSISTENT;
+            v8::Persistent<v8::String>* LONG_NUMBER_PERSISTENT;
+            v8::Persistent<v8::String>* PROTOTYPE_PERSISTENT;
+            v8::Persistent<v8::String>* SUPER_PERSISTENT;
+            v8::Persistent<v8::String>* TARGET_PERSISTENT;
+            v8::Persistent<v8::String>* TO_STRING_PERSISTENT;
+            v8::Persistent<v8::String>* JAVA_LONG_PERSISTENT;
+            v8::Persistent<v8::String>* VALUE_OF_PERSISTENT;
+            v8::Persistent<v8::String>* VALUE_PERSISTENT;
+            v8::Persistent<v8::String>* UNCAUGHT_ERROR_PERSISTENT;
+            v8::Persistent<v8::String>* IMPLEMENTATION_OBJECT_PERSISTENT;
         };
 
     private:
         V8StringConstants() {
         };
 
-        static PerIsolateV8Constants *GetConstantsForIsolate(v8::Isolate *isolate);
+        static PerIsolateV8Constants* GetConstantsForIsolate(v8::Isolate* isolate);
 
 
-    };
+};
 }
 
 #endif /* V8STRINGCONSTANTS_H_ */
