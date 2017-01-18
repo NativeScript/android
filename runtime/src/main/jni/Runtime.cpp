@@ -454,7 +454,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring nativeLibDir
 	else if (!Constants::V8_HEAP_SNAPSHOT_BLOB.empty() || !Constants::V8_HEAP_SNAPSHOT_SCRIPT.empty())
 	{
 		DEBUG_WRITE("Snapshot enabled.");
-		__android_log_print(ANDROID_LOG_DEBUG, pckName.c_str(), "V8 version %s", V8::GetVersion());
 
 		string snapshotPath;
 		bool saveSnapshot = true;
