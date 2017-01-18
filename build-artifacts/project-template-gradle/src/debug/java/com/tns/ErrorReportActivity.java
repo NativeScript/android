@@ -23,7 +23,7 @@ public class ErrorReportActivity extends AppCompatActivity {
     protected void onUserLeaveHint() {
         super.onUserLeaveHint();
 
-        if(!isCheckingForPermissions()) {
+        if (!isCheckingForPermissions()) {
             ErrorReport.killProcess(this);
         }
     }

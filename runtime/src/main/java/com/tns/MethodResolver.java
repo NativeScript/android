@@ -10,660 +10,500 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 
-class MethodResolver
-{
-	private static Map<String, String> primitiveTypesSignature = new HashMap<String, String>();
+class MethodResolver {
+    private static Map<String, String> primitiveTypesSignature = new HashMap<String, String>();
 
-	static
-	{
-		// Boolean
-		primitiveTypesSignature.put("boolean", "Z");
-		primitiveTypesSignature.put("Boolean", "Z");
-		// Integer
-		primitiveTypesSignature.put("int", "I");
-		primitiveTypesSignature.put("Integer", "I");
-		// Double
-		primitiveTypesSignature.put("double", "D");
-		primitiveTypesSignature.put("Double", "D");
-		// Float
-		primitiveTypesSignature.put("float", "F");
-		primitiveTypesSignature.put("Float", "F");
-		// Short
-		primitiveTypesSignature.put("short", "S");
-		primitiveTypesSignature.put("Short", "S");
-		// Long
-		primitiveTypesSignature.put("long", "J");
-		primitiveTypesSignature.put("Long", "J");
-		// Char
-		primitiveTypesSignature.put("char", "C");
-		primitiveTypesSignature.put("Character", "C");
-		// Byte
-		primitiveTypesSignature.put("byte", "B");
-		primitiveTypesSignature.put("Byte", "B");
-		// Void
-		primitiveTypesSignature.put("void", "V");
-	}
+    static {
+        // Boolean
+        primitiveTypesSignature.put("boolean", "Z");
+        primitiveTypesSignature.put("Boolean", "Z");
+        // Integer
+        primitiveTypesSignature.put("int", "I");
+        primitiveTypesSignature.put("Integer", "I");
+        // Double
+        primitiveTypesSignature.put("double", "D");
+        primitiveTypesSignature.put("Double", "D");
+        // Float
+        primitiveTypesSignature.put("float", "F");
+        primitiveTypesSignature.put("Float", "F");
+        // Short
+        primitiveTypesSignature.put("short", "S");
+        primitiveTypesSignature.put("Short", "S");
+        // Long
+        primitiveTypesSignature.put("long", "J");
+        primitiveTypesSignature.put("Long", "J");
+        // Char
+        primitiveTypesSignature.put("char", "C");
+        primitiveTypesSignature.put("Character", "C");
+        // Byte
+        primitiveTypesSignature.put("byte", "B");
+        primitiveTypesSignature.put("Byte", "B");
+        // Void
+        primitiveTypesSignature.put("void", "V");
+    }
 
-	private static class Tuple<X, Y>
-	{
-		public final X x;
-		public final Y y;
+    private static class Tuple<X, Y> {
+        public final X x;
+        public final Y y;
 
-		public Tuple(X x, Y y)
-		{
-			this.x = x;
-			this.y = y;
-		}
-	}
+        public Tuple(X x, Y y) {
+            this.x = x;
+            this.y = y;
+        }
+    }
 
-	private static class DistanceComparator implements Comparator<Tuple<?, Integer>>
-	{
-		@Override
-		public int compare(Tuple<?, Integer> left, Tuple<?, Integer> right)
-		{
-			return left.y.compareTo(right.y);
-		}
-	}
+    private static class DistanceComparator implements Comparator<Tuple<?, Integer>> {
+        @Override
+        public int compare(Tuple<?, Integer> left, Tuple<?, Integer> right) {
+            return left.y.compareTo(right.y);
+        }
+    }
 
-	private static DistanceComparator distanceComparator = new DistanceComparator();
+    private static DistanceComparator distanceComparator = new DistanceComparator();
 
-	private static Map<Constructor<?>, Class<?>[]> constructorParamTypeCache = new HashMap<Constructor<?>, Class<?>[]>();
+    private static Map<Constructor<?>, Class<?>[]> constructorParamTypeCache = new HashMap<Constructor<?>, Class<?>[]>();
 
-	public static String getMethodSignature(Class<?> retType, Class<?>[] params)
-	{
-		StringBuilder ret = new StringBuilder();
-		ret.append('(');
-		for (int i = 0; i < params.length; i++)
-		{
-			Class<?> type = params[i];
-			ret.append(getTypeSignature(type));
-		}
-		ret.append(')');
-		ret.append(getTypeSignature(retType));
-		return ret.toString();
-	}
+    public static String getMethodSignature(Class<?> retType, Class<?>[] params) {
+        StringBuilder ret = new StringBuilder();
+        ret.append('(');
+        for (int i = 0; i < params.length; i++) {
+            Class<?> type = params[i];
+            ret.append(getTypeSignature(type));
+        }
+        ret.append(')');
+        ret.append(getTypeSignature(retType));
+        return ret.toString();
+    }
 
-	public static String getTypeSignature(Class<?> type)
-	{
-		if (type == null)
-		{
-			return "V";
-		}
+    public static String getTypeSignature(Class<?> type) {
+        if (type == null) {
+            return "V";
+        }
 
-		Class<?> t = type;
+        Class<?> t = type;
 
-		String array = "";
-		while (t.isArray())
-		{
-			array += "[";
-			t = t.getComponentType();
-		}
+        String array = "";
+        while (t.isArray()) {
+            array += "[";
+            t = t.getComponentType();
+        }
 
-		String signature = primitiveTypesSignature.get(t.getName());
-		if (signature == null)
-		{
-			signature = "L" + t.getName().replace('.', '/') + ";";
-		}
+        String signature = primitiveTypesSignature.get(t.getName());
+        if (signature == null) {
+            signature = "L" + t.getName().replace('.', '/') + ";";
+        }
 
-		return array + signature;
-	}
+        return array + signature;
+    }
 
-	static HashMap<Class<?>, MethodFinder> methodOverloadsForClass = new HashMap<Class<?>, MethodFinder>();
-	static ArrayList<Tuple<Method, Integer>> candidates = new ArrayList<Tuple<Method, Integer>>();
+    static HashMap<Class<?>, MethodFinder> methodOverloadsForClass = new HashMap<Class<?>, MethodFinder>();
+    static ArrayList<Tuple<Method, Integer>> candidates = new ArrayList<Tuple<Method, Integer>>();
 
-	static String resolveMethodOverload(Class<?> clazz, String methodName, Object[] args) throws ClassNotFoundException
-	{
-		candidates.clear();
-		int argLength = (args != null) ? args.length : 0;
+    static String resolveMethodOverload(Class<?> clazz, String methodName, Object[] args) throws ClassNotFoundException {
+        candidates.clear();
+        int argLength = (args != null) ? args.length : 0;
 
-		Class<?> c = clazz;
-		int iterationIndex = 0;
-		while (c != null)
-		{
-			MethodFinder finder = methodOverloadsForClass.get(c);
-			if (finder == null)
-			{
-				finder = new MethodFinder(c);
-				methodOverloadsForClass.put(c, finder);
-			}
+        Class<?> c = clazz;
+        int iterationIndex = 0;
+        while (c != null) {
+            MethodFinder finder = methodOverloadsForClass.get(c);
+            if (finder == null) {
+                finder = new MethodFinder(c);
+                methodOverloadsForClass.put(c, finder);
+            }
 
-			ArrayList<Method> matchingMethods = finder.getMatchingMethods(methodName);
-			tryFindMatches(methodName, candidates, args, argLength, matchingMethods);
-			if (candidates.size() > iterationIndex && candidates.get(iterationIndex).y == 0)
-			{
-				// direct matching (distance 0) found
-				break;
-			}
+            ArrayList<Method> matchingMethods = finder.getMatchingMethods(methodName);
+            tryFindMatches(methodName, candidates, args, argLength, matchingMethods);
+            if (candidates.size() > iterationIndex && candidates.get(iterationIndex).y == 0) {
+                // direct matching (distance 0) found
+                break;
+            }
 
-			c = c.getSuperclass();
-			iterationIndex++;
-		}
+            c = c.getSuperclass();
+            iterationIndex++;
+        }
 
-		if (!candidates.isEmpty())
-		{
-			if (candidates.size() > 1)
-				Collections.sort(candidates, distanceComparator);
+        if (!candidates.isEmpty()) {
+            if (candidates.size() > 1) {
+                Collections.sort(candidates, distanceComparator);
+            }
 
-			Method method = candidates.get(0).x;
-			return getMethodSignature(method.getReturnType(), method.getParameterTypes());
-		}
+            Method method = candidates.get(0).x;
+            return getMethodSignature(method.getReturnType(), method.getParameterTypes());
+        }
 
-		return null;
-	}
+        return null;
+    }
 
-	static void tryFindMatches(String methodName, ArrayList<Tuple<Method, Integer>> candidates, Object[] args, int argLength, ArrayList<Method> methods)
-	{
-		for (Method method : methods)
-		{
-			Class<?>[] params = method.getParameterTypes();
+    static void tryFindMatches(String methodName, ArrayList<Tuple<Method, Integer>> candidates, Object[] args, int argLength, ArrayList<Method> methods) {
+        for (Method method : methods) {
+            Class<?>[] params = method.getParameterTypes();
 
-			boolean success = false;
+            boolean success = false;
 
-			if (params.length == argLength)
-			{
-				int dist = 0;
-				if (argLength == 0)
-				{
-					success = true;
-				}
-				else
-				{
-					for (int i = 0; i < params.length; i++)
-					{
-						if (args[i] != null)
-						{
-							Class<?> argClass = args[i] instanceof NullObject ? 
-									((NullObject)args[i]).getNullObjectClass() 
-									: args[i].getClass();
-									
-							Tuple<Boolean, Integer> res = isAssignableFrom(params[i], argClass);
-							success = res.x.booleanValue();
-							dist += res.y;
-						}
-						else
-						{
-							success = !params[i].isPrimitive();
-						}
+            if (params.length == argLength) {
+                int dist = 0;
+                if (argLength == 0) {
+                    success = true;
+                } else {
+                    for (int i = 0; i < params.length; i++) {
+                        if (args[i] != null) {
+                            Class<?> argClass = args[i] instanceof NullObject ?
+                                                ((NullObject)args[i]).getNullObjectClass()
+                                                : args[i].getClass();
 
-						if (!success)
-							break;
-					}
-				}
+                            Tuple<Boolean, Integer> res = isAssignableFrom(params[i], argClass);
+                            success = res.x.booleanValue();
+                            dist += res.y;
+                        } else {
+                            success = !params[i].isPrimitive();
+                        }
 
-				if (success)
-				{
-					candidates.add(new Tuple<Method, Integer>(method, Integer.valueOf(dist)));
-					if (dist == 0)
-						break;
-				}
-			}
-		}
-	}
+                        if (!success) {
+                            break;
+                        }
+                    }
+                }
 
-	static String resolveConstructorSignature(Class<?> clazz, Object[] args) throws ClassNotFoundException, IOException
-	{
-		Constructor<?> ctor = resolveConstructor(clazz, args);
-		
-		return ctor != null ? getMethodSignature(null, ctor.getParameterTypes()) : null;
-	}
-	
-	static Constructor<?> resolveConstructor(Class<?> clazz, Object[] args) throws ClassNotFoundException, IOException
-	{
-		Constructor<?>[] constructors = clazz.getConstructors();
+                if (success) {
+                    candidates.add(new Tuple<Method, Integer>(method, Integer.valueOf(dist)));
+                    if (dist == 0) {
+                        break;
+                    }
+                }
+            }
+        }
+    }
 
-		int argLen = (args != null) ? args.length : 0;
+    static String resolveConstructorSignature(Class<?> clazz, Object[] args) throws ClassNotFoundException, IOException {
+        Constructor<?> ctor = resolveConstructor(clazz, args);
 
-		if (constructors.length == 1)
-		{
-			if(argLen != constructors[0].getParameterTypes().length) {
-				return null;
-			}
+        return ctor != null ? getMethodSignature(null, ctor.getParameterTypes()) : null;
+    }
 
-			return constructors[0];
-		}
+    static Constructor<?> resolveConstructor(Class<?> clazz, Object[] args) throws ClassNotFoundException, IOException {
+        Constructor<?>[] constructors = clazz.getConstructors();
 
-		ArrayList<Tuple<Constructor<?>, Integer>> candidates = new ArrayList<Tuple<Constructor<?>, Integer>>();
+        int argLen = (args != null) ? args.length : 0;
 
-		for (Constructor<?> constructor : constructors)
-		{
-			int dist = 0;
-			Class<?>[] paramTypes = constructor.getParameterTypes();
+        if (constructors.length == 1) {
+            if (argLen != constructors[0].getParameterTypes().length) {
+                return null;
+            }
 
-			boolean success = true;
+            return constructors[0];
+        }
 
-			if (args == null)
-			{
-				if (paramTypes.length == 0)
-				{
-					return constructor;
-				}
+        ArrayList<Tuple<Constructor<?>, Integer>> candidates = new ArrayList<Tuple<Constructor<?>, Integer>>();
 
-				success = false;
-			}
-			else
-			{
-				if (paramTypes.length != argLen)
-				{
-					continue;
-				}
+        for (Constructor<?> constructor : constructors) {
+            int dist = 0;
+            Class<?>[] paramTypes = constructor.getParameterTypes();
 
-				for (int i = 0; i < args.length; i++)
-				{
-					if (args[i] != null)
-					{
-						Class<?> argClass = args[i] instanceof NullObject ? 
-								((NullObject)args[i]).getNullObjectClass() 
-								: args[i].getClass();
-								
-						Tuple<Boolean, Integer> res = isAssignableFrom(paramTypes[i], argClass);
-						success = res.x.booleanValue();
-						dist += res.y;
-					}
-					else
-					{
-						success = !paramTypes[i].isPrimitive();
-					}
+            boolean success = true;
 
-					if (!success)
-					{
-						break;
-					}
-				}
-			}
+            if (args == null) {
+                if (paramTypes.length == 0) {
+                    return constructor;
+                }
 
-			if (success)
-			{
-				if (dist == 0)
-				{
-					return constructor;
-				}
+                success = false;
+            } else {
+                if (paramTypes.length != argLen) {
+                    continue;
+                }
 
-				candidates.add(new Tuple<Constructor<?>, Integer>(constructor, Integer.valueOf(dist)));
-			}
-		}
+                for (int i = 0; i < args.length; i++) {
+                    if (args[i] != null) {
+                        Class<?> argClass = args[i] instanceof NullObject ?
+                                            ((NullObject)args[i]).getNullObjectClass()
+                                            : args[i].getClass();
 
-		if (!candidates.isEmpty())
-		{
-			Collections.sort(candidates, distanceComparator);
-			Constructor<?> selectedCtor = candidates.get(0).x;
+                        Tuple<Boolean, Integer> res = isAssignableFrom(paramTypes[i], argClass);
+                        success = res.x.booleanValue();
+                        dist += res.y;
+                    } else {
+                        success = !paramTypes[i].isPrimitive();
+                    }
 
-			return selectedCtor;
-		}
+                    if (!success) {
+                        break;
+                    }
+                }
+            }
 
-		return null;
-	}
+            if (success) {
+                if (dist == 0) {
+                    return constructor;
+                }
 
-	private static Tuple<Boolean, Integer> isAssignableFrom(Class<?> assignTo, Class<?> assignFrom)
-	{
-		boolean success = false;
-		int dist = 0;
+                candidates.add(new Tuple<Constructor<?>, Integer>(constructor, Integer.valueOf(dist)));
+            }
+        }
 
-		if (assignTo.isPrimitive())
-		{
-			if (assignTo.equals(byte.class))
-			{
-				if ((success = assignFrom.equals(Byte.class)))
-				{
-					dist += 0;
-				}
-				else if ((success = assignFrom.equals(Short.class)))
-				{
-					dist += 1001;
-				}
-				else if ((success = assignFrom.equals(Integer.class)))
-				{
-					dist += 1002;
-				}
-				else if ((success = assignFrom.equals(Long.class)))
-				{
-					dist += 1003;
-				}
-				else if ((success = assignFrom.equals(Float.class)))
-				{
-					dist += 1004;
-				}
-				else if ((success = assignFrom.equals(Double.class)))
-				{
-					dist += 1005;
-				}
-			}
-			else if (assignTo.equals(short.class))
-			{
-				if ((success = assignFrom.equals(Short.class)))
-				{
-					dist += 0;
-				}
-				else if ((success = assignFrom.equals(Byte.class)))
-				{
-					dist += 1;
-				}
-				else if ((success = assignFrom.equals(Integer.class)))
-				{
-					dist += 2;
-				}
-				else if ((success = assignFrom.equals(Long.class)))
-				{
-					dist += 3;
-				}
-				else if ((success = assignFrom.equals(Float.class)))
-				{
-					dist += 4;
-				}
-				else if ((success = assignFrom.equals(Double.class)))
-				{
-					dist += 5;
-				}
-			}
-			else if (assignTo.equals(int.class))
-			{
-				if ((success = assignFrom.equals(Integer.class)))
-				{
-					dist += 0;
-				}
-				else if ((success = assignFrom.equals(Short.class)))
-				{
-					dist += 1;
-				}
-				else if ((success = assignFrom.equals(Byte.class)))
-				{
-					dist += 2;
-				}
-				else if ((success = assignFrom.equals(Long.class)))
-				{
-					dist += 3;
-				}
-				else if ((success = assignFrom.equals(Float.class)))
-				{
-					dist += 4;
-				}
-				else if ((success = assignFrom.equals(Double.class)))
-				{
-					dist += 5;
-				}
-			}
-			else if (assignTo.equals(long.class))
-			{
-				if ((success = assignFrom.equals(Long.class)))
-				{
-					dist += 0;
-				}
-				else if ((success = assignFrom.equals(Integer.class)))
-				{
-					dist += 1;
-				}
-				else if ((success = assignFrom.equals(Short.class)))
-				{
-					dist += 2;
-				}
-				else if ((success = assignFrom.equals(Byte.class)))
-				{
-					dist += 3;
-				}
-				else if ((success = assignFrom.equals(Float.class)))
-				{
-					dist += 4;
-				}
-				else if ((success = assignFrom.equals(Double.class)))
-				{
-					dist += 5;
-				}
-			}
-			else if (assignTo.equals(float.class))
-			{
-				if ((success = assignFrom.equals(Float.class)))
-				{
-					dist += 0;
-				}
-				else if ((success = assignFrom.equals(Long.class)))
-				{
-					dist += 1;
-				}
-				else if ((success = assignFrom.equals(Integer.class)))
-				{
-					dist += 2;
-				}
-				else if ((success = assignFrom.equals(Short.class)))
-				{
-					dist += 3;
-				}
-				else if ((success = assignFrom.equals(Byte.class)))
-				{
-					dist += 4;
-				}
-				else if ((success = assignFrom.equals(Double.class)))
-				{
-					dist += 5;
-				}
-			}
-			else if (assignTo.equals(double.class))
-			{
-				if ((success = assignFrom.equals(Double.class)))
-				{
-					dist += 0;
-				}
-				else if ((success = assignFrom.equals(Float.class)))
-				{
-					dist += 1;
-				}
-				else if ((success = assignFrom.equals(Long.class)))
-				{
-					dist += 2;
-				}
-				else if ((success = assignFrom.equals(Integer.class)))
-				{
-					dist += 3;
-				}
-				else if ((success = assignFrom.equals(Short.class)))
-				{
-					dist += 4;
-				}
-				else if ((success = assignFrom.equals(Byte.class)))
-				{
-					dist += 5;
-				}
-			}
-			else if (assignTo.equals(boolean.class))
-			{
-				success = assignFrom.equals(Boolean.class);
-			}
-			else if (assignTo.equals(char.class))
-			{
-				success = assignFrom.equals(Character.class);
-			}
-		}
-		else
-		{
-			success = assignTo.isAssignableFrom(assignFrom);
+        if (!candidates.isEmpty()) {
+            Collections.sort(candidates, distanceComparator);
+            Constructor<?> selectedCtor = candidates.get(0).x;
 
-			if (success)
-			{
-				// TODO: consider interfaces as well
-				Class<?> currClass = assignFrom;
-				while (!assignTo.equals(currClass) && (currClass != null))
-				{
-					dist += 10 * 1000;
-					currClass = currClass.getSuperclass();
-				}
-			}
-		}
+            return selectedCtor;
+        }
 
-		Tuple<Boolean, Integer> ret = new Tuple<Boolean, Integer>(Boolean.valueOf(success), Integer.valueOf(dist));
+        return null;
+    }
 
-		return ret;
-	}
+    private static Tuple<Boolean, Integer> isAssignableFrom(Class<?> assignTo, Class<?> assignFrom) {
+        boolean success = false;
+        int dist = 0;
 
-	public static boolean convertConstructorArgs(Constructor<?> ctor, Object[] args)
-	{
-		boolean success = true;
+        if (assignTo.isPrimitive()) {
+            if (assignTo.equals(byte.class)) {
+                if ((success = assignFrom.equals(Byte.class))) {
+                    dist += 0;
+                } else if ((success = assignFrom.equals(Short.class))) {
+                    dist += 1001;
+                } else if ((success = assignFrom.equals(Integer.class))) {
+                    dist += 1002;
+                } else if ((success = assignFrom.equals(Long.class))) {
+                    dist += 1003;
+                } else if ((success = assignFrom.equals(Float.class))) {
+                    dist += 1004;
+                } else if ((success = assignFrom.equals(Double.class))) {
+                    dist += 1005;
+                }
+            } else if (assignTo.equals(short.class)) {
+                if ((success = assignFrom.equals(Short.class))) {
+                    dist += 0;
+                } else if ((success = assignFrom.equals(Byte.class))) {
+                    dist += 1;
+                } else if ((success = assignFrom.equals(Integer.class))) {
+                    dist += 2;
+                } else if ((success = assignFrom.equals(Long.class))) {
+                    dist += 3;
+                } else if ((success = assignFrom.equals(Float.class))) {
+                    dist += 4;
+                } else if ((success = assignFrom.equals(Double.class))) {
+                    dist += 5;
+                }
+            } else if (assignTo.equals(int.class)) {
+                if ((success = assignFrom.equals(Integer.class))) {
+                    dist += 0;
+                } else if ((success = assignFrom.equals(Short.class))) {
+                    dist += 1;
+                } else if ((success = assignFrom.equals(Byte.class))) {
+                    dist += 2;
+                } else if ((success = assignFrom.equals(Long.class))) {
+                    dist += 3;
+                } else if ((success = assignFrom.equals(Float.class))) {
+                    dist += 4;
+                } else if ((success = assignFrom.equals(Double.class))) {
+                    dist += 5;
+                }
+            } else if (assignTo.equals(long.class)) {
+                if ((success = assignFrom.equals(Long.class))) {
+                    dist += 0;
+                } else if ((success = assignFrom.equals(Integer.class))) {
+                    dist += 1;
+                } else if ((success = assignFrom.equals(Short.class))) {
+                    dist += 2;
+                } else if ((success = assignFrom.equals(Byte.class))) {
+                    dist += 3;
+                } else if ((success = assignFrom.equals(Float.class))) {
+                    dist += 4;
+                } else if ((success = assignFrom.equals(Double.class))) {
+                    dist += 5;
+                }
+            } else if (assignTo.equals(float.class)) {
+                if ((success = assignFrom.equals(Float.class))) {
+                    dist += 0;
+                } else if ((success = assignFrom.equals(Long.class))) {
+                    dist += 1;
+                } else if ((success = assignFrom.equals(Integer.class))) {
+                    dist += 2;
+                } else if ((success = assignFrom.equals(Short.class))) {
+                    dist += 3;
+                } else if ((success = assignFrom.equals(Byte.class))) {
+                    dist += 4;
+                } else if ((success = assignFrom.equals(Double.class))) {
+                    dist += 5;
+                }
+            } else if (assignTo.equals(double.class)) {
+                if ((success = assignFrom.equals(Double.class))) {
+                    dist += 0;
+                } else if ((success = assignFrom.equals(Float.class))) {
+                    dist += 1;
+                } else if ((success = assignFrom.equals(Long.class))) {
+                    dist += 2;
+                } else if ((success = assignFrom.equals(Integer.class))) {
+                    dist += 3;
+                } else if ((success = assignFrom.equals(Short.class))) {
+                    dist += 4;
+                } else if ((success = assignFrom.equals(Byte.class))) {
+                    dist += 5;
+                }
+            } else if (assignTo.equals(boolean.class)) {
+                success = assignFrom.equals(Boolean.class);
+            } else if (assignTo.equals(char.class)) {
+                success = assignFrom.equals(Character.class);
+            }
+        } else {
+            success = assignTo.isAssignableFrom(assignFrom);
 
-		if (ctor == null)
-		{
-			success = false;
-			return success;
-		}
+            if (success) {
+                // TODO: consider interfaces as well
+                Class<?> currClass = assignFrom;
+                while (!assignTo.equals(currClass) && (currClass != null)) {
+                    dist += 10 * 1000;
+                    currClass = currClass.getSuperclass();
+                }
+            }
+        }
 
-		Class<?>[] paramTypes;
-		if (constructorParamTypeCache.containsKey(ctor))
-		{
-			paramTypes = constructorParamTypeCache.get(ctor);
-		}
-		else
-		{
-			paramTypes = ctor.getParameterTypes();
-			constructorParamTypeCache.put(ctor, paramTypes);
-		}
+        Tuple<Boolean, Integer> ret = new Tuple<Boolean, Integer>(Boolean.valueOf(success), Integer.valueOf(dist));
 
-		for (int i = 0; i < paramTypes.length; i++)
-		{
-			Class<?> currParamType = paramTypes[i];
+        return ret;
+    }
 
-			if (currParamType.isPrimitive())
-			{
-				success = convertPrimitiveArg(currParamType, args, i);
-			}
+    public static boolean convertConstructorArgs(Constructor<?> ctor, Object[] args) {
+        boolean success = true;
 
-			if (!success)
-				break;
-		}
+        if (ctor == null) {
+            success = false;
+            return success;
+        }
 
-		return success;
-	}
+        Class<?>[] paramTypes;
+        if (constructorParamTypeCache.containsKey(ctor)) {
+            paramTypes = constructorParamTypeCache.get(ctor);
+        } else {
+            paramTypes = ctor.getParameterTypes();
+            constructorParamTypeCache.put(ctor, paramTypes);
+        }
 
-	private static boolean convertPrimitiveArg(Class<?> primitiveType, Object[] args, int argIndex)
-	{
-		boolean success = false;
+        for (int i = 0; i < paramTypes.length; i++) {
+            Class<?> currParamType = paramTypes[i];
 
-		Object currentArg = args[argIndex];
-		Class<?> currentArgClass = currentArg.getClass();
-		Number n;
+            if (currParamType.isPrimitive()) {
+                success = convertPrimitiveArg(currParamType, args, i);
+            }
 
-		if (primitiveType.equals(byte.class))
-		{
-			if (currentArgClass.equals(Byte.class)
-					|| currentArgClass.equals(Short.class)
-					|| currentArgClass.equals(Integer.class)
-					|| currentArgClass.equals(Long.class)
-					|| currentArgClass.equals(Float.class)
-					|| currentArgClass.equals(Double.class))
-			{
-				n = (Number) currentArg;
-				args[argIndex] = Byte.valueOf(n.byteValue());
-				success = true;
-			}
-		}
-		else if (primitiveType.equals(short.class))
-		{
-			if (currentArgClass.equals(Byte.class)
-					|| currentArgClass.equals(Short.class)
-					|| currentArgClass.equals(Integer.class)
-					|| currentArgClass.equals(Long.class)
-					|| currentArgClass.equals(Float.class)
-					|| currentArgClass.equals(Double.class))
-			{
-				n = (Number) currentArg;
-				args[argIndex] = Short.valueOf(n.shortValue());
-				success = true;
-			}
-		}
-		else if (primitiveType.equals(int.class))
-		{
-			if (currentArgClass.equals(Byte.class)
-					|| currentArgClass.equals(Short.class)
-					|| currentArgClass.equals(Integer.class)
-					|| currentArgClass.equals(Long.class)
-					|| currentArgClass.equals(Float.class)
-					|| currentArgClass.equals(Double.class))
-			{
-				n = (Number) currentArg;
-				args[argIndex] = Integer.valueOf(n.intValue());
-				success = true;
-			}
-		}
-		else if (primitiveType.equals(long.class))
-		{
-			if (currentArgClass.equals(Byte.class)
-					|| currentArgClass.equals(Short.class)
-					|| currentArgClass.equals(Integer.class)
-					|| currentArgClass.equals(Long.class)
-					|| currentArgClass.equals(Float.class)
-					|| currentArgClass.equals(Double.class))
-			{
-				n = (Number) currentArg;
-				args[argIndex] = Long.valueOf(n.longValue());
-				success = true;
-			}
-		}
-		else if (primitiveType.equals(float.class))
-		{
-			if (currentArgClass.equals(Byte.class)
-					|| currentArgClass.equals(Short.class)
-					|| currentArgClass.equals(Integer.class)
-					|| currentArgClass.equals(Long.class)
-					|| currentArgClass.equals(Float.class)
-					|| currentArgClass.equals(Double.class))
-			{
-				n = (Number) currentArg;
-				args[argIndex] = Float.valueOf(n.floatValue());
-				success = true;
-			}
-		}
-		else if (primitiveType.equals(double.class))
-		{
-			if (currentArgClass.equals(Byte.class)
-					|| currentArgClass.equals(Short.class)
-					|| currentArgClass.equals(Integer.class)
-					|| currentArgClass.equals(Long.class)
-					|| currentArgClass.equals(Float.class)
-					|| currentArgClass.equals(Double.class))
-			{
-				n = (Number) currentArg;
-				args[argIndex] = Double.valueOf(n.doubleValue());
-				success = true;
-			}
-		}
-		else if (primitiveType.equals(char.class))
-		{
-			success = currentArgClass.equals(Character.class);
-		}
-		else if (primitiveType.equals(boolean.class))
-		{
-			success = currentArgClass.equals(Boolean.class);
-		}
+            if (!success) {
+                break;
+            }
+        }
 
-		return success;
-	}
-	
-	static class MethodFinder {
-		private Method[] declaredMethods;
-		private HashMap<String, ArrayList<Method>> matchingMethods = new HashMap<String, ArrayList<Method>>();
-		public MethodFinder(Class<?> clazz) {
-			this.declaredMethods = clazz.getDeclaredMethods();
-		}
-		
-		public ArrayList<Method> getMatchingMethods(String methodName) {
-			ArrayList<Method> matches = this.matchingMethods.get(methodName);
-			if (matches == null) {
-				matches = new ArrayList<Method>();
-				for (Method method : this.declaredMethods)
-				{
-					if (!method.getName().equals(methodName))
-					{
-						continue;
-					}
+        return success;
+    }
 
-					int modifiers = method.getModifiers();
-					if (!Modifier.isPublic(modifiers) && !Modifier.isProtected(modifiers))
-					{
-						continue;
-					}
+    private static boolean convertPrimitiveArg(Class<?> primitiveType, Object[] args, int argIndex) {
+        boolean success = false;
 
-					matches.add(method);
-				}
+        Object currentArg = args[argIndex];
+        Class<?> currentArgClass = currentArg.getClass();
+        Number n;
 
-				matchingMethods.put(methodName, matches);
-			}
-			
-			return matches;
-		}
-	}
+        if (primitiveType.equals(byte.class)) {
+            if (currentArgClass.equals(Byte.class)
+                    || currentArgClass.equals(Short.class)
+                    || currentArgClass.equals(Integer.class)
+                    || currentArgClass.equals(Long.class)
+                    || currentArgClass.equals(Float.class)
+                    || currentArgClass.equals(Double.class)) {
+                n = (Number) currentArg;
+                args[argIndex] = Byte.valueOf(n.byteValue());
+                success = true;
+            }
+        } else if (primitiveType.equals(short.class)) {
+            if (currentArgClass.equals(Byte.class)
+                    || currentArgClass.equals(Short.class)
+                    || currentArgClass.equals(Integer.class)
+                    || currentArgClass.equals(Long.class)
+                    || currentArgClass.equals(Float.class)
+                    || currentArgClass.equals(Double.class)) {
+                n = (Number) currentArg;
+                args[argIndex] = Short.valueOf(n.shortValue());
+                success = true;
+            }
+        } else if (primitiveType.equals(int.class)) {
+            if (currentArgClass.equals(Byte.class)
+                    || currentArgClass.equals(Short.class)
+                    || currentArgClass.equals(Integer.class)
+                    || currentArgClass.equals(Long.class)
+                    || currentArgClass.equals(Float.class)
+                    || currentArgClass.equals(Double.class)) {
+                n = (Number) currentArg;
+                args[argIndex] = Integer.valueOf(n.intValue());
+                success = true;
+            }
+        } else if (primitiveType.equals(long.class)) {
+            if (currentArgClass.equals(Byte.class)
+                    || currentArgClass.equals(Short.class)
+                    || currentArgClass.equals(Integer.class)
+                    || currentArgClass.equals(Long.class)
+                    || currentArgClass.equals(Float.class)
+                    || currentArgClass.equals(Double.class)) {
+                n = (Number) currentArg;
+                args[argIndex] = Long.valueOf(n.longValue());
+                success = true;
+            }
+        } else if (primitiveType.equals(float.class)) {
+            if (currentArgClass.equals(Byte.class)
+                    || currentArgClass.equals(Short.class)
+                    || currentArgClass.equals(Integer.class)
+                    || currentArgClass.equals(Long.class)
+                    || currentArgClass.equals(Float.class)
+                    || currentArgClass.equals(Double.class)) {
+                n = (Number) currentArg;
+                args[argIndex] = Float.valueOf(n.floatValue());
+                success = true;
+            }
+        } else if (primitiveType.equals(double.class)) {
+            if (currentArgClass.equals(Byte.class)
+                    || currentArgClass.equals(Short.class)
+                    || currentArgClass.equals(Integer.class)
+                    || currentArgClass.equals(Long.class)
+                    || currentArgClass.equals(Float.class)
+                    || currentArgClass.equals(Double.class)) {
+                n = (Number) currentArg;
+                args[argIndex] = Double.valueOf(n.doubleValue());
+                success = true;
+            }
+        } else if (primitiveType.equals(char.class)) {
+            success = currentArgClass.equals(Character.class);
+        } else if (primitiveType.equals(boolean.class)) {
+            success = currentArgClass.equals(Boolean.class);
+        }
+
+        return success;
+    }
+
+    static class MethodFinder {
+        private Method[] declaredMethods;
+        private HashMap<String, ArrayList<Method>> matchingMethods = new HashMap<String, ArrayList<Method>>();
+        public MethodFinder(Class<?> clazz) {
+            this.declaredMethods = clazz.getDeclaredMethods();
+        }
+
+        public ArrayList<Method> getMatchingMethods(String methodName) {
+            ArrayList<Method> matches = this.matchingMethods.get(methodName);
+            if (matches == null) {
+                matches = new ArrayList<Method>();
+                for (Method method : this.declaredMethods) {
+                    if (!method.getName().equals(methodName)) {
+                        continue;
+                    }
+
+                    int modifiers = method.getModifiers();
+                    if (!Modifier.isPublic(modifiers) && !Modifier.isProtected(modifiers)) {
+                        continue;
+                    }
+
+                    matches.add(method);
+                }
+
+                matchingMethods.put(methodName, matches);
+            }
+
+            return matches;
+        }
+    }
 }

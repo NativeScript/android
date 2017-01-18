@@ -10,9 +10,8 @@
 
 #include <android/log.h>
 
-namespace tns
-{
-	extern bool LogEnabled;
+namespace tns {
+extern bool LogEnabled;
 
 #define DEBUG_WRITE(fmt, args...) if (tns::LogEnabled) __android_log_print(ANDROID_LOG_DEBUG, "TNS.Native", fmt, ##args)
 #define DEBUG_WRITE_FORCE(fmt, args...) __android_log_print(ANDROID_LOG_DEBUG, "TNS.Native", fmt, ##args)

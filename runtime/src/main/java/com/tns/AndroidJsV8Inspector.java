@@ -16,8 +16,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import fi.iki.elonen.NanoHTTPD;
 import fi.iki.elonen.NanoWSD;
 
-public class AndroidJsV8Inspector
-{
+public class AndroidJsV8Inspector {
     private static boolean DEBUG_LOG_ENABLED = false;
 
     private JsV8InspectorServer server;
@@ -49,8 +48,7 @@ public class AndroidJsV8Inspector
             this.server = new JsV8InspectorServer(context.getPackageName() + "-inspectorServer");
             this.server.start(-1);
 
-            if (DEBUG_LOG_ENABLED)
-            {
+            if (DEBUG_LOG_ENABLED) {
                 Log.d("V8Inspector", "start debugger ThreadId:" + Thread.currentThread().getId());
             }
 
@@ -101,10 +99,8 @@ public class AndroidJsV8Inspector
         }
 
         @Override
-        protected Response serveHttp(IHTTPSession session)
-        {
-            if (DEBUG_LOG_ENABLED)
-            {
+        protected Response serveHttp(IHTTPSession session) {
+            if (DEBUG_LOG_ENABLED) {
                 Log.d("{N}.v8-inspector", "http request for " + session.getUri());
             }
             return super.serveHttp(session);
@@ -123,19 +119,15 @@ public class AndroidJsV8Inspector
         }
 
         @Override
-        protected void onOpen()
-        {
-            if (DEBUG_LOG_ENABLED)
-            {
+        protected void onOpen() {
+            if (DEBUG_LOG_ENABLED) {
                 Log.d("V8Inspector", "onOpen: ThreadID:  " + Thread.currentThread().getId());
             }
 
             mainHandler.post(new Runnable() {
                 @Override
-                public void run()
-                {
-                    if (DEBUG_LOG_ENABLED)
-                    {
+                public void run() {
+                    if (DEBUG_LOG_ENABLED) {
                         Log.d("V8Inspector", "Connecting. threadID :  " + Thread.currentThread().getId());
                     }
 
@@ -145,20 +137,15 @@ public class AndroidJsV8Inspector
         }
 
         @Override
-        protected void onClose(NanoWSD.WebSocketFrame.CloseCode code, String reason, boolean initiatedByRemote)
-        {
-            if (DEBUG_LOG_ENABLED)
-            {
+        protected void onClose(NanoWSD.WebSocketFrame.CloseCode code, String reason, boolean initiatedByRemote) {
+            if (DEBUG_LOG_ENABLED) {
                 Log.d("V8Inspector", "onClose");
             }
 
-            mainHandler.post(new Runnable()
-            {
+            mainHandler.post(new Runnable() {
                 @Override
-                public void run()
-                {
-                    if (DEBUG_LOG_ENABLED)
-                    {
+                public void run() {
+                    if (DEBUG_LOG_ENABLED) {
                         Log.d("V8Inspector", "Disconnecting");
                     }
                     disconnect();
@@ -167,10 +154,8 @@ public class AndroidJsV8Inspector
         }
 
         @Override
-        protected void onMessage(final NanoWSD.WebSocketFrame message)
-        {
-            if (DEBUG_LOG_ENABLED)
-            {
+        protected void onMessage(final NanoWSD.WebSocketFrame message) {
+            if (DEBUG_LOG_ENABLED) {
                 Log.d("V8Inspector", "To dbg backend: " + message.getTextPayload() + " ThreadId:" + Thread.currentThread().getId());
             }
 
@@ -189,10 +174,8 @@ public class AndroidJsV8Inspector
         }
 
         @Override
-        public void send(String payload) throws IOException
-        {
-            if (DEBUG_LOG_ENABLED)
-            {
+        public void send(String payload) throws IOException {
+            if (DEBUG_LOG_ENABLED) {
                 Log.d("V8Inspector", "To dbg client: " + payload);
             }
 
@@ -211,8 +194,7 @@ public class AndroidJsV8Inspector
         }
 
         @Override
-        protected void onPong(NanoWSD.WebSocketFrame pong)
-        {
+        protected void onPong(NanoWSD.WebSocketFrame pong) {
         }
 
         @Override

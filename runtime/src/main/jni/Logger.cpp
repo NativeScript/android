@@ -2,10 +2,8 @@
 
 using namespace tns;
 
-Logger::Logger()
-{
+Logger::Logger() {
 }
 
-void Logger::Write()
-{
+void Logger::Write() {
 }
