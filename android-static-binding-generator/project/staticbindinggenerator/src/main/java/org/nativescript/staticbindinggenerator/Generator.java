@@ -47,10 +47,16 @@ public class Generator {
 
     public void writeBindings(String filename) throws IOException {
         Binding[] bindings = generateBindings(filename);
-
+        List<File> writenFiles = new ArrayList<File>();
         for (Binding b : bindings) {
-            try (PrintStream ps = new PrintStream(b.getFile())) {
-                ps.append(b.getContent());
+            if(!writenFiles.contains(b.getFile())) {
+                writenFiles.add(b.getFile());
+                try (PrintStream ps = new PrintStream(b.getFile())) {
+                    ps.append(b.getContent());
+                }
+            }
+            else {
+                throw new IOException("Trying to write already written file. Both files will have the same file name, which will lead to undefined behavior.\nPlease change the name of one of those classes.\n" + b.getFile());
             }
         }
     }
