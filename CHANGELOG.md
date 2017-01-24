@@ -1,3 +1,21 @@
+2.5.0-RC
+==
+
+## What's New
+
+ - [Error when running on real android device (#628)](https://github.com/NativeScript/android-runtime/issues/628)
+ - [Updating v8 to 5.4/5.5 #631)](https://github.com/NativeScript/android-runtime/issues/631)
+
+## Bug Fixes
+
+ - [Can't use npm packages ending with ".js" (#666)](https://github.com/NativeScript/android-runtime/issues/666)
+ - [Static binding generator crash build-time: clazz is null causes app to crash (#665)](https://github.com/NativeScript/android-runtime/issues/665)
+ - [Decorators aren't respected when extending classes with TypeScript 2.1.4+   (#651)](https://github.com/NativeScript/android-runtime/issues/651)
+ - [Samples SDK app crashes (#632)](https://github.com/NativeScript/android-runtime/issues/632)
+ - [Missing stack trace on worker errors (#629)](https://github.com/NativeScript/android-runtime/issues/629)
+ - [Classes using fields from compileSdk > Platform Sdk on device cause crash when extended in TS (#626)](https://github.com/NativeScript/android-runtime/issues/626)
+ - [A failure building in debug and release in series (#649)](https://github.com/NativeScript/android-runtime/issues/649)
+
 2.4.0
 ==
 
