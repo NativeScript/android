@@ -105,11 +105,11 @@ void V8StackTraceImpl::setCaptureStackTraceForUncaughtExceptions(
 }
 
 // static
-std::unique_ptr<V8StackTraceImpl> V8StackTraceImpl::create(
+std::unique_ptr<V8StackTraceImpl> V8StackTraceImpl::create(v8::Isolate *isolate,
     V8Debugger* debugger, int contextGroupId,
     v8::Local<v8::StackTrace> stackTrace, size_t maxStackSize,
     const String16& description) {
-  v8::Isolate* isolate = v8::Isolate::GetCurrent();
+
   v8::HandleScope scope(isolate);
   std::vector<V8StackTraceImpl::Frame> frames;
   if (!stackTrace.IsEmpty())
@@ -170,7 +170,7 @@ std::unique_ptr<V8StackTraceImpl> V8StackTraceImpl::capture(
     stackTrace = v8::StackTrace::CurrentStackTrace(
         isolate, static_cast<int>(maxStackSize), stackTraceOptions);
   }
-  return V8StackTraceImpl::create(debugger, contextGroupId, stackTrace,
+  return V8StackTraceImpl::create(isolate, debugger, contextGroupId, stackTrace,
                                   maxStackSize, description);
 }
 
@@ -247,7 +247,7 @@ V8StackTraceImpl::buildInspectorObjectForTail(V8Debugger* debugger) const {
   v8::HandleScope handleScope(v8::Isolate::GetCurrent());
   // Next call collapses possible empty stack and ensures
   // maxAsyncCallChainDepth.
-  std::unique_ptr<V8StackTraceImpl> fullChain = V8StackTraceImpl::create(
+  std::unique_ptr<V8StackTraceImpl> fullChain = V8StackTraceImpl::create(v8::Isolate::GetCurrent(),
       debugger, m_contextGroupId, v8::Local<v8::StackTrace>(),
       V8StackTraceImpl::maxCallStackSizeToCapture);
   if (!fullChain || !fullChain->m_parent) return nullptr;
