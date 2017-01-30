@@ -55,9 +55,6 @@ var MyActivity = (function (_super) {
     		onClick:  function() {
     			button.setBackgroundColor(colors[taps % colors.length]);
     			taps++;
-                taps++;
-                taps++;
-                taps++;
     		}}));
     };
     MyActivity = __decorate([
