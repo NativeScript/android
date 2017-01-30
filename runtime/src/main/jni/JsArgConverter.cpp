@@ -371,7 +371,7 @@ bool JsArgConverter::ConvertJavaScriptArray(const Local<Array>& jsArr, int index
     case 'J':
         arr = m_env.NewLongArray(arrLength);
         for (jsize i = 0; i < arrLength; i++) {
-            jlong value = jsArr->Get(i)->Int32Value();
+            jlong value = jsArr->Get(i)->NumberValue();
             m_env.SetLongArrayRegion((jlongArray) arr, i, 1, &value);
         }
         break;
