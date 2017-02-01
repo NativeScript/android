@@ -56,7 +56,7 @@ public class Generator {
                 }
             }
             else {
-                throw new IOException("Trying to write already written file. Both files will have the same file name, which will lead to undefined behavior.\nPlease change the name of one of those classes.\n" + b.getFile());
+                throw new IOException("File already exists. This may lead to undesired behavior.\nPlease change the name of one of the extended classes.\n" + b.getFile());
             }
         }
     }
