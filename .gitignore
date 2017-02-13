@@ -10,6 +10,7 @@ dist/
 local.properties
 
 gen/
+scratch/
 obj/
 bin/
 .svn/
