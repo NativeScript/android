@@ -18,6 +18,7 @@
 #include "src/inspector/v8-profiler-agent-impl.h"
 #include "src/inspector/v8-runtime-agent-impl.h"
 #include "src/inspector/v8-schema-agent-impl.h"
+#include "src/inspector/v8-page-agent-impl.h"
 
 namespace v8_inspector {
 
@@ -34,7 +35,9 @@ bool V8InspectorSession::canDispatchMethod(const StringView& method) {
          stringViewStartsWith(method,
                               protocol::Console::Metainfo::commandPrefix) ||
          stringViewStartsWith(method,
-                              protocol::Schema::Metainfo::commandPrefix);
+                              protocol::Schema::Metainfo::commandPrefix) ||
+         stringViewStartsWith(method,
+                               protocol::Page::Metainfo::commandPrefix);
 }
 
 std::unique_ptr<V8InspectorSessionImpl> V8InspectorSessionImpl::create(
@@ -59,7 +62,8 @@ V8InspectorSessionImpl::V8InspectorSessionImpl(V8InspectorImpl* inspector,
       m_heapProfilerAgent(nullptr),
       m_profilerAgent(nullptr),
       m_consoleAgent(nullptr),
-      m_schemaAgent(nullptr) {
+      m_schemaAgent(nullptr),
+      m_pageAgent(nullptr) {
   if (savedState.length()) {
     std::unique_ptr<protocol::Value> state =
         protocol::parseJSON(toString16(savedState));
@@ -94,12 +98,17 @@ V8InspectorSessionImpl::V8InspectorSessionImpl(V8InspectorImpl* inspector,
       this, this, agentState(protocol::Schema::Metainfo::domainName)));
   protocol::Schema::Dispatcher::wire(&m_dispatcher, m_schemaAgent.get());
 
+  m_pageAgent = wrapUnique(new V8PageAgentImpl(
+      this, this, agentState(protocol::Page::Metainfo::domainName)));
+  protocol::Page::Dispatcher::wire(&m_dispatcher, m_pageAgent.get());
+
   if (savedState.length()) {
     m_runtimeAgent->restore();
     m_debuggerAgent->restore();
     m_heapProfilerAgent->restore();
     m_profilerAgent->restore();
     m_consoleAgent->restore();
+    m_pageAgent->restore();
   }
 }
 
@@ -110,6 +119,7 @@ V8InspectorSessionImpl::~V8InspectorSessionImpl() {
   m_heapProfilerAgent->disable(&errorString);
   m_debuggerAgent->disable(&errorString);
   m_runtimeAgent->disable(&errorString);
+  m_pageAgent->disable(&errorString);
 
   discardInjectedScripts();
   m_inspector->disconnect(this);
@@ -352,6 +362,10 @@ V8InspectorSessionImpl::supportedDomainsImpl() {
   result.push_back(protocol::Schema::Domain::create()
                        .setName(protocol::Schema::Metainfo::domainName)
                        .setVersion(protocol::Schema::Metainfo::version)
+                       .build());
+  result.push_back(protocol::Schema::Domain::create()
+                       .setName(protocol::Page::Metainfo::domainName)
+                       .setVersion(protocol::Page::Metainfo::version)
                        .build());
   return result;
 }

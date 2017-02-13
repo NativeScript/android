@@ -17,15 +17,13 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import fi.iki.elonen.NanoHTTPD;
 import fi.iki.elonen.NanoWSD;
 
 class AndroidJsV8Inspector {
-    private static boolean DEBUG_LOG_ENABLED = true;
+    private static boolean DEBUG_LOG_ENABLED = false;
 
     private JsV8InspectorServer server;
     private Context context;
