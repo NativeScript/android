@@ -140,7 +140,7 @@ class AndroidJsV8Inspector {
     private static String getMimeType(String url) {
         String type = null;
         String extension = MimeTypeMap.getFileExtensionFromUrl(url);
-        if (extension != null) {
+        if (!extension.isEmpty()) {
             type = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension);
 
             // getMimeType may sometime return incorrect results in the context of NativeScript

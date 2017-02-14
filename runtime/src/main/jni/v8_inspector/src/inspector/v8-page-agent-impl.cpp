@@ -103,7 +103,7 @@ void V8PageAgentImpl::getResourceContent(ErrorString* errorString, const String&
     auto it = cachedPageResources.find(in_url.utf8());
     if (it == cachedPageResources.end()) {
         *errorString = "Resource not found.";
-
+        *out_content = "";
         return;
     }
 

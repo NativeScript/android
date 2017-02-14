@@ -8,6 +8,7 @@
 #include <NativeScriptAssert.h>
 #include <fstream>
 #include <iostream>
+#include <JniLocalRef.h>
 #include "base64.h"
 #include "v8_inspector/src/inspector/utils/v8-page-resources.h"
 #include "JEnv.h"
@@ -40,26 +41,20 @@ std::map<std::string, v8_inspector::utils::PageResource> PageResource::getPageRe
 
     jmethodID getResourcesMethod = env.GetStaticMethodID(inspectorClass, "getPageResources", "()[Landroid/util/Pair;");
     jobject arrayOfPairs = env.CallStaticObjectMethod(inspectorClass, getResourcesMethod);
-    jobjectArray pairs = static_cast<jobjectArray>(arrayOfPairs);
+    tns::JniLocalRef pairs(static_cast<jobjectArray>(arrayOfPairs));
     int arrSize = env.GetArrayLength(pairs);
 
     for (int i = 0; i < arrSize; ++i) {
-        auto pair = env.GetObjectArrayElement(pairs, i);
-        auto pairFilePath = (jstring) env.GetObjectField(pair, pairFirst);
-        auto pairMimeType = (jstring) env.GetObjectField(pair, pairSecond);
+        tns::JniLocalRef pair(env.GetObjectArrayElement(pairs, i));
+        tns::JniLocalRef pairFilePath((jstring) env.GetObjectField(pair, pairFirst));
+        tns::JniLocalRef pairMimeType((jstring) env.GetObjectField(pair, pairSecond));
 
         auto filePath = tns::ArgConverter::jstringToString(pairFilePath);
         auto mimeType = tns::ArgConverter::jstringToString(pairMimeType);
 
         utils::PageResource pageResource(filePath, mimeType);
         result.insert(std::make_pair(filePath, pageResource));
-
-        env.DeleteLocalRef(pairFilePath);
-        env.DeleteLocalRef(pairMimeType);
-        env.DeleteLocalRef(pair);
     }
-
-    env.DeleteLocalRef(pairs);
 
     s_cachedPageResources = result;
 
