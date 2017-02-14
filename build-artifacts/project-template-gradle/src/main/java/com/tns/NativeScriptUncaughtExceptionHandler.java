@@ -44,25 +44,19 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
         boolean res = false;
 
         if (Util.isDebuggableApp(context)) {
-            Class<?> ErrReport = null;
-            java.lang.reflect.Method startActivity = null;
-
             try {
+                Class<?> ErrReport = null;
+                java.lang.reflect.Method startActivity = null;
+
                 ErrReport = java.lang.Class.forName("com.tns.ErrorReport");
-            } catch (ClassNotFoundException e) {
-                android.util.Log.d("ClassNotFoundException", e.toString());
-            }
 
-            try {
                 startActivity = ErrReport.getDeclaredMethod("startActivity", android.content.Context.class, String.class);
-            } catch (NoSuchMethodException e) {
-                android.util.Log.d("NoSuchMethodException", e.toString());
-            }
 
-            try {
                 res = (Boolean) startActivity.invoke(null, context, errorMessage);
             } catch (Exception e) {
-                android.util.Log.d("Exception", e.toString());
+                android.util.Log.v("Error", errorMessage);
+                e.printStackTrace();
+                android.util.Log.v("Application Error", "ErrorActivity default implementation not found. Reinstall android platform to fix.");
             }
         }
 
