@@ -7,7 +7,6 @@
 #include "src/inspector/protocol/Page.h"
 
 #include "src/inspector/protocol/Protocol.h"
-#include "GenericTypes.h"
 
 namespace v8_inspector {
 namespace protocol {
@@ -247,108 +246,16 @@ std::unique_ptr<SearchResult> SearchResult::clone() const {
     return parse(serialize().get(), &errors);
 }
 
-std::unique_ptr<Cookie> Cookie::parse(protocol::Value* value, ErrorSupport* errors) {
-    if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
-        return nullptr;
-    }
-
-    std::unique_ptr<Cookie> result(new Cookie());
-    protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
-    protocol::Value* nameValue = object->get("name");
-    errors->setName("name");
-    result->m_name = ValueConversions<String>::parse(nameValue, errors);
-    protocol::Value* valueValue = object->get("value");
-    errors->setName("value");
-    result->m_value = ValueConversions<String>::parse(valueValue, errors);
-    protocol::Value* domainValue = object->get("domain");
-    errors->setName("domain");
-    result->m_domain = ValueConversions<String>::parse(domainValue, errors);
-    protocol::Value* pathValue = object->get("path");
-    errors->setName("path");
-    result->m_path = ValueConversions<String>::parse(pathValue, errors);
-    protocol::Value* expiresValue = object->get("expires");
-    errors->setName("expires");
-    result->m_expires = ValueConversions<double>::parse(expiresValue, errors);
-    protocol::Value* sizeValue = object->get("size");
-    errors->setName("size");
-    result->m_size = ValueConversions<int>::parse(sizeValue, errors);
-    protocol::Value* httpOnlyValue = object->get("httpOnly");
-    errors->setName("httpOnly");
-    result->m_httpOnly = ValueConversions<bool>::parse(httpOnlyValue, errors);
-    protocol::Value* secureValue = object->get("secure");
-    errors->setName("secure");
-    result->m_secure = ValueConversions<bool>::parse(secureValue, errors);
-    protocol::Value* sessionValue = object->get("session");
-    errors->setName("session");
-    result->m_session = ValueConversions<bool>::parse(sessionValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
-        return nullptr;
-    }
-    return result;
-}
-
-std::unique_ptr<protocol::DictionaryValue> Cookie::serialize() const {
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("name", ValueConversions<String>::serialize(m_name));
-    result->setValue("value", ValueConversions<String>::serialize(m_value));
-    result->setValue("domain", ValueConversions<String>::serialize(m_domain));
-    result->setValue("path", ValueConversions<String>::serialize(m_path));
-    result->setValue("expires", ValueConversions<double>::serialize(m_expires));
-    result->setValue("size", ValueConversions<int>::serialize(m_size));
-    result->setValue("httpOnly", ValueConversions<bool>::serialize(m_httpOnly));
-    result->setValue("secure", ValueConversions<bool>::serialize(m_secure));
-    result->setValue("session", ValueConversions<bool>::serialize(m_session));
-    return result;
-}
-
-std::unique_ptr<Cookie> Cookie::clone() const {
-    ErrorSupport errors;
-    return parse(serialize().get(), &errors);
-}
-
 // ------------- Enum values from params.
 
 
-namespace GetScriptExecutionStatus {
-namespace ResultEnum {
-const char* Allowed = "allowed";
-const char* Disabled = "disabled";
-const char* Forbidden = "forbidden";
-} // namespace ResultEnum
-} // namespace GetScriptExecutionStatus
-
 // ------------- Frontend notifications.
-
-void Frontend::domContentEventFired(double timestamp) {
-    std::unique_ptr<protocol::DictionaryValue> jsonMessage = DictionaryValue::create();
-    jsonMessage->setString("method", "Page.domContentEventFired");
-    std::unique_ptr<protocol::DictionaryValue> paramsObject = DictionaryValue::create();
-    paramsObject->setValue("timestamp", ValueConversions<double>::serialize(timestamp));
-    jsonMessage->setObject("params", std::move(paramsObject));
-    if (m_frontendChannel) {
-        m_frontendChannel->sendProtocolNotification(jsonMessage->toJSONString());
-    }
-}
 
 void Frontend::loadEventFired(double timestamp) {
     std::unique_ptr<protocol::DictionaryValue> jsonMessage = DictionaryValue::create();
     jsonMessage->setString("method", "Page.loadEventFired");
     std::unique_ptr<protocol::DictionaryValue> paramsObject = DictionaryValue::create();
     paramsObject->setValue("timestamp", ValueConversions<double>::serialize(timestamp));
-    jsonMessage->setObject("params", std::move(paramsObject));
-    if (m_frontendChannel) {
-        m_frontendChannel->sendProtocolNotification(jsonMessage->toJSONString());
-    }
-}
-
-void Frontend::frameNavigated(std::unique_ptr<protocol::Page::Frame> frame) {
-    std::unique_ptr<protocol::DictionaryValue> jsonMessage = DictionaryValue::create();
-    jsonMessage->setString("method", "Page.frameNavigated");
-    std::unique_ptr<protocol::DictionaryValue> paramsObject = DictionaryValue::create();
-    paramsObject->setValue("frame", ValueConversions<protocol::Page::Frame>::serialize(frame.get()));
     jsonMessage->setObject("params", std::move(paramsObject));
     if (m_frontendChannel) {
         m_frontendChannel->sendProtocolNotification(jsonMessage->toJSONString());
@@ -388,61 +295,6 @@ void Frontend::frameStoppedLoading(const String& frameId) {
     }
 }
 
-void Frontend::frameScheduledNavigation(const String& frameId, double delay) {
-    std::unique_ptr<protocol::DictionaryValue> jsonMessage = DictionaryValue::create();
-    jsonMessage->setString("method", "Page.frameScheduledNavigation");
-    std::unique_ptr<protocol::DictionaryValue> paramsObject = DictionaryValue::create();
-    paramsObject->setValue("frameId", ValueConversions<String>::serialize(frameId));
-    paramsObject->setValue("delay", ValueConversions<double>::serialize(delay));
-    jsonMessage->setObject("params", std::move(paramsObject));
-    if (m_frontendChannel) {
-        m_frontendChannel->sendProtocolNotification(jsonMessage->toJSONString());
-    }
-}
-
-void Frontend::frameClearedScheduledNavigation(const String& frameId) {
-    std::unique_ptr<protocol::DictionaryValue> jsonMessage = DictionaryValue::create();
-    jsonMessage->setString("method", "Page.frameClearedScheduledNavigation");
-    std::unique_ptr<protocol::DictionaryValue> paramsObject = DictionaryValue::create();
-    paramsObject->setValue("frameId", ValueConversions<String>::serialize(frameId));
-    jsonMessage->setObject("params", std::move(paramsObject));
-    if (m_frontendChannel) {
-        m_frontendChannel->sendProtocolNotification(jsonMessage->toJSONString());
-    }
-}
-
-void Frontend::javascriptDialogOpening(const String& message) {
-    std::unique_ptr<protocol::DictionaryValue> jsonMessage = DictionaryValue::create();
-    jsonMessage->setString("method", "Page.javascriptDialogOpening");
-    std::unique_ptr<protocol::DictionaryValue> paramsObject = DictionaryValue::create();
-    paramsObject->setValue("message", ValueConversions<String>::serialize(message));
-    jsonMessage->setObject("params", std::move(paramsObject));
-    if (m_frontendChannel) {
-        m_frontendChannel->sendProtocolNotification(jsonMessage->toJSONString());
-    }
-}
-
-void Frontend::javascriptDialogClosed() {
-    std::unique_ptr<protocol::DictionaryValue> jsonMessage = DictionaryValue::create();
-    jsonMessage->setString("method", "Page.javascriptDialogClosed");
-    std::unique_ptr<protocol::DictionaryValue> paramsObject = DictionaryValue::create();
-    jsonMessage->setObject("params", std::move(paramsObject));
-    if (m_frontendChannel) {
-        m_frontendChannel->sendProtocolNotification(jsonMessage->toJSONString());
-    }
-}
-
-void Frontend::scriptsEnabled(bool isEnabled) {
-    std::unique_ptr<protocol::DictionaryValue> jsonMessage = DictionaryValue::create();
-    jsonMessage->setString("method", "Page.scriptsEnabled");
-    std::unique_ptr<protocol::DictionaryValue> paramsObject = DictionaryValue::create();
-    paramsObject->setValue("isEnabled", ValueConversions<bool>::serialize(isEnabled));
-    jsonMessage->setObject("params", std::move(paramsObject));
-    if (m_frontendChannel) {
-        m_frontendChannel->sendProtocolNotification(jsonMessage->toJSONString());
-    }
-}
-
 void Frontend::flush() {
     m_frontendChannel->flushProtocolNotifications();
 }
@@ -459,25 +311,11 @@ class DispatcherImpl : public protocol::DispatcherBase {
             m_dispatchMap["Page.addScriptToEvaluateOnLoad"] = &DispatcherImpl::addScriptToEvaluateOnLoad;
             m_dispatchMap["Page.removeScriptToEvaluateOnLoad"] = &DispatcherImpl::removeScriptToEvaluateOnLoad;
             m_dispatchMap["Page.reload"] = &DispatcherImpl::reload;
-            m_dispatchMap["Page.navigate"] = &DispatcherImpl::navigate;
-            m_dispatchMap["Page.getCookies"] = &DispatcherImpl::getCookies;
-            m_dispatchMap["Page.deleteCookie"] = &DispatcherImpl::deleteCookie;
             m_dispatchMap["Page.getResourceTree"] = &DispatcherImpl::getResourceTree;
             m_dispatchMap["Page.getResourceContent"] = &DispatcherImpl::getResourceContent;
             m_dispatchMap["Page.searchInResource"] = &DispatcherImpl::searchInResource;
             m_dispatchMap["Page.searchInResources"] = &DispatcherImpl::searchInResources;
             m_dispatchMap["Page.setDocumentContent"] = &DispatcherImpl::setDocumentContent;
-            m_dispatchMap["Page.setShowPaintRects"] = &DispatcherImpl::setShowPaintRects;
-            m_dispatchMap["Page.getScriptExecutionStatus"] = &DispatcherImpl::getScriptExecutionStatus;
-            m_dispatchMap["Page.setScriptExecutionDisabled"] = &DispatcherImpl::setScriptExecutionDisabled;
-            m_dispatchMap["Page.setTouchEmulationEnabled"] = &DispatcherImpl::setTouchEmulationEnabled;
-            m_dispatchMap["Page.setEmulatedMedia"] = &DispatcherImpl::setEmulatedMedia;
-            m_dispatchMap["Page.getCompositingBordersVisible"] = &DispatcherImpl::getCompositingBordersVisible;
-            m_dispatchMap["Page.setCompositingBordersVisible"] = &DispatcherImpl::setCompositingBordersVisible;
-            m_dispatchMap["Page.snapshotNode"] = &DispatcherImpl::snapshotNode;
-            m_dispatchMap["Page.snapshotRect"] = &DispatcherImpl::snapshotRect;
-            m_dispatchMap["Page.handleJavaScriptDialog"] = &DispatcherImpl::handleJavaScriptDialog;
-            m_dispatchMap["Page.archive"] = &DispatcherImpl::archive;
         }
         ~DispatcherImpl() override { }
         void dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) override;
@@ -492,25 +330,11 @@ class DispatcherImpl : public protocol::DispatcherBase {
         void addScriptToEvaluateOnLoad(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
         void removeScriptToEvaluateOnLoad(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
         void reload(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        void navigate(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        void getCookies(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        void deleteCookie(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
         void getResourceTree(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
         void getResourceContent(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
         void searchInResource(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
         void searchInResources(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
         void setDocumentContent(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        void setShowPaintRects(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        void getScriptExecutionStatus(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        void setScriptExecutionDisabled(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        void setTouchEmulationEnabled(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        void setEmulatedMedia(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        void getCompositingBordersVisible(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        void setCompositingBordersVisible(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        void snapshotNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        void snapshotRect(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        void handleJavaScriptDialog(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        void archive(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
 
         Backend* m_backend;
 };
@@ -620,67 +444,6 @@ void DispatcherImpl::reload(int callId, std::unique_ptr<DictionaryValue> request
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     ErrorString error;
     m_backend->reload(&error, in_ignoreCache, in_scriptToEvaluateOnLoad);
-    if (weak->get()) {
-        weak->get()->sendResponse(callId, error);
-    }
-}
-
-void DispatcherImpl::navigate(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
-    // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* urlValue = object ? object->get("url") : nullptr;
-    errors->setName("url");
-    String in_url = ValueConversions<String>::parse(urlValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, InvalidParams, kInvalidRequest, errors);
-        return;
-    }
-
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    ErrorString error;
-    m_backend->navigate(&error, in_url);
-    if (weak->get()) {
-        weak->get()->sendResponse(callId, error);
-    }
-}
-
-void DispatcherImpl::getCookies(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
-    // Declare output parameters.
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    std::unique_ptr<protocol::Array<protocol::Page::Cookie>> out_cookies;
-
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    ErrorString error;
-    m_backend->getCookies(&error, &out_cookies);
-    if (!error.length()) {
-        result->setValue("cookies", ValueConversions<protocol::Array<protocol::Page::Cookie>>::serialize(out_cookies.get()));
-    }
-    if (weak->get()) {
-        weak->get()->sendResponse(callId, error, std::move(result));
-    }
-}
-
-void DispatcherImpl::deleteCookie(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
-    // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* cookieNameValue = object ? object->get("cookieName") : nullptr;
-    errors->setName("cookieName");
-    String in_cookieName = ValueConversions<String>::parse(cookieNameValue, errors);
-    protocol::Value* urlValue = object ? object->get("url") : nullptr;
-    errors->setName("url");
-    String in_url = ValueConversions<String>::parse(urlValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, InvalidParams, kInvalidRequest, errors);
-        return;
-    }
-
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    ErrorString error;
-    m_backend->deleteCookie(&error, in_cookieName, in_url);
     if (weak->get()) {
         weak->get()->sendResponse(callId, error);
     }
@@ -845,252 +608,6 @@ void DispatcherImpl::setDocumentContent(int callId, std::unique_ptr<DictionaryVa
     m_backend->setDocumentContent(&error, in_frameId, in_html);
     if (weak->get()) {
         weak->get()->sendResponse(callId, error);
-    }
-}
-
-void DispatcherImpl::setShowPaintRects(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
-    // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* resultValue = object ? object->get("result") : nullptr;
-    errors->setName("result");
-    bool in_result = ValueConversions<bool>::parse(resultValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, InvalidParams, kInvalidRequest, errors);
-        return;
-    }
-
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    ErrorString error;
-    m_backend->setShowPaintRects(&error, in_result);
-    if (weak->get()) {
-        weak->get()->sendResponse(callId, error);
-    }
-}
-
-void DispatcherImpl::getScriptExecutionStatus(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
-    // Declare output parameters.
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    String out_result;
-
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    ErrorString error;
-    m_backend->getScriptExecutionStatus(&error, &out_result);
-    if (!error.length()) {
-        result->setValue("result", ValueConversions<String>::serialize(out_result));
-    }
-    if (weak->get()) {
-        weak->get()->sendResponse(callId, error, std::move(result));
-    }
-}
-
-void DispatcherImpl::setScriptExecutionDisabled(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
-    // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* valueValue = object ? object->get("value") : nullptr;
-    errors->setName("value");
-    bool in_value = ValueConversions<bool>::parse(valueValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, InvalidParams, kInvalidRequest, errors);
-        return;
-    }
-
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    ErrorString error;
-    m_backend->setScriptExecutionDisabled(&error, in_value);
-    if (weak->get()) {
-        weak->get()->sendResponse(callId, error);
-    }
-}
-
-void DispatcherImpl::setTouchEmulationEnabled(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
-    // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* enabledValue = object ? object->get("enabled") : nullptr;
-    errors->setName("enabled");
-    bool in_enabled = ValueConversions<bool>::parse(enabledValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, InvalidParams, kInvalidRequest, errors);
-        return;
-    }
-
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    ErrorString error;
-    m_backend->setTouchEmulationEnabled(&error, in_enabled);
-    if (weak->get()) {
-        weak->get()->sendResponse(callId, error);
-    }
-}
-
-void DispatcherImpl::setEmulatedMedia(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
-    // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* mediaValue = object ? object->get("media") : nullptr;
-    errors->setName("media");
-    String in_media = ValueConversions<String>::parse(mediaValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, InvalidParams, kInvalidRequest, errors);
-        return;
-    }
-
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    ErrorString error;
-    m_backend->setEmulatedMedia(&error, in_media);
-    if (weak->get()) {
-        weak->get()->sendResponse(callId, error);
-    }
-}
-
-void DispatcherImpl::getCompositingBordersVisible(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
-    // Declare output parameters.
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    bool out_result;
-
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    ErrorString error;
-    m_backend->getCompositingBordersVisible(&error, &out_result);
-    if (!error.length()) {
-        result->setValue("result", ValueConversions<bool>::serialize(out_result));
-    }
-    if (weak->get()) {
-        weak->get()->sendResponse(callId, error, std::move(result));
-    }
-}
-
-void DispatcherImpl::setCompositingBordersVisible(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
-    // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* visibleValue = object ? object->get("visible") : nullptr;
-    errors->setName("visible");
-    bool in_visible = ValueConversions<bool>::parse(visibleValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, InvalidParams, kInvalidRequest, errors);
-        return;
-    }
-
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    ErrorString error;
-    m_backend->setCompositingBordersVisible(&error, in_visible);
-    if (weak->get()) {
-        weak->get()->sendResponse(callId, error);
-    }
-}
-
-void DispatcherImpl::snapshotNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
-    // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
-    errors->setName("nodeId");
-    int in_nodeId = ValueConversions<int>::parse(nodeIdValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, InvalidParams, kInvalidRequest, errors);
-        return;
-    }
-    // Declare output parameters.
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    String out_dataURL;
-
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    ErrorString error;
-    m_backend->snapshotNode(&error, in_nodeId, &out_dataURL);
-    if (!error.length()) {
-        result->setValue("dataURL", ValueConversions<String>::serialize(out_dataURL));
-    }
-    if (weak->get()) {
-        weak->get()->sendResponse(callId, error, std::move(result));
-    }
-}
-
-void DispatcherImpl::snapshotRect(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
-    // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* xValue = object ? object->get("x") : nullptr;
-    errors->setName("x");
-    int in_x = ValueConversions<int>::parse(xValue, errors);
-    protocol::Value* yValue = object ? object->get("y") : nullptr;
-    errors->setName("y");
-    int in_y = ValueConversions<int>::parse(yValue, errors);
-    protocol::Value* widthValue = object ? object->get("width") : nullptr;
-    errors->setName("width");
-    int in_width = ValueConversions<int>::parse(widthValue, errors);
-    protocol::Value* heightValue = object ? object->get("height") : nullptr;
-    errors->setName("height");
-    int in_height = ValueConversions<int>::parse(heightValue, errors);
-    protocol::Value* coordinateSystemValue = object ? object->get("coordinateSystem") : nullptr;
-    errors->setName("coordinateSystem");
-    String in_coordinateSystem = ValueConversions<String>::parse(coordinateSystemValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, InvalidParams, kInvalidRequest, errors);
-        return;
-    }
-    // Declare output parameters.
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    String out_dataURL;
-
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    ErrorString error;
-    m_backend->snapshotRect(&error, in_x, in_y, in_width, in_height, in_coordinateSystem, &out_dataURL);
-    if (!error.length()) {
-        result->setValue("dataURL", ValueConversions<String>::serialize(out_dataURL));
-    }
-    if (weak->get()) {
-        weak->get()->sendResponse(callId, error, std::move(result));
-    }
-}
-
-void DispatcherImpl::handleJavaScriptDialog(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
-    // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* acceptValue = object ? object->get("accept") : nullptr;
-    errors->setName("accept");
-    bool in_accept = ValueConversions<bool>::parse(acceptValue, errors);
-    protocol::Value* promptTextValue = object ? object->get("promptText") : nullptr;
-    Maybe<String> in_promptText;
-    if (promptTextValue) {
-        errors->setName("promptText");
-        in_promptText = ValueConversions<String>::parse(promptTextValue, errors);
-    }
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, InvalidParams, kInvalidRequest, errors);
-        return;
-    }
-
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    ErrorString error;
-    m_backend->handleJavaScriptDialog(&error, in_accept, in_promptText);
-    if (weak->get()) {
-        weak->get()->sendResponse(callId, error);
-    }
-}
-
-void DispatcherImpl::archive(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
-    // Declare output parameters.
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    String out_data;
-
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    ErrorString error;
-    m_backend->archive(&error, &out_data);
-    if (!error.length()) {
-        result->setValue("data", ValueConversions<String>::serialize(out_data));
-    }
-    if (weak->get()) {
-        weak->get()->sendResponse(callId, error, std::move(result));
     }
 }
 

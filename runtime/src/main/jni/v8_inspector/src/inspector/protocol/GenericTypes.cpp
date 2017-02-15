@@ -16,7 +16,7 @@ namespace GenericTypes {
 
 const char Metainfo::domainName[] = "GenericTypes";
 const char Metainfo::commandPrefix[] = "GenericTypes.";
-const char Metainfo::version[] = "1.1";
+const char Metainfo::version[] = "1.2";
 
 std::unique_ptr<SearchMatch> SearchMatch::parse(protocol::Value* value, ErrorSupport* errors) {
     if (!value || value->type() != protocol::Value::TypeObject) {

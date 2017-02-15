@@ -4,7 +4,6 @@
 
 #include <v8_inspector/src/inspector/utils/v8-search-utils-public.h>
 #include "v8-page-agent-impl.h"
-#include "v8_inspector/src/inspector/utils/v8-page-resources.h"
 #include "search-util.h"
 
 namespace v8_inspector {
@@ -185,71 +184,11 @@ void V8PageAgentImpl::reload(ErrorString*, const Maybe<bool>& in_ignoreCache,
 
 }
 
-void V8PageAgentImpl::navigate(ErrorString*, const String& in_url) {
-
-}
-
-void V8PageAgentImpl::getCookies(ErrorString*,
-                                 std::unique_ptr<protocol::Array<protocol::Page::Cookie>>* out_cookies) {
-
-}
-
-void V8PageAgentImpl::deleteCookie(ErrorString*, const String& in_cookieName,
-                                   const String& in_url) {
-
-}
-
 void V8PageAgentImpl::setDocumentContent(ErrorString*, const String& in_frameId,
         const String& in_html) {
 
 }
 
-void V8PageAgentImpl::setShowPaintRects(ErrorString*, bool in_result) {
-
-}
-
-void V8PageAgentImpl::getScriptExecutionStatus(ErrorString*, String* out_result) {
-
-}
-
-void V8PageAgentImpl::setScriptExecutionDisabled(ErrorString*, bool in_value) {
-
-}
-
-void V8PageAgentImpl::setTouchEmulationEnabled(ErrorString*, bool in_enabled) {
-
-}
-
-void V8PageAgentImpl::setEmulatedMedia(ErrorString*, const String& in_media) {
-
-}
-
-void V8PageAgentImpl::getCompositingBordersVisible(ErrorString*, bool* out_result) {
-
-}
-
-void V8PageAgentImpl::setCompositingBordersVisible(ErrorString*, bool in_visible) {
-
-}
-
-void V8PageAgentImpl::snapshotNode(ErrorString*, int in_nodeId, String* out_dataURL) {
-
-}
-
-void V8PageAgentImpl::snapshotRect(ErrorString*, int in_x, int in_y, int in_width,
-                                   int in_height, const String& in_coordinateSystem,
-                                   String* out_dataURL) {
-
-}
-
-void V8PageAgentImpl::handleJavaScriptDialog(ErrorString*, bool in_accept,
-        const Maybe<String>& in_promptText) {
-
-}
-
-void V8PageAgentImpl::archive(ErrorString*, String* out_data) {
-
-}
 
 void V8PageAgentImpl::reset() {
 

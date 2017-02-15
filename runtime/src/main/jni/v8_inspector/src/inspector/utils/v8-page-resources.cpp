@@ -112,16 +112,10 @@ std::map<std::string, const char*> PageResource::s_mimeTypeMap = {
     { "application/xml", v8_inspector::protocol::Page::ResourceTypeEnum::Document },
     // text/css mime type is regarded as document so as to display in the Sources tab
     { "text/css", v8_inspector::protocol::Page::ResourceTypeEnum::Document },
-    // regarding javascript files as Scripts will prevent them from being displayed in the Sources
-    // tab of DevTools, at least according to the FrontEnd implementation
     { "text/javascript", v8_inspector::protocol::Page::ResourceTypeEnum::Script },
     { "application/javascript", v8_inspector::protocol::Page::ResourceTypeEnum::Script },
     { "application/json", v8_inspector::protocol::Page::ResourceTypeEnum::Document },
-    // regarding typescript files as Scripts will prevent them from being displayed in the Sources
-    // tab of DevTools, at least according to the FrontEnd implementation :-/
-    // Enable typescripts as documents so that breakpoints may be set in code that has yet to be reached.
-    // Will result in duplicate of the same typescript fiels in the Sources tab
-    { "text/typescript", v8_inspector::protocol::Page::ResourceTypeEnum::Document },
+    { "text/typescript", v8_inspector::protocol::Page::ResourceTypeEnum::Script },
     { "image/jpeg", v8_inspector::protocol::Page::ResourceTypeEnum::Image },
     { "image/png", v8_inspector::protocol::Page::ResourceTypeEnum::Image },
     { "application/binary", v8_inspector::protocol::Page::ResourceTypeEnum::Other }

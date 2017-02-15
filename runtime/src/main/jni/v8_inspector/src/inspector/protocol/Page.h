@@ -29,8 +29,6 @@ class FrameResource;
 class FrameResourceTree;
 // Search result for resource.
 class SearchResult;
-// Cookie object
-class Cookie;
 // Unique script identifier.
 using ScriptIdentifier = String;
 
@@ -49,14 +47,6 @@ namespace CoordinateSystemEnum {
 extern const char* Viewport;
 extern const char* Page;
 } // namespace CoordinateSystemEnum
-
-namespace GetScriptExecutionStatus {
-namespace ResultEnum {
-extern const char* Allowed;
-extern const char* Disabled;
-extern const char* Forbidden;
-} // ResultEnum
-} // GetScriptExecutionStatus
 
 // ------------- Type and builder declarations.
 
@@ -556,193 +546,6 @@ class  SearchResult {
 };
 
 
-// Cookie object
-class  Cookie {
-        PROTOCOL_DISALLOW_COPY(Cookie);
-    public:
-        static std::unique_ptr<Cookie> parse(protocol::Value* value, ErrorSupport* errors);
-
-        ~Cookie() { }
-
-        String getName() {
-            return m_name;
-        }
-        void setName(const String& value) {
-            m_name = value;
-        }
-
-        String getValue() {
-            return m_value;
-        }
-        void setValue(const String& value) {
-            m_value = value;
-        }
-
-        String getDomain() {
-            return m_domain;
-        }
-        void setDomain(const String& value) {
-            m_domain = value;
-        }
-
-        String getPath() {
-            return m_path;
-        }
-        void setPath(const String& value) {
-            m_path = value;
-        }
-
-        double getExpires() {
-            return m_expires;
-        }
-        void setExpires(double value) {
-            m_expires = value;
-        }
-
-        int getSize() {
-            return m_size;
-        }
-        void setSize(int value) {
-            m_size = value;
-        }
-
-        bool getHttpOnly() {
-            return m_httpOnly;
-        }
-        void setHttpOnly(bool value) {
-            m_httpOnly = value;
-        }
-
-        bool getSecure() {
-            return m_secure;
-        }
-        void setSecure(bool value) {
-            m_secure = value;
-        }
-
-        bool getSession() {
-            return m_session;
-        }
-        void setSession(bool value) {
-            m_session = value;
-        }
-
-        std::unique_ptr<protocol::DictionaryValue> serialize() const;
-        std::unique_ptr<Cookie> clone() const;
-
-        template<int STATE>
-        class CookieBuilder {
-            public:
-                enum {
-                    NoFieldsSet = 0,
-                    NameSet = 1 << 1,
-                    ValueSet = 1 << 2,
-                    DomainSet = 1 << 3,
-                    PathSet = 1 << 4,
-                    ExpiresSet = 1 << 5,
-                    SizeSet = 1 << 6,
-                    HttpOnlySet = 1 << 7,
-                    SecureSet = 1 << 8,
-                    SessionSet = 1 << 9,
-                    AllFieldsSet = (NameSet | ValueSet | DomainSet | PathSet | ExpiresSet | SizeSet | HttpOnlySet | SecureSet | SessionSet | 0)
-                };
-
-
-                CookieBuilder<STATE | NameSet>& setName(const String& value) {
-                    static_assert(!(STATE & NameSet), "property name should not be set yet");
-                    m_result->setName(value);
-                    return castState<NameSet>();
-                }
-
-                CookieBuilder<STATE | ValueSet>& setValue(const String& value) {
-                    static_assert(!(STATE & ValueSet), "property value should not be set yet");
-                    m_result->setValue(value);
-                    return castState<ValueSet>();
-                }
-
-                CookieBuilder<STATE | DomainSet>& setDomain(const String& value) {
-                    static_assert(!(STATE & DomainSet), "property domain should not be set yet");
-                    m_result->setDomain(value);
-                    return castState<DomainSet>();
-                }
-
-                CookieBuilder<STATE | PathSet>& setPath(const String& value) {
-                    static_assert(!(STATE & PathSet), "property path should not be set yet");
-                    m_result->setPath(value);
-                    return castState<PathSet>();
-                }
-
-                CookieBuilder<STATE | ExpiresSet>& setExpires(double value) {
-                    static_assert(!(STATE & ExpiresSet), "property expires should not be set yet");
-                    m_result->setExpires(value);
-                    return castState<ExpiresSet>();
-                }
-
-                CookieBuilder<STATE | SizeSet>& setSize(int value) {
-                    static_assert(!(STATE & SizeSet), "property size should not be set yet");
-                    m_result->setSize(value);
-                    return castState<SizeSet>();
-                }
-
-                CookieBuilder<STATE | HttpOnlySet>& setHttpOnly(bool value) {
-                    static_assert(!(STATE & HttpOnlySet), "property httpOnly should not be set yet");
-                    m_result->setHttpOnly(value);
-                    return castState<HttpOnlySet>();
-                }
-
-                CookieBuilder<STATE | SecureSet>& setSecure(bool value) {
-                    static_assert(!(STATE & SecureSet), "property secure should not be set yet");
-                    m_result->setSecure(value);
-                    return castState<SecureSet>();
-                }
-
-                CookieBuilder<STATE | SessionSet>& setSession(bool value) {
-                    static_assert(!(STATE & SessionSet), "property session should not be set yet");
-                    m_result->setSession(value);
-                    return castState<SessionSet>();
-                }
-
-                std::unique_ptr<Cookie> build() {
-                    static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
-                    return std::move(m_result);
-                }
-
-            private:
-                friend class Cookie;
-                CookieBuilder() : m_result(new Cookie()) { }
-
-                template<int STEP> CookieBuilder<STATE | STEP>& castState() {
-                    return *reinterpret_cast<CookieBuilder<STATE | STEP>*>(this);
-                }
-
-                std::unique_ptr<protocol::Page::Cookie> m_result;
-        };
-
-        static CookieBuilder<0> create() {
-            return CookieBuilder<0>();
-        }
-
-    private:
-        Cookie() {
-            m_expires = 0;
-            m_size = 0;
-            m_httpOnly = false;
-            m_secure = false;
-            m_session = false;
-        }
-
-        String m_name;
-        String m_value;
-        String m_domain;
-        String m_path;
-        double m_expires;
-        int m_size;
-        bool m_httpOnly;
-        bool m_secure;
-        bool m_session;
-};
-
-
 // ------------- Backend interface.
 
 class  Backend {
@@ -754,25 +557,11 @@ class  Backend {
         virtual void addScriptToEvaluateOnLoad(ErrorString*, const String& in_scriptSource, String* out_identifier) = 0;
         virtual void removeScriptToEvaluateOnLoad(ErrorString*, const String& in_identifier) = 0;
         virtual void reload(ErrorString*, const Maybe<bool>& in_ignoreCache, const Maybe<String>& in_scriptToEvaluateOnLoad) = 0;
-        virtual void navigate(ErrorString*, const String& in_url) = 0;
-        virtual void getCookies(ErrorString*, std::unique_ptr<protocol::Array<protocol::Page::Cookie>>* out_cookies) = 0;
-        virtual void deleteCookie(ErrorString*, const String& in_cookieName, const String& in_url) = 0;
         virtual void getResourceTree(ErrorString*, std::unique_ptr<protocol::Page::FrameResourceTree>* out_frameTree) = 0;
         virtual void getResourceContent(ErrorString*, const String& in_frameId, const String& in_url, String* out_content, bool* out_base64Encoded) = 0;
         virtual void searchInResource(ErrorString*, const String& in_frameId, const String& in_url, const String& in_query, const Maybe<bool>& in_caseSensitive, const Maybe<bool>& in_isRegex, const Maybe<String>& in_requestId, std::unique_ptr<protocol::Array<protocol::GenericTypes::SearchMatch>>* out_result) = 0;
         virtual void searchInResources(ErrorString*, const String& in_text, const Maybe<bool>& in_caseSensitive, const Maybe<bool>& in_isRegex, std::unique_ptr<protocol::Array<protocol::Page::SearchResult>>* out_result) = 0;
         virtual void setDocumentContent(ErrorString*, const String& in_frameId, const String& in_html) = 0;
-        virtual void setShowPaintRects(ErrorString*, bool in_result) = 0;
-        virtual void getScriptExecutionStatus(ErrorString*, String* out_result) = 0;
-        virtual void setScriptExecutionDisabled(ErrorString*, bool in_value) = 0;
-        virtual void setTouchEmulationEnabled(ErrorString*, bool in_enabled) = 0;
-        virtual void setEmulatedMedia(ErrorString*, const String& in_media) = 0;
-        virtual void getCompositingBordersVisible(ErrorString*, bool* out_result) = 0;
-        virtual void setCompositingBordersVisible(ErrorString*, bool in_visible) = 0;
-        virtual void snapshotNode(ErrorString*, int in_nodeId, String* out_dataURL) = 0;
-        virtual void snapshotRect(ErrorString*, int in_x, int in_y, int in_width, int in_height, const String& in_coordinateSystem, String* out_dataURL) = 0;
-        virtual void handleJavaScriptDialog(ErrorString*, bool in_accept, const Maybe<String>& in_promptText) = 0;
-        virtual void archive(ErrorString*, String* out_data) = 0;
 
 };
 
@@ -781,17 +570,10 @@ class  Backend {
 class  Frontend {
     public:
         Frontend(FrontendChannel* frontendChannel) : m_frontendChannel(frontendChannel) { }
-        void domContentEventFired(double timestamp);
         void loadEventFired(double timestamp);
-        void frameNavigated(std::unique_ptr<protocol::Page::Frame> frame);
         void frameDetached(const String& frameId);
         void frameStartedLoading(const String& frameId);
         void frameStoppedLoading(const String& frameId);
-        void frameScheduledNavigation(const String& frameId, double delay);
-        void frameClearedScheduledNavigation(const String& frameId);
-        void javascriptDialogOpening(const String& message);
-        void javascriptDialogClosed();
-        void scriptsEnabled(bool isEnabled);
 
         void flush();
     private:

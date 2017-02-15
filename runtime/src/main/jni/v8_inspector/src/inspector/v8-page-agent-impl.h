@@ -33,21 +33,7 @@ class V8PageAgentImpl : public protocol::Page::Backend {
         void addScriptToEvaluateOnLoad(ErrorString*, const String& in_scriptSource, String* out_identifier) override;
         void removeScriptToEvaluateOnLoad(ErrorString*, const String& in_identifier) override;
         void reload(ErrorString*, const Maybe<bool>& in_ignoreCache, const Maybe<String>& in_scriptToEvaluateOnLoad) override;
-        void navigate(ErrorString*, const String& in_url) override;
-        void getCookies(ErrorString*, std::unique_ptr<protocol::Array<protocol::Page::Cookie>>* out_cookies) override;
-        void deleteCookie(ErrorString*, const String& in_cookieName, const String& in_url) override;
         void setDocumentContent(ErrorString*, const String& in_frameId, const String& in_html) override;
-        void setShowPaintRects(ErrorString*, bool in_result) override;
-        void getScriptExecutionStatus(ErrorString*, String* out_result) override;
-        void setScriptExecutionDisabled(ErrorString*, bool in_value) override;
-        void setTouchEmulationEnabled(ErrorString*, bool in_enabled) override;
-        void setEmulatedMedia(ErrorString*, const String& in_media) override;
-        void getCompositingBordersVisible(ErrorString*, bool* out_result) override;
-        void setCompositingBordersVisible(ErrorString*, bool in_visible) override;
-        void snapshotNode(ErrorString*, int in_nodeId, String* out_dataURL) override;
-        void snapshotRect(ErrorString*, int in_x, int in_y, int in_width, int in_height, const String& in_coordinateSystem, String* out_dataURL) override;
-        void handleJavaScriptDialog(ErrorString*, bool in_accept, const Maybe<String>& in_promptText) override;
-        void archive(ErrorString*, String* out_data) override;
 
         void restore();
         void reset();
