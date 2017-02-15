@@ -13,3 +13,5 @@ gen/
 obj/
 bin/
 .svn/
+
+**/.vscode/
