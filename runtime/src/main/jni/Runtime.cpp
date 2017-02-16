@@ -489,7 +489,9 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring nativeLibDir
 
     __android_log_print(ANDROID_LOG_DEBUG, "TNS.Native", "V8 version %s", V8::GetVersion());
 
-    auto globalTemplate = ObjectTemplate::New();
+    auto globalFunctionTemplate = FunctionTemplate::New(isolate);
+    globalFunctionTemplate->SetClassName(ArgConverter::ConvertToV8String(isolate, "NativeScriptGlobalObject"));
+    auto globalTemplate = ObjectTemplate::New(isolate, globalFunctionTemplate);
 
     const auto readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
 
