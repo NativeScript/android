@@ -69,8 +69,11 @@ void JsV8InspectorClient::disconnect() {
 
 
 void JsV8InspectorClient::dispatchMessage(const std::string& message) {
-    this->doDispatchMessage(isolate_, message);
+    Isolate::Scope isolate_scope(isolate_);
+    v8::HandleScope handleScope(isolate_);
+    Context::Scope context_scope(isolate_->GetCurrentContext());
 
+    this->doDispatchMessage(isolate_, message);
 }
 
 void JsV8InspectorClient::runMessageLoopOnPause(int context_group_id) {
@@ -169,7 +172,7 @@ void JsV8InspectorClient::init() {
 
     v8::HandleScope handle_scope(isolate_);
 
-    v8::Local<Context> context = Context::New(isolate_);
+    v8::Local<Context> context = isolate_->GetCurrentContext();
     v8::Context::Scope context_scope(context);
 
     inspector_ = V8Inspector::create(isolate_, this);
@@ -179,7 +182,7 @@ void JsV8InspectorClient::init() {
     v8::Persistent<v8::Context> persistentContext(context->GetIsolate(), context);
     context_.Reset(isolate_, persistentContext);
 
-    this->createInspectorSession(isolate_, JsV8InspectorClient::PersistentToLocal(isolate_, context_));
+    this->createInspectorSession(isolate_, context);
 }
 
 JsV8InspectorClient* JsV8InspectorClient::GetInstance() {
