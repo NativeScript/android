@@ -51,7 +51,7 @@ V8Debugger::V8Debugger(v8::Isolate* isolate, V8InspectorImpl* inspector)
     : m_isolate(isolate),
       m_inspector(inspector),
 
-      m_lastContextId(-1),
+      m_lastContextId(0),
       m_enableCount(0),
       m_breakpointsActivated(true),
       m_runningNestedMessageLoop(false),
@@ -701,7 +701,6 @@ void V8Debugger::compileDebuggerScript() {
                               v8::NewStringType::kInternalized,
                               sizeof(DebuggerScript_js))
           .ToLocalChecked();
-
 
     v8::Local<v8::Value> value;
   if (!m_inspector->compileAndRunInternalScript(debuggerContext(), scriptValue)
