@@ -1,9 +1,4 @@
 #include "JsV8InspectorClient.h"
-//#include "V8GlobalHelpers.h"
-//#include "ArgConverter.h"
-//#include "JniLocalRef.h"
-//#include "NativeScriptException.h"
-//#include "NativeScriptAssert.h"
 #include <sstream>
 #include <assert.h>
 #include <include/libplatform/libplatform.h>
@@ -173,13 +168,12 @@ void JsV8InspectorClient::init() {
     v8::HandleScope handle_scope(isolate_);
 
     v8::Local<Context> context = isolate_->GetCurrentContext();
-    v8::Context::Scope context_scope(context);
 
     inspector_ = V8Inspector::create(isolate_, this);
 
     inspector_->contextCreated(v8_inspector::V8ContextInfo(context, 0, v8_inspector::StringView()));
 
-    v8::Persistent<v8::Context> persistentContext(context->GetIsolate(), context);
+    v8::Persistent<v8::Context> persistentContext(context->GetIsolate(), JsV8InspectorClient::PersistentToLocal(isolate_, context_));
     context_.Reset(isolate_, persistentContext);
 
     this->createInspectorSession(isolate_, context);
