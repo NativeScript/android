@@ -16,7 +16,7 @@ def runOnDeviceOrEmulator = runOnDevice ? "-d" : "-e";
 model {
     android {
         compileSdkVersion = 23
-        buildToolsVersion = "23.0.3"
+        buildToolsVersion = "25.0.2"
 
         defaultConfig.with {
             applicationId = "com.tns.android_runtime_testapp"

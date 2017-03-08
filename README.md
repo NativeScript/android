@@ -24,7 +24,7 @@ The source in this repo is organized in Android Studio projects.
 * Install Android API Level 22 from Android Studio -> Tools -> Android -> SDK Manager
 * Install the Android NDK from Android Studio -> Tools -> Android -> SDK Manager
 * Download Android Support Repository through the Android SDK Manager
-* Download Build Tools 22 through the Android SDK Manager.
+* Download Build Tools 25.0.2 through the Android SDK Manager.
 
 # How to build
 
