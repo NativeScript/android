@@ -11,7 +11,6 @@
 #include "src/inspector/protocol/Forward.h"
 #include "src/inspector/string-16.h"
 
-
 using namespace v8_inspector;
 
 namespace tns {
@@ -39,6 +38,13 @@ class JsV8InspectorClient : V8InspectorClient, v8_inspector::V8Inspector::Channe
         void quitMessageLoopOnPause() override;
         v8::Local<v8::Context> ensureDefaultContextInGroup(int contextGroupId) override;
 
+        static void attachInspectorCallbacks(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate>& globalObjectTemplate);
+        static void InspectorIsConnectedGetterCallback(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
+
+        std::unique_ptr<V8Inspector> inspector_;
+        v8::Isolate* isolate_;
+        bool isConnected;
+
     private:
         JsV8InspectorClient(v8::Isolate* isolate);
 
@@ -48,9 +54,7 @@ class JsV8InspectorClient : V8InspectorClient, v8_inspector::V8Inspector::Channe
         static jmethodID getInspectorMessageMethod;
         static jmethodID sendToDevToolsConsoleMethod;
 
-        v8::Isolate* isolate_;
         v8::Persistent<v8::Context> context_;
-        std::unique_ptr<V8Inspector> inspector_;
         std::unique_ptr<V8InspectorSession> session_;
         jobject connection;
         bool running_nested_loop_;

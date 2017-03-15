@@ -6,6 +6,7 @@
 #include "NativeScriptException.h"
 
 #include "ArgConverter.h"
+#include "NetworkDomainCallbackHandlers.h"
 
 using namespace std;
 using namespace tns;
@@ -19,7 +20,8 @@ JsV8InspectorClient::JsV8InspectorClient(v8::Isolate* isolate)
       session_(nullptr),
       connection(nullptr),
       context_(),
-      running_nested_loop_(false) {
+      running_nested_loop_(false),
+      isConnected(false) {
     JEnv env;
 
     inspectorClass = env.FindClass("com/tns/AndroidJsV8Inspector");
@@ -38,6 +40,7 @@ JsV8InspectorClient::JsV8InspectorClient(v8::Isolate* isolate)
 void JsV8InspectorClient::connect(jobject connection) {
     JEnv env;
     this->connection = env.NewGlobalRef(connection);
+    this->isConnected = true;
 }
 
 void JsV8InspectorClient::createInspectorSession(v8::Isolate* isolate, const v8::Local<v8::Context>& context) {
@@ -58,6 +61,7 @@ void JsV8InspectorClient::disconnect() {
     JEnv env;
     env.DeleteGlobalRef(this->connection);
     this->connection = nullptr;
+    this->isConnected = false;
 
     this->createInspectorSession(isolate_, JsV8InspectorClient::PersistentToLocal(isolate_, context_));
 }
@@ -133,7 +137,6 @@ void JsV8InspectorClient::sendProtocolNotification(const v8_inspector::StringVie
     v8_inspector::String16 msg = ToString16(message);
 
     JEnv env;
-    const char* msss = msg.utf8().c_str();
     JniLocalRef str(env.NewStringUTF(msg.utf8().c_str()));
     env.CallStaticVoidMethod(inspectorClass, sendMethod, this->connection, (jstring) str);
 }
@@ -257,11 +260,27 @@ void MessageHandler(v8::Local<v8::Message> message, v8::Local<v8::Value> excepti
 //                               inspector->createStackTrace(stack), script_id);
 }
 
+void JsV8InspectorClient::attachInspectorCallbacks(Isolate* isolate,
+        Local<ObjectTemplate>& globalObjectTemplate) {
+    v8::HandleScope scope(isolate);
+
+    auto inspectorJSObject = ObjectTemplate::New(isolate);
+
+    inspectorJSObject->Set(ArgConverter::ConvertToV8String(isolate, "responseReceived"), FunctionTemplate::New(isolate, NetworkDomainCallbackHandlers::ResponseReceivedCallback));
+    inspectorJSObject->Set(ArgConverter::ConvertToV8String(isolate, "requestWillBeSent"), FunctionTemplate::New(isolate, NetworkDomainCallbackHandlers::RequestWillBeSentCallback));
+    inspectorJSObject->Set(ArgConverter::ConvertToV8String(isolate, "dataForRequestId"), FunctionTemplate::New(isolate, NetworkDomainCallbackHandlers::DataForRequestId));
+    inspectorJSObject->Set(ArgConverter::ConvertToV8String(isolate, "loadingFinished"), FunctionTemplate::New(isolate, NetworkDomainCallbackHandlers::LoadingFinishedCallback));
+    inspectorJSObject->SetAccessor(ArgConverter::ConvertToV8String(isolate, "isConnected"), JsV8InspectorClient::InspectorIsConnectedGetterCallback);
+
+    globalObjectTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__inspector"), inspectorJSObject);
+}
+
+void JsV8InspectorClient::InspectorIsConnectedGetterCallback(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info) {
+    info.GetReturnValue().Set(JsV8InspectorClient::GetInstance()->isConnected);
+}
+
 JsV8InspectorClient* JsV8InspectorClient::instance = nullptr;
 jclass JsV8InspectorClient::inspectorClass = nullptr;
 jmethodID JsV8InspectorClient::sendMethod = nullptr;
 jmethodID JsV8InspectorClient::sendToDevToolsConsoleMethod = nullptr;
 jmethodID JsV8InspectorClient::getInspectorMessageMethod = nullptr;
-
-
-
