@@ -125,20 +125,15 @@ public final class RuntimeHelper {
                 e.printStackTrace();
             }
 
+            boolean isDebuggable = Util.isDebuggableApp(app);
             StaticConfiguration config = new StaticConfiguration(logger, appName, nativeLibDir, rootDir,
-                    appDir, classLoader, dexDir, dexThumb, appConfig);
+                    appDir, classLoader, dexDir, dexThumb, appConfig, isDebuggable);
 
             runtime = Runtime.initializeRuntimeWithConfiguration(config);
-            if (Util.isDebuggableApp(app)) {
+            if (isDebuggable) {
                 try {
                     v8Inspector = new AndroidJsV8Inspector(app, logger);
                     v8Inspector.start();
-                    File debugBreakFile = new File("/data/local/tmp", app.getPackageName() + "-debugger-started");
-                    if (debugBreakFile.exists() && !debugBreakFile.isDirectory() && debugBreakFile.length() == 0) {
-                        java.io.FileWriter fileWriter = new java.io.FileWriter(debugBreakFile);
-                        fileWriter.write("started");
-                        fileWriter.close();
-                    }
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
