@@ -220,6 +220,9 @@ public class Builder {
                 if (interfaceClass != null) {
                     fields = interfaceClass.getFields();
 
+                    // If the interface iteself extends other interfaces - add their fields too
+                    getFieldsFromImplementedInterfaces(interfaceClass, node, root, fields);
+
                     //if interface and implementing class declare the same static field name the class take precedence
                     if (originalClassFields.size() > 0) {
                         for (FieldDescriptor f : fields) {
