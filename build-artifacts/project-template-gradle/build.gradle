@@ -478,7 +478,22 @@ task pluginExtend {
 // we need to copy all dependencies into a flat dir, as pointed by the repositories configurations at the top
 task copyAarDependencies (type: Copy) {
 	println "$configStage copyAarDependencies"
-	from fileTree(dir: nodeModulesDir, include: ["**/*.aar"], exclude: '**/.bin/**').files
+
+	def productionDependencies = new File("$projectDir/productionDependencies.json")
+	def transformedArr = [];
+	if(productionDependencies.exists()) {
+		String content = productionDependencies.getText("UTF-8")
+		def jsonSlurper = new JsonSlurper()
+		def packageJsonMap = jsonSlurper.parseText(content)
+
+		packageJsonMap.each { k ->
+			transformedArr.push(k + "/**/*.aar")
+		}
+	} else {
+		transformedArr.push("**/*.aar");
+	}
+
+	from fileTree(dir: nodeModulesDir, include: transformedArr, exclude: '**/.bin/**').files
 	into "$projectDir/libs/aar"
 }
 
