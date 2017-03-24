@@ -134,6 +134,15 @@ public final class RuntimeHelper {
                 try {
                     v8Inspector = new AndroidJsV8Inspector(app, logger);
                     v8Inspector.start();
+
+                    // the following snippet is used as means to notify the VSCode extension
+                    // debugger that the debugger agent has started
+                    File debugBreakFile = new File("/data/local/tmp", app.getPackageName() + "-debugger-started");
+                    if (debugBreakFile.exists() && !debugBreakFile.isDirectory() && debugBreakFile.length() == 0) {
+                        java.io.FileWriter fileWriter = new java.io.FileWriter(debugBreakFile);
+                        fileWriter.write("started");
+                        fileWriter.close();
+                    }
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
