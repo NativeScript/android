@@ -494,7 +494,7 @@ task copyAarDependencies (type: Copy) {
 	}
 
 	Object[] files = Files.find(
-				Paths.get("$nodeModulesDir"),
+				Paths.get("$projectDir", "$nodeModulesDir"),
 				Integer.MAX_VALUE,
 				filterAarFilesFn
 			)
