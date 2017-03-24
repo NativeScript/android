@@ -17,6 +17,10 @@ namespace NetworkDomainCallbackHandlers {
 static const char* FrameId = "NSFrameIdentifier";
 static const char* LoaderId = "NSLoaderIdentifier";
 
+/*
+ * Fired when device is about to send HTTP request.
+ * @param args - JS object : { requestId, timestamp, type, response }
+ */
 static void ResponseReceivedCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
     try {
         auto networkAgentInstance = V8NetworkAgentImpl::Instance;
@@ -90,6 +94,10 @@ static void ResponseReceivedCallback(const v8::FunctionCallbackInfo<v8::Value>& 
     }
 }
 
+/*
+ * Fired when HTTP response is available.
+ * @param args - JS object { requestId, url, request, timestamp, type }
+ */
 static void RequestWillBeSentCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
     try {
         auto networkAgentInstance = V8NetworkAgentImpl::Instance;
@@ -164,6 +172,10 @@ static void RequestWillBeSentCallback(const v8::FunctionCallbackInfo<v8::Value>&
     }
 }
 
+/*
+ * Called after response is received to save the response data for the provided requestId
+ * @param args - JS object { requestId, data, hasTextContent }
+ */
 static void DataForRequestId(const v8::FunctionCallbackInfo<v8::Value>& args) {
     try {
         auto networkAgentInstance = V8NetworkAgentImpl::Instance;
@@ -229,6 +241,10 @@ static void DataForRequestId(const v8::FunctionCallbackInfo<v8::Value>& args) {
     }
 }
 
+/*
+ * Fired when HTTP request has finished loading.
+ * @param args - JS object { requestId, timestamp }
+ */
 static void LoadingFinishedCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
     try {
         auto networkAgentInstance = V8NetworkAgentImpl::Instance;

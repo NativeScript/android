@@ -26,9 +26,24 @@ class V8NetworkAgentImpl : public protocol::Network::Backend {
         void enable(ErrorString*) override;
         void disable(ErrorString*) override;
 
+        /*
+         * NOT supported
+         */
         void setExtraHTTPHeaders(ErrorString*, std::unique_ptr<protocol::Network::Headers> in_headers) override;
+
+        /*
+         * Returns content served for the given request.
+         * The content of each response is stored in `m_responses` when a request completes.
+         * @param in_requestId
+         */
         void getResponseBody(ErrorString*, const String& in_requestId, String* out_body, bool* out_base64Encoded) override;
+        /*
+         * NOT supported
+         */
         void setCacheDisabled(ErrorString*, bool in_cacheDisabled) override;
+        /*
+         * NOT supported
+         */
         void loadResource(const String& in_frameId, const String& in_url, std::unique_ptr<LoadResourceCallback> callback) override;
 
         const bool enabled() {
