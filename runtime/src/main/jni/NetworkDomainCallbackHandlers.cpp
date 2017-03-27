@@ -4,6 +4,7 @@
 
 #include <sstream>
 #include "NetworkDomainCallbackHandlers.h"
+#include "NativeScriptAssert.h"
 
 using namespace tns;
 
@@ -48,13 +49,23 @@ void NetworkDomainCallbackHandlers::ResponseReceivedCallback(const v8::FunctionC
             throw NativeScriptException("`response` parameter not in the correct format.");
         }
 
-        auto responseJsonString = ArgConverter::ConvertToString(responseJson).c_str();
-        auto protocolResponseJson = protocol::parseJSON(responseJsonString);
+        auto responseJsonString = ArgConverter::ConvertToString(responseJson);
+        auto responseJsonCString = responseJsonString.c_str();
+        auto protocolResponseJson = protocol::parseJSON(responseJsonCString);
 
         protocol::ErrorSupport errorSupport;
 
         auto protocolResponseObj = protocol::Network::Response::parse(protocolResponseJson.get(),
                                    &errorSupport);
+
+        auto errorString = errorSupport.errors().utf8();
+
+        if (!errorString.empty()) {
+            auto errorMessage = "Error while parsing debug `response` object. ";
+            DEBUG_WRITE_FORCE("%s Error: %s", errorMessage, errorString.c_str());
+
+            throw NativeScriptException(errorMessage + errorString);
+        }
 
         auto requestIdString = ArgConverter::ConvertToString(requestId).c_str();
         auto networkRequestData = new v8_inspector::utils::NetworkRequestData();
@@ -122,13 +133,23 @@ void NetworkDomainCallbackHandlers::RequestWillBeSentCallback(const v8::Function
             throw NativeScriptException("`request` parameter not in the correct format.");
         }
 
-        auto requestJsonString = ArgConverter::ConvertToString(requestJson).c_str();
-        auto protocolRequestJson = protocol::parseJSON(requestJsonString);
+        auto requestJsonString = ArgConverter::ConvertToString(requestJson);
+        auto requestJsonCString = requestJsonString.c_str();
+        auto protocolRequestJson = protocol::parseJSON(requestJsonCString);
 
         protocol::ErrorSupport errorSupport;
 
-        auto protocolResponseObj = protocol::Network::Request::parse(protocolRequestJson.get(), &errorSupport);
+        auto protocolRequestObj = protocol::Network::Request::parse(protocolRequestJson.get(), &errorSupport);
         auto initiator = protocol::Network::Initiator::create().setType(protocol::Network::Initiator::TypeEnum::Script).build();
+
+        auto errorString = errorSupport.errors().utf8();
+
+        if (!errorString.empty()) {
+            auto errorMessage = "Error while parsing debug `request` object. ";
+            DEBUG_WRITE_FORCE("%s Error: %s", errorMessage, errorString.c_str());
+
+            throw NativeScriptException(errorMessage + errorString);
+        }
 
         protocol::Maybe<String16> type(ArgConverter::ConvertToString(typeArg).c_str());
         protocol::Maybe<protocol::Network::Response> emptyRedirect;
@@ -136,7 +157,7 @@ void NetworkDomainCallbackHandlers::RequestWillBeSentCallback(const v8::Function
                 FrameId,
                 LoaderId,
                 ArgConverter::ConvertToString(url).c_str(),
-                std::move(protocolResponseObj),
+                std::move(protocolRequestObj),
                 timeStamp,
                 std::move(initiator),
                 emptyRedirect,
