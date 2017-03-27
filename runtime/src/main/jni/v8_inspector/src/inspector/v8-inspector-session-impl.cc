@@ -19,6 +19,7 @@
 #include "src/inspector/v8-runtime-agent-impl.h"
 #include "src/inspector/v8-schema-agent-impl.h"
 #include "src/inspector/v8-page-agent-impl.h"
+#include "src/inspector/v8-network-agent-impl.h"
 
 namespace v8_inspector {
 
@@ -37,7 +38,9 @@ bool V8InspectorSession::canDispatchMethod(const StringView& method) {
          stringViewStartsWith(method,
                               protocol::Schema::Metainfo::commandPrefix) ||
          stringViewStartsWith(method,
-                               protocol::Page::Metainfo::commandPrefix);
+                               protocol::Page::Metainfo::commandPrefix) ||
+          stringViewStartsWith(method,
+                               protocol::Network::Metainfo::commandPrefix);
 }
 
 std::unique_ptr<V8InspectorSessionImpl> V8InspectorSessionImpl::create(
@@ -63,7 +66,8 @@ V8InspectorSessionImpl::V8InspectorSessionImpl(V8InspectorImpl* inspector,
       m_profilerAgent(nullptr),
       m_consoleAgent(nullptr),
       m_schemaAgent(nullptr),
-      m_pageAgent(nullptr) {
+      m_pageAgent(nullptr),
+      m_networkAgent(nullptr) {
   if (savedState.length()) {
     std::unique_ptr<protocol::Value> state =
         protocol::parseJSON(toString16(savedState));
@@ -102,6 +106,10 @@ V8InspectorSessionImpl::V8InspectorSessionImpl(V8InspectorImpl* inspector,
       this, this, agentState(protocol::Page::Metainfo::domainName)));
   protocol::Page::Dispatcher::wire(&m_dispatcher, m_pageAgent.get());
 
+  m_networkAgent = wrapUnique(new V8NetworkAgentImpl(
+          this, this, agentState(protocol::Network::Metainfo::domainName)));
+  protocol::Network::Dispatcher::wire(&m_dispatcher, m_networkAgent.get());
+
   if (savedState.length()) {
     m_runtimeAgent->restore();
     m_debuggerAgent->restore();
@@ -120,6 +128,7 @@ V8InspectorSessionImpl::~V8InspectorSessionImpl() {
   m_debuggerAgent->disable(&errorString);
   m_runtimeAgent->disable(&errorString);
   m_pageAgent->disable(&errorString);
+  m_networkAgent->disable(&errorString);
 
   discardInjectedScripts();
   m_inspector->disconnect(this);
@@ -366,6 +375,10 @@ V8InspectorSessionImpl::supportedDomainsImpl() {
   result.push_back(protocol::Schema::Domain::create()
                        .setName(protocol::Page::Metainfo::domainName)
                        .setVersion(protocol::Page::Metainfo::version)
+                       .build());
+  result.push_back(protocol::Schema::Domain::create()
+                       .setName(protocol::Network::Metainfo::domainName)
+                       .setVersion(protocol::Network::Metainfo::version)
                        .build());
   return result;
 }

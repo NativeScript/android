@@ -56,7 +56,7 @@ void V8PageAgentImpl::getResourceTree(
     ErrorString*, std::unique_ptr<protocol::Page::FrameResourceTree>* out_frameTree) {
     std::unique_ptr<protocol::Page::Frame> frameObject = protocol::Page::Frame::create()
             .setId(m_frameIdentifier.c_str())
-            .setLoaderId("Loader Identifier")
+            .setLoaderId("NSLoaderIdentifier")
             .setMimeType("text/directory")
             .setSecurityOrigin("")
             .setUrl(m_frameUrl.c_str())

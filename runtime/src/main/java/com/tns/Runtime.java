@@ -31,7 +31,7 @@ import android.util.SparseArray;
 import com.tns.bindings.ProxyGenerator;
 
 public class Runtime {
-    private native void initNativeScript(int runtimeId, String filesPath, String nativeLibDir, boolean verboseLoggingEnabled, String packageName, Object[] v8Options, String callingDir);
+    private native void initNativeScript(int runtimeId, String filesPath, String nativeLibDir, boolean verboseLoggingEnabled, boolean isDebuggable, String packageName, Object[] v8Options, String callingDir);
 
     private native void runModule(int runtimeId, String filePath) throws NativeScriptException;
 
@@ -441,10 +441,10 @@ public class Runtime {
     }
 
     public void init() {
-        init(config.logger, config.appName, config.nativeLibDir, config.rootDir, config.appDir, config.classLoader, config.dexDir, config.dexThumb, config.appConfig, dynamicConfig.callingJsDir);
+        init(config.logger, config.appName, config.nativeLibDir, config.rootDir, config.appDir, config.classLoader, config.dexDir, config.dexThumb, config.appConfig, dynamicConfig.callingJsDir, config.isDebuggable);
     }
 
-    private void init(Logger logger, String appName, String nativeLibDir, File rootDir, File appDir, ClassLoader classLoader, File dexDir, String dexThumb, AppConfig appConfig, String callingJsDir) throws RuntimeException {
+    private void init(Logger logger, String appName, String nativeLibDir, File rootDir, File appDir, ClassLoader classLoader, File dexDir, String dexThumb, AppConfig appConfig, String callingJsDir, boolean isDebuggable) throws RuntimeException {
         if (initialized) {
             throw new RuntimeException("NativeScriptApplication already initialized");
         }
@@ -463,7 +463,7 @@ public class Runtime {
             throw new RuntimeException("Fail to initialize Require class", ex);
         }
 
-        initNativeScript(getRuntimeId(), Module.getApplicationFilesPath(), nativeLibDir, logger.isEnabled(), appName, appConfig.getAsArray(), callingJsDir);
+        initNativeScript(getRuntimeId(), Module.getApplicationFilesPath(), nativeLibDir, logger.isEnabled(), isDebuggable, appName, appConfig.getAsArray(), callingJsDir);
 
         clearStartupData(getRuntimeId()); // It's safe to delete the data after the V8 debugger is initialized
 

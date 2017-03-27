@@ -22,6 +22,7 @@
 #include "include/zipconf.h"
 #include <sstream>
 #include <dlfcn.h>
+#include "NetworkDomainCallbackHandlers.h"
 #include "sys/system_properties.h"
 #include "JsV8InspectorClient.h"
 
@@ -117,20 +118,24 @@ ObjectManager* Runtime::GetObjectManager() const {
     return m_objectManager;
 }
 
-void Runtime::Init(JNIEnv* _env, jobject obj, int runtimeId, jstring filesPath, jstring nativeLibDir, jboolean verboseLoggingEnabled, jstring packageName, jobjectArray args, jstring callingDir) {
+void Runtime::Init(JNIEnv* _env, jobject obj, int runtimeId, jstring filesPath, jstring nativeLibDir, jboolean verboseLoggingEnabled, jboolean isDebuggable, jstring packageName, jobjectArray args, jstring callingDir) {
     JEnv env(_env);
 
     auto runtime = new Runtime(env, obj, runtimeId);
 
     auto enableLog = verboseLoggingEnabled == JNI_TRUE;
 
-    runtime->Init(filesPath, nativeLibDir, enableLog, packageName, args, callingDir);
+    runtime->Init(filesPath, nativeLibDir, enableLog, isDebuggable, packageName, args, callingDir);
 }
 
-void Runtime::Init(jstring filesPath, jstring nativeLibDir, bool verboseLoggingEnabled, jstring packageName, jobjectArray args, jstring callingDir) {
+void Runtime::Init(jstring filesPath, jstring nativeLibDir, bool verboseLoggingEnabled, bool isDebuggable, jstring packageName, jobjectArray args, jstring callingDir) {
     LogEnabled = verboseLoggingEnabled;
 
     auto filesRoot = ArgConverter::jstringToString(filesPath);
+    auto nativeLibDirStr = ArgConverter::jstringToString(nativeLibDir);
+    auto packageNameStr = ArgConverter::jstringToString(packageName);
+    auto callingDirStr = ArgConverter::jstringToString(callingDir);
+
     Constants::APP_ROOT_FOLDER_PATH = filesRoot + "/app/";
     // read config options passed from Java
     JniLocalRef v8Flags(m_env.GetObjectArrayElement(args, 0));
@@ -145,8 +150,10 @@ void Runtime::Init(jstring filesPath, jstring nativeLibDir, bool verboseLoggingE
 
     DEBUG_WRITE("Initializing Telerik NativeScript");
 
+    auto profilerOutputDirStr = ArgConverter::jstringToString(profilerOutputDir);
+
     NativeScriptException::Init(m_objectManager);
-    m_isolate = PrepareV8Runtime(filesRoot, nativeLibDir, packageName, callingDir, profilerOutputDir);
+    m_isolate = PrepareV8Runtime(filesRoot, nativeLibDirStr, packageNameStr, isDebuggable, callingDirStr, profilerOutputDirStr);
 
     s_isolate2RuntimesCache.insert(make_pair(m_isolate, this));
 }
@@ -342,7 +349,7 @@ void Runtime::PassUncaughtExceptionToJsNative(JNIEnv* env, jobject obj, jthrowab
     NativeScriptException::CallJsFuncWithErr(errObj);
 }
 
-void Runtime::PassUncaughtExceptionFromWorkerToMainHandler(Local<String> message, Local<String> stackTrace, Local<String> filename, int lineno) {
+void Runtime::PassUncaughtExceptionFromWorkerToMainHandler(Local<v8::String> message, Local<v8::String> stackTrace, Local<v8::String> filename, int lineno) {
     JEnv env;
     auto runtimeClass = env.GetObjectClass(m_runtime);
 
@@ -371,9 +378,7 @@ static void InitializeV8() {
     V8::Initialize();
 }
 
-bool x = false;
-
-Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring nativeLibDir, jstring packageName, jstring callingDir, jstring profilerOutputDir) {
+Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& nativeLibDir, const string& packageName, bool isDebuggable, const string& callingDir, const string& profilerOutputDir) {
     Isolate::CreateParams create_params;
     bool didInitializeV8 = false;
 
@@ -385,8 +390,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring nativeLibDir
     char sdkVersion[PROP_VALUE_MAX];
     __system_property_get("ro.build.version.sdk", sdkVersion);
 
-    auto pckName = ArgConverter::jstringToString(packageName);
-
     void* snapshotPtr;
 
     // If device isn't running on Sdk 17
@@ -395,8 +398,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring nativeLibDir
     } else {
         // If device is running on android Sdk 17
         // dlopen reads relative path to dynamic libraries or reads from folder different than the nativeLibsDirs on the android device
-        string libDir = ArgConverter::jstringToString(nativeLibDir);
-        string snapshotPath = libDir + "/libsnapshot.so";
+        string snapshotPath = nativeLibDir + "/libsnapshot.so";
         snapshotPtr = dlopen(snapshotPath.c_str(), RTLD_LAZY | RTLD_LOCAL);
     }
 
@@ -524,13 +526,20 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring nativeLibDir
     }
     /*
      * Emulate a `WorkerGlobalScope`
-     * Attach postMessage, close to the global object
+     * Attach 'postMessage', 'close' to the global object
      */
     else {
         auto postMessageFuncTemplate = FunctionTemplate::New(isolate, CallbackHandlers::WorkerGlobalPostMessageCallback);
         globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "postMessage"), postMessageFuncTemplate);
         auto closeFuncTemplate = FunctionTemplate::New(isolate, CallbackHandlers::WorkerGlobalCloseCallback);
         globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "close"), closeFuncTemplate);
+    }
+
+    /*
+     * Attach __inspector object with function callbacks that report to the Chrome DevTools frontend
+     */
+    if (isDebuggable) {
+        JsV8InspectorClient::attachInspectorCallbacks(isolate, globalTemplate);
     }
 
     m_weakRef.Init(isolate, globalTemplate, m_objectManager);
@@ -544,9 +553,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring nativeLibDir
 
     m_objectManager->Init(isolate);
 
-    auto baseCallingDir = ArgConverter::jstringToString(callingDir);
-
-    m_module.Init(isolate, baseCallingDir);
+    m_module.Init(isolate, callingDir);
 
     auto global = context->Global();
 
@@ -567,15 +574,14 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, jstring nativeLibDir
 
     CallbackHandlers::Init(isolate);
 
-    auto outputDir = ArgConverter::jstringToString(profilerOutputDir);
-    m_profiler.Init(isolate, global, pckName, outputDir);
+    m_profiler.Init(isolate, global, packageName, profilerOutputDir);
 
     // Do not build metadata (which should be static for the process) for non-main threads
     if (!s_mainThreadInitialized) {
         MetadataNode::BuildMetadata(filesPath);
     }
 
-    auto enableProfiler = !outputDir.empty();
+    auto enableProfiler = !profilerOutputDir.empty();
     MetadataNode::EnableProfiler(enableProfiler);
 
     MetadataNode::CreateTopLevelNamespaces(isolate, global);
