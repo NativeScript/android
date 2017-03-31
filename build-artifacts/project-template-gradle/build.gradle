@@ -87,7 +87,11 @@ def renameResultApks (variant) {
 	def name
 	variant.outputs.each { output ->
 		def apkDirectory = output.packageApplication.outputFile.parentFile
-		def apkNamePrefix = rootProject.name + "-" + variant.buildType.name
+		def abiName = "";
+		if(output.getFilter(com.android.build.OutputFile.ABI)) {
+			abiName = "-" + output.getFilter(com.android.build.OutputFile.ABI);
+		}
+		def apkNamePrefix = rootProject.name + "-" + variant.buildType.name + abiName
 		name = apkNamePrefix + ".apk"
 		output.packageApplication.outputFile = new File(apkDirectory, name);
 	}    
