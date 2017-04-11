@@ -11,7 +11,7 @@
         android:xlargeScreens="true"/>
 	
    <uses-sdk
-        android:minSdkVersion="17"
+        android:minSdkVersion="14"
 		android:targetSdkVersion="__APILEVEL__"/>
     
     <uses-permission android:name="android.permission.INTERNET"/>

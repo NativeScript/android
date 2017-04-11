@@ -9,7 +9,7 @@ model {
 
         defaultConfig.with {
             applicationId = "org.nativescript.runtimedebug"
-            minSdkVersion.apiLevel = 17
+            minSdkVersion.apiLevel = 14
             targetSdkVersion.apiLevel = 22
             versionCode = 1
             versionName = "1.0"
