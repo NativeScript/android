@@ -11,53 +11,55 @@
 #include "src/inspector/protocol/Forward.h"
 #include "src/inspector/string-16.h"
 
-
 using namespace v8_inspector;
 
-namespace tns
-{
-	class JsV8InspectorClient : V8InspectorClient, v8_inspector::V8Inspector::Channel
-	{
-		public:
-            static JsV8InspectorClient* GetInstance();
+namespace tns {
+class JsV8InspectorClient : V8InspectorClient, v8_inspector::V8Inspector::Channel {
+    public:
+        static JsV8InspectorClient* GetInstance();
 
-			template <class TypeName>
-			static v8::Local<TypeName> PersistentToLocal(v8::Isolate* isolate, const v8::Persistent<TypeName>& persistent);
+        template <class TypeName>
+        static v8::Local<TypeName> PersistentToLocal(v8::Isolate* isolate, const v8::Persistent<TypeName>& persistent);
 
-            void init();
-			void connect(jobject connection);
-			void createInspectorSession(v8::Isolate *isolate, const v8::Local<v8::Context> &context);
-			void disconnect();
-			void dispatchMessage(const std::string& message);
-			void doDispatchMessage(v8::Isolate *isolate, const std::string& message);
+        void init();
+        void connect(jobject connection);
+        void createInspectorSession(v8::Isolate* isolate, const v8::Local<v8::Context>& context);
+        void disconnect();
+        void dispatchMessage(const std::string& message);
+        void doDispatchMessage(v8::Isolate* isolate, const std::string& message);
 
-			void sendProtocolResponse(int callId, const v8_inspector::StringView &message) override;
-			void sendProtocolNotification(const v8_inspector::StringView &message) override;
-			void flushProtocolNotifications() override;
+        void sendProtocolResponse(int callId, const v8_inspector::StringView& message) override;
+        void sendProtocolNotification(const v8_inspector::StringView& message) override;
+        void flushProtocolNotifications() override;
 
-			static void sendToFrontEndCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
+        static void sendToFrontEndCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-			void runMessageLoopOnPause(int context_group_id) override;
-			void quitMessageLoopOnPause() override;
-			v8::Local<v8::Context> ensureDefaultContextInGroup(int contextGroupId) override;
+        void runMessageLoopOnPause(int context_group_id) override;
+        void quitMessageLoopOnPause() override;
+        v8::Local<v8::Context> ensureDefaultContextInGroup(int contextGroupId) override;
 
-		private:
-            JsV8InspectorClient(v8::Isolate *isolate);
+        static void attachInspectorCallbacks(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate>& globalObjectTemplate);
+        static void InspectorIsConnectedGetterCallback(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
 
-            static JsV8InspectorClient* instance;
-            static jclass inspectorClass;
-            static jmethodID sendMethod;
-			static jmethodID getInspectorMessageMethod;
-			static jmethodID sendToDevToolsConsoleMethod;
+        std::unique_ptr<V8Inspector> inspector_;
+        v8::Isolate* isolate_;
+        bool isConnected;
 
-            v8::Isolate* isolate_;
-			v8::Persistent<v8::Context> context_;
-            std::unique_ptr<V8Inspector> inspector_;
-            std::unique_ptr<V8InspectorSession> session_;
-            jobject connection;
-			bool running_nested_loop_;
-			bool terminated_;
-	};
+    private:
+        JsV8InspectorClient(v8::Isolate* isolate);
+
+        static JsV8InspectorClient* instance;
+        static jclass inspectorClass;
+        static jmethodID sendMethod;
+        static jmethodID getInspectorMessageMethod;
+        static jmethodID sendToDevToolsConsoleMethod;
+
+        v8::Persistent<v8::Context> context_;
+        std::unique_ptr<V8InspectorSession> session_;
+        jobject connection;
+        bool running_nested_loop_;
+        bool terminated_;
+};
 }
 
 #endif /* JSV8INSPECTORCLIENT_H_ */

@@ -51,7 +51,7 @@ V8Debugger::V8Debugger(v8::Isolate* isolate, V8InspectorImpl* inspector)
     : m_isolate(isolate),
       m_inspector(inspector),
 
-      m_lastContextId(-1),
+      m_lastContextId(0),
       m_enableCount(0),
       m_breakpointsActivated(true),
       m_runningNestedMessageLoop(false),
@@ -702,7 +702,6 @@ void V8Debugger::compileDebuggerScript() {
                               sizeof(DebuggerScript_js))
           .ToLocalChecked();
 
-
     v8::Local<v8::Value> value;
   if (!m_inspector->compileAndRunInternalScript(debuggerContext(), scriptValue)
            .ToLocal(&value)) {
@@ -894,7 +893,7 @@ std::unique_ptr<V8StackTraceImpl> V8Debugger::createStackTrace(
     v8::Local<v8::StackTrace> stackTrace) {
   int contextGroupId =
       m_isolate->InContext() ? getGroupId(m_isolate->GetCurrentContext()) : 0;
-  return V8StackTraceImpl::create(this, contextGroupId, stackTrace,
+  return V8StackTraceImpl::create(m_isolate, this, contextGroupId, stackTrace,
                                   V8StackTraceImpl::maxCallStackSizeToCapture);
 }
 

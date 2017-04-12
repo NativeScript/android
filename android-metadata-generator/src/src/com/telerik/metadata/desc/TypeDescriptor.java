@@ -13,8 +13,7 @@ public interface TypeDescriptor {
     TypeDescriptor FLOAT = new PrimitiveType("F");
     TypeDescriptor DOUBLE = new PrimitiveType("D");
 
-    class PrimitiveType implements TypeDescriptor
-    {
+    class PrimitiveType implements TypeDescriptor {
         private final String signature;
 
         private PrimitiveType(String signature) {

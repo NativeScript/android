@@ -13,6 +13,8 @@ public final class RuntimeHelper {
     private RuntimeHelper() {
     }
 
+    private static AndroidJsV8Inspector v8Inspector;
+
     // hasErrorIntent tells you if there was an event (with an uncaught
     // exception) raised from ErrorReport
     private static boolean hasErrorIntent(Application app) {
@@ -21,7 +23,7 @@ public final class RuntimeHelper {
         try {
             // empty file just to check if there was a raised uncaught error by
             // ErrorReport
-            if (AndroidJsDebugger.isDebuggableApp(app)) {
+            if (Util.isDebuggableApp(app)) {
                 String fileName = "";
 
                 try {
@@ -54,8 +56,6 @@ public final class RuntimeHelper {
         System.loadLibrary("NativeScript");
 
         Logger logger = new LogcatLogger(app);
-
-        Debugger debugger = AndroidJsDebugger.isDebuggableApp(app) ? new AndroidJsDebugger(app, logger) : null;
 
         Runtime runtime = null;
         boolean showErrorIntent = hasErrorIntent(app);
@@ -112,8 +112,9 @@ public final class RuntimeHelper {
             try {
                 dexThumb = Util.getDexThumb(app);
             } catch (NameNotFoundException e) {
-                if (logger.isEnabled())
+                if (logger.isEnabled()) {
                     logger.write("Error while getting current proxy thumb");
+                }
                 e.printStackTrace();
             }
 
@@ -124,10 +125,28 @@ public final class RuntimeHelper {
                 e.printStackTrace();
             }
 
-            StaticConfiguration config = new StaticConfiguration(logger, debugger, appName, nativeLibDir, rootDir,
-                    appDir, classLoader, dexDir, dexThumb, appConfig);
+            boolean isDebuggable = Util.isDebuggableApp(app);
+            StaticConfiguration config = new StaticConfiguration(logger, appName, nativeLibDir, rootDir,
+                    appDir, classLoader, dexDir, dexThumb, appConfig, isDebuggable);
 
             runtime = Runtime.initializeRuntimeWithConfiguration(config);
+            if (isDebuggable) {
+                try {
+                    v8Inspector = new AndroidJsV8Inspector(app, logger);
+                    v8Inspector.start();
+
+                    // the following snippet is used as means to notify the VSCode extension
+                    // debugger that the debugger agent has started
+                    File debugBreakFile = new File("/data/local/tmp", app.getPackageName() + "-debugger-started");
+                    if (debugBreakFile.exists() && !debugBreakFile.isDirectory() && debugBreakFile.length() == 0) {
+                        java.io.FileWriter fileWriter = new java.io.FileWriter(debugBreakFile);
+                        fileWriter.write("started");
+                        fileWriter.close();
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
 
             // runtime needs to be initialized before the NativeScriptSyncService is enabled because it uses runtime.runScript(...)
             if (NativeScriptSyncService.isSyncEnabled(app)) {

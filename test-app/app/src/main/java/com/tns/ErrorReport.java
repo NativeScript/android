@@ -64,8 +64,8 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
 
     private static final int REQUEST_EXTERNAL_STORAGE = 1;
     private static String[] PERMISSIONS_STORAGE = {
-            Manifest.permission.READ_EXTERNAL_STORAGE,
-            Manifest.permission.WRITE_EXTERNAL_STORAGE
+        Manifest.permission.READ_EXTERNAL_STORAGE,
+        Manifest.permission.WRITE_EXTERNAL_STORAGE
     };
 
     // Will prevent error activity from killing process if permission request dialog pops up
@@ -171,8 +171,9 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
                 content = e.getMessage();
             }
         } finally {
-            if (ps != null)
+            if (ps != null) {
                 ps.close();
+            }
         }
 
         return content;
@@ -190,7 +191,7 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
             Process process = java.lang.Runtime.getRuntime().exec(logcatCommand);
 
             BufferedReader bufferedReader = new BufferedReader(
-                    new InputStreamReader(process.getInputStream()));
+                new InputStreamReader(process.getInputStream()));
 
             StringBuilder log = new StringBuilder();
             String line = "";
@@ -214,7 +215,7 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
     static Intent getIntent(Context context) {
         Class<?> errorActivityClass;
 
-        if (AndroidJsDebugger.isDebuggableApp(context)) {
+        if (Util.isDebuggableApp(context)) {
             errorActivityClass = ErrorReportActivity.class;
         } else {
             return null;
@@ -321,12 +322,12 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
         @Override
         public Fragment getItem(int position) {
             switch (position) {
-                case 0:
-                    return new ExceptionTab();
-                case 1:
-                    return new LogcatTab();
-                default:
-                    return null;
+            case 0:
+                return new ExceptionTab();
+            case 1:
+                return new LogcatTab();
+            default:
+                return null;
             }
         }
 

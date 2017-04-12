@@ -1,10 +1,10 @@
 package org.nativescript.staticbindinggenerator;
 
+import java.io.IOException;
 import java.util.Arrays;
 
 public class Main {
-    public static void main(String[] args) {
-        try {
+    public static void main(String[] args) throws IOException {
             if (args.length < 3) {
                 throw new IllegalArgumentException("Expects at least three arguments");
             }
@@ -13,8 +13,5 @@ public class Main {
             String[] libs = Arrays.copyOfRange(args, 2, args.length);
 
             new Generator(outputDir, libs).writeBindings(inputBindingFilename);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
     }
 }

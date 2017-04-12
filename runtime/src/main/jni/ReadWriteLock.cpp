@@ -8,15 +8,13 @@ using namespace std;
 using namespace tns;
 
 ReadWriteLock::ReadWriteLock()
-        : shared(), reader_gate(), writer_gate(), active_readers(0), waiting_writers(0), active_writers(0)
-{
+    : shared(), reader_gate(), writer_gate(), active_readers(0), waiting_writers(0), active_writers(0) {
 }
 
 void ReadWriteLock::AquireReadLock() {
     //wait till there are no waiting writers and increment active readers
     std::unique_lock<std::mutex> lk(shared);
-    while( waiting_writers != 0 ) //starving readers and giving writer priority
-    {
+    while ( waiting_writers != 0 ) { //starving readers and giving writer priority
         reader_gate.wait(lk);
     }
     active_readers++;
@@ -35,8 +33,7 @@ void ReadWriteLock::AquireWriteLock() {
     //declare waiting and wait till there are no more active readers or writers and get lock
     std::unique_lock<std::mutex> lk(shared);
     waiting_writers++;
-    while( active_readers != 0 || active_writers != 0 ) //if any is active wait for them to finish
-    {
+    while ( active_readers != 0 || active_writers != 0 ) { //if any is active wait for them to finish
         writer_gate.wait(lk);
     }
     active_writers++;
@@ -48,10 +45,11 @@ void ReadWriteLock::ReleaseWriteUnlock() {
     std::unique_lock<std::mutex> lk(shared);
     waiting_writers--;
     active_writers--;
-    if(waiting_writers > 0)
-        writer_gate.notify_one(); //(priority to writers)
-    else
-        reader_gate.notify_all(); //notify readers
+    if (waiting_writers > 0) {
+        writer_gate.notify_one();    //(priority to writers)
+    } else {
+        reader_gate.notify_all();    //notify readers
+    }
     lk.unlock();
 }
 

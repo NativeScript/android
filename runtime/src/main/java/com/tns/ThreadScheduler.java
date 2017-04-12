@@ -2,11 +2,10 @@ package com.tns;
 
 import android.os.Handler;
 
-public interface ThreadScheduler
-{
-	boolean post(Runnable r);
+public interface ThreadScheduler {
+    boolean post(Runnable r);
 
-	Thread getThread();
+    Thread getThread();
 
-	Handler getHandler();
+    Handler getHandler();
 }

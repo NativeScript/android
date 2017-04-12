@@ -1,1 +1,0 @@
-android.app.Application**onClick*com.tns.NativeScriptApplication*a/b/c/MyApplication.js*android.view.View.OnClickListener

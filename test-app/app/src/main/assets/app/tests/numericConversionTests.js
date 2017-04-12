@@ -700,4 +700,15 @@ describe("Tests numeric conversions and constructor/method resolutions", functio
 				expect(exceptionThrown).toBe(true);
 				expect(exceptionCaught).toBe(true);
 			});
+
+            it("TestLongArrayIsConvertedCorrectly", function() {
+
+                __log("TEST: TestLongArrayIsConvertedCorrectly");
+
+                var t = new com.tns.tests.LongArrayTest();
+                var result = t.test([ 1485609581321, 1485609581321 ]);
+                var expectedResult = "[1485609581321, 1485609581321]"
+
+                expect(result).toBe(expectedResult);
+            });
 });

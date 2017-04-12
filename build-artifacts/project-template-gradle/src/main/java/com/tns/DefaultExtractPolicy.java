@@ -20,107 +20,106 @@ import com.tns.ExtractPolicy;
 import com.tns.FileExtractor;
 
 public class DefaultExtractPolicy implements ExtractPolicy {
-	private final Logger logger;
+    private final Logger logger;
 
-	private final static String ASSETS_THUMB_FILENAME = "assetsThumb";
+    private final static String ASSETS_THUMB_FILENAME = "assetsThumb";
 
-	public DefaultExtractPolicy(Logger logger) {
-		this.logger = logger;
-	}
+    public DefaultExtractPolicy(Logger logger) {
+        this.logger = logger;
+    }
 
-	public boolean shouldExtract(Context context)
-	{			
-		String assetsThumbFilePath = context.getFilesDir().getPath() + File.separatorChar + ASSETS_THUMB_FILENAME;
-		String oldAssetsThumb = getCachedAssetsThumb(assetsThumbFilePath);
-		if (oldAssetsThumb == null) {
-			return true;
-		} else {
-			String currentThumb = getAssetsThumb(context);
-			
-			if(currentThumb != null  && !currentThumb.equals(oldAssetsThumb)) {
-				return true;
-			}
-		}
-		
-		return false;
-	}
+    public boolean shouldExtract(Context context) {
+        String assetsThumbFilePath = context.getFilesDir().getPath() + File.separatorChar + ASSETS_THUMB_FILENAME;
+        String oldAssetsThumb = getCachedAssetsThumb(assetsThumbFilePath);
+        if (oldAssetsThumb == null) {
+            return true;
+        } else {
+            String currentThumb = getAssetsThumb(context);
 
-	public void setAssetsThumb(Context context) {
-		String assetsThumb = generateAssetsThumb(context);
-		if(assetsThumb != null) {
-			String assetsThumbFilePath = context.getFilesDir().getPath() + File.separatorChar + ASSETS_THUMB_FILENAME;
-			saveNewAssetsThumb(assetsThumb, assetsThumbFilePath);
-		}
-	}
-	
-	public boolean forceOverwrite() {
-		return true;
-	}
+            if (currentThumb != null  && !currentThumb.equals(oldAssetsThumb)) {
+                return true;
+            }
+        }
 
-	public FileExtractor extractor() {
-		return null;
-	}
+        return false;
+    }
 
-	public String getAssetsThumb(Context context) {
-		return generateAssetsThumb(context);
-	}
+    public void setAssetsThumb(Context context) {
+        String assetsThumb = generateAssetsThumb(context);
+        if (assetsThumb != null) {
+            String assetsThumbFilePath = context.getFilesDir().getPath() + File.separatorChar + ASSETS_THUMB_FILENAME;
+            saveNewAssetsThumb(assetsThumb, assetsThumbFilePath);
+        }
+    }
 
-	private String generateAssetsThumb(Context context) {
-		try {
-			PackageInfo packageInfo = context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
-			int code = packageInfo.versionCode;
-			long updateTime = packageInfo.lastUpdateTime;
-			return String.valueOf(updateTime) + "-" + String.valueOf(code);
-		} catch (PackageManager.NameNotFoundException e) {
-			logger.write("Error while getting current assets thumb");
-			e.printStackTrace();
-		}
+    public boolean forceOverwrite() {
+        return true;
+    }
 
-		return null;
-	}
+    public FileExtractor extractor() {
+        return null;
+    }
 
-	private String getCachedAssetsThumb(String assetsThumbFilePath) {
-		try {
-			File cachedThumbFile = new File(assetsThumbFilePath);
-			if (cachedThumbFile.exists()) {
-				FileInputStream in = new FileInputStream(cachedThumbFile);
-				BufferedReader reader = new BufferedReader(new InputStreamReader(in));
-				String cachedThumb = reader.readLine();
-				reader.close();
-				in.close();
-				return cachedThumb;
-			}
-		} catch (FileNotFoundException e) {
-			logger.write("Error while getting current assets thumb");
-			e.printStackTrace();
-		} catch (IOException e) {
-			logger.write("Error while getting current asstes thumb");
-			e.printStackTrace();
-		}
+    public String getAssetsThumb(Context context) {
+        return generateAssetsThumb(context);
+    }
 
-		return null;
-	}
+    private String generateAssetsThumb(Context context) {
+        try {
+            PackageInfo packageInfo = context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
+            int code = packageInfo.versionCode;
+            long updateTime = packageInfo.lastUpdateTime;
+            return String.valueOf(updateTime) + "-" + String.valueOf(code);
+        } catch (PackageManager.NameNotFoundException e) {
+            logger.write("Error while getting current assets thumb");
+            e.printStackTrace();
+        }
 
-	private void saveNewAssetsThumb(String newThumb, String assetsThumbFile) {
-		File cachedThumbFile = new File(assetsThumbFile);
-		try {
-			FileOutputStream out = new FileOutputStream(cachedThumbFile, false);
-			BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(out));
-			try {
-				writer.write(newThumb);
-				writer.newLine();
-				writer.flush();
-			} finally {
-				writer.close();
-				out.close();
-			}
-		} catch (FileNotFoundException e) {
-			logger.write("Error while writting current assets thumb");
-			e.printStackTrace();
-		} catch (IOException e) {
-			logger.write("Error while writting current assets thumb");
-			e.printStackTrace();
-		}
-	}
+        return null;
+    }
+
+    private String getCachedAssetsThumb(String assetsThumbFilePath) {
+        try {
+            File cachedThumbFile = new File(assetsThumbFilePath);
+            if (cachedThumbFile.exists()) {
+                FileInputStream in = new FileInputStream(cachedThumbFile);
+                BufferedReader reader = new BufferedReader(new InputStreamReader(in));
+                String cachedThumb = reader.readLine();
+                reader.close();
+                in.close();
+                return cachedThumb;
+            }
+        } catch (FileNotFoundException e) {
+            logger.write("Error while getting current assets thumb");
+            e.printStackTrace();
+        } catch (IOException e) {
+            logger.write("Error while getting current asstes thumb");
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
+    private void saveNewAssetsThumb(String newThumb, String assetsThumbFile) {
+        File cachedThumbFile = new File(assetsThumbFile);
+        try {
+            FileOutputStream out = new FileOutputStream(cachedThumbFile, false);
+            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(out));
+            try {
+                writer.write(newThumb);
+                writer.newLine();
+                writer.flush();
+            } finally {
+                writer.close();
+                out.close();
+            }
+        } catch (FileNotFoundException e) {
+            logger.write("Error while writting current assets thumb");
+            e.printStackTrace();
+        } catch (IOException e) {
+            logger.write("Error while writting current assets thumb");
+            e.printStackTrace();
+        }
+    }
 
 }

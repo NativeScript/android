@@ -4,7 +4,7 @@ var es5_visitors = (function () {
 
         defaultExtendDecoratorName = "JavaProxy",
         columnOffset = 1,
-        FILE_SEPARATOR = "f",
+        FILE_SEPARATOR = "_f",
         LINE_SEPARATOR = "_l",
         COLUMN_SEPARATOR = "_c",
         DECLARED_CLASS_SEPARATOR = "__",

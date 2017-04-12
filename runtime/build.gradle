@@ -192,7 +192,7 @@ if (!ndkDebuggable)
 }
 
 
-project.ext._buildToolsVersion = "23.0.3"
+project.ext._buildToolsVersion = "25.0.2"
 
 model {
     android {
