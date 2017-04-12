@@ -128,7 +128,11 @@ public class NativeScriptSyncService {
                 int length = input.readInt();
                 input.readFully(new byte[length]); // ignore the payload
                 executePartialSync(context, syncDir);
+                // delete temporary /sync dir after syncing .xml/.css resources
+                deleteRecursive(syncDir);
                 executeRemovedSync(context, removedSyncDir);
+                // delete temporary /removedsync dir after removing files from the project
+                deleteRecursive(removedSyncDir);
 
                 runtime.runScript(new File(NativeScriptSyncService.this.context.getFilesDir(), "internal/livesync.js"));
                 try {
@@ -157,7 +161,11 @@ public class NativeScriptSyncService {
             }
         }
 
-        fileOrDirectory.delete();
+        boolean success = fileOrDirectory.delete();
+
+        if (!success && fileOrDirectory.isDirectory()) {
+            android.util.Log.d("Sync", "Failed to delete temp sync directory: " + fileOrDirectory.getAbsolutePath());
+        }
     }
 
     public static boolean isSyncEnabled(Context context) {
