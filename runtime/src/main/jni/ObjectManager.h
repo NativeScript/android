@@ -49,11 +49,14 @@ class ObjectManager {
 
         v8::Local<v8::Object> GetEmptyObject(v8::Isolate* isolate);
 
+        static void MarkReachableArrayElements(v8::Local<v8::Object> &o, std::stack<v8::Local<v8::Value>> &s);
+
         enum class MetadataNodeKeys {
             JsInfo,
             CallSuper,
             END
         };
+
 
     private:
 
