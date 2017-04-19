@@ -264,6 +264,29 @@ describe("Tests garbage collection", function () {
 		gc();
 		java.lang.System.gc();
 	});
+
+	it("should keep array-enclosed objects alive after GC", function () {
+        function createObjects(name) {
+            var arr = new Array();
+            arr.push(new com.tns.tests.Class1());
+
+            var cb1 = new com.tns.tests.Class1.Callback1(name, {
+                getMessage: function() {
+                    var msg = arr[0].getMessage();
+                    return msg;
+                }
+            });
+
+            return com.tns.tests.Class1.Class2.printMessageWithDelay(cb1, 2 * 1000);
+        }
+
+        expect(createObjects("Callback1")).toBe(true);
+        expect(createObjects("Callback2")).toBe(true);
+        expect(createObjects("Callback3")).toBe(true);
+
+        gc();
+        java.lang.System.gc();
+    })
 	
 	it("should properly reintroduce Java object back in a callback", function () {
 		function getTestObject() {
