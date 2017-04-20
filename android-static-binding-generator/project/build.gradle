@@ -56,6 +56,11 @@ task generateInterfaceNamesList() {
 				shouldRun = !contents.equals(current.toString())
 			}
 
+			if (!shouldRun) {
+				//Force regeneration if the output dir contains no files
+				shouldRun = project.outDir.listFiles().length == 0
+			}
+
 			if (shouldRun) {
 				javaexec {
 					main "-jar"
