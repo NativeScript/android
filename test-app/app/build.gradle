@@ -45,6 +45,7 @@ model {
 
 dependencies {
 	def supportVer = "23.3.0"
+	compile project(':binding-generator')
 	compile project(':runtime')
 	compile fileTree(include: ['*.jar'], dir: 'libs')
 
