@@ -1,34 +1,19 @@
-var
-	searchForFile = require('child_process').exec,
-	execFindFile = require('child_process').exec,
-	checkIfAppIsRunning = require('child_process').exec,
+var execFindFile = require('child_process').exec,
+	runner = require("./interval-runner-with-timeout.js"),
+	exec = require('child_process').exec,
+	defaultPort = require("./config.json")["emulator-port"],
+    emulatorName = "emulator-" + defaultPort + " ",
 	fs = require('fs'),
 	pullfile,
-
-	isTimeToExit = false,
-
+	adb = process.env.ANDROID_HOME + "/platform-tools/adb ",
 	processTimeout = 20 * 60 * 1000, // 20 minutes timeout (empirical constant :)) 
 	searchInterval = 10 * 1000;
 
-searchForFile("", getFile);
+runner.runFunctionWithIntervalAndTimeout(checkIfAppIsRunning, searchInterval, processTimeout);
+runner.runFunctionWithIntervalAndTimeout(tryToGetFile, searchInterval, processTimeout);
 
-var runOnDeviceOrEmulator = process.argv[2];
-
-function getFile(error, stdout, stderr) {
-	closeProcessAfter(processTimeout);
-	setInterval(tryToGetFile, searchInterval);
-};
-
-function closeProcessAfter(timeout) {
-	//this will force process closed even if the the file is not found
-	setTimeout(function () { isTimeToExit = true; }, timeout);
-}
-
-function tryToGetFile() {
-	var checkApp = checkIfAppIsRunning("adb " + runOnDeviceOrEmulator + " shell \"ps | grep com.tns.android_runtime_testapp\"", checkIfProcessIsRunning);
-	pullfile = execFindFile("adb " + runOnDeviceOrEmulator + " pull /sdcard/android_unit_test_results.xml", checkIfFileExists);
-	pullfile.stdout.pipe(process.stdout, { end: false });
-	pullfile.stderr.pipe(process.stderr, { end: false });
+function checkIfAppIsRunning() {
+	exec(adb + "-s " + emulatorName + " shell \"ps | grep com.tns.android_runtime_testapp\"", checkIfProcessIsRunning);
 }
 
 function checkIfProcessIsRunning(err, stdout, stderr) {
@@ -39,22 +24,22 @@ function checkIfProcessIsRunning(err, stdout, stderr) {
 		console.log('com.tns.android_runtime_testapp process died!');
 		process.exit(1);
 	}
+}
 
+function tryToGetFile() {
+	pullfile = execFindFile(adb + "-s " + emulatorName + " pull /sdcard/android_unit_test_results.xml", checkIfFileExists);
+	pullfile.stdout.pipe(process.stdout, { end: false });
+	pullfile.stderr.pipe(process.stderr, { end: false });
 }
 
 function checkIfFileExists(err, stout, stderr) {
-
 	//if you find file in sdcard exit process
 	if (!err) {
 		console.log('Tests results file found file!');
-		process.exit();
+		process.exit(0);
 	}
 	else {
 		//if the time to get the file is out exit process
-		if (isTimeToExit) {
-			console.log(err);
-			console.log('Tests results file not found!');
-			process.exit(1);
-		}
+		console.log('Tests results file not found!');
 	}
 }

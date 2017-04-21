@@ -230,7 +230,51 @@ task copyReadme (type: Copy) {
 	into "$rootDir/dist"
 }
 
-//clean and set up dirs
+
+task cleanTestApp (type: Exec){
+	workingDir "$projectDir/test-app"
+        if (isWinOs) {
+            commandLine "cmd", "/c", "gradlew.bat", "clean"
+        } else {
+            commandLine "./gradlew", "clean"
+        }
+}
+
+task cleanBindingGenerator (type: Exec){
+        workingDir "$projectDir/binding-generator"
+        if (isWinOs) {
+            commandLine "cmd", "/c", "gradlew.bat", "clean"
+        } else {
+            commandLine "./gradlew", "clean"
+        }
+}
+
+task cleanStaticBindingGenerator (type: Exec){
+        workingDir "$projectDir/android-static-binding-generator/project/staticbindinggenerator"
+        if (isWinOs) {
+            commandLine "cmd", "/c", "gradlew.bat", "clean"
+        } else {
+            commandLine "./gradlew", "clean"
+        }
+}
+
+task deleteFlavors (type: Delete){
+	doLast {
+		def srcDir = new File("$projectDir/src")
+		srcDir.listFiles().each({ f ->
+			if(!f.getName().equals("main") &&
+				!f.getName().equals("debug") &&
+				!f.getName().equals("release"))	{
+				delete f
+			}
+		})
+	}
+}
+
+// run clean commands
+cleanBindingGenerator.dependsOn(cleanTestApp)
+cleanStaticBindingGenerator.dependsOn(cleanBindingGenerator)
+cleanDistDir.dependsOn(cleanStaticBindingGenerator)
 createDistDir.dependsOn(cleanDistDir)
 
 //copy framework structure
@@ -275,28 +319,55 @@ createNpmPackage.dependsOn(copyReadme, setPackageVersionInPackageJsonFile)
 task createPackage {
 	description "Builds the NativeScript Android App Package using an application project template."
 	dependsOn cleanDistDir,
-            createDistDir,
+	createDistDir,
+	copyProjectTemplate,
+	copyPackageJson,
+	copyStaticBindingGeneratorProject,
+	generateStaticBindingGeneratorJar,
+	copyGeneratedStaticBindingGeneratorJar,
+	getPackageVersion,
+	getCommitVersion,
+	generateRuntime,
+	setPackageVersionInPackageJsonFile,
+	copyGeneratedRuntime,
+	generateMetadataGeneratorJar,
+	copyGeneratedMetadataGeneratorJar,
+	copyReadme,
+	createNpmPackage
 
-            copyProjectTemplate,
-
-            copyPackageJson,
-
-			copyStaticBindingGeneratorProject,
-			generateStaticBindingGeneratorJar,
-			copyGeneratedStaticBindingGeneratorJar,
-
-            getPackageVersion,
-            getCommitVersion,
-			
-            generateRuntime,
-
-			setPackageVersionInPackageJsonFile,
-
-            copyGeneratedRuntime,
-            generateMetadataGeneratorJar,
-            copyGeneratedMetadataGeneratorJar,
-            copyReadme,
-            createNpmPackage
-
-	println "Creating NativeScript Android Package"			
+	println "Creating NativeScript Android Package"
 }
+
+task testBindingGenerator (type: Exec){
+        workingDir "$projectDir/binding-generator"
+        if (isWinOs) {
+            commandLine "cmd", "/c", "gradlew.bat", "test"
+        } else {
+            commandLine "./gradlew", "test"
+        }
+}
+
+task testStaticBindingGenerator (type: Exec){
+        workingDir "$projectDir/android-static-binding-generator/project/staticbindinggenerator"
+        if (isWinOs) {
+            commandLine "cmd", "/c", "gradlew.bat", "test"
+        } else {
+            commandLine "./gradlew", "test"
+        }
+}
+
+task runTests (type: Exec){
+        workingDir "$projectDir/test-app"
+	def emulator = ""
+	if(project.hasProperty("emulatorName")){
+		emulator = emulatorName
+	}
+        if (isWinOs) {
+            commandLine "cmd", "/c", "gradlew.bat", "assembleDebug", "runtest", "--rerun-tasks", "-PembedBindingGenerator=true", "-PemulatorName=$emulator"
+        } else {
+            commandLine "./gradlew", "assembleDebug", "runtest", "--rerun-tasks", "-PembedBindingGenerator=true", "-PemulatorName=$emulator"
+        }
+}
+
+testStaticBindingGenerator.dependsOn(testBindingGenerator)
+runTests.dependsOn(testStaticBindingGenerator)
