@@ -585,6 +585,8 @@ class  Backend {
 public:
     virtual ~Backend() { }
 
+    virtual void enable(ErrorString*) = 0;
+    virtual void disable(ErrorString*) = 0;
     virtual void getDocument(ErrorString*, std::unique_ptr<protocol::DOM::Node>* out_root) = 0;
     virtual void requestChildNodes(ErrorString*, int in_nodeId, const Maybe<int>& in_depth) = 0;
     virtual void querySelector(ErrorString*, int in_nodeId, const String& in_selector, int* out_nodeId) = 0;
@@ -619,7 +621,6 @@ public:
     virtual void markUndoableState(ErrorString*) = 0;
     virtual void focus(ErrorString*, int in_nodeId) = 0;
 
-    virtual void disable(ErrorString*) { }
 };
 
 // ------------- Frontend interface.

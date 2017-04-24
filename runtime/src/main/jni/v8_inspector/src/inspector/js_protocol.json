@@ -2442,6 +2442,12 @@
             ],
             "commands": [
                 {
+                    "name": "enable"
+                },
+                {
+                    "name": "disable"
+                },
+                {
                     "name": "getDocument",
                     "returns": [
                         {

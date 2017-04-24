@@ -498,6 +498,8 @@ public:
     DispatcherImpl(FrontendChannel* frontendChannel, Backend* backend)
         : DispatcherBase(frontendChannel)
         , m_backend(backend) {
+        m_dispatchMap["DOM.enable"] = &DispatcherImpl::enable;
+        m_dispatchMap["DOM.disable"] = &DispatcherImpl::disable;
         m_dispatchMap["DOM.getDocument"] = &DispatcherImpl::getDocument;
         m_dispatchMap["DOM.requestChildNodes"] = &DispatcherImpl::requestChildNodes;
         m_dispatchMap["DOM.querySelector"] = &DispatcherImpl::querySelector;
@@ -540,6 +542,8 @@ protected:
     using DispatchMap = protocol::HashMap<String, CallHandler>;
     DispatchMap m_dispatchMap;
 
+    void enable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    void disable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
     void getDocument(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
     void requestChildNodes(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
     void querySelector(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
@@ -589,6 +593,26 @@ void DispatcherImpl::dispatch(int callId, const String& method, std::unique_ptr<
     (this->*(it->second))(callId, std::move(messageObject), &errors);
 }
 
+
+void DispatcherImpl::enable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
+
+    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    ErrorString error;
+    m_backend->enable(&error);
+    if (weak->get())
+        weak->get()->sendResponse(callId, error);
+}
+
+void DispatcherImpl::disable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
+
+    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    ErrorString error;
+    m_backend->disable(&error);
+    if (weak->get())
+        weak->get()->sendResponse(callId, error);
+}
 
 void DispatcherImpl::getDocument(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
 {
