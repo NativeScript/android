@@ -20,6 +20,7 @@
 #include "src/inspector/v8-schema-agent-impl.h"
 #include "src/inspector/v8-page-agent-impl.h"
 #include "src/inspector/v8-network-agent-impl.h"
+#include "src/inspector/v8-dom-agent-impl.h"
 
 namespace v8_inspector {
 
@@ -38,9 +39,11 @@ bool V8InspectorSession::canDispatchMethod(const StringView& method) {
          stringViewStartsWith(method,
                               protocol::Schema::Metainfo::commandPrefix) ||
          stringViewStartsWith(method,
-                               protocol::Page::Metainfo::commandPrefix) ||
-          stringViewStartsWith(method,
-                               protocol::Network::Metainfo::commandPrefix);
+                              protocol::Page::Metainfo::commandPrefix) ||
+         stringViewStartsWith(method,
+                              protocol::Network::Metainfo::commandPrefix) ||
+         stringViewStartsWith(method,
+                              protocol::DOM::Metainfo::commandPrefix);
 }
 
 std::unique_ptr<V8InspectorSessionImpl> V8InspectorSessionImpl::create(
@@ -110,6 +113,10 @@ V8InspectorSessionImpl::V8InspectorSessionImpl(V8InspectorImpl* inspector,
           this, this, agentState(protocol::Network::Metainfo::domainName)));
   protocol::Network::Dispatcher::wire(&m_dispatcher, m_networkAgent.get());
 
+  m_domAgent = wrapUnique(new V8DOMAgentImpl(
+          this, this, agentState(protocol::DOM::Metainfo::domainName)));
+  protocol::DOM::Dispatcher::wire(&m_dispatcher, m_domAgent.get());
+
   if (savedState.length()) {
     m_runtimeAgent->restore();
     m_debuggerAgent->restore();
@@ -129,6 +136,7 @@ V8InspectorSessionImpl::~V8InspectorSessionImpl() {
   m_runtimeAgent->disable(&errorString);
   m_pageAgent->disable(&errorString);
   m_networkAgent->disable(&errorString);
+  m_domAgent->disable(&errorString);
 
   discardInjectedScripts();
   m_inspector->disconnect(this);
@@ -380,6 +388,11 @@ V8InspectorSessionImpl::supportedDomainsImpl() {
                        .setName(protocol::Network::Metainfo::domainName)
                        .setVersion(protocol::Network::Metainfo::version)
                        .build());
+  result.push_back(protocol::Schema::Domain::create()
+                       .setName(protocol::DOM::Metainfo::domainName)
+                       .setVersion(protocol::DOM::Metainfo::version)
+                       .build());
+
   return result;
 }
 
