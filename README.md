@@ -29,10 +29,23 @@ The source in this repo is organized in Android Studio projects.
 # How to build
 
 * Run command 
-```Shell
-gradlew build
-```
+
+  Windows: 
+
+  ```Shell
+  gradlew createPackage
+  ```
+
+  Mac/Linux:
+
+  ```Shell
+  ./gradlew createPackage
+  ```
+
+* The build process includes building of the runtime package (both optimized and with unstripped v8 symbol table), as well as all supplementary tools used for the android builds: metadata-generator, binding-generator, metadata-generator, static-binding-generator
 * The result of the build will be in the dist folder.
+
+  `Note:` To cut the build time in half and package only the optimized (stripped) version of the runtime package comment out 'tasks.generateRuntimeAar.execute()' in the [build.gradle](https://github.com/NativeScript/android-runtime/blob/v3.0.0-rc.1/build.gradle#L114) script.
 
 # How to run tests
 
@@ -42,5 +55,5 @@ gradlew build
   ``Note: Keep in mind the device or emulator needs to have an sdcard mounted.``
 * Run command
 ```Shell
-gradle runtest
+gradlew runtest
 ```
