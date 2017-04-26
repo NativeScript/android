@@ -460,6 +460,10 @@ void ObjectManager::MarkReachableObjects(Isolate* isolate, const Local<Object>& 
             NativeScriptExtension::ReleaseClosureObjects(closureObjects);
         }
 
+        if (o->IsArray()) {
+            MarkReachableArrayElements(o, s);
+        }
+
         auto proto = o->GetPrototype();
         if (!proto.IsEmpty() && !proto->IsNull() && !proto->IsUndefined() && proto->IsObject()) {
             s.push(proto);
@@ -516,6 +520,19 @@ void ObjectManager::MarkReachableObjects(Isolate* isolate, const Local<Object>& 
         } // for
 
     } // while
+}
+
+void ObjectManager::MarkReachableArrayElements(Local<Object> &o, stack<Local<Value>> &s) {
+    auto arr = o.As<Array>();
+
+    int arrEnclosedObjectsLength = arr->Length();
+    for (int i = 0; i < arrEnclosedObjectsLength; i++) {
+        auto enclosedElement = arr->Get(i);
+
+        if (!enclosedElement.IsEmpty() && enclosedElement->IsObject()) {
+            s.push(enclosedElement);
+        }
+    }
 }
 
 void ObjectManager::OnGcStartedStatic(Isolate* isolate, GCType type, GCCallbackFlags flags) {

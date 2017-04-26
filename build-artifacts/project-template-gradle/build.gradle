@@ -500,7 +500,8 @@ task copyAarDependencies (type: Copy) {
 	Object[] files = Files.find(
 				Paths.get("$projectDir", "$nodeModulesDir"),
 				Integer.MAX_VALUE,
-				filterAarFilesFn
+				filterAarFilesFn,
+				java.nio.file.FileVisitOption.FOLLOW_LINKS
 			)
 			.map(mapToStringFn)
 			.toArray();
