@@ -9,6 +9,7 @@ import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -141,6 +142,9 @@ public class Generator {
             String classname = dataRow.getBaseClassname();
             boolean isJavaExtend = classes.containsKey(classname);
             if (isJavaExtend) {
+
+//                System.out.println("SBG: DataRow: baseClassName: " + classname + ", suffix: " + dataRow.getSuffix() + ", interfaces: " + String.join(", ", Arrays.asList(dataRow.getInterfaces())) + ", jsFileName: " + dataRow.getJsFilename());
+
                 Binding binding = generateBinding(dataRow, interfaceNames);
 
                 if (binding != null) {
@@ -193,6 +197,9 @@ public class Generator {
             for (Method m : currentClass.getMethods()) {
                 methods.add(m);
             }
+
+//            System.out.println("SBG: getPublicApi:collectInterfaceMethods classname: " + currentClassname);
+
             collectInterfaceMethods(clazz, methods);
             for (Method m : methods) {
                 if (!m.isSynthetic() && (m.isPublic() || m.isProtected()) && !m.isStatic()) {
@@ -222,7 +229,8 @@ public class Generator {
             if (currentClassname.equals("java.lang.Object")) {
                 break;
             } else {
-                currentClass = classes.get(currentClass.getSuperclassName());
+                String superClassName = currentClass.getSuperclassName();
+                currentClass = classes.get(superClassName.replace('$', '.'));
             }
         }
         return api;
@@ -640,7 +648,14 @@ public class Generator {
 
     private void collectInterfaceMethods(JavaClass clazz, List<Method> methods) {
         JavaClass currentClass = clazz;
+
         while (true) {
+            if (currentClass == null) {
+                System.out.println("Contains android.support.v7.widget.RecyclerView$Adapter: " + classes.keySet().contains("android.support.v7.widget.RecyclerView$Adapter"));
+
+                System.out.println("Contains android.support.v7.widget.RecyclerView.Adapter: " + classes.keySet().contains("android.support.v7.widget.RecyclerView.Adapter"));
+            }
+
             String currentClassname = currentClass.getClassName();
 
             Queue<String> queue = new ArrayDeque<String>();
@@ -663,7 +678,8 @@ public class Generator {
             if (currentClassname.equals("java.lang.Object")) {
                 break;
             } else {
-                currentClass = classes.get(currentClass.getSuperclassName());
+                String superClassName = currentClass.getSuperclassName();
+                currentClass = classes.get(superClassName.replace('$', '.'));
             }
         }
     }
@@ -686,7 +702,8 @@ public class Generator {
                 break;
             }
 
-            currentClass = classes.get(currentClass.getSuperclassName());
+            String superClassName = currentClass.getSuperclassName();
+            currentClass = classes.get(superClassName.replace('$', '.'));
         }
 
         return isApplicationClass;
