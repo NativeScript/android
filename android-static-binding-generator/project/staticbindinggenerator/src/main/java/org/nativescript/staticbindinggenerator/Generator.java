@@ -191,37 +191,47 @@ public class Generator {
     private Map<String, List<Method>> getPublicApi(JavaClass clazz) {
         Map<String, List<Method>> api = new HashMap<String, List<Method>>();
         JavaClass currentClass = clazz;
+        String clazzName = clazz.getClassName();
         while (true) {
             String currentClassname = currentClass.getClassName();
-            List<Method> methods = new ArrayList<Method>();
-            for (Method m : currentClass.getMethods()) {
-                methods.add(m);
-            }
 
-//            System.out.println("SBG: getPublicApi:collectInterfaceMethods classname: " + currentClassname);
+            boolean shouldCollectMethods = !(!clazzName.equals(currentClassname) && currentClass.isAbstract());
 
-            collectInterfaceMethods(clazz, methods);
-            for (Method m : methods) {
-                if (!m.isSynthetic() && (m.isPublic() || m.isProtected()) && !m.isStatic()) {
-                    String name = m.getName();
+            if (shouldCollectMethods || currentClass.isInterface()) {
+                // Don't include abstract parent class's methods to avoid compilation issues
+                // where a child class has 2 methods, of the same type, with just a
+                // return type/parameter type that differs by being of a superclass of the class being extended.
+                // see Test testCanCompileBindingClassExtendingAnExtendedClassWithMethodsWithTheSameSignature
+                List<Method> methods = new ArrayList<Method>();
+                for (Method m : currentClass.getMethods()) {
+                    methods.add(m);
+                }
 
-                    List<Method> methodGroup;
-                    if (api.containsKey(name)) {
-                        methodGroup = api.get(name);
-                    } else {
-                        methodGroup = new ArrayList<Method>();
-                        api.put(name, methodGroup);
-                    }
-                    boolean found = false;
-                    String methodSig = m.getSignature();
-                    for (Method m1 : methodGroup) {
-                        found = methodSig.equals(m1.getSignature());
-                        if (found) {
-                            break;
+//                System.out.println("SBG: getPublicApi:collectInterfaceMethods classname: " + currentClassname);
+
+                collectInterfaceMethods(clazz, methods);
+                for (Method m : methods) {
+                    if (!m.isSynthetic() && (m.isPublic() || m.isProtected()) && !m.isStatic()) {
+                        String name = m.getName();
+
+                        List<Method> methodGroup;
+                        if (api.containsKey(name)) {
+                            methodGroup = api.get(name);
+                        } else {
+                            methodGroup = new ArrayList<Method>();
+                            api.put(name, methodGroup);
                         }
-                    }
-                    if (!found) {
-                        methodGroup.add(m);
+                        boolean found = false;
+                        String methodSig = m.getSignature();
+                        for (Method m1 : methodGroup) {
+                            found = methodSig.equals(m1.getSignature());
+                            if (found) {
+                                break;
+                            }
+                        }
+                        if (!found) {
+                            methodGroup.add(m);
+                        }
                     }
                 }
             }
@@ -650,12 +660,6 @@ public class Generator {
         JavaClass currentClass = clazz;
 
         while (true) {
-            if (currentClass == null) {
-                System.out.println("Contains android.support.v7.widget.RecyclerView$Adapter: " + classes.keySet().contains("android.support.v7.widget.RecyclerView$Adapter"));
-
-                System.out.println("Contains android.support.v7.widget.RecyclerView.Adapter: " + classes.keySet().contains("android.support.v7.widget.RecyclerView.Adapter"));
-            }
-
             String currentClassname = currentClass.getClassName();
 
             Queue<String> queue = new ArrayDeque<String>();

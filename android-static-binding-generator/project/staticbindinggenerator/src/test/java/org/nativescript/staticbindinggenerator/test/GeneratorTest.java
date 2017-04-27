@@ -1,5 +1,6 @@
 package org.nativescript.staticbindinggenerator.test;
 
+import com.example.ListView;
 import com.example.MyInterface;
 
 import org.apache.commons.io.IOUtils;
@@ -102,5 +103,30 @@ public class GeneratorTest {
 
         Assert.assertNotNull(ComplexClass);
         Assert.assertEquals(5, ComplexClass.getInterfaces().length); // 4 + 1 (hashcodeprovider)
+    }
+
+    @Test
+    public void testCanCompileBindingClassExtendingAnExtendedClassWithMethodsWithTheSameSignature() throws Exception {
+        URL u = ListView.class.getResource('/' + ListView.class.getName().replace('.', '/') + ".class");
+        File f = new File(u.toURI()).getParentFile().getParentFile().getParentFile();
+
+        String dataRowString = "com.example.ListView*_fapp_l9_c29__*createView*com.example.MyListView**";
+        DataRow dataRow = new DataRow(dataRowString);
+
+        System.out.println(dataRowString);
+
+        String outputDir = null;
+        String[] libs = {runtimePath, f.getAbsolutePath()};
+        Generator generator = new Generator(outputDir, libs);
+        Binding binding = generator.generateBinding(dataRow);
+
+        StringBuffer sourceCode = new StringBuffer();
+        sourceCode.append(binding.getContent());
+
+        Iterable<String> options = new ArrayList<String>(Arrays.asList("-cp", dependenciesDir));
+        Class<?> ComplexClass = InMemoryJavaCompiler.compile(binding.getClassname(), sourceCode.toString(), options);
+
+        Assert.assertNotNull(ComplexClass);
+        Assert.assertEquals(4, ComplexClass.getDeclaredMethods().length); // 1 + constructor + (equals + hashcode)
     }
 }
