@@ -9,6 +9,7 @@ import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -141,6 +142,9 @@ public class Generator {
             String classname = dataRow.getBaseClassname();
             boolean isJavaExtend = classes.containsKey(classname);
             if (isJavaExtend) {
+
+//                System.out.println("SBG: DataRow: baseClassName: " + classname + ", suffix: " + dataRow.getSuffix() + ", interfaces: " + String.join(", ", Arrays.asList(dataRow.getInterfaces())) + ", jsFileName: " + dataRow.getJsFilename());
+
                 Binding binding = generateBinding(dataRow, interfaceNames);
 
                 if (binding != null) {
@@ -187,34 +191,47 @@ public class Generator {
     private Map<String, List<Method>> getPublicApi(JavaClass clazz) {
         Map<String, List<Method>> api = new HashMap<String, List<Method>>();
         JavaClass currentClass = clazz;
+        String clazzName = clazz.getClassName();
         while (true) {
             String currentClassname = currentClass.getClassName();
-            List<Method> methods = new ArrayList<Method>();
-            for (Method m : currentClass.getMethods()) {
-                methods.add(m);
-            }
-            collectInterfaceMethods(clazz, methods);
-            for (Method m : methods) {
-                if (!m.isSynthetic() && (m.isPublic() || m.isProtected()) && !m.isStatic()) {
-                    String name = m.getName();
 
-                    List<Method> methodGroup;
-                    if (api.containsKey(name)) {
-                        methodGroup = api.get(name);
-                    } else {
-                        methodGroup = new ArrayList<Method>();
-                        api.put(name, methodGroup);
-                    }
-                    boolean found = false;
-                    String methodSig = m.getSignature();
-                    for (Method m1 : methodGroup) {
-                        found = methodSig.equals(m1.getSignature());
-                        if (found) {
-                            break;
+            boolean shouldCollectMethods = !(!clazzName.equals(currentClassname) && currentClass.isAbstract());
+
+            if (shouldCollectMethods || currentClass.isInterface()) {
+                // Don't include abstract parent class's methods to avoid compilation issues
+                // where a child class has 2 methods, of the same type, with just a
+                // return type/parameter type that differs by being of a superclass of the class being extended.
+                // see Test testCanCompileBindingClassExtendingAnExtendedClassWithMethodsWithTheSameSignature
+                List<Method> methods = new ArrayList<Method>();
+                for (Method m : currentClass.getMethods()) {
+                    methods.add(m);
+                }
+
+//                System.out.println("SBG: getPublicApi:collectInterfaceMethods classname: " + currentClassname);
+
+                collectInterfaceMethods(clazz, methods);
+                for (Method m : methods) {
+                    if (!m.isSynthetic() && (m.isPublic() || m.isProtected()) && !m.isStatic()) {
+                        String name = m.getName();
+
+                        List<Method> methodGroup;
+                        if (api.containsKey(name)) {
+                            methodGroup = api.get(name);
+                        } else {
+                            methodGroup = new ArrayList<Method>();
+                            api.put(name, methodGroup);
                         }
-                    }
-                    if (!found) {
-                        methodGroup.add(m);
+                        boolean found = false;
+                        String methodSig = m.getSignature();
+                        for (Method m1 : methodGroup) {
+                            found = methodSig.equals(m1.getSignature());
+                            if (found) {
+                                break;
+                            }
+                        }
+                        if (!found) {
+                            methodGroup.add(m);
+                        }
                     }
                 }
             }
@@ -222,7 +239,8 @@ public class Generator {
             if (currentClassname.equals("java.lang.Object")) {
                 break;
             } else {
-                currentClass = classes.get(currentClass.getSuperclassName());
+                String superClassName = currentClass.getSuperclassName();
+                currentClass = classes.get(superClassName.replace('$', '.'));
             }
         }
         return api;
@@ -640,6 +658,7 @@ public class Generator {
 
     private void collectInterfaceMethods(JavaClass clazz, List<Method> methods) {
         JavaClass currentClass = clazz;
+
         while (true) {
             String currentClassname = currentClass.getClassName();
 
@@ -663,7 +682,8 @@ public class Generator {
             if (currentClassname.equals("java.lang.Object")) {
                 break;
             } else {
-                currentClass = classes.get(currentClass.getSuperclassName());
+                String superClassName = currentClass.getSuperclassName();
+                currentClass = classes.get(superClassName.replace('$', '.'));
             }
         }
     }
@@ -686,7 +706,8 @@ public class Generator {
                 break;
             }
 
-            currentClass = classes.get(currentClass.getSuperclassName());
+            String superClassName = currentClass.getSuperclassName();
+            currentClass = classes.get(superClassName.replace('$', '.'));
         }
 
         return isApplicationClass;
