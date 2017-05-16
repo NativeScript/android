@@ -56,6 +56,8 @@ class CallbackHandlers {
 
         static void LogMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
+        static void TimeCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
+
         static void DumpReferenceTablesMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
         static void DumpReferenceTablesMethod();
