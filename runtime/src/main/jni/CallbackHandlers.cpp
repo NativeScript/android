@@ -13,6 +13,7 @@
 #include <sstream>
 #include <fstream>
 #include <cstdio>
+#include <chrono>
 #include "MethodCache.h"
 #include "SimpleProfiler.h"
 #include "Runtime.h"
@@ -629,6 +630,12 @@ void CallbackHandlers::LogMethodCallback(const v8::FunctionCallbackInfo<v8::Valu
         NativeScriptException nsEx(std::string("Error: c++ exception!"));
         nsEx.ReThrowToV8();
     }
+}
+
+void CallbackHandlers::TimeCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
+    auto nano = std::chrono::time_point_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now());
+    double duration = nano.time_since_epoch().count() / 1000000.0;
+    args.GetReturnValue().Set(duration);
 }
 
 void CallbackHandlers::DumpReferenceTablesMethodCallback(
