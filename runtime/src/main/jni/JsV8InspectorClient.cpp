@@ -43,6 +43,13 @@ void JsV8InspectorClient::connect(jobject connection) {
     this->isConnected = true;
 }
 
+void JsV8InspectorClient::scheduleBreak() {
+    Isolate::Scope isolate_scope(isolate_);
+    v8::HandleScope handleScope(isolate_);
+
+    this->session_->schedulePauseOnNextStatement(v8_inspector::StringView(), v8_inspector::StringView());
+}
+
 void JsV8InspectorClient::createInspectorSession(v8::Isolate* isolate, const v8::Local<v8::Context>& context) {
     session_ = inspector_->connect(0, this, v8_inspector::StringView());
 }

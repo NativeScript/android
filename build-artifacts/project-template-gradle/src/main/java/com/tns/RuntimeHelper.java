@@ -6,6 +6,7 @@ import android.app.Application;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.os.Build;
 import android.util.Log;
+
 import java.io.IOException;
 
 public final class RuntimeHelper {
@@ -28,7 +29,7 @@ public final class RuntimeHelper {
                 try {
                     java.lang.Class ErrReport = java.lang.Class.forName("com.tns.ErrorReport");
                     java.lang.reflect.Field field = ErrReport.getDeclaredField("ERROR_FILE_NAME");
-                    fileName = (String)field.get(null);
+                    fileName = (String) field.get(null);
                 } catch (Exception e) {
                     return false;
                 }
@@ -97,7 +98,7 @@ public final class RuntimeHelper {
                         logger.write("Extracting snapshot blob");
                     }
 
-                    aE.extractAssets(app,  "snapshots/" + Build.CPU_ABI, outputDir, extractPolicy);
+                    aE.extractAssets(app, "snapshots/" + Build.CPU_ABI, outputDir, extractPolicy);
                 }
 
                 extractPolicy.setAssetsThumb(app);
@@ -131,17 +132,32 @@ public final class RuntimeHelper {
             runtime = Runtime.initializeRuntimeWithConfiguration(config);
             if (isDebuggable) {
                 try {
-                    v8Inspector = new AndroidJsV8Inspector(app, logger);
+                    v8Inspector = new AndroidJsV8Inspector(app.getFilesDir().getAbsolutePath(), app.getPackageName());
                     v8Inspector.start();
 
                     // the following snippet is used as means to notify the VSCode extension
                     // debugger that the debugger agent has started
-                    File debugBreakFile = new File("/data/local/tmp", app.getPackageName() + "-debugger-started");
+                    File debuggerStartedFile = new File("/data/local/tmp", app.getPackageName() + "-debugger-started");
+                    if (debuggerStartedFile.exists() && !debuggerStartedFile.isDirectory() && debuggerStartedFile.length() == 0) {
+                        java.io.FileWriter fileWriter = new java.io.FileWriter(debuggerStartedFile);
+                        fileWriter.write("started");
+                        fileWriter.close();
+                    }
+
+                    // check if --debug-brk flag has been set. If positive:
+                    // write to the file to invalidate the flag
+                    // inform the v8Inspector to pause the main thread
+                    File debugBreakFile = new File("/data/local/tmp", app.getPackageName() + "-debugbreak");
+                    boolean shouldBreak = false;
                     if (debugBreakFile.exists() && !debugBreakFile.isDirectory() && debugBreakFile.length() == 0) {
                         java.io.FileWriter fileWriter = new java.io.FileWriter(debugBreakFile);
                         fileWriter.write("started");
                         fileWriter.close();
+
+                        shouldBreak = true;
                     }
+
+                    v8Inspector.waitForDebugger(shouldBreak);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
