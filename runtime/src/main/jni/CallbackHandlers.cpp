@@ -89,7 +89,6 @@ bool CallbackHandlers::RegisterInstance(Isolate* isolate, const Local<Object>& j
 
     int javaObjectID = objectManager->GenerateNewObjectID();
 
-    DEBUG_WRITE("RegisterInstance: Linking new instance");
     objectManager->Link(jsObject, javaObjectID, nullptr);
 
     // resolve constructor
@@ -122,11 +121,10 @@ bool CallbackHandlers::RegisterInstance(Isolate* isolate, const Local<Object>& j
     success = !localInstance.IsNull();
 
     if (success) {
-        DEBUG_WRITE("RegisterInstance: Updating linked instance with its real class");
         jclass instanceClass = env.FindClass(fullClassName);
         objectManager->SetJavaClass(jsObject, instanceClass);
     } else {
-        DEBUG_WRITE("RegisterInstance failed with null new instance");
+        DEBUG_WRITE_FORCE("RegisterInstance failed with null new instance class: %s", fullClassName.c_str());
     }
 
     return success;
@@ -774,8 +772,6 @@ Local<Value> CallbackHandlers::CallJSMethod(Isolate* isolate, JNIEnv* _env,
         for (int i = 0; i < argc; i++) {
             arguments[i] = jsArgs->Get(i);
         }
-
-        DEBUG_WRITE("implementationObject->GetIdentityHash()=%d", jsObject->GetIdentityHash());
 
         TryCatch tc;
         Local<Value> jsResult;
