@@ -588,38 +588,16 @@ public:
     virtual void enable(ErrorString*) = 0;
     virtual void disable(ErrorString*) = 0;
     virtual void getDocument(ErrorString*, std::unique_ptr<protocol::DOM::Node>* out_root) = 0;
-    virtual void requestChildNodes(ErrorString*, int in_nodeId, const Maybe<int>& in_depth) = 0;
-    virtual void querySelector(ErrorString*, int in_nodeId, const String& in_selector, int* out_nodeId) = 0;
-    virtual void querySelectorAll(ErrorString*, int in_nodeId, const String& in_selector, std::unique_ptr<protocol::Array<int>>* out_nodeIds) = 0;
-    virtual void setNodeName(ErrorString*, int in_nodeId, const String& in_name, int* out_nodeId) = 0;
-    virtual void setNodeValue(ErrorString*, int in_nodeId, const String& in_value) = 0;
     virtual void removeNode(ErrorString*, int in_nodeId) = 0;
     virtual void setAttributeValue(ErrorString*, int in_nodeId, const String& in_name, const String& in_value) = 0;
     virtual void setAttributesAsText(ErrorString*, int in_nodeId, const String& in_text, const Maybe<String>& in_name) = 0;
     virtual void removeAttribute(ErrorString*, int in_nodeId, const String& in_name) = 0;
-    virtual void getOuterHTML(ErrorString*, int in_nodeId, String* out_outerHTML) = 0;
-    virtual void setOuterHTML(ErrorString*, int in_nodeId, const String& in_outerHTML) = 0;
     virtual void performSearch(ErrorString*, const String& in_query, const Maybe<protocol::Array<int>>& in_nodeIds, String* out_searchId, int* out_resultCount) = 0;
     virtual void getSearchResults(ErrorString*, const String& in_searchId, int in_fromIndex, int in_toIndex, std::unique_ptr<protocol::Array<int>>* out_nodeIds) = 0;
     virtual void discardSearchResults(ErrorString*, const String& in_searchId) = 0;
-    virtual void requestNode(ErrorString*, const String& in_objectId, int* out_nodeId) = 0;
-    virtual void setInspectModeEnabled(ErrorString*, bool in_enabled, const Maybe<protocol::DOM::HighlightConfig>& in_highlightConfig) = 0;
-    virtual void highlightRect(ErrorString*, int in_x, int in_y, int in_width, int in_height, const Maybe<protocol::DOM::RGBAColor>& in_color, const Maybe<protocol::DOM::RGBAColor>& in_outlineColor, const Maybe<bool>& in_usePageCoordinates) = 0;
-    virtual void highlightQuad(ErrorString*, std::unique_ptr<protocol::Array<double>> in_quad, const Maybe<protocol::DOM::RGBAColor>& in_color, const Maybe<protocol::DOM::RGBAColor>& in_outlineColor, const Maybe<bool>& in_usePageCoordinates) = 0;
-    virtual void highlightSelector(ErrorString*, std::unique_ptr<protocol::DOM::HighlightConfig> in_highlightConfig, const String& in_selectorString, const Maybe<String>& in_frameId) = 0;
     virtual void highlightNode(ErrorString*, std::unique_ptr<protocol::DOM::HighlightConfig> in_highlightConfig, const Maybe<int>& in_nodeId, const Maybe<String>& in_objectId) = 0;
     virtual void hideHighlight(ErrorString*) = 0;
-    virtual void highlightFrame(ErrorString*, const String& in_frameId, const Maybe<protocol::DOM::RGBAColor>& in_contentColor, const Maybe<protocol::DOM::RGBAColor>& in_contentOutlineColor) = 0;
-    virtual void pushNodeByPathToFrontend(ErrorString*, const String& in_path, int* out_nodeId) = 0;
-    virtual void pushNodeByBackendIdToFrontend(ErrorString*, int in_backendNodeId, int* out_nodeId) = 0;
-    virtual void releaseBackendNodeIds(ErrorString*, const String& in_nodeGroup) = 0;
     virtual void resolveNode(ErrorString*, int in_nodeId, const Maybe<String>& in_objectGroup, std::unique_ptr<protocol::Runtime::RemoteObject>* out_object) = 0;
-    virtual void getAttributes(ErrorString*, int in_nodeId, std::unique_ptr<protocol::Array<String>>* out_attributes) = 0;
-    virtual void moveTo(ErrorString*, int in_nodeId, int in_targetNodeId, const Maybe<int>& in_insertBeforeNodeId, int* out_nodeId) = 0;
-    virtual void undo(ErrorString*) = 0;
-    virtual void redo(ErrorString*) = 0;
-    virtual void markUndoableState(ErrorString*) = 0;
-    virtual void focus(ErrorString*, int in_nodeId) = 0;
 
 };
 

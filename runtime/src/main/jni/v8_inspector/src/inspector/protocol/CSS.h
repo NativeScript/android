@@ -1918,17 +1918,6 @@ public:
     virtual void getComputedStyleForNode(ErrorString*, int in_nodeId, std::unique_ptr<protocol::Array<protocol::CSS::CSSComputedStyleProperty>>* out_computedStyle) = 0;
     virtual void getPlatformFontsForNode(ErrorString*, int in_nodeId, std::unique_ptr<protocol::Array<protocol::CSS::PlatformFontUsage>>* out_fonts) = 0;
     virtual void getStyleSheetText(ErrorString*, const String& in_styleSheetId, String* out_text) = 0;
-    virtual void setStyleSheetText(ErrorString*, const String& in_styleSheetId, const String& in_text, Maybe<String>* out_sourceMapURL) = 0;
-    virtual void setRuleSelector(ErrorString*, const String& in_styleSheetId, std::unique_ptr<protocol::CSS::SourceRange> in_range, const String& in_selector, std::unique_ptr<protocol::CSS::SelectorList>* out_selectorList) = 0;
-    virtual void setKeyframeKey(ErrorString*, const String& in_styleSheetId, std::unique_ptr<protocol::CSS::SourceRange> in_range, const String& in_keyText, std::unique_ptr<protocol::CSS::Value>* out_keyText) = 0;
-    virtual void setStyleTexts(ErrorString*, std::unique_ptr<protocol::Array<protocol::CSS::StyleDeclarationEdit>> in_edits, std::unique_ptr<protocol::Array<protocol::CSS::CSSStyle>>* out_styles) = 0;
-    virtual void setMediaText(ErrorString*, const String& in_styleSheetId, std::unique_ptr<protocol::CSS::SourceRange> in_range, const String& in_text, std::unique_ptr<protocol::CSS::CSSMedia>* out_media) = 0;
-    virtual void createStyleSheet(ErrorString*, const String& in_frameId, String* out_styleSheetId) = 0;
-    virtual void addRule(ErrorString*, const String& in_styleSheetId, const String& in_ruleText, std::unique_ptr<protocol::CSS::SourceRange> in_location, std::unique_ptr<protocol::CSS::CSSRule>* out_rule) = 0;
-    virtual void forcePseudoState(ErrorString*, int in_nodeId, std::unique_ptr<protocol::Array<String>> in_forcedPseudoClasses) = 0;
-    virtual void getMediaQueries(ErrorString*, std::unique_ptr<protocol::Array<protocol::CSS::CSSMedia>>* out_medias) = 0;
-    virtual void setEffectivePropertyValueForNode(ErrorString*, int in_nodeId, const String& in_propertyName, const String& in_value) = 0;
-    virtual void getBackgroundColors(ErrorString*, int in_nodeId, Maybe<protocol::Array<String>>* out_backgroundColors) = 0;
 
 };
 
