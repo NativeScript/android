@@ -46,23 +46,22 @@ public class Generator {
     }
 
 
-    public void writeBindings(String filename) throws IOException {
+    public void writeBindings(String filename) throws IOException, ClassNotFoundException {
         Binding[] bindings = generateBindings(filename);
         List<File> writenFiles = new ArrayList<File>();
         for (Binding b : bindings) {
-            if(!writenFiles.contains(b.getFile())) {
+            if (!writenFiles.contains(b.getFile())) {
                 writenFiles.add(b.getFile());
                 try (PrintStream ps = new PrintStream(b.getFile())) {
                     ps.append(b.getContent());
                 }
-            }
-            else {
+            } else {
                 throw new IOException("File already exists. This may lead to undesired behavior.\nPlease change the name of one of the extended classes.\n" + b.getFile());
             }
         }
     }
 
-    public Binding[] generateBindings(String filename) throws IOException {
+    public Binding[] generateBindings(String filename) throws IOException, ClassNotFoundException {
         List<DataRow> rows = getRows(filename);
 
         Binding[] generatedFiles = processRows(rows);
@@ -70,8 +69,8 @@ public class Generator {
         return generatedFiles;
     }
 
-    public Binding generateBinding(DataRow dataRow, HashSet interfaceNames) {
-        JavaClass clazz = classes.get(dataRow.getBaseClassname());
+    public Binding generateBinding(DataRow dataRow, HashSet interfaceNames) throws ClassNotFoundException {
+        JavaClass clazz = getClass(dataRow.getBaseClassname());
 
         boolean hasSpecifiedName = !dataRow.getFilename().isEmpty();
         String packageName = hasSpecifiedName ? getBaseDir(dataRow.getFilename()) : (DEFAULT_PACKAGE_NAME + "." + clazz.getPackageName());
@@ -112,7 +111,7 @@ public class Generator {
         return new Binding(new File(baseDir, normalizedName + JAVA_EXT), w.toString(), classname);
     }
 
-    public Binding generateBinding(DataRow dataRow) {
+    public Binding generateBinding(DataRow dataRow) throws ClassNotFoundException {
         return generateBinding(dataRow, new HashSet());
     }
 
@@ -134,7 +133,7 @@ public class Generator {
         return rows;
     }
 
-    private Binding[] processRows(List<DataRow> rows) throws IOException {
+    private Binding[] processRows(List<DataRow> rows) throws IOException, ClassNotFoundException {
         ArrayList<Binding> bindings = new ArrayList<>();
         HashSet interfaceNames = new HashSet();
 
@@ -184,11 +183,11 @@ public class Generator {
             char c = Character.isJavaIdentifierPart(ch) ? ch : '_';
             sb.append(c);
         }
-        String name = sb.toString();
-        return name;
+
+        return sb.toString();
     }
 
-    private Map<String, List<Method>> getPublicApi(JavaClass clazz) {
+    private Map<String, List<Method>> getPublicApi(JavaClass clazz) throws ClassNotFoundException {
         Map<String, List<Method>> api = new HashMap<String, List<Method>>();
         JavaClass currentClass = clazz;
         String clazzName = clazz.getClassName();
@@ -240,7 +239,7 @@ public class Generator {
                 break;
             } else {
                 String superClassName = currentClass.getSuperclassName();
-                currentClass = classes.get(superClassName.replace('$', '.'));
+                currentClass = getClass(superClassName);
             }
         }
         return api;
@@ -329,7 +328,7 @@ public class Generator {
         return sig;
     }
 
-    private void writeBinding(Writer w, DataRow dataRow, JavaClass clazz, String packageName, String name) {
+    private void writeBinding(Writer w, DataRow dataRow, JavaClass clazz, String packageName, String name) throws ClassNotFoundException {
         String[] implInterfaces = dataRow.getInterfaces();
         collectImplementedInterfaces(implInterfaces, clazz);
 
@@ -382,12 +381,12 @@ public class Generator {
             }
         }
 
-        boolean hasInitMethod2 = isApplicationClass ? false : hasInitMethod;
+        boolean hasInitMethod2 = !isApplicationClass && hasInitMethod;
         writeConstructors(clazz, name, hasInitMethod2, isApplicationClass, w);
 
         if (isInterface) {
             Set<String> objectMethods = new HashSet<String>();
-            for (Method objMethod : classes.get("java.lang.Object").getMethods()) {
+            for (Method objMethod : getClass("java.lang.Object").getMethods()) {
                 if (!objMethod.isStatic() && (objMethod.isPublic() || objMethod.isProtected())) {
                     String sig = getFullMethodSignature(objMethod);
                     objectMethods.add(sig);
@@ -408,7 +407,7 @@ public class Generator {
             }
             while (!interfaceNames.isEmpty()) {
                 String iname = interfaceNames.pollFirst();
-                JavaClass iface = classes.get(iname.replace('$', '.'));
+                JavaClass iface = getClass(iname);
                 for (String iname2 : iface.getInterfaceNames()) {
                     interfaceNames.add(iname2.replace('$', '.'));
                 }
@@ -527,7 +526,6 @@ public class Generator {
 
     private void writeThrowsClause(Method m, Writer w) {
     }
-
 
     private void writeConstructors(JavaClass clazz, String classname, boolean hasInitMethod, boolean isApplicationClass, Writer w) {
         boolean isInterface = clazz.isInterface();
@@ -656,7 +654,7 @@ public class Generator {
         w.write(type);
     }
 
-    private void collectInterfaceMethods(JavaClass clazz, List<Method> methods) {
+    private void collectInterfaceMethods(JavaClass clazz, List<Method> methods) throws ClassNotFoundException {
         JavaClass currentClass = clazz;
 
         while (true) {
@@ -669,7 +667,7 @@ public class Generator {
 
             while (!queue.isEmpty()) {
                 String ifaceName = queue.poll();
-                JavaClass currentInterface = classes.get(ifaceName.replace('$', '.'));
+                JavaClass currentInterface = getClass(ifaceName);
                 Method[] ifaceMethods = currentInterface.getMethods();
                 for (Method m : ifaceMethods) {
                     methods.add(m);
@@ -683,12 +681,12 @@ public class Generator {
                 break;
             } else {
                 String superClassName = currentClass.getSuperclassName();
-                currentClass = classes.get(superClassName.replace('$', '.'));
+                currentClass = getClass(superClassName);
             }
         }
     }
 
-    private boolean isApplicationClass(JavaClass clazz, Map<String, JavaClass> classes) {
+    private boolean isApplicationClass(JavaClass clazz, Map<String, JavaClass> classes) throws ClassNotFoundException {
         boolean isApplicationClass = false;
 
         String applicationClassname = "android.app.Application";
@@ -707,9 +705,19 @@ public class Generator {
             }
 
             String superClassName = currentClass.getSuperclassName();
-            currentClass = classes.get(superClassName.replace('$', '.'));
+            currentClass = getClass(superClassName);
         }
 
         return isApplicationClass;
+    }
+
+    private JavaClass getClass(String className) throws ClassNotFoundException {
+        JavaClass clazz = classes.get(className.replace('$', '.'));
+
+        if (clazz == null) {
+            throw new ClassNotFoundException("Class: " + className);
+        }
+
+        return clazz;
     }
 }
