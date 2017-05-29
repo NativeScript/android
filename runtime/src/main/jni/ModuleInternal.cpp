@@ -16,6 +16,7 @@
 #include "SimpleProfiler.h"
 #include "include/v8.h"
 #include "CallbackHandlers.h"
+#include "ManualInstrumentation.h"
 #include <sstream>
 #include <libgen.h>
 #include <dlfcn.h>
@@ -92,6 +93,7 @@ void ModuleInternal::Init(Isolate* isolate, const string& baseDir) {
 }
 
 Local<Function> ModuleInternal::GetRequireFunction(Isolate* isolate, const string& dirName) {
+    TNSPERF();
     Local<Function> requireFunc;
 
     auto itFound = m_requireCache.find(dirName);
@@ -155,6 +157,8 @@ void ModuleInternal::RequireCallbackImpl(const v8::FunctionCallbackInfo<v8::Valu
     }
 
     string moduleName = ArgConverter::ConvertToString(args[0].As<String>());
+    string frameName("RequireCallback " + moduleName);
+    tns::instrumentation::Frame frame(frameName.c_str());
     string callingModuleDirName = ArgConverter::ConvertToString(args[1].As<String>());
     auto isData = false;
 
@@ -174,12 +178,14 @@ void ModuleInternal::RequireCallbackImpl(const v8::FunctionCallbackInfo<v8::Valu
 }
 
 void ModuleInternal::RequireNativeCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
+    TNSPERF();
     auto ext = args.Data().As<External>();
     auto funcPtr = reinterpret_cast<FunctionCallback>(ext->Value());
     funcPtr(args);
 }
 
 void ModuleInternal::Load(const string& path) {
+    TNSPERF();
     auto isolate = m_isolate;
     auto context = isolate->GetCurrentContext();
     auto globalObject = context->Global();
@@ -189,6 +195,7 @@ void ModuleInternal::Load(const string& path) {
 }
 
 void ModuleInternal::LoadWorker(const string& path) {
+    TNSPERF();
     auto isolate = m_isolate;
     TryCatch tc;
 
@@ -257,6 +264,8 @@ Local<Object> ModuleInternal::LoadImpl(Isolate* isolate, const string& moduleNam
 }
 
 Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& modulePath, const string& moduleCacheKey) {
+    string frameName("LoadModule " + modulePath);
+    tns::instrumentation::Frame frame(frameName.c_str());
     Local<Object> result;
 
     auto moduleObj = Object::New(isolate);
@@ -341,6 +350,8 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& moduleP
 }
 
 Local<Script> ModuleInternal::LoadScript(Isolate* isolate, const string& path, const Local<String>& fullRequiredModulePath) {
+    string frameName("LoadScript " + path);
+    tns::instrumentation::Frame frame(frameName.c_str());
     Local<Script> script;
 
     TryCatch tc;
@@ -357,6 +368,7 @@ Local<Script> ModuleInternal::LoadScript(Isolate* isolate, const string& path, c
     ScriptCompiler::CompileOptions option = ScriptCompiler::kNoCompileOptions;
 
     if (cacheData != nullptr) {
+        tns::instrumentation::Frame frame("Compile, cached");
         option = ScriptCompiler::kConsumeCodeCache;
         auto maybeScript = ScriptCompiler::Compile(isolate->GetCurrentContext(), &source, option);
         if (maybeScript.IsEmpty() || tc.HasCaught()) {
@@ -364,6 +376,7 @@ Local<Script> ModuleInternal::LoadScript(Isolate* isolate, const string& path, c
         }
         script = maybeScript.ToLocalChecked();
     } else {
+        tns::instrumentation::Frame frame("Compile, no cache");
         if (Constants::V8_CACHE_COMPILED_CODE) {
             option = ScriptCompiler::kProduceCodeCache;
         }
@@ -381,6 +394,8 @@ Local<Script> ModuleInternal::LoadScript(Isolate* isolate, const string& path, c
 }
 
 Local<Object> ModuleInternal::LoadData(Isolate* isolate, const string& path) {
+    string frameName("LoadData " + path);
+    tns::instrumentation::Frame frame(frameName.c_str());
     Local<Object> json;
 
     auto jsonData = File::ReadText(path);
@@ -413,6 +428,7 @@ Local<Object> ModuleInternal::LoadData(Isolate* isolate, const string& path) {
 }
 
 Local<String> ModuleInternal::WrapModuleContent(const string& path) {
+    TNSPERF();
     string content = File::ReadText(path);
 
     auto separatorIndex = path.find_last_of("/");
@@ -427,6 +443,7 @@ Local<String> ModuleInternal::WrapModuleContent(const string& path) {
 }
 
 ScriptCompiler::CachedData* ModuleInternal::TryLoadScriptCache(const std::string& path) {
+    TNSPERF();
     if (!Constants::V8_CACHE_COMPILED_CODE) {
         return nullptr;
     }
@@ -445,6 +462,8 @@ void ModuleInternal::SaveScriptCache(const ScriptCompiler::Source& source, const
     if (!Constants::V8_CACHE_COMPILED_CODE) {
         return;
     }
+
+    tns::instrumentation::Frame frame("SaveScriptCache");
 
     int length = source.GetCachedData()->length;
     auto cachePath = path + ".cache";

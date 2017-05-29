@@ -31,6 +31,8 @@ class Runtime {
 
         static void Init(JNIEnv* _env, jobject obj, int runtimeId, jstring filesPath, jstring nativeLibsDir, jboolean verboseLoggingEnabled, jboolean isDebuggable, jstring packageName, jobjectArray args, jstring callingDir);
 
+        static void SetManualInstrumentationMode(jstring mode);
+
         void Init(jstring filesPath, jstring nativeLibsDir, bool verboseLoggingEnabled, bool isDebuggable, jstring packageName, jobjectArray args, jstring callingDir);
 
         v8::Isolate* GetIsolate() const;

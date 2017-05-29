@@ -25,6 +25,7 @@
 #include "NetworkDomainCallbackHandlers.h"
 #include "sys/system_properties.h"
 #include "JsV8InspectorClient.h"
+#include "ManualInstrumentation.h"
 
 using namespace v8;
 using namespace std;
@@ -607,6 +608,12 @@ jobject Runtime::ConvertJsValueToJavaObject(JEnv& env, const Local<Value>& value
     return javaResult;
 }
 
+void Runtime::SetManualInstrumentationMode(jstring mode) {
+    auto modeStr = ArgConverter::jstringToString(mode);
+    if (modeStr == "timeline") {
+        tns::instrumentation::Frame::enable();
+    }
+}
 
 void Runtime::DestroyRuntime() {
     s_id2RuntimeCache.erase(m_id);
