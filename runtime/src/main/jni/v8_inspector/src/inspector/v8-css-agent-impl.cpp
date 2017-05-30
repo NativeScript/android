@@ -3,9 +3,12 @@
 //
 
 #include <NativeScriptAssert.h>
+#include <ArgConverter.h>
 #include "v8-css-agent-impl.h"
 
 namespace v8_inspector {
+
+    using tns::ArgConverter;
 
     namespace CSSAgentState {
         static const char cssEnabled[] = "cssEnabled";
@@ -140,6 +143,42 @@ namespace v8_inspector {
     void V8CSSAgentImpl::getComputedStyleForNode(ErrorString *, int in_nodeId,
                                                  std::unique_ptr<protocol::Array<protocol::CSS::CSSComputedStyleProperty>> *out_computedStyle) {
         auto computedStylePropertyArr = protocol::Array<protocol::CSS::CSSComputedStyleProperty>::create();
+
+        auto getComputedStylesForNodeString = "__getComputedStylesForNode";
+        // TODO: Pete: Find a better way to get a hold of the isolate
+        auto isolate = v8::Isolate::GetCurrent();
+        auto context = isolate->GetCurrentContext();
+        auto global = context->Global();
+        auto getComputedStylesForNode = global->Get(ArgConverter::ConvertToV8String(isolate, getComputedStylesForNodeString));
+
+        if (!getComputedStylesForNode.IsEmpty() && getComputedStylesForNode->IsFunction()) {
+            auto getComputedStylesForNodeFunc = getComputedStylesForNode.As<v8::Function>();
+            v8::Local<v8::Value> args[] = { v8::Number::New(isolate, in_nodeId) };
+            auto maybeResult = getComputedStylesForNodeFunc->Call(context, global, 1, args);
+            v8::Local<v8::Value> outResult;
+
+            maybeResult.ToLocal(&outResult);
+
+            if (!outResult.IsEmpty()) {
+                auto resultString = ArgConverter::ConvertToString(outResult->ToString());
+                auto resultCStr = resultString.c_str();
+                auto resultJson = protocol::parseJSON(resultCStr);
+
+                protocol::ErrorSupport errorSupport;
+                auto computedStyles = protocol::Array<protocol::CSS::CSSComputedStyleProperty>::parse(resultJson.get(), &errorSupport);
+
+                auto errorSupportString = errorSupport.errors().utf8();
+                if (!errorSupportString.empty()) {
+                    auto errorMessage = "Error while parsing CSSComputedStyleProperty object. ";
+                    DEBUG_WRITE_FORCE("%s Error: %s", errorMessage, errorSupportString.c_str());
+                } else {
+                    *out_computedStyle = std::move(computedStyles);
+
+                    return;
+                }
+            }
+        }
+
         *out_computedStyle = std::move(computedStylePropertyArr);
     }
 
