@@ -79,7 +79,6 @@ JniLocalRef ObjectManager::GetJavaObjectByJsObject(const Local<Object>& object) 
 }
 
 ObjectManager::JSInstanceInfo* ObjectManager::GetJSInstanceInfo(const Local<Object>& object) {
-    DEBUG_WRITE("ObjectManager::GetJSInstanceInfo: called");
     JSInstanceInfo* jsInstanceInfo = nullptr;
 
     auto isolate = m_isolate;
@@ -140,8 +139,6 @@ jclass ObjectManager::GetJavaClass(const Local<Object>& instance) {
 }
 
 void ObjectManager::SetJavaClass(const Local<Object>& instance, jclass clazz) {
-    DEBUG_WRITE("SetClass called");
-
     JSInstanceInfo* jsInfo = GetJSInstanceInfo(instance);
     jsInfo->ObjectClazz = clazz;
 }
@@ -275,8 +272,6 @@ void ObjectManager::JSObjectWeakCallbackStatic(const WeakCallbackInfo<ObjectWeak
  *	These objects are categorized by "regular" and "callback" and saved in different arrays for performance optimizations during GC
  * */
 void ObjectManager::JSObjectWeakCallback(Isolate* isolate, ObjectWeakCallbackState* callbackState) {
-    DEBUG_WRITE("JSObjectWeakCallback called");
-
     HandleScope handleScope(isolate);
 
     Persistent<Object>* po = callbackState->target;
@@ -319,8 +314,6 @@ int ObjectManager::GenerateNewObjectID() {
 }
 
 void ObjectManager::ReleaseJSInstance(Persistent<Object>* po, JSInstanceInfo* jsInstanceInfo) {
-    DEBUG_WRITE("ReleaseJSInstance instance");
-
     int javaObjectID = jsInstanceInfo->JavaObjectID;
 
     auto it = m_idToObject.find(javaObjectID);
@@ -522,7 +515,7 @@ void ObjectManager::MarkReachableObjects(Isolate* isolate, const Local<Object>& 
     } // while
 }
 
-void ObjectManager::MarkReachableArrayElements(Local<Object> &o, stack<Local<Value>> &s) {
+void ObjectManager::MarkReachableArrayElements(Local<Object>& o, stack<Local<Value>>& s) {
     auto arr = o.As<Array>();
 
     int arrEnclosedObjectsLength = arr->Length();

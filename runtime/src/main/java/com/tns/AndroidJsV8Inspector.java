@@ -18,6 +18,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import fi.iki.elonen.NanoHTTPD;
 import fi.iki.elonen.NanoWSD;
@@ -26,23 +27,32 @@ class AndroidJsV8Inspector {
     private static boolean DEBUG_LOG_ENABLED = false;
 
     private JsV8InspectorServer server;
-    private Context context;
-    private static String applicationDir;
+    private static String ApplicationDir;
+    private String packageName;
 
     protected native final void init();
 
     protected native final void connect(Object connection);
+
+    private native void scheduleBreak();
 
     protected static native void disconnect();
 
     protected native final void dispatchMessage(String message);
 
     private Handler mainHandler;
-    private LinkedBlockingQueue<String> inspectorMessages = new LinkedBlockingQueue<String>();
 
-    AndroidJsV8Inspector(Context context, Logger logger) {
-        this.context = context;
-        applicationDir = context.getFilesDir().getAbsolutePath();
+    private final Object debugBrkLock;
+
+    private static AtomicBoolean DebugInitialized = new AtomicBoolean(false);
+
+    private LinkedBlockingQueue<String> inspectorMessages = new LinkedBlockingQueue<String>();
+    private LinkedBlockingQueue<String> pendingInspectorMessages = new LinkedBlockingQueue<String>();
+
+    AndroidJsV8Inspector(String filesDir, String packageName) {
+        ApplicationDir = filesDir;
+        this.packageName = packageName;
+        this.debugBrkLock = new Object();
     }
 
     public void start() throws IOException {
@@ -51,7 +61,7 @@ class AndroidJsV8Inspector {
 
             mainHandler = currentRuntime.getHandler();
 
-            this.server = new JsV8InspectorServer(this.context.getPackageName() + "-inspectorServer");
+            this.server = new JsV8InspectorServer(this.packageName + "-inspectorServer");
             this.server.start(-1);
 
             if (DEBUG_LOG_ENABLED) {
@@ -82,9 +92,7 @@ class AndroidJsV8Inspector {
             String sendingText = consoleMessage.toString();
             AndroidJsV8Inspector.send(connection, sendingText);
 
-        } catch (JSONException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
+        } catch (JSONException | IOException e) {
             e.printStackTrace();
         }
     }
@@ -102,11 +110,11 @@ class AndroidJsV8Inspector {
     @RuntimeCallable
     public static Pair<String, String>[] getPageResources() {
         // necessary to align the data dir returned by context (emulator) and that used by the v8 inspector
-        if (applicationDir.startsWith("/data/user/0/")) {
-            applicationDir = applicationDir.replaceFirst("/data/user/0/", "/data/data/");
+        if (ApplicationDir.startsWith("/data/user/0/")) {
+            ApplicationDir = ApplicationDir.replaceFirst("/data/user/0/", "/data/data/");
         }
 
-        String dataDir = applicationDir;
+        String dataDir = ApplicationDir;
         File rootFilesDir = new File(dataDir, "app");
 
 
@@ -168,8 +176,41 @@ class AndroidJsV8Inspector {
         return type;
     }
 
-    class JsV8InspectorServer extends NanoWSD {
-        public JsV8InspectorServer(String name) {
+    // pause the main thread for 30 seconds (30 * 1000 ms)
+    // allowing the devtools frontend to establish connection with the inspector
+    protected void waitForDebugger(boolean shouldBreak) {
+        if (shouldBreak) {
+            synchronized (this.debugBrkLock) {
+                try {
+                    this.debugBrkLock.wait(1000 * 30);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                } finally {
+                    AndroidJsV8Inspector.DebugInitialized.getAndSet(true);
+                    this.processDebugBreak();
+                }
+            }
+        } else {
+            AndroidJsV8Inspector.DebugInitialized.getAndSet(true);
+        }
+    }
+
+    // process all messages coming front the frontend necessary to initialize the inspector backend
+    // schedule a debug line break at first convenience
+    private void processDebugBreak() {
+        processDebugBreakMessages();
+        scheduleBreak();
+    }
+
+    private void processDebugBreakMessages() {
+        while (!pendingInspectorMessages.isEmpty()) {
+            String inspectorMessage = pendingInspectorMessages.poll();
+            dispatchMessage(inspectorMessage);
+        }
+    }
+
+    private class JsV8InspectorServer extends NanoWSD {
+        JsV8InspectorServer(String name) {
             super(name);
         }
 
@@ -187,9 +228,8 @@ class AndroidJsV8Inspector {
         }
     }
 
-    class JsV8InspectorWebSocket extends NanoWSD.WebSocket {
-
-        public JsV8InspectorWebSocket(NanoHTTPD.IHTTPSession handshakeRequest) {
+    private class JsV8InspectorWebSocket extends NanoWSD.WebSocket {
+        JsV8InspectorWebSocket(NanoHTTPD.IHTTPSession handshakeRequest) {
             super(handshakeRequest);
         }
 
@@ -199,16 +239,7 @@ class AndroidJsV8Inspector {
                 Log.d("V8Inspector", "onOpen: ThreadID:  " + Thread.currentThread().getId());
             }
 
-            mainHandler.post(new Runnable() {
-                @Override
-                public void run() {
-                    if (DEBUG_LOG_ENABLED) {
-                        Log.d("V8Inspector", "Connecting. threadID :  " + Thread.currentThread().getId());
-                    }
-
-                    connect(JsV8InspectorWebSocket.this);
-                }
-            });
+            connect(JsV8InspectorWebSocket.this);
         }
 
         @Override
@@ -236,16 +267,30 @@ class AndroidJsV8Inspector {
 
             inspectorMessages.offer(message.getTextPayload());
 
-            mainHandler.post(new Runnable() {
-                @Override
-                public void run() {
-                    String nextMessage = inspectorMessages.poll();
-                    while (nextMessage != null) {
-                        dispatchMessage(nextMessage);
-                        nextMessage = inspectorMessages.poll();
+            if (!AndroidJsV8Inspector.DebugInitialized.get()) {
+                String nextMessage = inspectorMessages.poll();
+                while (nextMessage != null) {
+                    pendingInspectorMessages.offer(nextMessage);
+                    nextMessage = inspectorMessages.poll();
+                }
+
+                if (message.getTextPayload().contains("Debugger.enable")) {
+                    synchronized (debugBrkLock) {
+                        debugBrkLock.notify();
                     }
                 }
-            });
+            } else {
+                mainHandler.postAtFrontOfQueue(new Runnable() {
+                    @Override
+                    public void run() {
+                        String nextMessage = inspectorMessages.poll();
+                        while (nextMessage != null) {
+                            dispatchMessage(nextMessage);
+                            nextMessage = inspectorMessages.poll();
+                        }
+                    }
+                });
+            }
         }
 
         @Override
@@ -259,8 +304,7 @@ class AndroidJsV8Inspector {
 
         public String getInspectorMessage() {
             try {
-                String message = inspectorMessages.take();
-                return message;
+                return inspectorMessages.take();
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }

@@ -13,6 +13,7 @@
 #include <sstream>
 #include <fstream>
 #include <cstdio>
+#include <chrono>
 #include "MethodCache.h"
 #include "SimpleProfiler.h"
 #include "Runtime.h"
@@ -88,7 +89,6 @@ bool CallbackHandlers::RegisterInstance(Isolate* isolate, const Local<Object>& j
 
     int javaObjectID = objectManager->GenerateNewObjectID();
 
-    DEBUG_WRITE("RegisterInstance: Linking new instance");
     objectManager->Link(jsObject, javaObjectID, nullptr);
 
     // resolve constructor
@@ -121,11 +121,10 @@ bool CallbackHandlers::RegisterInstance(Isolate* isolate, const Local<Object>& j
     success = !localInstance.IsNull();
 
     if (success) {
-        DEBUG_WRITE("RegisterInstance: Updating linked instance with its real class");
         jclass instanceClass = env.FindClass(fullClassName);
         objectManager->SetJavaClass(jsObject, instanceClass);
     } else {
-        DEBUG_WRITE("RegisterInstance failed with null new instance");
+        DEBUG_WRITE_FORCE("RegisterInstance failed with null new instance class: %s", fullClassName.c_str());
     }
 
     return success;
@@ -631,6 +630,12 @@ void CallbackHandlers::LogMethodCallback(const v8::FunctionCallbackInfo<v8::Valu
     }
 }
 
+void CallbackHandlers::TimeCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
+    auto nano = std::chrono::time_point_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now());
+    double duration = nano.time_since_epoch().count() / 1000000.0;
+    args.GetReturnValue().Set(duration);
+}
+
 void CallbackHandlers::DumpReferenceTablesMethodCallback(
     const v8::FunctionCallbackInfo<v8::Value>& args) {
     DumpReferenceTablesMethod();
@@ -767,8 +772,6 @@ Local<Value> CallbackHandlers::CallJSMethod(Isolate* isolate, JNIEnv* _env,
         for (int i = 0; i < argc; i++) {
             arguments[i] = jsArgs->Get(i);
         }
-
-        DEBUG_WRITE("implementationObject->GetIdentityHash()=%d", jsObject->GetIdentityHash());
 
         TryCatch tc;
         Local<Value> jsResult;

@@ -23,6 +23,7 @@ class JsV8InspectorClient : V8InspectorClient, v8_inspector::V8Inspector::Channe
 
         void init();
         void connect(jobject connection);
+        void scheduleBreak();
         void createInspectorSession(v8::Isolate* isolate, const v8::Local<v8::Context>& context);
         void disconnect();
         void dispatchMessage(const std::string& message);

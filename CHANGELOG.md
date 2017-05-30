@@ -1,3 +1,25 @@
+3.0.1
+==
+
+## Bug Fixes
+
+ - [--debug-brk flag not working (#2741)](https://github.com/NativeScript/nativescript-cli/issues/2741)
+ 
+3.0.0
+==
+
+## What's New
+
+ - [Chrome DevTools Network Domain (#715)](https://github.com/NativeScript/android-runtime/issues/715)
+ - [Chrome DevTools Scope Tab (#713)](https://github.com/NativeScript/android-runtime/issues/713)
+ - [Enabling java source code or direct dex generation #663)](https://github.com/NativeScript/android-runtime/issues/663)
+ - [Improve Gradle incremental build (#562)](https://github.com/NativeScript/android-runtime/issues/562)
+
+
+## Bug Fixes
+
+ - [Javascript array not marshalling to Java long[] properly  (#696)](https://github.com/NativeScript/android-runtime/issues/696)
+ 
 2.5.0-RC
 ==
 
