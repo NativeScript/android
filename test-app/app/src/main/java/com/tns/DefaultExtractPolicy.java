@@ -29,7 +29,7 @@ public class DefaultExtractPolicy implements ExtractPolicy {
     }
 
     public boolean shouldExtract(Context context) {
-        String assetsThumbFilePath = context.getFilesDir().getPath() + File.separatorChar + ASSETS_THUMB_FILENAME;
+        String assetsThumbFilePath = getFilesDir(context) + File.separatorChar + ASSETS_THUMB_FILENAME;
         String oldAssetsThumb = getCachedAssetsThumb(assetsThumbFilePath);
         if (oldAssetsThumb == null) {
             return true;
@@ -47,7 +47,7 @@ public class DefaultExtractPolicy implements ExtractPolicy {
     public void setAssetsThumb(Context context) {
         String assetsThumb = generateAssetsThumb(context);
         if (assetsThumb != null) {
-            String assetsThumbFilePath = context.getFilesDir().getPath() + File.separatorChar + ASSETS_THUMB_FILENAME;
+            String assetsThumbFilePath = getFilesDir(context) + File.separatorChar + ASSETS_THUMB_FILENAME;
             saveNewAssetsThumb(assetsThumb, assetsThumbFilePath);
         }
     }
@@ -114,11 +114,25 @@ public class DefaultExtractPolicy implements ExtractPolicy {
                 out.close();
             }
         } catch (FileNotFoundException e) {
-            logger.write("Error while writting current assets thumb");
+            logger.write("Error while writing current assets thumb");
             e.printStackTrace();
         } catch (IOException e) {
-            logger.write("Error while writting current assets thumb");
+            logger.write("Error while writing current assets thumb");
             e.printStackTrace();
+        }
+    }
+
+    /*
+        Write assetsThumb file to a no-backup directory to prevent the thumb from being
+        backed up on devices of API Level 23 and up.
+        Devices Level 22 and lower don't support the Auto Backup feature,
+        so it is safe to keep the thumb in the /files directory
+     */
+    private static String getFilesDir(Context context) {
+        if (android.os.Build.VERSION.SDK_INT >= /* 21 */ android.os.Build.VERSION_CODES.LOLLIPOP) {
+            return context.getNoBackupFilesDir().getPath();
+        } else {
+            return context.getFilesDir().getPath();
         }
     }
 
