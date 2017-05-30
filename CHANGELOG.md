@@ -1,3 +1,10 @@
+3.0.1
+==
+
+## Bug Fixes
+
+ - [--debug-brk flag not working (#2741)](https://github.com/NativeScript/nativescript-cli/issues/2741)
+ 
 3.0.0
 ==
 
