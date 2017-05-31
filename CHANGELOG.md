@@ -4,7 +4,8 @@
 ## Bug Fixes
 
  - [--debug-brk flag not working (#2741)](https://github.com/NativeScript/nativescript-cli/issues/2741)
- 
+ - [Clean app between different versions of application package. Ensure Android 6's AutoBackup feature doesn't restore files for NS apps](https://github.com/NativeScript/android-runtime/pull/771#issue-232247925)
+
 3.0.0
 ==
 
