@@ -48,10 +48,9 @@ public class Generator {
 
     public void writeBindings(String filename) throws IOException, ClassNotFoundException {
         Binding[] bindings = generateBindings(filename);
-        List<File> writenFiles = new ArrayList<File>();
+        Set<File> writtenFiles = new HashSet<File>();
         for (Binding b : bindings) {
-            if (!writenFiles.contains(b.getFile())) {
-                writenFiles.add(b.getFile());
+            if (writtenFiles.add(b.getFile())) {
                 try (PrintStream ps = new PrintStream(b.getFile())) {
                     ps.append(b.getContent());
                 }
