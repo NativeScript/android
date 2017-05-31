@@ -85,11 +85,13 @@ public final class RuntimeHelper {
 
                 String outputDir = app.getFilesDir().getPath() + File.separator;
 
-                aE.extractAssets(app, "app", outputDir, extractPolicy);
-                aE.extractAssets(app, "internal", outputDir, extractPolicy);
-                aE.extractAssets(app, "metadata", outputDir, extractPolicy);
+                // will force deletion of previously extracted files in app/files directories
+                // see https://github.com/NativeScript/NativeScript/issues/4137 for reference
+                boolean removePreviouslyInstalledAssets = true;
+                aE.extractAssets(app, "app", outputDir, extractPolicy, removePreviouslyInstalledAssets);
+                aE.extractAssets(app, "internal", outputDir, extractPolicy, removePreviouslyInstalledAssets);
+                aE.extractAssets(app, "metadata", outputDir, extractPolicy, false);
 
-                // enable with flags?
                 boolean shouldExtractSnapshots = true;
 
                 // will extract snapshot of the device appropriate architecture
@@ -98,7 +100,7 @@ public final class RuntimeHelper {
                         logger.write("Extracting snapshot blob");
                     }
 
-                    aE.extractAssets(app, "snapshots/" + Build.CPU_ABI, outputDir, extractPolicy);
+                    aE.extractAssets(app, "snapshots/" + Build.CPU_ABI, outputDir, extractPolicy, removePreviouslyInstalledAssets);
                 }
 
                 extractPolicy.setAssetsThumb(app);
