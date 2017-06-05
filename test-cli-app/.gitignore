@@ -7,8 +7,9 @@
 /build
 /captures
 app/build
-app/src
+app/src/*
 app/.iml
 app/proguard-rules.pro
 !app/build.gradle
 !app/src/.gitkeep
+gradle-app.setting

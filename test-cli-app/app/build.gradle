@@ -1,0 +1,117 @@
+/*
+* run from dir: test-app/
+* 	run on emulator: ./gradlew runtests //default
+* 	run on device: ./gradlew runtests -PrunOnDevice
+*
+*/
+
+
+def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
+
+apply plugin: 'com.android.model.application'
+
+def runOnDevice = project.hasProperty("runOnDevice");
+def runOnDeviceOrEmulator = runOnDevice ? "-d" : "-e";
+
+model {
+    android {
+        compileSdkVersion = 25
+        buildToolsVersion = "25.0.2"
+
+        defaultConfig.with {
+            applicationId = "com.tns.debugapp"
+            minSdkVersion.apiLevel = 17
+            targetSdkVersion.apiLevel = 22
+            versionCode = 1
+            versionName = "1.0"
+        }
+
+        lintOptions.with {
+            abortOnError = false
+        }
+    }
+
+//    android.ndk {
+//        moduleName = "test-app-dummy-native-lib"
+//    }
+
+    android.buildTypes {
+        release {
+            minifyEnabled = false
+            proguardFiles.add(file('proguard-rules.txt'))
+        }
+    }
+}
+
+dependencies {
+	def supportVer = "23.3.0"
+	compile project(':runtime')
+	compile fileTree(include: ['*.jar'], dir: 'libs')
+
+	compile "com.android.support:support-v4:$supportVer"
+	compile "com.android.support:appcompat-v7:$supportVer"
+	compile "com.android.support:design:$supportVer"
+
+	testCompile 'junit:junit:4.12'
+}
+
+repositories {
+    jcenter()
+    flatDir {
+        dirs 'src/F0', 'src/F1',
+                'src/F2', 'src/F3',
+                'src/F4', 'src/F5',
+                'src/F6', 'src/F7',
+                'src/F8', 'src/F9',
+                'src/F10', 'src/F11'
+    }
+}
+
+task addAarDependencies  {
+    FileTree tree = fileTree(dir: "$projectDir/src", include: ["**/*.aar"])
+    tree.each { File file ->
+        // remove the extension of the file (.aar)
+        def length = file.name.length() - 4
+        def fileName = file.name[0..<length]
+        println "\t+adding dependency: " + file.getAbsolutePath()
+        project.dependencies.add("compile", [name: fileName, ext: "aar"])
+    }
+}
+
+/////////////////////////////// installing application ////////////////////////////
+
+task installApk(type: Exec) {
+    doFirst {
+        println "Attempting to install buit apk"
+
+        if (isWinOs) {
+            commandLine "cmd", "/c", "node", "$rootDir\\tools\\deploy-apk.js", "$rootDir\\runtimedebug\\build\\outputs\\apk\\app-debug.apk"
+        } else {
+            commandLine "node", "$rootDir/tools/deploy-apk.js", "$rootDir/runtimedebug/build/outputs/apk/app-debug.apk"
+        }
+    }
+
+    doLast {
+        println "Install result:" + execResult
+    }
+}
+
+task startInstalledApk(type: Exec) {
+    doFirst {
+        println "Starting test application"
+
+        if (isWinOs) {
+            commandLine "cmd", "/c", "adb", "shell", "am", "start", "-n", "org.nativescript.runtimedebug/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
+        } else {
+            commandLine "adb", "shell", "am", "start", "-n", "org.nativescript.runtimedebug/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
+        }
+    }
+}
+
+startInstalledApk.dependsOn(installApk)
+
+task deleteDist (type: Delete) {
+	doFirst {
+        delete "$rootDir/dist"
+	}
+}

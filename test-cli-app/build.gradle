@@ -1,95 +1,25 @@
-apply plugin: 'com.android.model.application'
+/*
+*	Usage: 
+*		gradlew assembleDebug - Builds an Android apk in debug
+*		gradlew assembleRelease - Builds an Android apk in release
+*		gradlew runtests - Builds and runs the test applciation and pull an test results xml file in /dist/android_unit_test_results.xml
+*/
 
-import groovy.json.JsonSlurper //used to parse package.json
 
-model {
-    android {
-        compileSdkVersion = 23
-        buildToolsVersion = "23.0.3"
 
-        defaultConfig.with {
-            applicationId = "org.nativescript.runtimedebug"
-            minSdkVersion.apiLevel = 17
-            targetSdkVersion.apiLevel = 22
-            versionCode = 1
-            versionName = "1.0"
-        }
-
-        lintOptions.with {
-            abortOnError = false
-        }
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+buildscript {
+    repositories {
+        jcenter()
     }
 
-    android.buildTypes {
-        release {
-            minifyEnabled = false
-            proguardFiles.add(file('proguard-rules.txt'))
-        }
+    dependencies {
+        classpath 'com.android.tools.build:gradle-experimental:0.8.2'
     }
 }
 
-dependencies {
-    compile project(':runtime')
-    compile project(':binding-generator')
-    compile fileTree(dir: 'libs', include: ['*.jar'])
-    testCompile 'junit:junit:4.12'
-    compile 'com.android.support:appcompat-v7:23.3.0'
-    compile "com.android.support:support-v4:23.3.0"
-}
-
-repositories {
-    jcenter()
-    flatDir {
-        dirs 'src/F0', 'src/F1',
-                'src/F2', 'src/F3',
-                'src/F4', 'src/F5',
-                'src/F6', 'src/F7',
-                'src/F8', 'src/F9',
-                'src/F10', 'src/F11'
+allprojects {
+    repositories {
+        jcenter()
     }
 }
-
-task addAarDependencies  {
-    FileTree tree = fileTree(dir: "$projectDir/src", include: ["**/*.aar"])
-    tree.each { File file ->
-        // remove the extension of the file (.aar)
-        def length = file.name.length() - 4
-        def fileName = file.name[0..<length]
-        println "\t+adding dependency: " + file.getAbsolutePath()
-        project.dependencies.add("compile", [name: fileName, ext: "aar"])
-    }
-}
-
-def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
-
-/////////////////////////////// installing application ////////////////////////////
-
-task installApk(type: Exec) {
-    doFirst {
-        println "Attempting to install buit apk"
-
-        if (isWinOs) {
-            commandLine "cmd", "/c", "node", "$rootDir\\tools\\deploy-apk.js", "$rootDir\\runtimedebug\\build\\outputs\\apk\\app-debug.apk"
-        } else {
-            commandLine "node", "$rootDir/tools/deploy-apk.js", "$rootDir/runtimedebug/build/outputs/apk/app-debug.apk"
-        }
-    }
-
-    doLast {
-        println "Install result:" + execResult
-    }
-}
-
-task startInstalledApk(type: Exec) {
-    doFirst {
-        println "Starting test application"
-
-        if (isWinOs) {
-            commandLine "cmd", "/c", "adb", "shell", "am", "start", "-n", "org.nativescript.runtimedebug/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
-        } else {
-            commandLine "adb", "shell", "am", "start", "-n", "org.nativescript.runtimedebug/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
-        }
-    }
-}
-
-startInstalledApk.dependsOn(installApk)
