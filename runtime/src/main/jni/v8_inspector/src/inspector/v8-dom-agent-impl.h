@@ -47,6 +47,7 @@ namespace v8_inspector {
     private:
         V8InspectorSessionImpl* m_session;
         protocol::DictionaryValue* m_state;
+
         bool m_enabled;
 
         DISALLOW_COPY_AND_ASSIGN(V8DOMAgentImpl);

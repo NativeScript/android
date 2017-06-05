@@ -6,6 +6,7 @@
 #include "v8-dom-agent-impl.h"
 #include <ArgConverter.h>
 #include <Runtime.h>
+#include <v8_inspector/src/inspector/utils/v8-inspector-common.h>
 
 namespace v8_inspector {
 
@@ -57,44 +58,46 @@ namespace v8_inspector {
                 .setNodeValue("")
                 .build();
 
-        auto getDocumentFunctionString = "__getDocument";
+        auto getDocumentFunctionString = "getDocument";
         // TODO: Pete: Find a better way to get a hold of the isolate
         auto isolate = v8::Isolate::GetCurrent();
         auto context = isolate->GetCurrentContext();
         auto global = context->Global();
-        auto getDocument = global->Get(ArgConverter::ConvertToV8String(isolate, getDocumentFunctionString));
 
-        if (!getDocument.IsEmpty() && getDocument->IsFunction()) {
-            auto getDocumentFunc = getDocument.As<v8::Function>();
-            v8::Local<v8::Value> args[] = {  };
-            auto maybeResult = getDocumentFunc->Call(context, global, 0, args);
-            v8::Local<v8::Value> outResult;
+        auto globalInspectorObject = utils::Common::getGlobalInspectorObject(isolate);
 
-            maybeResult.ToLocal(&outResult);
+        if (!globalInspectorObject.IsEmpty()) {
+            auto getDocument = globalInspectorObject->Get(ArgConverter::ConvertToV8String(isolate, getDocumentFunctionString));
 
-            if (!outResult.IsEmpty()) {
-                auto resultString = ArgConverter::ConvertToString(outResult->ToString());
-                auto resultCStr = resultString.c_str();
-                auto resultJson = protocol::parseJSON(resultCStr);
+            if (!getDocument.IsEmpty() && getDocument->IsFunction()) {
+                auto getDocumentFunc = getDocument.As<v8::Function>();
+                v8::Local<v8::Value> args[] = {  };
+                auto maybeResult = getDocumentFunc->Call(context, global, 0, args);
+                v8::Local<v8::Value> outResult;
 
-                protocol::ErrorSupport errorSupport;
-                auto domNode = protocol::DOM::Node::parse(resultJson.get(), &errorSupport);
+                if (maybeResult.ToLocal(&outResult)) {
+                    auto resultString = ArgConverter::ConvertToString(outResult->ToString());
+                    auto resultCStr = resultString.c_str();
+                    auto resultJson = protocol::parseJSON(resultCStr);
 
-                auto errorSupportString = errorSupport.errors().utf8();
-                *errorString = errorSupportString.c_str();
-                if (!errorSupportString.empty()) {
-                    auto errorMessage = "Error while parsing debug `DOM Node` object. ";
-                    DEBUG_WRITE_FORCE("%s Error: %s", errorMessage, errorSupportString.c_str());
+                    protocol::ErrorSupport errorSupport;
+                    auto domNode = protocol::DOM::Node::parse(resultJson.get(), &errorSupport);
+
+                    auto errorSupportString = errorSupport.errors().utf8();
+                    *errorString = errorSupportString.c_str();
+                    if (!errorSupportString.empty()) {
+                        auto errorMessage = "Error while parsing debug `DOM Node` object. ";
+                        DEBUG_WRITE_FORCE("%s Error: %s", errorMessage, errorSupportString.c_str());
+                    } else {
+                        *out_root = std::move(domNode);
+
+                        return;
+                    }
                 } else {
-                    *out_root = std::move(domNode);
-
-                    return;
+                    *errorString = "Didn't get a proper result from __getDocument call. Returning empty visual tree.";
                 }
-            } else {
-                *errorString = "Didn't get a proper result from __getDocument call. Returning empty visual tree.";
             }
         }
-
         *out_root = std::move(defaultNode);
     }
 
@@ -133,8 +136,7 @@ namespace v8_inspector {
 
     }
 
-    void
-    V8DOMAgentImpl::getSearchResults(ErrorString *, const String &in_searchId, int in_fromIndex,
+    void V8DOMAgentImpl::getSearchResults(ErrorString *, const String &in_searchId, int in_fromIndex,
                                      int in_toIndex,
                                      std::unique_ptr<protocol::Array<int>> *out_nodeIds) {
 

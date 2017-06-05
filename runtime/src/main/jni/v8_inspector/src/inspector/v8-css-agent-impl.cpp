@@ -4,6 +4,7 @@
 
 #include <NativeScriptAssert.h>
 #include <ArgConverter.h>
+#include <v8_inspector/src/inspector/utils/v8-inspector-common.h>
 #include "v8-css-agent-impl.h"
 
 namespace v8_inspector {
@@ -65,7 +66,6 @@ namespace v8_inspector {
             .build();
 
         //// out_attributesStyle
-
         auto attrArr = protocol::Array<protocol::CSS::CSSProperty>::create();
         auto attributeStyle = protocol::CSS::CSSStyle::create()
             .setCssProperties(std::move(attrArr))
@@ -144,37 +144,41 @@ namespace v8_inspector {
                                                  std::unique_ptr<protocol::Array<protocol::CSS::CSSComputedStyleProperty>> *out_computedStyle) {
         auto computedStylePropertyArr = protocol::Array<protocol::CSS::CSSComputedStyleProperty>::create();
 
-        auto getComputedStylesForNodeString = "__getComputedStylesForNode";
+        auto getComputedStylesForNodeString = "getComputedStylesForNode";
         // TODO: Pete: Find a better way to get a hold of the isolate
         auto isolate = v8::Isolate::GetCurrent();
         auto context = isolate->GetCurrentContext();
         auto global = context->Global();
-        auto getComputedStylesForNode = global->Get(ArgConverter::ConvertToV8String(isolate, getComputedStylesForNodeString));
 
-        if (!getComputedStylesForNode.IsEmpty() && getComputedStylesForNode->IsFunction()) {
-            auto getComputedStylesForNodeFunc = getComputedStylesForNode.As<v8::Function>();
-            v8::Local<v8::Value> args[] = { v8::Number::New(isolate, in_nodeId) };
-            auto maybeResult = getComputedStylesForNodeFunc->Call(context, global, 1, args);
-            v8::Local<v8::Value> outResult;
+        auto globalInspectorObject = utils::Common::getGlobalInspectorObject(isolate);
 
-            maybeResult.ToLocal(&outResult);
+        if (!globalInspectorObject.IsEmpty()) {
+            auto getComputedStylesForNode = globalInspectorObject->Get(ArgConverter::ConvertToV8String(isolate, getComputedStylesForNodeString));
 
-            if (!outResult.IsEmpty()) {
-                auto resultString = ArgConverter::ConvertToString(outResult->ToString());
-                auto resultCStr = resultString.c_str();
-                auto resultJson = protocol::parseJSON(resultCStr);
+            if (!getComputedStylesForNode.IsEmpty() && getComputedStylesForNode->IsFunction()) {
+                auto getComputedStylesForNodeFunc = getComputedStylesForNode.As<v8::Function>();
+                v8::Local<v8::Value> args[] = {v8::Number::New(isolate, in_nodeId)};
+                auto maybeResult = getComputedStylesForNodeFunc->Call(context, global, 1, args);
+                v8::Local<v8::Value> outResult;
 
-                protocol::ErrorSupport errorSupport;
-                auto computedStyles = protocol::Array<protocol::CSS::CSSComputedStyleProperty>::parse(resultJson.get(), &errorSupport);
+                if (maybeResult.ToLocal(&outResult)) {
+                    auto resultString = ArgConverter::ConvertToString(outResult->ToString());
+                    auto resultCStr = resultString.c_str();
+                    auto resultJson = protocol::parseJSON(resultCStr);
 
-                auto errorSupportString = errorSupport.errors().utf8();
-                if (!errorSupportString.empty()) {
-                    auto errorMessage = "Error while parsing CSSComputedStyleProperty object. ";
-                    DEBUG_WRITE_FORCE("%s Error: %s", errorMessage, errorSupportString.c_str());
-                } else {
-                    *out_computedStyle = std::move(computedStyles);
+                    protocol::ErrorSupport errorSupport;
+                    auto computedStyles = protocol::Array<protocol::CSS::CSSComputedStyleProperty>::parse(
+                            resultJson.get(), &errorSupport);
 
-                    return;
+                    auto errorSupportString = errorSupport.errors().utf8();
+                    if (!errorSupportString.empty()) {
+                        auto errorMessage = "Error while parsing CSSComputedStyleProperty object. ";
+                        DEBUG_WRITE_FORCE("%s Error: %s", errorMessage, errorSupportString.c_str());
+                    } else {
+                        *out_computedStyle = std::move(computedStyles);
+
+                        return;
+                    }
                 }
             }
         }
@@ -185,7 +189,12 @@ namespace v8_inspector {
     void V8CSSAgentImpl::getPlatformFontsForNode(ErrorString *, int in_nodeId,
                                                  std::unique_ptr<protocol::Array<protocol::CSS::PlatformFontUsage>> *out_fonts) {
         auto fontsArr = protocol::Array<protocol::CSS::PlatformFontUsage>::create();
-        fontsArr->addItem(std::move(protocol::CSS::PlatformFontUsage::create().setFamilyName("System Font").setGlyphCount(1).setIsCustomFont(false).build()));
+        auto defaultFont = "System Font";
+        fontsArr->addItem(std::move(protocol::CSS::PlatformFontUsage::create()
+                                            .setFamilyName(defaultFont)
+                                            .setGlyphCount(1)
+                                            .setIsCustomFont(false)
+                                            .build()));
         *out_fonts = std::move(fontsArr);
     }
 
