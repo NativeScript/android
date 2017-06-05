@@ -98,11 +98,32 @@ namespace v8_inspector {
                 }
             }
         }
+
         *out_root = std::move(defaultNode);
     }
 
-    void V8DOMAgentImpl::removeNode(ErrorString*, int in_nodeId) {
-        // TODO: Pete: call modules' View class methods to remove view from parent view
+    void V8DOMAgentImpl::removeNode(ErrorString *errorString, int in_nodeId) {
+        auto removeNodeFunctionString = "removeNode";
+        // TODO: Pete: Find a better way to get a hold of the isolate
+        auto isolate = v8::Isolate::GetCurrent();
+        auto context = isolate->GetCurrentContext();
+        auto global = context->Global();
+
+        auto globalInspectorObject = utils::Common::getGlobalInspectorObject(isolate);
+
+        if (!globalInspectorObject.IsEmpty()) {
+            auto removeNode = globalInspectorObject->Get(ArgConverter::ConvertToV8String(isolate, removeNodeFunctionString));
+
+            if (!removeNode.IsEmpty() && removeNode->IsFunction()) {
+                auto removeNodeFunc = removeNode.As<v8::Function>();
+                v8::Local<v8::Value> args[] = { v8::Number::New(isolate, in_nodeId) };
+                removeNodeFunc->Call(context, global, 1, args);
+
+                return;
+            }
+        }
+
+        *errorString = "Couldn't remove the selected DOMNode from the visual tree.";
     }
 
     // Pete: return empty resolved object - prevents crashes when opening the 'properties', 'event listeners' tabs
@@ -113,8 +134,6 @@ namespace v8_inspector {
 
         *out_object = std::move(resolvedNode);
     }
-
-    V8DOMAgentImpl* V8DOMAgentImpl::Instance = 0;
 
     void V8DOMAgentImpl::setAttributeValue(ErrorString *, int in_nodeId, const String &in_name,
                                            const String &in_value) {
@@ -156,4 +175,6 @@ namespace v8_inspector {
     void V8DOMAgentImpl::hideHighlight(ErrorString *) {
 
     }
+
+    V8DOMAgentImpl* V8DOMAgentImpl::Instance = 0;
 }

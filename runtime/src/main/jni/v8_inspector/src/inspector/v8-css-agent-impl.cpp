@@ -157,7 +157,7 @@ namespace v8_inspector {
 
             if (!getComputedStylesForNode.IsEmpty() && getComputedStylesForNode->IsFunction()) {
                 auto getComputedStylesForNodeFunc = getComputedStylesForNode.As<v8::Function>();
-                v8::Local<v8::Value> args[] = {v8::Number::New(isolate, in_nodeId)};
+                v8::Local<v8::Value> args[] = { v8::Number::New(isolate, in_nodeId) };
                 auto maybeResult = getComputedStylesForNodeFunc->Call(context, global, 1, args);
                 v8::Local<v8::Value> outResult;
 
