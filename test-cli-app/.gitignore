@@ -1,3 +1,14 @@
+*.iml
+.gradle
+/local.properties
+/.idea/workspace.xml
+/.idea/libraries
+.DS_Store
 /build
-/src
-proguard-rules.pro
+/captures
+app/build
+app/src
+app/.iml
+app/proguard-rules.pro
+!app/build.gradle
+!app/src/.gitkeep
