@@ -18,6 +18,7 @@ namespace tns {
         static void ChildNodeInsertedCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
         static void ChildNodeRemovedCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
         static void AttributeModifiedCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
+        static void AttributeRemovedCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
     };
 }
 

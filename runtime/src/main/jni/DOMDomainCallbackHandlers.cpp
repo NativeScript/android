@@ -100,12 +100,70 @@ void DOMDomainCallbackHandlers::ChildNodeRemovedCallback(const v8::FunctionCallb
 }
 
 void DOMDomainCallbackHandlers::AttributeModifiedCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
-    auto domAgentInstance = V8DOMAgentImpl::Instance;
+    try {
+        auto domAgentInstance = V8DOMAgentImpl::Instance;
 
-    if (!domAgentInstance) {
-        return;
+        if (!domAgentInstance) {
+            return;
+        }
+
+        auto isolate = args.GetIsolate();
+
+        v8::HandleScope scope(isolate);
+
+        if (args.Length() != 3 || !(args[0]->IsNumber() && args[1]->IsString() && args[2]->IsString())) {
+            throw NativeScriptException("Calling AttributeModified with invalid arguments. Required params: nodeId: number, name: string, value: string");
+        }
+
+        auto nodeId = args[0]->ToNumber(isolate);
+        auto attributeName = args[1]->ToString();
+        auto attributeValue = args[2]->ToString();
+
+         domAgentInstance->m_frontend.attributeModified(nodeId->Int32Value(),
+                                                        ArgConverter::ConvertToString(attributeName).c_str(),
+                                                        ArgConverter::ConvertToString(attributeValue).c_str());
+    } catch (NativeScriptException& e) {
+        e.ReThrowToV8();
+    } catch (std::exception e) {
+        std::stringstream ss;
+        ss << "Error: c exception: " << e.what() << std::endl;
+        NativeScriptException nsEx(ss.str());
+        nsEx.ReThrowToV8();
+    } catch (...) {
+        NativeScriptException nsEx(std::string("Error: c exception!"));
+        nsEx.ReThrowToV8();
     }
+}
 
+void DOMDomainCallbackHandlers::AttributeRemovedCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    try {
+        auto domAgentInstance = V8DOMAgentImpl::Instance;
 
-//    domAgentInstance->m_frontend.attributeModified();
+        if (!domAgentInstance) {
+            return;
+        }
+        auto isolate = args.GetIsolate();
+
+        v8::HandleScope scope(isolate);
+
+        if (args.Length() != 2 || !(args[0]->IsNumber() && args[1]->IsString())) {
+            throw NativeScriptException("Calling AttributeRemoved with invalid arguments. Required params: nodeId: number, name: string");
+        }
+
+        auto nodeId = args[0]->ToNumber(isolate);
+        auto attributeName = args[1]->ToString();
+
+        domAgentInstance->m_frontend.attributeRemoved(nodeId->Int32Value(),
+                                                       ArgConverter::ConvertToString(attributeName).c_str());
+    } catch (NativeScriptException& e) {
+        e.ReThrowToV8();
+    } catch (std::exception e) {
+        std::stringstream ss;
+        ss << "Error: c exception: " << e.what() << std::endl;
+        NativeScriptException nsEx(ss.str());
+        nsEx.ReThrowToV8();
+    } catch (...) {
+        NativeScriptException nsEx(std::string("Error: c exception!"));
+        nsEx.ReThrowToV8();
+    }
 }
