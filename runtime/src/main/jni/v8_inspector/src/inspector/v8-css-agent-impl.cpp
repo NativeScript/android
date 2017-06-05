@@ -140,11 +140,11 @@ namespace v8_inspector {
         *out_attributesStyle = Maybe<protocol::CSS::CSSStyle>(std::move(attributeStyle));
     }
 
-    void V8CSSAgentImpl::getComputedStyleForNode(ErrorString *, int in_nodeId,
+    void V8CSSAgentImpl::getComputedStyleForNode(ErrorString *errorString, int in_nodeId,
                                                  std::unique_ptr<protocol::Array<protocol::CSS::CSSComputedStyleProperty>> *out_computedStyle) {
         auto computedStylePropertyArr = protocol::Array<protocol::CSS::CSSComputedStyleProperty>::create();
 
-        auto getComputedStylesForNodeString = "getComputedStylesForNode";
+        std::string getComputedStylesForNodeString = "getComputedStylesForNode";
         // TODO: Pete: Find a better way to get a hold of the isolate
         auto isolate = v8::Isolate::GetCurrent();
         auto context = isolate->GetCurrentContext();
@@ -158,7 +158,17 @@ namespace v8_inspector {
             if (!getComputedStylesForNode.IsEmpty() && getComputedStylesForNode->IsFunction()) {
                 auto getComputedStylesForNodeFunc = getComputedStylesForNode.As<v8::Function>();
                 v8::Local<v8::Value> args[] = { v8::Number::New(isolate, in_nodeId) };
+                v8::TryCatch tc;
+
                 auto maybeResult = getComputedStylesForNodeFunc->Call(context, global, 1, args);
+
+                if (tc.HasCaught()) {
+                    *errorString = utils::Common::getJSCallErrorMessage(getComputedStylesForNodeString, tc.Message()->Get()).c_str();
+
+                    *out_computedStyle = std::move(computedStylePropertyArr);
+                    return;
+                }
+
                 v8::Local<v8::Value> outResult;
 
                 if (maybeResult.ToLocal(&outResult)) {

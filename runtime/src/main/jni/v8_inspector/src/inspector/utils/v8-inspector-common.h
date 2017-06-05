@@ -12,6 +12,7 @@ namespace v8_inspector {
         class Common {
         public:
             static v8::Local<v8::Object> getGlobalInspectorObject(v8::Isolate *isolate);
+            static std::string getJSCallErrorMessage(const std::string& functionName, v8::Local<v8::String> tcMessage);
         };
     }
     }

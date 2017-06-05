@@ -2,6 +2,7 @@
 // Created by pkanev on 5/10/2017.
 //
 
+#include <sstream>
 #include <ArgConverter.h>
 #include <NativeScriptAssert.h>
 #include "DOMDomainCallbackHandlers.h"
@@ -19,65 +20,83 @@ void DOMDomainCallbackHandlers::DocumentUpdatedCallback(const v8::FunctionCallba
 }
 
 void DOMDomainCallbackHandlers::ChildNodeInsertedCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
-    auto domAgentInstance = V8DOMAgentImpl::Instance;
+    try {
+        auto domAgentInstance = V8DOMAgentImpl::Instance;
 
-    if (!domAgentInstance) {
-        return;
+        if (!domAgentInstance) {
+            return;
+        }
+
+        auto isolate = args.GetIsolate();
+
+        v8::HandleScope scope(isolate);
+
+        if (args.Length() != 3 || !(args[0]->IsNumber() && args[1]->IsNumber() && args[2]->IsString())) {
+            throw NativeScriptException("Calling ChildNodeInserted with invalid arguments. Required params: parentId: number, lastId: number, node: JSON String");
+        }
+
+        auto parentId = args[0]->ToNumber(isolate);
+        auto lastId = args[1]->ToNumber(isolate);
+        auto node = args[2]->ToString(isolate);
+
+        auto nodeString = ArgConverter::ConvertToString(node);
+        auto nodeCStr = nodeString.c_str();
+        auto nodeJson = protocol::parseJSON(nodeCStr);
+
+        protocol::ErrorSupport errorSupport;
+        auto domNode = protocol::DOM::Node::parse(nodeJson.get(), &errorSupport);
+
+        auto errorSupportString = errorSupport.errors().utf8();
+        if (!errorSupportString.empty()) {
+            auto errorMessage = "Error while parsing debug `DOM Node` object. ";
+            DEBUG_WRITE_FORCE("%s Error: %s", errorMessage, errorSupportString.c_str());
+        }
+
+        domAgentInstance->m_frontend.childNodeInserted(parentId->Int32Value(), lastId->Int32Value(), std::move(domNode));
+    } catch (NativeScriptException& e) {
+        e.ReThrowToV8();
+    } catch (std::exception e) {
+        std::stringstream ss;
+        ss << "Error: c exception: " << e.what() << std::endl;
+        NativeScriptException nsEx(ss.str());
+        nsEx.ReThrowToV8();
+    } catch (...) {
+        NativeScriptException nsEx(std::string("Error: c exception!"));
+        nsEx.ReThrowToV8();
     }
-
-    if (args.Length() == 0) {
-        return;
-    }
-
-    auto isolate = args.GetIsolate();
-
-    v8::HandleScope scope(isolate);
-
-    auto context = isolate->GetCurrentContext();
-
-    // TODO: Pete: Validate!
-    auto parentId = args[0]->ToNumber(isolate);
-    auto lastId = args[1]->ToNumber(isolate);
-    auto node = args[2]->ToString(isolate);
-
-    auto nodeString = ArgConverter::ConvertToString(node);
-    auto nodeCStr = nodeString.c_str();
-    auto nodeJson = protocol::parseJSON(nodeCStr);
-
-    protocol::ErrorSupport errorSupport;
-    auto domNode = protocol::DOM::Node::parse(nodeJson.get(), &errorSupport);
-
-    auto errorSupportString = errorSupport.errors().utf8();
-    if (!errorSupportString.empty()) {
-        auto errorMessage = "Error while parsing debug `DOM Node` object. ";
-        DEBUG_WRITE_FORCE("%s Error: %s", errorMessage, errorSupportString.c_str());
-    }
-
-    domAgentInstance->m_frontend.childNodeInserted(parentId->Int32Value(), lastId->Int32Value(), std::move(domNode));
 }
 
 void DOMDomainCallbackHandlers::ChildNodeRemovedCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
-    auto domAgentInstance = V8DOMAgentImpl::Instance;
+    try {
+        auto domAgentInstance = V8DOMAgentImpl::Instance;
 
-    if (!domAgentInstance) {
-        return;
+        if (!domAgentInstance) {
+            return;
+        }
+
+        auto isolate = args.GetIsolate();
+
+        v8::HandleScope scope(isolate);
+
+        if (args.Length() != 2 || !(args[0]->IsNumber() && args[1]->IsNumber())) {
+            throw NativeScriptException("Calling ChildNodeRemoved with invalid arguments. Required params: parentId: number, nodeId: number");
+        }
+
+        auto parentId = args[0]->ToNumber(isolate);
+        auto nodeId = args[1]->ToNumber(isolate);
+
+        domAgentInstance->m_frontend.childNodeRemoved(parentId->Int32Value(), nodeId->Int32Value());
+    } catch (NativeScriptException& e) {
+        e.ReThrowToV8();
+    } catch (std::exception e) {
+        std::stringstream ss;
+        ss << "Error: c exception: " << e.what() << std::endl;
+        NativeScriptException nsEx(ss.str());
+        nsEx.ReThrowToV8();
+    } catch (...) {
+        NativeScriptException nsEx(std::string("Error: c exception!"));
+        nsEx.ReThrowToV8();
     }
-
-    if (args.Length() == 0) {
-        return;
-    }
-
-    auto isolate = args.GetIsolate();
-
-    v8::HandleScope scope(isolate);
-
-    auto context = isolate->GetCurrentContext();
-
-    // TODO: Pete: Validate!
-    auto parentId = args[0]->ToNumber(isolate);
-    auto nodeId = args[1]->ToNumber(isolate);
-
-    domAgentInstance->m_frontend.childNodeRemoved(parentId->Int32Value(), nodeId->Int32Value());
 }
 
 void DOMDomainCallbackHandlers::AttributeModifiedCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {

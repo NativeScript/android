@@ -58,7 +58,7 @@ namespace v8_inspector {
                 .setNodeValue("")
                 .build();
 
-        auto getDocumentFunctionString = "getDocument";
+        std::string getDocumentFunctionString = "getDocument";
         // TODO: Pete: Find a better way to get a hold of the isolate
         auto isolate = v8::Isolate::GetCurrent();
         auto context = isolate->GetCurrentContext();
@@ -72,7 +72,17 @@ namespace v8_inspector {
             if (!getDocument.IsEmpty() && getDocument->IsFunction()) {
                 auto getDocumentFunc = getDocument.As<v8::Function>();
                 v8::Local<v8::Value> args[] = {  };
+                v8::TryCatch tc;
+
                 auto maybeResult = getDocumentFunc->Call(context, global, 0, args);
+
+                if (tc.HasCaught()) {
+                    *errorString = utils::Common::getJSCallErrorMessage(getDocumentFunctionString, tc.Message()->Get()).c_str();
+
+                    *out_root = std::move(defaultNode);
+                    return;
+                }
+
                 v8::Local<v8::Value> outResult;
 
                 if (maybeResult.ToLocal(&outResult)) {
@@ -87,7 +97,7 @@ namespace v8_inspector {
                     *errorString = errorSupportString.c_str();
                     if (!errorSupportString.empty()) {
                         auto errorMessage = "Error while parsing debug `DOM Node` object. ";
-                        DEBUG_WRITE_FORCE("%s Error: %s", errorMessage, errorSupportString.c_str());
+                        DEBUG_WRITE_FORCE("JS Error: %s", errorMessage, errorSupportString.c_str());
                     } else {
                         *out_root = std::move(domNode);
 
@@ -103,7 +113,8 @@ namespace v8_inspector {
     }
 
     void V8DOMAgentImpl::removeNode(ErrorString *errorString, int in_nodeId) {
-        auto removeNodeFunctionString = "removeNode";
+        std::string removeNodeFunctionString = "removeNode";
+
         // TODO: Pete: Find a better way to get a hold of the isolate
         auto isolate = v8::Isolate::GetCurrent();
         auto context = isolate->GetCurrentContext();
@@ -117,7 +128,13 @@ namespace v8_inspector {
             if (!removeNode.IsEmpty() && removeNode->IsFunction()) {
                 auto removeNodeFunc = removeNode.As<v8::Function>();
                 v8::Local<v8::Value> args[] = { v8::Number::New(isolate, in_nodeId) };
+                v8::TryCatch tc;
+
                 removeNodeFunc->Call(context, global, 1, args);
+
+                if (tc.HasCaught()) {
+                    *errorString = utils::Common::getJSCallErrorMessage(removeNodeFunctionString, tc.Message()->Get()).c_str();
+                }
 
                 return;
             }
