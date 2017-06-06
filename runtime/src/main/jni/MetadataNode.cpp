@@ -756,8 +756,7 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* is
     SetTypeMetadata(isolate, wrappedCtorFunc, new TypeMetadata(s_metadataReader.ReadTypeName(treeNode)));
 
     if (frame.check()) {
-        std::string log = "Materizlizing class: " + node->m_name;
-        frame.log(log.c_str());
+        frame.log("Materizlizing class: " + node->m_name);
     }
 
     return ctorFuncTemplate;
@@ -896,8 +895,7 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
         auto success = CallbackHandlers::RegisterInstance(isolate, thiz, className, argWrapper, implementationObject, true);
 
         if (frame.check()) {
-            std::string msg = "Interface constructor: " + node->m_name;
-            frame.log(msg.c_str());
+            frame.log("Interface constructor: " + node->m_name);
         }
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
@@ -1377,8 +1375,7 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
         cache->ExtendedCtorFuncCache.insert(make_pair(fullExtendedName, cacheData));
 
         if (frame.check()) {
-            std::string msg = "Extending: " + node->m_name;
-            frame.log(msg.c_str());
+            frame.log("Extending: " + node->m_name);
         }
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();

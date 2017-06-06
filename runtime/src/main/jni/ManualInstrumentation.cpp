@@ -5,4 +5,4 @@
 #include "ManualInstrumentation.h"
 
 bool tns::instrumentation::Frame::disabled = true;
-const std::chrono::steady_clock::time_point tns::instrumentation::Frame::disabled_time = std::chrono::steady_clock::now();
+const std::chrono::steady_clock::time_point tns::instrumentation::Frame::disabled_time = std::chrono::steady_clock::time_point();

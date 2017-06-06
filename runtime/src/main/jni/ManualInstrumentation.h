@@ -2,22 +2,23 @@
 // Created by Panayot Cankov on 26/05/2017.
 //
 
-#ifndef TEST_APP_MANUALINSTRUMENTATION_H
-#define TEST_APP_MANUALINSTRUMENTATION_H
+#ifndef MANUALINSTRUMENTATION_H
+#define MANUALINSTRUMENTATION_H
 
 #include "v8.h"
 #import <chrono>
 #import <NativeScriptAssert.h>
+#include <string>
 
 namespace tns {
     namespace instrumentation {
         class Frame {
         public:
-            inline Frame() : Frame(nullptr) { }
-            inline Frame(const char *name) : name(name), start(disabled ? disabled_time : std::chrono::steady_clock::now()) {}
+            inline Frame() : Frame("") { }
+            inline Frame(std::string name) : name(name), start(disabled ? disabled_time : std::chrono::steady_clock::now()) {}
 
             inline ~Frame() {
-                if (name && check()) {
+                if (!name.empty() && check()) {
                     log(name);
                 }
             }
@@ -42,6 +43,10 @@ namespace tns {
                 __android_log_print(ANDROID_LOG_DEBUG, "JS", "Timeline: %.3fms: Runtime: %s  (%.3fms - %.3fms)", duration / 1000.0, message, startMilis, endMilis);
             }
 
+            inline void log(const std::string& message) {
+                log(message.c_str());
+            }
+
             static inline void enable() { disabled = false; }
             static inline void disable() { disabled = true; }
 
@@ -50,7 +55,7 @@ namespace tns {
             static const std::chrono::steady_clock::time_point disabled_time; // Couldn't find reasonable constant
 
             const std::chrono::steady_clock::time_point start;
-            const char *name;
+            const std::string name;
 
             Frame(const Frame &) = delete;
             Frame &operator=(const Frame &) = delete;
@@ -63,4 +68,4 @@ namespace tns {
  */
 #define TNSPERF() tns::instrumentation::Frame __tns_manual_instrumentation(__func__)
 
-#endif //TEST_APP_MANUALINSTRUMENTATION_H
+#endif //MANUALINSTRUMENTATION_H

@@ -10,6 +10,17 @@ import java.util.Stack;
 public class ManualInstrumentation {
     private static Mode mode = Mode.Pending;
 
+    public static void setMode(String mode) {
+        switch (mode) {
+            case "timeline":
+                ManualInstrumentation.setMode(ManualInstrumentation.Mode.Timeline);
+                break;
+            default:
+                ManualInstrumentation.setMode(ManualInstrumentation.Mode.Disabled);
+        }
+        Runtime.SetManualInstrumentationMode(mode);
+    }
+
     public static void setMode(Mode mode) {
         if (ManualInstrumentation.mode == Mode.Pending) {
             switch(mode) {

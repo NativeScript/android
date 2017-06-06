@@ -119,14 +119,7 @@ public final class RuntimeHelper {
                 }
 
                 AppConfig appConfig = new AppConfig(appDir);
-                switch (appConfig.getProfilingMode()) {
-                    case "timeline":
-                        ManualInstrumentation.setMode(ManualInstrumentation.Mode.Timeline);
-                        break;
-                    default:
-                        ManualInstrumentation.setMode(ManualInstrumentation.Mode.Disabled);
-                }
-                Runtime.SetManualInstrumentationMode(appConfig.getProfilingMode());
+                ManualInstrumentation.setMode(appConfig.getProfilingMode());
 
                 ClassLoader classLoader = app.getClassLoader();
                 File dexDir = new File(rootDir, "code_cache/secondary-dexes");

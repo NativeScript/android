@@ -520,14 +520,9 @@ void ObjectManager::MarkReachableObjects(Isolate* isolate, const Local<Object>& 
 
     if (frame.check()) {
         auto cls = fromJsInfo->ObjectClazz;
-        JEnv env;
-        jclass clsClazz = env.GetObjectClass(cls);
-        jmethodID methodId = env.GetMethodID(clsClazz, "getSimpleName", "()Ljava/lang/String;");
-        jstring className = (jstring) env.CallObjectMethod(cls, methodId);
-        const char* str = env.GetStringUTFChars(className, NULL);
-        auto jsObjClassName = "MarkReachableObjects: " + std::string(str);
-        frame.log(jsObjClassName.c_str());
-        env.ReleaseStringUTFChars(className, str);
+        jclass clsClazz = m_env.GetObjectClass(cls);
+        jstring className = (jstring) m_env.CallObjectMethod(cls, GET_NAME_METHOD_ID);
+        frame.log("MarkReachableObjects: " + ArgConverter::jstringToString(className));
     }
 }
 

@@ -157,8 +157,7 @@ void ModuleInternal::RequireCallbackImpl(const v8::FunctionCallbackInfo<v8::Valu
     }
 
     string moduleName = ArgConverter::ConvertToString(args[0].As<String>());
-    string frameName("RequireCallback " + moduleName);
-    tns::instrumentation::Frame frame(frameName.c_str());
+    tns::instrumentation::Frame frame(("RequireCallback " + moduleName).c_str());
     string callingModuleDirName = ArgConverter::ConvertToString(args[1].As<String>());
     auto isData = false;
 
