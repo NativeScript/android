@@ -44,13 +44,14 @@ model {
 }
 
 dependencies {
-	def supportVer = "23.3.0"
+	def supportVer = "25.3.1"
 	compile project(':runtime')
 	compile fileTree(include: ['*.jar'], dir: 'libs')
 
 	compile "com.android.support:support-v4:$supportVer"
 	compile "com.android.support:appcompat-v7:$supportVer"
 	compile "com.android.support:design:$supportVer"
+    compile "com.github.gcacace:signature-pad:1.0.3"
 
 	testCompile 'junit:junit:4.12'
 }
