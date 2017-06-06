@@ -152,18 +152,43 @@ namespace v8_inspector {
         *out_object = std::move(resolvedNode);
     }
 
-    void V8DOMAgentImpl::setAttributeValue(ErrorString *, int in_nodeId, const String &in_name,
+    void V8DOMAgentImpl::setAttributeValue(ErrorString *errorString, int in_nodeId, const String &in_name,
                                            const String &in_value) {
-        // TODO: Pete: call modules' View class methods to set view's attribute
+        // Irrelevant
     }
 
-    void V8DOMAgentImpl::setAttributesAsText(ErrorString *, int in_nodeId, const String &in_text,
+    void V8DOMAgentImpl::setAttributesAsText(ErrorString *errorString, int in_nodeId, const String &in_text,
                                              const Maybe<String> &in_name) {
-        // TODO: Pete: call modules' View class methods to set view's attribute
+        // call modules' View class methods to modify view's attribute
+        // TODO: Pete: Find a better way to get a hold of the isolate
+        std::string setAttributeAsTextFunctionString = "setAttributeAsText";
+        auto isolate = v8::Isolate::GetCurrent();
+        auto context = isolate->GetCurrentContext();
+        auto global = context->Global();
+
+        auto globalInspectorObject = utils::Common::getGlobalInspectorObject(isolate);
+
+        if (!globalInspectorObject.IsEmpty()) {
+            auto setAttributeAsText = globalInspectorObject->Get(ArgConverter::ConvertToV8String(isolate, setAttributeAsTextFunctionString));
+
+            if (!setAttributeAsText.IsEmpty() && setAttributeAsText->IsFunction()) {
+                auto setAttributeAsTextFunc = setAttributeAsText.As<v8::Function>();
+                v8::Local<v8::Value> args[] = { v8::Number::New(isolate, in_nodeId), ArgConverter::ConvertToV8String(isolate, in_text.utf8()), ArgConverter::ConvertToV8String(isolate, in_name.fromJust().utf8()) };
+                v8::TryCatch tc;
+
+                setAttributeAsTextFunc->Call(context, global, 3, args);
+
+                if (tc.HasCaught()) {
+                    *errorString = utils::Common::getJSCallErrorMessage(setAttributeAsTextFunctionString, tc.Message()->Get()).c_str();
+                }
+
+                return;
+            }
+        }
     }
 
-    void V8DOMAgentImpl::removeAttribute(ErrorString *, int in_nodeId, const String &in_name) {
-        // TODO: Pete: call modules' View class methods to modify view's attribute
+    void V8DOMAgentImpl::removeAttribute(ErrorString *errorString, int in_nodeId, const String &in_name) {
+        // Irrelevant
     }
 
     void V8DOMAgentImpl::performSearch(ErrorString *, const String &in_query,
