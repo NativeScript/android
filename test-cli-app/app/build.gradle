@@ -1,11 +1,3 @@
-/*
-* run from dir: test-app/
-* 	run on emulator: ./gradlew runtests //default
-* 	run on device: ./gradlew runtests -PrunOnDevice
-*
-*/
-
-
 def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
 
 apply plugin: 'com.android.model.application'
@@ -21,7 +13,7 @@ model {
         defaultConfig.with {
             applicationId = "com.tns.debugapp"
             minSdkVersion.apiLevel = 17
-            targetSdkVersion.apiLevel = 22
+            targetSdkVersion.apiLevel = 25
             versionCode = 1
             versionName = "1.0"
         }
@@ -51,7 +43,6 @@ dependencies {
 	compile "com.android.support:support-v4:$supportVer"
 	compile "com.android.support:appcompat-v7:$supportVer"
 	compile "com.android.support:design:$supportVer"
-    compile "com.github.gcacace:signature-pad:1.0.3"
 
 	testCompile 'junit:junit:4.12'
 }
@@ -71,7 +62,6 @@ repositories {
 task addAarDependencies  {
     FileTree tree = fileTree(dir: "$projectDir/src", include: ["**/*.aar"])
     tree.each { File file ->
-        // remove the extension of the file (.aar)
         def length = file.name.length() - 4
         def fileName = file.name[0..<length]
         println "\t+adding dependency: " + file.getAbsolutePath()
