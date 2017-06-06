@@ -40,7 +40,7 @@ def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
 def metadataParams = new LinkedList <String> ()
 def allJarPaths = new LinkedList <String> ()
 def configurationsDir = "$projectDir/configurations"
-def createPluginConfigFile = false
+def shouldCreatePluginConfigFile = false
 def configStage = "\n:config phase: "
 def nodeModulesDir = "../../node_modules/"
 def libDir = "$projectDir/../../lib/Android/"
@@ -55,7 +55,7 @@ def asbgProject = project(":asbg")
 asbgProject.ext.outDir = new File("$projectDir", "src/main/java")
 asbgProject.ext.jsCodeDir = new File("$projectDir", "src/main/assets/app")
 
-def compiteCompileSdkVersion () {
+def computeCompileSdkVersion () {
 	if(project.hasProperty("compileSdk")) {
 		return compileSdk
 	}
@@ -118,14 +118,14 @@ task getDevDependencies {
 ////////////////////////////////////////////////////////////////////////////////////
 
 android {
-	compileSdkVersion compiteCompileSdkVersion()
+	compileSdkVersion computeCompileSdkVersion()
     buildToolsVersion computeBuildToolsVersion()
 	
 	defaultConfig {
 		minSdkVersion 17
 		targetSdkVersion computeTargetSdkVersion()
 		ndk {
-            		abiFilters "armeabi-v7a", "x86"
+            abiFilters "armeabi-v7a", "x86"
 		}
 	}
 	
@@ -183,14 +183,14 @@ repositories {
 }
 
 dependencies {
-	def suppotVer = "22.2.0";
+	def supportVer = "22.2.0";
 	if(project.hasProperty("supportVersion")) {
-		suppotVer = supportVersion
+		supportVer = supportVersion
 	}
 	
-    compile "com.android.support:support-v4:$suppotVer"
-    compile "com.android.support:appcompat-v7:$suppotVer"
-	debugCompile "com.android.support:design:$suppotVer"
+    compile "com.android.support:support-v4:$supportVer"
+    compile "com.android.support:appcompat-v7:$supportVer"
+	debugCompile "com.android.support:design:$supportVer"
 
     // take all jars within the libs dir
 	compile fileTree(dir: "$projectDir/libs", include: ["**/*.jar"])
@@ -268,7 +268,7 @@ def updateProductFlavorsContent(flavor, dimensionName, oldContent) {
 					def closingQuotes = oldContent.indexOf('"', openingQuoutes + 1);
 					if(closingQuotes == -1) {
 						closingQuotes = oldContent.indexOf("'", openingQuoutes + 1);
-					}	
+					}
 
 					index = closingQuotes + 1;
 				}
@@ -282,8 +282,7 @@ def updateProductFlavorsContent(flavor, dimensionName, oldContent) {
 		return newContent;
 }
 
-def createProductFlavorsContent(flavor, dimensionName, includeAndroidContent = true)
-{
+def createProductFlavorsContent(flavor, dimensionName, includeAndroidContent = true) {
 	if (includeAndroidContent)
   	{
     	def content = """
@@ -317,12 +316,11 @@ def createIncludeFile (filePath, flavor, dimensionName) {
 	defaultIncludeFile.text =  createProductFlavorsContent(flavor, dimensionName);
 }
 
-def sanatizeDimensionName(str) {
+def sanitizeDimensionName(str) {
 	return str.replaceAll(/\W/, "")
 }
 
-def replaceProductFlavorInContent(content, dimension, flavor)
-{
+def replaceProductFlavorInContent(content, dimension, flavor) {
 	def indexStart = content.indexOf("productFlavors");
 	def index = indexStart  + "productFlavors".length();
 	def indexEnd = -1;
@@ -373,17 +371,16 @@ def replaceProductFlavorInContent(content, dimension, flavor)
         }
     }
 }
-//make sure the include.gradle file, produced by the user, has only allowed characters in dimension attribute and remove any invalid characters if necessary
-def updateIncludeGradleFile(targetFile, dimensionName, flavor)
-{
+
+// make sure the include.gradle file provided by the user has only allowed characters in dimension attribute and remove any invalid characters if necessary
+def updateIncludeGradleFile(targetFile, dimensionName, flavor) {
 	def fileEntry = new File(targetFile.getAbsolutePath());
 	def content = fileEntry.text;
 	def replacedContent = replaceProductFlavorInContent(content, dimensionName, flavor);
 	fileEntry.text = replacedContent;
 }
 
-def renamePluginDirToFlavorName(directory, flavor) 
-{
+def renamePluginDirToFlavorName(directory, flavor) {
     def parentName = directory.getName();
     def parentFile = new File("src", parentName);
     if (parentFile.exists())
@@ -401,44 +398,73 @@ task createDefaultIncludeFiles {
 	println "$configStage createDefaultIncludeFiles"
 	def ft = file(configurationsDir)
 		
-	ft.listFiles().each { fl ->
-	
-		if(fl.isDirectory()) {
-			def fileName = fl.name
-			def dimensionName = sanatizeDimensionName(fileName)
-			createPluginConfigFile = true
-			def foundIncludeFile = false
-			
-			def flavor = "F" + flavorNumber++
-			println "\t+found plugins: " + fileName
-			fl.listFiles().each { subFile ->
-			
-				if(subFile.name == "include.gradle") {
-					foundIncludeFile = true
-					updateIncludeGradleFile(subFile, dimensionName, flavor)
-                                        renamePluginDirToFlavorName(subFile.getParentFile(), flavor);
+	ft.listFiles().each { file ->
+		if (file.isDirectory()) {
+			shouldCreatePluginConfigFile = true
+			def hasChildrenDirs = false
+			file.listFiles().each { subFile ->
+				if (subFile.isDirectory()) {
+					hasChildrenDirs = true
 				}
 			}
-			
-			flavorNames.add('"' + dimensionName + '"')
-			
-			if(!foundIncludeFile) {
-				createIncludeFile(fl.getAbsolutePath() , flavor, dimensionName)
-				renamePluginDirToFlavorName(fl, flavor);
-			}
+
+			// if plugin is scoped - traverse its children directories
+			// e.g. @scope/plugin-with-android-aars 
+			if (hasChildrenDirs) {
+				file.listFiles().each { subFile ->
+					if (subFile.isDirectory()) {
+						flavorNumber++
+						createIncludeGradleForPlugin(subFile, flavorNumber, flavorNames)
+					}
+				}
+			} else {
+				flavorNumber++
+				createIncludeGradleForPlugin(file, flavorNumber, flavorNames)
+			}			
 		}
+	}
+}
+
+def createIncludeGradleForPlugin(file, flavorNumber, flavorNames) {
+	def parentDir = new File(file.getParent())
+	def parentName = parentDir.name
+	def dirToRename = file
+
+	if (parentName.indexOf("@") == 0) {
+		dirToRename = new File(parentName + "_" + file.name)
+	}
+
+	def foundIncludeFile = false
+	def fileName = file.name
+	def dimensionName = sanitizeDimensionName(fileName)
+	
+	def flavor = "F" + flavorNumber
+	println "\t+found plugins: " + fileName
+	file.listFiles().each { subFile ->
+		if (subFile.name == "include.gradle") {
+			foundIncludeFile = true
+			updateIncludeGradleFile(subFile, dimensionName, flavor)
+								renamePluginDirToFlavorName(dirToRename, flavor);
+		}
+	}
+	
+	flavorNames.add('"' + dimensionName + '"')
+	
+	if (!foundIncludeFile) {
+		createIncludeFile(file.getAbsolutePath() , flavor, dimensionName)
+		renamePluginDirToFlavorName(dirToRename, flavor);
 	}
 }
 
 task createPluginsConfigFile {
 	description "creates product flavor config file based on what plugins are added"
 	
-	if(configDir.exists()) {
+	if (configDir.exists()) {
 		println "$configStage createPluginsConfigFile"
 		
 		def flavorsFile = new File("$configurationsDir/include.gradle")
 
-		if(createPluginConfigFile) {
+		if(shouldCreatePluginConfigFile) {
 			println "\t Creating product flavors include.gradle file in $configurationsDir folder..."
 			def flavors = flavorNames.join(", ")
 			
