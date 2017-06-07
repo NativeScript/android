@@ -18,11 +18,11 @@ The repo is structured in the following projects (ordered by dependencies):
 * **build/project-template** - this is an empty placeholder Android Application project, used by the [NativeScript CLI](https://github.com/NativeScript/nativescript-cli) when building an Android project.
 
 # Build Prerequisites
-The source in this repo is organized in Android Studio projects.
+Following are the minimal prerequisites to build the runtime package.
 
 * Install the latest [Android Studio ](https://developer.android.com/studio/index.html).
-* Install Android API Level 22 from Android Studio -> Tools -> Android -> SDK Manager
-* Install the Android NDK from Android Studio -> Tools -> Android -> SDK Manager
+* Install Android API Level 22, 23, 24, 25 from Android Studio -> Tools -> Android -> SDK Manager
+* Android NDK 12b - [NDK Archives](https://developer.android.com/ndk/downloads/older_releases.html)
 * Download Android Support Repository through the Android SDK Manager
 * Download Build Tools 25.0.2 through the Android SDK Manager.
 
