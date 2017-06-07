@@ -53,6 +53,8 @@ public class Runtime {
 
     public static native int getPointerSize();
 
+    public static native void SetManualInstrumentationMode(String mode);
+
     private static native void WorkerGlobalOnMessageCallback(int runtimeId, String message);
 
     private static native void WorkerObjectOnMessageCallback(int runtimeId, int workerId, String message);
@@ -144,26 +146,31 @@ public class Runtime {
 
     public Runtime(StaticConfiguration config, DynamicConfiguration dynamicConfiguration) {
         synchronized (Runtime.currentRuntime) {
-            Runtime existingRuntime = currentRuntime.get();
-            if (existingRuntime != null) {
-                throw new NativeScriptException("There is an existing runtime on this thread with id=" + existingRuntime.getRuntimeId());
+            ManualInstrumentation.Frame frame = ManualInstrumentation.start("new Runtime");
+            try {
+                Runtime existingRuntime = currentRuntime.get();
+                if (existingRuntime != null) {
+                    throw new NativeScriptException("There is an existing runtime on this thread with id=" + existingRuntime.getRuntimeId());
+                }
+
+                this.runtimeId = nextRuntimeId.getAndIncrement();
+                this.config = config;
+                this.dynamicConfig = dynamicConfiguration;
+                this.threadScheduler = dynamicConfiguration.myThreadScheduler;
+                this.workerId = dynamicConfiguration.workerId;
+                if (dynamicConfiguration.mainThreadScheduler != null) {
+                    this.mainThreadHandler = dynamicConfiguration.mainThreadScheduler.getHandler();
+                }
+
+                classResolver = new ClassResolver(this);
+                currentRuntime.set(this);
+
+                runtimeCache.put(this.runtimeId, this);
+
+                gcListener = GcListener.getInstance(config.appConfig.getGcThrottleTime(), config.appConfig.getMemoryCheckInterval(), config.appConfig.getFreeMemoryRatio());
+            } finally {
+                frame.close();
             }
-
-            this.runtimeId = nextRuntimeId.getAndIncrement();
-            this.config = config;
-            this.dynamicConfig = dynamicConfiguration;
-            this.threadScheduler = dynamicConfiguration.myThreadScheduler;
-            this.workerId = dynamicConfiguration.workerId;
-            if (dynamicConfiguration.mainThreadScheduler != null) {
-                this.mainThreadHandler = dynamicConfiguration.mainThreadScheduler.getHandler();
-            }
-
-            classResolver = new ClassResolver(this);
-            currentRuntime.set(this);
-
-            runtimeCache.put(this.runtimeId, this);
-
-            gcListener = GcListener.getInstance(config.appConfig.getGcThrottleTime(), config.appConfig.getMemoryCheckInterval(), config.appConfig.getFreeMemoryRatio());
         }
     }
 
@@ -449,35 +456,40 @@ public class Runtime {
             throw new RuntimeException("NativeScriptApplication already initialized");
         }
 
-        this.logger = logger;
-
-        this.dexFactory = new DexFactory(logger, classLoader, dexDir, dexThumb);
-
-        if (logger.isEnabled()) {
-            logger.write("Initializing NativeScript JAVA");
-        }
-
+        ManualInstrumentation.Frame frame = ManualInstrumentation.start("Runtime.init");
         try {
-            Module.init(logger, rootDir, appDir);
-        } catch (IOException ex) {
-            throw new RuntimeException("Fail to initialize Require class", ex);
+            this.logger = logger;
+
+            this.dexFactory = new DexFactory(logger, classLoader, dexDir, dexThumb);
+
+            if (logger.isEnabled()) {
+                logger.write("Initializing NativeScript JAVA");
+            }
+
+            try {
+                Module.init(logger, rootDir, appDir);
+            } catch (IOException ex) {
+                throw new RuntimeException("Fail to initialize Require class", ex);
+            }
+
+            initNativeScript(getRuntimeId(), Module.getApplicationFilesPath(), nativeLibDir, logger.isEnabled(), isDebuggable, appName, appConfig.getAsArray(), callingJsDir);
+
+            clearStartupData(getRuntimeId()); // It's safe to delete the data after the V8 debugger is initialized
+
+            if (logger.isEnabled()) {
+                Date d = new Date();
+                int pid = android.os.Process.myPid();
+                File f = new File("/proc/" + pid);
+                Date lastModDate = new Date(f.lastModified());
+                logger.write("init time=" + (d.getTime() - lastModDate.getTime()));
+            }
+
+            gcListener.subscribe(this);
+
+            initialized = true;
+        } finally {
+            frame.close();
         }
-
-        initNativeScript(getRuntimeId(), Module.getApplicationFilesPath(), nativeLibDir, logger.isEnabled(), isDebuggable, appName, appConfig.getAsArray(), callingJsDir);
-
-        clearStartupData(getRuntimeId()); // It's safe to delete the data after the V8 debugger is initialized
-
-        if (logger.isEnabled()) {
-            Date d = new Date();
-            int pid = android.os.Process.myPid();
-            File f = new File("/proc/" + pid);
-            Date lastModDate = new Date(f.lastModified());
-            logger.write("init time=" + (d.getTime() - lastModDate.getTime()));
-        }
-
-        gcListener.subscribe(this);
-
-        initialized = true;
     }
 
     @RuntimeCallable
@@ -495,8 +507,13 @@ public class Runtime {
     }
 
     public void run() throws NativeScriptException {
-        String mainModule = Module.bootstrapApp();
-        runModule(new File(mainModule));
+        ManualInstrumentation.Frame frame = ManualInstrumentation.start("Runtime.run");
+        try {
+            String mainModule = Module.bootstrapApp();
+            runModule(new File(mainModule));
+        } finally {
+            frame.close();
+        }
     }
 
     public void runModule(File jsFile) throws NativeScriptException {
@@ -568,14 +585,19 @@ public class Runtime {
     }
 
     public static void initInstance(Object instance) {
-        Runtime runtime = Runtime.getCurrentRuntime();
+        ManualInstrumentation.Frame frame = ManualInstrumentation.start("Runtime.initInstance");
+        try {
+            Runtime runtime = Runtime.getCurrentRuntime();
 
-        int objectId = runtime.currentObjectId;
+            int objectId = runtime.currentObjectId;
 
-        if (objectId != -1) {
-            runtime.makeInstanceStrong(instance, objectId);
-        } else {
-            runtime.createJSInstance(instance);
+            if (objectId != -1) {
+                runtime.makeInstanceStrong(instance, objectId);
+            } else {
+                runtime.createJSInstance(instance);
+            }
+        } finally {
+            frame.close();
         }
     }
 

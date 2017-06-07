@@ -11,6 +11,7 @@
 #include "Runtime.h"
 #include <sstream>
 #include <cctype>
+#include "ManualInstrumentation.h"
 
 #include "v8.h"
 
@@ -681,6 +682,7 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* is
 
 Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* isolate, MetadataTreeNode* treeNode, vector<MethodCallbackData*>& instanceMethodsCallbackData) {
     SET_PROFILER_FRAME();
+    tns::instrumentation::Frame frame;
 
     //try get cached "ctorFuncTemplate"
     Local<FunctionTemplate> ctorFuncTemplate;
@@ -753,6 +755,10 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* is
 
     SetTypeMetadata(isolate, wrappedCtorFunc, new TypeMetadata(s_metadataReader.ReadTypeName(treeNode)));
 
+    if (frame.check()) {
+        frame.log("Materizlizing class: " + node->m_name);
+    }
+
     return ctorFuncTemplate;
 }
 
@@ -807,6 +813,7 @@ void MetadataNode::SetInstanceMetadata(Isolate* isolate, Local<Object> object, M
 }
 
 void MetadataNode::ExtendedClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    TNSPERF();
     try {
         SET_PROFILER_FRAME();
 
@@ -843,6 +850,7 @@ void MetadataNode::ExtendedClassConstructorCallback(const v8::FunctionCallbackIn
 }
 
 void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    tns::instrumentation::Frame frame;
     try {
         SET_PROFILER_FRAME();
 
@@ -885,6 +893,10 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
         ArgsWrapper argWrapper(info, ArgType::Interface);
 
         auto success = CallbackHandlers::RegisterInstance(isolate, thiz, className, argWrapper, implementationObject, true);
+
+        if (frame.check()) {
+            frame.log("Interface constructor: " + node->m_name);
+        }
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -899,6 +911,7 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
 }
 
 void MetadataNode::ClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    TNSPERF();
     try {
         SET_PROFILER_FRAME();
 
@@ -1041,6 +1054,7 @@ void MetadataNode::ArrayIndexedPropertySetterCallback(uint32_t index, Local<Valu
 }
 
 Local<Object> MetadataNode::GetImplementationObject(Isolate* isolate, const Local<Object>& object) {
+    TNSPERF();
     DEBUG_WRITE("GetImplementationObject called  on object:%d", object->GetIdentityHash());
 
     auto target = object;
@@ -1247,6 +1261,7 @@ string MetadataNode::CreateFullClassName(const std::string& className, const std
 }
 
 void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    tns::instrumentation::Frame frame;
     try {
         if (info.IsConstructCall()) {
             string exMsg("Can't call 'extend' as constructor");
@@ -1358,6 +1373,10 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
         ExtendedClassCacheData cacheData(extendFunc, fullExtendedName, node);
         auto cache = GetMetadataNodeCache(isolate);
         cache->ExtendedCtorFuncCache.insert(make_pair(fullExtendedName, cacheData));
+
+        if (frame.check()) {
+            frame.log("Extending: " + node->m_name);
+        }
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
