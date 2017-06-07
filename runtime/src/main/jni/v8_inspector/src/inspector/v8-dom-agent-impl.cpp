@@ -144,6 +144,7 @@ namespace v8_inspector {
     }
 
     // Pete: return empty resolved object - prevents crashes when opening the 'properties', 'event listeners' tabs
+    // Not supported
     void V8DOMAgentImpl::resolveNode(ErrorString*, int in_nodeId, const Maybe<String>& in_objectGroup, std::unique_ptr<protocol::Runtime::RemoteObject>* out_object) {
         auto resolvedNode = protocol::Runtime::RemoteObject::create()
                 .setType("View")
@@ -191,22 +192,26 @@ namespace v8_inspector {
         // Irrelevant
     }
 
+    // Not supported
     void V8DOMAgentImpl::performSearch(ErrorString *, const String &in_query,
                                        const Maybe<protocol::Array<int>> &in_nodeIds,
                                        String *out_searchId, int *out_resultCount) {
 
     }
 
+    // Not supported
     void V8DOMAgentImpl::getSearchResults(ErrorString *, const String &in_searchId, int in_fromIndex,
                                      int in_toIndex,
                                      std::unique_ptr<protocol::Array<int>> *out_nodeIds) {
 
     }
 
+    // Not supported
     void V8DOMAgentImpl::discardSearchResults(ErrorString *, const String &in_searchId) {
 
     }
 
+    // Not supported
     void V8DOMAgentImpl::highlightNode(ErrorString *,
                                        std::unique_ptr<protocol::DOM::HighlightConfig> in_highlightConfig,
                                        const Maybe<int> &in_nodeId,

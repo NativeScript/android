@@ -48,7 +48,7 @@ namespace v8_inspector {
         m_enabled = false;
     }
 
-    // TODO: Pete: implement
+    // Not supported
     void V8CSSAgentImpl::getMatchedStylesForNode(ErrorString *errorString, int in_nodeId,
                                                  Maybe<protocol::CSS::CSSStyle> *out_inlineStyle,
                                                  Maybe<protocol::CSS::CSSStyle> *out_attributesStyle,
@@ -115,7 +115,7 @@ namespace v8_inspector {
         *out_pseudoElements = Maybe<protocol::Array<protocol::CSS::PseudoElementMatches>>(std::move(pseudoElementsArr));
     }
 
-    // TODO: Pete: implement
+    // Not supported
     void V8CSSAgentImpl::getInlineStylesForNode(ErrorString *, int in_nodeId,
                                                 Maybe<protocol::CSS::CSSStyle> *out_inlineStyle,
                                                 Maybe<protocol::CSS::CSSStyle> *out_attributesStyle) {
@@ -208,7 +208,7 @@ namespace v8_inspector {
         *out_fonts = std::move(fontsArr);
     }
 
-    // TODO: Pete: implement
+    // Not supported
     void V8CSSAgentImpl::getStyleSheetText(ErrorString *, const String &in_styleSheetId,
                                            String *out_text) {
         *out_text = "";
