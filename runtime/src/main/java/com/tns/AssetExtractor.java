@@ -26,7 +26,8 @@ public class AssetExtractor {
                 try {
                     delete(new File(outputPath + inputPath));
                 } catch (IOException e) {
-                    Log.d(LogTag, "Problem occurred while deleting assets from previous app version: " + outputPath + inputPath);
+                    String logTag = "AssetExtraction";
+                    Log.d(logTag, "Problem occurred while deleting assets from previous app version: " + outputPath + inputPath);
                 }
             }
 
@@ -50,7 +51,6 @@ public class AssetExtractor {
     private static void delete(File file) throws IOException {
         File[] files = file.listFiles();
         if (files == null) {
-            Log.d(LogTag, "Can't remove previously installed assets in " + file.getAbsolutePath());
             return;
         }
 
@@ -68,6 +68,4 @@ public class AssetExtractor {
             throw new IOException();
         }
     }
-
-    private static String LogTag = "JS: AssetExtraction";
 }
