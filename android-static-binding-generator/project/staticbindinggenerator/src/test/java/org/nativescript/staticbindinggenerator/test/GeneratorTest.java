@@ -1,6 +1,7 @@
 package org.nativescript.staticbindinggenerator.test;
 
 import com.example.ListView;
+import com.example.MyAbstractClass2;
 import com.example.MyInterface;
 
 import org.apache.commons.io.IOUtils;
@@ -128,5 +129,30 @@ public class GeneratorTest {
 
         Assert.assertNotNull(ComplexClass);
         Assert.assertEquals(4, ComplexClass.getDeclaredMethods().length); // 1 + constructor + (equals + hashcode)
+    }
+
+    @Test
+    public void testCanCompileBindingClassExtendingAnAbstractClassThatExtendsAbstractClass() throws Exception {
+        URL u = MyAbstractClass2.class.getResource('/' + MyAbstractClass2.class.getName().replace('.', '/') + ".class");
+        File f = new File(u.toURI()).getParentFile().getParentFile().getParentFile();
+
+        String dataRowString = "com.example.MyAbstractClass2*_fapp_l9_c29__*abstractMethod*com.example.com.example.MyExtendedClass**";
+        DataRow dataRow = new DataRow(dataRowString);
+
+        System.out.println(dataRowString);
+
+        String outputDir = null;
+        String[] libs = {runtimePath, f.getAbsolutePath()};
+        Generator generator = new Generator(outputDir, libs);
+        Binding binding = generator.generateBinding(dataRow);
+
+        StringBuffer sourceCode = new StringBuffer();
+        sourceCode.append(binding.getContent());
+
+        Iterable<String> options = new ArrayList<String>(Arrays.asList("-cp", dependenciesDir));
+        Class<?> ComplexClass = InMemoryJavaCompiler.compile(binding.getClassname(), sourceCode.toString(), options);
+
+        // class compiles, meaning abstract method of super-super class is extended properly
+        Assert.assertNotNull(ComplexClass);
     }
 }
