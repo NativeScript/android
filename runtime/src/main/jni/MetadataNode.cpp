@@ -1319,7 +1319,6 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
 
         auto isolate = info.GetIsolate();
 
-
         //resolve class (pre-generated or generated runtime from dex generator)
         uint8_t nodeType = s_metadataReader.GetNodeType(node->m_treeNode);
         bool isInterface = s_metadataReader.IsNodeTypeInterface(nodeType);
@@ -1420,6 +1419,9 @@ bool MetadataNode::GetExtendLocation(string& extendLocation) {
             }
 
             string srcFileName = ArgConverter::ConvertToString(scriptName);
+            // trim 'file://' to normalize path to always begin with "/data/"
+            srcFileName = Util::ReplaceAll(srcFileName, "file://", "");
+
             string fullPathToFile;
             if (srcFileName == "<embedded>") {
                 // Corner case, extend call is coming from the heap snapshot script

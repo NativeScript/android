@@ -552,7 +552,7 @@ jobjectArray CallbackHandlers::GetImplementedInterfaces(JEnv& env, const Local<O
                         if (element->IsFunction()) {
                             auto node = MetadataNode::GetTypeMetadataName(isolate, element);
 
-                            Util::ReplaceAll(node, std::string("/"), std::string("."));
+                            node = Util::ReplaceAll(node, std::string("/"), std::string("."));
 
                             jstring value = env.NewStringUTF(node.c_str());
                             interfacesToImplement.push_back(value);
