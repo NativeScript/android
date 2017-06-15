@@ -63,9 +63,9 @@ public class Generator {
                 // Compare text contents for equality
                 String content = new String(Files.readAllBytes(Paths.get(b.getFile().toString())));
                 if (content.equals(b.getContent())) {
-                    System.out.println("Warning: File already exists. This could mean the same code has been parsed more than once from two or more different files.");
+                    System.out.println("Warning: File already exists. This could mean the same code has been parsed more than once from two or more different files. \nFile:" + b.getFile());
                 } else {
-                    throw new IOException("File already exists. This may lead to undesired behavior.\nPlease change the name of one of the extended classes.\n" + b.getFile());
+                    throw new IOException("File already exists. This may lead to undesired behavior.\nPlease change the name of one of the extended classes.\nFile:" + b.getFile() + " Class: " + b.getClassname());
                 }
             }
         }
