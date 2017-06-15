@@ -7,9 +7,9 @@
 namespace v8_inspector {
 namespace utils {
 NetworkRequestData::NetworkRequestData()
-    : m_data(""),
+    : m_data(),
       m_hasTextContent(true) { }
-NetworkRequestData::NetworkRequestData(std::string data, bool hasTextContent)
+NetworkRequestData::NetworkRequestData(std::u16string data, bool hasTextContent)
     : m_data(data),
       m_hasTextContent(hasTextContent) { }
 }

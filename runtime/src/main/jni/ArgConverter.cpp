@@ -244,6 +244,17 @@ string ArgConverter::ConvertToString(const v8::Local<String>& s) {
     }
 }
 
+u16string ArgConverter::ConvertToUtf16String(const v8::Local<String>& s) {
+    if (s.IsEmpty()) {
+        return u16string();
+    } else {
+        auto str = ConvertToString(s);
+        auto utf16str =  Util::ConvertFromUtf8ToUtf16(str);
+
+        return utf16str;
+    }
+}
+
 jstring ArgConverter::ConvertToJavaString(const Local<Value>& value) {
     JEnv env;
     String::Value stringValue(value);
@@ -263,5 +274,18 @@ Local<String> ArgConverter::ConvertToV8String(Isolate* isolate, const char* data
     return String::NewFromUtf8(isolate, (const char*) data, String::kNormalString, length);
 }
 
+Local<String> ArgConverter::ConvertToV8UTF16String(Isolate* isolate, const string& string) {
+    auto utf16str = Util::ConvertFromUtf8ToUtf16(string);
+
+    return ConvertToV8UTF16String(isolate, utf16str);
+}
+
+Local<String> ArgConverter::ConvertToV8UTF16String(Isolate* isolate, const u16string& utf16string) {
+    return String::NewFromTwoByte(isolate, ((const uint16_t*) utf16string.data()));
+}
+
+Local<String> ArgConverter::ConvertToV8UTF16String(v8::Isolate* isolate, const uint16_t* utf16string, int size) {
+    return String::NewFromTwoByte(isolate, utf16string, NewStringType::kNormal, size).ToLocalChecked();
+}
 
 std::map<Isolate*, ArgConverter::TypeLongOperationsCache*> ArgConverter::s_type_long_operations_cache;

@@ -1,5 +1,7 @@
 #include "Util.h"
 #include <sstream>
+#include <iostream>
+#include <codecvt>
 
 using namespace v8;
 using namespace std;
@@ -77,28 +79,34 @@ bool Util::EndsWith(const string& str, const string& suffix) {
     return res;
 }
 
-string Util::ConvertFromJniToCanonicalName(const std::string& name) {
+string Util::ConvertFromJniToCanonicalName(const string& name) {
     string converted = name;
     replace(converted.begin(), converted.end(), '/', '.');
     return converted;
 }
 
-string Util::ConvertFromCanonicalToJniName(const std::string& name) {
+string Util::ConvertFromCanonicalToJniName(const string& name) {
     string converted = name;
     replace(converted.begin(), converted.end(), '.', '/');
     return converted;
 }
 
-string Util::ReplaceAll(std::string& str, const std::string& from, const std::string& to) {
+string Util::ReplaceAll(string& str, const string& from, const string& to) {
     if (from.empty()) {
         return str;
     }
 
     size_t start_pos = 0;
-    while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
+    while ((start_pos = str.find(from, start_pos)) != string::npos) {
         str.replace(start_pos, from.length(), to);
         start_pos += to.length();
     }
 
     return str;
+}
+
+u16string Util::ConvertFromUtf8ToUtf16(const string& str) {
+    auto utf16String = std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t>().from_bytes(str);
+
+    return utf16String;
 }
