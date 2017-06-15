@@ -9,7 +9,7 @@
 
 using namespace tns;
 
-void DOMDomainCallbackHandlers::DocumentUpdatedCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
+void DOMDomainCallbackHandlers::DocumentUpdatedCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
     auto domAgentInstance = V8DOMAgentImpl::Instance;
 
     if (!domAgentInstance) {
@@ -19,7 +19,7 @@ void DOMDomainCallbackHandlers::DocumentUpdatedCallback(const v8::FunctionCallba
     domAgentInstance->m_frontend.documentUpdated();
 }
 
-void DOMDomainCallbackHandlers::ChildNodeInsertedCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
+void DOMDomainCallbackHandlers::ChildNodeInsertedCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
     try {
         auto domAgentInstance = V8DOMAgentImpl::Instance;
 
@@ -39,9 +39,7 @@ void DOMDomainCallbackHandlers::ChildNodeInsertedCallback(const v8::FunctionCall
         auto lastId = args[1]->ToNumber(isolate);
         auto node = args[2]->ToString(isolate);
 
-        auto nodeString = ArgConverter::ConvertToString(node);
-        auto nodeCStr = nodeString.c_str();
-        auto nodeJson = protocol::parseJSON(nodeCStr);
+        auto nodeJson = protocol::parseJSON(v8_inspector::toProtocolString(node));
 
         protocol::ErrorSupport errorSupport;
         auto domNode = protocol::DOM::Node::parse(nodeJson.get(), &errorSupport);
@@ -66,7 +64,7 @@ void DOMDomainCallbackHandlers::ChildNodeInsertedCallback(const v8::FunctionCall
     }
 }
 
-void DOMDomainCallbackHandlers::ChildNodeRemovedCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
+void DOMDomainCallbackHandlers::ChildNodeRemovedCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
     try {
         auto domAgentInstance = V8DOMAgentImpl::Instance;
 
@@ -99,7 +97,7 @@ void DOMDomainCallbackHandlers::ChildNodeRemovedCallback(const v8::FunctionCallb
     }
 }
 
-void DOMDomainCallbackHandlers::AttributeModifiedCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
+void DOMDomainCallbackHandlers::AttributeModifiedCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
     try {
         auto domAgentInstance = V8DOMAgentImpl::Instance;
 
@@ -119,9 +117,9 @@ void DOMDomainCallbackHandlers::AttributeModifiedCallback(const v8::FunctionCall
         auto attributeName = args[1]->ToString();
         auto attributeValue = args[2]->ToString();
 
-         domAgentInstance->m_frontend.attributeModified(nodeId->Int32Value(),
-                                                        ArgConverter::ConvertToString(attributeName).c_str(),
-                                                        ArgConverter::ConvertToString(attributeValue).c_str());
+        domAgentInstance->m_frontend.attributeModified(nodeId->Int32Value(),
+                v8_inspector::toProtocolString(attributeName),
+                v8_inspector::toProtocolString(attributeValue));
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -135,7 +133,7 @@ void DOMDomainCallbackHandlers::AttributeModifiedCallback(const v8::FunctionCall
     }
 }
 
-void DOMDomainCallbackHandlers::AttributeRemovedCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
+void DOMDomainCallbackHandlers::AttributeRemovedCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
     try {
         auto domAgentInstance = V8DOMAgentImpl::Instance;
 
@@ -154,7 +152,7 @@ void DOMDomainCallbackHandlers::AttributeRemovedCallback(const v8::FunctionCallb
         auto attributeName = args[1]->ToString();
 
         domAgentInstance->m_frontend.attributeRemoved(nodeId->Int32Value(),
-                                                       ArgConverter::ConvertToString(attributeName).c_str());
+                v8_inspector::toProtocolString(attributeName));
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {

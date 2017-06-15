@@ -13,16 +13,16 @@ namespace utils {
 class NetworkRequestData {
     public:
         NetworkRequestData();
-        NetworkRequestData(std::string data, bool hasTextContent);
-        const char*  getData() {
-            return m_data.c_str();
+        NetworkRequestData(std::u16string data, bool hasTextContent);
+        const char16_t*  getData() {
+            return m_data.data();
         };
 
         const bool hasTextContent() {
             return m_hasTextContent;
         }
 
-        void setData(const std::string& data) {
+        void setData(const std::u16string& data) {
             m_data = data;
         }
 
@@ -31,7 +31,7 @@ class NetworkRequestData {
         }
 
     private:
-        std::string m_data;
+        std::u16string m_data;
         bool m_hasTextContent;
 };
 }

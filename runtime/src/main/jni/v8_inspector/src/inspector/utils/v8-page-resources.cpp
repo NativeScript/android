@@ -9,6 +9,7 @@
 #include <fstream>
 #include <iostream>
 #include <JniLocalRef.h>
+#include <Util.h>
 #include "base64.h"
 #include "v8_inspector/src/inspector/utils/v8-page-resources.h"
 #include "JEnv.h"
@@ -19,7 +20,7 @@ namespace utils {
 PageResource::PageResource(std::string filePath, std::string mimeType)
     : m_filePath(filePath),
       m_mimeType(mimeType),
-      m_content("") {
+      m_content() {
 
     m_type = PageResource::resourceTypeByMimeType(m_mimeType);
 }
@@ -82,15 +83,17 @@ String16 PageResource::getContent(protocol::ErrorString* errorString) {
 
         if (shouldEncode) {
             auto base64EncodedString = base64_encode(buff, size);
-            m_content = base64EncodedString;
+            m_content = tns::Util::ConvertFromUtf8ToUtf16(base64EncodedString);
         } else {
-            m_content = std::string(reinterpret_cast<char*>(buff));
+            auto utf8Content = std::string(reinterpret_cast<char*>(buff));
+            auto utf16Content = tns::Util::ConvertFromUtf8ToUtf16(utf8Content);
+            m_content = utf16Content;
         }
 
         free(buff);
     }
 
-    return m_content.c_str();
+    return String16((const uint16_t*) m_content.data());
 }
 
 const char* PageResource::resourceTypeByMimeType(std::string mimeType) {
