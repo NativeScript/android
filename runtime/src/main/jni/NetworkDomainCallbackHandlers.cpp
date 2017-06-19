@@ -49,9 +49,9 @@ void NetworkDomainCallbackHandlers::ResponseReceivedCallback(const v8::FunctionC
             throw NativeScriptException("`response` parameter not in the correct format.");
         }
 
-        auto responseJsonString = ArgConverter::ConvertToString(responseJson);
-        auto responseJsonCString = responseJsonString.c_str();
-        auto protocolResponseJson = protocol::parseJSON(responseJsonCString);
+        auto responseJsonString = ArgConverter::ConvertToUtf16String(responseJson);
+        auto responseUtf16Data = responseJsonString.data();
+        auto protocolResponseJson = protocol::parseJSON(String16((const uint16_t*) responseUtf16Data));
 
         protocol::ErrorSupport errorSupport;
 
@@ -133,9 +133,9 @@ void NetworkDomainCallbackHandlers::RequestWillBeSentCallback(const v8::Function
             throw NativeScriptException("`request` parameter not in the correct format.");
         }
 
-        auto requestJsonString = ArgConverter::ConvertToString(requestJson);
-        auto requestJsonCString = requestJsonString.c_str();
-        auto protocolRequestJson = protocol::parseJSON(requestJsonCString);
+        auto requestJsonString = ArgConverter::ConvertToUtf16String(requestJson);
+        auto requestUtf16Data = requestJsonString.data();
+        auto protocolRequestJson = protocol::parseJSON(String16((const uint16_t*)  requestUtf16Data));
 
         protocol::ErrorSupport errorSupport;
 
@@ -207,7 +207,7 @@ void NetworkDomainCallbackHandlers::DataForRequestIdCallback(const v8::FunctionC
         auto hasTextContent = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "hasTextContent")).ToLocalChecked()->ToBoolean();
 
         auto requestIdString = ArgConverter::ConvertToString(requestId).c_str();
-        auto dataString = ArgConverter::ConvertToString(data);
+        auto dataString = ArgConverter::ConvertToUtf16String(data);
         auto hasTextContentBool = hasTextContent->BooleanValue();
 
         auto responses = networkAgentInstance->m_responses;
@@ -219,11 +219,7 @@ void NetworkDomainCallbackHandlers::DataForRequestIdCallback(const v8::FunctionC
         } else {
             v8_inspector::utils::NetworkRequestData* response = it->second;
 
-            if (!hasTextContentBool) {
-                response->setData(dataString);
-            } else {
-                response->setData(ArgConverter::ConvertToString(data));
-            }
+            response->setData(dataString);
 
             response->setHasTextContent(hasTextContentBool);
         }

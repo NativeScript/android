@@ -143,8 +143,13 @@ public class GcListener {
 
     private void notifyGc() {
         synchronized (instance) {
-            for (Runtime runtime: subscribers.keySet()) {
-                runtime.notifyGc();
+            ManualInstrumentation.Frame frame = ManualInstrumentation.start("GcListener.notifyGc");
+            try {
+                for (Runtime runtime : subscribers.keySet()) {
+                    runtime.notifyGc();
+                }
+            } finally {
+                frame.close();
             }
         }
     }

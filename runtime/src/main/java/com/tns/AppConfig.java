@@ -5,6 +5,7 @@ import java.io.File;
 import org.json.JSONObject;
 
 import android.os.Build;
+import android.util.Log;
 
 class AppConfig {
     private enum KnownKeys {
@@ -15,7 +16,8 @@ class AppConfig {
         ProfilerOutputDirKey("profilerOutputDir", ""),
         GcThrottleTime("gcThrottleTime", 0),
         MemoryCheckInterval("memoryCheckInterval", 0),
-        FreeMemoryRatio("freeMemoryRatio", 0.0);
+        FreeMemoryRatio("freeMemoryRatio", 0.0),
+        Profiling("profiling", "");
 
         public static final KnownKeys[] asArray = {
             V8FlagsKey,
@@ -25,7 +27,8 @@ class AppConfig {
             ProfilerOutputDirKey,
             GcThrottleTime,
             MemoryCheckInterval,
-            FreeMemoryRatio
+            FreeMemoryRatio,
+            Profiling
         };
 
         private final String name;
@@ -69,39 +72,45 @@ class AppConfig {
         JSONObject rootObject;
         try {
             rootObject = FileSystem.readJSONFile(packageInfo);
-            if (rootObject != null && rootObject.has(AndroidKey)) {
-                JSONObject androidObject = rootObject.getJSONObject(AndroidKey);
-                if (androidObject.has(KnownKeys.V8FlagsKey.getName())) {
-                    values[KnownKeys.V8FlagsKey.getIndex()] = androidObject.getString(KnownKeys.V8FlagsKey.getName());
+            if (rootObject != null) {
+                if (rootObject.has(KnownKeys.Profiling.getName())) {
+                    String profiling = rootObject.getString(KnownKeys.Profiling.getName());
+                    values[KnownKeys.Profiling.getIndex()] = profiling;
                 }
-                if (androidObject.has(KnownKeys.CodeCacheKey.getName())) {
-                    values[KnownKeys.CodeCacheKey.getIndex()] = androidObject.getBoolean(KnownKeys.CodeCacheKey.getName());
-                }
-                if (androidObject.has(KnownKeys.HeapSnapshotScriptKey.getName())) {
-                    String value = androidObject.getString(KnownKeys.HeapSnapshotScriptKey.getName());
-                    values[KnownKeys.HeapSnapshotScriptKey.getIndex()] = FileSystem.resolveRelativePath(appDir.getPath(), value, appDir + "/app/");
-                }
-                if (androidObject.has(HeapSnapshotBlobKey)) {
-                    String value = androidObject.getString(HeapSnapshotBlobKey);
-                    String path = FileSystem.resolveRelativePath(appDir.getPath(), value, appDir + "/app/");
-                    File dir = new File(path);
-                    if (dir.exists() && dir.isDirectory()) {
-                        // this path is expected to be a directory, containing three sub-directories: armeabi-v7a, x86 and arm64-v8a
-                        path = path + "/" + Build.CPU_ABI + "/" + KnownKeys.SnapshotFile.getName();
-                        values[KnownKeys.SnapshotFile.getIndex()] = path;
+                if (rootObject.has(AndroidKey)) {
+                    JSONObject androidObject = rootObject.getJSONObject(AndroidKey);
+                    if (androidObject.has(KnownKeys.V8FlagsKey.getName())) {
+                        values[KnownKeys.V8FlagsKey.getIndex()] = androidObject.getString(KnownKeys.V8FlagsKey.getName());
                     }
-                }
-                if (androidObject.has(KnownKeys.ProfilerOutputDirKey.getName())) {
-                    values[KnownKeys.ProfilerOutputDirKey.getIndex()] = androidObject.getString(KnownKeys.ProfilerOutputDirKey.getName());
-                }
-                if (androidObject.has(KnownKeys.GcThrottleTime.getName())) {
-                    values[KnownKeys.GcThrottleTime.getIndex()] = androidObject.getInt(KnownKeys.GcThrottleTime.getName());
-                }
-                if (androidObject.has(KnownKeys.MemoryCheckInterval.getName())) {
-                    values[KnownKeys.MemoryCheckInterval.getIndex()] = androidObject.getInt(KnownKeys.MemoryCheckInterval.getName());
-                }
-                if (androidObject.has(KnownKeys.FreeMemoryRatio.getName())) {
-                    values[KnownKeys.FreeMemoryRatio.getIndex()] = androidObject.getDouble(KnownKeys.FreeMemoryRatio.getName());
+                    if (androidObject.has(KnownKeys.CodeCacheKey.getName())) {
+                        values[KnownKeys.CodeCacheKey.getIndex()] = androidObject.getBoolean(KnownKeys.CodeCacheKey.getName());
+                    }
+                    if (androidObject.has(KnownKeys.HeapSnapshotScriptKey.getName())) {
+                        String value = androidObject.getString(KnownKeys.HeapSnapshotScriptKey.getName());
+                        values[KnownKeys.HeapSnapshotScriptKey.getIndex()] = FileSystem.resolveRelativePath(appDir.getPath(), value, appDir + "/app/");
+                    }
+                    if (androidObject.has(HeapSnapshotBlobKey)) {
+                        String value = androidObject.getString(HeapSnapshotBlobKey);
+                        String path = FileSystem.resolveRelativePath(appDir.getPath(), value, appDir + "/app/");
+                        File dir = new File(path);
+                        if (dir.exists() && dir.isDirectory()) {
+                            // this path is expected to be a directory, containing three sub-directories: armeabi-v7a, x86 and arm64-v8a
+                            path = path + "/" + Build.CPU_ABI + "/" + KnownKeys.SnapshotFile.getName();
+                            values[KnownKeys.SnapshotFile.getIndex()] = path;
+                        }
+                    }
+                    if (androidObject.has(KnownKeys.ProfilerOutputDirKey.getName())) {
+                        values[KnownKeys.ProfilerOutputDirKey.getIndex()] = androidObject.getString(KnownKeys.ProfilerOutputDirKey.getName());
+                    }
+                    if (androidObject.has(KnownKeys.GcThrottleTime.getName())) {
+                        values[KnownKeys.GcThrottleTime.getIndex()] = androidObject.getInt(KnownKeys.GcThrottleTime.getName());
+                    }
+                    if (androidObject.has(KnownKeys.MemoryCheckInterval.getName())) {
+                        values[KnownKeys.MemoryCheckInterval.getIndex()] = androidObject.getInt(KnownKeys.MemoryCheckInterval.getName());
+                    }
+                    if (androidObject.has(KnownKeys.FreeMemoryRatio.getName())) {
+                        values[KnownKeys.FreeMemoryRatio.getIndex()] = androidObject.getDouble(KnownKeys.FreeMemoryRatio.getName());
+                    }
                 }
             }
         } catch (Exception e) {
@@ -132,5 +141,9 @@ class AppConfig {
 
     public double getFreeMemoryRatio() {
         return (double)values[KnownKeys.FreeMemoryRatio.getIndex()];
+    }
+
+    public String getProfilingMode() {
+        return (String)values[KnownKeys.Profiling.getIndex()];
     }
 }

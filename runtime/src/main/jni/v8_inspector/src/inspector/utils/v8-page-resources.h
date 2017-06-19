@@ -46,7 +46,7 @@ class PageResource {
     private:
         std::string m_filePath;
         std::string m_mimeType;
-        std::string m_content;
+        std::u16string m_content;
         const char* m_type;
 
         static std::map<std::string, const char*> s_mimeTypeMap;

@@ -170,6 +170,9 @@ task runAstParser(type: RunAstParserTask) {
 // 2. all subdirectories that do not have a package.json containing a "nativescript" key are skipped
 task traverseJsFiles () {
 	doFirst {
+		// invalidate previously generated bindings.txt file
+		// todo: remove when removing previously generated bindings is implemented
+		new File(bindingsFileP).delete()
 		traverseDirectory(jsCodeAbsolutePath, false)
 	}
 }

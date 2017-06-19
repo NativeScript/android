@@ -7,6 +7,8 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -14,6 +16,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Queue;
 import java.util.Set;
 import java.util.jar.JarInputStream;
@@ -23,6 +26,8 @@ import org.apache.bcel.classfile.ClassParser;
 import org.apache.bcel.classfile.JavaClass;
 import org.apache.bcel.classfile.Method;
 import org.apache.bcel.generic.Type;
+
+import javafx.util.Pair;
 
 public class Generator {
     private static final String JAVA_EXT = ".java";
@@ -45,18 +50,23 @@ public class Generator {
         this.classes = readClasses(libs, throwOnError);
     }
 
-
     public void writeBindings(String filename) throws IOException, ClassNotFoundException {
         Binding[] bindings = generateBindings(filename);
-        List<File> writenFiles = new ArrayList<File>();
+        Set<File> writtenFiles = new HashSet<File>();
         for (Binding b : bindings) {
-            if (!writenFiles.contains(b.getFile())) {
-                writenFiles.add(b.getFile());
+            if (writtenFiles.add(b.getFile())) {
                 try (PrintStream ps = new PrintStream(b.getFile())) {
                     ps.append(b.getContent());
                 }
+                // A file with that name has already been written
             } else {
-                throw new IOException("File already exists. This may lead to undesired behavior.\nPlease change the name of one of the extended classes.\n" + b.getFile());
+                // Compare text contents for equality
+                String content = new String(Files.readAllBytes(Paths.get(b.getFile().toString())));
+                if (content.equals(b.getContent())) {
+                    System.out.println("Warning: File already exists. This could mean the same code has been parsed more than once from two or more different files. \nFile:" + b.getFile());
+                } else {
+                    throw new IOException("File already exists. This may lead to undesired behavior.\nPlease change the name of one of the extended classes.\nFile:" + b.getFile() + " Class: " + b.getClassname());
+                }
             }
         }
     }
@@ -187,51 +197,32 @@ public class Generator {
         return sb.toString();
     }
 
-    private Map<String, List<Method>> getPublicApi(JavaClass clazz) throws ClassNotFoundException {
-        Map<String, List<Method>> api = new HashMap<String, List<Method>>();
+    private Map<String, MethodGroup> getPublicApi(JavaClass clazz) throws ClassNotFoundException {
+        Map<String, MethodGroup> api = new HashMap<>();
         JavaClass currentClass = clazz;
         String clazzName = clazz.getClassName();
         while (true) {
             String currentClassname = currentClass.getClassName();
 
-            boolean shouldCollectMethods = !(!clazzName.equals(currentClassname) && currentClass.isAbstract());
+            List<Method> methods = new ArrayList<Method>();
+            for (Method m : currentClass.getMethods()) {
+                methods.add(m);
+            }
 
-            if (shouldCollectMethods || currentClass.isInterface()) {
-                // Don't include abstract parent class's methods to avoid compilation issues
-                // where a child class has 2 methods, of the same type, with just a
-                // return type/parameter type that differs by being of a superclass of the class being extended.
-                // see Test testCanCompileBindingClassExtendingAnExtendedClassWithMethodsWithTheSameSignature
-                List<Method> methods = new ArrayList<Method>();
-                for (Method m : currentClass.getMethods()) {
-                    methods.add(m);
-                }
+            collectInterfaceMethods(clazz, methods);
+            for (Method m : methods) {
+                if (!m.isSynthetic() && (m.isPublic() || m.isProtected()) && !m.isStatic()) {
+                    String name = m.getName();
 
-//                System.out.println("SBG: getPublicApi:collectInterfaceMethods classname: " + currentClassname);
-
-                collectInterfaceMethods(clazz, methods);
-                for (Method m : methods) {
-                    if (!m.isSynthetic() && (m.isPublic() || m.isProtected()) && !m.isStatic()) {
-                        String name = m.getName();
-
-                        List<Method> methodGroup;
-                        if (api.containsKey(name)) {
-                            methodGroup = api.get(name);
-                        } else {
-                            methodGroup = new ArrayList<Method>();
-                            api.put(name, methodGroup);
-                        }
-                        boolean found = false;
-                        String methodSig = m.getSignature();
-                        for (Method m1 : methodGroup) {
-                            found = methodSig.equals(m1.getSignature());
-                            if (found) {
-                                break;
-                            }
-                        }
-                        if (!found) {
-                            methodGroup.add(m);
-                        }
+                    MethodGroup methodGroup;
+                    if (api.containsKey(name)) {
+                        methodGroup = api.get(name);
+                    } else {
+                        methodGroup = new MethodGroup(currentClassname);
+                        api.put(name, methodGroup);
                     }
+
+                    methodGroup.add(currentClassname, m);
                 }
             }
 
@@ -332,7 +323,7 @@ public class Generator {
         String[] implInterfaces = dataRow.getInterfaces();
         collectImplementedInterfaces(implInterfaces, clazz);
 
-        Map<String, List<Method>> api = getPublicApi(clazz);
+        Map<String, MethodGroup> api = getPublicApi(clazz);
 
         w.writeln("package " + packageName + ";");
         w.writeln();
@@ -439,7 +430,7 @@ public class Generator {
             collectInterfaceMethods(clazz, interfaceMethods);
             for (String methodName : dataRow.getMethods()) {
                 if (api.containsKey(methodName)) {
-                    List<Method> methodGroup = api.get(methodName);
+                    List<Method> methodGroup = api.get(methodName).getList();
                     for (Method m : methodGroup) {
                         boolean isInterfaceMethod = false;
                         if (interfaceMethods.contains(m)) {
@@ -719,5 +710,41 @@ public class Generator {
         }
 
         return clazz;
+    }
+
+    private class MethodGroup {
+        private List<Method> methods;
+        private String latestInheritorClassName;
+
+        public MethodGroup(String forClass) {
+            this.methods = new ArrayList<>();
+            this.latestInheritorClassName = forClass;
+        }
+
+        public void add(String methodClassname, Method m) {
+            boolean found = false;
+
+            String methodSig = m.getSignature();
+            for (Method m1 : this.methods) {
+                found = methodSig.equals(m1.getSignature());
+                if (found) {
+                    break;
+                }
+            }
+
+            if (!found) {
+                // Only add method to API if method hasn't already been added by an inheritor of
+                // the current class
+                if (!methodClassname.equals(this.latestInheritorClassName)) {
+                    return;
+                }
+
+                this.methods.add(m);
+            }
+        }
+
+        public List<Method> getList() {
+            return this.methods;
+        }
     }
 }

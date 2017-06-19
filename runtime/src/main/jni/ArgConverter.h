@@ -30,6 +30,8 @@ class ArgConverter {
 
         static std::string ConvertToString(const v8::Local<v8::String>& s);
 
+        static std::u16string ConvertToUtf16String(const v8::Local<v8::String>& s);
+
         static jstring ConvertToJavaString(const v8::Local<v8::Value>& jsValue);
 
         static v8::Local<v8::String> ConvertToV8String(v8::Isolate* isolate, const jchar* data, int length);
@@ -37,6 +39,12 @@ class ArgConverter {
         static v8::Local<v8::String> ConvertToV8String(v8::Isolate* isolate, const std::string& s);
 
         static v8::Local<v8::String> ConvertToV8String(v8::Isolate* isolate, const char* data, int length);
+
+        static v8::Local<v8::String> ConvertToV8UTF16String(v8::Isolate* isolate, const std::string& string);
+
+        static v8::Local<v8::String> ConvertToV8UTF16String(v8::Isolate* isolate, const uint16_t* utf16string, int size);
+
+        static v8::Local<v8::String> ConvertToV8UTF16String(v8::Isolate* isolate, const std::u16string& utf16string);
 
     private:
 

@@ -1,0 +1,1 @@
+com.example.MyAbstractClass2*_fapp_l9_c29__*abstractMethod*com.example.com.example.MyExtendedClass**

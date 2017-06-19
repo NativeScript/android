@@ -55,7 +55,7 @@ void V8NetworkAgentImpl::getResponseBody(ErrorString* errorString, const String&
         *errorString = "Response not found for requestId = " + in_requestId;
     } else {
         v8_inspector::utils::NetworkRequestData* response = it->second;
-        *out_body = response->getData();
+        *out_body = String16((const uint16_t*) response->getData());
         *out_base64Encoded = !response->hasTextContent();
     }
 }

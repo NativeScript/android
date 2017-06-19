@@ -11,11 +11,11 @@
 #include "include/v8.h"
 #include <algorithm>
 #include <sstream>
+#include "ManualInstrumentation.h"
 
 using namespace v8;
 using namespace std;
 using namespace tns;
-
 
 ObjectManager::ObjectManager(jobject javaRuntimeObject)
     : m_javaRuntimeObject(javaRuntimeObject), m_env(JEnv()), m_numberOfGC(0), m_currentObjectId(0), m_cache(NewWeakGlobalRefCallback, DeleteWeakGlobalRefCallback, 1000, this) {
@@ -339,6 +339,8 @@ void ObjectManager::ReleaseJSInstance(Persistent<Object>* po, JSInstanceInfo* js
  * The "regular" JS objects added on ObjectManager::JSObjectWeakCallback are dealt with(released) here.
  * */
 void ObjectManager::ReleaseRegularObjects() {
+    TNSPERF();
+
     HandleScope handleScope(m_isolate);
 
     auto propName = String::NewFromUtf8(m_isolate, "t::gcNum", NewStringType::kNormal).ToLocalChecked();
@@ -395,6 +397,8 @@ bool ObjectManager::HasImplObject(Isolate* isolate, const Local<Object>& obj) {
  * This method builds on top of V8s marking phase, because we need to consider the JAVA counterpart objects (is it "regular" or "callback"), when marking JS ones.
  * */
 void ObjectManager::MarkReachableObjects(Isolate* isolate, const Local<Object>& obj) {
+    tns::instrumentation::Frame frame;
+
     stack<Local<Value>> s;
 
     s.push(obj);
@@ -513,6 +517,13 @@ void ObjectManager::MarkReachableObjects(Isolate* isolate, const Local<Object>& 
         } // for
 
     } // while
+
+    if (frame.check()) {
+        auto cls = fromJsInfo->ObjectClazz;
+        jclass clsClazz = m_env.GetObjectClass(cls);
+        jstring className = (jstring) m_env.CallObjectMethod(cls, GET_NAME_METHOD_ID);
+        frame.log("MarkReachableObjects: " + ArgConverter::jstringToString(className));
+    }
 }
 
 void ObjectManager::MarkReachableArrayElements(Local<Object>& o, stack<Local<Value>>& s) {
@@ -565,6 +576,8 @@ void ObjectManager::OnGcFinishedStatic(Isolate* isolate, GCType type, GCCallback
 }
 
 void ObjectManager::OnGcStarted(GCType type, GCCallbackFlags flags) {
+    TNSPERF();
+
     GarbageCollectionInfo gcInfo(++m_numberOfGC);
     m_markedForGC.push(gcInfo);
 }
@@ -674,6 +687,8 @@ void ObjectManager::MakeImplObjectsWeak(const map<int, Persistent<Object>*>& ins
  * If the JAVA objects are released, we can release the their counterpart JS objects
  * */
 void ObjectManager::CheckWeakObjectsAreAlive(const vector<PersistentObjectIdPair>& instances, DirectBuffer& inputBuff, DirectBuffer& outputBuff) {
+    TNSPERF();
+
     for (const auto& poIdPair : instances) {
         int javaObjectId = poIdPair.javaObjectId;
 
@@ -711,7 +726,6 @@ void ObjectManager::CheckWeakObjectsAreAlive(const vector<PersistentObjectIdPair
             }
         }
     }
-
 }
 
 jweak ObjectManager::NewWeakGlobalRefCallback(const int& javaObjectID, void* state) {
