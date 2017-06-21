@@ -1,3 +1,9 @@
+3.1.0
+==
+
+## What's New
+ - [Chrome DevTools Elements Tab Support (#746)](https://github.com/NativeScript/android-runtime/issues/746)
+
 3.0.1
 ==
 
