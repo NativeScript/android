@@ -771,16 +771,11 @@ task deleteFlavors (type: Delete){
 	}
 }
 
-task deleteConfigurations (type: Delete) {
-	delete "$projectDir/configurations"
-}
-
 task deleteGeneratedBindings(type: Delete) {
 	delete "$projectDir/src/main/java/com/tns/gen"
 }
 
-deleteMetadata.dependsOn(":asbg:clean")
-deleteFlavors.dependsOn(deleteMetadata)
-deleteConfigurations.dependsOn(deleteFlavors)
-deleteGeneratedBindings.dependsOn(deleteConfigurations)
+clean.dependsOn(":asbg:clean")
+clean.dependsOn(deleteMetadata)
+clean.dependsOn(deleteFlavors)
 clean.dependsOn(deleteGeneratedBindings)
