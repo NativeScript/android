@@ -171,6 +171,27 @@ android {
 		}
 		
 		compileSourcesTask.finalizedBy(buildMetadata)
+
+		// forces packaging of resources and assets AFTER producing metadata
+		// Reference: https://github.com/NativeScript/android-runtime/issues/785
+
+		// Ensure metadata has been built and copied in assets before packaging
+		variant.outputs.each { output ->
+			def abiName = "";
+			if (output.getFilter(com.android.build.OutputFile.ABI)) {
+				abiName = output.getFilter(com.android.build.OutputFile.ABI)
+				def packageTask = project.tasks.findByName("package${output.name}")
+				if (packageTask) {
+					packageTask.dependsOn(buildMetadata)
+				}
+			}
+		}
+
+		// Compile the Java sources AFTER the Java code-generation step is done
+		def compileTask = project.tasks.findByName("compile${variantName}JavaWithJavac")
+		if (compileTask) {
+			compileTask.dependsOn("asbg:generateBindings")
+		}
 	}
 }
 
@@ -413,13 +434,11 @@ task createDefaultIncludeFiles {
 			if (hasChildrenDirs) {
 				file.listFiles().each { subFile ->
 					if (subFile.isDirectory()) {
-						flavorNumber++
-						createIncludeGradleForPlugin(subFile, flavorNumber, flavorNames)
+						createIncludeGradleForPlugin(subFile, flavorNumber++, flavorNames)
 					}
 				}
 			} else {
-				flavorNumber++
-				createIncludeGradleForPlugin(file, flavorNumber, flavorNames)
+				createIncludeGradleForPlugin(file, flavorNumber++, flavorNames)
 			}			
 		}
 	}
@@ -730,6 +749,7 @@ setProperties.finalizedBy("asbg:generateBindings", generateTypescriptDefinitions
 // 5. plugin extend (apply from include files)
 
 // --execution phase
+
 ensureMetadataOutDir.dependsOn(cleanLocalAarFiles)
 collectAllJars.dependsOn(ensureMetadataOutDir)
 buildMetadata.dependsOn(collectAllJars)
