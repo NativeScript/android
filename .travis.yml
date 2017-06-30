@@ -3,8 +3,6 @@ env:
   - NDK_VERSION=r12b
   - DATE=$(date +%Y-%m-%d)
   - PACKAGE_VERSION=next-$DATE-$TRAVIS_BUILD_NUMBER
-  - PACKAGE_NAME=tns-android
-  - ANDROID_HOME=/usr/local/android-sdk
 sudo: true
 language: android
 jdk:
@@ -47,26 +45,3 @@ script:
   - "cd test-app && ./gradlew assembleDebug runtests -PembedBindingGenerator=true --stacktrace"
   - adb -e logcat -d 300
   - cd ..
-before_deploy:
-  - FULL_PACKAGE_VERSION=`sed -n 's/\s*"version":\s*"\([a-zA-Z0-9\.]*\)"\s*,*/\1/p' dist/package.json`
-  - ls -la dist
-  - mv dist/tns-android*.tgz ../.deploymentpackage
-  - mv .travis ../
-  - cd ..
-  - rm -rf android-runtime
-  - tar -zxvf .deploymentpackage
-  - mv package android-runtime
-  - cd android-runtime
-  - rm ../.deploymentpackage
-  - nvm install 4.2.6
-  - nvm use 4.2.6
-  - mv ../.travis ./
-  - node ./.travis/add-publishConfig.js next
-deploy:
-  provider: npm
-  email: nativescript@telerik.com
-  on:
-    branch: master
-  skip_cleanup: true
-  api_key:
-    secure: aFJZR8VIbFAlXfFx5G2AveSgpGjr40prghvw8m06X0yvmUQlucwHVyq+Ov0ZD94br8d7OUOPbUzh+p9N/+oXLAXOj3DbQmJaCc+fk/e+avHu1BRy3fg295P9BQau1Abu+2ZO7tUbg5zAqJqhbEgjXsr9B5gxl+vwh4lbDhCPCwo=
