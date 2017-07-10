@@ -20,7 +20,7 @@
 
 
 import groovy.io.FileType
-import groovy.json.JsonSlurper //used to parse package.json
+import groovy.json.JsonSlurper
 
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -28,9 +28,9 @@ import java.nio.file.StandardOpenOption
 import java.util.regex.Pattern;
 
 buildscript {
-	repositories {
-		jcenter()
-	}
+    repositories {
+        jcenter()
+    }
 
 	dependencies {
 		classpath "com.android.tools.build:gradle:2.2.3"
@@ -47,6 +47,9 @@ def nodeModulesDir = "../../node_modules/"
 def flavorNames = new ArrayList<String>()
 def originalConfigurationsDir = new File(projectDir, "configurations")
 def configurationsDir = new File(projectDir, "build/configurations")
+def dependenciesJsonPath = file("dependencies.json")
+// TODO: Pete: Build script will not work with previous CLI versions
+def nativescriptDependencies = new JsonSlurper().parseText(dependenciesJsonPath.text)
 
 def packageJsonContents = [:]
 def excludedDevDependencies = ['**/.bin/**']
@@ -56,41 +59,18 @@ def asbgProject = project(":asbg")
 asbgProject.ext.outDir = new File("$projectDir", "src/main/java")
 asbgProject.ext.jsCodeDir = new File("$projectDir", "src/main/assets/app")
 
-def computeCompileSdkVersion () {
-	if(project.hasProperty("compileSdk")) {
-		return compileSdk
-	}
-	else {
-		return 23
-	}
-}
-
-def computeTargetSdkVersion() {
-	if(project.hasProperty("targetSdk")) {
-		return targetSdk
-	}
-	else {
-		return 23
-	}
-}
-
-def computeBuildToolsVersion() {
-	if(project.hasProperty("buildToolsVersion")) {
-		return buildToolsVersion
-	}
-	else {
-		return "25.0.2"
-	}
-}
+def computeCompileSdkVersion = { -> project.hasProperty("compileSdk") ? compileSdk : 23 }
+def computeTargetSdkVersion = { -> project.hasProperty("targetSdk") ? targetSdk : 23 }
+def computeBuildToolsVersion = { -> project.hasProperty("buildToolsVersion") ? buildToolsVersion : "25.0.2" }
 
 project.ext.selectedBuildType = project.hasProperty("release") ? "release" : "debug"
 
-def renameResultApks (variant) {
+def renameResultApks = { variant ->
 	def name
 	variant.outputs.each { output ->
 		def apkDirectory = output.packageApplication.outputFile.parentFile
 		def abiName = "";
-		if(output.getFilter(com.android.build.OutputFile.ABI)) {
+		if (output.getFilter(com.android.build.OutputFile.ABI)) {
 			abiName = "-" + output.getFilter(com.android.build.OutputFile.ABI);
 		}
 		def apkNamePrefix = rootProject.name + "-" + variant.buildType.name + abiName
@@ -103,13 +83,13 @@ def renameResultApks (variant) {
 task getDevDependencies {
 	doLast {
 		println "$configStage getDevDependencies"
-
+	
 		String content = new File("$projectDir/../../package.json").getText("UTF-8")
 		def jsonSlurper = new JsonSlurper()
 		def packageJsonMap = jsonSlurper.parseText(content)
-
+	
 		packageJsonContents = packageJsonMap.devDependencies;
-
+	
 		packageJsonContents.each { entry ->
 			excludedDevDependencies.add(entry.key + '/platforms/android/**/*.jar')
 		}
@@ -122,7 +102,7 @@ task getDevDependencies {
 android {
 	compileSdkVersion computeCompileSdkVersion()
 	buildToolsVersion computeBuildToolsVersion()
-
+	
 	defaultConfig {
 		minSdkVersion 17
 		targetSdkVersion computeTargetSdkVersion()
@@ -130,37 +110,37 @@ android {
 			abiFilters "armeabi-v7a", "x86"
 		}
 	}
-
+	
 	sourceSets.main {
-		jniLibs.srcDir "$projectDir/libs/jni"
-	}
-
+        jniLibs.srcDir "$projectDir/libs/jni"
+    }
+	
 	signingConfigs {
-		release {
-			if(project.hasProperty("release")) {
-				if(project.hasProperty("ksPath") &&
-						project.hasProperty("ksPassword") &&
-						project.hasProperty("alias") &&
-						project.hasProperty("password"))
-				{
+        release {
+            if (project.hasProperty("release")) {
+				if (project.hasProperty("ksPath") &&
+					project.hasProperty("ksPassword") &&
+					project.hasProperty("alias") &&
+					project.hasProperty("password")) {
+
 					storeFile file(ksPath)
 					storePassword ksPassword
 					keyAlias alias
 					keyPassword password
 				}
 			}
-		}
-	}
-	buildTypes {
-		release {
-			signingConfig signingConfigs.release
-		}
-	}
-
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+        }
+    }
+	
 	applicationVariants.all { variant ->
 		renameResultApks(variant)
 	}
-
+	
 	applicationVariants.all { variant ->
 		def variantName = variant.name.capitalize()
 		def compileSourcesTaskName = "compile${variantName}Sources"
@@ -171,7 +151,7 @@ android {
 		if(!dontRunSbg) {
 			collectAllJars.finalizedBy(setProperties)
 		}
-
+		
 		compileSourcesTask.finalizedBy(buildMetadata)
 
 		// forces packaging of resources and assets AFTER producing metadata
@@ -202,14 +182,17 @@ repositories {
     maven { url 'https://maven.google.com' }
 
     // used for local *.AAR files
+	def pluginDependencies = nativescriptDependencies.collect { "${it.directory}/platforms/android" }
+	pluginDependencies.add("libs/runtime-libs")
+
     flatDir {
-    	dirs 'libs/aar'
+    	dirs pluginDependencies
 	}
 }
 
 dependencies {
 	def supportVer = "22.2.0";
-	if(project.hasProperty("supportVersion")) {
+	if (project.hasProperty("supportVersion")) {
 		supportVer = supportVersion
 	}
 
@@ -217,35 +200,46 @@ dependencies {
 	compile "com.android.support:appcompat-v7:$supportVer"
 	debugCompile "com.android.support:design:$supportVer"
 
-	// take all jars within the libs dir
+    // take all jars within the libs dir
 	compile fileTree(dir: "$projectDir/libs", include: ["**/*.jar"])
 
 	// take all jars within the node_modules dir
 	compile fileTree(dir: nodeModulesDir, include: ["**/platforms/android/**/*.jar"], exclude: excludedDevDependencies)
-
-
-	//when gradle has aar support this will be preferred instead of addAarDependencies
-	// compile files("$rootDir/libs/aar") {
-	// builtBy 'copyAarDependencies'
-	// }
-	copyNativeScriptAar()
-
-	compile project(':runtime')
 }
 
-
-def copyNativeScriptAar() {
-	def useV8SymbolsFlag = new File("$projectDir/build-tools/useV8");
-	def runtimeAarType = "optimized";
-	if (useV8SymbolsFlag.exists() && !useV8SymbolsFlag.isDirectory()) {
-		println "Using less-optimized runtime bundle.";
-		runtimeAarType = "regular";
+task addNativeScriptRuntimePackageDependency {
+	def useV8Symbols = nativescriptDependencies.any {
+		def packageJsonPath = file("${it.directory}/package.json");
+		def packageJson = new JsonSlurper().parseText(packageJsonPath.text);
+		return packageJson.nativescript.useV8Symbols;
 	}
 
-	copy {
-		from "$projectDir/libs/runtime-libs/nativescript-${runtimeAarType}.aar"
-		into "$projectDir/libs/runtime-libs/"
-		rename "nativescript-${runtimeAarType}.aar", "nativescript.aar"
+	def runtime = useV8Symbols ? "nativescript-regular" : "nativescript-optimized";
+	println "\t+adding nativescript runtime package dependency: $runtime"
+
+	project.dependencies.add("compile", [name: runtime, ext: "aar"])
+}
+
+task addAarDependenciesFromNativeScriptPlugins {
+	nativescriptDependencies.each() { dep ->
+		def aarFiles = fileTree(dir: file("${dep.directory}/platforms/android"), include: ["**/*.aar"])
+		aarFiles.each { aarFile ->
+			def length = aarFile.name.length() - 4
+			def fileName = aarFile.name[0..<length]
+			println "\t+adding plugin dependency: " + aarFile.getAbsolutePath()
+			project.dependencies.add("compile", [name: fileName, ext: "aar"])
+		}
+	}
+}
+
+task applyAppGradleConfiguration {
+	description "applies user-defined gradle configuration"
+
+	def pathToAppGradle = "$projectDir/../../app/App_Resources/Android/app.gradle"
+	def appGradle = file(pathToAppGradle)
+	if(appGradle.exists()) {
+		println "\t+applying user-defined configuration from ${appGradle}"
+		apply from: pathToAppGradle
 	}
 }
 
@@ -255,62 +249,62 @@ def copyNativeScriptAar() {
 
 static def updateProductFlavorsContent(flavor, dimensionName, oldContent) {
 	def endIndex = oldContent.length() - 1;
-	def index = 0;
-	def newContent = "";
-	def level = -1;
-	def dimensionFound = false;
+		def index = 0;
+		def newContent = "";
+		def level = -1;
+		def dimensionFound = false;
 
-	while(index <= endIndex) {
-		if(level == 0 && (oldContent[index] == '"' || oldContent[index] == "'")) {
-			def closingQuotes = oldContent.indexOf('"', index + 1);
-			if(closingQuotes == -1) {
-				closingQuotes = oldContent.indexOf("'", index + 1);
-			}
-
-			index = closingQuotes + 1;
-			newContent += "\"${flavor}\"";
-			continue;
-		}
-
-		if(oldContent[index] == "{") {
-			level++;
-		}
-
-		if(oldContent[index] == "}") {
-			level--;
-		}
-
-		if(level > 0) {
-			if(!dimensionFound && oldContent.indexOf("dimension", index) == index) {
-				newContent += "dimension \"${dimensionName}\"";
-				dimensionFound = true;
-				index += "dimension ".length();
-				def openingQuoutes = oldContent.indexOf('"', index);
-				if(openingQuoutes == -1) {
-					openingQuoutes = oldContent.indexOf("'", index);
-				}
-
-				def closingQuotes = oldContent.indexOf('"', openingQuoutes + 1);
+		while(index <= endIndex) {
+			if(level == 0 && (oldContent[index] == '"' || oldContent[index] == "'")) {
+				def closingQuotes = oldContent.indexOf('"', index + 1);
 				if(closingQuotes == -1) {
-					closingQuotes = oldContent.indexOf("'", openingQuoutes + 1);
+					closingQuotes = oldContent.indexOf("'", index + 1);
 				}
 
 				index = closingQuotes + 1;
+				newContent += "\"${flavor}\"";
+				continue;
 			}
+
+			if(oldContent[index] == "{") {
+				level++;
+			}
+
+			if(oldContent[index] == "}") {
+				level--;
+			}
+
+			if(level > 0) {
+				if(!dimensionFound && oldContent.indexOf("dimension", index) == index) {
+					newContent += "dimension \"${dimensionName}\"";
+					dimensionFound = true;
+					index += "dimension ".length();
+					def openingQuoutes = oldContent.indexOf('"', index);
+					if(openingQuoutes == -1) {
+						openingQuoutes = oldContent.indexOf("'", index);
+					}
+
+					def closingQuotes = oldContent.indexOf('"', openingQuoutes + 1);
+					if(closingQuotes == -1) {
+						closingQuotes = oldContent.indexOf("'", openingQuoutes + 1);
+					}
+
+					index = closingQuotes + 1;
+				}
+			}
+
+			newContent += oldContent[index];
+
+			index++;
 		}
 
-		newContent += oldContent[index];
-
-		index++;
-	}
-
-	return newContent;
+		return newContent;
 }
 
 static def createProductFlavorsContent(flavor, dimensionName, includeAndroidContent = true) {
 	if (includeAndroidContent)
-	{
-		def content = """
+  	{
+    	def content = """
 android {
     productFlavors {
         "${flavor}" {
@@ -319,24 +313,24 @@ android {
     }
 }
 """
-		return content;
+    	return content;
 	}
 	else
 	{
-		def content = """
+    	def content = """
     productFlavors {
         "${flavor}" {
             dimension "${dimensionName}"
         }
     }
 """
-		return content;
+      return content;
 	}
 }
 
 def createIncludeFile (filePath, flavor, dimensionName, destination) {
-	println "\t + creating include.gradle file for ${filePath}"
-
+	println "\t + creating include.gradle file for ${filePath}" 
+	
 	def defaultIncludeFile = new File(destination, "include.gradle")
 	defaultIncludeFile.text =  createProductFlavorsContent(flavor, dimensionName);
 }
@@ -373,28 +367,28 @@ static def modifyProductFlavorInContent(content, dimension, flavor) {
 	}
 
 	if (indexEnd != -1)
-	{
+    {
 		// full content of productFlavors { ... } -> the substring is parenthesis to parenthesis -> { ... }
-		def oldProductFlavorsText = content.substring(indexStart, indexEnd + 1);
+      def oldProductFlavorsText = content.substring(indexStart, indexEnd + 1);
 
-		def newProductFlavorsContent = updateProductFlavorsContent(flavor, dimension, oldProductFlavorsText);
-
-		return content.replace(oldProductFlavorsText, newProductFlavorsContent);
-	}
-	else
-	{
-		def androidContentExists = content.indexOf("android {") != -1;
-		def newProductFlavorsContent = createProductFlavorsContent(flavor, dimension, !androidContentExists);
-
-		if (androidContentExists)
-		{
-			return content.replace("android {", "android { ${newProductFlavorsContent}");
-		}
-		else
-		{
-			return "${newProductFlavorsContent} \t ${content}"
-		}
-	}
+      def newProductFlavorsContent = updateProductFlavorsContent(flavor, dimension, oldProductFlavorsText);
+      
+      return content.replace(oldProductFlavorsText, newProductFlavorsContent);
+    }
+    else
+    {
+        def androidContentExists = content.indexOf("android {") != -1;
+        def newProductFlavorsContent = createProductFlavorsContent(flavor, dimension, !androidContentExists);
+        
+        if (androidContentExists)
+        {
+           return content.replace("android {", "android { ${newProductFlavorsContent}");
+        }
+        else
+        {
+           return "${newProductFlavorsContent} \t ${content}"
+        }
+    }
 }
 
 // make sure the include.gradle file provided by the user has only allowed characters in dimension attribute and remove any invalid characters if necessary
@@ -429,14 +423,14 @@ static def getParentDirStructure(includeGradleFile) {
 }
 
 def renamePluginDirToFlavorName(directory, flavor) {
-	def parentName = directory.getName();
-	def parentFile = new File("src", parentName);
-	if (parentFile.exists())
-	{
-		def targetDirName = new File("src", flavor);
-		println "Renaming plugin directory to flavor name: ${parentFile.getAbsolutePath()} -> ${targetDirName.getAbsolutePath()}";
-		parentFile.renameTo(targetDirName);
-	}
+    def parentName = directory.getName();
+    def parentFile = new File("src", parentName);
+    if (parentFile.exists())
+    {
+        def targetDirName = new File("src", flavor);
+        println "Renaming plugin directory to flavor name: ${parentFile.getAbsolutePath()} -> ${targetDirName.getAbsolutePath()}";
+        parentFile.renameTo(targetDirName);
+    }    
 }
 
 def flavorNumber = 0
@@ -446,29 +440,61 @@ task createDefaultIncludeFiles {
 	println "$configStage createDefaultIncludeFiles"
 	def fileTree = file(originalConfigurationsDir)
 
-	fileTree.listFiles().each { file ->
-		if (file.isDirectory()) {
-			shouldCreatePluginConfigFile = true
-			def hasChildrenDirs = false
-			file.listFiles().each { subFile ->
-				if (subFile.isDirectory()) {
-					hasChildrenDirs = true
-				}
-			}
-
-			// if plugin is scoped - traverse its children directories
-			// e.g. @scope/plugin-with-android-aars
-			if (hasChildrenDirs) {
-				file.listFiles().each { subFile ->
-					if (subFile.isDirectory()) {
-						createIncludeGradleForPlugin(subFile, flavorNumber++, flavorNames, configurationsDir)
-					}
-				}
-			} else {
-				createIncludeGradleForPlugin(file, flavorNumber++, flavorNames, configurationsDir)
-			}
+	def allFlavors = new ArrayList<String>()
+	nativescriptDependencies.each {
+		def androidDir = file("${it.directory}/platforms/android")
+		if (!androidDir.exists()) {
+			return
 		}
+
+		def packageJsonPath = file("${it.directory}/package.json")
+		def packageJson = new JsonSlurper().parseText(packageJsonPath.text)
+		def pluginName = packageJson.name
+		def dimensionName = sanitizeDimensionName(pluginName)
+		flavorNames.add('"' + dimensionName + '"')
+		def flavor = "F${flavorNumber++}"
+
+		def includeGradleFile = new File(androidDir, "include.gradle")
+		def destinationDir = file("${configurationsDir}/${pluginName}/")
+		Files.createDirectories(Paths.get(destinationDir.getAbsolutePath()))
+
+		def destinationIncludeGradleFile = file("${configurationsDir}/${pluginName}/include.gradle")
+		def content;
+		if (includeGradleFile.exists()) {
+			println "\t + add include.gradle from ${includeGradleFile}"
+			content = modifyProductFlavorInContent(includeGradleFile.text, dimensionName, flavor)
+		} else {
+			println "\t + creating include.gradle for plugin ${file(it.directory)}"
+			content = createProductFlavorsContent(flavor, dimensionName)
+		}
+
+		destinationIncludeGradleFile.text = content
 	}
+
+	// old logic copying from configurations/ into build/config and changing text content
+//	fileTree.listFiles().each { file ->
+//		if (file.isDirectory()) {
+//			shouldCreatePluginConfigFile = true
+//			def hasChildrenDirs = false
+//			file.listFiles().each { subFile ->
+//				if (subFile.isDirectory()) {
+//					hasChildrenDirs = true
+//				}
+//			}
+//
+//			// if plugin is scoped - traverse its children directories
+//			// e.g. @scope/plugin-with-android-aars
+//			if (hasChildrenDirs) {
+//				file.listFiles().each { subFile ->
+//					if (subFile.isDirectory()) {
+//						createIncludeGradleForPlugin(subFile, flavorNumber++, flavorNames, configurationsDir)
+//					}
+//				}
+//			} else {
+//				createIncludeGradleForPlugin(file, flavorNumber++, flavorNames, configurationsDir)
+//			}
+//		}
+//	}
 
 	createPluginsConfigFile(flavorNames, configurationsDir)
 }
@@ -485,7 +511,7 @@ def createIncludeGradleForPlugin(file, flavorNumber, flavorNames, configurations
 	def foundIncludeFile = false
 	def fileName = file.name
 	def dimensionName = sanitizeDimensionName(fileName)
-
+	
 	def flavor = "F" + flavorNumber
 	println "\t+found plugins: " + fileName
 	file.listFiles().each { subFile ->
@@ -494,12 +520,12 @@ def createIncludeGradleForPlugin(file, flavorNumber, flavorNames, configurations
 			def newIncludeFilePath = createPluginConfigurationPath(configurationsDir, subFile)
 			Files.createDirectories(newIncludeFilePath)
 			updateIncludeGradleFile(subFile, dimensionName, flavor, newIncludeFilePath)
-			renamePluginDirToFlavorName(dirToRename, flavor);
+								renamePluginDirToFlavorName(dirToRename, flavor);
 		}
 	}
-
+	
 	flavorNames.add('"' + dimensionName + '"')
-
+	
 	if (!foundIncludeFile) {
 		def newIncludeFilePath = createPluginConfigurationPath(configurationsDir, file)
 		Files.createDirectories(newIncludeFilePath)
@@ -529,16 +555,8 @@ android {
 }
 
 task pluginExtend {
-	description "applies additional configuration"
-
-	def pathToAppGradle = "$projectDir/../../app/App_Resources/Android/app.gradle"
-	def appGradle = file(pathToAppGradle)
-	if(appGradle.exists()) {
-		apply from: pathToAppGradle
-	}
-
 	if(configurationsDir.exists()) {
-		println "$configStage pluginExtend"
+	println "$configStage pluginExtend"
 		configurationsDir.eachFileRecurse(FileType.FILES) {
 			if(it.name == 'include.gradle') {
 				println "\t+applying configuration from: " + it
@@ -547,58 +565,6 @@ task pluginExtend {
 		}
 	}
 }
-
-//// doesn't work unless task is explicitly called (TODO: research configurations hook)
-// addAarDependencies.dependsOn(copyAarDependencies)
-// createDefaultIncludeFiles.dependsOn(addAarDependencies)
-// createPluginsConfigFile.dependsOn(createDefaultIncludeFiles)
-// pluginExtend.dependsOn(createPluginsConfigFile)
-
-////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////// BEFORE EXECUTION /////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////
-
-// we need to copy all dependencies into a flat dir, as pointed by the repositories configurations at the top
-task copyAarDependencies (type: Copy) {
-	def filterAarFilesFn = { path, attrs ->
-		String pathString = path.toString();
-		def isBin = Pattern.matches(".*/\\.bin/.*", pathString);
-		def isAar =  Pattern.matches(".*\\.aar\$", pathString);
-		return !isBin && isAar;
-	}
-
-	def mapToStringFn = { path ->
-		return path.toString();
-	}
-
-	Object[] files = Files.find(
-			Paths.get("$projectDir", "$nodeModulesDir"),
-			Integer.MAX_VALUE,
-			filterAarFilesFn,
-			java.nio.file.FileVisitOption.FOLLOW_LINKS
-	)
-			.map(mapToStringFn)
-			.toArray();
-
-	into "$projectDir/libs/aar"
-	from files
-}
-
-task addAarDependencies {
-	doLast {
-		println "$configStage addAarDependencies"
-		// manually traverse all the locally copied AAR files and add them to the project compilation dependencies list
-		FileTree tree = fileTree(dir: "$projectDir/libs/aar", include: ["**/*.aar"])
-		tree.each { File file ->
-			// remove the extension of the file (.aar)
-			def length = file.name.length() - 4
-			def fileName = file.name[0..<length]
-			println "\t+adding dependency: " + file.getAbsolutePath()
-			project.dependencies.add("compile", [name: fileName, ext: "aar"])
-		}
-	}
-}
-
 
 ////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////// EXECUTUION PHASE /////////////////////////////////////
@@ -615,19 +581,19 @@ task ensureMetadataOutDir {
 
 task collectAllJars {
 	description "gathers all paths to jar dependencies before building metadata with them"
-
+	
 	def explodedAarDir = project.buildDir.getAbsolutePath() + "/intermediates/exploded-aar/"
 	def sdkPath = android.sdkDirectory.getAbsolutePath();
 	def androidJar = sdkPath + "/platforms/" + android.compileSdkVersion + "/android.jar"
-
+	
 	doFirst {
 		configurations.compile.each { File dependencyFile ->
 			logger.info("Task: collectAllJars: dependency file: " + dependencyFile.getAbsolutePath())
 			allJarPaths.add(dependencyFile.getAbsolutePath())
 		}
-
+		
 		allJarPaths.add(androidJar);
-
+		
 		def ft = fileTree(dir: explodedAarDir, include: "**/*.jar")
 		ft.each { currentJarFile ->
 			allJarPaths.add(currentJarFile.getAbsolutePath())
@@ -643,23 +609,23 @@ task collectAllJars {
 				jars.add(f)
 			}
 		}
-
+		
 		asbgProject.ext.jarFiles = jars
 	}
 }
 
 task buildMetadata (type: JavaExec) {
 	description "builds metadata with provided jar dependencies"
-
+	
 	inputs.files(allJarPaths)
 	inputs.dir("$buildDir/intermediates/classes")
 
 	outputs.files("metadata/output/assets/metadata/treeNodeStream.dat", "metadata/output/assets/metadata/treeStringsStream.dat", "metadata/output/assets/metadata/treeValueStream.dat")
 
 	doFirst {
-		// get compiled classes to pass to metadata generator
-		// these need to be called after the classes have compiled
-		def classesDir = "$buildDir/intermediates/classes"
+		// get compiled classes to pass to metadata generator		
+		// these need to be called after the classes have compiled		
+		def classesDir = "$buildDir/intermediates/classes"		
 
 		def classesSubDirs = new File(classesDir).listFiles()
 		def selectedBuildType = project.ext.selectedBuildType
@@ -684,7 +650,7 @@ task buildMetadata (type: JavaExec) {
 		logger.info("Task buildMetadata: Call metadata-generator.jar with arguments: " + metadataParams.toString().replaceAll(',', ''))
 		args metadataParams.toArray()
 	}
-
+	
 	doLast {
 		copy {
 			from "$projectDir/metadata/output/assets/metadata"
@@ -747,9 +713,7 @@ task copyTypings {
 	}
 }
 
-copyTypings.onlyIf({
-	generateTypescriptDefinitions.didWork;
-})
+copyTypings.onlyIf { generateTypescriptDefinitions.didWork }
 
 task validateAppIdMatch {
 	doLast {
@@ -778,14 +742,14 @@ task setProperties {
 	project.ext.jarFiles = []
 	doLast {
 		def list = [];
-		allJarPaths.each({f ->
+		allJarPaths.each({f -> 
 			if(f.endsWith(".jar")) {
 				list.add(f);
 			}
 		})
 		project.jarFiles = list;
 	}
-}
+} 
 
 setProperties.finalizedBy("asbg:generateBindings", generateTypescriptDefinitions)
 
@@ -808,11 +772,6 @@ buildMetadata.dependsOn(collectAllJars)
 generateTypescriptDefinitions.finalizedBy(copyTypings)
 
 task buildapk {
-	// problem is compile dependencies need to be changed before configuration stage
-	// and this is the only way so far
-	tasks.copyAarDependencies.execute()
-	tasks.addAarDependencies.execute()
-
 	//done to build only necessary apk
 	if(project.hasProperty("release")) {
 		dependsOn "assembleRelease"
@@ -824,7 +783,7 @@ task buildapk {
 
 //////// custom clean ///////////
 task deleteMetadata (type: Delete){
-	delete "$projectDir/metadata/output"
+	delete "$projectDir/metadata/output", "$projectDir/src/main/assets/metadata"
 }
 
 task deleteFlavors (type: Delete){
