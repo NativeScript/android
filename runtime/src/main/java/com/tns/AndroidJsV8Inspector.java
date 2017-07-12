@@ -195,7 +195,7 @@ class AndroidJsV8Inspector {
         }
     }
 
-    // process all messages coming front the frontend necessary to initialize the inspector backend
+    // process all messages coming from the frontend necessary to initialize the inspector backend
     // schedule a debug line break at first convenience
     private void processDebugBreak() {
         processDebugBreakMessages();
