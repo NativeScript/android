@@ -26,6 +26,7 @@ import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.Message;
 import android.os.Process;
+import android.util.Log;
 import android.util.SparseArray;
 
 import com.tns.bindings.ProxyGenerator;
@@ -638,8 +639,8 @@ public class Runtime {
                         classCache.put(className, clazz);
                         break;
                     }
-                } catch (Exception e1) {
-                    e1.printStackTrace();
+                } catch (ClassNotFoundException e1) {
+                    Log.w("JS", "Dynamically loading class " + className + " was unsuccessful. Will attempt to load class from alternative ClassLoader.");
                 }
             }
             if (clazz == null) {
