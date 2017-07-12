@@ -520,8 +520,7 @@ void ObjectManager::MarkReachableObjects(Isolate* isolate, const Local<Object>& 
 
     if (frame.check()) {
         auto cls = fromJsInfo->ObjectClazz;
-        jclass clsClazz = m_env.GetObjectClass(cls);
-        jstring className = (jstring) m_env.CallObjectMethod(cls, GET_NAME_METHOD_ID);
+        JniLocalRef className(m_env.CallObjectMethod(cls, GET_NAME_METHOD_ID));
         frame.log("MarkReachableObjects: " + ArgConverter::jstringToString(className));
     }
 }

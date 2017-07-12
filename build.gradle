@@ -275,28 +275,28 @@ createNpmPackage.dependsOn(copyReadme, setPackageVersionInPackageJsonFile)
 task createPackage {
 	description "Builds the NativeScript Android App Package using an application project template."
 	dependsOn cleanDistDir,
-            createDistDir,
+	createDistDir,
 
-            copyProjectTemplate,
+	copyProjectTemplate,
 
-            copyPackageJson,
+	copyPackageJson,
 
-			copyStaticBindingGeneratorProject,
-			generateStaticBindingGeneratorJar,
-			copyGeneratedStaticBindingGeneratorJar,
+	copyStaticBindingGeneratorProject,
+	generateStaticBindingGeneratorJar,
+	copyGeneratedStaticBindingGeneratorJar,
 
-            getPackageVersion,
-            getCommitVersion,
-			
-            generateRuntime,
+	getPackageVersion,
+	getCommitVersion,
 
-			setPackageVersionInPackageJsonFile,
+	generateRuntime,
 
-            copyGeneratedRuntime,
-            generateMetadataGeneratorJar,
-            copyGeneratedMetadataGeneratorJar,
-            copyReadme,
-            createNpmPackage
+	setPackageVersionInPackageJsonFile,
+
+	copyGeneratedRuntime,
+	generateMetadataGeneratorJar,
+	copyGeneratedMetadataGeneratorJar,
+	copyReadme,
+	createNpmPackage
 
 	println "Creating NativeScript Android Package"			
 }
