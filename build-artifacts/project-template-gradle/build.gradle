@@ -1,6 +1,6 @@
 /*
 *	Script builds apk in release or debug mode
-*	To run: 
+*	To run:
 *			gradle buildapk -Prelease (release mode)
 *			gradle buildapk (debug mode -> default)
 * 	Options:
@@ -24,9 +24,9 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 
 buildscript {
-	repositories {
-		jcenter()
-	}
+    repositories {
+        jcenter()
+    }
 
 	dependencies {
 		classpath "com.android.tools.build:gradle:2.2.3"
@@ -40,9 +40,18 @@ def allJarPaths = new LinkedList <String> ()
 def configStage = "\tconfig phase: "
 def nodeModulesDir = "../../node_modules/"
 def configurationsDir = new File(projectDir, "build/configurations")
-def dependenciesJsonPath = file("dependencies.json")
-// TODO: Pete: Build script will not work with previous CLI versions
-def nativescriptDependencies = new JsonSlurper().parseText(dependenciesJsonPath.text)
+def dependenciesJson = file("dependencies.json")
+
+// the build script will not work with previous versions of the CLI (3.1 or earlier)
+if (!dependenciesJson.exists()) {
+	throw new BuildCancelledException("""
+'dependencies.json' file not found. Check whether the NativeScript CLI has prepared the project beforehand,
+and that your NativeScript version is 3.2, or a more recent one. To build an android project with the current
+version of the {N} CLI install a previous version of the runtime package - 'tns platform add android@3.1'.
+""")
+}
+
+def nativescriptDependencies = new JsonSlurper().parseText(dependenciesJson.text)
 
 def packageJsonContents = [:]
 def excludedDevDependencies = ['**/.bin/**']
@@ -105,16 +114,16 @@ android {
 	}
 
 	sourceSets.main {
-		jniLibs.srcDir "$projectDir/libs/jni"
-	}
+        jniLibs.srcDir "$projectDir/libs/jni"
+    }
 
 	signingConfigs {
-		release {
-			if (project.hasProperty("release")) {
+        release {
+            if (project.hasProperty("release")) {
 				if (project.hasProperty("ksPath") &&
-						project.hasProperty("ksPassword") &&
-						project.hasProperty("alias") &&
-						project.hasProperty("password")) {
+					project.hasProperty("ksPassword") &&
+					project.hasProperty("alias") &&
+					project.hasProperty("password")) {
 
 					storeFile file(ksPath)
 					storePassword ksPassword
@@ -122,13 +131,13 @@ android {
 					keyPassword password
 				}
 			}
-		}
-	}
-	buildTypes {
-		release {
-			signingConfig signingConfigs.release
-		}
-	}
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+        }
+    }
 
 	applicationVariants.all { variant ->
 		renameResultApks(variant)
@@ -171,20 +180,15 @@ android {
 }
 
 repositories {
-<<<<<<< b0b85ff945746802dd818d0593e055857a0a2bcb
     jcenter()
     maven { url 'https://maven.google.com' }
 
     // used for local *.AAR files
-=======
-	jcenter()
-	// used for local *.AAR files
->>>>>>> further refactor script
 	def pluginDependencies = nativescriptDependencies.collect { "${it.directory}/platforms/android" }
 	pluginDependencies.add("libs/runtime-libs")
 
-	flatDir {
-		dirs pluginDependencies
+    flatDir {
+    	dirs pluginDependencies
 	}
 }
 
@@ -194,11 +198,11 @@ dependencies {
 		supportVer = supportVersion
 	}
 
-	compile "com.android.support:support-v4:$supportVer"
-	compile "com.android.support:appcompat-v7:$supportVer"
+    compile "com.android.support:support-v4:$supportVer"
+    compile "com.android.support:appcompat-v7:$supportVer"
 	debugCompile "com.android.support:design:$supportVer"
 
-	// take all jars within the libs dir
+    // take all jars within the libs dir
 	compile fileTree(dir: "$projectDir/libs", include: ["**/*.jar"])
 
 	// take all jars within the node_modules dir
@@ -276,7 +280,6 @@ task applyPluginsIncludeGradleConfigurations {
 
 		includes.add(destinationIncludeGradleFile.getAbsolutePath());
 
-		// TODO: Pete figure out a way to deal with this
 		copyAndRenamePluginDirToFlavorName(androidDir, flavor);
 	}
 
@@ -308,62 +311,62 @@ task applyAppGradleConfiguration {
 
 static def updateProductFlavorsContent(flavor, dimensionName, oldContent) {
 	def endIndex = oldContent.length() - 1;
-	def index = 0;
-	def newContent = "";
-	def level = -1;
-	def dimensionFound = false;
+		def index = 0;
+		def newContent = "";
+		def level = -1;
+		def dimensionFound = false;
 
-	while(index <= endIndex) {
-		if(level == 0 && (oldContent[index] == '"' || oldContent[index] == "'")) {
-			def closingQuotes = oldContent.indexOf('"', index + 1);
-			if(closingQuotes == -1) {
-				closingQuotes = oldContent.indexOf("'", index + 1);
-			}
-
-			index = closingQuotes + 1;
-			newContent += "\"${flavor}\"";
-			continue;
-		}
-
-		if(oldContent[index] == "{") {
-			level++;
-		}
-
-		if(oldContent[index] == "}") {
-			level--;
-		}
-
-		if(level > 0) {
-			if(!dimensionFound && oldContent.indexOf("dimension", index) == index) {
-				newContent += "dimension \"${dimensionName}\"";
-				dimensionFound = true;
-				index += "dimension ".length();
-				def openingQuoutes = oldContent.indexOf('"', index);
-				if(openingQuoutes == -1) {
-					openingQuoutes = oldContent.indexOf("'", index);
-				}
-
-				def closingQuotes = oldContent.indexOf('"', openingQuoutes + 1);
-				if(closingQuotes == -1) {
-					closingQuotes = oldContent.indexOf("'", openingQuoutes + 1);
+		while(index <= endIndex) {
+			if (level == 0 && (oldContent[index] == '"' || oldContent[index] == "'")) {
+				def closingQuotes = oldContent.indexOf('"', index + 1);
+				if (closingQuotes == -1) {
+					closingQuotes = oldContent.indexOf("'", index + 1);
 				}
 
 				index = closingQuotes + 1;
+				newContent += "\"${flavor}\"";
+				continue;
 			}
+
+			if (oldContent[index] == "{") {
+				level++;
+			}
+
+			if (oldContent[index] == "}") {
+				level--;
+			}
+
+			if (level > 0) {
+				if (!dimensionFound && oldContent.indexOf("dimension", index) == index) {
+					newContent += "dimension \"${dimensionName}\"";
+					dimensionFound = true;
+					index += "dimension ".length();
+					def openingQuoutes = oldContent.indexOf('"', index);
+					if (openingQuoutes == -1) {
+						openingQuoutes = oldContent.indexOf("'", index);
+					}
+
+					def closingQuotes = oldContent.indexOf('"', openingQuoutes + 1);
+					if (closingQuotes == -1) {
+						closingQuotes = oldContent.indexOf("'", openingQuoutes + 1);
+					}
+
+					index = closingQuotes + 1;
+				}
+			}
+
+			newContent += oldContent[index];
+
+			index++;
 		}
 
-		newContent += oldContent[index];
-
-		index++;
-	}
-
-	return newContent;
+		return newContent;
 }
 
 static def createProductFlavorsContent(flavor, dimensionName, includeAndroidContent = true) {
 	if (includeAndroidContent)
-	{
-		def content = """
+  	{
+    	def content = """
 android {
     productFlavors {
         "${flavor}" {
@@ -372,18 +375,18 @@ android {
     }
 }
 """
-		return content;
+    	return content;
 	}
 	else
 	{
-		def content = """
+    	def content = """
     productFlavors {
         "${flavor}" {
             dimension "${dimensionName}"
         }
     }
 """
-		return content;
+      return content;
 	}
 }
 
@@ -419,28 +422,28 @@ static def modifyProductFlavorInContent(content, dimension, flavor) {
 	}
 
 	if (indexEnd != -1)
-	{
+    {
 		// full content of productFlavors { ... } -> the substring is parenthesis to parenthesis -> { ... }
-		def oldProductFlavorsText = content.substring(indexStart, indexEnd + 1);
+      def oldProductFlavorsText = content.substring(indexStart, indexEnd + 1);
 
-		def newProductFlavorsContent = updateProductFlavorsContent(flavor, dimension, oldProductFlavorsText);
+      def newProductFlavorsContent = updateProductFlavorsContent(flavor, dimension, oldProductFlavorsText);
 
-		return content.replace(oldProductFlavorsText, newProductFlavorsContent);
-	}
-	else
-	{
-		def androidContentExists = content.indexOf("android {") != -1;
-		def newProductFlavorsContent = createProductFlavorsContent(flavor, dimension, !androidContentExists);
+      return content.replace(oldProductFlavorsText, newProductFlavorsContent);
+    }
+    else
+    {
+        def androidContentExists = content.indexOf("android {") != -1;
+        def newProductFlavorsContent = createProductFlavorsContent(flavor, dimension, !androidContentExists);
 
-		if (androidContentExists)
-		{
-			return content.replace("android {", "android { ${newProductFlavorsContent}");
-		}
-		else
-		{
-			return "${newProductFlavorsContent} \t ${content}"
-		}
-	}
+        if (androidContentExists)
+        {
+           return content.replace("android {", "android { ${newProductFlavorsContent}");
+        }
+        else
+        {
+           return "${newProductFlavorsContent} \t ${content}"
+        }
+    }
 }
 
 def copyFolder(source, destination) {
@@ -508,7 +511,7 @@ task collectAllJars {
 		metadataParams.add("metadata-generator.jar");
 		metadataParams.add("$projectDir/metadata/output/assets/metadata");
 		def jars = new LinkedList<File>()
-		for(def i = 0; i < allJarPaths.size(); i++) {
+		for (def i = 0; i < allJarPaths.size(); i++) {
 			metadataParams.add(allJarPaths.get(i));
 			def f = new File(allJarPaths.get(i))
 			if (f.getName().endsWith(".jar")) {
@@ -670,7 +673,7 @@ generateTypescriptDefinitions.finalizedBy(copyTypings)
 
 task buildapk {
 	//done to build only necessary apk
-	if(project.hasProperty("release")) {
+	if (project.hasProperty("release")) {
 		dependsOn "assembleRelease"
 	}
 	else {
