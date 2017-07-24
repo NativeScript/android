@@ -174,6 +174,28 @@ task copyGeneratedMetadataGeneratorJar << {
 	}
 }
 
+task generateInterfaceNameGenerator (type: Exec) {
+	doFirst {
+		workingDir "$rootDir/android-static-binding-generator/project/interface-name-generator"
+
+		if(isWinOs) {
+			commandLine "cmd", "/c", "gradlew", "assemble"
+		}
+		else {
+			commandLine "./gradlew", "assemble"
+		}
+	}
+}
+
+
+task copyInterfaceNameGeneratorJar  << {
+	copy {
+		from "$rootDir/android-static-binding-generator/project/interface-name-generator/build/libs"
+		into "$rootDir/dist/framework/build-tools/android-static-binding-generator"
+	}
+}
+
+
 task generateStaticBindingGeneratorJar (type: Exec) {
 	doFirst {
 		workingDir "$rootDir/android-static-binding-generator/project/staticbindinggenerator"
@@ -185,8 +207,8 @@ task generateStaticBindingGeneratorJar (type: Exec) {
 			commandLine "./gradlew", "assemble"
 		}
 	}
-}
 
+}
 task copyGeneratedStaticBindingGeneratorJar << {
 	copy {
 		from "$rootDir/android-static-binding-generator/project/staticbindinggenerator/build/libs"
@@ -197,7 +219,7 @@ task copyGeneratedStaticBindingGeneratorJar << {
 task copyStaticBindingGeneratorProject << {
 	copy {
 		from "$rootDir/android-static-binding-generator/project"
-		exclude "staticbindinggenerator", "**/package.json", "*.txt", "**/logs", "**/out", "**/input_parced_typescript"
+		exclude "staticbindinggenerator", "interface-name-generator", "**/package.json", "*.txt", "**/logs", "**/out", "**/input_parced_typescript"
 
 		into "$rootDir/dist/framework/build-tools/android-static-binding-generator"
 	}
@@ -239,7 +261,9 @@ copyPackageJson.dependsOn(copyProjectTemplate)
 
 copyStaticBindingGeneratorProject.dependsOn(copyProjectTemplate)
 //generate static binding generator and copy into project template
-generateStaticBindingGeneratorJar.dependsOn(copyStaticBindingGeneratorProject)
+generateInterfaceNameGenerator.dependsOn(copyStaticBindingGeneratorProject)
+copyInterfaceNameGeneratorJar.dependsOn(generateInterfaceNameGenerator)
+generateStaticBindingGeneratorJar.dependsOn(copyInterfaceNameGeneratorJar)
 copyGeneratedStaticBindingGeneratorJar.dependsOn(generateStaticBindingGeneratorJar)
 
 //get version from package json
