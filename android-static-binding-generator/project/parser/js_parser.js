@@ -10,6 +10,12 @@ if (process.env.AST_PARSER_DISABLE_LOGGING && process.env.AST_PARSER_DISABLE_LOG
 	disableLogger = false;
 }
 
+var 	arguments = process.argv;
+if (arguments && arguments.length) {
+	if(arguments[arguments.length - 1] == "enableVerboseLogging") {
+		disableLogger = false
+	}
+}
 loggingSettings = {
 	"logPath": require("path").dirname(require.main.filename) + "/logs/i.txt",
 	"strategy": "console",
@@ -29,7 +35,6 @@ var fs = require("fs"),
 	lazy = require("lazy"),
 	eol = require('os').EOL,
 
-	arguments = process.argv,
 	appDir = path.dirname(require.main.filename),
 	extendDecoratorName = "JavaProxy",
 	interfacesDecoratorName = "Interfaces",
