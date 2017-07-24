@@ -241,8 +241,19 @@ public class Generator {
         if (libs != null) {
             for (String lib : libs) {
                 File f = new File(lib);
-                Map<String, JavaClass> classes = f.isFile() ? readJar(lib, throwOnError) : readDir(lib, throwOnError);
-                map.putAll(classes);
+                Map<String, JavaClass> classes = null;
+
+                if (f.isFile()) {
+                    classes = readJar(lib, throwOnError);
+                }
+
+                if (f.isDirectory()) {
+                    classes = readDir(lib, throwOnError);
+                }
+
+                if (classes != null) {
+                    map.putAll(classes);
+                }
             }
         }
         return map;
