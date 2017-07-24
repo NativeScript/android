@@ -238,6 +238,9 @@ class RunAstParserTask extends DefaultTask {
 		list.add(interfaceNamesFilePath)
 		list.add(jsFilesParametersPath)
 
+		if(project.gradle.startParameter.logLevel.equals(LogLevel.DEBUG)) {
+			list.add("enableVerboseLogging")
+		}
 		logger.info("Task: RunAstParserTask: running node with arguments: " + list.toString().replaceAll(',', ''))
 		runCommand(list)
 
