@@ -209,8 +209,10 @@ dependencies {
 		supportVer = supportVersion
 	}
 	
-    compile "com.android.support:support-v4:$supportVer"
-    compile "com.android.support:appcompat-v7:$supportVer"
+        compile group: 'commons-io', name: 'commons-io', version: '2.0.1'
+
+	compile "com.android.support:support-v4:$supportVer"
+	compile "com.android.support:appcompat-v7:$supportVer"
 	debugCompile "com.android.support:design:$supportVer"
 
     // take all jars within the libs dir
