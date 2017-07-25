@@ -3,11 +3,16 @@ package com.tns;
 import java.io.File;
 
 import android.app.Application;
+import android.content.Context;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.os.Build;
 import android.util.Log;
 
 import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 
 public final class RuntimeHelper {
     private RuntimeHelper() {
@@ -27,8 +32,8 @@ public final class RuntimeHelper {
                 String fileName = "";
 
                 try {
-                    java.lang.Class ErrReport = java.lang.Class.forName("com.tns.ErrorReport");
-                    java.lang.reflect.Field field = ErrReport.getDeclaredField("ERROR_FILE_NAME");
+                    Class ErrReport = Class.forName("com.tns.ErrorReport");
+                    Field field = ErrReport.getDeclaredField("ERROR_FILE_NAME");
                     fileName = (String) field.get(null);
                 } catch (Exception e) {
                     return false;
@@ -178,22 +183,43 @@ public final class RuntimeHelper {
                     }
                 }
 
-                // runtime needs to be initialized before the NativeScriptSyncService is enabled because it uses runtime.runScript(...)
-                if (NativeScriptSyncService.isSyncEnabled(app)) {
-                    NativeScriptSyncService syncService = new NativeScriptSyncService(runtime, logger, app);
+                try {
+                    Class NativeScriptSyncService = Class.forName("com.tns.NativeScriptSyncService");
+                    Method isSyncEnabledMethod = NativeScriptSyncService.getMethod("isSyncEnabled", Context.class);
+                    Boolean isSyncEnabled = (Boolean)isSyncEnabledMethod.invoke(NativeScriptSyncService, app);
 
-                    syncService.sync();
-                    syncService.startServer();
+                    // runtime needs to be initialized before the NativeScriptSyncService is enabled because it uses runtime.runScript(...)
+                    if (isSyncEnabled) {
+                        Constructor syncServiceConstructor = NativeScriptSyncService.getConstructor(new Class[] {Runtime.class, Logger.class, Context.class});
+                        Object syncService = syncServiceConstructor.newInstance(runtime, logger, app);
 
-                    // preserve this instance as strong reference
-                    // do not preserve in NativeScriptApplication field inorder to
-                    // make the code more portable
-                    // @@@
-                    // Runtime.getOrCreateJavaObjectID(syncService);
-                } else {
-                    if (logger.isEnabled()) {
-                        logger.write("NativeScript LiveSync is not enabled.");
+                        Method syncMethod = NativeScriptSyncService.getMethod("sync");
+                        syncMethod.invoke(syncService);
+
+                        Method startServerMethod = NativeScriptSyncService.getMethod("startServer");
+                        startServerMethod.invoke(syncService);
+
+                        // preserve this instance as strong reference
+                        // do not preserve in NativeScriptApplication field inorder to
+                        // make the code more portable
+                        // @@@
+                        // Runtime.getOrCreateJavaObjectID(syncService);
+                    } else {
+                        if (logger.isEnabled()) {
+                            logger.write("NativeScript LiveSync is not enabled.");
+                        }
                     }
+
+                } catch (ClassNotFoundException e) {
+                    e.printStackTrace();
+                } catch (NoSuchMethodException e) {
+                    e.printStackTrace();
+                } catch (IllegalAccessException e) {
+                    e.printStackTrace();
+                } catch (InvocationTargetException e) {
+                    e.printStackTrace();
+                } catch (InstantiationException e) {
+                    e.printStackTrace();
                 }
 
                 runtime.runScript(new File(appDir, "internal/ts_helpers.js"));

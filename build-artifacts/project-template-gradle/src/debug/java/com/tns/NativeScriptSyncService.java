@@ -154,17 +154,10 @@ public class NativeScriptSyncService {
     }
 
     private void deleteRecursive(File fileOrDirectory) {
-
-        if (fileOrDirectory.isDirectory()) {
-            for (File child : fileOrDirectory.listFiles()) {
-                deleteRecursive(child);
-            }
-        }
-
-        boolean success = fileOrDirectory.delete();
-
-        if (!success && fileOrDirectory.isDirectory()) {
-            android.util.Log.d("Sync", "Failed to delete temp sync directory: " + fileOrDirectory.getAbsolutePath());
+        try {
+            org.apache.commons.io.FileUtils.deleteDirectory(fileOrDirectory);
+        } catch (IOException e) {
+            android.util.Log.d("Sync", e.toString());
         }
     }
 
