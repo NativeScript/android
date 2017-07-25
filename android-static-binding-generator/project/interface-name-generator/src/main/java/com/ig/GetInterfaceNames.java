@@ -62,8 +62,9 @@ public class GetInterfaceNames
                 try {
                     c = cl.loadClass(className);
                 }
-                catch (NoClassDefFoundError localNoClassDefFoundError)
-                {
+                catch (IllegalAccessError e) {
+                }
+                catch (NoClassDefFoundError localNoClassDefFoundError) {
                 }
                 if ((c != null) && (c.isInterface() == true)) {
                     String res = c.getName().replace('$', '.');
