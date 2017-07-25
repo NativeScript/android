@@ -10,6 +10,7 @@ import android.util.Log;
 
 import java.io.IOException;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
@@ -31,8 +32,8 @@ public final class RuntimeHelper {
                 String fileName = "";
 
                 try {
-                    java.lang.Class ErrReport = java.lang.Class.forName("com.tns.ErrorReport");
-                    java.lang.reflect.Field field = ErrReport.getDeclaredField("ERROR_FILE_NAME");
+                    Class ErrReport = Class.forName("com.tns.ErrorReport");
+                    Field field = ErrReport.getDeclaredField("ERROR_FILE_NAME");
                     fileName = (String) field.get(null);
                 } catch (Exception e) {
                     return false;
@@ -183,7 +184,7 @@ public final class RuntimeHelper {
                 }
 
                 try {
-                    java.lang.Class NativeScriptSyncService = Class.forName("com.tns.NativeScriptSyncService");
+                    Class NativeScriptSyncService = Class.forName("com.tns.NativeScriptSyncService");
                     Method isSyncEnabledMethod = NativeScriptSyncService.getMethod("isSyncEnabled", Context.class);
                     Boolean isSyncEnabled = (Boolean)isSyncEnabledMethod.invoke(NativeScriptSyncService, app);
 
