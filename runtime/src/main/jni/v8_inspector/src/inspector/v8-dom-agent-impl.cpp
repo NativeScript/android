@@ -90,7 +90,7 @@ void V8DOMAgentImpl::getDocument(ErrorString* errorString, std::unique_ptr<proto
 
                 auto resultUtf16Data = resultString.data();
 
-                auto resultJson = protocol::parseJSON(String16((const uint16_t*) resultUtf16Data));
+                auto resultJson = protocol::StringUtil::parseJSON(String16((const uint16_t*) resultUtf16Data));
 
                 protocol::ErrorSupport errorSupport;
                 auto domNode = protocol::DOM::Node::parse(resultJson.get(), &errorSupport);

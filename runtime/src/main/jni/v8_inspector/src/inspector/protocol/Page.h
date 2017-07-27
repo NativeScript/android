@@ -8,6 +8,7 @@
 #define v8_inspector_protocol_Page_h
 
 #include "src/inspector/protocol/Protocol.h"
+#include "GenericTypes.h"
 // For each imported domain we generate a ValueConversions struct instead of a full domain definition
 // and include Domain::API version from there.
 
