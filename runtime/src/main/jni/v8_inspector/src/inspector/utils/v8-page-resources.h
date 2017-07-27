@@ -33,7 +33,7 @@ class PageResource {
          * Get string representation of the resource (file) contents
          * String is base64-encoded if the resource's MIME type isn't a Document | Stylesheet | Script
          */
-        String16 getContent(protocol::ErrorString*);
+        String16 getContent(protocol::String*);
 
         /*
          * Gets all file paths available in the application's files/app directory

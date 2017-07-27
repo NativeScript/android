@@ -62,7 +62,7 @@ std::map<std::string, v8_inspector::utils::PageResource> PageResource::getPageRe
     return result;
 }
 
-String16 PageResource::getContent(protocol::ErrorString* errorString) {
+String16 PageResource::getContent(protocol::String* errorString) {
     if (m_content.empty()) {
         auto filePath = m_filePath;
         auto shouldEncode = !hasTextContent();

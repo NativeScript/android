@@ -34,5 +34,11 @@ namespace v8_inspector {
 
             return errorMessage;
         }
+
+        protocol::DispatchResponse Common::protocolCommandNotSupportedDispatchResponse() {
+            return protocol::DispatchResponse::Error(s_notImplemented);
+        }
+
+        const String16 Common::s_notImplemented = "Protocol command not supported.";
     }
 }
