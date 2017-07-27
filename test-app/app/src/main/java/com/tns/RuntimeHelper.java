@@ -147,8 +147,8 @@ public final class RuntimeHelper {
                 runtime = Runtime.initializeRuntimeWithConfiguration(config);
                 if (isDebuggable) {
                     try {
-                        v8Inspector = new AndroidJsV8Inspector(app.getFilesDir().getAbsolutePath(), app.getPackageName());
-                        v8Inspector.start();
+//                        v8Inspector = new AndroidJsV8Inspector(app.getFilesDir().getAbsolutePath(), app.getPackageName());
+//                        v8Inspector.start();
 
                         // the following snippet is used as means to notify the VSCode extension
                         // debugger that the debugger agent has started
@@ -172,7 +172,7 @@ public final class RuntimeHelper {
                             shouldBreak = true;
                         }
 
-                        v8Inspector.waitForDebugger(shouldBreak);
+//                        v8Inspector.waitForDebugger(shouldBreak);
                     } catch (IOException e) {
                         e.printStackTrace();
                     }

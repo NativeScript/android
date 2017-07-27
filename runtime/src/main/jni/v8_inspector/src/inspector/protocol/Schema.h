@@ -23,12 +23,12 @@ class Domain;
 // ------------- Type and builder declarations.
 
 // Description of the protocol domain.
-class  Domain : public API::Domain {
+class  Domain : public Serializable, public API::Domain{
     PROTOCOL_DISALLOW_COPY(Domain);
 public:
-    static std::unique_ptr<Domain> parse(protocol::Value* value, ErrorSupport* errors);
+    static std::unique_ptr<Domain> fromValue(protocol::Value* value, ErrorSupport* errors);
 
-    ~Domain() { }
+    ~Domain() override { }
 
     String getName() { return m_name; }
     void setName(const String& value) { m_name = value; }
@@ -36,7 +36,8 @@ public:
     String getVersion() { return m_version; }
     void setVersion(const String& value) { m_version = value; }
 
-    std::unique_ptr<protocol::DictionaryValue> serialize() const;
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    String serialize() override { return toValue()->serialize(); }
     std::unique_ptr<Domain> clone() const;
     std::unique_ptr<StringBuffer> toJSONString() const override;
 
@@ -103,18 +104,22 @@ class  Backend {
 public:
     virtual ~Backend() { }
 
-    virtual void getDomains(ErrorString*, std::unique_ptr<protocol::Array<protocol::Schema::Domain>>* out_domains) = 0;
+    virtual DispatchResponse getDomains(std::unique_ptr<protocol::Array<protocol::Schema::Domain>>* out_domains) = 0;
 
-    virtual void disable(ErrorString*) { }
+    virtual DispatchResponse disable()
+    {
+        return DispatchResponse::OK();
+    }
 };
 
 // ------------- Frontend interface.
 
 class  Frontend {
 public:
-    Frontend(FrontendChannel* frontendChannel) : m_frontendChannel(frontendChannel) { }
+    explicit Frontend(FrontendChannel* frontendChannel) : m_frontendChannel(frontendChannel) { }
 
     void flush();
+    void sendRawNotification(const String&);
 private:
     FrontendChannel* m_frontendChannel;
 };

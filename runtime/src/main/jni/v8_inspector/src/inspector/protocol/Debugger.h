@@ -32,6 +32,18 @@ class CallFrame;
 class Scope;
 // Search match for resource.
 class SearchMatch;
+// 
+class BreakLocation;
+// Wrapper for notification params
+class ScriptParsedNotification;
+// Wrapper for notification params
+class ScriptFailedToParseNotification;
+// Wrapper for notification params
+class BreakpointResolvedNotification;
+// Wrapper for notification params
+class PausedNotification;
+// Wrapper for notification params
+using ResumedNotification = Object;
 
 namespace SetPauseOnExceptions {
 namespace StateEnum {
@@ -50,19 +62,21 @@ namespace ReasonEnum {
  extern const char* Assert;
  extern const char* DebugCommand;
  extern const char* PromiseRejection;
+ extern const char* OOM;
  extern const char* Other;
+ extern const char* Ambiguous;
 } // ReasonEnum
 } // Paused
 
 // ------------- Type and builder declarations.
 
 // Location in the source code.
-class  Location {
+class  Location : public Serializable{
     PROTOCOL_DISALLOW_COPY(Location);
 public:
-    static std::unique_ptr<Location> parse(protocol::Value* value, ErrorSupport* errors);
+    static std::unique_ptr<Location> fromValue(protocol::Value* value, ErrorSupport* errors);
 
-    ~Location() { }
+    ~Location() override { }
 
     String getScriptId() { return m_scriptId; }
     void setScriptId(const String& value) { m_scriptId = value; }
@@ -74,7 +88,8 @@ public:
     int getColumnNumber(int defaultValue) { return m_columnNumber.isJust() ? m_columnNumber.fromJust() : defaultValue; }
     void setColumnNumber(int value) { m_columnNumber = value; }
 
-    std::unique_ptr<protocol::DictionaryValue> serialize() const;
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    String serialize() override { return toValue()->serialize(); }
     std::unique_ptr<Location> clone() const;
 
     template<int STATE>
@@ -143,12 +158,12 @@ private:
 
 
 // Location in the source code.
-class  ScriptPosition {
+class  ScriptPosition : public Serializable{
     PROTOCOL_DISALLOW_COPY(ScriptPosition);
 public:
-    static std::unique_ptr<ScriptPosition> parse(protocol::Value* value, ErrorSupport* errors);
+    static std::unique_ptr<ScriptPosition> fromValue(protocol::Value* value, ErrorSupport* errors);
 
-    ~ScriptPosition() { }
+    ~ScriptPosition() override { }
 
     int getLineNumber() { return m_lineNumber; }
     void setLineNumber(int value) { m_lineNumber = value; }
@@ -156,7 +171,8 @@ public:
     int getColumnNumber() { return m_columnNumber; }
     void setColumnNumber(int value) { m_columnNumber = value; }
 
-    std::unique_ptr<protocol::DictionaryValue> serialize() const;
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    String serialize() override { return toValue()->serialize(); }
     std::unique_ptr<ScriptPosition> clone() const;
 
     template<int STATE>
@@ -219,12 +235,12 @@ private:
 
 
 // JavaScript call frame. Array of call frames form the call stack.
-class  CallFrame {
+class  CallFrame : public Serializable{
     PROTOCOL_DISALLOW_COPY(CallFrame);
 public:
-    static std::unique_ptr<CallFrame> parse(protocol::Value* value, ErrorSupport* errors);
+    static std::unique_ptr<CallFrame> fromValue(protocol::Value* value, ErrorSupport* errors);
 
-    ~CallFrame() { }
+    ~CallFrame() override { }
 
     String getCallFrameId() { return m_callFrameId; }
     void setCallFrameId(const String& value) { m_callFrameId = value; }
@@ -249,7 +265,8 @@ public:
     protocol::Runtime::RemoteObject* getReturnValue(protocol::Runtime::RemoteObject* defaultValue) { return m_returnValue.isJust() ? m_returnValue.fromJust() : defaultValue; }
     void setReturnValue(std::unique_ptr<protocol::Runtime::RemoteObject> value) { m_returnValue = std::move(value); }
 
-    std::unique_ptr<protocol::DictionaryValue> serialize() const;
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    String serialize() override { return toValue()->serialize(); }
     std::unique_ptr<CallFrame> clone() const;
 
     template<int STATE>
@@ -351,12 +368,12 @@ private:
 
 
 // Scope description.
-class  Scope {
+class  Scope : public Serializable{
     PROTOCOL_DISALLOW_COPY(Scope);
 public:
-    static std::unique_ptr<Scope> parse(protocol::Value* value, ErrorSupport* errors);
+    static std::unique_ptr<Scope> fromValue(protocol::Value* value, ErrorSupport* errors);
 
-    ~Scope() { }
+    ~Scope() override { }
 
     struct  TypeEnum {
         static const char* Global;
@@ -366,6 +383,8 @@ public:
         static const char* Catch;
         static const char* Block;
         static const char* Script;
+        static const char* Eval;
+        static const char* Module;
     }; // TypeEnum
 
     String getType() { return m_type; }
@@ -386,7 +405,8 @@ public:
     protocol::Debugger::Location* getEndLocation(protocol::Debugger::Location* defaultValue) { return m_endLocation.isJust() ? m_endLocation.fromJust() : defaultValue; }
     void setEndLocation(std::unique_ptr<protocol::Debugger::Location> value) { m_endLocation = std::move(value); }
 
-    std::unique_ptr<protocol::DictionaryValue> serialize() const;
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    String serialize() override { return toValue()->serialize(); }
     std::unique_ptr<Scope> clone() const;
 
     template<int STATE>
@@ -468,12 +488,12 @@ private:
 
 
 // Search match for resource.
-class  SearchMatch : public API::SearchMatch {
+class  SearchMatch : public Serializable, public API::SearchMatch{
     PROTOCOL_DISALLOW_COPY(SearchMatch);
 public:
-    static std::unique_ptr<SearchMatch> parse(protocol::Value* value, ErrorSupport* errors);
+    static std::unique_ptr<SearchMatch> fromValue(protocol::Value* value, ErrorSupport* errors);
 
-    ~SearchMatch() { }
+    ~SearchMatch() override { }
 
     double getLineNumber() { return m_lineNumber; }
     void setLineNumber(double value) { m_lineNumber = value; }
@@ -481,7 +501,8 @@ public:
     String getLineContent() { return m_lineContent; }
     void setLineContent(const String& value) { m_lineContent = value; }
 
-    std::unique_ptr<protocol::DictionaryValue> serialize() const;
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    String serialize() override { return toValue()->serialize(); }
     std::unique_ptr<SearchMatch> clone() const;
     std::unique_ptr<StringBuffer> toJSONString() const override;
 
@@ -543,35 +564,791 @@ private:
 };
 
 
+// 
+class  BreakLocation : public Serializable{
+    PROTOCOL_DISALLOW_COPY(BreakLocation);
+public:
+    static std::unique_ptr<BreakLocation> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~BreakLocation() override { }
+
+    String getScriptId() { return m_scriptId; }
+    void setScriptId(const String& value) { m_scriptId = value; }
+
+    int getLineNumber() { return m_lineNumber; }
+    void setLineNumber(int value) { m_lineNumber = value; }
+
+    bool hasColumnNumber() { return m_columnNumber.isJust(); }
+    int getColumnNumber(int defaultValue) { return m_columnNumber.isJust() ? m_columnNumber.fromJust() : defaultValue; }
+    void setColumnNumber(int value) { m_columnNumber = value; }
+
+    struct  TypeEnum {
+        static const char* DebuggerStatement;
+        static const char* Call;
+        static const char* Return;
+    }; // TypeEnum
+
+    bool hasType() { return m_type.isJust(); }
+    String getType(const String& defaultValue) { return m_type.isJust() ? m_type.fromJust() : defaultValue; }
+    void setType(const String& value) { m_type = value; }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    String serialize() override { return toValue()->serialize(); }
+    std::unique_ptr<BreakLocation> clone() const;
+
+    template<int STATE>
+    class BreakLocationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+          ScriptIdSet = 1 << 1,
+          LineNumberSet = 1 << 2,
+            AllFieldsSet = (ScriptIdSet | LineNumberSet | 0)};
+
+
+        BreakLocationBuilder<STATE | ScriptIdSet>& setScriptId(const String& value)
+        {
+            static_assert(!(STATE & ScriptIdSet), "property scriptId should not be set yet");
+            m_result->setScriptId(value);
+            return castState<ScriptIdSet>();
+        }
+
+        BreakLocationBuilder<STATE | LineNumberSet>& setLineNumber(int value)
+        {
+            static_assert(!(STATE & LineNumberSet), "property lineNumber should not be set yet");
+            m_result->setLineNumber(value);
+            return castState<LineNumberSet>();
+        }
+
+        BreakLocationBuilder<STATE>& setColumnNumber(int value)
+        {
+            m_result->setColumnNumber(value);
+            return *this;
+        }
+
+        BreakLocationBuilder<STATE>& setType(const String& value)
+        {
+            m_result->setType(value);
+            return *this;
+        }
+
+        std::unique_ptr<BreakLocation> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class BreakLocation;
+        BreakLocationBuilder() : m_result(new BreakLocation()) { }
+
+        template<int STEP> BreakLocationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<BreakLocationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Debugger::BreakLocation> m_result;
+    };
+
+    static BreakLocationBuilder<0> create()
+    {
+        return BreakLocationBuilder<0>();
+    }
+
+private:
+    BreakLocation()
+    {
+          m_lineNumber = 0;
+    }
+
+    String m_scriptId;
+    int m_lineNumber;
+    Maybe<int> m_columnNumber;
+    Maybe<String> m_type;
+};
+
+
+// Wrapper for notification params
+class  ScriptParsedNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(ScriptParsedNotification);
+public:
+    static std::unique_ptr<ScriptParsedNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~ScriptParsedNotification() override { }
+
+    String getScriptId() { return m_scriptId; }
+    void setScriptId(const String& value) { m_scriptId = value; }
+
+    String getUrl() { return m_url; }
+    void setUrl(const String& value) { m_url = value; }
+
+    int getStartLine() { return m_startLine; }
+    void setStartLine(int value) { m_startLine = value; }
+
+    int getStartColumn() { return m_startColumn; }
+    void setStartColumn(int value) { m_startColumn = value; }
+
+    int getEndLine() { return m_endLine; }
+    void setEndLine(int value) { m_endLine = value; }
+
+    int getEndColumn() { return m_endColumn; }
+    void setEndColumn(int value) { m_endColumn = value; }
+
+    int getExecutionContextId() { return m_executionContextId; }
+    void setExecutionContextId(int value) { m_executionContextId = value; }
+
+    String getHash() { return m_hash; }
+    void setHash(const String& value) { m_hash = value; }
+
+    bool hasExecutionContextAuxData() { return m_executionContextAuxData.isJust(); }
+    protocol::DictionaryValue* getExecutionContextAuxData(protocol::DictionaryValue* defaultValue) { return m_executionContextAuxData.isJust() ? m_executionContextAuxData.fromJust() : defaultValue; }
+    void setExecutionContextAuxData(std::unique_ptr<protocol::DictionaryValue> value) { m_executionContextAuxData = std::move(value); }
+
+    bool hasIsLiveEdit() { return m_isLiveEdit.isJust(); }
+    bool getIsLiveEdit(bool defaultValue) { return m_isLiveEdit.isJust() ? m_isLiveEdit.fromJust() : defaultValue; }
+    void setIsLiveEdit(bool value) { m_isLiveEdit = value; }
+
+    bool hasSourceMapURL() { return m_sourceMapURL.isJust(); }
+    String getSourceMapURL(const String& defaultValue) { return m_sourceMapURL.isJust() ? m_sourceMapURL.fromJust() : defaultValue; }
+    void setSourceMapURL(const String& value) { m_sourceMapURL = value; }
+
+    bool hasHasSourceURL() { return m_hasSourceURL.isJust(); }
+    bool getHasSourceURL(bool defaultValue) { return m_hasSourceURL.isJust() ? m_hasSourceURL.fromJust() : defaultValue; }
+    void setHasSourceURL(bool value) { m_hasSourceURL = value; }
+
+    bool hasIsModule() { return m_isModule.isJust(); }
+    bool getIsModule(bool defaultValue) { return m_isModule.isJust() ? m_isModule.fromJust() : defaultValue; }
+    void setIsModule(bool value) { m_isModule = value; }
+
+    bool hasLength() { return m_length.isJust(); }
+    int getLength(int defaultValue) { return m_length.isJust() ? m_length.fromJust() : defaultValue; }
+    void setLength(int value) { m_length = value; }
+
+    bool hasStackTrace() { return m_stackTrace.isJust(); }
+    protocol::Runtime::StackTrace* getStackTrace(protocol::Runtime::StackTrace* defaultValue) { return m_stackTrace.isJust() ? m_stackTrace.fromJust() : defaultValue; }
+    void setStackTrace(std::unique_ptr<protocol::Runtime::StackTrace> value) { m_stackTrace = std::move(value); }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    String serialize() override { return toValue()->serialize(); }
+    std::unique_ptr<ScriptParsedNotification> clone() const;
+
+    template<int STATE>
+    class ScriptParsedNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+          ScriptIdSet = 1 << 1,
+          UrlSet = 1 << 2,
+          StartLineSet = 1 << 3,
+          StartColumnSet = 1 << 4,
+          EndLineSet = 1 << 5,
+          EndColumnSet = 1 << 6,
+          ExecutionContextIdSet = 1 << 7,
+          HashSet = 1 << 8,
+            AllFieldsSet = (ScriptIdSet | UrlSet | StartLineSet | StartColumnSet | EndLineSet | EndColumnSet | ExecutionContextIdSet | HashSet | 0)};
+
+
+        ScriptParsedNotificationBuilder<STATE | ScriptIdSet>& setScriptId(const String& value)
+        {
+            static_assert(!(STATE & ScriptIdSet), "property scriptId should not be set yet");
+            m_result->setScriptId(value);
+            return castState<ScriptIdSet>();
+        }
+
+        ScriptParsedNotificationBuilder<STATE | UrlSet>& setUrl(const String& value)
+        {
+            static_assert(!(STATE & UrlSet), "property url should not be set yet");
+            m_result->setUrl(value);
+            return castState<UrlSet>();
+        }
+
+        ScriptParsedNotificationBuilder<STATE | StartLineSet>& setStartLine(int value)
+        {
+            static_assert(!(STATE & StartLineSet), "property startLine should not be set yet");
+            m_result->setStartLine(value);
+            return castState<StartLineSet>();
+        }
+
+        ScriptParsedNotificationBuilder<STATE | StartColumnSet>& setStartColumn(int value)
+        {
+            static_assert(!(STATE & StartColumnSet), "property startColumn should not be set yet");
+            m_result->setStartColumn(value);
+            return castState<StartColumnSet>();
+        }
+
+        ScriptParsedNotificationBuilder<STATE | EndLineSet>& setEndLine(int value)
+        {
+            static_assert(!(STATE & EndLineSet), "property endLine should not be set yet");
+            m_result->setEndLine(value);
+            return castState<EndLineSet>();
+        }
+
+        ScriptParsedNotificationBuilder<STATE | EndColumnSet>& setEndColumn(int value)
+        {
+            static_assert(!(STATE & EndColumnSet), "property endColumn should not be set yet");
+            m_result->setEndColumn(value);
+            return castState<EndColumnSet>();
+        }
+
+        ScriptParsedNotificationBuilder<STATE | ExecutionContextIdSet>& setExecutionContextId(int value)
+        {
+            static_assert(!(STATE & ExecutionContextIdSet), "property executionContextId should not be set yet");
+            m_result->setExecutionContextId(value);
+            return castState<ExecutionContextIdSet>();
+        }
+
+        ScriptParsedNotificationBuilder<STATE | HashSet>& setHash(const String& value)
+        {
+            static_assert(!(STATE & HashSet), "property hash should not be set yet");
+            m_result->setHash(value);
+            return castState<HashSet>();
+        }
+
+        ScriptParsedNotificationBuilder<STATE>& setExecutionContextAuxData(std::unique_ptr<protocol::DictionaryValue> value)
+        {
+            m_result->setExecutionContextAuxData(std::move(value));
+            return *this;
+        }
+
+        ScriptParsedNotificationBuilder<STATE>& setIsLiveEdit(bool value)
+        {
+            m_result->setIsLiveEdit(value);
+            return *this;
+        }
+
+        ScriptParsedNotificationBuilder<STATE>& setSourceMapURL(const String& value)
+        {
+            m_result->setSourceMapURL(value);
+            return *this;
+        }
+
+        ScriptParsedNotificationBuilder<STATE>& setHasSourceURL(bool value)
+        {
+            m_result->setHasSourceURL(value);
+            return *this;
+        }
+
+        ScriptParsedNotificationBuilder<STATE>& setIsModule(bool value)
+        {
+            m_result->setIsModule(value);
+            return *this;
+        }
+
+        ScriptParsedNotificationBuilder<STATE>& setLength(int value)
+        {
+            m_result->setLength(value);
+            return *this;
+        }
+
+        ScriptParsedNotificationBuilder<STATE>& setStackTrace(std::unique_ptr<protocol::Runtime::StackTrace> value)
+        {
+            m_result->setStackTrace(std::move(value));
+            return *this;
+        }
+
+        std::unique_ptr<ScriptParsedNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class ScriptParsedNotification;
+        ScriptParsedNotificationBuilder() : m_result(new ScriptParsedNotification()) { }
+
+        template<int STEP> ScriptParsedNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<ScriptParsedNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Debugger::ScriptParsedNotification> m_result;
+    };
+
+    static ScriptParsedNotificationBuilder<0> create()
+    {
+        return ScriptParsedNotificationBuilder<0>();
+    }
+
+private:
+    ScriptParsedNotification()
+    {
+          m_startLine = 0;
+          m_startColumn = 0;
+          m_endLine = 0;
+          m_endColumn = 0;
+          m_executionContextId = 0;
+    }
+
+    String m_scriptId;
+    String m_url;
+    int m_startLine;
+    int m_startColumn;
+    int m_endLine;
+    int m_endColumn;
+    int m_executionContextId;
+    String m_hash;
+    Maybe<protocol::DictionaryValue> m_executionContextAuxData;
+    Maybe<bool> m_isLiveEdit;
+    Maybe<String> m_sourceMapURL;
+    Maybe<bool> m_hasSourceURL;
+    Maybe<bool> m_isModule;
+    Maybe<int> m_length;
+    Maybe<protocol::Runtime::StackTrace> m_stackTrace;
+};
+
+
+// Wrapper for notification params
+class  ScriptFailedToParseNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(ScriptFailedToParseNotification);
+public:
+    static std::unique_ptr<ScriptFailedToParseNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~ScriptFailedToParseNotification() override { }
+
+    String getScriptId() { return m_scriptId; }
+    void setScriptId(const String& value) { m_scriptId = value; }
+
+    String getUrl() { return m_url; }
+    void setUrl(const String& value) { m_url = value; }
+
+    int getStartLine() { return m_startLine; }
+    void setStartLine(int value) { m_startLine = value; }
+
+    int getStartColumn() { return m_startColumn; }
+    void setStartColumn(int value) { m_startColumn = value; }
+
+    int getEndLine() { return m_endLine; }
+    void setEndLine(int value) { m_endLine = value; }
+
+    int getEndColumn() { return m_endColumn; }
+    void setEndColumn(int value) { m_endColumn = value; }
+
+    int getExecutionContextId() { return m_executionContextId; }
+    void setExecutionContextId(int value) { m_executionContextId = value; }
+
+    String getHash() { return m_hash; }
+    void setHash(const String& value) { m_hash = value; }
+
+    bool hasExecutionContextAuxData() { return m_executionContextAuxData.isJust(); }
+    protocol::DictionaryValue* getExecutionContextAuxData(protocol::DictionaryValue* defaultValue) { return m_executionContextAuxData.isJust() ? m_executionContextAuxData.fromJust() : defaultValue; }
+    void setExecutionContextAuxData(std::unique_ptr<protocol::DictionaryValue> value) { m_executionContextAuxData = std::move(value); }
+
+    bool hasSourceMapURL() { return m_sourceMapURL.isJust(); }
+    String getSourceMapURL(const String& defaultValue) { return m_sourceMapURL.isJust() ? m_sourceMapURL.fromJust() : defaultValue; }
+    void setSourceMapURL(const String& value) { m_sourceMapURL = value; }
+
+    bool hasHasSourceURL() { return m_hasSourceURL.isJust(); }
+    bool getHasSourceURL(bool defaultValue) { return m_hasSourceURL.isJust() ? m_hasSourceURL.fromJust() : defaultValue; }
+    void setHasSourceURL(bool value) { m_hasSourceURL = value; }
+
+    bool hasIsModule() { return m_isModule.isJust(); }
+    bool getIsModule(bool defaultValue) { return m_isModule.isJust() ? m_isModule.fromJust() : defaultValue; }
+    void setIsModule(bool value) { m_isModule = value; }
+
+    bool hasLength() { return m_length.isJust(); }
+    int getLength(int defaultValue) { return m_length.isJust() ? m_length.fromJust() : defaultValue; }
+    void setLength(int value) { m_length = value; }
+
+    bool hasStackTrace() { return m_stackTrace.isJust(); }
+    protocol::Runtime::StackTrace* getStackTrace(protocol::Runtime::StackTrace* defaultValue) { return m_stackTrace.isJust() ? m_stackTrace.fromJust() : defaultValue; }
+    void setStackTrace(std::unique_ptr<protocol::Runtime::StackTrace> value) { m_stackTrace = std::move(value); }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    String serialize() override { return toValue()->serialize(); }
+    std::unique_ptr<ScriptFailedToParseNotification> clone() const;
+
+    template<int STATE>
+    class ScriptFailedToParseNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+          ScriptIdSet = 1 << 1,
+          UrlSet = 1 << 2,
+          StartLineSet = 1 << 3,
+          StartColumnSet = 1 << 4,
+          EndLineSet = 1 << 5,
+          EndColumnSet = 1 << 6,
+          ExecutionContextIdSet = 1 << 7,
+          HashSet = 1 << 8,
+            AllFieldsSet = (ScriptIdSet | UrlSet | StartLineSet | StartColumnSet | EndLineSet | EndColumnSet | ExecutionContextIdSet | HashSet | 0)};
+
+
+        ScriptFailedToParseNotificationBuilder<STATE | ScriptIdSet>& setScriptId(const String& value)
+        {
+            static_assert(!(STATE & ScriptIdSet), "property scriptId should not be set yet");
+            m_result->setScriptId(value);
+            return castState<ScriptIdSet>();
+        }
+
+        ScriptFailedToParseNotificationBuilder<STATE | UrlSet>& setUrl(const String& value)
+        {
+            static_assert(!(STATE & UrlSet), "property url should not be set yet");
+            m_result->setUrl(value);
+            return castState<UrlSet>();
+        }
+
+        ScriptFailedToParseNotificationBuilder<STATE | StartLineSet>& setStartLine(int value)
+        {
+            static_assert(!(STATE & StartLineSet), "property startLine should not be set yet");
+            m_result->setStartLine(value);
+            return castState<StartLineSet>();
+        }
+
+        ScriptFailedToParseNotificationBuilder<STATE | StartColumnSet>& setStartColumn(int value)
+        {
+            static_assert(!(STATE & StartColumnSet), "property startColumn should not be set yet");
+            m_result->setStartColumn(value);
+            return castState<StartColumnSet>();
+        }
+
+        ScriptFailedToParseNotificationBuilder<STATE | EndLineSet>& setEndLine(int value)
+        {
+            static_assert(!(STATE & EndLineSet), "property endLine should not be set yet");
+            m_result->setEndLine(value);
+            return castState<EndLineSet>();
+        }
+
+        ScriptFailedToParseNotificationBuilder<STATE | EndColumnSet>& setEndColumn(int value)
+        {
+            static_assert(!(STATE & EndColumnSet), "property endColumn should not be set yet");
+            m_result->setEndColumn(value);
+            return castState<EndColumnSet>();
+        }
+
+        ScriptFailedToParseNotificationBuilder<STATE | ExecutionContextIdSet>& setExecutionContextId(int value)
+        {
+            static_assert(!(STATE & ExecutionContextIdSet), "property executionContextId should not be set yet");
+            m_result->setExecutionContextId(value);
+            return castState<ExecutionContextIdSet>();
+        }
+
+        ScriptFailedToParseNotificationBuilder<STATE | HashSet>& setHash(const String& value)
+        {
+            static_assert(!(STATE & HashSet), "property hash should not be set yet");
+            m_result->setHash(value);
+            return castState<HashSet>();
+        }
+
+        ScriptFailedToParseNotificationBuilder<STATE>& setExecutionContextAuxData(std::unique_ptr<protocol::DictionaryValue> value)
+        {
+            m_result->setExecutionContextAuxData(std::move(value));
+            return *this;
+        }
+
+        ScriptFailedToParseNotificationBuilder<STATE>& setSourceMapURL(const String& value)
+        {
+            m_result->setSourceMapURL(value);
+            return *this;
+        }
+
+        ScriptFailedToParseNotificationBuilder<STATE>& setHasSourceURL(bool value)
+        {
+            m_result->setHasSourceURL(value);
+            return *this;
+        }
+
+        ScriptFailedToParseNotificationBuilder<STATE>& setIsModule(bool value)
+        {
+            m_result->setIsModule(value);
+            return *this;
+        }
+
+        ScriptFailedToParseNotificationBuilder<STATE>& setLength(int value)
+        {
+            m_result->setLength(value);
+            return *this;
+        }
+
+        ScriptFailedToParseNotificationBuilder<STATE>& setStackTrace(std::unique_ptr<protocol::Runtime::StackTrace> value)
+        {
+            m_result->setStackTrace(std::move(value));
+            return *this;
+        }
+
+        std::unique_ptr<ScriptFailedToParseNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class ScriptFailedToParseNotification;
+        ScriptFailedToParseNotificationBuilder() : m_result(new ScriptFailedToParseNotification()) { }
+
+        template<int STEP> ScriptFailedToParseNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<ScriptFailedToParseNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Debugger::ScriptFailedToParseNotification> m_result;
+    };
+
+    static ScriptFailedToParseNotificationBuilder<0> create()
+    {
+        return ScriptFailedToParseNotificationBuilder<0>();
+    }
+
+private:
+    ScriptFailedToParseNotification()
+    {
+          m_startLine = 0;
+          m_startColumn = 0;
+          m_endLine = 0;
+          m_endColumn = 0;
+          m_executionContextId = 0;
+    }
+
+    String m_scriptId;
+    String m_url;
+    int m_startLine;
+    int m_startColumn;
+    int m_endLine;
+    int m_endColumn;
+    int m_executionContextId;
+    String m_hash;
+    Maybe<protocol::DictionaryValue> m_executionContextAuxData;
+    Maybe<String> m_sourceMapURL;
+    Maybe<bool> m_hasSourceURL;
+    Maybe<bool> m_isModule;
+    Maybe<int> m_length;
+    Maybe<protocol::Runtime::StackTrace> m_stackTrace;
+};
+
+
+// Wrapper for notification params
+class  BreakpointResolvedNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(BreakpointResolvedNotification);
+public:
+    static std::unique_ptr<BreakpointResolvedNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~BreakpointResolvedNotification() override { }
+
+    String getBreakpointId() { return m_breakpointId; }
+    void setBreakpointId(const String& value) { m_breakpointId = value; }
+
+    protocol::Debugger::Location* getLocation() { return m_location.get(); }
+    void setLocation(std::unique_ptr<protocol::Debugger::Location> value) { m_location = std::move(value); }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    String serialize() override { return toValue()->serialize(); }
+    std::unique_ptr<BreakpointResolvedNotification> clone() const;
+
+    template<int STATE>
+    class BreakpointResolvedNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+          BreakpointIdSet = 1 << 1,
+          LocationSet = 1 << 2,
+            AllFieldsSet = (BreakpointIdSet | LocationSet | 0)};
+
+
+        BreakpointResolvedNotificationBuilder<STATE | BreakpointIdSet>& setBreakpointId(const String& value)
+        {
+            static_assert(!(STATE & BreakpointIdSet), "property breakpointId should not be set yet");
+            m_result->setBreakpointId(value);
+            return castState<BreakpointIdSet>();
+        }
+
+        BreakpointResolvedNotificationBuilder<STATE | LocationSet>& setLocation(std::unique_ptr<protocol::Debugger::Location> value)
+        {
+            static_assert(!(STATE & LocationSet), "property location should not be set yet");
+            m_result->setLocation(std::move(value));
+            return castState<LocationSet>();
+        }
+
+        std::unique_ptr<BreakpointResolvedNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class BreakpointResolvedNotification;
+        BreakpointResolvedNotificationBuilder() : m_result(new BreakpointResolvedNotification()) { }
+
+        template<int STEP> BreakpointResolvedNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<BreakpointResolvedNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Debugger::BreakpointResolvedNotification> m_result;
+    };
+
+    static BreakpointResolvedNotificationBuilder<0> create()
+    {
+        return BreakpointResolvedNotificationBuilder<0>();
+    }
+
+private:
+    BreakpointResolvedNotification()
+    {
+    }
+
+    String m_breakpointId;
+    std::unique_ptr<protocol::Debugger::Location> m_location;
+};
+
+
+// Wrapper for notification params
+class  PausedNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(PausedNotification);
+public:
+    static std::unique_ptr<PausedNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~PausedNotification() override { }
+
+    protocol::Array<protocol::Debugger::CallFrame>* getCallFrames() { return m_callFrames.get(); }
+    void setCallFrames(std::unique_ptr<protocol::Array<protocol::Debugger::CallFrame>> value) { m_callFrames = std::move(value); }
+
+    struct  ReasonEnum {
+        static const char* XHR;
+        static const char* DOM;
+        static const char* EventListener;
+        static const char* Exception;
+        static const char* Assert;
+        static const char* DebugCommand;
+        static const char* PromiseRejection;
+        static const char* OOM;
+        static const char* Other;
+        static const char* Ambiguous;
+    }; // ReasonEnum
+
+    String getReason() { return m_reason; }
+    void setReason(const String& value) { m_reason = value; }
+
+    bool hasData() { return m_data.isJust(); }
+    protocol::DictionaryValue* getData(protocol::DictionaryValue* defaultValue) { return m_data.isJust() ? m_data.fromJust() : defaultValue; }
+    void setData(std::unique_ptr<protocol::DictionaryValue> value) { m_data = std::move(value); }
+
+    bool hasHitBreakpoints() { return m_hitBreakpoints.isJust(); }
+    protocol::Array<String>* getHitBreakpoints(protocol::Array<String>* defaultValue) { return m_hitBreakpoints.isJust() ? m_hitBreakpoints.fromJust() : defaultValue; }
+    void setHitBreakpoints(std::unique_ptr<protocol::Array<String>> value) { m_hitBreakpoints = std::move(value); }
+
+    bool hasAsyncStackTrace() { return m_asyncStackTrace.isJust(); }
+    protocol::Runtime::StackTrace* getAsyncStackTrace(protocol::Runtime::StackTrace* defaultValue) { return m_asyncStackTrace.isJust() ? m_asyncStackTrace.fromJust() : defaultValue; }
+    void setAsyncStackTrace(std::unique_ptr<protocol::Runtime::StackTrace> value) { m_asyncStackTrace = std::move(value); }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    String serialize() override { return toValue()->serialize(); }
+    std::unique_ptr<PausedNotification> clone() const;
+
+    template<int STATE>
+    class PausedNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+          CallFramesSet = 1 << 1,
+          ReasonSet = 1 << 2,
+            AllFieldsSet = (CallFramesSet | ReasonSet | 0)};
+
+
+        PausedNotificationBuilder<STATE | CallFramesSet>& setCallFrames(std::unique_ptr<protocol::Array<protocol::Debugger::CallFrame>> value)
+        {
+            static_assert(!(STATE & CallFramesSet), "property callFrames should not be set yet");
+            m_result->setCallFrames(std::move(value));
+            return castState<CallFramesSet>();
+        }
+
+        PausedNotificationBuilder<STATE | ReasonSet>& setReason(const String& value)
+        {
+            static_assert(!(STATE & ReasonSet), "property reason should not be set yet");
+            m_result->setReason(value);
+            return castState<ReasonSet>();
+        }
+
+        PausedNotificationBuilder<STATE>& setData(std::unique_ptr<protocol::DictionaryValue> value)
+        {
+            m_result->setData(std::move(value));
+            return *this;
+        }
+
+        PausedNotificationBuilder<STATE>& setHitBreakpoints(std::unique_ptr<protocol::Array<String>> value)
+        {
+            m_result->setHitBreakpoints(std::move(value));
+            return *this;
+        }
+
+        PausedNotificationBuilder<STATE>& setAsyncStackTrace(std::unique_ptr<protocol::Runtime::StackTrace> value)
+        {
+            m_result->setAsyncStackTrace(std::move(value));
+            return *this;
+        }
+
+        std::unique_ptr<PausedNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class PausedNotification;
+        PausedNotificationBuilder() : m_result(new PausedNotification()) { }
+
+        template<int STEP> PausedNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<PausedNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Debugger::PausedNotification> m_result;
+    };
+
+    static PausedNotificationBuilder<0> create()
+    {
+        return PausedNotificationBuilder<0>();
+    }
+
+private:
+    PausedNotification()
+    {
+    }
+
+    std::unique_ptr<protocol::Array<protocol::Debugger::CallFrame>> m_callFrames;
+    String m_reason;
+    Maybe<protocol::DictionaryValue> m_data;
+    Maybe<protocol::Array<String>> m_hitBreakpoints;
+    Maybe<protocol::Runtime::StackTrace> m_asyncStackTrace;
+};
+
+
 // ------------- Backend interface.
 
 class  Backend {
 public:
     virtual ~Backend() { }
 
-    virtual void enable(ErrorString*) = 0;
-    virtual void disable(ErrorString*) = 0;
-    virtual void setBreakpointsActive(ErrorString*, bool in_active) = 0;
-    virtual void setSkipAllPauses(ErrorString*, bool in_skip) = 0;
-    virtual void setBreakpointByUrl(ErrorString*, int in_lineNumber, const Maybe<String>& in_url, const Maybe<String>& in_urlRegex, const Maybe<int>& in_columnNumber, const Maybe<String>& in_condition, String* out_breakpointId, std::unique_ptr<protocol::Array<protocol::Debugger::Location>>* out_locations) = 0;
-    virtual void setBreakpoint(ErrorString*, std::unique_ptr<protocol::Debugger::Location> in_location, const Maybe<String>& in_condition, String* out_breakpointId, std::unique_ptr<protocol::Debugger::Location>* out_actualLocation) = 0;
-    virtual void removeBreakpoint(ErrorString*, const String& in_breakpointId) = 0;
-    virtual void continueToLocation(ErrorString*, std::unique_ptr<protocol::Debugger::Location> in_location) = 0;
-    virtual void stepOver(ErrorString*) = 0;
-    virtual void stepInto(ErrorString*) = 0;
-    virtual void stepOut(ErrorString*) = 0;
-    virtual void pause(ErrorString*) = 0;
-    virtual void resume(ErrorString*) = 0;
-    virtual void searchInContent(ErrorString*, const String& in_scriptId, const String& in_query, const Maybe<bool>& in_caseSensitive, const Maybe<bool>& in_isRegex, std::unique_ptr<protocol::Array<protocol::Debugger::SearchMatch>>* out_result) = 0;
-    virtual void setScriptSource(ErrorString*, const String& in_scriptId, const String& in_scriptSource, const Maybe<bool>& in_dryRun, Maybe<protocol::Array<protocol::Debugger::CallFrame>>* out_callFrames, Maybe<bool>* out_stackChanged, Maybe<protocol::Runtime::StackTrace>* out_asyncStackTrace, Maybe<protocol::Runtime::ExceptionDetails>* out_exceptionDetails) = 0;
-    virtual void restartFrame(ErrorString*, const String& in_callFrameId, std::unique_ptr<protocol::Array<protocol::Debugger::CallFrame>>* out_callFrames, Maybe<protocol::Runtime::StackTrace>* out_asyncStackTrace) = 0;
-    virtual void getScriptSource(ErrorString*, const String& in_scriptId, String* out_scriptSource) = 0;
-    virtual void setPauseOnExceptions(ErrorString*, const String& in_state) = 0;
-    virtual void evaluateOnCallFrame(ErrorString*, const String& in_callFrameId, const String& in_expression, const Maybe<String>& in_objectGroup, const Maybe<bool>& in_includeCommandLineAPI, const Maybe<bool>& in_silent, const Maybe<bool>& in_returnByValue, const Maybe<bool>& in_generatePreview, std::unique_ptr<protocol::Runtime::RemoteObject>* out_result, Maybe<protocol::Runtime::ExceptionDetails>* out_exceptionDetails) = 0;
-    virtual void setVariableValue(ErrorString*, int in_scopeNumber, const String& in_variableName, std::unique_ptr<protocol::Runtime::CallArgument> in_newValue, const String& in_callFrameId) = 0;
-    virtual void setAsyncCallStackDepth(ErrorString*, int in_maxDepth) = 0;
-    virtual void setBlackboxPatterns(ErrorString*, std::unique_ptr<protocol::Array<String>> in_patterns) = 0;
-    virtual void setBlackboxedRanges(ErrorString*, const String& in_scriptId, std::unique_ptr<protocol::Array<protocol::Debugger::ScriptPosition>> in_positions) = 0;
+    virtual DispatchResponse enable() = 0;
+    virtual DispatchResponse disable() = 0;
+    virtual DispatchResponse setBreakpointsActive(bool in_active) = 0;
+    virtual DispatchResponse setSkipAllPauses(bool in_skip) = 0;
+    virtual DispatchResponse setBreakpointByUrl(int in_lineNumber, Maybe<String> in_url, Maybe<String> in_urlRegex, Maybe<int> in_columnNumber, Maybe<String> in_condition, String* out_breakpointId, std::unique_ptr<protocol::Array<protocol::Debugger::Location>>* out_locations) = 0;
+    virtual DispatchResponse setBreakpoint(std::unique_ptr<protocol::Debugger::Location> in_location, Maybe<String> in_condition, String* out_breakpointId, std::unique_ptr<protocol::Debugger::Location>* out_actualLocation) = 0;
+    virtual DispatchResponse removeBreakpoint(const String& in_breakpointId) = 0;
+    virtual DispatchResponse getPossibleBreakpoints(std::unique_ptr<protocol::Debugger::Location> in_start, Maybe<protocol::Debugger::Location> in_end, Maybe<bool> in_restrictToFunction, std::unique_ptr<protocol::Array<protocol::Debugger::BreakLocation>>* out_locations) = 0;
+    virtual DispatchResponse continueToLocation(std::unique_ptr<protocol::Debugger::Location> in_location) = 0;
+    virtual DispatchResponse stepOver() = 0;
+    virtual DispatchResponse stepInto() = 0;
+    virtual DispatchResponse stepOut() = 0;
+    virtual DispatchResponse pause() = 0;
+    class  ScheduleStepIntoAsyncCallback {
+    public:
+        virtual void sendSuccess() = 0;
+        virtual void sendFailure(const DispatchResponse&) = 0;
+        virtual void fallThrough() = 0;
+        virtual ~ScheduleStepIntoAsyncCallback() { }
+    };
+    virtual void scheduleStepIntoAsync(std::unique_ptr<ScheduleStepIntoAsyncCallback> callback) = 0;
+    virtual DispatchResponse resume() = 0;
+    virtual DispatchResponse searchInContent(const String& in_scriptId, const String& in_query, Maybe<bool> in_caseSensitive, Maybe<bool> in_isRegex, std::unique_ptr<protocol::Array<protocol::Debugger::SearchMatch>>* out_result) = 0;
+    virtual DispatchResponse setScriptSource(const String& in_scriptId, const String& in_scriptSource, Maybe<bool> in_dryRun, Maybe<protocol::Array<protocol::Debugger::CallFrame>>* out_callFrames, Maybe<bool>* out_stackChanged, Maybe<protocol::Runtime::StackTrace>* out_asyncStackTrace, Maybe<protocol::Runtime::ExceptionDetails>* out_exceptionDetails) = 0;
+    virtual DispatchResponse restartFrame(const String& in_callFrameId, std::unique_ptr<protocol::Array<protocol::Debugger::CallFrame>>* out_callFrames, Maybe<protocol::Runtime::StackTrace>* out_asyncStackTrace) = 0;
+    virtual DispatchResponse getScriptSource(const String& in_scriptId, String* out_scriptSource) = 0;
+    virtual DispatchResponse setPauseOnExceptions(const String& in_state) = 0;
+    virtual DispatchResponse evaluateOnCallFrame(const String& in_callFrameId, const String& in_expression, Maybe<String> in_objectGroup, Maybe<bool> in_includeCommandLineAPI, Maybe<bool> in_silent, Maybe<bool> in_returnByValue, Maybe<bool> in_generatePreview, Maybe<bool> in_throwOnSideEffect, std::unique_ptr<protocol::Runtime::RemoteObject>* out_result, Maybe<protocol::Runtime::ExceptionDetails>* out_exceptionDetails) = 0;
+    virtual DispatchResponse setVariableValue(int in_scopeNumber, const String& in_variableName, std::unique_ptr<protocol::Runtime::CallArgument> in_newValue, const String& in_callFrameId) = 0;
+    virtual DispatchResponse setAsyncCallStackDepth(int in_maxDepth) = 0;
+    virtual DispatchResponse setBlackboxPatterns(std::unique_ptr<protocol::Array<String>> in_patterns) = 0;
+    virtual DispatchResponse setBlackboxedRanges(const String& in_scriptId, std::unique_ptr<protocol::Array<protocol::Debugger::ScriptPosition>> in_positions) = 0;
 
 };
 
@@ -579,14 +1356,15 @@ public:
 
 class  Frontend {
 public:
-    Frontend(FrontendChannel* frontendChannel) : m_frontendChannel(frontendChannel) { }
-    void scriptParsed(const String& scriptId, const String& url, int startLine, int startColumn, int endLine, int endColumn, int executionContextId, const String& hash, const Maybe<protocol::DictionaryValue>& executionContextAuxData = Maybe<protocol::DictionaryValue>(), const Maybe<bool>& isLiveEdit = Maybe<bool>(), const Maybe<String>& sourceMapURL = Maybe<String>(), const Maybe<bool>& hasSourceURL = Maybe<bool>());
-    void scriptFailedToParse(const String& scriptId, const String& url, int startLine, int startColumn, int endLine, int endColumn, int executionContextId, const String& hash, const Maybe<protocol::DictionaryValue>& executionContextAuxData = Maybe<protocol::DictionaryValue>(), const Maybe<String>& sourceMapURL = Maybe<String>(), const Maybe<bool>& hasSourceURL = Maybe<bool>());
+    explicit Frontend(FrontendChannel* frontendChannel) : m_frontendChannel(frontendChannel) { }
+    void scriptParsed(const String& scriptId, const String& url, int startLine, int startColumn, int endLine, int endColumn, int executionContextId, const String& hash, Maybe<protocol::DictionaryValue> executionContextAuxData = Maybe<protocol::DictionaryValue>(), Maybe<bool> isLiveEdit = Maybe<bool>(), Maybe<String> sourceMapURL = Maybe<String>(), Maybe<bool> hasSourceURL = Maybe<bool>(), Maybe<bool> isModule = Maybe<bool>(), Maybe<int> length = Maybe<int>(), Maybe<protocol::Runtime::StackTrace> stackTrace = Maybe<protocol::Runtime::StackTrace>());
+    void scriptFailedToParse(const String& scriptId, const String& url, int startLine, int startColumn, int endLine, int endColumn, int executionContextId, const String& hash, Maybe<protocol::DictionaryValue> executionContextAuxData = Maybe<protocol::DictionaryValue>(), Maybe<String> sourceMapURL = Maybe<String>(), Maybe<bool> hasSourceURL = Maybe<bool>(), Maybe<bool> isModule = Maybe<bool>(), Maybe<int> length = Maybe<int>(), Maybe<protocol::Runtime::StackTrace> stackTrace = Maybe<protocol::Runtime::StackTrace>());
     void breakpointResolved(const String& breakpointId, std::unique_ptr<protocol::Debugger::Location> location);
-    void paused(std::unique_ptr<protocol::Array<protocol::Debugger::CallFrame>> callFrames, const String& reason, const Maybe<protocol::DictionaryValue>& data = Maybe<protocol::DictionaryValue>(), const Maybe<protocol::Array<String>>& hitBreakpoints = Maybe<protocol::Array<String>>(), const Maybe<protocol::Runtime::StackTrace>& asyncStackTrace = Maybe<protocol::Runtime::StackTrace>());
+    void paused(std::unique_ptr<protocol::Array<protocol::Debugger::CallFrame>> callFrames, const String& reason, Maybe<protocol::DictionaryValue> data = Maybe<protocol::DictionaryValue>(), Maybe<protocol::Array<String>> hitBreakpoints = Maybe<protocol::Array<String>>(), Maybe<protocol::Runtime::StackTrace> asyncStackTrace = Maybe<protocol::Runtime::StackTrace>());
     void resumed();
 
     void flush();
+    void sendRawNotification(const String&);
 private:
     FrontendChannel* m_frontendChannel;
 };

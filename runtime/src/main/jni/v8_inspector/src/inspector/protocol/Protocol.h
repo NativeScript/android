@@ -54,7 +54,6 @@ namespace protocol {
 class  ErrorSupport {
 public:
     ErrorSupport();
-    ErrorSupport(String* errorString);
     ~ErrorSupport();
 
     void push();
@@ -67,7 +66,6 @@ public:
 private:
     std::vector<String> m_path;
     std::vector<String> m_errors;
-    String* m_errorString;
 };
 
 } // namespace v8_inspector
@@ -94,14 +92,14 @@ class ListValue;
 class DictionaryValue;
 class Value;
 
-class  Value {
+class  Value : public Serializable {
     PROTOCOL_DISALLOW_COPY(Value);
 public:
-    virtual ~Value() { }
+    virtual ~Value() override { }
 
     static std::unique_ptr<Value> null()
     {
-        return wrapUnique(new Value());
+        return std::unique_ptr<Value>(new Value());
     }
 
     enum ValueType {
@@ -125,9 +123,9 @@ public:
     virtual bool asString(String* output) const;
     virtual bool asSerialized(String* output) const;
 
-    String toJSONString() const;
     virtual void writeJSON(StringBuilder* output) const;
     virtual std::unique_ptr<Value> clone() const;
+    String serialize() override;
 
 protected:
     Value() : m_type(TypeNull) { }
@@ -144,17 +142,17 @@ class  FundamentalValue : public Value {
 public:
     static std::unique_ptr<FundamentalValue> create(bool value)
     {
-        return wrapUnique(new FundamentalValue(value));
+        return std::unique_ptr<FundamentalValue>(new FundamentalValue(value));
     }
 
     static std::unique_ptr<FundamentalValue> create(int value)
     {
-        return wrapUnique(new FundamentalValue(value));
+        return std::unique_ptr<FundamentalValue>(new FundamentalValue(value));
     }
 
     static std::unique_ptr<FundamentalValue> create(double value)
     {
-        return wrapUnique(new FundamentalValue(value));
+        return std::unique_ptr<FundamentalValue>(new FundamentalValue(value));
     }
 
     bool asBoolean(bool* output) const override;
@@ -179,12 +177,12 @@ class  StringValue : public Value {
 public:
     static std::unique_ptr<StringValue> create(const String& value)
     {
-        return wrapUnique(new StringValue(value));
+        return std::unique_ptr<StringValue>(new StringValue(value));
     }
 
     static std::unique_ptr<StringValue> create(const char* value)
     {
-        return wrapUnique(new StringValue(value));
+        return std::unique_ptr<StringValue>(new StringValue(value));
     }
 
     bool asString(String* output) const override;
@@ -202,7 +200,7 @@ class  SerializedValue : public Value {
 public:
     static std::unique_ptr<SerializedValue> create(const String& value)
     {
-        return wrapUnique(new SerializedValue(value));
+        return std::unique_ptr<SerializedValue>(new SerializedValue(value));
     }
 
     bool asSerialized(String* output) const override;
@@ -220,7 +218,7 @@ public:
     using Entry = std::pair<String, Value*>;
     static std::unique_ptr<DictionaryValue> create()
     {
-        return wrapUnique(new DictionaryValue());
+        return std::unique_ptr<DictionaryValue>(new DictionaryValue());
     }
 
     static DictionaryValue* cast(Value* value)
@@ -232,7 +230,7 @@ public:
 
     static std::unique_ptr<DictionaryValue> cast(std::unique_ptr<Value> value)
     {
-        return wrapUnique(DictionaryValue::cast(value.release()));
+        return std::unique_ptr<DictionaryValue>(DictionaryValue::cast(value.release()));
     }
 
     void writeJSON(StringBuilder* output) const override;
@@ -286,7 +284,7 @@ class  ListValue : public Value {
 public:
     static std::unique_ptr<ListValue> create()
     {
-        return wrapUnique(new ListValue());
+        return std::unique_ptr<ListValue>(new ListValue());
     }
 
     static ListValue* cast(Value* value)
@@ -298,7 +296,7 @@ public:
 
     static std::unique_ptr<ListValue> cast(std::unique_ptr<Value> value)
     {
-        return wrapUnique(ListValue::cast(value.release()));
+        return std::unique_ptr<ListValue>(ListValue::cast(value.release()));
     }
 
     ~ListValue() override;
@@ -338,10 +336,10 @@ namespace protocol {
 
 class  Object {
 public:
-    static std::unique_ptr<Object> parse(protocol::Value*, ErrorSupport*);
+    static std::unique_ptr<Object> fromValue(protocol::Value*, ErrorSupport*);
     ~Object();
 
-    std::unique_ptr<protocol::DictionaryValue> serialize() const;
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
     std::unique_ptr<Object> clone() const;
 private:
     explicit Object(std::unique_ptr<protocol::DictionaryValue>);
@@ -370,25 +368,25 @@ namespace protocol {
 
 template<typename T>
 struct ValueConversions {
-    static std::unique_ptr<T> parse(protocol::Value* value, ErrorSupport* errors)
+    static std::unique_ptr<T> fromValue(protocol::Value* value, ErrorSupport* errors)
     {
-        return T::parse(value, errors);
+        return T::fromValue(value, errors);
     }
 
-    static std::unique_ptr<protocol::Value> serialize(T* value)
+    static std::unique_ptr<protocol::Value> toValue(T* value)
     {
-        return value->serialize();
+        return value->toValue();
     }
 
-    static std::unique_ptr<protocol::Value> serialize(const std::unique_ptr<T>& value)
+    static std::unique_ptr<protocol::Value> toValue(const std::unique_ptr<T>& value)
     {
-        return value->serialize();
+        return value->toValue();
     }
 };
 
 template<>
 struct ValueConversions<bool> {
-    static bool parse(protocol::Value* value, ErrorSupport* errors)
+    static bool fromValue(protocol::Value* value, ErrorSupport* errors)
     {
         bool result = false;
         bool success = value ? value->asBoolean(&result) : false;
@@ -397,7 +395,7 @@ struct ValueConversions<bool> {
         return result;
     }
 
-    static std::unique_ptr<protocol::Value> serialize(bool value)
+    static std::unique_ptr<protocol::Value> toValue(bool value)
     {
         return FundamentalValue::create(value);
     }
@@ -405,7 +403,7 @@ struct ValueConversions<bool> {
 
 template<>
 struct ValueConversions<int> {
-    static int parse(protocol::Value* value, ErrorSupport* errors)
+    static int fromValue(protocol::Value* value, ErrorSupport* errors)
     {
         int result = 0;
         bool success = value ? value->asInteger(&result) : false;
@@ -414,7 +412,7 @@ struct ValueConversions<int> {
         return result;
     }
 
-    static std::unique_ptr<protocol::Value> serialize(int value)
+    static std::unique_ptr<protocol::Value> toValue(int value)
     {
         return FundamentalValue::create(value);
     }
@@ -422,7 +420,7 @@ struct ValueConversions<int> {
 
 template<>
 struct ValueConversions<double> {
-    static double parse(protocol::Value* value, ErrorSupport* errors)
+    static double fromValue(protocol::Value* value, ErrorSupport* errors)
     {
         double result = 0;
         bool success = value ? value->asDouble(&result) : false;
@@ -431,7 +429,7 @@ struct ValueConversions<double> {
         return result;
     }
 
-    static std::unique_ptr<protocol::Value> serialize(double value)
+    static std::unique_ptr<protocol::Value> toValue(double value)
     {
         return FundamentalValue::create(value);
     }
@@ -439,7 +437,7 @@ struct ValueConversions<double> {
 
 template<>
 struct ValueConversions<String> {
-    static String parse(protocol::Value* value, ErrorSupport* errors)
+    static String fromValue(protocol::Value* value, ErrorSupport* errors)
     {
         String result;
         bool success = value ? value->asString(&result) : false;
@@ -448,7 +446,7 @@ struct ValueConversions<String> {
         return result;
     }
 
-    static std::unique_ptr<protocol::Value> serialize(const String& value)
+    static std::unique_ptr<protocol::Value> toValue(const String& value)
     {
         return StringValue::create(value);
     }
@@ -456,7 +454,7 @@ struct ValueConversions<String> {
 
 template<>
 struct ValueConversions<Value> {
-    static std::unique_ptr<Value> parse(protocol::Value* value, ErrorSupport* errors)
+    static std::unique_ptr<Value> fromValue(protocol::Value* value, ErrorSupport* errors)
     {
         bool success = !!value;
         if (!success) {
@@ -466,12 +464,12 @@ struct ValueConversions<Value> {
         return value->clone();
     }
 
-    static std::unique_ptr<protocol::Value> serialize(Value* value)
+    static std::unique_ptr<protocol::Value> toValue(Value* value)
     {
         return value->clone();
     }
 
-    static std::unique_ptr<protocol::Value> serialize(const std::unique_ptr<Value>& value)
+    static std::unique_ptr<protocol::Value> toValue(const std::unique_ptr<Value>& value)
     {
         return value->clone();
     }
@@ -479,7 +477,7 @@ struct ValueConversions<Value> {
 
 template<>
 struct ValueConversions<DictionaryValue> {
-    static std::unique_ptr<DictionaryValue> parse(protocol::Value* value, ErrorSupport* errors)
+    static std::unique_ptr<DictionaryValue> fromValue(protocol::Value* value, ErrorSupport* errors)
     {
         bool success = value && value->type() == protocol::Value::TypeObject;
         if (!success)
@@ -487,12 +485,12 @@ struct ValueConversions<DictionaryValue> {
         return DictionaryValue::cast(value->clone());
     }
 
-    static std::unique_ptr<protocol::Value> serialize(DictionaryValue* value)
+    static std::unique_ptr<protocol::Value> toValue(DictionaryValue* value)
     {
         return value->clone();
     }
 
-    static std::unique_ptr<protocol::Value> serialize(const std::unique_ptr<DictionaryValue>& value)
+    static std::unique_ptr<protocol::Value> toValue(const std::unique_ptr<DictionaryValue>& value)
     {
         return value->clone();
     }
@@ -500,7 +498,7 @@ struct ValueConversions<DictionaryValue> {
 
 template<>
 struct ValueConversions<ListValue> {
-    static std::unique_ptr<ListValue> parse(protocol::Value* value, ErrorSupport* errors)
+    static std::unique_ptr<ListValue> fromValue(protocol::Value* value, ErrorSupport* errors)
     {
         bool success = value && value->type() == protocol::Value::TypeArray;
         if (!success)
@@ -508,12 +506,12 @@ struct ValueConversions<ListValue> {
         return ListValue::cast(value->clone());
     }
 
-    static std::unique_ptr<protocol::Value> serialize(ListValue* value)
+    static std::unique_ptr<protocol::Value> toValue(ListValue* value)
     {
         return value->clone();
     }
 
-    static std::unique_ptr<protocol::Value> serialize(const std::unique_ptr<ListValue>& value)
+    static std::unique_ptr<protocol::Value> toValue(const std::unique_ptr<ListValue>& value)
     {
         return value->clone();
     }
@@ -542,11 +540,12 @@ class Maybe {
 public:
     Maybe() : m_value() { }
     Maybe(std::unique_ptr<T> value) : m_value(std::move(value)) { }
+    Maybe(Maybe&& other) : m_value(std::move(other.m_value)) { }
     void operator=(std::unique_ptr<T> value) { m_value = std::move(value); }
     T* fromJust() const { DCHECK(m_value); return m_value.get(); }
     T* fromMaybe(T* defaultValue) const { return m_value ? m_value.get() : defaultValue; }
     bool isJust() const { return !!m_value; }
-    std::unique_ptr<T> takeJust() { DCHECK(m_value); return m_value.release(); }
+    std::unique_ptr<T> takeJust() { DCHECK(m_value); return std::move(m_value); }
 private:
     std::unique_ptr<T> m_value;
 };
@@ -556,6 +555,7 @@ class MaybeBase {
 public:
     MaybeBase() : m_isJust(false) { }
     MaybeBase(T value) : m_isJust(true), m_value(value) { }
+    MaybeBase(MaybeBase&& other) : m_isJust(other.m_isJust), m_value(std::move(other.m_value)) { }
     void operator=(T value) { m_value = value; m_isJust = true; }
     T fromJust() const { DCHECK(m_isJust); return m_value; }
     T fromMaybe(const T& defaultValue) const { return m_isJust ? m_value : defaultValue; }
@@ -572,6 +572,7 @@ class Maybe<bool> : public MaybeBase<bool> {
 public:
     Maybe() { }
     Maybe(bool value) : MaybeBase(value) { }
+    Maybe(Maybe&& other) : MaybeBase(std::move(other)) { }
     using MaybeBase::operator=;
 };
 
@@ -580,6 +581,7 @@ class Maybe<int> : public MaybeBase<int> {
 public:
     Maybe() { }
     Maybe(int value) : MaybeBase(value) { }
+    Maybe(Maybe&& other) : MaybeBase(std::move(other)) { }
     using MaybeBase::operator=;
 };
 
@@ -588,6 +590,7 @@ class Maybe<double> : public MaybeBase<double> {
 public:
     Maybe() { }
     Maybe(double value) : MaybeBase(value) { }
+    Maybe(Maybe&& other) : MaybeBase(std::move(other)) { }
     using MaybeBase::operator=;
 };
 
@@ -596,6 +599,7 @@ class Maybe<String> : public MaybeBase<String> {
 public:
     Maybe() { }
     Maybe(const String& value) : MaybeBase(value) { }
+    Maybe(Maybe&& other) : MaybeBase(std::move(other)) { }
     using MaybeBase::operator=;
 };
 
@@ -625,10 +629,10 @@ class Array {
 public:
     static std::unique_ptr<Array<T>> create()
     {
-        return wrapUnique(new Array<T>());
+        return std::unique_ptr<Array<T>>(new Array<T>());
     }
 
-    static std::unique_ptr<Array<T>> parse(protocol::Value* value, ErrorSupport* errors)
+    static std::unique_ptr<Array<T>> fromValue(protocol::Value* value, ErrorSupport* errors)
     {
         protocol::ListValue* array = ListValue::cast(value);
         if (!array) {
@@ -639,7 +643,7 @@ public:
         errors->push();
         for (size_t i = 0; i < array->size(); ++i) {
             errors->setName(StringUtil::fromInteger(i));
-            std::unique_ptr<T> item = ValueConversions<T>::parse(array->at(i), errors);
+            std::unique_ptr<T> item = ValueConversions<T>::fromValue(array->at(i), errors);
             result->m_vector.push_back(std::move(item));
         }
         errors->pop();
@@ -663,11 +667,11 @@ public:
         return m_vector[index].get();
     }
 
-    std::unique_ptr<protocol::ListValue> serialize()
+    std::unique_ptr<protocol::ListValue> toValue()
     {
         std::unique_ptr<protocol::ListValue> result = ListValue::create();
         for (auto& item : m_vector)
-            result->pushValue(ValueConversions<T>::serialize(item));
+            result->pushValue(ValueConversions<T>::toValue(item));
         return result;
     }
 
@@ -680,10 +684,10 @@ class ArrayBase {
 public:
     static std::unique_ptr<Array<T>> create()
     {
-        return wrapUnique(new Array<T>());
+        return std::unique_ptr<Array<T>>(new Array<T>());
     }
 
-    static std::unique_ptr<Array<T>> parse(protocol::Value* value, ErrorSupport* errors)
+    static std::unique_ptr<Array<T>> fromValue(protocol::Value* value, ErrorSupport* errors)
     {
         protocol::ListValue* array = ListValue::cast(value);
         if (!array) {
@@ -694,7 +698,7 @@ public:
         std::unique_ptr<Array<T>> result(new Array<T>());
         for (size_t i = 0; i < array->size(); ++i) {
             errors->setName(StringUtil::fromInteger(i));
-            T item = ValueConversions<T>::parse(array->at(i), errors);
+            T item = ValueConversions<T>::fromValue(array->at(i), errors);
             result->m_vector.push_back(item);
         }
         errors->pop();
@@ -718,11 +722,11 @@ public:
         return m_vector[index];
     }
 
-    std::unique_ptr<protocol::ListValue> serialize()
+    std::unique_ptr<protocol::ListValue> toValue()
     {
         std::unique_ptr<protocol::ListValue> result = ListValue::create();
         for (auto& item : m_vector)
-            result->pushValue(ValueConversions<T>::serialize(item));
+            result->pushValue(ValueConversions<T>::toValue(item));
         return result;
     }
 
@@ -741,30 +745,6 @@ template<> class Array<bool> : public ArrayBase<bool> {};
 #endif // !defined(v8_inspector_protocol_Array_h)
 
 
-// Copyright (c) 2016 The Chromium Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
-
-#ifndef v8_inspector_protocol_BackendCallback_h
-#define v8_inspector_protocol_BackendCallback_h
-
-//#include "Forward.h"
-
-namespace v8_inspector {
-namespace protocol {
-
-class  BackendCallback {
-public:
-    virtual ~BackendCallback() { }
-    virtual void sendFailure(const ErrorString&) = 0;
-};
-
-} // namespace v8_inspector
-} // namespace protocol
-
-#endif // !defined(v8_inspector_protocol_BackendCallback_h)
-
-
 // Copyright 2016 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -772,7 +752,6 @@ public:
 #ifndef v8_inspector_protocol_DispatcherBase_h
 #define v8_inspector_protocol_DispatcherBase_h
 
-//#include "BackendCallback.h"
 //#include "Collections.h"
 //#include "ErrorSupport.h"
 //#include "Forward.h"
@@ -783,10 +762,45 @@ namespace protocol {
 
 class WeakPtr;
 
+class  DispatchResponse {
+public:
+    enum Status {
+        kSuccess = 0,
+        kError = 1,
+        kFallThrough = 2,
+        kAsync = 3
+    };
+
+    enum ErrorCode {
+        kParseError = -32700,
+        kInvalidRequest = -32600,
+        kMethodNotFound = -32601,
+        kInvalidParams = -32602,
+        kInternalError = -32603,
+        kServerError = -32000,
+    };
+
+    Status status() const { return m_status; }
+    const String& errorMessage() const { return m_errorMessage; }
+    ErrorCode errorCode() const { return m_errorCode; }
+    bool isSuccess() const { return m_status == kSuccess; }
+
+    static DispatchResponse OK();
+    static DispatchResponse Error(const String&);
+    static DispatchResponse InternalError();
+    static DispatchResponse InvalidParams(const String&);
+    static DispatchResponse FallThrough();
+
+private:
+    Status m_status;
+    String m_errorMessage;
+    ErrorCode m_errorCode;
+};
+
 class  DispatcherBase {
     PROTOCOL_DISALLOW_COPY(DispatcherBase);
 public:
-    static const char kInvalidRequest[];
+    static const char kInvalidParamsString[];
     class  WeakPtr {
     public:
         explicit WeakPtr(DispatcherBase*);
@@ -798,48 +812,46 @@ public:
         DispatcherBase* m_dispatcher;
     };
 
-    class  Callback : public protocol::BackendCallback {
+    class  Callback {
     public:
-        Callback(std::unique_ptr<WeakPtr> backendImpl, int callId);
+        Callback(std::unique_ptr<WeakPtr> backendImpl, int callId, int callbackId);
         virtual ~Callback();
         void dispose();
 
     protected:
-        void sendIfActive(std::unique_ptr<protocol::DictionaryValue> partialMessage, const ErrorString& invocationError);
+        void sendIfActive(std::unique_ptr<protocol::DictionaryValue> partialMessage, const DispatchResponse& response);
+        void fallThroughIfActive();
 
     private:
         std::unique_ptr<WeakPtr> m_backendImpl;
         int m_callId;
+        int m_callbackId;
     };
 
     explicit DispatcherBase(FrontendChannel*);
     virtual ~DispatcherBase();
 
-    enum CommonErrorCode {
-        ParseError = -32700,
-        InvalidRequest = -32600,
-        MethodNotFound = -32601,
-        InvalidParams = -32602,
-        InternalError = -32603,
-        ServerError = -32000,
-    };
-
     static bool getCommandName(const String& message, String* result);
 
-    virtual void dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) = 0;
+    virtual DispatchResponse::Status dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) = 0;
 
-    void sendResponse(int callId, const ErrorString&, ErrorSupport*, std::unique_ptr<protocol::DictionaryValue> result);
-    void sendResponse(int callId, const ErrorString&, std::unique_ptr<protocol::DictionaryValue> result);
-    void sendResponse(int callId, const ErrorString&);
+    void sendResponse(int callId, const DispatchResponse&, std::unique_ptr<protocol::DictionaryValue> result);
+    void sendResponse(int callId, const DispatchResponse&);
 
-    void reportProtocolError(int callId, CommonErrorCode, const String& errorMessage, ErrorSupport* errors);
+    void reportProtocolError(int callId, DispatchResponse::ErrorCode, const String& errorMessage, ErrorSupport* errors);
     void clearFrontend();
 
     std::unique_ptr<WeakPtr> weakPtr();
 
+    int nextCallbackId();
+    void markFallThrough(int callbackId);
+    bool lastCallbackFallThrough() { return m_lastCallbackFallThrough; }
+
 private:
     FrontendChannel* m_frontendChannel;
     protocol::HashSet<WeakPtr*> m_weakPtrs;
+    int m_lastCallbackId;
+    bool m_lastCallbackFallThrough;
 };
 
 class  UberDispatcher {
@@ -847,13 +859,56 @@ class  UberDispatcher {
 public:
     explicit UberDispatcher(FrontendChannel*);
     void registerBackend(const String& name, std::unique_ptr<protocol::DispatcherBase>);
-    void dispatch(std::unique_ptr<Value> message);
+    DispatchResponse::Status dispatch(std::unique_ptr<Value> message);
     FrontendChannel* channel() { return m_frontendChannel; }
+    bool fallThroughForNotFound() { return m_fallThroughForNotFound; }
+    void setFallThroughForNotFound(bool);
     virtual ~UberDispatcher();
 
 private:
     FrontendChannel* m_frontendChannel;
+    bool m_fallThroughForNotFound;
     protocol::HashMap<String, std::unique_ptr<protocol::DispatcherBase>> m_dispatchers;
+};
+
+class InternalResponse : public Serializable {
+    PROTOCOL_DISALLOW_COPY(InternalResponse);
+public:
+    static std::unique_ptr<InternalResponse> createResponse(int callId, std::unique_ptr<Serializable> params);
+    static std::unique_ptr<InternalResponse> createNotification(const String& notification, std::unique_ptr<Serializable> params = nullptr);
+
+    String serialize() override;
+
+    ~InternalResponse() override {}
+
+private:
+    InternalResponse(int callId, const String& notification, std::unique_ptr<Serializable> params);
+
+    int m_callId;
+    String m_notification;
+    std::unique_ptr<Serializable> m_params;
+};
+
+class InternalRawNotification : public Serializable {
+public:
+    static std::unique_ptr<InternalRawNotification> create(const String& notification)
+    {
+        return std::unique_ptr<InternalRawNotification>(new InternalRawNotification(notification));
+    }
+    ~InternalRawNotification() override {}
+
+    String serialize() override
+    {
+        return m_notification;
+    }
+
+private:
+  explicit InternalRawNotification(const String& notification)
+    : m_notification(notification)
+  {
+  }
+
+  String m_notification;
 };
 
 } // namespace v8_inspector
@@ -875,8 +930,8 @@ private:
 namespace v8_inspector {
 namespace protocol {
 
- std::unique_ptr<Value> parseJSON(const uint8_t*, unsigned);
- std::unique_ptr<Value> parseJSON(const uint16_t*, unsigned);
+ std::unique_ptr<Value> parseJSONCharacters(const uint8_t*, unsigned);
+ std::unique_ptr<Value> parseJSONCharacters(const uint16_t*, unsigned);
 
 } // namespace v8_inspector
 } // namespace protocol

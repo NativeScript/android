@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/RUNTIME.iml" filepath="$PROJECT_DIR$/RUNTIME.iml" />
+      <module fileurl="file://$PROJECT_DIR$/android-runtime.iml" filepath="$PROJECT_DIR$/android-runtime.iml" />
     </modules>
   </component>
 </project>

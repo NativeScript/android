@@ -14,23 +14,6 @@
 
 namespace v8_inspector {
 
-void InspectedContext::weakCallback(
-    const v8::WeakCallbackInfo<InspectedContext>& data) {
-  InspectedContext* context = data.GetParameter();
-  if (!context->m_context.IsEmpty()) {
-    context->m_context.Reset();
-    data.SetSecondPassCallback(&InspectedContext::weakCallback);
-  } else {
-    context->m_inspector->discardInspectedContext(context->m_contextGroupId,
-                                                  context->m_contextId);
-  }
-}
-
-void InspectedContext::consoleWeakCallback(
-    const v8::WeakCallbackInfo<InspectedContext>& data) {
-  data.GetParameter()->m_console.Reset();
-}
-
 InspectedContext::InspectedContext(V8InspectorImpl* inspector,
                                    const V8ContextInfo& info, int contextId)
     : m_inspector(inspector),
@@ -41,29 +24,32 @@ InspectedContext::InspectedContext(V8InspectorImpl* inspector,
       m_humanReadableName(toString16(info.humanReadableName)),
       m_auxData(toString16(info.auxData)),
       m_reported(false) {
-  m_context.SetWeak(this, &InspectedContext::weakCallback,
-                    v8::WeakCallbackType::kParameter);
-
   v8::Isolate* isolate = m_inspector->isolate();
+  info.context->SetEmbedderData(static_cast<int>(v8::Context::kDebugIdIndex),
+                                v8::Int32::New(isolate, contextId));
   v8::Local<v8::Object> global = info.context->Global();
   v8::Local<v8::Object> console =
-      V8Console::createConsole(this, info.hasMemoryOnConsole);
+      m_inspector->console()->createConsole(info.context);
+  if (info.hasMemoryOnConsole) {
+    m_inspector->console()->installMemoryGetter(info.context, console);
+  }
   if (!global
            ->Set(info.context, toV8StringInternalized(isolate, "console"),
                  console)
-           .FromMaybe(false))
+           .FromMaybe(false)) {
     return;
-  m_console.Reset(isolate, console);
-  m_console.SetWeak(this, &InspectedContext::consoleWeakCallback,
-                    v8::WeakCallbackType::kParameter);
+  }
 }
 
 InspectedContext::~InspectedContext() {
-  if (!m_context.IsEmpty() && !m_console.IsEmpty()) {
-    v8::HandleScope scope(isolate());
-    V8Console::clearInspectedContextIfNeeded(context(),
-                                             m_console.Get(isolate()));
-  }
+}
+
+// static
+int InspectedContext::contextId(v8::Local<v8::Context> context) {
+  v8::Local<v8::Value> data =
+      context->GetEmbedderData(static_cast<int>(v8::Context::kDebugIdIndex));
+  if (data.IsEmpty() || !data->IsInt32()) return 0;
+  return static_cast<int>(data.As<v8::Int32>()->Value());
 }
 
 v8::Local<v8::Context> InspectedContext::context() const {
@@ -74,9 +60,13 @@ v8::Isolate* InspectedContext::isolate() const {
   return m_inspector->isolate();
 }
 
-void InspectedContext::createInjectedScript() {
+bool InspectedContext::createInjectedScript() {
   DCHECK(!m_injectedScript);
-  m_injectedScript = InjectedScript::create(this);
+  std::unique_ptr<InjectedScript> injectedScript = InjectedScript::create(this);
+  // InjectedScript::create can destroy |this|.
+  if (!injectedScript) return false;
+  m_injectedScript = std::move(injectedScript);
+  return true;
 }
 
 void InspectedContext::discardInjectedScript() { m_injectedScript.reset(); }
