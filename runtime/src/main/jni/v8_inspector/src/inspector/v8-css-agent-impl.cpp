@@ -52,6 +52,7 @@ namespace v8_inspector {
 
     // Not supported
     DispatchResponse V8CSSAgentImpl::getMatchedStylesForNode(int in_nodeId, Maybe<protocol::CSS::CSSStyle>* out_inlineStyle, Maybe<protocol::CSS::CSSStyle>* out_attributesStyle, Maybe<protocol::Array<protocol::CSS::RuleMatch>>* out_matchedCSSRules, Maybe<protocol::Array<protocol::CSS::PseudoElementMatches>>* out_pseudoElements, Maybe<protocol::Array<protocol::CSS::InheritedStyleEntry>>* out_inherited, Maybe<protocol::Array<protocol::CSS::CSSKeyframesRule>>* out_cssKeyframesRules) {
+        return utils::Common::protocolCommandNotSupportedDispatchResponse();
         //// out_inlineStyle
         auto cssPropsArr = protocol::Array<protocol::CSS::CSSProperty>::create();
         auto shorthandPropArr = protocol::Array<protocol::CSS::ShorthandEntry>::create();
@@ -102,17 +103,19 @@ namespace v8_inspector {
         //// out_cssKeyframesRules
         auto cssKeyFramesRulesArr = protocol::Array<protocol::CSS::CSSKeyframesRule>::create();
 
-        *out_inlineStyle = Maybe<protocol::CSS::CSSStyle>(std::move(inlineStyle));
-        *out_attributesStyle = Maybe<protocol::CSS::CSSStyle>(std::move(attributeStyle));
-        *out_matchedCSSRules = Maybe<protocol::Array<protocol::CSS::RuleMatch>>(std::move(rulesMatchedArr));
-        *out_cssKeyframesRules = Maybe<protocol::Array<protocol::CSS::CSSKeyframesRule>>(std::move(cssKeyFramesRulesArr));
-        *out_inherited = Maybe<protocol::Array<protocol::CSS::InheritedStyleEntry>>(std::move(inheritedElementsArr));
-        *out_pseudoElements = Maybe<protocol::Array<protocol::CSS::PseudoElementMatches>>(std::move(pseudoElementsArr));
+//        *out_inlineStyle = Maybe<protocol::CSS::CSSStyle>(std::move(inlineStyle));
+//        *out_attributesStyle = Maybe<protocol::CSS::CSSStyle>(std::move(attributeStyle));
+//        *out_matchedCSSRules = Maybe<protocol::Array<protocol::CSS::RuleMatch>>(std::move(rulesMatchedArr));
+//        *out_cssKeyframesRules = Maybe<protocol::Array<protocol::CSS::CSSKeyframesRule>>(std::move(cssKeyFramesRulesArr));
+//        *out_inherited = Maybe<protocol::Array<protocol::CSS::InheritedStyleEntry>>(std::move(inheritedElementsArr));
+//        *out_pseudoElements = Maybe<protocol::Array<protocol::CSS::PseudoElementMatches>>(std::move(pseudoElementsArr));
 
         return utils::Common::protocolCommandNotSupportedDispatchResponse();
     }
 
     DispatchResponse V8CSSAgentImpl::getInlineStylesForNode(int in_nodeId, Maybe<protocol::CSS::CSSStyle>* out_inlineStyle, Maybe<protocol::CSS::CSSStyle>* out_attributesStyle) {
+        return utils::Common::protocolCommandNotSupportedDispatchResponse();
+
         //// out_inlineStyle
         auto cssPropsArr = protocol::Array<protocol::CSS::CSSProperty>::create();
         auto shorthandPropArr = protocol::Array<protocol::CSS::ShorthandEntry>::create();
@@ -129,8 +132,8 @@ namespace v8_inspector {
                 .setShorthandEntries(std::move(protocol::Array<protocol::CSS::ShorthandEntry>::create()))
                 .build();
 
-        *out_inlineStyle = Maybe<protocol::CSS::CSSStyle>(std::move(inlineStyle));
-        *out_attributesStyle = Maybe<protocol::CSS::CSSStyle>(std::move(attributeStyle));
+//        *out_inlineStyle = Maybe<protocol::CSS::CSSStyle>(std::move(inlineStyle));
+//        *out_attributesStyle = Maybe<protocol::CSS::CSSStyle>(std::move(attributeStyle));
 
         return utils::Common::protocolCommandNotSupportedDispatchResponse();
     }
