@@ -721,6 +721,26 @@ copyTypings.onlyIf({
 	generateTypescriptDefinitions.didWork;
 })
 
+task validateAppIdMatch {
+	doLast {
+		def packageJsonFile = new File("$projectDir/../../package.json");
+		def lineSeparator = System.getProperty("line.separator");
+
+		if (packageJsonFile.exists()) {
+			String content = packageJsonFile.getText("UTF-8")
+			def jsonSlurper = new JsonSlurper()
+			def packageJsonMap = jsonSlurper.parseText(content)
+
+			if (packageJsonMap.nativescript.id != android.defaultConfig.applicationId) {
+				def errorMessage = "${lineSeparator}WARNING: The Application identifier is different from the one inside 'package.json' file.$lineSeparator" +
+					"NativeScript CLI might not work properly.$lineSeparator" +
+					"Update the application identifier in package.json and app.gradle so that they match.";
+				logger.error(errorMessage);
+			}
+		}
+	}
+}
+
 ////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////// OPTIONAL TASKS //////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
@@ -801,6 +821,7 @@ task deleteGeneratedBindings(type: Delete) {
 	delete "$projectDir/src/main/java/com/tns/gen"
 }
 
+buildapk.finalizedBy("validateAppIdMatch");
 deleteMetadata.dependsOn(":asbg:clean")
 deleteFlavors.dependsOn(deleteMetadata)
 deleteConfigurations.dependsOn(deleteFlavors)
