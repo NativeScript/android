@@ -69,7 +69,7 @@ String16 PageResource::getContent(protocol::String* errorString) {
         filePath.erase(0, 7); // deletes the 'file://' part before the full file path
         FILE* file = fopen(filePath.c_str(), "r+");
         if (file == nullptr) {
-            *errorString = "Resource not found";
+            *errorString = std::string("Resource not found at file path: " + filePath).c_str();
             return "";
         }
 

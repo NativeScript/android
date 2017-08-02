@@ -54,6 +54,7 @@ class JsV8InspectorClient : V8InspectorClient, v8_inspector::V8Inspector::Channe
         static jmethodID sendMethod;
         static jmethodID getInspectorMessageMethod;
         static jmethodID sendToDevToolsConsoleMethod;
+        static int contextGroupId;
 
         v8::Persistent<v8::Context> context_;
         std::unique_ptr<V8InspectorSession> session_;
