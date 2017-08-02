@@ -726,7 +726,7 @@ task validateAppIdMatch {
 		def packageJsonFile = new File("$projectDir/../../package.json");
 		def lineSeparator = System.getProperty("line.separator");
 
-		if (packageJsonFile.exists()) {
+		if (packageJsonFile.exists() && !project.hasProperty("release")) {
 			String content = packageJsonFile.getText("UTF-8")
 			def jsonSlurper = new JsonSlurper()
 			def packageJsonMap = jsonSlurper.parseText(content)
