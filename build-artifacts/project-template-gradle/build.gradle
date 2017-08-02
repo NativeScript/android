@@ -246,6 +246,8 @@ task addDependenciesFromNativeScriptPlugins {
 }
 
 task applyPluginsIncludeGradleConfigurations {
+	configurationsDir.deleteDir()
+
 	def dimensions = []
 	def includes = new ArrayList<String>()
 	def flavorNumber = 0
@@ -283,27 +285,22 @@ task applyPluginsIncludeGradleConfigurations {
 		copyAndRenamePluginDirToFlavorName(androidDir, flavor);
 	}
 
+	flavorDimensions(*dimensions)
+
 	includes.each {
 		println "\t + applying plugin configuration from ${it}"
 		apply from: it
 	}
-
-	def concatenatedDimensions = dimensions.collect { "\"${it}\"" }.join(", ");
-	def includeFile = file("${configurationsDir}/include.gradle")
-
-	includeFile.text = "android { flavorDimensions ${concatenatedDimensions} }"
-
-	apply from: includeFile
-
-	configurationsDir.deleteDir()
 }
+
+applyPluginsIncludeGradleConfigurations.finalizedBy(applyAppGradleConfiguration)
 
 task applyAppGradleConfiguration {
 	description "applies user-defined gradle configuration"
 
 	def pathToAppGradle = "$projectDir/../../app/App_Resources/Android/app.gradle"
 	def appGradle = file(pathToAppGradle)
-	if(appGradle.exists()) {
+	if (appGradle.exists()) {
 		println "\t + applying user-defined configuration from ${appGradle}"
 		apply from: pathToAppGradle
 	}
