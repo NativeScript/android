@@ -11,13 +11,14 @@ using namespace tns;
 void NetworkDomainCallbackHandlers::ResponseReceivedCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
     try {
         auto networkAgentInstance = V8NetworkAgentImpl::Instance;
+        const std::string wrongParametersError = "Not all parameters are present in the object argument in the call to ResponseReceived! Required params: 'requestId', `timestamp`, `type`, `response`";
 
         if (!networkAgentInstance) {
             return;
         }
 
-        if (args.Length() != 0 && !args[0]->IsObject()) {
-            return;
+        if (args.Length() == 0 || !args[0]->IsObject()) {
+            throw NativeScriptException(wrongParametersError);
         }
 
         auto isolate = args.GetIsolate();
@@ -32,8 +33,7 @@ void NetworkDomainCallbackHandlers::ResponseReceivedCallback(const v8::FunctionC
                 !argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "timestamp")).FromMaybe(false) ||
                 !argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "type")).FromMaybe(false)) ||
                 !argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "response")).FromMaybe(false)) {
-            throw NativeScriptException(
-                "Not all parameters are present in the object argument in the call to ResponseReceived! Required params: 'requestId', `timestamp`, `type`, `response`");
+            throw NativeScriptException(wrongParametersError);
         }
 
         auto requestId = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "requestId")).ToLocalChecked()->ToString();
@@ -94,13 +94,14 @@ void NetworkDomainCallbackHandlers::ResponseReceivedCallback(const v8::FunctionC
 void NetworkDomainCallbackHandlers::RequestWillBeSentCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
     try {
         auto networkAgentInstance = V8NetworkAgentImpl::Instance;
+        const std::string wrongParametersError = "Not all parameters are present in the object argument in the call to RequestWillBeSent! Required params: 'requestId', `url`, `timestamp`, `type`, `request`, `timestamps`";
 
         if (!networkAgentInstance) {
             return;
         }
 
-        if (args.Length() != 0 && !args[0]->IsObject()) {
-            return;
+        if (args.Length() == 0 || !args[0]->IsObject()) {
+            throw NativeScriptException(wrongParametersError);
         }
 
         auto isolate = args.GetIsolate();
@@ -116,7 +117,7 @@ void NetworkDomainCallbackHandlers::RequestWillBeSentCallback(const v8::Function
                 !(argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "request")).FromMaybe(false)) ||
                 !(argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "timestamp")).FromMaybe(false)) ||
                 !(argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "type")).FromMaybe(false)))) {
-            throw NativeScriptException("Not all parameters are present in the object argument in the call to RequestWillBeSent! Required params: 'requestId', `url`, `timestamp`, `type`, `request`, `timestamps`");
+            throw NativeScriptException(wrongParametersError);
         }
 
         auto requestId = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "requestId")).ToLocalChecked()->ToString();
@@ -178,13 +179,14 @@ void NetworkDomainCallbackHandlers::RequestWillBeSentCallback(const v8::Function
 void NetworkDomainCallbackHandlers::DataForRequestIdCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
     try {
         auto networkAgentInstance = V8NetworkAgentImpl::Instance;
+        const std::string wrongParametersError = "Not all parameters are present in the object argument in the call to DataForRequestId! Required params: 'requestId', `data`, `hasTextContent`";
 
         if (!networkAgentInstance) {
             return;
         }
 
-        if (args.Length() != 0 && !args[0]->IsObject()) {
-            return;
+        if (args.Length() == 0 || !args[0]->IsObject()) {
+            throw NativeScriptException(wrongParametersError);
         }
 
         auto isolate = args.GetIsolate();
@@ -198,8 +200,7 @@ void NetworkDomainCallbackHandlers::DataForRequestIdCallback(const v8::FunctionC
         if (!argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "requestId")).FromMaybe(false) ||
                 !argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "data")).FromMaybe(false) ||
                 !argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "hasTextContent")).FromMaybe(false)) {
-            throw NativeScriptException(
-                "Not all parameters are present in the object argument in the call to DataForRequestId! Required params: 'requestId', `data`, `hasTextContent`");
+            throw NativeScriptException(wrongParametersError);
         }
 
         auto requestId = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "requestId")).ToLocalChecked()->ToString();
@@ -239,13 +240,14 @@ void NetworkDomainCallbackHandlers::DataForRequestIdCallback(const v8::FunctionC
 void NetworkDomainCallbackHandlers::LoadingFinishedCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
     try {
         auto networkAgentInstance = V8NetworkAgentImpl::Instance;
+        const std::string wrongParametersError = "Not all parameters are present in the object argument in the call to LoadingFinished! Required params: 'requestId', `timeStamp`";
 
         if (!networkAgentInstance) {
             return;
         }
 
-        if (args.Length() != 0 && !args[0]->IsObject()) {
-            return;
+        if (args.Length() == 0 || !args[0]->IsObject()) {
+            throw NativeScriptException(wrongParametersError);
         }
 
         auto isolate = args.GetIsolate();
@@ -258,8 +260,7 @@ void NetworkDomainCallbackHandlers::LoadingFinishedCallback(const v8::FunctionCa
 
         if (!argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "requestId")).FromMaybe(false) ||
                 !argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "timestamp")).FromMaybe(false)) {
-            throw NativeScriptException(
-                "Not all parameters are present in the object argument in the call to LoadingFinished! Required params: 'requestId', `timeStamp`");
+            throw NativeScriptException(wrongParametersError);
         }
 
         auto requestId = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "requestId")).ToLocalChecked()->ToString();
