@@ -222,7 +222,6 @@ var readFile = function (filePath, err) {
 				return reject(err);
 			}
 
-			logger.info("+got content of file!");
 			var fileInfo = {
 				filePath: filePath,
 				data: data.toString()
@@ -241,8 +240,6 @@ var astFromFileContent = function (data, err) {
 			logger.warn("+DIDN'T parse ast from file!");
 			return reject(err);
 		}
-
-		logger.info("+parsing ast from file!");
 
 		var ast = babelParser.parse(data.data, {
 			minify: false,
