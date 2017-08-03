@@ -595,7 +595,7 @@ task collectAllJars {
 	
 	doFirst {
 		configurations.compile.each { File dependencyFile ->
-			// println "\t+" + dependencyFile.getAbsolutePath()
+			logger.info("Task: collectAllJars: dependency file: " + dependencyFile.getAbsolutePath())
 			allJarPaths.add(dependencyFile.getAbsolutePath())
 		}
 		
@@ -653,6 +653,8 @@ task buildMetadata (type: JavaExec) {
 
 		workingDir "build-tools"
 		main "-jar"
+
+		logger.info("Task buildMetadata: Call metadata-generator.jar with arguments: " + metadataParams.toString().replaceAll(',', ''))
 		args metadataParams.toArray()
 	}
 	
@@ -688,6 +690,7 @@ task generateTypescriptDefinitions (type: JavaExec) {
 		paramz.add("-output");
 		paramz.add("typings");
 
+		logger.info("Task generateTypescriptDefinitions: Call dts-generator.jar with arguments: " + paramz.toString().replaceAll(',', ''))
 		args paramz.toArray();
 	}
 }
@@ -764,7 +767,7 @@ task buildapk {
 	// problem is compile dependencies need to be changed before configuration stage
 	// and this is the only way so far
 	tasks.copyAarDependencies.execute()
-    tasks.addAarDependencies.execute()
+	tasks.addAarDependencies.execute()
 
 	//done to build only necessary apk
 	if(project.hasProperty("release")) {
