@@ -399,10 +399,6 @@ model {
     }
 }
 
-dependencies {
-    compile group: 'commons-io', name: 'commons-io', version: '2.0.1'
-}
-
 if (project.hasProperty("embedBindingGenerator")) {
     dependencies {
         compile fileTree(dir: (project(':binding-generator').buildDir.toString() + "/libs"), include: ['*.jar'])

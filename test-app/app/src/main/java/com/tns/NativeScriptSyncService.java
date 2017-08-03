@@ -61,18 +61,15 @@ public class NativeScriptSyncService {
 
         if (fullSyncDir.exists()) {
             executeFullSync(context, fullSyncDir);
-            deleteRecursive(fullSyncDir);
             return;
         }
 
         if (syncDir.exists()) {
             executePartialSync(context, syncDir);
-            deleteRecursive(syncDir);
         }
 
         if (removedSyncDir.exists()) {
             executeRemovedSync(context, removedSyncDir);
-            deleteRecursive(removedSyncDir);
         }
     }
 
@@ -128,11 +125,7 @@ public class NativeScriptSyncService {
                 int length = input.readInt();
                 input.readFully(new byte[length]); // ignore the payload
                 executePartialSync(context, syncDir);
-                // delete temporary /sync dir after syncing .xml/.css resources
-                deleteRecursive(syncDir);
                 executeRemovedSync(context, removedSyncDir);
-                // delete temporary /removedsync dir after removing files from the project
-                deleteRecursive(removedSyncDir);
 
                 runtime.runScript(new File(NativeScriptSyncService.this.context.getFilesDir(), "internal/livesync.js"));
                 try {
@@ -151,14 +144,6 @@ public class NativeScriptSyncService {
         localServerThread = new LocalServerSocketThread(context.getPackageName() + "-livesync");
         localServerJavaThread = new Thread(localServerThread);
         localServerJavaThread.start();
-    }
-
-    private void deleteRecursive(File fileOrDirectory) {
-        try {
-            org.apache.commons.io.FileUtils.deleteDirectory(fileOrDirectory);
-        } catch (IOException e) {
-            android.util.Log.d("Sync", e.toString());
-        }
     }
 
     public static boolean isSyncEnabled(Context context) {
