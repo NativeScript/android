@@ -432,7 +432,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
             DEBUG_WRITE_FORCE("Snapshot read %s (%dB).", snapshotPath.c_str(), m_heapSnapshotBlob->size);
         } else if (!saveSnapshot) {
             DEBUG_WRITE_FORCE("No snapshot file found at %s", snapshotPath.c_str());
-
         } else {
             // This should be executed before V8::Initialize, which calls it with false.
             NativeScriptExtension::CpuFeaturesProbe(true);
