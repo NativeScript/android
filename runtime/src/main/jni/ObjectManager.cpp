@@ -109,7 +109,7 @@ ObjectManager::JSInstanceInfo* ObjectManager::GetJSInstanceInfo(const Local<Obje
 }
 
 bool ObjectManager::IsJsRuntimeObject(const v8::Local<v8::Object>& object) {
-    int internalFieldCount = NativeScriptExtension::GetInternalFieldCount(object);
+    int internalFieldCount = object->InternalFieldCount();
     const int count = static_cast<int>(MetadataNodeKeys::END);
     return internalFieldCount == count;
 }
