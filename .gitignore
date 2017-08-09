@@ -16,3 +16,7 @@ bin/
 .svn/
 
 **/.vscode/
+
+.project
+.DS_Store
+.settings

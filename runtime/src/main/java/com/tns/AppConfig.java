@@ -17,7 +17,8 @@ class AppConfig {
         GcThrottleTime("gcThrottleTime", 0),
         MemoryCheckInterval("memoryCheckInterval", 0),
         FreeMemoryRatio("freeMemoryRatio", 0.0),
-        Profiling("profiling", "");
+        Profiling("profiling", ""),
+        MarkingMode("markingMode", "Full");
 
         public static final KnownKeys[] asArray = {
             V8FlagsKey,
@@ -28,7 +29,8 @@ class AppConfig {
             GcThrottleTime,
             MemoryCheckInterval,
             FreeMemoryRatio,
-            Profiling
+            Profiling,
+            MarkingMode
         };
 
         private final String name;
@@ -111,6 +113,9 @@ class AppConfig {
                     if (androidObject.has(KnownKeys.FreeMemoryRatio.getName())) {
                         values[KnownKeys.FreeMemoryRatio.getIndex()] = androidObject.getDouble(KnownKeys.FreeMemoryRatio.getName());
                     }
+                    if (androidObject.has(KnownKeys.MarkingMode.getName())) {
+                        values[KnownKeys.MarkingMode.getIndex()] = androidObject.getString(KnownKeys.MarkingMode.getName());
+                    }
                 }
             }
         } catch (Exception e) {
@@ -146,4 +151,5 @@ class AppConfig {
     public String getProfilingMode() {
         return (String)values[KnownKeys.Profiling.getIndex()];
     }
+    public String getMarkingMode() { return (String)values[KnownKeys.MarkingMode.getIndex()]; }
 }

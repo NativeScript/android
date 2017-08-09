@@ -57,6 +57,18 @@ class ObjectManager {
             END
         };
 
+        enum class JavaScriptMarkingMode {
+            /**
+             * For JavaScript instances with implementation objects that were marked for collection,
+             * MarkReachableObjects will scann the whole graph of reachable objects and keep strong reference to
+             * the Java instances of implementation objects.
+             */
+            Full,
+            /**
+             * Fully suppress the MarkReachableObjects.
+             */
+            None
+        };
 
     private:
 
@@ -142,7 +154,11 @@ class ObjectManager {
 
         static void JSObjectWeakCallbackStatic(const v8::WeakCallbackInfo<ObjectWeakCallbackState>& data);
 
+        static void JSObjectFinalizerStatic(const v8::WeakCallbackInfo<ObjectWeakCallbackState>& data);
+
         void JSObjectWeakCallback(v8::Isolate* isolate, ObjectWeakCallbackState* callbackState);
+
+        void JSObjectFinalizer(v8::Isolate* isolate, ObjectWeakCallbackState* callbackState);
 
         bool HasImplObject(v8::Isolate* isolate, const v8::Local<v8::Object>& obj);
 
@@ -196,6 +212,8 @@ class ObjectManager {
 
         bool m_useGlobalRefs;
 
+        JavaScriptMarkingMode m_markingMode;
+
         jclass JAVA_LANG_CLASS;
 
         jmethodID GET_NAME_METHOD_ID;
@@ -205,6 +223,8 @@ class ObjectManager {
         jmethodID GET_OR_CREATE_JAVA_OBJECT_ID_METHOD_ID;
 
         jmethodID MAKE_INSTANCE_WEAK_BATCH_METHOD_ID;
+
+        jmethodID MAKE_INSTANCE_WEAK_AND_CHECK_IF_ALIVE_METHOD_ID;
 
         jmethodID CHECK_WEAK_OBJECTS_ARE_ALIVE_METHOD_ID;
 
