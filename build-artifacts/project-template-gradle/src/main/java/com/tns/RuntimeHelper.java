@@ -181,45 +181,30 @@ public final class RuntimeHelper {
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
-                }
 
-                try {
-                    Class NativeScriptSyncService = Class.forName("com.tns.NativeScriptSyncService");
-                    Method isSyncEnabledMethod = NativeScriptSyncService.getMethod("isSyncEnabled", Context.class);
-                    Boolean isSyncEnabled = (Boolean)isSyncEnabledMethod.invoke(NativeScriptSyncService, app);
-
+                    // if app is in debuggable mode run livesync service
                     // runtime needs to be initialized before the NativeScriptSyncService is enabled because it uses runtime.runScript(...)
-                    if (isSyncEnabled) {
+                    try {
+                        Class NativeScriptSyncService = Class.forName("com.tns.NativeScriptSyncService");
+
                         Constructor cons = NativeScriptSyncService.getConstructor(new Class[] {Runtime.class, Logger.class, Context.class});
                         Object syncService = cons.newInstance(runtime, logger, app);
 
                         Method syncMethod = NativeScriptSyncService.getMethod("sync");
                         syncMethod.invoke(syncService);
-
                         Method startServerMethod = NativeScriptSyncService.getMethod("startServer");
                         startServerMethod.invoke(syncService);
-
-                        // preserve this instance as strong reference
-                        // do not preserve in NativeScriptApplication field inorder to
-                        // make the code more portable
-                        // @@@
-                        // Runtime.getOrCreateJavaObjectID(syncService);
-                    } else {
-                        if (logger.isEnabled()) {
-                            logger.write("NativeScript LiveSync is not enabled.");
-                        }
+                    } catch (ClassNotFoundException e) {
+                        e.printStackTrace();
+                    } catch (NoSuchMethodException e) {
+                        e.printStackTrace();
+                    } catch (IllegalAccessException e) {
+                        e.printStackTrace();
+                    } catch (InvocationTargetException e) {
+                        e.printStackTrace();
+                    } catch (InstantiationException e) {
+                        e.printStackTrace();
                     }
-
-                } catch (ClassNotFoundException e) {
-                    e.printStackTrace();
-                } catch (NoSuchMethodException e) {
-                    e.printStackTrace();
-                } catch (IllegalAccessException e) {
-                    e.printStackTrace();
-                } catch (InvocationTargetException e) {
-                    e.printStackTrace();
-                } catch (InstantiationException e) {
-                    e.printStackTrace();
                 }
 
                 runtime.runScript(new File(appDir, "internal/ts_helpers.js"));
