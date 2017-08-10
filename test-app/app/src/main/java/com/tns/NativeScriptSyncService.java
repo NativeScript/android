@@ -278,6 +278,8 @@ public class NativeScriptSyncService {
                     targetFile.delete();
                 } else {
                     deleteRemovedFiles(file, sourceRootAbsolutePath, targetRootAbsolutePath);
+
+                    // this is done so empty folders, if any, are deleted after we're don deleting files.
                     if (targetFile.listFiles().length == 0) {
                         targetFile.delete();
                     }
