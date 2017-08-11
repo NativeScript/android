@@ -1,7 +1,6 @@
 package com.tns;
 
 import android.app.Application;
-import android.os.Debug;
 
 public class NativeScriptApplication extends android.app.Application {
 

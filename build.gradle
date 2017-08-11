@@ -47,6 +47,33 @@ task createDistDir  << {
 	distF.mkdirs()
 }
 
+task copyFilesToProjectTemeplate << {
+	copy {
+		from "$rootDir/test-app/app/src/main/java/com/tns/ErrorReport.java"
+		from "$rootDir/test-app/app/src/main/java/com/tns/ErrorReportActivity.java"
+		from "$rootDir/test-app/app/src/main/java/com/tns/NativeScriptSyncService.java"
+		into "$rootDir/build-artifacts/project-template-gradle/src/debug/java/com/tns/"
+	}
+	copy {
+		from "$rootDir/test-app/app/src/main/assets/internal"
+		into "$rootDir/build-artifacts/project-template-gradle/src/main/assets/internal"
+	}
+	copy {
+		from "$rootDir/test-app/app/src/main/java/com/tns/AndroidJsV8Inspector.java"
+		from "$rootDir/test-app/app/src/main/java/com/tns/DefaultExtractPolicy.java"
+		from "$rootDir/test-app/app/src/main/java/com/tns/LogcatLogger.java"
+		from "$rootDir/test-app/app/src/main/java/com/tns/NativeScriptApplication.java"
+		from "$rootDir/test-app/app/src/main/java/com/tns/NativeScriptUncaughtExceptionHandler.java"
+		from "$rootDir/test-app/app/src/main/java/com/tns/RuntimeHelper.java"
+		from "$rootDir/test-app/app/src/main/java/com/tns/Util.java"
+		into "$rootDir/build-artifacts/project-template-gradle/src/main/java/com/tns/"
+	}
+	copy {
+		from "$rootDir/test-app/app/src/main/java/com/tns/internal"
+		into "$rootDir/build-artifacts/project-template-gradle/src/main/java/com/tns/internal"
+	}
+}
+
 task copyProjectTemplate (type: Copy) {
 	from "$rootDir/build-artifacts/project-template-gradle"
 	into "$rootDir/dist/framework"
@@ -252,14 +279,21 @@ task copyReadme (type: Copy) {
 	into "$rootDir/dist"
 }
 
+task cleanBuildArtefacts (type: Delete) {
+	delete "$rootDir/build-artifacts/project-template-gradle/src/debug/java"
+	delete "$rootDir/build-artifacts/project-template-gradle/src/main/java"
+	delete "$rootDir/build-artifacts/project-template-gradle/src/main/assets"
+}
+
 //clean and set up dirs
-createDistDir.dependsOn(cleanDistDir)
+copyFilesToProjectTemeplate.dependsOn(cleanDistDir)
 
 //copy framework structure
+createDistDir.dependsOn(copyFilesToProjectTemeplate)
 copyProjectTemplate.dependsOn(createDistDir)
 copyPackageJson.dependsOn(copyProjectTemplate)
 
-copyStaticBindingGeneratorProject.dependsOn(copyProjectTemplate)
+copyStaticBindingGeneratorProject.dependsOn(copyPackageJson)
 //generate static binding generator and copy into project template
 generateInterfaceNameGenerator.dependsOn(copyStaticBindingGeneratorProject)
 copyInterfaceNameGeneratorJar.dependsOn(generateInterfaceNameGenerator)
@@ -267,7 +301,7 @@ generateStaticBindingGeneratorJar.dependsOn(copyInterfaceNameGeneratorJar)
 copyGeneratedStaticBindingGeneratorJar.dependsOn(generateStaticBindingGeneratorJar)
 
 //get version from package json
-getPackageVersion.dependsOn(copyProjectTemplate)
+getPackageVersion.dependsOn(copyGeneratedStaticBindingGeneratorJar)
 getCommitVersion.dependsOn(getPackageVersion)
 
 //generate runtime and copy into framework structure
@@ -294,7 +328,9 @@ copyGeneratedMetadataGeneratorJar.dependsOn(generateMetadataGeneratorJar)
 copyReadme.dependsOn(copyGeneratedMetadataGeneratorJar)
 
 //pack runtime
-createNpmPackage.dependsOn(copyReadme, setPackageVersionInPackageJsonFile)
+setPackageVersionInPackageJsonFile.dependsOn(copyReadme)
+createNpmPackage.dependsOn(setPackageVersionInPackageJsonFile)
+cleanBuildArtefacts.dependsOn(createNpmPackage)
 
 task createPackage {
 	description "Builds the NativeScript Android App Package using an application project template."
@@ -320,7 +356,8 @@ task createPackage {
 	generateMetadataGeneratorJar,
 	copyGeneratedMetadataGeneratorJar,
 	copyReadme,
-	createNpmPackage
+	createNpmPackage,
+	cleanBuildArtefacts
 
 	println "Creating NativeScript Android Package"			
 }
