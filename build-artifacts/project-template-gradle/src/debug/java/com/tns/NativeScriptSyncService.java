@@ -268,16 +268,21 @@ public class NativeScriptSyncService {
         if (files != null) {
             for (int i = 0; i < files.length; i++) {
                 File file = files[i];
+                String targetFilePath = file.getAbsolutePath().replace(sourceRootAbsolutePath, targetRootAbsolutePath);
+                File targetFile = new File(targetFilePath);
                 if (file.isFile()) {
                     if (logger.isEnabled()) {
                         logger.write("Syncing removed file: " + file.getAbsolutePath().toString());
                     }
 
-                    String targetFilePath = file.getAbsolutePath().replace(sourceRootAbsolutePath, targetRootAbsolutePath);
-                    File targetFile = new File(targetFilePath);
                     targetFile.delete();
                 } else {
                     deleteRemovedFiles(file, sourceRootAbsolutePath, targetRootAbsolutePath);
+
+                    // this is done so empty folders, if any, are deleted after we're don deleting files.
+                    if (targetFile.listFiles().length == 0) {
+                        targetFile.delete();
+                    }
                 }
             }
         }
