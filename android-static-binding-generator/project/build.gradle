@@ -15,17 +15,17 @@ def jsParserP = "$projectDir/parser/js_parser.js"
 def jsFilesParametersP = "$projectDir/jsFilesParameters.txt"
 
 def webpackWorkersExcludePath = "$projectDir/../../src/main/assets/app/__worker-chunks.json"
-def webpackWorkersExcludesList;
+def webpackWorkersExcludesList = [];
 
 def workersExcludeFile = file(webpackWorkersExcludePath);
-def filterWorkerFiles = false;
 if (workersExcludeFile.exists()) {
-	filterWorkerFiles = true;
-	webpackWorkersExcludesList = new JsonSlurper().parseText(workersExcludeFile.text)
+	// in case the file exists but is malformed
+	try {
+		webpackWorkersExcludesList = new JsonSlurper().parseText(workersExcludeFile.text)
+	} catch (all) {
+		println "Malformed workers exclude file at ${webpackWorkersExcludePath}"
+	}
 }
-
-
-//def absoluteOutDir = new File("./outDir")//project.outDir
 
 def absoluteOutDir;
 if (project.hasProperty("outDir")) {
@@ -123,15 +123,7 @@ traverseDirectory = { dir, traverseExplicitly ->
 
 	currentDir.eachFile(FileType.FILES) { File f ->
 		def currFile = f.getAbsolutePath();
-		if (currFile.substring(currFile.length() - 3, currFile.length()).equals(".js")) {
-			// Read __worker-chunks.json file containing a list of webpacked workers
-			// ignore worker scripts, so as to not attempt to generate bindings for them
-			if (filterWorkerFiles) {
-				if (webpackWorkersExcludesList.any{element -> file(element).getAbsolutePath() == currFile}) {
-					return
-				}
-			}
-
+		if (isJsFile(currFile) && !isWorkerScript(currFile)) {
 			inputJsFiles.add(currFile)
 		}
 	}
@@ -139,6 +131,15 @@ traverseDirectory = { dir, traverseExplicitly ->
 	currentDir.eachFile FileType.DIRECTORIES, { d ->
 		traverseDirectory(d.getAbsolutePath(), traverseExplicitly)
 	}
+}
+
+def isJsFile = { fileName ->  return fileName.substring(fileName.length() - 3, fileName.length()).equals(".js") 
+}
+
+def isWorkerScript = { fileName -> 
+	// Read __worker-chunks.json file containing a list of webpacked workers
+	// ignore worker scripts, so as to not attempt to generate bindings for them
+	return webpackWorkersExcludesList.any{element -> file(element).getAbsolutePath() == fileName}
 }
 
 task traverseJsFilesArgs << { //(jsCodeDir, bindingsFilePath, interfaceNamesFilePath, jsParserPath, jsFilesParameter) {
