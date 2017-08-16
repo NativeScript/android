@@ -21,7 +21,7 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
     public void uncaughtException(Thread thread, Throwable ex) {
         String currentThreadMessage = "An uncaught Exception occurred on \"" + thread.getName() + "\" thread.\n";
 
-        String errorMessage = currentThreadMessage + ErrorReport.getErrorMessage(ex);
+        String errorMessage = currentThreadMessage + getErrorMessage(ex);
 
         if (Runtime.isInitialized()) {
             try {
@@ -41,8 +41,50 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
             logger.write("Uncaught Exception Message=" + errorMessage);
         }
 
-        if (!ErrorReport.startActivity(context, errorMessage) && defaultHandler != null) {
+        boolean res = false;
+
+        if (Util.isDebuggableApp(context)) {
+            try {
+                Class<?> ErrReport = null;
+                java.lang.reflect.Method startActivity = null;
+
+                ErrReport = java.lang.Class.forName("com.tns.ErrorReport");
+
+                startActivity = ErrReport.getDeclaredMethod("startActivity", android.content.Context.class, String.class);
+
+                res = (Boolean) startActivity.invoke(null, context, errorMessage);
+            } catch (Exception e) {
+                android.util.Log.v("Error", errorMessage);
+                e.printStackTrace();
+                android.util.Log.v("Application Error", "ErrorActivity default implementation not found. Reinstall android platform to fix.");
+            }
+        }
+
+        if (!res && defaultHandler != null) {
             defaultHandler.uncaughtException(thread, ex);
         }
+    }
+
+    private static String getErrorMessage(Throwable ex) {
+        String content;
+        java.io.PrintStream ps = null;
+
+        try {
+            java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+            ps = new java.io.PrintStream(baos);
+            ex.printStackTrace(ps);
+
+            try {
+                content = baos.toString("US-ASCII");
+            } catch (java.io.UnsupportedEncodingException e) {
+                content = e.getMessage();
+            }
+        } finally {
+            if (ps != null) {
+                ps.close();
+            }
+        }
+
+        return content;
     }
 }

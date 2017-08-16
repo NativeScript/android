@@ -21,8 +21,7 @@
         android:paddingRight="20dp"
         android:layout_alignParentBottom="true"
         android:layout_centerHorizontal="true"
-        tools:layout_width="match_parent"
-        style="@style/Widget.AppCompat.Button.Colored"/>
+        tools:layout_width="match_parent"/>
 
     <LinearLayout
         android:id="@+id/logcatLinearLayout"
