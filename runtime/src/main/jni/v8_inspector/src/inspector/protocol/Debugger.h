@@ -45,6 +45,13 @@ class PausedNotification;
 // Wrapper for notification params
 using ResumedNotification = Object;
 
+namespace ContinueToLocation {
+namespace TargetCallFramesEnum {
+ extern const char* Any;
+ extern const char* Current;
+} // TargetCallFramesEnum
+} // ContinueToLocation
+
 namespace SetPauseOnExceptions {
 namespace StateEnum {
  extern const char* None;
@@ -1325,7 +1332,7 @@ public:
     virtual DispatchResponse setBreakpoint(std::unique_ptr<protocol::Debugger::Location> in_location, Maybe<String> in_condition, String* out_breakpointId, std::unique_ptr<protocol::Debugger::Location>* out_actualLocation) = 0;
     virtual DispatchResponse removeBreakpoint(const String& in_breakpointId) = 0;
     virtual DispatchResponse getPossibleBreakpoints(std::unique_ptr<protocol::Debugger::Location> in_start, Maybe<protocol::Debugger::Location> in_end, Maybe<bool> in_restrictToFunction, std::unique_ptr<protocol::Array<protocol::Debugger::BreakLocation>>* out_locations) = 0;
-    virtual DispatchResponse continueToLocation(std::unique_ptr<protocol::Debugger::Location> in_location) = 0;
+    virtual DispatchResponse continueToLocation(std::unique_ptr<protocol::Debugger::Location> in_location, Maybe<String> in_targetCallFrames) = 0;
     virtual DispatchResponse stepOver() = 0;
     virtual DispatchResponse stepInto() = 0;
     virtual DispatchResponse stepOut() = 0;

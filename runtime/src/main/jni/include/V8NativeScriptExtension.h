@@ -14,8 +14,6 @@ namespace v8 {
 
 		static v8::Local<v8::Array> GetPropertyKeys(v8::Isolate *isolate, const v8::Local<v8::Context>& context, const v8::Local<v8::Object>& object, bool& success);
 
-		static int GetInternalFieldCount(const v8::Local<v8::Object>& object);
-
         static void CpuFeaturesProbe(bool cross_compile);
 	private:
 		NativeScriptExtension();

@@ -25,7 +25,9 @@ V8_EXPORT extern const char* Exception;
 V8_EXPORT extern const char* Assert;
 V8_EXPORT extern const char* DebugCommand;
 V8_EXPORT extern const char* PromiseRejection;
+V8_EXPORT extern const char* OOM;
 V8_EXPORT extern const char* Other;
+V8_EXPORT extern const char* Ambiguous;
 } // ReasonEnum
 } // Paused
 

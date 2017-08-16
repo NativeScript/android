@@ -650,6 +650,13 @@ std::unique_ptr<PausedNotification> PausedNotification::clone() const
 // ------------- Enum values from params.
 
 
+namespace ContinueToLocation {
+namespace TargetCallFramesEnum {
+const char* Any = "any";
+const char* Current = "current";
+} // namespace TargetCallFramesEnum
+} // namespace ContinueToLocation
+
 namespace SetPauseOnExceptions {
 namespace StateEnum {
 const char* None = "none";
@@ -1108,6 +1115,12 @@ DispatchResponse::Status DispatcherImpl::continueToLocation(int callId, std::uni
     protocol::Value* locationValue = object ? object->get("location") : nullptr;
     errors->setName("location");
     std::unique_ptr<protocol::Debugger::Location> in_location = ValueConversions<protocol::Debugger::Location>::fromValue(locationValue, errors);
+    protocol::Value* targetCallFramesValue = object ? object->get("targetCallFrames") : nullptr;
+    Maybe<String> in_targetCallFrames;
+    if (targetCallFramesValue) {
+        errors->setName("targetCallFrames");
+        in_targetCallFrames = ValueConversions<String>::fromValue(targetCallFramesValue, errors);
+    }
     errors->pop();
     if (errors->hasErrors()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
@@ -1115,7 +1128,7 @@ DispatchResponse::Status DispatcherImpl::continueToLocation(int callId, std::uni
     }
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->continueToLocation(std::move(in_location));
+    DispatchResponse response = m_backend->continueToLocation(std::move(in_location), std::move(in_targetCallFrames));
     if (weak->get())
         weak->get()->sendResponse(callId, response);
     return response.status();
