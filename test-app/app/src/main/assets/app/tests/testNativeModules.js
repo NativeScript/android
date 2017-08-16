@@ -1,6 +1,7 @@
 describe("Tests native modules)", function () {
 
-	it("should load native module", function () {
+    // disabled until the native library is rebuilt against the new libNativeScript.so
+	xit("should load native module", function () {
 		var x = 12;
 		var y = 34;
 		
