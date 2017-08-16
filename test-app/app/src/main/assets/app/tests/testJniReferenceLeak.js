@@ -96,7 +96,6 @@ describe("Tests JNI reference leak", function () {
 	});
 	
 	it("test_if_global_reference_leaks_when_interface_implementation_is_created", function () {
-		
 		var n = 0;
 		var N = 100 * 1000;
 		
