@@ -86,6 +86,14 @@ task generateInterfaceNamesList() {
 	}
 }
 
+def isJsFile = { fileName -> return fileName.substring(fileName.length() - 3, fileName.length()).equals(".js") }
+
+def isWorkerScript = { fileName ->
+	// Read __worker-chunks.json file containing a list of webpacked workers
+	// ignore worker scripts, so as to not attempt to generate bindings for them
+	return webpackWorkersExcludesList.any{element -> file(element).getAbsolutePath() == fileName}
+}
+
 def traverseDirectory
 
 traverseDirectory = { dir, traverseExplicitly ->
@@ -131,15 +139,6 @@ traverseDirectory = { dir, traverseExplicitly ->
 	currentDir.eachFile FileType.DIRECTORIES, { d ->
 		traverseDirectory(d.getAbsolutePath(), traverseExplicitly)
 	}
-}
-
-def isJsFile = { fileName ->  return fileName.substring(fileName.length() - 3, fileName.length()).equals(".js") 
-}
-
-def isWorkerScript = { fileName -> 
-	// Read __worker-chunks.json file containing a list of webpacked workers
-	// ignore worker scripts, so as to not attempt to generate bindings for them
-	return webpackWorkersExcludesList.any{element -> file(element).getAbsolutePath() == fileName}
 }
 
 task traverseJsFilesArgs << { //(jsCodeDir, bindingsFilePath, interfaceNamesFilePath, jsParserPath, jsFilesParameter) {
