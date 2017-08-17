@@ -5,7 +5,6 @@
 #ifndef v8_inspector_protocol_Forward_h
 #define v8_inspector_protocol_Forward_h
 
-#include "src/inspector/protocol-platform.h"
 #include "src/inspector/string-util.h"
 
 #include <vector>
@@ -15,12 +14,13 @@ namespace protocol {
 
 template<typename T> class Array;
 class DictionaryValue;
-using ErrorString = String;
+class DispatchResponse;
 class ErrorSupport;
 class FundamentalValue;
 class ListValue;
 template<typename T> class Maybe;
 class Object;
+using Response = DispatchResponse;
 class SerializedValue;
 class StringValue;
 class UberDispatcher;
@@ -72,11 +72,17 @@ enum NotNullTagEnum { NotNullLiteral };
 namespace v8_inspector {
 namespace protocol {
 
+class  Serializable {
+public:
+    virtual String serialize() = 0;
+    virtual ~Serializable() = default;
+};
+
 class  FrontendChannel {
 public:
     virtual ~FrontendChannel() { }
-    virtual void sendProtocolResponse(int callId, const String& message) = 0;
-    virtual void sendProtocolNotification(const String& message) = 0;
+    virtual void sendProtocolResponse(int callId, std::unique_ptr<Serializable> message) = 0;
+    virtual void sendProtocolNotification(std::unique_ptr<Serializable> message) = 0;
     virtual void flushProtocolNotifications() = 0;
 };
 

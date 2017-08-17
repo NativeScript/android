@@ -8,7 +8,7 @@
 
 #include <algorithm>
 #include <cmath>
-#include <stdlib.h>
+
 #include <cstring>
 
 
@@ -21,17 +21,8 @@
 namespace v8_inspector {
 namespace protocol {
 
-ErrorSupport::ErrorSupport() : m_errorString(nullptr) { }
-ErrorSupport::ErrorSupport(String* errorString) : m_errorString(errorString) { }
-ErrorSupport::~ErrorSupport()
-{
-    if (m_errorString && hasErrors()) {
-        StringBuilder builder;
-        builder.append("Internal error(s): ");
-        builder.append(errors());
-        *m_errorString = builder.toString();
-    }
-}
+ErrorSupport::ErrorSupport() { }
+ErrorSupport::~ErrorSupport() { }
 
 void ErrorSupport::setName(const String& name)
 {
@@ -54,17 +45,17 @@ void ErrorSupport::addError(const String& error)
     StringBuilder builder;
     for (size_t i = 0; i < m_path.size(); ++i) {
         if (i)
-            builder.append('.');
-        builder.append(m_path[i]);
+            StringUtil::builderAppend(builder, '.');
+        StringUtil::builderAppend(builder, m_path[i]);
     }
-    builder.append(": ");
-    builder.append(error);
-    m_errors.push_back(builder.toString());
+    StringUtil::builderAppend(builder, ": ");
+    StringUtil::builderAppend(builder, error);
+    m_errors.push_back(StringUtil::builderToString(builder));
 }
 
 bool ErrorSupport::hasErrors()
 {
-    return m_errors.size();
+    return !!m_errors.size();
 }
 
 String ErrorSupport::errors()
@@ -72,10 +63,10 @@ String ErrorSupport::errors()
     StringBuilder builder;
     for (size_t i = 0; i < m_errors.size(); ++i) {
         if (i)
-            builder.append("; ");
-        builder.append(m_errors[i]);
+            StringUtil::builderAppend(builder, "; ");
+        StringUtil::builderAppend(builder, m_errors[i]);
     }
-    return builder.toString();
+    return StringUtil::builderToString(builder);
 }
 
 } // namespace v8_inspector
@@ -100,13 +91,13 @@ const char* const falseValueString = "false";
 inline bool escapeChar(uint16_t c, StringBuilder* dst)
 {
     switch (c) {
-    case '\b': dst->append("\\b"); break;
-    case '\f': dst->append("\\f"); break;
-    case '\n': dst->append("\\n"); break;
-    case '\r': dst->append("\\r"); break;
-    case '\t': dst->append("\\t"); break;
-    case '\\': dst->append("\\\\"); break;
-    case '"': dst->append("\\\""); break;
+    case '\b': StringUtil::builderAppend(*dst, "\\b"); break;
+    case '\f': StringUtil::builderAppend(*dst, "\\f"); break;
+    case '\n': StringUtil::builderAppend(*dst, "\\n"); break;
+    case '\r': StringUtil::builderAppend(*dst, "\\r"); break;
+    case '\t': StringUtil::builderAppend(*dst, "\\t"); break;
+    case '\\': StringUtil::builderAppend(*dst, "\\\\"); break;
+    case '"': StringUtil::builderAppend(*dst, "\\\""); break;
     default:
         return false;
     }
@@ -117,10 +108,10 @@ const char hexDigits[17] = "0123456789ABCDEF";
 
 void appendUnsignedAsHex(uint16_t number, StringBuilder* dst)
 {
-    dst->append("\\u");
+    StringUtil::builderAppend(*dst, "\\u");
     for (size_t i = 0; i < 4; ++i) {
         uint16_t c = hexDigits[(number & 0xF000) >> 12];
-        dst->append(c);
+        StringUtil::builderAppend(*dst, c);
         number <<= 4;
     }
 }
@@ -136,7 +127,7 @@ void escapeStringForJSON(const String& str, StringBuilder* dst)
                 //    is also optional. It would also be a pain to implement here.
                 appendUnsignedAsHex(c, dst);
             } else {
-                dst->append(c);
+                StringUtil::builderAppend(*dst, c);
             }
         }
     }
@@ -144,9 +135,9 @@ void escapeStringForJSON(const String& str, StringBuilder* dst)
 
 void doubleQuoteStringForJSON(const String& str, StringBuilder* dst)
 {
-    dst->append('"');
+    StringUtil::builderAppend(*dst, '"');
     escapeStringForJSON(str, dst);
-    dst->append('"');
+    StringUtil::builderAppend(*dst, '"');
 }
 
 } // anonymous namespace
@@ -176,23 +167,23 @@ bool Value::asSerialized(String*) const
     return false;
 }
 
-String Value::toJSONString() const
-{
-    StringBuilder result;
-    StringUtil::builderReserve(result, 512);
-    writeJSON(&result);
-    return result.toString();
-}
-
 void Value::writeJSON(StringBuilder* output) const
 {
     DCHECK(m_type == TypeNull);
-    output->append(nullValueString, 4);
+    StringUtil::builderAppend(*output, nullValueString, 4);
 }
 
 std::unique_ptr<Value> Value::clone() const
 {
     return Value::null();
+}
+
+String Value::serialize()
+{
+    StringBuilder result;
+    StringUtil::builderReserve(result, 512);
+    writeJSON(&result);
+    return StringUtil::builderToString(result);
 }
 
 bool FundamentalValue::asBoolean(bool* output) const
@@ -229,17 +220,17 @@ void FundamentalValue::writeJSON(StringBuilder* output) const
     DCHECK(type() == TypeBoolean || type() == TypeInteger || type() == TypeDouble);
     if (type() == TypeBoolean) {
         if (m_boolValue)
-            output->append(trueValueString, 4);
+            StringUtil::builderAppend(*output, trueValueString, 4);
         else
-            output->append(falseValueString, 5);
+            StringUtil::builderAppend(*output, falseValueString, 5);
     } else if (type() == TypeDouble) {
         if (!std::isfinite(m_doubleValue)) {
-            output->append(nullValueString, 4);
+            StringUtil::builderAppend(*output, nullValueString, 4);
             return;
         }
-        output->append(StringUtil::fromDouble(m_doubleValue));
+        StringUtil::builderAppend(*output, StringUtil::fromDouble(m_doubleValue));
     } else if (type() == TypeInteger) {
-        output->append(StringUtil::fromInteger(m_integerValue));
+        StringUtil::builderAppend(*output, StringUtil::fromInteger(m_integerValue));
     }
 }
 
@@ -281,7 +272,7 @@ bool SerializedValue::asSerialized(String* output) const
 void SerializedValue::writeJSON(StringBuilder* output) const
 {
     DCHECK(type() == TypeSerialized);
-    output->append(m_serializedValue);
+    StringUtil::builderAppend(*output, m_serializedValue);
 }
 
 std::unique_ptr<Value> SerializedValue::clone() const
@@ -413,17 +404,17 @@ void DictionaryValue::remove(const String& name)
 
 void DictionaryValue::writeJSON(StringBuilder* output) const
 {
-    output->append('{');
+    StringUtil::builderAppend(*output, '{');
     for (size_t i = 0; i < m_order.size(); ++i) {
         Dictionary::const_iterator it = m_data.find(m_order[i]);
         CHECK(it != m_data.end());
         if (i)
-            output->append(',');
+            StringUtil::builderAppend(*output, ',');
         doubleQuoteStringForJSON(it->first, output);
-        output->append(':');
+        StringUtil::builderAppend(*output, ':');
         it->second->writeJSON(output);
     }
-    output->append('}');
+    StringUtil::builderAppend(*output, '}');
 }
 
 std::unique_ptr<Value> DictionaryValue::clone() const
@@ -449,15 +440,15 @@ ListValue::~ListValue()
 
 void ListValue::writeJSON(StringBuilder* output) const
 {
-    output->append('[');
+    StringUtil::builderAppend(*output, '[');
     bool first = true;
     for (const std::unique_ptr<protocol::Value>& value : m_data) {
         if (!first)
-            output->append(',');
+            StringUtil::builderAppend(*output, ',');
         value->writeJSON(output);
         first = false;
     }
-    output->append(']');
+    StringUtil::builderAppend(*output, ']');
 }
 
 std::unique_ptr<Value> ListValue::clone() const
@@ -498,24 +489,25 @@ protocol::Value* ListValue::at(size_t index)
 namespace v8_inspector {
 namespace protocol {
 
-std::unique_ptr<Object> Object::parse(protocol::Value* value, ErrorSupport* errors)
+std::unique_ptr<Object> Object::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
-    protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    if (!object) {
+    protocol::DictionaryValue* dictionary = DictionaryValue::cast(value);
+    if (!dictionary) {
         errors->addError("object expected");
         return nullptr;
     }
-    return wrapUnique(new Object(wrapUnique(static_cast<DictionaryValue*>(object->clone().release()))));
+    dictionary = static_cast<protocol::DictionaryValue*>(dictionary->clone().release());
+    return std::unique_ptr<Object>(new Object(std::unique_ptr<DictionaryValue>(dictionary)));
 }
 
-std::unique_ptr<protocol::DictionaryValue> Object::serialize() const
+std::unique_ptr<protocol::DictionaryValue> Object::toValue() const
 {
     return DictionaryValue::cast(m_object->clone());
 }
 
 std::unique_ptr<Object> Object::clone() const
 {
-    return wrapUnique(new Object(DictionaryValue::cast(m_object->clone())));
+    return std::unique_ptr<Object>(new Object(DictionaryValue::cast(m_object->clone())));
 }
 
 Object::Object(std::unique_ptr<protocol::DictionaryValue> object) : m_object(std::move(object)) { }
@@ -537,7 +529,55 @@ namespace v8_inspector {
 namespace protocol {
 
 // static
-const char DispatcherBase::kInvalidRequest[] = "Invalid request";
+DispatchResponse DispatchResponse::OK()
+{
+    DispatchResponse result;
+    result.m_status = kSuccess;
+    result.m_errorCode = kParseError;
+    return result;
+}
+
+// static
+DispatchResponse DispatchResponse::Error(const String& error)
+{
+    DispatchResponse result;
+    result.m_status = kError;
+    result.m_errorCode = kServerError;
+    result.m_errorMessage = error;
+    return result;
+}
+
+// static
+DispatchResponse DispatchResponse::InternalError()
+{
+    DispatchResponse result;
+    result.m_status = kError;
+    result.m_errorCode = kInternalError;
+    result.m_errorMessage = "Internal error";
+    return result;
+}
+
+// static
+DispatchResponse DispatchResponse::InvalidParams(const String& error)
+{
+    DispatchResponse result;
+    result.m_status = kError;
+    result.m_errorCode = kInvalidParams;
+    result.m_errorMessage = error;
+    return result;
+}
+
+// static
+DispatchResponse DispatchResponse::FallThrough()
+{
+    DispatchResponse result;
+    result.m_status = kFallThrough;
+    result.m_errorCode = kParseError;
+    return result;
+}
+
+// static
+const char DispatcherBase::kInvalidParamsString[] = "Invalid parameters";
 
 DispatcherBase::WeakPtr::WeakPtr(DispatcherBase* dispatcher) : m_dispatcher(dispatcher) { }
 
@@ -547,9 +587,10 @@ DispatcherBase::WeakPtr::~WeakPtr()
         m_dispatcher->m_weakPtrs.erase(this);
 }
 
-DispatcherBase::Callback::Callback(std::unique_ptr<DispatcherBase::WeakPtr> backendImpl, int callId)
+DispatcherBase::Callback::Callback(std::unique_ptr<DispatcherBase::WeakPtr> backendImpl, int callId, int callbackId)
     : m_backendImpl(std::move(backendImpl))
-    , m_callId(callId) { }
+    , m_callId(callId)
+    , m_callbackId(callbackId) { }
 
 DispatcherBase::Callback::~Callback() = default;
 
@@ -558,26 +599,48 @@ void DispatcherBase::Callback::dispose()
     m_backendImpl = nullptr;
 }
 
-void DispatcherBase::Callback::sendIfActive(std::unique_ptr<protocol::DictionaryValue> partialMessage, const ErrorString& invocationError)
+void DispatcherBase::Callback::sendIfActive(std::unique_ptr<protocol::DictionaryValue> partialMessage, const DispatchResponse& response)
 {
     if (!m_backendImpl || !m_backendImpl->get())
         return;
-    m_backendImpl->get()->sendResponse(m_callId, invocationError, nullptr, std::move(partialMessage));
+    m_backendImpl->get()->sendResponse(m_callId, response, std::move(partialMessage));
+    m_backendImpl = nullptr;
+}
+
+void DispatcherBase::Callback::fallThroughIfActive()
+{
+    if (!m_backendImpl || !m_backendImpl->get())
+        return;
+    m_backendImpl->get()->markFallThrough(m_callbackId);
     m_backendImpl = nullptr;
 }
 
 DispatcherBase::DispatcherBase(FrontendChannel* frontendChannel)
-    : m_frontendChannel(frontendChannel) { }
+    : m_frontendChannel(frontendChannel)
+    , m_lastCallbackId(0)
+    , m_lastCallbackFallThrough(false) { }
 
 DispatcherBase::~DispatcherBase()
 {
     clearFrontend();
 }
 
+int DispatcherBase::nextCallbackId()
+{
+    m_lastCallbackFallThrough = false;
+    return ++m_lastCallbackId;
+}
+
+void DispatcherBase::markFallThrough(int callbackId)
+{
+    DCHECK(callbackId == m_lastCallbackId);
+    m_lastCallbackFallThrough = true;
+}
+
 // static
 bool DispatcherBase::getCommandName(const String& message, String* result)
 {
-    std::unique_ptr<protocol::Value> value = parseJSON(message);
+    std::unique_ptr<protocol::Value> value = StringUtil::parseJSON(message);
     if (!value)
         return false;
 
@@ -591,47 +654,86 @@ bool DispatcherBase::getCommandName(const String& message, String* result)
     return true;
 }
 
-void DispatcherBase::sendResponse(int callId, const ErrorString& invocationError, ErrorSupport* errors, std::unique_ptr<protocol::DictionaryValue> result)
+void DispatcherBase::sendResponse(int callId, const DispatchResponse& response, std::unique_ptr<protocol::DictionaryValue> result)
 {
-    if (invocationError.length() || (errors && errors->hasErrors())) {
-        reportProtocolError(callId, ServerError, invocationError, errors);
+    if (!m_frontendChannel)
+        return;
+    if (response.status() == DispatchResponse::kError) {
+        reportProtocolError(callId, response.errorCode(), response.errorMessage(), nullptr);
         return;
     }
-
-    std::unique_ptr<protocol::DictionaryValue> responseMessage = DictionaryValue::create();
-    responseMessage->setInteger("id", callId);
-    responseMessage->setObject("result", std::move(result));
-    if (m_frontendChannel)
-        m_frontendChannel->sendProtocolResponse(callId, responseMessage->toJSONString());
+    m_frontendChannel->sendProtocolResponse(callId, InternalResponse::createResponse(callId, std::move(result)));
 }
 
-void DispatcherBase::sendResponse(int callId, const ErrorString& invocationError, std::unique_ptr<protocol::DictionaryValue> result)
+void DispatcherBase::sendResponse(int callId, const DispatchResponse& response)
 {
-    sendResponse(callId, invocationError, nullptr, std::move(result));
+    sendResponse(callId, response, DictionaryValue::create());
 }
 
-void DispatcherBase::sendResponse(int callId, const ErrorString& invocationError)
+namespace {
+
+class ProtocolError : public Serializable {
+public:
+    static std::unique_ptr<ProtocolError> createErrorResponse(int callId, DispatchResponse::ErrorCode code, const String& errorMessage, ErrorSupport* errors)
+    {
+        std::unique_ptr<ProtocolError> protocolError(new ProtocolError(code, errorMessage));
+        protocolError->m_callId = callId;
+        protocolError->m_hasCallId = true;
+        if (errors && errors->hasErrors())
+            protocolError->m_data = errors->errors();
+        return protocolError;
+    }
+
+    static std::unique_ptr<ProtocolError> createErrorNotification(DispatchResponse::ErrorCode code, const String& errorMessage)
+    {
+        return std::unique_ptr<ProtocolError>(new ProtocolError(code, errorMessage));
+    }
+
+    String serialize() override
+    {
+        std::unique_ptr<protocol::DictionaryValue> error = DictionaryValue::create();
+        error->setInteger("code", m_code);
+        error->setString("message", m_errorMessage);
+        if (m_data.length())
+            error->setString("data", m_data);
+        std::unique_ptr<protocol::DictionaryValue> message = DictionaryValue::create();
+        message->setObject("error", std::move(error));
+        if (m_hasCallId)
+            message->setInteger("id", m_callId);
+        return message->serialize();
+    }
+
+    ~ProtocolError() override {}
+
+private:
+    ProtocolError(DispatchResponse::ErrorCode code, const String& errorMessage)
+        : m_code(code)
+        , m_errorMessage(errorMessage)
+    {
+    }
+
+    DispatchResponse::ErrorCode m_code;
+    String m_errorMessage;
+    String m_data;
+    int m_callId = 0;
+    bool m_hasCallId = false;
+};
+
+} // namespace
+
+static void reportProtocolErrorTo(FrontendChannel* frontendChannel, int callId, DispatchResponse::ErrorCode code, const String& errorMessage, ErrorSupport* errors)
 {
-    sendResponse(callId, invocationError, nullptr, DictionaryValue::create());
+    if (frontendChannel)
+        frontendChannel->sendProtocolResponse(callId, ProtocolError::createErrorResponse(callId, code, errorMessage, errors));
 }
 
-static void reportProtocolErrorTo(FrontendChannel* frontendChannel, int callId, DispatcherBase::CommonErrorCode code, const String& errorMessage, ErrorSupport* errors)
+static void reportProtocolErrorTo(FrontendChannel* frontendChannel, DispatchResponse::ErrorCode code, const String& errorMessage)
 {
-    if (!frontendChannel)
-        return;
-    std::unique_ptr<protocol::DictionaryValue> error = DictionaryValue::create();
-    error->setInteger("code", code);
-    error->setString("message", errorMessage);
-    DCHECK(error);
-    if (errors && errors->hasErrors())
-        error->setString("data", errors->errors());
-    std::unique_ptr<protocol::DictionaryValue> message = DictionaryValue::create();
-    message->setObject("error", std::move(error));
-    message->setInteger("id", callId);
-    frontendChannel->sendProtocolResponse(callId, message->toJSONString());
+    if (frontendChannel)
+        frontendChannel->sendProtocolNotification(ProtocolError::createErrorNotification(code, errorMessage));
 }
 
-void DispatcherBase::reportProtocolError(int callId, CommonErrorCode code, const String& errorMessage, ErrorSupport* errors)
+void DispatcherBase::reportProtocolError(int callId, DispatchResponse::ErrorCode code, const String& errorMessage, ErrorSupport* errors)
 {
     reportProtocolErrorTo(m_frontendChannel, callId, code, errorMessage, errors);
 }
@@ -652,48 +754,99 @@ std::unique_ptr<DispatcherBase::WeakPtr> DispatcherBase::weakPtr()
 }
 
 UberDispatcher::UberDispatcher(FrontendChannel* frontendChannel)
-    : m_frontendChannel(frontendChannel) { }
+    : m_frontendChannel(frontendChannel)
+    , m_fallThroughForNotFound(false) { }
+
+void UberDispatcher::setFallThroughForNotFound(bool fallThroughForNotFound)
+{
+    m_fallThroughForNotFound = fallThroughForNotFound;
+}
 
 void UberDispatcher::registerBackend(const String& name, std::unique_ptr<protocol::DispatcherBase> dispatcher)
 {
     m_dispatchers[name] = std::move(dispatcher);
 }
 
-void UberDispatcher::dispatch(std::unique_ptr<Value> parsedMessage)
+DispatchResponse::Status UberDispatcher::dispatch(std::unique_ptr<Value> parsedMessage)
 {
-    if (!parsedMessage)
-        return;
+    if (!parsedMessage) {
+        reportProtocolErrorTo(m_frontendChannel, DispatchResponse::kParseError, "Message must be a valid JSON");
+        return DispatchResponse::kError;
+    }
     std::unique_ptr<protocol::DictionaryValue> messageObject = DictionaryValue::cast(std::move(parsedMessage));
-    if (!messageObject)
-        return;
+    if (!messageObject) {
+        reportProtocolErrorTo(m_frontendChannel, DispatchResponse::kInvalidRequest, "Message must be an object");
+        return DispatchResponse::kError;
+    }
 
     int callId = 0;
     protocol::Value* callIdValue = messageObject->get("id");
     bool success = callIdValue && callIdValue->asInteger(&callId);
-    if (!success)
-        return;
+    if (!success) {
+        reportProtocolErrorTo(m_frontendChannel, DispatchResponse::kInvalidRequest, "Message must have integer 'id' porperty");
+        return DispatchResponse::kError;
+    }
 
     protocol::Value* methodValue = messageObject->get("method");
     String method;
     success = methodValue && methodValue->asString(&method);
-    if (!success)
-        return;
+    if (!success) {
+        reportProtocolErrorTo(m_frontendChannel, callId, DispatchResponse::kInvalidRequest, "Message must have string 'method' porperty", nullptr);
+        return DispatchResponse::kError;
+    }
 
-    size_t dotIndex = method.find(".");
+    size_t dotIndex = StringUtil::find(method, ".");
     if (dotIndex == StringUtil::kNotFound) {
-        reportProtocolErrorTo(m_frontendChannel, callId, DispatcherBase::MethodNotFound, "'" + method + "' wasn't found", nullptr);
-        return;
+        if (m_fallThroughForNotFound)
+            return DispatchResponse::kFallThrough;
+        reportProtocolErrorTo(m_frontendChannel, callId, DispatchResponse::kMethodNotFound, "'" + method + "' wasn't found", nullptr);
+        return DispatchResponse::kError;
     }
     String domain = StringUtil::substring(method, 0, dotIndex);
     auto it = m_dispatchers.find(domain);
     if (it == m_dispatchers.end()) {
-        reportProtocolErrorTo(m_frontendChannel, callId, DispatcherBase::MethodNotFound, "'" + method + "' wasn't found", nullptr);
-        return;
+        if (m_fallThroughForNotFound)
+            return DispatchResponse::kFallThrough;
+        reportProtocolErrorTo(m_frontendChannel, callId, DispatchResponse::kMethodNotFound, "'" + method + "' wasn't found", nullptr);
+        return DispatchResponse::kError;
     }
-    it->second->dispatch(callId, method, std::move(messageObject));
+    return it->second->dispatch(callId, method, std::move(messageObject));
 }
 
 UberDispatcher::~UberDispatcher() = default;
+
+// static
+std::unique_ptr<InternalResponse> InternalResponse::createResponse(int callId, std::unique_ptr<Serializable> params)
+{
+    return std::unique_ptr<InternalResponse>(new InternalResponse(callId, String(), std::move(params)));
+}
+
+// static
+std::unique_ptr<InternalResponse> InternalResponse::createNotification(const String& notification, std::unique_ptr<Serializable> params)
+{
+    return std::unique_ptr<InternalResponse>(new InternalResponse(0, notification, std::move(params)));
+}
+
+String InternalResponse::serialize()
+{
+    std::unique_ptr<DictionaryValue> result = DictionaryValue::create();
+    std::unique_ptr<Serializable> params(m_params ? std::move(m_params) : DictionaryValue::create());
+    if (m_notification.length()) {
+        result->setString("method", m_notification);
+        result->setValue("params", SerializedValue::create(params->serialize()));
+    } else {
+        result->setInteger("id", m_callId);
+        result->setValue("result", SerializedValue::create(params->serialize()));
+    }
+    return result->serialize();
+}
+
+InternalResponse::InternalResponse(int callId, const String& notification, std::unique_ptr<Serializable> params)
+    : m_callId(callId)
+    , m_notification(notification)
+    , m_params(params ? std::move(params) : nullptr)
+{
+}
 
 } // namespace v8_inspector
 } // namespace protocol
@@ -751,19 +904,13 @@ double charactersToDouble(const uint16_t* characters, size_t length, bool* ok)
         buffer.push_back(static_cast<char>(characters[i]));
     }
     buffer.push_back('\0');
-    char* endptr;
-    double result = strtod(buffer.data(), &endptr);
-    *ok = !(*endptr);
-    return result;
+    return StringUtil::toDouble(buffer.data(), length, ok);
 }
 
 double charactersToDouble(const uint8_t* characters, size_t length, bool* ok)
 {
     std::string buffer(reinterpret_cast<const char*>(characters), length);
-    char* endptr;
-    double result = strtod(buffer.data(), &endptr);
-    *ok = !(*endptr);
-    return result;
+    return StringUtil::toDouble(buffer.data(), length, ok);
 }
 
 template<typename Char>
@@ -1037,7 +1184,7 @@ bool decodeString(const Char* start, const Char* end, StringBuilder* output)
     while (start < end) {
         uint16_t c = *start++;
         if ('\\' != c) {
-            output->append(c);
+            StringUtil::builderAppend(*output, c);
             continue;
         }
 	if (start == end)
@@ -1082,7 +1229,7 @@ bool decodeString(const Char* start, const Char* end, StringBuilder* output)
         default:
             return false;
         }
-        output->append(c);
+        StringUtil::builderAppend(*output, c);
     }
     return true;
 }
@@ -1100,7 +1247,7 @@ bool decodeString(const Char* start, const Char* end, String* output)
     StringUtil::builderReserve(buffer, end - start);
     if (!decodeString(start, end, &buffer))
         return false;
-    *output = buffer.toString();
+    *output = StringUtil::builderToString(buffer);
     return true;
 }
 
@@ -1238,12 +1385,12 @@ std::unique_ptr<Value> parseJSONInternal(const Char* start, unsigned length)
 
 } // anonymous namespace
 
-std::unique_ptr<Value> parseJSON(const uint16_t* characters, unsigned length)
+std::unique_ptr<Value> parseJSONCharacters(const uint16_t* characters, unsigned length)
 {
     return parseJSONInternal<uint16_t>(characters, length);
 }
 
-std::unique_ptr<Value> parseJSON(const uint8_t* characters, unsigned length)
+std::unique_ptr<Value> parseJSONCharacters(const uint8_t* characters, unsigned length)
 {
     return parseJSONInternal<uint8_t>(characters, length);
 }

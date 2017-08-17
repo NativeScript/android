@@ -25,7 +25,7 @@ const char* Inspector = "inspector";
 const char* Regular = "regular";
 } // namespace StyleSheetOriginEnum
 
-std::unique_ptr<PseudoElementMatches> PseudoElementMatches::parse(protocol::Value* value, ErrorSupport* errors)
+std::unique_ptr<PseudoElementMatches> PseudoElementMatches::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
@@ -37,31 +37,31 @@ std::unique_ptr<PseudoElementMatches> PseudoElementMatches::parse(protocol::Valu
     errors->push();
     protocol::Value* pseudoTypeValue = object->get("pseudoType");
     errors->setName("pseudoType");
-    result->m_pseudoType = ValueConversions<String>::parse(pseudoTypeValue, errors);
+    result->m_pseudoType = ValueConversions<String>::fromValue(pseudoTypeValue, errors);
     protocol::Value* matchesValue = object->get("matches");
     errors->setName("matches");
-    result->m_matches = ValueConversions<protocol::Array<protocol::CSS::RuleMatch>>::parse(matchesValue, errors);
+    result->m_matches = ValueConversions<protocol::Array<protocol::CSS::RuleMatch>>::fromValue(matchesValue, errors);
     errors->pop();
     if (errors->hasErrors())
         return nullptr;
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> PseudoElementMatches::serialize() const
+std::unique_ptr<protocol::DictionaryValue> PseudoElementMatches::toValue() const
 {
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("pseudoType", ValueConversions<String>::serialize(m_pseudoType));
-    result->setValue("matches", ValueConversions<protocol::Array<protocol::CSS::RuleMatch>>::serialize(m_matches.get()));
+    result->setValue("pseudoType", ValueConversions<String>::toValue(m_pseudoType));
+    result->setValue("matches", ValueConversions<protocol::Array<protocol::CSS::RuleMatch>>::toValue(m_matches.get()));
     return result;
 }
 
 std::unique_ptr<PseudoElementMatches> PseudoElementMatches::clone() const
 {
     ErrorSupport errors;
-    return parse(serialize().get(), &errors);
+    return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<InheritedStyleEntry> InheritedStyleEntry::parse(protocol::Value* value, ErrorSupport* errors)
+std::unique_ptr<InheritedStyleEntry> InheritedStyleEntry::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
@@ -74,33 +74,33 @@ std::unique_ptr<InheritedStyleEntry> InheritedStyleEntry::parse(protocol::Value*
     protocol::Value* inlineStyleValue = object->get("inlineStyle");
     if (inlineStyleValue) {
         errors->setName("inlineStyle");
-        result->m_inlineStyle = ValueConversions<protocol::CSS::CSSStyle>::parse(inlineStyleValue, errors);
+        result->m_inlineStyle = ValueConversions<protocol::CSS::CSSStyle>::fromValue(inlineStyleValue, errors);
     }
     protocol::Value* matchedCSSRulesValue = object->get("matchedCSSRules");
     errors->setName("matchedCSSRules");
-    result->m_matchedCSSRules = ValueConversions<protocol::Array<protocol::CSS::RuleMatch>>::parse(matchedCSSRulesValue, errors);
+    result->m_matchedCSSRules = ValueConversions<protocol::Array<protocol::CSS::RuleMatch>>::fromValue(matchedCSSRulesValue, errors);
     errors->pop();
     if (errors->hasErrors())
         return nullptr;
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> InheritedStyleEntry::serialize() const
+std::unique_ptr<protocol::DictionaryValue> InheritedStyleEntry::toValue() const
 {
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     if (m_inlineStyle.isJust())
-        result->setValue("inlineStyle", ValueConversions<protocol::CSS::CSSStyle>::serialize(m_inlineStyle.fromJust()));
-    result->setValue("matchedCSSRules", ValueConversions<protocol::Array<protocol::CSS::RuleMatch>>::serialize(m_matchedCSSRules.get()));
+        result->setValue("inlineStyle", ValueConversions<protocol::CSS::CSSStyle>::toValue(m_inlineStyle.fromJust()));
+    result->setValue("matchedCSSRules", ValueConversions<protocol::Array<protocol::CSS::RuleMatch>>::toValue(m_matchedCSSRules.get()));
     return result;
 }
 
 std::unique_ptr<InheritedStyleEntry> InheritedStyleEntry::clone() const
 {
     ErrorSupport errors;
-    return parse(serialize().get(), &errors);
+    return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<RuleMatch> RuleMatch::parse(protocol::Value* value, ErrorSupport* errors)
+std::unique_ptr<RuleMatch> RuleMatch::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
@@ -112,31 +112,31 @@ std::unique_ptr<RuleMatch> RuleMatch::parse(protocol::Value* value, ErrorSupport
     errors->push();
     protocol::Value* ruleValue = object->get("rule");
     errors->setName("rule");
-    result->m_rule = ValueConversions<protocol::CSS::CSSRule>::parse(ruleValue, errors);
+    result->m_rule = ValueConversions<protocol::CSS::CSSRule>::fromValue(ruleValue, errors);
     protocol::Value* matchingSelectorsValue = object->get("matchingSelectors");
     errors->setName("matchingSelectors");
-    result->m_matchingSelectors = ValueConversions<protocol::Array<int>>::parse(matchingSelectorsValue, errors);
+    result->m_matchingSelectors = ValueConversions<protocol::Array<int>>::fromValue(matchingSelectorsValue, errors);
     errors->pop();
     if (errors->hasErrors())
         return nullptr;
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> RuleMatch::serialize() const
+std::unique_ptr<protocol::DictionaryValue> RuleMatch::toValue() const
 {
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("rule", ValueConversions<protocol::CSS::CSSRule>::serialize(m_rule.get()));
-    result->setValue("matchingSelectors", ValueConversions<protocol::Array<int>>::serialize(m_matchingSelectors.get()));
+    result->setValue("rule", ValueConversions<protocol::CSS::CSSRule>::toValue(m_rule.get()));
+    result->setValue("matchingSelectors", ValueConversions<protocol::Array<int>>::toValue(m_matchingSelectors.get()));
     return result;
 }
 
 std::unique_ptr<RuleMatch> RuleMatch::clone() const
 {
     ErrorSupport errors;
-    return parse(serialize().get(), &errors);
+    return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<Value> Value::parse(protocol::Value* value, ErrorSupport* errors)
+std::unique_ptr<Value> Value::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
@@ -148,11 +148,11 @@ std::unique_ptr<Value> Value::parse(protocol::Value* value, ErrorSupport* errors
     errors->push();
     protocol::Value* textValue = object->get("text");
     errors->setName("text");
-    result->m_text = ValueConversions<String>::parse(textValue, errors);
+    result->m_text = ValueConversions<String>::fromValue(textValue, errors);
     protocol::Value* rangeValue = object->get("range");
     if (rangeValue) {
         errors->setName("range");
-        result->m_range = ValueConversions<protocol::CSS::SourceRange>::parse(rangeValue, errors);
+        result->m_range = ValueConversions<protocol::CSS::SourceRange>::fromValue(rangeValue, errors);
     }
     errors->pop();
     if (errors->hasErrors())
@@ -160,22 +160,22 @@ std::unique_ptr<Value> Value::parse(protocol::Value* value, ErrorSupport* errors
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> Value::serialize() const
+std::unique_ptr<protocol::DictionaryValue> Value::toValue() const
 {
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("text", ValueConversions<String>::serialize(m_text));
+    result->setValue("text", ValueConversions<String>::toValue(m_text));
     if (m_range.isJust())
-        result->setValue("range", ValueConversions<protocol::CSS::SourceRange>::serialize(m_range.fromJust()));
+        result->setValue("range", ValueConversions<protocol::CSS::SourceRange>::toValue(m_range.fromJust()));
     return result;
 }
 
 std::unique_ptr<Value> Value::clone() const
 {
     ErrorSupport errors;
-    return parse(serialize().get(), &errors);
+    return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<SelectorList> SelectorList::parse(protocol::Value* value, ErrorSupport* errors)
+std::unique_ptr<SelectorList> SelectorList::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
@@ -187,31 +187,31 @@ std::unique_ptr<SelectorList> SelectorList::parse(protocol::Value* value, ErrorS
     errors->push();
     protocol::Value* selectorsValue = object->get("selectors");
     errors->setName("selectors");
-    result->m_selectors = ValueConversions<protocol::Array<protocol::CSS::Value>>::parse(selectorsValue, errors);
+    result->m_selectors = ValueConversions<protocol::Array<protocol::CSS::Value>>::fromValue(selectorsValue, errors);
     protocol::Value* textValue = object->get("text");
     errors->setName("text");
-    result->m_text = ValueConversions<String>::parse(textValue, errors);
+    result->m_text = ValueConversions<String>::fromValue(textValue, errors);
     errors->pop();
     if (errors->hasErrors())
         return nullptr;
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> SelectorList::serialize() const
+std::unique_ptr<protocol::DictionaryValue> SelectorList::toValue() const
 {
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("selectors", ValueConversions<protocol::Array<protocol::CSS::Value>>::serialize(m_selectors.get()));
-    result->setValue("text", ValueConversions<String>::serialize(m_text));
+    result->setValue("selectors", ValueConversions<protocol::Array<protocol::CSS::Value>>::toValue(m_selectors.get()));
+    result->setValue("text", ValueConversions<String>::toValue(m_text));
     return result;
 }
 
 std::unique_ptr<SelectorList> SelectorList::clone() const
 {
     ErrorSupport errors;
-    return parse(serialize().get(), &errors);
+    return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<CSSStyleSheetHeader> CSSStyleSheetHeader::parse(protocol::Value* value, ErrorSupport* errors)
+std::unique_ptr<CSSStyleSheetHeader> CSSStyleSheetHeader::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
@@ -223,80 +223,80 @@ std::unique_ptr<CSSStyleSheetHeader> CSSStyleSheetHeader::parse(protocol::Value*
     errors->push();
     protocol::Value* styleSheetIdValue = object->get("styleSheetId");
     errors->setName("styleSheetId");
-    result->m_styleSheetId = ValueConversions<String>::parse(styleSheetIdValue, errors);
+    result->m_styleSheetId = ValueConversions<String>::fromValue(styleSheetIdValue, errors);
     protocol::Value* frameIdValue = object->get("frameId");
     errors->setName("frameId");
-    result->m_frameId = ValueConversions<String>::parse(frameIdValue, errors);
+    result->m_frameId = ValueConversions<String>::fromValue(frameIdValue, errors);
     protocol::Value* sourceURLValue = object->get("sourceURL");
     errors->setName("sourceURL");
-    result->m_sourceURL = ValueConversions<String>::parse(sourceURLValue, errors);
+    result->m_sourceURL = ValueConversions<String>::fromValue(sourceURLValue, errors);
     protocol::Value* sourceMapURLValue = object->get("sourceMapURL");
     if (sourceMapURLValue) {
         errors->setName("sourceMapURL");
-        result->m_sourceMapURL = ValueConversions<String>::parse(sourceMapURLValue, errors);
+        result->m_sourceMapURL = ValueConversions<String>::fromValue(sourceMapURLValue, errors);
     }
     protocol::Value* originValue = object->get("origin");
     errors->setName("origin");
-    result->m_origin = ValueConversions<String>::parse(originValue, errors);
+    result->m_origin = ValueConversions<String>::fromValue(originValue, errors);
     protocol::Value* titleValue = object->get("title");
     errors->setName("title");
-    result->m_title = ValueConversions<String>::parse(titleValue, errors);
+    result->m_title = ValueConversions<String>::fromValue(titleValue, errors);
     protocol::Value* ownerNodeValue = object->get("ownerNode");
     if (ownerNodeValue) {
         errors->setName("ownerNode");
-        result->m_ownerNode = ValueConversions<int>::parse(ownerNodeValue, errors);
+        result->m_ownerNode = ValueConversions<int>::fromValue(ownerNodeValue, errors);
     }
     protocol::Value* disabledValue = object->get("disabled");
     errors->setName("disabled");
-    result->m_disabled = ValueConversions<bool>::parse(disabledValue, errors);
+    result->m_disabled = ValueConversions<bool>::fromValue(disabledValue, errors);
     protocol::Value* hasSourceURLValue = object->get("hasSourceURL");
     if (hasSourceURLValue) {
         errors->setName("hasSourceURL");
-        result->m_hasSourceURL = ValueConversions<bool>::parse(hasSourceURLValue, errors);
+        result->m_hasSourceURL = ValueConversions<bool>::fromValue(hasSourceURLValue, errors);
     }
     protocol::Value* isInlineValue = object->get("isInline");
     errors->setName("isInline");
-    result->m_isInline = ValueConversions<bool>::parse(isInlineValue, errors);
+    result->m_isInline = ValueConversions<bool>::fromValue(isInlineValue, errors);
     protocol::Value* startLineValue = object->get("startLine");
     errors->setName("startLine");
-    result->m_startLine = ValueConversions<double>::parse(startLineValue, errors);
+    result->m_startLine = ValueConversions<double>::fromValue(startLineValue, errors);
     protocol::Value* startColumnValue = object->get("startColumn");
     errors->setName("startColumn");
-    result->m_startColumn = ValueConversions<double>::parse(startColumnValue, errors);
+    result->m_startColumn = ValueConversions<double>::fromValue(startColumnValue, errors);
     errors->pop();
     if (errors->hasErrors())
         return nullptr;
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> CSSStyleSheetHeader::serialize() const
+std::unique_ptr<protocol::DictionaryValue> CSSStyleSheetHeader::toValue() const
 {
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("styleSheetId", ValueConversions<String>::serialize(m_styleSheetId));
-    result->setValue("frameId", ValueConversions<String>::serialize(m_frameId));
-    result->setValue("sourceURL", ValueConversions<String>::serialize(m_sourceURL));
+    result->setValue("styleSheetId", ValueConversions<String>::toValue(m_styleSheetId));
+    result->setValue("frameId", ValueConversions<String>::toValue(m_frameId));
+    result->setValue("sourceURL", ValueConversions<String>::toValue(m_sourceURL));
     if (m_sourceMapURL.isJust())
-        result->setValue("sourceMapURL", ValueConversions<String>::serialize(m_sourceMapURL.fromJust()));
-    result->setValue("origin", ValueConversions<String>::serialize(m_origin));
-    result->setValue("title", ValueConversions<String>::serialize(m_title));
+        result->setValue("sourceMapURL", ValueConversions<String>::toValue(m_sourceMapURL.fromJust()));
+    result->setValue("origin", ValueConversions<String>::toValue(m_origin));
+    result->setValue("title", ValueConversions<String>::toValue(m_title));
     if (m_ownerNode.isJust())
-        result->setValue("ownerNode", ValueConversions<int>::serialize(m_ownerNode.fromJust()));
-    result->setValue("disabled", ValueConversions<bool>::serialize(m_disabled));
+        result->setValue("ownerNode", ValueConversions<int>::toValue(m_ownerNode.fromJust()));
+    result->setValue("disabled", ValueConversions<bool>::toValue(m_disabled));
     if (m_hasSourceURL.isJust())
-        result->setValue("hasSourceURL", ValueConversions<bool>::serialize(m_hasSourceURL.fromJust()));
-    result->setValue("isInline", ValueConversions<bool>::serialize(m_isInline));
-    result->setValue("startLine", ValueConversions<double>::serialize(m_startLine));
-    result->setValue("startColumn", ValueConversions<double>::serialize(m_startColumn));
+        result->setValue("hasSourceURL", ValueConversions<bool>::toValue(m_hasSourceURL.fromJust()));
+    result->setValue("isInline", ValueConversions<bool>::toValue(m_isInline));
+    result->setValue("startLine", ValueConversions<double>::toValue(m_startLine));
+    result->setValue("startColumn", ValueConversions<double>::toValue(m_startColumn));
     return result;
 }
 
 std::unique_ptr<CSSStyleSheetHeader> CSSStyleSheetHeader::clone() const
 {
     ErrorSupport errors;
-    return parse(serialize().get(), &errors);
+    return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<CSSRule> CSSRule::parse(protocol::Value* value, ErrorSupport* errors)
+std::unique_ptr<CSSRule> CSSRule::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
@@ -309,21 +309,21 @@ std::unique_ptr<CSSRule> CSSRule::parse(protocol::Value* value, ErrorSupport* er
     protocol::Value* styleSheetIdValue = object->get("styleSheetId");
     if (styleSheetIdValue) {
         errors->setName("styleSheetId");
-        result->m_styleSheetId = ValueConversions<String>::parse(styleSheetIdValue, errors);
+        result->m_styleSheetId = ValueConversions<String>::fromValue(styleSheetIdValue, errors);
     }
     protocol::Value* selectorListValue = object->get("selectorList");
     errors->setName("selectorList");
-    result->m_selectorList = ValueConversions<protocol::CSS::SelectorList>::parse(selectorListValue, errors);
+    result->m_selectorList = ValueConversions<protocol::CSS::SelectorList>::fromValue(selectorListValue, errors);
     protocol::Value* originValue = object->get("origin");
     errors->setName("origin");
-    result->m_origin = ValueConversions<String>::parse(originValue, errors);
+    result->m_origin = ValueConversions<String>::fromValue(originValue, errors);
     protocol::Value* styleValue = object->get("style");
     errors->setName("style");
-    result->m_style = ValueConversions<protocol::CSS::CSSStyle>::parse(styleValue, errors);
+    result->m_style = ValueConversions<protocol::CSS::CSSStyle>::fromValue(styleValue, errors);
     protocol::Value* mediaValue = object->get("media");
     if (mediaValue) {
         errors->setName("media");
-        result->m_media = ValueConversions<protocol::Array<protocol::CSS::CSSMedia>>::parse(mediaValue, errors);
+        result->m_media = ValueConversions<protocol::Array<protocol::CSS::CSSMedia>>::fromValue(mediaValue, errors);
     }
     errors->pop();
     if (errors->hasErrors())
@@ -331,26 +331,26 @@ std::unique_ptr<CSSRule> CSSRule::parse(protocol::Value* value, ErrorSupport* er
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> CSSRule::serialize() const
+std::unique_ptr<protocol::DictionaryValue> CSSRule::toValue() const
 {
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     if (m_styleSheetId.isJust())
-        result->setValue("styleSheetId", ValueConversions<String>::serialize(m_styleSheetId.fromJust()));
-    result->setValue("selectorList", ValueConversions<protocol::CSS::SelectorList>::serialize(m_selectorList.get()));
-    result->setValue("origin", ValueConversions<String>::serialize(m_origin));
-    result->setValue("style", ValueConversions<protocol::CSS::CSSStyle>::serialize(m_style.get()));
+        result->setValue("styleSheetId", ValueConversions<String>::toValue(m_styleSheetId.fromJust()));
+    result->setValue("selectorList", ValueConversions<protocol::CSS::SelectorList>::toValue(m_selectorList.get()));
+    result->setValue("origin", ValueConversions<String>::toValue(m_origin));
+    result->setValue("style", ValueConversions<protocol::CSS::CSSStyle>::toValue(m_style.get()));
     if (m_media.isJust())
-        result->setValue("media", ValueConversions<protocol::Array<protocol::CSS::CSSMedia>>::serialize(m_media.fromJust()));
+        result->setValue("media", ValueConversions<protocol::Array<protocol::CSS::CSSMedia>>::toValue(m_media.fromJust()));
     return result;
 }
 
 std::unique_ptr<CSSRule> CSSRule::clone() const
 {
     ErrorSupport errors;
-    return parse(serialize().get(), &errors);
+    return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<SourceRange> SourceRange::parse(protocol::Value* value, ErrorSupport* errors)
+std::unique_ptr<SourceRange> SourceRange::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
@@ -362,39 +362,39 @@ std::unique_ptr<SourceRange> SourceRange::parse(protocol::Value* value, ErrorSup
     errors->push();
     protocol::Value* startLineValue = object->get("startLine");
     errors->setName("startLine");
-    result->m_startLine = ValueConversions<int>::parse(startLineValue, errors);
+    result->m_startLine = ValueConversions<int>::fromValue(startLineValue, errors);
     protocol::Value* startColumnValue = object->get("startColumn");
     errors->setName("startColumn");
-    result->m_startColumn = ValueConversions<int>::parse(startColumnValue, errors);
+    result->m_startColumn = ValueConversions<int>::fromValue(startColumnValue, errors);
     protocol::Value* endLineValue = object->get("endLine");
     errors->setName("endLine");
-    result->m_endLine = ValueConversions<int>::parse(endLineValue, errors);
+    result->m_endLine = ValueConversions<int>::fromValue(endLineValue, errors);
     protocol::Value* endColumnValue = object->get("endColumn");
     errors->setName("endColumn");
-    result->m_endColumn = ValueConversions<int>::parse(endColumnValue, errors);
+    result->m_endColumn = ValueConversions<int>::fromValue(endColumnValue, errors);
     errors->pop();
     if (errors->hasErrors())
         return nullptr;
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> SourceRange::serialize() const
+std::unique_ptr<protocol::DictionaryValue> SourceRange::toValue() const
 {
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("startLine", ValueConversions<int>::serialize(m_startLine));
-    result->setValue("startColumn", ValueConversions<int>::serialize(m_startColumn));
-    result->setValue("endLine", ValueConversions<int>::serialize(m_endLine));
-    result->setValue("endColumn", ValueConversions<int>::serialize(m_endColumn));
+    result->setValue("startLine", ValueConversions<int>::toValue(m_startLine));
+    result->setValue("startColumn", ValueConversions<int>::toValue(m_startColumn));
+    result->setValue("endLine", ValueConversions<int>::toValue(m_endLine));
+    result->setValue("endColumn", ValueConversions<int>::toValue(m_endColumn));
     return result;
 }
 
 std::unique_ptr<SourceRange> SourceRange::clone() const
 {
     ErrorSupport errors;
-    return parse(serialize().get(), &errors);
+    return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<ShorthandEntry> ShorthandEntry::parse(protocol::Value* value, ErrorSupport* errors)
+std::unique_ptr<ShorthandEntry> ShorthandEntry::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
@@ -406,14 +406,14 @@ std::unique_ptr<ShorthandEntry> ShorthandEntry::parse(protocol::Value* value, Er
     errors->push();
     protocol::Value* nameValue = object->get("name");
     errors->setName("name");
-    result->m_name = ValueConversions<String>::parse(nameValue, errors);
+    result->m_name = ValueConversions<String>::fromValue(nameValue, errors);
     protocol::Value* valueValue = object->get("value");
     errors->setName("value");
-    result->m_value = ValueConversions<String>::parse(valueValue, errors);
+    result->m_value = ValueConversions<String>::fromValue(valueValue, errors);
     protocol::Value* importantValue = object->get("important");
     if (importantValue) {
         errors->setName("important");
-        result->m_important = ValueConversions<bool>::parse(importantValue, errors);
+        result->m_important = ValueConversions<bool>::fromValue(importantValue, errors);
     }
     errors->pop();
     if (errors->hasErrors())
@@ -421,23 +421,23 @@ std::unique_ptr<ShorthandEntry> ShorthandEntry::parse(protocol::Value* value, Er
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> ShorthandEntry::serialize() const
+std::unique_ptr<protocol::DictionaryValue> ShorthandEntry::toValue() const
 {
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("name", ValueConversions<String>::serialize(m_name));
-    result->setValue("value", ValueConversions<String>::serialize(m_value));
+    result->setValue("name", ValueConversions<String>::toValue(m_name));
+    result->setValue("value", ValueConversions<String>::toValue(m_value));
     if (m_important.isJust())
-        result->setValue("important", ValueConversions<bool>::serialize(m_important.fromJust()));
+        result->setValue("important", ValueConversions<bool>::toValue(m_important.fromJust()));
     return result;
 }
 
 std::unique_ptr<ShorthandEntry> ShorthandEntry::clone() const
 {
     ErrorSupport errors;
-    return parse(serialize().get(), &errors);
+    return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<CSSComputedStyleProperty> CSSComputedStyleProperty::parse(protocol::Value* value, ErrorSupport* errors)
+std::unique_ptr<CSSComputedStyleProperty> CSSComputedStyleProperty::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
@@ -449,31 +449,31 @@ std::unique_ptr<CSSComputedStyleProperty> CSSComputedStyleProperty::parse(protoc
     errors->push();
     protocol::Value* nameValue = object->get("name");
     errors->setName("name");
-    result->m_name = ValueConversions<String>::parse(nameValue, errors);
+    result->m_name = ValueConversions<String>::fromValue(nameValue, errors);
     protocol::Value* valueValue = object->get("value");
     errors->setName("value");
-    result->m_value = ValueConversions<String>::parse(valueValue, errors);
+    result->m_value = ValueConversions<String>::fromValue(valueValue, errors);
     errors->pop();
     if (errors->hasErrors())
         return nullptr;
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> CSSComputedStyleProperty::serialize() const
+std::unique_ptr<protocol::DictionaryValue> CSSComputedStyleProperty::toValue() const
 {
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("name", ValueConversions<String>::serialize(m_name));
-    result->setValue("value", ValueConversions<String>::serialize(m_value));
+    result->setValue("name", ValueConversions<String>::toValue(m_name));
+    result->setValue("value", ValueConversions<String>::toValue(m_value));
     return result;
 }
 
 std::unique_ptr<CSSComputedStyleProperty> CSSComputedStyleProperty::clone() const
 {
     ErrorSupport errors;
-    return parse(serialize().get(), &errors);
+    return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<CSSStyle> CSSStyle::parse(protocol::Value* value, ErrorSupport* errors)
+std::unique_ptr<CSSStyle> CSSStyle::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
@@ -486,23 +486,23 @@ std::unique_ptr<CSSStyle> CSSStyle::parse(protocol::Value* value, ErrorSupport* 
     protocol::Value* styleSheetIdValue = object->get("styleSheetId");
     if (styleSheetIdValue) {
         errors->setName("styleSheetId");
-        result->m_styleSheetId = ValueConversions<String>::parse(styleSheetIdValue, errors);
+        result->m_styleSheetId = ValueConversions<String>::fromValue(styleSheetIdValue, errors);
     }
     protocol::Value* cssPropertiesValue = object->get("cssProperties");
     errors->setName("cssProperties");
-    result->m_cssProperties = ValueConversions<protocol::Array<protocol::CSS::CSSProperty>>::parse(cssPropertiesValue, errors);
+    result->m_cssProperties = ValueConversions<protocol::Array<protocol::CSS::CSSProperty>>::fromValue(cssPropertiesValue, errors);
     protocol::Value* shorthandEntriesValue = object->get("shorthandEntries");
     errors->setName("shorthandEntries");
-    result->m_shorthandEntries = ValueConversions<protocol::Array<protocol::CSS::ShorthandEntry>>::parse(shorthandEntriesValue, errors);
+    result->m_shorthandEntries = ValueConversions<protocol::Array<protocol::CSS::ShorthandEntry>>::fromValue(shorthandEntriesValue, errors);
     protocol::Value* cssTextValue = object->get("cssText");
     if (cssTextValue) {
         errors->setName("cssText");
-        result->m_cssText = ValueConversions<String>::parse(cssTextValue, errors);
+        result->m_cssText = ValueConversions<String>::fromValue(cssTextValue, errors);
     }
     protocol::Value* rangeValue = object->get("range");
     if (rangeValue) {
         errors->setName("range");
-        result->m_range = ValueConversions<protocol::CSS::SourceRange>::parse(rangeValue, errors);
+        result->m_range = ValueConversions<protocol::CSS::SourceRange>::fromValue(rangeValue, errors);
     }
     errors->pop();
     if (errors->hasErrors())
@@ -510,27 +510,27 @@ std::unique_ptr<CSSStyle> CSSStyle::parse(protocol::Value* value, ErrorSupport* 
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> CSSStyle::serialize() const
+std::unique_ptr<protocol::DictionaryValue> CSSStyle::toValue() const
 {
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     if (m_styleSheetId.isJust())
-        result->setValue("styleSheetId", ValueConversions<String>::serialize(m_styleSheetId.fromJust()));
-    result->setValue("cssProperties", ValueConversions<protocol::Array<protocol::CSS::CSSProperty>>::serialize(m_cssProperties.get()));
-    result->setValue("shorthandEntries", ValueConversions<protocol::Array<protocol::CSS::ShorthandEntry>>::serialize(m_shorthandEntries.get()));
+        result->setValue("styleSheetId", ValueConversions<String>::toValue(m_styleSheetId.fromJust()));
+    result->setValue("cssProperties", ValueConversions<protocol::Array<protocol::CSS::CSSProperty>>::toValue(m_cssProperties.get()));
+    result->setValue("shorthandEntries", ValueConversions<protocol::Array<protocol::CSS::ShorthandEntry>>::toValue(m_shorthandEntries.get()));
     if (m_cssText.isJust())
-        result->setValue("cssText", ValueConversions<String>::serialize(m_cssText.fromJust()));
+        result->setValue("cssText", ValueConversions<String>::toValue(m_cssText.fromJust()));
     if (m_range.isJust())
-        result->setValue("range", ValueConversions<protocol::CSS::SourceRange>::serialize(m_range.fromJust()));
+        result->setValue("range", ValueConversions<protocol::CSS::SourceRange>::toValue(m_range.fromJust()));
     return result;
 }
 
 std::unique_ptr<CSSStyle> CSSStyle::clone() const
 {
     ErrorSupport errors;
-    return parse(serialize().get(), &errors);
+    return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<CSSProperty> CSSProperty::parse(protocol::Value* value, ErrorSupport* errors)
+std::unique_ptr<CSSProperty> CSSProperty::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
@@ -542,39 +542,39 @@ std::unique_ptr<CSSProperty> CSSProperty::parse(protocol::Value* value, ErrorSup
     errors->push();
     protocol::Value* nameValue = object->get("name");
     errors->setName("name");
-    result->m_name = ValueConversions<String>::parse(nameValue, errors);
+    result->m_name = ValueConversions<String>::fromValue(nameValue, errors);
     protocol::Value* valueValue = object->get("value");
     errors->setName("value");
-    result->m_value = ValueConversions<String>::parse(valueValue, errors);
+    result->m_value = ValueConversions<String>::fromValue(valueValue, errors);
     protocol::Value* importantValue = object->get("important");
     if (importantValue) {
         errors->setName("important");
-        result->m_important = ValueConversions<bool>::parse(importantValue, errors);
+        result->m_important = ValueConversions<bool>::fromValue(importantValue, errors);
     }
     protocol::Value* implicitValue = object->get("implicit");
     if (implicitValue) {
         errors->setName("implicit");
-        result->m_implicit = ValueConversions<bool>::parse(implicitValue, errors);
+        result->m_implicit = ValueConversions<bool>::fromValue(implicitValue, errors);
     }
     protocol::Value* textValue = object->get("text");
     if (textValue) {
         errors->setName("text");
-        result->m_text = ValueConversions<String>::parse(textValue, errors);
+        result->m_text = ValueConversions<String>::fromValue(textValue, errors);
     }
     protocol::Value* parsedOkValue = object->get("parsedOk");
     if (parsedOkValue) {
         errors->setName("parsedOk");
-        result->m_parsedOk = ValueConversions<bool>::parse(parsedOkValue, errors);
+        result->m_parsedOk = ValueConversions<bool>::fromValue(parsedOkValue, errors);
     }
     protocol::Value* disabledValue = object->get("disabled");
     if (disabledValue) {
         errors->setName("disabled");
-        result->m_disabled = ValueConversions<bool>::parse(disabledValue, errors);
+        result->m_disabled = ValueConversions<bool>::fromValue(disabledValue, errors);
     }
     protocol::Value* rangeValue = object->get("range");
     if (rangeValue) {
         errors->setName("range");
-        result->m_range = ValueConversions<protocol::CSS::SourceRange>::parse(rangeValue, errors);
+        result->m_range = ValueConversions<protocol::CSS::SourceRange>::fromValue(rangeValue, errors);
     }
     errors->pop();
     if (errors->hasErrors())
@@ -582,30 +582,30 @@ std::unique_ptr<CSSProperty> CSSProperty::parse(protocol::Value* value, ErrorSup
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> CSSProperty::serialize() const
+std::unique_ptr<protocol::DictionaryValue> CSSProperty::toValue() const
 {
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("name", ValueConversions<String>::serialize(m_name));
-    result->setValue("value", ValueConversions<String>::serialize(m_value));
+    result->setValue("name", ValueConversions<String>::toValue(m_name));
+    result->setValue("value", ValueConversions<String>::toValue(m_value));
     if (m_important.isJust())
-        result->setValue("important", ValueConversions<bool>::serialize(m_important.fromJust()));
+        result->setValue("important", ValueConversions<bool>::toValue(m_important.fromJust()));
     if (m_implicit.isJust())
-        result->setValue("implicit", ValueConversions<bool>::serialize(m_implicit.fromJust()));
+        result->setValue("implicit", ValueConversions<bool>::toValue(m_implicit.fromJust()));
     if (m_text.isJust())
-        result->setValue("text", ValueConversions<String>::serialize(m_text.fromJust()));
+        result->setValue("text", ValueConversions<String>::toValue(m_text.fromJust()));
     if (m_parsedOk.isJust())
-        result->setValue("parsedOk", ValueConversions<bool>::serialize(m_parsedOk.fromJust()));
+        result->setValue("parsedOk", ValueConversions<bool>::toValue(m_parsedOk.fromJust()));
     if (m_disabled.isJust())
-        result->setValue("disabled", ValueConversions<bool>::serialize(m_disabled.fromJust()));
+        result->setValue("disabled", ValueConversions<bool>::toValue(m_disabled.fromJust()));
     if (m_range.isJust())
-        result->setValue("range", ValueConversions<protocol::CSS::SourceRange>::serialize(m_range.fromJust()));
+        result->setValue("range", ValueConversions<protocol::CSS::SourceRange>::toValue(m_range.fromJust()));
     return result;
 }
 
 std::unique_ptr<CSSProperty> CSSProperty::clone() const
 {
     ErrorSupport errors;
-    return parse(serialize().get(), &errors);
+    return fromValue(toValue().get(), &errors);
 }
 
 const char* CSSMedia::SourceEnum::MediaRule = "mediaRule";
@@ -613,7 +613,7 @@ const char* CSSMedia::SourceEnum::ImportRule = "importRule";
 const char* CSSMedia::SourceEnum::LinkedSheet = "linkedSheet";
 const char* CSSMedia::SourceEnum::InlineSheet = "inlineSheet";
 
-std::unique_ptr<CSSMedia> CSSMedia::parse(protocol::Value* value, ErrorSupport* errors)
+std::unique_ptr<CSSMedia> CSSMedia::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
@@ -625,29 +625,29 @@ std::unique_ptr<CSSMedia> CSSMedia::parse(protocol::Value* value, ErrorSupport* 
     errors->push();
     protocol::Value* textValue = object->get("text");
     errors->setName("text");
-    result->m_text = ValueConversions<String>::parse(textValue, errors);
+    result->m_text = ValueConversions<String>::fromValue(textValue, errors);
     protocol::Value* sourceValue = object->get("source");
     errors->setName("source");
-    result->m_source = ValueConversions<String>::parse(sourceValue, errors);
+    result->m_source = ValueConversions<String>::fromValue(sourceValue, errors);
     protocol::Value* sourceURLValue = object->get("sourceURL");
     if (sourceURLValue) {
         errors->setName("sourceURL");
-        result->m_sourceURL = ValueConversions<String>::parse(sourceURLValue, errors);
+        result->m_sourceURL = ValueConversions<String>::fromValue(sourceURLValue, errors);
     }
     protocol::Value* rangeValue = object->get("range");
     if (rangeValue) {
         errors->setName("range");
-        result->m_range = ValueConversions<protocol::CSS::SourceRange>::parse(rangeValue, errors);
+        result->m_range = ValueConversions<protocol::CSS::SourceRange>::fromValue(rangeValue, errors);
     }
     protocol::Value* styleSheetIdValue = object->get("styleSheetId");
     if (styleSheetIdValue) {
         errors->setName("styleSheetId");
-        result->m_styleSheetId = ValueConversions<String>::parse(styleSheetIdValue, errors);
+        result->m_styleSheetId = ValueConversions<String>::fromValue(styleSheetIdValue, errors);
     }
     protocol::Value* mediaListValue = object->get("mediaList");
     if (mediaListValue) {
         errors->setName("mediaList");
-        result->m_mediaList = ValueConversions<protocol::Array<protocol::CSS::MediaQuery>>::parse(mediaListValue, errors);
+        result->m_mediaList = ValueConversions<protocol::Array<protocol::CSS::MediaQuery>>::fromValue(mediaListValue, errors);
     }
     errors->pop();
     if (errors->hasErrors())
@@ -655,29 +655,29 @@ std::unique_ptr<CSSMedia> CSSMedia::parse(protocol::Value* value, ErrorSupport* 
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> CSSMedia::serialize() const
+std::unique_ptr<protocol::DictionaryValue> CSSMedia::toValue() const
 {
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("text", ValueConversions<String>::serialize(m_text));
-    result->setValue("source", ValueConversions<String>::serialize(m_source));
+    result->setValue("text", ValueConversions<String>::toValue(m_text));
+    result->setValue("source", ValueConversions<String>::toValue(m_source));
     if (m_sourceURL.isJust())
-        result->setValue("sourceURL", ValueConversions<String>::serialize(m_sourceURL.fromJust()));
+        result->setValue("sourceURL", ValueConversions<String>::toValue(m_sourceURL.fromJust()));
     if (m_range.isJust())
-        result->setValue("range", ValueConversions<protocol::CSS::SourceRange>::serialize(m_range.fromJust()));
+        result->setValue("range", ValueConversions<protocol::CSS::SourceRange>::toValue(m_range.fromJust()));
     if (m_styleSheetId.isJust())
-        result->setValue("styleSheetId", ValueConversions<String>::serialize(m_styleSheetId.fromJust()));
+        result->setValue("styleSheetId", ValueConversions<String>::toValue(m_styleSheetId.fromJust()));
     if (m_mediaList.isJust())
-        result->setValue("mediaList", ValueConversions<protocol::Array<protocol::CSS::MediaQuery>>::serialize(m_mediaList.fromJust()));
+        result->setValue("mediaList", ValueConversions<protocol::Array<protocol::CSS::MediaQuery>>::toValue(m_mediaList.fromJust()));
     return result;
 }
 
 std::unique_ptr<CSSMedia> CSSMedia::clone() const
 {
     ErrorSupport errors;
-    return parse(serialize().get(), &errors);
+    return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<MediaQuery> MediaQuery::parse(protocol::Value* value, ErrorSupport* errors)
+std::unique_ptr<MediaQuery> MediaQuery::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
@@ -689,31 +689,31 @@ std::unique_ptr<MediaQuery> MediaQuery::parse(protocol::Value* value, ErrorSuppo
     errors->push();
     protocol::Value* expressionsValue = object->get("expressions");
     errors->setName("expressions");
-    result->m_expressions = ValueConversions<protocol::Array<protocol::CSS::MediaQueryExpression>>::parse(expressionsValue, errors);
+    result->m_expressions = ValueConversions<protocol::Array<protocol::CSS::MediaQueryExpression>>::fromValue(expressionsValue, errors);
     protocol::Value* activeValue = object->get("active");
     errors->setName("active");
-    result->m_active = ValueConversions<bool>::parse(activeValue, errors);
+    result->m_active = ValueConversions<bool>::fromValue(activeValue, errors);
     errors->pop();
     if (errors->hasErrors())
         return nullptr;
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> MediaQuery::serialize() const
+std::unique_ptr<protocol::DictionaryValue> MediaQuery::toValue() const
 {
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("expressions", ValueConversions<protocol::Array<protocol::CSS::MediaQueryExpression>>::serialize(m_expressions.get()));
-    result->setValue("active", ValueConversions<bool>::serialize(m_active));
+    result->setValue("expressions", ValueConversions<protocol::Array<protocol::CSS::MediaQueryExpression>>::toValue(m_expressions.get()));
+    result->setValue("active", ValueConversions<bool>::toValue(m_active));
     return result;
 }
 
 std::unique_ptr<MediaQuery> MediaQuery::clone() const
 {
     ErrorSupport errors;
-    return parse(serialize().get(), &errors);
+    return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<MediaQueryExpression> MediaQueryExpression::parse(protocol::Value* value, ErrorSupport* errors)
+std::unique_ptr<MediaQueryExpression> MediaQueryExpression::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
@@ -725,22 +725,22 @@ std::unique_ptr<MediaQueryExpression> MediaQueryExpression::parse(protocol::Valu
     errors->push();
     protocol::Value* valueValue = object->get("value");
     errors->setName("value");
-    result->m_value = ValueConversions<double>::parse(valueValue, errors);
+    result->m_value = ValueConversions<double>::fromValue(valueValue, errors);
     protocol::Value* unitValue = object->get("unit");
     errors->setName("unit");
-    result->m_unit = ValueConversions<String>::parse(unitValue, errors);
+    result->m_unit = ValueConversions<String>::fromValue(unitValue, errors);
     protocol::Value* featureValue = object->get("feature");
     errors->setName("feature");
-    result->m_feature = ValueConversions<String>::parse(featureValue, errors);
+    result->m_feature = ValueConversions<String>::fromValue(featureValue, errors);
     protocol::Value* valueRangeValue = object->get("valueRange");
     if (valueRangeValue) {
         errors->setName("valueRange");
-        result->m_valueRange = ValueConversions<protocol::CSS::SourceRange>::parse(valueRangeValue, errors);
+        result->m_valueRange = ValueConversions<protocol::CSS::SourceRange>::fromValue(valueRangeValue, errors);
     }
     protocol::Value* computedLengthValue = object->get("computedLength");
     if (computedLengthValue) {
         errors->setName("computedLength");
-        result->m_computedLength = ValueConversions<double>::parse(computedLengthValue, errors);
+        result->m_computedLength = ValueConversions<double>::fromValue(computedLengthValue, errors);
     }
     errors->pop();
     if (errors->hasErrors())
@@ -748,26 +748,26 @@ std::unique_ptr<MediaQueryExpression> MediaQueryExpression::parse(protocol::Valu
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> MediaQueryExpression::serialize() const
+std::unique_ptr<protocol::DictionaryValue> MediaQueryExpression::toValue() const
 {
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("value", ValueConversions<double>::serialize(m_value));
-    result->setValue("unit", ValueConversions<String>::serialize(m_unit));
-    result->setValue("feature", ValueConversions<String>::serialize(m_feature));
+    result->setValue("value", ValueConversions<double>::toValue(m_value));
+    result->setValue("unit", ValueConversions<String>::toValue(m_unit));
+    result->setValue("feature", ValueConversions<String>::toValue(m_feature));
     if (m_valueRange.isJust())
-        result->setValue("valueRange", ValueConversions<protocol::CSS::SourceRange>::serialize(m_valueRange.fromJust()));
+        result->setValue("valueRange", ValueConversions<protocol::CSS::SourceRange>::toValue(m_valueRange.fromJust()));
     if (m_computedLength.isJust())
-        result->setValue("computedLength", ValueConversions<double>::serialize(m_computedLength.fromJust()));
+        result->setValue("computedLength", ValueConversions<double>::toValue(m_computedLength.fromJust()));
     return result;
 }
 
 std::unique_ptr<MediaQueryExpression> MediaQueryExpression::clone() const
 {
     ErrorSupport errors;
-    return parse(serialize().get(), &errors);
+    return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<PlatformFontUsage> PlatformFontUsage::parse(protocol::Value* value, ErrorSupport* errors)
+std::unique_ptr<PlatformFontUsage> PlatformFontUsage::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
@@ -779,35 +779,35 @@ std::unique_ptr<PlatformFontUsage> PlatformFontUsage::parse(protocol::Value* val
     errors->push();
     protocol::Value* familyNameValue = object->get("familyName");
     errors->setName("familyName");
-    result->m_familyName = ValueConversions<String>::parse(familyNameValue, errors);
+    result->m_familyName = ValueConversions<String>::fromValue(familyNameValue, errors);
     protocol::Value* isCustomFontValue = object->get("isCustomFont");
     errors->setName("isCustomFont");
-    result->m_isCustomFont = ValueConversions<bool>::parse(isCustomFontValue, errors);
+    result->m_isCustomFont = ValueConversions<bool>::fromValue(isCustomFontValue, errors);
     protocol::Value* glyphCountValue = object->get("glyphCount");
     errors->setName("glyphCount");
-    result->m_glyphCount = ValueConversions<double>::parse(glyphCountValue, errors);
+    result->m_glyphCount = ValueConversions<double>::fromValue(glyphCountValue, errors);
     errors->pop();
     if (errors->hasErrors())
         return nullptr;
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> PlatformFontUsage::serialize() const
+std::unique_ptr<protocol::DictionaryValue> PlatformFontUsage::toValue() const
 {
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("familyName", ValueConversions<String>::serialize(m_familyName));
-    result->setValue("isCustomFont", ValueConversions<bool>::serialize(m_isCustomFont));
-    result->setValue("glyphCount", ValueConversions<double>::serialize(m_glyphCount));
+    result->setValue("familyName", ValueConversions<String>::toValue(m_familyName));
+    result->setValue("isCustomFont", ValueConversions<bool>::toValue(m_isCustomFont));
+    result->setValue("glyphCount", ValueConversions<double>::toValue(m_glyphCount));
     return result;
 }
 
 std::unique_ptr<PlatformFontUsage> PlatformFontUsage::clone() const
 {
     ErrorSupport errors;
-    return parse(serialize().get(), &errors);
+    return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<CSSKeyframesRule> CSSKeyframesRule::parse(protocol::Value* value, ErrorSupport* errors)
+std::unique_ptr<CSSKeyframesRule> CSSKeyframesRule::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
@@ -819,31 +819,31 @@ std::unique_ptr<CSSKeyframesRule> CSSKeyframesRule::parse(protocol::Value* value
     errors->push();
     protocol::Value* animationNameValue = object->get("animationName");
     errors->setName("animationName");
-    result->m_animationName = ValueConversions<protocol::CSS::Value>::parse(animationNameValue, errors);
+    result->m_animationName = ValueConversions<protocol::CSS::Value>::fromValue(animationNameValue, errors);
     protocol::Value* keyframesValue = object->get("keyframes");
     errors->setName("keyframes");
-    result->m_keyframes = ValueConversions<protocol::Array<protocol::CSS::CSSKeyframeRule>>::parse(keyframesValue, errors);
+    result->m_keyframes = ValueConversions<protocol::Array<protocol::CSS::CSSKeyframeRule>>::fromValue(keyframesValue, errors);
     errors->pop();
     if (errors->hasErrors())
         return nullptr;
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> CSSKeyframesRule::serialize() const
+std::unique_ptr<protocol::DictionaryValue> CSSKeyframesRule::toValue() const
 {
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("animationName", ValueConversions<protocol::CSS::Value>::serialize(m_animationName.get()));
-    result->setValue("keyframes", ValueConversions<protocol::Array<protocol::CSS::CSSKeyframeRule>>::serialize(m_keyframes.get()));
+    result->setValue("animationName", ValueConversions<protocol::CSS::Value>::toValue(m_animationName.get()));
+    result->setValue("keyframes", ValueConversions<protocol::Array<protocol::CSS::CSSKeyframeRule>>::toValue(m_keyframes.get()));
     return result;
 }
 
 std::unique_ptr<CSSKeyframesRule> CSSKeyframesRule::clone() const
 {
     ErrorSupport errors;
-    return parse(serialize().get(), &errors);
+    return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<CSSKeyframeRule> CSSKeyframeRule::parse(protocol::Value* value, ErrorSupport* errors)
+std::unique_ptr<CSSKeyframeRule> CSSKeyframeRule::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
@@ -856,41 +856,41 @@ std::unique_ptr<CSSKeyframeRule> CSSKeyframeRule::parse(protocol::Value* value, 
     protocol::Value* styleSheetIdValue = object->get("styleSheetId");
     if (styleSheetIdValue) {
         errors->setName("styleSheetId");
-        result->m_styleSheetId = ValueConversions<String>::parse(styleSheetIdValue, errors);
+        result->m_styleSheetId = ValueConversions<String>::fromValue(styleSheetIdValue, errors);
     }
     protocol::Value* originValue = object->get("origin");
     errors->setName("origin");
-    result->m_origin = ValueConversions<String>::parse(originValue, errors);
+    result->m_origin = ValueConversions<String>::fromValue(originValue, errors);
     protocol::Value* keyTextValue = object->get("keyText");
     errors->setName("keyText");
-    result->m_keyText = ValueConversions<protocol::CSS::Value>::parse(keyTextValue, errors);
+    result->m_keyText = ValueConversions<protocol::CSS::Value>::fromValue(keyTextValue, errors);
     protocol::Value* styleValue = object->get("style");
     errors->setName("style");
-    result->m_style = ValueConversions<protocol::CSS::CSSStyle>::parse(styleValue, errors);
+    result->m_style = ValueConversions<protocol::CSS::CSSStyle>::fromValue(styleValue, errors);
     errors->pop();
     if (errors->hasErrors())
         return nullptr;
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> CSSKeyframeRule::serialize() const
+std::unique_ptr<protocol::DictionaryValue> CSSKeyframeRule::toValue() const
 {
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     if (m_styleSheetId.isJust())
-        result->setValue("styleSheetId", ValueConversions<String>::serialize(m_styleSheetId.fromJust()));
-    result->setValue("origin", ValueConversions<String>::serialize(m_origin));
-    result->setValue("keyText", ValueConversions<protocol::CSS::Value>::serialize(m_keyText.get()));
-    result->setValue("style", ValueConversions<protocol::CSS::CSSStyle>::serialize(m_style.get()));
+        result->setValue("styleSheetId", ValueConversions<String>::toValue(m_styleSheetId.fromJust()));
+    result->setValue("origin", ValueConversions<String>::toValue(m_origin));
+    result->setValue("keyText", ValueConversions<protocol::CSS::Value>::toValue(m_keyText.get()));
+    result->setValue("style", ValueConversions<protocol::CSS::CSSStyle>::toValue(m_style.get()));
     return result;
 }
 
 std::unique_ptr<CSSKeyframeRule> CSSKeyframeRule::clone() const
 {
     ErrorSupport errors;
-    return parse(serialize().get(), &errors);
+    return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<StyleDeclarationEdit> StyleDeclarationEdit::parse(protocol::Value* value, ErrorSupport* errors)
+std::unique_ptr<StyleDeclarationEdit> StyleDeclarationEdit::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
@@ -902,32 +902,164 @@ std::unique_ptr<StyleDeclarationEdit> StyleDeclarationEdit::parse(protocol::Valu
     errors->push();
     protocol::Value* styleSheetIdValue = object->get("styleSheetId");
     errors->setName("styleSheetId");
-    result->m_styleSheetId = ValueConversions<String>::parse(styleSheetIdValue, errors);
+    result->m_styleSheetId = ValueConversions<String>::fromValue(styleSheetIdValue, errors);
     protocol::Value* rangeValue = object->get("range");
     errors->setName("range");
-    result->m_range = ValueConversions<protocol::CSS::SourceRange>::parse(rangeValue, errors);
+    result->m_range = ValueConversions<protocol::CSS::SourceRange>::fromValue(rangeValue, errors);
     protocol::Value* textValue = object->get("text");
     errors->setName("text");
-    result->m_text = ValueConversions<String>::parse(textValue, errors);
+    result->m_text = ValueConversions<String>::fromValue(textValue, errors);
     errors->pop();
     if (errors->hasErrors())
         return nullptr;
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> StyleDeclarationEdit::serialize() const
+std::unique_ptr<protocol::DictionaryValue> StyleDeclarationEdit::toValue() const
 {
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("styleSheetId", ValueConversions<String>::serialize(m_styleSheetId));
-    result->setValue("range", ValueConversions<protocol::CSS::SourceRange>::serialize(m_range.get()));
-    result->setValue("text", ValueConversions<String>::serialize(m_text));
+    result->setValue("styleSheetId", ValueConversions<String>::toValue(m_styleSheetId));
+    result->setValue("range", ValueConversions<protocol::CSS::SourceRange>::toValue(m_range.get()));
+    result->setValue("text", ValueConversions<String>::toValue(m_text));
     return result;
 }
 
 std::unique_ptr<StyleDeclarationEdit> StyleDeclarationEdit::clone() const
 {
     ErrorSupport errors;
-    return parse(serialize().get(), &errors);
+    return fromValue(toValue().get(), &errors);
+}
+
+std::unique_ptr<StyleSheetChangedNotification> StyleSheetChangedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->addError("object expected");
+        return nullptr;
+    }
+
+    std::unique_ptr<StyleSheetChangedNotification> result(new StyleSheetChangedNotification());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->push();
+    protocol::Value* styleSheetIdValue = object->get("styleSheetId");
+    errors->setName("styleSheetId");
+    result->m_styleSheetId = ValueConversions<String>::fromValue(styleSheetIdValue, errors);
+    errors->pop();
+    if (errors->hasErrors())
+        return nullptr;
+    return result;
+}
+
+std::unique_ptr<protocol::DictionaryValue> StyleSheetChangedNotification::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("styleSheetId", ValueConversions<String>::toValue(m_styleSheetId));
+    return result;
+}
+
+std::unique_ptr<StyleSheetChangedNotification> StyleSheetChangedNotification::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
+
+std::unique_ptr<StyleSheetAddedNotification> StyleSheetAddedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->addError("object expected");
+        return nullptr;
+    }
+
+    std::unique_ptr<StyleSheetAddedNotification> result(new StyleSheetAddedNotification());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->push();
+    protocol::Value* headerValue = object->get("header");
+    errors->setName("header");
+    result->m_header = ValueConversions<protocol::CSS::CSSStyleSheetHeader>::fromValue(headerValue, errors);
+    errors->pop();
+    if (errors->hasErrors())
+        return nullptr;
+    return result;
+}
+
+std::unique_ptr<protocol::DictionaryValue> StyleSheetAddedNotification::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("header", ValueConversions<protocol::CSS::CSSStyleSheetHeader>::toValue(m_header.get()));
+    return result;
+}
+
+std::unique_ptr<StyleSheetAddedNotification> StyleSheetAddedNotification::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
+
+std::unique_ptr<StyleSheetRemovedNotification> StyleSheetRemovedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->addError("object expected");
+        return nullptr;
+    }
+
+    std::unique_ptr<StyleSheetRemovedNotification> result(new StyleSheetRemovedNotification());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->push();
+    protocol::Value* styleSheetIdValue = object->get("styleSheetId");
+    errors->setName("styleSheetId");
+    result->m_styleSheetId = ValueConversions<String>::fromValue(styleSheetIdValue, errors);
+    errors->pop();
+    if (errors->hasErrors())
+        return nullptr;
+    return result;
+}
+
+std::unique_ptr<protocol::DictionaryValue> StyleSheetRemovedNotification::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("styleSheetId", ValueConversions<String>::toValue(m_styleSheetId));
+    return result;
+}
+
+std::unique_ptr<StyleSheetRemovedNotification> StyleSheetRemovedNotification::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
+
+std::unique_ptr<LayoutEditorChangeNotification> LayoutEditorChangeNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->addError("object expected");
+        return nullptr;
+    }
+
+    std::unique_ptr<LayoutEditorChangeNotification> result(new LayoutEditorChangeNotification());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->push();
+    protocol::Value* styleSheetIdValue = object->get("styleSheetId");
+    errors->setName("styleSheetId");
+    result->m_styleSheetId = ValueConversions<String>::fromValue(styleSheetIdValue, errors);
+    protocol::Value* changeRangeValue = object->get("changeRange");
+    errors->setName("changeRange");
+    result->m_changeRange = ValueConversions<protocol::CSS::SourceRange>::fromValue(changeRangeValue, errors);
+    errors->pop();
+    if (errors->hasErrors())
+        return nullptr;
+    return result;
+}
+
+std::unique_ptr<protocol::DictionaryValue> LayoutEditorChangeNotification::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("styleSheetId", ValueConversions<String>::toValue(m_styleSheetId));
+    result->setValue("changeRange", ValueConversions<protocol::CSS::SourceRange>::toValue(m_changeRange.get()));
+    return result;
+}
+
+std::unique_ptr<LayoutEditorChangeNotification> LayoutEditorChangeNotification::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
 }
 
 // ------------- Enum values from params.
@@ -937,67 +1069,57 @@ std::unique_ptr<StyleDeclarationEdit> StyleDeclarationEdit::clone() const
 
 void Frontend::mediaQueryResultChanged()
 {
-    std::unique_ptr<protocol::DictionaryValue> jsonMessage = DictionaryValue::create();
-    jsonMessage->setString("method", "CSS.mediaQueryResultChanged");
-    std::unique_ptr<protocol::DictionaryValue> paramsObject = DictionaryValue::create();
-    jsonMessage->setObject("params", std::move(paramsObject));
-    if (m_frontendChannel)
-        m_frontendChannel->sendProtocolNotification(jsonMessage->toJSONString());
+    if (!m_frontendChannel)
+        return;
+    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("CSS.mediaQueryResultChanged"));
 }
 
 void Frontend::fontsUpdated()
 {
-    std::unique_ptr<protocol::DictionaryValue> jsonMessage = DictionaryValue::create();
-    jsonMessage->setString("method", "CSS.fontsUpdated");
-    std::unique_ptr<protocol::DictionaryValue> paramsObject = DictionaryValue::create();
-    jsonMessage->setObject("params", std::move(paramsObject));
-    if (m_frontendChannel)
-        m_frontendChannel->sendProtocolNotification(jsonMessage->toJSONString());
+    if (!m_frontendChannel)
+        return;
+    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("CSS.fontsUpdated"));
 }
 
 void Frontend::styleSheetChanged(const String& styleSheetId)
 {
-    std::unique_ptr<protocol::DictionaryValue> jsonMessage = DictionaryValue::create();
-    jsonMessage->setString("method", "CSS.styleSheetChanged");
-    std::unique_ptr<protocol::DictionaryValue> paramsObject = DictionaryValue::create();
-    paramsObject->setValue("styleSheetId", ValueConversions<String>::serialize(styleSheetId));
-    jsonMessage->setObject("params", std::move(paramsObject));
-    if (m_frontendChannel)
-        m_frontendChannel->sendProtocolNotification(jsonMessage->toJSONString());
+    if (!m_frontendChannel)
+        return;
+    std::unique_ptr<StyleSheetChangedNotification> messageData = StyleSheetChangedNotification::create()
+        .setStyleSheetId(styleSheetId)
+        .build();
+    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("CSS.styleSheetChanged", std::move(messageData)));
 }
 
 void Frontend::styleSheetAdded(std::unique_ptr<protocol::CSS::CSSStyleSheetHeader> header)
 {
-    std::unique_ptr<protocol::DictionaryValue> jsonMessage = DictionaryValue::create();
-    jsonMessage->setString("method", "CSS.styleSheetAdded");
-    std::unique_ptr<protocol::DictionaryValue> paramsObject = DictionaryValue::create();
-    paramsObject->setValue("header", ValueConversions<protocol::CSS::CSSStyleSheetHeader>::serialize(header.get()));
-    jsonMessage->setObject("params", std::move(paramsObject));
-    if (m_frontendChannel)
-        m_frontendChannel->sendProtocolNotification(jsonMessage->toJSONString());
+    if (!m_frontendChannel)
+        return;
+    std::unique_ptr<StyleSheetAddedNotification> messageData = StyleSheetAddedNotification::create()
+        .setHeader(std::move(header))
+        .build();
+    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("CSS.styleSheetAdded", std::move(messageData)));
 }
 
 void Frontend::styleSheetRemoved(const String& styleSheetId)
 {
-    std::unique_ptr<protocol::DictionaryValue> jsonMessage = DictionaryValue::create();
-    jsonMessage->setString("method", "CSS.styleSheetRemoved");
-    std::unique_ptr<protocol::DictionaryValue> paramsObject = DictionaryValue::create();
-    paramsObject->setValue("styleSheetId", ValueConversions<String>::serialize(styleSheetId));
-    jsonMessage->setObject("params", std::move(paramsObject));
-    if (m_frontendChannel)
-        m_frontendChannel->sendProtocolNotification(jsonMessage->toJSONString());
+    if (!m_frontendChannel)
+        return;
+    std::unique_ptr<StyleSheetRemovedNotification> messageData = StyleSheetRemovedNotification::create()
+        .setStyleSheetId(styleSheetId)
+        .build();
+    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("CSS.styleSheetRemoved", std::move(messageData)));
 }
 
 void Frontend::layoutEditorChange(const String& styleSheetId, std::unique_ptr<protocol::CSS::SourceRange> changeRange)
 {
-    std::unique_ptr<protocol::DictionaryValue> jsonMessage = DictionaryValue::create();
-    jsonMessage->setString("method", "CSS.layoutEditorChange");
-    std::unique_ptr<protocol::DictionaryValue> paramsObject = DictionaryValue::create();
-    paramsObject->setValue("styleSheetId", ValueConversions<String>::serialize(styleSheetId));
-    paramsObject->setValue("changeRange", ValueConversions<protocol::CSS::SourceRange>::serialize(changeRange.get()));
-    jsonMessage->setObject("params", std::move(paramsObject));
-    if (m_frontendChannel)
-        m_frontendChannel->sendProtocolNotification(jsonMessage->toJSONString());
+    if (!m_frontendChannel)
+        return;
+    std::unique_ptr<LayoutEditorChangeNotification> messageData = LayoutEditorChangeNotification::create()
+        .setStyleSheetId(styleSheetId)
+        .setChangeRange(std::move(changeRange))
+        .build();
+    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("CSS.layoutEditorChange", std::move(messageData)));
 }
 
 void Frontend::flush()
@@ -1005,13 +1127,19 @@ void Frontend::flush()
     m_frontendChannel->flushProtocolNotifications();
 }
 
+void Frontend::sendRawNotification(const String& notification)
+{
+    m_frontendChannel->sendProtocolNotification(InternalRawNotification::create(notification));
+}
+
 // --------------------- Dispatcher.
 
 class DispatcherImpl : public protocol::DispatcherBase {
 public:
-    DispatcherImpl(FrontendChannel* frontendChannel, Backend* backend)
+    DispatcherImpl(FrontendChannel* frontendChannel, Backend* backend, bool fallThroughForNotFound)
         : DispatcherBase(frontendChannel)
-        , m_backend(backend) {
+        , m_backend(backend)
+        , m_fallThroughForNotFound(fallThroughForNotFound) {
         m_dispatchMap["CSS.enable"] = &DispatcherImpl::enable;
         m_dispatchMap["CSS.disable"] = &DispatcherImpl::disable;
         m_dispatchMap["CSS.getMatchedStylesForNode"] = &DispatcherImpl::getMatchedStylesForNode;
@@ -1021,89 +1149,74 @@ public:
         m_dispatchMap["CSS.getStyleSheetText"] = &DispatcherImpl::getStyleSheetText;
     }
     ~DispatcherImpl() override { }
-    void dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) override;
+    DispatchResponse::Status dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) override;
 
 protected:
-    using CallHandler = void (DispatcherImpl::*)(int callId, std::unique_ptr<DictionaryValue> messageObject, ErrorSupport* errors);
+    using CallHandler = DispatchResponse::Status (DispatcherImpl::*)(int callId, std::unique_ptr<DictionaryValue> messageObject, ErrorSupport* errors);
     using DispatchMap = protocol::HashMap<String, CallHandler>;
     DispatchMap m_dispatchMap;
 
-    void enable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void disable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getMatchedStylesForNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getInlineStylesForNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getComputedStyleForNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getPlatformFontsForNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getStyleSheetText(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    DispatchResponse::Status enable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    DispatchResponse::Status disable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    DispatchResponse::Status getMatchedStylesForNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    DispatchResponse::Status getInlineStylesForNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    DispatchResponse::Status getComputedStyleForNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    DispatchResponse::Status getPlatformFontsForNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    DispatchResponse::Status getStyleSheetText(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
 
     Backend* m_backend;
+    bool m_fallThroughForNotFound;
 };
 
-void DispatcherImpl::dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject)
+DispatchResponse::Status DispatcherImpl::dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject)
 {
     protocol::HashMap<String, CallHandler>::iterator it = m_dispatchMap.find(method);
     if (it == m_dispatchMap.end()) {
-        reportProtocolError(callId, MethodNotFound, "'" + method + "' wasn't found", nullptr);
-        return;
+        if (m_fallThroughForNotFound)
+            return DispatchResponse::kFallThrough;
+        reportProtocolError(callId, DispatchResponse::kMethodNotFound, "'" + method + "' wasn't found", nullptr);
+        return DispatchResponse::kError;
     }
 
     protocol::ErrorSupport errors;
-    (this->*(it->second))(callId, std::move(messageObject), &errors);
+    return (this->*(it->second))(callId, std::move(messageObject), &errors);
 }
 
 
-class EnableCallbackImpl : public Backend::EnableCallback, public DispatcherBase::Callback {
-public:
-    EnableCallbackImpl(std::unique_ptr<DispatcherBase::WeakPtr> backendImpl, int callId)
-        : DispatcherBase::Callback(std::move(backendImpl), callId) { }
-
-    void sendSuccess() override
-    {
-        std::unique_ptr<protocol::DictionaryValue> resultObject = DictionaryValue::create();
-        sendIfActive(std::move(resultObject), ErrorString());
-    }
-
-    void sendFailure(const ErrorString& error) override
-    {
-        DCHECK(error.length());
-        sendIfActive(nullptr, error);
-    }
-
-};
-
-void DispatcherImpl::enable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
-{
-    std::unique_ptr<EnableCallbackImpl> callback(new EnableCallbackImpl(weakPtr(), callId));
-
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    m_backend->enable(std::move(callback));
-}
-
-void DispatcherImpl::disable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+DispatchResponse::Status DispatcherImpl::enable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
 {
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    ErrorString error;
-    m_backend->disable(&error);
+    DispatchResponse response = m_backend->enable();
     if (weak->get())
-        weak->get()->sendResponse(callId, error);
+        weak->get()->sendResponse(callId, response);
+    return response.status();
 }
 
-void DispatcherImpl::getMatchedStylesForNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+DispatchResponse::Status DispatcherImpl::disable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
+
+    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    DispatchResponse response = m_backend->disable();
+    if (weak->get())
+        weak->get()->sendResponse(callId, response);
+    return response.status();
+}
+
+DispatchResponse::Status DispatcherImpl::getMatchedStylesForNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
     protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
     errors->setName("nodeId");
-    int in_nodeId = ValueConversions<int>::parse(nodeIdValue, errors);
+    int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     errors->pop();
     if (errors->hasErrors()) {
-        reportProtocolError(callId, InvalidParams, kInvalidRequest, errors);
-        return;
+        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
+        return DispatchResponse::kError;
     }
     // Declare output parameters.
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     Maybe<protocol::CSS::CSSStyle> out_inlineStyle;
     Maybe<protocol::CSS::CSSStyle> out_attributesStyle;
     Maybe<protocol::Array<protocol::CSS::RuleMatch>> out_matchedCSSRules;
@@ -1112,142 +1225,153 @@ void DispatcherImpl::getMatchedStylesForNode(int callId, std::unique_ptr<Diction
     Maybe<protocol::Array<protocol::CSS::CSSKeyframesRule>> out_cssKeyframesRules;
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    ErrorString error;
-    m_backend->getMatchedStylesForNode(&error, in_nodeId, &out_inlineStyle, &out_attributesStyle, &out_matchedCSSRules, &out_pseudoElements, &out_inherited, &out_cssKeyframesRules);
-    if (!error.length()) {
+    DispatchResponse response = m_backend->getMatchedStylesForNode(in_nodeId, &out_inlineStyle, &out_attributesStyle, &out_matchedCSSRules, &out_pseudoElements, &out_inherited, &out_cssKeyframesRules);
+    if (response.status() == DispatchResponse::kFallThrough)
+        return response.status();
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    if (response.status() == DispatchResponse::kSuccess) {
         if (out_inlineStyle.isJust())
-            result->setValue("inlineStyle", ValueConversions<protocol::CSS::CSSStyle>::serialize(out_inlineStyle.fromJust()));
+            result->setValue("inlineStyle", ValueConversions<protocol::CSS::CSSStyle>::toValue(out_inlineStyle.fromJust()));
         if (out_attributesStyle.isJust())
-            result->setValue("attributesStyle", ValueConversions<protocol::CSS::CSSStyle>::serialize(out_attributesStyle.fromJust()));
+            result->setValue("attributesStyle", ValueConversions<protocol::CSS::CSSStyle>::toValue(out_attributesStyle.fromJust()));
         if (out_matchedCSSRules.isJust())
-            result->setValue("matchedCSSRules", ValueConversions<protocol::Array<protocol::CSS::RuleMatch>>::serialize(out_matchedCSSRules.fromJust()));
+            result->setValue("matchedCSSRules", ValueConversions<protocol::Array<protocol::CSS::RuleMatch>>::toValue(out_matchedCSSRules.fromJust()));
         if (out_pseudoElements.isJust())
-            result->setValue("pseudoElements", ValueConversions<protocol::Array<protocol::CSS::PseudoElementMatches>>::serialize(out_pseudoElements.fromJust()));
+            result->setValue("pseudoElements", ValueConversions<protocol::Array<protocol::CSS::PseudoElementMatches>>::toValue(out_pseudoElements.fromJust()));
         if (out_inherited.isJust())
-            result->setValue("inherited", ValueConversions<protocol::Array<protocol::CSS::InheritedStyleEntry>>::serialize(out_inherited.fromJust()));
+            result->setValue("inherited", ValueConversions<protocol::Array<protocol::CSS::InheritedStyleEntry>>::toValue(out_inherited.fromJust()));
         if (out_cssKeyframesRules.isJust())
-            result->setValue("cssKeyframesRules", ValueConversions<protocol::Array<protocol::CSS::CSSKeyframesRule>>::serialize(out_cssKeyframesRules.fromJust()));
+            result->setValue("cssKeyframesRules", ValueConversions<protocol::Array<protocol::CSS::CSSKeyframesRule>>::toValue(out_cssKeyframesRules.fromJust()));
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, error, std::move(result));
+        weak->get()->sendResponse(callId, response, std::move(result));
+    return response.status();
 }
 
-void DispatcherImpl::getInlineStylesForNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+DispatchResponse::Status DispatcherImpl::getInlineStylesForNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
     protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
     errors->setName("nodeId");
-    int in_nodeId = ValueConversions<int>::parse(nodeIdValue, errors);
+    int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     errors->pop();
     if (errors->hasErrors()) {
-        reportProtocolError(callId, InvalidParams, kInvalidRequest, errors);
-        return;
+        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
+        return DispatchResponse::kError;
     }
     // Declare output parameters.
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     Maybe<protocol::CSS::CSSStyle> out_inlineStyle;
     Maybe<protocol::CSS::CSSStyle> out_attributesStyle;
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    ErrorString error;
-    m_backend->getInlineStylesForNode(&error, in_nodeId, &out_inlineStyle, &out_attributesStyle);
-    if (!error.length()) {
+    DispatchResponse response = m_backend->getInlineStylesForNode(in_nodeId, &out_inlineStyle, &out_attributesStyle);
+    if (response.status() == DispatchResponse::kFallThrough)
+        return response.status();
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    if (response.status() == DispatchResponse::kSuccess) {
         if (out_inlineStyle.isJust())
-            result->setValue("inlineStyle", ValueConversions<protocol::CSS::CSSStyle>::serialize(out_inlineStyle.fromJust()));
+            result->setValue("inlineStyle", ValueConversions<protocol::CSS::CSSStyle>::toValue(out_inlineStyle.fromJust()));
         if (out_attributesStyle.isJust())
-            result->setValue("attributesStyle", ValueConversions<protocol::CSS::CSSStyle>::serialize(out_attributesStyle.fromJust()));
+            result->setValue("attributesStyle", ValueConversions<protocol::CSS::CSSStyle>::toValue(out_attributesStyle.fromJust()));
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, error, std::move(result));
+        weak->get()->sendResponse(callId, response, std::move(result));
+    return response.status();
 }
 
-void DispatcherImpl::getComputedStyleForNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+DispatchResponse::Status DispatcherImpl::getComputedStyleForNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
     protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
     errors->setName("nodeId");
-    int in_nodeId = ValueConversions<int>::parse(nodeIdValue, errors);
+    int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     errors->pop();
     if (errors->hasErrors()) {
-        reportProtocolError(callId, InvalidParams, kInvalidRequest, errors);
-        return;
+        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
+        return DispatchResponse::kError;
     }
     // Declare output parameters.
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     std::unique_ptr<protocol::Array<protocol::CSS::CSSComputedStyleProperty>> out_computedStyle;
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    ErrorString error;
-    m_backend->getComputedStyleForNode(&error, in_nodeId, &out_computedStyle);
-    if (!error.length()) {
-        result->setValue("computedStyle", ValueConversions<protocol::Array<protocol::CSS::CSSComputedStyleProperty>>::serialize(out_computedStyle.get()));
+    DispatchResponse response = m_backend->getComputedStyleForNode(in_nodeId, &out_computedStyle);
+    if (response.status() == DispatchResponse::kFallThrough)
+        return response.status();
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    if (response.status() == DispatchResponse::kSuccess) {
+        result->setValue("computedStyle", ValueConversions<protocol::Array<protocol::CSS::CSSComputedStyleProperty>>::toValue(out_computedStyle.get()));
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, error, std::move(result));
+        weak->get()->sendResponse(callId, response, std::move(result));
+    return response.status();
 }
 
-void DispatcherImpl::getPlatformFontsForNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+DispatchResponse::Status DispatcherImpl::getPlatformFontsForNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
     protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
     errors->setName("nodeId");
-    int in_nodeId = ValueConversions<int>::parse(nodeIdValue, errors);
+    int in_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     errors->pop();
     if (errors->hasErrors()) {
-        reportProtocolError(callId, InvalidParams, kInvalidRequest, errors);
-        return;
+        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
+        return DispatchResponse::kError;
     }
     // Declare output parameters.
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     std::unique_ptr<protocol::Array<protocol::CSS::PlatformFontUsage>> out_fonts;
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    ErrorString error;
-    m_backend->getPlatformFontsForNode(&error, in_nodeId, &out_fonts);
-    if (!error.length()) {
-        result->setValue("fonts", ValueConversions<protocol::Array<protocol::CSS::PlatformFontUsage>>::serialize(out_fonts.get()));
+    DispatchResponse response = m_backend->getPlatformFontsForNode(in_nodeId, &out_fonts);
+    if (response.status() == DispatchResponse::kFallThrough)
+        return response.status();
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    if (response.status() == DispatchResponse::kSuccess) {
+        result->setValue("fonts", ValueConversions<protocol::Array<protocol::CSS::PlatformFontUsage>>::toValue(out_fonts.get()));
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, error, std::move(result));
+        weak->get()->sendResponse(callId, response, std::move(result));
+    return response.status();
 }
 
-void DispatcherImpl::getStyleSheetText(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+DispatchResponse::Status DispatcherImpl::getStyleSheetText(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
 {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
     protocol::Value* styleSheetIdValue = object ? object->get("styleSheetId") : nullptr;
     errors->setName("styleSheetId");
-    String in_styleSheetId = ValueConversions<String>::parse(styleSheetIdValue, errors);
+    String in_styleSheetId = ValueConversions<String>::fromValue(styleSheetIdValue, errors);
     errors->pop();
     if (errors->hasErrors()) {
-        reportProtocolError(callId, InvalidParams, kInvalidRequest, errors);
-        return;
+        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
+        return DispatchResponse::kError;
     }
     // Declare output parameters.
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     String out_text;
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    ErrorString error;
-    m_backend->getStyleSheetText(&error, in_styleSheetId, &out_text);
-    if (!error.length()) {
-        result->setValue("text", ValueConversions<String>::serialize(out_text));
+    DispatchResponse response = m_backend->getStyleSheetText(in_styleSheetId, &out_text);
+    if (response.status() == DispatchResponse::kFallThrough)
+        return response.status();
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    if (response.status() == DispatchResponse::kSuccess) {
+        result->setValue("text", ValueConversions<String>::toValue(out_text));
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, error, std::move(result));
+        weak->get()->sendResponse(callId, response, std::move(result));
+    return response.status();
 }
 
 // static
 void Dispatcher::wire(UberDispatcher* dispatcher, Backend* backend)
 {
-    dispatcher->registerBackend("CSS", wrapUnique(new DispatcherImpl(dispatcher->channel(), backend)));
+    dispatcher->registerBackend("CSS", std::unique_ptr<protocol::DispatcherBase>(new DispatcherImpl(dispatcher->channel(), backend, dispatcher->fallThroughForNotFound())));
 }
 
 } // CSS

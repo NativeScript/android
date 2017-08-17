@@ -11,7 +11,7 @@
 #include "NativeScriptException.h"
 
 namespace tns {
-    class DOMDomainCallbackHandlers {
+class DOMDomainCallbackHandlers {
 
     public:
         static void DocumentUpdatedCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
@@ -19,7 +19,7 @@ namespace tns {
         static void ChildNodeRemovedCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
         static void AttributeModifiedCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
         static void AttributeRemovedCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
-    };
+};
 }
 
 

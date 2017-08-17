@@ -58,6 +58,18 @@ class CSSKeyframesRule;
 class CSSKeyframeRule;
 // A descriptor of operation to mutate style declaration text.
 class StyleDeclarationEdit;
+// Wrapper for notification params
+using MediaQueryResultChangedNotification = Object;
+// Wrapper for notification params
+using FontsUpdatedNotification = Object;
+// Wrapper for notification params
+class StyleSheetChangedNotification;
+// Wrapper for notification params
+class StyleSheetAddedNotification;
+// Wrapper for notification params
+class StyleSheetRemovedNotification;
+// Wrapper for notification params
+class LayoutEditorChangeNotification;
 
 namespace StyleSheetOriginEnum {
  extern const char* Injected;
@@ -69,12 +81,12 @@ namespace StyleSheetOriginEnum {
 // ------------- Type and builder declarations.
 
 // CSS rule collection for a single pseudo style.
-class  PseudoElementMatches {
+class  PseudoElementMatches : public Serializable{
     PROTOCOL_DISALLOW_COPY(PseudoElementMatches);
 public:
-    static std::unique_ptr<PseudoElementMatches> parse(protocol::Value* value, ErrorSupport* errors);
+    static std::unique_ptr<PseudoElementMatches> fromValue(protocol::Value* value, ErrorSupport* errors);
 
-    ~PseudoElementMatches() { }
+    ~PseudoElementMatches() override { }
 
     String getPseudoType() { return m_pseudoType; }
     void setPseudoType(const String& value) { m_pseudoType = value; }
@@ -82,7 +94,8 @@ public:
     protocol::Array<protocol::CSS::RuleMatch>* getMatches() { return m_matches.get(); }
     void setMatches(std::unique_ptr<protocol::Array<protocol::CSS::RuleMatch>> value) { m_matches = std::move(value); }
 
-    std::unique_ptr<protocol::DictionaryValue> serialize() const;
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    String serialize() override { return toValue()->serialize(); }
     std::unique_ptr<PseudoElementMatches> clone() const;
 
     template<int STATE>
@@ -143,12 +156,12 @@ private:
 
 
 // Inherited CSS rule collection from ancestor node.
-class  InheritedStyleEntry {
+class  InheritedStyleEntry : public Serializable{
     PROTOCOL_DISALLOW_COPY(InheritedStyleEntry);
 public:
-    static std::unique_ptr<InheritedStyleEntry> parse(protocol::Value* value, ErrorSupport* errors);
+    static std::unique_ptr<InheritedStyleEntry> fromValue(protocol::Value* value, ErrorSupport* errors);
 
-    ~InheritedStyleEntry() { }
+    ~InheritedStyleEntry() override { }
 
     bool hasInlineStyle() { return m_inlineStyle.isJust(); }
     protocol::CSS::CSSStyle* getInlineStyle(protocol::CSS::CSSStyle* defaultValue) { return m_inlineStyle.isJust() ? m_inlineStyle.fromJust() : defaultValue; }
@@ -157,7 +170,8 @@ public:
     protocol::Array<protocol::CSS::RuleMatch>* getMatchedCSSRules() { return m_matchedCSSRules.get(); }
     void setMatchedCSSRules(std::unique_ptr<protocol::Array<protocol::CSS::RuleMatch>> value) { m_matchedCSSRules = std::move(value); }
 
-    std::unique_ptr<protocol::DictionaryValue> serialize() const;
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    String serialize() override { return toValue()->serialize(); }
     std::unique_ptr<InheritedStyleEntry> clone() const;
 
     template<int STATE>
@@ -216,12 +230,12 @@ private:
 
 
 // Match data for a CSS rule.
-class  RuleMatch {
+class  RuleMatch : public Serializable{
     PROTOCOL_DISALLOW_COPY(RuleMatch);
 public:
-    static std::unique_ptr<RuleMatch> parse(protocol::Value* value, ErrorSupport* errors);
+    static std::unique_ptr<RuleMatch> fromValue(protocol::Value* value, ErrorSupport* errors);
 
-    ~RuleMatch() { }
+    ~RuleMatch() override { }
 
     protocol::CSS::CSSRule* getRule() { return m_rule.get(); }
     void setRule(std::unique_ptr<protocol::CSS::CSSRule> value) { m_rule = std::move(value); }
@@ -229,7 +243,8 @@ public:
     protocol::Array<int>* getMatchingSelectors() { return m_matchingSelectors.get(); }
     void setMatchingSelectors(std::unique_ptr<protocol::Array<int>> value) { m_matchingSelectors = std::move(value); }
 
-    std::unique_ptr<protocol::DictionaryValue> serialize() const;
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    String serialize() override { return toValue()->serialize(); }
     std::unique_ptr<RuleMatch> clone() const;
 
     template<int STATE>
@@ -290,12 +305,12 @@ private:
 
 
 // Data for a simple selector (these are delimited by commas in a selector list).
-class  Value {
+class  Value : public Serializable{
     PROTOCOL_DISALLOW_COPY(Value);
 public:
-    static std::unique_ptr<Value> parse(protocol::Value* value, ErrorSupport* errors);
+    static std::unique_ptr<Value> fromValue(protocol::Value* value, ErrorSupport* errors);
 
-    ~Value() { }
+    ~Value() override { }
 
     String getText() { return m_text; }
     void setText(const String& value) { m_text = value; }
@@ -304,7 +319,8 @@ public:
     protocol::CSS::SourceRange* getRange(protocol::CSS::SourceRange* defaultValue) { return m_range.isJust() ? m_range.fromJust() : defaultValue; }
     void setRange(std::unique_ptr<protocol::CSS::SourceRange> value) { m_range = std::move(value); }
 
-    std::unique_ptr<protocol::DictionaryValue> serialize() const;
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    String serialize() override { return toValue()->serialize(); }
     std::unique_ptr<Value> clone() const;
 
     template<int STATE>
@@ -363,12 +379,12 @@ private:
 
 
 // Selector list data.
-class  SelectorList {
+class  SelectorList : public Serializable{
     PROTOCOL_DISALLOW_COPY(SelectorList);
 public:
-    static std::unique_ptr<SelectorList> parse(protocol::Value* value, ErrorSupport* errors);
+    static std::unique_ptr<SelectorList> fromValue(protocol::Value* value, ErrorSupport* errors);
 
-    ~SelectorList() { }
+    ~SelectorList() override { }
 
     protocol::Array<protocol::CSS::Value>* getSelectors() { return m_selectors.get(); }
     void setSelectors(std::unique_ptr<protocol::Array<protocol::CSS::Value>> value) { m_selectors = std::move(value); }
@@ -376,7 +392,8 @@ public:
     String getText() { return m_text; }
     void setText(const String& value) { m_text = value; }
 
-    std::unique_ptr<protocol::DictionaryValue> serialize() const;
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    String serialize() override { return toValue()->serialize(); }
     std::unique_ptr<SelectorList> clone() const;
 
     template<int STATE>
@@ -437,12 +454,12 @@ private:
 
 
 // CSS stylesheet metainformation.
-class  CSSStyleSheetHeader {
+class  CSSStyleSheetHeader : public Serializable{
     PROTOCOL_DISALLOW_COPY(CSSStyleSheetHeader);
 public:
-    static std::unique_ptr<CSSStyleSheetHeader> parse(protocol::Value* value, ErrorSupport* errors);
+    static std::unique_ptr<CSSStyleSheetHeader> fromValue(protocol::Value* value, ErrorSupport* errors);
 
-    ~CSSStyleSheetHeader() { }
+    ~CSSStyleSheetHeader() override { }
 
     String getStyleSheetId() { return m_styleSheetId; }
     void setStyleSheetId(const String& value) { m_styleSheetId = value; }
@@ -483,7 +500,8 @@ public:
     double getStartColumn() { return m_startColumn; }
     void setStartColumn(double value) { m_startColumn = value; }
 
-    std::unique_ptr<protocol::DictionaryValue> serialize() const;
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    String serialize() override { return toValue()->serialize(); }
     std::unique_ptr<CSSStyleSheetHeader> clone() const;
 
     template<int STATE>
@@ -632,12 +650,12 @@ private:
 
 
 // CSS rule representation.
-class  CSSRule {
+class  CSSRule : public Serializable{
     PROTOCOL_DISALLOW_COPY(CSSRule);
 public:
-    static std::unique_ptr<CSSRule> parse(protocol::Value* value, ErrorSupport* errors);
+    static std::unique_ptr<CSSRule> fromValue(protocol::Value* value, ErrorSupport* errors);
 
-    ~CSSRule() { }
+    ~CSSRule() override { }
 
     bool hasStyleSheetId() { return m_styleSheetId.isJust(); }
     String getStyleSheetId(const String& defaultValue) { return m_styleSheetId.isJust() ? m_styleSheetId.fromJust() : defaultValue; }
@@ -656,7 +674,8 @@ public:
     protocol::Array<protocol::CSS::CSSMedia>* getMedia(protocol::Array<protocol::CSS::CSSMedia>* defaultValue) { return m_media.isJust() ? m_media.fromJust() : defaultValue; }
     void setMedia(std::unique_ptr<protocol::Array<protocol::CSS::CSSMedia>> value) { m_media = std::move(value); }
 
-    std::unique_ptr<protocol::DictionaryValue> serialize() const;
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    String serialize() override { return toValue()->serialize(); }
     std::unique_ptr<CSSRule> clone() const;
 
     template<int STATE>
@@ -740,12 +759,12 @@ private:
 
 
 // Text range within a resource. All numbers are zero-based.
-class  SourceRange {
+class  SourceRange : public Serializable{
     PROTOCOL_DISALLOW_COPY(SourceRange);
 public:
-    static std::unique_ptr<SourceRange> parse(protocol::Value* value, ErrorSupport* errors);
+    static std::unique_ptr<SourceRange> fromValue(protocol::Value* value, ErrorSupport* errors);
 
-    ~SourceRange() { }
+    ~SourceRange() override { }
 
     int getStartLine() { return m_startLine; }
     void setStartLine(int value) { m_startLine = value; }
@@ -759,7 +778,8 @@ public:
     int getEndColumn() { return m_endColumn; }
     void setEndColumn(int value) { m_endColumn = value; }
 
-    std::unique_ptr<protocol::DictionaryValue> serialize() const;
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    String serialize() override { return toValue()->serialize(); }
     std::unique_ptr<SourceRange> clone() const;
 
     template<int STATE>
@@ -842,12 +862,12 @@ private:
 
 
 // 
-class  ShorthandEntry {
+class  ShorthandEntry : public Serializable{
     PROTOCOL_DISALLOW_COPY(ShorthandEntry);
 public:
-    static std::unique_ptr<ShorthandEntry> parse(protocol::Value* value, ErrorSupport* errors);
+    static std::unique_ptr<ShorthandEntry> fromValue(protocol::Value* value, ErrorSupport* errors);
 
-    ~ShorthandEntry() { }
+    ~ShorthandEntry() override { }
 
     String getName() { return m_name; }
     void setName(const String& value) { m_name = value; }
@@ -859,7 +879,8 @@ public:
     bool getImportant(bool defaultValue) { return m_important.isJust() ? m_important.fromJust() : defaultValue; }
     void setImportant(bool value) { m_important = value; }
 
-    std::unique_ptr<protocol::DictionaryValue> serialize() const;
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    String serialize() override { return toValue()->serialize(); }
     std::unique_ptr<ShorthandEntry> clone() const;
 
     template<int STATE>
@@ -927,12 +948,12 @@ private:
 
 
 // 
-class  CSSComputedStyleProperty {
+class  CSSComputedStyleProperty : public Serializable{
     PROTOCOL_DISALLOW_COPY(CSSComputedStyleProperty);
 public:
-    static std::unique_ptr<CSSComputedStyleProperty> parse(protocol::Value* value, ErrorSupport* errors);
+    static std::unique_ptr<CSSComputedStyleProperty> fromValue(protocol::Value* value, ErrorSupport* errors);
 
-    ~CSSComputedStyleProperty() { }
+    ~CSSComputedStyleProperty() override { }
 
     String getName() { return m_name; }
     void setName(const String& value) { m_name = value; }
@@ -940,7 +961,8 @@ public:
     String getValue() { return m_value; }
     void setValue(const String& value) { m_value = value; }
 
-    std::unique_ptr<protocol::DictionaryValue> serialize() const;
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    String serialize() override { return toValue()->serialize(); }
     std::unique_ptr<CSSComputedStyleProperty> clone() const;
 
     template<int STATE>
@@ -1001,12 +1023,12 @@ private:
 
 
 // CSS style representation.
-class  CSSStyle {
+class  CSSStyle : public Serializable{
     PROTOCOL_DISALLOW_COPY(CSSStyle);
 public:
-    static std::unique_ptr<CSSStyle> parse(protocol::Value* value, ErrorSupport* errors);
+    static std::unique_ptr<CSSStyle> fromValue(protocol::Value* value, ErrorSupport* errors);
 
-    ~CSSStyle() { }
+    ~CSSStyle() override { }
 
     bool hasStyleSheetId() { return m_styleSheetId.isJust(); }
     String getStyleSheetId(const String& defaultValue) { return m_styleSheetId.isJust() ? m_styleSheetId.fromJust() : defaultValue; }
@@ -1026,7 +1048,8 @@ public:
     protocol::CSS::SourceRange* getRange(protocol::CSS::SourceRange* defaultValue) { return m_range.isJust() ? m_range.fromJust() : defaultValue; }
     void setRange(std::unique_ptr<protocol::CSS::SourceRange> value) { m_range = std::move(value); }
 
-    std::unique_ptr<protocol::DictionaryValue> serialize() const;
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    String serialize() override { return toValue()->serialize(); }
     std::unique_ptr<CSSStyle> clone() const;
 
     template<int STATE>
@@ -1108,12 +1131,12 @@ private:
 
 
 // CSS property declaration data.
-class  CSSProperty {
+class  CSSProperty : public Serializable{
     PROTOCOL_DISALLOW_COPY(CSSProperty);
 public:
-    static std::unique_ptr<CSSProperty> parse(protocol::Value* value, ErrorSupport* errors);
+    static std::unique_ptr<CSSProperty> fromValue(protocol::Value* value, ErrorSupport* errors);
 
-    ~CSSProperty() { }
+    ~CSSProperty() override { }
 
     String getName() { return m_name; }
     void setName(const String& value) { m_name = value; }
@@ -1145,7 +1168,8 @@ public:
     protocol::CSS::SourceRange* getRange(protocol::CSS::SourceRange* defaultValue) { return m_range.isJust() ? m_range.fromJust() : defaultValue; }
     void setRange(std::unique_ptr<protocol::CSS::SourceRange> value) { m_range = std::move(value); }
 
-    std::unique_ptr<protocol::DictionaryValue> serialize() const;
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    String serialize() override { return toValue()->serialize(); }
     std::unique_ptr<CSSProperty> clone() const;
 
     template<int STATE>
@@ -1248,12 +1272,12 @@ private:
 
 
 // CSS media rule descriptor.
-class  CSSMedia {
+class  CSSMedia : public Serializable{
     PROTOCOL_DISALLOW_COPY(CSSMedia);
 public:
-    static std::unique_ptr<CSSMedia> parse(protocol::Value* value, ErrorSupport* errors);
+    static std::unique_ptr<CSSMedia> fromValue(protocol::Value* value, ErrorSupport* errors);
 
-    ~CSSMedia() { }
+    ~CSSMedia() override { }
 
     String getText() { return m_text; }
     void setText(const String& value) { m_text = value; }
@@ -1284,7 +1308,8 @@ public:
     protocol::Array<protocol::CSS::MediaQuery>* getMediaList(protocol::Array<protocol::CSS::MediaQuery>* defaultValue) { return m_mediaList.isJust() ? m_mediaList.fromJust() : defaultValue; }
     void setMediaList(std::unique_ptr<protocol::Array<protocol::CSS::MediaQuery>> value) { m_mediaList = std::move(value); }
 
-    std::unique_ptr<protocol::DictionaryValue> serialize() const;
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    String serialize() override { return toValue()->serialize(); }
     std::unique_ptr<CSSMedia> clone() const;
 
     template<int STATE>
@@ -1373,12 +1398,12 @@ private:
 
 
 // Media query descriptor.
-class  MediaQuery {
+class  MediaQuery : public Serializable{
     PROTOCOL_DISALLOW_COPY(MediaQuery);
 public:
-    static std::unique_ptr<MediaQuery> parse(protocol::Value* value, ErrorSupport* errors);
+    static std::unique_ptr<MediaQuery> fromValue(protocol::Value* value, ErrorSupport* errors);
 
-    ~MediaQuery() { }
+    ~MediaQuery() override { }
 
     protocol::Array<protocol::CSS::MediaQueryExpression>* getExpressions() { return m_expressions.get(); }
     void setExpressions(std::unique_ptr<protocol::Array<protocol::CSS::MediaQueryExpression>> value) { m_expressions = std::move(value); }
@@ -1386,7 +1411,8 @@ public:
     bool getActive() { return m_active; }
     void setActive(bool value) { m_active = value; }
 
-    std::unique_ptr<protocol::DictionaryValue> serialize() const;
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    String serialize() override { return toValue()->serialize(); }
     std::unique_ptr<MediaQuery> clone() const;
 
     template<int STATE>
@@ -1448,12 +1474,12 @@ private:
 
 
 // Media query expression descriptor.
-class  MediaQueryExpression {
+class  MediaQueryExpression : public Serializable{
     PROTOCOL_DISALLOW_COPY(MediaQueryExpression);
 public:
-    static std::unique_ptr<MediaQueryExpression> parse(protocol::Value* value, ErrorSupport* errors);
+    static std::unique_ptr<MediaQueryExpression> fromValue(protocol::Value* value, ErrorSupport* errors);
 
-    ~MediaQueryExpression() { }
+    ~MediaQueryExpression() override { }
 
     double getValue() { return m_value; }
     void setValue(double value) { m_value = value; }
@@ -1472,7 +1498,8 @@ public:
     double getComputedLength(double defaultValue) { return m_computedLength.isJust() ? m_computedLength.fromJust() : defaultValue; }
     void setComputedLength(double value) { m_computedLength = value; }
 
-    std::unique_ptr<protocol::DictionaryValue> serialize() const;
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    String serialize() override { return toValue()->serialize(); }
     std::unique_ptr<MediaQueryExpression> clone() const;
 
     template<int STATE>
@@ -1557,12 +1584,12 @@ private:
 
 
 // Information about amount of glyphs that were rendered with given font.
-class  PlatformFontUsage {
+class  PlatformFontUsage : public Serializable{
     PROTOCOL_DISALLOW_COPY(PlatformFontUsage);
 public:
-    static std::unique_ptr<PlatformFontUsage> parse(protocol::Value* value, ErrorSupport* errors);
+    static std::unique_ptr<PlatformFontUsage> fromValue(protocol::Value* value, ErrorSupport* errors);
 
-    ~PlatformFontUsage() { }
+    ~PlatformFontUsage() override { }
 
     String getFamilyName() { return m_familyName; }
     void setFamilyName(const String& value) { m_familyName = value; }
@@ -1573,7 +1600,8 @@ public:
     double getGlyphCount() { return m_glyphCount; }
     void setGlyphCount(double value) { m_glyphCount = value; }
 
-    std::unique_ptr<protocol::DictionaryValue> serialize() const;
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    String serialize() override { return toValue()->serialize(); }
     std::unique_ptr<PlatformFontUsage> clone() const;
 
     template<int STATE>
@@ -1645,12 +1673,12 @@ private:
 
 
 // CSS keyframes rule representation.
-class  CSSKeyframesRule {
+class  CSSKeyframesRule : public Serializable{
     PROTOCOL_DISALLOW_COPY(CSSKeyframesRule);
 public:
-    static std::unique_ptr<CSSKeyframesRule> parse(protocol::Value* value, ErrorSupport* errors);
+    static std::unique_ptr<CSSKeyframesRule> fromValue(protocol::Value* value, ErrorSupport* errors);
 
-    ~CSSKeyframesRule() { }
+    ~CSSKeyframesRule() override { }
 
     protocol::CSS::Value* getAnimationName() { return m_animationName.get(); }
     void setAnimationName(std::unique_ptr<protocol::CSS::Value> value) { m_animationName = std::move(value); }
@@ -1658,7 +1686,8 @@ public:
     protocol::Array<protocol::CSS::CSSKeyframeRule>* getKeyframes() { return m_keyframes.get(); }
     void setKeyframes(std::unique_ptr<protocol::Array<protocol::CSS::CSSKeyframeRule>> value) { m_keyframes = std::move(value); }
 
-    std::unique_ptr<protocol::DictionaryValue> serialize() const;
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    String serialize() override { return toValue()->serialize(); }
     std::unique_ptr<CSSKeyframesRule> clone() const;
 
     template<int STATE>
@@ -1719,12 +1748,12 @@ private:
 
 
 // CSS keyframe rule representation.
-class  CSSKeyframeRule {
+class  CSSKeyframeRule : public Serializable{
     PROTOCOL_DISALLOW_COPY(CSSKeyframeRule);
 public:
-    static std::unique_ptr<CSSKeyframeRule> parse(protocol::Value* value, ErrorSupport* errors);
+    static std::unique_ptr<CSSKeyframeRule> fromValue(protocol::Value* value, ErrorSupport* errors);
 
-    ~CSSKeyframeRule() { }
+    ~CSSKeyframeRule() override { }
 
     bool hasStyleSheetId() { return m_styleSheetId.isJust(); }
     String getStyleSheetId(const String& defaultValue) { return m_styleSheetId.isJust() ? m_styleSheetId.fromJust() : defaultValue; }
@@ -1739,7 +1768,8 @@ public:
     protocol::CSS::CSSStyle* getStyle() { return m_style.get(); }
     void setStyle(std::unique_ptr<protocol::CSS::CSSStyle> value) { m_style = std::move(value); }
 
-    std::unique_ptr<protocol::DictionaryValue> serialize() const;
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    String serialize() override { return toValue()->serialize(); }
     std::unique_ptr<CSSKeyframeRule> clone() const;
 
     template<int STATE>
@@ -1816,12 +1846,12 @@ private:
 
 
 // A descriptor of operation to mutate style declaration text.
-class  StyleDeclarationEdit {
+class  StyleDeclarationEdit : public Serializable{
     PROTOCOL_DISALLOW_COPY(StyleDeclarationEdit);
 public:
-    static std::unique_ptr<StyleDeclarationEdit> parse(protocol::Value* value, ErrorSupport* errors);
+    static std::unique_ptr<StyleDeclarationEdit> fromValue(protocol::Value* value, ErrorSupport* errors);
 
-    ~StyleDeclarationEdit() { }
+    ~StyleDeclarationEdit() override { }
 
     String getStyleSheetId() { return m_styleSheetId; }
     void setStyleSheetId(const String& value) { m_styleSheetId = value; }
@@ -1832,7 +1862,8 @@ public:
     String getText() { return m_text; }
     void setText(const String& value) { m_text = value; }
 
-    std::unique_ptr<protocol::DictionaryValue> serialize() const;
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    String serialize() override { return toValue()->serialize(); }
     std::unique_ptr<StyleDeclarationEdit> clone() const;
 
     template<int STATE>
@@ -1901,23 +1932,283 @@ private:
 };
 
 
+// Wrapper for notification params
+class  StyleSheetChangedNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(StyleSheetChangedNotification);
+public:
+    static std::unique_ptr<StyleSheetChangedNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~StyleSheetChangedNotification() override { }
+
+    String getStyleSheetId() { return m_styleSheetId; }
+    void setStyleSheetId(const String& value) { m_styleSheetId = value; }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    String serialize() override { return toValue()->serialize(); }
+    std::unique_ptr<StyleSheetChangedNotification> clone() const;
+
+    template<int STATE>
+    class StyleSheetChangedNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+          StyleSheetIdSet = 1 << 1,
+            AllFieldsSet = (StyleSheetIdSet | 0)};
+
+
+        StyleSheetChangedNotificationBuilder<STATE | StyleSheetIdSet>& setStyleSheetId(const String& value)
+        {
+            static_assert(!(STATE & StyleSheetIdSet), "property styleSheetId should not be set yet");
+            m_result->setStyleSheetId(value);
+            return castState<StyleSheetIdSet>();
+        }
+
+        std::unique_ptr<StyleSheetChangedNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class StyleSheetChangedNotification;
+        StyleSheetChangedNotificationBuilder() : m_result(new StyleSheetChangedNotification()) { }
+
+        template<int STEP> StyleSheetChangedNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<StyleSheetChangedNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::CSS::StyleSheetChangedNotification> m_result;
+    };
+
+    static StyleSheetChangedNotificationBuilder<0> create()
+    {
+        return StyleSheetChangedNotificationBuilder<0>();
+    }
+
+private:
+    StyleSheetChangedNotification()
+    {
+    }
+
+    String m_styleSheetId;
+};
+
+
+// Wrapper for notification params
+class  StyleSheetAddedNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(StyleSheetAddedNotification);
+public:
+    static std::unique_ptr<StyleSheetAddedNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~StyleSheetAddedNotification() override { }
+
+    protocol::CSS::CSSStyleSheetHeader* getHeader() { return m_header.get(); }
+    void setHeader(std::unique_ptr<protocol::CSS::CSSStyleSheetHeader> value) { m_header = std::move(value); }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    String serialize() override { return toValue()->serialize(); }
+    std::unique_ptr<StyleSheetAddedNotification> clone() const;
+
+    template<int STATE>
+    class StyleSheetAddedNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+          HeaderSet = 1 << 1,
+            AllFieldsSet = (HeaderSet | 0)};
+
+
+        StyleSheetAddedNotificationBuilder<STATE | HeaderSet>& setHeader(std::unique_ptr<protocol::CSS::CSSStyleSheetHeader> value)
+        {
+            static_assert(!(STATE & HeaderSet), "property header should not be set yet");
+            m_result->setHeader(std::move(value));
+            return castState<HeaderSet>();
+        }
+
+        std::unique_ptr<StyleSheetAddedNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class StyleSheetAddedNotification;
+        StyleSheetAddedNotificationBuilder() : m_result(new StyleSheetAddedNotification()) { }
+
+        template<int STEP> StyleSheetAddedNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<StyleSheetAddedNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::CSS::StyleSheetAddedNotification> m_result;
+    };
+
+    static StyleSheetAddedNotificationBuilder<0> create()
+    {
+        return StyleSheetAddedNotificationBuilder<0>();
+    }
+
+private:
+    StyleSheetAddedNotification()
+    {
+    }
+
+    std::unique_ptr<protocol::CSS::CSSStyleSheetHeader> m_header;
+};
+
+
+// Wrapper for notification params
+class  StyleSheetRemovedNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(StyleSheetRemovedNotification);
+public:
+    static std::unique_ptr<StyleSheetRemovedNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~StyleSheetRemovedNotification() override { }
+
+    String getStyleSheetId() { return m_styleSheetId; }
+    void setStyleSheetId(const String& value) { m_styleSheetId = value; }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    String serialize() override { return toValue()->serialize(); }
+    std::unique_ptr<StyleSheetRemovedNotification> clone() const;
+
+    template<int STATE>
+    class StyleSheetRemovedNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+          StyleSheetIdSet = 1 << 1,
+            AllFieldsSet = (StyleSheetIdSet | 0)};
+
+
+        StyleSheetRemovedNotificationBuilder<STATE | StyleSheetIdSet>& setStyleSheetId(const String& value)
+        {
+            static_assert(!(STATE & StyleSheetIdSet), "property styleSheetId should not be set yet");
+            m_result->setStyleSheetId(value);
+            return castState<StyleSheetIdSet>();
+        }
+
+        std::unique_ptr<StyleSheetRemovedNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class StyleSheetRemovedNotification;
+        StyleSheetRemovedNotificationBuilder() : m_result(new StyleSheetRemovedNotification()) { }
+
+        template<int STEP> StyleSheetRemovedNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<StyleSheetRemovedNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::CSS::StyleSheetRemovedNotification> m_result;
+    };
+
+    static StyleSheetRemovedNotificationBuilder<0> create()
+    {
+        return StyleSheetRemovedNotificationBuilder<0>();
+    }
+
+private:
+    StyleSheetRemovedNotification()
+    {
+    }
+
+    String m_styleSheetId;
+};
+
+
+// Wrapper for notification params
+class  LayoutEditorChangeNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(LayoutEditorChangeNotification);
+public:
+    static std::unique_ptr<LayoutEditorChangeNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~LayoutEditorChangeNotification() override { }
+
+    String getStyleSheetId() { return m_styleSheetId; }
+    void setStyleSheetId(const String& value) { m_styleSheetId = value; }
+
+    protocol::CSS::SourceRange* getChangeRange() { return m_changeRange.get(); }
+    void setChangeRange(std::unique_ptr<protocol::CSS::SourceRange> value) { m_changeRange = std::move(value); }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    String serialize() override { return toValue()->serialize(); }
+    std::unique_ptr<LayoutEditorChangeNotification> clone() const;
+
+    template<int STATE>
+    class LayoutEditorChangeNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+          StyleSheetIdSet = 1 << 1,
+          ChangeRangeSet = 1 << 2,
+            AllFieldsSet = (StyleSheetIdSet | ChangeRangeSet | 0)};
+
+
+        LayoutEditorChangeNotificationBuilder<STATE | StyleSheetIdSet>& setStyleSheetId(const String& value)
+        {
+            static_assert(!(STATE & StyleSheetIdSet), "property styleSheetId should not be set yet");
+            m_result->setStyleSheetId(value);
+            return castState<StyleSheetIdSet>();
+        }
+
+        LayoutEditorChangeNotificationBuilder<STATE | ChangeRangeSet>& setChangeRange(std::unique_ptr<protocol::CSS::SourceRange> value)
+        {
+            static_assert(!(STATE & ChangeRangeSet), "property changeRange should not be set yet");
+            m_result->setChangeRange(std::move(value));
+            return castState<ChangeRangeSet>();
+        }
+
+        std::unique_ptr<LayoutEditorChangeNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class LayoutEditorChangeNotification;
+        LayoutEditorChangeNotificationBuilder() : m_result(new LayoutEditorChangeNotification()) { }
+
+        template<int STEP> LayoutEditorChangeNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<LayoutEditorChangeNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::CSS::LayoutEditorChangeNotification> m_result;
+    };
+
+    static LayoutEditorChangeNotificationBuilder<0> create()
+    {
+        return LayoutEditorChangeNotificationBuilder<0>();
+    }
+
+private:
+    LayoutEditorChangeNotification()
+    {
+    }
+
+    String m_styleSheetId;
+    std::unique_ptr<protocol::CSS::SourceRange> m_changeRange;
+};
+
+
 // ------------- Backend interface.
 
 class  Backend {
 public:
     virtual ~Backend() { }
 
-    class  EnableCallback : public BackendCallback {
-    public:
-        virtual void sendSuccess() = 0;
-    };
-    virtual void enable(std::unique_ptr<EnableCallback> callback) = 0;
-    virtual void disable(ErrorString*) = 0;
-    virtual void getMatchedStylesForNode(ErrorString*, int in_nodeId, Maybe<protocol::CSS::CSSStyle>* out_inlineStyle, Maybe<protocol::CSS::CSSStyle>* out_attributesStyle, Maybe<protocol::Array<protocol::CSS::RuleMatch>>* out_matchedCSSRules, Maybe<protocol::Array<protocol::CSS::PseudoElementMatches>>* out_pseudoElements, Maybe<protocol::Array<protocol::CSS::InheritedStyleEntry>>* out_inherited, Maybe<protocol::Array<protocol::CSS::CSSKeyframesRule>>* out_cssKeyframesRules) = 0;
-    virtual void getInlineStylesForNode(ErrorString*, int in_nodeId, Maybe<protocol::CSS::CSSStyle>* out_inlineStyle, Maybe<protocol::CSS::CSSStyle>* out_attributesStyle) = 0;
-    virtual void getComputedStyleForNode(ErrorString*, int in_nodeId, std::unique_ptr<protocol::Array<protocol::CSS::CSSComputedStyleProperty>>* out_computedStyle) = 0;
-    virtual void getPlatformFontsForNode(ErrorString*, int in_nodeId, std::unique_ptr<protocol::Array<protocol::CSS::PlatformFontUsage>>* out_fonts) = 0;
-    virtual void getStyleSheetText(ErrorString*, const String& in_styleSheetId, String* out_text) = 0;
+    virtual DispatchResponse enable() = 0;
+    virtual DispatchResponse disable() = 0;
+    virtual DispatchResponse getMatchedStylesForNode(int in_nodeId, Maybe<protocol::CSS::CSSStyle>* out_inlineStyle, Maybe<protocol::CSS::CSSStyle>* out_attributesStyle, Maybe<protocol::Array<protocol::CSS::RuleMatch>>* out_matchedCSSRules, Maybe<protocol::Array<protocol::CSS::PseudoElementMatches>>* out_pseudoElements, Maybe<protocol::Array<protocol::CSS::InheritedStyleEntry>>* out_inherited, Maybe<protocol::Array<protocol::CSS::CSSKeyframesRule>>* out_cssKeyframesRules) = 0;
+    virtual DispatchResponse getInlineStylesForNode(int in_nodeId, Maybe<protocol::CSS::CSSStyle>* out_inlineStyle, Maybe<protocol::CSS::CSSStyle>* out_attributesStyle) = 0;
+    virtual DispatchResponse getComputedStyleForNode(int in_nodeId, std::unique_ptr<protocol::Array<protocol::CSS::CSSComputedStyleProperty>>* out_computedStyle) = 0;
+    virtual DispatchResponse getPlatformFontsForNode(int in_nodeId, std::unique_ptr<protocol::Array<protocol::CSS::PlatformFontUsage>>* out_fonts) = 0;
+    virtual DispatchResponse getStyleSheetText(const String& in_styleSheetId, String* out_text) = 0;
 
 };
 
@@ -1925,7 +2216,7 @@ public:
 
 class  Frontend {
 public:
-    Frontend(FrontendChannel* frontendChannel) : m_frontendChannel(frontendChannel) { }
+    explicit Frontend(FrontendChannel* frontendChannel) : m_frontendChannel(frontendChannel) { }
     void mediaQueryResultChanged();
     void fontsUpdated();
     void styleSheetChanged(const String& styleSheetId);
@@ -1934,6 +2225,7 @@ public:
     void layoutEditorChange(const String& styleSheetId, std::unique_ptr<protocol::CSS::SourceRange> changeRange);
 
     void flush();
+    void sendRawNotification(const String&);
 private:
     FrontendChannel* m_frontendChannel;
 };
