@@ -1,4 +1,5 @@
 #include "JsV8InspectorClient.h"
+#include <sstream>
 #include <assert.h>
 #include <include/libplatform/libplatform.h>
 #include "Runtime.h"
@@ -51,7 +52,7 @@ void JsV8InspectorClient::scheduleBreak() {
 }
 
 void JsV8InspectorClient::createInspectorSession(v8::Isolate* isolate, const v8::Local<v8::Context>& context) {
-    session_ = inspector_->connect(JsV8InspectorClient::contextGroupId, this, v8_inspector::StringView());
+    session_ = inspector_->connect(0, this, v8_inspector::StringView());
 }
 
 void JsV8InspectorClient::disconnect() {
@@ -124,8 +125,8 @@ void JsV8InspectorClient::doDispatchMessage(v8::Isolate* isolate, const std::str
     session_->dispatchProtocolMessage(message_view);
 }
 
-void JsV8InspectorClient::sendResponse(int callId, std::unique_ptr<StringBuffer> message) {
-    sendNotification(std::move(message));
+void JsV8InspectorClient::sendProtocolResponse(int callId, const v8_inspector::StringView& message) {
+    sendProtocolNotification(message);
 }
 
 static v8_inspector::String16 ToString16(const v8_inspector::StringView& string) {
@@ -136,15 +137,14 @@ static v8_inspector::String16 ToString16(const v8_inspector::StringView& string)
     return v8_inspector::String16(reinterpret_cast<const uint16_t*>(string.characters16()), string.length());
 }
 
-void JsV8InspectorClient::sendNotification(std::unique_ptr<StringBuffer> message) {
+void JsV8InspectorClient::sendProtocolNotification(const v8_inspector::StringView& message) {
     if (inspectorClass == nullptr || this->connection == nullptr) {
         return;
     }
 
-    v8_inspector::String16 msg = ToString16(message->string());
+    v8_inspector::String16 msg = ToString16(message);
 
     JEnv env;
-    // TODO: Pete: Check if we can use a wide (utf 16) string here
     JniLocalRef str(env.NewStringUTF(msg.utf8().c_str()));
     env.CallStaticVoidMethod(inspectorClass, sendMethod, this->connection, (jstring) str);
 }
@@ -182,7 +182,7 @@ void JsV8InspectorClient::init() {
 
     inspector_ = V8Inspector::create(isolate_, this);
 
-    inspector_->contextCreated(v8_inspector::V8ContextInfo(context, JsV8InspectorClient::contextGroupId, v8_inspector::StringView()));
+    inspector_->contextCreated(v8_inspector::V8ContextInfo(context, 0, v8_inspector::StringView()));
 
     v8::Persistent<v8::Context> persistentContext(context->GetIsolate(), JsV8InspectorClient::PersistentToLocal(isolate_, context_));
     context_.Reset(isolate_, persistentContext);
@@ -200,6 +200,7 @@ JsV8InspectorClient* JsV8InspectorClient::GetInstance() {
 
 
 void JsV8InspectorClient::sendToFrontEndCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
+
     if ((instance == nullptr) || (instance->connection == nullptr)) {
         return;
     }
@@ -208,7 +209,8 @@ void JsV8InspectorClient::sendToFrontEndCallback(const v8::FunctionCallbackInfo<
         if ((args.Length() > 0) && args[0]->IsString()) {
             std::string message = ArgConverter::ConvertToString(args[0]->ToString());
 
-            std::string level = "log";
+std:
+            string level = "log";
             if (args.Length() > 1  && args[1]->IsString()) {
                 level = ArgConverter::ConvertToString(args[1]->ToString());
             }
@@ -296,4 +298,3 @@ jclass JsV8InspectorClient::inspectorClass = nullptr;
 jmethodID JsV8InspectorClient::sendMethod = nullptr;
 jmethodID JsV8InspectorClient::sendToDevToolsConsoleMethod = nullptr;
 jmethodID JsV8InspectorClient::getInspectorMessageMethod = nullptr;
-int JsV8InspectorClient::contextGroupId = 1;

@@ -3,7 +3,6 @@
 //
 
 #include <v8_inspector/src/inspector/utils/v8-search-utils-public.h>
-#include <v8_inspector/src/inspector/utils/v8-inspector-common.h>
 #include "v8-page-agent-impl.h"
 #include "search-util.h"
 
@@ -24,45 +23,37 @@ V8PageAgentImpl::V8PageAgentImpl(
 
 V8PageAgentImpl::~V8PageAgentImpl() {}
 
-////////////////
-
-DispatchResponse V8PageAgentImpl::enable() {
+void V8PageAgentImpl::enable(ErrorString*) {
     if (m_enabled) {
-        return DispatchResponse::OK();
+        return;
     }
 
     m_state->setBoolean(PageAgentState::pageEnabled, true);
 
     m_enabled = true;
-
-    return DispatchResponse::OK();
 }
 
-DispatchResponse V8PageAgentImpl::disable() {
+void V8PageAgentImpl::disable(ErrorString*) {
     if (!m_enabled) {
-        return DispatchResponse::OK();
+        return;
     }
 
     m_state->setBoolean(PageAgentState::pageEnabled, false);
 
     m_enabled = false;
-
-    return DispatchResponse::OK();
 }
 
-DispatchResponse V8PageAgentImpl::addScriptToEvaluateOnLoad(const String& in_scriptSource, String* out_identifier) {
-    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+void V8PageAgentImpl::restore() {
+    if (!m_state->booleanProperty(PageAgentState::pageEnabled, false)) {
+        return;
+    }
+
+    ErrorString ignored;
+    enable(&ignored);
 }
 
-DispatchResponse V8PageAgentImpl::removeScriptToEvaluateOnLoad(const String& in_identifier) {
-    return utils::Common::protocolCommandNotSupportedDispatchResponse();
-}
-
-DispatchResponse V8PageAgentImpl::reload(Maybe<bool> in_ignoreCache, Maybe<String> in_scriptToEvaluateOnLoad) {
-    return utils::Common::protocolCommandNotSupportedDispatchResponse();
-}
-
-DispatchResponse V8PageAgentImpl::getResourceTree(std::unique_ptr<protocol::Page::FrameResourceTree>* out_frameTree) {
+void V8PageAgentImpl::getResourceTree(
+    ErrorString*, std::unique_ptr<protocol::Page::FrameResourceTree>* out_frameTree) {
     std::unique_ptr<protocol::Page::Frame> frameObject = protocol::Page::Frame::create()
             .setId(m_frameIdentifier.c_str())
             .setLoaderId("NSLoaderIdentifier")
@@ -91,15 +82,16 @@ DispatchResponse V8PageAgentImpl::getResourceTree(std::unique_ptr<protocol::Page
                      .setResources(std::move(subresources))
                      .build();
 
-    return DispatchResponse::OK();
 }
 
-DispatchResponse V8PageAgentImpl::getResourceContent(const String& in_frameId, const String& in_url, String* out_content, bool* out_base64Encoded) {
+void V8PageAgentImpl::getResourceContent(ErrorString* errorString, const String& in_frameId,
+        const String& in_url, String* out_content,
+        bool* out_base64Encoded) {
     if (in_url.utf8().compare(m_frameUrl) == 0) {
         *out_content = "";
         *out_base64Encoded = false;
 
-        return DispatchResponse::OK();
+        return;
     }
 
     std::map<std::string, v8_inspector::utils::PageResource> cachedPageResources = utils::PageResource::s_cachedPageResources;
@@ -109,26 +101,25 @@ DispatchResponse V8PageAgentImpl::getResourceContent(const String& in_frameId, c
 
     auto it = cachedPageResources.find(in_url.utf8());
     if (it == cachedPageResources.end()) {
+        *errorString = "Resource not found.";
         *out_content = "";
-        return DispatchResponse::Error("Resource not found.");
+        return;
     }
 
     auto resource = it->second;
 
     *out_base64Encoded = !resource.hasTextContent();
 
-    auto errorString = new String16();
-
     *out_content = resource.getContent(errorString);
-
-    if (!errorString->isEmpty()) {
-        return DispatchResponse::Error(*errorString);
-    }
-
-    return DispatchResponse::OK();
 }
 
-DispatchResponse V8PageAgentImpl::searchInResource(const String& in_frameId, const String& in_url, const String& in_query, Maybe<bool> in_caseSensitive, Maybe<bool> in_isRegex, Maybe<String> in_requestId, std::unique_ptr<protocol::Array<protocol::GenericTypes::SearchMatch>>* out_result) {
+void V8PageAgentImpl::searchInResource(ErrorString* errorString, const String& in_frameId,
+                                       const String& in_url,
+                                       const String& in_query,
+                                       const Maybe<bool>& in_caseSensitive,
+                                       const Maybe<bool>& in_isRegex,
+                                       const Maybe<String>& in_requestId,
+                                       std::unique_ptr<protocol::Array<protocol::GenericTypes::SearchMatch>>* out_result) {
     bool isRegex = in_isRegex.fromMaybe(false);
     bool isCaseSensitive = in_caseSensitive.fromMaybe(false);
 
@@ -142,11 +133,10 @@ DispatchResponse V8PageAgentImpl::searchInResource(const String& in_frameId, con
     auto it = cachedPageResources.find(in_url.utf8());
     if (it == cachedPageResources.end()) {
         *out_result = std::move(result);
-        return DispatchResponse::OK();
+        return;
     }
 
     auto resource = it->second;
-    auto errorString = new String16();
     auto content = resource.getContent(errorString);
     if (errorString->isEmpty()) {
         auto matches = v8_inspector::utils::ResourceContentSearchUtils::searchInTextByLinesImpl(m_session, content, in_query, isCaseSensitive, isRegex);
@@ -155,13 +145,13 @@ DispatchResponse V8PageAgentImpl::searchInResource(const String& in_frameId, con
         }
 
         *out_result = std::move(result);
-        return DispatchResponse::OK();
     }
-
-    return DispatchResponse::Error(*errorString);
 }
 
-DispatchResponse V8PageAgentImpl::searchInResources(const String& in_text, Maybe<bool> in_caseSensitive, Maybe<bool> in_isRegex, std::unique_ptr<protocol::Array<protocol::Page::SearchResult>>* out_result) {
+void V8PageAgentImpl::searchInResources(ErrorString*, const String& in_text,
+                                        const Maybe<bool>& in_caseSensitive,
+                                        const Maybe<bool>& in_isRegex,
+                                        std::unique_ptr<protocol::Array<protocol::Page::SearchResult>>* out_result) {
     bool isRegex = in_isRegex.fromMaybe(false);
     bool isCaseSensitive = in_caseSensitive.fromMaybe(false);
 
@@ -177,25 +167,30 @@ DispatchResponse V8PageAgentImpl::searchInResources(const String& in_text, Maybe
     }
 
     *out_result = utils::ResourceContentSearchUtils::getSearchMatches(m_session, resourceObjects, m_frameUrl.c_str(), in_text, isCaseSensitive, isRegex);
-
-    return DispatchResponse::OK();
 }
 
-DispatchResponse V8PageAgentImpl::setDocumentContent(const String& in_frameId, const String& in_html) {
-    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+void V8PageAgentImpl::addScriptToEvaluateOnLoad(ErrorString*, const String& in_scriptSource,
+        String* out_identifier) {
+
+}
+
+void V8PageAgentImpl::removeScriptToEvaluateOnLoad(ErrorString*, const String& in_identifier) {
+
 }
 
 
-void V8PageAgentImpl::restore() {
-    if (!m_state->booleanProperty(PageAgentState::pageEnabled, false)) {
-        return;
-    }
+void V8PageAgentImpl::reload(ErrorString*, const Maybe<bool>& in_ignoreCache,
+                             const Maybe<String>& in_scriptToEvaluateOnLoad) {
 
-    enable();
 }
+
+void V8PageAgentImpl::setDocumentContent(ErrorString*, const String& in_frameId,
+        const String& in_html) {
+
+}
+
 
 void V8PageAgentImpl::reset() {
 
 }
-
 }

@@ -30,7 +30,6 @@
 
 #include "src/inspector/v8-function-call.h"
 
-#include "src/inspector/inspected-context.h"
 #include "src/inspector/string-util.h"
 #include "src/inspector/v8-debugger.h"
 #include "src/inspector/v8-inspector-impl.h"
@@ -75,8 +74,6 @@ v8::Local<v8::Value> V8FunctionCall::call(bool& hadException,
 }
 
 v8::Local<v8::Value> V8FunctionCall::callWithoutExceptionHandling() {
-  v8::Context::Scope contextScope(m_context);
-
   v8::Local<v8::Object> thisObject = v8::Local<v8::Object>::Cast(m_value);
   v8::Local<v8::Value> value;
   if (!thisObject->Get(m_context, m_name).ToLocal(&value))
@@ -92,7 +89,7 @@ v8::Local<v8::Value> V8FunctionCall::callWithoutExceptionHandling() {
     DCHECK(!info[i].IsEmpty());
   }
 
-  int contextGroupId = m_inspector->contextGroupId(m_context);
+  int contextGroupId = V8Debugger::getGroupId(m_context);
   if (contextGroupId) {
     m_inspector->client()->muteMetrics(contextGroupId);
     m_inspector->muteExceptions(contextGroupId);

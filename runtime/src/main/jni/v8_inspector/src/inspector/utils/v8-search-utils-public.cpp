@@ -16,7 +16,7 @@ std::unique_ptr<protocol::Array<protocol::Page::SearchResult>> getSearchMatches(
     auto result = protocol::Array<protocol::Page::SearchResult>::create();
 
     for (PageResource& resource : resources) {
-        protocol::String* errorString;
+        ErrorString* errorString;
         String content = resource.getContent(errorString);
         if (errorString->isEmpty()) {
             int matchesCount = scriptRegexpMatchesByLines(*regex, content).size();

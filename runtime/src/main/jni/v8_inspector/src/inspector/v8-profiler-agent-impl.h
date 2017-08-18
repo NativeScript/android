@@ -20,60 +20,55 @@ namespace v8_inspector {
 
 class V8InspectorSessionImpl;
 
-using protocol::Maybe;
-using protocol::Response;
+using protocol::ErrorString;
 
 class V8ProfilerAgentImpl : public protocol::Profiler::Backend {
- public:
-  V8ProfilerAgentImpl(V8InspectorSessionImpl*, protocol::FrontendChannel*,
-                      protocol::DictionaryValue* state);
-  ~V8ProfilerAgentImpl() override;
+    public:
+        V8ProfilerAgentImpl(V8InspectorSessionImpl*, protocol::FrontendChannel*,
+                            protocol::DictionaryValue* state);
+        ~V8ProfilerAgentImpl() override;
 
-  bool enabled() const { return m_enabled; }
-  void restore();
+        bool enabled() const {
+            return m_enabled;
+        }
+        void restore();
 
-  Response enable() override;
-  Response disable() override;
-  Response setSamplingInterval(int) override;
-  Response start() override;
-  Response stop(std::unique_ptr<protocol::Profiler::Profile>*) override;
+        void enable(ErrorString*) override;
+        void disable(ErrorString*) override;
+        void setSamplingInterval(ErrorString*, int) override;
+        void start(ErrorString*) override;
+        void stop(ErrorString*,
+                  std::unique_ptr<protocol::Profiler::Profile>*) override;
 
-  Response startPreciseCoverage(Maybe<bool> binary) override;
-  Response stopPreciseCoverage() override;
-  Response takePreciseCoverage(
-      std::unique_ptr<protocol::Array<protocol::Profiler::ScriptCoverage>>*
-          out_result) override;
-  Response getBestEffortCoverage(
-      std::unique_ptr<protocol::Array<protocol::Profiler::ScriptCoverage>>*
-          out_result) override;
+        void consoleProfile(const String16& title);
+        void consoleProfileEnd(const String16& title);
 
-  void consoleProfile(const String16& title);
-  void consoleProfileEnd(const String16& title);
+        bool idleStarted();
+        bool idleFinished();
 
-  bool idleStarted();
-  bool idleFinished();
+        void collectSample();
 
- private:
-  String16 nextProfileId();
+    private:
+        String16 nextProfileId();
 
-  void startProfiling(const String16& title);
-  std::unique_ptr<protocol::Profiler::Profile> stopProfiling(
-      const String16& title, bool serialize);
+        void startProfiling(const String16& title);
+        std::unique_ptr<protocol::Profiler::Profile> stopProfiling(
+            const String16& title, bool serialize);
 
-  V8InspectorSessionImpl* m_session;
-  v8::Isolate* m_isolate;
-  v8::CpuProfiler* m_profiler = nullptr;
-  protocol::DictionaryValue* m_state;
-  protocol::Profiler::Frontend m_frontend;
-  bool m_enabled = false;
-  bool m_recordingCPUProfile = false;
-  class ProfileDescriptor;
-  std::vector<ProfileDescriptor> m_startedProfiles;
-  String16 m_frontendInitiatedProfileId;
-  bool m_idle = false;
-  int m_startedProfilesCount = 0;
+        bool isRecording() const;
 
-  DISALLOW_COPY_AND_ASSIGN(V8ProfilerAgentImpl);
+        V8InspectorSessionImpl* m_session;
+        v8::Isolate* m_isolate;
+        v8::CpuProfiler* m_profiler;
+        protocol::DictionaryValue* m_state;
+        protocol::Profiler::Frontend m_frontend;
+        bool m_enabled;
+        bool m_recordingCPUProfile;
+        class ProfileDescriptor;
+        std::vector<ProfileDescriptor> m_startedProfiles;
+        String16 m_frontendInitiatedProfileId;
+
+        DISALLOW_COPY_AND_ASSIGN(V8ProfilerAgentImpl);
 };
 
 }  // namespace v8_inspector

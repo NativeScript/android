@@ -25,19 +25,17 @@ V8_EXPORT extern const char* Exception;
 V8_EXPORT extern const char* Assert;
 V8_EXPORT extern const char* DebugCommand;
 V8_EXPORT extern const char* PromiseRejection;
-V8_EXPORT extern const char* OOM;
 V8_EXPORT extern const char* Other;
-V8_EXPORT extern const char* Ambiguous;
 } // ReasonEnum
 } // Paused
 
 // ------------- Types.
 
 class V8_EXPORT SearchMatch {
-public:
-    virtual std::unique_ptr<StringBuffer> toJSONString() const = 0;
-    virtual ~SearchMatch() { }
-    static std::unique_ptr<protocol::Debugger::API::SearchMatch> fromJSONString(const StringView& json);
+    public:
+        virtual std::unique_ptr<StringBuffer> toJSONString() const = 0;
+        virtual ~SearchMatch() { }
+        static std::unique_ptr<protocol::Debugger::API::SearchMatch> fromJSONString(const StringView& json);
 };
 
 } // namespace API

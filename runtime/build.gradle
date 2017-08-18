@@ -22,7 +22,7 @@ allprojects {
 def ndkDebuggable = false;
 def optimized = project.hasProperty("optimized")
 
-if (optimized) {
+if(optimized) {
     println "Optimized build triggered."
 }
 
@@ -33,6 +33,7 @@ for (String runTask : runTasks) {
         ndkDebuggable = true;
     }
 }
+
 
 project.ext.sdkDir = System.getenv("ANDROID_HOME")
 def ndkDir = System.getenv("ANDROID_NDK_HOME")
@@ -45,71 +46,110 @@ if (propertiesFile.exists()) {
 project.ext.ndkDir = ndkDir;
 
 
-class StripSymbolsTaskExecutionListener implements TaskExecutionListener {
+class StripSymbolsTaskExecutionListener implements TaskExecutionListener
+{
     @Override
-    void beforeExecute(Task task) {
+    void beforeExecute(Task task)
+    {
     }
 
-    String getMachineName() {
-        if (OperatingSystem.current().isWindows()) {
+    String getMachineName()
+    {
+        if (OperatingSystem.current().isWindows())
+        {
             return "windows";
-        } else if (OperatingSystem.current().isMacOsX()) {
+        }
+        else if (OperatingSystem.current().isMacOsX())
+        {
             return "darwin";
-        } else {
+        }
+        else
+        {
             return "linux";
         }
     }
 
-    String getStripToolName(String stripTaskName) {
+    String getStripToolName(String stripTaskName)
+    {
         stripTaskName = stripTaskName.toLowerCase();
         def stripToolName = ""
-        if (stripTaskName.contains("arm64")) {
+        if (stripTaskName.contains("arm64"))
+        {
             stripToolName = "aarch64-linux-android-strip";
-        } else if (stripTaskName.contains("arm")) {
+        }
+        else if (stripTaskName.contains("arm"))
+        {
             stripToolName = "arm-linux-androideabi-strip";
-        } else if (stripTaskName.contains("mips64")) {
+        }
+        else if (stripTaskName.contains("mips64"))
+        {
             stripToolName = "mips64el-linux-android-strip";
-        } else if (stripTaskName.contains("mips")) {
+        }
+        else if (stripTaskName.contains("mips"))
+        {
             stripToolName = "mipsel-linux-android-strip";
-        } else if (stripTaskName.contains("x86_64")) {
+        }
+        else if (stripTaskName.contains("x86_64"))
+        {
             stripToolName = "x86_64-linux-android-strip";
-        } else if (stripTaskName.contains("x86")) {
+        }
+        else if (stripTaskName.contains("x86"))
+        {
             stripToolName = "i686-linux-android-strip";
-        } else {
+        }
+        else
+        {
             throw new IllegalArgumentException("NOT SUPPORTED ARCHITECTURE NAME: ${stripTaskName}");
         }
 
-        if (OperatingSystem.current().isWindows()) {
+        if (OperatingSystem.current().isWindows())
+        {
             stripToolName += ".exe";
         }
 
         return stripToolName;
     }
 
-    String getStripToolDirectory(String stripTaskName) {
+    String getStripToolDirectory(String stripTaskName)
+    {
         stripTaskName = stripTaskName.toLowerCase();
         def stripToolDirectory = ""
-        if (stripTaskName.contains("arm64")) {
+        if (stripTaskName.contains("arm64"))
+        {
             stripToolDirectory = "aarch64-linux-android-4.9";
-        } else if (stripTaskName.contains("arm")) {
+        }
+        else if (stripTaskName.contains("arm"))
+        {
             stripToolDirectory = "arm-linux-androideabi-4.9";
-        } else if (stripTaskName.contains("mips64")) {
+        }
+        else if (stripTaskName.contains("mips64"))
+        {
             stripToolDirectory = "mips64el-linux-android-4.9";
-        } else if (stripTaskName.contains("mips")) {
+        }
+        else if (stripTaskName.contains("mips"))
+        {
             stripToolDirectory = "mipsel-linux-android-4.9";
-        } else if (stripTaskName.contains("x86_64")) {
+        }
+        else if (stripTaskName.contains("x86_64"))
+        {
             stripToolDirectory = "x86_64-4.9";
-        } else if (stripTaskName.contains("x86")) {
+        }
+        else if (stripTaskName.contains("x86"))
+        {
             stripToolDirectory = "x86-4.9";
-        } else {
+        }
+        else
+        {
             throw new IllegalArgumentException("NOT SUPPORTED ARCHITECTURE: ${stripTaskName}");
         }
 
         return stripToolDirectory;
     }
 
-    void afterExecute(Task task, TaskState taskState) {
-        if (task.getName().contains("stripSymbols") && !taskState.failure) {
+    void afterExecute(Task task, TaskState taskState)
+    {
+        if (task.getName().contains("stripSymbols") && !taskState.failure)
+        {
             println "Found STRIP COMMAND: ${task.getName()}"
             println "input file " + task.getInputs().getFiles().getAsPath();
             println "output dir " + task.getOutputs().getFiles().getAsPath();
@@ -130,9 +170,12 @@ class StripSymbolsTaskExecutionListener implements TaskExecutionListener {
             println "Strip tool: ${stripToolPath}"
 
             def command = "";
-            if (OperatingSystem.current().isWindows()) {
-                command = "cmd /c ${stripToolPath} ${libToStripPath}";
-            } else {
+            if (OperatingSystem.current().isWindows())
+            {
+                command =  "cmd /c ${stripToolPath} ${libToStripPath}";
+            }
+            else
+            {
                 command = "${stripToolPath} ${libToStripPath}";
             }
 
@@ -143,7 +186,8 @@ class StripSymbolsTaskExecutionListener implements TaskExecutionListener {
     }
 }
 
-if (!ndkDebuggable) {
+if (!ndkDebuggable)
+{
     project.gradle.addListener(new StripSymbolsTaskExecutionListener())
 }
 
@@ -156,7 +200,7 @@ model {
         buildToolsVersion = project.ext._buildToolsVersion
 
         defaultConfig.with {
-            if (optimized) {
+            if(optimized) {
                 project.archivesBaseName = "${archivesBaseName}-optimized"
             } else {
                 project.archivesBaseName = "${archivesBaseName}-regular"
@@ -186,17 +230,16 @@ model {
                        "-I${file("src/main/jni/v8_inspector")}".toString(),
                        //"-I${file("src/main/jni/v8_inspector/platform/inspector_protocol/")}".toString(),
                        //"-I${file("src/main/jni/v8_inspector/protocol/")}".toString(),
-        ])
+                       ])
 
-        cppFlags.addAll(["-std=c++11", "-fexceptions", "-fno-builtin-stpcpy", "-D__ANDROID__"])
-        //, "-DV8_INSPECTOR_USE_STL=1", "-D__GXX_EXPERIMENTAL_CXX0X__=1", "-DHAVE_INSPECTOR"
+        cppFlags.addAll(["-std=c++11", "-fexceptions", "-fno-builtin-stpcpy", "-DHAVE_INSPECTOR", "-D__ANDROID__"]) //, "-DV8_INSPECTOR_USE_STL=1", "-D__GXX_EXPERIMENTAL_CXX0X__=1"
 
 
         CFlags.addAll(["-Wno-error=format-security", "-g", "-fno-builtin-stpcpy"])
 
         ldLibs.addAll(["android", "dl", "log", "atomic", "z"])
 
-        if (optimized) {
+        if(optimized) {
             ldFlags.addAll(["-Wl,--exclude-libs=ALL", "-Wl,--gc-sections"])
         }
         ldFlags.addAll(["-Wl,--allow-multiple-definition"])
@@ -204,17 +247,21 @@ model {
         toolchain = "clang"
         stl = "c++_static"
 
-        abiFilters.addAll(["x86", "armeabi-v7a"])
+        abiFilters.addAll(["armeabi-v7a", "x86"])
 
-        if (System.getProperties()['idea.platform.prefix'] != null) {
+        if (System.getProperties()['idea.platform.prefix'] != null)
+        {
             // Built from AndroidStudio
             println "Build from AndroidStudio"
 
-            if (!ndkDebuggable) {
+            if (!ndkDebuggable)
+            {
                 abiFilters.addAll(["x86", "arm64-v8a"])
 
             }
-        } else {
+        }
+        else
+        {
             // Built from command line
             abiFilters.addAll(["x86", "arm64-v8a"])
 
@@ -264,7 +311,8 @@ model {
 
             tasks.whenTaskAdded { task ->
                 def taskName = task.getName()
-                if (taskName == "androidRelease") {
+                if (taskName == "androidRelease")
+                {
                     task.dependsOn(setRuntimeCommit)
                     task.mustRunAfter setRuntimeCommit
                     task.finalizedBy revertVersionFile
@@ -285,13 +333,11 @@ model {
             abiFilters.add("armeabi-v7a")
 
             ldLibs.add("${file("src/main/libs/armeabi-v7a/libv8_base.a")}".toString())
-            ldLibs.add("${file("src/main/libs/armeabi-v7a/libv8_builtins_setup.a")}".toString())
-            ldLibs.add("${file("src/main/libs/armeabi-v7a/libv8_builtins_generators.a")}".toString())
-            ldLibs.add("${file("src/main/libs/armeabi-v7a/libv8_base.a")}".toString())
             ldLibs.add("${file("src/main/libs/armeabi-v7a/libv8_libplatform.a")}".toString())
             ldLibs.add("${file("src/main/libs/armeabi-v7a/libv8_libbase.a")}".toString())
             ldLibs.add("${file("src/main/libs/armeabi-v7a/libv8_libsampler.a")}".toString())
             ldLibs.add("${file("src/main/libs/armeabi-v7a/libv8_nosnapshot.a")}".toString())
+            ldLibs.add("${file("src/main/libs/armeabi-v7a/libinspector.a")}".toString())
             ldLibs.add("${file("src/main/libs/armeabi-v7a/libzip.a")}".toString())
         }
 
@@ -299,13 +345,11 @@ model {
             abiFilters.add("x86")
 
             ldLibs.add("${file("src/main/libs/x86/libv8_base.a")}".toString())
-            ldLibs.add("${file("src/main/libs/x86/libv8_builtins_setup.a")}".toString())
-            ldLibs.add("${file("src/main/libs/x86/libv8_builtins_generators.a")}".toString())
-            ldLibs.add("${file("src/main/libs/x86/libv8_base.a")}".toString())
             ldLibs.add("${file("src/main/libs/x86/libv8_libplatform.a")}".toString())
             ldLibs.add("${file("src/main/libs/x86/libv8_libbase.a")}".toString())
-            ldLibs.add("${file("src/main/libs/x86/libv8_nosnapshot.a")}".toString())
             ldLibs.add("${file("src/main/libs/x86/libv8_libsampler.a")}".toString())
+            ldLibs.add("${file("src/main/libs/x86/libv8_nosnapshot.a")}".toString())
+            ldLibs.add("${file("src/main/libs/x86/libinspector.a")}".toString())
             ldLibs.add("${file("src/main/libs/x86/libzip.a")}".toString())
         }
 
@@ -315,15 +359,12 @@ model {
             ldFlags.addAll([
                     "-L${file("src/main/libs/arm64-v8a")}".toString(),
                     "-lv8_base",
-                    "-lv8_builtins_setup",
-                    "-lv8_builtins_generators",
-                    "-lv8_base",
                     "-lv8_libplatform",
                     "-lv8_libbase",
                     "-lv8_libsampler",
                     "-lv8_nosnapshot",
-                    "-lzip",
-                    "-v"
+                    "-linspector",
+                    "-lzip"
             ])
 
             //The correct way of setting these flags is not working hence the workaround above
@@ -351,8 +392,7 @@ model {
                     staticLibraryFile = file("src/main/libs/${targetPlatform.getName()}/libv8_libbase.a")
                     staticLibraryFile = file("src/main/libs/${targetPlatform.getName()}/libv8_libsampler.a")
                     staticLibraryFile = file("src/main/libs/${targetPlatform.getName()}/libv8_nosnapshot.a")
-                    staticLibraryFile = file("src/main/libs/${targetPlatform.getName()}/libv8_builtins_setup.a")
-                    staticLibraryFile = file("src/main/libs/${targetPlatform.getName()}/libv8_builtins_generators.a")
+                    staticLibraryFile = file("src/main/libs/${targetPlatform.getName()}/libzip.a")
                 }
             }
         }

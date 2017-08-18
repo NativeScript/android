@@ -14,9 +14,9 @@ namespace v8_inspector {
 
 class V8InspectorSessionImpl;
 
+using protocol::ErrorString;
 using v8_inspector::protocol::Maybe;
 using String = v8_inspector::String16;
-using protocol::DispatchResponse;
 
 class V8PageAgentImpl : public protocol::Page::Backend {
     public:
@@ -24,17 +24,17 @@ class V8PageAgentImpl : public protocol::Page::Backend {
                         protocol::DictionaryValue* state);
         ~V8PageAgentImpl() override;
 
-        DispatchResponse enable() override;
-        DispatchResponse disable() override;
-        DispatchResponse addScriptToEvaluateOnLoad(const String& in_scriptSource, String* out_identifier) override;
-        DispatchResponse removeScriptToEvaluateOnLoad(const String& in_identifier) override;
-        DispatchResponse reload(Maybe<bool> in_ignoreCache, Maybe<String> in_scriptToEvaluateOnLoad) override;
-        DispatchResponse getResourceTree(std::unique_ptr<protocol::Page::FrameResourceTree>* out_frameTree) override;
-        DispatchResponse getResourceContent(const String& in_frameId, const String& in_url, String* out_content, bool* out_base64Encoded) override;
-        DispatchResponse searchInResource(const String& in_frameId, const String& in_url, const String& in_query, Maybe<bool> in_caseSensitive, Maybe<bool> in_isRegex, Maybe<String> in_requestId, std::unique_ptr<v8_inspector::protocol::Array<protocol::GenericTypes::SearchMatch>>* out_result) override;
-        DispatchResponse searchInResources(const String& in_text, Maybe<bool> in_caseSensitive, Maybe<bool> in_isRegex, std::unique_ptr<v8_inspector::protocol::Array<protocol::Page::SearchResult>>* out_result) override;
-        DispatchResponse setDocumentContent(const String& in_frameId, const String& in_html) override;
-    
+        void enable(ErrorString*) override;
+        void disable(ErrorString*) override;
+        void getResourceTree(ErrorString*, std::unique_ptr<protocol::Page::FrameResourceTree>* out_frameTree) override;
+        void getResourceContent(ErrorString*, const String& in_frameId, const String& in_url, String* out_content, bool* out_base64Encoded) override;
+        void searchInResource(ErrorString*, const String& in_frameId, const String& in_url, const String& in_query, const Maybe<bool>& in_caseSensitive, const Maybe<bool>& in_isRegex, const Maybe<String>& in_requestId, std::unique_ptr<protocol::Array<protocol::GenericTypes::SearchMatch>>* out_result) override;
+        void searchInResources(ErrorString*, const String& in_text, const Maybe<bool>& in_caseSensitive, const Maybe<bool>& in_isRegex, std::unique_ptr<protocol::Array<protocol::Page::SearchResult>>* out_result) override;
+        void addScriptToEvaluateOnLoad(ErrorString*, const String& in_scriptSource, String* out_identifier) override;
+        void removeScriptToEvaluateOnLoad(ErrorString*, const String& in_identifier) override;
+        void reload(ErrorString*, const Maybe<bool>& in_ignoreCache, const Maybe<String>& in_scriptToEvaluateOnLoad) override;
+        void setDocumentContent(ErrorString*, const String& in_frameId, const String& in_html) override;
+
         void restore();
         void reset();
         const bool enabled() {

@@ -6,9 +6,7 @@ dist/
 /test-app/libs
 /test-app/metadata
 .idea
-.DS_Store
-.idea/
-*.iml
+
 local.properties
 
 gen/
@@ -18,10 +16,3 @@ bin/
 .svn/
 
 **/.vscode/
-
-### V8 platform build files
-
-/runtime/**/DEPS
-/runtime/**/OWNERS
-/runtime/**/*.gyp
-/runtime/**/*.gypi
