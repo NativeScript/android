@@ -26,29 +26,28 @@ V8ConsoleAgentImpl::V8ConsoleAgentImpl(
 
 V8ConsoleAgentImpl::~V8ConsoleAgentImpl() {}
 
-Response V8ConsoleAgentImpl::enable() {
-  if (m_enabled) return Response::OK();
+void V8ConsoleAgentImpl::enable(ErrorString* errorString) {
+  if (m_enabled) return;
   m_state->setBoolean(ConsoleAgentState::consoleEnabled, true);
   m_enabled = true;
   m_session->inspector()->enableStackCapturingIfNeeded();
   reportAllMessages();
-  return Response::OK();
 }
 
-Response V8ConsoleAgentImpl::disable() {
-  if (!m_enabled) return Response::OK();
+void V8ConsoleAgentImpl::disable(ErrorString* errorString) {
+  if (!m_enabled) return;
   m_session->inspector()->disableStackCapturingIfNeeded();
   m_state->setBoolean(ConsoleAgentState::consoleEnabled, false);
   m_enabled = false;
-  return Response::OK();
 }
 
-Response V8ConsoleAgentImpl::clearMessages() { return Response::OK(); }
+void V8ConsoleAgentImpl::clearMessages(ErrorString* errorString) {}
 
 void V8ConsoleAgentImpl::restore() {
   if (!m_state->booleanProperty(ConsoleAgentState::consoleEnabled, false))
     return;
-  enable();
+  ErrorString ignored;
+  enable(&ignored);
 }
 
 void V8ConsoleAgentImpl::messageAdded(V8ConsoleMessage* message) {

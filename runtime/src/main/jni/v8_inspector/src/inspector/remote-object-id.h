@@ -9,47 +9,54 @@
 
 namespace v8_inspector {
 
-using protocol::Response;
+using protocol::ErrorString;
 
 class RemoteObjectIdBase {
- public:
-  int contextId() const { return m_injectedScriptId; }
+    public:
+        int contextId() const {
+            return m_injectedScriptId;
+        }
 
- protected:
-  RemoteObjectIdBase();
-  ~RemoteObjectIdBase() {}
+    protected:
+        RemoteObjectIdBase();
+        ~RemoteObjectIdBase() {}
 
-  std::unique_ptr<protocol::DictionaryValue> parseInjectedScriptId(
-      const String16&);
+        std::unique_ptr<protocol::DictionaryValue> parseInjectedScriptId(
+            const String16&);
 
-  int m_injectedScriptId;
+        int m_injectedScriptId;
 };
 
 class RemoteObjectId final : public RemoteObjectIdBase {
- public:
-  static Response parse(const String16&, std::unique_ptr<RemoteObjectId>*);
-  ~RemoteObjectId() {}
-  int id() const { return m_id; }
+    public:
+        static std::unique_ptr<RemoteObjectId> parse(ErrorString*, const String16&);
+        ~RemoteObjectId() {}
+        int id() const {
+            return m_id;
+        }
 
- private:
-  RemoteObjectId();
+    private:
+        RemoteObjectId();
 
-  int m_id;
+        int m_id;
 };
 
 class RemoteCallFrameId final : public RemoteObjectIdBase {
- public:
-  static Response parse(const String16&, std::unique_ptr<RemoteCallFrameId>*);
-  ~RemoteCallFrameId() {}
+    public:
+        static std::unique_ptr<RemoteCallFrameId> parse(ErrorString*,
+                const String16&);
+        ~RemoteCallFrameId() {}
 
-  int frameOrdinal() const { return m_frameOrdinal; }
+        int frameOrdinal() const {
+            return m_frameOrdinal;
+        }
 
-  static String16 serialize(int injectedScriptId, int frameOrdinal);
+        static String16 serialize(int injectedScriptId, int frameOrdinal);
 
- private:
-  RemoteCallFrameId();
+    private:
+        RemoteCallFrameId();
 
-  int m_frameOrdinal;
+        int m_frameOrdinal;
 };
 
 }  // namespace v8_inspector

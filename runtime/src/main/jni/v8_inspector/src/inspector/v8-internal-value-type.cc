@@ -4,6 +4,7 @@
 
 #include "src/inspector/v8-internal-value-type.h"
 
+#include "src/inspector/protocol-platform.h"
 #include "src/inspector/string-util.h"
 
 namespace v8_inspector {

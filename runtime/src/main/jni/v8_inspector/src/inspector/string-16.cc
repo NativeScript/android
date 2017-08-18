@@ -8,11 +8,15 @@
 #include <cctype>
 #include <cstdlib>
 #include <cstring>
+#include <iomanip>
 #include <limits>
+#include <locale>
+#include <sstream>
 #include <string>
 
-#include "src/base/platform/platform.h"
-#include "src/conversions.h"
+//#include "src/base/platform/platform.h"
+#include "src/inspector/protocol-platform.h"
+#include "src/base/macros.h"
 
 namespace v8_inspector {
 
@@ -362,37 +366,63 @@ static inline void putUTF8Triple(char*& buffer, UChar ch) {
 
 }  // namespace
 
+    static inline int VSNPrintF(char* str,
+                                int length,
+                                const char* format,
+                                va_list args) {
+      int n = vsnprintf(str, length, format, args);
+      if (n < 0 || n >= length) {
+        // If the length is zero, the assignment fails.
+        if (length > 0)
+          str[length - 1] = '\0';
+        return -1;
+      } else {
+        return n;
+      }
+    }
+
+ static inline int SNPrintF(char* str, int length, const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    int result = VSNPrintF(str, length, format, args);
+    va_end(args);
+    return result;
+  }
+
+
+
+
 // static
 String16 String16::fromInteger(int number) {
-  char arr[50];
-  v8::internal::Vector<char> buffer(arr, arraysize(arr));
-  return String16(IntToCString(number, buffer));
+  const size_t kBufferSize = 50;
+  char buffer[kBufferSize];
+  SNPrintF(buffer, kBufferSize, "%d", number);
+  return String16(buffer);
 }
 
 // static
 String16 String16::fromInteger(size_t number) {
   const size_t kBufferSize = 50;
   char buffer[kBufferSize];
-#if !defined(_WIN32) && !defined(_WIN64)
-  v8::base::OS::SNPrintF(buffer, kBufferSize, "%zu", number);
-#else
-  v8::base::OS::SNPrintF(buffer, kBufferSize, "%Iu", number);
-#endif
+  SNPrintF(buffer, kBufferSize, "%zu", number);
   return String16(buffer);
 }
 
 // static
 String16 String16::fromDouble(double number) {
-  char arr[50];
-  v8::internal::Vector<char> buffer(arr, arraysize(arr));
-  return String16(DoubleToCString(number, buffer));
+  std::ostringstream s;
+  s.imbue(std::locale("C"));
+  s << std::fixed << std::setprecision(std::numeric_limits<double>::digits10)
+    << number;
+  return String16(s.str().c_str());
 }
 
 // static
 String16 String16::fromDouble(double number, int precision) {
-  std::unique_ptr<char[]> str(
-      v8::internal::DoubleToPrecisionCString(number, precision));
-  return String16(str.get());
+  std::ostringstream s;
+  s.imbue(std::locale("C"));
+  s << std::fixed << std::setprecision(precision) << number;
+  return String16(s.str().c_str());
 }
 
 int String16::toInteger(bool* ok) const {
@@ -438,26 +468,6 @@ void String16Builder::append(const UChar* characters, size_t length) {
 
 void String16Builder::append(const char* characters, size_t length) {
   m_buffer.insert(m_buffer.end(), characters, characters + length);
-}
-
-void String16Builder::appendNumber(int number) {
-  const int kBufferSize = 11;
-  char buffer[kBufferSize];
-  int chars = v8::base::OS::SNPrintF(buffer, kBufferSize, "%d", number);
-  DCHECK_GT(kBufferSize, chars);
-  m_buffer.insert(m_buffer.end(), buffer, buffer + chars);
-}
-
-void String16Builder::appendNumber(size_t number) {
-  const int kBufferSize = 20;
-  char buffer[kBufferSize];
-#if !defined(_WIN32) && !defined(_WIN64)
-  int chars = v8::base::OS::SNPrintF(buffer, kBufferSize, "%zu", number);
-#else
-  int chars = v8::base::OS::SNPrintF(buffer, kBufferSize, "%Iu", number);
-#endif
-  DCHECK_GT(kBufferSize, chars);
-  m_buffer.insert(m_buffer.end(), buffer, buffer + chars);
 }
 
 String16 String16Builder::toString() {

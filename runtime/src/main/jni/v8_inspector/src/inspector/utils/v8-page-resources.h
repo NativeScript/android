@@ -18,6 +18,7 @@ class PageResource {
             return strcmp(m_type, protocol::Page::ResourceTypeEnum::Document) == 0 ||
                    strcmp(m_type, protocol::Page::ResourceTypeEnum::Stylesheet) == 0 ||
                    strcmp(m_type, protocol::Page::ResourceTypeEnum::Script) == 0;
+
         };
         const char* getMimeType() {
             return m_mimeType.c_str();
@@ -33,7 +34,7 @@ class PageResource {
          * Get string representation of the resource (file) contents
          * String is base64-encoded if the resource's MIME type isn't a Document | Stylesheet | Script
          */
-        String16 getContent(protocol::String*);
+        String16 getContent(protocol::ErrorString*);
 
         /*
          * Gets all file paths available in the application's files/app directory
