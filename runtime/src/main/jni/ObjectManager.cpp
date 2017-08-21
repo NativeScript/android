@@ -329,6 +329,7 @@ void ObjectManager::ReleaseJSInstance(Persistent<Object>* po, JSInstanceInfo* js
     m_idToObject.erase(it);
     m_released.insert(po, javaObjectID);
     po->Reset();
+
     delete po;
     delete jsInstanceInfo;
 
