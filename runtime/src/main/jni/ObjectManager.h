@@ -57,10 +57,13 @@ class ObjectManager {
             END
         };
 
-        enum class JavaScriptMarkingMode {
+        /**
+         * Memory management modes. Keep the members in sync with the java/com/tns/MarkingMode.
+         */
+        enum JavaScriptMarkingMode {
             /**
              * For JavaScript instances with implementation objects that were marked for collection,
-             * MarkReachableObjects will scann the whole graph of reachable objects and keep strong reference to
+             * MarkReachableObjects will scan the whole graph of reachable objects and keep strong reference to
              * the Java instances of implementation objects.
              */
             Full,
@@ -139,6 +142,8 @@ class ObjectManager {
         bool IsJsRuntimeObject(const v8::Local<v8::Object>& object);
 
         JSInstanceInfo* GetJSInstanceInfo(const v8::Local<v8::Object>& object);
+
+        JSInstanceInfo* GetJSInstanceInfoFromRuntimeObject(const v8::Local<v8::Object>& object);
 
         void ReleaseJSInstance(v8::Persistent<v8::Object>* po, JSInstanceInfo* jsInstanceInfo);
 

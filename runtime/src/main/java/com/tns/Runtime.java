@@ -202,17 +202,17 @@ public class Runtime {
         return dynamicConfig;
     }
 
-    public int getMarkingMode() {
-        String mode = staticConfiguration == null || staticConfiguration.appConfig == null ? "full" : staticConfiguration.appConfig.getMarkingMode();
-        if ("none".equals(mode)) {
-            return 1;
+    @RuntimeCallable
+    public int getMarkingModeOrdinal() {
+        if (staticConfiguration != null && staticConfiguration.appConfig != null) {
+            return staticConfiguration.appConfig.getMarkingMode().ordinal();
+        } else {
+            return MarkingMode.values()[0].ordinal();
         }
-        return 0;
     }
 
     public static boolean isInitialized() {
         Runtime runtime = Runtime.getCurrentRuntime();
-
         return (runtime != null) ? runtime.isInitializedImpl() : false;
     }
 

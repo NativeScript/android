@@ -20,3 +20,5 @@ bin/
 .project
 .DS_Store
 .settings
+
+build-artifacts/

@@ -18,20 +18,7 @@ class AppConfig {
         MemoryCheckInterval("memoryCheckInterval", 0),
         FreeMemoryRatio("freeMemoryRatio", 0.0),
         Profiling("profiling", ""),
-        MarkingMode("markingMode", "Full");
-
-        public static final KnownKeys[] asArray = {
-            V8FlagsKey,
-            CodeCacheKey,
-            HeapSnapshotScriptKey,
-            SnapshotFile,
-            ProfilerOutputDirKey,
-            GcThrottleTime,
-            MemoryCheckInterval,
-            FreeMemoryRatio,
-            Profiling,
-            MarkingMode
-        };
+        MarkingMode("markingMode", com.tns.MarkingMode.values()[0]);
 
         private final String name;
         private final Object defaultValue;
@@ -44,18 +31,8 @@ class AppConfig {
         public String getName() {
             return name;
         }
-
         public Object getDefaultValue() {
             return defaultValue;
-        }
-
-        int getIndex() {
-            for (int i=0; i<asArray.length; i++) {
-                if (asArray[i] == this) {
-                    return i;
-                }
-            }
-            return -1;
         }
     }
 
@@ -75,21 +52,21 @@ class AppConfig {
         try {
             rootObject = FileSystem.readJSONFile(packageInfo);
             if (rootObject != null) {
-                if (rootObject.has(KnownKeys.Profiling.getName())) {
+                if (rootObject.has(KnownKeys.Profiling.name())) {
                     String profiling = rootObject.getString(KnownKeys.Profiling.getName());
-                    values[KnownKeys.Profiling.getIndex()] = profiling;
+                    values[KnownKeys.Profiling.ordinal()] = profiling;
                 }
                 if (rootObject.has(AndroidKey)) {
                     JSONObject androidObject = rootObject.getJSONObject(AndroidKey);
                     if (androidObject.has(KnownKeys.V8FlagsKey.getName())) {
-                        values[KnownKeys.V8FlagsKey.getIndex()] = androidObject.getString(KnownKeys.V8FlagsKey.getName());
+                        values[KnownKeys.V8FlagsKey.ordinal()] = androidObject.getString(KnownKeys.V8FlagsKey.getName());
                     }
                     if (androidObject.has(KnownKeys.CodeCacheKey.getName())) {
-                        values[KnownKeys.CodeCacheKey.getIndex()] = androidObject.getBoolean(KnownKeys.CodeCacheKey.getName());
+                        values[KnownKeys.CodeCacheKey.ordinal()] = androidObject.getBoolean(KnownKeys.CodeCacheKey.getName());
                     }
                     if (androidObject.has(KnownKeys.HeapSnapshotScriptKey.getName())) {
                         String value = androidObject.getString(KnownKeys.HeapSnapshotScriptKey.getName());
-                        values[KnownKeys.HeapSnapshotScriptKey.getIndex()] = FileSystem.resolveRelativePath(appDir.getPath(), value, appDir + "/app/");
+                        values[KnownKeys.HeapSnapshotScriptKey.ordinal()] = FileSystem.resolveRelativePath(appDir.getPath(), value, appDir + "/app/");
                     }
                     if (androidObject.has(HeapSnapshotBlobKey)) {
                         String value = androidObject.getString(HeapSnapshotBlobKey);
@@ -98,23 +75,27 @@ class AppConfig {
                         if (dir.exists() && dir.isDirectory()) {
                             // this path is expected to be a directory, containing three sub-directories: armeabi-v7a, x86 and arm64-v8a
                             path = path + "/" + Build.CPU_ABI + "/" + KnownKeys.SnapshotFile.getName();
-                            values[KnownKeys.SnapshotFile.getIndex()] = path;
+                            values[KnownKeys.SnapshotFile.ordinal()] = path;
                         }
                     }
                     if (androidObject.has(KnownKeys.ProfilerOutputDirKey.getName())) {
-                        values[KnownKeys.ProfilerOutputDirKey.getIndex()] = androidObject.getString(KnownKeys.ProfilerOutputDirKey.getName());
+                        values[KnownKeys.ProfilerOutputDirKey.ordinal()] = androidObject.getString(KnownKeys.ProfilerOutputDirKey.getName());
                     }
                     if (androidObject.has(KnownKeys.GcThrottleTime.getName())) {
-                        values[KnownKeys.GcThrottleTime.getIndex()] = androidObject.getInt(KnownKeys.GcThrottleTime.getName());
+                        values[KnownKeys.GcThrottleTime.ordinal()] = androidObject.getInt(KnownKeys.GcThrottleTime.getName());
                     }
                     if (androidObject.has(KnownKeys.MemoryCheckInterval.getName())) {
-                        values[KnownKeys.MemoryCheckInterval.getIndex()] = androidObject.getInt(KnownKeys.MemoryCheckInterval.getName());
+                        values[KnownKeys.MemoryCheckInterval.ordinal()] = androidObject.getInt(KnownKeys.MemoryCheckInterval.getName());
                     }
                     if (androidObject.has(KnownKeys.FreeMemoryRatio.getName())) {
-                        values[KnownKeys.FreeMemoryRatio.getIndex()] = androidObject.getDouble(KnownKeys.FreeMemoryRatio.getName());
+                        values[KnownKeys.FreeMemoryRatio.ordinal()] = androidObject.getDouble(KnownKeys.FreeMemoryRatio.getName());
                     }
                     if (androidObject.has(KnownKeys.MarkingMode.getName())) {
-                        values[KnownKeys.MarkingMode.getIndex()] = androidObject.getString(KnownKeys.MarkingMode.getName());
+                        try {
+                            String value = androidObject.getString(KnownKeys.MarkingMode.getName());
+                            values[KnownKeys.MarkingMode.ordinal()] = MarkingMode.valueOf(value);
+                        } catch(Throwable e) {
+                        }
                     }
                 }
             }
@@ -128,28 +109,27 @@ class AppConfig {
     }
 
     private static Object[] makeDefaultOptions() {
-        Object[] result = new Object[KnownKeys.asArray.length];
-        int index = 0;
-        for (KnownKeys key: KnownKeys.asArray) {
-            result[index++] = key.getDefaultValue();
+        Object[] result = new Object[KnownKeys.values().length];
+        for (KnownKeys key: KnownKeys.values()) {
+            result[key.ordinal()] = key.getDefaultValue();
         }
         return result;
     }
 
     public int getGcThrottleTime() {
-        return (int)values[KnownKeys.GcThrottleTime.getIndex()];
+        return (int)values[KnownKeys.GcThrottleTime.ordinal()];
     }
 
     public int getMemoryCheckInterval() {
-        return (int)values[KnownKeys.MemoryCheckInterval.getIndex()];
+        return (int)values[KnownKeys.MemoryCheckInterval.ordinal()];
     }
 
     public double getFreeMemoryRatio() {
-        return (double)values[KnownKeys.FreeMemoryRatio.getIndex()];
+        return (double)values[KnownKeys.FreeMemoryRatio.ordinal()];
     }
 
     public String getProfilingMode() {
-        return (String)values[KnownKeys.Profiling.getIndex()];
+        return (String)values[KnownKeys.Profiling.ordinal()];
     }
-    public String getMarkingMode() { return (String)values[KnownKeys.MarkingMode.getIndex()]; }
+    public MarkingMode getMarkingMode() { return (MarkingMode)values[KnownKeys.MarkingMode.ordinal()]; }
 }

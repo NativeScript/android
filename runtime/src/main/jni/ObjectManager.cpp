@@ -22,8 +22,7 @@ ObjectManager::ObjectManager(jobject javaRuntimeObject) :
         m_env(JEnv()),
         m_numberOfGC(0),
         m_currentObjectId(0),
-        m_cache(NewWeakGlobalRefCallback, DeleteWeakGlobalRefCallback, 1000, this),
-        m_markingMode(JavaScriptMarkingMode::Full) {
+        m_cache(NewWeakGlobalRefCallback, DeleteWeakGlobalRefCallback, 1000, this) {
 
     auto runtimeClass = m_env.FindClass("com/tns/Runtime");
     assert(runtimeClass != nullptr);
@@ -55,13 +54,9 @@ ObjectManager::ObjectManager(jobject javaRuntimeObject) :
     auto useGlobalRefs = m_env.CallStaticBooleanMethod(runtimeClass, useGlobalRefsMethodID);
     m_useGlobalRefs = useGlobalRefs == JNI_TRUE;
 
-    auto getMarkingModeMethodID = m_env.GetMethodID(runtimeClass, "getMarkingMode", "()I");
-    jint markingMode = m_env.CallIntMethod(m_javaRuntimeObject, getMarkingModeMethodID);
-    switch(markingMode) {
-        case 1:
-            m_markingMode = JavaScriptMarkingMode::None;
-            break;
-    }
+    auto getMarkingModeOrdinalMethodID = m_env.GetMethodID(runtimeClass, "getMarkingModeOrdinal", "()I");
+    jint markingMode = m_env.CallIntMethod(m_javaRuntimeObject, getMarkingModeOrdinalMethodID);
+    m_markingMode = static_cast<JavaScriptMarkingMode>(markingMode);
 }
 
 void ObjectManager::SetInstanceIsolate(Isolate* isolate) {
@@ -99,32 +94,35 @@ JniLocalRef ObjectManager::GetJavaObjectByJsObject(const Local<Object>& object) 
 
 ObjectManager::JSInstanceInfo* ObjectManager::GetJSInstanceInfo(const Local<Object>& object) {
     JSInstanceInfo* jsInstanceInfo = nullptr;
-
-    auto isolate = m_isolate;
-    HandleScope handleScope(isolate);
-
     if (IsJsRuntimeObject(object)) {
-        const int jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
-        auto jsInfo = object->GetInternalField(jsInfoIdx);
-        if (jsInfo->IsUndefined()) {
-            //Typescript object layout has an object instance as child of the actual registered instance. checking for that
-            auto prototypeObject = object->GetPrototype().As<Object>();
+        return GetJSInstanceInfoFromRuntimeObject(object);
+    }
+    return nullptr;
+}
 
-            if (!prototypeObject.IsEmpty() && prototypeObject->IsObject()) {
-                DEBUG_WRITE("GetJSInstanceInfo: need to check prototype :%d", prototypeObject->GetIdentityHash());
-                if (IsJsRuntimeObject(prototypeObject)) {
-                    jsInfo = prototypeObject->GetInternalField(jsInfoIdx);
-                }
+ObjectManager::JSInstanceInfo* ObjectManager::GetJSInstanceInfoFromRuntimeObject(const Local<Object>& object) {
+    HandleScope handleScope(m_isolate);
+
+    const int jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
+    auto jsInfo = object->GetInternalField(jsInfoIdx);
+    if (jsInfo->IsUndefined()) {
+        //Typescript object layout has an object instance as child of the actual registered instance. checking for that
+        auto prototypeObject = object->GetPrototype().As<Object>();
+
+        if (!prototypeObject.IsEmpty() && prototypeObject->IsObject()) {
+            DEBUG_WRITE("GetJSInstanceInfo: need to check prototype :%d", prototypeObject->GetIdentityHash());
+            if (IsJsRuntimeObject(prototypeObject)) {
+                jsInfo = prototypeObject->GetInternalField(jsInfoIdx);
             }
-        }
-
-        if (!jsInfo.IsEmpty() && jsInfo->IsExternal()) {
-            auto external = jsInfo.As<External>();
-            jsInstanceInfo = static_cast<JSInstanceInfo*>(external->Value());
         }
     }
 
-    return jsInstanceInfo;
+    if (!jsInfo.IsEmpty() && jsInfo->IsExternal()) {
+        auto external = jsInfo.As<External>();
+        return static_cast<JSInstanceInfo*>(external->Value());
+    }
+
+    return nullptr;
 }
 
 bool ObjectManager::IsJsRuntimeObject(const v8::Local<v8::Object>& object) {
@@ -297,41 +295,25 @@ void ObjectManager::JSObjectFinalizerStatic(const WeakCallbackInfo<ObjectWeakCal
 }
 
 void ObjectManager::JSObjectFinalizer(Isolate* isolate, ObjectWeakCallbackState* callbackState) {
+    HandleScope handleScope(m_isolate);
     Persistent<Object>* po = callbackState->target;
+    auto jsInstanceInfo = GetJSInstanceInfoFromRuntimeObject(po->Get(m_isolate));
 
-    auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
-    auto jsInstance = po->Get(m_isolate);
-    auto jsInfo = jsInstance->GetInternalField(jsInfoIdx);
-    if (jsInfo->IsUndefined()) {
-        // Typescript object layout has an object instance as child of the actual registered instance. checking for that
-        auto prototypeObject = jsInstance->GetPrototype().As<Object>();
-        if (!prototypeObject.IsEmpty() && prototypeObject->IsObject()) {
-            DEBUG_WRITE("GetJSInstanceInfo: need to check prototype :%d", prototypeObject->GetIdentityHash());
-            if (IsJsRuntimeObject(prototypeObject)) {
-                jsInfo = prototypeObject->GetInternalField(jsInfoIdx);
-            }
-        }
-    }
-
-    if (jsInfo.IsEmpty() || !jsInfo->IsExternal()) {
-        // The JavaScript instance has been forcefully disconnected from the Java instance.
+    if (!jsInstanceInfo) {
         po->Reset();
         return;
     }
 
-    auto external = jsInfo.As<External>();
-    auto jsInstanceInfo = static_cast<JSInstanceInfo *>(external->Value());
     auto javaObjectID = jsInstanceInfo->JavaObjectID;
-
     jboolean isJavaInstanceAlive = m_env.CallBooleanMethod(m_javaRuntimeObject, MAKE_INSTANCE_WEAK_AND_CHECK_IF_ALIVE_METHOD_ID, javaObjectID);
     if (isJavaInstanceAlive) {
         // If the Java instance is alive, keep the JavaScript instance alive.
-        // TODO: Check should we really register the finalizer again?
         po->SetWeak(callbackState, JSObjectFinalizerStatic, WeakCallbackType::kFinalizer);
     } else {
         // If the Java instance is dead, this JavaScript instance can be let die.
         delete jsInstanceInfo;
-        jsInstance->SetInternalField(jsInfoIdx, Undefined(m_isolate));
+        auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
+        po->Get(m_isolate)->SetInternalField(jsInfoIdx, Undefined(m_isolate));
         po->Reset();
     }
 }
