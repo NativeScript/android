@@ -17,8 +17,13 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
-ObjectManager::ObjectManager(jobject javaRuntimeObject)
-    : m_javaRuntimeObject(javaRuntimeObject), m_env(JEnv()), m_numberOfGC(0), m_currentObjectId(0), m_cache(NewWeakGlobalRefCallback, DeleteWeakGlobalRefCallback, 1000, this) {
+ObjectManager::ObjectManager(jobject javaRuntimeObject) :
+        m_javaRuntimeObject(javaRuntimeObject),
+        m_env(JEnv()),
+        m_numberOfGC(0),
+        m_currentObjectId(0),
+        m_cache(NewWeakGlobalRefCallback, DeleteWeakGlobalRefCallback, 1000, this) {
+
     auto runtimeClass = m_env.FindClass("com/tns/Runtime");
     assert(runtimeClass != nullptr);
 
@@ -30,6 +35,9 @@ ObjectManager::ObjectManager(jobject javaRuntimeObject)
 
     MAKE_INSTANCE_WEAK_BATCH_METHOD_ID = m_env.GetMethodID(runtimeClass, "makeInstanceWeak", "(Ljava/nio/ByteBuffer;IZ)V");
     assert(MAKE_INSTANCE_WEAK_BATCH_METHOD_ID != nullptr);
+
+    MAKE_INSTANCE_WEAK_AND_CHECK_IF_ALIVE_METHOD_ID = m_env.GetMethodID(runtimeClass, "makeInstanceWeakAndCheckIfAlive", "(I)Z");
+    assert(MAKE_INSTANCE_WEAK_AND_CHECK_IF_ALIVE_METHOD_ID != nullptr);
 
     CHECK_WEAK_OBJECTS_ARE_ALIVE_METHOD_ID = m_env.GetMethodID(runtimeClass, "checkWeakObjectAreAlive", "(Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;I)V");
     assert(CHECK_WEAK_OBJECTS_ARE_ALIVE_METHOD_ID != nullptr);
@@ -45,6 +53,10 @@ ObjectManager::ObjectManager(jobject javaRuntimeObject)
 
     auto useGlobalRefs = m_env.CallStaticBooleanMethod(runtimeClass, useGlobalRefsMethodID);
     m_useGlobalRefs = useGlobalRefs == JNI_TRUE;
+
+    auto getMarkingModeOrdinalMethodID = m_env.GetMethodID(runtimeClass, "getMarkingModeOrdinal", "()I");
+    jint markingMode = m_env.CallIntMethod(m_javaRuntimeObject, getMarkingModeOrdinalMethodID);
+    m_markingMode = static_cast<JavaScriptMarkingMode>(markingMode);
 }
 
 void ObjectManager::SetInstanceIsolate(Isolate* isolate) {
@@ -57,8 +69,10 @@ void ObjectManager::Init(Isolate* isolate) {
     auto jsWrapperFunc = jsWrapperFuncTemplate->GetFunction();
     m_poJsWrapperFunc = new Persistent<Function>(isolate, jsWrapperFunc);
 
-    isolate->AddGCPrologueCallback(ObjectManager::OnGcStartedStatic, kGCTypeAll);
-    isolate->AddGCEpilogueCallback(ObjectManager::OnGcFinishedStatic, kGCTypeAll);
+    if (m_markingMode != JavaScriptMarkingMode::None) {
+        isolate->AddGCPrologueCallback(ObjectManager::OnGcStartedStatic, kGCTypeAll);
+        isolate->AddGCEpilogueCallback(ObjectManager::OnGcFinishedStatic, kGCTypeAll);
+    }
 }
 
 
@@ -80,32 +94,35 @@ JniLocalRef ObjectManager::GetJavaObjectByJsObject(const Local<Object>& object) 
 
 ObjectManager::JSInstanceInfo* ObjectManager::GetJSInstanceInfo(const Local<Object>& object) {
     JSInstanceInfo* jsInstanceInfo = nullptr;
-
-    auto isolate = m_isolate;
-    HandleScope handleScope(isolate);
-
     if (IsJsRuntimeObject(object)) {
-        const int jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
-        auto jsInfo = object->GetInternalField(jsInfoIdx);
-        if (jsInfo->IsUndefined()) {
-            //Typescript object layout has an object instance as child of the actual registered instance. checking for that
-            auto prototypeObject = object->GetPrototype().As<Object>();
+        return GetJSInstanceInfoFromRuntimeObject(object);
+    }
+    return nullptr;
+}
 
-            if (!prototypeObject.IsEmpty() && prototypeObject->IsObject()) {
-                DEBUG_WRITE("GetJSInstanceInfo: need to check prototype :%d", prototypeObject->GetIdentityHash());
-                if (IsJsRuntimeObject(prototypeObject)) {
-                    jsInfo = prototypeObject->GetInternalField(jsInfoIdx);
-                }
+ObjectManager::JSInstanceInfo* ObjectManager::GetJSInstanceInfoFromRuntimeObject(const Local<Object>& object) {
+    HandleScope handleScope(m_isolate);
+
+    const int jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
+    auto jsInfo = object->GetInternalField(jsInfoIdx);
+    if (jsInfo->IsUndefined()) {
+        //Typescript object layout has an object instance as child of the actual registered instance. checking for that
+        auto prototypeObject = object->GetPrototype().As<Object>();
+
+        if (!prototypeObject.IsEmpty() && prototypeObject->IsObject()) {
+            DEBUG_WRITE("GetJSInstanceInfo: need to check prototype :%d", prototypeObject->GetIdentityHash());
+            if (IsJsRuntimeObject(prototypeObject)) {
+                jsInfo = prototypeObject->GetInternalField(jsInfoIdx);
             }
-        }
-
-        if (!jsInfo.IsEmpty() && jsInfo->IsExternal()) {
-            auto external = jsInfo.As<External>();
-            jsInstanceInfo = static_cast<JSInstanceInfo*>(external->Value());
         }
     }
 
-    return jsInstanceInfo;
+    if (!jsInfo.IsEmpty() && jsInfo->IsExternal()) {
+        auto external = jsInfo.As<External>();
+        return static_cast<JSInstanceInfo*>(external->Value());
+    }
+
+    return nullptr;
 }
 
 bool ObjectManager::IsJsRuntimeObject(const v8::Local<v8::Object>& object) {
@@ -211,7 +228,11 @@ void ObjectManager::Link(const Local<Object>& object, uint32_t javaObjectID, jcl
     auto state = new ObjectWeakCallbackState(this, jsInstanceInfo, objectHandle);
 
     // subscribe for JS GC event
-    objectHandle->SetWeak(state, JSObjectWeakCallbackStatic, WeakCallbackType::kFinalizer);
+    if (m_markingMode == JavaScriptMarkingMode::None) {
+        objectHandle->SetWeak(state, JSObjectFinalizerStatic, WeakCallbackType::kFinalizer);
+    } else {
+        objectHandle->SetWeak(state, JSObjectWeakCallbackStatic, WeakCallbackType::kFinalizer);
+    }
 
     auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
 
@@ -261,6 +282,40 @@ void ObjectManager::JSObjectWeakCallbackStatic(const WeakCallbackInfo<ObjectWeak
     auto isolate = data.GetIsolate();
 
     thisPtr->JSObjectWeakCallback(isolate, callbackState);
+}
+
+void ObjectManager::JSObjectFinalizerStatic(const WeakCallbackInfo<ObjectWeakCallbackState>& data) {
+    ObjectWeakCallbackState* callbackState = data.GetParameter();
+
+    ObjectManager* thisPtr = callbackState->thisPtr;
+
+    auto isolate = data.GetIsolate();
+
+    thisPtr->JSObjectFinalizer(isolate, callbackState);
+}
+
+void ObjectManager::JSObjectFinalizer(Isolate* isolate, ObjectWeakCallbackState* callbackState) {
+    HandleScope handleScope(m_isolate);
+    Persistent<Object>* po = callbackState->target;
+    auto jsInstanceInfo = GetJSInstanceInfoFromRuntimeObject(po->Get(m_isolate));
+
+    if (jsInstanceInfo == nullptr) {
+        po->Reset();
+        return;
+    }
+
+    auto javaObjectID = jsInstanceInfo->JavaObjectID;
+    jboolean isJavaInstanceAlive = m_env.CallBooleanMethod(m_javaRuntimeObject, MAKE_INSTANCE_WEAK_AND_CHECK_IF_ALIVE_METHOD_ID, javaObjectID);
+    if (isJavaInstanceAlive) {
+        // If the Java instance is alive, keep the JavaScript instance alive.
+        po->SetWeak(callbackState, JSObjectFinalizerStatic, WeakCallbackType::kFinalizer);
+    } else {
+        // If the Java instance is dead, this JavaScript instance can be let die.
+        delete jsInstanceInfo;
+        auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
+        po->Get(m_isolate)->SetInternalField(jsInfoIdx, Undefined(m_isolate));
+        po->Reset();
+    }
 }
 
 /*

@@ -202,9 +202,17 @@ public class Runtime {
         return dynamicConfig;
     }
 
+    @RuntimeCallable
+    public int getMarkingModeOrdinal() {
+        if (staticConfiguration != null && staticConfiguration.appConfig != null) {
+            return staticConfiguration.appConfig.getMarkingMode().ordinal();
+        } else {
+            return ((MarkingMode)AppConfig.KnownKeys.MarkingMode.getDefaultValue()).ordinal();
+        }
+    }
+
     public static boolean isInitialized() {
         Runtime runtime = Runtime.getCurrentRuntime();
-
         return (runtime != null) ? runtime.isInitializedImpl() : false;
     }
 
@@ -803,6 +811,38 @@ public class Runtime {
         for (int i = 0; i < length; i++) {
             int javaObjectId = buff.getInt();
             makeInstanceWeak(javaObjectId, keepAsWeak);
+        }
+    }
+
+    @RuntimeCallable
+    private boolean makeInstanceWeakAndCheckIfAlive(int javaObjectID) {
+        if (logger.isEnabled()) {
+            logger.write("makeInstanceWeakAndCheckIfAlive instance " + javaObjectID);
+        }
+        Object instance = strongInstances.get(javaObjectID);
+        if (instance == null) {
+            WeakReference<Object> ref = weakInstances.get(javaObjectID);
+            if (ref == null) {
+                return false;
+            } else {
+                instance = ref.get();
+                if (instance == null) {
+                    // The Java was moved from strong to weak, and then the Java instance was collected.
+                    weakInstances.remove(javaObjectID);
+                    weakJavaObjectToID.remove(Integer.valueOf(javaObjectID));
+                    return false;
+                } else {
+                    return true;
+                }
+            }
+        } else {
+            strongInstances.delete(javaObjectID);
+            strongJavaObjectToID.remove(instance);
+
+            weakJavaObjectToID.put(instance, Integer.valueOf(javaObjectID));
+            weakInstances.put(javaObjectID, new WeakReference<Object>(instance));
+
+            return true;
         }
     }
 
