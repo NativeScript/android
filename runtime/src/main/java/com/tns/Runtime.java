@@ -207,7 +207,7 @@ public class Runtime {
         if (staticConfiguration != null && staticConfiguration.appConfig != null) {
             return staticConfiguration.appConfig.getMarkingMode().ordinal();
         } else {
-            return MarkingMode.values()[0].ordinal();
+            return ((MarkingMode)AppConfig.KnownKeys.MarkingMode.getDefaultValue()).ordinal();
         }
     }
 

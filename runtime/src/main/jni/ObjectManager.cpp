@@ -299,7 +299,7 @@ void ObjectManager::JSObjectFinalizer(Isolate* isolate, ObjectWeakCallbackState*
     Persistent<Object>* po = callbackState->target;
     auto jsInstanceInfo = GetJSInstanceInfoFromRuntimeObject(po->Get(m_isolate));
 
-    if (!jsInstanceInfo) {
+    if (jsInstanceInfo == nullptr) {
         po->Reset();
         return;
     }

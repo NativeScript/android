@@ -1,14 +1,12 @@
 package com.tns;
 
 import java.io.File;
-
 import org.json.JSONObject;
-
 import android.os.Build;
 import android.util.Log;
 
 class AppConfig {
-    private enum KnownKeys {
+    protected enum KnownKeys {
         V8FlagsKey("v8Flags", "--expose_gc"),
         CodeCacheKey("codeCache", false),
         HeapSnapshotScriptKey("heapSnapshotScript", ""),
@@ -18,7 +16,7 @@ class AppConfig {
         MemoryCheckInterval("memoryCheckInterval", 0),
         FreeMemoryRatio("freeMemoryRatio", 0.0),
         Profiling("profiling", ""),
-        MarkingMode("markingMode", com.tns.MarkingMode.values()[0]);
+        MarkingMode("markingMode", com.tns.MarkingMode.full);
 
         private final String name;
         private final Object defaultValue;
@@ -52,7 +50,7 @@ class AppConfig {
         try {
             rootObject = FileSystem.readJSONFile(packageInfo);
             if (rootObject != null) {
-                if (rootObject.has(KnownKeys.Profiling.name())) {
+                if (rootObject.has(KnownKeys.Profiling.getName())) {
                     String profiling = rootObject.getString(KnownKeys.Profiling.getName());
                     values[KnownKeys.Profiling.ordinal()] = profiling;
                 }
@@ -92,9 +90,12 @@ class AppConfig {
                     }
                     if (androidObject.has(KnownKeys.MarkingMode.getName())) {
                         try {
-                            String value = androidObject.getString(KnownKeys.MarkingMode.getName());
-                            values[KnownKeys.MarkingMode.ordinal()] = MarkingMode.valueOf(value);
-                        } catch(Throwable e) {
+                            String markingModeString = androidObject.getString(KnownKeys.MarkingMode.getName());
+                            MarkingMode markingMode = MarkingMode.valueOf(markingModeString);
+                            values[KnownKeys.MarkingMode.ordinal()] = markingMode;
+                        } catch(Exception e) {
+                            e.printStackTrace();
+                            Log.v("JS", "Failed to parse marking mode. The default " + ((MarkingMode)KnownKeys.MarkingMode.getDefaultValue()).name() + " will be used.");
                         }
                     }
                 }
@@ -131,5 +132,6 @@ class AppConfig {
     public String getProfilingMode() {
         return (String)values[KnownKeys.Profiling.ordinal()];
     }
+
     public MarkingMode getMarkingMode() { return (MarkingMode)values[KnownKeys.MarkingMode.ordinal()]; }
 }
