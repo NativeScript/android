@@ -123,12 +123,12 @@ function createReleaseNotes(milestone) {
 
             var bugs = issues.filter(function (i) {
                 return i.labels.filter(function (l) {
-                    return l.name == "T:Bug";
+                    return l.name == "bug";
                 }).length > 0;
             });
             var features = issues.filter(function (i) {
                 return i.labels.filter(function (l) {
-                    return l.name == "T:Feature";
+                    return l.name == "feature";
                 }).length > 0;
             });
             
