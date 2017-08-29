@@ -1,3 +1,10 @@
+3.2.0
+==
+
+## Bug Fixes
+
+ - [Static binding generator fails when using Webpack + Workers (#778)](https://github.com/NativeScript/android-runtime/issues/778)
+
 3.1.1
 ==
 
