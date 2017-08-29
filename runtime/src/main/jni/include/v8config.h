@@ -410,7 +410,12 @@
 // Note that alignment of a type within a struct can be less than the
 // alignment of the type stand-alone (because of ancient ABIs), so this
 // should only be used as a last resort.
-namespace v8 { template <typename T> class AlignOfHelper { char c; T t; }; }
+namespace v8 {
+template <typename T> class AlignOfHelper {
+        char c;
+        T t;
+};
+}
 # define V8_ALIGNOF(type) (sizeof(::v8::AlignOfHelper<type>) - sizeof(type))
 #endif
 

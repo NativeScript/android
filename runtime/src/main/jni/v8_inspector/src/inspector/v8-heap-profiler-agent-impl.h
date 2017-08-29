@@ -19,53 +19,53 @@ using protocol::ErrorString;
 using protocol::Maybe;
 
 class V8HeapProfilerAgentImpl : public protocol::HeapProfiler::Backend {
- public:
-  V8HeapProfilerAgentImpl(V8InspectorSessionImpl*, protocol::FrontendChannel*,
-                          protocol::DictionaryValue* state);
-  ~V8HeapProfilerAgentImpl() override;
-  void restore();
+    public:
+        V8HeapProfilerAgentImpl(V8InspectorSessionImpl*, protocol::FrontendChannel*,
+                                protocol::DictionaryValue* state);
+        ~V8HeapProfilerAgentImpl() override;
+        void restore();
 
-  void collectGarbage(ErrorString*) override;
+        void collectGarbage(ErrorString*) override;
 
-  void enable(ErrorString*) override;
-  void startTrackingHeapObjects(ErrorString*,
-                                const Maybe<bool>& trackAllocations) override;
-  void stopTrackingHeapObjects(ErrorString*,
-                               const Maybe<bool>& reportProgress) override;
+        void enable(ErrorString*) override;
+        void startTrackingHeapObjects(ErrorString*,
+                                      const Maybe<bool>& trackAllocations) override;
+        void stopTrackingHeapObjects(ErrorString*,
+                                     const Maybe<bool>& reportProgress) override;
 
-  void disable(ErrorString*) override;
+        void disable(ErrorString*) override;
 
-  void takeHeapSnapshot(ErrorString*,
-                        const Maybe<bool>& reportProgress) override;
+        void takeHeapSnapshot(ErrorString*,
+                              const Maybe<bool>& reportProgress) override;
 
-  void getObjectByHeapObjectId(
-      ErrorString*, const String16& heapSnapshotObjectId,
-      const Maybe<String16>& objectGroup,
-      std::unique_ptr<protocol::Runtime::RemoteObject>* result) override;
-  void addInspectedHeapObject(ErrorString*,
-                              const String16& inspectedHeapObjectId) override;
-  void getHeapObjectId(ErrorString*, const String16& objectId,
-                       String16* heapSnapshotObjectId) override;
+        void getObjectByHeapObjectId(
+            ErrorString*, const String16& heapSnapshotObjectId,
+            const Maybe<String16>& objectGroup,
+            std::unique_ptr<protocol::Runtime::RemoteObject>* result) override;
+        void addInspectedHeapObject(ErrorString*,
+                                    const String16& inspectedHeapObjectId) override;
+        void getHeapObjectId(ErrorString*, const String16& objectId,
+                             String16* heapSnapshotObjectId) override;
 
-  void startSampling(ErrorString*,
-                     const Maybe<double>& samplingInterval) override;
-  void stopSampling(
-      ErrorString*,
-      std::unique_ptr<protocol::HeapProfiler::SamplingHeapProfile>*) override;
+        void startSampling(ErrorString*,
+                           const Maybe<double>& samplingInterval) override;
+        void stopSampling(
+            ErrorString*,
+            std::unique_ptr<protocol::HeapProfiler::SamplingHeapProfile>*) override;
 
- private:
-  void startTrackingHeapObjectsInternal(bool trackAllocations);
-  void stopTrackingHeapObjectsInternal();
-  void requestHeapStatsUpdate();
-  static void onTimer(void*);
+    private:
+        void startTrackingHeapObjectsInternal(bool trackAllocations);
+        void stopTrackingHeapObjectsInternal();
+        void requestHeapStatsUpdate();
+        static void onTimer(void*);
 
-  V8InspectorSessionImpl* m_session;
-  v8::Isolate* m_isolate;
-  protocol::HeapProfiler::Frontend m_frontend;
-  protocol::DictionaryValue* m_state;
-  bool m_hasTimer;
+        V8InspectorSessionImpl* m_session;
+        v8::Isolate* m_isolate;
+        protocol::HeapProfiler::Frontend m_frontend;
+        protocol::DictionaryValue* m_state;
+        bool m_hasTimer;
 
-  DISALLOW_COPY_AND_ASSIGN(V8HeapProfilerAgentImpl);
+        DISALLOW_COPY_AND_ASSIGN(V8HeapProfilerAgentImpl);
 };
 
 }  // namespace v8_inspector

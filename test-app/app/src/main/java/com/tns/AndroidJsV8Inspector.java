@@ -1,6 +1,5 @@
 package com.tns;
 
-import android.content.Context;
 import android.os.Handler;
 import android.util.Log;
 import android.util.Pair;
@@ -44,7 +43,7 @@ class AndroidJsV8Inspector {
 
     private final Object debugBrkLock;
 
-    private static AtomicBoolean DebugInitialized = new AtomicBoolean(false);
+    private static AtomicBoolean ReadyToProcessMessages = new AtomicBoolean(false);
 
     private LinkedBlockingQueue<String> inspectorMessages = new LinkedBlockingQueue<String>();
     private LinkedBlockingQueue<String> pendingInspectorMessages = new LinkedBlockingQueue<String>();
@@ -186,16 +185,16 @@ class AndroidJsV8Inspector {
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 } finally {
-                    AndroidJsV8Inspector.DebugInitialized.getAndSet(true);
+                    AndroidJsV8Inspector.ReadyToProcessMessages.set(true);
                     this.processDebugBreak();
                 }
             }
         } else {
-            AndroidJsV8Inspector.DebugInitialized.getAndSet(true);
+            AndroidJsV8Inspector.ReadyToProcessMessages.set(true);
         }
     }
 
-    // process all messages coming front the frontend necessary to initialize the inspector backend
+    // process all messages coming from the frontend necessary to initialize the inspector backend
     // schedule a debug line break at first convenience
     private void processDebugBreak() {
         processDebugBreakMessages();
@@ -267,7 +266,7 @@ class AndroidJsV8Inspector {
 
             inspectorMessages.offer(message.getTextPayload());
 
-            if (!AndroidJsV8Inspector.DebugInitialized.get()) {
+            if (!AndroidJsV8Inspector.ReadyToProcessMessages.get()) {
                 String nextMessage = inspectorMessages.poll();
                 while (nextMessage != null) {
                     pendingInspectorMessages.offer(nextMessage);

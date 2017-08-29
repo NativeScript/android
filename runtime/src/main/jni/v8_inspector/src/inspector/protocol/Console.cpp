@@ -36,8 +36,7 @@ const char* ConsoleMessage::LevelEnum::Error = "error";
 const char* ConsoleMessage::LevelEnum::Debug = "debug";
 const char* ConsoleMessage::LevelEnum::Info = "info";
 
-std::unique_ptr<ConsoleMessage> ConsoleMessage::parse(protocol::Value* value, ErrorSupport* errors)
-{
+std::unique_ptr<ConsoleMessage> ConsoleMessage::parse(protocol::Value* value, ErrorSupport* errors) {
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -71,28 +70,30 @@ std::unique_ptr<ConsoleMessage> ConsoleMessage::parse(protocol::Value* value, Er
         result->m_column = ValueConversions<int>::parse(columnValue, errors);
     }
     errors->pop();
-    if (errors->hasErrors())
+    if (errors->hasErrors()) {
         return nullptr;
+    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> ConsoleMessage::serialize() const
-{
+std::unique_ptr<protocol::DictionaryValue> ConsoleMessage::serialize() const {
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("source", ValueConversions<String>::serialize(m_source));
     result->setValue("level", ValueConversions<String>::serialize(m_level));
     result->setValue("text", ValueConversions<String>::serialize(m_text));
-    if (m_url.isJust())
+    if (m_url.isJust()) {
         result->setValue("url", ValueConversions<String>::serialize(m_url.fromJust()));
-    if (m_line.isJust())
+    }
+    if (m_line.isJust()) {
         result->setValue("line", ValueConversions<int>::serialize(m_line.fromJust()));
-    if (m_column.isJust())
+    }
+    if (m_column.isJust()) {
         result->setValue("column", ValueConversions<int>::serialize(m_column.fromJust()));
+    }
     return result;
 }
 
-std::unique_ptr<ConsoleMessage> ConsoleMessage::clone() const
-{
+std::unique_ptr<ConsoleMessage> ConsoleMessage::clone() const {
     ErrorSupport errors;
     return parse(serialize().get(), &errors);
 }
@@ -102,50 +103,48 @@ std::unique_ptr<ConsoleMessage> ConsoleMessage::clone() const
 
 // ------------- Frontend notifications.
 
-void Frontend::messageAdded(std::unique_ptr<protocol::Console::ConsoleMessage> message)
-{
+void Frontend::messageAdded(std::unique_ptr<protocol::Console::ConsoleMessage> message) {
     std::unique_ptr<protocol::DictionaryValue> jsonMessage = DictionaryValue::create();
     jsonMessage->setString("method", "Console.messageAdded");
     std::unique_ptr<protocol::DictionaryValue> paramsObject = DictionaryValue::create();
     paramsObject->setValue("message", ValueConversions<protocol::Console::ConsoleMessage>::serialize(message.get()));
     jsonMessage->setObject("params", std::move(paramsObject));
-    if (m_frontendChannel)
+    if (m_frontendChannel) {
         m_frontendChannel->sendProtocolNotification(jsonMessage->toJSONString());
+    }
 }
 
-void Frontend::flush()
-{
+void Frontend::flush() {
     m_frontendChannel->flushProtocolNotifications();
 }
 
 // --------------------- Dispatcher.
 
 class DispatcherImpl : public protocol::DispatcherBase {
-public:
-    DispatcherImpl(FrontendChannel* frontendChannel, Backend* backend)
-        : DispatcherBase(frontendChannel)
-        , m_backend(backend) {
-        m_dispatchMap["Console.enable"] = &DispatcherImpl::enable;
-        m_dispatchMap["Console.disable"] = &DispatcherImpl::disable;
-        m_dispatchMap["Console.clearMessages"] = &DispatcherImpl::clearMessages;
-    }
-    ~DispatcherImpl() override { }
-    void dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) override;
+    public:
+        DispatcherImpl(FrontendChannel* frontendChannel, Backend* backend)
+            : DispatcherBase(frontendChannel)
+            , m_backend(backend) {
+            m_dispatchMap["Console.enable"] = &DispatcherImpl::enable;
+            m_dispatchMap["Console.disable"] = &DispatcherImpl::disable;
+            m_dispatchMap["Console.clearMessages"] = &DispatcherImpl::clearMessages;
+        }
+        ~DispatcherImpl() override { }
+        void dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) override;
 
-protected:
-    using CallHandler = void (DispatcherImpl::*)(int callId, std::unique_ptr<DictionaryValue> messageObject, ErrorSupport* errors);
-    using DispatchMap = protocol::HashMap<String, CallHandler>;
-    DispatchMap m_dispatchMap;
+    protected:
+        using CallHandler = void (DispatcherImpl::*)(int callId, std::unique_ptr<DictionaryValue> messageObject, ErrorSupport* errors);
+        using DispatchMap = protocol::HashMap<String, CallHandler>;
+        DispatchMap m_dispatchMap;
 
-    void enable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void disable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void clearMessages(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void enable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void disable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void clearMessages(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
 
-    Backend* m_backend;
+        Backend* m_backend;
 };
 
-void DispatcherImpl::dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject)
-{
+void DispatcherImpl::dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) {
     protocol::HashMap<String, CallHandler>::iterator it = m_dispatchMap.find(method);
     if (it == m_dispatchMap.end()) {
         reportProtocolError(callId, MethodNotFound, "'" + method + "' wasn't found", nullptr);
@@ -157,39 +156,38 @@ void DispatcherImpl::dispatch(int callId, const String& method, std::unique_ptr<
 }
 
 
-void DispatcherImpl::enable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
-{
+void DispatcherImpl::enable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     ErrorString error;
     m_backend->enable(&error);
-    if (weak->get())
+    if (weak->get()) {
         weak->get()->sendResponse(callId, error);
+    }
 }
 
-void DispatcherImpl::disable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
-{
+void DispatcherImpl::disable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     ErrorString error;
     m_backend->disable(&error);
-    if (weak->get())
+    if (weak->get()) {
         weak->get()->sendResponse(callId, error);
+    }
 }
 
-void DispatcherImpl::clearMessages(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
-{
+void DispatcherImpl::clearMessages(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     ErrorString error;
     m_backend->clearMessages(&error);
-    if (weak->get())
+    if (weak->get()) {
         weak->get()->sendResponse(callId, error);
+    }
 }
 
 // static
-void Dispatcher::wire(UberDispatcher* dispatcher, Backend* backend)
-{
+void Dispatcher::wire(UberDispatcher* dispatcher, Backend* backend) {
     dispatcher->registerBackend("Console", wrapUnique(new DispatcherImpl(dispatcher->channel(), backend)));
 }
 

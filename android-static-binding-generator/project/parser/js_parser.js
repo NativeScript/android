@@ -10,6 +10,12 @@ if (process.env.AST_PARSER_DISABLE_LOGGING && process.env.AST_PARSER_DISABLE_LOG
 	disableLogger = false;
 }
 
+var 	arguments = process.argv;
+if (arguments && arguments.length) {
+	if(arguments[arguments.length - 1] == "enableVerboseLogging") {
+		disableLogger = false
+	}
+}
 loggingSettings = {
 	"logPath": require("path").dirname(require.main.filename) + "/logs/i.txt",
 	"strategy": "console",
@@ -29,7 +35,6 @@ var fs = require("fs"),
 	lazy = require("lazy"),
 	eol = require('os').EOL,
 
-	arguments = process.argv,
 	appDir = path.dirname(require.main.filename),
 	extendDecoratorName = "JavaProxy",
 	interfacesDecoratorName = "Interfaces",
@@ -217,7 +222,6 @@ var readFile = function (filePath, err) {
 				return reject(err);
 			}
 
-			logger.info("+got content of file!");
 			var fileInfo = {
 				filePath: filePath,
 				data: data.toString()
@@ -236,8 +240,6 @@ var astFromFileContent = function (data, err) {
 			logger.warn("+DIDN'T parse ast from file!");
 			return reject(err);
 		}
-
-		logger.info("+parsing ast from file!");
 
 		var ast = babelParser.parse(data.data, {
 			minify: false,

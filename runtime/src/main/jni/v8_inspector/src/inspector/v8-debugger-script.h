@@ -38,48 +38,70 @@
 namespace v8_inspector {
 
 class V8DebuggerScript {
- public:
-  V8DebuggerScript(v8::Local<v8::Context>, v8::Local<v8::Object>,
-                   bool isLiveEdit);
-  ~V8DebuggerScript();
+    public:
+        V8DebuggerScript(v8::Local<v8::Context>, v8::Local<v8::Object>,
+                         bool isLiveEdit);
+        ~V8DebuggerScript();
 
-  const String16& scriptId() const { return m_id; }
-  const String16& url() const { return m_url; }
-  bool hasSourceURL() const { return !m_sourceURL.isEmpty(); }
-  const String16& sourceURL() const;
-  const String16& sourceMappingURL() const { return m_sourceMappingURL; }
-  v8::Local<v8::String> source(v8::Isolate*) const;
-  const String16& hash() const { return m_hash; }
-  int startLine() const { return m_startLine; }
-  int startColumn() const { return m_startColumn; }
-  int endLine() const { return m_endLine; }
-  int endColumn() const { return m_endColumn; }
-  int executionContextId() const { return m_executionContextId; }
-  const String16& executionContextAuxData() const {
-    return m_executionContextAuxData;
-  }
-  bool isLiveEdit() const { return m_isLiveEdit; }
+        const String16& scriptId() const {
+            return m_id;
+        }
+        const String16& url() const {
+            return m_url;
+        }
+        bool hasSourceURL() const {
+            return !m_sourceURL.isEmpty();
+        }
+        const String16& sourceURL() const;
+        const String16& sourceMappingURL() const {
+            return m_sourceMappingURL;
+        }
+        v8::Local<v8::String> source(v8::Isolate*) const;
+        const String16& hash() const {
+            return m_hash;
+        }
+        int startLine() const {
+            return m_startLine;
+        }
+        int startColumn() const {
+            return m_startColumn;
+        }
+        int endLine() const {
+            return m_endLine;
+        }
+        int endColumn() const {
+            return m_endColumn;
+        }
+        int executionContextId() const {
+            return m_executionContextId;
+        }
+        const String16& executionContextAuxData() const {
+            return m_executionContextAuxData;
+        }
+        bool isLiveEdit() const {
+            return m_isLiveEdit;
+        }
 
-  void setSourceURL(const String16&);
-  void setSourceMappingURL(const String16&);
-  void setSource(v8::Isolate*, v8::Local<v8::String>);
+        void setSourceURL(const String16&);
+        void setSourceMappingURL(const String16&);
+        void setSource(v8::Isolate*, v8::Local<v8::String>);
 
- private:
-  String16 m_id;
-  String16 m_url;
-  String16 m_sourceURL;
-  String16 m_sourceMappingURL;
-  v8::Global<v8::String> m_source;
-  String16 m_hash;
-  int m_startLine;
-  int m_startColumn;
-  int m_endLine;
-  int m_endColumn;
-  int m_executionContextId;
-  String16 m_executionContextAuxData;
-  bool m_isLiveEdit;
+    private:
+        String16 m_id;
+        String16 m_url;
+        String16 m_sourceURL;
+        String16 m_sourceMappingURL;
+        v8::Global<v8::String> m_source;
+        String16 m_hash;
+        int m_startLine;
+        int m_startColumn;
+        int m_endLine;
+        int m_endColumn;
+        int m_executionContextId;
+        String16 m_executionContextAuxData;
+        bool m_isLiveEdit;
 
-  DISALLOW_COPY_AND_ASSIGN(V8DebuggerScript);
+        DISALLOW_COPY_AND_ASSIGN(V8DebuggerScript);
 };
 
 }  // namespace v8_inspector

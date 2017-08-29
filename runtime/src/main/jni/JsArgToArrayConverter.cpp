@@ -263,7 +263,8 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index) {
             if (success) {
                 SetConvertedObject(env, index, obj.Move(), obj.IsGlobal());
             } else {
-                s << "Cannot convert JavaScript object with id " << jsObj->GetIdentityHash() << " at index " << index;
+                String::Utf8Value jsObjStr(jsObj);
+                s << "Cannot marshal JavaScript argument " << (*jsObjStr ? *jsObjStr : "<failed-to-string>") << " at index " << index << " to Java type.";
             }
             break;
 
@@ -274,7 +275,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index) {
         SetConvertedObject(env, index, nullptr);
         success = true;
     } else {
-        s << "Cannot convert JavaScript object at index " << index;
+        s << "Cannot marshal JavaScript argument at index " << index << " to Java type.";
         success = false;
     }
 

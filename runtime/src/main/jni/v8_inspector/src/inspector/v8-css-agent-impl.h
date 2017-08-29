@@ -9,17 +9,17 @@
 
 namespace v8_inspector {
 
-    class V8InspectorSessionImpl;
+class V8InspectorSessionImpl;
 
-    using protocol::ErrorString;
-    using v8_inspector::protocol::Maybe;
-    using String = v8_inspector::String16;
+using protocol::ErrorString;
+using v8_inspector::protocol::Maybe;
+using String = v8_inspector::String16;
 
 
-    class V8CSSAgentImpl : public protocol::CSS::Backend {
+class V8CSSAgentImpl : public protocol::CSS::Backend {
     public:
-        V8CSSAgentImpl(V8InspectorSessionImpl *, protocol::FrontendChannel *,
-            protocol::DictionaryValue *state);
+        V8CSSAgentImpl(V8InspectorSessionImpl*, protocol::FrontendChannel*,
+                       protocol::DictionaryValue* state);
 
         ~V8CSSAgentImpl() override;
 
@@ -40,7 +40,7 @@ namespace v8_inspector {
         bool m_enabled;
 
         DISALLOW_COPY_AND_ASSIGN(V8CSSAgentImpl);
-    };
+};
 }
 
 

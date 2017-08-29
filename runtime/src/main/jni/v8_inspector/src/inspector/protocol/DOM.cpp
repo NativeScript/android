@@ -35,8 +35,7 @@ const char* Removals = "removals";
 const char* Text = "text";
 } // namespace LiveRegionRelevantEnum
 
-std::unique_ptr<Node> Node::parse(protocol::Value* value, ErrorSupport* errors)
-{
+std::unique_ptr<Node> Node::parse(protocol::Value* value, ErrorSupport* errors) {
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -156,68 +155,85 @@ std::unique_ptr<Node> Node::parse(protocol::Value* value, ErrorSupport* errors)
         result->m_contentSecurityPolicyHash = ValueConversions<String>::parse(contentSecurityPolicyHashValue, errors);
     }
     errors->pop();
-    if (errors->hasErrors())
+    if (errors->hasErrors()) {
         return nullptr;
+    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> Node::serialize() const
-{
+std::unique_ptr<protocol::DictionaryValue> Node::serialize() const {
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("nodeId", ValueConversions<int>::serialize(m_nodeId));
     result->setValue("nodeType", ValueConversions<int>::serialize(m_nodeType));
     result->setValue("nodeName", ValueConversions<String>::serialize(m_nodeName));
     result->setValue("localName", ValueConversions<String>::serialize(m_localName));
     result->setValue("nodeValue", ValueConversions<String>::serialize(m_nodeValue));
-    if (m_childNodeCount.isJust())
+    if (m_childNodeCount.isJust()) {
         result->setValue("childNodeCount", ValueConversions<int>::serialize(m_childNodeCount.fromJust()));
-    if (m_children.isJust())
+    }
+    if (m_children.isJust()) {
         result->setValue("children", ValueConversions<protocol::Array<protocol::DOM::Node>>::serialize(m_children.fromJust()));
-    if (m_attributes.isJust())
+    }
+    if (m_attributes.isJust()) {
         result->setValue("attributes", ValueConversions<protocol::Array<String>>::serialize(m_attributes.fromJust()));
-    if (m_documentURL.isJust())
+    }
+    if (m_documentURL.isJust()) {
         result->setValue("documentURL", ValueConversions<String>::serialize(m_documentURL.fromJust()));
-    if (m_baseURL.isJust())
+    }
+    if (m_baseURL.isJust()) {
         result->setValue("baseURL", ValueConversions<String>::serialize(m_baseURL.fromJust()));
-    if (m_publicId.isJust())
+    }
+    if (m_publicId.isJust()) {
         result->setValue("publicId", ValueConversions<String>::serialize(m_publicId.fromJust()));
-    if (m_systemId.isJust())
+    }
+    if (m_systemId.isJust()) {
         result->setValue("systemId", ValueConversions<String>::serialize(m_systemId.fromJust()));
-    if (m_xmlVersion.isJust())
+    }
+    if (m_xmlVersion.isJust()) {
         result->setValue("xmlVersion", ValueConversions<String>::serialize(m_xmlVersion.fromJust()));
-    if (m_name.isJust())
+    }
+    if (m_name.isJust()) {
         result->setValue("name", ValueConversions<String>::serialize(m_name.fromJust()));
-    if (m_value.isJust())
+    }
+    if (m_value.isJust()) {
         result->setValue("value", ValueConversions<String>::serialize(m_value.fromJust()));
-    if (m_pseudoType.isJust())
+    }
+    if (m_pseudoType.isJust()) {
         result->setValue("pseudoType", ValueConversions<String>::serialize(m_pseudoType.fromJust()));
-    if (m_shadowRootType.isJust())
+    }
+    if (m_shadowRootType.isJust()) {
         result->setValue("shadowRootType", ValueConversions<String>::serialize(m_shadowRootType.fromJust()));
-    if (m_frameId.isJust())
+    }
+    if (m_frameId.isJust()) {
         result->setValue("frameId", ValueConversions<String>::serialize(m_frameId.fromJust()));
-    if (m_contentDocument.isJust())
+    }
+    if (m_contentDocument.isJust()) {
         result->setValue("contentDocument", ValueConversions<protocol::DOM::Node>::serialize(m_contentDocument.fromJust()));
-    if (m_shadowRoots.isJust())
+    }
+    if (m_shadowRoots.isJust()) {
         result->setValue("shadowRoots", ValueConversions<protocol::Array<protocol::DOM::Node>>::serialize(m_shadowRoots.fromJust()));
-    if (m_templateContent.isJust())
+    }
+    if (m_templateContent.isJust()) {
         result->setValue("templateContent", ValueConversions<protocol::DOM::Node>::serialize(m_templateContent.fromJust()));
-    if (m_pseudoElements.isJust())
+    }
+    if (m_pseudoElements.isJust()) {
         result->setValue("pseudoElements", ValueConversions<protocol::Array<protocol::DOM::Node>>::serialize(m_pseudoElements.fromJust()));
-    if (m_role.isJust())
+    }
+    if (m_role.isJust()) {
         result->setValue("role", ValueConversions<String>::serialize(m_role.fromJust()));
-    if (m_contentSecurityPolicyHash.isJust())
+    }
+    if (m_contentSecurityPolicyHash.isJust()) {
         result->setValue("contentSecurityPolicyHash", ValueConversions<String>::serialize(m_contentSecurityPolicyHash.fromJust()));
+    }
     return result;
 }
 
-std::unique_ptr<Node> Node::clone() const
-{
+std::unique_ptr<Node> Node::clone() const {
     ErrorSupport errors;
     return parse(serialize().get(), &errors);
 }
 
-std::unique_ptr<RGBAColor> RGBAColor::parse(protocol::Value* value, ErrorSupport* errors)
-{
+std::unique_ptr<RGBAColor> RGBAColor::parse(protocol::Value* value, ErrorSupport* errors) {
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -241,30 +257,29 @@ std::unique_ptr<RGBAColor> RGBAColor::parse(protocol::Value* value, ErrorSupport
         result->m_a = ValueConversions<double>::parse(aValue, errors);
     }
     errors->pop();
-    if (errors->hasErrors())
+    if (errors->hasErrors()) {
         return nullptr;
+    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> RGBAColor::serialize() const
-{
+std::unique_ptr<protocol::DictionaryValue> RGBAColor::serialize() const {
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("r", ValueConversions<int>::serialize(m_r));
     result->setValue("g", ValueConversions<int>::serialize(m_g));
     result->setValue("b", ValueConversions<int>::serialize(m_b));
-    if (m_a.isJust())
+    if (m_a.isJust()) {
         result->setValue("a", ValueConversions<double>::serialize(m_a.fromJust()));
+    }
     return result;
 }
 
-std::unique_ptr<RGBAColor> RGBAColor::clone() const
-{
+std::unique_ptr<RGBAColor> RGBAColor::clone() const {
     ErrorSupport errors;
     return parse(serialize().get(), &errors);
 }
 
-std::unique_ptr<HighlightConfig> HighlightConfig::parse(protocol::Value* value, ErrorSupport* errors)
-{
+std::unique_ptr<HighlightConfig> HighlightConfig::parse(protocol::Value* value, ErrorSupport* errors) {
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -299,29 +314,33 @@ std::unique_ptr<HighlightConfig> HighlightConfig::parse(protocol::Value* value, 
         result->m_marginColor = ValueConversions<protocol::DOM::RGBAColor>::parse(marginColorValue, errors);
     }
     errors->pop();
-    if (errors->hasErrors())
+    if (errors->hasErrors()) {
         return nullptr;
+    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> HighlightConfig::serialize() const
-{
+std::unique_ptr<protocol::DictionaryValue> HighlightConfig::serialize() const {
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (m_showInfo.isJust())
+    if (m_showInfo.isJust()) {
         result->setValue("showInfo", ValueConversions<bool>::serialize(m_showInfo.fromJust()));
-    if (m_contentColor.isJust())
+    }
+    if (m_contentColor.isJust()) {
         result->setValue("contentColor", ValueConversions<protocol::DOM::RGBAColor>::serialize(m_contentColor.fromJust()));
-    if (m_paddingColor.isJust())
+    }
+    if (m_paddingColor.isJust()) {
         result->setValue("paddingColor", ValueConversions<protocol::DOM::RGBAColor>::serialize(m_paddingColor.fromJust()));
-    if (m_borderColor.isJust())
+    }
+    if (m_borderColor.isJust()) {
         result->setValue("borderColor", ValueConversions<protocol::DOM::RGBAColor>::serialize(m_borderColor.fromJust()));
-    if (m_marginColor.isJust())
+    }
+    if (m_marginColor.isJust()) {
         result->setValue("marginColor", ValueConversions<protocol::DOM::RGBAColor>::serialize(m_marginColor.fromJust()));
+    }
     return result;
 }
 
-std::unique_ptr<HighlightConfig> HighlightConfig::clone() const
-{
+std::unique_ptr<HighlightConfig> HighlightConfig::clone() const {
     ErrorSupport errors;
     return parse(serialize().get(), &errors);
 }
@@ -331,30 +350,29 @@ std::unique_ptr<HighlightConfig> HighlightConfig::clone() const
 
 // ------------- Frontend notifications.
 
-void Frontend::documentUpdated()
-{
+void Frontend::documentUpdated() {
     std::unique_ptr<protocol::DictionaryValue> jsonMessage = DictionaryValue::create();
     jsonMessage->setString("method", "DOM.documentUpdated");
     std::unique_ptr<protocol::DictionaryValue> paramsObject = DictionaryValue::create();
     jsonMessage->setObject("params", std::move(paramsObject));
-    if (m_frontendChannel)
+    if (m_frontendChannel) {
         m_frontendChannel->sendProtocolNotification(jsonMessage->toJSONString());
+    }
 }
 
-void Frontend::setChildNodes(int parentId, std::unique_ptr<protocol::Array<protocol::DOM::Node>> nodes)
-{
+void Frontend::setChildNodes(int parentId, std::unique_ptr<protocol::Array<protocol::DOM::Node>> nodes) {
     std::unique_ptr<protocol::DictionaryValue> jsonMessage = DictionaryValue::create();
     jsonMessage->setString("method", "DOM.setChildNodes");
     std::unique_ptr<protocol::DictionaryValue> paramsObject = DictionaryValue::create();
     paramsObject->setValue("parentId", ValueConversions<int>::serialize(parentId));
     paramsObject->setValue("nodes", ValueConversions<protocol::Array<protocol::DOM::Node>>::serialize(nodes.get()));
     jsonMessage->setObject("params", std::move(paramsObject));
-    if (m_frontendChannel)
+    if (m_frontendChannel) {
         m_frontendChannel->sendProtocolNotification(jsonMessage->toJSONString());
+    }
 }
 
-void Frontend::attributeModified(int nodeId, const String& name, const String& value)
-{
+void Frontend::attributeModified(int nodeId, const String& name, const String& value) {
     std::unique_ptr<protocol::DictionaryValue> jsonMessage = DictionaryValue::create();
     jsonMessage->setString("method", "DOM.attributeModified");
     std::unique_ptr<protocol::DictionaryValue> paramsObject = DictionaryValue::create();
@@ -362,59 +380,59 @@ void Frontend::attributeModified(int nodeId, const String& name, const String& v
     paramsObject->setValue("name", ValueConversions<String>::serialize(name));
     paramsObject->setValue("value", ValueConversions<String>::serialize(value));
     jsonMessage->setObject("params", std::move(paramsObject));
-    if (m_frontendChannel)
+    if (m_frontendChannel) {
         m_frontendChannel->sendProtocolNotification(jsonMessage->toJSONString());
+    }
 }
 
-void Frontend::attributeRemoved(int nodeId, const String& name)
-{
+void Frontend::attributeRemoved(int nodeId, const String& name) {
     std::unique_ptr<protocol::DictionaryValue> jsonMessage = DictionaryValue::create();
     jsonMessage->setString("method", "DOM.attributeRemoved");
     std::unique_ptr<protocol::DictionaryValue> paramsObject = DictionaryValue::create();
     paramsObject->setValue("nodeId", ValueConversions<int>::serialize(nodeId));
     paramsObject->setValue("name", ValueConversions<String>::serialize(name));
     jsonMessage->setObject("params", std::move(paramsObject));
-    if (m_frontendChannel)
+    if (m_frontendChannel) {
         m_frontendChannel->sendProtocolNotification(jsonMessage->toJSONString());
+    }
 }
 
-void Frontend::inlineStyleInvalidated(std::unique_ptr<protocol::Array<int>> nodeIds)
-{
+void Frontend::inlineStyleInvalidated(std::unique_ptr<protocol::Array<int>> nodeIds) {
     std::unique_ptr<protocol::DictionaryValue> jsonMessage = DictionaryValue::create();
     jsonMessage->setString("method", "DOM.inlineStyleInvalidated");
     std::unique_ptr<protocol::DictionaryValue> paramsObject = DictionaryValue::create();
     paramsObject->setValue("nodeIds", ValueConversions<protocol::Array<int>>::serialize(nodeIds.get()));
     jsonMessage->setObject("params", std::move(paramsObject));
-    if (m_frontendChannel)
+    if (m_frontendChannel) {
         m_frontendChannel->sendProtocolNotification(jsonMessage->toJSONString());
+    }
 }
 
-void Frontend::characterDataModified(int nodeId, const String& characterData)
-{
+void Frontend::characterDataModified(int nodeId, const String& characterData) {
     std::unique_ptr<protocol::DictionaryValue> jsonMessage = DictionaryValue::create();
     jsonMessage->setString("method", "DOM.characterDataModified");
     std::unique_ptr<protocol::DictionaryValue> paramsObject = DictionaryValue::create();
     paramsObject->setValue("nodeId", ValueConversions<int>::serialize(nodeId));
     paramsObject->setValue("characterData", ValueConversions<String>::serialize(characterData));
     jsonMessage->setObject("params", std::move(paramsObject));
-    if (m_frontendChannel)
+    if (m_frontendChannel) {
         m_frontendChannel->sendProtocolNotification(jsonMessage->toJSONString());
+    }
 }
 
-void Frontend::childNodeCountUpdated(int nodeId, int childNodeCount)
-{
+void Frontend::childNodeCountUpdated(int nodeId, int childNodeCount) {
     std::unique_ptr<protocol::DictionaryValue> jsonMessage = DictionaryValue::create();
     jsonMessage->setString("method", "DOM.childNodeCountUpdated");
     std::unique_ptr<protocol::DictionaryValue> paramsObject = DictionaryValue::create();
     paramsObject->setValue("nodeId", ValueConversions<int>::serialize(nodeId));
     paramsObject->setValue("childNodeCount", ValueConversions<int>::serialize(childNodeCount));
     jsonMessage->setObject("params", std::move(paramsObject));
-    if (m_frontendChannel)
+    if (m_frontendChannel) {
         m_frontendChannel->sendProtocolNotification(jsonMessage->toJSONString());
+    }
 }
 
-void Frontend::childNodeInserted(int parentNodeId, int previousNodeId, std::unique_ptr<protocol::DOM::Node> node)
-{
+void Frontend::childNodeInserted(int parentNodeId, int previousNodeId, std::unique_ptr<protocol::DOM::Node> node) {
     std::unique_ptr<protocol::DictionaryValue> jsonMessage = DictionaryValue::create();
     jsonMessage->setString("method", "DOM.childNodeInserted");
     std::unique_ptr<protocol::DictionaryValue> paramsObject = DictionaryValue::create();
@@ -422,123 +440,122 @@ void Frontend::childNodeInserted(int parentNodeId, int previousNodeId, std::uniq
     paramsObject->setValue("previousNodeId", ValueConversions<int>::serialize(previousNodeId));
     paramsObject->setValue("node", ValueConversions<protocol::DOM::Node>::serialize(node.get()));
     jsonMessage->setObject("params", std::move(paramsObject));
-    if (m_frontendChannel)
+    if (m_frontendChannel) {
         m_frontendChannel->sendProtocolNotification(jsonMessage->toJSONString());
+    }
 }
 
-void Frontend::childNodeRemoved(int parentNodeId, int nodeId)
-{
+void Frontend::childNodeRemoved(int parentNodeId, int nodeId) {
     std::unique_ptr<protocol::DictionaryValue> jsonMessage = DictionaryValue::create();
     jsonMessage->setString("method", "DOM.childNodeRemoved");
     std::unique_ptr<protocol::DictionaryValue> paramsObject = DictionaryValue::create();
     paramsObject->setValue("parentNodeId", ValueConversions<int>::serialize(parentNodeId));
     paramsObject->setValue("nodeId", ValueConversions<int>::serialize(nodeId));
     jsonMessage->setObject("params", std::move(paramsObject));
-    if (m_frontendChannel)
+    if (m_frontendChannel) {
         m_frontendChannel->sendProtocolNotification(jsonMessage->toJSONString());
+    }
 }
 
-void Frontend::shadowRootPushed(int hostId, std::unique_ptr<protocol::DOM::Node> root)
-{
+void Frontend::shadowRootPushed(int hostId, std::unique_ptr<protocol::DOM::Node> root) {
     std::unique_ptr<protocol::DictionaryValue> jsonMessage = DictionaryValue::create();
     jsonMessage->setString("method", "DOM.shadowRootPushed");
     std::unique_ptr<protocol::DictionaryValue> paramsObject = DictionaryValue::create();
     paramsObject->setValue("hostId", ValueConversions<int>::serialize(hostId));
     paramsObject->setValue("root", ValueConversions<protocol::DOM::Node>::serialize(root.get()));
     jsonMessage->setObject("params", std::move(paramsObject));
-    if (m_frontendChannel)
+    if (m_frontendChannel) {
         m_frontendChannel->sendProtocolNotification(jsonMessage->toJSONString());
+    }
 }
 
-void Frontend::shadowRootPopped(int hostId, int rootId)
-{
+void Frontend::shadowRootPopped(int hostId, int rootId) {
     std::unique_ptr<protocol::DictionaryValue> jsonMessage = DictionaryValue::create();
     jsonMessage->setString("method", "DOM.shadowRootPopped");
     std::unique_ptr<protocol::DictionaryValue> paramsObject = DictionaryValue::create();
     paramsObject->setValue("hostId", ValueConversions<int>::serialize(hostId));
     paramsObject->setValue("rootId", ValueConversions<int>::serialize(rootId));
     jsonMessage->setObject("params", std::move(paramsObject));
-    if (m_frontendChannel)
+    if (m_frontendChannel) {
         m_frontendChannel->sendProtocolNotification(jsonMessage->toJSONString());
+    }
 }
 
-void Frontend::pseudoElementAdded(int parentId, std::unique_ptr<protocol::DOM::Node> pseudoElement)
-{
+void Frontend::pseudoElementAdded(int parentId, std::unique_ptr<protocol::DOM::Node> pseudoElement) {
     std::unique_ptr<protocol::DictionaryValue> jsonMessage = DictionaryValue::create();
     jsonMessage->setString("method", "DOM.pseudoElementAdded");
     std::unique_ptr<protocol::DictionaryValue> paramsObject = DictionaryValue::create();
     paramsObject->setValue("parentId", ValueConversions<int>::serialize(parentId));
     paramsObject->setValue("pseudoElement", ValueConversions<protocol::DOM::Node>::serialize(pseudoElement.get()));
     jsonMessage->setObject("params", std::move(paramsObject));
-    if (m_frontendChannel)
+    if (m_frontendChannel) {
         m_frontendChannel->sendProtocolNotification(jsonMessage->toJSONString());
+    }
 }
 
-void Frontend::pseudoElementRemoved(int parentId, int pseudoElementId)
-{
+void Frontend::pseudoElementRemoved(int parentId, int pseudoElementId) {
     std::unique_ptr<protocol::DictionaryValue> jsonMessage = DictionaryValue::create();
     jsonMessage->setString("method", "DOM.pseudoElementRemoved");
     std::unique_ptr<protocol::DictionaryValue> paramsObject = DictionaryValue::create();
     paramsObject->setValue("parentId", ValueConversions<int>::serialize(parentId));
     paramsObject->setValue("pseudoElementId", ValueConversions<int>::serialize(pseudoElementId));
     jsonMessage->setObject("params", std::move(paramsObject));
-    if (m_frontendChannel)
+    if (m_frontendChannel) {
         m_frontendChannel->sendProtocolNotification(jsonMessage->toJSONString());
+    }
 }
 
-void Frontend::flush()
-{
+void Frontend::flush() {
     m_frontendChannel->flushProtocolNotifications();
 }
 
 // --------------------- Dispatcher.
 
 class DispatcherImpl : public protocol::DispatcherBase {
-public:
-    DispatcherImpl(FrontendChannel* frontendChannel, Backend* backend)
-        : DispatcherBase(frontendChannel)
-        , m_backend(backend) {
-        m_dispatchMap["DOM.enable"] = &DispatcherImpl::enable;
-        m_dispatchMap["DOM.disable"] = &DispatcherImpl::disable;
-        m_dispatchMap["DOM.getDocument"] = &DispatcherImpl::getDocument;
-        m_dispatchMap["DOM.removeNode"] = &DispatcherImpl::removeNode;
-        m_dispatchMap["DOM.setAttributeValue"] = &DispatcherImpl::setAttributeValue;
-        m_dispatchMap["DOM.setAttributesAsText"] = &DispatcherImpl::setAttributesAsText;
-        m_dispatchMap["DOM.removeAttribute"] = &DispatcherImpl::removeAttribute;
-        m_dispatchMap["DOM.performSearch"] = &DispatcherImpl::performSearch;
-        m_dispatchMap["DOM.getSearchResults"] = &DispatcherImpl::getSearchResults;
-        m_dispatchMap["DOM.discardSearchResults"] = &DispatcherImpl::discardSearchResults;
-        m_dispatchMap["DOM.highlightNode"] = &DispatcherImpl::highlightNode;
-        m_dispatchMap["DOM.hideHighlight"] = &DispatcherImpl::hideHighlight;
-        m_dispatchMap["DOM.resolveNode"] = &DispatcherImpl::resolveNode;
-    }
-    ~DispatcherImpl() override { }
-    void dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) override;
+    public:
+        DispatcherImpl(FrontendChannel* frontendChannel, Backend* backend)
+            : DispatcherBase(frontendChannel)
+            , m_backend(backend) {
+            m_dispatchMap["DOM.enable"] = &DispatcherImpl::enable;
+            m_dispatchMap["DOM.disable"] = &DispatcherImpl::disable;
+            m_dispatchMap["DOM.getDocument"] = &DispatcherImpl::getDocument;
+            m_dispatchMap["DOM.removeNode"] = &DispatcherImpl::removeNode;
+            m_dispatchMap["DOM.setAttributeValue"] = &DispatcherImpl::setAttributeValue;
+            m_dispatchMap["DOM.setAttributesAsText"] = &DispatcherImpl::setAttributesAsText;
+            m_dispatchMap["DOM.removeAttribute"] = &DispatcherImpl::removeAttribute;
+            m_dispatchMap["DOM.performSearch"] = &DispatcherImpl::performSearch;
+            m_dispatchMap["DOM.getSearchResults"] = &DispatcherImpl::getSearchResults;
+            m_dispatchMap["DOM.discardSearchResults"] = &DispatcherImpl::discardSearchResults;
+            m_dispatchMap["DOM.highlightNode"] = &DispatcherImpl::highlightNode;
+            m_dispatchMap["DOM.hideHighlight"] = &DispatcherImpl::hideHighlight;
+            m_dispatchMap["DOM.resolveNode"] = &DispatcherImpl::resolveNode;
+        }
+        ~DispatcherImpl() override { }
+        void dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) override;
 
-protected:
-    using CallHandler = void (DispatcherImpl::*)(int callId, std::unique_ptr<DictionaryValue> messageObject, ErrorSupport* errors);
-    using DispatchMap = protocol::HashMap<String, CallHandler>;
-    DispatchMap m_dispatchMap;
+    protected:
+        using CallHandler = void (DispatcherImpl::*)(int callId, std::unique_ptr<DictionaryValue> messageObject, ErrorSupport* errors);
+        using DispatchMap = protocol::HashMap<String, CallHandler>;
+        DispatchMap m_dispatchMap;
 
-    void enable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void disable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getDocument(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void removeNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setAttributeValue(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setAttributesAsText(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void removeAttribute(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void performSearch(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getSearchResults(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void discardSearchResults(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void highlightNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void hideHighlight(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void resolveNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void enable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void disable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void getDocument(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void removeNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void setAttributeValue(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void setAttributesAsText(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void removeAttribute(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void performSearch(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void getSearchResults(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void discardSearchResults(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void highlightNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void hideHighlight(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void resolveNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
 
-    Backend* m_backend;
+        Backend* m_backend;
 };
 
-void DispatcherImpl::dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject)
-{
+void DispatcherImpl::dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) {
     protocol::HashMap<String, CallHandler>::iterator it = m_dispatchMap.find(method);
     if (it == m_dispatchMap.end()) {
         reportProtocolError(callId, MethodNotFound, "'" + method + "' wasn't found", nullptr);
@@ -550,28 +567,27 @@ void DispatcherImpl::dispatch(int callId, const String& method, std::unique_ptr<
 }
 
 
-void DispatcherImpl::enable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
-{
+void DispatcherImpl::enable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     ErrorString error;
     m_backend->enable(&error);
-    if (weak->get())
+    if (weak->get()) {
         weak->get()->sendResponse(callId, error);
+    }
 }
 
-void DispatcherImpl::disable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
-{
+void DispatcherImpl::disable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     ErrorString error;
     m_backend->disable(&error);
-    if (weak->get())
+    if (weak->get()) {
         weak->get()->sendResponse(callId, error);
+    }
 }
 
-void DispatcherImpl::getDocument(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
-{
+void DispatcherImpl::getDocument(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Declare output parameters.
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     std::unique_ptr<protocol::DOM::Node> out_root;
@@ -582,12 +598,12 @@ void DispatcherImpl::getDocument(int callId, std::unique_ptr<DictionaryValue> re
     if (!error.length()) {
         result->setValue("root", ValueConversions<protocol::DOM::Node>::serialize(out_root.get()));
     }
-    if (weak->get())
+    if (weak->get()) {
         weak->get()->sendResponse(callId, error, std::move(result));
+    }
 }
 
-void DispatcherImpl::removeNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
-{
+void DispatcherImpl::removeNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -603,12 +619,12 @@ void DispatcherImpl::removeNode(int callId, std::unique_ptr<DictionaryValue> req
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     ErrorString error;
     m_backend->removeNode(&error, in_nodeId);
-    if (weak->get())
+    if (weak->get()) {
         weak->get()->sendResponse(callId, error);
+    }
 }
 
-void DispatcherImpl::setAttributeValue(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
-{
+void DispatcherImpl::setAttributeValue(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -630,12 +646,12 @@ void DispatcherImpl::setAttributeValue(int callId, std::unique_ptr<DictionaryVal
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     ErrorString error;
     m_backend->setAttributeValue(&error, in_nodeId, in_name, in_value);
-    if (weak->get())
+    if (weak->get()) {
         weak->get()->sendResponse(callId, error);
+    }
 }
 
-void DispatcherImpl::setAttributesAsText(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
-{
+void DispatcherImpl::setAttributesAsText(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -660,12 +676,12 @@ void DispatcherImpl::setAttributesAsText(int callId, std::unique_ptr<DictionaryV
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     ErrorString error;
     m_backend->setAttributesAsText(&error, in_nodeId, in_text, in_name);
-    if (weak->get())
+    if (weak->get()) {
         weak->get()->sendResponse(callId, error);
+    }
 }
 
-void DispatcherImpl::removeAttribute(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
-{
+void DispatcherImpl::removeAttribute(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -684,12 +700,12 @@ void DispatcherImpl::removeAttribute(int callId, std::unique_ptr<DictionaryValue
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     ErrorString error;
     m_backend->removeAttribute(&error, in_nodeId, in_name);
-    if (weak->get())
+    if (weak->get()) {
         weak->get()->sendResponse(callId, error);
+    }
 }
 
-void DispatcherImpl::performSearch(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
-{
+void DispatcherImpl::performSearch(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -719,12 +735,12 @@ void DispatcherImpl::performSearch(int callId, std::unique_ptr<DictionaryValue> 
         result->setValue("searchId", ValueConversions<String>::serialize(out_searchId));
         result->setValue("resultCount", ValueConversions<int>::serialize(out_resultCount));
     }
-    if (weak->get())
+    if (weak->get()) {
         weak->get()->sendResponse(callId, error, std::move(result));
+    }
 }
 
-void DispatcherImpl::getSearchResults(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
-{
+void DispatcherImpl::getSearchResults(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -752,12 +768,12 @@ void DispatcherImpl::getSearchResults(int callId, std::unique_ptr<DictionaryValu
     if (!error.length()) {
         result->setValue("nodeIds", ValueConversions<protocol::Array<int>>::serialize(out_nodeIds.get()));
     }
-    if (weak->get())
+    if (weak->get()) {
         weak->get()->sendResponse(callId, error, std::move(result));
+    }
 }
 
-void DispatcherImpl::discardSearchResults(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
-{
+void DispatcherImpl::discardSearchResults(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -773,12 +789,12 @@ void DispatcherImpl::discardSearchResults(int callId, std::unique_ptr<Dictionary
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     ErrorString error;
     m_backend->discardSearchResults(&error, in_searchId);
-    if (weak->get())
+    if (weak->get()) {
         weak->get()->sendResponse(callId, error);
+    }
 }
 
-void DispatcherImpl::highlightNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
-{
+void DispatcherImpl::highlightNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -806,22 +822,22 @@ void DispatcherImpl::highlightNode(int callId, std::unique_ptr<DictionaryValue> 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     ErrorString error;
     m_backend->highlightNode(&error, std::move(in_highlightConfig), in_nodeId, in_objectId);
-    if (weak->get())
+    if (weak->get()) {
         weak->get()->sendResponse(callId, error);
+    }
 }
 
-void DispatcherImpl::hideHighlight(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
-{
+void DispatcherImpl::hideHighlight(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     ErrorString error;
     m_backend->hideHighlight(&error);
-    if (weak->get())
+    if (weak->get()) {
         weak->get()->sendResponse(callId, error);
+    }
 }
 
-void DispatcherImpl::resolveNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
-{
+void DispatcherImpl::resolveNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -849,13 +865,13 @@ void DispatcherImpl::resolveNode(int callId, std::unique_ptr<DictionaryValue> re
     if (!error.length()) {
         result->setValue("object", ValueConversions<protocol::Runtime::RemoteObject>::serialize(out_object.get()));
     }
-    if (weak->get())
+    if (weak->get()) {
         weak->get()->sendResponse(callId, error, std::move(result));
+    }
 }
 
 // static
-void Dispatcher::wire(UberDispatcher* dispatcher, Backend* backend)
-{
+void Dispatcher::wire(UberDispatcher* dispatcher, Backend* backend) {
     dispatcher->registerBackend("DOM", wrapUnique(new DispatcherImpl(dispatcher->channel(), backend)));
 }
 

@@ -9,211 +9,211 @@
 
 namespace v8_inspector {
 
-    using tns::ArgConverter;
+using tns::ArgConverter;
 
-    namespace CSSAgentState {
-        static const char cssEnabled[] = "cssEnabled";
+namespace CSSAgentState {
+static const char cssEnabled[] = "cssEnabled";
+}
+
+V8CSSAgentImpl::V8CSSAgentImpl(V8InspectorSessionImpl* session,
+                               protocol::FrontendChannel* frontendChannel,
+                               protocol::DictionaryValue* state)
+    : m_session(session),
+      m_frontend(frontendChannel),
+      m_state(state),
+      m_enabled(false) {
+    Instance = this;
+}
+
+V8CSSAgentImpl::~V8CSSAgentImpl() { }
+
+void V8CSSAgentImpl::enable(std::unique_ptr<protocol::CSS::Backend::EnableCallback> callback) {
+    if (m_enabled) {
+        callback->sendFailure("CSS Agent already enabled!");
+        return;
     }
 
-    V8CSSAgentImpl::V8CSSAgentImpl(V8InspectorSessionImpl *session,
-                                   protocol::FrontendChannel *frontendChannel,
-                                   protocol::DictionaryValue *state)
-        : m_session(session),
-          m_frontend(frontendChannel),
-          m_state(state),
-          m_enabled(false) {
-        Instance = this;
+    m_state->setBoolean(CSSAgentState::cssEnabled, true);
+    m_enabled = true;
+    callback->sendSuccess();
+}
+
+void V8CSSAgentImpl::disable(ErrorString*) {
+    if (!m_enabled) {
+        return;
     }
 
-    V8CSSAgentImpl::~V8CSSAgentImpl() { }
+    m_state->setBoolean(CSSAgentState::cssEnabled, false);
 
-    void V8CSSAgentImpl::enable(std::unique_ptr<protocol::CSS::Backend::EnableCallback> callback) {
-        if (m_enabled) {
-            callback->sendFailure("CSS Agent already enabled!");
-            return;
-        }
+    m_enabled = false;
+}
 
-        m_state->setBoolean(CSSAgentState::cssEnabled, true);
-        m_enabled = true;
-        callback->sendSuccess();
-    }
+// Not supported
+void V8CSSAgentImpl::getMatchedStylesForNode(ErrorString* errorString, int in_nodeId,
+        Maybe<protocol::CSS::CSSStyle>* out_inlineStyle,
+        Maybe<protocol::CSS::CSSStyle>* out_attributesStyle,
+        Maybe<protocol::Array<protocol::CSS::RuleMatch>>* out_matchedCSSRules,
+        Maybe<protocol::Array<protocol::CSS::PseudoElementMatches>>* out_pseudoElements,
+        Maybe<protocol::Array<protocol::CSS::InheritedStyleEntry>>* out_inherited,
+        Maybe<protocol::Array<protocol::CSS::CSSKeyframesRule>>* out_cssKeyframesRules) {
 
-    void V8CSSAgentImpl::disable(ErrorString *) {
-        if (!m_enabled) {
-            return;
-        }
+    //// out_inlineStyle
+    auto cssPropsArr = protocol::Array<protocol::CSS::CSSProperty>::create();
+    auto shorthandPropArr = protocol::Array<protocol::CSS::ShorthandEntry>::create();
+    auto inlineStyle = protocol::CSS::CSSStyle::create()
+                       .setCssProperties(std::move(cssPropsArr))
+                       .setShorthandEntries(std::move(shorthandPropArr))
+                       .build();
 
-        m_state->setBoolean(CSSAgentState::cssEnabled, false);
+    //// out_attributesStyle
+    auto attrArr = protocol::Array<protocol::CSS::CSSProperty>::create();
+    auto attributeStyle = protocol::CSS::CSSStyle::create()
+                          .setCssProperties(std::move(attrArr))
+                          .setShorthandEntries(std::move(protocol::Array<protocol::CSS::ShorthandEntry>::create()))
+                          .build();
 
-        m_enabled = false;
-    }
+    //// out_matchedCSSRules
+    auto cssSelectorsArr = protocol::Array<protocol::CSS::Value>::create();
+    auto cssSelectorList = protocol::CSS::SelectorList::create()
+                           .setSelectors(std::move(cssSelectorsArr))
+                           .setText("")
+                           .build();
 
-    // Not supported
-    void V8CSSAgentImpl::getMatchedStylesForNode(ErrorString *errorString, int in_nodeId,
-                                                 Maybe<protocol::CSS::CSSStyle> *out_inlineStyle,
-                                                 Maybe<protocol::CSS::CSSStyle> *out_attributesStyle,
-                                                 Maybe<protocol::Array<protocol::CSS::RuleMatch>> *out_matchedCSSRules,
-                                                 Maybe<protocol::Array<protocol::CSS::PseudoElementMatches>> *out_pseudoElements,
-                                                 Maybe<protocol::Array<protocol::CSS::InheritedStyleEntry>> *out_inherited,
-                                                 Maybe<protocol::Array<protocol::CSS::CSSKeyframesRule>> *out_cssKeyframesRules) {
+    auto cssRule = protocol::CSS::CSSRule::create()
+                   .setSelectorList(std::move(cssSelectorList))
+                   .setOrigin(protocol::CSS::StyleSheetOriginEnum::Regular)
+                   .setStyle(std::move(protocol::CSS::CSSStyle::create()
+                                       .setCssProperties(std::move(protocol::Array<protocol::CSS::CSSProperty>::create()))
+                                       .setShorthandEntries(std::move(protocol::Array<protocol::CSS::ShorthandEntry>::create()))
+                                       .build()))
+                   .build();
 
-        //// out_inlineStyle
-        auto cssPropsArr = protocol::Array<protocol::CSS::CSSProperty>::create();
-        auto shorthandPropArr = protocol::Array<protocol::CSS::ShorthandEntry>::create();
-        auto inlineStyle = protocol::CSS::CSSStyle::create()
-            .setCssProperties(std::move(cssPropsArr))
-            .setShorthandEntries(std::move(shorthandPropArr))
-            .build();
+    auto rulesMatchedArr = protocol::Array<protocol::CSS::RuleMatch>::create();
 
-        //// out_attributesStyle
-        auto attrArr = protocol::Array<protocol::CSS::CSSProperty>::create();
-        auto attributeStyle = protocol::CSS::CSSStyle::create()
-            .setCssProperties(std::move(attrArr))
-            .setShorthandEntries(std::move(protocol::Array<protocol::CSS::ShorthandEntry>::create()))
-            .build();
+    //// out_pseudoElements
+    auto pseudoElementsArr = protocol::Array<protocol::CSS::PseudoElementMatches>::create();
 
-        //// out_matchedCSSRules
-        auto cssSelectorsArr = protocol::Array<protocol::CSS::Value>::create();
-        auto cssSelectorList = protocol::CSS::SelectorList::create()
-            .setSelectors(std::move(cssSelectorsArr))
-            .setText("")
-            .build();
+    //// out_inherited
+    auto inheritedElementsArr = protocol::Array<protocol::CSS::InheritedStyleEntry>::create();
+    auto inheritedelem = protocol::CSS::InheritedStyleEntry::create()
+                         .setInlineStyle(std::move(protocol::CSS::CSSStyle::create()
+                                         .setCssProperties(std::move(protocol::Array<protocol::CSS::CSSProperty>::create()))
+                                         .setShorthandEntries(std::move(protocol::Array<protocol::CSS::ShorthandEntry>::create()))
+                                         .build()))
+                         .setMatchedCSSRules(std::move(protocol::Array<protocol::CSS::RuleMatch>::create()))
+                         .build();
+    inheritedElementsArr->addItem(std::move(inheritedelem));
 
-        auto cssRule = protocol::CSS::CSSRule::create()
-            .setSelectorList(std::move(cssSelectorList))
-            .setOrigin(protocol::CSS::StyleSheetOriginEnum::Regular)
-            .setStyle(std::move(protocol::CSS::CSSStyle::create()
-                                        .setCssProperties(std::move(protocol::Array<protocol::CSS::CSSProperty>::create()))
-                                        .setShorthandEntries(std::move(protocol::Array<protocol::CSS::ShorthandEntry>::create()))
-                                        .build()))
-            .build();
+    //// out_cssKeyframesRules
+    auto cssKeyFramesRulesArr = protocol::Array<protocol::CSS::CSSKeyframesRule>::create();
 
-        auto rulesMatchedArr = protocol::Array<protocol::CSS::RuleMatch>::create();
+    *out_inlineStyle = Maybe<protocol::CSS::CSSStyle>(std::move(inlineStyle));
+    *out_attributesStyle = Maybe<protocol::CSS::CSSStyle>(std::move(attributeStyle));
+    *out_matchedCSSRules = Maybe<protocol::Array<protocol::CSS::RuleMatch>>(std::move(rulesMatchedArr));
+    *out_cssKeyframesRules = Maybe<protocol::Array<protocol::CSS::CSSKeyframesRule>>(std::move(cssKeyFramesRulesArr));
+    *out_inherited = Maybe<protocol::Array<protocol::CSS::InheritedStyleEntry>>(std::move(inheritedElementsArr));
+    *out_pseudoElements = Maybe<protocol::Array<protocol::CSS::PseudoElementMatches>>(std::move(pseudoElementsArr));
+}
 
-        //// out_pseudoElements
-        auto pseudoElementsArr = protocol::Array<protocol::CSS::PseudoElementMatches>::create();
+// Not supported
+void V8CSSAgentImpl::getInlineStylesForNode(ErrorString*, int in_nodeId,
+        Maybe<protocol::CSS::CSSStyle>* out_inlineStyle,
+        Maybe<protocol::CSS::CSSStyle>* out_attributesStyle) {
 
-        //// out_inherited
-        auto inheritedElementsArr = protocol::Array<protocol::CSS::InheritedStyleEntry>::create();
-        auto inheritedelem = protocol::CSS::InheritedStyleEntry::create()
-                .setInlineStyle(std::move(protocol::CSS::CSSStyle::create()
-                                                  .setCssProperties(std::move(protocol::Array<protocol::CSS::CSSProperty>::create()))
-                                                  .setShorthandEntries(std::move(protocol::Array<protocol::CSS::ShorthandEntry>::create()))
-                                                  .build()))
-                .setMatchedCSSRules(std::move(protocol::Array<protocol::CSS::RuleMatch>::create()))
-                .build();
-        inheritedElementsArr->addItem(std::move(inheritedelem));
+    //// out_inlineStyle
+    auto cssPropsArr = protocol::Array<protocol::CSS::CSSProperty>::create();
+    auto shorthandPropArr = protocol::Array<protocol::CSS::ShorthandEntry>::create();
 
-        //// out_cssKeyframesRules
-        auto cssKeyFramesRulesArr = protocol::Array<protocol::CSS::CSSKeyframesRule>::create();
+    auto inlineStyle = protocol::CSS::CSSStyle::create()
+                       .setCssProperties(std::move(cssPropsArr))
+                       .setShorthandEntries(std::move(shorthandPropArr))
+                       .build();
 
-        *out_inlineStyle = Maybe<protocol::CSS::CSSStyle>(std::move(inlineStyle));
-        *out_attributesStyle = Maybe<protocol::CSS::CSSStyle>(std::move(attributeStyle));
-        *out_matchedCSSRules = Maybe<protocol::Array<protocol::CSS::RuleMatch>>(std::move(rulesMatchedArr));
-        *out_cssKeyframesRules = Maybe<protocol::Array<protocol::CSS::CSSKeyframesRule>>(std::move(cssKeyFramesRulesArr));
-        *out_inherited = Maybe<protocol::Array<protocol::CSS::InheritedStyleEntry>>(std::move(inheritedElementsArr));
-        *out_pseudoElements = Maybe<protocol::Array<protocol::CSS::PseudoElementMatches>>(std::move(pseudoElementsArr));
-    }
+    //// out_attributesStyle
+    auto attrArr = protocol::Array<protocol::CSS::CSSProperty>::create();
+    auto attributeStyle = protocol::CSS::CSSStyle::create()
+                          .setCssProperties(std::move(attrArr))
+                          .setShorthandEntries(std::move(protocol::Array<protocol::CSS::ShorthandEntry>::create()))
+                          .build();
 
-    // Not supported
-    void V8CSSAgentImpl::getInlineStylesForNode(ErrorString *, int in_nodeId,
-                                                Maybe<protocol::CSS::CSSStyle> *out_inlineStyle,
-                                                Maybe<protocol::CSS::CSSStyle> *out_attributesStyle) {
+    *out_inlineStyle = Maybe<protocol::CSS::CSSStyle>(std::move(inlineStyle));
+    *out_attributesStyle = Maybe<protocol::CSS::CSSStyle>(std::move(attributeStyle));
+}
 
-        //// out_inlineStyle
-        auto cssPropsArr = protocol::Array<protocol::CSS::CSSProperty>::create();
-        auto shorthandPropArr = protocol::Array<protocol::CSS::ShorthandEntry>::create();
+void V8CSSAgentImpl::getComputedStyleForNode(ErrorString* errorString, int in_nodeId,
+        std::unique_ptr<protocol::Array<protocol::CSS::CSSComputedStyleProperty>>* out_computedStyle) {
+    auto computedStylePropertyArr = protocol::Array<protocol::CSS::CSSComputedStyleProperty>::create();
 
-        auto inlineStyle = protocol::CSS::CSSStyle::create()
-                .setCssProperties(std::move(cssPropsArr))
-                .setShorthandEntries(std::move(shorthandPropArr))
-                .build();
+    std::string getComputedStylesForNodeString = "getComputedStylesForNode";
+    // TODO: Pete: Find a better way to get a hold of the isolate
+    auto isolate = v8::Isolate::GetCurrent();
+    auto context = isolate->GetCurrentContext();
+    auto global = context->Global();
 
-        //// out_attributesStyle
-        auto attrArr = protocol::Array<protocol::CSS::CSSProperty>::create();
-        auto attributeStyle = protocol::CSS::CSSStyle::create()
-                .setCssProperties(std::move(attrArr))
-                .setShorthandEntries(std::move(protocol::Array<protocol::CSS::ShorthandEntry>::create()))
-                .build();
+    auto globalInspectorObject = utils::Common::getGlobalInspectorObject(isolate);
 
-        *out_inlineStyle = Maybe<protocol::CSS::CSSStyle>(std::move(inlineStyle));
-        *out_attributesStyle = Maybe<protocol::CSS::CSSStyle>(std::move(attributeStyle));
-    }
+    if (!globalInspectorObject.IsEmpty()) {
+        auto getComputedStylesForNode = globalInspectorObject->Get(ArgConverter::ConvertToV8String(isolate, getComputedStylesForNodeString));
 
-    void V8CSSAgentImpl::getComputedStyleForNode(ErrorString *errorString, int in_nodeId,
-                                                 std::unique_ptr<protocol::Array<protocol::CSS::CSSComputedStyleProperty>> *out_computedStyle) {
-        auto computedStylePropertyArr = protocol::Array<protocol::CSS::CSSComputedStyleProperty>::create();
+        if (!getComputedStylesForNode.IsEmpty() && getComputedStylesForNode->IsFunction()) {
+            auto getComputedStylesForNodeFunc = getComputedStylesForNode.As<v8::Function>();
+            v8::Local<v8::Value> args[] = { v8::Number::New(isolate, in_nodeId) };
+            v8::TryCatch tc;
 
-        std::string getComputedStylesForNodeString = "getComputedStylesForNode";
-        // TODO: Pete: Find a better way to get a hold of the isolate
-        auto isolate = v8::Isolate::GetCurrent();
-        auto context = isolate->GetCurrentContext();
-        auto global = context->Global();
+            auto maybeResult = getComputedStylesForNodeFunc->Call(context, global, 1, args);
 
-        auto globalInspectorObject = utils::Common::getGlobalInspectorObject(isolate);
+            if (tc.HasCaught()) {
+                *errorString = utils::Common::getJSCallErrorMessage(getComputedStylesForNodeString, tc.Message()->Get()).c_str();
 
-        if (!globalInspectorObject.IsEmpty()) {
-            auto getComputedStylesForNode = globalInspectorObject->Get(ArgConverter::ConvertToV8String(isolate, getComputedStylesForNodeString));
+                *out_computedStyle = std::move(computedStylePropertyArr);
+                return;
+            }
 
-            if (!getComputedStylesForNode.IsEmpty() && getComputedStylesForNode->IsFunction()) {
-                auto getComputedStylesForNodeFunc = getComputedStylesForNode.As<v8::Function>();
-                v8::Local<v8::Value> args[] = { v8::Number::New(isolate, in_nodeId) };
-                v8::TryCatch tc;
+            v8::Local<v8::Value> outResult;
 
-                auto maybeResult = getComputedStylesForNodeFunc->Call(context, global, 1, args);
+            if (maybeResult.ToLocal(&outResult)) {
+                auto resultString = ArgConverter::ConvertToString(outResult->ToString());
+                auto resultCStr = resultString.c_str();
+                auto resultJson = protocol::parseJSON(resultCStr);
 
-                if (tc.HasCaught()) {
-                    *errorString = utils::Common::getJSCallErrorMessage(getComputedStylesForNodeString, tc.Message()->Get()).c_str();
+                protocol::ErrorSupport errorSupport;
+                auto computedStyles = protocol::Array<protocol::CSS::CSSComputedStyleProperty>::parse(
+                                          resultJson.get(), &errorSupport);
 
-                    *out_computedStyle = std::move(computedStylePropertyArr);
+                auto errorSupportString = errorSupport.errors().utf8();
+                if (!errorSupportString.empty()) {
+                    auto errorMessage = "Error while parsing CSSComputedStyleProperty object. ";
+                    DEBUG_WRITE_FORCE("%s Error: %s", errorMessage, errorSupportString.c_str());
+                } else {
+                    *out_computedStyle = std::move(computedStyles);
+
                     return;
-                }
-
-                v8::Local<v8::Value> outResult;
-
-                if (maybeResult.ToLocal(&outResult)) {
-                    auto resultString = ArgConverter::ConvertToString(outResult->ToString());
-                    auto resultCStr = resultString.c_str();
-                    auto resultJson = protocol::parseJSON(resultCStr);
-
-                    protocol::ErrorSupport errorSupport;
-                    auto computedStyles = protocol::Array<protocol::CSS::CSSComputedStyleProperty>::parse(
-                            resultJson.get(), &errorSupport);
-
-                    auto errorSupportString = errorSupport.errors().utf8();
-                    if (!errorSupportString.empty()) {
-                        auto errorMessage = "Error while parsing CSSComputedStyleProperty object. ";
-                        DEBUG_WRITE_FORCE("%s Error: %s", errorMessage, errorSupportString.c_str());
-                    } else {
-                        *out_computedStyle = std::move(computedStyles);
-
-                        return;
-                    }
                 }
             }
         }
-
-        *out_computedStyle = std::move(computedStylePropertyArr);
     }
 
-    void V8CSSAgentImpl::getPlatformFontsForNode(ErrorString *, int in_nodeId,
-                                                 std::unique_ptr<protocol::Array<protocol::CSS::PlatformFontUsage>> *out_fonts) {
-        auto fontsArr = protocol::Array<protocol::CSS::PlatformFontUsage>::create();
-        auto defaultFont = "System Font";
-        fontsArr->addItem(std::move(protocol::CSS::PlatformFontUsage::create()
-                                            .setFamilyName(defaultFont)
-                                            .setGlyphCount(1)
-                                            .setIsCustomFont(false)
-                                            .build()));
-        *out_fonts = std::move(fontsArr);
-    }
+    *out_computedStyle = std::move(computedStylePropertyArr);
+}
 
-    // Not supported
-    void V8CSSAgentImpl::getStyleSheetText(ErrorString *, const String &in_styleSheetId,
-                                           String *out_text) {
-        *out_text = "";
-    }
+void V8CSSAgentImpl::getPlatformFontsForNode(ErrorString*, int in_nodeId,
+        std::unique_ptr<protocol::Array<protocol::CSS::PlatformFontUsage>>* out_fonts) {
+    auto fontsArr = protocol::Array<protocol::CSS::PlatformFontUsage>::create();
+    auto defaultFont = "System Font";
+    fontsArr->addItem(std::move(protocol::CSS::PlatformFontUsage::create()
+                                .setFamilyName(defaultFont)
+                                .setGlyphCount(1)
+                                .setIsCustomFont(false)
+                                .build()));
+    *out_fonts = std::move(fontsArr);
+}
+
+// Not supported
+void V8CSSAgentImpl::getStyleSheetText(ErrorString*, const String& in_styleSheetId,
+                                       String* out_text) {
+    *out_text = "";
+}
 
 
-    V8CSSAgentImpl* V8CSSAgentImpl::Instance = 0;
+V8CSSAgentImpl* V8CSSAgentImpl::Instance = 0;
 }

@@ -20,28 +20,28 @@
 
 namespace v8_inspector {
 
-    class InjectedScript;
-    class RemoteObjectIdBase;
-    class V8ConsoleAgentImpl;
-    class V8DebuggerAgentImpl;
-    class V8InspectorImpl;
-    class V8HeapProfilerAgentImpl;
-    class V8ProfilerAgentImpl;
-    class V8RuntimeAgentImpl;
-    class V8SchemaAgentImpl;
-    class V8PageAgentImpl;
-    class V8NetworkAgentImpl;
-    class V8DOMAgentImpl;
-    class V8CSSAgentImpl;
+class InjectedScript;
+class RemoteObjectIdBase;
+class V8ConsoleAgentImpl;
+class V8DebuggerAgentImpl;
+class V8InspectorImpl;
+class V8HeapProfilerAgentImpl;
+class V8ProfilerAgentImpl;
+class V8RuntimeAgentImpl;
+class V8SchemaAgentImpl;
+class V8PageAgentImpl;
+class V8NetworkAgentImpl;
+class V8DOMAgentImpl;
+class V8CSSAgentImpl;
 
-    using protocol::ErrorString;
+using protocol::ErrorString;
 
-    class V8InspectorSessionImpl : public V8InspectorSession,
-                                   public protocol::FrontendChannel {
+class V8InspectorSessionImpl : public V8InspectorSession,
+    public protocol::FrontendChannel {
     public:
         static std::unique_ptr<V8InspectorSessionImpl> create(
-                V8InspectorImpl*, int contextGroupId, V8Inspector::Channel*,
-                const StringView& state);
+            V8InspectorImpl*, int contextGroupId, V8Inspector::Channel*,
+            const StringView& state);
         ~V8InspectorSessionImpl();
 
         V8InspectorImpl* inspector() const {
@@ -85,11 +85,11 @@ namespace v8_inspector {
         void reportAllContexts(V8RuntimeAgentImpl*);
         void setCustomObjectFormatterEnabled(bool);
         std::unique_ptr<protocol::Runtime::RemoteObject> wrapObject(
-                v8::Local<v8::Context>, v8::Local<v8::Value>, const String16& groupName,
-                bool generatePreview);
+            v8::Local<v8::Context>, v8::Local<v8::Value>, const String16& groupName,
+            bool generatePreview);
         std::unique_ptr<protocol::Runtime::RemoteObject> wrapTable(
-                v8::Local<v8::Context>, v8::Local<v8::Value> table,
-                v8::Local<v8::Value> columns);
+            v8::Local<v8::Context>, v8::Local<v8::Value> table,
+            v8::Local<v8::Value> columns);
         std::vector<std::unique_ptr<protocol::Schema::Domain>> supportedDomainsImpl();
         bool unwrapObject(ErrorString*, const String16& objectId,
                           v8::Local<v8::Value>*, v8::Local<v8::Context>*,
@@ -100,9 +100,9 @@ namespace v8_inspector {
         void dispatchProtocolMessage(const StringView& message) override;
         std::unique_ptr<StringBuffer> stateJSON() override;
         std::vector<std::unique_ptr<protocol::Schema::API::Domain>> supportedDomains()
-        override;
+                override;
         void addInspectedObject(
-                std::unique_ptr<V8InspectorSession::Inspectable>) override;
+            std::unique_ptr<V8InspectorSession::Inspectable>) override;
         void schedulePauseOnNextStatement(const StringView& breakReason,
                                           const StringView& breakDetails) override;
         void cancelPauseOnNextStatement() override;
@@ -112,15 +112,15 @@ namespace v8_inspector {
         void resume() override;
         void stepOver() override;
         std::vector<std::unique_ptr<protocol::Debugger::API::SearchMatch>>
-        searchInTextByLines(const StringView& text, const StringView& query,
-                            bool caseSensitive, bool isRegex) override;
+                searchInTextByLines(const StringView& text, const StringView& query,
+                                    bool caseSensitive, bool isRegex) override;
         void releaseObjectGroup(const StringView& objectGroup) override;
         bool unwrapObject(std::unique_ptr<StringBuffer>*, const StringView& objectId,
                           v8::Local<v8::Value>*, v8::Local<v8::Context>*,
                           std::unique_ptr<StringBuffer>* objectGroup) override;
         std::unique_ptr<protocol::Runtime::API::RemoteObject> wrapObject(
-                v8::Local<v8::Context>, v8::Local<v8::Value>,
-                const StringView& groupName) override;
+            v8::Local<v8::Context>, v8::Local<v8::Value>,
+            const StringView& groupName) override;
 
         V8InspectorSession::Inspectable* inspectedObject(unsigned num);
         static const unsigned kInspectedObjectBufferSize = 5;
@@ -158,7 +158,7 @@ namespace v8_inspector {
                 m_inspectedObjects;
 
         DISALLOW_COPY_AND_ASSIGN(V8InspectorSessionImpl);
-    };
+};
 
 }  // namespace v8_inspector
 
