@@ -274,6 +274,9 @@ task generateBindings() {
 	inputs.dir (bindingsFile)
 
 	doFirst {
+		if(!file(bindingsFileP).exists()) {
+			throw new GradleException("No ${bindingsFileP} was found after runAstParser task was ran! Check to see if there are any .js files inside ${jsCodeDir}")
+		}
 		javaexec {
 			main "-jar"
 
