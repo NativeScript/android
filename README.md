@@ -1,7 +1,8 @@
 [![Build Status](https://travis-ci.org/NativeScript/android-runtime.svg?branch=master)](https://travis-ci.org/NativeScript/android-runtime)
 
 # Android-Runtime
-Contains the source code for the NativeScript's Android runtime. The android-runtime is a main component used in [NativeScript](https://www.nativescript.org/).
+Contains the source code for the NativeScript's Android runtime. 
+The android-runtime is a main component used in [NativeScript](https://www.nativescript.org/).
 
 # Main Projects
 The repo is structured in the following projects (ordered by dependencies):
