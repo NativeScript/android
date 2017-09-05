@@ -33,6 +33,7 @@ class AndroidJsV8Inspector {
 
     protected native final void connect(Object connection);
 
+    // schedule a debug line break at first convenience
     private native void scheduleBreak();
 
     protected static native void disconnect();
@@ -178,29 +179,22 @@ class AndroidJsV8Inspector {
     // pause the main thread for 30 seconds (30 * 1000 ms)
     // allowing the devtools frontend to establish connection with the inspector
     protected void waitForDebugger(boolean shouldBreak) {
-        if (shouldBreak) {
-            synchronized (this.debugBrkLock) {
-                try {
-                    this.debugBrkLock.wait(1000 * 30);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                } finally {
-                    AndroidJsV8Inspector.ReadyToProcessMessages.set(true);
-                    this.processDebugBreak();
+        synchronized (this.debugBrkLock) {
+            try {
+                this.debugBrkLock.wait(1000 * 30);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } finally {
+                AndroidJsV8Inspector.ReadyToProcessMessages.set(true);
+                this.processDebugBreakMessages();
+                if (shouldBreak) {
+                    this.scheduleBreak();
                 }
             }
-        } else {
-            AndroidJsV8Inspector.ReadyToProcessMessages.set(true);
         }
     }
 
     // process all messages coming from the frontend necessary to initialize the inspector backend
-    // schedule a debug line break at first convenience
-    private void processDebugBreak() {
-        processDebugBreakMessages();
-        scheduleBreak();
-    }
-
     private void processDebugBreakMessages() {
         while (!pendingInspectorMessages.isEmpty()) {
             String inspectorMessage = pendingInspectorMessages.poll();
