@@ -4,6 +4,7 @@ import java.io.File;
 
 import android.app.Application;
 import android.content.Context;
+import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.os.Build;
 import android.util.Log;
@@ -15,6 +16,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
 public final class RuntimeHelper {
+    private static final String WAIT_FOR_DEBUG = "WAIT_FOR_DEBUG";
+
     private RuntimeHelper() {
     }
 
@@ -47,7 +50,7 @@ public final class RuntimeHelper {
                 }
             }
         } catch (Exception e) {
-            Log.d(logTag, e.getMessage());
+            Log.d("TNS.Java", e.getMessage());
         }
 
         return hasErrorIntent;
@@ -176,9 +179,23 @@ public final class RuntimeHelper {
 
                             shouldBreak = true;
                         }
+                        String applicationName = getApplicationName(app.getApplicationContext());
+                        Class<?> buildConfigClass = Class.forName(applicationName + ".BuildConfig");
 
-                        v8Inspector.waitForDebugger(shouldBreak);
+                        try {
+                            Field field = buildConfigClass.getDeclaredField(WAIT_FOR_DEBUG);
+                            boolean shouldWaitForDebug = (boolean) field.get(null);
+                            if (shouldWaitForDebug) {
+                                v8Inspector.waitForDebugger(shouldBreak);
+                            }
+                        } catch (NoSuchFieldException e) {
+                            logger.write("WARNING: Didn't find " + WAIT_FOR_DEBUG + " field, so we won't wait for debugger");
+                        }
                     } catch (IOException e) {
+                        e.printStackTrace();
+                    } catch (IllegalAccessException e) {
+                        e.printStackTrace();
+                    } catch (ClassNotFoundException e) {
                         e.printStackTrace();
                     }
 
@@ -233,5 +250,8 @@ public final class RuntimeHelper {
         }
     }
 
-    private static final String logTag = "MyApp";
+    private static String getApplicationName(Context context) {
+        ApplicationInfo applicationInfo = context.getApplicationInfo();
+        return applicationInfo.packageName;
+    }
 }
