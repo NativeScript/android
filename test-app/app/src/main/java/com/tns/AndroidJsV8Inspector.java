@@ -1,7 +1,6 @@
 package com.tns;
 
 import android.os.Handler;
-import android.util.Log;
 import android.util.Pair;
 import android.webkit.MimeTypeMap;
 
@@ -23,8 +22,7 @@ import fi.iki.elonen.NanoHTTPD;
 import fi.iki.elonen.NanoWSD;
 
 class AndroidJsV8Inspector {
-    private static boolean DEBUG_LOG_ENABLED = false;
-
+    private static final String V8_INSPECTOR_TAG = "V8Inspector";
     private JsV8InspectorServer server;
     private static String ApplicationDir;
     private String packageName;
@@ -48,11 +46,13 @@ class AndroidJsV8Inspector {
 
     private LinkedBlockingQueue<String> inspectorMessages = new LinkedBlockingQueue<String>();
     private LinkedBlockingQueue<String> pendingInspectorMessages = new LinkedBlockingQueue<String>();
+    private Logger logger;
 
-    AndroidJsV8Inspector(String filesDir, String packageName) {
+    AndroidJsV8Inspector(String filesDir, String packageName, Logger logger) {
         ApplicationDir = filesDir;
         this.packageName = packageName;
         this.debugBrkLock = new Object();
+        this.logger = logger;
     }
 
     public void start() throws IOException {
@@ -64,8 +64,8 @@ class AndroidJsV8Inspector {
             this.server = new JsV8InspectorServer(this.packageName + "-inspectorServer");
             this.server.start(-1);
 
-            if (DEBUG_LOG_ENABLED) {
-                Log.d("V8Inspector", "start debugger ThreadId:" + Thread.currentThread().getId());
+            if (logger.isEnabled()) {
+                logger.write(V8_INSPECTOR_TAG, "start debugger ThreadId:" + Thread.currentThread().getId());
             }
 
             init();
@@ -181,6 +181,7 @@ class AndroidJsV8Inspector {
     protected void waitForDebugger(boolean shouldBreak) {
         synchronized (this.debugBrkLock) {
             try {
+                logger.write(V8_INSPECTOR_TAG, "Waiting 30 seconds for debugger to connect");
                 this.debugBrkLock.wait(1000 * 30);
             } catch (InterruptedException e) {
                 e.printStackTrace();
@@ -209,8 +210,8 @@ class AndroidJsV8Inspector {
 
         @Override
         protected Response serveHttp(IHTTPSession session) {
-            if (DEBUG_LOG_ENABLED) {
-                Log.d("{N}.v8-inspector", "http request for " + session.getUri());
+            if (logger.isEnabled()) {
+                logger.write(V8_INSPECTOR_TAG, "http request for " + session.getUri());
             }
             return super.serveHttp(session);
         }
@@ -228,8 +229,8 @@ class AndroidJsV8Inspector {
 
         @Override
         protected void onOpen() {
-            if (DEBUG_LOG_ENABLED) {
-                Log.d("V8Inspector", "onOpen: ThreadID:  " + Thread.currentThread().getId());
+            if (logger.isEnabled()) {
+                logger.write(V8_INSPECTOR_TAG, "onOpen: ThreadID:  " + Thread.currentThread().getId());
             }
 
             connect(JsV8InspectorWebSocket.this);
@@ -237,15 +238,15 @@ class AndroidJsV8Inspector {
 
         @Override
         protected void onClose(NanoWSD.WebSocketFrame.CloseCode code, String reason, boolean initiatedByRemote) {
-            if (DEBUG_LOG_ENABLED) {
-                Log.d("V8Inspector", "onClose");
+            if (logger.isEnabled()) {
+                logger.write(V8_INSPECTOR_TAG, "onClose");
             }
 
             mainHandler.post(new Runnable() {
                 @Override
                 public void run() {
-                    if (DEBUG_LOG_ENABLED) {
-                        Log.d("V8Inspector", "Disconnecting");
+                    if (logger.isEnabled()) {
+                        logger.write(V8_INSPECTOR_TAG, "Disconnecting");
                     }
                     disconnect();
                 }
@@ -254,8 +255,8 @@ class AndroidJsV8Inspector {
 
         @Override
         protected void onMessage(final NanoWSD.WebSocketFrame message) {
-            if (DEBUG_LOG_ENABLED) {
-                Log.d("V8Inspector", "To dbg backend: " + message.getTextPayload() + " ThreadId:" + Thread.currentThread().getId());
+            if (logger.isEnabled()) {
+                logger.write(V8_INSPECTOR_TAG, "To dbg backend: " + message.getTextPayload() + " ThreadId:" + Thread.currentThread().getId());
             }
 
             inspectorMessages.offer(message.getTextPayload());
@@ -288,8 +289,8 @@ class AndroidJsV8Inspector {
 
         @Override
         public void send(String payload) throws IOException {
-            if (DEBUG_LOG_ENABLED) {
-                Log.d("V8Inspector", "To dbg client: " + payload);
+            if (logger.isEnabled()) {
+                logger.write(V8_INSPECTOR_TAG, "To dbg client: " + payload);
             }
 
             super.send(payload);

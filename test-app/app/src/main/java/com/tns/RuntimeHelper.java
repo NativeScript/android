@@ -152,7 +152,7 @@ public final class RuntimeHelper {
                 runtime = Runtime.initializeRuntimeWithConfiguration(config);
                 if (isDebuggable) {
                     try {
-                        v8Inspector = new AndroidJsV8Inspector(app.getFilesDir().getAbsolutePath(), app.getPackageName());
+                        v8Inspector = new AndroidJsV8Inspector(app.getFilesDir().getAbsolutePath(), app.getPackageName(), logger);
                         v8Inspector.start();
 
                         // the following snippet is used as means to notify the VSCode extension
