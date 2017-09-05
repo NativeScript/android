@@ -12,16 +12,6 @@ public class ClassRepo {
     private static ArrayList<ClassMapProvider> cachedProviders = new ArrayList<ClassMapProvider>();
 
     public static void addToCache(ClassMapProvider classMapProvider) {
-        for (String className : classMapProvider.getClassMap().keySet()) {
-            for (ClassMapProvider cachedProvider : cachedProviders) {
-                ClassDescriptor clazz = cachedProvider.getClassMap().get(className);
-                if (clazz != null) {
-                    String errMsg = "Class " + className + " conflict: "
-                                    + classMapProvider.getPath() + " and " + cachedProvider.getPath();
-                    throw new IllegalArgumentException(errMsg);
-                }
-            }
-        }
         cachedProviders.add(classMapProvider);
     }
 
@@ -33,6 +23,7 @@ public class ClassRepo {
                 break;
             }
         }
+
         return clazz;
     }
 
