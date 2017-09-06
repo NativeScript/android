@@ -655,15 +655,10 @@ void MetadataNode::SetInnerTypes(Isolate* isolate, Local<Function>& ctorFunction
     if (treeNode->children != nullptr) {
         const auto& children = *treeNode->children;
 
-//		// prototype of outer class
-//		auto prototypeTemplate2 = ctorFunction->Get(V8StringConstants::GetPrototype(isolate)).As<Object>();
-
         for (auto curChild : children) {
             auto childNode = GetOrCreateInternal(curChild);
 
-            auto type = s_metadataReader.GetNodeType(curChild);
-            auto isStatic = s_metadataReader.IsNodeTypeStatic(type);
-
+            // The call to GetConstructorFunctionTemplate bootstraps the ctor function for the childNode
             auto innerTypeCtorFuncTemplate = childNode->GetConstructorFunctionTemplate(isolate, curChild);
             auto innerTypeCtorFunc = Local<Function>::New(isolate, *GetOrCreateInternal(curChild)->GetPersistentConstructorFunction(isolate));
             auto innerTypeName = ArgConverter::ConvertToV8String(isolate, curChild->name);
@@ -683,6 +678,8 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* is
 Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* isolate, MetadataTreeNode* treeNode, vector<MethodCallbackData*>& instanceMethodsCallbackData) {
     SET_PROFILER_FRAME();
     tns::instrumentation::Frame frame;
+
+    v8::HandleScope handleScope(isolate);
 
     //try get cached "ctorFuncTemplate"
     Local<FunctionTemplate> ctorFuncTemplate;
@@ -817,11 +814,15 @@ void MetadataNode::ExtendedClassConstructorCallback(const v8::FunctionCallbackIn
     try {
         SET_PROFILER_FRAME();
 
-        assert(info.IsConstructCall());
+        if (!info.IsConstructCall()) {
+            throw NativeScriptException(string("Incorrectly calling a Java class as a method. Class must be created by invoking its constructor with the `new` keyword."));
+        }
 
         auto isolate = info.GetIsolate();
         auto thiz = info.This();
         auto extData = reinterpret_cast<ExtendedClassCallbackData*>(info.Data().As<External>()->Value());
+
+        v8::HandleScope handleScope(isolate);
 
         auto implementationObject = Local<Object>::New(isolate, *extData->implementationObject);
 
@@ -854,9 +855,15 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
     try {
         SET_PROFILER_FRAME();
 
+        if (!info.IsConstructCall()) {
+            throw NativeScriptException(string("Interface implementation must be invoked as a constructor with the `new` keyword."));
+        }
+
         auto isolate = info.GetIsolate();
         auto thiz = info.This();
         auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value());
+
+        v8::HandleScope handleScope(isolate);
 
         Local<Object> implementationObject;
         Local<String> v8ExtendName;

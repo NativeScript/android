@@ -27,4 +27,8 @@ describe("Tests Java interfaces are implemented correctly", function () {
 
 		expect(callClose).toBe(true);
 	});
+
+	it("should not crash with no exception when calling interface incorrectly", function () {
+	    expect(() => { java.lang.Runnable({ run: () => { android.util.Log.d("Log", ""); } }) }).toThrow();
+	});
 });
