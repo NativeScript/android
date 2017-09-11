@@ -1,8 +1,12 @@
 env:
   global:
+  - NODE_VERSION=6.11.1
   - NDK_VERSION=r12b
   - DATE=$(date +%Y-%m-%d)
   - PACKAGE_VERSION=next-$DATE-$TRAVIS_BUILD_NUMBER
+  - EMULATOR_API_LEVEL=21
+  - ANDROID_ABI=armeabi-v7a
+  - EMULATOR_NAME=runtime-emu
 sudo: true
 language: android
 jdk:
@@ -15,9 +19,10 @@ android:
   - tools
   - build-tools-25.0.2
   - android-23
+  - android-$EMULATOR_API_LEVEL
   - extra-android-support
   - extra-android-m2repository
-  - sys-img-armeabi-v7a-android-21
+  - sys-img-$ANDROID_ABI-android-$EMULATOR_API_LEVEL
 before_cache:
   - rm -f $HOME/.gradle/caches/modules-2/modules-2.lock
 cache:
@@ -33,10 +38,12 @@ before_install:
   - "rm -rf android-ndk-$NDK_VERSION-linux-x86_64.zip"
   - export ANDROID_NDK_HOME=`pwd`/android-ndk-$NDK_VERSION
   - export PATH=${PATH}:${ANDROID_NDK_HOME}
+install:
+  - nvm install $NODE_VERSION
 script:
   - "./gradlew createPackage -i -PpreReleaseVersion=$PACKAGE_VERSION -PgitCommitVersion=$TRAVIS_COMMIT --stacktrace"
-  - echo no | android create avd --force -n Arm21 -t android-21 -b armeabi-v7a -c 12M
-  - emulator -avd Arm21 -no-skin -no-audio -no-window &
+  - echo no | android create avd --force -n $EMULATOR_NAME-$EMULATOR_API_LEVEL -t android-$EMULATOR_API_LEVEL --abi $ANDROID_ABI -c 12M
+  - emulator -avd $EMULATOR_NAME-$EMULATOR_API_LEVEL -no-skin -no-audio -no-window &
   - android-wait-for-emulator
   - "cd test-app && ./gradlew assembleDebug runtests -PembedBindingGenerator=true --stacktrace"
   - adb -e logcat -d 300
