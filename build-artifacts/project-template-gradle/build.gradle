@@ -4,6 +4,8 @@
 *			gradle buildapk -Prelease (release mode)
 *			gradle buildapk (debug mode -> default)
 * 	Options:
+*			-PwaitForDebugger //in case property is passed debugger will wait for "Debugger.enable" from frontend for 30 seconds
+*
 *			-Prelease  //this flag will run build in release mode
 *			-PksPath=[path_to_keystore_file]
 *			-PksPassword=[password_for_keystore_file]
@@ -14,7 +16,7 @@
 *			-PbuildToolsVersion=[build_tools_version]
 *			-PsupportVersion=[support_version]
 *			-PcompileSdk=[compile_sdk_version]
-
+*
 *			-PdontRunSbg=[true/false]
 */
 
@@ -153,6 +155,13 @@ android {
         release {
             signingConfig signingConfigs.release
         }
+	debug {
+		def waitForDebbug = "false";
+		if(project.hasProperty("waitForDebugger")) {
+			waitForDebbug = "true";
+		}
+		buildConfigField "boolean", "WAIT_FOR_DEBUG", waitForDebbug
+	}
     }
 	
 	applicationVariants.all { variant ->

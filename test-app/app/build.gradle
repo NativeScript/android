@@ -40,6 +40,15 @@ model {
             minifyEnabled = false
             proguardFiles.add(file('proguard-rules.txt'))
         }
+		debug {
+			buildConfigFields {
+				create() {
+					type "boolean"
+					name "WAIT_FOR_DEBUG"
+					value "false"
+				}
+			}
+		}
     }
 }
 
