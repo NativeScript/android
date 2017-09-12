@@ -153,6 +153,9 @@ android {
         release {
             signingConfig signingConfigs.release
         }
+	debug {
+		buildConfigField "boolean", "WAIT_FOR_DEBUG", "true"
+	}
     }
 	
 	applicationVariants.all { variant ->
