@@ -29,7 +29,7 @@ public class Generator {
                 "You need to pass an output directory!");
         }
 
-        if (args != null && args.length > 1) {
+        if (args.length > 1) {
             params = new String[args.length - 1];
             for (int i = 1; i < args.length; i++) {
                 params[i - 1] = args[i];

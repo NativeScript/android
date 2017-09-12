@@ -60,7 +60,11 @@ public class Builder {
                 // our class path API 17
                 // Class<?> clazz = Class.forName(className, false, loader);
                 ClassDescriptor clazz = ClassRepo.findClass(className);
-                generate(clazz, root);
+                if (clazz == null) {
+                    throw new ClassNotFoundException("Class " + className + " not found in the input android libraries.");
+                } else {
+                    generate(clazz, root);
+                }
             } catch (Throwable e) {
                 System.out.println("Skip " + className);
                 System.out.println("\tError: " + e.toString());
@@ -248,6 +252,12 @@ public class Builder {
         } else {
             String name = ClassUtil.getCanonicalName(type.getSignature());
             ClassDescriptor clazz = ClassRepo.findClass(name);
+
+            // if clazz is not found in the ClassRepo, the method/field being analyzed will be skipped
+            if (clazz == null) {
+                return null;
+            }
+
             node = getOrCreateNode(root, clazz, null);
         }
 
