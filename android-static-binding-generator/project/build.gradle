@@ -155,23 +155,16 @@ task traverseJsFilesArgs { //(jsCodeDir, bindingsFilePath, interfaceNamesFilePat
 		list.add(interfaceNamesFilePath)
 		list.add(jsFilesParameter)
 
-	def list = new ArrayList<String>();
-	list.add("node")
-	list.add(jsParserPath)
-	list.add(jsCodeDir)
-	list.add(bindingsFilePath)
-	list.add(interfaceNamesFilePath)
-	list.add(jsFilesParameter)
+		logger.info("Task: traverseJsFilesArgs: executed with arguments: " + list.toString().replaceAll(',', ''))
+		def proc = list.execute()
+		proc.in.eachLine { line -> println line }
+		proc.out.close()
+		proc.waitFor()
 
-	logger.info("Task: traverseJsFilesArgs: executed with arguments: " + list.toString().replaceAll(',', ''))
-	def proc = list.execute()
-	proc.in.eachLine { line -> println line }
-	proc.out.close()
-	proc.waitFor()
-
-	if (proc.exitValue()) {
-		println "gave the following error: "
-		println "[ERROR] ${proc.getErrorStream()}"
+		if (proc.exitValue()) {
+			println "gave the following error: "
+			println "[ERROR] ${proc.getErrorStream()}"
+		}
 	}
 }
 
@@ -279,9 +272,10 @@ task generateBindings() {
 	inputs.dir (bindingsFile)
 
 	doFirst {
-		if(!file(bindingsFileP).exists()) {
+		if (!file(bindingsFileP).exists()) {
 			throw new GradleException("No ${bindingsFileP} was found after runAstParser task was ran! Check to see if there are any .js files inside ${jsCodeDir}")
 		}
+
 		javaexec {
 			main "-jar"
 

@@ -39,22 +39,20 @@ def metadataParams = new LinkedList <String> ()
 def allJarPaths = new LinkedList <String> ()
 def configStage = "\tconfig phase: "
 def nodeModulesDir = "../../node_modules/"
-def configurationsDir = new File(projectDir, "build/configurations")
 def dependenciesJson = file("dependencies.json")
 
 // the build script will not work with previous versions of the CLI (3.1 or earlier)
 if (!dependenciesJson.exists()) {
 	throw new BuildCancelledException("""
 'dependencies.json' file not found. Check whether the NativeScript CLI has prepared the project beforehand,
-and that your NativeScript version is 3.2, or a more recent one. To build an android project with the current
-version of the {N} CLI install a previous version of the runtime package - 'tns platform add android@3.1'.
+and that your NativeScript version is 3.3, or a more recent one. To build an android project with the current
+version of the {N} CLI install a previous version of the runtime package - 'tns platform add android@3.2'.
 """)
 }
 
 def nativescriptDependencies = new JsonSlurper().parseText(dependenciesJson.text)
 
 def packageJsonContents = [:]
-def excludedDevDependencies = ['**/.bin/**']
 
 def dontRunSbg = project.hasProperty("dontRunSbg");
 def asbgProject = project(":asbg")
@@ -81,25 +79,74 @@ def renameResultApks = { variant ->
 	}
 }
 
-// gets the devDependencies declared in the package.json and excludes them from the build
-task getDevDependencies {
-	doLast {
-		println "$configStage getDevDependencies"
-
-		String content = new File("$projectDir/../../package.json").getText("UTF-8")
-		def jsonSlurper = new JsonSlurper()
-		def packageJsonMap = jsonSlurper.parseText(content)
-
-		packageJsonContents = packageJsonMap.devDependencies;
-
-		packageJsonContents.each { entry ->
-			excludedDevDependencies.add(entry.key + '/platforms/android/**/*.jar')
-		}
-	}
-}
 ////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////// CONFIGURATIONS ///////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
+
+def applyPluginsIncludeGradleConfigurations =  { ->
+	def taskNames = project.getGradle().startParameter.taskNames
+
+	// don't apply plugin configurations if clean is invoked
+	if (taskNames && taskNames.size() > 0 && taskNames.getAt(0).equals("clean")) {
+		return []
+	}
+
+	def configurationsDir = new File(projectDir, "build/configurations")
+	configurationsDir.deleteDir()
+
+	def dimensions = []
+	def includes = new ArrayList<String>()
+	def flavorNumber = 0
+
+	nativescriptDependencies.each { dep ->
+		def androidDir = file("${dep.directory}/platforms/android")
+		if (!androidDir.exists()) {
+			return
+		}
+
+		def packageJsonPath = file("${dep.directory}/package.json")
+		def packageJson = new JsonSlurper().parseText(packageJsonPath.text)
+		def pluginName = packageJson.name
+		def dimensionName = sanitizeDimensionName(pluginName)
+
+		dimensions.add(dimensionName)
+		def flavor = "F${flavorNumber++}"
+
+		def includeGradleFile = new File(androidDir, "include.gradle")
+		def destinationDir = file("${configurationsDir}/${pluginName}/")
+		def destinationIncludeGradleFile = file("${configurationsDir}/${pluginName}/include.gradle")
+
+		Files.createDirectories(Paths.get(destinationDir.getAbsolutePath()))
+
+		if (includeGradleFile.exists()) {
+			println "\t + add include.gradle from ${includeGradleFile}"
+			destinationIncludeGradleFile.text = modifyProductFlavorInContent(includeGradleFile.text, dimensionName, flavor)
+		} else {
+			println "\t + creating include.gradle for plugin ${file(dep.directory)}"
+			destinationIncludeGradleFile.text = createProductFlavorsContent(flavor, dimensionName)
+		}
+
+		includes.add(destinationIncludeGradleFile.getAbsolutePath());
+
+		copyAndRenamePluginDirToFlavorName(androidDir, flavor);
+	}
+
+	includes.each {
+		println "\t + applying plugin configuration from ${it}"
+		apply from: it
+	}
+
+	return dimensions
+}
+
+def applyAppGradleConfiguration = { ->
+	def pathToAppGradle = "$projectDir/../../app/App_Resources/Android/app.gradle"
+	def appGradle = file(pathToAppGradle)
+	if (appGradle.exists()) {
+		println "\t + applying user-defined configuration from ${appGradle}"
+		apply from: pathToAppGradle
+	}
+}
 
 android {
 	compileSdkVersion computeCompileSdkVersion()
@@ -177,6 +224,12 @@ android {
 			compileTask.dependsOn("asbg:generateBindings")
 		}
 	}
+
+	def dimensions = applyPluginsIncludeGradleConfigurations()
+	
+	flavorDimensions(*dimensions)
+
+	applyAppGradleConfiguration()
 }
 
 repositories {
@@ -204,9 +257,6 @@ dependencies {
 
     // take all jars within the libs dir
 	compile fileTree(dir: "$projectDir/libs", include: ["**/*.jar"])
-
-	// take all jars within the node_modules dir
-	compile fileTree(dir: nodeModulesDir, include: ["**/platforms/android/**/*.jar"], exclude: excludedDevDependencies)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -242,67 +292,6 @@ task addDependenciesFromNativeScriptPlugins {
 		}
 
 		project.dependencies.add("compile", jarFiles)
-	}
-}
-
-task applyPluginsIncludeGradleConfigurations {
-	configurationsDir.deleteDir()
-
-	def dimensions = []
-	def includes = new ArrayList<String>()
-	def flavorNumber = 0
-
-	nativescriptDependencies.each { dep ->
-		def androidDir = file("${dep.directory}/platforms/android")
-		if (!androidDir.exists()) {
-			return
-		}
-
-		def packageJsonPath = file("${dep.directory}/package.json")
-		def packageJson = new JsonSlurper().parseText(packageJsonPath.text)
-		def pluginName = packageJson.name
-		def dimensionName = sanitizeDimensionName(pluginName)
-
-		dimensions.add(dimensionName)
-		def flavor = "F${flavorNumber++}"
-
-		def includeGradleFile = new File(androidDir, "include.gradle")
-		def destinationDir = file("${configurationsDir}/${pluginName}/")
-		def destinationIncludeGradleFile = file("${configurationsDir}/${pluginName}/include.gradle")
-
-		Files.createDirectories(Paths.get(destinationDir.getAbsolutePath()))
-
-		if (includeGradleFile.exists()) {
-			println "\t + add include.gradle from ${includeGradleFile}"
-			destinationIncludeGradleFile.text = modifyProductFlavorInContent(includeGradleFile.text, dimensionName, flavor)
-		} else {
-			println "\t + creating include.gradle for plugin ${file(dep.directory)}"
-			destinationIncludeGradleFile.text = createProductFlavorsContent(flavor, dimensionName)
-		}
-
-		includes.add(destinationIncludeGradleFile.getAbsolutePath());
-
-		copyAndRenamePluginDirToFlavorName(androidDir, flavor);
-	}
-
-	flavorDimensions(*dimensions)
-
-	includes.each {
-		println "\t + applying plugin configuration from ${it}"
-		apply from: it
-	}
-}
-
-applyPluginsIncludeGradleConfigurations.finalizedBy(applyAppGradleConfiguration)
-
-task applyAppGradleConfiguration {
-	description "applies user-defined gradle configuration"
-
-	def pathToAppGradle = "$projectDir/../../app/App_Resources/Android/app.gradle"
-	def appGradle = file(pathToAppGradle)
-	if (appGradle.exists()) {
-		println "\t + applying user-defined configuration from ${appGradle}"
-		apply from: pathToAppGradle
 	}
 }
 
@@ -476,14 +465,14 @@ def copyAndRenamePluginDirToFlavorName(directory, flavor) {
 	copyFolder(directory, targetDir)
 }
 
-////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////// EXECUTUION PHASE /////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////
-
 task ensureMetadataOutDir {
 	def outputDir = file("$projectDir/metadata/output/assets/metadata")
 	outputDir.mkdirs()
 }
+
+////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////// EXECUTUION PHASE /////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
 
 task collectAllJars {
 	description "gathers all paths to jar dependencies before building metadata with them"
