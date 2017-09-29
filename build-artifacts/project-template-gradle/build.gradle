@@ -197,6 +197,8 @@ android {
 
 repositories {
     jcenter()
+    maven { url 'https://maven.google.com' }
+
     // used for local *.AAR files
     flatDir {
     	dirs 'libs/aar'
