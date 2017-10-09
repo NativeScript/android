@@ -80,9 +80,9 @@ public class Runtime {
             "Primitive types need to be manually wrapped in their respective Object wrappers.\n" +
             "If you are creating an instance of an inner class, make sure to always provide reference to the outer `this` as the first argument.";
 
-    private final SparseArray<Object> strongInstances = new SparseArray<Object>();
+    private final HashMap<Integer, Object> strongInstances = new HashMap<>();
 
-    private final SparseArray<WeakReference<Object>> weakInstances = new SparseArray<WeakReference<Object>>();
+    private final HashMap<Integer, WeakReference<Object>> weakInstances = new HashMap<>();
 
     private final NativeScriptHashMap<Object, Integer> strongJavaObjectToID = new NativeScriptHashMap<Object, Integer>();
 
@@ -801,7 +801,7 @@ public class Runtime {
             weakInstances.put(javaObjectID, new WeakReference<Object>(instance));
         }
 
-        strongInstances.delete(javaObjectID);
+        strongInstances.remove(javaObjectID);
         strongJavaObjectToID.remove(instance);
     }
 
@@ -829,17 +829,17 @@ public class Runtime {
                 if (instance == null) {
                     // The Java was moved from strong to weak, and then the Java instance was collected.
                     weakInstances.remove(javaObjectID);
-                    weakJavaObjectToID.remove(Integer.valueOf(javaObjectID));
+                    weakJavaObjectToID.remove(javaObjectID);
                     return false;
                 } else {
                     return true;
                 }
             }
         } else {
-            strongInstances.delete(javaObjectID);
+            strongInstances.remove(javaObjectID);
             strongJavaObjectToID.remove(instance);
 
-            weakJavaObjectToID.put(instance, Integer.valueOf(javaObjectID));
+            weakJavaObjectToID.put(instance, javaObjectID);
             weakInstances.put(javaObjectID, new WeakReference<Object>(instance));
 
             return true;
@@ -862,7 +862,7 @@ public class Runtime {
 
                 if (instance == null) {
                     isReleased = 1;
-                    weakInstances.delete(javaObjectId);
+                    weakInstances.remove(javaObjectId);
                 } else {
                     isReleased = 0;
                 }
@@ -880,7 +880,11 @@ public class Runtime {
             logger.write("Platform.getJavaObjectByID:" + javaObjectID);
         }
 
-        Object instance = strongInstances.get(javaObjectID, keyNotFoundObject);
+        Object instance = strongInstances.get(javaObjectID);
+
+        if (instance == null) {
+            instance = keyNotFoundObject;
+        }
 
         if (instance == keyNotFoundObject) {
             WeakReference<Object> wr = weakInstances.get(javaObjectID);
