@@ -21,4 +21,4 @@ bin/
 .DS_Store
 .settings
 
-build-artifacts/
+*.iml
