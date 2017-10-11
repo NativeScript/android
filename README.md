@@ -6,15 +6,15 @@ Contains the source code for the NativeScript's Android runtime. The android-run
 # Main Projects
 The repo is structured in the following projects (ordered by dependencies):
 
-* **android-metadata-generator** - generates metadata necessary for the Android Runtime. Situated __android-metadata-generator__ in project.
-* **android-binding-generator** - enables Java & Android types to be dynamically created at runtime. Needed by the `extend` routine. Situated __test-app/runtime-binding-generator__ in project.
-* **android-runtime** - contains the core logic behind the NativeScript's Android Runtime. This project contains native C++ code and needs the Android NDK to build properly. Situated __test-app/runtime__ in project.
-* **android-runtime-testapp** - this is a vanilla Android Application, which contains the tests for the runtime project. Situated __test-app/app__ in project.
+* **android-metadata-generator** - generates metadata necessary for the Android Runtime. Located in __android-metadata-generator__.
+* **android-binding-generator** - enables Java & Android types to be dynamically created at runtime. Needed by the `extend` routine. Located in __test-app/runtime-binding-generator__.
+* **android-runtime** - contains the core logic behind the NativeScript's Android Runtime. This project contains native C++ code and needs the Android NDK to build properly. Located in __test-app/runtime__.
+* **android-runtime-testapp** - this is a vanilla Android Application, which contains the tests for the runtime project.  Located in __test-app/app__.
 
 # Helper Projects
 
-* **android-static-binding-generator** - build tool that generates bindings based on the user's javascript code. Situated __android-static-binding-generator__ in project.
-* **project-template** - this is an empty placeholder Android Application project, used by the [NativeScript CLI](https://github.com/NativeScript/nativescript-cli) when building an Android project. Situated __build-artifacts/project-template-gradle/__ in project.
+* **android-static-binding-generator** - build tool that generates bindings based on the user's javascript code. Located in __android-static-binding-generator__.
+* **project-template** - this is an empty placeholder Android Application project, used by the [NativeScript CLI](https://github.com/NativeScript/nativescript-cli) when building an Android project. Located in __build-artifacts/project-template-gradle/__.
 
 # Build Prerequisites
 Following are the minimal prerequisites to build the runtime package.
