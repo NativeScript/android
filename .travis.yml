@@ -18,7 +18,7 @@ android:
   - platform-tools
   - tools
   - build-tools-26.0.1
-  - android-23
+  - android-26
   - android-$EMULATOR_API_LEVEL
   - extra-android-support
   - extra-android-m2repository
