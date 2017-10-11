@@ -141,7 +141,7 @@ public final class RuntimeHelper {
                 String nativeLibDir = null;
                 try {
                     nativeLibDir = app.getPackageManager().getApplicationInfo(appName, 0).nativeLibraryDir;
-                } catch (android.content.pm.PackageManager.NameNotFoundException e) {
+                } catch (NameNotFoundException e) {
                     e.printStackTrace();
                 }
 

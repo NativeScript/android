@@ -602,7 +602,7 @@ describe("Tests ", function () {
 
 		var dir = __dirname;
 
-		var expectedDirname = "/data/data/com.tns.android_runtime_testapp/files/app/tests";
+		var expectedDirname = "/data/data/com.tns.testapplication/files/app/tests";
 
 		expect(dir).toBe(expectedDirname);
 	});
@@ -613,7 +613,7 @@ describe("Tests ", function () {
 
 		var file = __filename;
 
-		var expectedFilename = "/data/data/com.tns.android_runtime_testapp/files/app/tests/tests.js";
+		var expectedFilename = "/data/data/com.tns.testapplication/files/app/tests/tests.js";
 
 		expect(file).toBe(expectedFilename);
 

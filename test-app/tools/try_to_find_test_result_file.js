@@ -25,18 +25,18 @@ function closeProcessAfter(timeout) {
 }
 
 function tryToGetFile() {
-	var checkApp = checkIfAppIsRunning("adb " + runOnDeviceOrEmulator + " shell \"ps | grep com.tns.android_runtime_testapp\"", checkIfProcessIsRunning);
-	pullfile = execFindFile("adb " + runOnDeviceOrEmulator + " pull /sdcard/android_unit_test_results.xml", checkIfFileExists);
+	var checkApp = checkIfAppIsRunning("adb " + runOnDeviceOrEmulator + " shell \"ps | grep com.tns.testapplication\"", checkIfProcessIsRunning);
+	pullfile = execFindFile("adb " + runOnDeviceOrEmulator + " pull /data/data/com.tns.testapplication/android_unit_test_results.xml", checkIfFileExists);
 	pullfile.stdout.pipe(process.stdout, { end: false });
 	pullfile.stderr.pipe(process.stderr, { end: false });
 }
 
 function checkIfProcessIsRunning(err, stdout, stderr) {
 	if(stdout) {
-		console.log("com.tns.android_runtime_testapp process is running")
+		console.log("com.tns.testapplication process is running")
 	}
 	else {
-		console.log('com.tns.android_runtime_testapp process died!');
+		console.log('com.tns.testapplication process died or never started!');
 		process.exit(1);
 	}
 
@@ -44,7 +44,7 @@ function checkIfProcessIsRunning(err, stdout, stderr) {
 
 function checkIfFileExists(err, stout, stderr) {
 
-	//if you find file in sdcard exit process
+	//if you find file in /data/data/com.tns.testapplication exit process
 	if (!err) {
 		console.log('Tests results file found file!');
 		process.exit();

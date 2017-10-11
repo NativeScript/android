@@ -1,0 +1,166 @@
+apply plugin: 'com.android.library'
+
+def optimized = project.hasProperty("optimized")
+if (optimized) {
+    println "Optimized build triggered."
+}
+
+project.ext._buildToolsVersion = "26.0.1"
+
+android {
+    sourceSets {
+        main {
+            def defaultSrcPath = "src/main/java";
+            def bindingGeneratorSourcePath = new File(project(":runtime-binding-generator").projectDir, defaultSrcPath)
+
+            // embedd runtime binding generator in runtime, while keeping it in a sperate project
+            java.srcDirs = [bindingGeneratorSourcePath, defaultSrcPath]
+        }
+    }
+    compileSdkVersion 26
+    buildToolsVersion project.ext._buildToolsVersion
+
+    publishNonDefault true
+    defaultConfig {
+        minSdkVersion 17
+        targetSdkVersion 26
+        versionCode 1
+        versionName "1.0"
+
+        if (optimized) {
+            project.archivesBaseName = "${archivesBaseName}-optimized"
+        } else {
+            project.archivesBaseName = "${archivesBaseName}-regular"
+        }
+
+        externalNativeBuild {
+            cmake {
+                if (optimized) {
+                    arguments.push("-DOPTIMIZED_BUILD=true")
+                }
+
+                //https://developer.android.com/ndk/guides/cmake.html
+                //TODO: plamen5kov: figure out why can't ANDROID_TOOLCHAIN and ANDROID_STL be set in CMakeLists.txt
+                arguments "-DANDROID_TOOLCHAIN=clang", "-DANDROID_STL=c++_static", "-DANDROID_NDK_ROOT=${android.ndkDirectory}"
+            }
+        }
+
+        ndk {
+            abiFilters 'x86', 'armeabi-v7a'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path "CMakeLists.txt"
+        }
+    }
+}
+
+dependencies {
+    compile fileTree(include: ['*.jar'], dir: 'libs')
+    compile 'com.android.support:appcompat-v7:26.0.2'
+}
+
+tasks.whenTaskAdded { task ->
+    def taskName = task.getName()
+    if (taskName.contains("externalNativeBuildRelease")) {
+        setRuntimeCommit.dependsOn(setPackageVersion)
+        task.dependsOn(setRuntimeCommit)
+    }
+    if (taskName.contains("Strip")) {
+        task.finalizedBy(revertVersionFile)
+    }
+    if ((taskName == "bundleDebug") || (taskName == "bundleRelease")) {
+        task.finalizedBy createPackageConfigFileTask(taskName)
+    }
+}
+
+task setPackageVersion {
+    onlyIf {
+        project.hasProperty('packageVersion')
+    }
+
+    doFirst {
+        println "Setting runtime version: '${packageVersion}'"
+
+        def versionFile = "$projectDir/src/main/cpp/Version.h"
+        String contents = new File(versionFile).getText("UTF-8")
+        contents = contents.replaceAll(/0.0.0.0/, packageVersion)
+        new File(versionFile).write(contents, "UTF-8")
+    }
+}
+
+task setRuntimeCommit {
+    onlyIf {
+        project.hasProperty('gitCommitVersion')
+    }
+
+    doFirst {
+
+        println "Setting runtime commit: '${gitCommitVersion}'"
+
+        def versionFile = "$projectDir/src/main/cpp//Version.h"
+        String contents = new File(versionFile).getText("UTF-8")
+        contents = contents.replaceAll(/RUNTIME_COMMIT_SHA_PLACEHOLDER/, gitCommitVersion)
+        new File(versionFile).write(contents, "UTF-8")
+    }
+}
+
+task revertVersionFile(type: Exec) {
+    onlyIf {
+        project.hasProperty('packageVersion') || project.hasProperty('gitCommitVersion')
+    }
+
+    doFirst {
+        def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
+        def versionFileName = "$projectDir/src/main/cpp/Version.h"
+        def versionFilePath = new File(versionFileName).getAbsolutePath()
+        println "Reverting Version.h file: ${versionFilePath}"
+
+        if (isWinOs) {
+            commandLine "cmd", "/c", "git", "checkout", "--", versionFilePath
+        } else {
+            commandLine "git", "checkout", "--", versionFilePath
+        }
+    }
+}
+
+def createPackageConfigFileTask(taskName) {
+    def mode = (taskName == "bundleDebug") ? "debug" : "release"
+
+    return tasks.create(name: "packageConfigFileTaskFor${mode}",) {
+        def sdkDir = android.getSdkDirectory().getAbsolutePath()
+        doFirst {
+            def pathToAAR = "${buildDir}/outputs/aar/${project.archivesBaseName}-${mode}.aar"
+
+            if (new File(pathToAAR).exists()) {
+                def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
+
+                def aaptCommand = new File(sdkDir, "/build-tools/$project.ext._buildToolsVersion/aapt").getAbsolutePath()
+                if (isWinOs) {
+                    aaptCommand += ".exe"
+                }
+
+                def removeCmdParams = new ArrayList<String>([aaptCommand, "remove", pathToAAR, "config.json"])
+                exec {
+                    ignoreExitValue true
+                    workingDir "$projectDir/src/main"
+                    commandLine removeCmdParams.toArray()
+                }
+                def addCmdParams = new ArrayList<String>([aaptCommand, "add", pathToAAR, "config.json"])
+                exec {
+                    workingDir "$projectDir/src/main"
+                    commandLine addCmdParams.toArray()
+                }
+            }
+        }
+    }
+}

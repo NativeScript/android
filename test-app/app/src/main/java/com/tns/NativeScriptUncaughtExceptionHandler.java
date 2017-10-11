@@ -48,9 +48,9 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
                 Class<?> ErrReport = null;
                 java.lang.reflect.Method startActivity = null;
 
-                ErrReport = java.lang.Class.forName("com.tns.ErrorReport");
+                ErrReport = Class.forName("com.tns.ErrorReport");
 
-                startActivity = ErrReport.getDeclaredMethod("startActivity", android.content.Context.class, String.class);
+                startActivity = ErrReport.getDeclaredMethod("startActivity", Context.class, String.class);
 
                 res = (Boolean) startActivity.invoke(null, context, errorMessage);
             } catch (Exception e) {

@@ -16,11 +16,10 @@ global.__onUncaughtError = function(error){
 require('./Infrastructure/timers');
 
 global.__JUnitSaveResults = function (unitTestResults) {
-	var pathToSdcard = '/sdcard';
+	var pathToApp = '/data/data/com.tns.testapplication';
 	var unitTestFileName = 'android_unit_test_results.xml';
 	try {
-        var javaFile = new java.io.File(pathToSdcard, unitTestFileName);
-        
+        var javaFile = new java.io.File(pathToApp, unitTestFileName);
         var stream = new java.io.FileOutputStream(javaFile);
         var actualEncoding = 'UTF-8';
         var writer = new java.io.OutputStreamWriter(stream, actualEncoding);
@@ -28,7 +27,7 @@ global.__JUnitSaveResults = function (unitTestResults) {
         writer.close();
     }
     catch (exception) {
-    	__log('failed writing to files dir: ' + exception);
+        android.util.Log.d("TEST RESULTS", 'failed writing to files dir: ' + exception)
     }
 };
 

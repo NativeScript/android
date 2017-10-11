@@ -1,136 +1,110 @@
-/*
-* run from dir: test-app/
-* 	run on emulator: ./gradlew runtests //default
-* 	run on device: ./gradlew runtests -PrunOnDevice
-*
-*/
+apply plugin: 'com.android.application'
 
-
-def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
-
-apply plugin: 'com.android.model.application'
-
-def runOnDevice = project.hasProperty("runOnDevice");
-def runOnDeviceOrEmulator = runOnDevice ? "-d" : "-e";
-
-model {
-    android {
-        compileSdkVersion = 23
-        buildToolsVersion = "25.0.2"
-
-        defaultConfig.with {
-            applicationId = "com.tns.android_runtime_testapp"
-            minSdkVersion.apiLevel = 17
-            targetSdkVersion.apiLevel = 22
-            versionCode = 1
-            versionName = "1.0"
-        }
-
-        lintOptions.with {
-            abortOnError = false
-        }
+android {
+    compileSdkVersion 26
+    buildToolsVersion "26.0.1"
+    defaultConfig {
+        applicationId "com.tns.testapplication"
+        minSdkVersion 17
+        targetSdkVersion 26
+        versionCode 1
+        versionName "1.0"
+        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
     }
-
-//    android.ndk {
-//        moduleName = "test-app-dummy-native-lib"
-//    }
-
-    android.buildTypes {
+    buildTypes {
         release {
-            minifyEnabled = false
-            proguardFiles.add(file('proguard-rules.txt'))
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
 }
 
 dependencies {
-	def supportVer = "23.3.0"
-	compile project(':runtime')
-	compile fileTree(include: ['*.jar'], dir: 'libs')
+    releaseCompile project(path: ':runtime', configuration: 'release')
+    debugCompile project(path: ':runtime', configuration: 'debug')
 
-	compile "com.android.support:support-v4:$supportVer"
-	compile "com.android.support:appcompat-v7:$supportVer"
-	compile "com.android.support:design:$supportVer"
-
-	testCompile 'junit:junit:4.12'
+    compile fileTree(include: ['*.jar'], dir: 'libs')
+    compile 'com.android.support:appcompat-v7:26.0.2'
+    compile 'com.android.support:design:26.0.2'
+    compile 'com.android.support.constraint:constraint-layout:1.0.2'
 }
 
-task deleteDist (type: Delete) {
-	doFirst {
+def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
+def runOnDevice = project.hasProperty("runOnDevice");
+def runOnDeviceOrEmulator = runOnDevice ? "-d" : "-e";
+
+task deleteDist(type: Delete) {
+    doFirst {
         delete "$rootDir/dist"
-	}
+    }
 }
 
-task installApk (type: Exec) {
-	doFirst {
-		println "Attempting to install buit apk"
+task installApk(type: Exec) {
+    doFirst {
+        println "Attempting to install buit apk"
 
-		if(isWinOs) {
-			commandLine "cmd", "/c", "node", "$rootDir\\tools\\deploy-apk.js", "$rootDir\\app\\build\\outputs\\apk\\app-debug.apk", runOnDeviceOrEmulator
-		}
-		else {
-			commandLine "node", "$rootDir/tools/deploy-apk.js", "$rootDir/app/build/outputs/apk/app-debug.apk", runOnDeviceOrEmulator
-		}
-	}
-    
+        if (isWinOs) {
+            commandLine "cmd", "/c", "node", "$rootDir\\tools\\deploy-apk.js", "$rootDir\\app\\build\\outputs\\apk\\app-debug.apk", runOnDeviceOrEmulator
+        } else {
+            commandLine "node", "$rootDir/tools/deploy-apk.js", "$rootDir/app/build/outputs/apk/app-debug.apk", runOnDeviceOrEmulator
+        }
+    }
+
     doLast {
         println "Install result:" + execResult
     }
 }
 
-task deletePreviousResultXml (type: Exec) {
-	doFirst {
+task deletePreviousResultXml(type: Exec) {
+    doFirst {
         println "Removing previous android_unit_test_results.xml"
 
-        if(isWinOs) {
-            commandLine "cmd", "/c", "adb", runOnDeviceOrEmulator , "shell", "rm", "-rf", "/sdcard/android_unit_test_results.xml"
-        }
-        else {
-            commandLine "adb", runOnDeviceOrEmulator, "shell", "rm", "-rf", "/sdcard/android_unit_test_results.xml"
+        if (isWinOs) {
+            commandLine "cmd", "/c", "adb", "root", "&&", "adb", runOnDeviceOrEmulator, "shell", "rm", "-rf", "/data/data/com.tns.testapplication/android_unit_test_results.xml"
+        } else {
+            commandLine "adb", "root", "&&", "adb", runOnDeviceOrEmulator, "shell", "rm", "-rf", "/data/data/com.tns.testapplication/android_unit_test_results.xml"
         }
     }
 }
 
-task startInstalledApk (type: Exec) {
-	doFirst {
-		println "Starting test application"
-		
-		if(isWinOs) {
-			commandLine "cmd", "/c", "adb", runOnDeviceOrEmulator, "shell", "am", "start", "-n", "com.tns.android_runtime_testapp/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
-		}
-		else {
-			commandLine "adb", runOnDeviceOrEmulator, "shell", "am", "start", "-n", "com.tns.android_runtime_testapp/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
-		}
-	}
+task startInstalledApk(type: Exec) {
+    doFirst {
+        println "Starting test application"
+
+        if (isWinOs) {
+            commandLine "cmd", "/c", "adb", runOnDeviceOrEmulator, "shell", "am", "start", "-n", "com.tns.testapplication/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
+        } else {
+            commandLine "adb", runOnDeviceOrEmulator, "shell", "am", "start", "-n", "com.tns.testapplication/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
+        }
+    }
 }
 
 task createDistFolder {
-	doLast {
-		def distDir = file("$rootDir/dist")
-		distDir.mkdirs()
-	}
+    doLast {
+        def distDir = file("$rootDir/dist")
+        distDir.mkdirs()
+    }
 }
 
-task waitForUnitTestResultFile (type: Exec) {	
-	doFirst {
-		println "Waiting for tests to finish..."
-		
-		if(isWinOs) {
-			commandLine "cmd", "/c", "node", "$rootDir\\tools\\try_to_find_test_result_file.js", runOnDeviceOrEmulator
-		}
-		else {
-			commandLine "node", "$rootDir/tools/try_to_find_test_result_file.js", runOnDeviceOrEmulator
-		}
-	}
+task waitForUnitTestResultFile(type: Exec) {
+    doFirst {
+        println "Waiting for tests to finish..."
+
+        if (isWinOs) {
+            commandLine "cmd", "/c", "node", "$rootDir\\tools\\try_to_find_test_result_file.js", runOnDeviceOrEmulator
+        } else {
+            commandLine "node", "$rootDir/tools/try_to_find_test_result_file.js", runOnDeviceOrEmulator
+        }
+    }
 }
 
-task copyResultToDist (type: Copy) {	
-	from "$rootDir/app/android_unit_test_results.xml"
-	into "$rootDir/dist"
+task copyResultToDist(type: Copy) {
+    from "$rootDir/app/android_unit_test_results.xml"
+    into "$rootDir/dist"
 }
 
-task deleteRootLevelResult (type: Delete) {
-	delete "$rootDir/app/android_unit_test_results.xml"
+task deleteRootLevelResult(type: Delete) {
+    delete "$rootDir/app/android_unit_test_results.xml"
 }
 
 deletePreviousResultXml.dependsOn(deleteDist)
@@ -142,13 +116,12 @@ copyResultToDist.dependsOn(waitForUnitTestResultFile)
 deleteRootLevelResult.dependsOn(copyResultToDist)
 
 task runtests {
-	dependsOn deleteRootLevelResult
+    dependsOn deleteRootLevelResult
 }
 
 tasks.whenTaskAdded { task ->
 
-    if (task.getName() == "assembleDebug")
-	{
-		runtests.dependsOn assembleDebug
-	} 
+    if (task.getName() == "assembleDebug") {
+        runtests.dependsOn assembleDebug
+    }
 }
