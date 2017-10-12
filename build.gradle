@@ -8,7 +8,8 @@
 
 defaultTasks 'createPackage'
 
-import groovy.json.JsonSlurper //used to parse package.json
+import groovy.json.JsonSlurper
+
 import groovy.json.JsonBuilder
 import groovy.json.JsonOutput
 
@@ -18,271 +19,265 @@ def distDir = "$projectDir/dist"
 def pVersion = "no package version was provided by build.gradle build"
 def arVersion = "no commit sha was provided by build.gradle build"
 
-
-
 task checkEnvironmentVariables {
-	if ("$System.env.JAVA_HOME" == "" || "$System.env.JAVA_HOME" == "null") {
-		throw new GradleException("Set JAVA_HOME to point to the correct Jdk location\n");
-	}
-	
-	if ("$System.env.ANDROID_HOME" == "" || "$System.env.ANDROID_HOME" == "null") {
-		throw new GradleException("Set ANDROID_HOME to point to the correct Android SDK location\n");
-	}
-	
-	if ("$System.env.GIT_COMMIT" == "null" && !project.hasProperty("gitCommitVersion")) {
-		logger.warn("Warning: The GIT_COMMIT is not set. This NativeScript Android Runtime will not be tagged with the git commit it is build from\n");
-	}
-	
-	if(project.hasProperty("metadataGen") && !file("../android-metadata-generator/dist/tns-android-metadata-generator-0.0.1.tgz").exists()) {
-		throw new GradleException("android-metadata-generator build output not found and no metadataGen option specified. Build android-metadata-generator first.\n");
-	}
+    if ("$System.env.JAVA_HOME" == "" || "$System.env.JAVA_HOME" == "null") {
+        throw new GradleException("Set JAVA_HOME to point to the correct Jdk location\n");
+    }
+
+    if ("$System.env.ANDROID_HOME" == "" || "$System.env.ANDROID_HOME" == "null") {
+        throw new GradleException("Set ANDROID_HOME to point to the correct Android SDK location\n");
+    }
+
+    if ("$System.env.GIT_COMMIT" == "null" && !project.hasProperty("gitCommitVersion")) {
+        logger.warn("Warning: The GIT_COMMIT is not set. This NativeScript Android Runtime will not be tagged with the git commit it is build from\n");
+    }
+
+    if (project.hasProperty("metadataGen") && !file("../android-metadata-generator/dist/tns-android-metadata-generator-0.0.1.tgz").exists()) {
+        throw new GradleException("android-metadata-generator build output not found and no metadataGen option specified. Build android-metadata-generator first.\n");
+    }
 }
 
-task cleanDistDir (type: Delete) {
-	delete distDir
+task cleanDistDir(type: Delete) {
+    delete distDir
 }
 
-task createDistDir  << {
-	def distF = new File(distDir)
-	distF.mkdirs()
+task createDistDir {
+    doLast {
+        def distF = new File(distDir)
+        distF.mkdirs()
+    }
 }
 
-task copyFilesToProjectTemeplate << {
-	copy {
-		from "$rootDir/test-app/app/src/main/java/com/tns/ErrorReport.java"
-		from "$rootDir/test-app/app/src/main/java/com/tns/ErrorReportActivity.java"
-		from "$rootDir/test-app/app/src/main/java/com/tns/NativeScriptSyncService.java"
-		into "$rootDir/build-artifacts/project-template-gradle/src/debug/java/com/tns/"
-	}
-	copy {
-		from "$rootDir/test-app/app/src/main/assets/internal"
-		into "$rootDir/build-artifacts/project-template-gradle/src/main/assets/internal"
-	}
-	copy {
-		from "$rootDir/test-app/app/src/main/java/com/tns/AndroidJsV8Inspector.java"
-		from "$rootDir/test-app/app/src/main/java/com/tns/DefaultExtractPolicy.java"
-		from "$rootDir/test-app/app/src/main/java/com/tns/LogcatLogger.java"
-		from "$rootDir/test-app/app/src/main/java/com/tns/NativeScriptApplication.java"
-		from "$rootDir/test-app/app/src/main/java/com/tns/NativeScriptUncaughtExceptionHandler.java"
-		from "$rootDir/test-app/app/src/main/java/com/tns/RuntimeHelper.java"
-		from "$rootDir/test-app/app/src/main/java/com/tns/Util.java"
-		into "$rootDir/build-artifacts/project-template-gradle/src/main/java/com/tns/"
-	}
-	copy {
-		from "$rootDir/test-app/app/src/main/java/com/tns/internal"
-		into "$rootDir/build-artifacts/project-template-gradle/src/main/java/com/tns/internal"
-	}
+task copyFilesToProjectTemeplate {
+    doLast {
+        copy {
+            from "$rootDir/test-app/app/src/main/java/com/tns/ErrorReport.java"
+            from "$rootDir/test-app/app/src/main/java/com/tns/ErrorReportActivity.java"
+            from "$rootDir/test-app/app/src/main/java/com/tns/NativeScriptSyncService.java"
+            into "$rootDir/build-artifacts/project-template-gradle/src/debug/java/com/tns/"
+        }
+        copy {
+            from "$rootDir/test-app/app/src/main/assets/internal"
+            into "$rootDir/build-artifacts/project-template-gradle/src/main/assets/internal"
+        }
+        copy {
+            from "$rootDir/test-app/app/src/main/java/com/tns/AndroidJsV8Inspector.java"
+            from "$rootDir/test-app/app/src/main/java/com/tns/DefaultExtractPolicy.java"
+            from "$rootDir/test-app/app/src/main/java/com/tns/LogcatLogger.java"
+            from "$rootDir/test-app/app/src/main/java/com/tns/NativeScriptApplication.java"
+            from "$rootDir/test-app/app/src/main/java/com/tns/NativeScriptUncaughtExceptionHandler.java"
+            from "$rootDir/test-app/app/src/main/java/com/tns/RuntimeHelper.java"
+            from "$rootDir/test-app/app/src/main/java/com/tns/Util.java"
+            into "$rootDir/build-artifacts/project-template-gradle/src/main/java/com/tns/"
+        }
+        copy {
+            from "$rootDir/test-app/app/src/main/java/com/tns/internal"
+            into "$rootDir/build-artifacts/project-template-gradle/src/main/java/com/tns/internal"
+        }
+    }
 }
 
-task copyProjectTemplate (type: Copy) {
-	from "$rootDir/build-artifacts/project-template-gradle"
-	into "$rootDir/dist/framework"
+task copyProjectTemplate(type: Copy) {
+    from "$rootDir/build-artifacts/project-template-gradle"
+    into "$rootDir/dist/framework"
 }
 
-task copyPackageJson (type: Copy) {
-		from "$rootDir/package.json"
-		into "$rootDir/dist"
+task copyPackageJson(type: Copy) {
+    from "$rootDir/package.json"
+    into "$rootDir/dist"
 }
 
-task getPackageVersion << {
+task getPackageVersion {
+    doLast {
+        String content = new File("$rootDir/package.json").getText("UTF-8")
+        def jsonSlurper = new JsonSlurper()
+        def packageJsonMap = jsonSlurper.parseText(content)
 
-	String content = new File("$rootDir/package.json").getText("UTF-8")
-	def jsonSlurper = new JsonSlurper()
-	def packageJsonMap = jsonSlurper.parseText(content)
+        pVersion = packageJsonMap.version
 
-	pVersion = packageJsonMap.version
+        println "Using runtime version from package.json '${pVersion}'"
 
-	println "Using runtime version from package.json '${pVersion}'"
+        if (project.hasProperty("packageVersion")) {
+            pVersion += "-" + packageVersion
 
-	if (project.hasProperty("packageVersion")) {
-		pVersion += "-" + packageVersion
-		
-		println "Using packageVersion property '${pVersion}'"
-	}
+            println "Using packageVersion property '${pVersion}'"
+        }
 
 
-	if (project.hasProperty("preReleaseVersion")) {
-		pVersion += "-" + preReleaseVersion
+        if (project.hasProperty("preReleaseVersion")) {
+            pVersion += "-" + preReleaseVersion
 
-		println "Adding preReleaseVersion property '${pVersion}' to package version"
-	}
+            println "Adding preReleaseVersion property '${pVersion}' to package version"
+        }
 
-	println "The package version is '${pVersion}'"
+        println "The package version is '${pVersion}'"
+    }
 }
 
-task getCommitVersion << {
-
-	if (project.hasProperty("gitCommitVersion")) {
-		println "Using commit version property " + gitCommitVersion
-		arVersion =  gitCommitVersion
-	}
-	else if ("$System.env.GIT_COMMIT" != "null") {        
-		println "Using commit version environment variable " + $System.env.GIT_COMMIT
-		String content = "$System.env.GIT_COMMIT"
-		arVersion = content.trim()
-	}
-}
-
-task generateBindingGenerator (type: Exec)   {
-	doFirst {
-		workingDir "$rootDir/binding-generator"
-		if(isWinOs) {
-			commandLine "cmd", "/c", "gradlew", "jar"
-		}
-		else {
-			commandLine "./gradlew", "jar"
-		}
-	}
+task getCommitVersion {
+    doLast {
+        if (project.hasProperty("gitCommitVersion")) {
+            println "Using commit version property " + gitCommitVersion
+            arVersion = gitCommitVersion
+        } else if ("$System.env.GIT_COMMIT" != "null") {
+            println "Using commit version environment variable " + $System.env.GIT_COMMIT
+            String content = "$System.env.GIT_COMMIT"
+            arVersion = content.trim()
+        }
+    }
 }
 
 task generateRuntime {
-	doFirst {
-		tasks.generateOptimizedRuntimeAar.execute();
-		tasks.generateRuntimeAar.execute();
-	}
+    doFirst {
+        tasks.generateOptimizedRuntimeAar.execute();
+        tasks.generateRuntimeAar.execute();
+    }
 }
 
 task generateOptimizedRuntimeAar(type: Exec) {
-	doFirst {
-		workingDir "$rootDir/runtime"
-		if(isWinOs) {
-			commandLine "cmd", "/c", "gradlew", "assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-PembedBindingGenerator=true", "-Poptimized"
-		}
-		else {
-			commandLine "./gradlew", "assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-PembedBindingGenerator=true", "-Poptimized"
-		}
-	}
+    doFirst {
+        workingDir "$rootDir/test-app"
+        if (isWinOs) {
+            commandLine "cmd", "/c", "gradlew", "assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-Poptimized"
+        } else {
+            commandLine "./gradlew", "assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-Poptimized"
+        }
+    }
 }
 
 task generateRuntimeAar(type: Exec) {
-	doFirst {
-		workingDir "$rootDir/runtime"
-		if(isWinOs) {
-			commandLine "cmd", "/c", "gradlew", "assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-PembedBindingGenerator=true"
-		}
-		else {
-			commandLine "./gradlew", "assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-PembedBindingGenerator=true"
-		}	
-	}
+    doFirst {
+        workingDir "$rootDir/test-app"
+        if (isWinOs) {
+            commandLine "cmd", "/c", "gradlew", "assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"
+        } else {
+            commandLine "./gradlew", "assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"
+        }
+    }
 }
 
-task copyGeneratedRuntime << {
-	copy {
-		from "$rootDir/runtime/build/outputs/aar/runtime-regular-release.aar"
-		into "$rootDir/dist/framework/libs/runtime-libs/"
-		rename "runtime-regular-release.aar", "nativescript-regular.aar"
-	}
+task copyGeneratedRuntime {
+    doLast {
+        copy {
+            from "$rootDir/test-app/runtime/build/outputs/aar/runtime-regular-release.aar"
+            into "$rootDir/dist/framework/libs/runtime-libs/"
+            rename "runtime-regular-release.aar", "nativescript-regular.aar"
+        }
 
-	copy {
-		from "$rootDir/runtime/build/outputs/aar/runtime-optimized-release.aar"
-		into "$rootDir/dist/framework/libs/runtime-libs/"
-		rename "runtime-optimized-release.aar", "nativescript-optimized.aar"
-	}
+        copy {
+            from "$rootDir/test-app/runtime/build/outputs/aar/runtime-optimized-release.aar"
+            into "$rootDir/dist/framework/libs/runtime-libs/"
+            rename "runtime-optimized-release.aar", "nativescript-optimized.aar"
+        }
+    }
 }
 
-task generateMetadataGeneratorJar (type: Exec) {
-	doFirst {
-		workingDir "$rootDir/android-metadata-generator"
-		
-		if(isWinOs) {
-			commandLine "cmd", "/c", "gradlew", "jarmg"
-		}
-		else {
-			commandLine "./gradlew", "jarmg"
-		}
-	}
+task generateMetadataGeneratorJar(type: Exec) {
+    doFirst {
+        workingDir "$rootDir/android-metadata-generator"
+
+        if (isWinOs) {
+            commandLine "cmd", "/c", "gradlew", "jarmg"
+        } else {
+            commandLine "./gradlew", "jarmg"
+        }
+    }
 }
 
-task copyGeneratedMetadataGeneratorJar << {
-	copy {
-		from "$rootDir/android-metadata-generator/dist"
-		into "$rootDir/dist/framework/build-tools"
-		rename "android-metadata-generator.jar", "metadata-generator.jar"
-	}
+task copyGeneratedMetadataGeneratorJar {
+    doLast {
+        copy {
+            from "$rootDir/android-metadata-generator/dist"
+            into "$rootDir/dist/framework/build-tools"
+            rename "android-metadata-generator.jar", "metadata-generator.jar"
+        }
+    }
 }
 
-task generateInterfaceNameGenerator (type: Exec) {
-	doFirst {
-		workingDir "$rootDir/android-static-binding-generator/project/interface-name-generator"
+task generateInterfaceNameGenerator(type: Exec) {
+    doFirst {
+        workingDir "$rootDir/android-static-binding-generator/project/interface-name-generator"
 
-		if(isWinOs) {
-			commandLine "cmd", "/c", "gradlew", "assemble"
-		}
-		else {
-			commandLine "./gradlew", "assemble"
-		}
-	}
+        if (isWinOs) {
+            commandLine "cmd", "/c", "gradlew", "assemble"
+        } else {
+            commandLine "./gradlew", "assemble"
+        }
+    }
 }
 
-
-task copyInterfaceNameGeneratorJar  << {
-	copy {
-		from "$rootDir/android-static-binding-generator/project/interface-name-generator/build/libs"
-		into "$rootDir/dist/framework/build-tools/android-static-binding-generator"
-	}
+task copyInterfaceNameGeneratorJar {
+    doLast {
+        copy {
+            from "$rootDir/android-static-binding-generator/project/interface-name-generator/build/libs"
+            into "$rootDir/dist/framework/build-tools/android-static-binding-generator"
+        }
+    }
 }
 
+task generateStaticBindingGeneratorJar(type: Exec) {
+    doFirst {
+        workingDir "$rootDir/android-static-binding-generator/project/staticbindinggenerator"
 
-task generateStaticBindingGeneratorJar (type: Exec) {
-	doFirst {
-		workingDir "$rootDir/android-static-binding-generator/project/staticbindinggenerator"
-		
-		if(isWinOs) {
-			commandLine "cmd", "/c", "gradlew", "assemble"
-		}
-		else {
-			commandLine "./gradlew", "assemble"
-		}
-	}
+        if (isWinOs) {
+            commandLine "cmd", "/c", "gradlew", "assemble"
+        } else {
+            commandLine "./gradlew", "assemble"
+        }
+    }
 
 }
-task copyGeneratedStaticBindingGeneratorJar << {
-	copy {
-		from "$rootDir/android-static-binding-generator/project/staticbindinggenerator/build/libs"
-		into "$rootDir/dist/framework/build-tools/android-static-binding-generator"
-	}
+task copyGeneratedStaticBindingGeneratorJar {
+    doLast {
+        copy {
+            from "$rootDir/android-static-binding-generator/project/staticbindinggenerator/build/libs"
+            into "$rootDir/dist/framework/build-tools/android-static-binding-generator"
+        }
+    }
 }
 
-task copyStaticBindingGeneratorProject << {
-	copy {
-		from "$rootDir/android-static-binding-generator/project"
-		exclude "staticbindinggenerator", "interface-name-generator", "**/package.json", "*.txt", "**/logs", "**/out", "**/input_parced_typescript"
+task copyStaticBindingGeneratorProject {
+    doLast {
+        copy {
+            from "$rootDir/android-static-binding-generator/project"
+            exclude "staticbindinggenerator", "interface-name-generator", "**/package.json", "*.txt", "**/logs", "**/out", "**/input_parced_typescript"
 
-		into "$rootDir/dist/framework/build-tools/android-static-binding-generator"
-	}
+            into "$rootDir/dist/framework/build-tools/android-static-binding-generator"
+        }
+    }
 }
 
-task createNpmPackage (type: Exec) {
-	doFirst {
-		workingDir "$rootDir/dist"
-		
-		if(isWinOs) {
-			commandLine "cmd", "/c", "npm", "pack"
-		}
-		else {
-			commandLine "npm", "pack"
-		}
-	}
+task createNpmPackage(type: Exec) {
+    doFirst {
+        workingDir "$rootDir/dist"
+
+        if (isWinOs) {
+            commandLine "cmd", "/c", "npm", "pack"
+        } else {
+            commandLine "npm", "pack"
+        }
+    }
 }
 
-task setPackageVersionInPackageJsonFile << {
-	
-		def inputFile = new File("$rootDir/dist/package.json")
-		def json = new JsonSlurper().parseText(inputFile.text)
-		json.version = pVersion
-		def jb = new JsonBuilder(json);
-		inputFile.text = JsonOutput.prettyPrint(jb.toString())
+task setPackageVersionInPackageJsonFile {
+    doLast {
+        def inputFile = new File("$rootDir/dist/package.json")
+        def json = new JsonSlurper().parseText(inputFile.text)
+        json.version = pVersion
+        def jb = new JsonBuilder(json);
+        inputFile.text = JsonOutput.prettyPrint(jb.toString())
+    }
 }
 
-task copyReadme (type: Copy) {
-	from "README.md"
-	into "$rootDir/dist"
+task copyReadme(type: Copy) {
+    from "README.md"
+    into "$rootDir/dist"
 }
 
-task cleanBuildArtefacts (type: Delete) {
-	delete "$rootDir/build-artifacts/project-template-gradle/src/debug/java"
-	delete "$rootDir/build-artifacts/project-template-gradle/src/main/java"
-	delete "$rootDir/build-artifacts/project-template-gradle/src/main/assets"
+task cleanBuildArtefacts(type: Delete) {
+    delete "$rootDir/build-artifacts/project-template-gradle/src/debug/java"
+    delete "$rootDir/build-artifacts/project-template-gradle/src/main/java"
+    delete "$rootDir/build-artifacts/project-template-gradle/src/main/assets"
 }
 
 //clean and set up dirs
@@ -305,19 +300,17 @@ getPackageVersion.dependsOn(copyGeneratedStaticBindingGeneratorJar)
 getCommitVersion.dependsOn(getPackageVersion)
 
 //generate runtime and copy into framework structure
-generateBindingGenerator.dependsOn(getCommitVersion)
-generateRuntime.dependsOn(generateBindingGenerator)
+generateRuntime.dependsOn(getCommitVersion)
 
 setPackageVersionInPackageJsonFile.dependsOn(generateRuntime)
 
 //generateRuntime.dependsOn(build)
 
 tasks.whenTaskAdded { task ->
-                if (task.getName() == "build")
-                {
-                    generateRuntime
-                } 
-            }
+    if (task.getName() == "build") {
+        generateRuntime
+    }
+}
 
 copyGeneratedRuntime.dependsOn(generateRuntime)
 
@@ -333,31 +326,31 @@ createNpmPackage.dependsOn(setPackageVersionInPackageJsonFile)
 cleanBuildArtefacts.dependsOn(createNpmPackage)
 
 task createPackage {
-	description "Builds the NativeScript Android App Package using an application project template."
-	dependsOn cleanDistDir,
-	createDistDir,
+    description "Builds the NativeScript Android App Package using an application project template."
+    dependsOn cleanDistDir,
+            createDistDir,
 
-	copyProjectTemplate,
+            copyProjectTemplate,
 
-	copyPackageJson,
+            copyPackageJson,
 
-	copyStaticBindingGeneratorProject,
-	generateStaticBindingGeneratorJar,
-	copyGeneratedStaticBindingGeneratorJar,
+            copyStaticBindingGeneratorProject,
+            generateStaticBindingGeneratorJar,
+            copyGeneratedStaticBindingGeneratorJar,
 
-	getPackageVersion,
-	getCommitVersion,
+            getPackageVersion,
+            getCommitVersion,
 
-	generateRuntime,
+            generateRuntime,
 
-	setPackageVersionInPackageJsonFile,
+            setPackageVersionInPackageJsonFile,
 
-	copyGeneratedRuntime,
-	generateMetadataGeneratorJar,
-	copyGeneratedMetadataGeneratorJar,
-	copyReadme,
-	createNpmPackage,
-	cleanBuildArtefacts
+            copyGeneratedRuntime,
+            generateMetadataGeneratorJar,
+            copyGeneratedMetadataGeneratorJar,
+            copyReadme,
+            createNpmPackage,
+            cleanBuildArtefacts
 
-	println "Creating NativeScript Android Package"			
+    println "Creating NativeScript Android Package"
 }

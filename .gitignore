@@ -2,9 +2,6 @@
 node_modules/
 dist/
 .gradle
-/test-app/build
-/test-app/libs
-/test-app/metadata
 .idea
 
 local.properties
@@ -21,4 +18,3 @@ bin/
 .DS_Store
 .settings
 
-*.iml

@@ -98,7 +98,7 @@ public class Button1 extends ButtonBase {
         Log.d(logTag, "Button: setLabel called text:" + text);
     }
 
-    public void setOnClickListener(android.view.View.OnClickListener l) {
+    public void setOnClickListener(OnClickListener l) {
         mOnClickListener = l;
         if (l instanceof OnClickListener) {
             Log.d(logTag, "Button: onClickListener called l:" + "TelerikOnClickListener");

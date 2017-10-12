@@ -45,6 +45,7 @@
     }
     function log(str) {
     	__log(str);
+        android.util.Log.d("{N} Runtime Tests", str);
 //        var con = global.console || console;
 //        if (con && con.log) {
 //            con.log(str);

@@ -1,25 +1,23 @@
-/*
-*	Usage: 
-*		gradlew assembleDebug - Builds an Android apk in debug
-*		gradlew assembleRelease - Builds an Android apk in release
-*		gradlew runtests - Builds and runs the test applciation and pull an test results xml file in /dist/android_unit_test_results.xml
-*/
-
-
-
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
+
 buildscript {
+    
     repositories {
+        google()
         jcenter()
     }
-
     dependencies {
-        classpath 'com.android.tools.build:gradle-experimental:0.8.2'
+        classpath 'com.android.tools.build:gradle:2.3.3'
     }
 }
 
 allprojects {
     repositories {
+        google()
         jcenter()
     }
+}
+
+task clean(type: Delete) {
+    delete rootProject.buildDir
 }

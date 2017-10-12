@@ -6,23 +6,22 @@ Contains the source code for the NativeScript's Android runtime. The android-run
 # Main Projects
 The repo is structured in the following projects (ordered by dependencies):
 
-* **android-metadata-generator** - generates metadata necessary for the Android Runtime.
-* **android-binding-generator** - enables Java & Android types to be dynamically created at runtime. Needed by the `extend` routine.
-* **android-runtime** - contains the core logic behind the NativeScript's Android Runtime. This project contains native C++ code and needs the Android NDK to build properly.
-* **android-runtime-testapp** - this is a vanilla Android Application, which contains the tests for the runtime project.
+* [**android-metadata-generator**](android-metadata-generator) - generates metadata necessary for the Android Runtime.
+* [**android-binding-generator**](test-app/runtime-binding-generator) - enables Java & Android types to be dynamically created at runtime. Needed by the `extend` routine.
+* [**android-runtime**](test-app/runtime) - contains the core logic behind the NativeScript's Android Runtime. This project contains native C++ code and needs the Android NDK to build properly.
+* [**android-runtime-testapp**](test-app/app) - this is a vanilla Android Application, which contains the tests for the runtime project.
 
 # Helper Projects
 
-* **android-static-binding-generator** - build tool that generates bindings based on the user's javascript code
-* **android-binding-generator-tester** - contains the tests for the binding-generator project.
-* **build/project-template** - this is an empty placeholder Android Application project, used by the [NativeScript CLI](https://github.com/NativeScript/nativescript-cli) when building an Android project.
+* [**android-static-binding-generator**](android-static-binding-generator) - build tool that generates bindings based on the user's javascript code.
+* [**project-template**](build-artifacts/project-template-gradle) - this is an empty placeholder Android Application project, used by the [NativeScript CLI](https://github.com/NativeScript/nativescript-cli) when building an Android project.
 
 # Build Prerequisites
 Following are the minimal prerequisites to build the runtime package.
 
 * Install the latest [Android Studio ](https://developer.android.com/studio/index.html).
 * Install Android API Level 22, 23, 24, 25 from Android Studio -> Tools -> Android -> SDK Manager
-* Android NDK 12b - [NDK Archives](https://developer.android.com/ndk/downloads/older_releases.html)
+* Android NDK 15c - [NDK Archives](https://developer.android.com/ndk/downloads/older_releases.html) or [NDK Downloads](https://developer.android.com/ndk/downloads/index.html) if you can't find it in the archives.
 * Download Android Support Repository through the Android SDK Manager
 * Download Build Tools 25.0.2 through the Android SDK Manager.
 
@@ -33,13 +32,13 @@ Following are the minimal prerequisites to build the runtime package.
   Windows: 
 
   ```Shell
-  gradlew createPackage
+  gradlew
   ```
 
   Mac/Linux:
 
   ```Shell
-  ./gradlew createPackage
+  ./gradlew
   ```
 
 * The build process includes building of the runtime package (both optimized and with unstripped v8 symbol table), as well as all supplementary tools used for the android builds: metadata-generator, binding-generator, metadata-generator, static-binding-generator
