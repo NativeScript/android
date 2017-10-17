@@ -1,3 +1,15 @@
+3.3.0
+==
+
+## Bug Fixes
+
+ - [Provide better error message while parsing js files (#833)]
+ (https://github.com/NativeScript/android-runtime/issues/833)
+ - [Improve JavaScript Metadata generation (#832)]
+ (https://github.com/NativeScript/android-runtime/issues/832)
+ - [Improve Error handling incorrectly implementing Java interface (#836)]
+ (https://github.com/NativeScript/android-runtime/issues/836)
+
 3.2.0
 ==
 
