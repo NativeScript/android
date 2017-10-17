@@ -73,4 +73,12 @@ describe("Tests extended classes ", function () {
 		
 		expect(labelgetIMAGE_ID_PROP1).toBe(labelgetIMAGE_ID_PROP2);
 	});
+
+	it("should not crash with no exception when incorrectly calling extended class constructor", function () {
+	    let MyObj = java.lang.Object.extend({
+                        toString: () => { return "It's MyObj" }
+                    });
+
+        expect(() => { myObj() }).toThrow();
+	});
 });

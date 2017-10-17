@@ -103,8 +103,6 @@ function readLinesFromFile(filePath, outArr, resolveParameter) {
 					return reject(err);
 				}
 
-				console.log("finished with reading lines with js files");
-
 				return resolve(resolveParameter)
 			});
 	});

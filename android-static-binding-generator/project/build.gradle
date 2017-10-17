@@ -4,10 +4,10 @@
 
 import groovy.json.JsonSlurper
 import groovy.io.FileType
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.nio.file.Paths
 
-def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
-
-def astParserDir = "$projectDir/parser"
 def interfaceNamesFileP = "$projectDir/interfaces-names.txt"
 def bindingsFileP = "$projectDir/bindings.txt"
 def cachedJarsFilePath = "$projectDir/cached.txt"
@@ -30,12 +30,11 @@ if (workersExcludeFile.exists()) {
 def absoluteOutDir;
 if (project.hasProperty("outDir")) {
 	absoluteOutDir = project.outDir;
-	
+
 	if (!absoluteOutDir.exists()) {
 		absoluteOutDir.mkdirs()
 	}
 }
-
 
 // def absoluteJsCodeDir = new File("./jsCodeDir").getAbsolutePath()//project.jsCodeDir
 def absoluteJsCodeDir;
@@ -45,31 +44,30 @@ if (!project.hasProperty("test")) {
 	jsCodeAbsolutePath = absoluteJsCodeDir.getAbsolutePath()
 }
 
-def utf8 = java.nio.charset.StandardCharsets.UTF_8
-def current = ""
+def utf8 = StandardCharsets.UTF_8
+def jarsList = ""
 
 def shouldRun = true
 def rootTraversed = false;
 def inputJsFiles = new LinkedList <String> ();
 
 // depends on passed jars and generated interface-names
-task generateInterfaceNamesList() {
-
+task generateInterfaceNamesList {
 	doFirst {
 		if(!project.hasProperty("test")) {
-			current = project.jarFiles
+			jarsList = project.jarFiles
 			def cache = new File(cachedJarsFilePath)
-			
+
 			if (cache.exists()) {
 				def contents = new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(cachedJarsFilePath)), utf8).trim()
-				shouldRun = !contents.equals(current.toString())
+				shouldRun = !contents.equals(jarsList.toString())
 			}
 
 			if (shouldRun) {
 				javaexec {
 					main "-jar"
 
-					def jarsAsStr = current.toString();
+					def jarsAsStr = jarsList.toString();
 					def jarsArr = jarsAsStr.replaceAll(/[\[\]]/, "").split(", ")
 
 					def str = new LinkedList <String> ();
@@ -80,7 +78,7 @@ task generateInterfaceNamesList() {
 
 					args str.toArray()
 				}
-				java.nio.file.Files.write(java.nio.file.Paths.get(cachedJarsFilePath), [current.toString()], utf8)
+				Files.write(Paths.get(cachedJarsFilePath), [jarsList.toString()], utf8)
 			}
 		}
 	}
@@ -95,9 +93,7 @@ def isWorkerScript = { fileName ->
 }
 
 def traverseDirectory
-
 traverseDirectory = { dir, traverseExplicitly ->
-
 	def currentDir = new File(dir)
 	def pJsonFile = false;
 
@@ -141,32 +137,34 @@ traverseDirectory = { dir, traverseExplicitly ->
 	}
 }
 
-task traverseJsFilesArgs << { //(jsCodeDir, bindingsFilePath, interfaceNamesFilePath, jsParserPath, jsFilesParameter) {
-	jsCodeAbsolutePath = jsCodeDir;
-	inputJsFiles = new LinkedList<String>();
-	traverseDirectory(jsCodeDir, false);
+task traverseJsFilesArgs { //(jsCodeDir, bindingsFilePath, interfaceNamesFilePath, jsParserPath, jsFilesParameter) {
+	doLast {
+		jsCodeAbsolutePath = jsCodeDir;
+		inputJsFiles = new LinkedList<String>();
+		traverseDirectory(jsCodeDir, false);
 
-	new File(jsFilesParameter).withWriter { out ->
-		inputJsFiles.each {out.println it}
-	}
+		new File(jsFilesParameter).withWriter { out ->
+			inputJsFiles.each {out.println it}
+		}
 
-	def list = new ArrayList<String>();
-	list.add("node")
-	list.add(jsParserPath)
-	list.add(jsCodeDir)
-	list.add(bindingsFilePath)
-	list.add(interfaceNamesFilePath)
-	list.add(jsFilesParameter)
+		def list = new ArrayList<String>();
+		list.add("node")
+		list.add(jsParserPath)
+		list.add(jsCodeDir)
+		list.add(bindingsFilePath)
+		list.add(interfaceNamesFilePath)
+		list.add(jsFilesParameter)
 
-	logger.info("Task: traverseJsFilesArgs: executed with arguments: " + list.toString().replaceAll(',', ''))
-	def proc = list.execute()
-	proc.in.eachLine { line -> println line }
-	proc.out.close()
-	proc.waitFor()
+		logger.info("Task: traverseJsFilesArgs: executed with arguments: " + list.toString().replaceAll(',', ''))
+		def proc = list.execute()
+		proc.in.eachLine { line -> println line }
+		proc.out.close()
+		proc.waitFor()
 
-	if (proc.exitValue()) {
-		println "gave the following error: "
-		println "[ERROR] ${proc.getErrorStream()}"
+		if (proc.exitValue()) {
+			println "gave the following error: "
+			println "[ERROR] ${proc.getErrorStream()}"
+		}
 	}
 }
 
@@ -187,7 +185,7 @@ task runAstParser(type: RunAstParserTask) {
 // traverses the javascript code input directory
 // 1. traverses all root directory files
 // 2. all subdirectories that do not have a package.json containing a "nativescript" key are skipped
-task traverseJsFiles () {
+task traverseJsFiles {
 	doFirst {
 		// invalidate previously generated bindings.txt file
 		// todo: remove when removing previously generated bindings is implemented
@@ -274,6 +272,10 @@ task generateBindings() {
 	inputs.dir (bindingsFile)
 
 	doFirst {
+		if (!file(bindingsFileP).exists()) {
+			throw new GradleException("No ${bindingsFileP} was found after runAstParser task was ran! Check to see if there are any .js files inside ${jsCodeDir}")
+		}
+
 		javaexec {
 			main "-jar"
 
@@ -282,7 +284,7 @@ task generateBindings() {
 			str.add(bindingsFileP)
 			str.add(absoluteOutDir)
 
-			def jarsAsStr = current.toString();
+			def jarsAsStr = jarsList.toString();
 			def jarsArr = jarsAsStr.replaceAll(/[\[\]]/, "").split(", ")
 			str.addAll(jarsArr)
 
