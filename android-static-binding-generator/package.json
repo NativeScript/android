@@ -2,10 +2,11 @@
   "name": "static_analysis",
   "version": "1.0.0",
   "description": "",
-  "main": "project/parse.js",
+  "main": "project/parser",
   "scripts": {
-    "test": "jasmine JASMINE_CONFIG_PATH=jasmine.json"
+    "test": "node run-tests.js"
   },
+  "repository": "https://github.com/NativeScript/android-runtime/",
   "author": "",
   "license": "ISC",
   "dependencies": {
@@ -15,6 +16,7 @@
     "lazy": "^1.0.11"
   },
   "devDependencies": {
+    "jasmine": "^2.8.0",
     "jasmine-node": "^1.14.5"
   }
 }

@@ -219,11 +219,16 @@ task generateStaticBindingGeneratorJar(type: Exec) {
     doFirst {
         workingDir "$rootDir/android-static-binding-generator/project/staticbindinggenerator"
 
+        
+        def commandArgs = ["assemble"]
+
         if (isWinOs) {
-            commandLine "cmd", "/c", "gradlew", "assemble"
+            commandLine "cmd", "/c", "gradlew"
         } else {
-            commandLine "./gradlew", "assemble"
+            commandLine "./gradlew"
         }
+
+        args commandArgs
     }
 
 }
