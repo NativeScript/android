@@ -3,7 +3,9 @@
 
     console.log("Installing JavaScript parser test dependencies.");
 
-    execSync('npm install');
+    let npmInstallResult = execSync('npm install');
+
+    console.log(npmInstallResult.toString());
 
     console.log("Executing JavaScript parser tests using Jasmine.");
 
