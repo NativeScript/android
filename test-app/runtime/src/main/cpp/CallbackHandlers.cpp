@@ -634,8 +634,8 @@ void CallbackHandlers::LogMethodCallback(const v8::FunctionCallbackInfo<v8::Valu
 }
 
 void CallbackHandlers::TimeCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
-    auto nano = std::chrono::time_point_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now());
-    double duration = nano.time_since_epoch().count() / 1000000.0;
+    auto nano = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now());
+    double duration = nano.time_since_epoch().count();
     args.GetReturnValue().Set(duration);
 }
 
