@@ -15,7 +15,7 @@ namespace instrumentation {
 class Frame {
     public:
         inline Frame() : Frame("") { }
-        inline Frame(std::string name) : name(name), start(disabled ? disabled_time : std::chrono::steady_clock::now()) {}
+        inline Frame(std::string name) : name(name), start(disabled ? disabled_time : std::chrono::system_clock::now()) {}
 
         inline ~Frame() {
             if (!name.empty() && check()) {
@@ -27,7 +27,7 @@ class Frame {
             if (disabled) {
                 return false;
             }
-            std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+            std::chrono::system_clock::time_point end = std::chrono::system_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::operator-(end, start)).count();
             return duration >= 16000;
         }
@@ -36,7 +36,7 @@ class Frame {
             if (disabled) {
                 return;
             }
-            std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+            std::chrono::system_clock::time_point end = std::chrono::system_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::operator-(end, start)).count();
             auto startMilis = std::chrono::time_point_cast<std::chrono::microseconds>(start).time_since_epoch().count() / 1000.0;
             auto endMilis = std::chrono::time_point_cast<std::chrono::microseconds>(end).time_since_epoch().count() / 1000.0;
@@ -56,9 +56,9 @@ class Frame {
 
     private:
         static bool disabled;
-        static const std::chrono::steady_clock::time_point disabled_time; // Couldn't find reasonable constant
+        static const std::chrono::system_clock::time_point disabled_time; // Couldn't find reasonable constant
 
-        const std::chrono::steady_clock::time_point start;
+        const std::chrono::system_clock::time_point start;
         const std::string name;
 
         Frame(const Frame&) = delete;
