@@ -1,16 +1,15 @@
-'use strict';
-
-var exec = require("child_process").exec,
+const exec = require("child_process").exec,
     path = require("path"),
     fs = require("fs"),
     prefix = path.resolve(__dirname, "../cases/"),
     interfaceNames = path.resolve(__dirname, "../interfaces-names.txt"),
     gradleTraverse = path.resolve(__dirname, "../../project"),
     gradleTaskName = "traverseJsFilesArgs",
-    parser = path.resolve(__dirname, "../../project/parser/js_parser.js");
+    parser = path.resolve(__dirname, "../../project/parser/js_parser.js"),
+    gradleExecutable = path.resolve(__dirname, "../../project/staticbindinggenerator/gradlew");
 
 function execGradle(inputPath, bindingsOutput, jsFilesInput, callback) {
-    exec("gradle -p " + gradleTraverse + " " + gradleTaskName + " -Ptest -PjsCodeDir=\"" + inputPath + "\" -PbindingsFilePath=\"" + bindingsOutput + "\" -PinterfaceNamesFilePath=\"" + interfaceNames + "\" -PjsParserPath=\"" + parser + "\" -PjsFilesParameter=\"" + jsFilesInput + "\"", callback);
+    exec(`${gradleExecutable} -p ${gradleTraverse} ${gradleTaskName} -Ptest -PjsCodeDir="${inputPath}" -PbindingsFilePath="${bindingsOutput}" -PinterfaceNamesFilePath="${interfaceNames}" -PjsParserPath="${parser}" -PjsFilesParameter="${jsFilesInput}"`, callback);
 }
 
 function logExecResult(stdout, stderr) {
@@ -35,9 +34,11 @@ function clearOutput(bindingsOutput, jsFilesInput) {
 }
 
 describe("parser/js_parser tests", function () {
+    beforeAll(() => {
+        jasmine.DEFAULT_TIMEOUT_INTERVAL = 20 * 1000; // give enough time to start the gradle daemon
+    });
 
-    describe("js_parser tests", function () {
-
+    describe("Traversal tests", function () {
         it("Analyse files only in the correct folder structure", function (done) {
 
             let input = path.normalize(prefix + "/mini_app/app"),
@@ -213,7 +214,6 @@ describe("parser/js_parser tests", function () {
                     console.error(`exec error: ${error}`);
                     return;
                 }
-
                 logExecResult(stdout, stderr)
 
                 let bindingsContent = fs.readFileSync(output, "utf-8").toString().trim().split('\n');

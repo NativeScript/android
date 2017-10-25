@@ -51,6 +51,11 @@ script:
   - echo no | android create avd --force -n $EMULATOR_NAME-$EMULATOR_API_LEVEL -t android-$EMULATOR_API_LEVEL --abi $ANDROID_ABI -c 12M
   - emulator -avd $EMULATOR_NAME-$EMULATOR_API_LEVEL -no-skin -no-audio -no-window &
   - android-wait-for-emulator
+  - cd android-static-binding-generator
+  - "npm install"
+  - "node run-tests"
+  - cd ..
+  - "android-static-binding-generator/project/staticbindinggenerator/gradlew clean test --project-dir android-static-binding-generator/project/staticbindinggenerator/"
   - "cd test-app && ./gradlew runtest --stacktrace"
   - adb -e logcat -d 300
   - cd ..
