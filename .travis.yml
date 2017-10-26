@@ -30,12 +30,18 @@ matrix:
       sudo: true
       language: android
       jdk: oraclejdk8
+      android:
+        components:
+          - android-$EMULATOR_API_LEVEL
+          - extra-android-support
+          - extra-android-m2repository
+          - cmake
+          - sys-img-$ANDROID_ABI-android-$EMULATOR_API_LEVEL
       git:
         submodules: false
       script:
-        # (PR) build the runtime only once, with the c++ code optimizations 
-        - 'if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then bash ./gradlew -PskipUnoptimized -PpreReleaseVersion=$PACKAGE_VERSION -PgitCommitVersion=$TRAVIS_COMMIT --stacktrace; fi'
-        # (master branch) build the runtime twice - optimized, and regular packages
+        # (master branch) build the runtime twice - optimized, and regular packages, skip on PRs
+        # test-app/gradlew runtest will take care of building the runtime for its testing needs
         - 'if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then bash ./gradlew -PpreReleaseVersion=$PACKAGE_VERSION -PgitCommitVersion=$TRAVIS_COMMIT --stacktrace; fi'
         - echo no | android create avd --force -n $EMULATOR_NAME-$EMULATOR_API_LEVEL -t android-$EMULATOR_API_LEVEL --abi $ANDROID_ABI -c 12M
         - emulator -avd $EMULATOR_NAME-$EMULATOR_API_LEVEL -no-skin -no-audio -no-window &
@@ -61,11 +67,6 @@ android:
     - tools
     - build-tools-26.0.1
     - android-26
-    - android-$EMULATOR_API_LEVEL
-    - extra-android-support
-    - extra-android-m2repository
-    - cmake
-    - sys-img-$ANDROID_ABI-android-$EMULATOR_API_LEVEL
   licenses:
     - 'android-sdk-preview-license-52d11cd2'
     - 'android-sdk-license-.+'
