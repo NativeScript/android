@@ -42,7 +42,7 @@ describe("parser/js_parser tests", function () {
         it("Analyse files only in the correct folder structure", function (done) {
 
             let input = path.normalize(prefix + "/mini_app/app"),
-                jsFilesParameter = path.normalize(prefix + "/mini_app/jsfiles.txt"),
+                jsFilesParameter = path.normalize(prefix + "/mini_app/jsFiles.txt"),
                 output = path.normalize(prefix + "/mini_app/bindings.txt");
 
             clearOutput(output, jsFilesParameter);
@@ -122,6 +122,31 @@ describe("parser/js_parser tests", function () {
                 });
 
                 expect(allLines.length).toBe(0);
+                done();
+            });
+        });
+
+        it("Files with dots in their names won't reflect in resulting java class names", function (done) {
+            let input = path.normalize(prefix + "/file_names_with_dots/app"),
+                jsFilesParameter = path.normalize(prefix + "/file_names_with_dots/jsFiles.txt"),
+                output = prefix + "/file_names_with_dots/bindings.txt";
+
+            clearOutput(output, jsFilesParameter);
+
+            execGradle(input, output, jsFilesParameter, function (error, stdout, stderr) {
+                if (error) {
+                    console.error(`exec error: ${error}`);
+                    return;
+                }
+
+                logExecResult(stdout, stderr)
+
+                let bindingsContent = fs.readFileSync(output, "utf-8").toString().trim().split('\n');
+
+                let expectedPartialContent = "file_with_dots";
+                let foundExpected = bindingsContent[0].indexOf(expectedPartialContent)
+
+                expect(foundExpected).toBeGreaterThan(0);
                 done();
             });
         });
