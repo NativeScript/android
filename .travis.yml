@@ -33,7 +33,10 @@ matrix:
       git:
         submodules: false
       script:
-        - "./gradlew -PpreReleaseVersion=$PACKAGE_VERSION -PgitCommitVersion=$TRAVIS_COMMIT --stacktrace"
+        # (PR) build the runtime only once, with the c++ code optimizations 
+        - 'if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then bash ./gradlew -PskipUnoptimized -PpreReleaseVersion=$PACKAGE_VERSION -PgitCommitVersion=$TRAVIS_COMMIT --stacktrace; fi'
+        # (master branch) build the runtime twice - optimized, and regular packages
+        - 'if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then bash ./gradlew -PpreReleaseVersion=$PACKAGE_VERSION -PgitCommitVersion=$TRAVIS_COMMIT --stacktrace; fi'
         - echo no | android create avd --force -n $EMULATOR_NAME-$EMULATOR_API_LEVEL -t android-$EMULATOR_API_LEVEL --abi $ANDROID_ABI -c 12M
         - emulator -avd $EMULATOR_NAME-$EMULATOR_API_LEVEL -no-skin -no-audio -no-window &
         - android-wait-for-emulator

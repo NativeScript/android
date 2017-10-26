@@ -18,6 +18,7 @@ def localMetadataGen = "../android-metadata-generator/dist/tns-android-metadata-
 def distDir = "$projectDir/dist"
 def pVersion = "no package version was provided by build.gradle build"
 def arVersion = "no commit sha was provided by build.gradle build"
+def generateRegularRuntimePackage = !project.hasProperty("skipUnoptimized");
 
 task checkEnvironmentVariables {
     if ("$System.env.JAVA_HOME" == "" || "$System.env.JAVA_HOME" == "null") {
@@ -130,7 +131,10 @@ task getCommitVersion {
 task generateRuntime {
     doFirst {
         tasks.generateOptimizedRuntimeAar.execute();
-        tasks.generateRuntimeAar.execute();
+
+        if (generateRegularRuntimePackage) {
+            tasks.generateRuntimeAar.execute();
+        }
     }
 }
 
