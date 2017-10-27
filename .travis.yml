@@ -7,23 +7,66 @@ env:
   - EMULATOR_API_LEVEL=21
   - ANDROID_ABI=armeabi-v7a
   - EMULATOR_NAME=runtime-emu
-sudo: true
-language: android
-jdk:
-  - oraclejdk8
-git:
-  submodules: false
+
+matrix:
+  include:
+    - stage: "Static Binding Generator Parser Tests"
+      language: node_js 
+      node_js: "6"
+      git:
+        submodules: false
+      script:
+        - cd android-static-binding-generator
+        - npm install && node run-tests
+        - cd ..
+    - stage: "Static Binding Generator Class Generator Tests"
+      language: android
+      jdk: oraclejdk8
+      git:
+        submodules: false
+      script:
+        - "android-static-binding-generator/project/staticbindinggenerator/gradlew test --project-dir android-static-binding-generator/project/staticbindinggenerator/"    
+    - stage: "Build and Tests"
+      sudo: true
+      language: android
+      jdk: oraclejdk8
+      android:
+        components:
+          - android-$EMULATOR_API_LEVEL
+          - extra-android-support
+          - extra-android-m2repository
+          - cmake
+          - sys-img-$ANDROID_ABI-android-$EMULATOR_API_LEVEL
+      git:
+        submodules: false
+      script:
+        # (master branch) build the runtime twice - optimized, and regular packages, skip on PRs
+        # test-app/gradlew runtest will take care of building the runtime for its testing needs
+        - 'if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then bash ./gradlew -PpreReleaseVersion=$PACKAGE_VERSION -PgitCommitVersion=$TRAVIS_COMMIT --stacktrace; fi'
+        - echo no | android create avd --force -n $EMULATOR_NAME-$EMULATOR_API_LEVEL -t android-$EMULATOR_API_LEVEL --abi $ANDROID_ABI -c 12M
+        - emulator -avd $EMULATOR_NAME-$EMULATOR_API_LEVEL -no-skin -no-audio -no-window &
+        - android-wait-for-emulator
+        - cd test-app 
+        - "./gradlew runtest --stacktrace"
+        - adb -e logcat -d 300
+        - cd ..
+      before_install:
+        - echo "y" | sdkmanager "cmake;3.6.4111459"
+        - sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules
+        - git submodule update --init --recursive
+        - wget https://dl.google.com/android/repository/android-ndk-$NDK_VERSION-linux-x86_64.zip
+        - chmod +x android-ndk-$NDK_VERSION-linux-x86_64.zip
+        - "unzip -q android-ndk-$NDK_VERSION-linux-x86_64.zip"
+        - "rm -rf android-ndk-$NDK_VERSION-linux-x86_64.zip"
+        - export ANDROID_NDK_HOME=`pwd`/android-ndk-$NDK_VERSION
+        - export PATH=${PATH}:${ANDROID_NDK_HOME}
+
 android:
   components:
     - platform-tools
     - tools
     - build-tools-26.0.1
     - android-26
-    - android-$EMULATOR_API_LEVEL
-    - extra-android-support
-    - extra-android-m2repository
-    - cmake
-    - sys-img-$ANDROID_ABI-android-$EMULATOR_API_LEVEL
   licenses:
     - 'android-sdk-preview-license-52d11cd2'
     - 'android-sdk-license-.+'
@@ -34,28 +77,7 @@ cache:
   directories:
   - "$HOME/.gradle/caches/"
   - "$HOME/.gradle/wrapper/"
-before_install:
-  - echo "y" | sdkmanager "cmake;3.6.4111459"
-  - sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules
-  - git submodule update --init --recursive
-  - wget https://dl.google.com/android/repository/android-ndk-$NDK_VERSION-linux-x86_64.zip
-  - chmod +x android-ndk-$NDK_VERSION-linux-x86_64.zip
-  - "unzip -q android-ndk-$NDK_VERSION-linux-x86_64.zip"
-  - "rm -rf android-ndk-$NDK_VERSION-linux-x86_64.zip"
-  - export ANDROID_NDK_HOME=`pwd`/android-ndk-$NDK_VERSION
-  - export PATH=${PATH}:${ANDROID_NDK_HOME}
+
 install:
   - nvm install $NODE_VERSION
-script:
-  - "./gradlew -PpreReleaseVersion=$PACKAGE_VERSION -PgitCommitVersion=$TRAVIS_COMMIT --stacktrace"
-  - echo no | android create avd --force -n $EMULATOR_NAME-$EMULATOR_API_LEVEL -t android-$EMULATOR_API_LEVEL --abi $ANDROID_ABI -c 12M
-  - emulator -avd $EMULATOR_NAME-$EMULATOR_API_LEVEL -no-skin -no-audio -no-window &
-  - android-wait-for-emulator
-  - cd android-static-binding-generator
-  - "npm install"
-  - "node run-tests"
-  - cd ..
-  - "android-static-binding-generator/project/staticbindinggenerator/gradlew clean test --project-dir android-static-binding-generator/project/staticbindinggenerator/"
-  - "cd test-app && ./gradlew runtest --stacktrace"
-  - adb -e logcat -d 300
-  - cd ..
+  
