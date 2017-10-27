@@ -151,6 +151,31 @@ describe("parser/js_parser tests", function () {
             });
         });
 
+        it("Files and folders with dashes in their names won't reflect in resulting java class names", function (done) {
+            let input = path.normalize(prefix + "/directory_with_dashes/app"),
+                jsFilesParameter = path.normalize(prefix + "/directory_with_dashes/jsFiles.txt"),
+                output = prefix + "/directory_with_dashes/bindings.txt";
+
+            clearOutput(output, jsFilesParameter);
+
+            execGradle(input, output, jsFilesParameter, function (error, stdout, stderr) {
+                if (error) {
+                    console.error(`exec error: ${error}`);
+                    return;
+                }
+
+                logExecResult(stdout, stderr)
+
+                let bindingsContent = fs.readFileSync(output, "utf-8").toString().trim().split('\n');
+
+                let expectedPartialContent = "dir_with_dashes_file_with_dashes";
+                let foundExpected = bindingsContent[0].indexOf(expectedPartialContent)
+
+                expect(foundExpected).toBeGreaterThan(0);
+                done();
+            });
+        });
+
         it("Generate valid metadata for bindings from a transpiled typescript file where multiple interfaces are implemented using a decorator", function (done) {
             let input = path.normalize(prefix + "/extends_with_interfaces_ts/app"),
                 jsFilesParameter = path.normalize(prefix + "/extends_with_interfaces_ts/jsFiles.txt"),
