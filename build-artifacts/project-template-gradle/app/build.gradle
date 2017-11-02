@@ -97,9 +97,7 @@ def applyPluginsIncludeGradleConfigurations =  { ->
 			return
 		}
 		def includeGradleFile = new File(androidDir, "include.gradle")
-		if(!includeGradleFile.exists()) {
-			return;
-		}
+
 		def packageJsonPath = file("$rootDir/${dep.directory}/package.json")
 		def packageJson = new JsonSlurper().parseText(packageJsonPath.text)
 		def pluginName = packageJson.name
@@ -192,7 +190,7 @@ android {
 	applyAppGradleConfiguration()
 }
 
-def localRuntimeExists = file("$projectDir/libs/runtime-libs/nativescript-regular.aar").exists()
+def localRuntimeExists = file("$projectDir/libs/runtime-libs/nativescript-regular.aar").exists() || file("$projectDir/libs/runtime-libs/nativescript-optimized.aar").exists()
 
 repositories {
 
@@ -229,9 +227,9 @@ task addNativeScriptRuntimePackageDependency {
 		return packageJson.nativescript.useV8Symbols;
 	}
 
-	def runtime = useV8Symbols ? "nativescript-regular" : "nativescript-optimized";
-	println "\t + adding nativescript runtime package dependency: $runtime"
 	if(localRuntimeExists) {
+		def runtime = useV8Symbols ? "nativescript-regular" : "nativescript-optimized";
+		println "\t + adding nativescript runtime package dependency: $runtime"
 		project.dependencies.add("compile", [name: runtime, ext: "aar"])
 	}
 }
@@ -504,7 +502,6 @@ task extractAllJars {
 task collectAllJars {
 	description "gathers all paths to jar dependencies before building metadata with them"
 
-	def explodedAarDir = project.hasProperty("extractedDependenciesDir") ? extractedDependenciesDir : project.buildDir.getAbsolutePath() + "/intermediates/exploded-aar/"
 	def sdkPath = android.sdkDirectory.getAbsolutePath();
 	def androidJar = sdkPath + "/platforms/" + android.compileSdkVersion + "/android.jar"
 
@@ -516,7 +513,7 @@ task collectAllJars {
 
 		allJarPaths.add(androidJar);
 
-		def ft = fileTree(dir: explodedAarDir, include: "**/*.jar")
+		def ft = fileTree(dir: extractedDependenciesDir, include: "**/*.jar")
 		ft.each { currentJarFile ->
 			allJarPaths.add(currentJarFile.getAbsolutePath())
 		}
