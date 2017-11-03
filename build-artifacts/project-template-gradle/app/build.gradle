@@ -456,12 +456,12 @@ def explodeAar (File compileDependency, String outputDir) {
 		Enumeration enumEntries = jar.entries()
 		while (enumEntries.hasMoreElements()) {
 			JarEntry file = (JarEntry) enumEntries.nextElement();
-			if(file.name.equals("classes.jar")) {
+			if(file.name.endsWith(".jar")) {
 				def f = new File(outputDir , file.name);
 				new File(f.parent).mkdirs();
-				InputStream is = jar.getInputStream(file); // get the input stream
+				InputStream is = jar.getInputStream(file);
 				FileOutputStream fos = new FileOutputStream(f);
-				while (is.available() > 0) {  // write contents of 'is' to 'fos'
+				while (is.available() > 0) {
 					fos.write(is.read())
 				}
 				fos.close()
