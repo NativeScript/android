@@ -636,7 +636,7 @@ copyTypings.onlyIf { generateTypescriptDefinitions.didWork }
 
 task validateAppIdMatch {
 	doLast {
-		def packageJsonFile = new File("$projectDir/../../package.json");
+		def packageJsonFile = new File("$rootDir/../../package.json");
 		def lineSeparator = System.getProperty("line.separator");
 
 		if (packageJsonFile.exists() && !project.hasProperty("release")) {
