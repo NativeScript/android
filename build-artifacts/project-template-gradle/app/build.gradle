@@ -133,7 +133,7 @@ def applyPluginsIncludeGradleConfigurations =  { ->
 }
 
 def applyAppGradleConfiguration = { ->
-	def pathToAppGradle = "$projectDir/../../app/App_Resources/Android/app.gradle"
+	def pathToAppGradle = "$rootDir/../../app/App_Resources/Android/app.gradle"
 	def appGradle = file(pathToAppGradle)
 	if (appGradle.exists()) {
 		println "\t + applying user-defined configuration from ${appGradle}"
