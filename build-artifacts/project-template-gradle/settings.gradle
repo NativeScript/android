@@ -1,3 +1,5 @@
 rootProject.name = "__PROJECT_NAME__"
-include ':app', ':asbg'
+include ':app', ':asbg' //,  ':runtime', ":runtime-binding-generator"
 project(':asbg').projectDir = new File('build-tools/android-static-binding-generator')
+//project(':runtime').projectDir = new File('path/to/runtime')
+//project(':runtime-binding-generator').projectDir = new File('path/to/runtime-binding-generator')
