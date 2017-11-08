@@ -8,6 +8,7 @@
 #include "ArgConverter.h"
 #include "DOMDomainCallbackHandlers.h"
 #include "NetworkDomainCallbackHandlers.h"
+#include "CSSDomainCallbackHandlers.h"
 
 using namespace std;
 using namespace tns;
@@ -285,6 +286,9 @@ void JsV8InspectorClient::attachInspectorCallbacks(Isolate* isolate,
     inspectorJSObject->Set(ArgConverter::ConvertToV8String(isolate, "childNodeRemoved"), FunctionTemplate::New(isolate, DOMDomainCallbackHandlers::ChildNodeRemovedCallback));
     inspectorJSObject->Set(ArgConverter::ConvertToV8String(isolate, "attributeModified"), FunctionTemplate::New(isolate, DOMDomainCallbackHandlers::AttributeModifiedCallback));
     inspectorJSObject->Set(ArgConverter::ConvertToV8String(isolate, "attributeRemoved"), FunctionTemplate::New(isolate, DOMDomainCallbackHandlers::AttributeRemovedCallback));
+
+    inspectorJSObject->Set(ArgConverter::ConvertToV8String(isolate, "styleSheetAdded"), FunctionTemplate::New(isolate, CSSDomainCallbackHandlers::StyleSheetAddedCallback));
+    inspectorJSObject->Set(ArgConverter::ConvertToV8String(isolate, "styleSheetRemoved"), FunctionTemplate::New(isolate, CSSDomainCallbackHandlers::StyleSheetRemovedCallback));
 
     globalObjectTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__inspector"), inspectorJSObject);
 }

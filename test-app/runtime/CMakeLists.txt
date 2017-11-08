@@ -50,6 +50,7 @@ add_library( # Sets the name of the library. When it's built you can find it wit
             src/main/cpp/NativeScriptException.cpp
             src/main/cpp/SimpleAllocator.cpp
             src/main/cpp/DOMDomainCallbackHandlers.cpp
+            src/main/cpp/CSSDomainCallbackHandlers.cpp
             src/main/cpp/NetworkDomainCallbackHandlers.cpp
             src/main/cpp/Runtime.cpp
             src/main/cpp/JsArgConverter.cpp

@@ -39,7 +39,7 @@ void DOMDomainCallbackHandlers::ChildNodeInsertedCallback(const v8::FunctionCall
         auto lastId = args[1]->ToNumber(isolate);
         auto node = args[2]->ToString(isolate);
 
-        auto nodeJson = protocol::parseJSON(v8_inspector::toProtocolString(node));
+        auto nodeJson = protocol::parseJSON(toProtocolString(node));
 
         protocol::ErrorSupport errorSupport;
         auto domNode = protocol::DOM::Node::parse(nodeJson.get(), &errorSupport);
