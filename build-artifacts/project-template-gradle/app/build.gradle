@@ -214,7 +214,6 @@ dependencies {
 	compile "com.android.support:support-v4:$supportVer"
 	compile "com.android.support:appcompat-v7:$supportVer"
 	debugCompile "com.android.support:design:$supportVer"
-//	compile project(":runtime")
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -232,6 +231,8 @@ task addNativeScriptRuntimePackageDependency {
 		def runtime = useV8Symbols ? "nativescript-regular" : "nativescript-optimized";
 		println "\t + adding nativescript runtime package dependency: $runtime"
 		project.dependencies.add("compile", [name: runtime, ext: "aar"])
+	} else {
+		project.dependencies.add("compile", project(':runtime'))
 	}
 }
 
