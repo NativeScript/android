@@ -14,7 +14,7 @@ def cachedJarsFilePath = "$projectDir/cached.txt"
 def jsParserP = "$projectDir/parser/js_parser.js"
 def jsFilesParametersP = "$projectDir/jsFilesParameters.txt"
 
-def webpackWorkersExcludePath = "$projectDir/../../src/main/assets/app/__worker-chunks.json"
+def webpackWorkersExcludePath = "$rootDir/app/src/main/assets/app/__worker-chunks.json"
 def webpackWorkersExcludesList = [];
 
 def workersExcludeFile = file(webpackWorkersExcludePath);
@@ -40,8 +40,13 @@ if (project.hasProperty("outDir")) {
 def absoluteJsCodeDir;
 def jsCodeAbsolutePath;
 if (!project.hasProperty("test")) {
-	absoluteJsCodeDir = project.jsCodeDir
-	jsCodeAbsolutePath = absoluteJsCodeDir.getAbsolutePath()
+	println project.jsCodeDir.equals(null)
+	if(project.jsCodeDir.exists()) {
+		absoluteJsCodeDir = project.jsCodeDir
+		jsCodeAbsolutePath = absoluteJsCodeDir.getAbsolutePath()
+	} else {
+		logger.log(LogLevel.WARN, "The input jsCodeDir: ${jsCodeDir} folder could not be found. Please make sure you've passed the correct folder containing the .js files that need to be parsed.");
+	}
 }
 
 def utf8 = StandardCharsets.UTF_8
