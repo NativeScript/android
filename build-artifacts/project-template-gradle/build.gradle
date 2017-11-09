@@ -232,8 +232,6 @@ android {
 	def dimensions = applyPluginsIncludeGradleConfigurations()
 	
 	flavorDimensions(*dimensions)
-
-	applyAppGradleConfiguration()
 }
 
 repositories {
