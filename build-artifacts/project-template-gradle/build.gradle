@@ -145,6 +145,8 @@ def applyAppGradleConfiguration = { ->
 	if (appGradle.exists()) {
 		println "\t + applying user-defined configuration from ${appGradle}"
 		apply from: pathToAppGradle
+	} else {
+		println "\t + couldn't load user-defined configuration from ${appGradle}. File doesn't exist."
 	}
 }
 
@@ -224,6 +226,8 @@ android {
 			compileTask.dependsOn("asbg:generateBindings")
 		}
 	}
+
+	applyAppGradleConfiguration()
 
 	def dimensions = applyPluginsIncludeGradleConfigurations()
 	
