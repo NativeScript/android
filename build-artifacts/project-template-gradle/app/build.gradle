@@ -52,9 +52,9 @@ def asbgProject = project(":asbg")
 asbgProject.ext.outDir = new File("$projectDir", "src/main/java")
 asbgProject.ext.jsCodeDir = new File("$projectDir", "src/main/assets/app")
 
-def computeCompileSdkVersion = { -> project.hasProperty("compileSdk") ? compileSdk : 23 }
-def computeTargetSdkVersion = { -> project.hasProperty("targetSdk") ? targetSdk : 23 }
-def computeBuildToolsVersion = { -> project.hasProperty("buildToolsVersion") ? buildToolsVersion : "25.0.2" }
+def computeCompileSdkVersion = { -> project.hasProperty("compileSdk") ? compileSdk : 26 }
+def computeTargetSdkVersion = { -> project.hasProperty("targetSdk") ? targetSdk : 26 }
+def computeBuildToolsVersion = { -> project.hasProperty("buildToolsVersion") ? buildToolsVersion : "26.0.1" }
 
 project.ext.selectedBuildType = project.hasProperty("release") ? "release" : "debug"
 
@@ -190,13 +190,13 @@ android {
 	applyAppGradleConfiguration()
 }
 
-def localRuntimeExists = file("$projectDir/libs/runtime-libs/nativescript-regular.aar").exists() || file("$projectDir/libs/runtime-libs/nativescript-optimized.aar").exists()
+def externalRuntimeExists = !findProject(':runtime').is(null)
 
 repositories {
 
 	// used for local *.AAR files
 	def pluginDependencies = nativescriptDependencies.collect { "$rootDir/${it.directory}/platforms/android" }
-	if(localRuntimeExists) {
+	if(!externalRuntimeExists) {
 		pluginDependencies.add("libs/runtime-libs")
 	}
 
@@ -206,7 +206,7 @@ repositories {
 }
 
 dependencies {
-	def supportVer = "22.2.0"
+	def supportVer = "25.3.1"
 	if (project.hasProperty("supportVersion")) {
 		supportVer = supportVersion
 	}
@@ -227,10 +227,12 @@ task addNativeScriptRuntimePackageDependency {
 		return packageJson.nativescript.useV8Symbols;
 	}
 
-	if(localRuntimeExists) {
+	if(!externalRuntimeExists) {
 		def runtime = useV8Symbols ? "nativescript-regular" : "nativescript-optimized";
 		println "\t + adding nativescript runtime package dependency: $runtime"
 		project.dependencies.add("compile", [name: runtime, ext: "aar"])
+	} else {
+		project.dependencies.add("compile", project(':runtime'))
 	}
 }
 
