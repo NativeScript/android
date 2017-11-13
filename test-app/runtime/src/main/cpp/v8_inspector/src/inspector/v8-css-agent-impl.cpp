@@ -5,6 +5,7 @@
 #include <NativeScriptAssert.h>
 #include <ArgConverter.h>
 #include <v8_inspector/src/inspector/utils/v8-inspector-common.h>
+#include <NativeScriptException.h>
 #include "v8-css-agent-impl.h"
 
 namespace v8_inspector {
@@ -57,6 +58,62 @@ void V8CSSAgentImpl::getMatchedStylesForNode(ErrorString* errorString, int in_no
         Maybe<protocol::Array<protocol::CSS::InheritedStyleEntry>>* out_inherited,
         Maybe<protocol::Array<protocol::CSS::CSSKeyframesRule>>* out_cssKeyframesRules) {
 
+    std::string getMatchedStylesForNodeFunctionString = "getMatchedStylesForNode";
+    // TODO: Pete: Find a better way to get a hold of the isolate
+    auto isolate = v8::Isolate::GetCurrent();
+
+    v8::HandleScope scope(isolate);
+
+    auto context = isolate->GetCurrentContext();
+    auto global = context->Global();
+
+    auto globalInspectorObject = utils::Common::getGlobalInspectorObject(isolate);
+
+    if (!globalInspectorObject.IsEmpty()) {
+        auto getMatchedStylesForNode = globalInspectorObject->Get(ArgConverter::ConvertToV8String(isolate, getMatchedStylesForNodeFunctionString));
+
+        if (!getMatchedStylesForNode.IsEmpty() && getMatchedStylesForNode->IsFunction()) {
+            auto getMatchedStylesForNodeFunc = getMatchedStylesForNode.As<v8::Function>();
+            auto nodeId = v8::Number::New(isolate, in_nodeId);
+            v8::Local<v8::Value> args[] = { nodeId };
+            v8::TryCatch tc;
+
+            auto maybeResult = getMatchedStylesForNodeFunc->Call(context, global, 1, args);
+
+            if (tc.HasCaught()) {
+                *errorString = utils::Common::getJSCallErrorMessage(getMatchedStylesForNodeFunctionString, tc.Message()->Get()).c_str();
+
+                return;
+            }
+
+            v8::Local<v8::Value> outResult;
+
+            if (maybeResult.ToLocal(&outResult)) {
+                auto matchedStylesProtocolValue = toProtocolValue(errorString, isolate->GetCurrentContext(), outResult);
+                if (!errorString->isEmpty()) {
+                    auto errorMessage = "Error while parsing debug `matchedCSSRules` object. " + errorString->utf8();
+                    throw tns::NativeScriptException(errorMessage);
+                }
+
+                protocol::ErrorSupport errorSupport;
+                auto matchedStyles = protocol::Array<protocol::CSS::RuleMatch>::parse(matchedStylesProtocolValue.get(), &errorSupport);
+
+                auto errorSupportString = errorSupport.errors().utf8();
+                if (!errorSupportString.empty()) {
+                    DEBUG_WRITE_FORCE("ERROR: %s", errorSupport.errors().utf8().c_str());
+                    auto errorMessage = "Error while parsing debug `matchedCSSRules` object. " + errorSupportString;
+                    throw tns::NativeScriptException(errorMessage);
+                }
+
+                *out_matchedCSSRules = Maybe<protocol::Array<protocol::CSS::RuleMatch>>(std::move(matchedStyles));
+            } else {
+                *errorString = "Didn't get a proper result from getMatchedStylesForNode call. ";
+            }
+
+            //        *out_matchedCSSRules = Maybe<protocol::Array<protocol::CSS::RuleMatch>>(std::move(rulesMatchedArr));
+        }
+    }
+
     //// out_inlineStyle
     auto cssPropsArr = protocol::Array<protocol::CSS::CSSProperty>::create();
     auto shorthandPropArr = protocol::Array<protocol::CSS::ShorthandEntry>::create();
@@ -71,24 +128,6 @@ void V8CSSAgentImpl::getMatchedStylesForNode(ErrorString* errorString, int in_no
                           .setCssProperties(std::move(attrArr))
                           .setShorthandEntries(std::move(protocol::Array<protocol::CSS::ShorthandEntry>::create()))
                           .build();
-
-    //// out_matchedCSSRules
-    auto cssSelectorsArr = protocol::Array<protocol::CSS::Value>::create();
-    auto cssSelectorList = protocol::CSS::SelectorList::create()
-                           .setSelectors(std::move(cssSelectorsArr))
-                           .setText("")
-                           .build();
-
-    auto cssRule = protocol::CSS::CSSRule::create()
-                   .setSelectorList(std::move(cssSelectorList))
-                   .setOrigin(protocol::CSS::StyleSheetOriginEnum::Regular)
-                   .setStyle(std::move(protocol::CSS::CSSStyle::create()
-                                       .setCssProperties(std::move(protocol::Array<protocol::CSS::CSSProperty>::create()))
-                                       .setShorthandEntries(std::move(protocol::Array<protocol::CSS::ShorthandEntry>::create()))
-                                       .build()))
-                   .build();
-
-    auto rulesMatchedArr = protocol::Array<protocol::CSS::RuleMatch>::create();
 
     //// out_pseudoElements
     auto pseudoElementsArr = protocol::Array<protocol::CSS::PseudoElementMatches>::create();
@@ -109,7 +148,7 @@ void V8CSSAgentImpl::getMatchedStylesForNode(ErrorString* errorString, int in_no
 
     *out_inlineStyle = Maybe<protocol::CSS::CSSStyle>(std::move(inlineStyle));
     *out_attributesStyle = Maybe<protocol::CSS::CSSStyle>(std::move(attributeStyle));
-    *out_matchedCSSRules = Maybe<protocol::Array<protocol::CSS::RuleMatch>>(std::move(rulesMatchedArr));
+//        *out_matchedCSSRules = Maybe<protocol::Array<protocol::CSS::RuleMatch>>(std::move(rulesMatchedArr));
     *out_cssKeyframesRules = Maybe<protocol::Array<protocol::CSS::CSSKeyframesRule>>(std::move(cssKeyFramesRulesArr));
     *out_inherited = Maybe<protocol::Array<protocol::CSS::InheritedStyleEntry>>(std::move(inheritedElementsArr));
     *out_pseudoElements = Maybe<protocol::Array<protocol::CSS::PseudoElementMatches>>(std::move(pseudoElementsArr));
@@ -208,10 +247,50 @@ void V8CSSAgentImpl::getPlatformFontsForNode(ErrorString*, int in_nodeId,
     *out_fonts = std::move(fontsArr);
 }
 
-// Not supported
-void V8CSSAgentImpl::getStyleSheetText(ErrorString*, const String& in_styleSheetId,
-                                       String* out_text) {
+void V8CSSAgentImpl::getStyleSheetText(ErrorString* errorString, const String& in_styleSheetId, String* out_text) {
     *out_text = "";
+
+    std::string getStyleSheetTextFunctionString = "getStyleSheetText";
+    // TODO: Pete: Find a better way to get a hold of the isolate
+    auto isolate = v8::Isolate::GetCurrent();
+
+    v8::HandleScope scope(isolate);
+
+    auto context = isolate->GetCurrentContext();
+    auto global = context->Global();
+
+    auto globalInspectorObject = utils::Common::getGlobalInspectorObject(isolate);
+
+    if (!globalInspectorObject.IsEmpty()) {
+        auto getStyleSheetText = globalInspectorObject->Get(ArgConverter::ConvertToV8String(isolate, getStyleSheetTextFunctionString));
+
+        if (!getStyleSheetText.IsEmpty() && getStyleSheetText->IsFunction()) {
+            auto getStyleSheetTextFunc = getStyleSheetText.As<v8::Function>();
+            auto styleSheetId = toV8String(isolate, in_styleSheetId);
+            v8::Local<v8::Value> args[] = { styleSheetId };
+            v8::TryCatch tc;
+
+            auto maybeResult = getStyleSheetTextFunc->Call(context, global, 1, args);
+
+            if (tc.HasCaught()) {
+                *errorString = utils::Common::getJSCallErrorMessage(getStyleSheetTextFunctionString, tc.Message()->Get()).c_str();
+
+                return;
+            }
+
+            v8::Local<v8::Value> outResult;
+
+            if (maybeResult.ToLocal(&outResult)) {
+                auto resultString = ArgConverter::ConvertToUtf16String(outResult->ToString());
+
+                auto resultUtf16Data = resultString.data();
+
+                *out_text = String16((const uint16_t*) resultUtf16Data);
+            } else {
+                *errorString = "Didn't get a proper result from __getStyleSheetText call. Returning empty CSS content.";
+            }
+        }
+    }
 }
 
 
