@@ -2477,6 +2477,11 @@
             "description": "Actions and events related to the inspected page belong to the page domain.",
             "types": [
                 {
+                    "id": "FrameId",
+                    "type": "string",
+                    "description": "Unique frame identifier."
+                },
+                {
                     "id": "ResourceType",
                     "type": "string",
                     "enum": [
@@ -2644,6 +2649,38 @@
                     "id": "ScriptIdentifier",
                     "type": "string",
                     "description": "Unique script identifier."
+                },
+                {
+                    "id": "Viewport",
+                    "type": "object",
+                    "description": "Viewport for capturing screenshot.",
+                    "properties": [
+                        {
+                            "name": "x",
+                            "type": "number",
+                            "description": "X offset in CSS pixels."
+                        },
+                        {
+                            "name": "y",
+                            "type": "number",
+                            "description": "Y offset in CSS pixels"
+                        },
+                        {
+                            "name": "width",
+                            "type": "number",
+                            "description": "Rectangle width in CSS pixels"
+                        },
+                        {
+                            "name": "height",
+                            "type": "number",
+                            "description": "Rectangle height in CSS pixels"
+                        },
+                        {
+                            "name": "scale",
+                            "type": "number",
+                            "description": "Page scale factor."
+                        }
+                    ]
                 }
             ],
             "commands": [
@@ -5369,7 +5406,92 @@
                 "Runtime"
             ],
             "experimental": true,
-            "types": [],
+            "types": [
+                {
+                    "id": "HighlightConfig",
+                    "type": "object",
+                    "properties": [
+                        {
+                            "name": "showInfo",
+                            "type": "boolean",
+                            "optional": true,
+                            "description": "Whether the node info tooltip should be shown (default: false)."
+                        },
+                        {
+                            "name": "showRulers",
+                            "type": "boolean",
+                            "optional": true,
+                            "description": "Whether the rulers should be shown (default: false)."
+                        },
+                        {
+                            "name": "showExtensionLines",
+                            "type": "boolean",
+                            "optional": true,
+                            "description": "Whether the extension lines from node to the rulers should be shown (default: false)."
+                        },
+                        {
+                            "name": "displayAsMaterial",
+                            "type": "boolean",
+                            "optional": true
+                        },
+                        {
+                            "name": "contentColor",
+                            "$ref": "DOM.RGBA",
+                            "optional": true,
+                            "description": "The content box highlight fill color (default: transparent)."
+                        },
+                        {
+                            "name": "paddingColor",
+                            "$ref": "DOM.RGBA",
+                            "optional": true,
+                            "description": "The padding highlight fill color (default: transparent)."
+                        },
+                        {
+                            "name": "borderColor",
+                            "$ref": "DOM.RGBA",
+                            "optional": true,
+                            "description": "The border highlight fill color (default: transparent)."
+                        },
+                        {
+                            "name": "marginColor",
+                            "$ref": "DOM.RGBA",
+                            "optional": true,
+                            "description": "The margin highlight fill color (default: transparent)."
+                        },
+                        {
+                            "name": "eventTargetColor",
+                            "$ref": "DOM.RGBA",
+                            "optional": true,
+                            "description": "The event target element highlight fill color (default: transparent)."
+                        },
+                        {
+                            "name": "shapeColor",
+                            "$ref": "DOM.RGBA",
+                            "optional": true,
+                            "description": "The shape outside fill color (default: transparent)."
+                        },
+                        {
+                            "name": "shapeMarginColor",
+                            "$ref": "DOM.RGBA",
+                            "optional": true,
+                            "description": "The shape margin fill color (default: transparent)."
+                        },
+                        {
+                            "name": "selectorList",
+                            "type": "string",
+                            "optional": true,
+                            "description": "Selectors to highlight relevant nodes."
+                        },
+                        {
+                            "name": "cssGridColor",
+                            "$ref": "DOM.RGBA",
+                            "optional": true,
+                            "description": "The grid layout color (default: transparent)."
+                        }
+                    ],
+                    "description": "Configuration data for the highlighting of page elements."
+                }
+            ],
             "commands": [
                 {
                     "name": "enable",
