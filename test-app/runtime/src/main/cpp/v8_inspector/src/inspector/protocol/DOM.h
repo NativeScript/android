@@ -8,7 +8,6 @@
 #define v8_inspector_protocol_DOM_h
 
 #include "src/inspector/protocol/Protocol.h"
-#include "Runtime.h"
 // For each imported domain we generate a ValueConversions struct instead of a full domain definition
 // and include Domain::API version from there.
 
@@ -30,9 +29,7 @@ using LiveRegionRelevant = String;
 // DOM interaction is implemented in terms of mirror objects that represent the actual DOM nodes. DOMNode is a base node mirror type.
 class Node;
 // A structure holding an RGBA color.
-class RGBAColor;
-// Configuration data for the highlighting of page elements.
-class HighlightConfig;
+class RGBA;
 
 namespace PseudoTypeEnum {
 extern const char* Before;
@@ -482,12 +479,12 @@ class  Node {
 
 
 // A structure holding an RGBA color.
-class  RGBAColor {
-        PROTOCOL_DISALLOW_COPY(RGBAColor);
+class  RGBA {
+        PROTOCOL_DISALLOW_COPY(RGBA);
     public:
-        static std::unique_ptr<RGBAColor> parse(protocol::Value* value, ErrorSupport* errors);
+        static std::unique_ptr<RGBA> parse(protocol::Value* value, ErrorSupport* errors);
 
-        ~RGBAColor() { }
+        ~RGBA() { }
 
         int getR() {
             return m_r;
@@ -521,10 +518,10 @@ class  RGBAColor {
         }
 
         std::unique_ptr<protocol::DictionaryValue> serialize() const;
-        std::unique_ptr<RGBAColor> clone() const;
+        std::unique_ptr<RGBA> clone() const;
 
         template<int STATE>
-        class RGBAColorBuilder {
+        class RGBABuilder {
             public:
                 enum {
                     NoFieldsSet = 0,
@@ -535,51 +532,51 @@ class  RGBAColor {
                 };
 
 
-                RGBAColorBuilder<STATE | RSet>& setR(int value) {
+                RGBABuilder<STATE | RSet>& setR(int value) {
                     static_assert(!(STATE & RSet), "property r should not be set yet");
                     m_result->setR(value);
                     return castState<RSet>();
                 }
 
-                RGBAColorBuilder<STATE | GSet>& setG(int value) {
+                RGBABuilder<STATE | GSet>& setG(int value) {
                     static_assert(!(STATE & GSet), "property g should not be set yet");
                     m_result->setG(value);
                     return castState<GSet>();
                 }
 
-                RGBAColorBuilder<STATE | BSet>& setB(int value) {
+                RGBABuilder<STATE | BSet>& setB(int value) {
                     static_assert(!(STATE & BSet), "property b should not be set yet");
                     m_result->setB(value);
                     return castState<BSet>();
                 }
 
-                RGBAColorBuilder<STATE>& setA(double value) {
+                RGBABuilder<STATE>& setA(double value) {
                     m_result->setA(value);
                     return *this;
                 }
 
-                std::unique_ptr<RGBAColor> build() {
+                std::unique_ptr<RGBA> build() {
                     static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
                     return std::move(m_result);
                 }
 
             private:
-                friend class RGBAColor;
-                RGBAColorBuilder() : m_result(new RGBAColor()) { }
+                friend class RGBA;
+                RGBABuilder() : m_result(new RGBA()) { }
 
-                template<int STEP> RGBAColorBuilder<STATE | STEP>& castState() {
-                    return *reinterpret_cast<RGBAColorBuilder<STATE | STEP>*>(this);
+                template<int STEP> RGBABuilder<STATE | STEP>& castState() {
+                    return *reinterpret_cast<RGBABuilder<STATE | STEP>*>(this);
                 }
 
-                std::unique_ptr<protocol::DOM::RGBAColor> m_result;
+                std::unique_ptr<protocol::DOM::RGBA> m_result;
         };
 
-        static RGBAColorBuilder<0> create() {
-            return RGBAColorBuilder<0>();
+        static RGBABuilder<0> create() {
+            return RGBABuilder<0>();
         }
 
     private:
-        RGBAColor() {
+        RGBA() {
             m_r = 0;
             m_g = 0;
             m_b = 0;
@@ -589,133 +586,6 @@ class  RGBAColor {
         int m_g;
         int m_b;
         Maybe<double> m_a;
-};
-
-
-// Configuration data for the highlighting of page elements.
-class  HighlightConfig {
-        PROTOCOL_DISALLOW_COPY(HighlightConfig);
-    public:
-        static std::unique_ptr<HighlightConfig> parse(protocol::Value* value, ErrorSupport* errors);
-
-        ~HighlightConfig() { }
-
-        bool hasShowInfo() {
-            return m_showInfo.isJust();
-        }
-        bool getShowInfo(bool defaultValue) {
-            return m_showInfo.isJust() ? m_showInfo.fromJust() : defaultValue;
-        }
-        void setShowInfo(bool value) {
-            m_showInfo = value;
-        }
-
-        bool hasContentColor() {
-            return m_contentColor.isJust();
-        }
-        protocol::DOM::RGBAColor* getContentColor(protocol::DOM::RGBAColor* defaultValue) {
-            return m_contentColor.isJust() ? m_contentColor.fromJust() : defaultValue;
-        }
-        void setContentColor(std::unique_ptr<protocol::DOM::RGBAColor> value) {
-            m_contentColor = std::move(value);
-        }
-
-        bool hasPaddingColor() {
-            return m_paddingColor.isJust();
-        }
-        protocol::DOM::RGBAColor* getPaddingColor(protocol::DOM::RGBAColor* defaultValue) {
-            return m_paddingColor.isJust() ? m_paddingColor.fromJust() : defaultValue;
-        }
-        void setPaddingColor(std::unique_ptr<protocol::DOM::RGBAColor> value) {
-            m_paddingColor = std::move(value);
-        }
-
-        bool hasBorderColor() {
-            return m_borderColor.isJust();
-        }
-        protocol::DOM::RGBAColor* getBorderColor(protocol::DOM::RGBAColor* defaultValue) {
-            return m_borderColor.isJust() ? m_borderColor.fromJust() : defaultValue;
-        }
-        void setBorderColor(std::unique_ptr<protocol::DOM::RGBAColor> value) {
-            m_borderColor = std::move(value);
-        }
-
-        bool hasMarginColor() {
-            return m_marginColor.isJust();
-        }
-        protocol::DOM::RGBAColor* getMarginColor(protocol::DOM::RGBAColor* defaultValue) {
-            return m_marginColor.isJust() ? m_marginColor.fromJust() : defaultValue;
-        }
-        void setMarginColor(std::unique_ptr<protocol::DOM::RGBAColor> value) {
-            m_marginColor = std::move(value);
-        }
-
-        std::unique_ptr<protocol::DictionaryValue> serialize() const;
-        std::unique_ptr<HighlightConfig> clone() const;
-
-        template<int STATE>
-        class HighlightConfigBuilder {
-            public:
-                enum {
-                    NoFieldsSet = 0,
-                    AllFieldsSet = (0)
-                };
-
-
-                HighlightConfigBuilder<STATE>& setShowInfo(bool value) {
-                    m_result->setShowInfo(value);
-                    return *this;
-                }
-
-                HighlightConfigBuilder<STATE>& setContentColor(std::unique_ptr<protocol::DOM::RGBAColor> value) {
-                    m_result->setContentColor(std::move(value));
-                    return *this;
-                }
-
-                HighlightConfigBuilder<STATE>& setPaddingColor(std::unique_ptr<protocol::DOM::RGBAColor> value) {
-                    m_result->setPaddingColor(std::move(value));
-                    return *this;
-                }
-
-                HighlightConfigBuilder<STATE>& setBorderColor(std::unique_ptr<protocol::DOM::RGBAColor> value) {
-                    m_result->setBorderColor(std::move(value));
-                    return *this;
-                }
-
-                HighlightConfigBuilder<STATE>& setMarginColor(std::unique_ptr<protocol::DOM::RGBAColor> value) {
-                    m_result->setMarginColor(std::move(value));
-                    return *this;
-                }
-
-                std::unique_ptr<HighlightConfig> build() {
-                    static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
-                    return std::move(m_result);
-                }
-
-            private:
-                friend class HighlightConfig;
-                HighlightConfigBuilder() : m_result(new HighlightConfig()) { }
-
-                template<int STEP> HighlightConfigBuilder<STATE | STEP>& castState() {
-                    return *reinterpret_cast<HighlightConfigBuilder<STATE | STEP>*>(this);
-                }
-
-                std::unique_ptr<protocol::DOM::HighlightConfig> m_result;
-        };
-
-        static HighlightConfigBuilder<0> create() {
-            return HighlightConfigBuilder<0>();
-        }
-
-    private:
-        HighlightConfig() {
-        }
-
-        Maybe<bool> m_showInfo;
-        Maybe<protocol::DOM::RGBAColor> m_contentColor;
-        Maybe<protocol::DOM::RGBAColor> m_paddingColor;
-        Maybe<protocol::DOM::RGBAColor> m_borderColor;
-        Maybe<protocol::DOM::RGBAColor> m_marginColor;
 };
 
 
@@ -735,8 +605,6 @@ class  Backend {
         virtual void performSearch(ErrorString*, const String& in_query, const Maybe<protocol::Array<int>>& in_nodeIds, String* out_searchId, int* out_resultCount) = 0;
         virtual void getSearchResults(ErrorString*, const String& in_searchId, int in_fromIndex, int in_toIndex, std::unique_ptr<protocol::Array<int>>* out_nodeIds) = 0;
         virtual void discardSearchResults(ErrorString*, const String& in_searchId) = 0;
-        virtual void highlightNode(ErrorString*, std::unique_ptr<protocol::DOM::HighlightConfig> in_highlightConfig, const Maybe<int>& in_nodeId, const Maybe<String>& in_objectId) = 0;
-        virtual void hideHighlight(ErrorString*) = 0;
         virtual void resolveNode(ErrorString*, int in_nodeId, const Maybe<String>& in_objectGroup, std::unique_ptr<protocol::Runtime::RemoteObject>* out_object) = 0;
 
 };

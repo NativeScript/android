@@ -8,7 +8,6 @@
 #define v8_inspector_protocol_Network_h
 
 #include "src/inspector/protocol/Protocol.h"
-#include "Runtime.h"
 // For each imported domain we generate a ValueConversions struct instead of a full domain definition
 // and include Domain::API version from there.
 
@@ -1038,6 +1037,7 @@ class  Backend {
                 virtual void sendSuccess(const String& content, const String& mimeType, double status) = 0;
         };
         virtual void loadResource(const String& in_frameId, const String& in_url, std::unique_ptr<LoadResourceCallback> callback) = 0;
+
 };
 
 // ------------- Frontend interface.

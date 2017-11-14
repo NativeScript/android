@@ -8,7 +8,7 @@
 
 #include <algorithm>
 #include <cmath>
-#include <stdlib.h>
+
 #include <cstring>
 
 
@@ -716,7 +716,7 @@ double charactersToDouble(const uint16_t* characters, size_t length, bool* ok) {
     }
     buffer.push_back('\0');
     char* endptr;
-    double result = strtod(buffer.data(), &endptr);
+    double result = std::strtod(buffer.data(), &endptr);
     *ok = !(*endptr);
     return result;
 }
@@ -724,7 +724,7 @@ double charactersToDouble(const uint16_t* characters, size_t length, bool* ok) {
 double charactersToDouble(const uint8_t* characters, size_t length, bool* ok) {
     std::string buffer(reinterpret_cast<const char*>(characters), length);
     char* endptr;
-    double result = strtod(buffer.data(), &endptr);
+    double result = std::strtod(buffer.data(), &endptr);
     *ok = !(*endptr);
     return result;
 }

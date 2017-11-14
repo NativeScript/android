@@ -233,13 +233,13 @@ std::unique_ptr<Node> Node::clone() const {
     return parse(serialize().get(), &errors);
 }
 
-std::unique_ptr<RGBAColor> RGBAColor::parse(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<RGBA> RGBA::parse(protocol::Value* value, ErrorSupport* errors) {
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
     }
 
-    std::unique_ptr<RGBAColor> result(new RGBAColor());
+    std::unique_ptr<RGBA> result(new RGBA());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
     errors->push();
     protocol::Value* rValue = object->get("r");
@@ -263,7 +263,7 @@ std::unique_ptr<RGBAColor> RGBAColor::parse(protocol::Value* value, ErrorSupport
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> RGBAColor::serialize() const {
+std::unique_ptr<protocol::DictionaryValue> RGBA::serialize() const {
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("r", ValueConversions<int>::serialize(m_r));
     result->setValue("g", ValueConversions<int>::serialize(m_g));
@@ -274,73 +274,7 @@ std::unique_ptr<protocol::DictionaryValue> RGBAColor::serialize() const {
     return result;
 }
 
-std::unique_ptr<RGBAColor> RGBAColor::clone() const {
-    ErrorSupport errors;
-    return parse(serialize().get(), &errors);
-}
-
-std::unique_ptr<HighlightConfig> HighlightConfig::parse(protocol::Value* value, ErrorSupport* errors) {
-    if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
-        return nullptr;
-    }
-
-    std::unique_ptr<HighlightConfig> result(new HighlightConfig());
-    protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
-    protocol::Value* showInfoValue = object->get("showInfo");
-    if (showInfoValue) {
-        errors->setName("showInfo");
-        result->m_showInfo = ValueConversions<bool>::parse(showInfoValue, errors);
-    }
-    protocol::Value* contentColorValue = object->get("contentColor");
-    if (contentColorValue) {
-        errors->setName("contentColor");
-        result->m_contentColor = ValueConversions<protocol::DOM::RGBAColor>::parse(contentColorValue, errors);
-    }
-    protocol::Value* paddingColorValue = object->get("paddingColor");
-    if (paddingColorValue) {
-        errors->setName("paddingColor");
-        result->m_paddingColor = ValueConversions<protocol::DOM::RGBAColor>::parse(paddingColorValue, errors);
-    }
-    protocol::Value* borderColorValue = object->get("borderColor");
-    if (borderColorValue) {
-        errors->setName("borderColor");
-        result->m_borderColor = ValueConversions<protocol::DOM::RGBAColor>::parse(borderColorValue, errors);
-    }
-    protocol::Value* marginColorValue = object->get("marginColor");
-    if (marginColorValue) {
-        errors->setName("marginColor");
-        result->m_marginColor = ValueConversions<protocol::DOM::RGBAColor>::parse(marginColorValue, errors);
-    }
-    errors->pop();
-    if (errors->hasErrors()) {
-        return nullptr;
-    }
-    return result;
-}
-
-std::unique_ptr<protocol::DictionaryValue> HighlightConfig::serialize() const {
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (m_showInfo.isJust()) {
-        result->setValue("showInfo", ValueConversions<bool>::serialize(m_showInfo.fromJust()));
-    }
-    if (m_contentColor.isJust()) {
-        result->setValue("contentColor", ValueConversions<protocol::DOM::RGBAColor>::serialize(m_contentColor.fromJust()));
-    }
-    if (m_paddingColor.isJust()) {
-        result->setValue("paddingColor", ValueConversions<protocol::DOM::RGBAColor>::serialize(m_paddingColor.fromJust()));
-    }
-    if (m_borderColor.isJust()) {
-        result->setValue("borderColor", ValueConversions<protocol::DOM::RGBAColor>::serialize(m_borderColor.fromJust()));
-    }
-    if (m_marginColor.isJust()) {
-        result->setValue("marginColor", ValueConversions<protocol::DOM::RGBAColor>::serialize(m_marginColor.fromJust()));
-    }
-    return result;
-}
-
-std::unique_ptr<HighlightConfig> HighlightConfig::clone() const {
+std::unique_ptr<RGBA> RGBA::clone() const {
     ErrorSupport errors;
     return parse(serialize().get(), &errors);
 }
@@ -526,8 +460,6 @@ class DispatcherImpl : public protocol::DispatcherBase {
             m_dispatchMap["DOM.performSearch"] = &DispatcherImpl::performSearch;
             m_dispatchMap["DOM.getSearchResults"] = &DispatcherImpl::getSearchResults;
             m_dispatchMap["DOM.discardSearchResults"] = &DispatcherImpl::discardSearchResults;
-            m_dispatchMap["DOM.highlightNode"] = &DispatcherImpl::highlightNode;
-            m_dispatchMap["DOM.hideHighlight"] = &DispatcherImpl::hideHighlight;
             m_dispatchMap["DOM.resolveNode"] = &DispatcherImpl::resolveNode;
         }
         ~DispatcherImpl() override { }
@@ -548,8 +480,6 @@ class DispatcherImpl : public protocol::DispatcherBase {
         void performSearch(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
         void getSearchResults(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
         void discardSearchResults(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        void highlightNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        void hideHighlight(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
         void resolveNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
 
         Backend* m_backend;
@@ -789,49 +719,6 @@ void DispatcherImpl::discardSearchResults(int callId, std::unique_ptr<Dictionary
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     ErrorString error;
     m_backend->discardSearchResults(&error, in_searchId);
-    if (weak->get()) {
-        weak->get()->sendResponse(callId, error);
-    }
-}
-
-void DispatcherImpl::highlightNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
-    // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* highlightConfigValue = object ? object->get("highlightConfig") : nullptr;
-    errors->setName("highlightConfig");
-    std::unique_ptr<protocol::DOM::HighlightConfig> in_highlightConfig = ValueConversions<protocol::DOM::HighlightConfig>::parse(highlightConfigValue, errors);
-    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
-    Maybe<int> in_nodeId;
-    if (nodeIdValue) {
-        errors->setName("nodeId");
-        in_nodeId = ValueConversions<int>::parse(nodeIdValue, errors);
-    }
-    protocol::Value* objectIdValue = object ? object->get("objectId") : nullptr;
-    Maybe<String> in_objectId;
-    if (objectIdValue) {
-        errors->setName("objectId");
-        in_objectId = ValueConversions<String>::parse(objectIdValue, errors);
-    }
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, InvalidParams, kInvalidRequest, errors);
-        return;
-    }
-
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    ErrorString error;
-    m_backend->highlightNode(&error, std::move(in_highlightConfig), in_nodeId, in_objectId);
-    if (weak->get()) {
-        weak->get()->sendResponse(callId, error);
-    }
-}
-
-void DispatcherImpl::hideHighlight(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
-
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    ErrorString error;
-    m_backend->hideHighlight(&error);
     if (weak->get()) {
         weak->get()->sendResponse(callId, error);
     }
