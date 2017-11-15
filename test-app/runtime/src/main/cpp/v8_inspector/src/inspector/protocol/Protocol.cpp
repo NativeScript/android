@@ -6,6 +6,7 @@
 
 #include "src/inspector/protocol/Protocol.h"
 
+#include <cstdlib>
 #include <algorithm>
 #include <cmath>
 

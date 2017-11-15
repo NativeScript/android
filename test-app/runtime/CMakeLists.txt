@@ -105,6 +105,8 @@ add_library( # Sets the name of the library. When it's built you can find it wit
             src/main/cpp/v8_inspector/src/inspector/v8-inspector-session-impl.cc
             src/main/cpp/v8_inspector/src/inspector/v8-debugger-agent-impl.cc
             src/main/cpp/v8_inspector/src/inspector/injected-script.cc
+            src/main/cpp/v8_inspector/src/inspector/protocol/Overlay.cpp
+            src/main/cpp/v8_inspector/src/inspector/protocol/Log.cpp
             src/main/cpp/v8_inspector/src/inspector/protocol/DOM.cpp
             src/main/cpp/v8_inspector/src/inspector/protocol/CSS.cpp
             src/main/cpp/v8_inspector/src/inspector/protocol/Console.cpp

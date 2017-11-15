@@ -2268,6 +2268,7 @@ class  Backend {
         virtual void getMediaQueries(ErrorString*, std::unique_ptr<protocol::Array<protocol::CSS::CSSMedia>>* out_medias) = 0;
         virtual void setEffectivePropertyValueForNode(ErrorString*, int in_nodeId, const String& in_propertyName, const String& in_value) = 0;
         virtual void getBackgroundColors(ErrorString*, int in_nodeId, Maybe<protocol::Array<String>>* out_backgroundColors, Maybe<String>* out_computedFontSize, Maybe<String>* out_computedFontWeight, Maybe<String>* out_computedBodyFontSize) = 0;
+        // TODO: Pete: Unnecessary - remove before publish
         virtual void startRuleUsageTracking(ErrorString*) = 0;
         virtual void takeCoverageDelta(ErrorString*, std::unique_ptr<protocol::Array<protocol::CSS::RuleUsage>>* out_coverage) = 0;
         virtual void stopRuleUsageTracking(ErrorString*, std::unique_ptr<protocol::Array<protocol::CSS::RuleUsage>>* out_ruleUsage) = 0;
