@@ -86,6 +86,7 @@ add_library( # Sets the name of the library. When it's built you can find it wit
             src/main/cpp/v8_inspector/src/inspector/v8-regex.cc
             src/main/cpp/v8_inspector/src/inspector/v8-console-agent-impl.cc
             src/main/cpp/v8_inspector/src/inspector/v8-network-agent-impl.cpp
+            src/main/cpp/v8_inspector/src/inspector/v8-overlay-agent-impl.cpp
             src/main/cpp/v8_inspector/src/inspector/remote-object-id.cc
             src/main/cpp/v8_inspector/src/inspector/v8-inspector-impl.cc
             src/main/cpp/v8_inspector/src/inspector/search-util.cc
