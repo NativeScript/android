@@ -96,6 +96,12 @@ def applyPluginsIncludeGradleConfigurations =  { ->
 		if (!androidDir.exists()) {
 			return
 		}
+
+		FileTree allFilesExeptForAar = fileTree(dir: androidDir, exclude: "**/*.aar");
+		if(allFilesExeptForAar.size() <= 0) {
+			return;
+		}
+
 		def includeGradleFile = new File(androidDir, "include.gradle")
 
 		def packageJsonPath = file("$rootDir/${dep.directory}/package.json")
