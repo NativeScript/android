@@ -97,8 +97,8 @@ def applyPluginsIncludeGradleConfigurations =  { ->
 			return
 		}
 
-		FileTree allFilesExeptForAar = fileTree(dir: androidDir, exclude: "**/*.aar");
-		if(allFilesExeptForAar.size() <= 0) {
+		FileTree allFilesExceptForAars = fileTree(dir: androidDir, exclude: "**/*.aar");
+		if(allFilesExceptForAars.size() <= 0) {
 			return;
 		}
 
