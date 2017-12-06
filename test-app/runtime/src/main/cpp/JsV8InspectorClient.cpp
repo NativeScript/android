@@ -2,6 +2,7 @@
 #include <sstream>
 #include <assert.h>
 #include <include/libplatform/libplatform.h>
+#include <v8_inspector/src/inspector/v8-log-agent-impl.h>
 #include "Runtime.h"
 #include "NativeScriptException.h"
 
@@ -199,8 +200,7 @@ JsV8InspectorClient* JsV8InspectorClient::GetInstance() {
 }
 
 
-void JsV8InspectorClient::sendToFrontEndCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
-
+void JsV8InspectorClient::logMessageToDevToolsConsole(const v8::FunctionCallbackInfo<v8::Value>& args) {
     if ((instance == nullptr) || (instance->connection == nullptr)) {
         return;
     }
@@ -209,16 +209,22 @@ void JsV8InspectorClient::sendToFrontEndCallback(const v8::FunctionCallbackInfo<
         if ((args.Length() > 0) && args[0]->IsString()) {
             std::string message = ArgConverter::ConvertToString(args[0]->ToString());
 
-std:
-            string level = "log";
+            std::string level = "info";
             if (args.Length() > 1  && args[1]->IsString()) {
-                level = ArgConverter::ConvertToString(args[1]->ToString());
+                auto levelArg = ArgConverter::ConvertToString(args[1]->ToString());
+                if (levelArg.compare("log") == 0) {
+                    level = "info";
+                } else {
+                    level = levelArg;
+                }
             }
 
-            JEnv env;
-            JniLocalRef str(env.NewStringUTF(message.c_str()));
-            JniLocalRef lev(env.NewStringUTF(level.c_str()));
-            env.CallStaticVoidMethod(inspectorClass, sendToDevToolsConsoleMethod, instance->connection, (jstring) str, (jstring)lev);
+            auto isolate = args.GetIsolate();
+            auto stack = StackTrace::CurrentStackTrace(isolate, 5, StackTrace::StackTraceOptions::kDetailed);
+
+            auto frame = stack->GetFrame(2);
+
+            v8_inspector::V8LogAgentImpl::EntryAdded(message, level, ArgConverter::ConvertToString(frame->GetScriptNameOrSourceURL()), frame->GetLineNumber());
         }
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
