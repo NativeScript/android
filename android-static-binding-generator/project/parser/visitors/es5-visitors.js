@@ -599,7 +599,8 @@ var es5_visitors = (function () {
     }
 
     function _generateLineToWrite(classNameFromDecorator, extendClass, overriddenMethodNames, extendInfo, filePath, implementedInterfaces) {
-        var lineToWrite = extendClass + "*" + extendInfo.replace(/[\\/\\-]/g, "_") + "*" + overriddenMethodNames + "*" + classNameFromDecorator + "*" + filePath + "*" + (implementedInterfaces ? implementedInterfaces : "");
+        var sanitizedExtendInfo = extendInfo.replace(/[-\\/\\.]/g, "_");
+        var lineToWrite = extendClass + "*" + sanitizedExtendInfo + "*" + overriddenMethodNames + "*" + classNameFromDecorator + "*" + filePath + "*" + (implementedInterfaces ? implementedInterfaces : "");
         return lineToWrite;
     }
 

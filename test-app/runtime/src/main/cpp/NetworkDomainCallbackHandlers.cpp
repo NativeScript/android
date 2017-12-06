@@ -67,11 +67,11 @@ void NetworkDomainCallbackHandlers::ResponseReceivedCallback(const v8::FunctionC
             throw NativeScriptException(errorMessage + errorString);
         }
 
-        auto requestIdString = ArgConverter::ConvertToString(requestId).c_str();
+        auto requestIdString = ArgConverter::ConvertToString(requestId);
         auto networkRequestData = new v8_inspector::utils::NetworkRequestData();
         networkAgentInstance->m_responses.insert(std::make_pair(requestIdString, networkRequestData));
 
-        networkAgentInstance->m_frontend.responseReceived(requestIdString,
+        networkAgentInstance->m_frontend.responseReceived(requestIdString.c_str(),
                 FrameId,
                 LoaderId,
                 timeStamp,
@@ -206,7 +206,7 @@ void NetworkDomainCallbackHandlers::DataForRequestIdCallback(const v8::FunctionC
         auto data = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "data")).ToLocalChecked()->ToString();
         auto hasTextContent = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "hasTextContent")).ToLocalChecked()->ToBoolean();
 
-        auto requestIdString = ArgConverter::ConvertToString(requestId).c_str();
+        auto requestIdString = ArgConverter::ConvertToString(requestId);
         auto dataString = ArgConverter::ConvertToUtf16String(data);
         auto hasTextContentBool = hasTextContent->BooleanValue();
 
@@ -215,7 +215,7 @@ void NetworkDomainCallbackHandlers::DataForRequestIdCallback(const v8::FunctionC
 
         if (it == responses.end()) {
             throw NativeScriptException("Response not found for requestId = " +
-                                        ArgConverter::ConvertToString(requestId));
+                                        requestIdString);
         } else {
             v8_inspector::utils::NetworkRequestData* response = it->second;
 

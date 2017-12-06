@@ -18,6 +18,7 @@ def localMetadataGen = "../android-metadata-generator/dist/tns-android-metadata-
 def distDir = "$projectDir/dist"
 def pVersion = "no package version was provided by build.gradle build"
 def arVersion = "no commit sha was provided by build.gradle build"
+def generateRegularRuntimePackage = !project.hasProperty("skipUnoptimized");
 
 task checkEnvironmentVariables {
     if ("$System.env.JAVA_HOME" == "" || "$System.env.JAVA_HOME" == "null") {
@@ -54,11 +55,11 @@ task copyFilesToProjectTemeplate {
             from "$rootDir/test-app/app/src/main/java/com/tns/ErrorReport.java"
             from "$rootDir/test-app/app/src/main/java/com/tns/ErrorReportActivity.java"
             from "$rootDir/test-app/app/src/main/java/com/tns/NativeScriptSyncService.java"
-            into "$rootDir/build-artifacts/project-template-gradle/src/debug/java/com/tns/"
+            into "$rootDir/build-artifacts/project-template-gradle/app/src/debug/java/com/tns/"
         }
         copy {
             from "$rootDir/test-app/app/src/main/assets/internal"
-            into "$rootDir/build-artifacts/project-template-gradle/src/main/assets/internal"
+            into "$rootDir/build-artifacts/project-template-gradle/app/src/main/assets/internal"
         }
         copy {
             from "$rootDir/test-app/app/src/main/java/com/tns/AndroidJsV8Inspector.java"
@@ -68,11 +69,11 @@ task copyFilesToProjectTemeplate {
             from "$rootDir/test-app/app/src/main/java/com/tns/NativeScriptUncaughtExceptionHandler.java"
             from "$rootDir/test-app/app/src/main/java/com/tns/RuntimeHelper.java"
             from "$rootDir/test-app/app/src/main/java/com/tns/Util.java"
-            into "$rootDir/build-artifacts/project-template-gradle/src/main/java/com/tns/"
+            into "$rootDir/build-artifacts/project-template-gradle/app/src/main/java/com/tns/"
         }
         copy {
             from "$rootDir/test-app/app/src/main/java/com/tns/internal"
-            into "$rootDir/build-artifacts/project-template-gradle/src/main/java/com/tns/internal"
+            into "$rootDir/build-artifacts/project-template-gradle/app/src/main/java/com/tns/internal"
         }
     }
 }
@@ -130,7 +131,10 @@ task getCommitVersion {
 task generateRuntime {
     doFirst {
         tasks.generateOptimizedRuntimeAar.execute();
-        tasks.generateRuntimeAar.execute();
+
+        if (generateRegularRuntimePackage) {
+            tasks.generateRuntimeAar.execute();
+        }
     }
 }
 
@@ -160,13 +164,13 @@ task copyGeneratedRuntime {
     doLast {
         copy {
             from "$rootDir/test-app/runtime/build/outputs/aar/runtime-regular-release.aar"
-            into "$rootDir/dist/framework/libs/runtime-libs/"
+            into "$rootDir/dist/framework/app/libs/runtime-libs/"
             rename "runtime-regular-release.aar", "nativescript-regular.aar"
         }
 
         copy {
             from "$rootDir/test-app/runtime/build/outputs/aar/runtime-optimized-release.aar"
-            into "$rootDir/dist/framework/libs/runtime-libs/"
+            into "$rootDir/dist/framework/app/libs/runtime-libs/"
             rename "runtime-optimized-release.aar", "nativescript-optimized.aar"
         }
     }
@@ -219,11 +223,16 @@ task generateStaticBindingGeneratorJar(type: Exec) {
     doFirst {
         workingDir "$rootDir/android-static-binding-generator/project/staticbindinggenerator"
 
+        
+        def commandArgs = ["assemble"]
+
         if (isWinOs) {
-            commandLine "cmd", "/c", "gradlew", "assemble"
+            commandLine "cmd", "/c", "gradlew"
         } else {
-            commandLine "./gradlew", "assemble"
+            commandLine "./gradlew"
         }
+
+        args commandArgs
     }
 
 }
@@ -275,9 +284,9 @@ task copyReadme(type: Copy) {
 }
 
 task cleanBuildArtefacts(type: Delete) {
-    delete "$rootDir/build-artifacts/project-template-gradle/src/debug/java"
-    delete "$rootDir/build-artifacts/project-template-gradle/src/main/java"
-    delete "$rootDir/build-artifacts/project-template-gradle/src/main/assets"
+    delete "$rootDir/build-artifacts/project-template-gradle/app/src/debug/java"
+    delete "$rootDir/build-artifacts/project-template-gradle/app/src/main/java"
+    delete "$rootDir/build-artifacts/project-template-gradle/app/src/main/assets"
 }
 
 //clean and set up dirs

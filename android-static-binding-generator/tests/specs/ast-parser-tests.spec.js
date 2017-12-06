@@ -1,16 +1,15 @@
-'use strict';
-
-var exec = require("child_process").exec,
+const exec = require("child_process").exec,
     path = require("path"),
     fs = require("fs"),
     prefix = path.resolve(__dirname, "../cases/"),
     interfaceNames = path.resolve(__dirname, "../interfaces-names.txt"),
     gradleTraverse = path.resolve(__dirname, "../../project"),
     gradleTaskName = "traverseJsFilesArgs",
-    parser = path.resolve(__dirname, "../../project/parser/js_parser.js");
+    parser = path.resolve(__dirname, "../../project/parser/js_parser.js"),
+    gradleExecutable = path.resolve(__dirname, "../../project/staticbindinggenerator/gradlew");
 
 function execGradle(inputPath, bindingsOutput, jsFilesInput, callback) {
-    exec("gradle -p " + gradleTraverse + " " + gradleTaskName + " -Ptest -PjsCodeDir=\"" + inputPath + "\" -PbindingsFilePath=\"" + bindingsOutput + "\" -PinterfaceNamesFilePath=\"" + interfaceNames + "\" -PjsParserPath=\"" + parser + "\" -PjsFilesParameter=\"" + jsFilesInput + "\"", callback);
+    exec(`${gradleExecutable} -p ${gradleTraverse} ${gradleTaskName} -Ptest -PjsCodeDir="${inputPath}" -PbindingsFilePath="${bindingsOutput}" -PinterfaceNamesFilePath="${interfaceNames}" -PjsParserPath="${parser}" -PjsFilesParameter="${jsFilesInput}"`, callback);
 }
 
 function logExecResult(stdout, stderr) {
@@ -35,13 +34,15 @@ function clearOutput(bindingsOutput, jsFilesInput) {
 }
 
 describe("parser/js_parser tests", function () {
+    beforeAll(() => {
+        jasmine.DEFAULT_TIMEOUT_INTERVAL = 20 * 1000; // give enough time to start the gradle daemon
+    });
 
-    describe("js_parser tests", function () {
-
+    describe("Traversal tests", function () {
         it("Analyse files only in the correct folder structure", function (done) {
 
             let input = path.normalize(prefix + "/mini_app/app"),
-                jsFilesParameter = path.normalize(prefix + "/mini_app/jsfiles.txt"),
+                jsFilesParameter = path.normalize(prefix + "/mini_app/jsFiles.txt"),
                 output = path.normalize(prefix + "/mini_app/bindings.txt");
 
             clearOutput(output, jsFilesParameter);
@@ -121,6 +122,56 @@ describe("parser/js_parser tests", function () {
                 });
 
                 expect(allLines.length).toBe(0);
+                done();
+            });
+        });
+
+        it("Files with dots in their names won't reflect in resulting java class names", function (done) {
+            let input = path.normalize(prefix + "/file_names_with_dots/app"),
+                jsFilesParameter = path.normalize(prefix + "/file_names_with_dots/jsFiles.txt"),
+                output = prefix + "/file_names_with_dots/bindings.txt";
+
+            clearOutput(output, jsFilesParameter);
+
+            execGradle(input, output, jsFilesParameter, function (error, stdout, stderr) {
+                if (error) {
+                    console.error(`exec error: ${error}`);
+                    return;
+                }
+
+                logExecResult(stdout, stderr)
+
+                let bindingsContent = fs.readFileSync(output, "utf-8").toString().trim().split('\n');
+
+                let expectedPartialContent = "file_with_dots";
+                let foundExpected = bindingsContent[0].indexOf(expectedPartialContent)
+
+                expect(foundExpected).toBeGreaterThan(0);
+                done();
+            });
+        });
+
+        it("Files and folders with dashes in their names won't reflect in resulting java class names", function (done) {
+            let input = path.normalize(prefix + "/directory_with_dashes/app"),
+                jsFilesParameter = path.normalize(prefix + "/directory_with_dashes/jsFiles.txt"),
+                output = prefix + "/directory_with_dashes/bindings.txt";
+
+            clearOutput(output, jsFilesParameter);
+
+            execGradle(input, output, jsFilesParameter, function (error, stdout, stderr) {
+                if (error) {
+                    console.error(`exec error: ${error}`);
+                    return;
+                }
+
+                logExecResult(stdout, stderr)
+
+                let bindingsContent = fs.readFileSync(output, "utf-8").toString().trim().split('\n');
+
+                let expectedPartialContent = "dir_with_dashes_file_with_dashes";
+                let foundExpected = bindingsContent[0].indexOf(expectedPartialContent)
+
+                expect(foundExpected).toBeGreaterThan(0);
                 done();
             });
         });
@@ -213,7 +264,6 @@ describe("parser/js_parser tests", function () {
                     console.error(`exec error: ${error}`);
                     return;
                 }
-
                 logExecResult(stdout, stderr)
 
                 let bindingsContent = fs.readFileSync(output, "utf-8").toString().trim().split('\n');
