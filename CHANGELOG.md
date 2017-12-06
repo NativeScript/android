@@ -1,3 +1,14 @@
+3.4.0
+==
+
+## What's New
+
+ - [Android Studio Integration (#876)](https://github.com/NativeScript/android-runtime/issues/876)
+
+## Bug Fixes
+
+ - [Faulty Java class name when extending a class inside a file containing dots (#761)](https://github.com/NativeScript/android-runtime/issues/761)
+
 3.3.1
 ==
 
