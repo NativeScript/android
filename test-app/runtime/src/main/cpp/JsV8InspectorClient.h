@@ -33,7 +33,7 @@ class JsV8InspectorClient : V8InspectorClient, v8_inspector::V8Inspector::Channe
         void sendProtocolNotification(const v8_inspector::StringView& message) override;
         void flushProtocolNotifications() override;
 
-        static void sendToFrontEndCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
+        static void logMessageToDevToolsConsole(const v8::FunctionCallbackInfo<v8::Value>& args);
 
         void runMessageLoopOnPause(int context_group_id) override;
         void quitMessageLoopOnPause() override;
