@@ -110,3 +110,7 @@ u16string Util::ConvertFromUtf8ToUtf16(const string& str) {
 
     return utf16String;
 }
+
+uint16_t* Util::ConvertFromUtf8ToProtocolUtf16(const string& str) {
+    return ((uint16_t*)ConvertFromUtf8ToUtf16(str).c_str());
+}

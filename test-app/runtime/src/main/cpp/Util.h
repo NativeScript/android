@@ -21,6 +21,8 @@ class Util {
         static std::string ReplaceAll(std::string& str, const std::string& from, const std::string& to);
 
         static std::u16string ConvertFromUtf8ToUtf16(const std::string& str);
+
+        static std::uint16_t* ConvertFromUtf8ToProtocolUtf16(const std::string& str);
 };
 }
 

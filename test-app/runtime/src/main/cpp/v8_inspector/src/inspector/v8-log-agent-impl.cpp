@@ -69,10 +69,11 @@ void V8LogAgentImpl::EntryAdded(std::string text, std::string verbosityLevel, st
     auto nano = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now());
     double timestamp = nano.time_since_epoch().count();
 
+    auto textString16 = String16(tns::Util::ConvertFromUtf8ToProtocolUtf16(text));
+
     auto logEntry = protocol::Log::LogEntry::create()
                     .setSource(protocol::Log::LogEntry::SourceEnum::Javascript)
-//                    .setText(tns::Util::ConvertFromUtf8ToUtf16(text))
-                    .setText(text.c_str())
+                    .setText(textString16)
                     .setLevel(verbosityLevel.c_str())
                     .setTimestamp(timestamp)
                     .setUrl(url.c_str())
