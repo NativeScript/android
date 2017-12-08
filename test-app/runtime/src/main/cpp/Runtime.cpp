@@ -22,6 +22,7 @@
 #include "include/zipconf.h"
 #include <sstream>
 #include <dlfcn.h>
+#include <console/Console.h>
 #include "NetworkDomainCallbackHandlers.h"
 #include "sys/system_properties.h"
 #include "JsV8InspectorClient.h"
@@ -571,6 +572,12 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     if (s_mainThreadInitialized) {
         global->ForceSet(ArgConverter::ConvertToV8String(isolate, "self"), global, readOnlyFlags);
     }
+
+    /*
+     * Attach 'console' object to the global object
+     */
+    v8::Local<v8::Object> console = Console::createConsole(context, filesPath);
+    global->ForceSet(context, ArgConverter::ConvertToV8String(isolate, "console"), console, readOnlyFlags);
 
     ArgConverter::Init(isolate);
 

@@ -73,6 +73,7 @@ add_library( # Sets the name of the library. When it's built you can find it wit
             src/main/cpp/ObjectManager.cpp
             src/main/cpp/V8GlobalHelpers.cpp
             src/main/cpp/MetadataTreeNode.cpp
+            src/main/cpp/console/Console.cpp
 
             # Inspector source (we build it because we've customized it a bit)
             src/main/cpp/v8_inspector/src/inspector/string-16.cc
