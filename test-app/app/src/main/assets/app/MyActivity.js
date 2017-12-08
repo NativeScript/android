@@ -29,8 +29,8 @@ var MyActivity = (function (_super) {
     MyActivity.prototype.onCreate = function (bundle) {
         _super.prototype.onCreate.call(this, bundle);
 
-    	require("./tests/testsWithContext").run(this);
-    	execute(); //run jasmine
+//    	require("./tests/testsWithContext").run(this);
+//    	execute(); //run jasmine
 
     	var layout = new android.widget.LinearLayout(this);
     	layout.setOrientation(1);
@@ -53,8 +53,18 @@ var MyActivity = (function (_super) {
 
     	button.setOnClickListener(new android.view.View.OnClickListener("AppClickListener", {
     		onClick:  function() {
+    		console.time();
+    		console.log("Ha 512312312");
+    		var f = function() { console.log(5) };
+    		console.log("5", 5, 12, "asdasdasd", { a: 5, b: 234 }, f);
     			button.setBackgroundColor(colors[taps % colors.length]);
     			taps++;
+
+    			console.timeEnd();
+    			console.dir(button);
+    			console.dir(f);
+    			console.dir(5);
+    			console.dir(layout);
     		}}));
     };
     MyActivity = __decorate([
