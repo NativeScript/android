@@ -8,3 +8,13 @@ include ':app',
 project(':static-binding-generator').projectDir = new File('build-tools/static-binding-generator')
 project(':android-metadata-generator').projectDir = new File('build-tools/android-metadata-generator')
 project(':dts-generator').projectDir = new File('build-tools/android-dts-generator/dts-generator')
+
+def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
+exec {
+    workingDir "$rootDir/build-tools/jsparser"
+    if (isWinOs) {
+        commandLine "cmd", "/c", "npm", "install"
+    } else {
+        commandLine "npm", "install"
+    }
+}
