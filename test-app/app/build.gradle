@@ -146,6 +146,19 @@ dependencies {
     compile "com.android.support:support-v4:$supportVer"
     compile "com.android.support:appcompat-v7:$supportVer"
     debugCompile "com.android.support:design:$supportVer"
+
+    def sbjProjectExists = !findProject(':static-binding-generator').is(null)
+    if(sbjProjectExists) {
+        compile project(':static-binding-generator')
+    }
+    def mdgProjectExists = !findProject(':android-metadata-generator').is(null)
+    if(mdgProjectExists) {
+        compile project(':android-metadata-generator')
+    }
+    def dtgProjectExists = !findProject(':dts-generator').is(null)
+    if(dtgProjectExists) {
+        compile project(':dts-generator')
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
