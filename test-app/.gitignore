@@ -16,3 +16,10 @@ app/app.iml
 .idea/gradle.xml
 .idea/dictionaries
 .idea/libraries
+
+
+treeNodeStream.dat
+treeStringsStream.dat
+treeValueStream.dat
+NativeScriptActivity.java
+NativeScriptApplication.java
