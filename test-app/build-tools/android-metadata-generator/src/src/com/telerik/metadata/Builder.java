@@ -28,7 +28,7 @@ public class Builder {
 
     private static MethodNameComparator methodNameComparator = new MethodNameComparator();
 
-    public static TreeNode build(String[] paths) throws Exception {
+    public static TreeNode build(List<String> paths) throws Exception {
         for (String path : paths) {
             File file = new File(path);
             if (file.exists()) {
