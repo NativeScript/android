@@ -1,22 +1,21 @@
-apply plugin: 'java'
+import java.nio.file.Files
 
-buildscript {
-    repositories {
-        jcenter()
-    }
-}
-
-allprojects {
-    repositories {
-        jcenter()
-    }
-}
+apply plugin: 'java-library'
 
 dependencies {
     compile 'org.apache.bcel:bcel:5.2'
-    compile fileTree(dir: 'libs', include: ['*.jar'])
+    compile group: 'org.json', name: 'json', version: '20090211'
+    compile 'commons-io:commons-io:2.5'
     testCompile 'junit:junit:4.+'
-    testCompile 'commons-io:commons-io:2.5'
+}
+
+sourceCompatibility = "1.7"
+targetCompatibility = "1.7"
+
+task copyJarToBuildTools (type: Copy) {
+    inputs.dir("$projectDir/build/libs/static-binding-generator.jar")
+    from "$projectDir/build/libs/static-binding-generator.jar"
+    into "$projectDir/../"
 }
 
 jar {
@@ -24,7 +23,6 @@ jar {
         attributes("Manifest-Version": "1.0",
                 "Main-Class": "org.nativescript.staticbindinggenerator.Main")
     }
-
     from {
         configurations.runtime.collect {
             it.isDirectory() ? it : zipTree(it)
@@ -35,3 +33,5 @@ jar {
         }
     }
 }
+
+jar.finalizedBy(copyJarToBuildTools)
