@@ -4,3 +4,7 @@
 [submodule "test-app/app/src/main/assets/app/shared"]
 	path = test-app/app/src/main/assets/app/shared
 	url = https://github.com/NativeScript/common-runtime-tests-app.git
+[submodule "test-app/build-tools/android-dts-generator"]
+	path = test-app/build-tools/android-dts-generator
+	url = https://github.com/NativeScript/android-dts-generator.git
+	branch = master
