@@ -188,7 +188,7 @@ task copyFilesToProjectTemeplate {
         }
         copy {
             from "$BUILD_TOOLS_PATH/jsparser"
-            exclude "logs", "node_modules", "out", "package.json"
+            exclude "logs", "node_modules", "out", "package.json", "tests"
             into "$DIST_FRAMEWORK_PATH/build-tools/jsparser"
         }
         copy {
