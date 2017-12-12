@@ -23,3 +23,4 @@ treeStringsStream.dat
 treeValueStream.dat
 NativeScriptActivity.java
 NativeScriptApplication.java
+**/com/tns/gen
