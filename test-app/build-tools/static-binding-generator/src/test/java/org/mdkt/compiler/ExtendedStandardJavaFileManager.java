@@ -28,12 +28,12 @@ public class ExtendedStandardJavaFileManager extends ForwardingJavaFileManager<J
     }
 
     @Override
-    public JavaFileObject getJavaFileForOutput(JavaFileManager.Location location, String className, JavaFileObject.Kind kind, FileObject sibling) throws IOException {
+    public JavaFileObject getJavaFileForOutput(Location location, String className, JavaFileObject.Kind kind, FileObject sibling) throws IOException {
         return compiledCode;
     }
 
     @Override
-    public ClassLoader getClassLoader(JavaFileManager.Location location) {
+    public ClassLoader getClassLoader(Location location) {
         return cl;
     }
 }

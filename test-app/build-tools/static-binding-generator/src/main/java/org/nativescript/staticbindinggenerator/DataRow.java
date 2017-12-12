@@ -47,7 +47,8 @@ public class DataRow {
     private void parse(String row) {
         String[] data = row.split(DELIMITER, -1);
         if (data.length != ELEMENT_NUMBER) {
-            throw new IllegalArgumentException("Wrong number of elements " + data.length + " (Expected " + ELEMENT_NUMBER +")\n" + row);
+//            throw new IllegalArgumentException("Wrong number of elements " + data.length + " (Expected " + ELEMENT_NUMBER +")\n" + row);
+            return;
         }
 
         baseClassname = data[0];

@@ -1,4 +1,4 @@
-package com.ig;
+package org.nativescript.staticbindinggenerator;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -9,27 +9,24 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.Enumeration;
+import java.util.List;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
 public class GetInterfaceNames {
     private static String currentDir;
 
-    public static void main(String[] args)
+    public static void generateInterfaceFile(List<DataRow> rows)
     throws IOException, ClassNotFoundException {
         currentDir = System.getProperty("user.dir");
-        String outputFileName = "interfaces-names.txt";
-
-        if ((args != null) &&
-                (args.length < 1)) {
-            throw new IllegalArgumentException("There are no parameters passed!");
-        }
+        String outputFileName = Main.SBG_INTERFACE_NAMES;
 
         PrintWriter out = ensureOutputFile(outputFileName);
 
-        for (String pathToJar : args) {
-            if (pathToJar.endsWith(".jar")) {
-                generateInterfaceNames(pathToJar, out);
+        for (DataRow dr : rows) {
+            String pathToDependency = dr.getRow();
+            if (pathToDependency .endsWith(".jar")) {
+                generateInterfaceNames(pathToDependency, out);
             }
         }
 
@@ -69,7 +66,7 @@ public class GetInterfaceNames {
         jarFile.close();
     }
 
-    private static PrintWriter ensureOutputFile(String outputFileName) throws IOException {
+    public static PrintWriter ensureOutputFile(String outputFileName) throws IOException {
         File checkFile = new File(currentDir, outputFileName);
         if (checkFile.exists()) {
             checkFile.delete();

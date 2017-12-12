@@ -11,12 +11,10 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Queue;
 import java.util.Set;
 import java.util.jar.JarInputStream;
@@ -27,8 +25,6 @@ import org.apache.bcel.classfile.JavaClass;
 import org.apache.bcel.classfile.Method;
 import org.apache.bcel.generic.Type;
 
-import javafx.util.Pair;
-
 public class Generator {
     private static final String JAVA_EXT = ".java";
 
@@ -36,15 +32,15 @@ public class Generator {
 
     private static final String DEFAULT_PACKAGE_NAME = "com.tns.gen";
 
-    private final String outputDir;
-    private final String[] libs;
+    private final File outputDir;
+    private final List<DataRow>  libs;
     private final Map<String, JavaClass> classes;
 
-    public Generator(String outputDir, String[] libs) throws IOException {
+    public Generator(File outputDir, List<DataRow> libs) throws IOException {
         this(outputDir, libs, false);
     }
 
-    public Generator(String outputDir, String[] libs, boolean throwOnError) throws IOException {
+    public Generator(File outputDir, List<DataRow> libs, boolean throwOnError) throws IOException {
         this.outputDir = outputDir;
         this.libs = libs;
         this.classes = readClasses(libs, throwOnError);
@@ -125,7 +121,7 @@ public class Generator {
         return generateBinding(dataRow, new HashSet());
     }
 
-    private List<DataRow> getRows(String filename) throws IOException {
+    public static List<DataRow> getRows(String filename) throws IOException {
         List<DataRow> rows = new ArrayList<DataRow>();
         BufferedReader br = null;
         try {
@@ -135,6 +131,8 @@ public class Generator {
                 DataRow row = new DataRow(line);
                 rows.add(row);
             }
+        } catch (Exception e) {
+            e.printStackTrace();
         } finally {
             if (br != null) {
                 br.close();
@@ -236,10 +234,11 @@ public class Generator {
         return api;
     }
 
-    private Map<String, JavaClass> readClasses(String[] libs, boolean throwOnError) throws FileNotFoundException, IOException {
+    private Map<String, JavaClass> readClasses(List<DataRow> libs, boolean throwOnError) throws FileNotFoundException, IOException {
         Map<String, JavaClass> map = new HashMap<String, JavaClass>();
         if (libs != null) {
-            for (String lib : libs) {
+            for (DataRow dr : libs) {
+                String lib = dr.getRow();
                 File f = new File(lib);
                 Map<String, JavaClass> classes = f.isFile() ? readJar(lib, throwOnError) : readDir(lib, throwOnError);
                 map.putAll(classes);

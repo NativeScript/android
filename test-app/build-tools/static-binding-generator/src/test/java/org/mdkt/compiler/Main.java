@@ -1,4 +1,4 @@
-package java.org.mdkt.compiler;
+package org.mdkt.compiler;
 
 /**
  * Created by slavchev on 6/17/2016.

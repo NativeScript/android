@@ -44,8 +44,9 @@ public class GeneratorTest {
         List<String> lines = Utils.getDataRowsFromResource("datarow-named-extend.txt");
         DataRow dataRow = new DataRow(lines.get(0));
 
-        String outputDir = null;
-        String[] libs = {runtimePath};
+        File outputDir = null;
+        List<DataRow> libs = new ArrayList<>();
+        libs.add(new DataRow(runtimePath));
         Generator generator = new Generator(outputDir, libs);
         Binding binding = generator.generateBinding(dataRow);
 
@@ -71,8 +72,10 @@ public class GeneratorTest {
         List<String> lines = IOUtils.readLines(new StringReader(s));
         DataRow dataRow = new DataRow(lines.get(0));
 
-        String outputDir = null;
-        String[] libs = {rt.getAbsolutePath(), f.getAbsolutePath()};
+        File outputDir = null;
+        List<DataRow> libs = new ArrayList<>();
+        libs.add(new DataRow(rt.getAbsolutePath()));
+        libs.add(new DataRow(f.getAbsolutePath()));
         Generator generator = new Generator(outputDir, libs);
         Binding binding = generator.generateBinding(dataRow);
 
@@ -91,8 +94,9 @@ public class GeneratorTest {
         List<String> lines = Utils.getDataRowsFromResource("datarow-class-extends-interfaces.txt");
         DataRow dataRow = new DataRow(lines.get(0));
 
-        String outputDir = null;
-        String[] libs = {runtimePath};
+        File outputDir = null;
+        List<DataRow> libs = new ArrayList<>();
+        libs.add(new DataRow(runtimePath));
         Generator generator = new Generator(outputDir, libs);
         Binding binding = generator.generateBinding(dataRow);
 
@@ -116,8 +120,10 @@ public class GeneratorTest {
 
         System.out.println(dataRowString);
 
-        String outputDir = null;
-        String[] libs = {runtimePath, f.getAbsolutePath()};
+        File outputDir = null;
+        List<DataRow> libs = new ArrayList<>();
+        libs.add(new DataRow(runtimePath));
+        libs.add(new DataRow(f.getAbsolutePath()));
         Generator generator = new Generator(outputDir, libs);
         Binding binding = generator.generateBinding(dataRow);
 
@@ -141,8 +147,10 @@ public class GeneratorTest {
 
         System.out.println(dataRowString);
 
-        String outputDir = null;
-        String[] libs = {runtimePath, f.getAbsolutePath()};
+        File outputDir = null;
+        List<DataRow> libs = new ArrayList<>();
+        libs.add(new DataRow(runtimePath));
+        libs.add(new DataRow(f.getAbsolutePath()));
         Generator generator = new Generator(outputDir, libs);
         Binding binding = generator.generateBinding(dataRow);
 
