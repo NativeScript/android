@@ -10,8 +10,6 @@ apply plugin: "java"
 sourceCompatibility = 1.6
 targetCompatibility = 1.6
 
-def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
-
 buildscript {
     repositories {
         jcenter()
@@ -28,37 +26,13 @@ sourceSets {
             srcDir 'src/src'
         }
     }
-	main.output.classesDir = "$rootDir/dist/classes"
 }
+
+compileJava.outputs.dir("$rootDir/dist/classes")
 
 dependencies {
     compile files("./src/libs/bcel-5.2.jar")
     compile files("./src/libs/dx.jar")
-}
-
-task makeDistDir {
-	def distDir = new File("$rootDir/dist")
-	distDir.mkdirs()
-}
-
-task cleanDist (type: Delete) {
-	delete "$rootDir/dist"
-}
-
-task cleanDistForJar (type: Delete) {
-	delete "$rootDir/dist"
-}
-
-task cleanBuildDir (type: Delete){
-	delete "$rootDir/build"
-}
-
-task cleanBuildDirForJar (type: Delete){
-	delete "$rootDir/build"
-}
-
-task cleanBin (type: Delete) {
-	delete "$rootDir/src/bin"
 }
 
 task copyNecessaryFiles {
@@ -72,17 +46,6 @@ task copyNecessaryFiles {
 			from "$rootDir/package.json"
 			into "$rootDir/dist"
 		}	
-	}
-}
-
-task packMetadataGenerator (type: Exec) {
-	workingDir "$rootDir/dist"
-	
-	if(isWinOs) {
-		commandLine "cmd", "/c", "npm", "pack"
-	}
-	else {
-		commandLine "npm", "pack"
 	}
 }
 
@@ -104,28 +67,12 @@ jar {
     }
 }
 
-task copyJarToDist (type: Copy) {
-	from "$rootDir/build/libs/android-metadata-generator.jar"
-	into "$rootDir/dist"
+task copyJarToBuildTools (type: Copy) {
+	from "$projectDir/build/libs/android-metadata-generator.jar"
+	into "$projectDir/../"
 }
 
-makeDistDir.dependsOn(cleanDist)
-cleanBin.dependsOn(makeDistDir)
-compileJava.dependsOn(cleanBin)
-cleanBuildDir.dependsOn(compileJava)
-copyNecessaryFiles.dependsOn(cleanBuildDir)
-packMetadataGenerator.dependsOn(copyNecessaryFiles)
+jar.finalizedBy(copyJarToBuildTools)
 
-task packmg {
-	dependsOn packMetadataGenerator
-}
-
-cleanDistForJar.dependsOn(jar)
-copyJarToDist.dependsOn(cleanDistForJar)
-cleanBuildDirForJar.dependsOn(copyJarToDist)
-
-task jarmg {
-	dependsOn cleanBuildDirForJar
-}
 
 
