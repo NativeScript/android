@@ -31,7 +31,7 @@ class V8LogAgentImpl : public protocol::Log::Backend {
         void startViolationsReport(ErrorString*, std::unique_ptr<protocol::Array<protocol::Log::ViolationSetting>> in_config) override;
         void stopViolationsReport(ErrorString*) override;
 
-        static void EntryAdded(std::string text, std::string verbosityLevel, std::string url, int lineNumber);
+        static void EntryAdded(const std::string& text, std::string verbosityLevel, std::string url, int lineNumber);
 
         static V8LogAgentImpl* Instance;
         protocol::Log::Frontend m_frontend;

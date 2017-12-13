@@ -199,46 +199,6 @@ JsV8InspectorClient* JsV8InspectorClient::GetInstance() {
     return instance;
 }
 
-
-void JsV8InspectorClient::logMessageToDevToolsConsole(const v8::FunctionCallbackInfo<v8::Value>& args) {
-    if ((instance == nullptr) || (instance->connection == nullptr)) {
-        return;
-    }
-
-    try {
-        if ((args.Length() > 0) && args[0]->IsString()) {
-            std::string message = ArgConverter::ConvertToString(args[0]->ToString());
-
-            std::string level = "info";
-            if (args.Length() > 1  && args[1]->IsString()) {
-                auto levelArg = ArgConverter::ConvertToString(args[1]->ToString());
-                if (levelArg.compare("log") == 0) {
-                    level = "info";
-                } else {
-                    level = levelArg;
-                }
-            }
-
-            auto isolate = args.GetIsolate();
-            auto stack = StackTrace::CurrentStackTrace(isolate, 5, StackTrace::StackTraceOptions::kDetailed);
-
-            auto frame = stack->GetFrame(2);
-
-            v8_inspector::V8LogAgentImpl::EntryAdded(message, level, ArgConverter::ConvertToString(frame->GetScriptNameOrSourceURL()), frame->GetLineNumber());
-        }
-    } catch (NativeScriptException& e) {
-        e.ReThrowToV8();
-    } catch (std::exception e) {
-        stringstream ss;
-        ss << "Error: c++ exception: " << e.what() << endl;
-        NativeScriptException nsEx(ss.str());
-        nsEx.ReThrowToV8();
-    } catch (...) {
-        NativeScriptException nsEx(std::string("Error: c++ exception!"));
-        nsEx.ReThrowToV8();
-    }
-}
-
 void MessageHandler(v8::Local<v8::Message> message, v8::Local<v8::Value> exception) {
 //    v8::Isolate *isolate = v8::Isolate::GetCurrent();
 //    v8::Local<v8::Context> context = isolate->GetEnteredContext();

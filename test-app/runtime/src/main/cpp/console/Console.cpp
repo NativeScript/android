@@ -10,6 +10,8 @@
 #include <iomanip>
 #include <sstream>
 #include <V8GlobalHelpers.h>
+#include <v8_inspector/src/inspector/v8-log-agent-impl.h>
+#include <JsV8InspectorClient.h>
 #include "Console.h"
 
 namespace tns {
@@ -37,6 +39,37 @@ v8::Local<v8::Object> Console::createConsole(v8::Local<v8::Context> context, con
     bindFunctionProperty(context, console, "timeEnd", timeEndCallback);
 
     return console;
+}
+
+void Console::sendToADBLogcat(const std::string& message, android_LogPriority logPriority) {
+    // split strings into chunks of 4000 characters
+    // __android_log_write can't send more than 4000 to the stdout at a time
+
+    auto messageLength = message.length();
+    int maxStringLength = 4000;
+
+    if (messageLength < maxStringLength) {
+        __android_log_write(logPriority, Console::LOG_TAG, message.c_str());
+    } else {
+        for (int i = 0; i < messageLength; i += maxStringLength) {
+            auto messagePart = message.substr(i, maxStringLength);
+
+            __android_log_write(logPriority, Console::LOG_TAG, messagePart.c_str());
+        }
+    }
+}
+
+void Console::sendToDevToolsFrontEnd(v8::Isolate* isolate, const std::string& message, const std::string& logLevel) {
+    if (!JsV8InspectorClient::inspectorIsConnected()) {
+        return;
+    }
+
+    auto stack = v8::StackTrace::CurrentStackTrace(isolate, 1, v8::StackTrace::StackTraceOptions::kDetailed);
+
+    auto frame = stack->GetFrame(0);
+
+    // will be no-op in non-debuggable builds
+    v8_inspector::V8LogAgentImpl::EntryAdded(message, logLevel, ArgConverter::ConvertToString(frame->GetScriptNameOrSourceURL()), frame->GetLineNumber());
 }
 
 const std::string& buildLogString(const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -71,24 +104,6 @@ const std::string& buildLogString(const v8::FunctionCallbackInfo<v8::Value>& inf
     return ss.str();
 }
 
-void Console::sendToADBLogcat(const std::string& message, android_LogPriority logPriority) {
-    // split strings into chunks of 4000 characters
-    // __android_log_write can't send more than 4000 to the stdout at a time
-
-    auto messageLength = message.length();
-    int maxStringLength = 4000;
-
-    if (messageLength < maxStringLength) {
-        __android_log_write(logPriority, Console::LOG_TAG, message.c_str());
-    } else {
-        for (int i = 0; i < messageLength; i += maxStringLength) {
-            auto messagePart = message.substr(i, maxStringLength);
-
-            __android_log_write(logPriority, Console::LOG_TAG, messagePart.c_str());
-        }
-    }
-}
-
 void Console::assertCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
     auto isolate = info.GetIsolate();
 
@@ -111,6 +126,7 @@ void Console::assertCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 
         std::string log = ss.str();
         sendToADBLogcat(log, ANDROID_LOG_ERROR);
+        sendToDevToolsFrontEnd(isolate, log, "error");
     }
 }
 
@@ -118,24 +134,28 @@ void Console::errorCallback(const v8::FunctionCallbackInfo <v8::Value>& info) {
     std::string log = buildLogString(info);
 
     sendToADBLogcat(log, ANDROID_LOG_ERROR);
+    sendToDevToolsFrontEnd(info.GetIsolate(), log, "error");
 }
 
 void Console::infoCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
     std::string log = buildLogString(info);
 
     sendToADBLogcat(log, ANDROID_LOG_INFO);
+    sendToDevToolsFrontEnd(info.GetIsolate(), log, "info");
 }
 
 void Console::logCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
     std::string log = buildLogString(info);
 
     sendToADBLogcat(log, ANDROID_LOG_INFO);
+    sendToDevToolsFrontEnd(info.GetIsolate(), log, "info");
 }
 
 void Console::warnCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
     std::string log = buildLogString(info);
 
     sendToADBLogcat(log, ANDROID_LOG_WARN);
+    sendToDevToolsFrontEnd(info.GetIsolate(), log, "warning");
 }
 
 void Console::dirCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -183,6 +203,7 @@ void Console::dirCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
     std::string log = ss.str();
 
     sendToADBLogcat(log, ANDROID_LOG_INFO);
+    sendToDevToolsFrontEnd(isolate, log, "info");
 }
 
 const std::string& buildStacktraceFrameLocationPart(v8::Local<v8::StackFrame> frame) {
@@ -209,10 +230,17 @@ const std::string& buildStacktraceFrameMessage(v8::Local<v8::StackFrame> frame) 
 
 void Console::traceCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
     auto isolate = info.GetIsolate();
+    std::stringstream ss;
 
-    std::string log = buildLogString(info);
+    std::string logString = buildLogString(info);
+    ss << logString;
 
-    log.append("\nTrace\n");
+    // append a new line
+    if (logString.length()) {
+        ss << std::endl;
+    }
+
+    ss << "Trace" << std::endl;
 
     v8::HandleScope scope(isolate);
 
@@ -220,16 +248,15 @@ void Console::traceCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 
     auto framesCount = stack->GetFrameCount();
 
-    std::stringstream ss;
-
     for (int i = 0; i < framesCount; i++) {
         auto frame = stack->GetFrame(i);
 
         ss << buildStacktraceFrameMessage(frame) << std::endl;
     }
 
-    log.append(ss.str());
+    std::string log = ss.str();
     __android_log_write(ANDROID_LOG_ERROR, LOG_TAG, log.c_str());
+    sendToDevToolsFrontEnd(isolate, log, "error");
 }
 
 void Console::timeCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -279,6 +306,7 @@ void Console::timeEndCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
         std::string warning = std::string("No such label '" + label + "' for console.timeEnd()");
 
         __android_log_write(ANDROID_LOG_WARN, LOG_TAG, warning.c_str());
+        sendToDevToolsFrontEnd(isolate, warning, "warning");
 
         return;
     }
@@ -296,6 +324,7 @@ void Console::timeEndCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
     std::string log = ss.str();
 
     __android_log_write(ANDROID_LOG_INFO, LOG_TAG, log.c_str());
+    sendToDevToolsFrontEnd(isolate, log, "info");
 }
 
 const char* Console::LOG_TAG = "JS";

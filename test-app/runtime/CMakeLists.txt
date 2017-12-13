@@ -78,12 +78,14 @@ add_library( # Sets the name of the library. When it's built you can find it wit
             # Inspector source (we build it because we've customized it a bit)
             src/main/cpp/v8_inspector/src/inspector/string-16.cc
             src/main/cpp/v8_inspector/src/inspector/string-util.cc
+            src/main/cpp/v8_inspector/src/inspector/v8-console-message.cc
             src/main/cpp/v8_inspector/src/inspector/v8-profiler-agent-impl.cc
             src/main/cpp/v8_inspector/src/inspector/v8-debugger-script.cc
             src/main/cpp/v8_inspector/src/inspector/v8-function-call.cc
             src/main/cpp/v8_inspector/src/inspector/v8-css-agent-impl.cpp
             src/main/cpp/v8_inspector/src/inspector/v8-page-agent-impl.cpp
             src/main/cpp/v8_inspector/src/inspector/v8-regex.cc
+            src/main/cpp/v8_inspector/src/inspector/v8-console-agent-impl.cc
             src/main/cpp/v8_inspector/src/inspector/v8-network-agent-impl.cpp
             src/main/cpp/v8_inspector/src/inspector/v8-overlay-agent-impl.cpp
             src/main/cpp/v8_inspector/src/inspector/remote-object-id.cc
@@ -96,6 +98,7 @@ add_library( # Sets the name of the library. When it's built you can find it wit
             src/main/cpp/v8_inspector/src/inspector/v8-schema-agent-impl.cc
             src/main/cpp/v8_inspector/src/inspector/java-script-call-frame.cc
             src/main/cpp/v8_inspector/src/inspector/v8-injected-script-host.cc
+            src/main/cpp/v8_inspector/src/inspector/v8-console.cc
             src/main/cpp/v8_inspector/src/inspector/v8-stack-trace-impl.cc
             src/main/cpp/v8_inspector/src/inspector/inspected-context.cc
             src/main/cpp/v8_inspector/src/inspector/v8-heap-profiler-agent-impl.cc
