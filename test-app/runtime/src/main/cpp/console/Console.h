@@ -46,6 +46,7 @@ class Console {
         }
 
         static void sendToADBLogcat(const std::string& log, android_LogPriority logPriority);
+        static void sendToDevToolsFrontEnd(v8::Isolate* isolate, const std::string& message, const std::string& logLevel);
 };
 
 }

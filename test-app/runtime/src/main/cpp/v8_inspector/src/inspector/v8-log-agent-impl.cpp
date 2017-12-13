@@ -59,7 +59,7 @@ void V8LogAgentImpl::clear(ErrorString*) {
 
 }
 
-void V8LogAgentImpl::EntryAdded(std::string text, std::string verbosityLevel, std::string url, int lineNumber) {
+void V8LogAgentImpl::EntryAdded(const std::string& text, std::string verbosityLevel, std::string url, int lineNumber) {
     auto logAgentInstance = V8LogAgentImpl::Instance;
 
     if (!logAgentInstance) {
