@@ -77,6 +77,15 @@ def applyAppGradleConfiguration = { ->
     }
 }
 
+def applyPluginGradleConfigurations = { ->
+    nativescriptDependencies.each {dep ->
+        def includeGradlePath = "$rootDir/${dep.directory}/$PLATFORMS_ANDROID/include.gradle"
+        if(file(includeGradlePath).exists()) {
+            apply from: includeGradlePath
+        }
+    }
+}
+
 android {
     compileSdkVersion computeCompileSdkVersion()
     buildToolsVersion computeBuildToolsVersion()
@@ -116,6 +125,7 @@ android {
     }
 
     applyAppGradleConfiguration()
+    applyPluginGradleConfigurations()
 }
 
 def externalRuntimeExists = !findProject(':runtime').is(null)
