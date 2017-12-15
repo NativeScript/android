@@ -142,21 +142,19 @@ dependencies {
     if (project.hasProperty("supportVersion")) {
         supportVer = supportVersion
     }
-
     compile "com.android.support:support-v4:$supportVer"
     compile "com.android.support:appcompat-v7:$supportVer"
     debugCompile "com.android.support:design:$supportVer"
-
-    def sbjProjectExists = !findProject(':static-binding-generator').is(null)
-    if(sbjProjectExists) {
+    def sbgProjectExists = !findProject(':static-binding-generator').is(null)
+    if (sbgProjectExists) {
         provided project(':static-binding-generator')
     }
     def mdgProjectExists = !findProject(':android-metadata-generator').is(null)
-    if(mdgProjectExists) {
+    if (mdgProjectExists) {
         provided project(':android-metadata-generator')
     }
-    def dtgProjectExists = !findProject(':dts-generator').is(null)
-    if(dtgProjectExists) {
+    def dtsgProjectExists = !findProject(':dts-generator').is(null)
+    if (dtsgProjectExists) {
         provided project(':dts-generator')
     }
 }
@@ -210,7 +208,7 @@ tasks.whenTaskAdded({ org.gradle.api.DefaultTask currentTask ->
         currentTask.finalizedBy(ensureMetadataOutDir)
         ensureMetadataOutDir.finalizedBy(buildMetadata)
     }
-    if (currentTask.equals("assembleDebug") || currentTask.equals("assembleRelease")) {
+    if (currentTask =~ /assemble.+Debug/ || currentTask =~ /assemble.+Release/) {
         currentTask.finalizedBy("validateAppIdMatch")
     }
 })
