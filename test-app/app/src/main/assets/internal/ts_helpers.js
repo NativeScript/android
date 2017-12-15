@@ -119,9 +119,10 @@
 	    }
 	}
 	
-	global.__native = __native;
-	global.__extends = __extends;
-	global.__decorate = __decorate;
+	Object.defineProperty(global, "__native", { value: __native });
+	Object.defineProperty(global, "__extends", { value: __extends });
+	Object.defineProperty(global, "__decorate", { value: __decorate });
+
 	global.JavaProxy = JavaProxy;
 	global.Interfaces = Interfaces;
 })()
