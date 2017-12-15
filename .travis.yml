@@ -10,22 +10,22 @@ env:
 
 matrix:
   include:
-    - stage: "Static Binding Generator Parser Tests"
-      language: node_js 
-      node_js: "6"
-      git:
-        submodules: false
-      script:
-        - cd android-static-binding-generator
-        - npm install && node run-tests
-        - cd ..
-    - stage: "Static Binding Generator Class Generator Tests"
-      language: android
-      jdk: oraclejdk8
-      git:
-        submodules: false
-      script:
-        - "android-static-binding-generator/project/staticbindinggenerator/gradlew test --project-dir android-static-binding-generator/project/staticbindinggenerator/"    
+    # - stage: "Static Binding Generator Parser Tests"
+    #   language: node_js 
+    #   node_js: "6"
+    #   git:
+    #     submodules: false
+    #   script:
+    #     - cd android-static-binding-generator
+    #     - npm install && node run-tests
+    #     - cd ..
+    # - stage: "Static Binding Generator Class Generator Tests"
+    #   language: android
+    #   jdk: oraclejdk8
+    #   git:
+    #     submodules: false
+    #   script:
+    #     - "android-static-binding-generator/project/staticbindinggenerator/gradlew test --project-dir android-static-binding-generator/project/staticbindinggenerator/"
     - stage: "Build and Tests"
       sudo: true
       language: android
