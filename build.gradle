@@ -287,6 +287,16 @@ task createPackage {
     println "Creating NativeScript Android Package"
 }
 
+task runSbgTests (type: Exec) {
+    doFirst {
+        workingDir "$TEST_APP_PATH"
+        if (isWinOs) {
+            commandLine "cmd", "/c", "gradlew", ":static-binding-generator:test"
+        } else {
+            commandLine "./gradlew", ":static-binding-generator:test"
+        }
+    }
+}
 
 task runTests (type: Exec) {
     doFirst {
@@ -298,3 +308,5 @@ task runTests (type: Exec) {
         }
     }
 }
+
+runTests.dependsOn(runSbgTests)
