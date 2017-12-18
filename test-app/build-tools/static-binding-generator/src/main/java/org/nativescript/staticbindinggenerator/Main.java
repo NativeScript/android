@@ -36,10 +36,13 @@ public class Main {
         GetInterfaceNames.generateInterfaceFile(rows);
 
         //run static js analysis
+        String inputBindingFilename = Paths.get(System.getProperty("user.dir"), SBG_BINDINGS_NAME).toString();
+        try {
+            new File(inputBindingFilename).delete();
+        } catch (Exception e) {}
         runJsParser(inputDir);
 
         // generate java bindings
-        String inputBindingFilename = Paths.get(System.getProperty("user.dir"), SBG_BINDINGS_NAME).toString();
         new Generator(outputDir, rows).writeBindings(inputBindingFilename);
     }
 
@@ -65,7 +68,7 @@ public class Main {
     }
 
     private static void runJsParser(File inputDir) throws IOException {
-        String parserPath = Paths.get(System.getProperty("user.dir"),"jsparser", "js_parser.js").toString();
+        String parserPath = Paths.get(System.getProperty("user.dir"), "jsparser", "js_parser.js").toString();
         String inputPath = inputDir.getAbsolutePath();
         String bindingsFilePath = Paths.get(System.getProperty("user.dir"), SBG_BINDINGS_NAME).toString();
         String interfaceNamesFilePath = Paths.get(System.getProperty("user.dir"), SBG_INTERFACE_NAMES).toString();
