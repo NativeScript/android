@@ -33,13 +33,13 @@ class V8LogAgentImpl : public protocol::Log::Backend {
 
         static void EntryAdded(const std::string& text, std::string verbosityLevel, std::string url, int lineNumber);
 
-        static V8LogAgentImpl* Instance;
-        protocol::Log::Frontend m_frontend;
-
     private:
         V8InspectorSessionImpl* m_session;
         protocol::DictionaryValue* m_state;
+        protocol::Log::Frontend m_frontend;
         bool m_enabled;
+
+        static V8LogAgentImpl* Instance;
 };
 
 }
