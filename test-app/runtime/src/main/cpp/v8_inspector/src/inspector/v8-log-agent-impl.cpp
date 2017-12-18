@@ -46,17 +46,17 @@ void V8LogAgentImpl::disable(ErrorString*) {
     m_enabled = false;
 }
 
-void V8LogAgentImpl::startViolationsReport(ErrorString*,
+void V8LogAgentImpl::startViolationsReport(ErrorString* errorString,
         std::unique_ptr<protocol::Array<protocol::Log::ViolationSetting>> in_config) {
-
+    *errorString = "startViolationsReport not implemented.";
 }
 
-void V8LogAgentImpl::stopViolationsReport(ErrorString*) {
-
+void V8LogAgentImpl::stopViolationsReport(ErrorString* errorString) {
+    *errorString = "stopViolationsReport not implemented.";
 }
 
-void V8LogAgentImpl::clear(ErrorString*) {
-
+void V8LogAgentImpl::clear(ErrorString* errorString) {
+    *errorString = "clear not implemented.";
 }
 
 void V8LogAgentImpl::EntryAdded(const std::string& text, std::string verbosityLevel, std::string url, int lineNumber) {

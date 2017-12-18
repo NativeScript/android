@@ -72,7 +72,7 @@ void Console::sendToDevToolsFrontEnd(v8::Isolate* isolate, const std::string& me
     v8_inspector::V8LogAgentImpl::EntryAdded(message, logLevel, ArgConverter::ConvertToString(frame->GetScriptNameOrSourceURL()), frame->GetLineNumber());
 }
 
-const std::string& buildLogString(const v8::FunctionCallbackInfo<v8::Value>& info) {
+const std::string buildLogString(const v8::FunctionCallbackInfo<v8::Value>& info) {
     auto isolate = info.GetIsolate();
 
     v8::HandleScope scope(isolate);
@@ -99,9 +99,13 @@ const std::string& buildLogString(const v8::FunctionCallbackInfo<v8::Value>& inf
 
             ss << ArgConverter::ConvertToString(argString);
         }
+    } else {
+        ss << std::endl;
     }
 
-    return ss.str();
+    std::string stringResult = ss.str();
+
+    return stringResult;
 }
 
 void Console::assertCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -111,20 +115,20 @@ void Console::assertCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
     auto expressionPasses = argLen && info[0]->BooleanValue();
 
     if (!expressionPasses) {
-        std::stringstream ss;
+        std::stringstream assertionError;
 
-        ss << "Assertion failed: ";
+        assertionError << "Assertion failed: ";
 
         if (argLen > 1) {
             v8::Local<v8::String> argString;
             info[1]->ToDetailString(isolate->GetCurrentContext()).ToLocal(&argString);
 
-            ss << ArgConverter::ConvertToString(argString);
+            assertionError << ArgConverter::ConvertToString(argString);
         } else {
-            ss << "console.assert";
+            assertionError << "console.assert";
         }
 
-        std::string log = ss.str();
+        std::string log = assertionError.str();
         sendToADBLogcat(log, ANDROID_LOG_ERROR);
         sendToDevToolsFrontEnd(isolate, log, "error");
     }
@@ -177,12 +181,12 @@ void Console::dirCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 
             auto propertiesLen = propNames->Length();
             for (int i = 0; i < propertiesLen; i++) {
-                auto propName = propNames->Get(context, i).ToLocalChecked();
-                auto property = argObject->Get(context, propName).ToLocalChecked();
+                auto propertyName = propNames->Get(context, i).ToLocalChecked();
+                auto propertyValue = argObject->Get(context, propertyName).ToLocalChecked();
 
-                auto propIsFunction = property->IsFunction();
+                auto propIsFunction = propertyValue->IsFunction();
 
-                ss << ArgConverter::ConvertToString(propName->ToString(isolate));
+                ss << ArgConverter::ConvertToString(propertyName->ToString(isolate));
 
                 if (propIsFunction) {
                     ss << "()";
@@ -206,26 +210,42 @@ void Console::dirCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
     sendToDevToolsFrontEnd(isolate, log, "info");
 }
 
-const std::string& buildStacktraceFrameLocationPart(v8::Local<v8::StackFrame> frame) {
+const std::string buildStacktraceFrameLocationPart(v8::Local<v8::StackFrame> frame) {
     std::stringstream ss;
 
-    ss << ArgConverter::ConvertToString(frame->GetScriptNameOrSourceURL()) << ":" << frame->GetLineNumber() << ":" << frame->GetColumn();
+    auto scriptName = frame->GetScriptNameOrSourceURL();
+    auto scriptNameConverted = ArgConverter::ConvertToString(scriptName);
+    if (scriptNameConverted.length() < 1) {
+        ss << "VM";
+    } else {
+        ss << scriptNameConverted << ":" << frame->GetLineNumber() << ":" << frame->GetColumn();
+    }
 
-    return ss.str();
+    std::string stringResult = ss.str();
+
+    return stringResult;
 }
 
-const std::string& buildStacktraceFrameMessage(v8::Local<v8::StackFrame> frame) {
+const std::string buildStacktraceFrameMessage(v8::Local<v8::StackFrame> frame) {
     std::stringstream ss;
 
+    auto functionName = frame->GetFunctionName();
+    auto functionNameConverted = ArgConverter::ConvertToString(functionName);
+    if (functionNameConverted.length() < 1) {
+        functionNameConverted = "<anonymous>";
+    }
+
     if (frame->IsConstructor()) {
-        ss << "at new " << ArgConverter::ConvertToString(frame->GetFunctionName()) << " (" << buildStacktraceFrameLocationPart(frame) << ")";
+        ss << "at new " << functionNameConverted << " (" << buildStacktraceFrameLocationPart(frame) << ")";
     } else if (frame->IsEval()) {
         ss << "eval at " << buildStacktraceFrameLocationPart(frame) << std::endl;
     } else {
-        ss << "at " << ArgConverter::ConvertToString(frame->GetFunctionName()) << " (" << buildStacktraceFrameLocationPart(frame) << ")";
+        ss << "at " << functionNameConverted << " (" << buildStacktraceFrameLocationPart(frame) << ")";
     }
 
-    return ss.str();
+    std::string stringResult = ss.str();
+
+    return stringResult;
 }
 
 void Console::traceCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -233,14 +253,14 @@ void Console::traceCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
     std::stringstream ss;
 
     std::string logString = buildLogString(info);
-    ss << logString;
 
-    // append a new line
-    if (logString.length()) {
-        ss << std::endl;
+    if (logString.compare("\n") == 0) {
+        ss << "Trace";
+    } else {
+        ss << "Trace: " << logString;
     }
 
-    ss << "Trace" << std::endl;
+    ss << std::endl;
 
     v8::HandleScope scope(isolate);
 
