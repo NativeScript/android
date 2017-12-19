@@ -309,4 +309,5 @@ task runTests (type: Exec) {
     }
 }
 
+runSbgTests.dependsOn(generateMdgJar)
 runTests.dependsOn(runSbgTests)
