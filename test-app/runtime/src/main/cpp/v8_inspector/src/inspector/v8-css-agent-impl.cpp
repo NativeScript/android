@@ -27,15 +27,14 @@ V8CSSAgentImpl::V8CSSAgentImpl(V8InspectorSessionImpl* session,
 
 V8CSSAgentImpl::~V8CSSAgentImpl() { }
 
-void V8CSSAgentImpl::enable(std::unique_ptr<protocol::CSS::Backend::EnableCallback> callback) {
+void V8CSSAgentImpl::enable(ErrorString* errorString) {
     if (m_enabled) {
-        callback->sendFailure("CSS Agent already enabled!");
+        *errorString = "CSS Agent already enabled!";
         return;
     }
 
     m_state->setBoolean(CSSAgentState::cssEnabled, true);
     m_enabled = true;
-    callback->sendSuccess();
 }
 
 void V8CSSAgentImpl::disable(ErrorString*) {
@@ -214,6 +213,91 @@ void V8CSSAgentImpl::getStyleSheetText(ErrorString*, const String& in_styleSheet
     *out_text = "";
 }
 
+void V8CSSAgentImpl::collectClassNames(ErrorString*, const String& in_styleSheetId,
+                                       std::unique_ptr<protocol::Array<String>>* out_classNames) {
+
+}
+
+void V8CSSAgentImpl::setStyleSheetText(ErrorString*, const String& in_styleSheetId,
+                                       const String& in_text, Maybe<String>* out_sourceMapURL) {
+
+}
+
+void V8CSSAgentImpl::setRuleSelector(ErrorString*, const String& in_styleSheetId,
+                                     std::unique_ptr<protocol::CSS::SourceRange> in_range,
+                                     const String& in_selector,
+                                     std::unique_ptr<protocol::CSS::SelectorList>* out_selectorList) {
+
+}
+
+void V8CSSAgentImpl::setKeyframeKey(ErrorString*, const String& in_styleSheetId,
+                                    std::unique_ptr<protocol::CSS::SourceRange> in_range,
+                                    const String& in_keyText,
+                                    std::unique_ptr<protocol::CSS::Value>* out_keyText) {
+
+}
+
+void V8CSSAgentImpl::setStyleTexts(ErrorString*,
+                                   std::unique_ptr<protocol::Array<protocol::CSS::StyleDeclarationEdit>> in_edits,
+                                   std::unique_ptr<protocol::Array<protocol::CSS::CSSStyle>>* out_styles) {
+
+}
+
+void V8CSSAgentImpl::setMediaText(ErrorString*, const String& in_styleSheetId,
+                                  std::unique_ptr<protocol::CSS::SourceRange> in_range,
+                                  const String& in_text,
+                                  std::unique_ptr<protocol::CSS::CSSMedia>* out_media) {
+
+}
+
+void V8CSSAgentImpl::createStyleSheet(ErrorString*, const String& in_frameId,
+                                      String* out_styleSheetId) {
+
+}
+
+void V8CSSAgentImpl::addRule(ErrorString*, const String& in_styleSheetId, const String& in_ruleText,
+                             std::unique_ptr<protocol::CSS::SourceRange> in_location,
+                             std::unique_ptr<protocol::CSS::CSSRule>* out_rule) {
+
+}
+
+void V8CSSAgentImpl::forcePseudoState(ErrorString*, int in_nodeId,
+                                      std::unique_ptr<protocol::Array<String>> in_forcedPseudoClasses) {
+
+}
+
+void V8CSSAgentImpl::getMediaQueries(ErrorString*,
+                                     std::unique_ptr<protocol::Array<protocol::CSS::CSSMedia>>* out_medias) {
+
+}
+
+void V8CSSAgentImpl::setEffectivePropertyValueForNode(ErrorString*, int in_nodeId,
+        const String& in_propertyName,
+        const String& in_value) {
+
+}
+
+void V8CSSAgentImpl::getBackgroundColors(ErrorString*, int in_nodeId,
+        Maybe<protocol::Array<String>>* out_backgroundColors,
+        Maybe<String>* out_computedFontSize,
+        Maybe<String>* out_computedFontWeight,
+        Maybe<String>* out_computedBodyFontSize) {
+
+}
+
+void V8CSSAgentImpl::startRuleUsageTracking(ErrorString*) {
+
+}
+
+void V8CSSAgentImpl::takeCoverageDelta(ErrorString*,
+                                       std::unique_ptr<protocol::Array<protocol::CSS::RuleUsage>>* out_coverage) {
+
+}
+
+void V8CSSAgentImpl::stopRuleUsageTracking(ErrorString*,
+        std::unique_ptr<protocol::Array<protocol::CSS::RuleUsage>>* out_ruleUsage) {
+
+}
 
 V8CSSAgentImpl* V8CSSAgentImpl::Instance = 0;
 }

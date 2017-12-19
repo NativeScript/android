@@ -10,6 +10,7 @@
 #include "src/inspector/protocol/Protocol.h"
 // For each imported domain we generate a ValueConversions struct instead of a full domain definition
 // and include Domain::API version from there.
+#include "src/inspector/protocol/DOM.h"
 
 namespace v8_inspector {
 namespace protocol {
@@ -34,6 +35,8 @@ class SelectorList;
 class CSSStyleSheetHeader;
 // CSS rule representation.
 class CSSRule;
+// CSS coverage information.
+class RuleUsage;
 // Text range within a resource. All numbers are zero-based.
 class SourceRange;
 //
@@ -556,6 +559,13 @@ class  CSSStyleSheetHeader {
             m_startColumn = value;
         }
 
+        double getLength() {
+            return m_length;
+        }
+        void setLength(double value) {
+            m_length = value;
+        }
+
         std::unique_ptr<protocol::DictionaryValue> serialize() const;
         std::unique_ptr<CSSStyleSheetHeader> clone() const;
 
@@ -573,7 +583,8 @@ class  CSSStyleSheetHeader {
                     IsInlineSet = 1 << 7,
                     StartLineSet = 1 << 8,
                     StartColumnSet = 1 << 9,
-                    AllFieldsSet = (StyleSheetIdSet | FrameIdSet | SourceURLSet | OriginSet | TitleSet | DisabledSet | IsInlineSet | StartLineSet | StartColumnSet | 0)
+                    LengthSet = 1 << 10,
+                    AllFieldsSet = (StyleSheetIdSet | FrameIdSet | SourceURLSet | OriginSet | TitleSet | DisabledSet | IsInlineSet | StartLineSet | StartColumnSet | LengthSet | 0)
                 };
 
 
@@ -646,6 +657,12 @@ class  CSSStyleSheetHeader {
                     return castState<StartColumnSet>();
                 }
 
+                CSSStyleSheetHeaderBuilder<STATE | LengthSet>& setLength(double value) {
+                    static_assert(!(STATE & LengthSet), "property length should not be set yet");
+                    m_result->setLength(value);
+                    return castState<LengthSet>();
+                }
+
                 std::unique_ptr<CSSStyleSheetHeader> build() {
                     static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
                     return std::move(m_result);
@@ -672,6 +689,7 @@ class  CSSStyleSheetHeader {
             m_isInline = false;
             m_startLine = 0;
             m_startColumn = 0;
+            m_length = 0;
         }
 
         String m_styleSheetId;
@@ -686,6 +704,7 @@ class  CSSStyleSheetHeader {
         bool m_isInline;
         double m_startLine;
         double m_startColumn;
+        double m_length;
 };
 
 
@@ -810,6 +829,116 @@ class  CSSRule {
         String m_origin;
         std::unique_ptr<protocol::CSS::CSSStyle> m_style;
         Maybe<protocol::Array<protocol::CSS::CSSMedia>> m_media;
+};
+
+
+// CSS coverage information.
+class  RuleUsage {
+        PROTOCOL_DISALLOW_COPY(RuleUsage);
+    public:
+        static std::unique_ptr<RuleUsage> parse(protocol::Value* value, ErrorSupport* errors);
+
+        ~RuleUsage() { }
+
+        String getStyleSheetId() {
+            return m_styleSheetId;
+        }
+        void setStyleSheetId(const String& value) {
+            m_styleSheetId = value;
+        }
+
+        double getStartOffset() {
+            return m_startOffset;
+        }
+        void setStartOffset(double value) {
+            m_startOffset = value;
+        }
+
+        double getEndOffset() {
+            return m_endOffset;
+        }
+        void setEndOffset(double value) {
+            m_endOffset = value;
+        }
+
+        bool getUsed() {
+            return m_used;
+        }
+        void setUsed(bool value) {
+            m_used = value;
+        }
+
+        std::unique_ptr<protocol::DictionaryValue> serialize() const;
+        std::unique_ptr<RuleUsage> clone() const;
+
+        template<int STATE>
+        class RuleUsageBuilder {
+            public:
+                enum {
+                    NoFieldsSet = 0,
+                    StyleSheetIdSet = 1 << 1,
+                    StartOffsetSet = 1 << 2,
+                    EndOffsetSet = 1 << 3,
+                    UsedSet = 1 << 4,
+                    AllFieldsSet = (StyleSheetIdSet | StartOffsetSet | EndOffsetSet | UsedSet | 0)
+                };
+
+
+                RuleUsageBuilder<STATE | StyleSheetIdSet>& setStyleSheetId(const String& value) {
+                    static_assert(!(STATE & StyleSheetIdSet), "property styleSheetId should not be set yet");
+                    m_result->setStyleSheetId(value);
+                    return castState<StyleSheetIdSet>();
+                }
+
+                RuleUsageBuilder<STATE | StartOffsetSet>& setStartOffset(double value) {
+                    static_assert(!(STATE & StartOffsetSet), "property startOffset should not be set yet");
+                    m_result->setStartOffset(value);
+                    return castState<StartOffsetSet>();
+                }
+
+                RuleUsageBuilder<STATE | EndOffsetSet>& setEndOffset(double value) {
+                    static_assert(!(STATE & EndOffsetSet), "property endOffset should not be set yet");
+                    m_result->setEndOffset(value);
+                    return castState<EndOffsetSet>();
+                }
+
+                RuleUsageBuilder<STATE | UsedSet>& setUsed(bool value) {
+                    static_assert(!(STATE & UsedSet), "property used should not be set yet");
+                    m_result->setUsed(value);
+                    return castState<UsedSet>();
+                }
+
+                std::unique_ptr<RuleUsage> build() {
+                    static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+                    return std::move(m_result);
+                }
+
+            private:
+                friend class RuleUsage;
+                RuleUsageBuilder() : m_result(new RuleUsage()) { }
+
+                template<int STEP> RuleUsageBuilder<STATE | STEP>& castState() {
+                    return *reinterpret_cast<RuleUsageBuilder<STATE | STEP>*>(this);
+                }
+
+                std::unique_ptr<protocol::CSS::RuleUsage> m_result;
+        };
+
+        static RuleUsageBuilder<0> create() {
+            return RuleUsageBuilder<0>();
+        }
+
+    private:
+        RuleUsage() {
+            m_startOffset = 0;
+            m_endOffset = 0;
+            m_used = false;
+        }
+
+        String m_styleSheetId;
+        double m_startOffset;
+        double m_endOffset;
+        bool m_used;
 };
 
 
@@ -2120,17 +2249,29 @@ class  Backend {
     public:
         virtual ~Backend() { }
 
-        class  EnableCallback : public BackendCallback {
-            public:
-                virtual void sendSuccess() = 0;
-        };
-        virtual void enable(std::unique_ptr<EnableCallback> callback) = 0;
+        virtual void enable(ErrorString*) = 0;
         virtual void disable(ErrorString*) = 0;
         virtual void getMatchedStylesForNode(ErrorString*, int in_nodeId, Maybe<protocol::CSS::CSSStyle>* out_inlineStyle, Maybe<protocol::CSS::CSSStyle>* out_attributesStyle, Maybe<protocol::Array<protocol::CSS::RuleMatch>>* out_matchedCSSRules, Maybe<protocol::Array<protocol::CSS::PseudoElementMatches>>* out_pseudoElements, Maybe<protocol::Array<protocol::CSS::InheritedStyleEntry>>* out_inherited, Maybe<protocol::Array<protocol::CSS::CSSKeyframesRule>>* out_cssKeyframesRules) = 0;
         virtual void getInlineStylesForNode(ErrorString*, int in_nodeId, Maybe<protocol::CSS::CSSStyle>* out_inlineStyle, Maybe<protocol::CSS::CSSStyle>* out_attributesStyle) = 0;
         virtual void getComputedStyleForNode(ErrorString*, int in_nodeId, std::unique_ptr<protocol::Array<protocol::CSS::CSSComputedStyleProperty>>* out_computedStyle) = 0;
         virtual void getPlatformFontsForNode(ErrorString*, int in_nodeId, std::unique_ptr<protocol::Array<protocol::CSS::PlatformFontUsage>>* out_fonts) = 0;
         virtual void getStyleSheetText(ErrorString*, const String& in_styleSheetId, String* out_text) = 0;
+        virtual void collectClassNames(ErrorString*, const String& in_styleSheetId, std::unique_ptr<protocol::Array<String>>* out_classNames) = 0;
+        virtual void setStyleSheetText(ErrorString*, const String& in_styleSheetId, const String& in_text, Maybe<String>* out_sourceMapURL) = 0;
+        virtual void setRuleSelector(ErrorString*, const String& in_styleSheetId, std::unique_ptr<protocol::CSS::SourceRange> in_range, const String& in_selector, std::unique_ptr<protocol::CSS::SelectorList>* out_selectorList) = 0;
+        virtual void setKeyframeKey(ErrorString*, const String& in_styleSheetId, std::unique_ptr<protocol::CSS::SourceRange> in_range, const String& in_keyText, std::unique_ptr<protocol::CSS::Value>* out_keyText) = 0;
+        virtual void setStyleTexts(ErrorString*, std::unique_ptr<protocol::Array<protocol::CSS::StyleDeclarationEdit>> in_edits, std::unique_ptr<protocol::Array<protocol::CSS::CSSStyle>>* out_styles) = 0;
+        virtual void setMediaText(ErrorString*, const String& in_styleSheetId, std::unique_ptr<protocol::CSS::SourceRange> in_range, const String& in_text, std::unique_ptr<protocol::CSS::CSSMedia>* out_media) = 0;
+        virtual void createStyleSheet(ErrorString*, const String& in_frameId, String* out_styleSheetId) = 0;
+        virtual void addRule(ErrorString*, const String& in_styleSheetId, const String& in_ruleText, std::unique_ptr<protocol::CSS::SourceRange> in_location, std::unique_ptr<protocol::CSS::CSSRule>* out_rule) = 0;
+        virtual void forcePseudoState(ErrorString*, int in_nodeId, std::unique_ptr<protocol::Array<String>> in_forcedPseudoClasses) = 0;
+        virtual void getMediaQueries(ErrorString*, std::unique_ptr<protocol::Array<protocol::CSS::CSSMedia>>* out_medias) = 0;
+        virtual void setEffectivePropertyValueForNode(ErrorString*, int in_nodeId, const String& in_propertyName, const String& in_value) = 0;
+        virtual void getBackgroundColors(ErrorString*, int in_nodeId, Maybe<protocol::Array<String>>* out_backgroundColors, Maybe<String>* out_computedFontSize, Maybe<String>* out_computedFontWeight, Maybe<String>* out_computedBodyFontSize) = 0;
+        // TODO: Pete: Unnecessary - remove before publish
+        virtual void startRuleUsageTracking(ErrorString*) = 0;
+        virtual void takeCoverageDelta(ErrorString*, std::unique_ptr<protocol::Array<protocol::CSS::RuleUsage>>* out_coverage) = 0;
+        virtual void stopRuleUsageTracking(ErrorString*, std::unique_ptr<protocol::Array<protocol::CSS::RuleUsage>>* out_ruleUsage) = 0;
 
 };
 
@@ -2139,12 +2280,9 @@ class  Backend {
 class  Frontend {
     public:
         Frontend(FrontendChannel* frontendChannel) : m_frontendChannel(frontendChannel) { }
-        void mediaQueryResultChanged();
-        void fontsUpdated();
         void styleSheetChanged(const String& styleSheetId);
         void styleSheetAdded(std::unique_ptr<protocol::CSS::CSSStyleSheetHeader> header);
         void styleSheetRemoved(const String& styleSheetId);
-        void layoutEditorChange(const String& styleSheetId, std::unique_ptr<protocol::CSS::SourceRange> changeRange);
 
         void flush();
     private:

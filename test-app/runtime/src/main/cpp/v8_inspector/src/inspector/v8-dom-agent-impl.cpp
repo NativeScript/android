@@ -218,17 +218,5 @@ void V8DOMAgentImpl::discardSearchResults(ErrorString*, const String& in_searchI
 
 }
 
-// Not supported
-void V8DOMAgentImpl::highlightNode(ErrorString*,
-                                   std::unique_ptr<protocol::DOM::HighlightConfig> in_highlightConfig,
-                                   const Maybe<int>& in_nodeId,
-                                   const Maybe<String>& in_objectId) {
-
-}
-
-void V8DOMAgentImpl::hideHighlight(ErrorString*) {
-
-}
-
 V8DOMAgentImpl* V8DOMAgentImpl::Instance = 0;
 }

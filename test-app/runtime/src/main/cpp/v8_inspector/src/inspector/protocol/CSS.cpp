@@ -254,6 +254,9 @@ std::unique_ptr<CSSStyleSheetHeader> CSSStyleSheetHeader::parse(protocol::Value*
     protocol::Value* startColumnValue = object->get("startColumn");
     errors->setName("startColumn");
     result->m_startColumn = ValueConversions<double>::parse(startColumnValue, errors);
+    protocol::Value* lengthValue = object->get("length");
+    errors->setName("length");
+    result->m_length = ValueConversions<double>::parse(lengthValue, errors);
     errors->pop();
     if (errors->hasErrors()) {
         return nullptr;
@@ -281,6 +284,7 @@ std::unique_ptr<protocol::DictionaryValue> CSSStyleSheetHeader::serialize() cons
     result->setValue("isInline", ValueConversions<bool>::serialize(m_isInline));
     result->setValue("startLine", ValueConversions<double>::serialize(m_startLine));
     result->setValue("startColumn", ValueConversions<double>::serialize(m_startColumn));
+    result->setValue("length", ValueConversions<double>::serialize(m_length));
     return result;
 }
 
@@ -339,6 +343,48 @@ std::unique_ptr<protocol::DictionaryValue> CSSRule::serialize() const {
 }
 
 std::unique_ptr<CSSRule> CSSRule::clone() const {
+    ErrorSupport errors;
+    return parse(serialize().get(), &errors);
+}
+
+std::unique_ptr<RuleUsage> RuleUsage::parse(protocol::Value* value, ErrorSupport* errors) {
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->addError("object expected");
+        return nullptr;
+    }
+
+    std::unique_ptr<RuleUsage> result(new RuleUsage());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->push();
+    protocol::Value* styleSheetIdValue = object->get("styleSheetId");
+    errors->setName("styleSheetId");
+    result->m_styleSheetId = ValueConversions<String>::parse(styleSheetIdValue, errors);
+    protocol::Value* startOffsetValue = object->get("startOffset");
+    errors->setName("startOffset");
+    result->m_startOffset = ValueConversions<double>::parse(startOffsetValue, errors);
+    protocol::Value* endOffsetValue = object->get("endOffset");
+    errors->setName("endOffset");
+    result->m_endOffset = ValueConversions<double>::parse(endOffsetValue, errors);
+    protocol::Value* usedValue = object->get("used");
+    errors->setName("used");
+    result->m_used = ValueConversions<bool>::parse(usedValue, errors);
+    errors->pop();
+    if (errors->hasErrors()) {
+        return nullptr;
+    }
+    return result;
+}
+
+std::unique_ptr<protocol::DictionaryValue> RuleUsage::serialize() const {
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("styleSheetId", ValueConversions<String>::serialize(m_styleSheetId));
+    result->setValue("startOffset", ValueConversions<double>::serialize(m_startOffset));
+    result->setValue("endOffset", ValueConversions<double>::serialize(m_endOffset));
+    result->setValue("used", ValueConversions<bool>::serialize(m_used));
+    return result;
+}
+
+std::unique_ptr<RuleUsage> RuleUsage::clone() const {
     ErrorSupport errors;
     return parse(serialize().get(), &errors);
 }
@@ -921,26 +967,6 @@ std::unique_ptr<StyleDeclarationEdit> StyleDeclarationEdit::clone() const {
 
 // ------------- Frontend notifications.
 
-void Frontend::mediaQueryResultChanged() {
-    std::unique_ptr<protocol::DictionaryValue> jsonMessage = DictionaryValue::create();
-    jsonMessage->setString("method", "CSS.mediaQueryResultChanged");
-    std::unique_ptr<protocol::DictionaryValue> paramsObject = DictionaryValue::create();
-    jsonMessage->setObject("params", std::move(paramsObject));
-    if (m_frontendChannel) {
-        m_frontendChannel->sendProtocolNotification(jsonMessage->toJSONString());
-    }
-}
-
-void Frontend::fontsUpdated() {
-    std::unique_ptr<protocol::DictionaryValue> jsonMessage = DictionaryValue::create();
-    jsonMessage->setString("method", "CSS.fontsUpdated");
-    std::unique_ptr<protocol::DictionaryValue> paramsObject = DictionaryValue::create();
-    jsonMessage->setObject("params", std::move(paramsObject));
-    if (m_frontendChannel) {
-        m_frontendChannel->sendProtocolNotification(jsonMessage->toJSONString());
-    }
-}
-
 void Frontend::styleSheetChanged(const String& styleSheetId) {
     std::unique_ptr<protocol::DictionaryValue> jsonMessage = DictionaryValue::create();
     jsonMessage->setString("method", "CSS.styleSheetChanged");
@@ -974,18 +1000,6 @@ void Frontend::styleSheetRemoved(const String& styleSheetId) {
     }
 }
 
-void Frontend::layoutEditorChange(const String& styleSheetId, std::unique_ptr<protocol::CSS::SourceRange> changeRange) {
-    std::unique_ptr<protocol::DictionaryValue> jsonMessage = DictionaryValue::create();
-    jsonMessage->setString("method", "CSS.layoutEditorChange");
-    std::unique_ptr<protocol::DictionaryValue> paramsObject = DictionaryValue::create();
-    paramsObject->setValue("styleSheetId", ValueConversions<String>::serialize(styleSheetId));
-    paramsObject->setValue("changeRange", ValueConversions<protocol::CSS::SourceRange>::serialize(changeRange.get()));
-    jsonMessage->setObject("params", std::move(paramsObject));
-    if (m_frontendChannel) {
-        m_frontendChannel->sendProtocolNotification(jsonMessage->toJSONString());
-    }
-}
-
 void Frontend::flush() {
     m_frontendChannel->flushProtocolNotifications();
 }
@@ -1004,6 +1018,21 @@ class DispatcherImpl : public protocol::DispatcherBase {
             m_dispatchMap["CSS.getComputedStyleForNode"] = &DispatcherImpl::getComputedStyleForNode;
             m_dispatchMap["CSS.getPlatformFontsForNode"] = &DispatcherImpl::getPlatformFontsForNode;
             m_dispatchMap["CSS.getStyleSheetText"] = &DispatcherImpl::getStyleSheetText;
+            m_dispatchMap["CSS.collectClassNames"] = &DispatcherImpl::collectClassNames;
+            m_dispatchMap["CSS.setStyleSheetText"] = &DispatcherImpl::setStyleSheetText;
+            m_dispatchMap["CSS.setRuleSelector"] = &DispatcherImpl::setRuleSelector;
+            m_dispatchMap["CSS.setKeyframeKey"] = &DispatcherImpl::setKeyframeKey;
+            m_dispatchMap["CSS.setStyleTexts"] = &DispatcherImpl::setStyleTexts;
+            m_dispatchMap["CSS.setMediaText"] = &DispatcherImpl::setMediaText;
+            m_dispatchMap["CSS.createStyleSheet"] = &DispatcherImpl::createStyleSheet;
+            m_dispatchMap["CSS.addRule"] = &DispatcherImpl::addRule;
+            m_dispatchMap["CSS.forcePseudoState"] = &DispatcherImpl::forcePseudoState;
+            m_dispatchMap["CSS.getMediaQueries"] = &DispatcherImpl::getMediaQueries;
+            m_dispatchMap["CSS.setEffectivePropertyValueForNode"] = &DispatcherImpl::setEffectivePropertyValueForNode;
+            m_dispatchMap["CSS.getBackgroundColors"] = &DispatcherImpl::getBackgroundColors;
+            m_dispatchMap["CSS.startRuleUsageTracking"] = &DispatcherImpl::startRuleUsageTracking;
+            m_dispatchMap["CSS.takeCoverageDelta"] = &DispatcherImpl::takeCoverageDelta;
+            m_dispatchMap["CSS.stopRuleUsageTracking"] = &DispatcherImpl::stopRuleUsageTracking;
         }
         ~DispatcherImpl() override { }
         void dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) override;
@@ -1020,6 +1049,21 @@ class DispatcherImpl : public protocol::DispatcherBase {
         void getComputedStyleForNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
         void getPlatformFontsForNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
         void getStyleSheetText(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void collectClassNames(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void setStyleSheetText(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void setRuleSelector(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void setKeyframeKey(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void setStyleTexts(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void setMediaText(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void createStyleSheet(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void addRule(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void forcePseudoState(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void getMediaQueries(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void setEffectivePropertyValueForNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void getBackgroundColors(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void startRuleUsageTracking(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void takeCoverageDelta(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void stopRuleUsageTracking(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
 
         Backend* m_backend;
 };
@@ -1036,28 +1080,14 @@ void DispatcherImpl::dispatch(int callId, const String& method, std::unique_ptr<
 }
 
 
-class EnableCallbackImpl : public Backend::EnableCallback, public DispatcherBase::Callback {
-    public:
-        EnableCallbackImpl(std::unique_ptr<DispatcherBase::WeakPtr> backendImpl, int callId)
-            : DispatcherBase::Callback(std::move(backendImpl), callId) { }
-
-        void sendSuccess() override {
-            std::unique_ptr<protocol::DictionaryValue> resultObject = DictionaryValue::create();
-            sendIfActive(std::move(resultObject), ErrorString());
-        }
-
-        void sendFailure(const ErrorString& error) override {
-            DCHECK(error.length());
-            sendIfActive(nullptr, error);
-        }
-
-};
-
 void DispatcherImpl::enable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
-    std::unique_ptr<EnableCallbackImpl> callback(new EnableCallbackImpl(weakPtr(), callId));
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    m_backend->enable(std::move(callback));
+    ErrorString error;
+    m_backend->enable(&error);
+    if (weak->get()) {
+        weak->get()->sendResponse(callId, error);
+    }
 }
 
 void DispatcherImpl::disable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
@@ -1227,6 +1257,401 @@ void DispatcherImpl::getStyleSheetText(int callId, std::unique_ptr<DictionaryVal
     m_backend->getStyleSheetText(&error, in_styleSheetId, &out_text);
     if (!error.length()) {
         result->setValue("text", ValueConversions<String>::serialize(out_text));
+    }
+    if (weak->get()) {
+        weak->get()->sendResponse(callId, error, std::move(result));
+    }
+}
+
+void DispatcherImpl::collectClassNames(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+    // Prepare input parameters.
+    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
+    errors->push();
+    protocol::Value* styleSheetIdValue = object ? object->get("styleSheetId") : nullptr;
+    errors->setName("styleSheetId");
+    String in_styleSheetId = ValueConversions<String>::parse(styleSheetIdValue, errors);
+    errors->pop();
+    if (errors->hasErrors()) {
+        reportProtocolError(callId, InvalidParams, kInvalidRequest, errors);
+        return;
+    }
+    // Declare output parameters.
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    std::unique_ptr<protocol::Array<String>> out_classNames;
+
+    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    ErrorString error;
+    m_backend->collectClassNames(&error, in_styleSheetId, &out_classNames);
+    if (!error.length()) {
+        result->setValue("classNames", ValueConversions<protocol::Array<String>>::serialize(out_classNames.get()));
+    }
+    if (weak->get()) {
+        weak->get()->sendResponse(callId, error, std::move(result));
+    }
+}
+
+void DispatcherImpl::setStyleSheetText(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+    // Prepare input parameters.
+    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
+    errors->push();
+    protocol::Value* styleSheetIdValue = object ? object->get("styleSheetId") : nullptr;
+    errors->setName("styleSheetId");
+    String in_styleSheetId = ValueConversions<String>::parse(styleSheetIdValue, errors);
+    protocol::Value* textValue = object ? object->get("text") : nullptr;
+    errors->setName("text");
+    String in_text = ValueConversions<String>::parse(textValue, errors);
+    errors->pop();
+    if (errors->hasErrors()) {
+        reportProtocolError(callId, InvalidParams, kInvalidRequest, errors);
+        return;
+    }
+    // Declare output parameters.
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    Maybe<String> out_sourceMapURL;
+
+    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    ErrorString error;
+    m_backend->setStyleSheetText(&error, in_styleSheetId, in_text, &out_sourceMapURL);
+    if (!error.length()) {
+        if (out_sourceMapURL.isJust()) {
+            result->setValue("sourceMapURL", ValueConversions<String>::serialize(out_sourceMapURL.fromJust()));
+        }
+    }
+    if (weak->get()) {
+        weak->get()->sendResponse(callId, error, std::move(result));
+    }
+}
+
+void DispatcherImpl::setRuleSelector(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+    // Prepare input parameters.
+    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
+    errors->push();
+    protocol::Value* styleSheetIdValue = object ? object->get("styleSheetId") : nullptr;
+    errors->setName("styleSheetId");
+    String in_styleSheetId = ValueConversions<String>::parse(styleSheetIdValue, errors);
+    protocol::Value* rangeValue = object ? object->get("range") : nullptr;
+    errors->setName("range");
+    std::unique_ptr<protocol::CSS::SourceRange> in_range = ValueConversions<protocol::CSS::SourceRange>::parse(rangeValue, errors);
+    protocol::Value* selectorValue = object ? object->get("selector") : nullptr;
+    errors->setName("selector");
+    String in_selector = ValueConversions<String>::parse(selectorValue, errors);
+    errors->pop();
+    if (errors->hasErrors()) {
+        reportProtocolError(callId, InvalidParams, kInvalidRequest, errors);
+        return;
+    }
+    // Declare output parameters.
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    std::unique_ptr<protocol::CSS::SelectorList> out_selectorList;
+
+    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    ErrorString error;
+    m_backend->setRuleSelector(&error, in_styleSheetId, std::move(in_range), in_selector, &out_selectorList);
+    if (!error.length()) {
+        result->setValue("selectorList", ValueConversions<protocol::CSS::SelectorList>::serialize(out_selectorList.get()));
+    }
+    if (weak->get()) {
+        weak->get()->sendResponse(callId, error, std::move(result));
+    }
+}
+
+void DispatcherImpl::setKeyframeKey(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+    // Prepare input parameters.
+    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
+    errors->push();
+    protocol::Value* styleSheetIdValue = object ? object->get("styleSheetId") : nullptr;
+    errors->setName("styleSheetId");
+    String in_styleSheetId = ValueConversions<String>::parse(styleSheetIdValue, errors);
+    protocol::Value* rangeValue = object ? object->get("range") : nullptr;
+    errors->setName("range");
+    std::unique_ptr<protocol::CSS::SourceRange> in_range = ValueConversions<protocol::CSS::SourceRange>::parse(rangeValue, errors);
+    protocol::Value* keyTextValue = object ? object->get("keyText") : nullptr;
+    errors->setName("keyText");
+    String in_keyText = ValueConversions<String>::parse(keyTextValue, errors);
+    errors->pop();
+    if (errors->hasErrors()) {
+        reportProtocolError(callId, InvalidParams, kInvalidRequest, errors);
+        return;
+    }
+    // Declare output parameters.
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    std::unique_ptr<protocol::CSS::Value> out_keyText;
+
+    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    ErrorString error;
+    m_backend->setKeyframeKey(&error, in_styleSheetId, std::move(in_range), in_keyText, &out_keyText);
+    if (!error.length()) {
+        result->setValue("keyText", ValueConversions<protocol::CSS::Value>::serialize(out_keyText.get()));
+    }
+    if (weak->get()) {
+        weak->get()->sendResponse(callId, error, std::move(result));
+    }
+}
+
+void DispatcherImpl::setStyleTexts(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+    // Prepare input parameters.
+    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
+    errors->push();
+    protocol::Value* editsValue = object ? object->get("edits") : nullptr;
+    errors->setName("edits");
+    std::unique_ptr<protocol::Array<protocol::CSS::StyleDeclarationEdit>> in_edits = ValueConversions<protocol::Array<protocol::CSS::StyleDeclarationEdit>>::parse(editsValue, errors);
+    errors->pop();
+    if (errors->hasErrors()) {
+        reportProtocolError(callId, InvalidParams, kInvalidRequest, errors);
+        return;
+    }
+    // Declare output parameters.
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    std::unique_ptr<protocol::Array<protocol::CSS::CSSStyle>> out_styles;
+
+    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    ErrorString error;
+    m_backend->setStyleTexts(&error, std::move(in_edits), &out_styles);
+    if (!error.length()) {
+        result->setValue("styles", ValueConversions<protocol::Array<protocol::CSS::CSSStyle>>::serialize(out_styles.get()));
+    }
+    if (weak->get()) {
+        weak->get()->sendResponse(callId, error, std::move(result));
+    }
+}
+
+void DispatcherImpl::setMediaText(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+    // Prepare input parameters.
+    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
+    errors->push();
+    protocol::Value* styleSheetIdValue = object ? object->get("styleSheetId") : nullptr;
+    errors->setName("styleSheetId");
+    String in_styleSheetId = ValueConversions<String>::parse(styleSheetIdValue, errors);
+    protocol::Value* rangeValue = object ? object->get("range") : nullptr;
+    errors->setName("range");
+    std::unique_ptr<protocol::CSS::SourceRange> in_range = ValueConversions<protocol::CSS::SourceRange>::parse(rangeValue, errors);
+    protocol::Value* textValue = object ? object->get("text") : nullptr;
+    errors->setName("text");
+    String in_text = ValueConversions<String>::parse(textValue, errors);
+    errors->pop();
+    if (errors->hasErrors()) {
+        reportProtocolError(callId, InvalidParams, kInvalidRequest, errors);
+        return;
+    }
+    // Declare output parameters.
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    std::unique_ptr<protocol::CSS::CSSMedia> out_media;
+
+    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    ErrorString error;
+    m_backend->setMediaText(&error, in_styleSheetId, std::move(in_range), in_text, &out_media);
+    if (!error.length()) {
+        result->setValue("media", ValueConversions<protocol::CSS::CSSMedia>::serialize(out_media.get()));
+    }
+    if (weak->get()) {
+        weak->get()->sendResponse(callId, error, std::move(result));
+    }
+}
+
+void DispatcherImpl::createStyleSheet(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+    // Prepare input parameters.
+    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
+    errors->push();
+    protocol::Value* frameIdValue = object ? object->get("frameId") : nullptr;
+    errors->setName("frameId");
+    String in_frameId = ValueConversions<String>::parse(frameIdValue, errors);
+    errors->pop();
+    if (errors->hasErrors()) {
+        reportProtocolError(callId, InvalidParams, kInvalidRequest, errors);
+        return;
+    }
+    // Declare output parameters.
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    String out_styleSheetId;
+
+    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    ErrorString error;
+    m_backend->createStyleSheet(&error, in_frameId, &out_styleSheetId);
+    if (!error.length()) {
+        result->setValue("styleSheetId", ValueConversions<String>::serialize(out_styleSheetId));
+    }
+    if (weak->get()) {
+        weak->get()->sendResponse(callId, error, std::move(result));
+    }
+}
+
+void DispatcherImpl::addRule(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+    // Prepare input parameters.
+    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
+    errors->push();
+    protocol::Value* styleSheetIdValue = object ? object->get("styleSheetId") : nullptr;
+    errors->setName("styleSheetId");
+    String in_styleSheetId = ValueConversions<String>::parse(styleSheetIdValue, errors);
+    protocol::Value* ruleTextValue = object ? object->get("ruleText") : nullptr;
+    errors->setName("ruleText");
+    String in_ruleText = ValueConversions<String>::parse(ruleTextValue, errors);
+    protocol::Value* locationValue = object ? object->get("location") : nullptr;
+    errors->setName("location");
+    std::unique_ptr<protocol::CSS::SourceRange> in_location = ValueConversions<protocol::CSS::SourceRange>::parse(locationValue, errors);
+    errors->pop();
+    if (errors->hasErrors()) {
+        reportProtocolError(callId, InvalidParams, kInvalidRequest, errors);
+        return;
+    }
+    // Declare output parameters.
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    std::unique_ptr<protocol::CSS::CSSRule> out_rule;
+
+    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    ErrorString error;
+    m_backend->addRule(&error, in_styleSheetId, in_ruleText, std::move(in_location), &out_rule);
+    if (!error.length()) {
+        result->setValue("rule", ValueConversions<protocol::CSS::CSSRule>::serialize(out_rule.get()));
+    }
+    if (weak->get()) {
+        weak->get()->sendResponse(callId, error, std::move(result));
+    }
+}
+
+void DispatcherImpl::forcePseudoState(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+    // Prepare input parameters.
+    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
+    errors->push();
+    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
+    errors->setName("nodeId");
+    int in_nodeId = ValueConversions<int>::parse(nodeIdValue, errors);
+    protocol::Value* forcedPseudoClassesValue = object ? object->get("forcedPseudoClasses") : nullptr;
+    errors->setName("forcedPseudoClasses");
+    std::unique_ptr<protocol::Array<String>> in_forcedPseudoClasses = ValueConversions<protocol::Array<String>>::parse(forcedPseudoClassesValue, errors);
+    errors->pop();
+    if (errors->hasErrors()) {
+        reportProtocolError(callId, InvalidParams, kInvalidRequest, errors);
+        return;
+    }
+
+    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    ErrorString error;
+    m_backend->forcePseudoState(&error, in_nodeId, std::move(in_forcedPseudoClasses));
+    if (weak->get()) {
+        weak->get()->sendResponse(callId, error);
+    }
+}
+
+void DispatcherImpl::getMediaQueries(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+    // Declare output parameters.
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    std::unique_ptr<protocol::Array<protocol::CSS::CSSMedia>> out_medias;
+
+    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    ErrorString error;
+    m_backend->getMediaQueries(&error, &out_medias);
+    if (!error.length()) {
+        result->setValue("medias", ValueConversions<protocol::Array<protocol::CSS::CSSMedia>>::serialize(out_medias.get()));
+    }
+    if (weak->get()) {
+        weak->get()->sendResponse(callId, error, std::move(result));
+    }
+}
+
+void DispatcherImpl::setEffectivePropertyValueForNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+    // Prepare input parameters.
+    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
+    errors->push();
+    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
+    errors->setName("nodeId");
+    int in_nodeId = ValueConversions<int>::parse(nodeIdValue, errors);
+    protocol::Value* propertyNameValue = object ? object->get("propertyName") : nullptr;
+    errors->setName("propertyName");
+    String in_propertyName = ValueConversions<String>::parse(propertyNameValue, errors);
+    protocol::Value* valueValue = object ? object->get("value") : nullptr;
+    errors->setName("value");
+    String in_value = ValueConversions<String>::parse(valueValue, errors);
+    errors->pop();
+    if (errors->hasErrors()) {
+        reportProtocolError(callId, InvalidParams, kInvalidRequest, errors);
+        return;
+    }
+
+    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    ErrorString error;
+    m_backend->setEffectivePropertyValueForNode(&error, in_nodeId, in_propertyName, in_value);
+    if (weak->get()) {
+        weak->get()->sendResponse(callId, error);
+    }
+}
+
+void DispatcherImpl::getBackgroundColors(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+    // Prepare input parameters.
+    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
+    errors->push();
+    protocol::Value* nodeIdValue = object ? object->get("nodeId") : nullptr;
+    errors->setName("nodeId");
+    int in_nodeId = ValueConversions<int>::parse(nodeIdValue, errors);
+    errors->pop();
+    if (errors->hasErrors()) {
+        reportProtocolError(callId, InvalidParams, kInvalidRequest, errors);
+        return;
+    }
+    // Declare output parameters.
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    Maybe<protocol::Array<String>> out_backgroundColors;
+    Maybe<String> out_computedFontSize;
+    Maybe<String> out_computedFontWeight;
+    Maybe<String> out_computedBodyFontSize;
+
+    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    ErrorString error;
+    m_backend->getBackgroundColors(&error, in_nodeId, &out_backgroundColors, &out_computedFontSize, &out_computedFontWeight, &out_computedBodyFontSize);
+    if (!error.length()) {
+        if (out_backgroundColors.isJust()) {
+            result->setValue("backgroundColors", ValueConversions<protocol::Array<String>>::serialize(out_backgroundColors.fromJust()));
+        }
+        if (out_computedFontSize.isJust()) {
+            result->setValue("computedFontSize", ValueConversions<String>::serialize(out_computedFontSize.fromJust()));
+        }
+        if (out_computedFontWeight.isJust()) {
+            result->setValue("computedFontWeight", ValueConversions<String>::serialize(out_computedFontWeight.fromJust()));
+        }
+        if (out_computedBodyFontSize.isJust()) {
+            result->setValue("computedBodyFontSize", ValueConversions<String>::serialize(out_computedBodyFontSize.fromJust()));
+        }
+    }
+    if (weak->get()) {
+        weak->get()->sendResponse(callId, error, std::move(result));
+    }
+}
+
+void DispatcherImpl::startRuleUsageTracking(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+
+    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    ErrorString error;
+    m_backend->startRuleUsageTracking(&error);
+    if (weak->get()) {
+        weak->get()->sendResponse(callId, error);
+    }
+}
+
+void DispatcherImpl::takeCoverageDelta(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+    // Declare output parameters.
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    std::unique_ptr<protocol::Array<protocol::CSS::RuleUsage>> out_coverage;
+
+    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    ErrorString error;
+    m_backend->takeCoverageDelta(&error, &out_coverage);
+    if (!error.length()) {
+        result->setValue("coverage", ValueConversions<protocol::Array<protocol::CSS::RuleUsage>>::serialize(out_coverage.get()));
+    }
+    if (weak->get()) {
+        weak->get()->sendResponse(callId, error, std::move(result));
+    }
+}
+
+void DispatcherImpl::stopRuleUsageTracking(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+    // Declare output parameters.
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    std::unique_ptr<protocol::Array<protocol::CSS::RuleUsage>> out_ruleUsage;
+
+    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    ErrorString error;
+    m_backend->stopRuleUsageTracking(&error, &out_ruleUsage);
+    if (!error.length()) {
+        result->setValue("ruleUsage", ValueConversions<protocol::Array<protocol::CSS::RuleUsage>>::serialize(out_ruleUsage.get()));
     }
     if (weak->get()) {
         weak->get()->sendResponse(callId, error, std::move(result));

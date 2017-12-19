@@ -246,6 +246,52 @@ std::unique_ptr<SearchResult> SearchResult::clone() const {
     return parse(serialize().get(), &errors);
 }
 
+std::unique_ptr<Viewport> Viewport::parse(protocol::Value* value, ErrorSupport* errors) {
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->addError("object expected");
+        return nullptr;
+    }
+
+    std::unique_ptr<Viewport> result(new Viewport());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->push();
+    protocol::Value* xValue = object->get("x");
+    errors->setName("x");
+    result->m_x = ValueConversions<double>::parse(xValue, errors);
+    protocol::Value* yValue = object->get("y");
+    errors->setName("y");
+    result->m_y = ValueConversions<double>::parse(yValue, errors);
+    protocol::Value* widthValue = object->get("width");
+    errors->setName("width");
+    result->m_width = ValueConversions<double>::parse(widthValue, errors);
+    protocol::Value* heightValue = object->get("height");
+    errors->setName("height");
+    result->m_height = ValueConversions<double>::parse(heightValue, errors);
+    protocol::Value* scaleValue = object->get("scale");
+    errors->setName("scale");
+    result->m_scale = ValueConversions<double>::parse(scaleValue, errors);
+    errors->pop();
+    if (errors->hasErrors()) {
+        return nullptr;
+    }
+    return result;
+}
+
+std::unique_ptr<protocol::DictionaryValue> Viewport::serialize() const {
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("x", ValueConversions<double>::serialize(m_x));
+    result->setValue("y", ValueConversions<double>::serialize(m_y));
+    result->setValue("width", ValueConversions<double>::serialize(m_width));
+    result->setValue("height", ValueConversions<double>::serialize(m_height));
+    result->setValue("scale", ValueConversions<double>::serialize(m_scale));
+    return result;
+}
+
+std::unique_ptr<Viewport> Viewport::clone() const {
+    ErrorSupport errors;
+    return parse(serialize().get(), &errors);
+}
+
 // ------------- Enum values from params.
 
 
