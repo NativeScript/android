@@ -187,6 +187,10 @@ void Console::dirCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 
                 if (propIsFunction) {
                     ss << "()";
+                } else if (propertyValue->IsObject()) {
+                    ss << ": " << ArgConverter::ConvertToString(JsonStringifyObject(isolate, propertyValue));
+                } else {
+                    ss << ": " << ArgConverter::ConvertToString(propertyValue->ToDetailString(isolate));
                 }
 
                 ss << std::endl;
