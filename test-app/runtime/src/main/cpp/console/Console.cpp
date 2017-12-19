@@ -72,7 +72,7 @@ void Console::sendToDevToolsFrontEnd(v8::Isolate* isolate, const std::string& me
     v8_inspector::V8LogAgentImpl::EntryAdded(message, logLevel, ArgConverter::ConvertToString(frame->GetScriptNameOrSourceURL()), frame->GetLineNumber());
 }
 
-const std::string buildLogString(const v8::FunctionCallbackInfo<v8::Value>& info) {
+const std::string buildLogString(const v8::FunctionCallbackInfo<v8::Value>& info, int startingIndex = 0) {
     auto isolate = info.GetIsolate();
 
     v8::HandleScope scope(isolate);
@@ -81,7 +81,7 @@ const std::string buildLogString(const v8::FunctionCallbackInfo<v8::Value>& info
 
     auto argLen = info.Length();
     if (argLen) {
-        for (int i = 0; i < argLen; i++) {
+        for (int i = startingIndex; i < argLen; i++) {
             v8::Local<v8::String> argString;
             if (info[i]->IsFunction()) {
                 info[i]->ToDetailString(isolate->GetCurrentContext()).ToLocal(&argString);
@@ -120,10 +120,7 @@ void Console::assertCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
         assertionError << "Assertion failed: ";
 
         if (argLen > 1) {
-            v8::Local<v8::String> argString;
-            info[1]->ToDetailString(isolate->GetCurrentContext()).ToLocal(&argString);
-
-            assertionError << ArgConverter::ConvertToString(argString);
+            assertionError << buildLogString(info, 1);
         } else {
             assertionError << "console.assert";
         }
@@ -197,11 +194,12 @@ void Console::dirCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 
             ss << "==== object dump end ====" << std::endl;
         } else {
-            v8::Local<v8::String> argString;
-            info[0]->ToString(isolate->GetCurrentContext()).ToLocal(&argString);
+            std::string logString = buildLogString(info);
 
-            ss << ArgConverter::ConvertToString(argString);
+            ss << logString;
         }
+    } else {
+        ss << std::endl;
     }
 
     std::string log = ss.str();
