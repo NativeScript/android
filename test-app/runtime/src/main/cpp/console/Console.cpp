@@ -188,9 +188,14 @@ void Console::dirCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
                 if (propIsFunction) {
                     ss << "()";
                 } else if (propertyValue->IsObject()) {
-                    ss << ": " << ArgConverter::ConvertToString(JsonStringifyObject(isolate, propertyValue));
+                    std::string jsonStringifiedObject = ArgConverter::ConvertToString(JsonStringifyObject(isolate, propertyValue));
+                    // if object prints out as the error string for circular references, replace with #CR instead for brevity
+                    if (jsonStringifiedObject.find("circular structure") != std::string::npos) {
+                        jsonStringifiedObject = "#CR";
+                    }
+                    ss << ": " << jsonStringifiedObject;
                 } else {
-                    ss << ": " << ArgConverter::ConvertToString(propertyValue->ToDetailString(isolate));
+                    ss << ": \"" << ArgConverter::ConvertToString(propertyValue->ToDetailString(isolate)) << "\"";
                 }
 
                 ss << std::endl;
