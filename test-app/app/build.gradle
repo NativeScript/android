@@ -217,7 +217,7 @@ task addDependenciesFromNativeScriptPlugins {
             project.dependencies.add("compile", [name: fileName, ext: "aar"])
         }
 
-        def jarFiles = fileTree(dir: file("${dep.directory}/$PLATFORMS_ANDROID"), include: ["**/*.jar"])
+        def jarFiles = fileTree(dir: file("$rootDir/${dep.directory}/$PLATFORMS_ANDROID"), include: ["**/*.jar"])
         jarFiles.each { jarFile ->
             println "\t + adding jar plugin dependency: " + jarFile.getAbsolutePath()
         }
