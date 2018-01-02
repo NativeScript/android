@@ -11,7 +11,7 @@ public class NativeScriptApplication extends Application {
     }
 
     public void onCreate() {
-        ManualInstrumentation.Frame frame = ManualInstrumentation.start("NaitveScriptApplication.onCreate");
+        ManualInstrumentation.Frame frame = ManualInstrumentation.start("NativeScriptApplication.onCreate");
         try {
             super.onCreate();
             com.tns.Runtime runtime = RuntimeHelper.initRuntime(this);
