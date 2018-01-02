@@ -363,3 +363,16 @@ task createPackage {
 
     println "Creating NativeScript Android Package"
 }
+
+def TEST_APP_PATH = "$rootDir/test-app"
+
+task runTests (type: Exec) {
+    doFirst {
+        workingDir "$TEST_APP_PATH"
+        if (isWinOs) {
+            commandLine "cmd", "/c", "gradlew", "-b", "runtests.gradle", "runtests"
+        } else {
+            commandLine "./gradlew", "-b", "runtests.gradle", "runtests"
+        }
+    }
+}
