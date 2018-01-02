@@ -26,8 +26,6 @@ class CallbackHandlers {
          */
         static std::map<int, v8::Persistent<v8::Object>*> id2WorkerMap;
 
-        static std::map<v8::Isolate*, v8::Persistent<v8::Function>*> isolateToJsonStringify;
-
         static int nextWorkerId;
 
         static void Init(v8::Isolate* isolate);
