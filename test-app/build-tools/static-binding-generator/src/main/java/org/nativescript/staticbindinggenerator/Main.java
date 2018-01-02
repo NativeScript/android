@@ -1,11 +1,13 @@
 package org.nativescript.staticbindinggenerator;
 
 import org.apache.commons.io.FileUtils;
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.io.PrintWriter;
 import java.nio.charset.Charset;
 import java.nio.file.Paths;
@@ -13,37 +15,56 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Main {
-    public static final String SBG_INPUT_OUTPUT_DIRS = "sbg-input-output-dirs.txt";
+    public static final String SBG_INPUT_FILE = "sbg-input-file.txt";
+    public static final String SBG_OUTPUT_FILE = "sbg-output-file.txt";
     public static final String SBG_BINDINGS_NAME = "sbg-bindings.txt";
     public static final String SBG_JS_PARCED_FILES = "sbg-js-parced-files.txt";
     public static final String SBG_INTERFACE_NAMES = "sbg-interfaces-names.txt";
+
     private static String jsCodeAbsolutePath;
-    private static List<String> inputJsFiles = new ArrayList<>();
+    private static List<String> inputJsFiles;
     private static File outputDir;
     private static File inputDir;
     private static String dependenciesFile;
+    private static String webpackWorkersExcludePath;
+
+    static {
+        inputJsFiles = new ArrayList<>();
+    }
 
     public static void main(String[] args) throws IOException, ClassNotFoundException {
 
         validateInput();
 
-        //webpack specific excluded files
         getWorkerExcludeFile();
 
         List<DataRow> rows = Generator.getRows(dependenciesFile);
-
-        //generate interfaceNames.txt needed for js parser
         GetInterfaceNames.generateInterfaceFile(rows);
-
-        //run static js analysis
-        String inputBindingFilename = Paths.get(System.getProperty("user.dir"), SBG_BINDINGS_NAME).toString();
-        try {
-            new File(inputBindingFilename).delete();
-        } catch (Exception e) {}
-        runJsParser(inputDir);
+        generateJsInputFile();
+        runJsParser();
 
         // generate java bindings
+        String inputBindingFilename = Paths.get(System.getProperty("user.dir"), SBG_BINDINGS_NAME).toString();
         new Generator(outputDir, rows).writeBindings(inputBindingFilename);
+    }
+
+    /*
+    * Method should traverse all js files from input folder and put the ones that need traversing in another file
+    * */
+    private static void generateJsInputFile() throws IOException {
+        try {
+            traverseDirectory(inputDir, false/*traverse explicitly*/);
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+        String pathToJsFileParams = SBG_JS_PARCED_FILES;
+        PrintWriter pw = GetInterfaceNames.ensureOutputFile(pathToJsFileParams);
+        for (String f : inputJsFiles) {
+            pw.write(f);
+            pw.write("\n");
+        }
+        pw.flush();
+        pw.close();
     }
 
     private static void validateInput() throws IOException {
@@ -52,48 +73,33 @@ public class Main {
             throw new IllegalArgumentException(String.format("Couldn't find input dependenciesFile file. Make sure the file %s is present.", dependenciesFile));
         }
 
-        List<DataRow> inputOutput = Generator.getRows(SBG_INPUT_OUTPUT_DIRS);
-        inputDir = new File(inputOutput.get(0).getRow());
+        List<DataRow> inputFile = Generator.getRows(SBG_INPUT_FILE);
+        inputDir = new File(inputFile.get(0).getRow());
+        webpackWorkersExcludePath = Paths.get(inputDir.getAbsolutePath(), "__worker-chunks.json").toString();
+
         if (!inputDir.exists() || !inputDir.isDirectory()) {
             throw new IllegalArgumentException(String.format("Couldn't find the output dir %s or it wasn't a directory", inputDir.getAbsolutePath()));
         }
         jsCodeAbsolutePath = inputDir.getAbsolutePath();
 
-        //asd
-        outputDir = new File(inputOutput.get(1).getRow());
+        List<DataRow> outputFile = Generator.getRows(SBG_OUTPUT_FILE);
+        outputDir = new File(outputFile.get(0).getRow());
         if (!outputDir.exists() || !outputDir.isDirectory()) {
             System.out.println(String.format("Couldn't find the output dir %s or it wasn't a directory so it will be created!", outputDir.getAbsolutePath()));
             outputDir.mkdirs();
         }
     }
 
-    private static void runJsParser(File inputDir) throws IOException {
+    /*
+     * Run the javascript static analysis [js_parser] and generate an output file.
+     * This output file should contain all the information needed to generate java counterparts to the traversed js classes.
+    * */
+    private static void runJsParser() throws IOException {
         String parserPath = Paths.get(System.getProperty("user.dir"), "jsparser", "js_parser.js").toString();
-        String inputPath = inputDir.getAbsolutePath();
-        String bindingsFilePath = Paths.get(System.getProperty("user.dir"), SBG_BINDINGS_NAME).toString();
-        String interfaceNamesFilePath = Paths.get(System.getProperty("user.dir"), SBG_INTERFACE_NAMES).toString();
-        try {
-            traverseDirectory(inputDir, false/*traverse explicitly*/);
-        } catch (JSONException e) {
-            e.printStackTrace();
-        }
-        String pathToJsFileParams = SBG_JS_PARCED_FILES;
-        PrintWriter pw = GetInterfaceNames.ensureOutputFile(pathToJsFileParams);
-        pathToJsFileParams = Paths.get(System.getProperty("user.dir"), pathToJsFileParams).toString();
-        for (String f : inputJsFiles) {
-            pw.write(f);
-            pw.write("\n");
-        }
-        pw.flush();
-        pw.close();
 
         List<String> l = new ArrayList<String>();
         l.add("node");
         l.add(parserPath);
-        l.add(inputPath);
-        l.add(bindingsFilePath);
-        l.add(interfaceNamesFilePath);
-        l.add(pathToJsFileParams);
 
         ProcessBuilder pb = new ProcessBuilder(l);
         pb.redirectOutput(ProcessBuilder.Redirect.INHERIT);
@@ -103,6 +109,7 @@ public class Main {
             p.waitFor();
         } catch (InterruptedException e) {
             e.printStackTrace();
+            throw new InterruptedIOException("A problem occured while waiting for the jsparser to finish.");
         }
     }
 
@@ -156,9 +163,11 @@ public class Main {
         }
     }
 
-    private static String webpackWorkersExcludePath = System.getProperty("user.dir") + "/app/src/main/assets/app/__worker-chunks.json";
     private static List<String> webpackWorkersExcludesList;
 
+    /*
+    * Should provide the webpack specific files that need to be excluded from the js analysis
+    * */
     private static void getWorkerExcludeFile() {
         webpackWorkersExcludesList = new ArrayList<String>();
 
@@ -166,7 +175,11 @@ public class Main {
         if (workersExcludeFile.exists()) {
             try {
                 String workersExcludeFileContent = FileUtils.readFileToString(workersExcludeFile, Charset.defaultCharset());
-                webpackWorkersExcludesList = (List<String>) new JSONObject(workersExcludeFileContent);
+                JSONArray jsonarray = new JSONArray(workersExcludeFileContent);
+                for (int i = 0; i < jsonarray.length(); i++) {
+                    String excludeFile = (String) jsonarray.get(i);
+                    webpackWorkersExcludesList.add(excludeFile);
+                }
             } catch (Exception e) {
                 e.printStackTrace();
                 System.out.println("Malformed workers exclude file at ${webpackWorkersExcludePath}");
