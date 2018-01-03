@@ -1,34 +1,3 @@
-apply plugin: 'com.android.application'
-
-android {
-    compileSdkVersion 26
-    buildToolsVersion "26.0.1"
-    defaultConfig {
-        applicationId "com.tns.testapplication"
-        minSdkVersion 17
-        targetSdkVersion 26
-        versionCode 1
-        versionName "1.0"
-        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
-    }
-    buildTypes {
-        release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-        }
-    }
-}
-
-dependencies {
-    releaseCompile project(path: ':runtime', configuration: 'release')
-    debugCompile project(path: ':runtime', configuration: 'debug')
-
-    compile fileTree(include: ['*.jar'], dir: 'libs')
-    compile 'com.android.support:appcompat-v7:26.0.2'
-    compile 'com.android.support:design:26.0.2'
-    compile 'com.android.support.constraint:constraint-layout:1.0.2'
-}
-
 def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
 def runOnDevice = project.hasProperty("runOnDevice");
 def runOnDeviceOrEmulator = runOnDevice ? "-d" : "-e";
@@ -40,18 +9,26 @@ task deleteDist(type: Delete) {
 }
 
 task installApk(type: Exec) {
+        doFirst {
+            println "Attempting to install buit apk"
+
+            if (isWinOs) {
+                commandLine "cmd", "/c", "gradlew", ":app:installDebug"
+            } else {
+                commandLine "./gradlew", ":app:installDebug"
+            }
+        }
+}
+
+task runAdbAsRoot(type: Exec) {
     doFirst {
-        println "Attempting to install buit apk"
+        println "Removing previous android_unit_test_results.xml"
 
         if (isWinOs) {
-            commandLine "cmd", "/c", "node", "$rootDir\\tools\\deploy-apk.js", "$rootDir\\app\\build\\outputs\\apk\\app-debug.apk", runOnDeviceOrEmulator
+            commandLine "cmd", "/c", "adb", "root"
         } else {
-            commandLine "node", "$rootDir/tools/deploy-apk.js", "$rootDir/app/build/outputs/apk/app-debug.apk", runOnDeviceOrEmulator
+            commandLine "adb", "root"
         }
-    }
-
-    doLast {
-        println "Install result:" + execResult
     }
 }
 
@@ -60,9 +37,9 @@ task deletePreviousResultXml(type: Exec) {
         println "Removing previous android_unit_test_results.xml"
 
         if (isWinOs) {
-            commandLine "cmd", "/c", "adb", "root", "&&", "adb", runOnDeviceOrEmulator, "shell", "rm", "-rf", "/data/data/com.tns.testapplication/android_unit_test_results.xml"
+            commandLine "cmd", "/c", "adb", runOnDeviceOrEmulator, "shell", "rm", "-rf", "/data/data/com.tns.testapplication/android_unit_test_results.xml"
         } else {
-            commandLine "adb", "root", "&&", "adb", runOnDeviceOrEmulator, "shell", "rm", "-rf", "/data/data/com.tns.testapplication/android_unit_test_results.xml"
+            commandLine "adb", runOnDeviceOrEmulator, "shell", "rm", "-rf", "/data/data/com.tns.testapplication/android_unit_test_results.xml"
         }
     }
 }
@@ -99,15 +76,16 @@ task waitForUnitTestResultFile(type: Exec) {
 }
 
 task copyResultToDist(type: Copy) {
-    from "$rootDir/app/android_unit_test_results.xml"
+    from "$rootDir/android_unit_test_results.xml"
     into "$rootDir/dist"
 }
 
 task deleteRootLevelResult(type: Delete) {
-    delete "$rootDir/app/android_unit_test_results.xml"
+    delete "$rootDir/android_unit_test_results.xml"
 }
 
-deletePreviousResultXml.dependsOn(deleteDist)
+runAdbAsRoot.dependsOn(deleteDist)
+deletePreviousResultXml.dependsOn(runAdbAsRoot)
 installApk.dependsOn(deletePreviousResultXml)
 startInstalledApk.dependsOn(installApk)
 createDistFolder.dependsOn(startInstalledApk)
@@ -117,11 +95,4 @@ deleteRootLevelResult.dependsOn(copyResultToDist)
 
 task runtests {
     dependsOn deleteRootLevelResult
-}
-
-tasks.whenTaskAdded { task ->
-
-    if (task.getName() == "assembleDebug") {
-        runtests.dependsOn assembleDebug
-    }
 }
