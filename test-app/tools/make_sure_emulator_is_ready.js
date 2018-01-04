@@ -33,6 +33,7 @@ function checkCommandOutput(err, stdout, stderr) {
 			console.log(`${err}`);
 		}
 	}
+	console.log("waiting for device to start up...")
 }
 
 function closeProcessAfter(timeout) {

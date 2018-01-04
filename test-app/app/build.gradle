@@ -41,7 +41,7 @@ task deleteDist(type: Delete) {
 
 task waitForEmulatorToStart(type: Exec) {
     doFirst {
-        println "Waiting for tests to finish..."
+        println "Waiting for emulator to start..."
 
         if (isWinOs) {
             commandLine "cmd", "/c", "node", "$rootDir\\tools\\make_sure_emulator_is_ready.js", runOnDeviceOrEmulator
