@@ -39,19 +39,27 @@ task deleteDist(type: Delete) {
     }
 }
 
-task installApk(type: Exec) {
+task waitForEmulatorToStart(type: Exec) {
     doFirst {
-        println "Attempting to install buit apk"
+        println "Waiting for tests to finish..."
 
         if (isWinOs) {
-            commandLine "cmd", "/c", "node", "$rootDir\\tools\\deploy-apk.js", "$rootDir\\app\\build\\outputs\\apk\\app-debug.apk", runOnDeviceOrEmulator
+            commandLine "cmd", "/c", "node", "$rootDir\\tools\\make_sure_emulator_is_ready.js", runOnDeviceOrEmulator
         } else {
-            commandLine "node", "$rootDir/tools/deploy-apk.js", "$rootDir/app/build/outputs/apk/app-debug.apk", runOnDeviceOrEmulator
+            commandLine "node", "$rootDir/tools/make_sure_emulator_is_ready.js", runOnDeviceOrEmulator
         }
     }
+}
 
-    doLast {
-        println "Install result:" + execResult
+task runAdbAsRoot(type: Exec) {
+    doFirst {
+        println "Running adb as root"
+
+        if (isWinOs) {
+            commandLine "cmd", "/c", "adb", "root"
+        } else {
+            commandLine "adb", "root"
+        }
     }
 }
 
@@ -64,6 +72,22 @@ task deletePreviousResultXml(type: Exec) {
         } else {
             commandLine "adb", "root", "&&", "adb", runOnDeviceOrEmulator, "shell", "rm", "-rf", "/data/data/com.tns.testapplication/android_unit_test_results.xml"
         }
+    }
+}
+
+task installApk(type: Exec) {
+    doFirst {
+        println "Attempting to install built apk"
+
+        if (isWinOs) {
+            commandLine "cmd", "/c", "node", "$rootDir\\tools\\deploy-apk.js", "$rootDir\\app\\build\\outputs\\apk\\app-debug.apk", runOnDeviceOrEmulator
+        } else {
+            commandLine "node", "$rootDir/tools/deploy-apk.js", "$rootDir/app/build/outputs/apk/app-debug.apk", runOnDeviceOrEmulator
+        }
+    }
+
+    doLast {
+        println "Install result:" + execResult
     }
 }
 
@@ -107,7 +131,9 @@ task deleteRootLevelResult(type: Delete) {
     delete "$rootDir/app/android_unit_test_results.xml"
 }
 
-deletePreviousResultXml.dependsOn(deleteDist)
+waitForEmulatorToStart.dependsOn(deleteDist)
+runAdbAsRoot.dependsOn(waitForEmulatorToStart)
+deletePreviousResultXml.dependsOn(runAdbAsRoot)
 installApk.dependsOn(deletePreviousResultXml)
 startInstalledApk.dependsOn(installApk)
 createDistFolder.dependsOn(startInstalledApk)
