@@ -1,0 +1,35 @@
+apply plugin: 'java-library'
+
+dependencies {
+    compile 'org.apache.bcel:bcel:5.2'
+    compile group: 'org.json', name: 'json', version: '20090211'
+    compile 'commons-io:commons-io:2.5'
+    testCompile 'junit:junit:4.+'
+}
+
+sourceCompatibility = "1.7"
+targetCompatibility = "1.7"
+
+task copyJarToBuildTools (type: Copy) {
+    inputs.dir("$projectDir/build/libs/static-binding-generator.jar")
+    from "$projectDir/build/libs/static-binding-generator.jar"
+    into "$projectDir/../"
+}
+
+jar {
+    manifest {
+        attributes("Manifest-Version": "1.0",
+                "Main-Class": "org.nativescript.staticbindinggenerator.Main")
+    }
+    from {
+        configurations.runtime.collect {
+            it.isDirectory() ? it : zipTree(it)
+        }
+
+        configurations.compile.collect {
+            it.isDirectory() ? it : zipTree(it)
+        }
+    }
+}
+
+jar.finalizedBy(copyJarToBuildTools)
