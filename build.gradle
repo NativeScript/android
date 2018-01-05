@@ -264,7 +264,7 @@ task createNpmPackage(type: Exec) {
         }
     }
 }
-
+generateDtsgJar.dependsOn(cleanDistDir)
 generateSbgJar.dependsOn(generateDtsgJar)
 generateMdgJar.dependsOn(generateSbgJar)
 createDistDir.dependsOn(generateMdgJar)
