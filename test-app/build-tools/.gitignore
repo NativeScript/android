@@ -9,3 +9,4 @@ android-metadata-generator.jar
 mdg-output-dir.txt
 mdg-java-dependencies.txt
 dts-generator.jar
+sbg-input-output-dirs.txt
