@@ -10,9 +10,9 @@ if (process.env.AST_PARSER_DISABLE_LOGGING && process.env.AST_PARSER_DISABLE_LOG
 	disableLogger = false;
 }
 
-var 	arguments = process.argv;
+var arguments = process.argv;
 if (arguments && arguments.length) {
-	if(arguments[arguments.length - 1] == "enableVerboseLogging") {
+	if (arguments[arguments.length - 1] == "enableVerboseLogging") {
 		disableLogger = false
 	}
 }
@@ -35,16 +35,20 @@ var fs = require("fs"),
 	lazy = require("lazy"),
 	eol = require('os').EOL,
 
+	BUILD_TOOLS_DIR = `${__dirname}/../`,
 	appDir = path.dirname(require.main.filename),
 	extendDecoratorName = "JavaProxy",
 	interfacesDecoratorName = "Interfaces",
 	outFile = "out/out_parsed_typescript.txt", // default out file
 	inputDir = "input_parced_typescript", // default input folder
 	SBG_INTERFACE_NAMES = "sbg-interface-names.txt",
-	interfacesNamesFilePath = "../" + SBG_INTERFACE_NAMES, //default interace_names file path
+	interfacesNamesFilePath = getRelativeToBuildTools(SBG_INTERFACE_NAMES), //default interace_names file path
+	SBG_INPUT_FILE = "sbg-input-file.txt",
+	SBG_BINDINGS_NAME = "sbg-bindings.txt",
+	SBG_INTERFACE_NAMES = "sbg-interfaces-names.txt",
+	SBG_JS_PARCED_FILES = "sbg-js-parced-files.txt",
 	interfaceNames = [],
 	inputFiles = [];
-
 
 //env variables
 if (process.env.AST_PARSER_OUT_FILE) {
@@ -57,24 +61,17 @@ if (process.env.AST_PARSER_INTERFACE_FILE_PATH) {
 	interfacesNamesFilePath = process.env.AST_PARSER_INTERFACE_FILE_PATH.trim();
 }
 
+inputDir = fs.readFileSync(getRelativeToBuildTools(SBG_INPUT_FILE), "UTF-8").trim();
+try {
+	fs.unlinkSync(getRelativeToBuildTools(SBG_BINDINGS_NAME)); //delete before each run
+} catch (e) { }
+outFile = getRelativeToBuildTools(SBG_BINDINGS_NAME)
+interfacesNamesFilePath = getRelativeToBuildTools(SBG_INTERFACE_NAMES)
+inputFilesPath = getRelativeToBuildTools(SBG_JS_PARCED_FILES)
 
-//console variables have priority
-if (arguments && arguments.length >= 3) {
-	inputDir = arguments[2]
-	// console.log("inputDir: " + inputDir)
+function getRelativeToBuildTools(relativePath) {
+	return path.resolve(`${BUILD_TOOLS_DIR}/${relativePath}`)
 }
-if (arguments && arguments.length >= 4) {
-	outFile = arguments[3]
-	// console.log("outFile: " + outFile)
-}
-if (arguments && arguments.length >= 5) {
-	interfacesNamesFilePath = arguments[4]
-	// console.log("interfacesNamesFilePath: " + interfacesNamesFilePath)
-}
-if (arguments && arguments.length >= 6) {
-	inputFilesPath = arguments[5]
-}
-
 
 /////////////// PREPARATION ////////////////
 // fileHelpers.createFile(outFile)
@@ -113,10 +110,10 @@ function readLinesFromFile(filePath, outArr, resolveParameter) {
 /*
 *	Get line and column of the __extends function from ts_helpers file
 */
-function getFileAst(tsHelpersFilePath) {	
+function getFileAst(tsHelpersFilePath) {
 	return new Promise(function (resolve, reject) {
-		fs.readFile(tsHelpersFilePath, 'utf8', function(err, fileContent) {
-			if (err) {				
+		fs.readFile(tsHelpersFilePath, 'utf8', function (err, fileContent) {
+			if (err) {
 				logger.warn("+DIDN'T parse ast from file " + tsHelpersFilePath);
 				return reject(err);
 			}
@@ -126,7 +123,7 @@ function getFileAst(tsHelpersFilePath) {
 			var ast = babelParser.parse(fileContent, {
 				minify: false,
 				plugins: ["decorators"]
-			});			
+			});
 
 			return resolve(ast);
 		});
@@ -142,15 +139,15 @@ function getExtendsLineColumn(ast) {
 
 		var tsHelpersInfo = {};
 		traverse.default(ast, {
-			enter: function(path) {
+			enter: function (path) {
 
-				if(t.isAssignmentExpression(path.parent) &&
+				if (t.isAssignmentExpression(path.parent) &&
 					t.isCallExpression(path) &&
-					 path.node.callee.property &&
-					 path.node.callee.property.name === "extend" &&
-					 path.node.callee.object.name === "parent") {
-						tsHelpersInfo.line = path.node.callee.property.loc.start.line
-						tsHelpersInfo.column = path.node.callee.property.loc.start.column + 1
+					path.node.callee.property &&
+					path.node.callee.property.name === "extend" &&
+					path.node.callee.object.name === "parent") {
+					tsHelpersInfo.line = path.node.callee.property.loc.start.line
+					tsHelpersInfo.column = path.node.callee.property.loc.start.column + 1
 				}
 			}
 		})
@@ -197,15 +194,15 @@ function traverseAndAnalyseFilesDir(inputDir, err) {
 function traverseFiles(filesToTraverse) {
 
 	var filesLength = filesToTraverse.length;
-	for(var i = 0; i < filesLength; i += 1) {
+	for (var i = 0; i < filesLength; i += 1) {
 		var fp = filesToTraverse[i];
 		logger.info("Visiting JavaScript file: " + fp);
 
 		readFile(fp)
-		.then(astFromFileContent)
-		.then(visitAst)
-		.then(writeToFile)
-		.catch(exceptionHandler)
+			.then(astFromFileContent)
+			.then(visitAst)
+			.then(writeToFile)
+			.catch(exceptionHandler)
 	}
 }
 
@@ -213,7 +210,7 @@ function traverseFiles(filesToTraverse) {
 *	Gets the file content as text and passes it down the line.
 */
 var readFile = function (filePath, err) {
-	
+
 	return new Promise(function (resolve, reject) {
 		fs.readFile(filePath, function (err, data) {
 			if (err) {
@@ -234,7 +231,7 @@ var readFile = function (filePath, err) {
 *	Get's the AST (https://en.wikipedia.org/wiki/Abstract_syntax_tree) from the file content and passes it down the line.
 */
 var astFromFileContent = function (data, err) {
-	return new Promise(function (resolve, reject) {		
+	return new Promise(function (resolve, reject) {
 		if (err) {
 			logger.warn("+DIDN'T parse ast from file!");
 			return reject(err);
@@ -288,7 +285,7 @@ var visitAst = function (data, err) {
 	});
 }
 
-var writeToFile = function (data, err) {	
+var writeToFile = function (data, err) {
 	return new Promise(function (resolve, reject) {
 		if (data.trim() != "") {
 			// fs.appendFile(outFile, stringify(data), function (writeFileError) {
