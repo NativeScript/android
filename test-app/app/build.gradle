@@ -29,7 +29,8 @@ def PACKAGE_JSON = "package.json"
 
 //static binding generator
 def SBG_JAVA_DEPENDENCIES = "sbg-java-dependencies.txt"
-def SBG_INPUT_OUTPUT_DIRS = "sbg-input-output-dirs.txt"
+def SBG_INPUT_FILE = "sbg-input-file.txt"
+def SBG_OUTPUT_FILE = "sbg-output-file.txt"
 def SBG_JS_PARCED_FILES = "sbg-js-parced-files.txt"
 def SBG_BINDINGS_NAME = "sbg-bindings.txt"
 def SBG_INTERFACE_NAMES = "sbg-interface-names.txt"
@@ -87,17 +88,17 @@ def applyPluginGradleConfigurations = { ->
 }
 
 def renameResultApks = { variant ->
-	def name
-	variant.outputs.each { output ->
-		def apkDirectory = output.packageApplication.outputFile.parentFile
-		def abiName = "";
-		if (output.getFilter(com.android.build.OutputFile.ABI)) {
-			abiName = "-" + output.getFilter(com.android.build.OutputFile.ABI);
-		}
-		def apkNamePrefix = rootProject.name + "-" + variant.buildType.name + abiName
-		name = apkNamePrefix + ".apk"
-		output.packageApplication.outputFile = new File(apkDirectory, name);
-	}
+    def name
+    variant.outputs.each { output ->
+        def apkDirectory = output.packageApplication.outputFile.parentFile
+        def abiName = "";
+        if (output.getFilter(com.android.build.OutputFile.ABI)) {
+            abiName = "-" + output.getFilter(com.android.build.OutputFile.ABI);
+        }
+        def apkNamePrefix = rootProject.name + "-" + variant.buildType.name + abiName
+        name = apkNamePrefix + ".apk"
+        output.packageApplication.outputFile = new File(apkDirectory, name);
+    }
 }
 
 android {
@@ -138,9 +139,9 @@ android {
         }
     }
 
-	applicationVariants.all { variant ->
-		renameResultApks(variant)
-	}
+    applicationVariants.all { variant ->
+        renameResultApks(variant)
+    }
 
     applyAppGradleConfiguration()
     applyPluginGradleConfigurations()
@@ -217,7 +218,7 @@ task addDependenciesFromNativeScriptPlugins {
             project.dependencies.add("compile", [name: fileName, ext: "aar"])
         }
 
-        def jarFiles = fileTree(dir: file("$rootDir/${dep.directory}/$PLATFORMS_ANDROID"), include: ["**/*.jar"])
+        def jarFiles = fileTree(dir: file("${dep.directory}/$PLATFORMS_ANDROID"), include: ["**/*.jar"])
         jarFiles.each { jarFile ->
             println "\t + adding jar plugin dependency: " + jarFile.getAbsolutePath()
         }
@@ -333,8 +334,11 @@ task collectAllJars {
                 }
             }
         }
-        new File("$BUILD_TOOLS_PATH/$SBG_INPUT_OUTPUT_DIRS").withWriter { out ->
+
+        new File("$BUILD_TOOLS_PATH/$SBG_INPUT_FILE").withWriter { out ->
             out.println INPUT_JS_DIR
+        }
+        new File("$BUILD_TOOLS_PATH/$SBG_OUTPUT_FILE").withWriter { out ->
             out.println OUTPUT_JAVA_DIR
         }
     }
@@ -464,7 +468,8 @@ task cleanSbg(type: Delete) {
             "$BUILD_TOOLS_PATH/$SBG_JAVA_DEPENDENCIES",
             "$BUILD_TOOLS_PATH/$SBG_INTERFACE_NAMES",
             "$BUILD_TOOLS_PATH/$SBG_BINDINGS_NAME",
-            "$BUILD_TOOLS_PATH/$SBG_INPUT_OUTPUT_DIRS",
+            "$BUILD_TOOLS_PATH/$SBG_INPUT_FILE",
+            "$BUILD_TOOLS_PATH/$SBG_OUTPUT_FILE",
             "$OUTPUT_JAVA_DIR/com/tns/gen"
 }
 

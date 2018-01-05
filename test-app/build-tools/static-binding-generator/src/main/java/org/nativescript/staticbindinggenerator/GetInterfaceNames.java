@@ -16,6 +16,9 @@ import java.util.jar.JarFile;
 public class GetInterfaceNames {
     private static String currentDir;
 
+    /*
+    * generate interfaceNames.txt file, needed for js analyzer
+    * */
     public static void generateInterfaceFile(List<DataRow> rows)
     throws IOException, ClassNotFoundException {
         currentDir = System.getProperty("user.dir");
