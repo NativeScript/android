@@ -1,7 +1,0 @@
-{
-    "spec_dir": "tests/specs",
-    "spec_files": [
-        "**.js"
-    ],
-    "helpers": []
-}
