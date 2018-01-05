@@ -8,6 +8,18 @@ task deleteDist(type: Delete) {
     }
 }
 
+task waitForEmulatorToStart(type: Exec) {
+    doFirst {
+        println "Waiting for emulator to start..."
+
+        if (isWinOs) {
+            commandLine "cmd", "/c", "node", "$rootDir\\tools\\make_sure_emulator_is_ready.js", runOnDeviceOrEmulator
+        } else {
+            commandLine "node", "$rootDir/tools/make_sure_emulator_is_ready.js", runOnDeviceOrEmulator
+        }
+    }
+}
+
 task installApk(type: Exec) {
         doFirst {
             println "Attempting to install buit apk"
@@ -84,7 +96,9 @@ task deleteRootLevelResult(type: Delete) {
     delete "$rootDir/android_unit_test_results.xml"
 }
 
-runAdbAsRoot.dependsOn(deleteDist)
+
+waitForEmulatorToStart.dependsOn(deleteDist)
+runAdbAsRoot.dependsOn(waitForEmulatorToStart)
 deletePreviousResultXml.dependsOn(runAdbAsRoot)
 installApk.dependsOn(deletePreviousResultXml)
 startInstalledApk.dependsOn(installApk)
