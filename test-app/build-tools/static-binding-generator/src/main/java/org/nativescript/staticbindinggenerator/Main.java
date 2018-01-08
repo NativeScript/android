@@ -1,6 +1,7 @@
 package org.nativescript.staticbindinggenerator;
 
 import org.apache.commons.io.FileUtils;
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -25,6 +26,7 @@ public class Main {
     private static File outputDir;
     private static File inputDir;
     private static String dependenciesFile;
+    private static String webpackWorkersExcludePath;
 
     static {
         inputJsFiles = new ArrayList<>();
@@ -73,6 +75,8 @@ public class Main {
 
         List<DataRow> inputFile = Generator.getRows(SBG_INPUT_FILE);
         inputDir = new File(inputFile.get(0).getRow());
+        webpackWorkersExcludePath = Paths.get(inputDir.getAbsolutePath(), "__worker-chunks.json").toString();
+
         if (!inputDir.exists() || !inputDir.isDirectory()) {
             throw new IllegalArgumentException(String.format("Couldn't find the output dir %s or it wasn't a directory", inputDir.getAbsolutePath()));
         }
@@ -172,7 +176,11 @@ public class Main {
         if (workersExcludeFile.exists()) {
             try {
                 String workersExcludeFileContent = FileUtils.readFileToString(workersExcludeFile, Charset.defaultCharset());
-                webpackWorkersExcludesList = (List<String>) new JSONObject(workersExcludeFileContent);
+                JSONArray jsonarray = new JSONArray(workersExcludeFileContent);
+                for (int i = 0; i < jsonarray.length(); i++) {
+                    String excludeFile = (String) jsonarray.get(i);
+                    webpackWorkersExcludesList.add(excludeFile);
+                }
             } catch (Exception e) {
                 e.printStackTrace();
                 System.out.println("Malformed workers exclude file at ${webpackWorkersExcludePath}");
