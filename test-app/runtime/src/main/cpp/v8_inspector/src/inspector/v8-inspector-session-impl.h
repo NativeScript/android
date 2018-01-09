@@ -16,6 +16,7 @@
 #include "src/inspector/protocol/DOM.h"
 #include "src/inspector/protocol/CSS.h"
 #include "src/inspector/protocol/Overlay.h"
+#include "src/inspector/protocol/Log.h"
 
 #include "include/v8-inspector.h"
 
@@ -35,6 +36,7 @@ class V8NetworkAgentImpl;
 class V8DOMAgentImpl;
 class V8CSSAgentImpl;
 class V8OverlayAgentImpl;
+class V8LogAgentImpl;
 
 using protocol::ErrorString;
 
@@ -78,6 +80,9 @@ class V8InspectorSessionImpl : public V8InspectorSession,
         }
         V8OverlayAgentImpl* overlayAgent() {
             return m_overlayAgent.get();
+        }
+        V8LogAgentImpl* logAgent() {
+            return m_logAgent.get();
         }
         int contextGroupId() const {
             return m_contextGroupId;
@@ -159,6 +164,7 @@ class V8InspectorSessionImpl : public V8InspectorSession,
         std::unique_ptr<V8DOMAgentImpl> m_domAgent;
         std::unique_ptr<V8CSSAgentImpl> m_cssAgent;
         std::unique_ptr<V8OverlayAgentImpl> m_overlayAgent;
+        std::unique_ptr<V8LogAgentImpl> m_logAgent;
 
         std::vector<std::unique_ptr<V8InspectorSession::Inspectable>>
                 m_inspectedObjects;
