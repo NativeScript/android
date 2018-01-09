@@ -163,7 +163,6 @@ public class Main {
         }
     }
 
-    private static String webpackWorkersExcludePath = System.getProperty("user.dir") + "/app/src/main/assets/app/__worker-chunks.json";
     private static List<String> webpackWorkersExcludesList;
 
     /*
