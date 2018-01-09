@@ -19,22 +19,17 @@ string tns::ConvertToString(const Local<v8::String>& s) {
 }
 
 Local<String> tns::JsonStringifyObject(Isolate* isolate, Handle<v8::Value> value) {
-    v8::HandleScope scope(isolate);
-
     if (value.IsEmpty()) {
         return String::Empty(isolate);
     }
 
-    v8::Local<v8::String> resultString;
-    v8::TryCatch tc;
-    auto success = v8::JSON::Stringify(isolate->GetCurrentContext(), value->ToObject(isolate)).ToLocal(&resultString);
+    auto stringifyFunction = CallbackHandlers::isolateToJsonStringify.find(isolate)->second;
+    auto func = Local<Function>::New(isolate, *stringifyFunction);
+    Local<Value> args[] = { value };
 
-    if (!success && tc.HasCaught()) {
-        auto message = tc.Message()->Get();
-        resultString = v8::String::Concat(ArgConverter::ConvertToV8String(isolate, "Couldn't convert object to a JSON string: "), message);
-    }
+    auto result = func->Call(Undefined(isolate), 1, args);
 
-    return resultString;
+    return result->ToString(isolate);
 }
 
 jstring tns::ConvertToJavaString(const Local<Value>& value) {

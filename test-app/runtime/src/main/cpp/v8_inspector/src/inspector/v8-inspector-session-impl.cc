@@ -23,7 +23,6 @@
 #include "src/inspector/v8-dom-agent-impl.h"
 #include "src/inspector/v8-css-agent-impl.h"
 #include "src/inspector/v8-overlay-agent-impl.h"
-#include "src/inspector/v8-log-agent-impl.h"
 
 namespace v8_inspector {
 
@@ -50,9 +49,7 @@ namespace v8_inspector {
              stringViewStartsWith(method,
                                   protocol::CSS::Metainfo::commandPrefix) ||
              stringViewStartsWith(method,
-                                  protocol::Overlay::Metainfo::commandPrefix) ||
-             stringViewStartsWith(method,
-                                  protocol::Log::Metainfo::commandPrefix);
+                                  protocol::Overlay::Metainfo::commandPrefix);
     }
 
     std::unique_ptr<V8InspectorSessionImpl> V8InspectorSessionImpl::create(
@@ -82,8 +79,7 @@ namespace v8_inspector {
               m_networkAgent(nullptr),
               m_domAgent(nullptr),
               m_cssAgent(nullptr),
-              m_overlayAgent(nullptr),
-              m_logAgent(nullptr) {
+              m_overlayAgent(nullptr) {
       if (savedState.length()) {
         std::unique_ptr<protocol::Value> state =
                 protocol::parseJSON(toString16(savedState));
@@ -136,11 +132,7 @@ namespace v8_inspector {
 
       m_overlayAgent = wrapUnique(new V8OverlayAgentImpl(
               this, this, agentState(protocol::Overlay::Metainfo::domainName)));
-        protocol::Overlay::Dispatcher::wire(&m_dispatcher, m_overlayAgent.get());
-
-      m_logAgent = wrapUnique(new V8LogAgentImpl(
-              this, this, agentState(protocol::Log::Metainfo::domainName)));
-      protocol::Log::Dispatcher::wire(&m_dispatcher, m_logAgent.get());
+      protocol::Overlay::Dispatcher::wire(&m_dispatcher, m_overlayAgent.get());
 
       if (savedState.length()) {
         m_runtimeAgent->restore();
@@ -164,7 +156,6 @@ namespace v8_inspector {
       m_domAgent->disable(&errorString);
       m_cssAgent->disable(&errorString);
       m_overlayAgent->disable(&errorString);
-      m_logAgent->disable(&errorString);
 
       discardInjectedScripts();
       m_inspector->disconnect(this);
@@ -427,10 +418,6 @@ namespace v8_inspector {
       result.push_back(protocol::Schema::Domain::create()
                                .setName(protocol::Overlay::Metainfo::domainName)
                                .setVersion(protocol::Overlay::Metainfo::version)
-                               .build());
-      result.push_back(protocol::Schema::Domain::create()
-                               .setName(protocol::Log::Metainfo::domainName)
-                               .setVersion(protocol::Log::Metainfo::version)
                                .build());
       return result;
     }

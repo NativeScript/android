@@ -22,7 +22,6 @@
 #include "include/zipconf.h"
 #include <sstream>
 #include <dlfcn.h>
-#include <console/Console.h>
 #include "NetworkDomainCallbackHandlers.h"
 #include "sys/system_properties.h"
 #include "JsV8InspectorClient.h"
@@ -501,6 +500,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__log"), FunctionTemplate::New(isolate, CallbackHandlers::LogMethodCallback));
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__dumpReferenceTables"), FunctionTemplate::New(isolate, CallbackHandlers::DumpReferenceTablesMethodCallback));
+    globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__consoleMessage"), FunctionTemplate::New(isolate, JsV8InspectorClient::sendToFrontEndCallback));
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__enableVerboseLogging"), FunctionTemplate::New(isolate, CallbackHandlers::EnableVerboseLoggingMethodCallback));
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__disableVerboseLogging"), FunctionTemplate::New(isolate, CallbackHandlers::DisableVerboseLoggingMethodCallback));
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__exit"), FunctionTemplate::New(isolate, CallbackHandlers::ExitMethodCallback));
@@ -571,12 +571,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     if (s_mainThreadInitialized) {
         global->ForceSet(ArgConverter::ConvertToV8String(isolate, "self"), global, readOnlyFlags);
     }
-
-    /*
-     * Attach 'console' object to the global object
-     */
-    v8::Local<v8::Object> console = Console::createConsole(context, filesPath);
-    global->ForceSet(context, ArgConverter::ConvertToV8String(isolate, "console"), console, readOnlyFlags);
 
     ArgConverter::Init(isolate);
 

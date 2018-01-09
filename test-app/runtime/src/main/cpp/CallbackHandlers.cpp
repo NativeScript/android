@@ -58,6 +58,13 @@ void CallbackHandlers::Init(Isolate* isolate) {
 
     assert(INIT_WORKER_METHOD_ID != nullptr);
 
+    Local<Object> json = isolate->GetCurrentContext()->Global()->Get(String::NewFromUtf8(isolate, "JSON"))->ToObject();
+    Local<Function> stringify = json->Get(String::NewFromUtf8(isolate, "stringify")).As<Function>();
+
+    auto persistentStringify = new Persistent<Function>(isolate, stringify);
+
+    isolateToJsonStringify.insert({isolate, persistentStringify});
+
     MetadataNode::Init(isolate);
 
     MethodCache::Init();
@@ -1373,6 +1380,8 @@ void CallbackHandlers::TerminateWorkerThread(Isolate* isolate) {
 
 int CallbackHandlers::nextWorkerId = 0;
 std::map<int, Persistent<Object>*> CallbackHandlers::id2WorkerMap;
+
+std::map<Isolate*, Persistent<Function>*> CallbackHandlers::isolateToJsonStringify;
 
 short CallbackHandlers::MAX_JAVA_STRING_ARRAY_LENGTH = 100;
 jclass CallbackHandlers::RUNTIME_CLASS = nullptr;
