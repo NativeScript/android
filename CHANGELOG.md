@@ -1,3 +1,11 @@
+3.4.1
+==
+
+## Bug Fixes
+
+ - [Want help to access webview document height and cookies (#5243)](https://github.com/NativeScript/NativeScript/issues/5243)
+ - [Question about plugin using native lib NS 3.4 (#5254)](https://github.com/NativeScript/NativeScript/issues/5254)
+
 3.4.0
 ==
 
