@@ -825,7 +825,6 @@ void MetadataNode::ExtendedClassConstructorCallback(const v8::FunctionCallbackIn
         v8::HandleScope handleScope(isolate);
 
         auto implementationObject = Local<Object>::New(isolate, *extData->implementationObject);
-
         const auto& extendName = extData->extendedName;
 
         SetInstanceMetadata(isolate, thiz, extData->node);
@@ -835,6 +834,8 @@ void MetadataNode::ExtendedClassConstructorCallback(const v8::FunctionCallbackIn
         ArgsWrapper argWrapper(info, ArgType::Class);
 
         string fullClassName = extData->fullClassName;
+
+        DEBUG_WRITE_FORCE("fullClassName: %s", fullClassName.c_str());
 
         bool success = CallbackHandlers::RegisterInstance(isolate, thiz, fullClassName, argWrapper, implementationObject, false);
     } catch (NativeScriptException& e) {
@@ -1186,8 +1187,7 @@ void MetadataNode::PackageGetterCallback(Local<Name> property, const PropertyCal
     }
 }
 
-bool MetadataNode::ValidateExtendArguments(const FunctionCallbackInfo<Value>& info, string& extendLocation, v8::Local<v8::String>& extendName, Local<Object>& implementationObject) {
-    bool extendLocationFound = GetExtendLocation(extendLocation);
+bool MetadataNode::ValidateExtendArguments(const FunctionCallbackInfo<Value>& info, bool extendLocationFound, string& extendLocation, v8::Local<v8::String>& extendName, Local<Object>& implementationObject, bool isTypeScriptExtend) {
 
     if (info.Length() == 1) {
         if (!extendLocationFound) {
@@ -1207,7 +1207,7 @@ bool MetadataNode::ValidateExtendArguments(const FunctionCallbackInfo<Value>& in
         }
 
         implementationObject = info[0]->ToObject();
-    } else if (info.Length() == 2) {
+    } else if (info.Length() == 2 || isTypeScriptExtend) {
         if (!info[0]->IsString()) {
             stringstream ss;
             ss << "Invalid extend() call. No name for extend specified at location: " << extendLocation.c_str();
@@ -1282,6 +1282,7 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
         string extendLocation;
 
         auto hasDot = false;
+        auto isTypeScriptExtend = false;
         if (info.Length() == 2) {
             if (info[0].IsEmpty() || !info[0]->IsString()) {
                 stringstream ss;
@@ -1299,13 +1300,19 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
             }
             string strName = ArgConverter::ConvertToString(info[0].As<String>());
             hasDot = strName.find('.') != string::npos;
+        } else if (info.Length() == 3) {
+            if (info[2]->IsBoolean() && info[2]->BooleanValue()) {
+                isTypeScriptExtend = true;
+            }
         }
 
         if (hasDot) {
             extendName = info[0].As<String>();
             implementationObject = info[1].As<Object>();
         } else {
-            auto validArgs = ValidateExtendArguments(info, extendLocation, extendName, implementationObject);
+            std::string getExtendLocation;
+            auto isValidExtendLocation = GetExtendLocation(extendLocation, isTypeScriptExtend);
+            auto validArgs = ValidateExtendArguments(info, isValidExtendLocation, extendLocation, extendName, implementationObject, isTypeScriptExtend);
 
             if (!validArgs) {
                 return;
@@ -1412,11 +1419,17 @@ bool MetadataNode::IsValidExtendName(const Local<String>& name) {
     return true;
 }
 
-bool MetadataNode::GetExtendLocation(string& extendLocation) {
+bool MetadataNode::GetExtendLocation(string& extendLocation, bool isTypeScriptExtend) {
     stringstream extendLocationStream;
-    auto stackTrace = StackTrace::CurrentStackTrace(Isolate::GetCurrent(), 1, StackTrace::kOverview);
+    auto stackTrace = StackTrace::CurrentStackTrace(Isolate::GetCurrent(), 3, StackTrace::kOverview);
     if (!stackTrace.IsEmpty()) {
-        auto frame = stackTrace->GetFrame(0);
+        Local<StackFrame> frame;
+        if (isTypeScriptExtend) {
+            frame = stackTrace->GetFrame(2); // the _super.apply call to ts_helpers will always be the third call frame
+        }  else {
+            frame = stackTrace->GetFrame(0);
+        }
+
         if (!frame.IsEmpty()) {
             auto scriptName = frame->GetScriptName();
             if (scriptName.IsEmpty()) {
