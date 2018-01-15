@@ -253,6 +253,10 @@ task runSbg(type: JavaExec) {
     workingDir "$BUILD_TOOLS_PATH"
     main "-jar"
     args "static-binding-generator.jar"
+
+    doFirst {
+        new File("$OUTPUT_JAVA_DIR/com/tns/gen").deleteDir();
+    }
 }
 
 task ensureMetadataOutDir {
