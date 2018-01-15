@@ -835,8 +835,6 @@ void MetadataNode::ExtendedClassConstructorCallback(const v8::FunctionCallbackIn
 
         string fullClassName = extData->fullClassName;
 
-        DEBUG_WRITE_FORCE("fullClassName: %s", fullClassName.c_str());
-
         bool success = CallbackHandlers::RegisterInstance(isolate, thiz, fullClassName, argWrapper, implementationObject, false);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
