@@ -17,6 +17,13 @@ The repo is structured in the following projects (ordered by dependencies):
 * [**android-static-binding-generator**](android-static-binding-generator) - build tool that generates bindings based on the user's javascript code.
 * [**project-template**](build-artifacts/project-template-gradle) - this is an empty placeholder Android Application project, used by the [NativeScript CLI](https://github.com/NativeScript/nativescript-cli) when building an Android project.
 
+## Architecture diagram
+The NativeScript Android Runtime architecture can be summarized in the following diagram. 
+
+![Android Runtime diagram](https://github.com/NativeScript/docs/blob/master/docs/img/ns-runtime-android.png)
+
+For more details on how it works, read the [documentation](https://docs.nativescript.org/runtimes/android/overview). 
+
 # Build Prerequisites
 Following are the minimal prerequisites to build the runtime package.
 
