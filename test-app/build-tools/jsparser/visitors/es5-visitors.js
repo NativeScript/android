@@ -201,19 +201,59 @@ var es5_visitors = (function () {
          */
         if (constructorFunctionName === returnIdentifierName && !!constructorFunctionName) {
             var constructorFunctionScope = extendPath.node.body[1];
-            var firstLineOfCtorFunction = constructorFunctionScope.body.body[0];
-            if (types.isVariableDeclaration(firstLineOfCtorFunction)) {
-                var variableRHS = firstLineOfCtorFunction.declarations[0].init;
-                var variableRHSPaths = variableRHS._paths.filter(node => types.isCallExpression(node));
-                variableRHSPaths = variableRHSPaths.length > 0 ? variableRHSPaths[0] : null;
-                if (types.isMemberExpression(variableRHSPaths && variableRHSPaths.node.callee)) {
-                    var superCallee = variableRHSPaths.node.callee.property;
+            // try to get node from `var _this = super.call(_this);` or get `_this = super.call(_this);`
+            var thisSuperCallLineNode = getThisDeclarationSuperCallLineNode(constructorFunctionScope.body.body) || getThisAssignmentSuperCallLineNode(constructorFunctionScope.body.body);
+
+            //// helper functions to find the correct _this nodes
+            // necessary for when _super.call(this) is not called on the _this variable declaration
+            // checks if the line is as follows:
+            //  _this = _super.call(this) || this;
+            // to pass the check:
+            //  - the variable must be called '_this'
+            //  - the RHS of the assignment must be a logical expression
+            //  - the left part of the logical expression must be a function call
+            function getThisAssignmentSuperCallLineNode(node) {
+                var matchingNodes = node.filter(
+                    (node) => {
+                        return types.isExpressionStatement(node)
+                            && types.isAssignmentExpression(node.expression)
+                            && node.expression.left.name === "_this"
+                            && types.isLogicalExpression(node.expression.right)
+                            && types.isCallExpression(node.expression.right.left);
+                    });
+
+                return matchingNodes.length > 0 ? matchingNodes[0].expression.right.left : null;
+            }
+            // necessary for when _super.call(this) is assigned directly on the _this variable declaration  
+            // checks if the line is as follows:
+            //  var _this = _super.call(this) || this;
+            // to pass the check:
+            //  - the variable must be called '_this'
+            //  - the RHS of the assignment must be a logical expression
+            //  - the left part of the logical expression must be a function call
+            function getThisDeclarationSuperCallLineNode(node) {
+                var matchingNodes = node.filter(
+                    (node) => {
+                        return types.isVariableDeclaration(node)
+                            && node.declarations[0].id.name === "_this"
+                            && types.isLogicalExpression(node.declarations[0].init)
+                            && types.isCallExpression(node.declarations[0].init.left);
+                    });
+
+                return matchingNodes.length > 0 ? matchingNodes[0].declarations[0].init.left : null;
+            }
+            ////
+
+            if (thisSuperCallLineNode) {
+                var variableRHS = thisSuperCallLineNode;
+                if (variableRHS.callee && types.isMemberExpression(variableRHS.callee)) {
+                    var superCallee = variableRHS.callee.property;
                     superCalleeStartColumn = superCallee.loc.start.column + 1;
                     superCalleeLine = superCallee.loc.start.line;
                 } else {
                     config.logger.info(UNSUPPORTED_TYPESCRIPT_EXTEND_FORMAT_MESSAGE);
                 }
-            } else if (types.isExpressionStatement(firstLineOfCtorFunction)) {
+            } else {
                 config.logger.info(UNSUPPORTED_TYPESCRIPT_EXTEND_FORMAT_MESSAGE);
             }
         }
