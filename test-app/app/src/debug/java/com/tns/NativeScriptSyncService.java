@@ -1,39 +1,23 @@
 package com.tns;
 
 import java.io.Closeable;
-import java.io.DataInputStream;
 import java.io.File;
-import java.io.FileFilter;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
 import android.content.Context;
-import android.content.pm.ApplicationInfo;
-import android.content.pm.PackageManager.NameNotFoundException;
 import android.net.LocalServerSocket;
 import android.net.LocalSocket;
-import android.util.Log;
+import android.support.annotation.NonNull;
 
 public class NativeScriptSyncService {
-    private static String SYNC_ROOT_SOURCE_DIR = "/data/local/tmp/";
-    private static final String SYNC_SOURCE_DIR = "/sync/";
-    private static final String FULL_SYNC_SOURCE_DIR = "/fullsync/";
-    private static final String REMOVED_SYNC_SOURCE_DIR = "/removedsync/";
+    private static String DEVICE_APP_DIR;
 
     private final Runtime runtime;
     private static Logger logger;
     private final Context context;
-
-    private final String syncPath;
-    private final String fullSyncPath;
-    private final String removedSyncPath;
-    private final File fullSyncDir;
-    private final File syncDir;
-    private final File removedSyncDir;
 
     private LocalServerSocketThread localServerThread;
     private Thread localServerJavaThread;
@@ -42,35 +26,7 @@ public class NativeScriptSyncService {
         this.runtime = runtime;
         this.logger = logger;
         this.context = context;
-
-        syncPath = SYNC_ROOT_SOURCE_DIR + context.getPackageName() + SYNC_SOURCE_DIR;
-        fullSyncPath = SYNC_ROOT_SOURCE_DIR + context.getPackageName() + FULL_SYNC_SOURCE_DIR;
-        removedSyncPath = SYNC_ROOT_SOURCE_DIR + context.getPackageName() + REMOVED_SYNC_SOURCE_DIR;
-        fullSyncDir = new File(fullSyncPath);
-        syncDir = new File(syncPath);
-        removedSyncDir = new File(removedSyncPath);
-    }
-
-    public void sync() {
-        if (logger != null && logger.isEnabled()) {
-            logger.write("Sync is enabled:");
-            logger.write("Sync path              : " + syncPath);
-            logger.write("Full sync path         : " + fullSyncPath);
-            logger.write("Removed files sync path: " + removedSyncPath);
-        }
-
-        if (fullSyncDir.exists()) {
-            executeFullSync(context, fullSyncDir);
-            return;
-        }
-
-        if (syncDir.exists()) {
-            executePartialSync(context, syncDir);
-        }
-
-        if (removedSyncDir.exists()) {
-            executeRemovedSync(context, removedSyncDir);
-        }
+        DEVICE_APP_DIR = this.context.getFilesDir().getAbsolutePath() + "/app";
     }
 
     private class LocalServerSocketThread implements Runnable {
@@ -109,224 +65,239 @@ public class NativeScriptSyncService {
         }
     }
 
-    private class ListenerWorker implements Runnable {
-        private final DataInputStream input;
-        private Closeable socket;
-        private OutputStream output;
-
-        public ListenerWorker(LocalSocket socket) throws IOException {
-            this.socket = socket;
-            input = new DataInputStream(socket.getInputStream());
-            output = socket.getOutputStream();
-        }
-
-        public void run() {
-            try {
-                int length = input.readInt();
-                input.readFully(new byte[length]); // ignore the payload
-                executePartialSync(context, syncDir);
-                executeRemovedSync(context, removedSyncDir);
-
-                runtime.runScript(new File(NativeScriptSyncService.this.context.getFilesDir(), "internal/livesync.js"));
-                try {
-                    output.write(1);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                socket.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
     public void startServer() {
         localServerThread = new LocalServerSocketThread(context.getPackageName() + "-livesync");
         localServerJavaThread = new Thread(localServerThread);
         localServerJavaThread.start();
     }
 
-    public static boolean isSyncEnabled(Context context) {
-        int flags;
-        boolean shouldExecuteSync = false;
-        try {
-            flags = context.getPackageManager().getPackageInfo(context.getPackageName(), 0).applicationInfo.flags;
-            shouldExecuteSync = ((flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0);
-        } catch (NameNotFoundException e) {
-            e.printStackTrace();
-            return false;
+    private class ListenerWorker implements Runnable {
+        public static final int OPERATION_BYTE_SIZE = 1;
+        public static final int FILE_NAME_LENGTH_BYTE_SIZE = 5;
+        public static final int CONTENT_LENGTH_BYTE_SIZE = 10;
+        public static final int DELETE_FILE_OPERATION = 7;
+        public static final int CREATE_FILE_OPERATION = 8;
+        public static final String FILE_NAME = "fileName";
+        public static final String FILE_NAME_LENGTH = FILE_NAME + "Length";
+        public static final String OPERATION = "operation";
+        public static final String FILE_CONTENT = "fileContent";
+        public static final String FILE_CONTENT_LENGTH = FILE_CONTENT + "Length";
+        public static final int DEFAULT_OPERATION = -1;
+        public final String LIVESYNC_ERROR_SUGGESTION = String.format("\nMake sure you are following this protocol when transferring files." +
+                "\nTransfer protocol: \n\tdelete: (%s)(%s)(%s)" +
+                "\n\tcreate: (%s)(%s)(%s)(%s)(%s)" +
+                "\n\t%s: exactly %s btye (%s - delete, %s - create)" +
+                "\n\t%s: exactly %s bytes" +
+                "\n\t%s: relative to app folder" +
+                "\n\t%s: exactly %s bytes" +
+                "\n\t%s: byte buffer" +
+                "\n\tExample delete: 700003./a" +
+                "\n\tExample create: 800007./a.txt0000000011fileContent",
+                OPERATION, FILE_NAME_LENGTH, FILE_NAME,
+                OPERATION, FILE_NAME_LENGTH, FILE_NAME, FILE_CONTENT_LENGTH, FILE_CONTENT,
+                OPERATION, OPERATION_BYTE_SIZE, DELETE_FILE_OPERATION, CREATE_FILE_OPERATION,
+                FILE_NAME_LENGTH, FILE_NAME_LENGTH_BYTE_SIZE,
+                FILE_NAME,
+                FILE_CONTENT_LENGTH, CONTENT_LENGTH_BYTE_SIZE,
+                FILE_CONTENT);
+        private final InputStream input;
+        private Closeable socket;
+        private OutputStream output;
+
+        public ListenerWorker(LocalSocket socket) throws IOException {
+            this.socket = socket;
+            input = socket.getInputStream();
+            output = socket.getOutputStream();
         }
 
-        return shouldExecuteSync;
-    }
-
-    final FileFilter deletingFilesFilter = new FileFilter() {
-        @Override
-        public boolean accept(File pathname) {
-            if (pathname.isDirectory()) {
-                return true;
-            }
-
-            boolean success = pathname.delete();
-            if (!success) {
-                logger.write("Syncing: file not deleted: " + pathname.getAbsolutePath().toString());
-            }
-            return false;
-        }
-    };
-
-    private void deleteDir(File directory) {
-        File[] subDirectories = directory.listFiles(deletingFilesFilter);
-        if (subDirectories != null) {
-            for (int i = 0; i < subDirectories.length; i++) {
-                File subDir = subDirectories[i];
-                deleteDir(subDir);
-            }
-        }
-
-        boolean success = directory.delete();
-        if (!success && directory.exists()) {
-            logger.write("Syncing: directory not deleted: " + directory.getAbsolutePath().toString());
-        }
-    }
-
-    private void moveFiles(File sourceDir, String sourceRootAbsolutePath, String targetRootAbsolutePath) {
-        File[] files = sourceDir.listFiles();
-
-        if (files != null) {
-            if (logger.isEnabled()) {
-                logger.write("Syncing total number of fiiles: " + files.length);
-            }
-
-            for (int i = 0; i < files.length; i++) {
-                File file = files[i];
-                if (file.isFile()) {
-                    if (logger.isEnabled()) {
-                        logger.write("Syncing: " + file.getAbsolutePath().toString());
-                    }
-
-                    String targetFilePath = file.getAbsolutePath().replace(sourceRootAbsolutePath, targetRootAbsolutePath);
-                    File targetFileDir = new File(targetFilePath);
-
-                    File targetParent = targetFileDir.getParentFile();
-                    if (targetParent != null) {
-                        targetParent.mkdirs();
-                    }
-
-                    boolean success = copyFile(file.getAbsolutePath(), targetFilePath);
-                    if (!success) {
-                        logger.write("Sync failed: " + file.getAbsolutePath().toString());
-                    }
-                } else {
-                    moveFiles(file, sourceRootAbsolutePath, targetRootAbsolutePath);
-                }
-            }
-        } else {
-            if (logger.isEnabled()) {
-                logger.write("Can't move files. Source is empty.");
-            }
-        }
-    }
-
-    // this removes only the app directory from the device to preserve
-    // any existing files in /files directory on the device
-    private void executeFullSync(Context context, final File sourceDir) {
-        String appPath = context.getFilesDir().getAbsolutePath() + "/app";
-        final File appDir = new File(appPath);
-
-        if (appDir.exists()) {
-            deleteDir(appDir);
-            moveFiles(sourceDir, sourceDir.getAbsolutePath(), appDir.getAbsolutePath());
-        }
-    }
-
-    private void executePartialSync(Context context, File sourceDir) {
-        String appPath = context.getFilesDir().getAbsolutePath() + "/app";
-        final File appDir = new File(appPath);
-
-        if (!appDir.exists()) {
-            Log.e("TNS", "Application dir does not exists. Partial Sync failed. appDir: " + appPath);
-            return;
-        }
-
-        if (logger.isEnabled()) {
-            logger.write("Syncing sourceDir " + sourceDir.getAbsolutePath() + " with " + appDir.getAbsolutePath());
-        }
-
-        moveFiles(sourceDir, sourceDir.getAbsolutePath(), appDir.getAbsolutePath());
-    }
-
-    private void deleteRemovedFiles(File sourceDir, String sourceRootAbsolutePath, String targetRootAbsolutePath) {
-        if (!sourceDir.exists()) {
-            if (logger.isEnabled()) {
-                logger.write("Directory does not exist: " + sourceDir.getAbsolutePath());
-            }
-        }
-
-        File[] files = sourceDir.listFiles();
-
-        if (files != null) {
-            for (int i = 0; i < files.length; i++) {
-                File file = files[i];
-                String targetFilePath = file.getAbsolutePath().replace(sourceRootAbsolutePath, targetRootAbsolutePath);
-                File targetFile = new File(targetFilePath);
-                if (file.isFile()) {
-                    if (logger.isEnabled()) {
-                        logger.write("Syncing removed file: " + file.getAbsolutePath().toString());
-                    }
-
-                    targetFile.delete();
-                } else {
-                    deleteRemovedFiles(file, sourceRootAbsolutePath, targetRootAbsolutePath);
-
-                    // this is done so empty folders, if any, are deleted after we're don deleting files.
-                    if (targetFile.listFiles().length == 0) {
-                        targetFile.delete();
-                    }
-                }
-            }
-        }
-    }
-
-    private void executeRemovedSync(final Context context, final File sourceDir) {
-        String appPath = context.getFilesDir().getAbsolutePath() + "/app";
-        deleteRemovedFiles(sourceDir, sourceDir.getAbsolutePath(), appPath);
-    }
-
-    private boolean copyFile(String sourceFile, String destinationFile) {
-        FileInputStream fis = null;
-        FileOutputStream fos = null;
-
-        try {
-            fis = new FileInputStream(sourceFile);
-            fos = new FileOutputStream(destinationFile, false);
-
-            byte[] buffer = new byte[4096];
-            int read = 0;
-
-            while ((read = fis.read(buffer)) != -1) {
-                fos.write(buffer, 0, read);
-            }
-        } catch (FileNotFoundException e) {
-            logger.write("Error copying file " + sourceFile);
-            e.printStackTrace();
-            return false;
-        } catch (IOException e) {
-            logger.write("Error copying file " + sourceFile);
-            e.printStackTrace();
-            return false;
-        } finally {
+        public void run() {
+            boolean exceptionWhileLivesyncing = false;
             try {
-                if (fis != null) {
-                    fis.close();
+                do {
+                    int operation = getOperation();
+                    if (operation == DELETE_FILE_OPERATION) {
+
+                        String fileName = getFileName();
+                        deleteRecursive(new File(DEVICE_APP_DIR, fileName));
+
+                    } else if (operation == CREATE_FILE_OPERATION) {
+
+                        String fileName = getFileName();
+                        byte[] content = getFileContent();
+                        createOrOverrideFile(fileName, content);
+
+                    } else if (operation == DEFAULT_OPERATION) {
+                        logger.write("LiveSync: input stream is empty!");
+                        break;
+                    } else {
+                        throw new IllegalArgumentException(String.format("\nLiveSync: Operation not recognised. %s", LIVESYNC_ERROR_SUGGESTION));
+                    }
+
+                } while (this.input.available() > 0);
+
+            } catch (Exception e) {
+                logger.write(String.format("Error while LiveSyncing: %s", e.toString()));
+                e.printStackTrace();
+                exceptionWhileLivesyncing = true;
+            } finally {
+                try {
+                    socket.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
-                if (fos != null) {
-                    fos.close();
-                }
-            } catch (IOException e) {
+            }
+
+            if (!exceptionWhileLivesyncing) {
+                runtime.runScript(new File(NativeScriptSyncService.this.context.getFilesDir(), "internal/livesync.js"));
             }
         }
 
-        return true;
+        /*
+        * Tries to read operation input stream
+        * If the stream is empty, method returns -1
+        * */
+        private int getOperation() {
+            Integer operation = DEFAULT_OPERATION;
+            try {
+
+                byte[] operationBuff = readNextBytes(OPERATION_BYTE_SIZE);
+                if (operationBuff == null) {
+                    return DEFAULT_OPERATION;
+                }
+                operation = Integer.parseInt(new String(operationBuff));
+
+            } catch (NumberFormatException e) {
+                throw new IllegalStateException(String.format("\nLiveSync: failed to parse %s. %s\noriginal exception: %s", OPERATION, LIVESYNC_ERROR_SUGGESTION, e.toString()));
+            } catch (Exception e) {
+                throw new IllegalStateException(String.format("\nLiveSync: failed to parse %s. %s\noriginal exception: %s", OPERATION, LIVESYNC_ERROR_SUGGESTION, e.toString()));
+            }
+            return operation;
+        }
+
+        private String getFileName() {
+            byte[] fileNameBuffer;
+            int fileNameLenth = -1;
+            byte[] fileNameLengthBuffer;
+
+            try {
+
+                fileNameLengthBuffer = readNextBytes(FILE_NAME_LENGTH_BYTE_SIZE);
+
+            } catch (Exception e) {
+                throw new IllegalStateException(String.format("\nLiveSync: failed to parse %s. %s\noriginal exception: %s", FILE_NAME_LENGTH, LIVESYNC_ERROR_SUGGESTION, e.toString()));
+            }
+
+            if (fileNameLengthBuffer == null) {
+                throw new IllegalStateException(String.format("\nLiveSync: Missing %s bytes. %s", FILE_NAME_LENGTH, LIVESYNC_ERROR_SUGGESTION));
+            }
+
+            try {
+                fileNameLenth = Integer.valueOf(new String(fileNameLengthBuffer));
+                fileNameBuffer = readNextBytes(fileNameLenth);
+
+            } catch (NumberFormatException e) {
+                throw new IllegalStateException(String.format("\nLiveSync: failed to parse %s. %s\noriginal exception: %s", FILE_NAME, LIVESYNC_ERROR_SUGGESTION, e.toString()));
+            } catch (Exception e) {
+                throw new IllegalStateException(String.format("\nLiveSync: failed to parse %s. %s\noriginal exception: %s", FILE_NAME, LIVESYNC_ERROR_SUGGESTION, e.toString()));
+            }
+
+            if (fileNameBuffer == null) {
+                throw new IllegalStateException(String.format("\nLiveSync: Missing %s bytes. %s", FILE_NAME, LIVESYNC_ERROR_SUGGESTION));
+            }
+
+            String fileName = new String(fileNameBuffer);
+            if (fileName.trim().length() < fileNameLenth) {
+                logger.write(String.format("WARNING: %s parsed length is less than %s. We read less information than you specified!", FILE_NAME, FILE_NAME_LENGTH));
+            }
+
+            return fileName.trim();
+        }
+
+        private byte[] getFileContent() throws IOException {
+            byte[] contentBuff;
+            int contentL = -1;
+            byte[] contentLength;
+            try {
+                contentLength = readNextBytes(CONTENT_LENGTH_BYTE_SIZE);
+            } catch (Exception e) {
+                throw new IllegalStateException(String.format("\nLiveSync: failed to parse %s. %s\noriginal exception: %s", FILE_CONTENT_LENGTH, LIVESYNC_ERROR_SUGGESTION, e.toString()));
+            }
+
+            if (contentLength == null) {
+                throw new IllegalStateException(String.format("\nLiveSync: Missing %s bytes. %s", FILE_CONTENT_LENGTH, LIVESYNC_ERROR_SUGGESTION));
+            }
+
+            try {
+                contentL = Integer.parseInt(new String(contentLength));
+                contentBuff = readNextBytes(contentL);
+
+            } catch (NumberFormatException e) {
+                throw new IllegalStateException(String.format("\nLiveSync: failed to parse %s. %s\noriginal exception: %s", FILE_CONTENT_LENGTH, LIVESYNC_ERROR_SUGGESTION, e.toString()));
+            } catch (Exception e) {
+                throw new IllegalStateException(String.format("\nLiveSync: failed to parse %s. %s\noriginal exception: %s", FILE_CONTENT, LIVESYNC_ERROR_SUGGESTION, e.toString()));
+            }
+
+            if (contentBuff == null) {
+                throw new IllegalStateException(String.format("\nLiveSync: Missing %s bytes. %s", FILE_CONTENT, LIVESYNC_ERROR_SUGGESTION));
+            }
+
+            return contentBuff;
+        }
+
+        private void createOrOverrideFile(String fileName, byte[] content) throws IOException {
+            File fileToCreate = prepareFile(fileName);
+            try {
+
+                fileToCreate.getParentFile().mkdirs();
+                FileOutputStream fos = new FileOutputStream(fileToCreate.getCanonicalPath());
+                fos.write(content);
+                fos.close();
+
+            } catch (Exception e) {
+                throw new IOException(String.format("\nLiveSync: failed to write file: %s\noriginal exception: %s", fileName, e.toString()));
+            }
+        }
+
+        void deleteRecursive(File fileOrDirectory) {
+            if (fileOrDirectory.isDirectory())
+                for (File child : fileOrDirectory.listFiles()) {
+                    deleteRecursive(child);
+                }
+
+            fileOrDirectory.delete();
+        }
+
+        @NonNull
+        private File prepareFile(String fileName) {
+            File fileToCreate = new File(DEVICE_APP_DIR, fileName);
+            if (fileToCreate.exists()) {
+                fileToCreate.delete();
+            }
+            return fileToCreate;
+        }
+
+        /*
+        * Reads next bites from input stream. Bytes read depend on passed parameter.
+        * */
+        private byte[] readNextBytes(int size) throws IOException {
+            byte[] buffer = new byte[size];
+            int bytesRead = 0;
+            int bufferWriteOffset = bytesRead;
+            do {
+
+                bytesRead = this.input.read(buffer, bufferWriteOffset, size);
+                if (bytesRead == -1) {
+                    if (bufferWriteOffset == 0) {
+                        return null;
+                    }
+                    break;
+                }
+                size -= bytesRead;
+                bufferWriteOffset += bytesRead;
+            } while (size > 0);
+
+            return buffer;
+        }
+
     }
 }
