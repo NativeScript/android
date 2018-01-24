@@ -113,6 +113,15 @@ public class NativeScriptSyncService {
         public void run() {
             boolean exceptionWhileLivesyncing = false;
             try {
+
+                output.write(context.getPackageName().getBytes());
+
+            } catch (IOException e) {
+                logger.write(String.format("Error while LiveSyncing: Client socket might be closed!", e.toString()));
+                exceptionWhileLivesyncing = true;
+                e.printStackTrace();
+            }
+            try {
                 do {
                     int operation = getOperation();
                     if (operation == DELETE_FILE_OPERATION) {
