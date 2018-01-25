@@ -150,7 +150,6 @@ android {
 def externalRuntimeExists = !findProject(':runtime').is(null)
 
 repositories {
-
     // used for local *.AAR files
     def pluginDependencies = nativescriptDependencies.collect {
         "$rootDir/${it.directory}/$PLATFORMS_ANDROID"
@@ -158,6 +157,11 @@ repositories {
     if (!externalRuntimeExists) {
         pluginDependencies.add("libs/runtime-libs")
     }
+
+    def localAppResources = getAppResourcesDirectory()
+    def localAppResourcesLibraries = "$localAppResources/Android/libs"
+
+    pluginDependencies.add(localAppResourcesLibraries)
 
     if (pluginDependencies.size() > 0) {
         flatDir {
@@ -222,6 +226,25 @@ task addDependenciesFromNativeScriptPlugins {
         }
 
         project.dependencies.add("compile", jarFiles)
+    }
+}
+
+task addDependenciesFromAppResourcesLibraries {
+    def appResources = getAppResourcesDirectory()
+    def appResourcesLibraries = file("$appResources/Android/libs")
+    if (appResourcesLibraries.exists()) {
+        def aarFiles = fileTree(dir: appResourcesLibraries, include: ["**/*.aar"])
+        aarFiles.each { aarFile ->
+            def length = aarFile.name.length() - 4
+            def fileName = aarFile.name[0..<length]
+            println "\t + adding aar library dependency: " + aarFile.getAbsolutePath()
+            project.dependencies.add("compile", [name: fileName, ext: "aar"])
+        }
+
+        def jarFiles = fileTree(dir: appResourcesLibraries, include: ["**/*.jar"])
+        jarFiles.each { jarFile ->
+            println "\t + adding jar library dependency: " + jarFile.getAbsolutePath()
+        }
     }
 }
 
