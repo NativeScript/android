@@ -183,6 +183,7 @@ var es5_visitors = (function () {
         var returnIdentifierName;
         var superCalleeStartColumn;
         var superCalleeLine;
+        var locationAssigned = false;
 
         // checks if constructor function and return identifiers match in a transpiled typescript class extend
         if (extendPath.node.body && extendPath.node.body.length >= 3) {
@@ -198,64 +199,99 @@ var es5_visitors = (function () {
                     var _this = _super.call(this) || this;
                     return global.__native(_this);
                 }
+
+                **UGLIFIED extended class**
+
+                function t(t) {
+                    var r = e.call(this) || this;
+                    r.textBase = t;
+                    return global.__native(r);
+                }
          */
         if (constructorFunctionName === returnIdentifierName && !!constructorFunctionName) {
             var constructorFunctionScope = extendPath.node.body[1];
-            // try to get node from `var _this = super.call(_this);` or get `_this = super.call(_this);`
-            var thisSuperCallLineNode = getThisDeclarationSuperCallLineNode(constructorFunctionScope.body.body) || getThisAssignmentSuperCallLineNode(constructorFunctionScope.body.body);
+            // the 'super' variable will always be passed as the second argument to the __extends call
+            // try to find the 'super' identifier which may be uglified
+            var superVariableIdentifier = getSuperVariableIdentifier(extendPath.node.body[0]);
 
-            //// helper functions to find the correct _this nodes
-            // necessary for when _super.call(this) is not called on the _this variable declaration
-            // checks if the line is as follows:
-            //  _this = _super.call(this) || this;
-            // to pass the check:
-            //  - the variable must be called '_this'
-            //  - the RHS of the assignment must be a logical expression
-            //  - the left part of the logical expression must be a function call
-            function getThisAssignmentSuperCallLineNode(node) {
-                var matchingNodes = node.filter(
+            //// helper functions to find the correct super.call(this) node
+            function getSuperVariableIdentifier(__extendsNode) {
+                if (types.isExpressionStatement(__extendsNode) && types.isCallExpression(__extendsNode.expression)) {
+                    var __extendsCallArguments = __extendsNode.expression.arguments;
+                    if (__extendsCallArguments.length == 2) {
+                        return __extendsCallArguments[1].name;
+                    }
+                }
+            }
+
+            /** Getting the super.call node from assignment
+                if expressionStatement => check possibleExpressionStatements[0]
+                if possibleExpressionStatements[0].expression is assignment expression
+                if possibleExpressionStatements[0].expression.right is logical expression
+                if possibleExpressionStatements[0].expression.right.left is Call expression
+                if possibleExpressionStatements[0].expression.right.left.callee.object.name === superVariableIdentifier
+                if the above is valid, then variableRHS = possibleVariableDeclarations[0].expression.right.left 
+             */
+            function getThisAssignmentSuperCallLineNode(nodes, superIdentifier) {
+                var matchingNodes = nodes.filter(
                     (node) => {
-                        return types.isExpressionStatement(node)
-                            && types.isAssignmentExpression(node.expression)
-                            && node.expression.left.name === "_this"
+                        return types.isAssignmentExpression(node.expression)
                             && types.isLogicalExpression(node.expression.right)
-                            && types.isCallExpression(node.expression.right.left);
+                            && types.isCallExpression(node.expression.right.left)
+                            && node.expression.right.left.callee.object.name === superIdentifier;
                     });
 
                 return matchingNodes.length > 0 ? matchingNodes[0].expression.right.left : null;
             }
-            // necessary for when _super.call(this) is assigned directly on the _this variable declaration  
-            // checks if the line is as follows:
-            //  var _this = _super.call(this) || this;
-            // to pass the check:
-            //  - the variable must be called '_this'
-            //  - the RHS of the assignment must be a logical expression
-            //  - the left part of the logical expression must be a function call
-            function getThisDeclarationSuperCallLineNode(node) {
-                var matchingNodes = node.filter(
+
+            /** Getting the super.call node from declaration
+                if variableDeclaration => check possibleVariableDeclarations[0].declarations[0].init  isn't null
+                if possibleNodesForSuperCall[0].declarations[0].init is logical expression
+                if possibleNodesForSuperCall[0].declarations[0].init.left is Call Expression
+                if possibleNodesForSuperCall[0].declarations[0].init.left.callee.object.name === superVariableIdentifier
+                if the above is valid, then variableRHS = possibleVariableDeclarations[0].declarations[0].init.left
+             */
+            function getThisDeclarationSuperCallLineNode(nodes, superIdentifier) {
+                var matchingNodes = nodes.filter(
                     (node) => {
-                        return types.isVariableDeclaration(node)
-                            && node.declarations[0].id.name === "_this"
-                            && types.isLogicalExpression(node.declarations[0].init)
-                            && types.isCallExpression(node.declarations[0].init.left);
+                        return types.isLogicalExpression(node.declarations[0].init)
+                            && types.isCallExpression(node.declarations[0].init.left)
+                            && node.declarations[0].init.left.callee.object.name === superIdentifier;
                     });
 
                 return matchingNodes.length > 0 ? matchingNodes[0].declarations[0].init.left : null;
             }
             ////
 
-            if (thisSuperCallLineNode) {
-                var variableRHS = thisSuperCallLineNode;
-                if (variableRHS.callee && types.isMemberExpression(variableRHS.callee)) {
-                    var superCallee = variableRHS.callee.property;
-                    superCalleeStartColumn = superCallee.loc.start.column + 1;
-                    superCalleeLine = superCallee.loc.start.line;
-                } else {
-                    config.logger.info(UNSUPPORTED_TYPESCRIPT_EXTEND_FORMAT_MESSAGE);
+            if (superVariableIdentifier) {
+                var possibleVariableDeclarations = [];
+                var possibleExpressionStatements = [];
+
+                constructorFunctionScope.body.body.forEach(node => {
+                    if (types.isVariableDeclaration(node)) {
+                        possibleVariableDeclarations.push(node);
+                    } else if (types.isExpressionStatement(node)) {
+                        possibleExpressionStatements.push(node);
+                    }
+                });
+
+                if (possibleVariableDeclarations.length > 0 || possibleExpressionStatements.length > 0) {
+                    var superCallRHS = getThisDeclarationSuperCallLineNode(possibleVariableDeclarations, superVariableIdentifier)
+                        || getThisAssignmentSuperCallLineNode(possibleExpressionStatements, superVariableIdentifier);
+
+                    if (superCallRHS) {
+                        var superCallee = superCallRHS.callee.property;
+                        superCalleeStartColumn = superCallee.loc.start.column + 1;
+                        superCalleeLine = superCallee.loc.start.line;
+
+                        locationAssigned = true;
+                    }
                 }
-            } else {
-                config.logger.info(UNSUPPORTED_TYPESCRIPT_EXTEND_FORMAT_MESSAGE);
             }
+        }
+
+        if (!locationAssigned) {
+            config.logger.info(UNSUPPORTED_TYPESCRIPT_EXTEND_FORMAT_MESSAGE + " ctor function name: " + constructorFunctionName);
         }
 
         return {
