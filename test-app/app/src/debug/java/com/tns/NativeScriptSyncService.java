@@ -30,6 +30,7 @@ public class NativeScriptSyncService {
     }
 
     private class LocalServerSocketThread implements Runnable {
+
         private volatile boolean running;
         private final String name;
 
@@ -62,6 +63,11 @@ public class NativeScriptSyncService {
             } catch (IOException e) {
                 e.printStackTrace();
             }
+        }
+
+        @Override
+        protected void finalize() throws Throwable {
+            this.serverSocket.close();
         }
     }
 
@@ -148,12 +154,6 @@ public class NativeScriptSyncService {
                 logger.write(String.format("Error while LiveSyncing: %s", e.toString()));
                 e.printStackTrace();
                 exceptionWhileLivesyncing = true;
-            } finally {
-                try {
-                    socket.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
             }
 
             if (!exceptionWhileLivesyncing) {
@@ -306,6 +306,11 @@ public class NativeScriptSyncService {
             } while (size > 0);
 
             return buffer;
+        }
+
+        @Override
+        protected void finalize() throws Throwable {
+            this.socket.close();
         }
 
     }
