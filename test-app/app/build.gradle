@@ -17,6 +17,7 @@
 */
 
 import groovy.json.JsonSlurper
+import java.nio.file.Paths
 
 apply plugin: "com.android.application"
 
@@ -67,8 +68,25 @@ project.ext.selectedBuildType = project.hasProperty("release") ? "release" : "de
 ///////////////////////////// CONFIGURATIONS ///////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
 
+def getAppResourcesDirectory = { ->
+    def defaultPathToAppResources = "$USER_PROJECT_ROOT/app/App_Resources"
+    def pathToAppResources
+    def nsConfigFile = file("$USER_PROJECT_ROOT/nsconfig.json")
+
+    if (nsConfigFile.exists()) {
+        def nsConfigJsonContent = new JsonSlurper().parseText(nsConfigFile.getText("UTF-8"))
+
+        if (nsConfigJsonContent.app_resources != null) {
+            pathToAppResources = java.nio.file.Paths.get(USER_PROJECT_ROOT).resolve(nsConfigJsonContent.app_resources).toAbsolutePath()
+        }
+    }
+
+    return pathToAppResources != null ? pathToAppResources : defaultPathToAppResources
+}
+
 def applyAppGradleConfiguration = { ->
-    def pathToAppGradle = "$USER_PROJECT_ROOT/app/App_Resources/Android/app.gradle"
+    def appResourcesDir = getAppResourcesDirectory()
+    def pathToAppGradle = "$appResourcesDir/Android/app.gradle"
     def appGradle = file(pathToAppGradle)
     if (appGradle.exists()) {
         println "\t + applying user-defined configuration from ${appGradle}"
