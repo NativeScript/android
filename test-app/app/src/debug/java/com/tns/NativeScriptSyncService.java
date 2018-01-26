@@ -131,19 +131,19 @@ public class NativeScriptSyncService {
         }
 
         public void run() {
-            boolean exceptionWhileLivesyncing = false;
             try {
 
                 output.write(context.getPackageName().getBytes());
 
             } catch (IOException e) {
                 logger.write(String.format("Error while LiveSyncing: Client socket might be closed!", e.toString()));
-                exceptionWhileLivesyncing = true;
                 e.printStackTrace();
             }
             try {
                 do {
                     int operation = getOperation();
+
+                    System.out.println("Operation: " + input.available());
                     if (operation == DELETE_FILE_OPERATION) {
 
                         String fileName = getFileName();
@@ -155,7 +155,6 @@ public class NativeScriptSyncService {
                         byte[] content = getFileContent(fileName);
                         createOrOverrideFile(fileName, content);
 
-
                     } else if (operation == DEFAULT_OPERATION) {
                         logger.write("LiveSync: input stream is empty!");
                         break;
@@ -163,12 +162,13 @@ public class NativeScriptSyncService {
                         throw new IllegalArgumentException(String.format("\nLiveSync: Operation not recognised. %s", LIVESYNC_ERROR_SUGGESTION));
                     }
 
-                } while (this.input.available() > 0);
+                    //TODO: do debouncing
+                    runtime.runScript(new File(NativeScriptSyncService.this.context.getFilesDir(), "internal/livesync.js"));
+                } while (true);
 
             } catch (Exception e) {
                 logger.write(String.format("Error while LiveSyncing: %s", e.toString()));
                 e.printStackTrace();
-                exceptionWhileLivesyncing = true;
                 flushInputStream();
             } catch (Throwable e) {
                 logger.write(String.format("%s(%s): Error while LiveSyncing.\nOriginal Exception: %s", Thread.currentThread().getName(), Thread.currentThread().getId(), e.toString()));
@@ -179,14 +179,11 @@ public class NativeScriptSyncService {
                 }
             }
 
-            if (!exceptionWhileLivesyncing) {
-                runtime.runScript(new File(NativeScriptSyncService.this.context.getFilesDir(), "internal/livesync.js"));
-            }
         }
 
         private void flushInputStream() {
             try {
-                this.input.skip(1000000);
+                this.input.skip(Long.MAX_VALUE);
             } catch (IOException e) {
             }
         }
@@ -205,8 +202,6 @@ public class NativeScriptSyncService {
                 }
                 operation = Integer.parseInt(new String(operationBuff));
 
-            } catch (NumberFormatException e) {
-                throw new IllegalStateException(String.format("\nLiveSync: failed to parse %s. %s\nOriginal Exception: %s", OPERATION, LIVESYNC_ERROR_SUGGESTION, e.toString()));
             } catch (Exception e) {
                 throw new IllegalStateException(String.format("\nLiveSync: failed to parse %s. %s\nOriginal Exception: %s", OPERATION, LIVESYNC_ERROR_SUGGESTION, e.toString()));
             }
