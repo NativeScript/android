@@ -97,6 +97,7 @@ public class NativeScriptSyncService {
         public static final int CONTENT_LENGTH_BYTE_SIZE = 10;
         public static final int DELETE_FILE_OPERATION = 7;
         public static final int CREATE_FILE_OPERATION = 8;
+        public static final int DO_SYNC_OPERATION = 9;
         public static final String FILE_NAME = "fileName";
         public static final String FILE_NAME_LENGTH = FILE_NAME + "Length";
         public static final String OPERATION = "operation";
@@ -143,7 +144,6 @@ public class NativeScriptSyncService {
                 do {
                     int operation = getOperation();
 
-                    System.out.println("Operation: " + input.available());
                     if (operation == DELETE_FILE_OPERATION) {
 
                         String fileName = getFileName();
@@ -155,6 +155,10 @@ public class NativeScriptSyncService {
                         byte[] content = getFileContent(fileName);
                         createOrOverrideFile(fileName, content);
 
+                    } else if (operation == DO_SYNC_OPERATION) {
+
+                        runtime.runScript(new File(NativeScriptSyncService.this.context.getFilesDir(), "internal/livesync.js"));
+
                     } else if (operation == DEFAULT_OPERATION) {
                         logger.write("LiveSync: input stream is empty!");
                         break;
@@ -162,8 +166,6 @@ public class NativeScriptSyncService {
                         throw new IllegalArgumentException(String.format("\nLiveSync: Operation not recognised. %s", LIVESYNC_ERROR_SUGGESTION));
                     }
 
-                    //TODO: do debouncing
-                    runtime.runScript(new File(NativeScriptSyncService.this.context.getFilesDir(), "internal/livesync.js"));
                 } while (true);
 
             } catch (Exception e) {
