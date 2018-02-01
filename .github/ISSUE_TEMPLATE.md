@@ -40,5 +40,5 @@ Please provide us with the log by following these steps:
 <!--
 Please provide us with the necessary information to reproduce your problem. That includes but is not limited to presenting us with steps to reproduce the problem, or a small repo example.
 -->
-Consider using the [playground] (https://play.nativescript.org) to provide the code you have issues with.
+Consider using the [playground](https://play.nativescript.org) to provide the code you have issues with.
 
