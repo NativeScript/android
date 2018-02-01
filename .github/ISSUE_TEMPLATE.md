@@ -2,7 +2,7 @@
 
 ## Please, provide the details below:
 
-### Did you verify this is a real problem by searching [Stack Overflow](http://stackoverflow.com/questions/tagged/nativescript) and the [other open issues in this repo](https://github.com/NativeScript/nativescript/issues)?
+### Did you verify this is a real problem by searching the [NativeScript Forum](http://forum.nativescript.org) and the [other open issues in this repo](https://github.com/NativeScript/nativescript/issues)?
 
 ### Tell us about the problem
 <!--Please, ensure your title is less than 63 characters long and starts with a capital
@@ -40,4 +40,5 @@ Please provide us with the log by following these steps:
 <!--
 Please provide us with the necessary information to reproduce your problem. That includes but is not limited to presenting us with steps to reproduce the problem, or a small repo example.
 -->
+Consider using the [playground] (https://play.nativescript.org) to provide the code you have issues with.
 
