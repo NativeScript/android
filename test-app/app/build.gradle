@@ -81,9 +81,46 @@ def applyAppGradleConfiguration = { ->
 def applyPluginGradleConfigurations = { ->
     nativescriptDependencies.each {dep ->
         def includeGradlePath = "$rootDir/${dep.directory}/$PLATFORMS_ANDROID/include.gradle"
-        if(file(includeGradlePath).exists()) {
+        if (file(includeGradlePath).exists()) {
+            stripProductFlavorFromIncludeGradle(includeGradlePath)
+            
             apply from: includeGradlePath
         }
+    }
+}
+
+def stripProductFlavorFromIncludeGradle = { includeGradlePath ->
+	def includeGradleFile = new File(includeGradlePath)
+	def includeGradleContent = includeGradleFile.text
+
+	def PRODUCT_FLAVORS = "productFlavors"
+	def indexStart = includeGradleContent.indexOf(PRODUCT_FLAVORS
+	def index = indexStart  + PRODUCT_FLAVORS.length()
+	def indexEnd = -1
+	def nestedOpenBracketsCount = 0
+
+	if (indexStart != -1) {
+        // get the index of the closing bracket of the productFlavors { } scope
+		while (index < content.length()) {
+			if (content[index] == "}") {
+				nestedOpenBracketsCount--
+
+				if (nestedOpenBracketsCount == 0) {
+					indexEnd = index
+					break
+				}
+			} else if (content[index] == "{") {
+				nestedOpenBracketsCount++
+			}
+
+			index++
+		}
+    }
+
+    if (indexEnd != -1) {
+        def oldProductFlavorsText = content.substring(indexStart, indexEnd + 1)
+
+        includeGradleFile.text = includeGradleContent.replace(oldProductFlavorsText, "")
     }
 }
 
@@ -91,13 +128,13 @@ def renameResultApks = { variant ->
     def name
     variant.outputs.each { output ->
         def apkDirectory = output.packageApplication.outputFile.parentFile
-        def abiName = "";
+        def abiName = ""
         if (output.getFilter(com.android.build.OutputFile.ABI)) {
-            abiName = "-" + output.getFilter(com.android.build.OutputFile.ABI);
+            abiName = "-" + output.getFilter(com.android.build.OutputFile.ABI)
         }
         def apkNamePrefix = rootProject.name + "-" + variant.buildType.name + abiName
         name = apkNamePrefix + ".apk"
-        output.packageApplication.outputFile = new File(apkDirectory, name);
+        output.packageApplication.outputFile = new File(apkDirectory, name)
     }
 }
 
@@ -255,7 +292,7 @@ task runSbg(type: JavaExec) {
     args "static-binding-generator.jar"
 
     doFirst {
-        new File("$OUTPUT_JAVA_DIR/com/tns/gen").deleteDir();
+        new File("$OUTPUT_JAVA_DIR/com/tns/gen").deleteDir()
     }
 }
 
