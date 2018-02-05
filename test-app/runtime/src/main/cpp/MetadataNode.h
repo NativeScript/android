@@ -107,7 +107,7 @@ class MetadataNode {
         static void InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
         static void ClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
         static void ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
-        static bool ValidateExtendArguments(const v8::FunctionCallbackInfo<v8::Value>& info, bool extendLocationFound, std::string& extendLocation, v8::Local<v8::String>& extendName, v8::Local<v8::Object>& implementationObject, bool isTypeScriptExtend);
+        static bool ValidateExtendArguments(const v8::FunctionCallbackInfo<v8::Value>& info, std::string& extendLocation, v8::Local<v8::String>& extendName, v8::Local<v8::Object>& implementationObject);
         static void ExtendedClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 
         static void NullObjectAccessorGetterCallback(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
@@ -126,7 +126,7 @@ class MetadataNode {
         static void ArrayIndexedPropertySetterCallback(uint32_t index, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<v8::Value>& info);
 
         static bool IsValidExtendName(const v8::Local<v8::String>& name);
-        static bool GetExtendLocation(std::string& extendLocation, bool isTypeScriptExtend);
+        static bool GetExtendLocation(std::string& extendLocation);
         static ExtendedClassCacheData GetCachedExtendedClassData(v8::Isolate* isolate, const std::string& proxyClassName);
 
         v8::Local<v8::Function> Wrap(v8::Isolate* isolate, const v8::Local<v8::Function>& function, const std::string& name, const std::string& origin, bool isCtorFunc);

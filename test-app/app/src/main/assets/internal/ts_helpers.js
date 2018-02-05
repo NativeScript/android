@@ -55,7 +55,7 @@
 			function extend(child, parent) {
 				__log("TS extend called");
 				if (!child.__extended) {
-		        	child.__extended = parent.extend(child.name, child.prototype, true);
+		        	child.__extended = parent.extend(child.name, child.prototype);
 		        }
 		 
 		        return child.__extended;
