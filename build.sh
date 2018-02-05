@@ -1,6 +1,7 @@
-echo "Print variables"
-echo "PACKAGE_VERSION: " $PACKAGE_VERSION
-echo "GIT_COMMIT: " $GIT_COMMIT
+###############################################################################################
+# Android Runtime build script for CI.
+# This file is used by the CI only and it's not meant for regular development.
+###############################################################################################
 
 echo "Ensure adb is in PATH"
 export PATH=$ANDROID_HOME/platform-tools:$PATH
