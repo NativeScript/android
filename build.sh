@@ -7,8 +7,7 @@ export PATH=$ANDROID_HOME/platform-tools:$PATH
 adb version
 
 echo "Update submodule"
-git submodule update
-git lfs pull
+git submodule update --init
 
 echo "Cleanup old build and test artefacts"
 rm -rf dist/*
