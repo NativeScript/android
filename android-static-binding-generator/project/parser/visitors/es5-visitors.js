@@ -1,6 +1,6 @@
 var es5_visitors = (function () {
 
-    var types = require("babel-types"),
+    var t = require("babel-types"),
 
         defaultExtendDecoratorName = "JavaProxy",
         columnOffset = 1,
@@ -12,7 +12,6 @@ var es5_visitors = (function () {
         customExtendsArr = [],
         normalExtendsArr = [],
         interfacesArr = [],
-        UNSUPPORTED_TYPESCRIPT_EXTEND_FORMAT_MESSAGE = "[WARN] TypeScript-extended class has a super() call in an unsupported format.",
 
         customExtendsArrGlobal = [];
 
@@ -36,18 +35,18 @@ var es5_visitors = (function () {
 
         // ES5 Syntax
         // anchor is extend (normal extend pattern + custom extend pattern) 
-        if (types.isMemberExpression(path) && path.node.property.name === "extend") {
+        if (t.isMemberExpression(path) && path.node.property.name === "extend") {
             traverseEs5Extend(path, config);
         }
 
         //anchor is new keyword (interface pattern)
-        if (types.isNewExpression(path)) {
+        if (t.isNewExpression(path)) {
             traverseInterface(path, config);
         }
 
         // // Parsed Typescript to ES5 Syntax (normal extend pattern + custom extend pattern)
         // 	// anchor is __extends
-        if (types.isIdentifier(path) && path.node.name === "__extends") {
+        if (t.isIdentifier(path) && path.node.name === "__extends") {
             traverseTsExtend(path, config);
         }
         // Maybe it's not a good idea to expose this scenario because it can be explicitly covered
@@ -112,13 +111,9 @@ var es5_visitors = (function () {
 
         var overriddenMethodNames = _getOverriddenMethodsTypescript(path, 3);
 
-        var extendPath = _getParent(path, 3, config);
+        var extendParent = _getParrent(path, 1, config);
         var declaredClassName = "";
-
-        var typescriptClassExtendSuperCallLocation = getTypeScriptExtendSuperCallLocation(extendPath, config);
-        var extendParent = _getParent(path, 1, config);
-
-        if (types.isCallExpression(extendParent)) {
+        if (t.isCallExpression(extendParent)) {
             declaredClassName = extendParent.node.arguments[0].name;
         }
 
@@ -137,7 +132,7 @@ var es5_visitors = (function () {
         if (decorateNodes) {
             for (var i in decorateNodes) {
                 var currentDecorator = decorateNodes[i];
-                if (types.isCallExpression(currentDecorator)) {
+                if (t.isCallExpression(currentDecorator)) {
                     // Interfaces/Implements
                     if (currentDecorator.callee.name === config.interfacesDecoratorName) {
                         currentDecorator.callee.skipMeOnVisit = true;
@@ -166,9 +161,7 @@ var es5_visitors = (function () {
         if (isDecoratedWithExtend) {
             traverseJavaProxyExtend(customExtendDecoratorValue, config, customExtendDecoratorName, extendClass, overriddenMethodNames, implementedInterfaces);
         } else {
-            var lineToWrite;
-
-            lineToWrite = _generateLineToWrite("", extendClass, overriddenMethodNames, `${FILE_SEPARATOR}${config.filePath}${LINE_SEPARATOR}${typescriptClassExtendSuperCallLocation.line}${COLUMN_SEPARATOR}${typescriptClassExtendSuperCallLocation.column}` + DECLARED_CLASS_SEPARATOR + declaredClassName, "", implementedInterfaces);
+            var lineToWrite = _generateLineToWrite("", extendClass, overriddenMethodNames, TYPESCRIPT_EXTEND_STRING + DECLARED_CLASS_SEPARATOR + declaredClassName, "", implementedInterfaces);
 
             if (config.logger) {
                 config.logger.info(lineToWrite)
@@ -178,145 +171,23 @@ var es5_visitors = (function () {
         }
     }
 
-    function getTypeScriptExtendSuperCallLocation(extendPath, config) {
-        var constructorFunctionName;
-        var returnIdentifierName;
-        var superCalleeStartColumn;
-        var superCalleeLine;
-        var locationAssigned = false;
+	function traverseForDecorate(path, config, depth) {
+		var iifeRoot = _getParrent(path, depth)
+		var body = iifeRoot.node.body;
+		for (var index in body) {
+			var ci = body[index];
+			if (isDecorateStatement(ci)) {
+				// returns the node of the decorate (node.expression.right.callee)
+				// __decorate([..])
+				return ci.expression.right.arguments[0].elements;
+			}
+		}
 
-        // checks if constructor function and return identifiers match in a transpiled typescript class extend
-        if (extendPath.node.body && extendPath.node.body.length >= 3) {
-            if (types.isFunctionDeclaration(extendPath.node.body[1]) && extendPath.node.body[1].id)
-                constructorFunctionName = extendPath.node.body[1].id.name;
-            if (types.isReturnStatement(extendPath.node.body[extendPath.node.body.length - 1]))
-                returnIdentifierName = extendPath.node.body[extendPath.node.body.length - 1].argument.name;
-        }
-
-        // checks the typescript-extended class for a strict format, and a super call/apply inside
-        /**
-         *      function MyBtn() {
-                    var _this = _super.call(this) || this;
-                    return global.__native(_this);
-                }
-
-                **UGLIFIED extended class**
-
-                function t(t) {
-                    var r = e.call(this) || this;
-                    r.textBase = t;
-                    return global.__native(r);
-                }
-         */
-        if (constructorFunctionName === returnIdentifierName && !!constructorFunctionName) {
-            var constructorFunctionScope = extendPath.node.body[1];
-            // the 'super' variable will always be passed as the second argument to the __extends call
-            // try to find the 'super' identifier which may be uglified
-            var superVariableIdentifier = getSuperVariableIdentifier(extendPath.node.body[0]);
-
-            //// helper functions to find the correct super.call(this) node
-            function getSuperVariableIdentifier(__extendsNode) {
-                if (types.isExpressionStatement(__extendsNode) && types.isCallExpression(__extendsNode.expression)) {
-                    var __extendsCallArguments = __extendsNode.expression.arguments;
-                    if (__extendsCallArguments.length == 2) {
-                        return __extendsCallArguments[1].name;
-                    }
-                }
-            }
-
-            /** Getting the super.call node from assignment
-                if expressionStatement => check possibleExpressionStatements[0]
-                if possibleExpressionStatements[0].expression is assignment expression
-                if possibleExpressionStatements[0].expression.right is logical expression
-                if possibleExpressionStatements[0].expression.right.left is Call expression
-                if possibleExpressionStatements[0].expression.right.left.callee.object.name === superVariableIdentifier
-                if the above is valid, then variableRHS = possibleVariableDeclarations[0].expression.right.left 
-             */
-            function getThisAssignmentSuperCallLineNode(nodes, superIdentifier) {
-                var matchingNodes = nodes.filter(
-                    (node) => {
-                        return types.isAssignmentExpression(node.expression)
-                            && types.isLogicalExpression(node.expression.right)
-                            && types.isCallExpression(node.expression.right.left)
-                            && node.expression.right.left.callee.object.name === superIdentifier;
-                    });
-
-                return matchingNodes.length > 0 ? matchingNodes[0].expression.right.left : null;
-            }
-
-            /** Getting the super.call node from declaration
-                if variableDeclaration => check possibleVariableDeclarations[0].declarations[0].init  isn't null
-                if possibleNodesForSuperCall[0].declarations[0].init is logical expression
-                if possibleNodesForSuperCall[0].declarations[0].init.left is Call Expression
-                if possibleNodesForSuperCall[0].declarations[0].init.left.callee.object.name === superVariableIdentifier
-                if the above is valid, then variableRHS = possibleVariableDeclarations[0].declarations[0].init.left
-             */
-            function getThisDeclarationSuperCallLineNode(nodes, superIdentifier) {
-                var matchingNodes = nodes.filter(
-                    (node) => {
-                        return types.isLogicalExpression(node.declarations[0].init)
-                            && types.isCallExpression(node.declarations[0].init.left)
-                            && node.declarations[0].init.left.callee.object.name === superIdentifier;
-                    });
-
-                return matchingNodes.length > 0 ? matchingNodes[0].declarations[0].init.left : null;
-            }
-            ////
-
-            if (superVariableIdentifier) {
-                var possibleVariableDeclarations = [];
-                var possibleExpressionStatements = [];
-
-                constructorFunctionScope.body.body.forEach(node => {
-                    if (types.isVariableDeclaration(node)) {
-                        possibleVariableDeclarations.push(node);
-                    } else if (types.isExpressionStatement(node)) {
-                        possibleExpressionStatements.push(node);
-                    }
-                });
-
-                if (possibleVariableDeclarations.length > 0 || possibleExpressionStatements.length > 0) {
-                    var superCallRHS = getThisDeclarationSuperCallLineNode(possibleVariableDeclarations, superVariableIdentifier)
-                        || getThisAssignmentSuperCallLineNode(possibleExpressionStatements, superVariableIdentifier);
-
-                    if (superCallRHS) {
-                        var superCallee = superCallRHS.callee.property;
-                        superCalleeStartColumn = superCallee.loc.start.column + 1;
-                        superCalleeLine = superCallee.loc.start.line;
-
-                        locationAssigned = true;
-                    }
-                }
-            }
-        }
-
-        if (!locationAssigned) {
-            config.logger.info(UNSUPPORTED_TYPESCRIPT_EXTEND_FORMAT_MESSAGE + " ctor function name: " + constructorFunctionName);
-        }
-
-        return {
-            line: superCalleeLine,
-            column: superCalleeStartColumn
-        };
-    }
-
-    function traverseForDecorate(path, config, depth) {
-        var iifeRoot = _getParent(path, depth)
-        var body = iifeRoot.node.body;
-        for (var index in body) {
-            var ci = body[index];
-            if (isDecorateStatement(ci)) {
-                // returns the node of the decorate (node.expression.right.callee)
-                // __decorate([..])
-                return ci.expression.right.arguments[0].elements;
-            }
-        }
-
-        return null;
-    }
+		return null;
+	}
 
     function traverseForDecorateSpecial(path, config, depth) {
-        var iifeRoot = _getParent(path, depth);
+        var iifeRoot = _getParrent(path, depth);
 
         var sibling = iifeRoot.getSibling(iifeRoot.key + 1).node;
         if (sibling) {
@@ -331,12 +202,12 @@ var es5_visitors = (function () {
     }
 
     function isDecorateStatement(node) {
-        return types.isExpressionStatement(node) &&
-            types.isAssignmentExpression(node.expression) &&
+        return t.isExpressionStatement(node) &&
+            t.isAssignmentExpression(node.expression) &&
             node.expression.right.callee &&
             node.expression.right.callee.name === "__decorate" &&
             node.expression.right.arguments &&
-            types.isArrayExpression(node.expression.right.arguments[0])
+            t.isArrayExpression(node.expression.right.arguments[0])
     }
 
 	/* 
@@ -425,10 +296,10 @@ var es5_visitors = (function () {
             var extendArguments = path.parent.arguments;
             var arg0,
                 arg1;
-            if (extendArguments.length === 1 && types.isObjectExpression(arg0)) {
+            if (extendArguments.length === 1 && t.isObjectExpression(arg0)) {
                 arg0 = extendArguments[0];
             }
-            else if (types.isStringLiteral(arg0)) {
+            else if (t.isStringLiteral(arg0)) {
 
             }
 
@@ -436,12 +307,12 @@ var es5_visitors = (function () {
                 arg1;
             if (extendArguments.length) {
                 // Get implementation object when there is only 1 argument
-                if (extendArguments.length === 1 && types.isObjectExpression(extendArguments[0])) {
+                if (extendArguments.length === 1 && t.isObjectExpression(extendArguments[0])) {
                     arg1 = extendArguments[0];
                 }
                 // Get the name of the extended class and the implementation object when both arguments are present
                 else if (extendArguments.length === 2) {
-                    if (types.isStringLiteral(extendArguments[0]) && types.isObjectExpression(extendArguments[1])) {
+                    if (t.isStringLiteral(extendArguments[0]) && t.isObjectExpression(extendArguments[1])) {
                         arg0 = extendArguments[0];
                         arg1 = extendArguments[1];
                     }
@@ -515,7 +386,7 @@ var es5_visitors = (function () {
 	*/
     function _getOverriddenMethods(node, config) {
         var overriddenMethodNames = [];
-        if (types.isObjectExpression(node)) {
+        if (t.isObjectExpression(node)) {
             var objectProperties = node.properties;
 
             for (var index in objectProperties) {
@@ -536,7 +407,7 @@ var es5_visitors = (function () {
 
         var interfacesFound = false;
 
-        if (types.isObjectExpression(node)) {
+        if (t.isObjectExpression(node)) {
             var objectProperties = node.properties;
 
 			/*
@@ -557,7 +428,7 @@ var es5_visitors = (function () {
                 // if the user has declared interfaces that he is implementing
                 if (!interfacesFound
                     && objectProperties[index].key.name.toLowerCase() === "interfaces"
-                    && types.isArrayExpression(objectProperties[index].value)) {
+                    && t.isArrayExpression(objectProperties[index].value)) {
                     interfacesFound = true;
                     var interfaces = objectProperties[index].value.elements;
 
@@ -580,7 +451,7 @@ var es5_visitors = (function () {
     function _getWholeInterfaceNameFromInterfacesNode(node) {
         var interfaceName = "";
 
-        if (types.isMemberExpression(node)) {
+        if (t.isMemberExpression(node)) {
             interfaceName += _resolveInterfacePath(node.object);
             interfaceName += node.property.name;
         }
@@ -591,8 +462,8 @@ var es5_visitors = (function () {
     function _resolveInterfacePath(node) {
         var subNode = "";
 
-        if (types.isMemberExpression(node)) {
-            if (types.isMemberExpression(node.object)) {
+        if (t.isMemberExpression(node)) {
+            if (t.isMemberExpression(node.object)) {
                 subNode += _resolveInterfacePath(node.object);
                 subNode += node.property.name + ".";
             } else {
@@ -609,7 +480,7 @@ var es5_visitors = (function () {
             isAndroidInterface = false;
 
         while (node !== undefined) {
-            if (!types.isMemberExpression(node)) {
+            if (!t.isMemberExpression(node)) {
                 if (isAndroidInterface) {
                     arr.push(node.name)
                 }
@@ -627,10 +498,10 @@ var es5_visitors = (function () {
     function _getArgumentFromNodeAsString(path, count, config) {
 
         var extClassArr = [];
-        var extendedClass = _getParent(path, count, config);
+        var extendedClass = _getParrent(path, count, config);
 
         if (extendedClass) {
-            if (types.isCallExpression(extendedClass.node)) {
+            if (t.isCallExpression(extendedClass.node)) {
                 var o = extendedClass.node.arguments[0];
             }
             else {
@@ -647,7 +518,7 @@ var es5_visitors = (function () {
     }
 
     function _getDecoratorArgument(path, config, customDecoratorName) {
-        if (path.parent && types.isCallExpression(path.parent)) {
+        if (path.parent && t.isCallExpression(path.parent)) {
 
             if (path.parent.arguments && path.parent.arguments.length > 0) {
 
@@ -682,13 +553,13 @@ var es5_visitors = (function () {
     function _getOverriddenMethodsTypescript(path, count) {
         var overriddenMethods = [];
 
-        var cn = _getParent(path, count)
+        var cn = _getParrent(path, count)
 
         // this pattern follows typescript generated syntax
         for (var item in cn.node.body) {
             var ci = cn.node.body[item];
-            if (types.isExpressionStatement(ci)) {
-                if (types.isAssignmentExpression(ci.expression)) {
+            if (t.isExpressionStatement(ci)) {
+                if (t.isAssignmentExpression(ci.expression)) {
                     if (ci.expression.left.property) {
                         overriddenMethods.push(ci.expression.left.property.name)
                     }
@@ -699,18 +570,18 @@ var es5_visitors = (function () {
         return overriddenMethods;
     }
 
-    function _getParent(node, numberOfParents, config) {
+    function _getParrent(node, numberOfParrents, config) {
         if (!node) {
             throw {
                 message: "No parent found for node in file: " + config.filePath,
                 errCode: 1
             }
         }
-        if (numberOfParents === 0) {
+        if (numberOfParrents === 0) {
             return node;
         }
 
-        return _getParent(node.parentPath, --numberOfParents)
+        return _getParrent(node.parentPath, --numberOfParrents)
     }
 
     function _testJavaProxyName(name) {
