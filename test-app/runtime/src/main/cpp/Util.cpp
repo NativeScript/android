@@ -110,3 +110,9 @@ u16string Util::ConvertFromUtf8ToUtf16(const string& str) {
 
     return utf16String;
 }
+
+uint16_t* Util::ConvertFromUtf8ToProtocolUtf16(const string& str) {
+    auto utf16String = std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t>().from_bytes(str);
+
+    return (uint16_t*)utf16String.c_str();
+}
