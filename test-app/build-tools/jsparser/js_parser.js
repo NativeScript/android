@@ -40,13 +40,13 @@ var fs = require("fs"),
 	extendDecoratorName = "JavaProxy",
 	interfacesDecoratorName = "Interfaces",
 	outFile = "out/out_parsed_typescript.txt", // default out file
-	inputDir = "input_parced_typescript", // default input folder
+	inputDir = "input_parsed_typescript", // default input folder
 	SBG_INTERFACE_NAMES = "sbg-interface-names.txt",
 	interfacesNamesFilePath = getRelativeToBuildTools(SBG_INTERFACE_NAMES), //default interace_names file path
 	SBG_INPUT_FILE = "sbg-input-file.txt",
 	SBG_BINDINGS_NAME = "sbg-bindings.txt",
 	SBG_INTERFACE_NAMES = "sbg-interfaces-names.txt",
-	SBG_JS_PARCED_FILES = "sbg-js-parced-files.txt",
+	SBG_JS_PARSED_FILES = "sbg-js-parsed-files.txt",
 	interfaceNames = [],
 	inputFiles = [];
 
@@ -67,7 +67,7 @@ try {
 } catch (e) { }
 outFile = getRelativeToBuildTools(SBG_BINDINGS_NAME)
 interfacesNamesFilePath = getRelativeToBuildTools(SBG_INTERFACE_NAMES)
-inputFilesPath = getRelativeToBuildTools(SBG_JS_PARCED_FILES)
+inputFilesPath = getRelativeToBuildTools(SBG_JS_PARSED_FILES)
 
 function getRelativeToBuildTools(relativePath) {
 	return path.resolve(`${BUILD_TOOLS_DIR}/${relativePath}`)
@@ -82,7 +82,6 @@ var tsHelpersFilePath = path.join(inputDir, "..", "internal", "ts_helpers.js");
 // ENTRY POINT!
 readLinesFromFile(inputFilesPath, inputFiles, tsHelpersFilePath)
 	.then(getFileAst)
-	.then(getExtendsLineColumn) //config
 	.then(readInterfaceNames) //config
 	.then(traverseAndAnalyseFilesDir) //start
 	.catch(exceptionHandler);
@@ -127,33 +126,6 @@ function getFileAst(tsHelpersFilePath) {
 
 			return resolve(ast);
 		});
-	});
-};
-
-/*
-*	Get line and column of the extend function in the tsHelpers.js file
-* 	(Line and column are used as identifiers for the typescript extended classes!)
-*/
-function getExtendsLineColumn(ast) {
-	return new Promise(function (resolve, reject) {
-
-		var tsHelpersInfo = {};
-		traverse.default(ast, {
-			enter: function (path) {
-
-				if (t.isAssignmentExpression(path.parent) &&
-					t.isCallExpression(path) &&
-					path.node.callee.property &&
-					path.node.callee.property.name === "extend" &&
-					path.node.callee.object.name === "parent") {
-					tsHelpersInfo.line = path.node.callee.property.loc.start.line
-					tsHelpersInfo.column = path.node.callee.property.loc.start.column + 1
-				}
-			}
-		})
-
-		es5_visitors.setLineAndColumn(tsHelpersInfo);
-		return resolve(true);
 	});
 };
 

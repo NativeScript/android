@@ -4,11 +4,7 @@ var es5_visitors = (function () {
 
         defaultExtendDecoratorName = "JavaProxy",
         columnOffset = 1,
-        FILE_SEPARATOR = "_f",
-        LINE_SEPARATOR = "_l",
-        COLUMN_SEPARATOR = "_c",
-        DECLARED_CLASS_SEPARATOR = "__",
-        TYPESCRIPT_EXTEND_STRING = FILE_SEPARATOR + "rnal_ts_helpers_l47_c38",
+        ASTERISK_SEPARATOR = "*",
         customExtendsArr = [],
         normalExtendsArr = [],
         interfacesArr = [],
@@ -72,9 +68,9 @@ var es5_visitors = (function () {
         return res;
     }
 
-	/*
-	*	Returns the common extends array generated from visitor
-	*/
+    /*
+   *       Returns the common extends array generated from visitor
+   */
     es5Visitor.getCommonExtendInfo = function () {
         var res = [];
         for (var index in normalExtendsArr) {
@@ -168,7 +164,7 @@ var es5_visitors = (function () {
         } else {
             var lineToWrite;
 
-            lineToWrite = _generateLineToWrite("", extendClass, overriddenMethodNames, `${FILE_SEPARATOR}${config.filePath}${LINE_SEPARATOR}${typescriptClassExtendSuperCallLocation.line}${COLUMN_SEPARATOR}${typescriptClassExtendSuperCallLocation.column}` + DECLARED_CLASS_SEPARATOR + declaredClassName, "", implementedInterfaces);
+            lineToWrite = _generateLineToWrite("", extendClass, overriddenMethodNames, { file: config.filePath, line: typescriptClassExtendSuperCallLocation.line, column: typescriptClassExtendSuperCallLocation.column, className: declaredClassName }, "", implementedInterfaces);
 
             if (config.logger) {
                 config.logger.info(lineToWrite)
@@ -382,7 +378,12 @@ var es5_visitors = (function () {
 
             var isCorrectInterfaceName = _testClassName(arg0.value);
             var overriddenInterfaceMethods = _getOverriddenMethods(arg1, config);
-            var extendInfo = FILE_SEPARATOR + config.filePath + LINE_SEPARATOR + path.node.loc.start.line + COLUMN_SEPARATOR + (path.node.loc.start.column + columnOffset) + DECLARED_CLASS_SEPARATOR + (isCorrectInterfaceName ? arg0.value : "");
+            var extendInfo = {
+                file: config.filePath,
+                line: path.node.loc.start.line,
+                column: path.node.loc.start.column + columnOffset,
+                className: (isCorrectInterfaceName ? arg0.value : "")
+            }
             var lineToWrite = _generateLineToWrite("", currentInterface, overriddenInterfaceMethods.join(","), extendInfo, "");
             if (config.logger) {
                 config.logger.info(lineToWrite)
@@ -496,7 +497,12 @@ var es5_visitors = (function () {
             if (config.logger) {
                 config.logger.info(lineToWrite)
             }
-            var extendInfo = FILE_SEPARATOR + config.filePath + LINE_SEPARATOR + path.node.property.loc.start.line + COLUMN_SEPARATOR + (path.node.property.loc.start.column + columnOffset) + DECLARED_CLASS_SEPARATOR + className;
+            var extendInfo = {
+                file: config.filePath,
+                line: path.node.property.loc.start.line,
+                column: path.node.property.loc.start.column + columnOffset,
+                className: className
+            };
             lineToWrite = _generateLineToWrite(isCorrectExtendClassName ? className : "", extendClass.reverse().join("."), overriddenMethodNames, extendInfo, "", implementedInterfaces);
             normalExtendsArr.push(lineToWrite)
         }
@@ -727,9 +733,22 @@ var es5_visitors = (function () {
         return false;
     }
 
-    function _generateLineToWrite(classNameFromDecorator, extendClass, overriddenMethodNames, extendInfo, filePath, implementedInterfaces) {
-        var sanitizedExtendInfo = extendInfo.replace(/[-\\/\\.]/g, "_");
-        var lineToWrite = extendClass + "*" + sanitizedExtendInfo + "*" + overriddenMethodNames + "*" + classNameFromDecorator + "*" + filePath + "*" + (implementedInterfaces ? implementedInterfaces : "");
+    function _generateLineToWrite(classNameFromDecorator, extendClass, overriddenMethodNames, extendInfo, filePath, implementedInterfaces = "") {
+        const extendInfoFile = extendInfo.file ? extendInfo.file.replace(/[-\\/\\.]/g, "_") : "";
+        const extendInfoLine = extendInfo.line ? extendInfo.line : "";
+        const extendInfoColumn = extendInfo.column ? extendInfo.column : "";
+        const extendInfoNewClassName = extendInfo.className ? extendInfo.className : "";
+
+        var lineToWrite = `${extendClass}${ASTERISK_SEPARATOR}`
+            + `${extendInfoFile}${ASTERISK_SEPARATOR}`
+            + `${extendInfoLine}${ASTERISK_SEPARATOR}`
+            + `${extendInfoColumn}${ASTERISK_SEPARATOR}`
+            + `${extendInfoNewClassName}${ASTERISK_SEPARATOR}`
+            + `${overriddenMethodNames}${ASTERISK_SEPARATOR}`
+            + `${classNameFromDecorator}${ASTERISK_SEPARATOR}`
+            + `${filePath}${ASTERISK_SEPARATOR}`
+            + `${implementedInterfaces}`
+
         return lineToWrite;
     }
 
@@ -737,8 +756,7 @@ var es5_visitors = (function () {
         if (customExtendsArrGlobal.indexOf(param) === -1) {
             customExtendsArr.push(lineToWrite)
             customExtendsArrGlobal.push(param)
-        }
-        else {
+        } else {
             console.log("Warning: there already is an extend called " + param + ".")
             if (extendPath.indexOf("tns_modules") === -1) {
                 // app folder will take precedence over tns_modules
@@ -749,13 +767,8 @@ var es5_visitors = (function () {
         }
     }
 
-    function setLineAndColumn(data) {
-        TYPESCRIPT_EXTEND_STRING = FILE_SEPARATOR + "rnal_ts_helpers_l" + data.line + "_c" + data.column;
-    }
-
     return {
-        es5Visitor: es5Visitor,
-        setLineAndColumn: setLineAndColumn
+        es5Visitor: es5Visitor
     }
 })();
 

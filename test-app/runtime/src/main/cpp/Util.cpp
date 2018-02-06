@@ -110,3 +110,20 @@ u16string Util::ConvertFromUtf8ToUtf16(const string& str) {
 
     return utf16String;
 }
+
+void Util::JoinString(const std::vector<std::string>& list, const std::string& delimiter,
+                      std::string& out) {
+    out.clear();
+
+    stringstream ss;
+
+    for (vector<string>::const_iterator it = list.begin(); it != list.end(); ++it) {
+        ss << *it;
+
+        if (it != list.end() - 1) {
+            ss << delimiter;
+        }
+    }
+
+    out = ss.str();
+}

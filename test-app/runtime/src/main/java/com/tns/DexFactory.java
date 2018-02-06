@@ -64,10 +64,6 @@ public class DexFactory {
     public Class<?> resolveClass(String name, String className, String[] methodOverrides, String[] implementedInterfaces, boolean isInterface) throws ClassNotFoundException, IOException {
         String fullClassName = className.replace("$", "_");
 
-        if (!isInterface) {
-            fullClassName += CLASS_NAME_LOCATION_SEPARATOR + name;
-        }
-
         // try to get pre-generated binding classes
         try {
             if (logger.isEnabled()) {
@@ -82,6 +78,9 @@ public class DexFactory {
 
             return pregeneratedClass;
         } catch (Exception e) {
+            if (logger.isEnabled()) {
+                logger.write("Pre-generated class not found:  " + fullClassName.replace("-", "_"));
+            }
         }
         //
 

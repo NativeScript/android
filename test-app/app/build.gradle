@@ -31,7 +31,7 @@ def PACKAGE_JSON = "package.json"
 def SBG_JAVA_DEPENDENCIES = "sbg-java-dependencies.txt"
 def SBG_INPUT_FILE = "sbg-input-file.txt"
 def SBG_OUTPUT_FILE = "sbg-output-file.txt"
-def SBG_JS_PARCED_FILES = "sbg-js-parced-files.txt"
+def SBG_JS_PARSED_FILES = "sbg-js-parsed-files.txt"
 def SBG_BINDINGS_NAME = "sbg-bindings.txt"
 def SBG_INTERFACE_NAMES = "sbg-interface-names.txt"
 def INPUT_JS_DIR = "$projectDir/src/main/assets/app"
@@ -248,7 +248,6 @@ tasks.whenTaskAdded({ org.gradle.api.DefaultTask currentTask ->
 
 task runSbg(type: JavaExec) {
     inputs.dir(INPUT_JS_DIR)
-    outputs.dir(OUTPUT_JAVA_DIR)
 
     workingDir "$BUILD_TOOLS_PATH"
     main "-jar"
@@ -468,7 +467,7 @@ task validateAppIdMatch {
 
 //////// custom clean ///////////
 task cleanSbg(type: Delete) {
-    delete "$BUILD_TOOLS_PATH/$SBG_JS_PARCED_FILES",
+    delete "$BUILD_TOOLS_PATH/$SBG_JS_PARSED_FILES",
             "$BUILD_TOOLS_PATH/$SBG_JAVA_DEPENDENCIES",
             "$BUILD_TOOLS_PATH/$SBG_INTERFACE_NAMES",
             "$BUILD_TOOLS_PATH/$SBG_BINDINGS_NAME",

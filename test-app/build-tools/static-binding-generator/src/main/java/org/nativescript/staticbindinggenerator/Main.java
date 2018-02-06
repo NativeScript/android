@@ -18,7 +18,7 @@ public class Main {
     public static final String SBG_INPUT_FILE = "sbg-input-file.txt";
     public static final String SBG_OUTPUT_FILE = "sbg-output-file.txt";
     public static final String SBG_BINDINGS_NAME = "sbg-bindings.txt";
-    public static final String SBG_JS_PARCED_FILES = "sbg-js-parced-files.txt";
+    public static final String SBG_JS_PARSED_FILES = "sbg-js-parsed-files.txt";
     public static final String SBG_INTERFACE_NAMES = "sbg-interfaces-names.txt";
 
     private static String jsCodeAbsolutePath;
@@ -57,7 +57,7 @@ public class Main {
         } catch (JSONException e) {
             e.printStackTrace();
         }
-        String pathToJsFileParams = SBG_JS_PARCED_FILES;
+        String pathToJsFileParams = SBG_JS_PARSED_FILES;
         PrintWriter pw = GetInterfaceNames.ensureOutputFile(pathToJsFileParams);
         for (String f : inputJsFiles) {
             pw.write(f);
