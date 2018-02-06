@@ -2,10 +2,14 @@ package org.nativescript.staticbindinggenerator;
 
 public class DataRow {
     private final String DELIMITER = "\\*";
-    private final int ELEMENT_NUMBER = 6;
+    private final int ELEMENT_NUMBER = 9;
     private final String row;
     private String baseClassname;
     private String suffix;
+    private String file;
+    private String line;
+    private String column;
+    private String newClassName;
     private String[] methods;
     private String filename;
     private String jsFilename;
@@ -24,8 +28,25 @@ public class DataRow {
         return baseClassname;
     }
 
+
     public String getSuffix() {
         return suffix;
+    }
+
+    public String getFile() {
+        return file;
+    }
+
+    public String getLine() {
+        return line;
+    }
+
+    public String getColumn() {
+        return column;
+    }
+
+    public String getNewClassName() {
+        return newClassName;
     }
 
     public String[] getMethods() {
@@ -52,10 +73,17 @@ public class DataRow {
         }
 
         baseClassname = data[0];
-        suffix = data[1];
-        methods = data[2].split(",");
-        filename = data[3];
-        jsFilename = data[4];
-        interfaces = data[5].split(",");
+        file = data[1];
+        line = data[2];
+        column = data[3];
+
+        int newClassNameIndex = 4;
+
+        newClassName = data[newClassNameIndex];
+
+        methods = data[newClassNameIndex + 1].split(",");
+        filename = data[newClassNameIndex + 2];
+        jsFilename = data[newClassNameIndex + 3];
+        interfaces = data[newClassNameIndex + 4].split(",");
     }
 }

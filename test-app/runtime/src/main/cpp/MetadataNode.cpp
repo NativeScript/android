@@ -1258,8 +1258,19 @@ MetadataNode::ExtendedClassCacheData MetadataNode::GetCachedExtendedClassData(Is
 string MetadataNode::CreateFullClassName(const std::string& className, const std::string& extendNameAndLocation = "") {
     string fullClassName = className;
 
+    // create a class name consisting only of the last file name part + line + column + variable identifier
     if (!extendNameAndLocation.empty()) {
-        fullClassName += Constants::CLASS_NAME_LOCATION_SEPARATOR + extendNameAndLocation;
+        vector<string> classNameParts;
+
+        Util::SplitString(className, "/", classNameParts);
+
+        // remove the class name and leave just the package identifier of the original class
+        while (std::isupper(classNameParts.back().at(0))) {
+            classNameParts.pop_back();
+        }
+
+        Util::JoinString(classNameParts, "/", fullClassName);
+        fullClassName += "/" + extendNameAndLocation;
     }
 
     return fullClassName;
@@ -1308,7 +1319,6 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
             extendName = info[0].As<String>();
             implementationObject = info[1].As<Object>();
         } else {
-            std::string getExtendLocation;
             auto isValidExtendLocation = GetExtendLocation(extendLocation, isTypeScriptExtend);
             auto validArgs = ValidateExtendArguments(info, isValidExtendLocation, extendLocation, extendName, implementationObject, isTypeScriptExtend);
 
@@ -1454,6 +1464,15 @@ bool MetadataNode::GetExtendLocation(string& extendLocation, bool isTypeScriptEx
 
                 std::replace(fullPathToFile.begin(), fullPathToFile.end(), '/', '_');
                 std::replace(fullPathToFile.begin(), fullPathToFile.end(), '.', '_');
+                std::replace(fullPathToFile.begin(), fullPathToFile.end(), '-', '_');
+                std::replace(fullPathToFile.begin(), fullPathToFile.end(), ' ', '_');
+
+                std::vector<std::string> pathParts;
+
+                Util::SplitString(fullPathToFile, "_", pathParts);
+
+                std::string lastPathPart = pathParts.back();
+                fullPathToFile = lastPathPart;
             }
 
             int lineNumber = frame->GetLineNumber();
@@ -1470,8 +1489,7 @@ bool MetadataNode::GetExtendLocation(string& extendLocation, bool isTypeScriptEx
                 return false;
             }
 
-            extendLocationStream << "f" << fullPathToFile.c_str() << "_l" << lineNumber << "_c" << column << "__";
-            //DEBUG_WRITE("EXTEND_LOCATION %s", extendLocationStream.str().c_str());
+            extendLocationStream << fullPathToFile.c_str() << "_" << lineNumber << "_" << column << "_";
         }
     }
 

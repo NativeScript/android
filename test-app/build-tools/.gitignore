@@ -1,7 +1,7 @@
 static-binding-generator.jar
 sbg-bindings.txt
 sbg-interfaces-names.txt
-sbg-js-parced-files.txt
+sbg-js-parsed-files.txt
 sbg-input-file.txt
 sbg-output-file.txt
 sbg-java-dependencies.txt

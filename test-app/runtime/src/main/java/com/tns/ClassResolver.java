@@ -14,16 +14,10 @@ class ClassResolver {
         String name = null;
         String className = cannonicalClassName;
 
-        int classExtendSeparatorIndex = cannonicalClassName.indexOf("_f");
-        if (classExtendSeparatorIndex != -1) {
-            className = cannonicalClassName.substring(0, classExtendSeparatorIndex);
-            name = cannonicalClassName.substring(classExtendSeparatorIndex + 1);
-        } else {
-            classExtendSeparatorIndex = cannonicalClassName.indexOf("_unknown_location");
-            if (classExtendSeparatorIndex != -1) {
-                className = cannonicalClassName.substring(0, classExtendSeparatorIndex);
-                name = cannonicalClassName.substring(classExtendSeparatorIndex + 1);
-            }
+        int locationSeparatorIndex = cannonicalClassName.indexOf("_unknown_location");
+        if (locationSeparatorIndex != -1) {
+            className = cannonicalClassName.substring(0, locationSeparatorIndex);
+            name = cannonicalClassName.substring(locationSeparatorIndex + 1);
         }
 
         Class<?> clazz = null;
