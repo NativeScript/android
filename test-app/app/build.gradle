@@ -58,7 +58,7 @@ def nativescriptDependencies = new JsonSlurper().parseText(dependenciesJson.text
 def computeCompileSdkVersion = { -> project.hasProperty("compileSdk") ? compileSdk : 26 }
 def computeTargetSdkVersion = { -> project.hasProperty("targetSdk") ? targetSdk : 26 }
 def computeBuildToolsVersion = { ->
-    project.hasProperty("buildToolsVersion") ? buildToolsVersion : "26.0.1"
+    project.hasProperty("buildToolsVersion") ? buildToolsVersion : "27.0.1"
 }
 
 project.ext.selectedBuildType = project.hasProperty("release") ? "release" : "debug"
@@ -84,20 +84,6 @@ def applyPluginGradleConfigurations = { ->
         if(file(includeGradlePath).exists()) {
             apply from: includeGradlePath
         }
-    }
-}
-
-def renameResultApks = { variant ->
-    def name
-    variant.outputs.each { output ->
-        def apkDirectory = output.packageApplication.outputFile.parentFile
-        def abiName = "";
-        if (output.getFilter(com.android.build.OutputFile.ABI)) {
-            abiName = "-" + output.getFilter(com.android.build.OutputFile.ABI);
-        }
-        def apkNamePrefix = rootProject.name + "-" + variant.buildType.name + abiName
-        name = apkNamePrefix + ".apk"
-        output.packageApplication.outputFile = new File(apkDirectory, name);
     }
 }
 
@@ -139,10 +125,6 @@ android {
         }
     }
 
-    applicationVariants.all { variant ->
-        renameResultApks(variant)
-    }
-
     applyAppGradleConfiguration()
     applyPluginGradleConfigurations()
 }
@@ -167,7 +149,7 @@ repositories {
 }
 
 dependencies {
-    def supportVer = "26.0.1"
+    def supportVer = "27.0.1"
     if (project.hasProperty("supportVersion")) {
         supportVer = supportVersion
     }
@@ -186,27 +168,25 @@ dependencies {
     if (dtsgProjectExists) {
         provided project(':dts-generator')
     }
-}
 
-////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////// CONFIGURATION PHASE //////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////
-
-task addNativeScriptRuntimePackageDependency {
     def useV8Symbols = nativescriptDependencies.any {
         def packageJsonPath = file("$rootDir/${it.directory}/$PACKAGE_JSON")
         def packageJson = new JsonSlurper().parseText(packageJsonPath.text)
         return packageJson.nativescript.useV8Symbols
     }
-
     if (!externalRuntimeExists) {
         def runtime = useV8Symbols ? "nativescript-regular" : "nativescript-optimized"
         println "\t + adding nativescript runtime package dependency: $runtime"
         project.dependencies.add("compile", [name: runtime, ext: "aar"])
     } else {
-        project.dependencies.add("compile", project(':runtime'))
+        implementation project(':runtime')
+
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////// CONFIGURATION PHASE //////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////
 
 task addDependenciesFromNativeScriptPlugins {
     nativescriptDependencies.each { dep ->
