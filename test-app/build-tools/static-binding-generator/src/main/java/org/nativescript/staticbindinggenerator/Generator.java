@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
@@ -84,19 +85,21 @@ public class Generator {
 
         File baseDir = new File(outputDir, baseDirPath);
         if (!baseDir.exists()) {
-            boolean success = baseDir.mkdirs();
+            baseDir.mkdirs();
         }
 
-        String name;
+        String name = "";
         Boolean isInterface = clazz.isInterface();
 
         if (hasSpecifiedName) {
             name = getSimpleClassname(dataRow.getFilename());
         } else {
-            name = getSimpleClassname(clazz.getClassName());
-
-            if (!isInterface) {
-                name += dataRow.getSuffix();
+            if (isInterface) {
+                name = getSimpleClassname(clazz.getClassName());
+            } else {
+                // name of the class: last portion of the full file name + line + column + variable name
+                String[] lastFilePathPart = dataRow.getFile().split("_");
+                name += lastFilePathPart[lastFilePathPart.length - 1] + "_" + dataRow.getLine() + "_" + dataRow.getColumn() + "_" + dataRow.getNewClassName();
             }
         }
 
@@ -149,9 +152,6 @@ public class Generator {
             String classname = dataRow.getBaseClassname();
             boolean isJavaExtend = classes.containsKey(classname);
             if (isJavaExtend) {
-
-//                System.out.println("SBG: DataRow: baseClassName: " + classname + ", suffix: " + dataRow.getSuffix() + ", interfaces: " + String.join(", ", Arrays.asList(dataRow.getInterfaces())) + ", jsFileName: " + dataRow.getJsFilename());
-
                 Binding binding = generateBinding(dataRow, interfaceNames);
 
                 if (binding != null) {

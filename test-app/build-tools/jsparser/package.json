@@ -1,7 +1,7 @@
 {
   "name": "ast-parser",
   "version": "1.0.0",
-  "description": "",
+  "description": "javascript static analysis tool",
   "main": "js_parser.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -15,6 +15,5 @@
     "filewalker": "0.1.2",
     "lazy": "1.0.11"
   },
-  "repository": "https://github.com/NativeScript/android-runtime",
-  "description": "javascript static analysis tool"
+  "repository": "https://github.com/NativeScript/android-runtime"
 }
