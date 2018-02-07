@@ -76,6 +76,27 @@ def renameResultApks = { variant ->
 ///////////////////////////// CONFIGURATIONS ///////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
 
+def getAppResourcesDirectory = { ->
+	def USER_PROJECT_ROOT = "$rootDir/../.."
+    def defaultPathToAppResources = "$USER_PROJECT_ROOT/app/App_Resources"
+    def pathToAppResources
+    def nsConfigFile = file("$USER_PROJECT_ROOT/nsconfig.json")
+
+    if (nsConfigFile.exists()) {
+        def nsConfigJsonContent = new JsonSlurper().parseText(nsConfigFile.getText("UTF-8"))
+
+        if (nsConfigJsonContent.appResourcesPath != null) {
+            pathToAppResources = java.nio.file.Paths.get(USER_PROJECT_ROOT).resolve(nsConfigJsonContent.appResourcesPath).toAbsolutePath()
+        } else if (nsConfigJsonContent.appPath != null) {
+			def pathToApp = java.nio.file.Paths.get(USER_PROJECT_ROOT).resolve(nsConfigJsonContent.appPath).toAbsolutePath();
+			pathToAppResources = "$pathToApp/App_Resources"
+		}
+    }
+
+    return pathToAppResources != null ? pathToAppResources : defaultPathToAppResources
+}
+
+
 def applyPluginsIncludeGradleConfigurations =  { ->
 	def taskNames = project.getGradle().startParameter.taskNames
 
@@ -139,7 +160,8 @@ def applyPluginsIncludeGradleConfigurations =  { ->
 }
 
 def applyAppGradleConfiguration = { ->
-	def pathToAppGradle = "$rootDir/../../app/App_Resources/Android/app.gradle"
+	def appResourcesDir = getAppResourcesDirectory()
+	def pathToAppGradle = "$appResourcesDir/Android/app.gradle"
 	def appGradle = file(pathToAppGradle)
 	if (appGradle.exists()) {
 		println "\t + applying user-defined configuration from ${appGradle}"
