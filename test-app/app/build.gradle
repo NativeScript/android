@@ -245,6 +245,8 @@ task addDependenciesFromAppResourcesLibraries {
         jarFiles.each { jarFile ->
             println "\t + adding jar library dependency: " + jarFile.getAbsolutePath()
         }
+        
+        project.dependencies.add("compile", jarFiles)
     }
 }
 
