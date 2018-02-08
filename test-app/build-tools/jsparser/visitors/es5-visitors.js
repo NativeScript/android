@@ -734,7 +734,7 @@ var es5_visitors = (function () {
     }
 
     function _generateLineToWrite(classNameFromDecorator, extendClass, overriddenMethodNames, extendInfo, filePath, implementedInterfaces = "") {
-        const extendInfoFile = extendInfo.file ? extendInfo.file.replace(/[-\\/\\.]/g, "_") : "";
+        const extendInfoFile = extendInfo.file ? extendInfo.file.replace(/[-\\/\\. ]/g, "_") : "";
         const extendInfoLine = extendInfo.line ? extendInfo.line : "";
         const extendInfoColumn = extendInfo.column ? extendInfo.column : "";
         const extendInfoNewClassName = extendInfo.className ? extendInfo.className : "";
