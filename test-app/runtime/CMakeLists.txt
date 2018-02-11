@@ -8,13 +8,19 @@ cmake_minimum_required(VERSION 3.4.1)
 # "-DANDROID_STL=c++_static" is just not enough for clang++ to find some libraries in the ndk
 MESSAGE( STATUS "## ANDROID_NDK_ROOT: " ${ANDROID_NDK_ROOT} )
 
+if ( ANDROID_ABI MATCHES "arm64" )
+    set(ARCH_INCLUDE_DIR "aarch64-linux-android")
+else()
+    set(ARCH_INCLUDE_DIR "arm-linux-androideabi")
+endif()
+
 # Command info: https://cmake.org/cmake/help/v3.4/command/include_directories.html
 include_directories( src/main/cpp
                     src/main/cpp/include
                     src/main/cpp/v8_inspector
 
                     # hack to find some libraries from the ndk
-                    ${ANDROID_NDK_ROOT}/sysroot/usr/include/arm-linux-androideabi/
+                    ${ANDROID_NDK_ROOT}/sysroot/usr/include/${ARCH_INCLUDE_DIR}/
                     )
 if ( OPTIMIZED_BUILD )
     set(CMAKE_CXX_FLAGS "-std=c++11 -fexceptions -fno-builtin-stpcpy -fno-rtti -O3 -fvisibility=hidden -ffunction-sections -fno-data-sections -Wl,--exclude-libs=ALL -Wl,--gc-sections")
