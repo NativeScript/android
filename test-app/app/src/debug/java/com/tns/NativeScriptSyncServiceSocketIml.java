@@ -1,16 +1,15 @@
 package com.tns;
 
+import android.content.Context;
+import android.net.LocalServerSocket;
+import android.net.LocalSocket;
+
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-
-import android.content.Context;
-import android.net.LocalServerSocket;
-import android.net.LocalSocket;
-import android.support.annotation.NonNull;
 
 public class NativeScriptSyncServiceSocketIml {
     private static String DEVICE_APP_DIR;
@@ -66,7 +65,6 @@ public class NativeScriptSyncServiceSocketIml {
             }
         }
 
-        @NonNull
         private Thread setUpLivesyncThread() {
             Thread livesyncThread = new Thread(livesyncWorker);
             livesyncThread.setUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
@@ -303,7 +301,6 @@ public class NativeScriptSyncServiceSocketIml {
             fileOrDirectory.delete();
         }
 
-        @NonNull
         private File prepareFile(String fileName) {
             File fileToCreate = new File(DEVICE_APP_DIR, fileName);
             if (fileToCreate.exists()) {
