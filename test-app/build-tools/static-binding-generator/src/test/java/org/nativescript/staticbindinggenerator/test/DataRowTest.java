@@ -14,13 +14,15 @@ public class DataRowTest {
 
         DataRow row = new DataRow(lines.get(0));
 
-        Assert.assertEquals(row.getBaseClassname(), "java.lang.Runnable");
-        Assert.assertEquals(row.getSuffix(), "_fapp_tns_modules_timer_timer_l14_c20__");
+        Assert.assertEquals(row.getBaseClassname(), "android.view.View.OnClickListener");
+        Assert.assertEquals(row.getFile(), "MyActivity");
+        Assert.assertEquals(row.getLine(), "54");
+        Assert.assertEquals(row.getColumn(), "32");
+        Assert.assertEquals(row.getNewClassName(), "AppClickListener");
+        Assert.assertEquals(row.getMethods()[0], "onClick");
         Assert.assertEquals(row.getFilename(), "");
         Assert.assertEquals(row.getJsFilename(), "");
-        String[] methods = row.getMethods();
-        Assert.assertEquals(methods.length, 1);
-        Assert.assertEquals(methods[0], "run");
+        Assert.assertEquals(row.getInterfaces()[0], "");
     }
 
     @Test
@@ -30,12 +32,14 @@ public class DataRowTest {
         DataRow row = new DataRow(lines.get(0));
 
         Assert.assertEquals(row.getBaseClassname(), "java.lang.Object");
-        Assert.assertEquals(row.getSuffix(), "_frnal_prepareExtend_l62_c37__HelloWorldModel");
-        Assert.assertEquals(row.getFilename(), "a.b.c.MyObject");
-        Assert.assertEquals(row.getJsFilename(), "some/full/path/myobj.js");
-        String[] methods = row.getMethods();
-        Assert.assertEquals(methods.length, 1);
-        Assert.assertEquals(methods[0], "hashCode");
+        Assert.assertEquals(row.getFile(), "");
+        Assert.assertEquals(row.getLine(), "");
+        Assert.assertEquals(row.getColumn(), "");
+        Assert.assertEquals(row.getNewClassName(), "");
+        Assert.assertEquals(row.getMethods()[0], "toString");
+        Assert.assertEquals(row.getFilename(), "com.tns.NativeScriptActivity");
+        Assert.assertEquals(row.getJsFilename(), "MyActivity.js");
+        Assert.assertEquals(row.getInterfaces()[0], "");
     }
 
     @Test
@@ -45,7 +49,6 @@ public class DataRowTest {
         DataRow row = new DataRow(lines.get(0));
 
         Assert.assertEquals(row.getBaseClassname(), "java.lang.Object");
-        Assert.assertEquals(row.getSuffix(), "");
         Assert.assertEquals(row.getFilename(), "com.tns.ComplexClass");
         Assert.assertEquals(row.getJsFilename(), "app.js");
 

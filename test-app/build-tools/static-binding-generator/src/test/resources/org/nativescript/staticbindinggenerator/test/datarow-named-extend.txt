@@ -1,1 +1,1 @@
-java.lang.Object*_frnal_prepareExtend_l62_c37__HelloWorldModel*hashCode*a.b.c.MyObject*some/full/path/myobj.js*
+java.lang.Object*****toString*com.tns.NativeScriptActivity*MyActivity.js*

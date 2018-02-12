@@ -115,7 +115,7 @@ public class GeneratorTest {
         URL u = ListView.class.getResource('/' + ListView.class.getName().replace('.', '/') + ".class");
         File f = new File(u.toURI()).getParentFile().getParentFile().getParentFile();
 
-        String dataRowString = "com.example.ListView*_fapp_l9_c29__*createView*com.example.MyListView**";
+        String dataRowString = "com.example.ListView*app*9*29**createView*com.example.MyListView**";
         DataRow dataRow = new DataRow(dataRowString);
 
         System.out.println(dataRowString);
@@ -142,7 +142,7 @@ public class GeneratorTest {
         URL u = MyAbstractClass2.class.getResource('/' + MyAbstractClass2.class.getName().replace('.', '/') + ".class");
         File f = new File(u.toURI()).getParentFile().getParentFile().getParentFile();
 
-        String dataRowString = "com.example.MyAbstractClass2*_fapp_l9_c29__*abstractMethod*com.example.com.example.MyExtendedClass**";
+        String dataRowString = "com.example.MyAbstractClass2**9*29**abstractMethod*com.example.com.example.MyExtendedClass**";
         DataRow dataRow = new DataRow(dataRowString);
 
         System.out.println(dataRowString);

@@ -1,1 +1,1 @@
-java.lang.Runnable*_fapp_tns_modules_timer_timer_l14_c20__*run***
+android.view.View.OnClickListener*MyActivity*54*32*AppClickListener*onClick***

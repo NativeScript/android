@@ -1,1 +1,1 @@
-com.example.MyInterface*_fapp_l9_c29__*getTile***
+com.example.MyInterface*app*9*29**getTile***
