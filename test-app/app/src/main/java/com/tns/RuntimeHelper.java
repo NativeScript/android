@@ -190,6 +190,9 @@ public final class RuntimeHelper {
                         Constructor cons = NativeScriptSyncService.getConstructor(new Class[] {Runtime.class, Logger.class, Context.class});
                         Object syncService = cons.newInstance(runtime, logger, app);
 
+                        Method syncMethod = NativeScriptSyncService.getMethod("sync");
+                        syncMethod.invoke(syncService);
+
                         Method startServerMethod = NativeScriptSyncService.getMethod("startServer");
                         startServerMethod.invoke(syncService);
                     } catch (ClassNotFoundException e) {
