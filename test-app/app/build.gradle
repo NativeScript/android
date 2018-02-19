@@ -154,6 +154,12 @@ repositories {
     def pluginDependencies = nativescriptDependencies.collect {
         "$rootDir/${it.directory}/$PLATFORMS_ANDROID"
     }
+
+    // some plugins may have their android dependencies in a /libs subdirectory
+    pluginDependencies.addAll(nativescriptDependencies.collect {
+        "$rootDir/${it.directory}/$PLATFORMS_ANDROID/libs"
+    })
+
     if (!externalRuntimeExists) {
         pluginDependencies.add("libs/runtime-libs")
     }
