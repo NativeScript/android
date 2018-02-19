@@ -1258,19 +1258,11 @@ MetadataNode::ExtendedClassCacheData MetadataNode::GetCachedExtendedClassData(Is
 string MetadataNode::CreateFullClassName(const std::string& className, const std::string& extendNameAndLocation = "") {
     string fullClassName = className;
 
-    // create a class name consisting only of the last file name part + line + column + variable identifier
+    // create a class name consisting only of the base class name + last file name part + line + column + variable identifier
     if (!extendNameAndLocation.empty()) {
-        vector<string> classNameParts;
-
-        Util::SplitString(className, "/", classNameParts);
-
-        // remove the class name and leave just the package identifier of the original class
-        while (std::isupper(classNameParts.back().at(0))) {
-            classNameParts.pop_back();
-        }
-
-        Util::JoinString(classNameParts, "/", fullClassName);
-        fullClassName += "/" + extendNameAndLocation;
+        string tempClassName = className;
+        fullClassName = Util::ReplaceAll(tempClassName, "$", "_");
+        fullClassName += "_" + extendNameAndLocation;
     }
 
     return fullClassName;

@@ -97,6 +97,7 @@ public class Generator {
             if (isInterface) {
                 name = getSimpleClassname(clazz.getClassName());
             } else {
+                name = getSimpleClassname(clazz.getClassName().replace("$", "_")) + "_";
                 // name of the class: last portion of the full file name + line + column + variable name
                 String[] lastFilePathPart = dataRow.getFile().split("_");
                 name += lastFilePathPart[lastFilePathPart.length - 1] + "_" + dataRow.getLine() + "_" + dataRow.getColumn() + "_" + dataRow.getNewClassName();
