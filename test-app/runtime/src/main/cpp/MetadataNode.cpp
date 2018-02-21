@@ -825,7 +825,6 @@ void MetadataNode::ExtendedClassConstructorCallback(const v8::FunctionCallbackIn
         v8::HandleScope handleScope(isolate);
 
         auto implementationObject = Local<Object>::New(isolate, *extData->implementationObject);
-        const auto& extendName = extData->extendedName;
 
         SetInstanceMetadata(isolate, thiz, extData->node);
         thiz->SetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::CallSuper), True(isolate));
@@ -835,7 +834,7 @@ void MetadataNode::ExtendedClassConstructorCallback(const v8::FunctionCallbackIn
 
         string fullClassName = extData->fullClassName;
 
-        bool success = CallbackHandlers::RegisterInstance(isolate, thiz, fullClassName, argWrapper, implementationObject, false);
+        bool success = CallbackHandlers::RegisterInstance(isolate, thiz, fullClassName, argWrapper, implementationObject, false, extData->node->m_name);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -934,7 +933,7 @@ void MetadataNode::ClassConstructorCallback(const v8::FunctionCallbackInfo<v8::V
         ArgsWrapper argWrapper(info, ArgType::Class);
 
         string fullClassName = CreateFullClassName(className, extendName);
-        bool success = CallbackHandlers::RegisterInstance(isolate, thiz, fullClassName, argWrapper, Local<Object>(), false);
+        bool success = CallbackHandlers::RegisterInstance(isolate, thiz, fullClassName, argWrapper, Local<Object>(), false, className);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -1325,8 +1324,9 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
 
         string extendNameAndLocation = extendLocation + ArgConverter::ConvertToString(extendName);
         string fullClassName;
+        string baseClassName = node->m_name;
         if (!hasDot) {
-            fullClassName = TNS_PREFIX + CreateFullClassName(node->m_name, extendNameAndLocation);
+            fullClassName = TNS_PREFIX + CreateFullClassName(baseClassName, extendNameAndLocation);
         } else {
             fullClassName = ArgConverter::ConvertToString(info[0].As<String>());
         }
@@ -1336,7 +1336,7 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
         //resolve class (pre-generated or generated runtime from dex generator)
         uint8_t nodeType = s_metadataReader.GetNodeType(node->m_treeNode);
         bool isInterface = s_metadataReader.IsNodeTypeInterface(nodeType);
-        auto clazz = CallbackHandlers::ResolveClass(isolate, fullClassName, implementationObject, isInterface);
+        auto clazz = CallbackHandlers::ResolveClass(isolate, baseClassName, fullClassName, implementationObject, isInterface);
         auto fullExtendedName = CallbackHandlers::ResolveClassName(isolate, clazz);
         DEBUG_WRITE("ExtendsCallMethodHandler: extend full name %s", fullClassName.c_str());
 

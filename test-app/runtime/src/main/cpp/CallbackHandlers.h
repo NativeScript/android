@@ -32,9 +32,9 @@ class CallbackHandlers {
 
         static v8::Local<v8::Object> CreateJSWrapper(v8::Isolate* isolate, jint javaObjectID, const std::string& typeName);
 
-        static bool RegisterInstance(v8::Isolate* isolate, const v8::Local<v8::Object>& jsObject, const std::string& fullClassName, const ArgsWrapper& argWrapper, const v8::Local<v8::Object>& implementationObject, bool isInterface);
+        static bool RegisterInstance(v8::Isolate* isolate, const v8::Local<v8::Object>& jsObject, const std::string& fullClassName, const ArgsWrapper& argWrapper, const v8::Local<v8::Object>& implementationObject, bool isInterface, const std::string& baseClassName = std::string());
 
-        static jclass ResolveClass(v8::Isolate* isolate, const std::string& fullClassname, const v8::Local<v8::Object>& implementationObject, bool isInterface);
+        static jclass ResolveClass(v8::Isolate* isolate, const std::string& baseClassName, const std::string& fullClassName, const v8::Local<v8::Object>& implementationObject, bool isInterface);
 
         static std::string ResolveClassName(v8::Isolate* isolate, jclass& clazz);
 
