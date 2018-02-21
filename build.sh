@@ -30,7 +30,6 @@ cp dist/tns-android-*.tgz dist/tns-android.tgz
 $ANDROID_HOME/platform-tools/adb devices
 $ANDROID_HOME/platform-tools/adb -e logcat -c
 $ANDROID_HOME/platform-tools/adb -e logcat > consoleLog.txt &
-cd test-app
 ./gradlew runtest
 
 echo $cwd
