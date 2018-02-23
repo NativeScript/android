@@ -72,6 +72,21 @@ void Console::sendToDevToolsFrontEnd(v8::Isolate* isolate, const std::string& me
     v8_inspector::V8LogAgentImpl::EntryAdded(message, logLevel, ArgConverter::ConvertToString(frame->GetScriptNameOrSourceURL()), frame->GetLineNumber());
 }
 
+const v8::Local<v8::String> transformJSObject(v8::Isolate* isolate, v8::Local<v8::Object> object) {
+    auto objToString = object->ToString(isolate);
+    v8::Local<v8::String> resultString;
+
+    auto hasCustomToStringImplementation = !objToString->SameValue(ArgConverter::ConvertToV8String(isolate, "[object Object]"));
+
+    if (hasCustomToStringImplementation) {
+        resultString = objToString;
+    } else {
+        resultString = JsonStringifyObject(isolate, object);
+    }
+
+    return resultString;
+}
+
 const std::string buildLogString(const v8::FunctionCallbackInfo<v8::Value>& info, int startingIndex = 0) {
     auto isolate = info.GetIsolate();
 
@@ -87,7 +102,8 @@ const std::string buildLogString(const v8::FunctionCallbackInfo<v8::Value>& info
                 info[i]->ToDetailString(isolate->GetCurrentContext()).ToLocal(&argString);
             } else if (info[i]->IsObject()) {
                 v8::Local<v8::Object> obj = info[i].As<v8::Object>();
-                argString = JsonStringifyObject(isolate, obj);
+
+                argString = transformJSObject(isolate, obj);
             } else {
                 info[i]->ToDetailString(isolate->GetCurrentContext()).ToLocal(&argString);
             }
@@ -188,7 +204,9 @@ void Console::dirCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
                 if (propIsFunction) {
                     ss << "()";
                 } else if (propertyValue->IsObject()) {
-                    std::string jsonStringifiedObject = ArgConverter::ConvertToString(JsonStringifyObject(isolate, propertyValue));
+                    auto obj = propertyValue->ToObject(isolate);
+                    auto objString = transformJSObject(isolate, obj);
+                    std::string jsonStringifiedObject = ArgConverter::ConvertToString(objString);
                     // if object prints out as the error string for circular references, replace with #CR instead for brevity
                     if (jsonStringifiedObject.find("circular structure") != std::string::npos) {
                         jsonStringifiedObject = "#CR";
