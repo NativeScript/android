@@ -2,11 +2,11 @@ def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
 def runOnDevice = project.hasProperty("runOnDevice");
 def runOnDeviceOrEmulator = runOnDevice ? "-d" : "-e";
 
-task deleteDist(type: Delete) {
-    doFirst {
-        delete "$rootDir/dist"
-    }
-}
+// task deleteDist(type: Delete) {
+//     doFirst {
+//         delete "$rootDir/dist"
+//     }
+// }
 
 task waitForEmulatorToStart(type: Exec) {
     doFirst {
@@ -97,7 +97,7 @@ task deleteRootLevelResult(type: Delete) {
 }
 
 
-waitForEmulatorToStart.dependsOn(deleteDist)
+// waitForEmulatorToStart.dependsOn(deleteDist)
 runAdbAsRoot.dependsOn(waitForEmulatorToStart)
 deletePreviousResultXml.dependsOn(runAdbAsRoot)
 installApk.dependsOn(deletePreviousResultXml)
