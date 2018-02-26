@@ -42,6 +42,10 @@ $ANDROID_HOME/platform-tools/adb -e logcat > consoleLog.txt &
 cd test-app
 ./gradlew runtest --rerun-tasks
 
+echo $cwd
+
+cd $cwd
+
 echo "Stopping running emulators"
 for KILLPID in `ps ax | grep 'emulator' | grep -v 'grep' | awk ' { print $1;}'`; do kill -9 $KILLPID; done || true
 for KILLPID in `ps ax | grep 'qemu' | grep -v 'grep' | awk ' { print $1;}'`; do kill -9 $KILLPID; done || true
