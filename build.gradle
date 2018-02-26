@@ -46,6 +46,8 @@ task cleanDistDir(type: Delete) {
 }
 
 task createDistDir {
+    dependsOn 'cleanDistDir'
+
     doLast {
         def distF = new File(DIST_PATH)
         distF.mkdirs()
@@ -264,15 +266,18 @@ task createNpmPackage(type: Exec) {
         }
     }
 }
-generateDtsgJar.dependsOn(cleanDistDir)
+
 generateSbgJar.dependsOn(generateDtsgJar)
 generateMdgJar.dependsOn(generateSbgJar)
 createDistDir.dependsOn(generateMdgJar)
+
 getPackageVersion.dependsOn(createDistDir)
 getCommitVersion.dependsOn(getPackageVersion)
+
 generateRuntime.dependsOn(getCommitVersion)
 generateOptimizedRuntimeAar.dependsOn(generateRuntime)
 generateRuntimeAar.dependsOn(generateOptimizedRuntimeAar)
+
 copyFilesToProjectTemeplate.dependsOn(generateRuntimeAar)
 copyProjectTemplate.dependsOn(copyFilesToProjectTemeplate)
 copyPackageJson.dependsOn(copyProjectTemplate)
