@@ -5,6 +5,7 @@
 #include "v8.h"
 #include "include/v8.h"
 #include <string>
+#include <map>
 
 namespace tns {
 std::string ConvertToString(const v8::Local<v8::String>& s);
