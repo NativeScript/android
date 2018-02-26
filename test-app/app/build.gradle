@@ -76,8 +76,10 @@ def getAppResourcesDirectory = { ->
     if (nsConfigFile.exists()) {
         def nsConfigJsonContent = new JsonSlurper().parseText(nsConfigFile.getText("UTF-8"))
 
-        if (nsConfigJsonContent.app_resources != null) {
-            pathToAppResources = java.nio.file.Paths.get(USER_PROJECT_ROOT).resolve(nsConfigJsonContent.app_resources).toAbsolutePath()
+        if (nsConfigJsonContent.appResourcesPath != null) {
+            pathToAppResources = java.nio.file.Paths.get(USER_PROJECT_ROOT).resolve(nsConfigJsonContent.appResourcesPath).toAbsolutePath()
+        } else if (nsConfigJsonContent.appPath != null) {
+            pathToAppResources = java.nio.file.Paths.get(USER_PROJECT_ROOT).resolve(nsConfigJsonContent.appPath).toAbsolutePath()
         }
     }
 
