@@ -304,6 +304,10 @@ void Console::dirCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 
                     if (propIsFunction) {
                         ss << "()";
+                    } else if (propertyValue->IsArray()) {
+                        auto stringResult = buildStringFromArg(isolate, propertyValue);
+                        std::string jsonStringifiedArray = ArgConverter::ConvertToString(stringResult);
+                        ss << ": " << jsonStringifiedArray;
                     } else if (propertyValue->IsObject()) {
                         auto obj = propertyValue->ToObject(isolate);
                         auto objString = transformJSObject(isolate, obj);
