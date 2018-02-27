@@ -76,7 +76,7 @@ const v8::Local<v8::String> transformJSObject(v8::Isolate* isolate, v8::Local<v8
     auto objToString = object->ToString(isolate);
     v8::Local<v8::String> resultString;
 
-    auto hasCustomToStringImplementation = !objToString->SameValue(ArgConverter::ConvertToV8String(isolate, "[object Object]"));
+    auto hasCustomToStringImplementation = ArgConverter::ConvertToString(objToString).find("[object Object]") == std::string::npos;
 
     if (hasCustomToStringImplementation) {
         resultString = objToString;
@@ -85,6 +85,52 @@ const v8::Local<v8::String> transformJSObject(v8::Isolate* isolate, v8::Local<v8
     }
 
     return resultString;
+}
+
+const v8::Local<v8::String> buildStringFromArg(v8::Isolate* isolate, const v8::Local<v8::Value>& val) {
+    v8::Local<v8::String> argString;
+    if (val->IsFunction()) {
+        val->ToDetailString(isolate->GetCurrentContext()).ToLocal(&argString);
+    } else if (val->IsArray()) {
+        auto cachedSelf = val;
+        auto array = val->ToObject();
+        auto arrayEntryKeys = array->GetPropertyNames(isolate->GetCurrentContext()).ToLocalChecked();
+        auto context = isolate->GetCurrentContext();
+
+        auto arrayLength = arrayEntryKeys->Length();
+
+        argString = ArgConverter::ConvertToV8String(isolate, "[");
+
+        for (int i = 0; i < arrayLength; i++) {
+            auto propertyName = arrayEntryKeys->Get(context, i).ToLocalChecked();
+
+            auto propertyValue = array->Get(context, propertyName).ToLocalChecked();
+
+            // avoid bottomless recursion with cyclic reference to the same array
+            if (propertyValue->StrictEquals(cachedSelf)) {
+                argString = v8::String::Concat(argString, ArgConverter::ConvertToV8String(isolate, "[Circular]"));
+                continue;
+            }
+
+            auto objectString = buildStringFromArg(isolate, propertyValue);
+
+            argString = v8::String::Concat(argString, objectString);
+
+            if (i != arrayLength - 1) {
+                argString = v8::String::Concat(argString, ArgConverter::ConvertToV8String(isolate, ", "));
+            }
+        }
+
+        argString = v8::String::Concat(argString, ArgConverter::ConvertToV8String(isolate, "]"));
+    } else if (val->IsObject()) {
+        v8::Local<v8::Object> obj = val.As<v8::Object>();
+
+        argString = transformJSObject(isolate, obj);
+    } else {
+        val->ToDetailString(isolate->GetCurrentContext()).ToLocal(&argString);
+    }
+
+    return argString;
 }
 
 const std::string buildLogString(const v8::FunctionCallbackInfo<v8::Value>& info, int startingIndex = 0) {
@@ -98,15 +144,8 @@ const std::string buildLogString(const v8::FunctionCallbackInfo<v8::Value>& info
     if (argLen) {
         for (int i = startingIndex; i < argLen; i++) {
             v8::Local<v8::String> argString;
-            if (info[i]->IsFunction()) {
-                info[i]->ToDetailString(isolate->GetCurrentContext()).ToLocal(&argString);
-            } else if (info[i]->IsObject()) {
-                v8::Local<v8::Object> obj = info[i].As<v8::Object>();
 
-                argString = transformJSObject(isolate, obj);
-            } else {
-                info[i]->ToDetailString(isolate->GetCurrentContext()).ToLocal(&argString);
-            }
+            argString = buildStringFromArg(isolate, info[i]);
 
             // separate args with a space
             if (i != 0) {
