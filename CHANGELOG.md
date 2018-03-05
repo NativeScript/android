@@ -1,3 +1,10 @@
+3.4.2
+==
+
+## Bug Fixes
+
+ - [fix include gradle flavor generation for plugins with incomplete include.gradle scripts (#937)](https://github.com/NativeScript/android-runtime/pull/937)
+
 3.4.1
 ==
 
