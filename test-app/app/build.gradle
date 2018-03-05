@@ -43,6 +43,9 @@ def MDG_OUTPUT_DIR = "mdg-output-dir.txt"
 def MDG_JAVA_DEPENDENCIES = "mdg-java-dependencies.txt"
 def METADATA_OUT_PATH = "$projectDir/src/main/assets/metadata"
 
+//paths to jar libraries
+def jarLibraries = new LinkedList<String>()
+
 // the build script will not work with previous versions of the CLI (3.1 or earlier)
 def dependenciesJson = file("$rootDir/dependencies.json")
 if (!dependenciesJson.exists()) {
@@ -228,12 +231,14 @@ task addDependenciesFromNativeScriptPlugins {
             project.dependencies.add("compile", [name: fileName, ext: "aar"])
         }
 
-        def jarFiles = fileTree(dir: file("${dep.directory}/$PLATFORMS_ANDROID"), include: ["**/*.jar"])
+        def jarFiles = fileTree(dir: file("$rootDir/${dep.directory}/$PLATFORMS_ANDROID"), include: ["**/*.jar"])
         jarFiles.each { jarFile ->
-            println "\t + adding jar plugin dependency: " + jarFile.getAbsolutePath()
+            def jarFileAbsolutePath = jarFile.getAbsolutePath()
+            println "\t + adding jar plugin dependency: $jarFileAbsolutePath"
+            jarLibraries.add(jarFile.getAbsolutePath())
         }
 
-        project.dependencies.add("compile", jarFiles)
+        project.dependencies.add("implementation", jarFiles)
     }
 }
 
@@ -251,7 +256,9 @@ task addDependenciesFromAppResourcesLibraries {
 
         def jarFiles = fileTree(dir: appResourcesLibraries, include: ["**/*.jar"])
         jarFiles.each { jarFile ->
-            println "\t + adding jar library dependency: " + jarFile.getAbsolutePath()
+            def jarFileAbsolutePath = jarFile.getAbsolutePath()
+            println "\t + adding jar plugin dependency: $jarFileAbsolutePath"
+            jarLibraries.add(jarFile.getAbsolutePath())
         }
         
         project.dependencies.add("compile", jarFiles)
@@ -353,6 +360,7 @@ task collectAllJars {
     doFirst {
         def allJarPaths = new LinkedList<String>()
         allJarPaths.add(androidJar)
+        allJarPaths.addAll(jarLibraries)
         def ft = fileTree(dir: extractedDependenciesDir, include: "**/*.jar")
         ft.each { currentJarFile ->
             allJarPaths.add(currentJarFile.getAbsolutePath())
