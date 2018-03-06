@@ -7,7 +7,7 @@ var checkBootAnimationPropertyExec = require('child_process').exec,
 
 var runOnDeviceOrEmulator = process.argv[2];
 
-checkBootAnimationPropertyExec("", check)
+checkBootAnimationPropertyExec("empty", check)
 
 function check() {
 	closeProcessAfter(processTimeout);
