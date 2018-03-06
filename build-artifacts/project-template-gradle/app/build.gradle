@@ -371,43 +371,42 @@ static def sanitizeDimensionName(str) {
 }
 
 static def modifyProductFlavorInContent(content, dimension, flavor) {
-	def indexStart = content.indexOf("productFlavors");
-	def index = indexStart  + "productFlavors".length();
-	def indexEnd = -1;
-	def nestedOpenBracketsCount = 0;
+	def PRODUCT_FLAVORS = "productFlavors"
+	def indexStart = content.indexOf(PRODUCT_FLAVORS)
+	def index = indexStart  + PRODUCT_FLAVORS.length()
+	def indexEnd = -1
+	def nestedOpenBracketsCount = 0
 
-	while (index < content.length())
-	{
-		// print content[index];
-		if (content[index] == "}")
-		{
-			nestedOpenBracketsCount--;
+	if (indexStart != -1) {
+		// get the index of the closing bracket of the productFlavors { } scope
+		while (index < content.length()) {
+			// print content[index];
+			if (content[index] == "}") {
+				nestedOpenBracketsCount--
 
-			if (nestedOpenBracketsCount == 0)
-			{
-				indexEnd = index;
-				break;
+				if (nestedOpenBracketsCount == 0) {
+					indexEnd = index
+					break
+				}
+			} else if (content[index] == "{") {
+				nestedOpenBracketsCount++
 			}
-		}
-		else if (content[index] == "{")
-		{
-			nestedOpenBracketsCount++;
-		}
 
-		index++;
+			index++
+		}
 	}
 
-	if (indexEnd != -1)
-	{
+
+	if (indexEnd != -1)	{
+		// replace the productFlavor dimension with a shorter one - F0, F1, F2, etc.
 		// full content of productFlavors { ... } -> the substring is parenthesis to parenthesis -> { ... }
-		def oldProductFlavorsText = content.substring(indexStart, indexEnd + 1);
+		def oldProductFlavorsText = content.substring(indexStart, indexEnd + 1)
 
 		def newProductFlavorsContent = updateProductFlavorsContent(flavor, dimension, oldProductFlavorsText);
 
-		return content.replace(oldProductFlavorsText, newProductFlavorsContent);
-	}
-	else
-	{
+		return content.replace(oldProductFlavorsText, newProductFlavorsContent)
+	} else {
+		// create a productFlavor dimension - F0, F1, F2, etc.
 		def androidContentExists = content.indexOf("android {") != -1;
 		def newProductFlavorsContent = createProductFlavorsContent(flavor, dimension, !androidContentExists);
 
