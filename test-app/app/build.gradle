@@ -43,8 +43,9 @@ def MDG_OUTPUT_DIR = "mdg-output-dir.txt"
 def MDG_JAVA_DEPENDENCIES = "mdg-java-dependencies.txt"
 def METADATA_OUT_PATH = "$projectDir/src/main/assets/metadata"
 
-//paths to jar libraries
-def jarLibraries = new LinkedList<String>()
+// paths to jar libraries
+def pluginsJarLibraries = new LinkedList<String>()
+def allJarLibraries = new LinkedList<String>()
 
 // the build script will not work with previous versions of the CLI (3.1 or earlier)
 def dependenciesJson = file("$rootDir/dependencies.json")
@@ -235,7 +236,7 @@ task addDependenciesFromNativeScriptPlugins {
         jarFiles.each { jarFile ->
             def jarFileAbsolutePath = jarFile.getAbsolutePath()
             println "\t + adding jar plugin dependency: $jarFileAbsolutePath"
-            jarLibraries.add(jarFile.getAbsolutePath())
+            pluginsJarLibraries.add(jarFile.getAbsolutePath())
         }
 
         project.dependencies.add("implementation", jarFiles)
@@ -258,7 +259,7 @@ task addDependenciesFromAppResourcesLibraries {
         jarFiles.each { jarFile ->
             def jarFileAbsolutePath = jarFile.getAbsolutePath()
             println "\t + adding jar plugin dependency: $jarFileAbsolutePath"
-            jarLibraries.add(jarFile.getAbsolutePath())
+            pluginsJarLibraries.add(jarFile.getAbsolutePath())
         }
         
         project.dependencies.add("compile", jarFiles)
@@ -360,7 +361,7 @@ task collectAllJars {
     doFirst {
         def allJarPaths = new LinkedList<String>()
         allJarPaths.add(androidJar)
-        allJarPaths.addAll(jarLibraries)
+        allJarPaths.addAll(pluginsJarLibraries)
         def ft = fileTree(dir: extractedDependenciesDir, include: "**/*.jar")
         ft.each { currentJarFile ->
             allJarPaths.add(currentJarFile.getAbsolutePath())
@@ -383,6 +384,8 @@ task collectAllJars {
         new File("$BUILD_TOOLS_PATH/$SBG_OUTPUT_FILE").withWriter { out ->
             out.println OUTPUT_JAVA_DIR
         }
+
+        allJarLibraries.addAll(allJarPaths)
     }
 }
 
@@ -438,7 +441,7 @@ task generateTypescriptDefinitions(type: JavaExec) {
         paramz.add("dts-generator.jar")
         paramz.add("-input")
 
-        for (String jarPath : project.jarFiles) {
+        for (String jarPath : allJarLibraries) {
             // don't generate typings for runtime jars and classes
             if (shouldIncludeDirForTypings(jarPath, includeDirs)) {
                 paramz.add(jarPath)
@@ -456,6 +459,8 @@ task generateTypescriptDefinitions(type: JavaExec) {
 generateTypescriptDefinitions.onlyIf {
     project.hasProperty("generateTypings") && Boolean.parseBoolean(project.generateTypings)
 }
+
+collectAllJars.finalizedBy(generateTypescriptDefinitions)
 
 static def shouldIncludeDirForTypings(path, includeDirs) {
     for (String p : includeDirs) {
@@ -479,6 +484,7 @@ task copyTypings {
 }
 
 copyTypings.onlyIf { generateTypescriptDefinitions.didWork }
+generateTypescriptDefinitions.finalizedBy(copyTypings)
 
 task validateAppIdMatch {
     doLast {
