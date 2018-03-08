@@ -32,7 +32,7 @@ void CallbackHandlers::Init(Isolate* isolate) {
     assert(RUNTIME_CLASS != nullptr);
 
     RESOLVE_CLASS_METHOD_ID = env.GetMethodID(RUNTIME_CLASS, "resolveClass",
-                              "(Ljava/lang/String;[Ljava/lang/String;[Ljava/lang/String;Z)Ljava/lang/Class;");
+                              "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;[Ljava/lang/String;Z)Ljava/lang/Class;");
     assert(RESOLVE_CLASS_METHOD_ID != nullptr);
 
     CURRENT_OBJECTID_FIELD_ID = env.GetFieldID(RUNTIME_CLASS, "currentObjectId", "I");
@@ -67,7 +67,8 @@ bool CallbackHandlers::RegisterInstance(Isolate* isolate, const Local<Object>& j
                                         const std::string& fullClassName,
                                         const ArgsWrapper& argWrapper,
                                         const Local<Object>& implementationObject,
-                                        bool isInterface) {
+                                        bool isInterface,
+                                        const std::string& baseClassName) {
     bool success;
 
     DEBUG_WRITE("RegisterInstance called for '%s'", fullClassName.c_str());
@@ -77,7 +78,7 @@ bool CallbackHandlers::RegisterInstance(Isolate* isolate, const Local<Object>& j
 
     JEnv env;
 
-    jclass generatedJavaClass = ResolveClass(isolate, fullClassName, implementationObject,
+    jclass generatedJavaClass = ResolveClass(isolate, baseClassName, fullClassName, implementationObject,
                                 isInterface);
 
     int javaObjectID = objectManager->GenerateNewObjectID();
@@ -123,15 +124,16 @@ bool CallbackHandlers::RegisterInstance(Isolate* isolate, const Local<Object>& j
     return success;
 }
 
-jclass CallbackHandlers::ResolveClass(Isolate* isolate, const string& fullClassname,
+jclass CallbackHandlers::ResolveClass(Isolate* isolate, const string& baseClassName, const string& fullClassName,
                                       const Local<Object>& implementationObject, bool isInterface) {
     JEnv env;
-    jclass globalRefToGeneratedClass = env.CheckForClassInCache(fullClassname);
+    jclass globalRefToGeneratedClass = env.CheckForClassInCache(fullClassName);
 
     if (globalRefToGeneratedClass == nullptr) {
 
         // get needed arguments in order to load binding
-        JniLocalRef javaFullClassName(env.NewStringUTF(fullClassname.c_str()));
+        JniLocalRef javaBaseClassName(env.NewStringUTF(baseClassName.c_str()));
+        JniLocalRef javaFullClassName(env.NewStringUTF(fullClassName.c_str()));
 
         jobjectArray methodOverrides = GetMethodOverrides(env, implementationObject);
 
@@ -142,12 +144,13 @@ jclass CallbackHandlers::ResolveClass(Isolate* isolate, const string& fullClassn
         // create or load generated binding (java class)
         jclass generatedClass = (jclass)env.CallObjectMethod(runtime->GetJavaRuntime(),
                                 RESOLVE_CLASS_METHOD_ID,
+                                (jstring) javaBaseClassName,
                                 (jstring) javaFullClassName,
                                 methodOverrides,
                                 implementedInterfaces,
                                 isInterface);
 
-        globalRefToGeneratedClass = env.InsertClassIntoCache(fullClassname, generatedClass);
+        globalRefToGeneratedClass = env.InsertClassIntoCache(fullClassName, generatedClass);
 
         env.DeleteGlobalRef(methodOverrides);
         env.DeleteGlobalRef(implementedInterfaces);

@@ -10,8 +10,10 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.InvalidClassException;
 import java.io.OutputStreamWriter;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -24,7 +26,7 @@ import dalvik.system.DexClassLoader;
 import dalvik.system.DexFile;
 
 public class DexFactory {
-    private static final char CLASS_NAME_LOCATION_SEPARATOR = '_';
+    private static final String COM_TNS_GEN_PREFIX = "com.tns.gen.";
 
     private final Logger logger;
     private final File dexDir;
@@ -61,12 +63,9 @@ public class DexFactory {
     static long totalMultiDexTime = 0;
     static long totalLoadDexTime = 0;
 
-    public Class<?> resolveClass(String name, String className, String[] methodOverrides, String[] implementedInterfaces, boolean isInterface) throws ClassNotFoundException, IOException {
+    public Class<?> resolveClass(String baseClassName, String name, String className, String[] methodOverrides, String[] implementedInterfaces, boolean isInterface) throws ClassNotFoundException, IOException {
         String fullClassName = className.replace("$", "_");
-
-        if (!isInterface) {
-            fullClassName += CLASS_NAME_LOCATION_SEPARATOR + name;
-        }
+        String originalFullClassName = fullClassName;
 
         // try to get pre-generated binding classes
         try {
@@ -82,22 +81,37 @@ public class DexFactory {
 
             return pregeneratedClass;
         } catch (Exception e) {
+            if (logger.isEnabled()) {
+                logger.write("Pre-generated class not found:  " + fullClassName.replace("-", "_"));
+            }
         }
         //
 
+        // new: com.tns.gen.android.widget.DatePicker_MyActivity_59_56_
+        // old: com.tns.tests.Button1_fMyActivity_l56_c44__MyButton
+        // ne1: com.tns.tests.Button1_MyActivity_58_44_MyButton_0
         Class<?> existingClass = this.injectedDexClasses.get(fullClassName);
         if (existingClass != null) {
             return existingClass;
         }
 
-        String classToProxy = this.getClassToProxyName(className);
-        String dexFilePath = classToProxy;
-
-        if (!isInterface) {
-            dexFilePath += CLASS_NAME_LOCATION_SEPARATOR + name;
+        String classToProxy;
+        if (!baseClassName.isEmpty()) {
+            classToProxy = this.getClassToProxyName(baseClassName);
+        } else {
+            classToProxy = this.getClassToProxyName(className);
         }
 
-        File dexFile = this.getDexFile(dexFilePath);
+        // strip the `com.tns.gen` off the base extended class name
+        String desiredDexClassName = this.getClassToProxyName(fullClassName);
+
+        // when interfaces are extended as classes, we still want to preserve
+        // just the interface name without the extra file, line, column information
+        if (!baseClassName.isEmpty() && isInterface) {
+            fullClassName = COM_TNS_GEN_PREFIX + classToProxy;
+        }
+
+        File dexFile = this.getDexFile(desiredDexClassName);
 
         // generate dex file
         if (dexFile == null) {
@@ -106,7 +120,12 @@ public class DexFactory {
                 logger.write("generating proxy in place");
             }
 
-            dexFilePath = this.generateDex(name, classToProxy, methodOverrides, implementedInterfaces, isInterface);
+            String dexFilePath;
+            if (isInterface) {
+                dexFilePath = this.generateDex(name, classToProxy, methodOverrides, implementedInterfaces, isInterface);
+            } else {
+                dexFilePath = this.generateDex(desiredDexClassName, classToProxy, methodOverrides, implementedInterfaces, isInterface);
+            }
             dexFile = new File(dexFilePath);
             long stopGenTime = System.nanoTime();
             totalGenTime += stopGenTime - startGenTime;
@@ -146,8 +165,13 @@ public class DexFactory {
             // However, this is the only viable way to get our dynamic classes
             // loaded within the system class loader
 
-            df = DexFile.loadDex(jarFilePath, new File(this.odexDir, fullClassName).getAbsolutePath(), 0);
-            result = df.loadClass(fullClassName, classLoader);
+            if (isInterface) {
+                df = DexFile.loadDex(jarFilePath, new File(this.odexDir, fullClassName).getAbsolutePath(), 0);
+                result = df.loadClass(fullClassName, classLoader);
+            } else {
+                df = DexFile.loadDex(jarFilePath, new File(this.odexDir, desiredDexClassName).getAbsolutePath(), 0);
+                result = df.loadClass(desiredDexClassName, classLoader);
+            }
         } catch (IOException e) {
             e.printStackTrace();
             // fall back to DexClassLoader
@@ -155,7 +179,7 @@ public class DexFactory {
             result = dexClassLoader.loadClass(fullClassName);
         }
 
-        this.injectedDexClasses.put(fullClassName, result);
+        this.injectedDexClasses.put(originalFullClassName, result);
 
         return result;
     }
@@ -192,11 +216,11 @@ public class DexFactory {
     private String getClassToProxyName(String className) throws InvalidClassException {
         String classToProxy = className;
 
-        if (className.startsWith("com.tns.gen.")) {
+        if (className.startsWith(COM_TNS_GEN_PREFIX)) {
             classToProxy = className.substring(12);
         }
 
-        if (classToProxy.startsWith("com.tns.gen.")) {
+        if (classToProxy.startsWith(COM_TNS_GEN_PREFIX)) {
             throw new InvalidClassException("Can't generate proxy of proxy");
         }
 

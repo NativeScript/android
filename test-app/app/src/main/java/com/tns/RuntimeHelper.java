@@ -192,6 +192,7 @@ public final class RuntimeHelper {
 
                         Method syncMethod = NativeScriptSyncService.getMethod("sync");
                         syncMethod.invoke(syncService);
+
                         Method startServerMethod = NativeScriptSyncService.getMethod("startServer");
                         startServerMethod.invoke(syncService);
                     } catch (ClassNotFoundException e) {
