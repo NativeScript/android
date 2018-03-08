@@ -67,6 +67,8 @@ def computeBuildToolsVersion = { ->
 }
 
 project.ext.selectedBuildType = project.hasProperty("release") ? "release" : "debug"
+project.ext.appPath = ""
+project.ext.appResourcesPath = ""
 
 ////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////// CONFIGURATIONS ///////////////////////////////////////
@@ -83,11 +85,14 @@ def getAppResourcesDirectory = { ->
         if (nsConfigJsonContent.appResourcesPath != null) {
             pathToAppResources = java.nio.file.Paths.get(USER_PROJECT_ROOT).resolve(nsConfigJsonContent.appResourcesPath).toAbsolutePath()
         } else if (nsConfigJsonContent.appPath != null) {
+            project.ext.appPath = nsConfigJsonContent.appPath
             pathToAppResources = java.nio.file.Paths.get(USER_PROJECT_ROOT).resolve(nsConfigJsonContent.appPath).toAbsolutePath()
         }
     }
 
-    return pathToAppResources != null ? pathToAppResources : defaultPathToAppResources
+    def result = pathToAppResources != null ? pathToAppResources : defaultPathToAppResources
+    project.ext.appResourcesPath = result
+    return result
 }
 
 def applyAppGradleConfiguration = { ->
