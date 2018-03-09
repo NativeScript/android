@@ -92,6 +92,12 @@ void V8DOMAgentImpl::getDocument(ErrorString* errorString, std::unique_ptr<proto
                     auto errorMessage = "Error while parsing debug `DOM Node` object. ";
                     DEBUG_WRITE_FORCE("JS Error: %s", errorMessage, errorSupportString.c_str());
                     *errorString = errorSupportString.c_str();
+
+                    return;
+                } else if (domNode->getChildren(protocol::Array<protocol::DOM::Node>::create().get())->length() == 0) {
+                    *errorString = "Root view empty.";
+
+                    return;
                 } else {
                     *out_root = std::move(domNode);
 
@@ -99,6 +105,8 @@ void V8DOMAgentImpl::getDocument(ErrorString* errorString, std::unique_ptr<proto
                 }
             } else {
                 *errorString = "Didn't get a proper result from __getDocument call. Returning empty visual tree.";
+
+                return;
             }
         }
     }
