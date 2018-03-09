@@ -50,14 +50,6 @@ void V8DOMAgentImpl::disable(ErrorString*) {
 }
 
 void V8DOMAgentImpl::getDocument(ErrorString* errorString, std::unique_ptr<protocol::DOM::Node>* out_root) {
-    std::unique_ptr<protocol::DOM::Node> defaultNode = protocol::DOM::Node::create()
-            .setNodeId(0)
-            .setNodeType(9)
-            .setNodeName("Frame")
-            .setLocalName("Frame")
-            .setNodeValue("")
-            .build();
-
     std::string getDocumentFunctionString = "getDocument";
     // TODO: Pete: Find a better way to get a hold of the isolate
     auto isolate = v8::Isolate::GetCurrent();
@@ -79,7 +71,6 @@ void V8DOMAgentImpl::getDocument(ErrorString* errorString, std::unique_ptr<proto
             if (tc.HasCaught()) {
                 *errorString = utils::Common::getJSCallErrorMessage(getDocumentFunctionString, tc.Message()->Get()).c_str();
 
-                *out_root = std::move(defaultNode);
                 return;
             }
 
@@ -100,6 +91,13 @@ void V8DOMAgentImpl::getDocument(ErrorString* errorString, std::unique_ptr<proto
                 if (!errorSupportString.empty()) {
                     auto errorMessage = "Error while parsing debug `DOM Node` object. ";
                     DEBUG_WRITE_FORCE("JS Error: %s", errorMessage, errorSupportString.c_str());
+                    *errorString = errorSupportString.c_str();
+
+                    return;
+                } else if (domNode->getChildren(protocol::Array<protocol::DOM::Node>::create().get())->length() == 0) {
+                    *errorString = "Root view empty.";
+
+                    return;
                 } else {
                     *out_root = std::move(domNode);
 
@@ -107,11 +105,13 @@ void V8DOMAgentImpl::getDocument(ErrorString* errorString, std::unique_ptr<proto
                 }
             } else {
                 *errorString = "Didn't get a proper result from __getDocument call. Returning empty visual tree.";
+
+                return;
             }
         }
     }
 
-    *out_root = std::move(defaultNode);
+    *errorString = "getDocument function not available on the global object.";
 }
 
 void V8DOMAgentImpl::removeNode(ErrorString* errorString, int in_nodeId) {
