@@ -9,7 +9,7 @@
 ## What's New
 
  - [Respect `.jar` and `.aar` libraries from `App_Resources/Android/libs` (#899)](https://github.com/NativeScript/android-runtime/issues/899)
- - [Add user-defined Android project files - `.java`, resources, assets in `App_Resources/Android` (#700)](https://github.com/NativeScript/android-runtime/issues/700) - **Enabled after updating the App_Resources/Android subdirectory structure. Use `tns resources-update android` with CLI 4.0.0-rc or newer.**
+ - [Add user-defined Android project files - `.java`, resources, assets in `App_Resources/Android` (#700)](https://github.com/NativeScript/android-runtime/issues/700) - **Enabled after updating the App_Resources/Android subdirectory structure. Use `tns resources update android` with CLI 4.0.0-rc or newer.**
  - [Console API improvements - file name, line, column support in Chrome DevTools; Objects are expanded to JSON representations (#894) (#884)](https://github.com/NativeScript/android-runtime/pull/894) - **Replaces the console API in the `tns-core-modules`.**
  - [Update Gradle to 4.1 and Android plugin for Gradle to 3.0.1 (#938)](https://github.com/NativeScript/android-runtime/issues/938)
 
