@@ -17,6 +17,7 @@
 #include "MethodCache.h"
 #include "SimpleProfiler.h"
 #include "Runtime.h"
+#include "ManualInstrumentation.h"
 
 using namespace v8;
 using namespace std;
@@ -128,6 +129,7 @@ jclass CallbackHandlers::ResolveClass(Isolate* isolate, const string& baseClassN
                                       const Local<Object>& implementationObject, bool isInterface) {
     JEnv env;
     jclass globalRefToGeneratedClass = env.CheckForClassInCache(fullClassName);
+    tns::instrumentation::Frame frame;
 
     if (globalRefToGeneratedClass == nullptr) {
 
@@ -154,6 +156,10 @@ jclass CallbackHandlers::ResolveClass(Isolate* isolate, const string& baseClassN
 
         env.DeleteGlobalRef(methodOverrides);
         env.DeleteGlobalRef(implementedInterfaces);
+    }
+
+    if (frame.check()) {
+        frame.log("ResolveClass: " + fullClassName);
     }
 
     return globalRefToGeneratedClass;
