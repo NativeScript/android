@@ -1,0 +1,79 @@
+/* 
+*	Packs metadata generator in a .tgz file in ~/dist folder
+*	To build .tgz
+*			gradlew packmg
+*	To build jar
+*			gradlew jarmg
+*/
+apply plugin: "java"
+
+sourceCompatibility = 1.6
+targetCompatibility = 1.6
+
+buildscript {
+    repositories {
+        jcenter()
+        google()
+    }
+
+    dependencies {
+        classpath 'com.android.tools.build:gradle:3.0.1'
+    }
+}
+
+sourceSets {
+    main {
+        java {
+            srcDir 'src/src'
+        }
+    }
+}
+
+compileJava.outputs.dir("$rootDir/dist/classes")
+
+dependencies {
+    compile files("./src/libs/bcel-5.2.jar")
+    compile files("./src/libs/dx.jar")
+}
+
+task copyNecessaryFiles {
+	doLast {
+		copy {
+			from "$rootDir/helpers"
+			into "$rootDir/dist/bin"
+		}
+		
+		copy {
+			from "$rootDir/package.json"
+			into "$rootDir/dist"
+		}	
+	}
+}
+
+jar {
+    manifest {
+        attributes("Manifest-Version": "1.0",
+                   "Main-Class": "com.telerik.metadata.Generator")
+    }
+	
+    from {
+
+        configurations.runtime.collect {
+            it.isDirectory() ? it : zipTree(it)
+        }
+
+        configurations.compile.collect {
+            it.isDirectory() ? it : zipTree(it)
+        }
+    }
+}
+
+task copyJarToBuildTools (type: Copy) {
+	from "$projectDir/build/libs/android-metadata-generator.jar"
+	into "$projectDir/../"
+}
+
+jar.finalizedBy(copyJarToBuildTools)
+
+
+

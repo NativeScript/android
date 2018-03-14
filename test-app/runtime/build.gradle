@@ -5,7 +5,7 @@ if (optimized) {
     println "Optimized build triggered."
 }
 
-project.ext._buildToolsVersion = "26.0.1"
+project.ext._buildToolsVersion = "27.0.1"
 
 android {
     sourceSets {

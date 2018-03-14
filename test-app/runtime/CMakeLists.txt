@@ -79,6 +79,7 @@ add_library( # Sets the name of the library. When it's built you can find it wit
             src/main/cpp/ObjectManager.cpp
             src/main/cpp/V8GlobalHelpers.cpp
             src/main/cpp/MetadataTreeNode.cpp
+            src/main/cpp/console/Console.cpp
 
             # Inspector source (we build it because we've customized it a bit)
             src/main/cpp/v8_inspector/src/inspector/string-16.cc
@@ -92,6 +93,7 @@ add_library( # Sets the name of the library. When it's built you can find it wit
             src/main/cpp/v8_inspector/src/inspector/v8-regex.cc
             src/main/cpp/v8_inspector/src/inspector/v8-console-agent-impl.cc
             src/main/cpp/v8_inspector/src/inspector/v8-network-agent-impl.cpp
+            src/main/cpp/v8_inspector/src/inspector/v8-overlay-agent-impl.cpp
             src/main/cpp/v8_inspector/src/inspector/remote-object-id.cc
             src/main/cpp/v8_inspector/src/inspector/v8-inspector-impl.cc
             src/main/cpp/v8_inspector/src/inspector/search-util.cc
@@ -110,7 +112,10 @@ add_library( # Sets the name of the library. When it's built you can find it wit
             src/main/cpp/v8_inspector/src/inspector/injected-script-native.cc
             src/main/cpp/v8_inspector/src/inspector/v8-inspector-session-impl.cc
             src/main/cpp/v8_inspector/src/inspector/v8-debugger-agent-impl.cc
+            src/main/cpp/v8_inspector/src/inspector/v8-log-agent-impl.cpp
             src/main/cpp/v8_inspector/src/inspector/injected-script.cc
+            src/main/cpp/v8_inspector/src/inspector/protocol/Overlay.cpp
+            src/main/cpp/v8_inspector/src/inspector/protocol/Log.cpp
             src/main/cpp/v8_inspector/src/inspector/protocol/DOM.cpp
             src/main/cpp/v8_inspector/src/inspector/protocol/CSS.cpp
             src/main/cpp/v8_inspector/src/inspector/protocol/Console.cpp
