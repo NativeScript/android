@@ -826,8 +826,6 @@ void MetadataNode::ExtendedClassConstructorCallback(const v8::FunctionCallbackIn
 
         auto implementationObject = Local<Object>::New(isolate, *extData->implementationObject);
 
-        const auto& extendName = extData->extendedName;
-
         SetInstanceMetadata(isolate, thiz, extData->node);
         thiz->SetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::CallSuper), True(isolate));
         V8SetPrivateValue(isolate, thiz, V8StringConstants::GetImplementationObject(isolate), implementationObject);
@@ -836,7 +834,7 @@ void MetadataNode::ExtendedClassConstructorCallback(const v8::FunctionCallbackIn
 
         string fullClassName = extData->fullClassName;
 
-        bool success = CallbackHandlers::RegisterInstance(isolate, thiz, fullClassName, argWrapper, implementationObject, false);
+        bool success = CallbackHandlers::RegisterInstance(isolate, thiz, fullClassName, argWrapper, implementationObject, false, extData->node->m_name);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -935,7 +933,7 @@ void MetadataNode::ClassConstructorCallback(const v8::FunctionCallbackInfo<v8::V
         ArgsWrapper argWrapper(info, ArgType::Class);
 
         string fullClassName = CreateFullClassName(className, extendName);
-        bool success = CallbackHandlers::RegisterInstance(isolate, thiz, fullClassName, argWrapper, Local<Object>(), false);
+        bool success = CallbackHandlers::RegisterInstance(isolate, thiz, fullClassName, argWrapper, Local<Object>(), false, className);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -1186,8 +1184,7 @@ void MetadataNode::PackageGetterCallback(Local<Name> property, const PropertyCal
     }
 }
 
-bool MetadataNode::ValidateExtendArguments(const FunctionCallbackInfo<Value>& info, string& extendLocation, v8::Local<v8::String>& extendName, Local<Object>& implementationObject) {
-    bool extendLocationFound = GetExtendLocation(extendLocation);
+bool MetadataNode::ValidateExtendArguments(const FunctionCallbackInfo<Value>& info, bool extendLocationFound, string& extendLocation, v8::Local<v8::String>& extendName, Local<Object>& implementationObject, bool isTypeScriptExtend) {
 
     if (info.Length() == 1) {
         if (!extendLocationFound) {
@@ -1207,7 +1204,7 @@ bool MetadataNode::ValidateExtendArguments(const FunctionCallbackInfo<Value>& in
         }
 
         implementationObject = info[0]->ToObject();
-    } else if (info.Length() == 2) {
+    } else if (info.Length() == 2 || isTypeScriptExtend) {
         if (!info[0]->IsString()) {
             stringstream ss;
             ss << "Invalid extend() call. No name for extend specified at location: " << extendLocation.c_str();
@@ -1260,8 +1257,11 @@ MetadataNode::ExtendedClassCacheData MetadataNode::GetCachedExtendedClassData(Is
 string MetadataNode::CreateFullClassName(const std::string& className, const std::string& extendNameAndLocation = "") {
     string fullClassName = className;
 
+    // create a class name consisting only of the base class name + last file name part + line + column + variable identifier
     if (!extendNameAndLocation.empty()) {
-        fullClassName += Constants::CLASS_NAME_LOCATION_SEPARATOR + extendNameAndLocation;
+        string tempClassName = className;
+        fullClassName = Util::ReplaceAll(tempClassName, "$", "_");
+        fullClassName += "_" + extendNameAndLocation;
     }
 
     return fullClassName;
@@ -1282,6 +1282,7 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
         string extendLocation;
 
         auto hasDot = false;
+        auto isTypeScriptExtend = false;
         if (info.Length() == 2) {
             if (info[0].IsEmpty() || !info[0]->IsString()) {
                 stringstream ss;
@@ -1299,13 +1300,18 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
             }
             string strName = ArgConverter::ConvertToString(info[0].As<String>());
             hasDot = strName.find('.') != string::npos;
+        } else if (info.Length() == 3) {
+            if (info[2]->IsBoolean() && info[2]->BooleanValue()) {
+                isTypeScriptExtend = true;
+            }
         }
 
         if (hasDot) {
             extendName = info[0].As<String>();
             implementationObject = info[1].As<Object>();
         } else {
-            auto validArgs = ValidateExtendArguments(info, extendLocation, extendName, implementationObject);
+            auto isValidExtendLocation = GetExtendLocation(extendLocation, isTypeScriptExtend);
+            auto validArgs = ValidateExtendArguments(info, isValidExtendLocation, extendLocation, extendName, implementationObject, isTypeScriptExtend);
 
             if (!validArgs) {
                 return;
@@ -1318,8 +1324,9 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
 
         string extendNameAndLocation = extendLocation + ArgConverter::ConvertToString(extendName);
         string fullClassName;
+        string baseClassName = node->m_name;
         if (!hasDot) {
-            fullClassName = TNS_PREFIX + CreateFullClassName(node->m_name, extendNameAndLocation);
+            fullClassName = TNS_PREFIX + CreateFullClassName(baseClassName, extendNameAndLocation);
         } else {
             fullClassName = ArgConverter::ConvertToString(info[0].As<String>());
         }
@@ -1329,7 +1336,7 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
         //resolve class (pre-generated or generated runtime from dex generator)
         uint8_t nodeType = s_metadataReader.GetNodeType(node->m_treeNode);
         bool isInterface = s_metadataReader.IsNodeTypeInterface(nodeType);
-        auto clazz = CallbackHandlers::ResolveClass(isolate, fullClassName, implementationObject, isInterface);
+        auto clazz = CallbackHandlers::ResolveClass(isolate, baseClassName, fullClassName, implementationObject, isInterface);
         auto fullExtendedName = CallbackHandlers::ResolveClassName(isolate, clazz);
         DEBUG_WRITE("ExtendsCallMethodHandler: extend full name %s", fullClassName.c_str());
 
@@ -1412,11 +1419,17 @@ bool MetadataNode::IsValidExtendName(const Local<String>& name) {
     return true;
 }
 
-bool MetadataNode::GetExtendLocation(string& extendLocation) {
+bool MetadataNode::GetExtendLocation(string& extendLocation, bool isTypeScriptExtend) {
     stringstream extendLocationStream;
-    auto stackTrace = StackTrace::CurrentStackTrace(Isolate::GetCurrent(), 1, StackTrace::kOverview);
+    auto stackTrace = StackTrace::CurrentStackTrace(Isolate::GetCurrent(), 3, StackTrace::kOverview);
     if (!stackTrace.IsEmpty()) {
-        auto frame = stackTrace->GetFrame(0);
+        Local<StackFrame> frame;
+        if (isTypeScriptExtend) {
+            frame = stackTrace->GetFrame(2); // the _super.apply call to ts_helpers will always be the third call frame
+        }  else {
+            frame = stackTrace->GetFrame(0);
+        }
+
         if (!frame.IsEmpty()) {
             auto scriptName = frame->GetScriptName();
             if (scriptName.IsEmpty()) {
@@ -1443,6 +1456,15 @@ bool MetadataNode::GetExtendLocation(string& extendLocation) {
 
                 std::replace(fullPathToFile.begin(), fullPathToFile.end(), '/', '_');
                 std::replace(fullPathToFile.begin(), fullPathToFile.end(), '.', '_');
+                std::replace(fullPathToFile.begin(), fullPathToFile.end(), '-', '_');
+                std::replace(fullPathToFile.begin(), fullPathToFile.end(), ' ', '_');
+
+                std::vector<std::string> pathParts;
+
+                Util::SplitString(fullPathToFile, "_", pathParts);
+
+                std::string lastPathPart = pathParts.back();
+                fullPathToFile = lastPathPart;
             }
 
             int lineNumber = frame->GetLineNumber();
@@ -1459,8 +1481,7 @@ bool MetadataNode::GetExtendLocation(string& extendLocation) {
                 return false;
             }
 
-            extendLocationStream << "f" << fullPathToFile.c_str() << "_l" << lineNumber << "_c" << column << "__";
-            //DEBUG_WRITE("EXTEND_LOCATION %s", extendLocationStream.str().c_str());
+            extendLocationStream << fullPathToFile.c_str() << "_" << lineNumber << "_" << column << "_";
         }
     }
 
