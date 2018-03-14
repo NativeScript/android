@@ -67,37 +67,43 @@ def computeBuildToolsVersion = { ->
 }
 
 project.ext.selectedBuildType = project.hasProperty("release") ? "release" : "debug"
-project.ext.appPath = ""
 project.ext.appResourcesPath = ""
 
 ////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////// CONFIGURATIONS ///////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
 
-def getAppResourcesDirectory = { ->
-    def defaultPathToAppResources = "$USER_PROJECT_ROOT/app/App_Resources"
-    def pathToAppResources
+def getAppResourcesPath = { ->
+    def relativePathToApp = "app"
+    def relativePathToAppResources
+    def absolutePathToAppResources
     def nsConfigFile = file("$USER_PROJECT_ROOT/nsconfig.json")
+    def nsConfig
 
     if (nsConfigFile.exists()) {
-        def nsConfigJsonContent = new JsonSlurper().parseText(nsConfigFile.getText("UTF-8"))
-
-        if (nsConfigJsonContent.appResourcesPath != null) {
-            pathToAppResources = java.nio.file.Paths.get(USER_PROJECT_ROOT).resolve(nsConfigJsonContent.appResourcesPath).toAbsolutePath()
-        } else if (nsConfigJsonContent.appPath != null) {
-            project.ext.appPath = nsConfigJsonContent.appPath
-            pathToAppResources = java.nio.file.Paths.get(USER_PROJECT_ROOT).resolve(nsConfigJsonContent.appPath).toAbsolutePath()
-        }
+        nsConfig = new JsonSlurper().parseText(nsConfigFile.getText("UTF-8"))
     }
 
-    def result = pathToAppResources != null ? pathToAppResources : defaultPathToAppResources
-    project.ext.appResourcesPath = result
-    return result
-}
+    if(nsConfig != null && nsConfig.appPath != null){
+        relativePathToApp = nsConfig.appPath
+    }
+
+    if(nsConfig != null && nsConfig.appResourcesPath != null ) {
+        relativePathToAppResources = nsConfig.appResourcesPath
+    } else {
+        relativePathToAppResources  = "$relativePathToApp/App_Resources"
+    }
+
+    absolutePathToAppResources = java.nio.file.Paths.get(USER_PROJECT_ROOT).resolve(relativePathToAppResources).toAbsolutePath()
+
+    project.ext.appResourcesPath = absolutePathToAppResources
+
+    return absolutePathToAppResources
+};
 
 def applyAppGradleConfiguration = { ->
-    def appResourcesDir = getAppResourcesDirectory()
-    def pathToAppGradle = "$appResourcesDir/Android/app.gradle"
+    def appResourcesPath = getAppResourcesPath()
+    def pathToAppGradle = "$appResourcesPath/Android/app.gradle"
     def appGradle = file(pathToAppGradle)
     if (appGradle.exists()) {
         println "\t + applying user-defined configuration from ${appGradle}"
@@ -175,8 +181,8 @@ repositories {
         pluginDependencies.add("libs/runtime-libs")
     }
 
-    def localAppResources = getAppResourcesDirectory()
-    def localAppResourcesLibraries = "$localAppResources/Android/libs"
+    def appResourcesPath = getAppResourcesPath()
+    def localAppResourcesLibraries = "$appResourcesPath/Android/libs"
 
     pluginDependencies.add(localAppResourcesLibraries)
 
@@ -249,8 +255,8 @@ task addDependenciesFromNativeScriptPlugins {
 }
 
 task addDependenciesFromAppResourcesLibraries {
-    def appResources = getAppResourcesDirectory()
-    def appResourcesLibraries = file("$appResources/Android/libs")
+    def appResourcesPath = getAppResourcesPath()
+    def appResourcesLibraries = file("$appResourcesPath/Android/libs")
     if (appResourcesLibraries.exists()) {
         def aarFiles = fileTree(dir: appResourcesLibraries, include: ["**/*.aar"])
         aarFiles.each { aarFile ->
