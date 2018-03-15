@@ -10,7 +10,7 @@ var
 	processTimeout = 20 * 60 * 1000, // 20 minutes timeout (empirical constant :)) 
 	searchInterval = 10 * 1000;
 
-searchForFile("", getFile);
+searchForFile("empty", getFile);
 
 var runOnDeviceOrEmulator = process.argv[2];
 

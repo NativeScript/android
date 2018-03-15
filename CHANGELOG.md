@@ -1,3 +1,22 @@
+4.0.0-rc
+==
+
+## Breaking Changes
+
+ - [Rewrite the build script routine to no longer use flavors as the primary mechanism to apply nativescript plugin Android configurations (#890)](https://github.com/NativeScript/android-runtime/issues/890) - **If you see the `All flavors must now belong to a named flavor dimension.` build error, ensure that you are using the latest CLI. Plugins will be built implicitly by the CLI, version 4.0.0-rc or newer.**
+ - [Application package outputs are now located at `platforms/android/app/build/outputs/<build-type>/<flavor - if any>/app-<build-type>.apk` (#938)](https://github.com/NativeScript/android-runtime/issues/938)
+
+## What's New
+
+ - [Respect `.jar` and `.aar` libraries from `App_Resources/Android/libs` (#899)](https://github.com/NativeScript/android-runtime/issues/899)
+ - [Add user-defined Android project files - `.java`, resources, assets in `App_Resources/Android` (#700)](https://github.com/NativeScript/android-runtime/issues/700) - **Enabled after updating the App_Resources/Android subdirectory structure. Use `tns resources update android` with CLI 4.0.0-rc or newer.**
+ - [Console API improvements - file name, line, column support in Chrome DevTools; Objects are expanded to JSON representations (#894) (#884)](https://github.com/NativeScript/android-runtime/pull/894) - **Replaces the console API in the `tns-core-modules`.**
+ - [Update Gradle to 4.1 and Android plugin for Gradle to 3.0.1 (#938)](https://github.com/NativeScript/android-runtime/issues/938)
+
+## Bug Fixes
+
+ - [fix: static binding generator creating wrong files, when two extended classes have the same name (#692)](https://github.com/NativeScript/android-runtime/issues/692)
+
 3.4.2
 ==
 

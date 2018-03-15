@@ -33,8 +33,6 @@ class V8DOMAgentImpl : public protocol::DOM::Backend {
         void performSearch(ErrorString*, const String& in_query, const Maybe<protocol::Array<int>>& in_nodeIds, String* out_searchId, int* out_resultCount) override;
         void getSearchResults(ErrorString*, const String& in_searchId, int in_fromIndex, int in_toIndex, std::unique_ptr<protocol::Array<int>>* out_nodeIds) override;
         void discardSearchResults(ErrorString*, const String& in_searchId) override;
-        void highlightNode(ErrorString*, std::unique_ptr<protocol::DOM::HighlightConfig> in_highlightConfig, const Maybe<int>& in_nodeId, const Maybe<String>& in_objectId) override;
-        void hideHighlight(ErrorString*) override;
         void resolveNode(ErrorString*, int in_nodeId, const Maybe<String>& in_objectGroup, std::unique_ptr<protocol::Runtime::RemoteObject>* out_object) override;
 
         const bool enabled() {
