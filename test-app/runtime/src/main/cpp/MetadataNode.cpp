@@ -1481,6 +1481,12 @@ bool MetadataNode::GetExtendLocation(string& extendLocation, bool isTypeScriptEx
                 return false;
             }
 
+            // Account for the column length offset added by the addition of the Common JS function wrapper
+            // See issue https://github.com/NativeScript/android-runtime/issues/975
+            if (lineNumber == 1) {
+                column = column - ModuleInternal::MODULE_PROLOGUE_LENGTH;
+            }
+
             extendLocationStream << fullPathToFile.c_str() << "_" << lineNumber << "_" << column << "_";
         }
     }
