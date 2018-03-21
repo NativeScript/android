@@ -1446,7 +1446,11 @@ bool MetadataNode::GetExtendLocation(string& extendLocation, bool isTypeScriptEx
             if (srcFileName == "<embedded>") {
                 // Corner case, extend call is coming from the heap snapshot script
                 // This is possible for lazily compiled code - e.g. from the body of a function
-                fullPathToFile = "_embedded_script_";
+
+                // Replace embedded_script with 'script' as the SBG will emit classes from the
+                // embedded_script file as 'Object_script_line_col', getting rid of fragments
+                // preceding the underscore (_)
+                fullPathToFile = "script";
             } else {
                 string hardcodedPathToSkip = Constants::APP_ROOT_FOLDER_PATH;
 
