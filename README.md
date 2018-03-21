@@ -41,12 +41,19 @@ Following are the minimal prerequisites to build the runtime package.
 
 * Install the latest [Android Studio](https://developer.android.com/studio/index.html).
 * From the SDK Manager (Android Studio -> Tools -> Android -> SDK Manager) install the following components:
-    * Android API Level 22, 23, 24, 25
+    * Android API Level 23, 24, 25, 26
     * Android NDK 
     * Android Support Repository
     * Download Build Tools 
     * CMake
     * LLDB
+* Clone this repository as well as the submodules: `git clone --recurse-submodules git@github.com:NativeScript/android-runtime.git`
+
+## Working with the Runtime in Android Studio
+
+* Open the test-app folder in Android Studio. It represents a valid Android project and you are able to build and run a test application working with the Runtime from the source.
+
+Note: You might need to run the Android Studio from the command line in order to preserve the environment variables. This is in case you get errors like "missing npm" if starting the studio the usual way.
 
 ## How to Build
 
