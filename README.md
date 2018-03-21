@@ -39,11 +39,14 @@ For more details on how it works, read the [documentation](https://docs.nativesc
 ## Build Prerequisites
 Following are the minimal prerequisites to build the runtime package.
 
-* Install the latest [Android Studio ](https://developer.android.com/studio/index.html).
-* Install Android API Level 22, 23, 24, 25 from Android Studio -> Tools -> Android -> SDK Manager
-* Android NDK 15c - [NDK Archives](https://developer.android.com/ndk/downloads/older_releases.html) or [NDK Downloads](https://developer.android.com/ndk/downloads/index.html) if you can't find it in the archives.
-* Download Android Support Repository through the Android SDK Manager
-* Download Build Tools 25.0.2 through the Android SDK Manager.
+* Install the latest [Android Studio](https://developer.android.com/studio/index.html).
+* From the SDK Manager (Android Studio -> Tools -> Android -> SDK Manager) install the following components:
+    * Android API Level 22, 23, 24, 25
+    * Android NDK 
+    * Android Support Repository
+    * Download Build Tools 
+    * CMake
+    * LLDB
 
 ## How to Build
 
