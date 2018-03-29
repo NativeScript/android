@@ -18,38 +18,38 @@ namespace experimental {
 // Allow the embedder to construct accessors that V8 can compile and use
 // directly, without jumping into the runtime.
 class V8_EXPORT FastAccessorBuilder {
-    public:
-        struct ValueId {
-            size_t value_id;
-        };
-        struct LabelId {
-            size_t label_id;
-        };
+ public:
+  struct ValueId {
+    size_t value_id;
+  };
+  struct LabelId {
+    size_t label_id;
+  };
 
-        static FastAccessorBuilder* New(Isolate* isolate);
+  static FastAccessorBuilder* New(Isolate* isolate);
 
-        ValueId IntegerConstant(int int_constant);
-        ValueId GetReceiver();
-        ValueId LoadInternalField(ValueId value_id, int field_no);
-        ValueId LoadInternalFieldUnchecked(ValueId value_id, int field_no);
-        ValueId LoadValue(ValueId value_id, int offset);
-        ValueId LoadObject(ValueId value_id, int offset);
-        ValueId ToSmi(ValueId value_id);
+  ValueId IntegerConstant(int int_constant);
+  ValueId GetReceiver();
+  ValueId LoadInternalField(ValueId value_id, int field_no);
+  ValueId LoadInternalFieldUnchecked(ValueId value_id, int field_no);
+  ValueId LoadValue(ValueId value_id, int offset);
+  ValueId LoadObject(ValueId value_id, int offset);
+  ValueId ToSmi(ValueId value_id);
 
-        void ReturnValue(ValueId value_id);
-        void CheckFlagSetOrReturnNull(ValueId value_id, int mask);
-        void CheckNotZeroOrReturnNull(ValueId value_id);
-        LabelId MakeLabel();
-        void SetLabel(LabelId label_id);
-        void Goto(LabelId label_id);
-        void CheckNotZeroOrJump(ValueId value_id, LabelId label_id);
-        ValueId Call(v8::FunctionCallback callback, ValueId value_id);
+  void ReturnValue(ValueId value_id);
+  void CheckFlagSetOrReturnNull(ValueId value_id, int mask);
+  void CheckNotZeroOrReturnNull(ValueId value_id);
+  LabelId MakeLabel();
+  void SetLabel(LabelId label_id);
+  void Goto(LabelId label_id);
+  void CheckNotZeroOrJump(ValueId value_id, LabelId label_id);
+  ValueId Call(v8::FunctionCallback callback, ValueId value_id);
 
-    private:
-        FastAccessorBuilder() = delete;
-        FastAccessorBuilder(const FastAccessorBuilder&) = delete;
-        ~FastAccessorBuilder() = delete;
-        void operator=(const FastAccessorBuilder&) = delete;
+ private:
+  FastAccessorBuilder() = delete;
+  FastAccessorBuilder(const FastAccessorBuilder&) = delete;
+  ~FastAccessorBuilder() = delete;
+  void operator=(const FastAccessorBuilder&) = delete;
 };
 
 }  // namespace experimental
