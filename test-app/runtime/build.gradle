@@ -41,7 +41,7 @@ android {
 
                 //https://developer.android.com/ndk/guides/cmake.html
                 //TODO: plamen5kov: figure out why can't ANDROID_TOOLCHAIN and ANDROID_STL be set in CMakeLists.txt
-                arguments "-DANDROID_TOOLCHAIN=clang", "-DANDROID_STL=c++_static", "-DANDROID_NDK_ROOT=${android.ndkDirectory}", "-DCMAKE_VERBOSE_MAKEFILE:BOOL=ON"
+                arguments "-DANDROID_TOOLCHAIN=clang", "-DANDROID_STL=c++_static", "-DANDROID_NDK_ROOT=${android.ndkDirectory}"
             }
         }
 

@@ -41,6 +41,9 @@ class JsV8InspectorClient : V8InspectorClient, v8_inspector::V8Inspector::Channe
 
         static void attachInspectorCallbacks(v8::Isolate* isolate, v8::Local<v8::ObjectTemplate>& globalObjectTemplate);
         static void InspectorIsConnectedGetterCallback(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
+        static bool inspectorIsConnected() {
+            return JsV8InspectorClient::GetInstance()->isConnected;
+        }
 
         std::unique_ptr<V8Inspector> inspector_;
         v8::Isolate* isolate_;
