@@ -25,11 +25,11 @@
 // chromium.
 enum CategoryGroupEnabledFlags {
     // Category group enabled for the recording mode.
-    kEnabledForRecording_CategoryGroupEnabledFlags = 1 << 0,
+            kEnabledForRecording_CategoryGroupEnabledFlags = 1 << 0,
     // Category group enabled by SetEventCallbackEnabled().
-    kEnabledForEventCallback_CategoryGroupEnabledFlags = 1 << 2,
+            kEnabledForEventCallback_CategoryGroupEnabledFlags = 1 << 2,
     // Category group enabled to export events to ETW.
-    kEnabledForETWExport_CategoryGroupEnabledFlags = 1 << 3,
+            kEnabledForETWExport_CategoryGroupEnabledFlags = 1 << 3,
 };
 
 // By default, const char* asrgument values are assumed to have long-lived scope
@@ -72,8 +72,8 @@ enum CategoryGroupEnabledFlags {
 // for best performance when tracing is disabled.
 // const uint8_t*
 //     TRACE_EVENT_API_GET_CATEGORY_GROUP_ENABLED(const char* category_group)
-#define TRACE_EVENT_API_GET_CATEGORY_GROUP_ENABLED              \
-  v8::internal::tracing::TraceEventHelper::GetCurrentPlatform() \
+#define TRACE_EVENT_API_GET_CATEGORY_GROUP_ENABLED                \
+  v8::internal::tracing::TraceEventHelper::GetTracingController() \
       ->GetCategoryGroupEnabled
 
 // Get the number of times traces have been recorded. This is used to implement
@@ -96,20 +96,37 @@ enum CategoryGroupEnabledFlags {
 //                    unsigned int flags)
 #define TRACE_EVENT_API_ADD_TRACE_EVENT v8::internal::tracing::AddTraceEventImpl
 
+// Add a trace event to the platform tracing system.
+// uint64_t TRACE_EVENT_API_ADD_TRACE_EVENT_WITH_TIMESTAMP(
+//                    char phase,
+//                    const uint8_t* category_group_enabled,
+//                    const char* name,
+//                    const char* scope,
+//                    uint64_t id,
+//                    uint64_t bind_id,
+//                    int num_args,
+//                    const char** arg_names,
+//                    const uint8_t* arg_types,
+//                    const uint64_t* arg_values,
+//                    unsigned int flags,
+//                    int64_t timestamp)
+#define TRACE_EVENT_API_ADD_TRACE_EVENT_WITH_TIMESTAMP \
+  v8::internal::tracing::AddTraceEventWithTimestampImpl
+
 // Set the duration field of a COMPLETE trace event.
 // void TRACE_EVENT_API_UPDATE_TRACE_EVENT_DURATION(
 //     const uint8_t* category_group_enabled,
 //     const char* name,
 //     uint64_t id)
-#define TRACE_EVENT_API_UPDATE_TRACE_EVENT_DURATION             \
-  v8::internal::tracing::TraceEventHelper::GetCurrentPlatform() \
+#define TRACE_EVENT_API_UPDATE_TRACE_EVENT_DURATION               \
+  v8::internal::tracing::TraceEventHelper::GetTracingController() \
       ->UpdateTraceEventDuration
 
 // Defines atomic operations used internally by the tracing system.
 #define TRACE_EVENT_API_ATOMIC_WORD v8::base::AtomicWord
-#define TRACE_EVENT_API_ATOMIC_LOAD(var) v8::base::NoBarrier_Load(&(var))
+#define TRACE_EVENT_API_ATOMIC_LOAD(var) v8::base::Relaxed_Load(&(var))
 #define TRACE_EVENT_API_ATOMIC_STORE(var, value) \
-  v8::base::NoBarrier_Store(&(var), (value))
+  v8::base::Relaxed_Store(&(var), (value))
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -212,10 +229,18 @@ enum CategoryGroupEnabledFlags {
     }                                                                          \
   } while (0)
 
-// Adds a trace event with a given timestamp. Not Implemented.
+// Adds a trace event with a given timestamp.
 #define INTERNAL_TRACE_EVENT_ADD_WITH_TIMESTAMP(phase, category_group, name, \
                                                 timestamp, flags, ...)       \
-  UNIMPLEMENTED()
+  do {                                                                       \
+    INTERNAL_TRACE_EVENT_GET_CATEGORY_INFO(category_group);                  \
+    if (INTERNAL_TRACE_EVENT_CATEGORY_GROUP_ENABLED_FOR_RECORDING_MODE()) {  \
+      v8::internal::tracing::AddTraceEventWithTimestamp(                     \
+          phase, INTERNAL_TRACE_EVENT_UID(category_group_enabled), name,     \
+          v8::internal::tracing::kGlobalScope, v8::internal::tracing::kNoId, \
+          v8::internal::tracing::kNoId, flags, timestamp, ##__VA_ARGS__);    \
+    }                                                                        \
+  } while (0)
 
 // Adds a trace event with a given id and timestamp. Not Implemented.
 #define INTERNAL_TRACE_EVENT_ADD_WITH_ID_AND_TIMESTAMP(     \
@@ -263,189 +288,195 @@ enum CategoryGroupEnabledFlags {
   }
 
 namespace v8 {
-namespace internal {
+    namespace internal {
 
-class Isolate;
+        class Isolate;
 
-namespace tracing {
+        namespace tracing {
 
 // Specify these values when the corresponding argument of AddTraceEvent is not
 // used.
-const int kZeroNumArgs = 0;
-const decltype(nullptr) kGlobalScope = nullptr;
-const uint64_t kNoId = 0;
+            const int kZeroNumArgs = 0;
+            const decltype(nullptr) kGlobalScope = nullptr;
+            const uint64_t kNoId = 0;
 
-class TraceEventHelper {
-    public:
-        static v8::Platform* GetCurrentPlatform();
-};
+            class TraceEventHelper {
+            public:
+                static v8::TracingController* GetTracingController();
+            };
 
 // TraceID encapsulates an ID that can either be an integer or pointer. Pointers
 // are by default mangled with the Process ID so that they are unlikely to
 // collide when the same pointer is used on different processes.
-class TraceID {
-    public:
-        class WithScope {
+            class TraceID {
             public:
-                WithScope(const char* scope, uint64_t raw_id)
-                    : scope_(scope), raw_id_(raw_id) {}
-                uint64_t raw_id() const {
-                    return raw_id_;
+                class WithScope {
+                public:
+                    WithScope(const char* scope, uint64_t raw_id)
+                            : scope_(scope), raw_id_(raw_id) {}
+                    uint64_t raw_id() const { return raw_id_; }
+                    const char* scope() const { return scope_; }
+
+                private:
+                    const char* scope_ = nullptr;
+                    uint64_t raw_id_;
+                };
+
+                class DontMangle {
+                public:
+                    explicit DontMangle(const void* raw_id)
+                            : raw_id_(static_cast<uint64_t>(reinterpret_cast<uintptr_t>(raw_id))) {}
+                    explicit DontMangle(uint64_t raw_id) : raw_id_(raw_id) {}
+                    explicit DontMangle(unsigned int raw_id) : raw_id_(raw_id) {}
+                    explicit DontMangle(uint16_t raw_id) : raw_id_(raw_id) {}
+                    explicit DontMangle(unsigned char raw_id) : raw_id_(raw_id) {}
+                    explicit DontMangle(int64_t raw_id)
+                            : raw_id_(static_cast<uint64_t>(raw_id)) {}
+                    explicit DontMangle(int raw_id) : raw_id_(static_cast<uint64_t>(raw_id)) {}
+                    explicit DontMangle(int16_t raw_id)
+                            : raw_id_(static_cast<uint64_t>(raw_id)) {}
+                    explicit DontMangle(signed char raw_id)
+                            : raw_id_(static_cast<uint64_t>(raw_id)) {}
+                    explicit DontMangle(WithScope scoped_id)
+                            : scope_(scoped_id.scope()), raw_id_(scoped_id.raw_id()) {}
+                    const char* scope() const { return scope_; }
+                    uint64_t raw_id() const { return raw_id_; }
+
+                private:
+                    const char* scope_ = nullptr;
+                    uint64_t raw_id_;
+                };
+
+                class ForceMangle {
+                public:
+                    explicit ForceMangle(uint64_t raw_id) : raw_id_(raw_id) {}
+                    explicit ForceMangle(unsigned int raw_id) : raw_id_(raw_id) {}
+                    explicit ForceMangle(uint16_t raw_id) : raw_id_(raw_id) {}
+                    explicit ForceMangle(unsigned char raw_id) : raw_id_(raw_id) {}
+                    explicit ForceMangle(int64_t raw_id)
+                            : raw_id_(static_cast<uint64_t>(raw_id)) {}
+                    explicit ForceMangle(int raw_id) : raw_id_(static_cast<uint64_t>(raw_id)) {}
+                    explicit ForceMangle(int16_t raw_id)
+                            : raw_id_(static_cast<uint64_t>(raw_id)) {}
+                    explicit ForceMangle(signed char raw_id)
+                            : raw_id_(static_cast<uint64_t>(raw_id)) {}
+                    uint64_t raw_id() const { return raw_id_; }
+
+                private:
+                    uint64_t raw_id_;
+                };
+
+                TraceID(const void* raw_id, unsigned int* flags)
+                        : raw_id_(static_cast<uint64_t>(reinterpret_cast<uintptr_t>(raw_id))) {
+                    *flags |= TRACE_EVENT_FLAG_MANGLE_ID;
                 }
-                const char* scope() const {
-                    return scope_;
+                TraceID(ForceMangle raw_id, unsigned int* flags) : raw_id_(raw_id.raw_id()) {
+                    *flags |= TRACE_EVENT_FLAG_MANGLE_ID;
                 }
+                TraceID(DontMangle maybe_scoped_id, unsigned int* flags)
+                        : scope_(maybe_scoped_id.scope()), raw_id_(maybe_scoped_id.raw_id()) {}
+                TraceID(uint64_t raw_id, unsigned int* flags) : raw_id_(raw_id) {
+                    (void)flags;
+                }
+                TraceID(unsigned int raw_id, unsigned int* flags) : raw_id_(raw_id) {
+                    (void)flags;
+                }
+                TraceID(uint16_t raw_id, unsigned int* flags) : raw_id_(raw_id) {
+                    (void)flags;
+                }
+                TraceID(unsigned char raw_id, unsigned int* flags) : raw_id_(raw_id) {
+                    (void)flags;
+                }
+                TraceID(int64_t raw_id, unsigned int* flags)
+                        : raw_id_(static_cast<uint64_t>(raw_id)) {
+                    (void)flags;
+                }
+                TraceID(int raw_id, unsigned int* flags)
+                        : raw_id_(static_cast<uint64_t>(raw_id)) {
+                    (void)flags;
+                }
+                TraceID(int16_t raw_id, unsigned int* flags)
+                        : raw_id_(static_cast<uint64_t>(raw_id)) {
+                    (void)flags;
+                }
+                TraceID(signed char raw_id, unsigned int* flags)
+                        : raw_id_(static_cast<uint64_t>(raw_id)) {
+                    (void)flags;
+                }
+                TraceID(WithScope scoped_id, unsigned int* flags)
+                        : scope_(scoped_id.scope()), raw_id_(scoped_id.raw_id()) {}
+
+                uint64_t raw_id() const { return raw_id_; }
+                const char* scope() const { return scope_; }
 
             private:
                 const char* scope_ = nullptr;
                 uint64_t raw_id_;
-        };
-
-        class DontMangle {
-            public:
-                explicit DontMangle(const void* raw_id)
-                    : raw_id_(static_cast<uint64_t>(reinterpret_cast<uintptr_t>(raw_id))) {}
-                explicit DontMangle(uint64_t raw_id) : raw_id_(raw_id) {}
-                explicit DontMangle(unsigned int raw_id) : raw_id_(raw_id) {}
-                explicit DontMangle(uint16_t raw_id) : raw_id_(raw_id) {}
-                explicit DontMangle(unsigned char raw_id) : raw_id_(raw_id) {}
-                explicit DontMangle(int64_t raw_id)
-                    : raw_id_(static_cast<uint64_t>(raw_id)) {}
-                explicit DontMangle(int raw_id) : raw_id_(static_cast<uint64_t>(raw_id)) {}
-                explicit DontMangle(int16_t raw_id)
-                    : raw_id_(static_cast<uint64_t>(raw_id)) {}
-                explicit DontMangle(signed char raw_id)
-                    : raw_id_(static_cast<uint64_t>(raw_id)) {}
-                explicit DontMangle(WithScope scoped_id)
-                    : scope_(scoped_id.scope()), raw_id_(scoped_id.raw_id()) {}
-                const char* scope() const {
-                    return scope_;
-                }
-                uint64_t raw_id() const {
-                    return raw_id_;
-                }
-
-            private:
-                const char* scope_ = nullptr;
-                uint64_t raw_id_;
-        };
-
-        class ForceMangle {
-            public:
-                explicit ForceMangle(uint64_t raw_id) : raw_id_(raw_id) {}
-                explicit ForceMangle(unsigned int raw_id) : raw_id_(raw_id) {}
-                explicit ForceMangle(uint16_t raw_id) : raw_id_(raw_id) {}
-                explicit ForceMangle(unsigned char raw_id) : raw_id_(raw_id) {}
-                explicit ForceMangle(int64_t raw_id)
-                    : raw_id_(static_cast<uint64_t>(raw_id)) {}
-                explicit ForceMangle(int raw_id) : raw_id_(static_cast<uint64_t>(raw_id)) {}
-                explicit ForceMangle(int16_t raw_id)
-                    : raw_id_(static_cast<uint64_t>(raw_id)) {}
-                explicit ForceMangle(signed char raw_id)
-                    : raw_id_(static_cast<uint64_t>(raw_id)) {}
-                uint64_t raw_id() const {
-                    return raw_id_;
-                }
-
-            private:
-                uint64_t raw_id_;
-        };
-
-        TraceID(const void* raw_id, unsigned int* flags)
-            : raw_id_(static_cast<uint64_t>(reinterpret_cast<uintptr_t>(raw_id))) {
-            *flags |= TRACE_EVENT_FLAG_MANGLE_ID;
-        }
-        TraceID(ForceMangle raw_id, unsigned int* flags) : raw_id_(raw_id.raw_id()) {
-            *flags |= TRACE_EVENT_FLAG_MANGLE_ID;
-        }
-        TraceID(DontMangle maybe_scoped_id, unsigned int* flags)
-            : scope_(maybe_scoped_id.scope()), raw_id_(maybe_scoped_id.raw_id()) {}
-        TraceID(uint64_t raw_id, unsigned int* flags) : raw_id_(raw_id) {
-            (void)flags;
-        }
-        TraceID(unsigned int raw_id, unsigned int* flags) : raw_id_(raw_id) {
-            (void)flags;
-        }
-        TraceID(uint16_t raw_id, unsigned int* flags) : raw_id_(raw_id) {
-            (void)flags;
-        }
-        TraceID(unsigned char raw_id, unsigned int* flags) : raw_id_(raw_id) {
-            (void)flags;
-        }
-        TraceID(int64_t raw_id, unsigned int* flags)
-            : raw_id_(static_cast<uint64_t>(raw_id)) {
-            (void)flags;
-        }
-        TraceID(int raw_id, unsigned int* flags)
-            : raw_id_(static_cast<uint64_t>(raw_id)) {
-            (void)flags;
-        }
-        TraceID(int16_t raw_id, unsigned int* flags)
-            : raw_id_(static_cast<uint64_t>(raw_id)) {
-            (void)flags;
-        }
-        TraceID(signed char raw_id, unsigned int* flags)
-            : raw_id_(static_cast<uint64_t>(raw_id)) {
-            (void)flags;
-        }
-        TraceID(WithScope scoped_id, unsigned int* flags)
-            : scope_(scoped_id.scope()), raw_id_(scoped_id.raw_id()) {}
-
-        uint64_t raw_id() const {
-            return raw_id_;
-        }
-        const char* scope() const {
-            return scope_;
-        }
-
-    private:
-        const char* scope_ = nullptr;
-        uint64_t raw_id_;
-};
+            };
 
 // Simple union to store various types as uint64_t.
-union TraceValueUnion {
-    bool as_bool;
-    uint64_t as_uint;
-    int64_t as_int;
-    double as_double;
-    const void* as_pointer;
-    const char* as_string;
-};
+            union TraceValueUnion {
+                bool as_bool;
+                uint64_t as_uint;
+                int64_t as_int;
+                double as_double;
+                const void* as_pointer;
+                const char* as_string;
+            };
 
 // Simple container for const char* that should be copied instead of retained.
-class TraceStringWithCopy {
-    public:
-        explicit TraceStringWithCopy(const char* str) : str_(str) {}
-        operator const char* () const {
-            return str_;
-        }
+            class TraceStringWithCopy {
+            public:
+                explicit TraceStringWithCopy(const char* str) : str_(str) {}
+                operator const char*() const { return str_; }
 
-    private:
-        const char* str_;
-};
+            private:
+                const char* str_;
+            };
 
-static V8_INLINE uint64_t AddTraceEventImpl(
-    char phase, const uint8_t* category_group_enabled, const char* name,
-    const char* scope, uint64_t id, uint64_t bind_id, int32_t num_args,
-    const char** arg_names, const uint8_t* arg_types,
-    const uint64_t* arg_values, unsigned int flags) {
-    std::unique_ptr<ConvertableToTraceFormat> arg_convertables[2];
-    if (num_args > 0 && arg_types[0] == TRACE_VALUE_TYPE_CONVERTABLE) {
-        arg_convertables[0].reset(reinterpret_cast<ConvertableToTraceFormat*>(
-                                      static_cast<intptr_t>(arg_values[0])));
-    }
-    if (num_args > 1 && arg_types[1] == TRACE_VALUE_TYPE_CONVERTABLE) {
-        arg_convertables[1].reset(reinterpret_cast<ConvertableToTraceFormat*>(
-                                      static_cast<intptr_t>(arg_values[1])));
-    }
-    DCHECK(num_args <= 2);
-    v8::Platform* platform =
-        v8::internal::tracing::TraceEventHelper::GetCurrentPlatform();
-    return platform->AddTraceEvent(phase, category_group_enabled, name, scope, id,
-                                   bind_id, num_args, arg_names, arg_types,
-                                   arg_values, arg_convertables, flags);
-}
+            static V8_INLINE uint64_t AddTraceEventImpl(
+                    char phase, const uint8_t* category_group_enabled, const char* name,
+                    const char* scope, uint64_t id, uint64_t bind_id, int32_t num_args,
+                    const char** arg_names, const uint8_t* arg_types,
+                    const uint64_t* arg_values, unsigned int flags) {
+                std::unique_ptr<ConvertableToTraceFormat> arg_convertables[2];
+                if (num_args > 0 && arg_types[0] == TRACE_VALUE_TYPE_CONVERTABLE) {
+                    arg_convertables[0].reset(reinterpret_cast<ConvertableToTraceFormat*>(
+                                                      static_cast<intptr_t>(arg_values[0])));
+                }
+                if (num_args > 1 && arg_types[1] == TRACE_VALUE_TYPE_CONVERTABLE) {
+                    arg_convertables[1].reset(reinterpret_cast<ConvertableToTraceFormat*>(
+                                                      static_cast<intptr_t>(arg_values[1])));
+                }
+                DCHECK_LE(num_args, 2);
+                v8::TracingController* controller =
+                        v8::internal::tracing::TraceEventHelper::GetTracingController();
+                return controller->AddTraceEvent(phase, category_group_enabled, name, scope,
+                                                 id, bind_id, num_args, arg_names, arg_types,
+                                                 arg_values, arg_convertables, flags);
+            }
+
+            static V8_INLINE uint64_t AddTraceEventWithTimestampImpl(
+                    char phase, const uint8_t* category_group_enabled, const char* name,
+                    const char* scope, uint64_t id, uint64_t bind_id, int32_t num_args,
+                    const char** arg_names, const uint8_t* arg_types,
+                    const uint64_t* arg_values, unsigned int flags, int64_t timestamp) {
+                std::unique_ptr<ConvertableToTraceFormat> arg_convertables[2];
+                if (num_args > 0 && arg_types[0] == TRACE_VALUE_TYPE_CONVERTABLE) {
+                    arg_convertables[0].reset(reinterpret_cast<ConvertableToTraceFormat*>(
+                                                      static_cast<intptr_t>(arg_values[0])));
+                }
+                if (num_args > 1 && arg_types[1] == TRACE_VALUE_TYPE_CONVERTABLE) {
+                    arg_convertables[1].reset(reinterpret_cast<ConvertableToTraceFormat*>(
+                                                      static_cast<intptr_t>(arg_values[1])));
+                }
+                DCHECK_LE(num_args, 2);
+                v8::TracingController* controller =
+                        v8::internal::tracing::TraceEventHelper::GetTracingController();
+                return controller->AddTraceEventWithTimestamp(
+                        phase, category_group_enabled, name, scope, id, bind_id, num_args,
+                        arg_names, arg_types, arg_values, arg_convertables, flags, timestamp);
+            }
 
 // Define SetTraceValue for each allowed type. It stores the type and
 // value in the return arguments. This allows this API to avoid declaring any
@@ -467,38 +498,38 @@ static V8_INLINE uint64_t AddTraceEventImpl(
     *value = static_cast<uint64_t>(arg);                                    \
   }
 
-INTERNAL_DECLARE_SET_TRACE_VALUE_INT(uint64_t, TRACE_VALUE_TYPE_UINT)
-INTERNAL_DECLARE_SET_TRACE_VALUE_INT(unsigned int, TRACE_VALUE_TYPE_UINT)
-INTERNAL_DECLARE_SET_TRACE_VALUE_INT(uint16_t, TRACE_VALUE_TYPE_UINT)
-INTERNAL_DECLARE_SET_TRACE_VALUE_INT(unsigned char, TRACE_VALUE_TYPE_UINT)
-INTERNAL_DECLARE_SET_TRACE_VALUE_INT(int64_t, TRACE_VALUE_TYPE_INT)
-INTERNAL_DECLARE_SET_TRACE_VALUE_INT(int, TRACE_VALUE_TYPE_INT)
-INTERNAL_DECLARE_SET_TRACE_VALUE_INT(int16_t, TRACE_VALUE_TYPE_INT)
-INTERNAL_DECLARE_SET_TRACE_VALUE_INT(signed char, TRACE_VALUE_TYPE_INT)
-INTERNAL_DECLARE_SET_TRACE_VALUE(bool, as_bool, TRACE_VALUE_TYPE_BOOL)
-INTERNAL_DECLARE_SET_TRACE_VALUE(double, as_double, TRACE_VALUE_TYPE_DOUBLE)
-INTERNAL_DECLARE_SET_TRACE_VALUE(const void*, as_pointer,
-                                 TRACE_VALUE_TYPE_POINTER)
-INTERNAL_DECLARE_SET_TRACE_VALUE(const char*, as_string,
-                                 TRACE_VALUE_TYPE_STRING)
-INTERNAL_DECLARE_SET_TRACE_VALUE(const TraceStringWithCopy&, as_string,
-                                 TRACE_VALUE_TYPE_COPY_STRING)
+            INTERNAL_DECLARE_SET_TRACE_VALUE_INT(uint64_t, TRACE_VALUE_TYPE_UINT)
+            INTERNAL_DECLARE_SET_TRACE_VALUE_INT(unsigned int, TRACE_VALUE_TYPE_UINT)
+            INTERNAL_DECLARE_SET_TRACE_VALUE_INT(uint16_t, TRACE_VALUE_TYPE_UINT)
+            INTERNAL_DECLARE_SET_TRACE_VALUE_INT(unsigned char, TRACE_VALUE_TYPE_UINT)
+            INTERNAL_DECLARE_SET_TRACE_VALUE_INT(int64_t, TRACE_VALUE_TYPE_INT)
+            INTERNAL_DECLARE_SET_TRACE_VALUE_INT(int, TRACE_VALUE_TYPE_INT)
+            INTERNAL_DECLARE_SET_TRACE_VALUE_INT(int16_t, TRACE_VALUE_TYPE_INT)
+            INTERNAL_DECLARE_SET_TRACE_VALUE_INT(signed char, TRACE_VALUE_TYPE_INT)
+            INTERNAL_DECLARE_SET_TRACE_VALUE(bool, as_bool, TRACE_VALUE_TYPE_BOOL)
+            INTERNAL_DECLARE_SET_TRACE_VALUE(double, as_double, TRACE_VALUE_TYPE_DOUBLE)
+            INTERNAL_DECLARE_SET_TRACE_VALUE(const void*, as_pointer,
+                                             TRACE_VALUE_TYPE_POINTER)
+            INTERNAL_DECLARE_SET_TRACE_VALUE(const char*, as_string,
+                                             TRACE_VALUE_TYPE_STRING)
+            INTERNAL_DECLARE_SET_TRACE_VALUE(const TraceStringWithCopy&, as_string,
+                                             TRACE_VALUE_TYPE_COPY_STRING)
 
 #undef INTERNAL_DECLARE_SET_TRACE_VALUE
 #undef INTERNAL_DECLARE_SET_TRACE_VALUE_INT
 
-static V8_INLINE void SetTraceValue(ConvertableToTraceFormat* convertable_value,
-                                    unsigned char* type, uint64_t* value) {
-    *type = TRACE_VALUE_TYPE_CONVERTABLE;
-    *value = static_cast<uint64_t>(reinterpret_cast<intptr_t>(convertable_value));
-}
+            static V8_INLINE void SetTraceValue(ConvertableToTraceFormat* convertable_value,
+                                                unsigned char* type, uint64_t* value) {
+                *type = TRACE_VALUE_TYPE_CONVERTABLE;
+                *value = static_cast<uint64_t>(reinterpret_cast<intptr_t>(convertable_value));
+            }
 
-template <typename T>
-static V8_INLINE typename std::enable_if<
-std::is_convertible<T*, ConvertableToTraceFormat*>::value>::type
-SetTraceValue(std::unique_ptr<T> ptr, unsigned char* type, uint64_t* value) {
-    SetTraceValue(ptr.release(), type, value);
-}
+            template <typename T>
+            static V8_INLINE typename std::enable_if<
+                    std::is_convertible<T*, ConvertableToTraceFormat*>::value>::type
+            SetTraceValue(std::unique_ptr<T> ptr, unsigned char* type, uint64_t* value) {
+                SetTraceValue(ptr.release(), type, value);
+            }
 
 // These AddTraceEvent template
 // function is defined here instead of in the macro, because the arg_values
@@ -506,111 +537,153 @@ SetTraceValue(std::unique_ptr<T> ptr, unsigned char* type, uint64_t* value) {
 // pointers to the internal c_str and pass through to the tracing API,
 // the arg_values must live throughout these procedures.
 
-static V8_INLINE uint64_t AddTraceEvent(char phase,
-                                        const uint8_t* category_group_enabled,
-                                        const char* name, const char* scope,
-                                        uint64_t id, uint64_t bind_id,
-                                        unsigned int flags) {
-    return TRACE_EVENT_API_ADD_TRACE_EVENT(phase, category_group_enabled, name,
-                                           scope, id, bind_id, kZeroNumArgs,
-                                           nullptr, nullptr, nullptr, flags);
-}
+            static V8_INLINE uint64_t AddTraceEvent(char phase,
+                                                    const uint8_t* category_group_enabled,
+                                                    const char* name, const char* scope,
+                                                    uint64_t id, uint64_t bind_id,
+                                                    unsigned int flags) {
+                return TRACE_EVENT_API_ADD_TRACE_EVENT(phase, category_group_enabled, name,
+                                                       scope, id, bind_id, kZeroNumArgs,
+                                                       nullptr, nullptr, nullptr, flags);
+            }
 
-template <class ARG1_TYPE>
-static V8_INLINE uint64_t AddTraceEvent(
-    char phase, const uint8_t* category_group_enabled, const char* name,
-    const char* scope, uint64_t id, uint64_t bind_id, unsigned int flags,
-    const char* arg1_name, ARG1_TYPE&& arg1_val) {
-    const int num_args = 1;
-    uint8_t arg_type;
-    uint64_t arg_value;
-    SetTraceValue(std::forward<ARG1_TYPE>(arg1_val), &arg_type, &arg_value);
-    return TRACE_EVENT_API_ADD_TRACE_EVENT(
-               phase, category_group_enabled, name, scope, id, bind_id, num_args,
-               &arg1_name, &arg_type, &arg_value, flags);
-}
+            template <class ARG1_TYPE>
+            static V8_INLINE uint64_t AddTraceEvent(
+                    char phase, const uint8_t* category_group_enabled, const char* name,
+                    const char* scope, uint64_t id, uint64_t bind_id, unsigned int flags,
+                    const char* arg1_name, ARG1_TYPE&& arg1_val) {
+                const int num_args = 1;
+                uint8_t arg_type;
+                uint64_t arg_value;
+                SetTraceValue(std::forward<ARG1_TYPE>(arg1_val), &arg_type, &arg_value);
+                return TRACE_EVENT_API_ADD_TRACE_EVENT(
+                        phase, category_group_enabled, name, scope, id, bind_id, num_args,
+                        &arg1_name, &arg_type, &arg_value, flags);
+            }
 
-template <class ARG1_TYPE, class ARG2_TYPE>
-static V8_INLINE uint64_t AddTraceEvent(
-    char phase, const uint8_t* category_group_enabled, const char* name,
-    const char* scope, uint64_t id, uint64_t bind_id, unsigned int flags,
-    const char* arg1_name, ARG1_TYPE&& arg1_val, const char* arg2_name,
-    ARG2_TYPE&& arg2_val) {
-    const int num_args = 2;
-    const char* arg_names[2] = {arg1_name, arg2_name};
-    unsigned char arg_types[2];
-    uint64_t arg_values[2];
-    SetTraceValue(std::forward<ARG1_TYPE>(arg1_val), &arg_types[0],
-                  &arg_values[0]);
-    SetTraceValue(std::forward<ARG2_TYPE>(arg2_val), &arg_types[1],
-                  &arg_values[1]);
-    return TRACE_EVENT_API_ADD_TRACE_EVENT(
-               phase, category_group_enabled, name, scope, id, bind_id, num_args,
-               arg_names, arg_types, arg_values, flags);
-}
+            template <class ARG1_TYPE, class ARG2_TYPE>
+            static V8_INLINE uint64_t AddTraceEvent(
+                    char phase, const uint8_t* category_group_enabled, const char* name,
+                    const char* scope, uint64_t id, uint64_t bind_id, unsigned int flags,
+                    const char* arg1_name, ARG1_TYPE&& arg1_val, const char* arg2_name,
+                    ARG2_TYPE&& arg2_val) {
+                const int num_args = 2;
+                const char* arg_names[2] = {arg1_name, arg2_name};
+                unsigned char arg_types[2];
+                uint64_t arg_values[2];
+                SetTraceValue(std::forward<ARG1_TYPE>(arg1_val), &arg_types[0],
+                              &arg_values[0]);
+                SetTraceValue(std::forward<ARG2_TYPE>(arg2_val), &arg_types[1],
+                              &arg_values[1]);
+                return TRACE_EVENT_API_ADD_TRACE_EVENT(
+                        phase, category_group_enabled, name, scope, id, bind_id, num_args,
+                        arg_names, arg_types, arg_values, flags);
+            }
+
+            static V8_INLINE uint64_t AddTraceEventWithTimestamp(
+                    char phase, const uint8_t* category_group_enabled, const char* name,
+                    const char* scope, uint64_t id, uint64_t bind_id, unsigned int flags,
+                    int64_t timestamp) {
+                return TRACE_EVENT_API_ADD_TRACE_EVENT_WITH_TIMESTAMP(
+                        phase, category_group_enabled, name, scope, id, bind_id, kZeroNumArgs,
+                        nullptr, nullptr, nullptr, flags, timestamp);
+            }
+
+            template <class ARG1_TYPE>
+            static V8_INLINE uint64_t AddTraceEventWithTimestamp(
+                    char phase, const uint8_t* category_group_enabled, const char* name,
+                    const char* scope, uint64_t id, uint64_t bind_id, unsigned int flags,
+                    int64_t timestamp, const char* arg1_name, ARG1_TYPE&& arg1_val) {
+                const int num_args = 1;
+                uint8_t arg_type;
+                uint64_t arg_value;
+                SetTraceValue(std::forward<ARG1_TYPE>(arg1_val), &arg_type, &arg_value);
+                return TRACE_EVENT_API_ADD_TRACE_EVENT_WITH_TIMESTAMP(
+                        phase, category_group_enabled, name, scope, id, bind_id, num_args,
+                        &arg1_name, &arg_type, &arg_value, flags, timestamp);
+            }
+
+            template <class ARG1_TYPE, class ARG2_TYPE>
+            static V8_INLINE uint64_t AddTraceEventWithTimestamp(
+                    char phase, const uint8_t* category_group_enabled, const char* name,
+                    const char* scope, uint64_t id, uint64_t bind_id, unsigned int flags,
+                    int64_t timestamp, const char* arg1_name, ARG1_TYPE&& arg1_val,
+                    const char* arg2_name, ARG2_TYPE&& arg2_val) {
+                const int num_args = 2;
+                const char* arg_names[2] = {arg1_name, arg2_name};
+                unsigned char arg_types[2];
+                uint64_t arg_values[2];
+                SetTraceValue(std::forward<ARG1_TYPE>(arg1_val), &arg_types[0],
+                              &arg_values[0]);
+                SetTraceValue(std::forward<ARG2_TYPE>(arg2_val), &arg_types[1],
+                              &arg_values[1]);
+                return TRACE_EVENT_API_ADD_TRACE_EVENT_WITH_TIMESTAMP(
+                        phase, category_group_enabled, name, scope, id, bind_id, num_args,
+                        arg_names, arg_types, arg_values, flags, timestamp);
+            }
 
 // Used by TRACE_EVENTx macros. Do not use directly.
-class ScopedTracer {
-    public:
-        // Note: members of data_ intentionally left uninitialized. See Initialize.
-        ScopedTracer() : p_data_(NULL) {}
+            class ScopedTracer {
+            public:
+                // Note: members of data_ intentionally left uninitialized. See Initialize.
+                ScopedTracer() : p_data_(nullptr) {}
 
-        ~ScopedTracer() {
-            if (p_data_ && *data_.category_group_enabled)
-                TRACE_EVENT_API_UPDATE_TRACE_EVENT_DURATION(
-                    data_.category_group_enabled, data_.name, data_.event_handle);
-        }
+                ~ScopedTracer() {
+                    if (p_data_ && *data_.category_group_enabled)
+                        TRACE_EVENT_API_UPDATE_TRACE_EVENT_DURATION(
+                                data_.category_group_enabled, data_.name, data_.event_handle);
+                }
 
-        void Initialize(const uint8_t* category_group_enabled, const char* name,
-                        uint64_t event_handle) {
-            data_.category_group_enabled = category_group_enabled;
-            data_.name = name;
-            data_.event_handle = event_handle;
-            p_data_ = &data_;
-        }
+                void Initialize(const uint8_t* category_group_enabled, const char* name,
+                                uint64_t event_handle) {
+                    data_.category_group_enabled = category_group_enabled;
+                    data_.name = name;
+                    data_.event_handle = event_handle;
+                    p_data_ = &data_;
+                }
 
-    private:
-        // This Data struct workaround is to avoid initializing all the members
-        // in Data during construction of this object, since this object is always
-        // constructed, even when tracing is disabled. If the members of Data were
-        // members of this class instead, compiler warnings occur about potential
-        // uninitialized accesses.
-        struct Data {
-            const uint8_t* category_group_enabled;
-            const char* name;
-            uint64_t event_handle;
-        };
-        Data* p_data_;
-        Data data_;
-};
+            private:
+                // This Data struct workaround is to avoid initializing all the members
+                // in Data during construction of this object, since this object is always
+                // constructed, even when tracing is disabled. If the members of Data were
+                // members of this class instead, compiler warnings occur about potential
+                // uninitialized accesses.
+                struct Data {
+                    const uint8_t* category_group_enabled;
+                    const char* name;
+                    uint64_t event_handle;
+                };
+                Data* p_data_;
+                Data data_;
+            };
 
 // Do not use directly.
-class CallStatsScopedTracer {
-    public:
-        CallStatsScopedTracer() : p_data_(nullptr) {}
-        ~CallStatsScopedTracer() {
-            if (V8_UNLIKELY(p_data_ && *data_.category_group_enabled)) {
-                AddEndTraceEvent();
-            }
-        }
+            class CallStatsScopedTracer {
+            public:
+                CallStatsScopedTracer() : p_data_(nullptr) {}
+                ~CallStatsScopedTracer() {
+                    if (V8_UNLIKELY(p_data_ && *data_.category_group_enabled)) {
+                        AddEndTraceEvent();
+                    }
+                }
 
-        void Initialize(v8::internal::Isolate* isolate,
-                        const uint8_t* category_group_enabled, const char* name);
+                void Initialize(v8::internal::Isolate* isolate,
+                                const uint8_t* category_group_enabled, const char* name);
 
-    private:
-        void AddEndTraceEvent();
-        struct Data {
-            const uint8_t* category_group_enabled;
-            const char* name;
-            v8::internal::Isolate* isolate;
-        };
-        bool has_parent_scope_;
-        Data* p_data_;
-        Data data_;
-};
+            private:
+                void AddEndTraceEvent();
+                struct Data {
+                    const uint8_t* category_group_enabled;
+                    const char* name;
+                    v8::internal::Isolate* isolate;
+                };
+                bool has_parent_scope_;
+                Data* p_data_;
+                Data data_;
+            };
 
-}  // namespace tracing
-}  // namespace internal
+        }  // namespace tracing
+    }  // namespace internal
 }  // namespace v8
 
 #endif  // SRC_TRACING_TRACE_EVENT_H_

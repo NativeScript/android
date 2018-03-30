@@ -32,6 +32,13 @@ public:
     static std::unique_ptr<protocol::Runtime::API::StackTrace> fromJSONString(const StringView& json);
 };
 
+class V8_EXPORT StackTraceId {
+public:
+    virtual std::unique_ptr<StringBuffer> toJSONString() const = 0;
+    virtual ~StackTraceId() { }
+    static std::unique_ptr<protocol::Runtime::API::StackTraceId> fromJSONString(const StringView& json);
+};
+
 } // namespace API
 } // namespace Runtime
 } // namespace v8_inspector

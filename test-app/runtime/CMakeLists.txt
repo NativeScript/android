@@ -108,10 +108,8 @@ add_library( # Sets the name of the library. When it's built you can find it wit
         src/main/cpp/v8_inspector/src/inspector/v8-overlay-agent-impl.cpp
         src/main/cpp/v8_inspector/src/inspector/v8-page-agent-impl.cpp
 
-        src/main/cpp/v8_inspector/src/inspector/injected-script-native.cc
         src/main/cpp/v8_inspector/src/inspector/injected-script.cc
         src/main/cpp/v8_inspector/src/inspector/inspected-context.cc
-        src/main/cpp/v8_inspector/src/inspector/java-script-call-frame.cc
         src/main/cpp/v8_inspector/src/inspector/remote-object-id.cc
         src/main/cpp/v8_inspector/src/inspector/search-util.cc
         src/main/cpp/v8_inspector/src/inspector/string-16.cc
@@ -135,6 +133,7 @@ add_library( # Sets the name of the library. When it's built you can find it wit
         src/main/cpp/v8_inspector/src/inspector/v8-schema-agent-impl.cc
         src/main/cpp/v8_inspector/src/inspector/v8-stack-trace-impl.cc
         src/main/cpp/v8_inspector/src/inspector/v8-value-copier.cc
+        src/main/cpp/v8_inspector/src/inspector/v8-value-utils.cc
         src/main/cpp/v8_inspector/src/inspector/wasm-translation.cc
 )
 
@@ -154,12 +153,11 @@ MESSAGE( STATUS "# CMAKE_CXX_FLAGS: " ${CMAKE_CXX_FLAGS} )
 target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libzip.a )
 target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libinspector.a )
 target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_base.a )
-target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_builtins_setup.a )
-target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_builtins_generators.a )
-target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_base.a )
+target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_init.a )
+target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_initializers.a )
 target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_libplatform.a )
-target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_libbase.a )
 target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_libsampler.a )
+target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_libbase.a )
 target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_nosnapshot.a )
 
 # Command info: https://cmake.org/cmake/help/v3.4/command/find_library.html

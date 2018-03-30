@@ -20,28 +20,32 @@ class V8InspectorImpl;
 // page already has itself (e.g. origin restriction bypasses).
 
 class V8InjectedScriptHost {
-    public:
-        // We expect that debugger outlives any JS context and thus
-        // V8InjectedScriptHost (owned by JS)
-        // is destroyed before inspector.
-        static v8::Local<v8::Object> create(v8::Local<v8::Context>, V8InspectorImpl*);
+ public:
+  // We expect that debugger outlives any JS context and thus
+  // V8InjectedScriptHost (owned by JS)
+  // is destroyed before inspector.
+  static v8::Local<v8::Object> create(v8::Local<v8::Context>, V8InspectorImpl*);
 
-    private:
-        static void nullifyPrototypeCallback(
-            const v8::FunctionCallbackInfo<v8::Value>&);
-        static void getPropertyCallback(const v8::FunctionCallbackInfo<v8::Value>&);
-        static void internalConstructorNameCallback(
-            const v8::FunctionCallbackInfo<v8::Value>&);
-        static void formatAccessorsAsProperties(
-            const v8::FunctionCallbackInfo<v8::Value>&);
-        static void subtypeCallback(const v8::FunctionCallbackInfo<v8::Value>&);
-        static void getInternalPropertiesCallback(
-            const v8::FunctionCallbackInfo<v8::Value>&);
-        static void objectHasOwnPropertyCallback(
-            const v8::FunctionCallbackInfo<v8::Value>&);
-        static void bindCallback(const v8::FunctionCallbackInfo<v8::Value>&);
-        static void proxyTargetValueCallback(
-            const v8::FunctionCallbackInfo<v8::Value>&);
+ private:
+  static void nullifyPrototypeCallback(
+      const v8::FunctionCallbackInfo<v8::Value>&);
+  static void getPropertyCallback(const v8::FunctionCallbackInfo<v8::Value>&);
+  static void internalConstructorNameCallback(
+      const v8::FunctionCallbackInfo<v8::Value>&);
+  static void formatAccessorsAsProperties(
+      const v8::FunctionCallbackInfo<v8::Value>&);
+  static void subtypeCallback(const v8::FunctionCallbackInfo<v8::Value>&);
+  static void getInternalPropertiesCallback(
+      const v8::FunctionCallbackInfo<v8::Value>&);
+  static void objectHasOwnPropertyCallback(
+      const v8::FunctionCallbackInfo<v8::Value>&);
+  static void bindCallback(const v8::FunctionCallbackInfo<v8::Value>&);
+  static void proxyTargetValueCallback(
+      const v8::FunctionCallbackInfo<v8::Value>&);
+  static void nativeAccessorDescriptorCallback(
+      const v8::FunctionCallbackInfo<v8::Value>&);
+  static void typedArrayPropertiesCallback(
+      const v8::FunctionCallbackInfo<v8::Value>&);
 };
 
 }  // namespace v8_inspector

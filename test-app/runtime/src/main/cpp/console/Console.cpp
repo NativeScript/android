@@ -318,7 +318,7 @@ void Console::dirCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
                         }
                         ss << ": " << jsonStringifiedObject;
                     } else {
-                        ss << ": \"" << ArgConverter::ConvertToString(propertyValue->ToDetailString(isolate)) << "\"";
+                        ss << ": \"" << ArgConverter::ConvertToString(propertyValue->ToDetailString(context).ToLocalChecked()) << "\"";
                     }
 
                     ss << std::endl;

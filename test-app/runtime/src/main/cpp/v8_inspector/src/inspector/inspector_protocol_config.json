@@ -3,39 +3,21 @@
         "path": "js_protocol.json",
         "package": "src/inspector/protocol",
         "output": "protocol",
-        "namespace": [
-            "v8_inspector",
-            "protocol"
-        ],
+        "namespace": ["v8_inspector", "protocol"],
         "options": [
             {
                 "domain": "Schema",
-                "exported": [
-                    "Domain"
-                ]
+                "exported": ["Domain"]
             },
             {
                 "domain": "Runtime",
-                "async": [
-                    "evaluate",
-                    "awaitPromise",
-                    "callFunctionOn",
-                    "runScript"
-                ],
-                "exported": [
-                    "StackTrace",
-                    "RemoteObject"
-                ]
+                "async": ["evaluate", "awaitPromise", "callFunctionOn", "runScript"],
+                "exported": ["StackTrace", "StackTraceId", "RemoteObject", "ExecutionContextId"]
             },
             {
                 "domain": "Debugger",
-                "async": [
-                    "scheduleStepIntoAsync"
-                ],
-                "exported": [
-                    "SearchMatch",
-                    "paused.reason"
-                ]
+                "async": [ "scheduleStepIntoAsync" ],
+                "exported": ["SearchMatch", "paused.reason"]
             },
             {
                 "domain": "Console"
@@ -45,8 +27,8 @@
             },
             {
                 "domain": "HeapProfiler"
-            },
-            {
+            }
+            ,{
                 "domain": "GenericTypes"
             },
             {
@@ -60,9 +42,16 @@
             },
             {
                 "domain": "CSS"
+            },
+            {
+                "domain": "Overlay"
+            },
+            {
+                "domain": "Log"
             }
         ]
     },
+
     "exported": {
         "package": "include/inspector",
         "output": "../../include/inspector",
@@ -72,6 +61,7 @@
         "to_string_out": "StringBufferImpl::adopt(%s)",
         "export_macro": "V8_EXPORT"
     },
+
     "lib": {
         "package": "src/inspector/protocol",
         "output": "protocol",

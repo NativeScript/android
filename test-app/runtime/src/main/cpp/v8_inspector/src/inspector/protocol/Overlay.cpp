@@ -16,9 +16,10 @@ namespace Overlay {
 
 const char Metainfo::domainName[] = "Overlay";
 const char Metainfo::commandPrefix[] = "Overlay.";
-const char Metainfo::version[] = "1.2";
+const char Metainfo::version[] = "1.3";
 
-std::unique_ptr<HighlightConfig> HighlightConfig::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<HighlightConfig> HighlightConfig::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -93,62 +94,51 @@ std::unique_ptr<HighlightConfig> HighlightConfig::fromValue(protocol::Value* val
         result->m_cssGridColor = ValueConversions<protocol::DOM::RGBAColor>::fromValue(cssGridColorValue, errors);
     }
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> HighlightConfig::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> HighlightConfig::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (m_showInfo.isJust()) {
+    if (m_showInfo.isJust())
         result->setValue("showInfo", ValueConversions<bool>::toValue(m_showInfo.fromJust()));
-    }
-    if (m_showRulers.isJust()) {
+    if (m_showRulers.isJust())
         result->setValue("showRulers", ValueConversions<bool>::toValue(m_showRulers.fromJust()));
-    }
-    if (m_showExtensionLines.isJust()) {
+    if (m_showExtensionLines.isJust())
         result->setValue("showExtensionLines", ValueConversions<bool>::toValue(m_showExtensionLines.fromJust()));
-    }
-    if (m_displayAsMaterial.isJust()) {
+    if (m_displayAsMaterial.isJust())
         result->setValue("displayAsMaterial", ValueConversions<bool>::toValue(m_displayAsMaterial.fromJust()));
-    }
-    if (m_contentColor.isJust()) {
+    if (m_contentColor.isJust())
         result->setValue("contentColor", ValueConversions<protocol::DOM::RGBAColor>::toValue(m_contentColor.fromJust()));
-    }
-    if (m_paddingColor.isJust()) {
+    if (m_paddingColor.isJust())
         result->setValue("paddingColor", ValueConversions<protocol::DOM::RGBAColor>::toValue(m_paddingColor.fromJust()));
-    }
-    if (m_borderColor.isJust()) {
+    if (m_borderColor.isJust())
         result->setValue("borderColor", ValueConversions<protocol::DOM::RGBAColor>::toValue(m_borderColor.fromJust()));
-    }
-    if (m_marginColor.isJust()) {
+    if (m_marginColor.isJust())
         result->setValue("marginColor", ValueConversions<protocol::DOM::RGBAColor>::toValue(m_marginColor.fromJust()));
-    }
-    if (m_eventTargetColor.isJust()) {
+    if (m_eventTargetColor.isJust())
         result->setValue("eventTargetColor", ValueConversions<protocol::DOM::RGBAColor>::toValue(m_eventTargetColor.fromJust()));
-    }
-    if (m_shapeColor.isJust()) {
+    if (m_shapeColor.isJust())
         result->setValue("shapeColor", ValueConversions<protocol::DOM::RGBAColor>::toValue(m_shapeColor.fromJust()));
-    }
-    if (m_shapeMarginColor.isJust()) {
+    if (m_shapeMarginColor.isJust())
         result->setValue("shapeMarginColor", ValueConversions<protocol::DOM::RGBAColor>::toValue(m_shapeMarginColor.fromJust()));
-    }
-    if (m_selectorList.isJust()) {
+    if (m_selectorList.isJust())
         result->setValue("selectorList", ValueConversions<String>::toValue(m_selectorList.fromJust()));
-    }
-    if (m_cssGridColor.isJust()) {
+    if (m_cssGridColor.isJust())
         result->setValue("cssGridColor", ValueConversions<protocol::DOM::RGBAColor>::toValue(m_cssGridColor.fromJust()));
-    }
     return result;
 }
 
-std::unique_ptr<HighlightConfig> HighlightConfig::clone() const {
+std::unique_ptr<HighlightConfig> HighlightConfig::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<ScreenshotRequestedNotification> ScreenshotRequestedNotification::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<ScreenshotRequestedNotification> ScreenshotRequestedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -161,19 +151,20 @@ std::unique_ptr<ScreenshotRequestedNotification> ScreenshotRequestedNotification
     errors->setName("viewport");
     result->m_viewport = ValueConversions<protocol::Page::Viewport>::fromValue(viewportValue, errors);
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> ScreenshotRequestedNotification::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> ScreenshotRequestedNotification::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("viewport", ValueConversions<protocol::Page::Viewport>::toValue(m_viewport.get()));
     return result;
 }
 
-std::unique_ptr<ScreenshotRequestedNotification> ScreenshotRequestedNotification::clone() const {
+std::unique_ptr<ScreenshotRequestedNotification> ScreenshotRequestedNotification::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
@@ -183,68 +174,72 @@ std::unique_ptr<ScreenshotRequestedNotification> ScreenshotRequestedNotification
 
 // ------------- Frontend notifications.
 
-void Frontend::screenshotRequested(std::unique_ptr<protocol::Page::Viewport> viewport) {
-    if (!m_frontendChannel) {
+void Frontend::screenshotRequested(std::unique_ptr<protocol::Page::Viewport> viewport)
+{
+    if (!m_frontendChannel)
         return;
-    }
     std::unique_ptr<ScreenshotRequestedNotification> messageData = ScreenshotRequestedNotification::create()
-            .setViewport(std::move(viewport))
-            .build();
+        .setViewport(std::move(viewport))
+        .build();
     m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Overlay.screenshotRequested", std::move(messageData)));
 }
 
-void Frontend::flush() {
+void Frontend::flush()
+{
     m_frontendChannel->flushProtocolNotifications();
 }
 
-void Frontend::sendRawNotification(const String& notification) {
+void Frontend::sendRawNotification(const String& notification)
+{
     m_frontendChannel->sendProtocolNotification(InternalRawNotification::create(notification));
 }
 
 // --------------------- Dispatcher.
 
 class DispatcherImpl : public protocol::DispatcherBase {
-    public:
-        DispatcherImpl(FrontendChannel* frontendChannel, Backend* backend, bool fallThroughForNotFound)
-            : DispatcherBase(frontendChannel)
-            , m_backend(backend)
-            , m_fallThroughForNotFound(fallThroughForNotFound) {
-            m_dispatchMap["Overlay.enable"] = &DispatcherImpl::enable;
-            m_dispatchMap["Overlay.disable"] = &DispatcherImpl::disable;
-            m_dispatchMap["Overlay.setShowFPSCounter"] = &DispatcherImpl::setShowFPSCounter;
-            m_dispatchMap["Overlay.setPausedInDebuggerMessage"] = &DispatcherImpl::setPausedInDebuggerMessage;
-            m_dispatchMap["Overlay.highlightNode"] = &DispatcherImpl::highlightNode;
-            m_dispatchMap["Overlay.highlightFrame"] = &DispatcherImpl::highlightFrame;
-            m_dispatchMap["Overlay.hideHighlight"] = &DispatcherImpl::hideHighlight;
-            m_dispatchMap["Overlay.getHighlightObjectForTest"] = &DispatcherImpl::getHighlightObjectForTest;
-        }
-        ~DispatcherImpl() override { }
-        DispatchResponse::Status dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) override;
+public:
+    DispatcherImpl(FrontendChannel* frontendChannel, Backend* backend, bool fallThroughForNotFound)
+        : DispatcherBase(frontendChannel)
+        , m_backend(backend)
+        , m_fallThroughForNotFound(fallThroughForNotFound) {
+        m_dispatchMap["Overlay.enable"] = &DispatcherImpl::enable;
+        m_dispatchMap["Overlay.disable"] = &DispatcherImpl::disable;
+        m_dispatchMap["Overlay.setShowFPSCounter"] = &DispatcherImpl::setShowFPSCounter;
+        m_dispatchMap["Overlay.setPausedInDebuggerMessage"] = &DispatcherImpl::setPausedInDebuggerMessage;
+        m_dispatchMap["Overlay.highlightNode"] = &DispatcherImpl::highlightNode;
+        m_dispatchMap["Overlay.highlightFrame"] = &DispatcherImpl::highlightFrame;
+        m_dispatchMap["Overlay.hideHighlight"] = &DispatcherImpl::hideHighlight;
+        m_dispatchMap["Overlay.getHighlightObjectForTest"] = &DispatcherImpl::getHighlightObjectForTest;
+    }
+    ~DispatcherImpl() override { }
+    DispatchResponse::Status dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) override;
+    HashMap<String, String>& redirects() { return m_redirects; }
 
-    protected:
-        using CallHandler = DispatchResponse::Status (DispatcherImpl::*)(int callId, std::unique_ptr<DictionaryValue> messageObject, ErrorSupport* errors);
-        using DispatchMap = protocol::HashMap<String, CallHandler>;
-        DispatchMap m_dispatchMap;
+protected:
+    using CallHandler = DispatchResponse::Status (DispatcherImpl::*)(int callId, std::unique_ptr<DictionaryValue> messageObject, ErrorSupport* errors);
+    using DispatchMap = protocol::HashMap<String, CallHandler>;
+    DispatchMap m_dispatchMap;
+    HashMap<String, String> m_redirects;
 
-        DispatchResponse::Status enable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status disable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status setShowFPSCounter(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status setPausedInDebuggerMessage(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status highlightNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status highlightFrame(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status hideHighlight(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status getHighlightObjectForTest(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    DispatchResponse::Status enable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    DispatchResponse::Status disable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    DispatchResponse::Status setShowFPSCounter(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    DispatchResponse::Status setPausedInDebuggerMessage(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    DispatchResponse::Status highlightNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    DispatchResponse::Status highlightFrame(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    DispatchResponse::Status hideHighlight(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    DispatchResponse::Status getHighlightObjectForTest(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
 
-        Backend* m_backend;
-        bool m_fallThroughForNotFound;
+    Backend* m_backend;
+    bool m_fallThroughForNotFound;
 };
 
-DispatchResponse::Status DispatcherImpl::dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) {
+DispatchResponse::Status DispatcherImpl::dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject)
+{
     protocol::HashMap<String, CallHandler>::iterator it = m_dispatchMap.find(method);
     if (it == m_dispatchMap.end()) {
-        if (m_fallThroughForNotFound) {
+        if (m_fallThroughForNotFound)
             return DispatchResponse::kFallThrough;
-        }
         reportProtocolError(callId, DispatchResponse::kMethodNotFound, "'" + method + "' wasn't found", nullptr);
         return DispatchResponse::kError;
     }
@@ -254,27 +249,32 @@ DispatchResponse::Status DispatcherImpl::dispatch(int callId, const String& meth
 }
 
 
-DispatchResponse::Status DispatcherImpl::enable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+DispatchResponse::Status DispatcherImpl::enable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->enable();
-    if (weak->get()) {
+    if (response.status() == DispatchResponse::kFallThrough)
+        return response.status();
+    if (weak->get())
         weak->get()->sendResponse(callId, response);
-    }
     return response.status();
 }
 
-DispatchResponse::Status DispatcherImpl::disable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+DispatchResponse::Status DispatcherImpl::disable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->disable();
-    if (weak->get()) {
+    if (response.status() == DispatchResponse::kFallThrough)
+        return response.status();
+    if (weak->get())
         weak->get()->sendResponse(callId, response);
-    }
     return response.status();
 }
 
-DispatchResponse::Status DispatcherImpl::setShowFPSCounter(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+DispatchResponse::Status DispatcherImpl::setShowFPSCounter(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -289,13 +289,15 @@ DispatchResponse::Status DispatcherImpl::setShowFPSCounter(int callId, std::uniq
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setShowFPSCounter(in_show);
-    if (weak->get()) {
+    if (response.status() == DispatchResponse::kFallThrough)
+        return response.status();
+    if (weak->get())
         weak->get()->sendResponse(callId, response);
-    }
     return response.status();
 }
 
-DispatchResponse::Status DispatcherImpl::setPausedInDebuggerMessage(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+DispatchResponse::Status DispatcherImpl::setPausedInDebuggerMessage(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -313,13 +315,15 @@ DispatchResponse::Status DispatcherImpl::setPausedInDebuggerMessage(int callId, 
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setPausedInDebuggerMessage(std::move(in_message));
-    if (weak->get()) {
+    if (response.status() == DispatchResponse::kFallThrough)
+        return response.status();
+    if (weak->get())
         weak->get()->sendResponse(callId, response);
-    }
     return response.status();
 }
 
-DispatchResponse::Status DispatcherImpl::highlightNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+DispatchResponse::Status DispatcherImpl::highlightNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -352,13 +356,15 @@ DispatchResponse::Status DispatcherImpl::highlightNode(int callId, std::unique_p
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->highlightNode(std::move(in_highlightConfig), std::move(in_nodeId), std::move(in_backendNodeId), std::move(in_objectId));
-    if (weak->get()) {
+    if (response.status() == DispatchResponse::kFallThrough)
+        return response.status();
+    if (weak->get())
         weak->get()->sendResponse(callId, response);
-    }
     return response.status();
 }
 
-DispatchResponse::Status DispatcherImpl::highlightFrame(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+DispatchResponse::Status DispatcherImpl::highlightFrame(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -385,23 +391,27 @@ DispatchResponse::Status DispatcherImpl::highlightFrame(int callId, std::unique_
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->highlightFrame(in_frameId, std::move(in_contentColor), std::move(in_contentOutlineColor));
-    if (weak->get()) {
+    if (response.status() == DispatchResponse::kFallThrough)
+        return response.status();
+    if (weak->get())
         weak->get()->sendResponse(callId, response);
-    }
     return response.status();
 }
 
-DispatchResponse::Status DispatcherImpl::hideHighlight(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+DispatchResponse::Status DispatcherImpl::hideHighlight(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->hideHighlight();
-    if (weak->get()) {
+    if (response.status() == DispatchResponse::kFallThrough)
+        return response.status();
+    if (weak->get())
         weak->get()->sendResponse(callId, response);
-    }
     return response.status();
 }
 
-DispatchResponse::Status DispatcherImpl::getHighlightObjectForTest(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+DispatchResponse::Status DispatcherImpl::getHighlightObjectForTest(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -418,22 +428,23 @@ DispatchResponse::Status DispatcherImpl::getHighlightObjectForTest(int callId, s
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getHighlightObjectForTest(in_nodeId, &out_highlight);
-    if (response.status() == DispatchResponse::kFallThrough) {
+    if (response.status() == DispatchResponse::kFallThrough)
         return response.status();
-    }
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     if (response.status() == DispatchResponse::kSuccess) {
         result->setValue("highlight", ValueConversions<protocol::DictionaryValue>::toValue(out_highlight.get()));
     }
-    if (weak->get()) {
+    if (weak->get())
         weak->get()->sendResponse(callId, response, std::move(result));
-    }
     return response.status();
 }
 
 // static
-void Dispatcher::wire(UberDispatcher* dispatcher, Backend* backend) {
-    dispatcher->registerBackend("Overlay", std::unique_ptr<protocol::DispatcherBase>(new DispatcherImpl(dispatcher->channel(), backend, dispatcher->fallThroughForNotFound())));
+void Dispatcher::wire(UberDispatcher* uber, Backend* backend)
+{
+    std::unique_ptr<DispatcherImpl> dispatcher(new DispatcherImpl(uber->channel(), backend, uber->fallThroughForNotFound()));
+    uber->setupRedirects(dispatcher->redirects());
+    uber->registerBackend("Overlay", std::move(dispatcher));
 }
 
 } // Overlay

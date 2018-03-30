@@ -73,17 +73,17 @@ namespace v8_inspector {
 namespace protocol {
 
 class  Serializable {
-    public:
-        virtual String serialize() = 0;
-        virtual ~Serializable() = default;
+public:
+    virtual String serialize() = 0;
+    virtual ~Serializable() = default;
 };
 
 class  FrontendChannel {
-    public:
-        virtual ~FrontendChannel() { }
-        virtual void sendProtocolResponse(int callId, std::unique_ptr<Serializable> message) = 0;
-        virtual void sendProtocolNotification(std::unique_ptr<Serializable> message) = 0;
-        virtual void flushProtocolNotifications() = 0;
+public:
+    virtual ~FrontendChannel() { }
+    virtual void sendProtocolResponse(int callId, std::unique_ptr<Serializable> message) = 0;
+    virtual void sendProtocolNotification(std::unique_ptr<Serializable> message) = 0;
+    virtual void flushProtocolNotifications() = 0;
 };
 
 } // namespace v8_inspector

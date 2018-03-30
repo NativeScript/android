@@ -160,6 +160,20 @@ class ActualScript : public V8DebuggerScript {
     m_sourceMappingURL = sourceMappingURL;
   }
 
+  void setSource(const String16& newSource, bool preview,
+                 bool* stackChanged) override {
+    DCHECK(!isModule());
+    v8::HandleScope scope(m_isolate);
+    v8::Local<v8::String> v8Source = toV8String(m_isolate, newSource);
+    if (!m_script.Get(m_isolate)->SetScriptSource(v8Source, preview,
+                                                  stackChanged)) {
+      return;
+    }
+    if (preview) return;
+    m_source = newSource;
+    m_hash = String16();
+  }
+
   bool getPossibleBreakpoints(
       const v8::debug::Location& start, const v8::debug::Location& end,
       bool restrictToFunction,
@@ -215,12 +229,23 @@ class ActualScript : public V8DebuggerScript {
     return m_script.Get(m_isolate)->GetSourceLocation(offset);
   }
 
+  bool setBreakpoint(const String16& condition, v8::debug::Location* location,
+                     int* id) const override {
+    v8::HandleScope scope(m_isolate);
+    return script()->SetBreakpoint(toV8String(m_isolate, condition), location,
+                                   id);
+  }
+
  private:
   String16 GetNameOrSourceUrl(v8::Local<v8::debug::Script> script) {
     v8::Local<v8::String> name;
     if (script->Name().ToLocal(&name) || script->SourceURL().ToLocal(&name))
       return toProtocolString(name);
     return String16();
+  }
+
+  v8::Local<v8::debug::Script> script() const override {
+    return m_script.Get(m_isolate);
   }
 
   String16 m_sourceMappingURL;
@@ -250,12 +275,14 @@ class WasmVirtualScript : public V8DebuggerScript {
     m_endLine = num_lines;
     m_endColumn = static_cast<int>(source.length()) - last_newline - 1;
     m_source = std::move(source);
+    m_executionContextId = script->ContextId().ToChecked();
   }
 
   const String16& sourceMappingURL() const override { return emptyString(); }
   bool isLiveEdit() const override { return false; }
   bool isModule() const override { return false; }
   void setSourceMappingURL(const String16&) override {}
+  void setSource(const String16&, bool, bool*) override { UNREACHABLE(); }
 
   bool getPossibleBreakpoints(
       const v8::debug::Location& start, const v8::debug::Location& end,
@@ -298,10 +325,30 @@ class WasmVirtualScript : public V8DebuggerScript {
     return v8::debug::Location();
   }
 
+  bool setBreakpoint(const String16& condition, v8::debug::Location* location,
+                     int* id) const override {
+    v8::HandleScope scope(m_isolate);
+    v8::Local<v8::debug::Script> script = m_script.Get(m_isolate);
+    String16 v8ScriptId = String16::fromInteger(script->Id());
+
+    TranslateProtocolLocationToV8Location(m_wasmTranslation, location,
+                                          scriptId(), v8ScriptId);
+    if (location->IsEmpty()) return false;
+    if (!script->SetBreakpoint(toV8String(m_isolate, condition), location, id))
+      return false;
+    TranslateV8LocationToProtocolLocation(m_wasmTranslation, location,
+                                          v8ScriptId, scriptId());
+    return true;
+  }
+
  private:
   static const String16& emptyString() {
     static const String16 singleEmptyString;
     return singleEmptyString;
+  }
+
+  v8::Local<v8::debug::Script> script() const override {
+    return m_script.Get(m_isolate);
   }
 
   v8::Global<v8::debug::WasmScript> m_script;
@@ -344,6 +391,12 @@ const String16& V8DebuggerScript::hash() const {
 
 void V8DebuggerScript::setSourceURL(const String16& sourceURL) {
   m_sourceURL = sourceURL;
+}
+
+bool V8DebuggerScript::setBreakpoint(const String16& condition,
+                                     v8::debug::Location* loc, int* id) const {
+  v8::HandleScope scope(m_isolate);
+  return script()->SetBreakpoint(toV8String(m_isolate, condition), loc, id);
 }
 
 }  // namespace v8_inspector

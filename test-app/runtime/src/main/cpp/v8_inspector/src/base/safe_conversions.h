@@ -19,8 +19,8 @@ namespace base {
 // for the destination type.
 template <typename Dst, typename Src>
 inline bool IsValueInRangeForNumericType(Src value) {
-    return internal::DstRangeRelationToSrcRange<Dst>(value) ==
-           internal::RANGE_VALID;
+  return internal::DstRangeRelationToSrcRange<Dst>(value) ==
+         internal::RANGE_VALID;
 }
 
 // checked_cast<> is analogous to static_cast<> for numeric types,
@@ -28,8 +28,8 @@ inline bool IsValueInRangeForNumericType(Src value) {
 // overflow or underflow. NaN source will always trigger a CHECK.
 template <typename Dst, typename Src>
 inline Dst checked_cast(Src value) {
-    CHECK(IsValueInRangeForNumericType<Dst>(value));
-    return static_cast<Dst>(value);
+  CHECK(IsValueInRangeForNumericType<Dst>(value));
+  return static_cast<Dst>(value);
 }
 
 // saturated_cast<> is analogous to static_cast<> for numeric types, except
@@ -37,29 +37,26 @@ inline Dst checked_cast(Src value) {
 // underflow. NaN assignment to an integral will trigger a CHECK condition.
 template <typename Dst, typename Src>
 inline Dst saturated_cast(Src value) {
-    // Optimization for floating point values, which already saturate.
-    if (std::numeric_limits<Dst>::is_iec559) {
-        return static_cast<Dst>(value);
-    }
+  // Optimization for floating point values, which already saturate.
+  if (std::numeric_limits<Dst>::is_iec559)
+    return static_cast<Dst>(value);
 
-    switch (internal::DstRangeRelationToSrcRange<Dst>(value)) {
+  switch (internal::DstRangeRelationToSrcRange<Dst>(value)) {
     case internal::RANGE_VALID:
-        return static_cast<Dst>(value);
+      return static_cast<Dst>(value);
 
     case internal::RANGE_UNDERFLOW:
-        return std::numeric_limits<Dst>::min();
+      return std::numeric_limits<Dst>::min();
 
     case internal::RANGE_OVERFLOW:
-        return std::numeric_limits<Dst>::max();
+      return std::numeric_limits<Dst>::max();
 
     // Should fail only on attempting to assign NaN to a saturated integer.
     case internal::RANGE_INVALID:
-        CHECK(false);
-        return std::numeric_limits<Dst>::max();
-    }
+      UNREACHABLE();
+  }
 
-    UNREACHABLE();
-    return static_cast<Dst>(value);
+  UNREACHABLE();
 }
 
 }  // namespace base

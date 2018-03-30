@@ -15,42 +15,34 @@ namespace base {
 // (e.g. implementers of sets, where the key is the value).
 template <typename Key, typename Value>
 struct TemplateHashMapEntry {
-        Key key;
-        Value value;
-        uint32_t hash;  // The full hash value for key
+  Key key;
+  Value value;
+  uint32_t hash;  // The full hash value for key
 
-        TemplateHashMapEntry(Key key, Value value, uint32_t hash)
-            : key(key), value(value), hash(hash), exists_(true) {}
+  TemplateHashMapEntry(Key key, Value value, uint32_t hash)
+      : key(key), value(value), hash(hash), exists_(true) {}
 
-        bool exists() const {
-            return exists_;
-        }
+  bool exists() const { return exists_; }
 
-        void clear() {
-            exists_ = false;
-        }
+  void clear() { exists_ = false; }
 
-    private:
-        bool exists_;
+ private:
+  bool exists_;
 };
 
 // Specialization for pointer-valued keys
 template <typename Key, typename Value>
 struct TemplateHashMapEntry<Key*, Value> {
-    Key* key;
-    Value value;
-    uint32_t hash;  // The full hash value for key
+  Key* key;
+  Value value;
+  uint32_t hash;  // The full hash value for key
 
-    TemplateHashMapEntry(Key* key, Value value, uint32_t hash)
-        : key(key), value(value), hash(hash) {}
+  TemplateHashMapEntry(Key* key, Value value, uint32_t hash)
+      : key(key), value(value), hash(hash) {}
 
-    bool exists() const {
-        return key != nullptr;
-    }
+  bool exists() const { return key != nullptr; }
 
-    void clear() {
-        key = nullptr;
-    }
+  void clear() { key = nullptr; }
 };
 
 // TODO(leszeks): There could be a specialisation for void values (e.g. for

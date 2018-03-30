@@ -76,7 +76,7 @@ DispatchResponse V8DOMAgentImpl::getDocument(std::unique_ptr<protocol::DOM::Node
         if (!getDocument.IsEmpty() && getDocument->IsFunction()) {
             auto getDocumentFunc = getDocument.As<v8::Function>();
             v8::Local<v8::Value> args[] = {  };
-            v8::TryCatch tc;
+            v8::TryCatch tc(isolate);
 
             auto maybeResult = getDocumentFunc->Call(context, global, 0, args);
 
@@ -135,7 +135,7 @@ DispatchResponse V8DOMAgentImpl::removeNode(int in_nodeId) {
         if (!removeNode.IsEmpty() && removeNode->IsFunction()) {
             auto removeNodeFunc = removeNode.As<v8::Function>();
             v8::Local<v8::Value> args[] = { v8::Number::New(isolate, in_nodeId) };
-            v8::TryCatch tc;
+            v8::TryCatch tc(isolate);
 
             removeNodeFunc->Call(context, global, 1, args);
 
@@ -176,7 +176,7 @@ DispatchResponse V8DOMAgentImpl::setAttributesAsText(int in_nodeId, const String
                 v8_inspector::toV8String(isolate, in_text),
                 v8_inspector::toV8String(isolate, in_name.fromJust())
             };
-            v8::TryCatch tc;
+            v8::TryCatch tc(isolate);
 
             setAttributeAsTextFunc->Call(context, global, 3, args);
 

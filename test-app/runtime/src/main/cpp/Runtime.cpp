@@ -184,7 +184,7 @@ jobject Runtime::RunScript(JNIEnv* _env, jobject obj, jstring scriptFile) {
     auto src = File::ReadText(filename);
     auto source = ArgConverter::ConvertToV8String(isolate, src);
 
-    TryCatch tc;
+    TryCatch tc(isolate);
 
     Local<Script> script;
     ScriptOrigin origin(ArgConverter::ConvertToV8String(isolate, filename));
@@ -466,7 +466,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
         }
     }
 
-    create_params.snapshot_blob = m_startupData;
+    //create_params.snapshot_blob = m_startupData;
 
     /*
      * Setup the V8Platform only once per process - once for the application lifetime
@@ -487,7 +487,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     isolate->SetData((uint32_t)Runtime::IsolateData::CONSTANTS, consts);
 
     V8::SetFlagsFromString(Constants::V8_STARTUP_FLAGS.c_str(), Constants::V8_STARTUP_FLAGS.size());
-    V8::SetCaptureStackTraceForUncaughtExceptions(true, 100, StackTrace::kOverview);
+    isolate->SetCaptureStackTraceForUncaughtExceptions(true, 100, StackTrace::kOverview);
 
     isolate->AddMessageListener(NativeScriptException::OnUncaughtError);
 
@@ -564,19 +564,19 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
         m_gcFunc = new Persistent<Function>(isolate, gcFunc.As<Function>());
     }
 
-    global->ForceSet(ArgConverter::ConvertToV8String(isolate, "global"), global, readOnlyFlags);
-    global->ForceSet(ArgConverter::ConvertToV8String(isolate, "__global"), global, readOnlyFlags);
+    global->DefineOwnProperty(context, ArgConverter::ConvertToV8String(isolate, "global"), global, readOnlyFlags);
+    global->DefineOwnProperty(context, ArgConverter::ConvertToV8String(isolate, "__global"), global, readOnlyFlags);
 
     // Do not set 'self' accessor to main thread JavaScript
     if (s_mainThreadInitialized) {
-        global->ForceSet(ArgConverter::ConvertToV8String(isolate, "self"), global, readOnlyFlags);
+        global->DefineOwnProperty(context, ArgConverter::ConvertToV8String(isolate, "self"), global, readOnlyFlags);
     }
 
     /*
      * Attach 'console' object to the global object
      */
     v8::Local<v8::Object> console = Console::createConsole(context, filesPath);
-    global->ForceSet(context, ArgConverter::ConvertToV8String(isolate, "console"), console, readOnlyFlags);
+    global->DefineOwnProperty(context, ArgConverter::ConvertToV8String(isolate, "console"), console, readOnlyFlags);
 
     ArgConverter::Init(isolate);
 

@@ -16,7 +16,7 @@ namespace DOM {
 
 const char Metainfo::domainName[] = "DOM";
 const char Metainfo::commandPrefix[] = "DOM.";
-const char Metainfo::version[] = "1.2";
+const char Metainfo::version[] = "1.3";
 
 namespace PseudoTypeEnum {
 const char* Before = "before";
@@ -29,13 +29,8 @@ const char* Open = "open";
 const char* Closed = "closed";
 } // namespace ShadowRootTypeEnum
 
-namespace LiveRegionRelevantEnum {
-const char* Additions = "additions";
-const char* Removals = "removals";
-const char* Text = "text";
-} // namespace LiveRegionRelevantEnum
-
-std::unique_ptr<Node> Node::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<Node> Node::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -155,85 +150,68 @@ std::unique_ptr<Node> Node::fromValue(protocol::Value* value, ErrorSupport* erro
         result->m_contentSecurityPolicyHash = ValueConversions<String>::fromValue(contentSecurityPolicyHashValue, errors);
     }
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> Node::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> Node::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("nodeId", ValueConversions<int>::toValue(m_nodeId));
     result->setValue("nodeType", ValueConversions<int>::toValue(m_nodeType));
     result->setValue("nodeName", ValueConversions<String>::toValue(m_nodeName));
     result->setValue("localName", ValueConversions<String>::toValue(m_localName));
     result->setValue("nodeValue", ValueConversions<String>::toValue(m_nodeValue));
-    if (m_childNodeCount.isJust()) {
+    if (m_childNodeCount.isJust())
         result->setValue("childNodeCount", ValueConversions<int>::toValue(m_childNodeCount.fromJust()));
-    }
-    if (m_children.isJust()) {
+    if (m_children.isJust())
         result->setValue("children", ValueConversions<protocol::Array<protocol::DOM::Node>>::toValue(m_children.fromJust()));
-    }
-    if (m_attributes.isJust()) {
+    if (m_attributes.isJust())
         result->setValue("attributes", ValueConversions<protocol::Array<String>>::toValue(m_attributes.fromJust()));
-    }
-    if (m_documentURL.isJust()) {
+    if (m_documentURL.isJust())
         result->setValue("documentURL", ValueConversions<String>::toValue(m_documentURL.fromJust()));
-    }
-    if (m_baseURL.isJust()) {
+    if (m_baseURL.isJust())
         result->setValue("baseURL", ValueConversions<String>::toValue(m_baseURL.fromJust()));
-    }
-    if (m_publicId.isJust()) {
+    if (m_publicId.isJust())
         result->setValue("publicId", ValueConversions<String>::toValue(m_publicId.fromJust()));
-    }
-    if (m_systemId.isJust()) {
+    if (m_systemId.isJust())
         result->setValue("systemId", ValueConversions<String>::toValue(m_systemId.fromJust()));
-    }
-    if (m_xmlVersion.isJust()) {
+    if (m_xmlVersion.isJust())
         result->setValue("xmlVersion", ValueConversions<String>::toValue(m_xmlVersion.fromJust()));
-    }
-    if (m_name.isJust()) {
+    if (m_name.isJust())
         result->setValue("name", ValueConversions<String>::toValue(m_name.fromJust()));
-    }
-    if (m_value.isJust()) {
+    if (m_value.isJust())
         result->setValue("value", ValueConversions<String>::toValue(m_value.fromJust()));
-    }
-    if (m_pseudoType.isJust()) {
+    if (m_pseudoType.isJust())
         result->setValue("pseudoType", ValueConversions<String>::toValue(m_pseudoType.fromJust()));
-    }
-    if (m_shadowRootType.isJust()) {
+    if (m_shadowRootType.isJust())
         result->setValue("shadowRootType", ValueConversions<String>::toValue(m_shadowRootType.fromJust()));
-    }
-    if (m_frameId.isJust()) {
+    if (m_frameId.isJust())
         result->setValue("frameId", ValueConversions<String>::toValue(m_frameId.fromJust()));
-    }
-    if (m_contentDocument.isJust()) {
+    if (m_contentDocument.isJust())
         result->setValue("contentDocument", ValueConversions<protocol::DOM::Node>::toValue(m_contentDocument.fromJust()));
-    }
-    if (m_shadowRoots.isJust()) {
+    if (m_shadowRoots.isJust())
         result->setValue("shadowRoots", ValueConversions<protocol::Array<protocol::DOM::Node>>::toValue(m_shadowRoots.fromJust()));
-    }
-    if (m_templateContent.isJust()) {
+    if (m_templateContent.isJust())
         result->setValue("templateContent", ValueConversions<protocol::DOM::Node>::toValue(m_templateContent.fromJust()));
-    }
-    if (m_pseudoElements.isJust()) {
+    if (m_pseudoElements.isJust())
         result->setValue("pseudoElements", ValueConversions<protocol::Array<protocol::DOM::Node>>::toValue(m_pseudoElements.fromJust()));
-    }
-    if (m_role.isJust()) {
+    if (m_role.isJust())
         result->setValue("role", ValueConversions<String>::toValue(m_role.fromJust()));
-    }
-    if (m_contentSecurityPolicyHash.isJust()) {
+    if (m_contentSecurityPolicyHash.isJust())
         result->setValue("contentSecurityPolicyHash", ValueConversions<String>::toValue(m_contentSecurityPolicyHash.fromJust()));
-    }
     return result;
 }
 
-std::unique_ptr<Node> Node::clone() const {
+std::unique_ptr<Node> Node::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<RGBAColor> RGBAColor::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<RGBAColor> RGBAColor::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -257,29 +235,30 @@ std::unique_ptr<RGBAColor> RGBAColor::fromValue(protocol::Value* value, ErrorSup
         result->m_a = ValueConversions<double>::fromValue(aValue, errors);
     }
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> RGBAColor::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> RGBAColor::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("r", ValueConversions<int>::toValue(m_r));
     result->setValue("g", ValueConversions<int>::toValue(m_g));
     result->setValue("b", ValueConversions<int>::toValue(m_b));
-    if (m_a.isJust()) {
+    if (m_a.isJust())
         result->setValue("a", ValueConversions<double>::toValue(m_a.fromJust()));
-    }
     return result;
 }
 
-std::unique_ptr<RGBAColor> RGBAColor::clone() const {
+std::unique_ptr<RGBAColor> RGBAColor::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<HighlightConfig> HighlightConfig::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<HighlightConfig> HighlightConfig::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -314,38 +293,35 @@ std::unique_ptr<HighlightConfig> HighlightConfig::fromValue(protocol::Value* val
         result->m_marginColor = ValueConversions<protocol::DOM::RGBAColor>::fromValue(marginColorValue, errors);
     }
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> HighlightConfig::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> HighlightConfig::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (m_showInfo.isJust()) {
+    if (m_showInfo.isJust())
         result->setValue("showInfo", ValueConversions<bool>::toValue(m_showInfo.fromJust()));
-    }
-    if (m_contentColor.isJust()) {
+    if (m_contentColor.isJust())
         result->setValue("contentColor", ValueConversions<protocol::DOM::RGBAColor>::toValue(m_contentColor.fromJust()));
-    }
-    if (m_paddingColor.isJust()) {
+    if (m_paddingColor.isJust())
         result->setValue("paddingColor", ValueConversions<protocol::DOM::RGBAColor>::toValue(m_paddingColor.fromJust()));
-    }
-    if (m_borderColor.isJust()) {
+    if (m_borderColor.isJust())
         result->setValue("borderColor", ValueConversions<protocol::DOM::RGBAColor>::toValue(m_borderColor.fromJust()));
-    }
-    if (m_marginColor.isJust()) {
+    if (m_marginColor.isJust())
         result->setValue("marginColor", ValueConversions<protocol::DOM::RGBAColor>::toValue(m_marginColor.fromJust()));
-    }
     return result;
 }
 
-std::unique_ptr<HighlightConfig> HighlightConfig::clone() const {
+std::unique_ptr<HighlightConfig> HighlightConfig::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<SetChildNodesNotification> SetChildNodesNotification::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<SetChildNodesNotification> SetChildNodesNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -361,25 +337,27 @@ std::unique_ptr<SetChildNodesNotification> SetChildNodesNotification::fromValue(
     errors->setName("nodes");
     result->m_nodes = ValueConversions<protocol::Array<protocol::DOM::Node>>::fromValue(nodesValue, errors);
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> SetChildNodesNotification::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> SetChildNodesNotification::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("parentId", ValueConversions<int>::toValue(m_parentId));
     result->setValue("nodes", ValueConversions<protocol::Array<protocol::DOM::Node>>::toValue(m_nodes.get()));
     return result;
 }
 
-std::unique_ptr<SetChildNodesNotification> SetChildNodesNotification::clone() const {
+std::unique_ptr<SetChildNodesNotification> SetChildNodesNotification::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<AttributeModifiedNotification> AttributeModifiedNotification::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<AttributeModifiedNotification> AttributeModifiedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -398,13 +376,13 @@ std::unique_ptr<AttributeModifiedNotification> AttributeModifiedNotification::fr
     errors->setName("value");
     result->m_value = ValueConversions<String>::fromValue(valueValue, errors);
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> AttributeModifiedNotification::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> AttributeModifiedNotification::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("nodeId", ValueConversions<int>::toValue(m_nodeId));
     result->setValue("name", ValueConversions<String>::toValue(m_name));
@@ -412,12 +390,14 @@ std::unique_ptr<protocol::DictionaryValue> AttributeModifiedNotification::toValu
     return result;
 }
 
-std::unique_ptr<AttributeModifiedNotification> AttributeModifiedNotification::clone() const {
+std::unique_ptr<AttributeModifiedNotification> AttributeModifiedNotification::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<AttributeRemovedNotification> AttributeRemovedNotification::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<AttributeRemovedNotification> AttributeRemovedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -433,25 +413,27 @@ std::unique_ptr<AttributeRemovedNotification> AttributeRemovedNotification::from
     errors->setName("name");
     result->m_name = ValueConversions<String>::fromValue(nameValue, errors);
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> AttributeRemovedNotification::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> AttributeRemovedNotification::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("nodeId", ValueConversions<int>::toValue(m_nodeId));
     result->setValue("name", ValueConversions<String>::toValue(m_name));
     return result;
 }
 
-std::unique_ptr<AttributeRemovedNotification> AttributeRemovedNotification::clone() const {
+std::unique_ptr<AttributeRemovedNotification> AttributeRemovedNotification::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<InlineStyleInvalidatedNotification> InlineStyleInvalidatedNotification::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<InlineStyleInvalidatedNotification> InlineStyleInvalidatedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -464,24 +446,26 @@ std::unique_ptr<InlineStyleInvalidatedNotification> InlineStyleInvalidatedNotifi
     errors->setName("nodeIds");
     result->m_nodeIds = ValueConversions<protocol::Array<int>>::fromValue(nodeIdsValue, errors);
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> InlineStyleInvalidatedNotification::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> InlineStyleInvalidatedNotification::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("nodeIds", ValueConversions<protocol::Array<int>>::toValue(m_nodeIds.get()));
     return result;
 }
 
-std::unique_ptr<InlineStyleInvalidatedNotification> InlineStyleInvalidatedNotification::clone() const {
+std::unique_ptr<InlineStyleInvalidatedNotification> InlineStyleInvalidatedNotification::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<CharacterDataModifiedNotification> CharacterDataModifiedNotification::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<CharacterDataModifiedNotification> CharacterDataModifiedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -497,25 +481,27 @@ std::unique_ptr<CharacterDataModifiedNotification> CharacterDataModifiedNotifica
     errors->setName("characterData");
     result->m_characterData = ValueConversions<String>::fromValue(characterDataValue, errors);
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> CharacterDataModifiedNotification::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> CharacterDataModifiedNotification::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("nodeId", ValueConversions<int>::toValue(m_nodeId));
     result->setValue("characterData", ValueConversions<String>::toValue(m_characterData));
     return result;
 }
 
-std::unique_ptr<CharacterDataModifiedNotification> CharacterDataModifiedNotification::clone() const {
+std::unique_ptr<CharacterDataModifiedNotification> CharacterDataModifiedNotification::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<ChildNodeCountUpdatedNotification> ChildNodeCountUpdatedNotification::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<ChildNodeCountUpdatedNotification> ChildNodeCountUpdatedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -531,25 +517,27 @@ std::unique_ptr<ChildNodeCountUpdatedNotification> ChildNodeCountUpdatedNotifica
     errors->setName("childNodeCount");
     result->m_childNodeCount = ValueConversions<int>::fromValue(childNodeCountValue, errors);
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> ChildNodeCountUpdatedNotification::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> ChildNodeCountUpdatedNotification::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("nodeId", ValueConversions<int>::toValue(m_nodeId));
     result->setValue("childNodeCount", ValueConversions<int>::toValue(m_childNodeCount));
     return result;
 }
 
-std::unique_ptr<ChildNodeCountUpdatedNotification> ChildNodeCountUpdatedNotification::clone() const {
+std::unique_ptr<ChildNodeCountUpdatedNotification> ChildNodeCountUpdatedNotification::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<ChildNodeInsertedNotification> ChildNodeInsertedNotification::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<ChildNodeInsertedNotification> ChildNodeInsertedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -568,13 +556,13 @@ std::unique_ptr<ChildNodeInsertedNotification> ChildNodeInsertedNotification::fr
     errors->setName("node");
     result->m_node = ValueConversions<protocol::DOM::Node>::fromValue(nodeValue, errors);
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> ChildNodeInsertedNotification::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> ChildNodeInsertedNotification::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("parentNodeId", ValueConversions<int>::toValue(m_parentNodeId));
     result->setValue("previousNodeId", ValueConversions<int>::toValue(m_previousNodeId));
@@ -582,12 +570,14 @@ std::unique_ptr<protocol::DictionaryValue> ChildNodeInsertedNotification::toValu
     return result;
 }
 
-std::unique_ptr<ChildNodeInsertedNotification> ChildNodeInsertedNotification::clone() const {
+std::unique_ptr<ChildNodeInsertedNotification> ChildNodeInsertedNotification::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<ChildNodeRemovedNotification> ChildNodeRemovedNotification::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<ChildNodeRemovedNotification> ChildNodeRemovedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -603,25 +593,27 @@ std::unique_ptr<ChildNodeRemovedNotification> ChildNodeRemovedNotification::from
     errors->setName("nodeId");
     result->m_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> ChildNodeRemovedNotification::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> ChildNodeRemovedNotification::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("parentNodeId", ValueConversions<int>::toValue(m_parentNodeId));
     result->setValue("nodeId", ValueConversions<int>::toValue(m_nodeId));
     return result;
 }
 
-std::unique_ptr<ChildNodeRemovedNotification> ChildNodeRemovedNotification::clone() const {
+std::unique_ptr<ChildNodeRemovedNotification> ChildNodeRemovedNotification::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<ShadowRootPushedNotification> ShadowRootPushedNotification::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<ShadowRootPushedNotification> ShadowRootPushedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -637,25 +629,27 @@ std::unique_ptr<ShadowRootPushedNotification> ShadowRootPushedNotification::from
     errors->setName("root");
     result->m_root = ValueConversions<protocol::DOM::Node>::fromValue(rootValue, errors);
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> ShadowRootPushedNotification::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> ShadowRootPushedNotification::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("hostId", ValueConversions<int>::toValue(m_hostId));
     result->setValue("root", ValueConversions<protocol::DOM::Node>::toValue(m_root.get()));
     return result;
 }
 
-std::unique_ptr<ShadowRootPushedNotification> ShadowRootPushedNotification::clone() const {
+std::unique_ptr<ShadowRootPushedNotification> ShadowRootPushedNotification::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<ShadowRootPoppedNotification> ShadowRootPoppedNotification::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<ShadowRootPoppedNotification> ShadowRootPoppedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -671,25 +665,27 @@ std::unique_ptr<ShadowRootPoppedNotification> ShadowRootPoppedNotification::from
     errors->setName("rootId");
     result->m_rootId = ValueConversions<int>::fromValue(rootIdValue, errors);
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> ShadowRootPoppedNotification::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> ShadowRootPoppedNotification::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("hostId", ValueConversions<int>::toValue(m_hostId));
     result->setValue("rootId", ValueConversions<int>::toValue(m_rootId));
     return result;
 }
 
-std::unique_ptr<ShadowRootPoppedNotification> ShadowRootPoppedNotification::clone() const {
+std::unique_ptr<ShadowRootPoppedNotification> ShadowRootPoppedNotification::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<PseudoElementAddedNotification> PseudoElementAddedNotification::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<PseudoElementAddedNotification> PseudoElementAddedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -705,25 +701,27 @@ std::unique_ptr<PseudoElementAddedNotification> PseudoElementAddedNotification::
     errors->setName("pseudoElement");
     result->m_pseudoElement = ValueConversions<protocol::DOM::Node>::fromValue(pseudoElementValue, errors);
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> PseudoElementAddedNotification::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> PseudoElementAddedNotification::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("parentId", ValueConversions<int>::toValue(m_parentId));
     result->setValue("pseudoElement", ValueConversions<protocol::DOM::Node>::toValue(m_pseudoElement.get()));
     return result;
 }
 
-std::unique_ptr<PseudoElementAddedNotification> PseudoElementAddedNotification::clone() const {
+std::unique_ptr<PseudoElementAddedNotification> PseudoElementAddedNotification::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<PseudoElementRemovedNotification> PseudoElementRemovedNotification::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<PseudoElementRemovedNotification> PseudoElementRemovedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -739,20 +737,21 @@ std::unique_ptr<PseudoElementRemovedNotification> PseudoElementRemovedNotificati
     errors->setName("pseudoElementId");
     result->m_pseudoElementId = ValueConversions<int>::fromValue(pseudoElementIdValue, errors);
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> PseudoElementRemovedNotification::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> PseudoElementRemovedNotification::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("parentId", ValueConversions<int>::toValue(m_parentId));
     result->setValue("pseudoElementId", ValueConversions<int>::toValue(m_pseudoElementId));
     return result;
 }
 
-std::unique_ptr<PseudoElementRemovedNotification> PseudoElementRemovedNotification::clone() const {
+std::unique_ptr<PseudoElementRemovedNotification> PseudoElementRemovedNotification::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
@@ -762,208 +761,212 @@ std::unique_ptr<PseudoElementRemovedNotification> PseudoElementRemovedNotificati
 
 // ------------- Frontend notifications.
 
-void Frontend::documentUpdated() {
-    if (!m_frontendChannel) {
+void Frontend::documentUpdated()
+{
+    if (!m_frontendChannel)
         return;
-    }
     m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("DOM.documentUpdated"));
 }
 
-void Frontend::setChildNodes(int parentId, std::unique_ptr<protocol::Array<protocol::DOM::Node>> nodes) {
-    if (!m_frontendChannel) {
+void Frontend::setChildNodes(int parentId, std::unique_ptr<protocol::Array<protocol::DOM::Node>> nodes)
+{
+    if (!m_frontendChannel)
         return;
-    }
     std::unique_ptr<SetChildNodesNotification> messageData = SetChildNodesNotification::create()
-            .setParentId(parentId)
-            .setNodes(std::move(nodes))
-            .build();
+        .setParentId(parentId)
+        .setNodes(std::move(nodes))
+        .build();
     m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("DOM.setChildNodes", std::move(messageData)));
 }
 
-void Frontend::attributeModified(int nodeId, const String& name, const String& value) {
-    if (!m_frontendChannel) {
+void Frontend::attributeModified(int nodeId, const String& name, const String& value)
+{
+    if (!m_frontendChannel)
         return;
-    }
     std::unique_ptr<AttributeModifiedNotification> messageData = AttributeModifiedNotification::create()
-            .setNodeId(nodeId)
-            .setName(name)
-            .setValue(value)
-            .build();
+        .setNodeId(nodeId)
+        .setName(name)
+        .setValue(value)
+        .build();
     m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("DOM.attributeModified", std::move(messageData)));
 }
 
-void Frontend::attributeRemoved(int nodeId, const String& name) {
-    if (!m_frontendChannel) {
+void Frontend::attributeRemoved(int nodeId, const String& name)
+{
+    if (!m_frontendChannel)
         return;
-    }
     std::unique_ptr<AttributeRemovedNotification> messageData = AttributeRemovedNotification::create()
-            .setNodeId(nodeId)
-            .setName(name)
-            .build();
+        .setNodeId(nodeId)
+        .setName(name)
+        .build();
     m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("DOM.attributeRemoved", std::move(messageData)));
 }
 
-void Frontend::inlineStyleInvalidated(std::unique_ptr<protocol::Array<int>> nodeIds) {
-    if (!m_frontendChannel) {
+void Frontend::inlineStyleInvalidated(std::unique_ptr<protocol::Array<int>> nodeIds)
+{
+    if (!m_frontendChannel)
         return;
-    }
     std::unique_ptr<InlineStyleInvalidatedNotification> messageData = InlineStyleInvalidatedNotification::create()
-            .setNodeIds(std::move(nodeIds))
-            .build();
+        .setNodeIds(std::move(nodeIds))
+        .build();
     m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("DOM.inlineStyleInvalidated", std::move(messageData)));
 }
 
-void Frontend::characterDataModified(int nodeId, const String& characterData) {
-    if (!m_frontendChannel) {
+void Frontend::characterDataModified(int nodeId, const String& characterData)
+{
+    if (!m_frontendChannel)
         return;
-    }
     std::unique_ptr<CharacterDataModifiedNotification> messageData = CharacterDataModifiedNotification::create()
-            .setNodeId(nodeId)
-            .setCharacterData(characterData)
-            .build();
+        .setNodeId(nodeId)
+        .setCharacterData(characterData)
+        .build();
     m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("DOM.characterDataModified", std::move(messageData)));
 }
 
-void Frontend::childNodeCountUpdated(int nodeId, int childNodeCount) {
-    if (!m_frontendChannel) {
+void Frontend::childNodeCountUpdated(int nodeId, int childNodeCount)
+{
+    if (!m_frontendChannel)
         return;
-    }
     std::unique_ptr<ChildNodeCountUpdatedNotification> messageData = ChildNodeCountUpdatedNotification::create()
-            .setNodeId(nodeId)
-            .setChildNodeCount(childNodeCount)
-            .build();
+        .setNodeId(nodeId)
+        .setChildNodeCount(childNodeCount)
+        .build();
     m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("DOM.childNodeCountUpdated", std::move(messageData)));
 }
 
-void Frontend::childNodeInserted(int parentNodeId, int previousNodeId, std::unique_ptr<protocol::DOM::Node> node) {
-    if (!m_frontendChannel) {
+void Frontend::childNodeInserted(int parentNodeId, int previousNodeId, std::unique_ptr<protocol::DOM::Node> node)
+{
+    if (!m_frontendChannel)
         return;
-    }
     std::unique_ptr<ChildNodeInsertedNotification> messageData = ChildNodeInsertedNotification::create()
-            .setParentNodeId(parentNodeId)
-            .setPreviousNodeId(previousNodeId)
-            .setNode(std::move(node))
-            .build();
+        .setParentNodeId(parentNodeId)
+        .setPreviousNodeId(previousNodeId)
+        .setNode(std::move(node))
+        .build();
     m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("DOM.childNodeInserted", std::move(messageData)));
 }
 
-void Frontend::childNodeRemoved(int parentNodeId, int nodeId) {
-    if (!m_frontendChannel) {
+void Frontend::childNodeRemoved(int parentNodeId, int nodeId)
+{
+    if (!m_frontendChannel)
         return;
-    }
     std::unique_ptr<ChildNodeRemovedNotification> messageData = ChildNodeRemovedNotification::create()
-            .setParentNodeId(parentNodeId)
-            .setNodeId(nodeId)
-            .build();
+        .setParentNodeId(parentNodeId)
+        .setNodeId(nodeId)
+        .build();
     m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("DOM.childNodeRemoved", std::move(messageData)));
 }
 
-void Frontend::shadowRootPushed(int hostId, std::unique_ptr<protocol::DOM::Node> root) {
-    if (!m_frontendChannel) {
+void Frontend::shadowRootPushed(int hostId, std::unique_ptr<protocol::DOM::Node> root)
+{
+    if (!m_frontendChannel)
         return;
-    }
     std::unique_ptr<ShadowRootPushedNotification> messageData = ShadowRootPushedNotification::create()
-            .setHostId(hostId)
-            .setRoot(std::move(root))
-            .build();
+        .setHostId(hostId)
+        .setRoot(std::move(root))
+        .build();
     m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("DOM.shadowRootPushed", std::move(messageData)));
 }
 
-void Frontend::shadowRootPopped(int hostId, int rootId) {
-    if (!m_frontendChannel) {
+void Frontend::shadowRootPopped(int hostId, int rootId)
+{
+    if (!m_frontendChannel)
         return;
-    }
     std::unique_ptr<ShadowRootPoppedNotification> messageData = ShadowRootPoppedNotification::create()
-            .setHostId(hostId)
-            .setRootId(rootId)
-            .build();
+        .setHostId(hostId)
+        .setRootId(rootId)
+        .build();
     m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("DOM.shadowRootPopped", std::move(messageData)));
 }
 
-void Frontend::pseudoElementAdded(int parentId, std::unique_ptr<protocol::DOM::Node> pseudoElement) {
-    if (!m_frontendChannel) {
+void Frontend::pseudoElementAdded(int parentId, std::unique_ptr<protocol::DOM::Node> pseudoElement)
+{
+    if (!m_frontendChannel)
         return;
-    }
     std::unique_ptr<PseudoElementAddedNotification> messageData = PseudoElementAddedNotification::create()
-            .setParentId(parentId)
-            .setPseudoElement(std::move(pseudoElement))
-            .build();
+        .setParentId(parentId)
+        .setPseudoElement(std::move(pseudoElement))
+        .build();
     m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("DOM.pseudoElementAdded", std::move(messageData)));
 }
 
-void Frontend::pseudoElementRemoved(int parentId, int pseudoElementId) {
-    if (!m_frontendChannel) {
+void Frontend::pseudoElementRemoved(int parentId, int pseudoElementId)
+{
+    if (!m_frontendChannel)
         return;
-    }
     std::unique_ptr<PseudoElementRemovedNotification> messageData = PseudoElementRemovedNotification::create()
-            .setParentId(parentId)
-            .setPseudoElementId(pseudoElementId)
-            .build();
+        .setParentId(parentId)
+        .setPseudoElementId(pseudoElementId)
+        .build();
     m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("DOM.pseudoElementRemoved", std::move(messageData)));
 }
 
-void Frontend::flush() {
+void Frontend::flush()
+{
     m_frontendChannel->flushProtocolNotifications();
 }
 
-void Frontend::sendRawNotification(const String& notification) {
+void Frontend::sendRawNotification(const String& notification)
+{
     m_frontendChannel->sendProtocolNotification(InternalRawNotification::create(notification));
 }
 
 // --------------------- Dispatcher.
 
 class DispatcherImpl : public protocol::DispatcherBase {
-    public:
-        DispatcherImpl(FrontendChannel* frontendChannel, Backend* backend, bool fallThroughForNotFound)
-            : DispatcherBase(frontendChannel)
-            , m_backend(backend)
-            , m_fallThroughForNotFound(fallThroughForNotFound) {
-            m_dispatchMap["DOM.enable"] = &DispatcherImpl::enable;
-            m_dispatchMap["DOM.disable"] = &DispatcherImpl::disable;
-            m_dispatchMap["DOM.getDocument"] = &DispatcherImpl::getDocument;
-            m_dispatchMap["DOM.removeNode"] = &DispatcherImpl::removeNode;
-            m_dispatchMap["DOM.setAttributeValue"] = &DispatcherImpl::setAttributeValue;
-            m_dispatchMap["DOM.setAttributesAsText"] = &DispatcherImpl::setAttributesAsText;
-            m_dispatchMap["DOM.removeAttribute"] = &DispatcherImpl::removeAttribute;
-            m_dispatchMap["DOM.performSearch"] = &DispatcherImpl::performSearch;
-            m_dispatchMap["DOM.getSearchResults"] = &DispatcherImpl::getSearchResults;
-            m_dispatchMap["DOM.discardSearchResults"] = &DispatcherImpl::discardSearchResults;
-            m_dispatchMap["DOM.highlightNode"] = &DispatcherImpl::highlightNode;
-            m_dispatchMap["DOM.hideHighlight"] = &DispatcherImpl::hideHighlight;
-            m_dispatchMap["DOM.resolveNode"] = &DispatcherImpl::resolveNode;
-        }
-        ~DispatcherImpl() override { }
-        DispatchResponse::Status dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) override;
+public:
+    DispatcherImpl(FrontendChannel* frontendChannel, Backend* backend, bool fallThroughForNotFound)
+        : DispatcherBase(frontendChannel)
+        , m_backend(backend)
+        , m_fallThroughForNotFound(fallThroughForNotFound) {
+        m_dispatchMap["DOM.enable"] = &DispatcherImpl::enable;
+        m_dispatchMap["DOM.disable"] = &DispatcherImpl::disable;
+        m_dispatchMap["DOM.getDocument"] = &DispatcherImpl::getDocument;
+        m_dispatchMap["DOM.removeNode"] = &DispatcherImpl::removeNode;
+        m_dispatchMap["DOM.setAttributeValue"] = &DispatcherImpl::setAttributeValue;
+        m_dispatchMap["DOM.setAttributesAsText"] = &DispatcherImpl::setAttributesAsText;
+        m_dispatchMap["DOM.removeAttribute"] = &DispatcherImpl::removeAttribute;
+        m_dispatchMap["DOM.performSearch"] = &DispatcherImpl::performSearch;
+        m_dispatchMap["DOM.getSearchResults"] = &DispatcherImpl::getSearchResults;
+        m_dispatchMap["DOM.discardSearchResults"] = &DispatcherImpl::discardSearchResults;
+        m_dispatchMap["DOM.highlightNode"] = &DispatcherImpl::highlightNode;
+        m_dispatchMap["DOM.hideHighlight"] = &DispatcherImpl::hideHighlight;
+        m_dispatchMap["DOM.resolveNode"] = &DispatcherImpl::resolveNode;
+    }
+    ~DispatcherImpl() override { }
+    DispatchResponse::Status dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) override;
+    HashMap<String, String>& redirects() { return m_redirects; }
 
-    protected:
-        using CallHandler = DispatchResponse::Status (DispatcherImpl::*)(int callId, std::unique_ptr<DictionaryValue> messageObject, ErrorSupport* errors);
-        using DispatchMap = protocol::HashMap<String, CallHandler>;
-        DispatchMap m_dispatchMap;
+protected:
+    using CallHandler = DispatchResponse::Status (DispatcherImpl::*)(int callId, std::unique_ptr<DictionaryValue> messageObject, ErrorSupport* errors);
+    using DispatchMap = protocol::HashMap<String, CallHandler>;
+    DispatchMap m_dispatchMap;
+    HashMap<String, String> m_redirects;
 
-        DispatchResponse::Status enable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status disable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status getDocument(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status removeNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status setAttributeValue(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status setAttributesAsText(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status removeAttribute(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status performSearch(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status getSearchResults(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status discardSearchResults(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status highlightNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status hideHighlight(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status resolveNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    DispatchResponse::Status enable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    DispatchResponse::Status disable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    DispatchResponse::Status getDocument(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    DispatchResponse::Status removeNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    DispatchResponse::Status setAttributeValue(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    DispatchResponse::Status setAttributesAsText(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    DispatchResponse::Status removeAttribute(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    DispatchResponse::Status performSearch(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    DispatchResponse::Status getSearchResults(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    DispatchResponse::Status discardSearchResults(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    DispatchResponse::Status highlightNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    DispatchResponse::Status hideHighlight(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    DispatchResponse::Status resolveNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
 
-        Backend* m_backend;
-        bool m_fallThroughForNotFound;
+    Backend* m_backend;
+    bool m_fallThroughForNotFound;
 };
 
-DispatchResponse::Status DispatcherImpl::dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) {
+DispatchResponse::Status DispatcherImpl::dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject)
+{
     protocol::HashMap<String, CallHandler>::iterator it = m_dispatchMap.find(method);
     if (it == m_dispatchMap.end()) {
-        if (m_fallThroughForNotFound) {
+        if (m_fallThroughForNotFound)
             return DispatchResponse::kFallThrough;
-        }
         reportProtocolError(callId, DispatchResponse::kMethodNotFound, "'" + method + "' wasn't found", nullptr);
         return DispatchResponse::kError;
     }
@@ -973,46 +976,50 @@ DispatchResponse::Status DispatcherImpl::dispatch(int callId, const String& meth
 }
 
 
-DispatchResponse::Status DispatcherImpl::enable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+DispatchResponse::Status DispatcherImpl::enable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->enable();
-    if (weak->get()) {
+    if (response.status() == DispatchResponse::kFallThrough)
+        return response.status();
+    if (weak->get())
         weak->get()->sendResponse(callId, response);
-    }
     return response.status();
 }
 
-DispatchResponse::Status DispatcherImpl::disable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+DispatchResponse::Status DispatcherImpl::disable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->disable();
-    if (weak->get()) {
+    if (response.status() == DispatchResponse::kFallThrough)
+        return response.status();
+    if (weak->get())
         weak->get()->sendResponse(callId, response);
-    }
     return response.status();
 }
 
-DispatchResponse::Status DispatcherImpl::getDocument(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+DispatchResponse::Status DispatcherImpl::getDocument(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
     // Declare output parameters.
     std::unique_ptr<protocol::DOM::Node> out_root;
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getDocument(&out_root);
-    if (response.status() == DispatchResponse::kFallThrough) {
+    if (response.status() == DispatchResponse::kFallThrough)
         return response.status();
-    }
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     if (response.status() == DispatchResponse::kSuccess) {
         result->setValue("root", ValueConversions<protocol::DOM::Node>::toValue(out_root.get()));
     }
-    if (weak->get()) {
+    if (weak->get())
         weak->get()->sendResponse(callId, response, std::move(result));
-    }
     return response.status();
 }
 
-DispatchResponse::Status DispatcherImpl::removeNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+DispatchResponse::Status DispatcherImpl::removeNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -1027,13 +1034,15 @@ DispatchResponse::Status DispatcherImpl::removeNode(int callId, std::unique_ptr<
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->removeNode(in_nodeId);
-    if (weak->get()) {
+    if (response.status() == DispatchResponse::kFallThrough)
+        return response.status();
+    if (weak->get())
         weak->get()->sendResponse(callId, response);
-    }
     return response.status();
 }
 
-DispatchResponse::Status DispatcherImpl::setAttributeValue(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+DispatchResponse::Status DispatcherImpl::setAttributeValue(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -1054,13 +1063,15 @@ DispatchResponse::Status DispatcherImpl::setAttributeValue(int callId, std::uniq
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setAttributeValue(in_nodeId, in_name, in_value);
-    if (weak->get()) {
+    if (response.status() == DispatchResponse::kFallThrough)
+        return response.status();
+    if (weak->get())
         weak->get()->sendResponse(callId, response);
-    }
     return response.status();
 }
 
-DispatchResponse::Status DispatcherImpl::setAttributesAsText(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+DispatchResponse::Status DispatcherImpl::setAttributesAsText(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -1084,13 +1095,15 @@ DispatchResponse::Status DispatcherImpl::setAttributesAsText(int callId, std::un
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setAttributesAsText(in_nodeId, in_text, std::move(in_name));
-    if (weak->get()) {
+    if (response.status() == DispatchResponse::kFallThrough)
+        return response.status();
+    if (weak->get())
         weak->get()->sendResponse(callId, response);
-    }
     return response.status();
 }
 
-DispatchResponse::Status DispatcherImpl::removeAttribute(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+DispatchResponse::Status DispatcherImpl::removeAttribute(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -1108,13 +1121,15 @@ DispatchResponse::Status DispatcherImpl::removeAttribute(int callId, std::unique
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->removeAttribute(in_nodeId, in_name);
-    if (weak->get()) {
+    if (response.status() == DispatchResponse::kFallThrough)
+        return response.status();
+    if (weak->get())
         weak->get()->sendResponse(callId, response);
-    }
     return response.status();
 }
 
-DispatchResponse::Status DispatcherImpl::performSearch(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+DispatchResponse::Status DispatcherImpl::performSearch(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -1138,21 +1153,20 @@ DispatchResponse::Status DispatcherImpl::performSearch(int callId, std::unique_p
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->performSearch(in_query, std::move(in_nodeIds), &out_searchId, &out_resultCount);
-    if (response.status() == DispatchResponse::kFallThrough) {
+    if (response.status() == DispatchResponse::kFallThrough)
         return response.status();
-    }
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     if (response.status() == DispatchResponse::kSuccess) {
         result->setValue("searchId", ValueConversions<String>::toValue(out_searchId));
         result->setValue("resultCount", ValueConversions<int>::toValue(out_resultCount));
     }
-    if (weak->get()) {
+    if (weak->get())
         weak->get()->sendResponse(callId, response, std::move(result));
-    }
     return response.status();
 }
 
-DispatchResponse::Status DispatcherImpl::getSearchResults(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+DispatchResponse::Status DispatcherImpl::getSearchResults(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -1175,20 +1189,19 @@ DispatchResponse::Status DispatcherImpl::getSearchResults(int callId, std::uniqu
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getSearchResults(in_searchId, in_fromIndex, in_toIndex, &out_nodeIds);
-    if (response.status() == DispatchResponse::kFallThrough) {
+    if (response.status() == DispatchResponse::kFallThrough)
         return response.status();
-    }
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     if (response.status() == DispatchResponse::kSuccess) {
         result->setValue("nodeIds", ValueConversions<protocol::Array<int>>::toValue(out_nodeIds.get()));
     }
-    if (weak->get()) {
+    if (weak->get())
         weak->get()->sendResponse(callId, response, std::move(result));
-    }
     return response.status();
 }
 
-DispatchResponse::Status DispatcherImpl::discardSearchResults(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+DispatchResponse::Status DispatcherImpl::discardSearchResults(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -1203,13 +1216,15 @@ DispatchResponse::Status DispatcherImpl::discardSearchResults(int callId, std::u
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->discardSearchResults(in_searchId);
-    if (weak->get()) {
+    if (response.status() == DispatchResponse::kFallThrough)
+        return response.status();
+    if (weak->get())
         weak->get()->sendResponse(callId, response);
-    }
     return response.status();
 }
 
-DispatchResponse::Status DispatcherImpl::highlightNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+DispatchResponse::Status DispatcherImpl::highlightNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -1236,23 +1251,27 @@ DispatchResponse::Status DispatcherImpl::highlightNode(int callId, std::unique_p
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->highlightNode(std::move(in_highlightConfig), std::move(in_nodeId), std::move(in_objectId));
-    if (weak->get()) {
+    if (response.status() == DispatchResponse::kFallThrough)
+        return response.status();
+    if (weak->get())
         weak->get()->sendResponse(callId, response);
-    }
     return response.status();
 }
 
-DispatchResponse::Status DispatcherImpl::hideHighlight(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+DispatchResponse::Status DispatcherImpl::hideHighlight(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->hideHighlight();
-    if (weak->get()) {
+    if (response.status() == DispatchResponse::kFallThrough)
+        return response.status();
+    if (weak->get())
         weak->get()->sendResponse(callId, response);
-    }
     return response.status();
 }
 
-DispatchResponse::Status DispatcherImpl::resolveNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+DispatchResponse::Status DispatcherImpl::resolveNode(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -1275,22 +1294,23 @@ DispatchResponse::Status DispatcherImpl::resolveNode(int callId, std::unique_ptr
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->resolveNode(in_nodeId, std::move(in_objectGroup), &out_object);
-    if (response.status() == DispatchResponse::kFallThrough) {
+    if (response.status() == DispatchResponse::kFallThrough)
         return response.status();
-    }
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     if (response.status() == DispatchResponse::kSuccess) {
         result->setValue("object", ValueConversions<protocol::Runtime::RemoteObject>::toValue(out_object.get()));
     }
-    if (weak->get()) {
+    if (weak->get())
         weak->get()->sendResponse(callId, response, std::move(result));
-    }
     return response.status();
 }
 
 // static
-void Dispatcher::wire(UberDispatcher* dispatcher, Backend* backend) {
-    dispatcher->registerBackend("DOM", std::unique_ptr<protocol::DispatcherBase>(new DispatcherImpl(dispatcher->channel(), backend, dispatcher->fallThroughForNotFound())));
+void Dispatcher::wire(UberDispatcher* uber, Backend* backend)
+{
+    std::unique_ptr<DispatcherImpl> dispatcher(new DispatcherImpl(uber->channel(), backend, uber->fallThroughForNotFound()));
+    uber->setupRedirects(dispatcher->redirects());
+    uber->registerBackend("DOM", std::move(dispatcher));
 }
 
 } // DOM

@@ -16,9 +16,10 @@ namespace Network {
 
 const char Metainfo::domainName[] = "Network";
 const char Metainfo::commandPrefix[] = "Network.";
-const char Metainfo::version[] = "1.2";
+const char Metainfo::version[] = "1.3";
 
-std::unique_ptr<ResourceTiming> ResourceTiming::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<ResourceTiming> ResourceTiming::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -52,13 +53,13 @@ std::unique_ptr<ResourceTiming> ResourceTiming::fromValue(protocol::Value* value
     errors->setName("responseStart");
     result->m_responseStart = ValueConversions<double>::fromValue(responseStartValue, errors);
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> ResourceTiming::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> ResourceTiming::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("startTime", ValueConversions<double>::toValue(m_startTime));
     result->setValue("domainLookupStart", ValueConversions<double>::toValue(m_domainLookupStart));
@@ -71,12 +72,14 @@ std::unique_ptr<protocol::DictionaryValue> ResourceTiming::toValue() const {
     return result;
 }
 
-std::unique_ptr<ResourceTiming> ResourceTiming::clone() const {
+std::unique_ptr<ResourceTiming> ResourceTiming::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<Request> Request::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<Request> Request::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -100,29 +103,30 @@ std::unique_ptr<Request> Request::fromValue(protocol::Value* value, ErrorSupport
         result->m_postData = ValueConversions<String>::fromValue(postDataValue, errors);
     }
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> Request::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> Request::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("url", ValueConversions<String>::toValue(m_url));
     result->setValue("method", ValueConversions<String>::toValue(m_method));
     result->setValue("headers", ValueConversions<protocol::Network::Headers>::toValue(m_headers.get()));
-    if (m_postData.isJust()) {
+    if (m_postData.isJust())
         result->setValue("postData", ValueConversions<String>::toValue(m_postData.fromJust()));
-    }
     return result;
 }
 
-std::unique_ptr<Request> Request::clone() const {
+std::unique_ptr<Request> Request::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<Response> Response::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<Response> Response::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -172,43 +176,40 @@ std::unique_ptr<Response> Response::fromValue(protocol::Value* value, ErrorSuppo
         result->m_timing = ValueConversions<protocol::Network::ResourceTiming>::fromValue(timingValue, errors);
     }
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> Response::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> Response::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("url", ValueConversions<String>::toValue(m_url));
     result->setValue("status", ValueConversions<double>::toValue(m_status));
     result->setValue("statusText", ValueConversions<String>::toValue(m_statusText));
     result->setValue("headers", ValueConversions<protocol::Network::Headers>::toValue(m_headers.get()));
-    if (m_headersText.isJust()) {
+    if (m_headersText.isJust())
         result->setValue("headersText", ValueConversions<String>::toValue(m_headersText.fromJust()));
-    }
     result->setValue("mimeType", ValueConversions<String>::toValue(m_mimeType));
-    if (m_requestHeaders.isJust()) {
+    if (m_requestHeaders.isJust())
         result->setValue("requestHeaders", ValueConversions<protocol::Network::Headers>::toValue(m_requestHeaders.fromJust()));
-    }
-    if (m_requestHeadersText.isJust()) {
+    if (m_requestHeadersText.isJust())
         result->setValue("requestHeadersText", ValueConversions<String>::toValue(m_requestHeadersText.fromJust()));
-    }
-    if (m_fromDiskCache.isJust()) {
+    if (m_fromDiskCache.isJust())
         result->setValue("fromDiskCache", ValueConversions<bool>::toValue(m_fromDiskCache.fromJust()));
-    }
-    if (m_timing.isJust()) {
+    if (m_timing.isJust())
         result->setValue("timing", ValueConversions<protocol::Network::ResourceTiming>::toValue(m_timing.fromJust()));
-    }
     return result;
 }
 
-std::unique_ptr<Response> Response::clone() const {
+std::unique_ptr<Response> Response::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<WebSocketRequest> WebSocketRequest::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<WebSocketRequest> WebSocketRequest::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -221,24 +222,26 @@ std::unique_ptr<WebSocketRequest> WebSocketRequest::fromValue(protocol::Value* v
     errors->setName("headers");
     result->m_headers = ValueConversions<protocol::Network::Headers>::fromValue(headersValue, errors);
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> WebSocketRequest::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> WebSocketRequest::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("headers", ValueConversions<protocol::Network::Headers>::toValue(m_headers.get()));
     return result;
 }
 
-std::unique_ptr<WebSocketRequest> WebSocketRequest::clone() const {
+std::unique_ptr<WebSocketRequest> WebSocketRequest::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<WebSocketResponse> WebSocketResponse::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<WebSocketResponse> WebSocketResponse::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -257,13 +260,13 @@ std::unique_ptr<WebSocketResponse> WebSocketResponse::fromValue(protocol::Value*
     errors->setName("headers");
     result->m_headers = ValueConversions<protocol::Network::Headers>::fromValue(headersValue, errors);
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> WebSocketResponse::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> WebSocketResponse::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("status", ValueConversions<double>::toValue(m_status));
     result->setValue("statusText", ValueConversions<String>::toValue(m_statusText));
@@ -271,12 +274,14 @@ std::unique_ptr<protocol::DictionaryValue> WebSocketResponse::toValue() const {
     return result;
 }
 
-std::unique_ptr<WebSocketResponse> WebSocketResponse::clone() const {
+std::unique_ptr<WebSocketResponse> WebSocketResponse::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<WebSocketFrame> WebSocketFrame::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<WebSocketFrame> WebSocketFrame::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -295,13 +300,13 @@ std::unique_ptr<WebSocketFrame> WebSocketFrame::fromValue(protocol::Value* value
     errors->setName("payloadData");
     result->m_payloadData = ValueConversions<String>::fromValue(payloadDataValue, errors);
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> WebSocketFrame::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> WebSocketFrame::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("opcode", ValueConversions<double>::toValue(m_opcode));
     result->setValue("mask", ValueConversions<bool>::toValue(m_mask));
@@ -309,12 +314,14 @@ std::unique_ptr<protocol::DictionaryValue> WebSocketFrame::toValue() const {
     return result;
 }
 
-std::unique_ptr<WebSocketFrame> WebSocketFrame::clone() const {
+std::unique_ptr<WebSocketFrame> WebSocketFrame::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<CachedResource> CachedResource::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<CachedResource> CachedResource::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -343,27 +350,26 @@ std::unique_ptr<CachedResource> CachedResource::fromValue(protocol::Value* value
         result->m_sourceMapURL = ValueConversions<String>::fromValue(sourceMapURLValue, errors);
     }
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> CachedResource::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> CachedResource::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("url", ValueConversions<String>::toValue(m_url));
     result->setValue("type", ValueConversions<String>::toValue(m_type));
-    if (m_response.isJust()) {
+    if (m_response.isJust())
         result->setValue("response", ValueConversions<protocol::Network::Response>::toValue(m_response.fromJust()));
-    }
     result->setValue("bodySize", ValueConversions<double>::toValue(m_bodySize));
-    if (m_sourceMapURL.isJust()) {
+    if (m_sourceMapURL.isJust())
         result->setValue("sourceMapURL", ValueConversions<String>::toValue(m_sourceMapURL.fromJust()));
-    }
     return result;
 }
 
-std::unique_ptr<CachedResource> CachedResource::clone() const {
+std::unique_ptr<CachedResource> CachedResource::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
@@ -372,7 +378,8 @@ const char* Initiator::TypeEnum::Parser = "parser";
 const char* Initiator::TypeEnum::Script = "script";
 const char* Initiator::TypeEnum::Other = "other";
 
-std::unique_ptr<Initiator> Initiator::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<Initiator> Initiator::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -400,33 +407,32 @@ std::unique_ptr<Initiator> Initiator::fromValue(protocol::Value* value, ErrorSup
         result->m_lineNumber = ValueConversions<double>::fromValue(lineNumberValue, errors);
     }
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> Initiator::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> Initiator::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("type", ValueConversions<String>::toValue(m_type));
-    if (m_stackTrace.isJust()) {
+    if (m_stackTrace.isJust())
         result->setValue("stackTrace", ValueConversions<protocol::Runtime::StackTrace>::toValue(m_stackTrace.fromJust()));
-    }
-    if (m_url.isJust()) {
+    if (m_url.isJust())
         result->setValue("url", ValueConversions<String>::toValue(m_url.fromJust()));
-    }
-    if (m_lineNumber.isJust()) {
+    if (m_lineNumber.isJust())
         result->setValue("lineNumber", ValueConversions<double>::toValue(m_lineNumber.fromJust()));
-    }
     return result;
 }
 
-std::unique_ptr<Initiator> Initiator::clone() const {
+std::unique_ptr<Initiator> Initiator::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<RequestWillBeSentNotification> RequestWillBeSentNotification::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<RequestWillBeSentNotification> RequestWillBeSentNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -467,13 +473,13 @@ std::unique_ptr<RequestWillBeSentNotification> RequestWillBeSentNotification::fr
         result->m_type = ValueConversions<String>::fromValue(typeValue, errors);
     }
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> RequestWillBeSentNotification::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> RequestWillBeSentNotification::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("requestId", ValueConversions<String>::toValue(m_requestId));
     result->setValue("frameId", ValueConversions<String>::toValue(m_frameId));
@@ -482,21 +488,21 @@ std::unique_ptr<protocol::DictionaryValue> RequestWillBeSentNotification::toValu
     result->setValue("request", ValueConversions<protocol::Network::Request>::toValue(m_request.get()));
     result->setValue("timestamp", ValueConversions<double>::toValue(m_timestamp));
     result->setValue("initiator", ValueConversions<protocol::Network::Initiator>::toValue(m_initiator.get()));
-    if (m_redirectResponse.isJust()) {
+    if (m_redirectResponse.isJust())
         result->setValue("redirectResponse", ValueConversions<protocol::Network::Response>::toValue(m_redirectResponse.fromJust()));
-    }
-    if (m_type.isJust()) {
+    if (m_type.isJust())
         result->setValue("type", ValueConversions<String>::toValue(m_type.fromJust()));
-    }
     return result;
 }
 
-std::unique_ptr<RequestWillBeSentNotification> RequestWillBeSentNotification::clone() const {
+std::unique_ptr<RequestWillBeSentNotification> RequestWillBeSentNotification::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<RequestServedFromCacheNotification> RequestServedFromCacheNotification::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<RequestServedFromCacheNotification> RequestServedFromCacheNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -509,24 +515,26 @@ std::unique_ptr<RequestServedFromCacheNotification> RequestServedFromCacheNotifi
     errors->setName("requestId");
     result->m_requestId = ValueConversions<String>::fromValue(requestIdValue, errors);
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> RequestServedFromCacheNotification::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> RequestServedFromCacheNotification::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("requestId", ValueConversions<String>::toValue(m_requestId));
     return result;
 }
 
-std::unique_ptr<RequestServedFromCacheNotification> RequestServedFromCacheNotification::clone() const {
+std::unique_ptr<RequestServedFromCacheNotification> RequestServedFromCacheNotification::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<ResponseReceivedNotification> ResponseReceivedNotification::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<ResponseReceivedNotification> ResponseReceivedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -554,13 +562,13 @@ std::unique_ptr<ResponseReceivedNotification> ResponseReceivedNotification::from
     errors->setName("response");
     result->m_response = ValueConversions<protocol::Network::Response>::fromValue(responseValue, errors);
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> ResponseReceivedNotification::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> ResponseReceivedNotification::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("requestId", ValueConversions<String>::toValue(m_requestId));
     result->setValue("frameId", ValueConversions<String>::toValue(m_frameId));
@@ -571,12 +579,14 @@ std::unique_ptr<protocol::DictionaryValue> ResponseReceivedNotification::toValue
     return result;
 }
 
-std::unique_ptr<ResponseReceivedNotification> ResponseReceivedNotification::clone() const {
+std::unique_ptr<ResponseReceivedNotification> ResponseReceivedNotification::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<DataReceivedNotification> DataReceivedNotification::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<DataReceivedNotification> DataReceivedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -598,13 +608,13 @@ std::unique_ptr<DataReceivedNotification> DataReceivedNotification::fromValue(pr
     errors->setName("encodedDataLength");
     result->m_encodedDataLength = ValueConversions<int>::fromValue(encodedDataLengthValue, errors);
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> DataReceivedNotification::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> DataReceivedNotification::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("requestId", ValueConversions<String>::toValue(m_requestId));
     result->setValue("timestamp", ValueConversions<double>::toValue(m_timestamp));
@@ -613,12 +623,14 @@ std::unique_ptr<protocol::DictionaryValue> DataReceivedNotification::toValue() c
     return result;
 }
 
-std::unique_ptr<DataReceivedNotification> DataReceivedNotification::clone() const {
+std::unique_ptr<DataReceivedNotification> DataReceivedNotification::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<LoadingFinishedNotification> LoadingFinishedNotification::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<LoadingFinishedNotification> LoadingFinishedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -639,28 +651,29 @@ std::unique_ptr<LoadingFinishedNotification> LoadingFinishedNotification::fromVa
         result->m_sourceMapURL = ValueConversions<String>::fromValue(sourceMapURLValue, errors);
     }
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> LoadingFinishedNotification::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> LoadingFinishedNotification::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("requestId", ValueConversions<String>::toValue(m_requestId));
     result->setValue("timestamp", ValueConversions<double>::toValue(m_timestamp));
-    if (m_sourceMapURL.isJust()) {
+    if (m_sourceMapURL.isJust())
         result->setValue("sourceMapURL", ValueConversions<String>::toValue(m_sourceMapURL.fromJust()));
-    }
     return result;
 }
 
-std::unique_ptr<LoadingFinishedNotification> LoadingFinishedNotification::clone() const {
+std::unique_ptr<LoadingFinishedNotification> LoadingFinishedNotification::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<LoadingFailedNotification> LoadingFailedNotification::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<LoadingFailedNotification> LoadingFailedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -684,29 +697,30 @@ std::unique_ptr<LoadingFailedNotification> LoadingFailedNotification::fromValue(
         result->m_canceled = ValueConversions<bool>::fromValue(canceledValue, errors);
     }
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> LoadingFailedNotification::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> LoadingFailedNotification::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("requestId", ValueConversions<String>::toValue(m_requestId));
     result->setValue("timestamp", ValueConversions<double>::toValue(m_timestamp));
     result->setValue("errorText", ValueConversions<String>::toValue(m_errorText));
-    if (m_canceled.isJust()) {
+    if (m_canceled.isJust())
         result->setValue("canceled", ValueConversions<bool>::toValue(m_canceled.fromJust()));
-    }
     return result;
 }
 
-std::unique_ptr<LoadingFailedNotification> LoadingFailedNotification::clone() const {
+std::unique_ptr<LoadingFailedNotification> LoadingFailedNotification::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<RequestServedFromMemoryCacheNotification> RequestServedFromMemoryCacheNotification::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<RequestServedFromMemoryCacheNotification> RequestServedFromMemoryCacheNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -737,13 +751,13 @@ std::unique_ptr<RequestServedFromMemoryCacheNotification> RequestServedFromMemor
     errors->setName("resource");
     result->m_resource = ValueConversions<protocol::Network::CachedResource>::fromValue(resourceValue, errors);
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> RequestServedFromMemoryCacheNotification::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> RequestServedFromMemoryCacheNotification::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("requestId", ValueConversions<String>::toValue(m_requestId));
     result->setValue("frameId", ValueConversions<String>::toValue(m_frameId));
@@ -755,12 +769,14 @@ std::unique_ptr<protocol::DictionaryValue> RequestServedFromMemoryCacheNotificat
     return result;
 }
 
-std::unique_ptr<RequestServedFromMemoryCacheNotification> RequestServedFromMemoryCacheNotification::clone() const {
+std::unique_ptr<RequestServedFromMemoryCacheNotification> RequestServedFromMemoryCacheNotification::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<WebSocketWillSendHandshakeRequestNotification> WebSocketWillSendHandshakeRequestNotification::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<WebSocketWillSendHandshakeRequestNotification> WebSocketWillSendHandshakeRequestNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -779,13 +795,13 @@ std::unique_ptr<WebSocketWillSendHandshakeRequestNotification> WebSocketWillSend
     errors->setName("request");
     result->m_request = ValueConversions<protocol::Network::WebSocketRequest>::fromValue(requestValue, errors);
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> WebSocketWillSendHandshakeRequestNotification::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> WebSocketWillSendHandshakeRequestNotification::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("requestId", ValueConversions<String>::toValue(m_requestId));
     result->setValue("timestamp", ValueConversions<double>::toValue(m_timestamp));
@@ -793,12 +809,14 @@ std::unique_ptr<protocol::DictionaryValue> WebSocketWillSendHandshakeRequestNoti
     return result;
 }
 
-std::unique_ptr<WebSocketWillSendHandshakeRequestNotification> WebSocketWillSendHandshakeRequestNotification::clone() const {
+std::unique_ptr<WebSocketWillSendHandshakeRequestNotification> WebSocketWillSendHandshakeRequestNotification::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<WebSocketHandshakeResponseReceivedNotification> WebSocketHandshakeResponseReceivedNotification::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<WebSocketHandshakeResponseReceivedNotification> WebSocketHandshakeResponseReceivedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -817,13 +835,13 @@ std::unique_ptr<WebSocketHandshakeResponseReceivedNotification> WebSocketHandsha
     errors->setName("response");
     result->m_response = ValueConversions<protocol::Network::WebSocketResponse>::fromValue(responseValue, errors);
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> WebSocketHandshakeResponseReceivedNotification::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> WebSocketHandshakeResponseReceivedNotification::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("requestId", ValueConversions<String>::toValue(m_requestId));
     result->setValue("timestamp", ValueConversions<double>::toValue(m_timestamp));
@@ -831,12 +849,14 @@ std::unique_ptr<protocol::DictionaryValue> WebSocketHandshakeResponseReceivedNot
     return result;
 }
 
-std::unique_ptr<WebSocketHandshakeResponseReceivedNotification> WebSocketHandshakeResponseReceivedNotification::clone() const {
+std::unique_ptr<WebSocketHandshakeResponseReceivedNotification> WebSocketHandshakeResponseReceivedNotification::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<WebSocketCreatedNotification> WebSocketCreatedNotification::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<WebSocketCreatedNotification> WebSocketCreatedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -852,25 +872,27 @@ std::unique_ptr<WebSocketCreatedNotification> WebSocketCreatedNotification::from
     errors->setName("url");
     result->m_url = ValueConversions<String>::fromValue(urlValue, errors);
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> WebSocketCreatedNotification::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> WebSocketCreatedNotification::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("requestId", ValueConversions<String>::toValue(m_requestId));
     result->setValue("url", ValueConversions<String>::toValue(m_url));
     return result;
 }
 
-std::unique_ptr<WebSocketCreatedNotification> WebSocketCreatedNotification::clone() const {
+std::unique_ptr<WebSocketCreatedNotification> WebSocketCreatedNotification::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<WebSocketClosedNotification> WebSocketClosedNotification::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<WebSocketClosedNotification> WebSocketClosedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -886,25 +908,27 @@ std::unique_ptr<WebSocketClosedNotification> WebSocketClosedNotification::fromVa
     errors->setName("timestamp");
     result->m_timestamp = ValueConversions<double>::fromValue(timestampValue, errors);
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> WebSocketClosedNotification::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> WebSocketClosedNotification::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("requestId", ValueConversions<String>::toValue(m_requestId));
     result->setValue("timestamp", ValueConversions<double>::toValue(m_timestamp));
     return result;
 }
 
-std::unique_ptr<WebSocketClosedNotification> WebSocketClosedNotification::clone() const {
+std::unique_ptr<WebSocketClosedNotification> WebSocketClosedNotification::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<WebSocketFrameReceivedNotification> WebSocketFrameReceivedNotification::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<WebSocketFrameReceivedNotification> WebSocketFrameReceivedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -923,13 +947,13 @@ std::unique_ptr<WebSocketFrameReceivedNotification> WebSocketFrameReceivedNotifi
     errors->setName("response");
     result->m_response = ValueConversions<protocol::Network::WebSocketFrame>::fromValue(responseValue, errors);
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> WebSocketFrameReceivedNotification::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> WebSocketFrameReceivedNotification::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("requestId", ValueConversions<String>::toValue(m_requestId));
     result->setValue("timestamp", ValueConversions<double>::toValue(m_timestamp));
@@ -937,12 +961,14 @@ std::unique_ptr<protocol::DictionaryValue> WebSocketFrameReceivedNotification::t
     return result;
 }
 
-std::unique_ptr<WebSocketFrameReceivedNotification> WebSocketFrameReceivedNotification::clone() const {
+std::unique_ptr<WebSocketFrameReceivedNotification> WebSocketFrameReceivedNotification::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<WebSocketFrameErrorNotification> WebSocketFrameErrorNotification::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<WebSocketFrameErrorNotification> WebSocketFrameErrorNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -961,13 +987,13 @@ std::unique_ptr<WebSocketFrameErrorNotification> WebSocketFrameErrorNotification
     errors->setName("errorMessage");
     result->m_errorMessage = ValueConversions<String>::fromValue(errorMessageValue, errors);
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> WebSocketFrameErrorNotification::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> WebSocketFrameErrorNotification::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("requestId", ValueConversions<String>::toValue(m_requestId));
     result->setValue("timestamp", ValueConversions<double>::toValue(m_timestamp));
@@ -975,12 +1001,14 @@ std::unique_ptr<protocol::DictionaryValue> WebSocketFrameErrorNotification::toVa
     return result;
 }
 
-std::unique_ptr<WebSocketFrameErrorNotification> WebSocketFrameErrorNotification::clone() const {
+std::unique_ptr<WebSocketFrameErrorNotification> WebSocketFrameErrorNotification::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
-std::unique_ptr<WebSocketFrameSentNotification> WebSocketFrameSentNotification::fromValue(protocol::Value* value, ErrorSupport* errors) {
+std::unique_ptr<WebSocketFrameSentNotification> WebSocketFrameSentNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
     if (!value || value->type() != protocol::Value::TypeObject) {
         errors->addError("object expected");
         return nullptr;
@@ -999,13 +1027,13 @@ std::unique_ptr<WebSocketFrameSentNotification> WebSocketFrameSentNotification::
     errors->setName("response");
     result->m_response = ValueConversions<protocol::Network::WebSocketFrame>::fromValue(responseValue, errors);
     errors->pop();
-    if (errors->hasErrors()) {
+    if (errors->hasErrors())
         return nullptr;
-    }
     return result;
 }
 
-std::unique_ptr<protocol::DictionaryValue> WebSocketFrameSentNotification::toValue() const {
+std::unique_ptr<protocol::DictionaryValue> WebSocketFrameSentNotification::toValue() const
+{
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("requestId", ValueConversions<String>::toValue(m_requestId));
     result->setValue("timestamp", ValueConversions<double>::toValue(m_timestamp));
@@ -1013,7 +1041,8 @@ std::unique_ptr<protocol::DictionaryValue> WebSocketFrameSentNotification::toVal
     return result;
 }
 
-std::unique_ptr<WebSocketFrameSentNotification> WebSocketFrameSentNotification::clone() const {
+std::unique_ptr<WebSocketFrameSentNotification> WebSocketFrameSentNotification::clone() const
+{
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
@@ -1023,241 +1052,241 @@ std::unique_ptr<WebSocketFrameSentNotification> WebSocketFrameSentNotification::
 
 // ------------- Frontend notifications.
 
-void Frontend::requestWillBeSent(const String& requestId, const String& frameId, const String& loaderId, const String& documentURL, std::unique_ptr<protocol::Network::Request> request, double timestamp, std::unique_ptr<protocol::Network::Initiator> initiator, Maybe<protocol::Network::Response> redirectResponse, Maybe<String> type) {
-    if (!m_frontendChannel) {
+void Frontend::requestWillBeSent(const String& requestId, const String& frameId, const String& loaderId, const String& documentURL, std::unique_ptr<protocol::Network::Request> request, double timestamp, std::unique_ptr<protocol::Network::Initiator> initiator, Maybe<protocol::Network::Response> redirectResponse, Maybe<String> type)
+{
+    if (!m_frontendChannel)
         return;
-    }
     std::unique_ptr<RequestWillBeSentNotification> messageData = RequestWillBeSentNotification::create()
-            .setRequestId(requestId)
-            .setFrameId(frameId)
-            .setLoaderId(loaderId)
-            .setDocumentURL(documentURL)
-            .setRequest(std::move(request))
-            .setTimestamp(timestamp)
-            .setInitiator(std::move(initiator))
-            .build();
-    if (redirectResponse.isJust()) {
+        .setRequestId(requestId)
+        .setFrameId(frameId)
+        .setLoaderId(loaderId)
+        .setDocumentURL(documentURL)
+        .setRequest(std::move(request))
+        .setTimestamp(timestamp)
+        .setInitiator(std::move(initiator))
+        .build();
+    if (redirectResponse.isJust())
         messageData->setRedirectResponse(std::move(redirectResponse).takeJust());
-    }
-    if (type.isJust()) {
+    if (type.isJust())
         messageData->setType(std::move(type).takeJust());
-    }
     m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.requestWillBeSent", std::move(messageData)));
 }
 
-void Frontend::requestServedFromCache(const String& requestId) {
-    if (!m_frontendChannel) {
+void Frontend::requestServedFromCache(const String& requestId)
+{
+    if (!m_frontendChannel)
         return;
-    }
     std::unique_ptr<RequestServedFromCacheNotification> messageData = RequestServedFromCacheNotification::create()
-            .setRequestId(requestId)
-            .build();
+        .setRequestId(requestId)
+        .build();
     m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.requestServedFromCache", std::move(messageData)));
 }
 
-void Frontend::responseReceived(const String& requestId, const String& frameId, const String& loaderId, double timestamp, const String& type, std::unique_ptr<protocol::Network::Response> response) {
-    if (!m_frontendChannel) {
+void Frontend::responseReceived(const String& requestId, const String& frameId, const String& loaderId, double timestamp, const String& type, std::unique_ptr<protocol::Network::Response> response)
+{
+    if (!m_frontendChannel)
         return;
-    }
     std::unique_ptr<ResponseReceivedNotification> messageData = ResponseReceivedNotification::create()
-            .setRequestId(requestId)
-            .setFrameId(frameId)
-            .setLoaderId(loaderId)
-            .setTimestamp(timestamp)
-            .setType(type)
-            .setResponse(std::move(response))
-            .build();
+        .setRequestId(requestId)
+        .setFrameId(frameId)
+        .setLoaderId(loaderId)
+        .setTimestamp(timestamp)
+        .setType(type)
+        .setResponse(std::move(response))
+        .build();
     m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.responseReceived", std::move(messageData)));
 }
 
-void Frontend::dataReceived(const String& requestId, double timestamp, int dataLength, int encodedDataLength) {
-    if (!m_frontendChannel) {
+void Frontend::dataReceived(const String& requestId, double timestamp, int dataLength, int encodedDataLength)
+{
+    if (!m_frontendChannel)
         return;
-    }
     std::unique_ptr<DataReceivedNotification> messageData = DataReceivedNotification::create()
-            .setRequestId(requestId)
-            .setTimestamp(timestamp)
-            .setDataLength(dataLength)
-            .setEncodedDataLength(encodedDataLength)
-            .build();
+        .setRequestId(requestId)
+        .setTimestamp(timestamp)
+        .setDataLength(dataLength)
+        .setEncodedDataLength(encodedDataLength)
+        .build();
     m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.dataReceived", std::move(messageData)));
 }
 
-void Frontend::loadingFinished(const String& requestId, double timestamp, Maybe<String> sourceMapURL) {
-    if (!m_frontendChannel) {
+void Frontend::loadingFinished(const String& requestId, double timestamp, Maybe<String> sourceMapURL)
+{
+    if (!m_frontendChannel)
         return;
-    }
     std::unique_ptr<LoadingFinishedNotification> messageData = LoadingFinishedNotification::create()
-            .setRequestId(requestId)
-            .setTimestamp(timestamp)
-            .build();
-    if (sourceMapURL.isJust()) {
+        .setRequestId(requestId)
+        .setTimestamp(timestamp)
+        .build();
+    if (sourceMapURL.isJust())
         messageData->setSourceMapURL(std::move(sourceMapURL).takeJust());
-    }
     m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.loadingFinished", std::move(messageData)));
 }
 
-void Frontend::loadingFailed(const String& requestId, double timestamp, const String& errorText, Maybe<bool> canceled) {
-    if (!m_frontendChannel) {
+void Frontend::loadingFailed(const String& requestId, double timestamp, const String& errorText, Maybe<bool> canceled)
+{
+    if (!m_frontendChannel)
         return;
-    }
     std::unique_ptr<LoadingFailedNotification> messageData = LoadingFailedNotification::create()
-            .setRequestId(requestId)
-            .setTimestamp(timestamp)
-            .setErrorText(errorText)
-            .build();
-    if (canceled.isJust()) {
+        .setRequestId(requestId)
+        .setTimestamp(timestamp)
+        .setErrorText(errorText)
+        .build();
+    if (canceled.isJust())
         messageData->setCanceled(std::move(canceled).takeJust());
-    }
     m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.loadingFailed", std::move(messageData)));
 }
 
-void Frontend::requestServedFromMemoryCache(const String& requestId, const String& frameId, const String& loaderId, const String& documentURL, double timestamp, std::unique_ptr<protocol::Network::Initiator> initiator, std::unique_ptr<protocol::Network::CachedResource> resource) {
-    if (!m_frontendChannel) {
+void Frontend::requestServedFromMemoryCache(const String& requestId, const String& frameId, const String& loaderId, const String& documentURL, double timestamp, std::unique_ptr<protocol::Network::Initiator> initiator, std::unique_ptr<protocol::Network::CachedResource> resource)
+{
+    if (!m_frontendChannel)
         return;
-    }
     std::unique_ptr<RequestServedFromMemoryCacheNotification> messageData = RequestServedFromMemoryCacheNotification::create()
-            .setRequestId(requestId)
-            .setFrameId(frameId)
-            .setLoaderId(loaderId)
-            .setDocumentURL(documentURL)
-            .setTimestamp(timestamp)
-            .setInitiator(std::move(initiator))
-            .setResource(std::move(resource))
-            .build();
+        .setRequestId(requestId)
+        .setFrameId(frameId)
+        .setLoaderId(loaderId)
+        .setDocumentURL(documentURL)
+        .setTimestamp(timestamp)
+        .setInitiator(std::move(initiator))
+        .setResource(std::move(resource))
+        .build();
     m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.requestServedFromMemoryCache", std::move(messageData)));
 }
 
-void Frontend::webSocketWillSendHandshakeRequest(const String& requestId, double timestamp, std::unique_ptr<protocol::Network::WebSocketRequest> request) {
-    if (!m_frontendChannel) {
+void Frontend::webSocketWillSendHandshakeRequest(const String& requestId, double timestamp, std::unique_ptr<protocol::Network::WebSocketRequest> request)
+{
+    if (!m_frontendChannel)
         return;
-    }
     std::unique_ptr<WebSocketWillSendHandshakeRequestNotification> messageData = WebSocketWillSendHandshakeRequestNotification::create()
-            .setRequestId(requestId)
-            .setTimestamp(timestamp)
-            .setRequest(std::move(request))
-            .build();
+        .setRequestId(requestId)
+        .setTimestamp(timestamp)
+        .setRequest(std::move(request))
+        .build();
     m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.webSocketWillSendHandshakeRequest", std::move(messageData)));
 }
 
-void Frontend::webSocketHandshakeResponseReceived(const String& requestId, double timestamp, std::unique_ptr<protocol::Network::WebSocketResponse> response) {
-    if (!m_frontendChannel) {
+void Frontend::webSocketHandshakeResponseReceived(const String& requestId, double timestamp, std::unique_ptr<protocol::Network::WebSocketResponse> response)
+{
+    if (!m_frontendChannel)
         return;
-    }
     std::unique_ptr<WebSocketHandshakeResponseReceivedNotification> messageData = WebSocketHandshakeResponseReceivedNotification::create()
-            .setRequestId(requestId)
-            .setTimestamp(timestamp)
-            .setResponse(std::move(response))
-            .build();
+        .setRequestId(requestId)
+        .setTimestamp(timestamp)
+        .setResponse(std::move(response))
+        .build();
     m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.webSocketHandshakeResponseReceived", std::move(messageData)));
 }
 
-void Frontend::webSocketCreated(const String& requestId, const String& url) {
-    if (!m_frontendChannel) {
+void Frontend::webSocketCreated(const String& requestId, const String& url)
+{
+    if (!m_frontendChannel)
         return;
-    }
     std::unique_ptr<WebSocketCreatedNotification> messageData = WebSocketCreatedNotification::create()
-            .setRequestId(requestId)
-            .setUrl(url)
-            .build();
+        .setRequestId(requestId)
+        .setUrl(url)
+        .build();
     m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.webSocketCreated", std::move(messageData)));
 }
 
-void Frontend::webSocketClosed(const String& requestId, double timestamp) {
-    if (!m_frontendChannel) {
+void Frontend::webSocketClosed(const String& requestId, double timestamp)
+{
+    if (!m_frontendChannel)
         return;
-    }
     std::unique_ptr<WebSocketClosedNotification> messageData = WebSocketClosedNotification::create()
-            .setRequestId(requestId)
-            .setTimestamp(timestamp)
-            .build();
+        .setRequestId(requestId)
+        .setTimestamp(timestamp)
+        .build();
     m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.webSocketClosed", std::move(messageData)));
 }
 
-void Frontend::webSocketFrameReceived(const String& requestId, double timestamp, std::unique_ptr<protocol::Network::WebSocketFrame> response) {
-    if (!m_frontendChannel) {
+void Frontend::webSocketFrameReceived(const String& requestId, double timestamp, std::unique_ptr<protocol::Network::WebSocketFrame> response)
+{
+    if (!m_frontendChannel)
         return;
-    }
     std::unique_ptr<WebSocketFrameReceivedNotification> messageData = WebSocketFrameReceivedNotification::create()
-            .setRequestId(requestId)
-            .setTimestamp(timestamp)
-            .setResponse(std::move(response))
-            .build();
+        .setRequestId(requestId)
+        .setTimestamp(timestamp)
+        .setResponse(std::move(response))
+        .build();
     m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.webSocketFrameReceived", std::move(messageData)));
 }
 
-void Frontend::webSocketFrameError(const String& requestId, double timestamp, const String& errorMessage) {
-    if (!m_frontendChannel) {
+void Frontend::webSocketFrameError(const String& requestId, double timestamp, const String& errorMessage)
+{
+    if (!m_frontendChannel)
         return;
-    }
     std::unique_ptr<WebSocketFrameErrorNotification> messageData = WebSocketFrameErrorNotification::create()
-            .setRequestId(requestId)
-            .setTimestamp(timestamp)
-            .setErrorMessage(errorMessage)
-            .build();
+        .setRequestId(requestId)
+        .setTimestamp(timestamp)
+        .setErrorMessage(errorMessage)
+        .build();
     m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.webSocketFrameError", std::move(messageData)));
 }
 
-void Frontend::webSocketFrameSent(const String& requestId, double timestamp, std::unique_ptr<protocol::Network::WebSocketFrame> response) {
-    if (!m_frontendChannel) {
+void Frontend::webSocketFrameSent(const String& requestId, double timestamp, std::unique_ptr<protocol::Network::WebSocketFrame> response)
+{
+    if (!m_frontendChannel)
         return;
-    }
     std::unique_ptr<WebSocketFrameSentNotification> messageData = WebSocketFrameSentNotification::create()
-            .setRequestId(requestId)
-            .setTimestamp(timestamp)
-            .setResponse(std::move(response))
-            .build();
+        .setRequestId(requestId)
+        .setTimestamp(timestamp)
+        .setResponse(std::move(response))
+        .build();
     m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Network.webSocketFrameSent", std::move(messageData)));
 }
 
-void Frontend::flush() {
+void Frontend::flush()
+{
     m_frontendChannel->flushProtocolNotifications();
 }
 
-void Frontend::sendRawNotification(const String& notification) {
+void Frontend::sendRawNotification(const String& notification)
+{
     m_frontendChannel->sendProtocolNotification(InternalRawNotification::create(notification));
 }
 
 // --------------------- Dispatcher.
 
 class DispatcherImpl : public protocol::DispatcherBase {
-    public:
-        DispatcherImpl(FrontendChannel* frontendChannel, Backend* backend, bool fallThroughForNotFound)
-            : DispatcherBase(frontendChannel)
-            , m_backend(backend)
-            , m_fallThroughForNotFound(fallThroughForNotFound) {
-            m_dispatchMap["Network.enable"] = &DispatcherImpl::enable;
-            m_dispatchMap["Network.disable"] = &DispatcherImpl::disable;
-            m_dispatchMap["Network.setExtraHTTPHeaders"] = &DispatcherImpl::setExtraHTTPHeaders;
-            m_dispatchMap["Network.getResponseBody"] = &DispatcherImpl::getResponseBody;
-            m_dispatchMap["Network.setCacheDisabled"] = &DispatcherImpl::setCacheDisabled;
-            m_dispatchMap["Network.loadResource"] = &DispatcherImpl::loadResource;
-        }
-        ~DispatcherImpl() override { }
-        DispatchResponse::Status dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) override;
+public:
+    DispatcherImpl(FrontendChannel* frontendChannel, Backend* backend, bool fallThroughForNotFound)
+        : DispatcherBase(frontendChannel)
+        , m_backend(backend)
+        , m_fallThroughForNotFound(fallThroughForNotFound) {
+        m_dispatchMap["Network.enable"] = &DispatcherImpl::enable;
+        m_dispatchMap["Network.disable"] = &DispatcherImpl::disable;
+        m_dispatchMap["Network.setExtraHTTPHeaders"] = &DispatcherImpl::setExtraHTTPHeaders;
+        m_dispatchMap["Network.getResponseBody"] = &DispatcherImpl::getResponseBody;
+        m_dispatchMap["Network.setCacheDisabled"] = &DispatcherImpl::setCacheDisabled;
+        m_dispatchMap["Network.loadResource"] = &DispatcherImpl::loadResource;
+    }
+    ~DispatcherImpl() override { }
+    DispatchResponse::Status dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) override;
+    HashMap<String, String>& redirects() { return m_redirects; }
 
-    protected:
-        using CallHandler = DispatchResponse::Status (DispatcherImpl::*)(int callId, std::unique_ptr<DictionaryValue> messageObject, ErrorSupport* errors);
-        using DispatchMap = protocol::HashMap<String, CallHandler>;
-        DispatchMap m_dispatchMap;
+protected:
+    using CallHandler = DispatchResponse::Status (DispatcherImpl::*)(int callId, std::unique_ptr<DictionaryValue> messageObject, ErrorSupport* errors);
+    using DispatchMap = protocol::HashMap<String, CallHandler>;
+    DispatchMap m_dispatchMap;
+    HashMap<String, String> m_redirects;
 
-        DispatchResponse::Status enable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status disable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status setExtraHTTPHeaders(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status getResponseBody(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status setCacheDisabled(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status loadResource(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    DispatchResponse::Status enable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    DispatchResponse::Status disable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    DispatchResponse::Status setExtraHTTPHeaders(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    DispatchResponse::Status getResponseBody(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    DispatchResponse::Status setCacheDisabled(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    DispatchResponse::Status loadResource(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
 
-        Backend* m_backend;
-        bool m_fallThroughForNotFound;
+    Backend* m_backend;
+    bool m_fallThroughForNotFound;
 };
 
-DispatchResponse::Status DispatcherImpl::dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) {
+DispatchResponse::Status DispatcherImpl::dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject)
+{
     protocol::HashMap<String, CallHandler>::iterator it = m_dispatchMap.find(method);
     if (it == m_dispatchMap.end()) {
-        if (m_fallThroughForNotFound) {
+        if (m_fallThroughForNotFound)
             return DispatchResponse::kFallThrough;
-        }
         reportProtocolError(callId, DispatchResponse::kMethodNotFound, "'" + method + "' wasn't found", nullptr);
         return DispatchResponse::kError;
     }
@@ -1267,27 +1296,32 @@ DispatchResponse::Status DispatcherImpl::dispatch(int callId, const String& meth
 }
 
 
-DispatchResponse::Status DispatcherImpl::enable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+DispatchResponse::Status DispatcherImpl::enable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->enable();
-    if (weak->get()) {
+    if (response.status() == DispatchResponse::kFallThrough)
+        return response.status();
+    if (weak->get())
         weak->get()->sendResponse(callId, response);
-    }
     return response.status();
 }
 
-DispatchResponse::Status DispatcherImpl::disable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+DispatchResponse::Status DispatcherImpl::disable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->disable();
-    if (weak->get()) {
+    if (response.status() == DispatchResponse::kFallThrough)
+        return response.status();
+    if (weak->get())
         weak->get()->sendResponse(callId, response);
-    }
     return response.status();
 }
 
-DispatchResponse::Status DispatcherImpl::setExtraHTTPHeaders(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+DispatchResponse::Status DispatcherImpl::setExtraHTTPHeaders(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -1302,13 +1336,15 @@ DispatchResponse::Status DispatcherImpl::setExtraHTTPHeaders(int callId, std::un
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setExtraHTTPHeaders(std::move(in_headers));
-    if (weak->get()) {
+    if (response.status() == DispatchResponse::kFallThrough)
+        return response.status();
+    if (weak->get())
         weak->get()->sendResponse(callId, response);
-    }
     return response.status();
 }
 
-DispatchResponse::Status DispatcherImpl::getResponseBody(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+DispatchResponse::Status DispatcherImpl::getResponseBody(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -1326,21 +1362,20 @@ DispatchResponse::Status DispatcherImpl::getResponseBody(int callId, std::unique
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getResponseBody(in_requestId, &out_body, &out_base64Encoded);
-    if (response.status() == DispatchResponse::kFallThrough) {
+    if (response.status() == DispatchResponse::kFallThrough)
         return response.status();
-    }
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     if (response.status() == DispatchResponse::kSuccess) {
         result->setValue("body", ValueConversions<String>::toValue(out_body));
         result->setValue("base64Encoded", ValueConversions<bool>::toValue(out_base64Encoded));
     }
-    if (weak->get()) {
+    if (weak->get())
         weak->get()->sendResponse(callId, response, std::move(result));
-    }
     return response.status();
 }
 
-DispatchResponse::Status DispatcherImpl::setCacheDisabled(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+DispatchResponse::Status DispatcherImpl::setCacheDisabled(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -1355,13 +1390,15 @@ DispatchResponse::Status DispatcherImpl::setCacheDisabled(int callId, std::uniqu
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setCacheDisabled(in_cacheDisabled);
-    if (weak->get()) {
+    if (response.status() == DispatchResponse::kFallThrough)
+        return response.status();
+    if (weak->get())
         weak->get()->sendResponse(callId, response);
-    }
     return response.status();
 }
 
-DispatchResponse::Status DispatcherImpl::loadResource(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+DispatchResponse::Status DispatcherImpl::loadResource(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -1383,24 +1420,25 @@ DispatchResponse::Status DispatcherImpl::loadResource(int callId, std::unique_pt
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->loadResource(in_frameId, in_url, &out_content, &out_mimeType, &out_status);
-    if (response.status() == DispatchResponse::kFallThrough) {
+    if (response.status() == DispatchResponse::kFallThrough)
         return response.status();
-    }
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     if (response.status() == DispatchResponse::kSuccess) {
         result->setValue("content", ValueConversions<String>::toValue(out_content));
         result->setValue("mimeType", ValueConversions<String>::toValue(out_mimeType));
         result->setValue("status", ValueConversions<double>::toValue(out_status));
     }
-    if (weak->get()) {
+    if (weak->get())
         weak->get()->sendResponse(callId, response, std::move(result));
-    }
     return response.status();
 }
 
 // static
-void Dispatcher::wire(UberDispatcher* dispatcher, Backend* backend) {
-    dispatcher->registerBackend("Network", std::unique_ptr<protocol::DispatcherBase>(new DispatcherImpl(dispatcher->channel(), backend, dispatcher->fallThroughForNotFound())));
+void Dispatcher::wire(UberDispatcher* uber, Backend* backend)
+{
+    std::unique_ptr<DispatcherImpl> dispatcher(new DispatcherImpl(uber->channel(), backend, uber->fallThroughForNotFound()));
+    uber->setupRedirects(dispatcher->redirects());
+    uber->registerBackend("Network", std::move(dispatcher));
 }
 
 } // Network

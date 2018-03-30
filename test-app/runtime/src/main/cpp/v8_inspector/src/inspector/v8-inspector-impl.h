@@ -31,7 +31,8 @@
 #ifndef V8_INSPECTOR_V8INSPECTORIMPL_H_
 #define V8_INSPECTOR_V8INSPECTORIMPL_H_
 
-#include <vector>
+#include <functional>
+#include <map>
 
 #include "src/base/macros.h"
 #include "src/inspector/protocol/Protocol.h"
@@ -51,105 +52,104 @@ class V8RuntimeAgentImpl;
 class V8StackTraceImpl;
 
 class V8InspectorImpl : public V8Inspector {
-    public:
-        V8InspectorImpl(v8::Isolate*, V8InspectorClient*);
-        ~V8InspectorImpl() override;
+ public:
+  V8InspectorImpl(v8::Isolate*, V8InspectorClient*);
+  ~V8InspectorImpl() override;
 
-        v8::Isolate* isolate() const {
-            return m_isolate;
-        }
-        V8InspectorClient* client() {
-            return m_client;
-        }
-        V8Debugger* debugger() {
-            return m_debugger.get();
-        }
-        int contextGroupId(v8::Local<v8::Context>);
-        int contextGroupId(int contextId);
+  v8::Isolate* isolate() const { return m_isolate; }
+  V8InspectorClient* client() { return m_client; }
+  V8Debugger* debugger() { return m_debugger.get(); }
+  int contextGroupId(v8::Local<v8::Context>) const;
+  int contextGroupId(int contextId) const;
 
-        v8::MaybeLocal<v8::Value> compileAndRunInternalScript(v8::Local<v8::Context>,
-                v8::Local<v8::String>);
-        v8::MaybeLocal<v8::Script> compileScript(v8::Local<v8::Context>,
-                const String16& code,
-                const String16& fileName);
-        v8::Local<v8::Context> regexContext();
+  v8::MaybeLocal<v8::Value> compileAndRunInternalScript(v8::Local<v8::Context>,
+                                                        v8::Local<v8::String>);
+  v8::MaybeLocal<v8::Script> compileScript(v8::Local<v8::Context>,
+                                           const String16& code,
+                                           const String16& fileName);
+  v8::Local<v8::Context> regexContext();
 
-        // V8Inspector implementation.
-        std::unique_ptr<V8InspectorSession> connect(int contextGroupId,
-                V8Inspector::Channel*,
-                const StringView& state) override;
-        void contextCreated(const V8ContextInfo&) override;
-        void contextDestroyed(v8::Local<v8::Context>) override;
-        void resetContextGroup(int contextGroupId) override;
-        void idleStarted() override;
-        void idleFinished() override;
-        unsigned exceptionThrown(v8::Local<v8::Context>, const StringView& message,
-                                 v8::Local<v8::Value> exception,
-                                 const StringView& detailedMessage,
-                                 const StringView& url, unsigned lineNumber,
-                                 unsigned columnNumber, std::unique_ptr<V8StackTrace>,
-                                 int scriptId) override;
-        void exceptionRevoked(v8::Local<v8::Context>, unsigned exceptionId,
-                              const StringView& message) override;
-        std::unique_ptr<V8StackTrace> createStackTrace(
-            v8::Local<v8::StackTrace>) override;
-        std::unique_ptr<V8StackTrace> captureStackTrace(bool fullStack) override;
-        void asyncTaskScheduled(const StringView& taskName, void* task,
-                                bool recurring) override;
-        void asyncTaskCanceled(void* task) override;
-        void asyncTaskStarted(void* task) override;
-        void asyncTaskFinished(void* task) override;
-        void allAsyncTasksCanceled() override;
+  // V8Inspector implementation.
+  std::unique_ptr<V8InspectorSession> connect(int contextGroupId,
+                                              V8Inspector::Channel*,
+                                              const StringView& state) override;
+  void contextCreated(const V8ContextInfo&) override;
+  void contextDestroyed(v8::Local<v8::Context>) override;
+  void contextCollected(int contextGroupId, int contextId);
+  void resetContextGroup(int contextGroupId) override;
+  void idleStarted() override;
+  void idleFinished() override;
+  unsigned exceptionThrown(v8::Local<v8::Context>, const StringView& message,
+                           v8::Local<v8::Value> exception,
+                           const StringView& detailedMessage,
+                           const StringView& url, unsigned lineNumber,
+                           unsigned columnNumber, std::unique_ptr<V8StackTrace>,
+                           int scriptId) override;
+  void exceptionRevoked(v8::Local<v8::Context>, unsigned exceptionId,
+                        const StringView& message) override;
+  std::unique_ptr<V8StackTrace> createStackTrace(
+      v8::Local<v8::StackTrace>) override;
+  std::unique_ptr<V8StackTrace> captureStackTrace(bool fullStack) override;
+  void asyncTaskScheduled(const StringView& taskName, void* task,
+                          bool recurring) override;
+  void asyncTaskCanceled(void* task) override;
+  void asyncTaskStarted(void* task) override;
+  void asyncTaskFinished(void* task) override;
+  void allAsyncTasksCanceled() override;
 
-        unsigned nextExceptionId() {
-            return ++m_lastExceptionId;
-        }
-        void enableStackCapturingIfNeeded();
-        void disableStackCapturingIfNeeded();
-        void muteExceptions(int contextGroupId);
-        void unmuteExceptions(int contextGroupId);
-        V8ConsoleMessageStorage* ensureConsoleMessageStorage(int contextGroupId);
-        bool hasConsoleMessageStorage(int contextGroupId);
-        using ContextByIdMap =
-            protocol::HashMap<int, std::unique_ptr<InspectedContext>>;
-        void discardInspectedContext(int contextGroupId, int contextId);
-        const ContextByIdMap* contextGroup(int contextGroupId);
-        void disconnect(V8InspectorSessionImpl*);
-        V8InspectorSessionImpl* sessionForContextGroup(int contextGroupId);
-        InspectedContext* getContext(int groupId, int contextId) const;
-        V8DebuggerAgentImpl* enabledDebuggerAgentForGroup(int contextGroupId);
-        V8RuntimeAgentImpl* enabledRuntimeAgentForGroup(int contextGroupId);
-        V8ProfilerAgentImpl* enabledProfilerAgentForGroup(int contextGroupId);
-        V8Console* console();
+  V8StackTraceId storeCurrentStackTrace(const StringView& description) override;
+  void externalAsyncTaskStarted(const V8StackTraceId& parent) override;
+  void externalAsyncTaskFinished(const V8StackTraceId& parent) override;
 
-    private:
-        v8::Isolate* m_isolate;
-        V8InspectorClient* m_client;
-        std::unique_ptr<V8Debugger> m_debugger;
-        v8::Global<v8::Context> m_regexContext;
-        int m_capturingStackTracesCount;
-        unsigned m_lastExceptionId;
-        int m_lastContextId;
+  unsigned nextExceptionId() { return ++m_lastExceptionId; }
+  void enableStackCapturingIfNeeded();
+  void disableStackCapturingIfNeeded();
+  void muteExceptions(int contextGroupId);
+  void unmuteExceptions(int contextGroupId);
+  V8ConsoleMessageStorage* ensureConsoleMessageStorage(int contextGroupId);
+  bool hasConsoleMessageStorage(int contextGroupId);
+  void discardInspectedContext(int contextGroupId, int contextId);
+  void disconnect(V8InspectorSessionImpl*);
+  V8InspectorSessionImpl* sessionById(int contextGroupId, int sessionId);
+  InspectedContext* getContext(int groupId, int contextId) const;
+  InspectedContext* getContext(int contextId) const;
+  V8Console* console();
+  void forEachContext(int contextGroupId,
+                      std::function<void(InspectedContext*)> callback);
+  void forEachSession(int contextGroupId,
+                      std::function<void(V8InspectorSessionImpl*)> callback);
 
-        using MuteExceptionsMap = protocol::HashMap<int, int>;
-        MuteExceptionsMap m_muteExceptionsMap;
+ private:
+  v8::Isolate* m_isolate;
+  V8InspectorClient* m_client;
+  std::unique_ptr<V8Debugger> m_debugger;
+  v8::Global<v8::Context> m_regexContext;
+  int m_capturingStackTracesCount;
+  unsigned m_lastExceptionId;
+  int m_lastContextId;
+  int m_lastSessionId = 0;
 
-        using ContextsByGroupMap =
-            protocol::HashMap<int, std::unique_ptr<ContextByIdMap>>;
-        ContextsByGroupMap m_contexts;
+  using MuteExceptionsMap = protocol::HashMap<int, int>;
+  MuteExceptionsMap m_muteExceptionsMap;
 
-        using SessionMap = protocol::HashMap<int, V8InspectorSessionImpl*>;
-        SessionMap m_sessions;
+  using ContextByIdMap =
+      protocol::HashMap<int, std::unique_ptr<InspectedContext>>;
+  using ContextsByGroupMap =
+      protocol::HashMap<int, std::unique_ptr<ContextByIdMap>>;
+  ContextsByGroupMap m_contexts;
 
-        using ConsoleStorageMap =
-            protocol::HashMap<int, std::unique_ptr<V8ConsoleMessageStorage>>;
-        ConsoleStorageMap m_consoleStorageMap;
+  // contextGroupId -> sessionId -> session
+  protocol::HashMap<int, std::map<int, V8InspectorSessionImpl*>> m_sessions;
 
-        protocol::HashMap<int, int> m_contextIdToGroupIdMap;
+  using ConsoleStorageMap =
+      protocol::HashMap<int, std::unique_ptr<V8ConsoleMessageStorage>>;
+  ConsoleStorageMap m_consoleStorageMap;
 
-        std::unique_ptr<V8Console> m_console;
+  protocol::HashMap<int, int> m_contextIdToGroupIdMap;
 
-        DISALLOW_COPY_AND_ASSIGN(V8InspectorImpl);
+  std::unique_ptr<V8Console> m_console;
+
+  DISALLOW_COPY_AND_ASSIGN(V8InspectorImpl);
 };
 
 }  // namespace v8_inspector

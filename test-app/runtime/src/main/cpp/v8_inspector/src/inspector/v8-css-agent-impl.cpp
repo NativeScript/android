@@ -152,7 +152,7 @@ DispatchResponse V8CSSAgentImpl::getComputedStyleForNode(int in_nodeId, std::uni
         if (!getComputedStylesForNode.IsEmpty() && getComputedStylesForNode->IsFunction()) {
             auto getComputedStylesForNodeFunc = getComputedStylesForNode.As<v8::Function>();
             v8::Local<v8::Value> args[] = { v8::Number::New(isolate, in_nodeId) };
-            v8::TryCatch tc;
+            v8::TryCatch tc(isolate);
 
             auto maybeResult = getComputedStylesForNodeFunc->Call(context, global, 1, args);
 

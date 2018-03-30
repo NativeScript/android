@@ -287,6 +287,13 @@ class V8_EXPORT CpuProfiler {
   static CpuProfiler* New(Isolate* isolate);
 
   /**
+   * Synchronously collect current stack sample in all profilers attached to
+   * the |isolate|. The call does not affect number of ticks recorded for
+   * the current top node.
+   */
+  static void CollectSample(Isolate* isolate);
+
+  /**
    * Disposes the CPU profiler object.
    */
   void Dispose();
@@ -322,7 +329,8 @@ class V8_EXPORT CpuProfiler {
    * Recording the forced sample does not contribute to the aggregated
    * profile statistics.
    */
-  void CollectSample();
+  V8_DEPRECATED("Use static CollectSample(Isolate*) instead.",
+                void CollectSample());
 
   /**
    * Tells the profiler whether the embedder is idle.
@@ -389,7 +397,7 @@ class V8_EXPORT HeapGraphNode {
     kRegExp = 6,         // RegExp.
     kHeapNumber = 7,     // Number stored in the heap.
     kNative = 8,         // Native object (not from V8 heap).
-    kSynthetic = 9,      // Synthetic object, usualy used for grouping
+    kSynthetic = 9,      // Synthetic object, usually used for grouping
                          // snapshot items together.
     kConsString = 10,    // Concatenated string. A pair of pointers to strings.
     kSlicedString = 11,  // Sliced string. A fragment of another string.
@@ -784,7 +792,7 @@ class V8_EXPORT HeapProfiler {
   /**
    * Returns the sampled profile of allocations allocated (and still live) since
    * StartSamplingHeapProfiler was called. The ownership of the pointer is
-   * transfered to the caller. Returns nullptr if sampling heap profiler is not
+   * transferred to the caller. Returns nullptr if sampling heap profiler is not
    * active.
    */
   AllocationProfile* GetAllocationProfile();
@@ -808,9 +816,6 @@ class V8_EXPORT HeapProfiler {
    * handle.
    */
   static const uint16_t kPersistentHandleNoClassId = 0;
-
-  /** Returns memory used for profiler internal data and snapshots. */
-  size_t GetProfilerMemorySize();
 
  private:
   HeapProfiler();

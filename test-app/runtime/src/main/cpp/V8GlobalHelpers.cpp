@@ -87,7 +87,7 @@ Local<String> tns::JsonStringifyObject(Isolate* isolate, Handle<v8::Value> value
     if (!smartJSONStringifyFunction.IsEmpty()) {
         if (value->IsObject()) {
             v8::Local<v8::Value> resultValue;
-            v8::TryCatch tc;
+            v8::TryCatch tc(isolate);
 
             Local<Value> args[] = { value->ToObject() };
             auto success = smartJSONStringifyFunction->Call(isolate->GetCurrentContext(), Undefined(isolate), 1, args).ToLocal(&resultValue);
@@ -99,7 +99,7 @@ Local<String> tns::JsonStringifyObject(Isolate* isolate, Handle<v8::Value> value
     }
 
     v8::Local<v8::String> resultString;
-    v8::TryCatch tc;
+    v8::TryCatch tc(isolate);
     auto success = v8::JSON::Stringify(isolate->GetCurrentContext(), value->ToObject(isolate), ArgConverter::ConvertToV8String(isolate, "2")).ToLocal(&resultString);
 
     if (!success && tc.HasCaught()) {
