@@ -3,7 +3,7 @@ describe("Tests native modules)", function () {
 	it("should load native module", function () {
 		var x = 12;
 		var y = 34;
-		
+
 		var arch;
 		var sysArch = java.lang.System.getProperty("os.arch"); // ro.product.cpu.abi
 		var lcArch = sysArch.toLowerCase();
@@ -16,11 +16,11 @@ describe("Tests native modules)", function () {
 		} else {
 			throw new Error("Unsupported architecture=" + sysArch);
 		}
-		
+
 		var calc = require("../modules/libCalc-" + arch + ".so");
-		
+
 		var sum = calc.add(x, y);
-		
+
 		expect(sum).toBe(46);
 	});
 });
