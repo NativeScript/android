@@ -151,7 +151,6 @@ MESSAGE( STATUS "# CMAKE_CXX_FLAGS: " ${CMAKE_CXX_FLAGS} )
 # Command info: https://cmake.org/cmake/help/v3.4/command/target_link_libraries.html
 # linking v8 and inspector libraries to runtime(NativeScript library)
 target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libzip.a )
-target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libinspector.a )
 target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_base.a )
 target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_init.a )
 target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_initializers.a )
