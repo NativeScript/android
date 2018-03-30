@@ -22,6 +22,7 @@
 #include "include/zipconf.h"
 #include <sstream>
 #include <dlfcn.h>
+#include <sys/stat.h>
 #include <console/Console.h>
 #include "NetworkDomainCallbackHandlers.h"
 #include "sys/system_properties.h"
@@ -392,20 +393,26 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     char sdkVersion[PROP_VALUE_MAX];
     __system_property_get("ro.build.version.sdk", sdkVersion);
 
-    void* snapshotPtr;
+    void* snapshotPtr = nullptr;
+    string snapshotPath;
 
     // If device isn't running on Sdk 17
     if (strcmp(sdkVersion, string("17").c_str()) != 0) {
-        snapshotPtr = dlopen("libsnapshot.so", RTLD_LAZY | RTLD_LOCAL);
+        snapshotPath = "libsnapshot.so";
     } else {
         // If device is running on android Sdk 17
         // dlopen reads relative path to dynamic libraries or reads from folder different than the nativeLibsDirs on the android device
         string snapshotPath = nativeLibDir + "/libsnapshot.so";
-        snapshotPtr = dlopen(snapshotPath.c_str(), RTLD_LAZY | RTLD_LOCAL);
     }
 
-    if (snapshotPtr == nullptr) {
-        DEBUG_WRITE_FORCE("Failed to load snapshot: %s", dlerror());
+    struct stat buffer;
+    bool snapshotFileExists = (stat (snapshotPath.c_str(), &buffer) == 0);
+    if (snapshotFileExists) {
+        // Only try to load a snapshot if the file exists
+        snapshotPtr = dlopen(snapshotPath.c_str(), RTLD_LAZY | RTLD_LOCAL);
+        if (snapshotPtr == nullptr) {
+            DEBUG_WRITE_FORCE("Failed to load snapshot: %s", dlerror());
+        }
     }
 
     if (snapshotPtr) {
@@ -429,11 +436,11 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
             m_heapSnapshotBlob = new MemoryMappedFile(MemoryMappedFile::Open(snapshotPath.c_str()));
             m_startupData->data = static_cast<const char*>(m_heapSnapshotBlob->memory);
             m_startupData->raw_size = m_heapSnapshotBlob->size;
+            create_params.snapshot_blob = m_startupData;
 
             DEBUG_WRITE_FORCE("Snapshot read %s (%dB).", snapshotPath.c_str(), m_heapSnapshotBlob->size);
         } else if (!saveSnapshot) {
             DEBUG_WRITE_FORCE("No snapshot file found at %s", snapshotPath.c_str());
-
         } else {
             // This should be executed before V8::Initialize, which calls it with false.
             NativeScriptExtension::CpuFeaturesProbe(true);
@@ -463,10 +470,10 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
                                       snapshotPath.c_str(), m_startupData->raw_size);
                 }
             }
+
+            create_params.snapshot_blob = m_startupData;
         }
     }
-
-    //create_params.snapshot_blob = m_startupData;
 
     /*
      * Setup the V8Platform only once per process - once for the application lifetime
