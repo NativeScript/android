@@ -11,6 +11,12 @@
 #include "src/inspector/protocol/Forward.h"
 #include "src/inspector/protocol/Runtime.h"
 #include "src/inspector/protocol/Schema.h"
+#include "src/inspector/protocol/Page.h"
+#include "src/inspector/protocol/Network.h"
+#include "src/inspector/protocol/DOM.h"
+#include "src/inspector/protocol/CSS.h"
+#include "src/inspector/protocol/Overlay.h"
+#include "src/inspector/protocol/Log.h"
 
 #include "include/v8-inspector.h"
 
@@ -25,6 +31,12 @@ class V8HeapProfilerAgentImpl;
 class V8ProfilerAgentImpl;
 class V8RuntimeAgentImpl;
 class V8SchemaAgentImpl;
+class V8PageAgentImpl;
+class V8NetworkAgentImpl;
+class V8DOMAgentImpl;
+class V8CSSAgentImpl;
+class V8OverlayAgentImpl;
+class V8LogAgentImpl;
 
 using protocol::Response;
 
@@ -36,12 +48,42 @@ class V8InspectorSessionImpl : public V8InspectorSession,
       V8Inspector::Channel*, const StringView& state);
   ~V8InspectorSessionImpl();
 
-  V8InspectorImpl* inspector() const { return m_inspector; }
-  V8ConsoleAgentImpl* consoleAgent() { return m_consoleAgent.get(); }
-  V8DebuggerAgentImpl* debuggerAgent() { return m_debuggerAgent.get(); }
-  V8SchemaAgentImpl* schemaAgent() { return m_schemaAgent.get(); }
-  V8ProfilerAgentImpl* profilerAgent() { return m_profilerAgent.get(); }
-  V8RuntimeAgentImpl* runtimeAgent() { return m_runtimeAgent.get(); }
+    V8InspectorImpl* inspector() const {
+        return m_inspector;
+    }
+    V8ConsoleAgentImpl* consoleAgent() {
+        return m_consoleAgent.get();
+    }
+    V8DebuggerAgentImpl* debuggerAgent() {
+        return m_debuggerAgent.get();
+    }
+    V8SchemaAgentImpl* schemaAgent() {
+        return m_schemaAgent.get();
+    }
+    V8ProfilerAgentImpl* profilerAgent() {
+        return m_profilerAgent.get();
+    }
+    V8RuntimeAgentImpl* runtimeAgent() {
+        return m_runtimeAgent.get();
+    }
+    V8PageAgentImpl* pageAgent() {
+        return m_pageAgent.get();
+    }
+    V8NetworkAgentImpl* networkAgent() {
+        return m_networkAgent.get();
+    }
+    V8DOMAgentImpl* domAgent() {
+        return m_domAgent.get();
+    }
+    V8CSSAgentImpl* cssAgent() {
+        return m_cssAgent.get();
+    }
+    V8OverlayAgentImpl* overlayAgent() {
+        return m_overlayAgent.get();
+    }
+    V8LogAgentImpl* logAgent() {
+        return m_logAgent.get();
+    }
   int contextGroupId() const { return m_contextGroupId; }
   int sessionId() const { return m_sessionId; }
 
@@ -118,6 +160,12 @@ class V8InspectorSessionImpl : public V8InspectorSession,
   std::unique_ptr<V8ProfilerAgentImpl> m_profilerAgent;
   std::unique_ptr<V8ConsoleAgentImpl> m_consoleAgent;
   std::unique_ptr<V8SchemaAgentImpl> m_schemaAgent;
+  std::unique_ptr<V8PageAgentImpl> m_pageAgent;
+  std::unique_ptr<V8NetworkAgentImpl> m_networkAgent;
+  std::unique_ptr<V8DOMAgentImpl> m_domAgent;
+  std::unique_ptr<V8CSSAgentImpl> m_cssAgent;
+  std::unique_ptr<V8OverlayAgentImpl> m_overlayAgent;
+  std::unique_ptr<V8LogAgentImpl> m_logAgent;
   std::vector<std::unique_ptr<V8InspectorSession::Inspectable>>
       m_inspectedObjects;
 

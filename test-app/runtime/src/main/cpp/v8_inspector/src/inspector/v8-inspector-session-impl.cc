@@ -18,6 +18,12 @@
 #include "src/inspector/v8-profiler-agent-impl.h"
 #include "src/inspector/v8-runtime-agent-impl.h"
 #include "src/inspector/v8-schema-agent-impl.h"
+#include "src/inspector/v8-page-agent-impl.h"
+#include "src/inspector/v8-network-agent-impl.h"
+#include "src/inspector/v8-dom-agent-impl.h"
+#include "src/inspector/v8-css-agent-impl.h"
+#include "src/inspector/v8-overlay-agent-impl.h"
+#include "src/inspector/v8-log-agent-impl.h"
 
 namespace v8_inspector {
 
@@ -34,7 +40,19 @@ bool V8InspectorSession::canDispatchMethod(const StringView& method) {
          stringViewStartsWith(method,
                               protocol::Console::Metainfo::commandPrefix) ||
          stringViewStartsWith(method,
-                              protocol::Schema::Metainfo::commandPrefix);
+                              protocol::Schema::Metainfo::commandPrefix) ||
+        stringViewStartsWith(method,
+                              protocol::Page::Metainfo::commandPrefix) ||
+         stringViewStartsWith(method,
+                              protocol::Network::Metainfo::commandPrefix) ||
+         stringViewStartsWith(method,
+                              protocol::DOM::Metainfo::commandPrefix) ||
+         stringViewStartsWith(method,
+                              protocol::CSS::Metainfo::commandPrefix) ||
+         stringViewStartsWith(method,
+                              protocol::Overlay::Metainfo::commandPrefix) ||
+         stringViewStartsWith(method,
+                              protocol::Log::Metainfo::commandPrefix);
 }
 
 // static
@@ -66,7 +84,13 @@ V8InspectorSessionImpl::V8InspectorSessionImpl(V8InspectorImpl* inspector,
       m_heapProfilerAgent(nullptr),
       m_profilerAgent(nullptr),
       m_consoleAgent(nullptr),
-      m_schemaAgent(nullptr) {
+      m_schemaAgent(nullptr),
+      m_pageAgent(nullptr),
+      m_networkAgent(nullptr),
+      m_domAgent(nullptr),
+      m_cssAgent(nullptr),
+      m_overlayAgent(nullptr),
+      m_logAgent(nullptr) {
   if (savedState.length()) {
     std::unique_ptr<protocol::Value> state =
         protocol::StringUtil::parseJSON(toString16(savedState));
@@ -101,12 +125,37 @@ V8InspectorSessionImpl::V8InspectorSessionImpl(V8InspectorImpl* inspector,
       this, this, agentState(protocol::Schema::Metainfo::domainName)));
   protocol::Schema::Dispatcher::wire(&m_dispatcher, m_schemaAgent.get());
 
+  m_pageAgent.reset(new V8PageAgentImpl(
+          this, this, agentState(protocol::Page::Metainfo::domainName)));
+  protocol::Page::Dispatcher::wire(&m_dispatcher, m_pageAgent.get());
+
+  m_networkAgent.reset(new V8NetworkAgentImpl(
+          this, this, agentState(protocol::Network::Metainfo::domainName)));
+  protocol::Network::Dispatcher::wire(&m_dispatcher, m_networkAgent.get());
+
+  m_domAgent.reset(new V8DOMAgentImpl(
+          this, this, agentState(protocol::DOM::Metainfo::domainName)));
+  protocol::DOM::Dispatcher::wire(&m_dispatcher, m_domAgent.get());
+
+  m_cssAgent.reset(new V8CSSAgentImpl(
+          this, this, agentState(protocol::CSS::Metainfo::domainName)));
+  protocol::CSS::Dispatcher::wire(&m_dispatcher, m_cssAgent.get());
+
+  m_overlayAgent.reset(new V8OverlayAgentImpl(
+          this, this, agentState(protocol::Overlay::Metainfo::domainName)));
+  protocol::Overlay::Dispatcher::wire(&m_dispatcher, m_overlayAgent.get());
+
+  m_logAgent.reset(new V8LogAgentImpl(
+          this, this, agentState(protocol::Log::Metainfo::domainName)));
+  protocol::Log::Dispatcher::wire(&m_dispatcher, m_logAgent.get());
+
   if (savedState.length()) {
     m_runtimeAgent->restore();
     m_debuggerAgent->restore();
     m_heapProfilerAgent->restore();
     m_profilerAgent->restore();
     m_consoleAgent->restore();
+    m_pageAgent->restore();
   }
 }
 
@@ -117,6 +166,12 @@ V8InspectorSessionImpl::~V8InspectorSessionImpl() {
   m_heapProfilerAgent->disable();
   m_debuggerAgent->disable();
   m_runtimeAgent->disable();
+  m_pageAgent->disable();
+  m_networkAgent->disable();
+  m_domAgent->disable();
+  m_cssAgent->disable();
+  m_overlayAgent->disable();
+  m_logAgent->disable();
   m_inspector->disconnect(this);
 }
 
@@ -351,6 +406,30 @@ V8InspectorSessionImpl::supportedDomainsImpl() {
                        .setName(protocol::Schema::Metainfo::domainName)
                        .setVersion(protocol::Schema::Metainfo::version)
                        .build());
+  result.push_back(protocol::Schema::Domain::create()
+                         .setName(protocol::Page::Metainfo::domainName)
+                         .setVersion(protocol::Page::Metainfo::version)
+                         .build());
+  result.push_back(protocol::Schema::Domain::create()
+                           .setName(protocol::Network::Metainfo::domainName)
+                           .setVersion(protocol::Network::Metainfo::version)
+                           .build());
+  result.push_back(protocol::Schema::Domain::create()
+                           .setName(protocol::DOM::Metainfo::domainName)
+                           .setVersion(protocol::DOM::Metainfo::version)
+                           .build());
+  result.push_back(protocol::Schema::Domain::create()
+                           .setName(protocol::CSS::Metainfo::domainName)
+                           .setVersion(protocol::CSS::Metainfo::version)
+                           .build());
+  result.push_back(protocol::Schema::Domain::create()
+                           .setName(protocol::Overlay::Metainfo::domainName)
+                           .setVersion(protocol::Overlay::Metainfo::version)
+                           .build());
+  result.push_back(protocol::Schema::Domain::create()
+                           .setName(protocol::Log::Metainfo::domainName)
+                           .setVersion(protocol::Log::Metainfo::version)
+                           .build());
   return result;
 }
 
