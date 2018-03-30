@@ -36,18 +36,18 @@ class SplayTree {
         class Locator;
 
         explicit SplayTree(AllocationPolicy allocator = AllocationPolicy())
-            : root_(NULL), allocator_(allocator) {}
+            : root_(nullptr), allocator_(allocator) {}
         ~SplayTree();
 
-        INLINE(void* operator new (size_t size,
-                                   AllocationPolicy allocator = AllocationPolicy())) {
+        INLINE(void* operator new(size_t size,
+                                  AllocationPolicy allocator = AllocationPolicy())) {
             return allocator.New(static_cast<int>(size));
         }
-        INLINE(void operator delete (void* p)) {
+        INLINE(void operator delete(void* p)) {
             AllocationPolicy::Delete(p);
         }
         // Please the MSVC compiler.  We should never have to execute this.
-        INLINE(void operator delete (void* p, AllocationPolicy policy)) {
+        INLINE(void operator delete(void* p, AllocationPolicy policy)) {
             UNREACHABLE();
         }
 
@@ -94,7 +94,7 @@ class SplayTree {
         }
 
         bool is_empty() {
-            return root_ == NULL;
+            return root_ == nullptr;
         }
 
         // Perform the splay operation for the given key. Moves the node with
@@ -106,20 +106,17 @@ class SplayTree {
         class Node {
             public:
                 Node(const Key& key, const Value& value)
-                    : key_(key),
-                      value_(value),
-                      left_(NULL),
-                      right_(NULL) { }
+                    : key_(key), value_(value), left_(nullptr), right_(nullptr) {}
 
-                INLINE(void* operator new (size_t size, AllocationPolicy allocator)) {
+                INLINE(void* operator new(size_t size, AllocationPolicy allocator)) {
                     return allocator.New(static_cast<int>(size));
                 }
-                INLINE(void operator delete (void* p)) {
+                INLINE(void operator delete(void* p)) {
                     return AllocationPolicy::Delete(p);
                 }
                 // Please the MSVC compiler.  We should never have to execute
                 // this.
-                INLINE(void operator delete (void* p, AllocationPolicy allocator)) {
+                INLINE(void operator delete(void* p, AllocationPolicy allocator)) {
                     UNREACHABLE();
                 }
 
@@ -150,7 +147,7 @@ class SplayTree {
         class Locator BASE_EMBEDDED {
             public:
                 explicit Locator(Node* node) : node_(node) { }
-                Locator() : node_(NULL) { }
+                Locator() : node_(nullptr) {}
                 const Key& key() {
                     return node_->key_;
                 }
@@ -174,7 +171,7 @@ class SplayTree {
     protected:
         // Resets tree root. Existing nodes become unreachable.
         void ResetRoot() {
-            root_ = NULL;
+            root_ = nullptr;
         }
 
     private:

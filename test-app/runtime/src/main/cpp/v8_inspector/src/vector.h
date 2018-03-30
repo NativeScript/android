@@ -19,13 +19,14 @@ namespace internal {
 template <typename T>
 class Vector {
     public:
-        Vector() : start_(NULL), length_(0) {}
-        Vector(T* data, int length) : start_(data), length_(length) {
-            DCHECK(length == 0 || (length > 0 && data != NULL));
+        constexpr Vector() : start_(nullptr), length_(0) {}
+
+        Vector(T* data, size_t length) : start_(data), length_(length) {
+            DCHECK(length == 0 || data != nullptr);
         }
 
         template <int N>
-        explicit Vector(T (&arr)[N]) : start_(arr), length_(N) {}
+        explicit constexpr Vector(T (&arr)[N]) : start_(arr), length_(N) {}
 
         static Vector<T> New(int length) {
             return Vector<T>(NewArray<T>(length), length);
@@ -33,36 +34,40 @@ class Vector {
 
         // Returns a vector using the same backing storage as this one,
         // spanning from and including 'from', to but not including 'to'.
-        Vector<T> SubVector(int from, int to) const {
-            DCHECK(0 <= from);
-            SLOW_DCHECK(from <= to);
-            SLOW_DCHECK(static_cast<unsigned>(to) <= static_cast<unsigned>(length_));
+        Vector<T> SubVector(size_t from, size_t to) const {
+            DCHECK_LE(from, to);
+            DCHECK_LE(to, length_);
             return Vector<T>(start() + from, to - from);
         }
 
         // Returns the length of the vector.
         int length() const {
+            DCHECK(length_ <= static_cast<size_t>(std::numeric_limits<int>::max()));
+            return static_cast<int>(length_);
+        }
+
+        // Returns the length of the vector as a size_t.
+        constexpr size_t size() const {
             return length_;
         }
 
         // Returns whether or not the vector is empty.
-        bool is_empty() const {
+        constexpr bool is_empty() const {
             return length_ == 0;
         }
 
         // Returns the pointer to the start of the data in the vector.
-        T* start() const {
+        constexpr T* start() const {
             return start_;
         }
 
         // Access individual vector elements - checks bounds in debug mode.
-        T& operator[](int index) const {
-            DCHECK_LE(0, index);
+        T& operator[](size_t index) const {
             DCHECK_LT(index, length_);
             return start_[index];
         }
 
-        const T& at(int index) const {
+        const T& at(size_t index) const {
             return operator[](index);
         }
 
@@ -71,21 +76,22 @@ class Vector {
         }
 
         T& last() {
+            DCHECK_LT(0, length_);
             return start_[length_ - 1];
         }
 
         typedef T* iterator;
-        inline iterator begin() const {
-            return &start_[0];
+        constexpr iterator begin() const {
+            return start_;
         }
-        inline iterator end() const {
-            return &start_[length_];
+        constexpr iterator end() const {
+            return start_ + length_;
         }
 
         // Returns a clone of this vector with a new backing store.
         Vector<T> Clone() const {
             T* result = NewArray<T>(length_);
-            for (int i = 0; i < length_; i++) {
+            for (size_t i = 0; i < length_; i++) {
                 result[i] = start_[i];
             }
             return Vector<T>(result, length_);
@@ -121,7 +127,7 @@ class Vector {
             std::stable_sort(start(), start() + length());
         }
 
-        void Truncate(int length) {
+        void Truncate(size_t length) {
             DCHECK(length <= length_);
             length_ = length;
         }
@@ -130,12 +136,12 @@ class Vector {
         // vector is empty.
         void Dispose() {
             DeleteArray(start_);
-            start_ = NULL;
+            start_ = nullptr;
             length_ = 0;
         }
 
-        inline Vector<T> operator+(int offset) {
-            DCHECK(offset < length_);
+        inline Vector<T> operator+(size_t offset) {
+            DCHECK_LE(offset, length_);
             return Vector<T>(start_ + offset, length_ - offset);
         }
 
@@ -146,11 +152,11 @@ class Vector {
 
         // Factory method for creating empty vectors.
         static Vector<T> empty() {
-            return Vector<T>(NULL, 0);
+            return Vector<T>(nullptr, 0);
         }
 
-        template<typename S>
-        static Vector<T> cast(Vector<S> input) {
+        template <typename S>
+        static constexpr Vector<T> cast(Vector<S> input) {
             return Vector<T>(reinterpret_cast<T*>(input.start()),
                              input.length() * sizeof(S) / sizeof(T));
         }
@@ -162,7 +168,7 @@ class Vector {
             if (start_ == other.start_) {
                 return true;
             }
-            for (int i = 0; i < length_; ++i) {
+            for (size_t i = 0; i < length_; ++i) {
                 if (start_[i] != other.start_[i]) {
                     return false;
                 }
@@ -177,7 +183,7 @@ class Vector {
 
     private:
         T* start_;
-        int length_;
+        size_t length_;
 
         template <typename CookedComparer>
         class RawComparer {
@@ -239,7 +245,7 @@ inline Vector<char> MutableCStrVector(char* data, int max) {
 }
 
 template <typename T, int N>
-inline Vector<T> ArrayVector(T (&arr)[N]) {
+inline constexpr Vector<T> ArrayVector(T (&arr)[N]) {
     return Vector<T>(arr);
 }
 
