@@ -1,5 +1,5 @@
 rootProject.name = "__PROJECT_NAME__"
-include ':app' //,  ':runtime', ":runtime-binding-generator"
+include ':app'//, ':runtime', ':runtime-binding-generator'
 
 //project(':runtime').projectDir = new File('path/to/runtime')
 //project(':runtime-binding-generator').projectDir = new File('path/to/runtime-binding-generator')
