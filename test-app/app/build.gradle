@@ -63,7 +63,7 @@ def nativescriptDependencies = new JsonSlurper().parseText(dependenciesJson.text
 def computeCompileSdkVersion = { -> project.hasProperty("compileSdk") ? compileSdk : 26 }
 def computeTargetSdkVersion = { -> project.hasProperty("targetSdk") ? targetSdk : 26 }
 def computeBuildToolsVersion = { ->
-    "25.2.5"
+    project.hasProperty("buildToolsVersion") ? buildToolsVersion : "27.0.1"
 }
 
 project.ext.selectedBuildType = project.hasProperty("release") ? "release" : "debug"
@@ -224,8 +224,7 @@ dependencies {
         println "\t + adding nativescript runtime package dependency: $runtime"
         project.dependencies.add("implementation", [name: runtime, ext: "aar"])
     } else {
-        implementation project(':runtime')
-
+        implementation project(path: ':runtime', configuration: 'default')
     }
 }
 
