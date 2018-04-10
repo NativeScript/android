@@ -76,8 +76,6 @@ Local<Function> GetSmartJSONStringifyFunction(Isolate* isolate) {
 }
 
 Local<String> tns::JsonStringifyObject(Isolate* isolate, Handle<v8::Value> value) {
-    v8::HandleScope scope(isolate);
-
     if (value.IsEmpty()) {
         return String::Empty(isolate);
     }

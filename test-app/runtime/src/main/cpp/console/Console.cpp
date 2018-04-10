@@ -82,6 +82,7 @@ const v8::Local<v8::String> transformJSObject(v8::Isolate* isolate, v8::Local<v8
     if (hasCustomToStringImplementation) {
         resultString = objToString;
     } else {
+        v8::HandleScope scope(isolate);
         resultString = JsonStringifyObject(isolate, object);
     }
 

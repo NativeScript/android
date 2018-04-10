@@ -26,7 +26,7 @@ void MetadataNode::Init(Isolate* isolate) {
 }
 
 MetadataNode::MetadataNode(MetadataTreeNode* treeNode) :
-        m_treeNode(treeNode) {
+    m_treeNode(treeNode) {
     uint8_t nodeType = s_metadataReader.GetNodeType(treeNode);
 
     m_name = s_metadataReader.ReadTypeName(m_treeNode);
@@ -133,7 +133,7 @@ Local<Object> MetadataNode::CreateWrapper(Isolate* isolate) {
     uint8_t nodeType = s_metadataReader.GetNodeType(m_treeNode);
 
     bool isClass = s_metadataReader.IsNodeTypeClass(nodeType),
-            isInterface = s_metadataReader.IsNodeTypeInterface(nodeType);
+         isInterface = s_metadataReader.IsNodeTypeInterface(nodeType);
 
     if (isClass || isInterface) {
         obj = GetConstructorFunction(isolate);
@@ -676,6 +676,7 @@ void MetadataNode::SetInnerTypes(Isolate* isolate, Local<Function>& ctorFunction
 Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* isolate, MetadataTreeNode* treeNode) {
     std::vector<MethodCallbackData*> instanceMethodsCallbackData;
 
+    v8::HandleScope handleScope(isolate);
     auto ft = GetConstructorFunctionTemplate(isolate, treeNode, instanceMethodsCallbackData);
 
     return ft;
@@ -684,8 +685,6 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* is
 Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* isolate, MetadataTreeNode* treeNode, vector<MethodCallbackData*>& instanceMethodsCallbackData) {
     SET_PROFILER_FRAME();
     tns::instrumentation::Frame frame;
-
-    v8::HandleScope handleScope(isolate);
 
     //try get cached "ctorFuncTemplate"
     Local<FunctionTemplate> ctorFuncTemplate;
@@ -1653,7 +1652,7 @@ Local<Function> MetadataNode::Wrap(Isolate* isolate, const Local<Function>& func
                       "double", "else", "enum", "eval", "export", "extends", "false", "final", "finally", "float", "for", "function", "goto", "if", "implements",
                       "import", "in", "instanceof", "int", "interface", "let", "long", "native", "new", "null", "package", "private", "protected", "public", "return",
                       "short", "static", "super", "switch", "synchronized", "this", "throw", "throws", "transient", "true", "try", "typeof", "var", "void", "volatile", "while", "with", "yield"
-        };
+                    };
 
         keywords = set<string>(kw, kw + sizeof(kw)/sizeof(kw[0]));
     }
@@ -1716,7 +1715,7 @@ Local<Function> MetadataNode::Wrap(Isolate* isolate, const Local<Function>& func
 bool MetadataNode::CheckClassHierarchy(JEnv& env, jclass currentClass, MetadataTreeNode* curentTreeNode, MetadataTreeNode* baseTreeNode, std::vector<MetadataTreeNode*>& skippedBaseTypes) {
     auto shouldSkipBaseClass = false;
     if ((currentClass != nullptr) && (baseTreeNode != curentTreeNode) && (baseTreeNode != nullptr) &&
-        (baseTreeNode->offsetValue > 0)) {
+            (baseTreeNode->offsetValue > 0)) {
         auto baseNode = GetOrCreateInternal(baseTreeNode);
         auto baseClass = env.FindClass(baseNode->m_name);
         if (baseClass != nullptr) {
