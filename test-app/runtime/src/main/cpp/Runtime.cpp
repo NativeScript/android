@@ -22,7 +22,6 @@
 #include "include/zipconf.h"
 #include <sstream>
 #include <dlfcn.h>
-#include <sys/stat.h>
 #include <console/Console.h>
 #include "NetworkDomainCallbackHandlers.h"
 #include "sys/system_properties.h"
@@ -405,14 +404,9 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
         string snapshotPath = nativeLibDir + "/libsnapshot.so";
     }
 
-    struct stat buffer;
-    bool snapshotFileExists = (stat (snapshotPath.c_str(), &buffer) == 0);
-    if (snapshotFileExists) {
-        // Only try to load a snapshot if the file exists
-        snapshotPtr = dlopen(snapshotPath.c_str(), RTLD_LAZY | RTLD_LOCAL);
-        if (snapshotPtr == nullptr) {
-            DEBUG_WRITE_FORCE("Failed to load snapshot: %s", dlerror());
-        }
+    snapshotPtr = dlopen(snapshotPath.c_str(), RTLD_LAZY | RTLD_LOCAL);
+    if (snapshotPtr == nullptr) {
+        DEBUG_WRITE_FORCE("Failed to load snapshot: %s", dlerror());
     }
 
     if (snapshotPtr) {
