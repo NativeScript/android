@@ -198,6 +198,8 @@ dependencies {
     if (project.hasProperty("supportVersion")) {
         supportVer = supportVersion
     }
+
+    compile "com.android.support:multidex:1.0.2"
     compile "com.android.support:support-v4:$supportVer"
     compile "com.android.support:appcompat-v7:$supportVer"
     debugCompile "com.android.support:design:$supportVer"
@@ -272,7 +274,7 @@ task addDependenciesFromAppResourcesLibraries {
             println "\t + adding jar plugin dependency: $jarFileAbsolutePath"
             pluginsJarLibraries.add(jarFile.getAbsolutePath())
         }
-        
+
         project.dependencies.add("compile", jarFiles)
     }
 }
