@@ -23,9 +23,9 @@ include_directories( src/main/cpp
                     ${ANDROID_NDK_ROOT}/sysroot/usr/include/${ARCH_INCLUDE_DIR}/
                     )
 if ( OPTIMIZED_BUILD )
-    set(CMAKE_CXX_FLAGS "-std=c++11 -fexceptions -fno-builtin-stpcpy -fno-rtti -O3 -fvisibility=hidden -ffunction-sections -fno-data-sections -Wl,--exclude-libs=ALL -Wl,--gc-sections")
+    set(CMAKE_CXX_FLAGS "-std=c++11 -Werror -fexceptions -fno-builtin-stpcpy -fno-rtti -O3 -fvisibility=hidden -ffunction-sections -fno-data-sections -Wl,--exclude-libs=ALL -Wl,--gc-sections")
 else()
-    set(CMAKE_CXX_FLAGS "-std=c++11 -fexceptions -fno-builtin-stpcpy -fno-rtti -g ")
+    set(CMAKE_CXX_FLAGS "-std=c++11 -Werror -fexceptions -fno-builtin-stpcpy -fno-rtti -g ")
 endif()
 
 # Command info: https://cmake.org/cmake/help/v3.4/command/add_library.html

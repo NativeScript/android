@@ -29,6 +29,10 @@ sourceSets {
     }
 }
 
+compileJava {
+    options.compilerArgs << "-Xlint:unchecked" << "-Xlint:deprecation"
+}
+
 compileJava.outputs.dir("$rootDir/dist/classes")
 
 dependencies {
