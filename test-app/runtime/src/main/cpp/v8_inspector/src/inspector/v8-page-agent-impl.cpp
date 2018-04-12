@@ -15,10 +15,11 @@ static const char pageEnabled[] = "pageEnabled";
 V8PageAgentImpl::V8PageAgentImpl(
     V8InspectorSessionImpl* session, protocol::FrontendChannel* frontendChannel,
     protocol::DictionaryValue* state)
-    : m_session(session), m_frontend(frontendChannel),
+    : m_session(session),
+      m_frontend(frontendChannel),
       m_state(state),
       m_enabled(false),
-      m_frameIdentifier("NSFrameIdentifier"),
+      m_frameIdentifier(""),
       m_frameUrl("file://") {}
 
 V8PageAgentImpl::~V8PageAgentImpl() {}
