@@ -12,6 +12,7 @@ Contains the source code for the NativeScript's Android Runtime. [NativeScript](
 - [Build Prerequisites](#build-prerequisites)
 - [How to build](#how-to-build)
 - [How to run tests](#how-to-run-tests)
+- [Misc](#misc)
 - [Get Help](#get-help)
 
 <!-- /TOC -->
@@ -86,6 +87,12 @@ Note: You might need to run the Android Studio from the command line in order to
 ```Shell
 gradlew runtest
 ```
+## Contribute
+We love PRs! Check out the [contributing guidelines](CONTRIBUTING.md). If you want to contribute, but you are not sure where to start - look for [issues labeled `help wanted`](https://github.com/NativeScript/android-runtime/issues?q=is%3Aopen+is%3Aissue+label%3A%22help+wanted%22).
+
+## Misc
+
+* [Implementing additional Chrome DevTools protocol Domains](docs/extending-inspector.md)
 
 ## Get Help
 Please, use [github issues](https://github.com/NativeScript/android-runtime/issues) strictly for [reporting bugs](CONTRIBUTING.md#reporting-bugs) or [requesting features](CONTRIBUTING.md#requesting-new-features). For general questions and support, check out the [NativeScript community forum](https://discourse.nativescript.org/) or ask our experts in [NativeScript community Slack channel](http://developer.telerik.com/wp-login.php?action=slack-invitation).

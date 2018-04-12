@@ -1446,7 +1446,11 @@ bool MetadataNode::GetExtendLocation(string& extendLocation, bool isTypeScriptEx
             if (srcFileName == "<embedded>") {
                 // Corner case, extend call is coming from the heap snapshot script
                 // This is possible for lazily compiled code - e.g. from the body of a function
-                fullPathToFile = "_embedded_script_";
+
+                // Replace embedded_script with 'script' as the SBG will emit classes from the
+                // embedded_script file as 'Object_script_line_col', getting rid of fragments
+                // preceding the underscore (_)
+                fullPathToFile = "script";
             } else {
                 string hardcodedPathToSkip = Constants::APP_ROOT_FOLDER_PATH;
 
@@ -1479,6 +1483,12 @@ bool MetadataNode::GetExtendLocation(string& extendLocation, bool isTypeScriptEx
                 extendLocationStream << fullPathToFile.c_str() << " line:" << lineNumber << " unkown column number";
                 extendLocation = extendLocationStream.str();
                 return false;
+            }
+
+            // Account for the column length offset added by the addition of the Common JS function wrapper
+            // See issue https://github.com/NativeScript/android-runtime/issues/975
+            if (lineNumber == 1) {
+                column = column - ModuleInternal::MODULE_PROLOGUE_LENGTH;
             }
 
             extendLocationStream << fullPathToFile.c_str() << "_" << lineNumber << "_" << column << "_";

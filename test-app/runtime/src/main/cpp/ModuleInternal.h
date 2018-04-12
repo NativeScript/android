@@ -34,6 +34,8 @@ class ModuleInternal {
          * Used before initializing workers, to ensure a thread will not be created, when the file doesn't exist
          */
         static void CheckFileExists(v8::Isolate* isolate, const std::string& path, const std::string& baseDir);
+
+        static int MODULE_PROLOGUE_LENGTH;
     private:
         enum class ModulePathKind;
 
