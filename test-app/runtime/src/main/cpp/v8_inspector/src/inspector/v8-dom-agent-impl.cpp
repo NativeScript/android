@@ -102,7 +102,7 @@ DispatchResponse V8DOMAgentImpl::getDocument(std::unique_ptr<protocol::DOM::Node
                 auto errorSupportString = errorSupport.errors().utf8();
                 if (!errorSupportString.empty()) {
                     auto errorMessage = "Error while parsing debug `DOM Node` object. ";
-                    DEBUG_WRITE_FORCE("JS Error: %s", errorMessage, errorSupportString.c_str());
+                    DEBUG_WRITE_FORCE("JS Error: %s, Error support: %s", errorMessage, errorSupportString.c_str());
                     return DispatchResponse::Error(errorMessage);
                 } else {
                     *out_root = std::move(domNode);
@@ -137,7 +137,7 @@ DispatchResponse V8DOMAgentImpl::removeNode(int in_nodeId) {
             v8::Local<v8::Value> args[] = { v8::Number::New(isolate, in_nodeId) };
             v8::TryCatch tc(isolate);
 
-            removeNodeFunc->Call(context, global, 1, args);
+            (void)removeNodeFunc->Call(context, global, 1, args);
 
             if (tc.HasCaught()) {
                 auto error = utils::Common::getJSCallErrorMessage(removeNodeFunctionString, tc.Message()->Get()).c_str();
@@ -178,7 +178,7 @@ DispatchResponse V8DOMAgentImpl::setAttributesAsText(int in_nodeId, const String
             };
             v8::TryCatch tc(isolate);
 
-            setAttributeAsTextFunc->Call(context, global, 3, args);
+            (void)setAttributeAsTextFunc->Call(context, global, 3, args);
 
             if (tc.HasCaught()) {
                 auto error = utils::Common::getJSCallErrorMessage(setAttributeAsTextFunctionString, tc.Message()->Get()).c_str();

@@ -29,7 +29,7 @@ void ArrayHelper::Init(const Local<Context>& context) {
         auto success = arr.ToLocal(&arrVal);
         if (success) {
             auto arrayObj = arrVal.As<Object>();
-            arrayObj->Set(context, ArgConverter::ConvertToV8String(isolate, "create"), FunctionTemplate::New(isolate, CreateJavaArrayCallback)->GetFunction());
+            (void)arrayObj->Set(context, ArgConverter::ConvertToV8String(isolate, "create"), FunctionTemplate::New(isolate, CreateJavaArrayCallback)->GetFunction());
         }
     }
 }

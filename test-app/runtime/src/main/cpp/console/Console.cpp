@@ -92,7 +92,7 @@ const v8::Local<v8::String> transformJSObject(v8::Isolate* isolate, v8::Local<v8
 const v8::Local<v8::String> buildStringFromArg(v8::Isolate* isolate, const v8::Local<v8::Value>& val) {
     v8::Local<v8::String> argString;
     if (val->IsFunction()) {
-        val->ToDetailString(isolate->GetCurrentContext()).ToLocal(&argString);
+        (void)val->ToDetailString(isolate->GetCurrentContext()).ToLocal(&argString);
     } else if (val->IsArray()) {
         auto cachedSelf = val;
         auto array = val->ToObject();
@@ -129,7 +129,7 @@ const v8::Local<v8::String> buildStringFromArg(v8::Isolate* isolate, const v8::L
 
         argString = transformJSObject(isolate, obj);
     } else {
-        val->ToDetailString(isolate->GetCurrentContext()).ToLocal(&argString);
+        (void)val->ToDetailString(isolate->GetCurrentContext()).ToLocal(&argString);
     }
 
     return argString;
@@ -292,7 +292,7 @@ void Console::dirCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
                 v8::Local<v8::Object> argObject = info[0].As<v8::Object>();
 
                 v8::Local<v8::Array> propNames;
-                argObject->GetPropertyNames(context).ToLocal(&propNames);
+                (void)argObject->GetPropertyNames(context).ToLocal(&propNames);
 
                 auto propertiesLen = propNames->Length();
                 for (int i = 0; i < propertiesLen; i++) {
