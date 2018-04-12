@@ -476,7 +476,7 @@ public class Dump {
         Label label = new Label();
         mv.visitJumpInsn(org.ow2.asmdex.Opcodes.INSN_IF_NEZ, label, thisRegister - 2, 0); //compare local var 1 with false
         mv.visitVarInsn(org.ow2.asmdex.Opcodes.INSN_CONST_4, thisRegister - 1, 1); 		//put true in local var 1
-        mv.visitFieldInsn(org.ow2.asmdex.Opcodes.INSN_IPUT_BOOLEAN, tnsClassSignature, "__initialized", "Z", thisRegister - 1 , thisRegister); //set field to the value of 2
+        mv.visitFieldInsn(org.ow2.asmdex.Opcodes.INSN_IPUT_BOOLEAN, tnsClassSignature, "__initialized", "Z", thisRegister - 1, thisRegister);  //set field to the value of 2
         mv.visitMethodInsn(org.ow2.asmdex.Opcodes.INSN_INVOKE_STATIC, LCOM_TNS_RUNTIME, "initInstance", "VLjava/lang/Object;", new int[] { thisRegister }); //call init instance passing this as arugment
         mv.visitLabel(label);
     }
@@ -600,7 +600,7 @@ public class Dump {
 
     private void generateCallOverrideBlock(MethodVisitor mv, MethodDescriptor method, int thisRegister, String classSignature, String tnsClassSignature) {
         //call the override
-        int argCount = generateArrayForCallJsArguments(mv, method.getParameterTypes() , thisRegister, classSignature, tnsClassSignature);
+        int argCount = generateArrayForCallJsArguments(mv, method.getParameterTypes(), thisRegister, classSignature, tnsClassSignature);
         mv.visitStringInsn(org.ow2.asmdex.Opcodes.INSN_CONST_STRING, 1, method.getName());
 
         ClassDescriptor returnType = method.getReturnType();
@@ -811,6 +811,7 @@ public class Dump {
         ClassVisitor cv;
 
         int classModifiers = getDexModifiers(classTo);
+        @SuppressWarnings("unchecked")
         ArrayList<String> interfacesToImplement = new ArrayList(Arrays.asList(classImplentedInterfaces));
 
         if (classTo.isInterface()) {
