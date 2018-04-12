@@ -1269,6 +1269,7 @@ string MetadataNode::CreateFullClassName(const std::string& className, const std
 
 void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
     tns::instrumentation::Frame frame;
+    tns::instrumentation::Frame frameFirstPart;
     try {
         if (info.IsConstructCall()) {
             string exMsg("Can't call 'extend' as constructor");
@@ -1317,6 +1318,12 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
                 return;
             }
         }
+
+        if (frameFirstPart.check()) {
+            frameFirstPart.log("Resolved location and validated arguments");
+        }
+
+        tns::instrumentation::Frame frameSecondPart;
 
         auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value());
 
@@ -1387,6 +1394,9 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
         auto cache = GetMetadataNodeCache(isolate);
         cache->ExtendedCtorFuncCache.insert(make_pair(fullExtendedName, cacheData));
 
+        if (frameSecondPart.check()) {
+            frameSecondPart.log("Created class descriptor");
+        }
         if (frame.check()) {
             frame.log("Extending: " + node->m_name);
         }
