@@ -30,7 +30,7 @@ sourceSets {
 }
 
 compileJava {
-    options.compilerArgs << "-Xlint:unchecked" << "-Xlint:deprecation"
+    options.compilerArgs << "-Xlint:all" << "-Xlint:-options" << "-Werror"
 }
 
 compileJava.outputs.dir("$rootDir/dist/classes")

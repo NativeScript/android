@@ -811,7 +811,7 @@ public class Dump {
         ClassVisitor cv;
 
         int classModifiers = getDexModifiers(classTo);
-        @SuppressWarnings("unchecked")
+        @SuppressWarnings({"unchecked", "rawtypes"})
         ArrayList<String> interfacesToImplement = new ArrayList(Arrays.asList(classImplentedInterfaces));
 
         if (classTo.isInterface()) {

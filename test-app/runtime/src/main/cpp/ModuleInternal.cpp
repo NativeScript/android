@@ -190,7 +190,7 @@ void ModuleInternal::Load(const string& path) {
     auto globalObject = context->Global();
     auto require = globalObject->Get(context, ArgConverter::ConvertToV8String(isolate, "require")).ToLocalChecked().As<Function>();
     Local<Value> args[] = { ArgConverter::ConvertToV8String(isolate, path) };
-    (void)require->Call(context, globalObject, 1, args);
+    require->Call(context, globalObject, 1, args);
 }
 
 void ModuleInternal::LoadWorker(const string& path) {

@@ -952,12 +952,12 @@ void CallbackHandlers::WorkerGlobalOnMessageCallback(Isolate* isolate, jstring m
         if (!isEmpty && isFunction) {
             auto msgString = ArgConverter::jstringToV8String(isolate, message).As<String>();
             Local<Value> msg;
-            (void)JSON::Parse(isolate, msgString).ToLocal(&msg);
+            JSON::Parse(isolate, msgString).ToLocal(&msg);
 
             auto obj = Object::New(isolate);
-            (void)obj->DefineOwnProperty(isolate->GetCurrentContext(),
-                                         ArgConverter::ConvertToV8String(isolate, "data"), msg,
-                                         PropertyAttribute::ReadOnly);
+            obj->DefineOwnProperty(isolate->GetCurrentContext(),
+                                   ArgConverter::ConvertToV8String(isolate, "data"), msg,
+                                   PropertyAttribute::ReadOnly);
             Local<Value> args1[] = {obj};
 
             auto func = callback.As<Function>();
@@ -1060,12 +1060,12 @@ void CallbackHandlers::WorkerObjectOnMessageCallback(Isolate* isolate, jint work
         if (!isEmpty && isFunction) {
             auto msgString = ArgConverter::jstringToV8String(isolate, message).As<String>();
             Local<Value> msg;
-            (void)JSON::Parse(isolate, msgString).ToLocal(&msg);
+            JSON::Parse(isolate, msgString).ToLocal(&msg);
 
             auto obj = Object::New(isolate);
-            (void)obj->DefineOwnProperty(isolate->GetCurrentContext(),
-                                         ArgConverter::ConvertToV8String(isolate, "data"), msg,
-                                         PropertyAttribute::ReadOnly);
+            obj->DefineOwnProperty(isolate->GetCurrentContext(),
+                                   ArgConverter::ConvertToV8String(isolate, "data"), msg,
+                                   PropertyAttribute::ReadOnly);
             Local<Value> args1[] = {obj};
 
             auto func = callback.As<Function>();

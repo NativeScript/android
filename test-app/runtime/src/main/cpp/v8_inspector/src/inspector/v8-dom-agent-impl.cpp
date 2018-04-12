@@ -137,7 +137,7 @@ DispatchResponse V8DOMAgentImpl::removeNode(int in_nodeId) {
             v8::Local<v8::Value> args[] = { v8::Number::New(isolate, in_nodeId) };
             v8::TryCatch tc(isolate);
 
-            (void)removeNodeFunc->Call(context, global, 1, args);
+            removeNodeFunc->Call(context, global, 1, args);
 
             if (tc.HasCaught()) {
                 auto error = utils::Common::getJSCallErrorMessage(removeNodeFunctionString, tc.Message()->Get()).c_str();
@@ -178,7 +178,7 @@ DispatchResponse V8DOMAgentImpl::setAttributesAsText(int in_nodeId, const String
             };
             v8::TryCatch tc(isolate);
 
-            (void)setAttributeAsTextFunc->Call(context, global, 3, args);
+            setAttributeAsTextFunc->Call(context, global, 3, args);
 
             if (tc.HasCaught()) {
                 auto error = utils::Common::getJSCallErrorMessage(setAttributeAsTextFunctionString, tc.Message()->Get()).c_str();

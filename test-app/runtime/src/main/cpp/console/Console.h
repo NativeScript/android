@@ -42,7 +42,7 @@ class Console {
 
             func->SetName(funcName);
 
-            (void)consoleInstance->CreateDataProperty(context, funcName, func);
+            consoleInstance->CreateDataProperty(context, funcName, func);
         }
 
         static void sendToADBLogcat(const std::string& log, android_LogPriority logPriority);

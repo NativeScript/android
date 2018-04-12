@@ -17,6 +17,11 @@ public class TypeInfo implements TypeDescriptor {
     }
 
     @Override
+    public int hashCode() {
+        return getSignature().hashCode();
+    }
+
+    @Override
     public boolean equals(Object other) {
         if ((other != null) && (other instanceof TypeDescriptor)) {
             TypeDescriptor otherTypeDesc = (TypeDescriptor)other;

@@ -11,7 +11,7 @@ sourceCompatibility = "1.7"
 targetCompatibility = "1.7"
 
 compileJava {
-    options.compilerArgs << "-Xlint:unchecked" << "-Xlint:deprecation"
+    options.compilerArgs << "-Xlint:all" << "-Xlint:-options" << "-Werror"
 }
 
 task copyJarToBuildTools (type: Copy) {

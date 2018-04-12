@@ -69,7 +69,7 @@ public class EncodedValueType extends EncodedValue {
 
     @Override
     public byte[] encode(ConstantPool constantPool) {
-        int index = constantPool.getTypeIndex(((String)value));
+        int index = constantPool.getTypeIndex((value));
         return EncodedValueUtil.encodeUnsignedValue(index, type);
     }
 
