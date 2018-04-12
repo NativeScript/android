@@ -8,7 +8,8 @@
 #define v8_inspector_protocol_Page_h
 
 #include "src/inspector/protocol/Protocol.h"
-#include "GenericTypes.h"
+#include "src/inspector/protocol/GenericTypes.h"
+#include "src/inspector/protocol/Runtime.h"
 // For each imported domain we generate a ValueConversions struct instead of a full domain definition
 // and include Domain::API version from there.
 
@@ -17,12 +18,14 @@ namespace protocol {
 namespace Page {
 
 // ------------- Forward and enum declarations.
-// Unique frame identifier.
-using FrameId = String;
 // Resource type as it was perceived by the rendering engine.
 using ResourceType = String;
 // Coordinate system used by supplied coordinates.
 using CoordinateSystem = String;
+// Unique frame identifier.
+using FrameId = String;
+// Viewport for capturing screenshot.
+class Viewport;
 // Information about the Frame on the page.
 class Frame;
 //
@@ -33,8 +36,14 @@ class FrameResourceTree;
 class SearchResult;
 // Unique script identifier.
 using ScriptIdentifier = String;
-// Viewport for capturing screenshot.
-class Viewport;
+// Wrapper for notification params
+class LoadEventFiredNotification;
+// Wrapper for notification params
+class FrameDetachedNotification;
+// Wrapper for notification params
+class FrameStartedLoadingNotification;
+// Wrapper for notification params
+class FrameStoppedLoadingNotification;
 
 namespace ResourceTypeEnum {
 extern const char* Document;
@@ -54,13 +63,143 @@ extern const char* Page;
 
 // ------------- Type and builder declarations.
 
+// Viewport for capturing screenshot.
+class  Viewport : public Serializable {
+        PROTOCOL_DISALLOW_COPY(Viewport);
+    public:
+        static std::unique_ptr<Viewport> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+        ~Viewport() override { }
+
+        double getX() {
+            return m_x;
+        }
+        void setX(double value) {
+            m_x = value;
+        }
+
+        double getY() {
+            return m_y;
+        }
+        void setY(double value) {
+            m_y = value;
+        }
+
+        double getWidth() {
+            return m_width;
+        }
+        void setWidth(double value) {
+            m_width = value;
+        }
+
+        double getHeight() {
+            return m_height;
+        }
+        void setHeight(double value) {
+            m_height = value;
+        }
+
+        double getScale() {
+            return m_scale;
+        }
+        void setScale(double value) {
+            m_scale = value;
+        }
+
+        std::unique_ptr<protocol::DictionaryValue> toValue() const;
+        String serialize() override {
+            return toValue()->serialize();
+        }
+        std::unique_ptr<Viewport> clone() const;
+
+        template<int STATE>
+        class ViewportBuilder {
+            public:
+                enum {
+                    NoFieldsSet = 0,
+                    XSet = 1 << 1,
+                    YSet = 1 << 2,
+                    WidthSet = 1 << 3,
+                    HeightSet = 1 << 4,
+                    ScaleSet = 1 << 5,
+                    AllFieldsSet = (XSet | YSet | WidthSet | HeightSet | ScaleSet | 0)
+                };
+
+
+                ViewportBuilder<STATE | XSet>& setX(double value) {
+                    static_assert(!(STATE & XSet), "property x should not be set yet");
+                    m_result->setX(value);
+                    return castState<XSet>();
+                }
+
+                ViewportBuilder<STATE | YSet>& setY(double value) {
+                    static_assert(!(STATE & YSet), "property y should not be set yet");
+                    m_result->setY(value);
+                    return castState<YSet>();
+                }
+
+                ViewportBuilder<STATE | WidthSet>& setWidth(double value) {
+                    static_assert(!(STATE & WidthSet), "property width should not be set yet");
+                    m_result->setWidth(value);
+                    return castState<WidthSet>();
+                }
+
+                ViewportBuilder<STATE | HeightSet>& setHeight(double value) {
+                    static_assert(!(STATE & HeightSet), "property height should not be set yet");
+                    m_result->setHeight(value);
+                    return castState<HeightSet>();
+                }
+
+                ViewportBuilder<STATE | ScaleSet>& setScale(double value) {
+                    static_assert(!(STATE & ScaleSet), "property scale should not be set yet");
+                    m_result->setScale(value);
+                    return castState<ScaleSet>();
+                }
+
+                std::unique_ptr<Viewport> build() {
+                    static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+                    return std::move(m_result);
+                }
+
+            private:
+                friend class Viewport;
+                ViewportBuilder() : m_result(new Viewport()) { }
+
+                template<int STEP> ViewportBuilder<STATE | STEP>& castState() {
+                    return *reinterpret_cast<ViewportBuilder<STATE | STEP>*>(this);
+                }
+
+                std::unique_ptr<protocol::Page::Viewport> m_result;
+        };
+
+        static ViewportBuilder<0> create() {
+            return ViewportBuilder<0>();
+        }
+
+    private:
+        Viewport() {
+            m_x = 0;
+            m_y = 0;
+            m_width = 0;
+            m_height = 0;
+            m_scale = 0;
+        }
+
+        double m_x;
+        double m_y;
+        double m_width;
+        double m_height;
+        double m_scale;
+};
+
+
 // Information about the Frame on the page.
-class  Frame {
+class  Frame : public Serializable {
         PROTOCOL_DISALLOW_COPY(Frame);
     public:
-        static std::unique_ptr<Frame> parse(protocol::Value* value, ErrorSupport* errors);
+        static std::unique_ptr<Frame> fromValue(protocol::Value* value, ErrorSupport* errors);
 
-        ~Frame() { }
+        ~Frame() override { }
 
         String getId() {
             return m_id;
@@ -117,7 +256,10 @@ class  Frame {
             m_mimeType = value;
         }
 
-        std::unique_ptr<protocol::DictionaryValue> serialize() const;
+        std::unique_ptr<protocol::DictionaryValue> toValue() const;
+        String serialize() override {
+            return toValue()->serialize();
+        }
         std::unique_ptr<Frame> clone() const;
 
         template<int STATE>
@@ -209,12 +351,12 @@ class  Frame {
 
 
 //
-class  FrameResource {
+class  FrameResource : public Serializable {
         PROTOCOL_DISALLOW_COPY(FrameResource);
     public:
-        static std::unique_ptr<FrameResource> parse(protocol::Value* value, ErrorSupport* errors);
+        static std::unique_ptr<FrameResource> fromValue(protocol::Value* value, ErrorSupport* errors);
 
-        ~FrameResource() { }
+        ~FrameResource() override { }
 
         String getUrl() {
             return m_url;
@@ -267,7 +409,10 @@ class  FrameResource {
             m_sourceMapURL = value;
         }
 
-        std::unique_ptr<protocol::DictionaryValue> serialize() const;
+        std::unique_ptr<protocol::DictionaryValue> toValue() const;
+        String serialize() override {
+            return toValue()->serialize();
+        }
         std::unique_ptr<FrameResource> clone() const;
 
         template<int STATE>
@@ -349,12 +494,12 @@ class  FrameResource {
 
 
 // Information about the Frame hierarchy along with their cached resources.
-class  FrameResourceTree {
+class  FrameResourceTree : public Serializable {
         PROTOCOL_DISALLOW_COPY(FrameResourceTree);
     public:
-        static std::unique_ptr<FrameResourceTree> parse(protocol::Value* value, ErrorSupport* errors);
+        static std::unique_ptr<FrameResourceTree> fromValue(protocol::Value* value, ErrorSupport* errors);
 
-        ~FrameResourceTree() { }
+        ~FrameResourceTree() override { }
 
         protocol::Page::Frame* getFrame() {
             return m_frame.get();
@@ -380,7 +525,10 @@ class  FrameResourceTree {
             m_resources = std::move(value);
         }
 
-        std::unique_ptr<protocol::DictionaryValue> serialize() const;
+        std::unique_ptr<protocol::DictionaryValue> toValue() const;
+        String serialize() override {
+            return toValue()->serialize();
+        }
         std::unique_ptr<FrameResourceTree> clone() const;
 
         template<int STATE>
@@ -442,12 +590,12 @@ class  FrameResourceTree {
 
 
 // Search result for resource.
-class  SearchResult {
+class  SearchResult : public Serializable {
         PROTOCOL_DISALLOW_COPY(SearchResult);
     public:
-        static std::unique_ptr<SearchResult> parse(protocol::Value* value, ErrorSupport* errors);
+        static std::unique_ptr<SearchResult> fromValue(protocol::Value* value, ErrorSupport* errors);
 
-        ~SearchResult() { }
+        ~SearchResult() override { }
 
         String getUrl() {
             return m_url;
@@ -480,7 +628,10 @@ class  SearchResult {
             m_requestId = value;
         }
 
-        std::unique_ptr<protocol::DictionaryValue> serialize() const;
+        std::unique_ptr<protocol::DictionaryValue> toValue() const;
+        String serialize() override {
+            return toValue()->serialize();
+        }
         std::unique_ptr<SearchResult> clone() const;
 
         template<int STATE>
@@ -550,130 +701,264 @@ class  SearchResult {
 };
 
 
-// Viewport for capturing screenshot.
-class  Viewport {
-        PROTOCOL_DISALLOW_COPY(Viewport);
+// Wrapper for notification params
+class  LoadEventFiredNotification : public Serializable {
+        PROTOCOL_DISALLOW_COPY(LoadEventFiredNotification);
     public:
-        static std::unique_ptr<Viewport> parse(protocol::Value* value, ErrorSupport* errors);
+        static std::unique_ptr<LoadEventFiredNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
 
-        ~Viewport() { }
+        ~LoadEventFiredNotification() override { }
 
-        double getX() {
-            return m_x;
+        double getTimestamp() {
+            return m_timestamp;
         }
-        void setX(double value) {
-            m_x = value;
-        }
-
-        double getY() {
-            return m_y;
-        }
-        void setY(double value) {
-            m_y = value;
+        void setTimestamp(double value) {
+            m_timestamp = value;
         }
 
-        double getWidth() {
-            return m_width;
+        std::unique_ptr<protocol::DictionaryValue> toValue() const;
+        String serialize() override {
+            return toValue()->serialize();
         }
-        void setWidth(double value) {
-            m_width = value;
-        }
-
-        double getHeight() {
-            return m_height;
-        }
-        void setHeight(double value) {
-            m_height = value;
-        }
-
-        double getScale() {
-            return m_scale;
-        }
-        void setScale(double value) {
-            m_scale = value;
-        }
-
-        std::unique_ptr<protocol::DictionaryValue> serialize() const;
-        std::unique_ptr<Viewport> clone() const;
+        std::unique_ptr<LoadEventFiredNotification> clone() const;
 
         template<int STATE>
-        class ViewportBuilder {
+        class LoadEventFiredNotificationBuilder {
             public:
                 enum {
                     NoFieldsSet = 0,
-                    XSet = 1 << 1,
-                    YSet = 1 << 2,
-                    WidthSet = 1 << 3,
-                    HeightSet = 1 << 4,
-                    ScaleSet = 1 << 5,
-                    AllFieldsSet = (XSet | YSet | WidthSet | HeightSet | ScaleSet | 0)
+                    TimestampSet = 1 << 1,
+                    AllFieldsSet = (TimestampSet | 0)
                 };
 
 
-                ViewportBuilder<STATE | XSet>& setX(double value) {
-                    static_assert(!(STATE & XSet), "property x should not be set yet");
-                    m_result->setX(value);
-                    return castState<XSet>();
+                LoadEventFiredNotificationBuilder<STATE | TimestampSet>& setTimestamp(double value) {
+                    static_assert(!(STATE & TimestampSet), "property timestamp should not be set yet");
+                    m_result->setTimestamp(value);
+                    return castState<TimestampSet>();
                 }
 
-                ViewportBuilder<STATE | YSet>& setY(double value) {
-                    static_assert(!(STATE & YSet), "property y should not be set yet");
-                    m_result->setY(value);
-                    return castState<YSet>();
-                }
-
-                ViewportBuilder<STATE | WidthSet>& setWidth(double value) {
-                    static_assert(!(STATE & WidthSet), "property width should not be set yet");
-                    m_result->setWidth(value);
-                    return castState<WidthSet>();
-                }
-
-                ViewportBuilder<STATE | HeightSet>& setHeight(double value) {
-                    static_assert(!(STATE & HeightSet), "property height should not be set yet");
-                    m_result->setHeight(value);
-                    return castState<HeightSet>();
-                }
-
-                ViewportBuilder<STATE | ScaleSet>& setScale(double value) {
-                    static_assert(!(STATE & ScaleSet), "property scale should not be set yet");
-                    m_result->setScale(value);
-                    return castState<ScaleSet>();
-                }
-
-                std::unique_ptr<Viewport> build() {
+                std::unique_ptr<LoadEventFiredNotification> build() {
                     static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
                     return std::move(m_result);
                 }
 
             private:
-                friend class Viewport;
-                ViewportBuilder() : m_result(new Viewport()) { }
+                friend class LoadEventFiredNotification;
+                LoadEventFiredNotificationBuilder() : m_result(new LoadEventFiredNotification()) { }
 
-                template<int STEP> ViewportBuilder<STATE | STEP>& castState() {
-                    return *reinterpret_cast<ViewportBuilder<STATE | STEP>*>(this);
+                template<int STEP> LoadEventFiredNotificationBuilder<STATE | STEP>& castState() {
+                    return *reinterpret_cast<LoadEventFiredNotificationBuilder<STATE | STEP>*>(this);
                 }
 
-                std::unique_ptr<protocol::Page::Viewport> m_result;
+                std::unique_ptr<protocol::Page::LoadEventFiredNotification> m_result;
         };
 
-        static ViewportBuilder<0> create() {
-            return ViewportBuilder<0>();
+        static LoadEventFiredNotificationBuilder<0> create() {
+            return LoadEventFiredNotificationBuilder<0>();
         }
 
     private:
-        Viewport() {
-            m_x = 0;
-            m_y = 0;
-            m_width = 0;
-            m_height = 0;
-            m_scale = 0;
+        LoadEventFiredNotification() {
+            m_timestamp = 0;
         }
 
-        double m_x;
-        double m_y;
-        double m_width;
-        double m_height;
-        double m_scale;
+        double m_timestamp;
+};
+
+
+// Wrapper for notification params
+class  FrameDetachedNotification : public Serializable {
+        PROTOCOL_DISALLOW_COPY(FrameDetachedNotification);
+    public:
+        static std::unique_ptr<FrameDetachedNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+        ~FrameDetachedNotification() override { }
+
+        String getFrameId() {
+            return m_frameId;
+        }
+        void setFrameId(const String& value) {
+            m_frameId = value;
+        }
+
+        std::unique_ptr<protocol::DictionaryValue> toValue() const;
+        String serialize() override {
+            return toValue()->serialize();
+        }
+        std::unique_ptr<FrameDetachedNotification> clone() const;
+
+        template<int STATE>
+        class FrameDetachedNotificationBuilder {
+            public:
+                enum {
+                    NoFieldsSet = 0,
+                    FrameIdSet = 1 << 1,
+                    AllFieldsSet = (FrameIdSet | 0)
+                };
+
+
+                FrameDetachedNotificationBuilder<STATE | FrameIdSet>& setFrameId(const String& value) {
+                    static_assert(!(STATE & FrameIdSet), "property frameId should not be set yet");
+                    m_result->setFrameId(value);
+                    return castState<FrameIdSet>();
+                }
+
+                std::unique_ptr<FrameDetachedNotification> build() {
+                    static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+                    return std::move(m_result);
+                }
+
+            private:
+                friend class FrameDetachedNotification;
+                FrameDetachedNotificationBuilder() : m_result(new FrameDetachedNotification()) { }
+
+                template<int STEP> FrameDetachedNotificationBuilder<STATE | STEP>& castState() {
+                    return *reinterpret_cast<FrameDetachedNotificationBuilder<STATE | STEP>*>(this);
+                }
+
+                std::unique_ptr<protocol::Page::FrameDetachedNotification> m_result;
+        };
+
+        static FrameDetachedNotificationBuilder<0> create() {
+            return FrameDetachedNotificationBuilder<0>();
+        }
+
+    private:
+        FrameDetachedNotification() {
+        }
+
+        String m_frameId;
+};
+
+
+// Wrapper for notification params
+class  FrameStartedLoadingNotification : public Serializable {
+        PROTOCOL_DISALLOW_COPY(FrameStartedLoadingNotification);
+    public:
+        static std::unique_ptr<FrameStartedLoadingNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+        ~FrameStartedLoadingNotification() override { }
+
+        String getFrameId() {
+            return m_frameId;
+        }
+        void setFrameId(const String& value) {
+            m_frameId = value;
+        }
+
+        std::unique_ptr<protocol::DictionaryValue> toValue() const;
+        String serialize() override {
+            return toValue()->serialize();
+        }
+        std::unique_ptr<FrameStartedLoadingNotification> clone() const;
+
+        template<int STATE>
+        class FrameStartedLoadingNotificationBuilder {
+            public:
+                enum {
+                    NoFieldsSet = 0,
+                    FrameIdSet = 1 << 1,
+                    AllFieldsSet = (FrameIdSet | 0)
+                };
+
+
+                FrameStartedLoadingNotificationBuilder<STATE | FrameIdSet>& setFrameId(const String& value) {
+                    static_assert(!(STATE & FrameIdSet), "property frameId should not be set yet");
+                    m_result->setFrameId(value);
+                    return castState<FrameIdSet>();
+                }
+
+                std::unique_ptr<FrameStartedLoadingNotification> build() {
+                    static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+                    return std::move(m_result);
+                }
+
+            private:
+                friend class FrameStartedLoadingNotification;
+                FrameStartedLoadingNotificationBuilder() : m_result(new FrameStartedLoadingNotification()) { }
+
+                template<int STEP> FrameStartedLoadingNotificationBuilder<STATE | STEP>& castState() {
+                    return *reinterpret_cast<FrameStartedLoadingNotificationBuilder<STATE | STEP>*>(this);
+                }
+
+                std::unique_ptr<protocol::Page::FrameStartedLoadingNotification> m_result;
+        };
+
+        static FrameStartedLoadingNotificationBuilder<0> create() {
+            return FrameStartedLoadingNotificationBuilder<0>();
+        }
+
+    private:
+        FrameStartedLoadingNotification() {
+        }
+
+        String m_frameId;
+};
+
+
+// Wrapper for notification params
+class  FrameStoppedLoadingNotification : public Serializable {
+        PROTOCOL_DISALLOW_COPY(FrameStoppedLoadingNotification);
+    public:
+        static std::unique_ptr<FrameStoppedLoadingNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+        ~FrameStoppedLoadingNotification() override { }
+
+        String getFrameId() {
+            return m_frameId;
+        }
+        void setFrameId(const String& value) {
+            m_frameId = value;
+        }
+
+        std::unique_ptr<protocol::DictionaryValue> toValue() const;
+        String serialize() override {
+            return toValue()->serialize();
+        }
+        std::unique_ptr<FrameStoppedLoadingNotification> clone() const;
+
+        template<int STATE>
+        class FrameStoppedLoadingNotificationBuilder {
+            public:
+                enum {
+                    NoFieldsSet = 0,
+                    FrameIdSet = 1 << 1,
+                    AllFieldsSet = (FrameIdSet | 0)
+                };
+
+
+                FrameStoppedLoadingNotificationBuilder<STATE | FrameIdSet>& setFrameId(const String& value) {
+                    static_assert(!(STATE & FrameIdSet), "property frameId should not be set yet");
+                    m_result->setFrameId(value);
+                    return castState<FrameIdSet>();
+                }
+
+                std::unique_ptr<FrameStoppedLoadingNotification> build() {
+                    static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+                    return std::move(m_result);
+                }
+
+            private:
+                friend class FrameStoppedLoadingNotification;
+                FrameStoppedLoadingNotificationBuilder() : m_result(new FrameStoppedLoadingNotification()) { }
+
+                template<int STEP> FrameStoppedLoadingNotificationBuilder<STATE | STEP>& castState() {
+                    return *reinterpret_cast<FrameStoppedLoadingNotificationBuilder<STATE | STEP>*>(this);
+                }
+
+                std::unique_ptr<protocol::Page::FrameStoppedLoadingNotification> m_result;
+        };
+
+        static FrameStoppedLoadingNotificationBuilder<0> create() {
+            return FrameStoppedLoadingNotificationBuilder<0>();
+        }
+
+    private:
+        FrameStoppedLoadingNotification() {
+        }
+
+        String m_frameId;
 };
 
 
@@ -683,16 +968,16 @@ class  Backend {
     public:
         virtual ~Backend() { }
 
-        virtual void enable(ErrorString*) = 0;
-        virtual void disable(ErrorString*) = 0;
-        virtual void addScriptToEvaluateOnLoad(ErrorString*, const String& in_scriptSource, String* out_identifier) = 0;
-        virtual void removeScriptToEvaluateOnLoad(ErrorString*, const String& in_identifier) = 0;
-        virtual void reload(ErrorString*, const Maybe<bool>& in_ignoreCache, const Maybe<String>& in_scriptToEvaluateOnLoad) = 0;
-        virtual void getResourceTree(ErrorString*, std::unique_ptr<protocol::Page::FrameResourceTree>* out_frameTree) = 0;
-        virtual void getResourceContent(ErrorString*, const String& in_frameId, const String& in_url, String* out_content, bool* out_base64Encoded) = 0;
-        virtual void searchInResource(ErrorString*, const String& in_frameId, const String& in_url, const String& in_query, const Maybe<bool>& in_caseSensitive, const Maybe<bool>& in_isRegex, const Maybe<String>& in_requestId, std::unique_ptr<protocol::Array<protocol::GenericTypes::SearchMatch>>* out_result) = 0;
-        virtual void searchInResources(ErrorString*, const String& in_text, const Maybe<bool>& in_caseSensitive, const Maybe<bool>& in_isRegex, std::unique_ptr<protocol::Array<protocol::Page::SearchResult>>* out_result) = 0;
-        virtual void setDocumentContent(ErrorString*, const String& in_frameId, const String& in_html) = 0;
+        virtual DispatchResponse enable() = 0;
+        virtual DispatchResponse disable() = 0;
+        virtual DispatchResponse addScriptToEvaluateOnLoad(const String& in_scriptSource, String* out_identifier) = 0;
+        virtual DispatchResponse removeScriptToEvaluateOnLoad(const String& in_identifier) = 0;
+        virtual DispatchResponse reload(Maybe<bool> in_ignoreCache, Maybe<String> in_scriptToEvaluateOnLoad) = 0;
+        virtual DispatchResponse getResourceTree(std::unique_ptr<protocol::Page::FrameResourceTree>* out_frameTree) = 0;
+        virtual DispatchResponse getResourceContent(const String& in_frameId, const String& in_url, String* out_content, bool* out_base64Encoded) = 0;
+        virtual DispatchResponse searchInResource(const String& in_frameId, const String& in_url, const String& in_query, Maybe<bool> in_caseSensitive, Maybe<bool> in_isRegex, Maybe<String> in_requestId, std::unique_ptr<protocol::Array<protocol::GenericTypes::SearchMatch>>* out_result) = 0;
+        virtual DispatchResponse searchInResources(const String& in_text, Maybe<bool> in_caseSensitive, Maybe<bool> in_isRegex, std::unique_ptr<protocol::Array<protocol::Page::SearchResult>>* out_result) = 0;
+        virtual DispatchResponse setDocumentContent(const String& in_frameId, const String& in_html) = 0;
 
 };
 
@@ -700,13 +985,14 @@ class  Backend {
 
 class  Frontend {
     public:
-        Frontend(FrontendChannel* frontendChannel) : m_frontendChannel(frontendChannel) { }
+        explicit Frontend(FrontendChannel* frontendChannel) : m_frontendChannel(frontendChannel) { }
         void loadEventFired(double timestamp);
         void frameDetached(const String& frameId);
         void frameStartedLoading(const String& frameId);
         void frameStoppedLoading(const String& frameId);
 
         void flush();
+        void sendRawNotification(const String&);
     private:
         FrontendChannel* m_frontendChannel;
 };

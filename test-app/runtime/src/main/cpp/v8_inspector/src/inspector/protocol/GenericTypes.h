@@ -22,12 +22,12 @@ class SearchMatch;
 // ------------- Type and builder declarations.
 
 // Search match in a resource.
-class  SearchMatch {
+class  SearchMatch : public Serializable {
         PROTOCOL_DISALLOW_COPY(SearchMatch);
     public:
-        static std::unique_ptr<SearchMatch> parse(protocol::Value* value, ErrorSupport* errors);
+        static std::unique_ptr<SearchMatch> fromValue(protocol::Value* value, ErrorSupport* errors);
 
-        ~SearchMatch() { }
+        ~SearchMatch() override { }
 
         double getLineNumber() {
             return m_lineNumber;
@@ -43,7 +43,10 @@ class  SearchMatch {
             m_lineContent = value;
         }
 
-        std::unique_ptr<protocol::DictionaryValue> serialize() const;
+        std::unique_ptr<protocol::DictionaryValue> toValue() const;
+        String serialize() override {
+            return toValue()->serialize();
+        }
         std::unique_ptr<SearchMatch> clone() const;
 
         template<int STATE>
@@ -106,16 +109,19 @@ class  Backend {
         virtual ~Backend() { }
 
 
-        virtual void disable(ErrorString*) { }
+        virtual DispatchResponse disable() {
+            return DispatchResponse::OK();
+        }
 };
 
 // ------------- Frontend interface.
 
 class  Frontend {
     public:
-        Frontend(FrontendChannel* frontendChannel) : m_frontendChannel(frontendChannel) { }
+        explicit Frontend(FrontendChannel* frontendChannel) : m_frontendChannel(frontendChannel) { }
 
         void flush();
+        void sendRawNotification(const String&);
     private:
         FrontendChannel* m_frontendChannel;
 };

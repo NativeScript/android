@@ -20,7 +20,7 @@
   3. The names of the authors may not be used to endorse or promote
      products derived from this software without specific prior
      written permission.
-
+ 
   THIS SOFTWARE IS PROVIDED BY THE AUTHORS ``AS IS'' AND ANY EXPRESS
   OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
   WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -126,7 +126,7 @@ extern "C" {
 #define ZIP_ER_REMOVE        22  /* S Can't remove file */
 #define ZIP_ER_DELETED       23  /* N Entry has been deleted */
 #define ZIP_ER_ENCRNOTSUPP   24  /* N Encryption method not supported */
-#define ZIP_ER_RDONLY        25  /* N Read-only archive */
+#define ZIP_ER_RDONLY        25  /* N Read-only archive */ 
 #define ZIP_ER_NOPASSWD      26  /* N No password provided */
 #define ZIP_ER_WRONGPASSWD   27  /* N Wrong password provided */
 
@@ -225,7 +225,7 @@ enum zip_source_cmd {
 
 struct zip_stat {
     zip_uint64_t valid;			/* which fields have valid values */
-    const char* name;			/* name of the file */
+    const char *name;			/* name of the file */
     zip_uint64_t index;			/* index within archive */
     zip_uint64_t size;			/* size of file (uncompressed) */
     zip_uint64_t comp_size;		/* size of file (compressed) */
@@ -240,79 +240,79 @@ struct zip;
 struct zip_file;
 struct zip_source;
 
-typedef zip_uint32_t zip_flags_t;
+typedef zip_uint32_t zip_flags_t;    
 
-typedef zip_int64_t (*zip_source_callback)(void*, void*, zip_uint64_t,
-        enum zip_source_cmd);
+typedef zip_int64_t (*zip_source_callback)(void *, void *, zip_uint64_t,
+					   enum zip_source_cmd);
 
 
 
 #ifndef ZIP_DISABLE_DEPRECATED
-ZIP_EXTERN zip_int64_t zip_add(struct zip*, const char*, struct zip_source*);    /* use zip_file_add */
-ZIP_EXTERN zip_int64_t zip_add_dir(struct zip*, const char*);   /* use zip_dir_add */
-ZIP_EXTERN const char* zip_get_file_comment(struct zip*, zip_uint64_t, int*, int);   /* use zip_file_get_comment */
-ZIP_EXTERN int zip_get_num_files(struct zip*);   /* use zip_get_num_entries instead */
-ZIP_EXTERN int zip_rename(struct zip*, zip_uint64_t, const char*);   /* use zip_file_rename */
-ZIP_EXTERN int zip_replace(struct zip*, zip_uint64_t, struct zip_source*);   /* use zip_file_replace */
-ZIP_EXTERN int zip_set_file_comment(struct zip*, zip_uint64_t, const char*, int);   /* use zip_file_set_comment */
+ZIP_EXTERN zip_int64_t zip_add(struct zip *, const char *, struct zip_source *); /* use zip_file_add */
+ZIP_EXTERN zip_int64_t zip_add_dir(struct zip *, const char *); /* use zip_dir_add */
+ZIP_EXTERN const char *zip_get_file_comment(struct zip *, zip_uint64_t, int *, int); /* use zip_file_get_comment */
+ZIP_EXTERN int zip_get_num_files(struct zip *);  /* use zip_get_num_entries instead */
+ZIP_EXTERN int zip_rename(struct zip *, zip_uint64_t, const char *); /* use zip_file_rename */
+ZIP_EXTERN int zip_replace(struct zip *, zip_uint64_t, struct zip_source *); /* use zip_file_replace */
+ZIP_EXTERN int zip_set_file_comment(struct zip *, zip_uint64_t, const char *, int); /* use zip_file_set_comment */
 #endif
 
-ZIP_EXTERN int zip_archive_set_tempdir(struct zip*, const char*);
-ZIP_EXTERN int zip_close(struct zip*);
-ZIP_EXTERN int zip_delete(struct zip*, zip_uint64_t);
-ZIP_EXTERN zip_int64_t zip_dir_add(struct zip*, const char*, zip_flags_t);
-ZIP_EXTERN void zip_discard(struct zip*);
-ZIP_EXTERN void zip_error_clear(struct zip*);
-ZIP_EXTERN void zip_error_get(struct zip*, int*, int*);
+ZIP_EXTERN int zip_archive_set_tempdir(struct zip *, const char *);
+ZIP_EXTERN int zip_close(struct zip *);
+ZIP_EXTERN int zip_delete(struct zip *, zip_uint64_t);
+ZIP_EXTERN zip_int64_t zip_dir_add(struct zip *, const char *, zip_flags_t);
+ZIP_EXTERN void zip_discard(struct zip *);
+ZIP_EXTERN void zip_error_clear(struct zip *);
+ZIP_EXTERN void zip_error_get(struct zip *, int *, int *);
 ZIP_EXTERN int zip_error_get_sys_type(int);
-ZIP_EXTERN int zip_error_to_str(char*, zip_uint64_t, int, int);
-ZIP_EXTERN int zip_fclose(struct zip_file*);
-ZIP_EXTERN struct zip* zip_fdopen(int, int, int*);
-ZIP_EXTERN zip_int64_t zip_file_add(struct zip*, const char*, struct zip_source*, zip_flags_t);
-ZIP_EXTERN void zip_file_error_clear(struct zip_file*);
-ZIP_EXTERN void zip_file_error_get(struct zip_file*, int*, int*);
-ZIP_EXTERN int zip_file_extra_field_delete(struct zip*, zip_uint64_t, zip_uint16_t, zip_flags_t);
-ZIP_EXTERN int zip_file_extra_field_delete_by_id(struct zip*, zip_uint64_t, zip_uint16_t, zip_uint16_t, zip_flags_t);
-ZIP_EXTERN int zip_file_extra_field_set(struct zip*, zip_uint64_t, zip_uint16_t, zip_uint16_t, const zip_uint8_t*, zip_uint16_t, zip_flags_t);
-ZIP_EXTERN zip_int16_t zip_file_extra_fields_count(struct zip*, zip_uint64_t, zip_flags_t);
-ZIP_EXTERN zip_int16_t zip_file_extra_fields_count_by_id(struct zip*, zip_uint64_t, zip_uint16_t, zip_flags_t);
-ZIP_EXTERN const zip_uint8_t* zip_file_extra_field_get(struct zip*, zip_uint64_t, zip_uint16_t, zip_uint16_t*, zip_uint16_t*, zip_flags_t);
-ZIP_EXTERN const zip_uint8_t* zip_file_extra_field_get_by_id(struct zip*, zip_uint64_t, zip_uint16_t, zip_uint16_t, zip_uint16_t*, zip_flags_t);
-ZIP_EXTERN const char* zip_file_get_comment(struct zip*, zip_uint64_t, zip_uint32_t*, zip_flags_t);
-ZIP_EXTERN int zip_file_get_external_attributes(struct zip*, zip_uint64_t, zip_flags_t, zip_uint8_t*, zip_uint32_t*);
-ZIP_EXTERN int zip_file_rename(struct zip*, zip_uint64_t, const char*, zip_flags_t);
-ZIP_EXTERN int zip_file_replace(struct zip*, zip_uint64_t, struct zip_source*, zip_flags_t);
-ZIP_EXTERN int zip_file_set_comment(struct zip*, zip_uint64_t, const char*, zip_uint16_t, zip_flags_t);
-ZIP_EXTERN int zip_file_set_external_attributes(struct zip*, zip_uint64_t, zip_flags_t, zip_uint8_t, zip_uint32_t);
-ZIP_EXTERN const char* zip_file_strerror(struct zip_file*);
-ZIP_EXTERN struct zip_file* zip_fopen(struct zip*, const char*, zip_flags_t);
-ZIP_EXTERN struct zip_file* zip_fopen_encrypted(struct zip*, const char*, zip_flags_t, const char*);
-ZIP_EXTERN struct zip_file* zip_fopen_index(struct zip*, zip_uint64_t, zip_flags_t);
-ZIP_EXTERN struct zip_file* zip_fopen_index_encrypted(struct zip*, zip_uint64_t, zip_flags_t, const char*);
-ZIP_EXTERN zip_int64_t zip_fread(struct zip_file*, void*, zip_uint64_t);
-ZIP_EXTERN const char* zip_get_archive_comment(struct zip*, int*, zip_flags_t);
-ZIP_EXTERN int zip_get_archive_flag(struct zip*, zip_flags_t, zip_flags_t);
-ZIP_EXTERN const char* zip_get_name(struct zip*, zip_uint64_t, zip_flags_t);
-ZIP_EXTERN zip_int64_t zip_get_num_entries(struct zip*, zip_flags_t);
-ZIP_EXTERN zip_int64_t zip_name_locate(struct zip*, const char*, zip_flags_t);
-ZIP_EXTERN struct zip* zip_open(const char*, int, int*);
-ZIP_EXTERN int zip_set_archive_comment(struct zip*, const char*, zip_uint16_t);
-ZIP_EXTERN int zip_set_archive_flag(struct zip*, zip_flags_t, int);
-ZIP_EXTERN int zip_set_default_password(struct zip*, const char*);
-ZIP_EXTERN int zip_set_file_compression(struct zip*, zip_uint64_t, zip_int32_t, zip_uint32_t);
-ZIP_EXTERN struct zip_source* zip_source_buffer(struct zip*, const void*, zip_uint64_t, int);
-ZIP_EXTERN struct zip_source* zip_source_file(struct zip*, const char*, zip_uint64_t, zip_int64_t);
-ZIP_EXTERN struct zip_source* zip_source_filep(struct zip*, FILE*, zip_uint64_t, zip_int64_t);
-ZIP_EXTERN void zip_source_free(struct zip_source*);
-ZIP_EXTERN struct zip_source* zip_source_function(struct zip*, zip_source_callback, void*);
-ZIP_EXTERN struct zip_source* zip_source_zip(struct zip*, struct zip*, zip_uint64_t, zip_flags_t, zip_uint64_t, zip_int64_t);
-ZIP_EXTERN int zip_stat(struct zip*, const char*, zip_flags_t, struct zip_stat*);
-ZIP_EXTERN int zip_stat_index(struct zip*, zip_uint64_t, zip_flags_t, struct zip_stat*);
-ZIP_EXTERN void zip_stat_init(struct zip_stat*);
-ZIP_EXTERN const char* zip_strerror(struct zip*);
-ZIP_EXTERN int zip_unchange(struct zip*, zip_uint64_t);
-ZIP_EXTERN int zip_unchange_all(struct zip*);
-ZIP_EXTERN int zip_unchange_archive(struct zip*);
+ZIP_EXTERN int zip_error_to_str(char *, zip_uint64_t, int, int);
+ZIP_EXTERN int zip_fclose(struct zip_file *);
+ZIP_EXTERN struct zip *zip_fdopen(int, int, int *);
+ZIP_EXTERN zip_int64_t zip_file_add(struct zip *, const char *, struct zip_source *, zip_flags_t);
+ZIP_EXTERN void zip_file_error_clear(struct zip_file *);
+ZIP_EXTERN void zip_file_error_get(struct zip_file *, int *, int *);
+ZIP_EXTERN int zip_file_extra_field_delete(struct zip *, zip_uint64_t, zip_uint16_t, zip_flags_t);
+ZIP_EXTERN int zip_file_extra_field_delete_by_id(struct zip *, zip_uint64_t, zip_uint16_t, zip_uint16_t, zip_flags_t);
+ZIP_EXTERN int zip_file_extra_field_set(struct zip *, zip_uint64_t, zip_uint16_t, zip_uint16_t, const zip_uint8_t *, zip_uint16_t, zip_flags_t);
+ZIP_EXTERN zip_int16_t zip_file_extra_fields_count(struct zip *, zip_uint64_t, zip_flags_t);
+ZIP_EXTERN zip_int16_t zip_file_extra_fields_count_by_id(struct zip *, zip_uint64_t, zip_uint16_t, zip_flags_t);
+ZIP_EXTERN const zip_uint8_t *zip_file_extra_field_get(struct zip *, zip_uint64_t, zip_uint16_t, zip_uint16_t *, zip_uint16_t *, zip_flags_t);
+ZIP_EXTERN const zip_uint8_t *zip_file_extra_field_get_by_id(struct zip *, zip_uint64_t, zip_uint16_t, zip_uint16_t, zip_uint16_t *, zip_flags_t);
+ZIP_EXTERN const char *zip_file_get_comment(struct zip *, zip_uint64_t, zip_uint32_t *, zip_flags_t);
+ZIP_EXTERN int zip_file_get_external_attributes(struct zip *, zip_uint64_t, zip_flags_t, zip_uint8_t *, zip_uint32_t *);
+ZIP_EXTERN int zip_file_rename(struct zip *, zip_uint64_t, const char *, zip_flags_t);
+ZIP_EXTERN int zip_file_replace(struct zip *, zip_uint64_t, struct zip_source *, zip_flags_t);
+ZIP_EXTERN int zip_file_set_comment(struct zip *, zip_uint64_t, const char *, zip_uint16_t, zip_flags_t);
+ZIP_EXTERN int zip_file_set_external_attributes(struct zip *, zip_uint64_t, zip_flags_t, zip_uint8_t, zip_uint32_t);
+ZIP_EXTERN const char *zip_file_strerror(struct zip_file *);
+ZIP_EXTERN struct zip_file *zip_fopen(struct zip *, const char *, zip_flags_t);
+ZIP_EXTERN struct zip_file *zip_fopen_encrypted(struct zip *, const char *, zip_flags_t, const char *);
+ZIP_EXTERN struct zip_file *zip_fopen_index(struct zip *, zip_uint64_t, zip_flags_t);
+ZIP_EXTERN struct zip_file *zip_fopen_index_encrypted(struct zip *, zip_uint64_t, zip_flags_t, const char *);
+ZIP_EXTERN zip_int64_t zip_fread(struct zip_file *, void *, zip_uint64_t);
+ZIP_EXTERN const char *zip_get_archive_comment(struct zip *, int *, zip_flags_t);
+ZIP_EXTERN int zip_get_archive_flag(struct zip *, zip_flags_t, zip_flags_t);
+ZIP_EXTERN const char *zip_get_name(struct zip *, zip_uint64_t, zip_flags_t);
+ZIP_EXTERN zip_int64_t zip_get_num_entries(struct zip *, zip_flags_t);
+ZIP_EXTERN zip_int64_t zip_name_locate(struct zip *, const char *, zip_flags_t);
+ZIP_EXTERN struct zip *zip_open(const char *, int, int *);
+ZIP_EXTERN int zip_set_archive_comment(struct zip *, const char *, zip_uint16_t);
+ZIP_EXTERN int zip_set_archive_flag(struct zip *, zip_flags_t, int);
+ZIP_EXTERN int zip_set_default_password(struct zip *, const char *);
+ZIP_EXTERN int zip_set_file_compression(struct zip *, zip_uint64_t, zip_int32_t, zip_uint32_t);
+ZIP_EXTERN struct zip_source *zip_source_buffer(struct zip *, const void *, zip_uint64_t, int);
+ZIP_EXTERN struct zip_source *zip_source_file(struct zip *, const char *, zip_uint64_t, zip_int64_t);
+ZIP_EXTERN struct zip_source *zip_source_filep(struct zip *, FILE *, zip_uint64_t, zip_int64_t);
+ZIP_EXTERN void zip_source_free(struct zip_source *);
+ZIP_EXTERN struct zip_source *zip_source_function(struct zip *, zip_source_callback, void *);
+ZIP_EXTERN struct zip_source *zip_source_zip(struct zip *, struct zip *, zip_uint64_t, zip_flags_t, zip_uint64_t, zip_int64_t);
+ZIP_EXTERN int zip_stat(struct zip *, const char *, zip_flags_t, struct zip_stat *);
+ZIP_EXTERN int zip_stat_index(struct zip *, zip_uint64_t, zip_flags_t, struct zip_stat *);
+ZIP_EXTERN void zip_stat_init(struct zip_stat *);
+ZIP_EXTERN const char *zip_strerror(struct zip *);
+ZIP_EXTERN int zip_unchange(struct zip *, zip_uint64_t);
+ZIP_EXTERN int zip_unchange_all(struct zip *);
+ZIP_EXTERN int zip_unchange_archive(struct zip *);
 
 #ifdef __cplusplus
 }

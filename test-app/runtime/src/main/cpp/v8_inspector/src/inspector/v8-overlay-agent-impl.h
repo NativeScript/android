@@ -6,14 +6,15 @@
 #define V8_OVERLAY_AGENT_IMPL_H
 
 #include <v8_inspector/src/inspector/protocol/Overlay.h>
+#include <Util.h>
 
 namespace v8_inspector {
 
 class V8InspectorSessionImpl;
 
-using protocol::ErrorString;
 using v8_inspector::protocol::Maybe;
 using String = v8_inspector::String16;
+using v8_inspector::protocol::DispatchResponse;
 
 
 class V8OverlayAgentImpl : public protocol::Overlay::Backend {
@@ -22,14 +23,14 @@ class V8OverlayAgentImpl : public protocol::Overlay::Backend {
                            protocol::DictionaryValue* state);
 
         ~V8OverlayAgentImpl() override;
-        void enable(ErrorString*) override;
-        void disable(ErrorString*) override;
-        void setShowFPSCounter(ErrorString*, bool in_show) override;
-        void setPausedInDebuggerMessage(ErrorString*, const Maybe<String>& in_message) override;
-        void highlightNode(ErrorString*, std::unique_ptr<protocol::Overlay::HighlightConfig> in_highlightConfig, const Maybe<int>& in_nodeId, const Maybe<int>& in_backendNodeId, const Maybe<String>& in_objectId) override;
-        void highlightFrame(ErrorString*, const String& in_frameId, const Maybe<protocol::DOM::RGBA>& in_contentColor, const Maybe<protocol::DOM::RGBA>& in_contentOutlineColor) override;
-        void hideHighlight(ErrorString*) override;
-        void getHighlightObjectForTest(ErrorString*, int in_nodeId, std::unique_ptr<protocol::DictionaryValue>* out_highlight) override;
+        DispatchResponse enable() override;
+        DispatchResponse disable() override;
+        DispatchResponse setShowFPSCounter(bool in_show) override;
+        DispatchResponse setPausedInDebuggerMessage(const Maybe<String> in_message) override;
+        DispatchResponse highlightNode(std::unique_ptr<protocol::Overlay::HighlightConfig> in_highlightConfig, const Maybe<int> in_nodeId, const Maybe<int> in_backendNodeId, const Maybe<String> in_objectId) override;
+        DispatchResponse highlightFrame(const String& in_frameId, const Maybe<protocol::DOM::RGBAColor> in_contentColor, const Maybe<protocol::DOM::RGBAColor> in_contentOutlineColor) override;
+        DispatchResponse hideHighlight() override;
+        DispatchResponse getHighlightObjectForTest(int in_nodeId, std::unique_ptr<protocol::DictionaryValue>* out_highlight) override;
 
         protocol::Overlay::Frontend m_frontend;
 

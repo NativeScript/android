@@ -31,6 +31,7 @@ class V8HeapProfilerAgentImpl;
 class V8ProfilerAgentImpl;
 class V8RuntimeAgentImpl;
 class V8SchemaAgentImpl;
+
 class V8PageAgentImpl;
 class V8NetworkAgentImpl;
 class V8DOMAgentImpl;
@@ -38,7 +39,8 @@ class V8CSSAgentImpl;
 class V8OverlayAgentImpl;
 class V8LogAgentImpl;
 
-using protocol::ErrorString;
+
+using protocol::Response;
 
 class V8InspectorSessionImpl : public V8InspectorSession,
     public protocol::FrontendChannel {
@@ -88,8 +90,8 @@ class V8InspectorSessionImpl : public V8InspectorSession,
             return m_contextGroupId;
         }
 
-        InjectedScript* findInjectedScript(ErrorString*, int contextId);
-        InjectedScript* findInjectedScript(ErrorString*, RemoteObjectIdBase*);
+        Response findInjectedScript(int contextId, InjectedScript*&);
+        Response findInjectedScript(RemoteObjectIdBase*, InjectedScript*&);
         void reset();
         void discardInjectedScripts();
         void reportAllContexts(V8RuntimeAgentImpl*);
@@ -101,9 +103,8 @@ class V8InspectorSessionImpl : public V8InspectorSession,
             v8::Local<v8::Context>, v8::Local<v8::Value> table,
             v8::Local<v8::Value> columns);
         std::vector<std::unique_ptr<protocol::Schema::Domain>> supportedDomainsImpl();
-        bool unwrapObject(ErrorString*, const String16& objectId,
-                          v8::Local<v8::Value>*, v8::Local<v8::Context>*,
-                          String16* objectGroup);
+        Response unwrapObject(const String16& objectId, v8::Local<v8::Value>*,
+                              v8::Local<v8::Context>*, String16* objectGroup);
         void releaseObjectGroup(const String16& objectGroup);
 
         // V8InspectorSession implementation.
@@ -141,8 +142,10 @@ class V8InspectorSessionImpl : public V8InspectorSession,
         protocol::DictionaryValue* agentState(const String16& name);
 
         // protocol::FrontendChannel implementation.
-        void sendProtocolResponse(int callId, const String16& message) override;
-        void sendProtocolNotification(const String16& message) override;
+        void sendProtocolResponse(
+            int callId, std::unique_ptr<protocol::Serializable> message) override;
+        void sendProtocolNotification(
+            std::unique_ptr<protocol::Serializable> message) override;
         void flushProtocolNotifications() override;
 
         int m_contextGroupId;
@@ -159,12 +162,14 @@ class V8InspectorSessionImpl : public V8InspectorSession,
         std::unique_ptr<V8ProfilerAgentImpl> m_profilerAgent;
         std::unique_ptr<V8ConsoleAgentImpl> m_consoleAgent;
         std::unique_ptr<V8SchemaAgentImpl> m_schemaAgent;
+
         std::unique_ptr<V8PageAgentImpl> m_pageAgent;
         std::unique_ptr<V8NetworkAgentImpl> m_networkAgent;
         std::unique_ptr<V8DOMAgentImpl> m_domAgent;
         std::unique_ptr<V8CSSAgentImpl> m_cssAgent;
         std::unique_ptr<V8OverlayAgentImpl> m_overlayAgent;
         std::unique_ptr<V8LogAgentImpl> m_logAgent;
+
 
         std::vector<std::unique_ptr<V8InspectorSession::Inspectable>>
                 m_inspectedObjects;

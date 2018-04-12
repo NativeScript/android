@@ -22,16 +22,18 @@ namespace Log {
 class LogEntry;
 // Violation configuration setting.
 class ViolationSetting;
+// Wrapper for notification params
+class EntryAddedNotification;
 
 // ------------- Type and builder declarations.
 
 // Log entry.
-class  LogEntry {
+class  LogEntry : public Serializable {
         PROTOCOL_DISALLOW_COPY(LogEntry);
     public:
-        static std::unique_ptr<LogEntry> parse(protocol::Value* value, ErrorSupport* errors);
+        static std::unique_ptr<LogEntry> fromValue(protocol::Value* value, ErrorSupport* errors);
 
-        ~LogEntry() { }
+        ~LogEntry() override { }
 
         struct  SourceEnum {
             static const char* Xml;
@@ -144,7 +146,10 @@ class  LogEntry {
             m_args = std::move(value);
         }
 
-        std::unique_ptr<protocol::DictionaryValue> serialize() const;
+        std::unique_ptr<protocol::DictionaryValue> toValue() const;
+        String serialize() override {
+            return toValue()->serialize();
+        }
         std::unique_ptr<LogEntry> clone() const;
 
         template<int STATE>
@@ -253,12 +258,12 @@ class  LogEntry {
 
 
 // Violation configuration setting.
-class  ViolationSetting {
+class  ViolationSetting : public Serializable {
         PROTOCOL_DISALLOW_COPY(ViolationSetting);
     public:
-        static std::unique_ptr<ViolationSetting> parse(protocol::Value* value, ErrorSupport* errors);
+        static std::unique_ptr<ViolationSetting> fromValue(protocol::Value* value, ErrorSupport* errors);
 
-        ~ViolationSetting() { }
+        ~ViolationSetting() override { }
 
         struct  NameEnum {
             static const char* LongTask;
@@ -284,7 +289,10 @@ class  ViolationSetting {
             m_threshold = value;
         }
 
-        std::unique_ptr<protocol::DictionaryValue> serialize() const;
+        std::unique_ptr<protocol::DictionaryValue> toValue() const;
+        String serialize() override {
+            return toValue()->serialize();
+        }
         std::unique_ptr<ViolationSetting> clone() const;
 
         template<int STATE>
@@ -340,17 +348,82 @@ class  ViolationSetting {
 };
 
 
+// Wrapper for notification params
+class  EntryAddedNotification : public Serializable {
+        PROTOCOL_DISALLOW_COPY(EntryAddedNotification);
+    public:
+        static std::unique_ptr<EntryAddedNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+        ~EntryAddedNotification() override { }
+
+        protocol::Log::LogEntry* getEntry() {
+            return m_entry.get();
+        }
+        void setEntry(std::unique_ptr<protocol::Log::LogEntry> value) {
+            m_entry = std::move(value);
+        }
+
+        std::unique_ptr<protocol::DictionaryValue> toValue() const;
+        String serialize() override {
+            return toValue()->serialize();
+        }
+        std::unique_ptr<EntryAddedNotification> clone() const;
+
+        template<int STATE>
+        class EntryAddedNotificationBuilder {
+            public:
+                enum {
+                    NoFieldsSet = 0,
+                    EntrySet = 1 << 1,
+                    AllFieldsSet = (EntrySet | 0)
+                };
+
+
+                EntryAddedNotificationBuilder<STATE | EntrySet>& setEntry(std::unique_ptr<protocol::Log::LogEntry> value) {
+                    static_assert(!(STATE & EntrySet), "property entry should not be set yet");
+                    m_result->setEntry(std::move(value));
+                    return castState<EntrySet>();
+                }
+
+                std::unique_ptr<EntryAddedNotification> build() {
+                    static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+                    return std::move(m_result);
+                }
+
+            private:
+                friend class EntryAddedNotification;
+                EntryAddedNotificationBuilder() : m_result(new EntryAddedNotification()) { }
+
+                template<int STEP> EntryAddedNotificationBuilder<STATE | STEP>& castState() {
+                    return *reinterpret_cast<EntryAddedNotificationBuilder<STATE | STEP>*>(this);
+                }
+
+                std::unique_ptr<protocol::Log::EntryAddedNotification> m_result;
+        };
+
+        static EntryAddedNotificationBuilder<0> create() {
+            return EntryAddedNotificationBuilder<0>();
+        }
+
+    private:
+        EntryAddedNotification() {
+        }
+
+        std::unique_ptr<protocol::Log::LogEntry> m_entry;
+};
+
+
 // ------------- Backend interface.
 
 class  Backend {
     public:
         virtual ~Backend() { }
 
-        virtual void enable(ErrorString*) = 0;
-        virtual void disable(ErrorString*) = 0;
-        virtual void clear(ErrorString*) = 0;
-        virtual void startViolationsReport(ErrorString*, std::unique_ptr<protocol::Array<protocol::Log::ViolationSetting>> in_config) = 0;
-        virtual void stopViolationsReport(ErrorString*) = 0;
+        virtual DispatchResponse enable() = 0;
+        virtual DispatchResponse disable() = 0;
+        virtual DispatchResponse clear() = 0;
+        virtual DispatchResponse startViolationsReport(std::unique_ptr<protocol::Array<protocol::Log::ViolationSetting>> in_config) = 0;
+        virtual DispatchResponse stopViolationsReport() = 0;
 
 };
 
@@ -358,10 +431,11 @@ class  Backend {
 
 class  Frontend {
     public:
-        Frontend(FrontendChannel* frontendChannel) : m_frontendChannel(frontendChannel) { }
+        explicit Frontend(FrontendChannel* frontendChannel) : m_frontendChannel(frontendChannel) { }
         void entryAdded(std::unique_ptr<protocol::Log::LogEntry> entry);
 
         void flush();
+        void sendRawNotification(const String&);
     private:
         FrontendChannel* m_frontendChannel;
 };

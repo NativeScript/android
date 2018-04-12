@@ -26,37 +26,39 @@ V8LogAgentImpl::V8LogAgentImpl(V8InspectorSessionImpl* session, protocol::Fronte
 
 V8LogAgentImpl::~V8LogAgentImpl() { }
 
-void V8LogAgentImpl::enable(ErrorString* errorString) {
+DispatchResponse V8LogAgentImpl::enable() {
     if (m_enabled) {
-        *errorString = "Log Agent already enabled!";
-        return;
+        return DispatchResponse::Error("Log Agent already enabled!");
     }
 
     m_state->setBoolean(LogAgentState::logEnabled, true);
     m_enabled = true;
+
+    return DispatchResponse::OK();
 }
 
-void V8LogAgentImpl::disable(ErrorString*) {
+DispatchResponse V8LogAgentImpl::disable() {
     if (!m_enabled) {
-        return;
+        return DispatchResponse::OK();
     }
 
     m_state->setBoolean(LogAgentState::logEnabled, false);
 
     m_enabled = false;
+
+    return DispatchResponse::OK();
 }
 
-void V8LogAgentImpl::startViolationsReport(ErrorString* errorString,
-        std::unique_ptr<protocol::Array<protocol::Log::ViolationSetting>> in_config) {
-    *errorString = "startViolationsReport not implemented.";
+DispatchResponse V8LogAgentImpl::startViolationsReport(std::unique_ptr<protocol::Array<protocol::Log::ViolationSetting>> in_config) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-void V8LogAgentImpl::stopViolationsReport(ErrorString* errorString) {
-    *errorString = "stopViolationsReport not implemented.";
+DispatchResponse V8LogAgentImpl::stopViolationsReport() {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-void V8LogAgentImpl::clear(ErrorString* errorString) {
-    *errorString = "clear not implemented.";
+DispatchResponse V8LogAgentImpl::clear() {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
 void V8LogAgentImpl::EntryAdded(const std::string& text, std::string verbosityLevel, std::string url, int lineNumber) {

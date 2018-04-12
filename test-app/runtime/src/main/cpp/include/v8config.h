@@ -316,7 +316,7 @@
 //   V8_NORETURN void MyAbort() { abort(); }
 #if V8_HAS_ATTRIBUTE_NORETURN
 # define V8_NORETURN __attribute__((noreturn))
-#elif HAS_DECLSPEC_NORETURN
+#elif V8_HAS_DECLSPEC_NORETURN
 # define V8_NORETURN __declspec(noreturn)
 #else
 # define V8_NORETURN /* NOT SUPPORTED */
@@ -410,12 +410,7 @@
 // Note that alignment of a type within a struct can be less than the
 // alignment of the type stand-alone (because of ancient ABIs), so this
 // should only be used as a last resort.
-namespace v8 {
-template <typename T> class AlignOfHelper {
-        char c;
-        T t;
-};
-}
+namespace v8 { template <typename T> class AlignOfHelper { char c; T t; }; }
 # define V8_ALIGNOF(type) (sizeof(::v8::AlignOfHelper<type>) - sizeof(type))
 #endif
 

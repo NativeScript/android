@@ -21,6 +21,8 @@ class InspectedContext {
     public:
         ~InspectedContext();
 
+        static int contextId(v8::Local<v8::Context>);
+
         v8::Local<v8::Context> context() const;
         int contextId() const {
             return m_contextId;
@@ -53,15 +55,12 @@ class InspectedContext {
         InjectedScript* getInjectedScript() {
             return m_injectedScript.get();
         }
-        void createInjectedScript();
+        bool createInjectedScript();
         void discardInjectedScript();
 
     private:
         friend class V8InspectorImpl;
         InspectedContext(V8InspectorImpl*, const V8ContextInfo&, int contextId);
-        static void weakCallback(const v8::WeakCallbackInfo<InspectedContext>&);
-        static void consoleWeakCallback(
-            const v8::WeakCallbackInfo<InspectedContext>&);
 
         V8InspectorImpl* m_inspector;
         v8::Global<v8::Context> m_context;
@@ -72,7 +71,6 @@ class InspectedContext {
         const String16 m_auxData;
         bool m_reported;
         std::unique_ptr<InjectedScript> m_injectedScript;
-        v8::Global<v8::Object> m_console;
 
         DISALLOW_COPY_AND_ASSIGN(InspectedContext);
 };

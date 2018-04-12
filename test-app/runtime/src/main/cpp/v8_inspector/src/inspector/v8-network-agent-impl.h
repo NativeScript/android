@@ -8,14 +8,15 @@
 #include <v8_inspector/src/inspector/protocol/Network.h>
 #include <v8_inspector/src/inspector/utils/v8-network-request-data.h>
 #include <map>
+#include <v8_inspector/src/inspector/protocol/Protocol.h>
 
 namespace v8_inspector {
 
 class V8InspectorSessionImpl;
 
-using protocol::ErrorString;
 using v8_inspector::protocol::Maybe;
 using String = v8_inspector::String16;
+using v8_inspector::protocol::DispatchResponse;
 
 class V8NetworkAgentImpl : public protocol::Network::Backend {
     public:
@@ -23,28 +24,21 @@ class V8NetworkAgentImpl : public protocol::Network::Backend {
                            protocol::DictionaryValue* state);
         ~V8NetworkAgentImpl() override;
 
-        void enable(ErrorString*) override;
-        void disable(ErrorString*) override;
+        DispatchResponse enable() override;
+        DispatchResponse disable() override;
 
-        /*
-         * NOT supported
-         */
-        void setExtraHTTPHeaders(ErrorString*, std::unique_ptr<protocol::Network::Headers> in_headers) override;
+        DispatchResponse setExtraHTTPHeaders(std::unique_ptr<protocol::Network::Headers> in_headers) override;
 
         /*
          * Returns content served for the given request.
          * The content of each response is stored in `m_responses` when a request completes.
          * @param in_requestId
          */
-        void getResponseBody(ErrorString*, const String& in_requestId, String* out_body, bool* out_base64Encoded) override;
-        /*
-         * NOT supported
-         */
-        void setCacheDisabled(ErrorString*, bool in_cacheDisabled) override;
-        /*
-         * NOT supported
-         */
-        void loadResource(const String& in_frameId, const String& in_url, std::unique_ptr<LoadResourceCallback> callback) override;
+        DispatchResponse getResponseBody(const String& in_requestId, String* out_body, bool* out_base64Encoded) override;
+
+        DispatchResponse setCacheDisabled(bool in_cacheDisabled) override;
+
+        DispatchResponse loadResource(const String& in_frameId, const String& in_url, String* out_content, String* out_mimeType, double* out_status) override;
 
         const bool enabled() {
             return m_enabled;

@@ -12,7 +12,6 @@
                     "id": "Domain",
                     "type": "object",
                     "description": "Description of the protocol domain.",
-                    "exported": true,
                     "properties": [
                         {
                             "name": "name",
@@ -77,7 +76,6 @@
                     "id": "RemoteObject",
                     "type": "object",
                     "description": "Mirror object referencing original JavaScript object.",
-                    "exported": true,
                     "properties": [
                         {
                             "name": "type",
@@ -105,6 +103,8 @@
                                 "date",
                                 "map",
                                 "set",
+                                "weakmap",
+                                "weakset",
                                 "iterator",
                                 "generator",
                                 "error",
@@ -219,6 +219,8 @@
                                 "date",
                                 "map",
                                 "set",
+                                "weakmap",
+                                "weakset",
                                 "iterator",
                                 "generator",
                                 "error"
@@ -304,6 +306,8 @@
                                 "date",
                                 "map",
                                 "set",
+                                "weakmap",
+                                "weakset",
                                 "iterator",
                                 "generator",
                                 "error"
@@ -568,7 +572,6 @@
                     "id": "StackTrace",
                     "type": "object",
                     "description": "Call frames for assertions or error messages.",
-                    "exported": true,
                     "properties": [
                         {
                             "name": "description",
@@ -589,6 +592,13 @@
                             "$ref": "StackTrace",
                             "optional": true,
                             "description": "Asynchronous JavaScript stack trace that preceded this stack, if available."
+                        },
+                        {
+                            "name": "promiseCreationFrame",
+                            "$ref": "CallFrame",
+                            "optional": true,
+                            "experimental": true,
+                            "description": "Creation frame of the Promise which produced the next synchronous trace when resolved, if available."
                         }
                     ]
                 }
@@ -596,7 +606,6 @@
             "commands": [
                 {
                     "name": "evaluate",
-                    "async": true,
                     "parameters": [
                         {
                             "name": "expression",
@@ -671,7 +680,6 @@
                 },
                 {
                     "name": "awaitPromise",
-                    "async": true,
                     "parameters": [
                         {
                             "name": "promiseObjectId",
@@ -708,7 +716,6 @@
                 },
                 {
                     "name": "callFunctionOn",
-                    "async": true,
                     "parameters": [
                         {
                             "name": "objectId",
@@ -925,7 +932,6 @@
                 },
                 {
                     "name": "runScript",
-                    "async": true,
                     "parameters": [
                         {
                             "name": "scriptId",
@@ -1072,7 +1078,9 @@
                                 "endGroup",
                                 "assert",
                                 "profile",
-                                "profileEnd"
+                                "profileEnd",
+                                "count",
+                                "timeEnd"
                             ],
                             "description": "Type of the call."
                         },
@@ -1236,7 +1244,9 @@
                                 "closure",
                                 "catch",
                                 "block",
-                                "script"
+                                "script",
+                                "eval",
+                                "module"
                             ],
                             "description": "Scope type."
                         },
@@ -1269,7 +1279,6 @@
                     "id": "SearchMatch",
                     "type": "object",
                     "description": "Search match for resource.",
-                    "exported": true,
                     "properties": [
                         {
                             "name": "lineNumber",
@@ -1280,6 +1289,39 @@
                             "name": "lineContent",
                             "type": "string",
                             "description": "Line with match content."
+                        }
+                    ],
+                    "experimental": true
+                },
+                {
+                    "id": "BreakLocation",
+                    "type": "object",
+                    "properties": [
+                        {
+                            "name": "scriptId",
+                            "$ref": "Runtime.ScriptId",
+                            "description": "Script identifier as reported in the <code>Debugger.scriptParsed</code>."
+                        },
+                        {
+                            "name": "lineNumber",
+                            "type": "integer",
+                            "description": "Line number in the script (0-based)."
+                        },
+                        {
+                            "name": "columnNumber",
+                            "type": "integer",
+                            "optional": true,
+                            "description": "Column number in the script (0-based)."
+                        },
+                        {
+                            "name": "type",
+                            "type": "string",
+                            "enum": [
+                                "debuggerStatement",
+                                "call",
+                                "return"
+                            ],
+                            "optional": true
                         }
                     ],
                     "experimental": true
@@ -1406,6 +1448,40 @@
                     "description": "Removes JavaScript breakpoint."
                 },
                 {
+                    "name": "getPossibleBreakpoints",
+                    "parameters": [
+                        {
+                            "name": "start",
+                            "$ref": "Location",
+                            "description": "Start of range to search possible breakpoint locations in."
+                        },
+                        {
+                            "name": "end",
+                            "$ref": "Location",
+                            "optional": true,
+                            "description": "End of range to search possible breakpoint locations in (excluding). When not specifed, end of scripts is used as end of range."
+                        },
+                        {
+                            "name": "restrictToFunction",
+                            "type": "boolean",
+                            "optional": true,
+                            "description": "Only consider locations which are in the same (non-nested) function as start."
+                        }
+                    ],
+                    "returns": [
+                        {
+                            "name": "locations",
+                            "type": "array",
+                            "items": {
+                                "$ref": "BreakLocation"
+                            },
+                            "description": "List of the possible breakpoint locations."
+                        }
+                    ],
+                    "description": "Returns possible locations for breakpoint. scriptId in start and end range locations should be the same.",
+                    "experimental": true
+                },
+                {
                     "name": "continueToLocation",
                     "parameters": [
                         {
@@ -1431,6 +1507,11 @@
                 {
                     "name": "pause",
                     "description": "Stops on the next JavaScript statement."
+                },
+                {
+                    "name": "scheduleStepIntoAsync",
+                    "description": "Steps into next scheduled async task if any is scheduled before next pause. Returns success when async task is actually scheduled, returns error if no task were scheduled or another scheduleStepIntoAsync was called.",
+                    "experimental": true
                 },
                 {
                     "name": "resume",
@@ -1630,6 +1711,13 @@
                             "optional": true,
                             "experimental": true,
                             "description": "Whether preview should be generated for the result."
+                        },
+                        {
+                            "name": "throwOnSideEffect",
+                            "type": "boolean",
+                            "optional": true,
+                            "experimental": true,
+                            "description": "Whether to throw an exception if side effect cannot be ruled out during evaluation."
                         }
                     ],
                     "returns": [
@@ -1788,6 +1876,27 @@
                             "optional": true,
                             "description": "True, if this script has sourceURL.",
                             "experimental": true
+                        },
+                        {
+                            "name": "isModule",
+                            "type": "boolean",
+                            "optional": true,
+                            "description": "True, if this script is ES6 module.",
+                            "experimental": true
+                        },
+                        {
+                            "name": "length",
+                            "type": "integer",
+                            "optional": true,
+                            "description": "This script length.",
+                            "experimental": true
+                        },
+                        {
+                            "name": "stackTrace",
+                            "$ref": "Runtime.StackTrace",
+                            "optional": true,
+                            "description": "JavaScript top stack frame of where the script parsed event was triggered if available.",
+                            "experimental": true
                         }
                     ],
                     "description": "Fired when virtual machine parses script. This event is also fired for all known and uncollected scripts upon enabling debugger."
@@ -1853,6 +1962,27 @@
                             "optional": true,
                             "description": "True, if this script has sourceURL.",
                             "experimental": true
+                        },
+                        {
+                            "name": "isModule",
+                            "type": "boolean",
+                            "optional": true,
+                            "description": "True, if this script is ES6 module.",
+                            "experimental": true
+                        },
+                        {
+                            "name": "length",
+                            "type": "integer",
+                            "optional": true,
+                            "description": "This script length.",
+                            "experimental": true
+                        },
+                        {
+                            "name": "stackTrace",
+                            "$ref": "Runtime.StackTrace",
+                            "optional": true,
+                            "description": "JavaScript top stack frame of where the script parsed event was triggered if available.",
+                            "experimental": true
                         }
                     ],
                     "description": "Fired when virtual machine fails to parse the script."
@@ -1895,10 +2025,11 @@
                                 "assert",
                                 "debugCommand",
                                 "promiseRejection",
-                                "other"
+                                "OOM",
+                                "other",
+                                "ambiguous"
                             ],
-                            "description": "Pause reason.",
-                            "exported": true
+                            "description": "Pause reason."
                         },
                         {
                             "name": "data",
@@ -2143,6 +2274,76 @@
                             "description": "Number of samples attributed to the source line."
                         }
                     ]
+                },
+                {
+                    "id": "CoverageRange",
+                    "type": "object",
+                    "description": "Coverage data for a source range.",
+                    "properties": [
+                        {
+                            "name": "startOffset",
+                            "type": "integer",
+                            "description": "JavaScript script source offset for the range start."
+                        },
+                        {
+                            "name": "endOffset",
+                            "type": "integer",
+                            "description": "JavaScript script source offset for the range end."
+                        },
+                        {
+                            "name": "count",
+                            "type": "integer",
+                            "description": "Collected execution count of the source range."
+                        }
+                    ],
+                    "experimental": true
+                },
+                {
+                    "id": "FunctionCoverage",
+                    "type": "object",
+                    "description": "Coverage data for a JavaScript function.",
+                    "properties": [
+                        {
+                            "name": "functionName",
+                            "type": "string",
+                            "description": "JavaScript function name."
+                        },
+                        {
+                            "name": "ranges",
+                            "type": "array",
+                            "items": {
+                                "$ref": "CoverageRange"
+                            },
+                            "description": "Source ranges inside the function with coverage data."
+                        }
+                    ],
+                    "experimental": true
+                },
+                {
+                    "id": "ScriptCoverage",
+                    "type": "object",
+                    "description": "Coverage data for a JavaScript script.",
+                    "properties": [
+                        {
+                            "name": "scriptId",
+                            "$ref": "Runtime.ScriptId",
+                            "description": "JavaScript script id."
+                        },
+                        {
+                            "name": "url",
+                            "type": "string",
+                            "description": "JavaScript script name or url."
+                        },
+                        {
+                            "name": "functions",
+                            "type": "array",
+                            "items": {
+                                "$ref": "FunctionCoverage"
+                            },
+                            "description": "Functions contained in the script that has coverage data."
+                        }
+                    ],
+                    "experimental": true
                 }
             ],
             "commands": [
@@ -2175,6 +2376,54 @@
                             "description": "Recorded profile."
                         }
                     ]
+                },
+                {
+                    "name": "startPreciseCoverage",
+                    "parameters": [
+                        {
+                            "name": "callCount",
+                            "type": "boolean",
+                            "optional": true,
+                            "description": "Collect accurate call counts beyond simple 'covered' or 'not covered'."
+                        }
+                    ],
+                    "description": "Enable precise code coverage. Coverage data for JavaScript executed before enabling precise code coverage may be incomplete. Enabling prevents running optimized code and resets execution counters.",
+                    "experimental": true
+                },
+                {
+                    "name": "stopPreciseCoverage",
+                    "description": "Disable precise code coverage. Disabling releases unnecessary execution count records and allows executing optimized code.",
+                    "experimental": true
+                },
+                {
+                    "name": "takePreciseCoverage",
+                    "returns": [
+                        {
+                            "name": "result",
+                            "type": "array",
+                            "items": {
+                                "$ref": "ScriptCoverage"
+                            },
+                            "description": "Coverage data for the current isolate."
+                        }
+                    ],
+                    "description": "Collect coverage data for the current isolate, and resets execution counters. Precise code coverage needs to have started.",
+                    "experimental": true
+                },
+                {
+                    "name": "getBestEffortCoverage",
+                    "returns": [
+                        {
+                            "name": "result",
+                            "type": "array",
+                            "items": {
+                                "$ref": "ScriptCoverage"
+                            },
+                            "description": "Coverage data for the current isolate."
+                        }
+                    ],
+                    "description": "Collect coverage data for the current isolate. The coverage data may be incomplete due to garbage collection.",
+                    "experimental": true
                 }
             ],
             "events": [
@@ -2477,11 +2726,6 @@
             "description": "Actions and events related to the inspected page belong to the page domain.",
             "types": [
                 {
-                    "id": "FrameId",
-                    "type": "string",
-                    "description": "Unique frame identifier."
-                },
-                {
                     "id": "ResourceType",
                     "type": "string",
                     "enum": [
@@ -2649,38 +2893,6 @@
                     "id": "ScriptIdentifier",
                     "type": "string",
                     "description": "Unique script identifier."
-                },
-                {
-                    "id": "Viewport",
-                    "type": "object",
-                    "description": "Viewport for capturing screenshot.",
-                    "properties": [
-                        {
-                            "name": "x",
-                            "type": "number",
-                            "description": "X offset in CSS pixels."
-                        },
-                        {
-                            "name": "y",
-                            "type": "number",
-                            "description": "Y offset in CSS pixels"
-                        },
-                        {
-                            "name": "width",
-                            "type": "number",
-                            "description": "Rectangle width in CSS pixels"
-                        },
-                        {
-                            "name": "height",
-                            "type": "number",
-                            "description": "Rectangle height in CSS pixels"
-                        },
-                        {
-                            "name": "scale",
-                            "type": "number",
-                            "description": "Page scale factor."
-                        }
-                    ]
                 }
             ],
             "commands": [
@@ -3857,7 +4069,7 @@
                     "description": "DOM interaction is implemented in terms of mirror objects that represent the actual DOM nodes. DOMNode is a base node mirror type."
                 },
                 {
-                    "id": "RGBA",
+                    "id": "RGBAColor",
                     "type": "object",
                     "properties": [
                         {
@@ -3883,6 +4095,53 @@
                         }
                     ],
                     "description": "A structure holding an RGBA color."
+                },
+                {
+                    "id": "Quad",
+                    "type": "array",
+                    "items": {
+                        "type": "number"
+                    },
+                    "minItems": 8,
+                    "maxItems": 8,
+                    "description": "An array of quad vertices, x immediately followed by y for each point, points clock-wise."
+                },
+                {
+                    "id": "HighlightConfig",
+                    "type": "object",
+                    "properties": [
+                        {
+                            "name": "showInfo",
+                            "type": "boolean",
+                            "optional": true,
+                            "description": "Whether the node info tooltip should be shown (default: false)."
+                        },
+                        {
+                            "name": "contentColor",
+                            "$ref": "RGBAColor",
+                            "optional": true,
+                            "description": "The content box highlight fill color (default: transparent)."
+                        },
+                        {
+                            "name": "paddingColor",
+                            "$ref": "RGBAColor",
+                            "optional": true,
+                            "description": "The padding highlight fill color (default: transparent)."
+                        },
+                        {
+                            "name": "borderColor",
+                            "$ref": "RGBAColor",
+                            "optional": true,
+                            "description": "The border highlight fill color (default: transparent)."
+                        },
+                        {
+                            "name": "marginColor",
+                            "$ref": "RGBAColor",
+                            "optional": true,
+                            "description": "The margin highlight fill color (default: transparent)."
+                        }
+                    ],
+                    "description": "Configuration data for the highlighting of page elements."
                 }
             ],
             "commands": [
@@ -4046,6 +4305,33 @@
                         }
                     ],
                     "description": "Discards search results from the session with the given id. <code>getSearchResults</code> should no longer be called for that search."
+                },
+                {
+                    "name": "highlightNode",
+                    "parameters": [
+                        {
+                            "name": "highlightConfig",
+                            "$ref": "HighlightConfig",
+                            "description": "A descriptor for the highlight appearance."
+                        },
+                        {
+                            "name": "nodeId",
+                            "$ref": "NodeId",
+                            "optional": true,
+                            "description": "Identifier of the node to highlight."
+                        },
+                        {
+                            "name": "objectId",
+                            "$ref": "Runtime.RemoteObjectId",
+                            "optional": true,
+                            "description": "JavaScript object id of the node to be highlighted."
+                        }
+                    ],
+                    "description": "Highlights DOM node with given id or with the given JavaScript object wrapper. Either nodeId or objectId must be specified."
+                },
+                {
+                    "name": "hideHighlight",
+                    "description": "Hides DOM node highlight."
                 },
                 {
                     "name": "resolveNode",
@@ -4285,10 +4571,7 @@
         {
             "domain": "CSS",
             "experimental": true,
-            "description": "This domain exposes CSS read/write operations. All CSS objects (stylesheets, rules, and styles) have an associated <code>id</code> used in subsequent operations on the related object. Each object type has a specific <code>id</code> structure, and those are not interchangeable between objects of different kinds. CSS objects can be loaded using the <code>get*ForNode()</code> calls (which accept a DOM node id). A client can also keep track of stylesheets via the <code>styleSheetAdded</code>/<code>styleSheetRemoved</code> events and subsequently load the required stylesheet contents using the <code>getStyleSheet[Text]()</code> methods.",
-            "dependencies": [
-                "DOM"
-            ],
+            "description": "This domain exposes CSS read/write operations. All CSS objects (stylesheets, rules, and styles) have an associated 'id' used in subsequent operations on the related object. Each object type has a specific 'id' structure, and those are not interchangeable between objects of different kinds. CSS objects can be loaded using the <code>get*ForNode()</code> calls (which accept a DOM node id). A client can also discover all the existing stylesheets with the <code>getAllStyleSheets()</code> method (or keeping track of the <code>styleSheetAdded</code>/<code>styleSheetRemoved</code> events) and subsequently load the required stylesheet contents using the <code>getStyleSheet[Text]()</code> methods.",
             "types": [
                 {
                     "id": "StyleSheetId",
@@ -4415,7 +4698,7 @@
                         },
                         {
                             "name": "frameId",
-                            "$ref": "Page.FrameId",
+                            "type": "string",
                             "description": "Owner frame identifier."
                         },
                         {
@@ -4470,11 +4753,6 @@
                             "name": "startColumn",
                             "type": "number",
                             "description": "Column offset of the stylesheet within the resource (zero based)."
-                        },
-                        {
-                            "name": "length",
-                            "type": "number",
-                            "description": "Size of the content (in characters)."
                         }
                     ],
                     "description": "CSS stylesheet metainformation."
@@ -4515,33 +4793,6 @@
                         }
                     ],
                     "description": "CSS rule representation."
-                },
-                {
-                    "id": "RuleUsage",
-                    "type": "object",
-                    "properties": [
-                        {
-                            "name": "styleSheetId",
-                            "$ref": "StyleSheetId",
-                            "description": "The css style sheet identifier (absent for user agent stylesheet and user-specified stylesheet rules) this rule came from."
-                        },
-                        {
-                            "name": "startOffset",
-                            "type": "number",
-                            "description": "Offset of the start of the rule (including selector) from the beginning of the stylesheet."
-                        },
-                        {
-                            "name": "endOffset",
-                            "type": "number",
-                            "description": "Offset of the end of the rule body from the beginning of the stylesheet."
-                        },
-                        {
-                            "name": "used",
-                            "type": "boolean",
-                            "description": "Indicates whether the rule was actually used by some element in the page."
-                        }
-                    ],
-                    "description": "CSS coverage information."
                 },
                 {
                     "id": "SourceRange",
@@ -4747,6 +4998,7 @@
                                 "$ref": "MediaQuery"
                             },
                             "optional": true,
+                            "experimental": true,
                             "description": "Array of media queries."
                         }
                     ],
@@ -4770,7 +5022,8 @@
                             "description": "Whether the media query condition is satisfied."
                         }
                     ],
-                    "description": "Media query descriptor."
+                    "description": "Media query descriptor.",
+                    "experimental": true
                 },
                 {
                     "id": "MediaQueryExpression",
@@ -4804,7 +5057,8 @@
                             "description": "Computed length of media query expression (if applicable)."
                         }
                     ],
-                    "description": "Media query expression descriptor."
+                    "description": "Media query expression descriptor.",
+                    "experimental": true
                 },
                 {
                     "id": "PlatformFontUsage",
@@ -4826,7 +5080,8 @@
                             "description": "Amount of glyphs that were rendered with this font."
                         }
                     ],
-                    "description": "Information about amount of glyphs that were rendered with given font."
+                    "description": "Information about amount of glyphs that were rendered with given font.",
+                    "experimental": true
                 },
                 {
                     "id": "CSSKeyframesRule",
@@ -4902,6 +5157,7 @@
             "commands": [
                 {
                     "name": "enable",
+                    "async": true,
                     "description": "Enables the CSS agent for the given page. Clients should not assume that the CSS agent has been enabled until the result of this command is received."
                 },
                 {
@@ -5030,7 +5286,8 @@
                             "description": "Usage statistics for every employed platform font."
                         }
                     ],
-                    "description": "Requests information about platform fonts which we used to render child TextNodes in the given node."
+                    "description": "Requests information about platform fonts which we used to render child TextNodes in the given node.",
+                    "experimental": true
                 },
                 {
                     "name": "getStyleSheetText",
@@ -5048,321 +5305,17 @@
                         }
                     ],
                     "description": "Returns the current textual content and the URL for a stylesheet."
-                },
-                {
-                    "name": "collectClassNames",
-                    "parameters": [
-                        {
-                            "name": "styleSheetId",
-                            "$ref": "StyleSheetId"
-                        }
-                    ],
-                    "returns": [
-                        {
-                            "name": "classNames",
-                            "type": "array",
-                            "items": {
-                                "type": "string"
-                            },
-                            "description": "Class name list."
-                        }
-                    ],
-                    "description": "Returns all class names from specified stylesheet."
-                },
-                {
-                    "name": "setStyleSheetText",
-                    "parameters": [
-                        {
-                            "name": "styleSheetId",
-                            "$ref": "StyleSheetId"
-                        },
-                        {
-                            "name": "text",
-                            "type": "string"
-                        }
-                    ],
-                    "returns": [
-                        {
-                            "name": "sourceMapURL",
-                            "type": "string",
-                            "optional": true,
-                            "description": "URL of source map associated with script (if any)."
-                        }
-                    ],
-                    "description": "Sets the new stylesheet text."
-                },
-                {
-                    "name": "setRuleSelector",
-                    "parameters": [
-                        {
-                            "name": "styleSheetId",
-                            "$ref": "StyleSheetId"
-                        },
-                        {
-                            "name": "range",
-                            "$ref": "SourceRange"
-                        },
-                        {
-                            "name": "selector",
-                            "type": "string"
-                        }
-                    ],
-                    "returns": [
-                        {
-                            "name": "selectorList",
-                            "$ref": "SelectorList",
-                            "description": "The resulting selector list after modification."
-                        }
-                    ],
-                    "description": "Modifies the rule selector."
-                },
-                {
-                    "name": "setKeyframeKey",
-                    "parameters": [
-                        {
-                            "name": "styleSheetId",
-                            "$ref": "StyleSheetId"
-                        },
-                        {
-                            "name": "range",
-                            "$ref": "SourceRange"
-                        },
-                        {
-                            "name": "keyText",
-                            "type": "string"
-                        }
-                    ],
-                    "returns": [
-                        {
-                            "name": "keyText",
-                            "$ref": "Value",
-                            "description": "The resulting key text after modification."
-                        }
-                    ],
-                    "description": "Modifies the keyframe rule key text."
-                },
-                {
-                    "name": "setStyleTexts",
-                    "parameters": [
-                        {
-                            "name": "edits",
-                            "type": "array",
-                            "items": {
-                                "$ref": "StyleDeclarationEdit"
-                            }
-                        }
-                    ],
-                    "returns": [
-                        {
-                            "name": "styles",
-                            "type": "array",
-                            "items": {
-                                "$ref": "CSSStyle"
-                            },
-                            "description": "The resulting styles after modification."
-                        }
-                    ],
-                    "description": "Applies specified style edits one after another in the given order."
-                },
-                {
-                    "name": "setMediaText",
-                    "parameters": [
-                        {
-                            "name": "styleSheetId",
-                            "$ref": "StyleSheetId"
-                        },
-                        {
-                            "name": "range",
-                            "$ref": "SourceRange"
-                        },
-                        {
-                            "name": "text",
-                            "type": "string"
-                        }
-                    ],
-                    "returns": [
-                        {
-                            "name": "media",
-                            "$ref": "CSSMedia",
-                            "description": "The resulting CSS media rule after modification."
-                        }
-                    ],
-                    "description": "Modifies the rule selector."
-                },
-                {
-                    "name": "createStyleSheet",
-                    "parameters": [
-                        {
-                            "name": "frameId",
-                            "$ref": "Page.FrameId",
-                            "description": "Identifier of the frame where \"via-inspector\" stylesheet should be created."
-                        }
-                    ],
-                    "returns": [
-                        {
-                            "name": "styleSheetId",
-                            "$ref": "StyleSheetId",
-                            "description": "Identifier of the created \"via-inspector\" stylesheet."
-                        }
-                    ],
-                    "description": "Creates a new special \"via-inspector\" stylesheet in the frame with given <code>frameId</code>."
-                },
-                {
-                    "name": "addRule",
-                    "parameters": [
-                        {
-                            "name": "styleSheetId",
-                            "$ref": "StyleSheetId",
-                            "description": "The css style sheet identifier where a new rule should be inserted."
-                        },
-                        {
-                            "name": "ruleText",
-                            "type": "string",
-                            "description": "The text of a new rule."
-                        },
-                        {
-                            "name": "location",
-                            "$ref": "SourceRange",
-                            "description": "Text position of a new rule in the target style sheet."
-                        }
-                    ],
-                    "returns": [
-                        {
-                            "name": "rule",
-                            "$ref": "CSSRule",
-                            "description": "The newly created rule."
-                        }
-                    ],
-                    "description": "Inserts a new rule with the given <code>ruleText</code> in a stylesheet with given <code>styleSheetId</code>, at the position specified by <code>location</code>."
-                },
-                {
-                    "name": "forcePseudoState",
-                    "parameters": [
-                        {
-                            "name": "nodeId",
-                            "$ref": "DOM.NodeId",
-                            "description": "The element id for which to force the pseudo state."
-                        },
-                        {
-                            "name": "forcedPseudoClasses",
-                            "type": "array",
-                            "items": {
-                                "type": "string",
-                                "enum": [
-                                    "active",
-                                    "focus",
-                                    "hover",
-                                    "visited"
-                                ]
-                            },
-                            "description": "Element pseudo classes to force when computing the element's style."
-                        }
-                    ],
-                    "description": "Ensures that the given node will have specified pseudo-classes whenever its style is computed by the browser."
-                },
-                {
-                    "name": "getMediaQueries",
-                    "returns": [
-                        {
-                            "name": "medias",
-                            "type": "array",
-                            "items": {
-                                "$ref": "CSSMedia"
-                            }
-                        }
-                    ],
-                    "description": "Returns all media queries parsed by the rendering engine."
-                },
-                {
-                    "name": "setEffectivePropertyValueForNode",
-                    "parameters": [
-                        {
-                            "name": "nodeId",
-                            "$ref": "DOM.NodeId",
-                            "description": "The element id for which to set property."
-                        },
-                        {
-                            "name": "propertyName",
-                            "type": "string"
-                        },
-                        {
-                            "name": "value",
-                            "type": "string"
-                        }
-                    ],
-                    "description": "Find a rule with the given active property for the given node and set the new value for this property"
-                },
-                {
-                    "name": "getBackgroundColors",
-                    "parameters": [
-                        {
-                            "name": "nodeId",
-                            "$ref": "DOM.NodeId",
-                            "description": "Id of the node to get background colors for."
-                        }
-                    ],
-                    "returns": [
-                        {
-                            "name": "backgroundColors",
-                            "type": "array",
-                            "items": {
-                                "type": "string"
-                            },
-                            "description": "The range of background colors behind this element, if it contains any visible text. If no visible text is present, this will be undefined. In the case of a flat background color, this will consist of simply that color. In the case of a gradient, this will consist of each of the color stops. For anything more complicated, this will be an empty array. Images will be ignored (as if the image had failed to load).",
-                            "optional": true
-                        },
-                        {
-                            "name": "computedFontSize",
-                            "type": "string",
-                            "description": "The computed font size for this node, as a CSS computed value string (e.g. '12px').",
-                            "optional": true
-                        },
-                        {
-                            "name": "computedFontWeight",
-                            "type": "string",
-                            "description": "The computed font weight for this node, as a CSS computed value string (e.g. 'normal' or '100').",
-                            "optional": true
-                        },
-                        {
-                            "name": "computedBodyFontSize",
-                            "type": "string",
-                            "description": "The computed font size for the document body, as a computed CSS value string (e.g. '16px').",
-                            "optional": true
-                        }
-                    ]
-                },
-                {
-                    "name": "startRuleUsageTracking",
-                    "description": "Enables the selector recording."
-                },
-                {
-                    "name": "takeCoverageDelta",
-                    "description": "Obtain list of rules that became used since last call to this method (or since start of coverage instrumentation)",
-                    "returns": [
-                        {
-                            "name": "coverage",
-                            "type": "array",
-                            "items": {
-                                "$ref": "RuleUsage"
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "stopRuleUsageTracking",
-                    "returns": [
-                        {
-                            "name": "ruleUsage",
-                            "type": "array",
-                            "items": {
-                                "$ref": "RuleUsage"
-                            }
-                        }
-                    ],
-                    "description": "The list of rules with an indication of whether these were used"
                 }
             ],
             "events": [
+                {
+                    "name": "mediaQueryResultChanged",
+                    "description": "Fires whenever a MediaQuery result changes (for example, after a browser window has been resized.) The current implementation considers only viewport-dependent media features."
+                },
+                {
+                    "name": "fontsUpdated",
+                    "description": "Fires whenever a web font gets loaded."
+                },
                 {
                     "name": "styleSheetChanged",
                     "parameters": [
@@ -5394,389 +5347,21 @@
                         }
                     ],
                     "description": "Fired whenever an active document stylesheet is removed."
-                }
-            ]
-        },
-        {
-            "domain": "Overlay",
-            "description": "This domain provides various functionality related to drawing atop the inspected page.",
-            "dependencies": [
-                "DOM",
-                "Page",
-                "Runtime"
-            ],
-            "experimental": true,
-            "types": [
-                {
-                    "id": "HighlightConfig",
-                    "type": "object",
-                    "properties": [
-                        {
-                            "name": "showInfo",
-                            "type": "boolean",
-                            "optional": true,
-                            "description": "Whether the node info tooltip should be shown (default: false)."
-                        },
-                        {
-                            "name": "showRulers",
-                            "type": "boolean",
-                            "optional": true,
-                            "description": "Whether the rulers should be shown (default: false)."
-                        },
-                        {
-                            "name": "showExtensionLines",
-                            "type": "boolean",
-                            "optional": true,
-                            "description": "Whether the extension lines from node to the rulers should be shown (default: false)."
-                        },
-                        {
-                            "name": "displayAsMaterial",
-                            "type": "boolean",
-                            "optional": true
-                        },
-                        {
-                            "name": "contentColor",
-                            "$ref": "DOM.RGBA",
-                            "optional": true,
-                            "description": "The content box highlight fill color (default: transparent)."
-                        },
-                        {
-                            "name": "paddingColor",
-                            "$ref": "DOM.RGBA",
-                            "optional": true,
-                            "description": "The padding highlight fill color (default: transparent)."
-                        },
-                        {
-                            "name": "borderColor",
-                            "$ref": "DOM.RGBA",
-                            "optional": true,
-                            "description": "The border highlight fill color (default: transparent)."
-                        },
-                        {
-                            "name": "marginColor",
-                            "$ref": "DOM.RGBA",
-                            "optional": true,
-                            "description": "The margin highlight fill color (default: transparent)."
-                        },
-                        {
-                            "name": "eventTargetColor",
-                            "$ref": "DOM.RGBA",
-                            "optional": true,
-                            "description": "The event target element highlight fill color (default: transparent)."
-                        },
-                        {
-                            "name": "shapeColor",
-                            "$ref": "DOM.RGBA",
-                            "optional": true,
-                            "description": "The shape outside fill color (default: transparent)."
-                        },
-                        {
-                            "name": "shapeMarginColor",
-                            "$ref": "DOM.RGBA",
-                            "optional": true,
-                            "description": "The shape margin fill color (default: transparent)."
-                        },
-                        {
-                            "name": "selectorList",
-                            "type": "string",
-                            "optional": true,
-                            "description": "Selectors to highlight relevant nodes."
-                        },
-                        {
-                            "name": "cssGridColor",
-                            "$ref": "DOM.RGBA",
-                            "optional": true,
-                            "description": "The grid layout color (default: transparent)."
-                        }
-                    ],
-                    "description": "Configuration data for the highlighting of page elements."
-                }
-            ],
-            "commands": [
-                {
-                    "name": "enable",
-                    "description": "Enables domain notifications."
                 },
                 {
-                    "name": "disable",
-                    "description": "Disables domain notifications."
-                },
-                {
-                    "name": "setShowFPSCounter",
-                    "description": "Requests that backend shows the FPS counter",
+                    "name": "layoutEditorChange",
                     "parameters": [
                         {
-                            "name": "show",
-                            "type": "boolean",
-                            "description": "True for showing the FPS counter"
+                            "name": "styleSheetId",
+                            "$ref": "StyleSheetId",
+                            "description": "Identifier of the stylesheet where the modification occurred."
+                        },
+                        {
+                            "name": "changeRange",
+                            "$ref": "SourceRange",
+                            "description": "Range where the modification occurred."
                         }
                     ]
-                },
-                {
-                    "name": "setPausedInDebuggerMessage",
-                    "parameters": [
-                        {
-                            "name": "message",
-                            "type": "string",
-                            "optional": true,
-                            "description": "The message to display, also triggers resume and step over controls."
-                        }
-                    ]
-                },
-                {
-                    "name": "highlightNode",
-                    "description": "Highlights DOM node with given id or with the given JavaScript object wrapper. Either nodeId or objectId must be specified.",
-                    "parameters": [
-                        {
-                            "name": "highlightConfig",
-                            "$ref": "HighlightConfig",
-                            "description": "A descriptor for the highlight appearance."
-                        },
-                        {
-                            "name": "nodeId",
-                            "$ref": "DOM.NodeId",
-                            "optional": true,
-                            "description": "Identifier of the node to highlight."
-                        },
-                        {
-                            "name": "backendNodeId",
-                            "$ref": "DOM.BackendNodeId",
-                            "optional": true,
-                            "description": "Identifier of the backend node to highlight."
-                        },
-                        {
-                            "name": "objectId",
-                            "$ref": "Runtime.RemoteObjectId",
-                            "optional": true,
-                            "description": "JavaScript object id of the node to be highlighted."
-                        }
-                    ]
-                },
-                {
-                    "name": "highlightFrame",
-                    "description": "Highlights owner element of the frame with given id.",
-                    "parameters": [
-                        {
-                            "name": "frameId",
-                            "$ref": "Page.FrameId",
-                            "description": "Identifier of the frame to highlight."
-                        },
-                        {
-                            "name": "contentColor",
-                            "$ref": "DOM.RGBA",
-                            "optional": true,
-                            "description": "The content box highlight fill color (default: transparent)."
-                        },
-                        {
-                            "name": "contentOutlineColor",
-                            "$ref": "DOM.RGBA",
-                            "optional": true,
-                            "description": "The content box highlight outline color (default: transparent)."
-                        }
-                    ]
-                },
-                {
-                    "name": "hideHighlight",
-                    "description": "Hides any highlight."
-                },
-                {
-                    "name": "getHighlightObjectForTest",
-                    "description": "For testing.",
-                    "parameters": [
-                        {
-                            "name": "nodeId",
-                            "$ref": "DOM.NodeId",
-                            "description": "Id of the node to get highlight object for."
-                        }
-                    ],
-                    "returns": [
-                        {
-                            "name": "highlight",
-                            "type": "object",
-                            "description": "Highlight data for the node."
-                        }
-                    ]
-                }
-            ],
-            "events": [
-                {
-                    "name": "screenshotRequested",
-                    "description": "Fired when user asks to capture screenshot of some area on the page.",
-                    "parameters": [
-                        {
-                            "name": "viewport",
-                            "$ref": "Page.Viewport",
-                            "description": "Viewport to capture, in CSS."
-                        }
-                    ]
-                }
-            ]
-        },
-        {
-            "domain": "Log",
-            "description": "Provides access to log entries.",
-            "dependencies": [
-                "Runtime",
-                "Network"
-            ],
-            "types": [
-                {
-                    "id": "LogEntry",
-                    "type": "object",
-                    "description": "Log entry.",
-                    "properties": [
-                        {
-                            "name": "source",
-                            "type": "string",
-                            "enum": [
-                                "xml",
-                                "javascript",
-                                "network",
-                                "storage",
-                                "appcache",
-                                "rendering",
-                                "security",
-                                "deprecation",
-                                "worker",
-                                "violation",
-                                "intervention",
-                                "recommendation",
-                                "other"
-                            ],
-                            "description": "Log entry source."
-                        },
-                        {
-                            "name": "level",
-                            "type": "string",
-                            "enum": [
-                                "verbose",
-                                "info",
-                                "warning",
-                                "error"
-                            ],
-                            "description": "Log entry severity."
-                        },
-                        {
-                            "name": "text",
-                            "type": "string",
-                            "description": "Logged text."
-                        },
-                        {
-                            "name": "timestamp",
-                            "$ref": "Runtime.Timestamp",
-                            "description": "Timestamp when this entry was added."
-                        },
-                        {
-                            "name": "url",
-                            "type": "string",
-                            "optional": true,
-                            "description": "URL of the resource if known."
-                        },
-                        {
-                            "name": "lineNumber",
-                            "type": "integer",
-                            "optional": true,
-                            "description": "Line number in the resource."
-                        },
-                        {
-                            "name": "stackTrace",
-                            "$ref": "Runtime.StackTrace",
-                            "optional": true,
-                            "description": "JavaScript stack trace."
-                        },
-                        {
-                            "name": "networkRequestId",
-                            "$ref": "Network.RequestId",
-                            "optional": true,
-                            "description": "Identifier of the network request associated with this entry."
-                        },
-                        {
-                            "name": "workerId",
-                            "type": "string",
-                            "optional": true,
-                            "description": "Identifier of the worker associated with this entry."
-                        },
-                        {
-                            "name": "args",
-                            "type": "array",
-                            "items": {
-                                "$ref": "Runtime.RemoteObject"
-                            },
-                            "optional": true,
-                            "description": "Call arguments."
-                        }
-                    ]
-                },
-                {
-                    "id": "ViolationSetting",
-                    "type": "object",
-                    "description": "Violation configuration setting.",
-                    "properties": [
-                        {
-                            "name": "name",
-                            "type": "string",
-                            "enum": [
-                                "longTask",
-                                "longLayout",
-                                "blockedEvent",
-                                "blockedParser",
-                                "discouragedAPIUse",
-                                "handler",
-                                "recurringHandler"
-                            ],
-                            "description": "Violation type."
-                        },
-                        {
-                            "name": "threshold",
-                            "type": "number",
-                            "description": "Time threshold to trigger upon."
-                        }
-                    ]
-                }
-            ],
-            "commands": [
-                {
-                    "name": "enable",
-                    "description": "Enables log domain, sends the entries collected so far to the client by means of the <code>entryAdded</code> notification."
-                },
-                {
-                    "name": "disable",
-                    "description": "Disables log domain, prevents further log entries from being reported to the client."
-                },
-                {
-                    "name": "clear",
-                    "description": "Clears the log."
-                },
-                {
-                    "name": "startViolationsReport",
-                    "parameters": [
-                        {
-                            "name": "config",
-                            "type": "array",
-                            "items": {
-                                "$ref": "ViolationSetting"
-                            },
-                            "description": "Configuration for violations."
-                        }
-                    ],
-                    "description": "start violation reporting."
-                },
-                {
-                    "name": "stopViolationsReport",
-                    "description": "Stop violation reporting."
-                }
-            ],
-            "events": [
-                {
-                    "name": "entryAdded",
-                    "parameters": [
-                        {
-                            "name": "entry",
-                            "$ref": "LogEntry",
-                            "description": "The entry."
-                        }
-                    ],
-                    "description": "Issued when new message was logged."
                 }
             ]
         }
