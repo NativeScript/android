@@ -45,7 +45,7 @@ for emulator in $listOfEmulators; do
 
     echo "Rename unit test result"
     (
-        cp ./test-app/dist
+        cd ./test-app/dist
         mv android_unit_test_results.xml $emulator.xml
     )
 
