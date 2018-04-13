@@ -15,6 +15,11 @@ public class ClassInfo implements ClassDescriptor {
     }
 
     @Override
+    public int hashCode() {
+        return getSignature().hashCode();
+    }
+
+    @Override
     public boolean equals(Object o) {
         if ((o == null) || !(o instanceof ClassDescriptor)) {
             return false;

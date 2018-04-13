@@ -102,7 +102,7 @@ DispatchResponse V8DOMAgentImpl::getDocument(std::unique_ptr<protocol::DOM::Node
                 auto errorSupportString = errorSupport.errors().utf8();
                 if (!errorSupportString.empty()) {
                     auto errorMessage = "Error while parsing debug `DOM Node` object. ";
-                    DEBUG_WRITE_FORCE("JS Error: %s", errorMessage, errorSupportString.c_str());
+                    DEBUG_WRITE_FORCE("JS Error: %s, Error support: %s", errorMessage, errorSupportString.c_str());
                     return DispatchResponse::Error(errorMessage);
                 } else {
                     *out_root = std::move(domNode);

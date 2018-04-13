@@ -759,7 +759,7 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* is
     SetTypeMetadata(isolate, wrappedCtorFunc, new TypeMetadata(s_metadataReader.ReadTypeName(treeNode)));
 
     if (frame.check()) {
-        frame.log("Materizlizing class: " + node->m_name);
+        frame.log("Materializing class: " + node->m_name);
     }
 
     return ctorFuncTemplate;

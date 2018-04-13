@@ -432,7 +432,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
             m_startupData->raw_size = m_heapSnapshotBlob->size;
             create_params.snapshot_blob = m_startupData;
 
-            DEBUG_WRITE_FORCE("Snapshot read %s (%dB).", snapshotPath.c_str(), m_heapSnapshotBlob->size);
+            DEBUG_WRITE_FORCE("Snapshot read %s (%zuB).", snapshotPath.c_str(), m_heapSnapshotBlob->size);
         } else if (!saveSnapshot) {
             DEBUG_WRITE_FORCE("No snapshot file found at %s", snapshotPath.c_str());
         } else {
@@ -459,7 +459,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
                 if (!writeSuccess) {
                     DEBUG_WRITE_FORCE("Failed to save created snapshot.");
                 } else {
-                    DEBUG_WRITE_FORCE("Saved snapshot of %s (%dB) in %s (%dB)",
+                    DEBUG_WRITE_FORCE("Saved snapshot of %s (%zuB) in %s (%dB)",
                                       Constants::V8_HEAP_SNAPSHOT_SCRIPT.c_str(), customScript.size(),
                                       snapshotPath.c_str(), m_startupData->raw_size);
                 }
