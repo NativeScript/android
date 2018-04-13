@@ -14,6 +14,8 @@ else()
     set(ARCH_INCLUDE_DIR "arm-linux-androideabi")
 endif()
 
+set(COMMON_CMAKE_ARGUMENTS "-std=c++11 -Werror -Wno-unused-result -mstackrealign -fexceptions -fno-builtin-stpcpy -fno-rtti")
+
 # Command info: https://cmake.org/cmake/help/v3.4/command/include_directories.html
 include_directories( src/main/cpp
                     src/main/cpp/include
@@ -23,9 +25,9 @@ include_directories( src/main/cpp
                     ${ANDROID_NDK_ROOT}/sysroot/usr/include/${ARCH_INCLUDE_DIR}/
                     )
 if ( OPTIMIZED_BUILD )
-    set(CMAKE_CXX_FLAGS "-std=c++11 -Werror -Wno-unused-result -fexceptions -fno-builtin-stpcpy -fno-rtti -O3 -fvisibility=hidden -ffunction-sections -fno-data-sections -Wl,--exclude-libs=ALL -Wl,--gc-sections")
+    set(CMAKE_CXX_FLAGS "${COMMON_CMAKE_ARGUMENTS} -O3 -fvisibility=hidden -ffunction-sections -fno-data-sections -Wl,--exclude-libs=ALL -Wl,--gc-sections")
 else()
-    set(CMAKE_CXX_FLAGS "-std=c++11 -Werror -Wno-unused-result -fexceptions -fno-builtin-stpcpy -fno-rtti -g ")
+    set(CMAKE_CXX_FLAGS "${COMMON_CMAKE_ARGUMENTS} -g ")
 endif()
 
 # Command info: https://cmake.org/cmake/help/v3.4/command/add_library.html
