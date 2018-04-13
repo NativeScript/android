@@ -19,29 +19,33 @@ for KILLPID in `ps ax | grep 'emulator' | grep -v 'grep' | awk ' { print $1;}'`;
 for KILLPID in `ps ax | grep 'qemu' | grep -v 'grep' | awk ' { print $1;}'`; do kill -9 $KILLPID; done
 for KILLPID in `ps ax | grep 'adb' | grep -v 'grep' | awk ' { print $1;}'`; do kill -9 $KILLPID; done
 
-echo "Start emulator"
-$ANDROID_HOME/tools/emulator -avd Emulator-Api19-Default -wipe-data -gpu on &
-
-if [ "$1" -ne "unit_tests_only" ]; then
+if [ "$1" != 'unit_tests_only' ]; then
     echo "Building Android Runtime with paramerter packageVersion: $PACKAGE_VERSION and commit: $GIT_COMMIT"
     ./gradlew -PpackageVersion=$PACKAGE_VERSION -PgitCommitVersion=$GIT_COMMIT
-fi
-
-echo "Run Android Runtime unit tests"
-if [ "$1" -ne "unit_tests_only" ]; then
     cp dist/tns-android-*.tgz dist/tns-android.tgz
 fi
-$ANDROID_HOME/platform-tools/adb devices
-$ANDROID_HOME/platform-tools/adb -e logcat -c
-$ANDROID_HOME/platform-tools/adb -e logcat > consoleLog.txt &
-./gradlew runtest
+
+
+listOfEmulators='Emulator-Api19-Default Emulator-Api23-Default Emulator-Api27-Google Emulator-ApiP-Google' 
+
+for emulator in $listOfEmulators; do
+    echo "Start emulator $emulator"
+    $ANDROID_HOME/tools/emulator -avd $emulator -wipe-data -gpu on &
+
+    echo "Run Android Runtime unit tests for $emulator"
+    $ANDROID_HOME/platform-tools/adb devices
+    $ANDROID_HOME/platform-tools/adb -e logcat -c
+    $ANDROID_HOME/platform-tools/adb -e logcat > consoleLog.txt &v
+    ./gradlew runtest
+
+    echo "Rename unit test result"
+    mv ./test-app/dist/{android_unit_test_results.xml,$emulator.xml}
+
+    echo "Stopping running emulators"
+    for KILLPID in `ps ax | grep 'emulator' | grep -v 'grep' | awk ' { print $1;}'`; do kill -9 $KILLPID; done
+    for KILLPID in `ps ax | grep 'qemu' | grep -v 'grep' | awk ' { print $1;}'`; do kill -9 $KILLPID; done
+    for KILLPID in `ps ax | grep 'adb' | grep -v 'grep' | awk ' { print $1;}'`; do kill -9 $KILLPID; done
+done
 
 echo $cwd
-
 cd $cwd
-
-echo "Stopping running emulators"
-for KILLPID in `ps ax | grep 'emulator' | grep -v 'grep' | awk ' { print $1;}'`; do kill -9 $KILLPID; done || true
-for KILLPID in `ps ax | grep 'qemu' | grep -v 'grep' | awk ' { print $1;}'`; do kill -9 $KILLPID; done || true
-for KILLPID in `ps ax | grep 'adb' | grep -v 'grep' | awk ' { print $1;}'`; do kill -9 $KILLPID &> /dev/null; done || true
-
