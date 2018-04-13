@@ -25,9 +25,9 @@ include_directories( src/main/cpp
                     ${ANDROID_NDK_ROOT}/sysroot/usr/include/${ARCH_INCLUDE_DIR}/
                     )
 if ( OPTIMIZED_BUILD )
-    set(CMAKE_CXX_FLAGS "${COMMON_CMAKE_ARGUMENTS} -O3 -fvisibility=hidden -ffunction-sections -fno-data-sections -Wl,--exclude-libs=ALL -Wl,--gc-sections")
+    set(CMAKE_CXX_FLAGS "${COMMON_CMAKE_ARGUMENTS} -O3 -fvisibility=hidden -ffunction-sections -fno-data-sections")
 else()
-    set(CMAKE_CXX_FLAGS "${COMMON_CMAKE_ARGUMENTS} -g ")
+    set(CMAKE_CXX_FLAGS "${COMMON_CMAKE_ARGUMENTS} -g")
 endif()
 
 # Command info: https://cmake.org/cmake/help/v3.4/command/add_library.html
@@ -139,7 +139,11 @@ add_library( # Sets the name of the library. When it's built you can find it wit
         src/main/cpp/v8_inspector/src/inspector/wasm-translation.cc
 )
 
-set_target_properties(NativeScript PROPERTIES LINK_FLAGS -Wl,--allow-multiple-definition)
+if ( OPTIMIZED_BUILD )
+    set_target_properties(NativeScript PROPERTIES LINK_FLAGS -Wl,--allow-multiple-definition -Wl,--exclude-libs=ALL -Wl,--gc-sections)
+else()
+    set_target_properties(NativeScript PROPERTIES LINK_FLAGS -Wl,--allow-multiple-definition)
+endif()
 
 
 MESSAGE( STATUS "# General cmake Info" )
