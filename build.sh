@@ -26,7 +26,7 @@ if [ "$1" != 'unit_tests_only' ]; then
 fi
 
 
-listOfEmulators='Emulator-Api19-Default Emulator-Api23-Default Emulator-Api27-Google Emulator-ApiP-Google' 
+listOfEmulators='Emulator-Api19-Default Emulator-Api23-Default Emulator-Api27-Google Emulator-ApiP-Google'
 
 for emulator in $listOfEmulators; do
     echo "Start emulator $emulator"
@@ -35,7 +35,7 @@ for emulator in $listOfEmulators; do
     echo "Run Android Runtime unit tests for $emulator"
     $ANDROID_HOME/platform-tools/adb devices
     $ANDROID_HOME/platform-tools/adb -e logcat -c
-    $ANDROID_HOME/platform-tools/adb -e logcat > consoleLog.txt &v
+    $ANDROID_HOME/platform-tools/adb -e logcat > consoleLog.txt &
     ./gradlew runtest
 
     echo "Rename unit test result"
