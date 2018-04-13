@@ -22,11 +22,15 @@ for KILLPID in `ps ax | grep 'adb' | grep -v 'grep' | awk ' { print $1;}'`; do k
 echo "Start emulator"
 $ANDROID_HOME/tools/emulator -avd Emulator-Api19-Default -wipe-data -gpu on &
 
-echo "Building Android Runtime with paramerter packageVersion: $PACKAGE_VERSION and commit: $GIT_COMMIT"
-./gradlew -PpackageVersion=$PACKAGE_VERSION -PgitCommitVersion=$GIT_COMMIT
+if [ "$1" -ne "unit_tests_only" ]; then
+    echo "Building Android Runtime with paramerter packageVersion: $PACKAGE_VERSION and commit: $GIT_COMMIT"
+    ./gradlew -PpackageVersion=$PACKAGE_VERSION -PgitCommitVersion=$GIT_COMMIT
+fi
 
 echo "Run Android Runtime unit tests"
-cp dist/tns-android-*.tgz dist/tns-android.tgz
+if [ "$1" -ne "unit_tests_only" ]; then
+    cp dist/tns-android-*.tgz dist/tns-android.tgz
+fi
 $ANDROID_HOME/platform-tools/adb devices
 $ANDROID_HOME/platform-tools/adb -e logcat -c
 $ANDROID_HOME/platform-tools/adb -e logcat > consoleLog.txt &

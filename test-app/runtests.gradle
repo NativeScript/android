@@ -25,9 +25,9 @@ task installApk(type: Exec) {
             println "Attempting to install buit apk"
 
             if (isWinOs) {
-                commandLine "cmd", "/c", "gradlew", ":app:installDebug"
+                commandLine "cmd", "/c", "gradlew", ":app:installDebug", "-PonlyX86"
             } else {
-                commandLine "./gradlew", ":app:installDebug"
+                commandLine "./gradlew", ":app:installDebug", "-PonlyX86"
             }
         }
 }
