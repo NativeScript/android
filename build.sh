@@ -35,7 +35,7 @@ listOfEmulators="Emulator-Api19-Default Emulator-Api23-Default Emulator-Api27-Go
 
 for emulator in $listOfEmulators; do
     echo "Start emulator $emulator"
-    $ANDROID_HOME/tools/emulator -avd ${emulator} -wipe-data -gpu on &
+    $ANDROID_HOME/emulator/emulator -avd ${emulator} -wipe-data -gpu on &
 
     echo "Run Android Runtime unit tests for $emulator"
     $ANDROID_HOME/platform-tools/adb devices
