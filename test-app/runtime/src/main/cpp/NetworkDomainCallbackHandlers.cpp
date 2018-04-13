@@ -279,5 +279,5 @@ void NetworkDomainCallbackHandlers::LoadingFinishedCallback(const v8::FunctionCa
     }
 }
 
-const char* NetworkDomainCallbackHandlers::FrameId = "NSFrameIdentifier";
+const char* NetworkDomainCallbackHandlers::FrameId = "";
 const char* NetworkDomainCallbackHandlers::LoaderId = "NSLoaderIdentifier";
