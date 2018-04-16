@@ -1,4 +1,4 @@
-/* 
+/*
 *	Packs metadata generator in a .tgz file in ~/dist folder
 *	To build .tgz
 *			gradlew packmg
@@ -32,8 +32,8 @@ sourceSets {
 compileJava.outputs.dir("$rootDir/dist/classes")
 
 dependencies {
-    compile files("./src/libs/bcel-5.2.jar")
-    compile files("./src/libs/dx.jar")
+    implementation files("./src/libs/bcel-5.2.jar")
+    implementation files("./src/libs/dx.jar")
 }
 
 task copyNecessaryFiles {
@@ -42,11 +42,11 @@ task copyNecessaryFiles {
 			from "$rootDir/helpers"
 			into "$rootDir/dist/bin"
 		}
-		
+
 		copy {
 			from "$rootDir/package.json"
 			into "$rootDir/dist"
-		}	
+		}
 	}
 }
 
@@ -55,7 +55,7 @@ jar {
         attributes("Manifest-Version": "1.0",
                    "Main-Class": "com.telerik.metadata.Generator")
     }
-	
+
     from {
 
         configurations.runtime.collect {

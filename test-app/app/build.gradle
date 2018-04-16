@@ -206,15 +206,15 @@ dependencies {
 
     def sbgProjectExists = !findProject(':static-binding-generator').is(null)
     if (sbgProjectExists) {
-        provided project(':static-binding-generator')
+        compileOnly project(':static-binding-generator')
     }
     def mdgProjectExists = !findProject(':android-metadata-generator').is(null)
     if (mdgProjectExists) {
-        provided project(':android-metadata-generator')
+        compileOnly project(':android-metadata-generator')
     }
     def dtsgProjectExists = !findProject(':dts-generator').is(null)
     if (dtsgProjectExists) {
-        provided project(':dts-generator')
+        compileOnly project(':dts-generator')
     }
 
     def useV8Symbols = nativescriptDependencies.any {
