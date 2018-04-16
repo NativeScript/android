@@ -33,17 +33,18 @@ fi
 if [ "$2" != '' ]; then
     listOfEmulators=$2
 else
-    listOfEmulators="Emulator-Api27-Google Emulator-Api23-Default Emulator-ApiP-Google Emulator-Api19-Default"
+    listOfEmulators="Emulator-Api19-Default Emulator-Api23-Default Emulator-ApiP-Google Emulator-Api27-Google "
 fi
 
 for emulator in $listOfEmulators; do
     echo "Start emulator $emulator"
-    $ANDROID_HOME/emulator/emulator -avd ${emulator} -wipe-data -gpu on &
+    $ANDROID_HOME/emulator/emulator -avd ${emulator} -wipe-data -gpu on
 
     echo "Run Android Runtime unit tests for $emulator"
     $ANDROID_HOME/platform-tools/adb devices
     $ANDROID_HOME/platform-tools/adb -e logcat -c
-    $ANDROID_HOME/platform-tools/adb -e logcat > consoleLog.txt &
+    $ANDROID_HOME/platform-tools/adb -e logcat > consoleLog.txt
+
     if [ "$1" != 'unit_tests_only' ]; then
         ./gradlew runtest
     else
