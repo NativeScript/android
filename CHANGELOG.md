@@ -1,3 +1,10 @@
+4.0.1
+==
+
+## Bug Fixes
+
+ - [App crash on startup on Android 4.4](https://github.com/NativeScript/android-runtime/issues/999)
+
 4.0.0
 ==
 
