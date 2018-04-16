@@ -207,20 +207,23 @@ dependencies {
     if (project.hasProperty("supportVersion")) {
         supportVer = supportVersion
     }
-    compile "com.android.support:support-v4:$supportVer"
-    compile "com.android.support:appcompat-v7:$supportVer"
-    debugCompile "com.android.support:design:$supportVer"
+
+    implementation "com.android.support:multidex:1.0.2"
+    implementation "com.android.support:support-v4:$supportVer"
+    implementation "com.android.support:appcompat-v7:$supportVer"
+    debugImplementation "com.android.support:design:$supportVer"
+
     def sbgProjectExists = !findProject(':static-binding-generator').is(null)
     if (sbgProjectExists) {
-        provided project(':static-binding-generator')
+        compileOnly project(':static-binding-generator')
     }
     def mdgProjectExists = !findProject(':android-metadata-generator').is(null)
     if (mdgProjectExists) {
-        provided project(':android-metadata-generator')
+        compileOnly project(':android-metadata-generator')
     }
     def dtsgProjectExists = !findProject(':dts-generator').is(null)
     if (dtsgProjectExists) {
-        provided project(':dts-generator')
+        compileOnly project(':dts-generator')
     }
 
     def useV8Symbols = nativescriptDependencies.any {
@@ -231,10 +234,9 @@ dependencies {
     if (!externalRuntimeExists) {
         def runtime = useV8Symbols ? "nativescript-regular" : "nativescript-optimized"
         println "\t + adding nativescript runtime package dependency: $runtime"
-        project.dependencies.add("compile", [name: runtime, ext: "aar"])
+        project.dependencies.add("implementation", [name: runtime, ext: "aar"])
     } else {
-        implementation project(':runtime')
-
+        implementation project(path: ':runtime', configuration: 'default')
     }
 }
 
@@ -249,7 +251,7 @@ task addDependenciesFromNativeScriptPlugins {
             def length = aarFile.name.length() - 4
             def fileName = aarFile.name[0..<length]
             println "\t + adding aar plugin dependency: " + aarFile.getAbsolutePath()
-            project.dependencies.add("compile", [name: fileName, ext: "aar"])
+            project.dependencies.add("implementation", [name: fileName, ext: "aar"])
         }
 
         def jarFiles = fileTree(dir: file("$rootDir/${dep.directory}/$PLATFORMS_ANDROID"), include: ["**/*.jar"])
@@ -272,7 +274,7 @@ task addDependenciesFromAppResourcesLibraries {
             def length = aarFile.name.length() - 4
             def fileName = aarFile.name[0..<length]
             println "\t + adding aar library dependency: " + aarFile.getAbsolutePath()
-            project.dependencies.add("compile", [name: fileName, ext: "aar"])
+            project.dependencies.add("implementation", [name: fileName, ext: "aar"])
         }
 
         def jarFiles = fileTree(dir: appResourcesLibraries, include: ["**/*.jar"])
@@ -282,7 +284,7 @@ task addDependenciesFromAppResourcesLibraries {
             pluginsJarLibraries.add(jarFile.getAbsolutePath())
         }
 
-        project.dependencies.add("compile", jarFiles)
+        project.dependencies.add("implementation", jarFiles)
     }
 }
 
@@ -355,18 +357,20 @@ def explodeAar(File compileDependency, String outputDir) {
 }
 
 task extractAllJars {
-
     outputs.dir extractedDependenciesDir
 
     doLast {
-        def iter = configurations.compile.resolvedConfiguration.resolvedArtifacts.iterator()
+        def iter;
+        if (project.selectedBuildType == "release") {
+            iter = configurations.releaseCompileClasspath.resolve()
+        } else {
+            iter = configurations.debugCompileClasspath.resolve()
+        }
         def dependencyCounter = 0
-        while (iter.hasNext()) {
-            //declaring variable as specific class for getting code completion in Android Studio
-            org.gradle.api.internal.artifacts.DefaultResolvedArtifact nextDependency = iter.next()
-
+        iter.each {
+            def nextDependency = it
             def outputDir = java.nio.file.Paths.get(extractedDependenciesDir, "" + dependencyCounter).normalize().toString()
-            explodeAar(nextDependency.file, outputDir)
+            explodeAar(nextDependency, outputDir)
             dependencyCounter++
         }
     }
