@@ -15,7 +15,7 @@ namespace {
 
 String16 findMagicComment(const String16& content, const String16& name,
                           bool multiline) {
-  DCHECK(name.find("=") == String16::kNotFound);
+  DCHECK_EQ(String16::kNotFound, name.find("="));
   size_t length = content.length();
   size_t nameLength = name.length();
 
@@ -132,7 +132,8 @@ std::unique_ptr<V8Regex> createSearchRegex(V8InspectorImpl* inspector,
                                            const String16& query,
                                            bool caseSensitive, bool isRegex) {
   String16 regexSource = isRegex ? query : createSearchRegexSource(query);
-  return wrapUnique(new V8Regex(inspector, regexSource, caseSensitive));
+  return std::unique_ptr<V8Regex>(
+      new V8Regex(inspector, regexSource, caseSensitive));
 }
 
 }  // namespace

@@ -772,7 +772,7 @@ Local<Value> CallbackHandlers::CallJSMethod(Isolate* isolate, JNIEnv* _env,
             arguments[i] = jsArgs->Get(i);
         }
 
-        TryCatch tc;
+        TryCatch tc(isolate);
         Local<Value> jsResult;
         {
             SET_PROFILER_FRAME();
@@ -991,7 +991,7 @@ void CallbackHandlers::WorkerGlobalPostMessageCallback(const v8::FunctionCallbac
     HandleScope scope(isolate);
 
     try {
-        TryCatch tc;
+        TryCatch tc(isolate);
 
         // TODO: Pete: Discuss whether this is the way to go
         if (args.Length() != 1) {
@@ -1206,7 +1206,7 @@ void CallbackHandlers::WorkerGlobalCloseCallback(const v8::FunctionCallbackInfo<
 
 void CallbackHandlers::CallWorkerScopeOnErrorHandle(Isolate* isolate, TryCatch& tc) {
     try {
-        TryCatch innerTc;
+        TryCatch innerTc(isolate);
 
         // See if `onerror` handle is implemented
         auto context = isolate->GetCurrentContext();
@@ -1239,7 +1239,7 @@ void CallbackHandlers::CallWorkerScopeOnErrorHandle(Isolate* isolate, TryCatch& 
             Local<Value> outStackTrace = innerTc.StackTrace(context).FromMaybe(Local<Value>());
             Local<String> stackTrace;
             if (!outStackTrace.IsEmpty()) {
-                stackTrace = outStackTrace->ToDetailString();
+                stackTrace = outStackTrace->ToDetailString(context).FromMaybe(Local<String>());
             }
             auto source = innerTc.Message()->GetScriptResourceName()->ToString(isolate);
 
@@ -1254,7 +1254,7 @@ void CallbackHandlers::CallWorkerScopeOnErrorHandle(Isolate* isolate, TryCatch& 
         Local<Value> outStackTrace = tc.StackTrace(context).FromMaybe(Local<Value>());
         Local<String> stackTrace;
         if (!outStackTrace.IsEmpty()) {
-            stackTrace = outStackTrace->ToDetailString();
+            stackTrace = outStackTrace->ToDetailString(context).FromMaybe(Local<String>());
         }
 
         auto runtime = Runtime::GetRuntime(isolate);
@@ -1329,7 +1329,7 @@ void CallbackHandlers::CallWorkerObjectOnErrorHandle(Isolate* isolate, jint work
         auto strThreadname = ArgConverter::jstringToString(threadName);
         auto strStackTrace = ArgConverter::jstringToString(stackTrace);
 
-        DEBUG_WRITE("Unhandled exception in '%s' thread. file: %s, line %d\nStackTrace: %s",
+        DEBUG_WRITE("Unhandled exception in '%s' thread. file: %s, line %d, message: %s\nStackTrace: %s",
                     strThreadname.c_str(), strFilename.c_str(), lineno, strMessage.c_str(), strStackTrace.c_str());
 
         // Do not throw exception?

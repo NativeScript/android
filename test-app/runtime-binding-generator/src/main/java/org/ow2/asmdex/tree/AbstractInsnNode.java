@@ -231,7 +231,7 @@ public abstract class AbstractInsnNode {
      * @return the clone of the given label.
      */
     static LabelNode clone(final LabelNode label, final Map<LabelNode, LabelNode> map) {
-        return (LabelNode) map.get(label);
+        return map.get(label);
     }
 
     /**
@@ -244,7 +244,7 @@ public abstract class AbstractInsnNode {
     static LabelNode[] clone(final List<LabelNode> labels, final Map<LabelNode, LabelNode> map) {
         LabelNode[] clones = new LabelNode[labels.size()];
         for (int i = 0; i < clones.length; ++i) {
-            clones[i] = (LabelNode) map.get(labels.get(i));
+            clones[i] = map.get(labels.get(i));
         }
         return clones;
     }

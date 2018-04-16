@@ -8,7 +8,6 @@
 #include <v8_inspector/src/inspector/string-16.h>
 #include <v8_inspector/src/inspector/v8-regex.h>
 #include <v8_inspector/src/inspector/v8-inspector-session-impl.h>
-#include <v8_inspector/src/inspector/protocol-platform.h>
 #include <v8_inspector/src/inspector/protocol/Debugger.h>
 #include "v8-page-resources.h"
 
@@ -85,7 +84,7 @@ std::unique_ptr<V8Regex> createSearchRegex(V8InspectorImpl* inspector,
         const String16& query,
         bool caseSensitive, bool isRegex) {
     String16 regexSource = isRegex ? query : createSearchRegexSource(query);
-    return wrapUnique(new V8Regex(inspector, regexSource, caseSensitive));
+    return std::unique_ptr<V8Regex>(new V8Regex(inspector, regexSource, caseSensitive));
 }
 
 // Implementation taken from v8_inspector/src/inspector/search-util

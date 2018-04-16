@@ -789,8 +789,10 @@ public abstract class NanoWSD extends NanoHTTPD {
         switch (size % 3) {
         case 1:
             ar[--a] = '=';
+            break;
         case 2:
             ar[--a] = '=';
+            break;
         }
         return new String(ar);
     }

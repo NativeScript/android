@@ -84,7 +84,7 @@ public class LabelNode extends AbstractInsnNode {
 
     @Override
     public AbstractInsnNode clone(final Map<LabelNode, LabelNode> labels) {
-        return (LabelNode) labels.get(this);
+        return labels.get(this);
     }
 
     /**

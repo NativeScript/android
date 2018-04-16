@@ -1,5 +1,6 @@
 package com.tns;
 
+@SuppressWarnings("serial")
 public class NativeScriptException extends RuntimeException {
     @SuppressWarnings("unused")
     private long jsValueAddress = 0;

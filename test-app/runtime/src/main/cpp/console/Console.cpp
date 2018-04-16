@@ -82,6 +82,7 @@ const v8::Local<v8::String> transformJSObject(v8::Isolate* isolate, v8::Local<v8
     if (hasCustomToStringImplementation) {
         resultString = objToString;
     } else {
+        v8::HandleScope scope(isolate);
         resultString = JsonStringifyObject(isolate, object);
     }
 
@@ -318,7 +319,7 @@ void Console::dirCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
                         }
                         ss << ": " << jsonStringifiedObject;
                     } else {
-                        ss << ": \"" << ArgConverter::ConvertToString(propertyValue->ToDetailString(isolate)) << "\"";
+                        ss << ": \"" << ArgConverter::ConvertToString(propertyValue->ToDetailString(context).ToLocalChecked()) << "\"";
                     }
 
                     ss << std::endl;

@@ -19,10 +19,10 @@ namespace API {
 // ------------- Types.
 
 class V8_EXPORT Domain {
-    public:
-        virtual std::unique_ptr<StringBuffer> toJSONString() const = 0;
-        virtual ~Domain() { }
-        static std::unique_ptr<protocol::Schema::API::Domain> fromJSONString(const StringView& json);
+public:
+    virtual std::unique_ptr<StringBuffer> toJSONString() const = 0;
+    virtual ~Domain() { }
+    static std::unique_ptr<protocol::Schema::API::Domain> fromJSONString(const StringView& json);
 };
 
 } // namespace API
