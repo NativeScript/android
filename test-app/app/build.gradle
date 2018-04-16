@@ -21,6 +21,11 @@ import java.nio.file.Paths
 
 apply plugin: "com.android.application"
 
+def onlyX86 = project.hasProperty("onlyX86")
+if (onlyX86) {
+    println "OnlyX86 build triggered."
+}
+
 //common
 def BUILD_TOOLS_PATH = "$rootDir/build-tools"
 def TYPINGS_PATH = "$BUILD_TOOLS_PATH/typings"
@@ -130,7 +135,11 @@ android {
         minSdkVersion 17
         targetSdkVersion computeTargetSdkVersion()
         ndk {
-            abiFilters 'x86', 'armeabi-v7a', 'arm64-v8a'
+            if (onlyX86) {
+                abiFilters 'x86'
+            } else {
+                abiFilters 'x86', 'armeabi-v7a', 'arm64-v8a'
+            }
         }
     }
 
