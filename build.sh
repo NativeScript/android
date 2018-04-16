@@ -33,7 +33,7 @@ fi
 if [ "$2" != '' ]; then
     listOfEmulators=$2
 else
-    listOfEmulators="Emulator-Api19-Default Emulator-Api23-Default Emulator-ApiP-Google Emulator-Api27-Google "
+    listOfEmulators="Emulator-Api19-Default"
 fi
 
 for emulator in $listOfEmulators; do
