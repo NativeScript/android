@@ -9,7 +9,7 @@
 
     console.log("Executing JavaScript parser tests using Jasmine.");
 
-    const subprocess = spawnSync('node', ['./node_modules/jasmine/bin/jasmine.js', 'JASMINE_CONFIG_PATH=jasmine.json'], { cwd: __dirname });
+    const subprocess = spawnSync('node', ['./node_modules/jasmine-xml-reporter/bin/jasmine.js', '--junitreport', '--output=test-results', 'JASMINE_CONFIG_PATH=jasmine.json'], { cwd: __dirname });
 
     let stdout = subprocess.stdout.toString();
     let stderr = subprocess.stderr.toString();
