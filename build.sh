@@ -25,8 +25,8 @@ if [ "$1" != 'unit_tests_only' ]; then
     ./gradlew -PpackageVersion=$PACKAGE_VERSION -PgitCommitVersion=$GIT_COMMIT
     cp dist/tns-android-*.tgz dist/tns-android.tgz
 else
-    echo "Building Android Runtime with paramerter packageVersion: $PACKAGE_VERSION and commit: $GIT_COMMIT"
-    ./gradlew -PpackageVersion=$PACKAGE_VERSION -PgitCommitVersion=$GIT_COMMIT  -PskipUnoptimized -PonlyX86
+    echo "Building Android Runtime for x86 unit tests with paramerter packageVersion: $PACKAGE_VERSION and commit: $GIT_COMMIT"
+    ./gradlew -PpackageVersion=$PACKAGE_VERSION -PgitCommitVersion=$GIT_COMMIT -PskipUnoptimized -PonlyX86
     cp dist/tns-android-*.tgz dist/tns-android.tgz
 fi
 
@@ -41,7 +41,11 @@ for emulator in $listOfEmulators; do
     $ANDROID_HOME/platform-tools/adb devices
     $ANDROID_HOME/platform-tools/adb -e logcat -c
     $ANDROID_HOME/platform-tools/adb -e logcat > consoleLog.txt &
-    ./gradlew runtest
+    if [ "$1" != 'unit_tests_only' ]; then
+        ./gradlew runtest
+    else
+        ./gradlew runtest -PonlyX86
+    fi
 
     echo "Rename unit test result"
     (
