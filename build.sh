@@ -30,8 +30,11 @@ else
     cp dist/tns-android-*.tgz dist/tns-android.tgz
 fi
 
-
-listOfEmulators="Emulator-Api19-Default Emulator-Api23-Default Emulator-Api27-Google Emulator-ApiP-Google"
+if [ "$2" != '' ]; then
+    listOfEmulators=$2
+else
+    listOfEmulators="Emulator-Api19-Default Emulator-Api23-Default Emulator-Api27-Google Emulator-ApiP-Google"
+fi
 
 for emulator in $listOfEmulators; do
     echo "Start emulator $emulator"
