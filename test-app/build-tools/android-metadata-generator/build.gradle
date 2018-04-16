@@ -1,4 +1,4 @@
-/* 
+/*
 *	Packs metadata generator in a .tgz file in ~/dist folder
 *	To build .tgz
 *			gradlew packmg
@@ -46,11 +46,11 @@ task copyNecessaryFiles {
 			from "$rootDir/helpers"
 			into "$rootDir/dist/bin"
 		}
-		
+
 		copy {
 			from "$rootDir/package.json"
 			into "$rootDir/dist"
-		}	
+		}
 	}
 }
 
@@ -59,7 +59,7 @@ jar {
         attributes("Manifest-Version": "1.0",
                    "Main-Class": "com.telerik.metadata.Generator")
     }
-	
+
     from {
 
         configurations.runtime.collect {
