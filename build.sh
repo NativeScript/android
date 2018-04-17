@@ -38,12 +38,12 @@ fi
 
 for emulator in $listOfEmulators; do
     echo "Start emulator $emulator"
-    $ANDROID_HOME/emulator/emulator -avd ${emulator} -wipe-data -gpu on
+    $ANDROID_HOME/emulator/emulator -avd ${emulator} -wipe-data -gpu on&
 
     echo "Run Android Runtime unit tests for $emulator"
     $ANDROID_HOME/platform-tools/adb devices
     $ANDROID_HOME/platform-tools/adb -e logcat -c
-    $ANDROID_HOME/platform-tools/adb -e logcat > consoleLog.txt
+    $ANDROID_HOME/platform-tools/adb -e logcat > consoleLog.txt&
 
     if [ "$1" != 'unit_tests_only' ]; then
         ./gradlew runtest
