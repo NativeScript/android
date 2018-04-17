@@ -16,7 +16,9 @@
     "lazy": "^1.0.11"
   },
   "devDependencies": {
-    "jasmine": "2.8.0",
-    "jasmine-node": "1.14.5"
+    "jasmine": "^2.8.0",
+    "jasmine-node": "1.14.5",
+    "jasmine-reporters": "^2.3.0",
+    "jasmine-xml-reporter": "^1.1.0"
   }
 }
