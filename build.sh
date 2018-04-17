@@ -36,6 +36,9 @@ else
     listOfEmulators="Emulator-Api19-Default"
 fi
 
+# Run static binding generator unit tests
+./gradlew runSbgTests
+
 for emulator in $listOfEmulators; do
     echo "Start emulator $emulator"
     $ANDROID_HOME/emulator/emulator -avd ${emulator} -wipe-data -gpu on&
