@@ -13,7 +13,7 @@ git submodule update --init
 
 echo "Cleanup old build and test artefacts"
 rm -rf consoleLog.txt
-rm -rf test-app/dist/android_unit_test_results.xml
+rm -rf test-app/dist/*.xml
 
 echo "Stopping running emulators if any"
 for KILLPID in `ps ax | grep 'emulator' | grep -v 'grep' | awk ' { print $1;}'`; do kill -9 $KILLPID; done
