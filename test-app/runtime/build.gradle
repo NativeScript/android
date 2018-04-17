@@ -24,7 +24,6 @@ android {
     compileSdkVersion 26
     buildToolsVersion project.ext._buildToolsVersion
 
-    publishNonDefault true
     defaultConfig {
         minSdkVersion 17
         targetSdkVersion 26
@@ -73,7 +72,7 @@ android {
 }
 
 dependencies {
-    compile fileTree(include: ['*.jar'], dir: 'libs')
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
 }
 
 tasks.whenTaskAdded { task ->

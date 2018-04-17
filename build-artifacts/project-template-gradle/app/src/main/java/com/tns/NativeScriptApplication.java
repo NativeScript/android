@@ -1,6 +1,8 @@
 package com.tns;
 
 import android.app.Application;
+import android.os.Build;
+import android.support.multidex.MultiDex;
 
 public class NativeScriptApplication extends Application {
 
@@ -20,6 +22,14 @@ public class NativeScriptApplication extends Application {
             }
         } finally {
             frame.close();
+        }
+    }
+
+    public void attachBaseContext(android.content.Context base) {
+        super.attachBaseContext(base);
+        if (Build.VERSION.SDK_INT < 21) {
+            // As the new gradle plugin automatically uses multidex if necessary we need to call this for older android API versions
+            MultiDex.install(this);
         }
     }
 
