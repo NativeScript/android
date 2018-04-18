@@ -302,7 +302,18 @@ task createPackage {
     println "Creating NativeScript Android Package"
 }
 
-task runSbgTests (type: Exec) {
+task runAstTests (type: Exec) {
+    doFirst {
+        workingDir "$TEST_APP_PATH/build-tools/jsparser/tests"
+        if (isWinOs) {
+            commandLine "cmd", "/c", "npm", "test"
+        } else {
+            commandLine "npm", "test"
+        }
+    }
+}
+
+task runSbgTests (type: Exec, dependsOn: 'runAstTests') {
     doFirst {
         workingDir "$TEST_APP_PATH"
         if (isWinOs) {
