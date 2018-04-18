@@ -143,6 +143,17 @@ task generateRuntime {
     }
 }
 
+task cleanRuntime (type: Exec) {
+    doFirst {
+        workingDir "$TEST_APP_PATH"
+        if (isWinOs) {
+            commandLine "cmd", "/c", "gradlew", ":runtime:clean"
+        } else {
+            commandLine "./gradlew", ":runtime:clean"
+        }
+    }
+}
+
 task generateOptimizedRuntimeAar (type: Exec) {
     doFirst {
         workingDir "$TEST_APP_PATH"
