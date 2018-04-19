@@ -20,6 +20,7 @@ for KILLPID in `ps ax | grep 'emulator' | grep -v 'grep' | awk ' { print $1;}'`;
 for KILLPID in `ps ax | grep 'qemu' | grep -v 'grep' | awk ' { print $1;}'`; do kill -9 $KILLPID; done
 for KILLPID in `ps ax | grep 'adb' | grep -v 'grep' | awk ' { print $1;}'`; do kill -9 $KILLPID; done
 
+./gradlew cleanRuntime
 if [ "$1" != 'unit_tests_only' ]; then
     echo "Building Android Runtime with paramerter packageVersion: $PACKAGE_VERSION and commit: $GIT_COMMIT"
     ./gradlew -PpackageVersion=$PACKAGE_VERSION -PgitCommitVersion=$GIT_COMMIT
