@@ -12,7 +12,7 @@ This step involves fetching and building the V8 projectory, explanation for whic
 
 > Note: When passing arguments to gn to have a project generate, make sure to include the inspector sources. For an overview of all available gn arguments run `gn args project-dir --list`
 
-1. Modify `v8/src/inspector/js_protocol.json` to only contain the domains that will be used in the runtime project. The right way to go about this is to copy-paste the `js_protocol` from the runtime project, and add on top of it. For a complete list of all protocol domains supported by the Chrome browser refer to [browser_protocol.json](https://chromium.googlesource.com/chromium/src/+log/master/third_party/WebKit/Source/core/inspector/browser_protocol.json) in the Chromium project.
+1. Modify `v8/src/inspector/js_protocol.json` to only contain the domains that will be used in the runtime project. The right way to go about this is to copy-paste the `js_protocol` from the runtime project, and add on top of it. For a complete list of all protocol domains supported by the Chrome browser refer to [browser_protocol.json](https://chromium.googlesource.com/chromium/src/+log/master/third_party/WebKit/Source/core/inspector/browser_protocol.json) in the Chromium project. Example browser_protocol.json file can be found [here](https://chromedevtools.github.io/devtools-protocol/tot/) 
 2. Modify `v8/src/inspector/inspector_protocol_config.json` and include the names for the additional protocol domain definitions that would need to be generated.
 ```json
 {
