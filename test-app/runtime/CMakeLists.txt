@@ -40,6 +40,7 @@ add_library( # Sets the name of the library. When it's built you can find it wit
         SHARED
 
         # Runtime source
+        src/main/cpp/snapshots/${ANDROID_ABI}/snapshot.cc
         src/main/cpp/ArgConverter.cpp
         src/main/cpp/ArrayBufferHelper.cpp
         src/main/cpp/ArrayElementAccessor.cpp
