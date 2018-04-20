@@ -381,6 +381,8 @@ static void InitializeV8() {
 }
 
 Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& nativeLibDir, const string& packageName, bool isDebuggable, const string& callingDir, const string& profilerOutputDir) {
+    tns::instrumentation::Frame frame("Runtime.PrepareV8Runtime");
+
     Isolate::CreateParams create_params;
     bool didInitializeV8 = false;
 
@@ -477,7 +479,11 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
         InitializeV8();
     }
 
+    tns::instrumentation::Frame isolateFrame("Isolate.New");
     auto isolate = Isolate::New(create_params);
+    isolateFrame.log("Isolate.New");
+    isolateFrame.disable();
+
     Isolate::Scope isolate_scope(isolate);
     HandleScope handleScope(isolate);
 
