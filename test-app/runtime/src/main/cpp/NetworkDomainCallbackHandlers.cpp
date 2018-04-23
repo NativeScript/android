@@ -71,13 +71,16 @@ void NetworkDomainCallbackHandlers::ResponseReceivedCallback(const v8::FunctionC
         auto networkRequestData = new v8_inspector::utils::NetworkRequestData();
         networkAgentInstance->m_responses.insert(std::make_pair(requestIdString, networkRequestData));
 
-        networkAgentInstance->m_frontend.responseReceived(requestIdString,
-                FrameId,
-                LoaderId,
-                timeStamp,
-                ArgConverter::ConvertToString(
-                    type).c_str(),
-                std::move(protocolResponseObj));
+        auto id = ArgConverter::ConvertToV8String(isolate, FrameId);
+        protocol::Maybe<String16> frameId(ArgConverter::ConvertToString(id).c_str());
+
+        networkAgentInstance->m_frontend.responseReceived(
+            requestIdString,
+            LoaderId,
+            timeStamp,
+            ArgConverter::ConvertToString(type).c_str(),
+            std::move(protocolResponseObj),
+            std::move(frameId));
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -116,7 +119,8 @@ void NetworkDomainCallbackHandlers::RequestWillBeSentCallback(const v8::Function
                 !(argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "url")).FromMaybe(false)) ||
                 !(argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "request")).FromMaybe(false)) ||
                 !(argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "timestamp")).FromMaybe(false)) ||
-                !(argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "type")).FromMaybe(false)))) {
+                !(argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "type")).FromMaybe(false))) ||
+                !(argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "wallTime")).FromMaybe(false))) {
             throw NativeScriptException(wrongParametersError);
         }
 
@@ -124,6 +128,7 @@ void NetworkDomainCallbackHandlers::RequestWillBeSentCallback(const v8::Function
         auto url = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "url")).ToLocalChecked()->ToString();
         auto request = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "request")).ToLocalChecked();
         auto timeStamp = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "timestamp")).ToLocalChecked()->ToNumber(isolate)->IntegerValue();
+        auto wallTime = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "wallTime")).ToLocalChecked()->ToNumber(isolate)->IntegerValue();
         auto typeArg = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "type")).ToLocalChecked()->ToString();
 
         auto requestAsObj = request->ToObject();
@@ -152,17 +157,20 @@ void NetworkDomainCallbackHandlers::RequestWillBeSentCallback(const v8::Function
             throw NativeScriptException(errorMessage + errorString);
         }
 
+        protocol::Maybe<String16> frameId(ArgConverter::ConvertToString(ArgConverter::ConvertToV8String(isolate, FrameId)).c_str());
         protocol::Maybe<String16> type(ArgConverter::ConvertToString(typeArg).c_str());
         protocol::Maybe<protocol::Network::Response> emptyRedirect;
-        networkAgentInstance->m_frontend.requestWillBeSent(ArgConverter::ConvertToString(requestId).c_str(),
-                FrameId,
-                LoaderId,
-                ArgConverter::ConvertToString(url).c_str(),
-                std::move(protocolRequestObj),
-                timeStamp,
-                std::move(initiator),
-                std::move(emptyRedirect),
-                std::move(type));
+        networkAgentInstance->m_frontend.requestWillBeSent(
+            ArgConverter::ConvertToString(requestId).c_str(),
+            LoaderId,
+            ArgConverter::ConvertToString(url).c_str(),
+            std::move(protocolRequestObj),
+            timeStamp,
+            wallTime,
+            std::move(initiator),
+            std::move(emptyRedirect),
+            std::move(type),
+            std::move(frameId));
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -259,14 +267,16 @@ void NetworkDomainCallbackHandlers::LoadingFinishedCallback(const v8::FunctionCa
         v8::Local<v8::Object> argsObj = args[0]->ToObject();
 
         if (!argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "requestId")).FromMaybe(false) ||
-                !argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "timestamp")).FromMaybe(false)) {
+                !argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "timestamp")).FromMaybe(false) ||
+                !argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "encodedDataLength")).FromMaybe(false)) {
             throw NativeScriptException(wrongParametersError);
         }
 
         auto requestId = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "requestId")).ToLocalChecked()->ToString();
         auto timeStamp = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "timestamp")).ToLocalChecked()->ToNumber(isolate)->IntegerValue();
+        auto encodedDataLength = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "encodedDataLength")).ToLocalChecked()->ToNumber(isolate)->IntegerValue();
 
-        networkAgentInstance->m_frontend.loadingFinished(ArgConverter::ConvertToString(requestId).c_str(), timeStamp);
+        networkAgentInstance->m_frontend.loadingFinished(ArgConverter::ConvertToString(requestId).c_str(), timeStamp, encodedDataLength);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {

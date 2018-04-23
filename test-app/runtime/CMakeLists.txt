@@ -83,7 +83,7 @@ add_library( # Sets the name of the library. When it's built you can find it wit
         src/main/cpp/com_tns_Runtime.cpp
         src/main/cpp/console/Console.cpp
 
-        #Inspector source
+        # Inspector source
         src/main/cpp/v8_inspector/src/inspector/protocol/CSS.cpp
         src/main/cpp/v8_inspector/src/inspector/protocol/Console.cpp
         src/main/cpp/v8_inspector/src/inspector/protocol/DOM.cpp
@@ -102,7 +102,6 @@ add_library( # Sets the name of the library. When it's built you can find it wit
         src/main/cpp/v8_inspector/src/inspector/utils/v8-inspector-common.cpp
         src/main/cpp/v8_inspector/src/inspector/utils/v8-network-request-data.cpp
         src/main/cpp/v8_inspector/src/inspector/utils/v8-page-resources.cpp
-        src/main/cpp/v8_inspector/src/inspector/utils/v8-search-utils-public.cpp
         src/main/cpp/v8_inspector/src/inspector/v8-css-agent-impl.cpp
         src/main/cpp/v8_inspector/src/inspector/v8-dom-agent-impl.cpp
         src/main/cpp/v8_inspector/src/inspector/v8-log-agent-impl.cpp
@@ -117,12 +116,12 @@ add_library( # Sets the name of the library. When it's built you can find it wit
         src/main/cpp/v8_inspector/src/inspector/string-16.cc
         src/main/cpp/v8_inspector/src/inspector/string-util.cc
         src/main/cpp/v8_inspector/src/inspector/test-interface.cc
+        src/main/cpp/v8_inspector/src/inspector/v8-console.cc
         src/main/cpp/v8_inspector/src/inspector/v8-console-agent-impl.cc
         src/main/cpp/v8_inspector/src/inspector/v8-console-message.cc
-        src/main/cpp/v8_inspector/src/inspector/v8-console.cc
+        src/main/cpp/v8_inspector/src/inspector/v8-debugger.cc
         src/main/cpp/v8_inspector/src/inspector/v8-debugger-agent-impl.cc
         src/main/cpp/v8_inspector/src/inspector/v8-debugger-script.cc
-        src/main/cpp/v8_inspector/src/inspector/v8-debugger.cc
         src/main/cpp/v8_inspector/src/inspector/v8-function-call.cc
         src/main/cpp/v8_inspector/src/inspector/v8-heap-profiler-agent-impl.cc
         src/main/cpp/v8_inspector/src/inspector/v8-injected-script-host.cc
@@ -134,7 +133,6 @@ add_library( # Sets the name of the library. When it's built you can find it wit
         src/main/cpp/v8_inspector/src/inspector/v8-runtime-agent-impl.cc
         src/main/cpp/v8_inspector/src/inspector/v8-schema-agent-impl.cc
         src/main/cpp/v8_inspector/src/inspector/v8-stack-trace-impl.cc
-        src/main/cpp/v8_inspector/src/inspector/v8-value-copier.cc
         src/main/cpp/v8_inspector/src/inspector/v8-value-utils.cc
         src/main/cpp/v8_inspector/src/inspector/wasm-translation.cc
 )
@@ -163,7 +161,7 @@ target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROI
 target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_libplatform.a )
 target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_libsampler.a )
 target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_libbase.a )
-target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_nosnapshot.a )
+target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_snapshot.a )
 
 # Command info: https://cmake.org/cmake/help/v3.4/command/find_library.html
 # Searches for a specified prebuilt library and stores the path as a
