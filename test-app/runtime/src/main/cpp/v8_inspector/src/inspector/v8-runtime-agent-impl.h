@@ -28,8 +28,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef V8_INSPECTOR_V8RUNTIMEAGENTIMPL_H_
-#define V8_INSPECTOR_V8RUNTIMEAGENTIMPL_H_
+#ifndef V8_INSPECTOR_V8_RUNTIME_AGENT_IMPL_H_
+#define V8_INSPECTOR_V8_RUNTIME_AGENT_IMPL_H_
 
 #include "src/base/macros.h"
 #include "src/inspector/protocol/Forward.h"
@@ -50,83 +50,85 @@ using protocol::Response;
 using protocol::Maybe;
 
 class V8RuntimeAgentImpl : public protocol::Runtime::Backend {
- public:
-  V8RuntimeAgentImpl(V8InspectorSessionImpl*, protocol::FrontendChannel*,
-                     protocol::DictionaryValue* state);
-  ~V8RuntimeAgentImpl() override;
-  void restore();
+    public:
+        V8RuntimeAgentImpl(V8InspectorSessionImpl*, protocol::FrontendChannel*,
+                           protocol::DictionaryValue* state);
+        ~V8RuntimeAgentImpl() override;
+        void restore();
 
-  // Part of the protocol.
-  Response enable() override;
-  Response disable() override;
-  void evaluate(const String16& expression, Maybe<String16> objectGroup,
-                Maybe<bool> includeCommandLineAPI, Maybe<bool> silent,
-                Maybe<int> executionContextId, Maybe<bool> returnByValue,
-                Maybe<bool> generatePreview, Maybe<bool> userGesture,
-                Maybe<bool> awaitPromise,
-                std::unique_ptr<EvaluateCallback>) override;
-  void awaitPromise(const String16& promiseObjectId, Maybe<bool> returnByValue,
-                    Maybe<bool> generatePreview,
-                    std::unique_ptr<AwaitPromiseCallback>) override;
-  void callFunctionOn(
-      const String16& expression, Maybe<String16> objectId,
-      Maybe<protocol::Array<protocol::Runtime::CallArgument>> optionalArguments,
-      Maybe<bool> silent, Maybe<bool> returnByValue,
-      Maybe<bool> generatePreview, Maybe<bool> userGesture,
-      Maybe<bool> awaitPromise, Maybe<int> executionContextId,
-      Maybe<String16> objectGroup,
-      std::unique_ptr<CallFunctionOnCallback>) override;
-  Response releaseObject(const String16& objectId) override;
-  Response getProperties(
-      const String16& objectId, Maybe<bool> ownProperties,
-      Maybe<bool> accessorPropertiesOnly, Maybe<bool> generatePreview,
-      std::unique_ptr<protocol::Array<protocol::Runtime::PropertyDescriptor>>*
-          result,
-      Maybe<protocol::Array<protocol::Runtime::InternalPropertyDescriptor>>*
-          internalProperties,
-      Maybe<protocol::Runtime::ExceptionDetails>*) override;
-  Response releaseObjectGroup(const String16& objectGroup) override;
-  Response runIfWaitingForDebugger() override;
-  Response setCustomObjectFormatterEnabled(bool) override;
-  Response discardConsoleEntries() override;
-  Response compileScript(const String16& expression, const String16& sourceURL,
-                         bool persistScript, Maybe<int> executionContextId,
-                         Maybe<String16>*,
-                         Maybe<protocol::Runtime::ExceptionDetails>*) override;
-  void runScript(const String16&, Maybe<int> executionContextId,
-                 Maybe<String16> objectGroup, Maybe<bool> silent,
-                 Maybe<bool> includeCommandLineAPI, Maybe<bool> returnByValue,
-                 Maybe<bool> generatePreview, Maybe<bool> awaitPromise,
-                 std::unique_ptr<RunScriptCallback>) override;
-  Response queryObjects(
-      const String16& prototypeObjectId,
-      std::unique_ptr<protocol::Runtime::RemoteObject>* objects) override;
-  Response globalLexicalScopeNames(
-      Maybe<int> executionContextId,
-      std::unique_ptr<protocol::Array<String16>>* outNames) override;
+        // Part of the protocol.
+        Response enable() override;
+        Response disable() override;
+        void evaluate(const String16& expression, Maybe<String16> objectGroup,
+                      Maybe<bool> includeCommandLineAPI, Maybe<bool> silent,
+                      Maybe<int> executionContextId, Maybe<bool> returnByValue,
+                      Maybe<bool> generatePreview, Maybe<bool> userGesture,
+                      Maybe<bool> awaitPromise,
+                      std::unique_ptr<EvaluateCallback>) override;
+        void awaitPromise(const String16& promiseObjectId, Maybe<bool> returnByValue,
+                          Maybe<bool> generatePreview,
+                          std::unique_ptr<AwaitPromiseCallback>) override;
+        void callFunctionOn(
+            const String16& expression, Maybe<String16> objectId,
+            Maybe<protocol::Array<protocol::Runtime::CallArgument>> optionalArguments,
+            Maybe<bool> silent, Maybe<bool> returnByValue,
+            Maybe<bool> generatePreview, Maybe<bool> userGesture,
+            Maybe<bool> awaitPromise, Maybe<int> executionContextId,
+            Maybe<String16> objectGroup,
+            std::unique_ptr<CallFunctionOnCallback>) override;
+        Response releaseObject(const String16& objectId) override;
+        Response getProperties(
+            const String16& objectId, Maybe<bool> ownProperties,
+            Maybe<bool> accessorPropertiesOnly, Maybe<bool> generatePreview,
+            std::unique_ptr<protocol::Array<protocol::Runtime::PropertyDescriptor>>*
+            result,
+            Maybe<protocol::Array<protocol::Runtime::InternalPropertyDescriptor>>*
+            internalProperties,
+            Maybe<protocol::Runtime::ExceptionDetails>*) override;
+        Response releaseObjectGroup(const String16& objectGroup) override;
+        Response runIfWaitingForDebugger() override;
+        Response setCustomObjectFormatterEnabled(bool) override;
+        Response discardConsoleEntries() override;
+        Response compileScript(const String16& expression, const String16& sourceURL,
+                               bool persistScript, Maybe<int> executionContextId,
+                               Maybe<String16>*,
+                               Maybe<protocol::Runtime::ExceptionDetails>*) override;
+        void runScript(const String16&, Maybe<int> executionContextId,
+                       Maybe<String16> objectGroup, Maybe<bool> silent,
+                       Maybe<bool> includeCommandLineAPI, Maybe<bool> returnByValue,
+                       Maybe<bool> generatePreview, Maybe<bool> awaitPromise,
+                       std::unique_ptr<RunScriptCallback>) override;
+        Response queryObjects(
+            const String16& prototypeObjectId,
+            std::unique_ptr<protocol::Runtime::RemoteObject>* objects) override;
+        Response globalLexicalScopeNames(
+            Maybe<int> executionContextId,
+            std::unique_ptr<protocol::Array<String16>>* outNames) override;
 
-  void reset();
-  void reportExecutionContextCreated(InspectedContext*);
-  void reportExecutionContextDestroyed(InspectedContext*);
-  void inspect(std::unique_ptr<protocol::Runtime::RemoteObject> objectToInspect,
-               std::unique_ptr<protocol::DictionaryValue> hints);
-  void messageAdded(V8ConsoleMessage*);
-  bool enabled() const { return m_enabled; }
+        void reset();
+        void reportExecutionContextCreated(InspectedContext*);
+        void reportExecutionContextDestroyed(InspectedContext*);
+        void inspect(std::unique_ptr<protocol::Runtime::RemoteObject> objectToInspect,
+                     std::unique_ptr<protocol::DictionaryValue> hints);
+        void messageAdded(V8ConsoleMessage*);
+        bool enabled() const {
+            return m_enabled;
+        }
 
- private:
-  bool reportMessage(V8ConsoleMessage*, bool generatePreview);
+    private:
+        bool reportMessage(V8ConsoleMessage*, bool generatePreview);
 
-  V8InspectorSessionImpl* m_session;
-  protocol::DictionaryValue* m_state;
-  protocol::Runtime::Frontend m_frontend;
-  V8InspectorImpl* m_inspector;
-  bool m_enabled;
-  protocol::HashMap<String16, std::unique_ptr<v8::Global<v8::Script>>>
-      m_compiledScripts;
+        V8InspectorSessionImpl* m_session;
+        protocol::DictionaryValue* m_state;
+        protocol::Runtime::Frontend m_frontend;
+        V8InspectorImpl* m_inspector;
+        bool m_enabled;
+        protocol::HashMap<String16, std::unique_ptr<v8::Global<v8::Script>>>
+        m_compiledScripts;
 
-  DISALLOW_COPY_AND_ASSIGN(V8RuntimeAgentImpl);
+        DISALLOW_COPY_AND_ASSIGN(V8RuntimeAgentImpl);
 };
 
 }  // namespace v8_inspector
 
-#endif  // V8_INSPECTOR_V8RUNTIMEAGENTIMPL_H_
+#endif  // V8_INSPECTOR_V8_RUNTIME_AGENT_IMPL_H_

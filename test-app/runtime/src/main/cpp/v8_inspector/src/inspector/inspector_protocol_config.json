@@ -27,8 +27,8 @@
             },
             {
                 "domain": "HeapProfiler"
-            }
-            ,{
+            },
+            {
                 "domain": "GenericTypes"
             },
             {

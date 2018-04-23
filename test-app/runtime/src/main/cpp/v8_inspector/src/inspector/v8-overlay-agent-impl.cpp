@@ -62,8 +62,8 @@ DispatchResponse V8OverlayAgentImpl::highlightNode(std::unique_ptr<protocol::Ove
 }
 
 DispatchResponse V8OverlayAgentImpl::highlightFrame(const String& in_frameId,
-        const Maybe<protocol::DOM::RGBAColor> in_contentColor,
-        const Maybe<protocol::DOM::RGBAColor> in_contentOutlineColor) {
+        Maybe<protocol::DOM::RGBA> in_contentColor,
+        Maybe<protocol::DOM::RGBA> in_contentOutlineColor) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
@@ -75,4 +75,37 @@ DispatchResponse V8OverlayAgentImpl::getHighlightObjectForTest(int in_nodeId,
         std::unique_ptr<protocol::DictionaryValue>* out_highlight) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
+
+DispatchResponse V8OverlayAgentImpl::highlightQuad(std::unique_ptr<protocol::Array<double>> in_quad, Maybe<protocol::DOM::RGBA> in_color, Maybe<protocol::DOM::RGBA> in_outlineColor) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8OverlayAgentImpl::highlightRect(int in_x, int in_y, int in_width, int in_height, Maybe<protocol::DOM::RGBA> in_color, Maybe<protocol::DOM::RGBA> in_outlineColor) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8OverlayAgentImpl::setInspectMode(const String& in_mode, Maybe<protocol::Overlay::HighlightConfig> in_highlightConfig) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8OverlayAgentImpl::setShowDebugBorders(bool in_show) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8OverlayAgentImpl::setShowPaintRects(bool in_result) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8OverlayAgentImpl::setShowScrollBottleneckRects(bool in_show) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8OverlayAgentImpl::setShowViewportSizeOnResize(bool in_show) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8OverlayAgentImpl::setSuspended(bool in_suspended) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
 }

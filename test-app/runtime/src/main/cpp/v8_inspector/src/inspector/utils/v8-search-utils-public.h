@@ -89,16 +89,16 @@ std::unique_ptr<V8Regex> createSearchRegex(V8InspectorImpl* inspector,
 
 // Implementation taken from v8_inspector/src/inspector/search-util
 // modified return type to protocol::GenericTypes::SearchMatch (originally protocol::Debugger::SearchMatch)
-std::unique_ptr<protocol::GenericTypes::SearchMatch> buildObjectForSearchMatch(
+std::unique_ptr<protocol::Debugger::SearchMatch> buildObjectForSearchMatch(
     int lineNumber, const String16& lineContent) {
-    return protocol::GenericTypes::SearchMatch::create()
+    return protocol::Debugger::SearchMatch::create()
            .setLineNumber(lineNumber)
            .setLineContent(lineContent)
            .build();
 }
 
 // Implementation taken from v8_inspector/src/inspector/search-util
-std::vector<std::unique_ptr<protocol::GenericTypes::SearchMatch>>
+std::vector<std::unique_ptr<protocol::Debugger::SearchMatch>>
         searchInTextByLinesImpl(V8InspectorSession* session, const String16& text,
                                 const String16& query, const bool caseSensitive,
 const bool isRegex) {
@@ -108,20 +108,12 @@ const bool isRegex) {
     std::vector<std::pair<int, String16>> matches =
                                            scriptRegexpMatchesByLines(*regex.get(), text);
 
-    std::vector<std::unique_ptr<protocol::GenericTypes::SearchMatch>> result;
+    std::vector<std::unique_ptr<protocol::Debugger::SearchMatch>> result;
     for (const auto& match : matches) {
         result.push_back(buildObjectForSearchMatch(match.first, match.second));
     }
     return result;
 }
-
-std::unique_ptr<protocol::Array<protocol::Page::SearchResult>> getSearchMatches(
-            V8InspectorSessionImpl* inspector, std::vector<utils::PageResource>& resources,
-            const String16& frameIdentifier, const String16& text, bool isCaseSensitive,
-            bool isRegex);
-
-std::unique_ptr<protocol::Page::SearchResult> buildObjectForSearchResult(
-    const String16& frameId, const String16& url, int matchesCount);
 }
 }
 }
