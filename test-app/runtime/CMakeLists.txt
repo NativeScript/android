@@ -40,7 +40,6 @@ add_library( # Sets the name of the library. When it's built you can find it wit
         SHARED
 
         # Runtime source
-        src/main/cpp/snapshots/${ANDROID_ABI}/snapshot.cc
         src/main/cpp/ArgConverter.cpp
         src/main/cpp/ArrayBufferHelper.cpp
         src/main/cpp/ArrayElementAccessor.cpp
@@ -164,7 +163,7 @@ target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROI
 target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_libplatform.a )
 target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_libsampler.a )
 target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_libbase.a )
-target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_nosnapshot.a )
+target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_snapshot.a )
 
 # Command info: https://cmake.org/cmake/help/v3.4/command/find_library.html
 # Searches for a specified prebuilt library and stores the path as a
