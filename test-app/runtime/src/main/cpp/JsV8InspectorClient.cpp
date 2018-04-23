@@ -4,6 +4,7 @@
 #include "Runtime.h"
 #include "NativeScriptException.h"
 
+#include <v8_inspector/src/inspector/v8-log-agent-impl.h>
 #include "ArgConverter.h"
 #include "DOMDomainCallbackHandlers.h"
 #include "NetworkDomainCallbackHandlers.h"
@@ -198,7 +199,6 @@ JsV8InspectorClient* JsV8InspectorClient::GetInstance() {
     return instance;
 }
 
-
 void JsV8InspectorClient::sendToFrontEndCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
     if ((instance == nullptr) || (instance->connection == nullptr)) {
         return;
@@ -229,6 +229,20 @@ void JsV8InspectorClient::sendToFrontEndCallback(const v8::FunctionCallbackInfo<
         NativeScriptException nsEx(std::string("Error: c++ exception!"));
         nsEx.ReThrowToV8();
     }
+}
+
+void JsV8InspectorClient::consoleLogCallback(const string& message, const string& logLevel) {
+    if (!inspectorIsConnected()) {
+        return;
+    }
+
+    auto isolate = Runtime::GetRuntime(0)->GetIsolate();
+    auto stack = v8::StackTrace::CurrentStackTrace(isolate, 1, v8::StackTrace::StackTraceOptions::kDetailed);
+
+    auto frame = stack->GetFrame(0);
+
+    // will be no-op in non-debuggable builds
+    v8_inspector::V8LogAgentImpl::EntryAdded(message, logLevel, ArgConverter::ConvertToString(frame->GetScriptNameOrSourceURL()), frame->GetLineNumber());
 }
 
 void MessageHandler(v8::Local<v8::Message> message, v8::Local<v8::Value> exception) {

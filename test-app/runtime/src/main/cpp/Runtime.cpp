@@ -25,8 +25,11 @@
 #include <console/Console.h>
 #include "NetworkDomainCallbackHandlers.h"
 #include "sys/system_properties.h"
-#include "JsV8InspectorClient.h"
 #include "ManualInstrumentation.h"
+
+#ifdef INCLUDE_INSPECTOR
+#include "JsV8InspectorClient.h"
+#endif
 
 using namespace v8;
 using namespace std;
@@ -544,13 +547,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
         globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "close"), closeFuncTemplate);
     }
 
-    /*
-     * Attach __inspector object with function callbacks that report to the Chrome DevTools frontend
-     */
-    if (isDebuggable) {
-        JsV8InspectorClient::attachInspectorCallbacks(isolate, globalTemplate);
-    }
-
     m_weakRef.Init(isolate, globalTemplate, m_objectManager);
 
     SimpleProfiler::Init(isolate, globalTemplate);
@@ -579,10 +575,22 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
         global->DefineOwnProperty(context, ArgConverter::ConvertToV8String(isolate, "self"), global, readOnlyFlags);
     }
 
+#ifdef INCLUDE_INSPECTOR
+    /*
+     * Attach __inspector object with function callbacks that report to the Chrome DevTools frontend
+     */
+    if (isDebuggable) {
+        JsV8InspectorClient::attachInspectorCallbacks(isolate, globalTemplate);
+    }
+
+    v8::Local<v8::Object> console = Console::createConsole(context, JsV8InspectorClient::consoleLogCallback);
+#else
+    v8::Local<v8::Object> console = Console::createConsole(context, nullptr);
+#endif
+
     /*
      * Attach 'console' object to the global object
      */
-    v8::Local<v8::Object> console = Console::createConsole(context, filesPath);
     global->DefineOwnProperty(context, ArgConverter::ConvertToV8String(isolate, "console"), console, readOnlyFlags);
 
     ArgConverter::Init(isolate);

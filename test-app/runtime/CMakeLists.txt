@@ -24,66 +24,24 @@ include_directories( src/main/cpp
                     # hack to find some libraries from the ndk
                     ${ANDROID_NDK_ROOT}/sysroot/usr/include/${ARCH_INCLUDE_DIR}/
                     )
-if ( OPTIMIZED_BUILD )
+if ( OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD )
     set(CMAKE_CXX_FLAGS "${COMMON_CMAKE_ARGUMENTS} -O3 -fvisibility=hidden -ffunction-sections -fno-data-sections")
 else()
     set(CMAKE_CXX_FLAGS "${COMMON_CMAKE_ARGUMENTS} -g")
 endif()
 
-# Command info: https://cmake.org/cmake/help/v3.4/command/add_library.html
-# Creates(shared static) and names a library given relative sources
-# Gradle automatically packages shared libraries with your APK.
-add_library( # Sets the name of the library. When it's built you can find it with lib prefix libNativeScript.so
-        NativeScript
+if ( NOT OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD )
+    # When building in Release mode we do not include the V8 inspector sources
+    add_definitions(-DINCLUDE_INSPECTOR)
 
-        # Sets the library as a shared library.
-        SHARED
+    set(
+        INSPECTOR_SOURCES
 
-        # Runtime source
-        src/main/cpp/ArgConverter.cpp
-        src/main/cpp/ArrayBufferHelper.cpp
-        src/main/cpp/ArrayElementAccessor.cpp
-        src/main/cpp/ArrayHelper.cpp
-        src/main/cpp/AssetExtractor.cpp
-        src/main/cpp/CallbackHandlers.cpp
-        src/main/cpp/Constants.cpp
-        src/main/cpp/DOMDomainCallbackHandlers.cpp
-        src/main/cpp/DirectBuffer.cpp
-        src/main/cpp/FieldAccessor.cpp
-        src/main/cpp/File.cpp
-        src/main/cpp/JEnv.cpp
-        src/main/cpp/JType.cpp
-        src/main/cpp/JniSignatureParser.cpp
-        src/main/cpp/JsArgConverter.cpp
-        src/main/cpp/JsArgToArrayConverter.cpp
-        src/main/cpp/JsV8InspectorClient.cpp
-        src/main/cpp/Logger.cpp
-        src/main/cpp/ManualInstrumentation.cpp
-        src/main/cpp/MetadataMethodInfo.cpp
-        src/main/cpp/MetadataNode.cpp
-        src/main/cpp/MetadataReader.cpp
-        src/main/cpp/MetadataTreeNode.cpp
-        src/main/cpp/MethodCache.cpp
-        src/main/cpp/ModuleInternal.cpp
-        src/main/cpp/NativeScriptException.cpp
-        src/main/cpp/NetworkDomainCallbackHandlers.cpp
-        src/main/cpp/NumericCasts.cpp
-        src/main/cpp/ObjectManager.cpp
-        src/main/cpp/Profiler.cpp
-        src/main/cpp/ReadWriteLock.cpp
-        src/main/cpp/Runtime.cpp
-        src/main/cpp/SimpleAllocator.cpp
-        src/main/cpp/SimpleProfiler.cpp
-        src/main/cpp/Util.cpp
-        src/main/cpp/V8GlobalHelpers.cpp
-        src/main/cpp/V8StringConstants.cpp
-        src/main/cpp/WeakRef.cpp
         src/main/cpp/com_tns_AndroidJsV8Inspector.cpp
-        src/main/cpp/com_tns_AssetExtractor.cpp
-        src/main/cpp/com_tns_Runtime.cpp
-        src/main/cpp/console/Console.cpp
+        src/main/cpp/JsV8InspectorClient.cpp
+        src/main/cpp/DOMDomainCallbackHandlers.cpp
+        src/main/cpp/NetworkDomainCallbackHandlers.cpp
 
-        # Inspector source
         src/main/cpp/v8_inspector/src/inspector/protocol/CSS.cpp
         src/main/cpp/v8_inspector/src/inspector/protocol/Console.cpp
         src/main/cpp/v8_inspector/src/inspector/protocol/DOM.cpp
@@ -135,13 +93,66 @@ add_library( # Sets the name of the library. When it's built you can find it wit
         src/main/cpp/v8_inspector/src/inspector/v8-stack-trace-impl.cc
         src/main/cpp/v8_inspector/src/inspector/v8-value-utils.cc
         src/main/cpp/v8_inspector/src/inspector/wasm-translation.cc
-)
-
-if ( OPTIMIZED_BUILD )
-    set_target_properties(NativeScript PROPERTIES LINK_FLAGS -Wl,--allow-multiple-definition -Wl,--exclude-libs=ALL -Wl,--gc-sections)
+    )
 else()
-    set_target_properties(NativeScript PROPERTIES LINK_FLAGS -Wl,--allow-multiple-definition)
+    # Debug builds will include the V8 inspector sources
+    set(INSPECTOR_SOURCES)
 endif()
+
+# Command info: https://cmake.org/cmake/help/v3.4/command/add_library.html
+# Creates(shared static) and names a library given relative sources
+# Gradle automatically packages shared libraries with your APK.
+add_library( # Sets the name of the library. When it's built you can find it with lib prefix libNativeScript.so
+            NativeScript
+
+            # Sets the library as a shared library.
+            SHARED
+
+            # Runtime source
+            src/main/cpp/ArgConverter.cpp
+            src/main/cpp/ArrayBufferHelper.cpp
+            src/main/cpp/ArrayElementAccessor.cpp
+            src/main/cpp/ArrayHelper.cpp
+            src/main/cpp/AssetExtractor.cpp
+            src/main/cpp/CallbackHandlers.cpp
+            src/main/cpp/Constants.cpp
+            src/main/cpp/DirectBuffer.cpp
+            src/main/cpp/FieldAccessor.cpp
+            src/main/cpp/File.cpp
+            src/main/cpp/JEnv.cpp
+            src/main/cpp/JType.cpp
+            src/main/cpp/JniSignatureParser.cpp
+            src/main/cpp/JsArgConverter.cpp
+            src/main/cpp/JsArgToArrayConverter.cpp
+            src/main/cpp/Logger.cpp
+            src/main/cpp/ManualInstrumentation.cpp
+            src/main/cpp/MetadataMethodInfo.cpp
+            src/main/cpp/MetadataNode.cpp
+            src/main/cpp/MetadataReader.cpp
+            src/main/cpp/MetadataTreeNode.cpp
+            src/main/cpp/MethodCache.cpp
+            src/main/cpp/ModuleInternal.cpp
+            src/main/cpp/NativeScriptException.cpp
+            src/main/cpp/NumericCasts.cpp
+            src/main/cpp/ObjectManager.cpp
+            src/main/cpp/Profiler.cpp
+            src/main/cpp/ReadWriteLock.cpp
+            src/main/cpp/Runtime.cpp
+            src/main/cpp/SimpleAllocator.cpp
+            src/main/cpp/SimpleProfiler.cpp
+            src/main/cpp/Util.cpp
+            src/main/cpp/V8GlobalHelpers.cpp
+            src/main/cpp/V8StringConstants.cpp
+            src/main/cpp/WeakRef.cpp
+            src/main/cpp/com_tns_AssetExtractor.cpp
+            src/main/cpp/com_tns_Runtime.cpp
+            src/main/cpp/console/Console.cpp
+
+            # V8 inspector source files will be included only in Release mode
+            ${INSPECTOR_SOURCES}
+            )
+
+set_target_properties(NativeScript PROPERTIES LINK_FLAGS -Wl,--allow-multiple-definition)
 
 
 MESSAGE( STATUS "# General cmake Info" )
