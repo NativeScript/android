@@ -14,9 +14,9 @@ namespace v8_inspector {
 
 class V8InspectorSessionImpl;
 
-using protocol::ErrorString;
 using v8_inspector::protocol::Maybe;
 using String = v8_inspector::String16;
+using v8_inspector::protocol::DispatchResponse;
 
 
 class V8LogAgentImpl : public protocol::Log::Backend {
@@ -25,11 +25,11 @@ class V8LogAgentImpl : public protocol::Log::Backend {
                        protocol::DictionaryValue* state);
 
         ~V8LogAgentImpl() override;
-        void enable(ErrorString*) override;
-        void disable(ErrorString*) override;
-        void clear(ErrorString*) override;
-        void startViolationsReport(ErrorString*, std::unique_ptr<protocol::Array<protocol::Log::ViolationSetting>> in_config) override;
-        void stopViolationsReport(ErrorString*) override;
+        DispatchResponse enable() override;
+        DispatchResponse disable() override;
+        DispatchResponse clear() override;
+        DispatchResponse startViolationsReport(std::unique_ptr<protocol::Array<protocol::Log::ViolationSetting>> in_config) override;
+        DispatchResponse stopViolationsReport() override;
 
         static void EntryAdded(const std::string& text, std::string verbosityLevel, std::string url, int lineNumber);
 

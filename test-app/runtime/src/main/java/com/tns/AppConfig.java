@@ -72,7 +72,9 @@ class AppConfig {
                         File dir = new File(path);
                         if (dir.exists() && dir.isDirectory()) {
                             // this path is expected to be a directory, containing three sub-directories: armeabi-v7a, x86 and arm64-v8a
-                            path = path + "/" + Build.CPU_ABI + "/" + KnownKeys.SnapshotFile.getName();
+                            @SuppressWarnings("deprecation")
+                            String cpu_abi = Build.CPU_ABI;
+                            path = path + "/" + cpu_abi + "/" + KnownKeys.SnapshotFile.getName();
                             values[KnownKeys.SnapshotFile.ordinal()] = path;
                         }
                     }

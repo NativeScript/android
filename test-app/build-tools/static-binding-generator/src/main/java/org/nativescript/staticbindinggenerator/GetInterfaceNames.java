@@ -42,17 +42,18 @@ public class GetInterfaceNames {
         }
 
         JarFile jarFile = new JarFile(pathToJar);
-        Enumeration currentJarFile = jarFile.entries();
+        Enumeration<JarEntry> currentJarFile = jarFile.entries();
 
         URLClassLoader cl = getClassLoader(pathToJar);
 
         while (currentJarFile.hasMoreElements()) {
-            JarEntry jarEntry = (JarEntry)currentJarFile.nextElement();
+            JarEntry jarEntry = currentJarFile.nextElement();
 
             if ((!jarEntry.isDirectory()) && (jarEntry.getName().endsWith(".class"))) {
                 String className = jarEntry.getName().substring(0, jarEntry.getName().length() - 6);
                 className = className.replace('/', '.');
 
+                @SuppressWarnings("rawtypes")
                 Class c = null;
                 try {
                     c = cl.loadClass(className);

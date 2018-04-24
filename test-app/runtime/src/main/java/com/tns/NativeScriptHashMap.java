@@ -60,6 +60,7 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
      * is set to half the minimum, so that the first resize will create a
      * minimum-sized table.
      */
+    @SuppressWarnings("rawtypes")
     private static final Entry[] EMPTY_TABLE = new HashMapEntry[MINIMUM_CAPACITY >>> 1];
 
     /**
@@ -541,7 +542,7 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
      *            must be a power of two
      */
     private HashMapEntry<K, V>[] makeTable(int newCapacity) {
-        @SuppressWarnings("unchecked")
+        @SuppressWarnings({"unchecked", "rawtypes"})
         HashMapEntry<K, V>[] newTable = (HashMapEntry<K, V>[]) new HashMapEntry[newCapacity];
         table = newTable;
         threshold = (newCapacity >> 1) + (newCapacity >> 2); // 3/4 capacity

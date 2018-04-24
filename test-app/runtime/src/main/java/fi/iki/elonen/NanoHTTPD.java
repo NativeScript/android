@@ -336,7 +336,7 @@ public abstract class NanoHTTPD {
          *
          * @param name The cookie name.
          */
-        public void delete(String name) {
+        public void delete (String name) {
             set(name, "-delete-", -30);
         }
 
@@ -450,7 +450,7 @@ public abstract class NanoHTTPD {
         }
 
         @Override
-        public void delete() throws Exception {
+        public void delete () throws Exception {
             safeClose(this.fstream);
             if (!this.file.delete()) {
                 throw new Exception("could not delete temporary file: " + this.file.getAbsolutePath());
@@ -1875,7 +1875,7 @@ public abstract class NanoHTTPD {
      */
     public interface TempFile {
 
-        public void delete() throws Exception;
+        public void delete () throws Exception;
 
         public String getName();
 
@@ -1967,7 +1967,7 @@ public abstract class NanoHTTPD {
         try {
             Enumeration<URL> resources = NanoHTTPD.class.getClassLoader().getResources(resourceName);
             while (resources.hasMoreElements()) {
-                URL url = (URL) resources.nextElement();
+                URL url = resources.nextElement();
                 Properties properties = new Properties();
                 InputStream stream = null;
                 try {

@@ -283,6 +283,11 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
             }
         });
 
+        this.setOnTabSelectedListener(tabLayout);
+    }
+
+    @SuppressWarnings("deprecation")
+    private void setOnTabSelectedListener(TabLayout tabLayout) {
         tabLayout.setOnTabSelectedListener(this);
     }
 

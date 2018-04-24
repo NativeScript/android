@@ -29,7 +29,7 @@
 #include <map>
 
 namespace tns {
-class MetadataNode {
+    class MetadataNode {
     public:
         static void Init(v8::Isolate* isolate);
 
@@ -110,15 +110,15 @@ class MetadataNode {
         static bool ValidateExtendArguments(const v8::FunctionCallbackInfo<v8::Value>& info, bool extendLocationFound, std::string& extendLocation, v8::Local<v8::String>& extendName, v8::Local<v8::Object>& implementationObject, bool isTypeScriptExtend);
         static void ExtendedClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 
-        static void NullObjectAccessorGetterCallback(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
+        static void NullObjectAccessorGetterCallback(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info);
         static void NullValueOfCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-        static void FieldAccessorGetterCallback(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
-        static void FieldAccessorSetterCallback(v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info);
-        static void ClassAccessorGetterCallback(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
+        static void FieldAccessorGetterCallback(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info);
+        static void FieldAccessorSetterCallback(v8::Local<v8::Name> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info);
+        static void ClassAccessorGetterCallback(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info);
         static void SetClassAccessor(v8::Local<v8::Function>& ctorFunction);
-        static void SuperAccessorGetterCallback(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
-        static void ArrayLengthGetterCallack(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
+        static void SuperAccessorGetterCallback(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info);
+        static void ArrayLengthGetterCallack(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info);
 
         static void PackageGetterCallback(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info);
 
@@ -150,13 +150,13 @@ class MetadataNode {
 
         struct MethodCallbackData {
             MethodCallbackData()
-                :
-                node(nullptr), parent(nullptr), isSuper(false) {
+                    :
+                    node(nullptr), parent(nullptr), isSuper(false) {
             }
 
             MethodCallbackData(MetadataNode* _node)
-                :
-                node(_node), parent(nullptr), isSuper(false) {
+                    :
+                    node(_node), parent(nullptr), isSuper(false) {
             }
 
             std::vector<MetadataEntry> candidates;
@@ -167,8 +167,8 @@ class MetadataNode {
 
         struct ExtendedClassCallbackData {
             ExtendedClassCallbackData(MetadataNode* _node, const std::string& _extendedName, const v8::Local<v8::Object>& _implementationObject, std::string _fullClassName)
-                :
-                node(_node), extendedName(_extendedName), fullClassName(_fullClassName) {
+                    :
+                    node(_node), extendedName(_extendedName), fullClassName(_fullClassName) {
                 implementationObject = new v8::Persistent<v8::Object>(_implementationObject->GetIsolate(), _implementationObject);
             }
 
@@ -181,8 +181,8 @@ class MetadataNode {
 
         struct TypeMetadata {
             TypeMetadata(const std::string& _name)
-                :
-                name(_name) {
+                    :
+                    name(_name) {
             }
 
             std::string name;
@@ -190,8 +190,8 @@ class MetadataNode {
 
         struct CtorCacheData {
             CtorCacheData(v8::Persistent<v8::FunctionTemplate>* _ft, std::vector<MethodCallbackData*> _instanceMethodCallbacks)
-                :
-                ft(_ft), instanceMethodCallbacks(_instanceMethodCallbacks) {
+                    :
+                    ft(_ft), instanceMethodCallbacks(_instanceMethodCallbacks) {
             }
 
             v8::Persistent<v8::FunctionTemplate>* ft;
@@ -200,12 +200,12 @@ class MetadataNode {
 
         struct ExtendedClassCacheData {
             ExtendedClassCacheData()
-                :
-                extendedCtorFunction(nullptr), node(nullptr) {
+                    :
+                    extendedCtorFunction(nullptr), node(nullptr) {
             }
             ExtendedClassCacheData(const v8::Local<v8::Function>& extCtorFunc, const std::string& _extendedName, MetadataNode* _node)
-                :
-                extendedName(_extendedName), node(_node) {
+                    :
+                    extendedName(_extendedName), node(_node) {
                 extendedCtorFunction = new v8::Persistent<v8::Function>(extCtorFunc->GetIsolate(), extCtorFunc);
             }
             v8::Persistent<v8::Function>* extendedCtorFunction;
@@ -220,5 +220,5 @@ class MetadataNode {
 
             std::map<std::string, MetadataNode::ExtendedClassCacheData> ExtendedCtorFuncCache;
         };
-};
+    };
 }

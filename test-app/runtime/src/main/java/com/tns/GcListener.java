@@ -30,6 +30,7 @@ public class GcListener {
             while (true) {
                 try {
                     PhantomReference<Object> ref = createRef();
+                    @SuppressWarnings("unchecked")
                     PhantomReference<Objects> o = (PhantomReference<Objects>)GcListener.this.q.remove();
                     long currentUpdateTime = System.nanoTime();
                     if ((currentUpdateTime - lastUpdateTime) > throttleTime) {

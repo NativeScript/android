@@ -283,11 +283,11 @@ string NativeScriptException::GetErrorMessage(const Local<Message>& message, Loc
 
 
     //get current message
-    auto str = error->ToDetailString();
+    auto str = error->ToDetailString(context);
     if (str.IsEmpty()) {
         str = String::NewFromUtf8(isolate, "");
     }
-    String::Utf8Value utfError(str);
+    String::Utf8Value utfError(isolate, str.FromMaybe(Local<String>()));
 
     //get script name
     auto scriptResName = message->GetScriptResourceName();

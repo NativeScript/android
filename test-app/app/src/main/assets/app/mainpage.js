@@ -41,7 +41,7 @@ require("./tests/testFieldGetSet");
 require("./tests/extendedClassesTests");
 require("./tests/extendClassNameTests");
 require("./tests/testJniReferenceLeak");
-require("./tests/testNativeModules");
+//require("./tests/testNativeModules");
 require("./tests/requireExceptionTests");
 require("./tests/java-array-test");
 require("./tests/field-access-test");

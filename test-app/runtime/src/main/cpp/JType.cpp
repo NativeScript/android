@@ -138,6 +138,8 @@ void JType::Init(JEnv env, Type type) {
         this->ctor = env.GetMethodID(this->clazz, "<init>", "(D)V");
         this->valueField = env.GetFieldID(this->clazz, "value", "D");
         break;
+    default:
+        break;
     }
 }
 

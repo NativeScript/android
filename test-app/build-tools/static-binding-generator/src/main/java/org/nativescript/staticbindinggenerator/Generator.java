@@ -76,7 +76,7 @@ public class Generator {
         return generatedFiles;
     }
 
-    public Binding generateBinding(DataRow dataRow, HashSet interfaceNames) throws ClassNotFoundException {
+    public Binding generateBinding(DataRow dataRow, HashSet<String> interfaceNames) throws ClassNotFoundException {
         JavaClass clazz = getClass(dataRow.getBaseClassname());
 
         boolean hasSpecifiedName = !dataRow.getFilename().isEmpty();
@@ -122,7 +122,7 @@ public class Generator {
     }
 
     public Binding generateBinding(DataRow dataRow) throws ClassNotFoundException {
-        return generateBinding(dataRow, new HashSet());
+        return generateBinding(dataRow, new HashSet<String>());
     }
 
     public static List<DataRow> getRows(String filename) throws IOException {
@@ -146,8 +146,8 @@ public class Generator {
     }
 
     private Binding[] processRows(List<DataRow> rows) throws IOException, ClassNotFoundException {
-        ArrayList<Binding> bindings = new ArrayList<>();
-        HashSet interfaceNames = new HashSet();
+        ArrayList<Binding> bindings = new ArrayList<Binding>();
+        HashSet<String> interfaceNames = new HashSet<String>();
 
         for (DataRow dataRow : rows) {
             String classname = dataRow.getBaseClassname();
@@ -197,7 +197,7 @@ public class Generator {
     }
 
     private Map<String, MethodGroup> getPublicApi(JavaClass clazz) throws ClassNotFoundException {
-        Map<String, MethodGroup> api = new HashMap<>();
+        Map<String, MethodGroup> api = new HashMap<String, MethodGroup>();
         JavaClass currentClass = clazz;
         String clazzName = clazz.getClassName();
         while (true) {
@@ -717,7 +717,7 @@ public class Generator {
         private String latestInheritorClassName;
 
         public MethodGroup(String forClass) {
-            this.methods = new ArrayList<>();
+            this.methods = new ArrayList<Method>();
             this.latestInheritorClassName = forClass;
         }
 

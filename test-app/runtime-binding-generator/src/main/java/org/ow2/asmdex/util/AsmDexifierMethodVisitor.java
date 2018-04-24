@@ -491,7 +491,7 @@ public class AsmDexifierMethodVisitor extends MethodVisitor {
                 labelNames.put(label, name);
                 pr.addText("Label " + name + " = new Label();\n");
             } else {
-                name = (String)labelNames.get(label);
+                name = labelNames.get(label);
             }
         }
 
