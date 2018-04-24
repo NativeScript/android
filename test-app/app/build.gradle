@@ -127,6 +127,36 @@ def applyPluginGradleConfigurations = { ->
     }
 }
 
+def getAppIdentifier = { packageJsonMap ->
+	def appIdentifier = "";
+	if (packageJsonMap) {
+		appIdentifier = packageJsonMap.nativescript.id;
+		if (!(appIdentifier instanceof String)) {
+			appIdentifier = appIdentifier.android;
+		}
+	}
+
+	return appIdentifier;
+}
+
+def setAppIdentifier = { ->
+	println "\t + setting applicationId";
+	File packageJsonFile = new File("$rootDir/../../package.json");
+
+	if (packageJsonFile.exists()) {
+		def content = packageJsonFile.getText("UTF-8");
+		def jsonSlurper = new JsonSlurper();
+		def packageJsonMap = jsonSlurper.parseText(content);
+		def appIdentifier = getAppIdentifier(packageJsonMap);
+
+		if (appIdentifier) {
+			project.ext.nsApplicationIdentifier = appIdentifier;
+			android.defaultConfig.applicationId = appIdentifier;
+		}
+	}
+}
+
+
 android {
     compileSdkVersion computeCompileSdkVersion()
     buildToolsVersion computeBuildToolsVersion()
@@ -169,6 +199,7 @@ android {
         }
     }
 
+    setAppIdentifier()
     applyAppGradleConfiguration()
     applyPluginGradleConfigurations()
 }
@@ -298,7 +329,7 @@ tasks.whenTaskAdded({ org.gradle.api.DefaultTask currentTask ->
         currentTask.finalizedBy(ensureMetadataOutDir)
         ensureMetadataOutDir.finalizedBy(buildMetadata)
     }
-    if (currentTask =~ /assemble.+Debug/ || currentTask =~ /assemble.+Release/) {
+    if (currentTask =~ /assemble.*Debug/ || currentTask =~ /assemble.*Release/) {
         currentTask.finalizedBy("validateAppIdMatch")
     }
 })
@@ -511,23 +542,21 @@ copyTypings.onlyIf { generateTypescriptDefinitions.didWork }
 generateTypescriptDefinitions.finalizedBy(copyTypings)
 
 task validateAppIdMatch {
-    doLast {
-        def packageJsonFile = new File("$USER_PROJECT_ROOT/$PACKAGE_JSON")
-        def lineSeparator = System.getProperty("line.separator")
+	doLast {
+		def lineSeparator = System.getProperty("line.separator")
 
-        if (packageJsonFile.exists() && !project.hasProperty("release")) {
-            String content = packageJsonFile.getText("UTF-8")
-            def jsonSlurper = new JsonSlurper()
-            def packageJsonMap = jsonSlurper.parseText(content)
+		if (project.hasProperty("nsApplicationIdentifier") && !project.hasProperty("release")) {
+			if(project.nsApplicationIdentifier != android.defaultConfig.applicationId) {
+				def errorMessage = "${lineSeparator}WARNING: The Application identifier is different from the one inside \"package.json\" file.$lineSeparator" +
+					"NativeScript CLI might not work properly.$lineSeparator" +
+					"Remove applicationId from app.gradle and update the \"nativescript.id\" in package.json.$lineSeparator" +
+					"Actual: ${android.defaultConfig.applicationId}$lineSeparator" +
+					"Expected(from \"package.json\"): ${project.nsApplicationIdentifier}$lineSeparator";
 
-            if (packageJsonMap.nativescript.id != android.defaultConfig.applicationId) {
-                def errorMessage = "${lineSeparator}WARNING: The Application identifier is different from the one inside $PACKAGE_JSON file.$lineSeparator" +
-                        "NativeScript CLI might not work properly.$lineSeparator" +
-                        "Update the application identifier in $PACKAGE_JSON and app.gradle so that they match."
-                logger.error(errorMessage)
-            }
-        }
-    }
+				logger.error(errorMessage)
+			}
+		}
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
