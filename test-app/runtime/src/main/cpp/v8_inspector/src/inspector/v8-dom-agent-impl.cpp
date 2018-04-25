@@ -93,6 +93,46 @@ DispatchResponse V8DOMAgentImpl::getDocument(Maybe<int> in_depth, Maybe<bool> in
             if (maybeResult.ToLocal(&outResult)) {
                 auto resultString = ArgConverter::ConvertToUtf16String(outResult->ToString());
 
+                if (!outResult->ToObject()->Has(context, ArgConverter::ConvertToV8String(isolate, "backendNodeId")).FromMaybe(false)) {
+                    // Using an older version of the modules which doesn't set the backendNodeId required property
+                    auto scriptSource =
+                        "(function () {"
+                        "   function addBackendNodeId(node) {"
+                        "       if (!node.backendNodeId) {"
+                        "           node.backendNodeId = 0;"
+                        "       }"
+                        "       if (node.children) {"
+                        "           for (var i = 0; i < node.children.length; i++) {"
+                        "               addBackendNodeId(node.children[i]);"
+                        "           }"
+                        "       }"
+                        "   }"
+                        "   return function(stringifiedNode) {"
+                        "       try {"
+                        "           const node = JSON.parse(stringifiedNode);"
+                        "           addBackendNodeId(node);"
+                        "           return JSON.stringify(node);"
+                        "       } catch (e) {"
+                        "           return stringifiedNode;"
+                        "       }"
+                        "   }"
+                        "})()";
+
+                    auto source = ArgConverter::ConvertToV8String(isolate, scriptSource);
+                    v8::Local<v8::Script> script;
+                    v8::Script::Compile(context, source).ToLocal(&script);
+
+                    v8::Local<v8::Value> result;
+                    script->Run(context).ToLocal(&result);
+                    auto addBackendNodeIdFunction = result.As<v8::Function>();
+
+                    v8::Local<v8::Value> args[] = { outResult };
+                    v8::Local<v8::Value> scriptResult;
+                    addBackendNodeIdFunction->Call(context, context->Global(), 1, args).ToLocal(&scriptResult);
+
+                    resultString = ArgConverter::ConvertToUtf16String(scriptResult->ToString());
+                }
+
                 auto resultUtf16Data = resultString.data();
 
                 auto resultJson = protocol::StringUtil::parseJSON(String16((const uint16_t*) resultUtf16Data));

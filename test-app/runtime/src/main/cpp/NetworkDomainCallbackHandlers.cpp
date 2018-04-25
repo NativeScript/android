@@ -42,6 +42,22 @@ void NetworkDomainCallbackHandlers::ResponseReceivedCallback(const v8::FunctionC
         auto timeStamp = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "timestamp")).ToLocalChecked()->ToNumber(isolate)->IntegerValue();
 
         auto responseAsObj = response->ToObject();
+        auto connectionReusedProp = ArgConverter::ConvertToV8String(isolate, "connectionReused");
+        if (!responseAsObj->Has(context, connectionReusedProp).FromMaybe(false)) {
+            responseAsObj->Set(connectionReusedProp, v8::Boolean::New(isolate, true));
+        }
+        auto connectionIdProp = ArgConverter::ConvertToV8String(isolate, "connectionId");
+        if (!responseAsObj->Has(context, connectionIdProp).FromMaybe(false)) {
+            responseAsObj->Set(connectionIdProp, v8::Number::New(isolate, 0));
+        }
+        auto encodedDataLengthProp = ArgConverter::ConvertToV8String(isolate, "encodedDataLength");
+        if (!responseAsObj->Has(context, encodedDataLengthProp).FromMaybe(false)) {
+            responseAsObj->Set(encodedDataLengthProp, v8::Number::New(isolate, 0));
+        }
+        auto securityStateProp = ArgConverter::ConvertToV8String(isolate, "securityState");
+        if (!responseAsObj->Has(context, securityStateProp).FromMaybe(false)) {
+            responseAsObj->Set(securityStateProp, ArgConverter::ConvertToV8String(isolate, "info"));
+        }
         v8::Local<v8::String> responseJson;
         auto maybeResponseJson = v8::JSON::Stringify(context, responseAsObj);
 
@@ -119,8 +135,7 @@ void NetworkDomainCallbackHandlers::RequestWillBeSentCallback(const v8::Function
                 !(argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "url")).FromMaybe(false)) ||
                 !(argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "request")).FromMaybe(false)) ||
                 !(argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "timestamp")).FromMaybe(false)) ||
-                !(argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "type")).FromMaybe(false))) ||
-                !(argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "wallTime")).FromMaybe(false))) {
+                !(argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "type")).FromMaybe(false)))) {
             throw NativeScriptException(wrongParametersError);
         }
 
@@ -128,10 +143,22 @@ void NetworkDomainCallbackHandlers::RequestWillBeSentCallback(const v8::Function
         auto url = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "url")).ToLocalChecked()->ToString();
         auto request = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "request")).ToLocalChecked();
         auto timeStamp = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "timestamp")).ToLocalChecked()->ToNumber(isolate)->IntegerValue();
-        auto wallTime = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "wallTime")).ToLocalChecked()->ToNumber(isolate)->IntegerValue();
         auto typeArg = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "type")).ToLocalChecked()->ToString();
+        long long int wallTime = 0;
+        if (argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "wallTime")).FromMaybe(true)) {
+            wallTime = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "wallTime")).ToLocalChecked()->ToNumber(isolate)->IntegerValue();
+        }
 
         auto requestAsObj = request->ToObject();
+        auto initialPriorityProp = ArgConverter::ConvertToV8String(isolate, "initialPriority");
+        auto referrerPolicyProp = ArgConverter::ConvertToV8String(isolate, "referrerPolicy");
+        if (!argsObj->Has(context, initialPriorityProp).FromMaybe(false)) {
+            requestAsObj->Set(initialPriorityProp, ArgConverter::ConvertToV8String(isolate, "Medium"));
+        }
+        if (!argsObj->Has(context, referrerPolicyProp).FromMaybe(false)) {
+            requestAsObj->Set(referrerPolicyProp, ArgConverter::ConvertToV8String(isolate, "no-referrer-when-downgrade"));
+        }
+
         v8::Local<v8::String> requestJson;
         auto maybeRequestJson = v8::JSON::Stringify(context, requestAsObj);
 
@@ -266,14 +293,17 @@ void NetworkDomainCallbackHandlers::LoadingFinishedCallback(const v8::FunctionCa
         v8::Local<v8::Object> argsObj = args[0]->ToObject();
 
         if (!argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "requestId")).FromMaybe(false) ||
-                !argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "timestamp")).FromMaybe(false) ||
-                !argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "encodedDataLength")).FromMaybe(false)) {
+                !argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "timestamp")).FromMaybe(false)) {
             throw NativeScriptException(wrongParametersError);
         }
 
         auto requestId = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "requestId")).ToLocalChecked()->ToString();
         auto timeStamp = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "timestamp")).ToLocalChecked()->ToNumber(isolate)->IntegerValue();
-        auto encodedDataLength = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "encodedDataLength")).ToLocalChecked()->ToNumber(isolate)->IntegerValue();
+        long long int encodedDataLength = 0;
+        auto encodedDataLengthProp = ArgConverter::ConvertToV8String(isolate, "encodedDataLength");
+        if (argsObj->Has(context, encodedDataLengthProp).FromMaybe(true)) {
+            encodedDataLength = argsObj->Get(context, encodedDataLengthProp).ToLocalChecked()->ToNumber(isolate)->IntegerValue();
+        }
 
         networkAgentInstance->m_frontend.loadingFinished(ArgConverter::ConvertToString(requestId).c_str(), timeStamp, encodedDataLength);
     } catch (NativeScriptException& e) {
