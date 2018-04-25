@@ -546,7 +546,7 @@ public class CodeItem {
                 oldToNewHandlerOffsets.put(oldOffset, newOffset);
             }
 
-            int readSize = (int)reader.sleb128(); // May be negative if catch_all present.
+            int readSize = reader.sleb128(); // May be negative if catch_all present.
             int size = (readSize >= 0 ? readSize : -readSize);
             out.putSleb128(readSize);
             // Encodes each encoded_type_addr_pair.

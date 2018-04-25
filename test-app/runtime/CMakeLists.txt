@@ -8,123 +8,142 @@ cmake_minimum_required(VERSION 3.4.1)
 # "-DANDROID_STL=c++_static" is just not enough for clang++ to find some libraries in the ndk
 MESSAGE( STATUS "## ANDROID_NDK_ROOT: " ${ANDROID_NDK_ROOT} )
 
+if ( ANDROID_ABI MATCHES "arm64" )
+    set(ARCH_INCLUDE_DIR "aarch64-linux-android")
+else()
+    set(ARCH_INCLUDE_DIR "arm-linux-androideabi")
+endif()
+
+set(COMMON_CMAKE_ARGUMENTS "-std=c++11 -Werror -Wno-unused-result -mstackrealign -fexceptions -fno-builtin-stpcpy -fno-rtti")
+
 # Command info: https://cmake.org/cmake/help/v3.4/command/include_directories.html
 include_directories( src/main/cpp
                     src/main/cpp/include
                     src/main/cpp/v8_inspector
 
                     # hack to find some libraries from the ndk
-                    ${ANDROID_NDK_ROOT}/sysroot/usr/include/arm-linux-androideabi/
+                    ${ANDROID_NDK_ROOT}/sysroot/usr/include/${ARCH_INCLUDE_DIR}/
                     )
 if ( OPTIMIZED_BUILD )
-    set(CMAKE_CXX_FLAGS "-std=c++11 -fexceptions -fno-builtin-stpcpy -fno-rtti -O3 -fvisibility=hidden -ffunction-sections -fno-data-sections -Wl,--exclude-libs=ALL -Wl,--gc-sections")
+    set(CMAKE_CXX_FLAGS "${COMMON_CMAKE_ARGUMENTS} -O3 -fvisibility=hidden -ffunction-sections -fno-data-sections")
 else()
-    set(CMAKE_CXX_FLAGS "-std=c++11 -fexceptions -fno-builtin-stpcpy -fno-rtti -g ")
+    set(CMAKE_CXX_FLAGS "${COMMON_CMAKE_ARGUMENTS} -g")
 endif()
 
 # Command info: https://cmake.org/cmake/help/v3.4/command/add_library.html
 # Creates(shared static) and names a library given relative sources
 # Gradle automatically packages shared libraries with your APK.
 add_library( # Sets the name of the library. When it's built you can find it with lib prefix libNativeScript.so
-            NativeScript
+        NativeScript
 
-            # Sets the library as a shared library.
-            SHARED
+        # Sets the library as a shared library.
+        SHARED
 
-            # Runtime source
-            src/main/cpp/JType.cpp
-            src/main/cpp/ArrayHelper.cpp
-            src/main/cpp/AssetExtractor.cpp
-            src/main/cpp/com_tns_AssetExtractor.cpp
-            src/main/cpp/ModuleInternal.cpp
-            src/main/cpp/V8StringConstants.cpp
-            src/main/cpp/ArrayBufferHelper.cpp
-            src/main/cpp/ArrayElementAccessor.cpp
-            src/main/cpp/NumericCasts.cpp
-            src/main/cpp/Util.cpp
-            src/main/cpp/JsV8InspectorClient.cpp
-            src/main/cpp/MethodCache.cpp
-            src/main/cpp/DirectBuffer.cpp
-            src/main/cpp/CallbackHandlers.cpp
-            src/main/cpp/File.cpp
-            src/main/cpp/NativeScriptException.cpp
-            src/main/cpp/SimpleAllocator.cpp
-            src/main/cpp/DOMDomainCallbackHandlers.cpp
-            src/main/cpp/NetworkDomainCallbackHandlers.cpp
-            src/main/cpp/Runtime.cpp
-            src/main/cpp/JsArgConverter.cpp
-            src/main/cpp/MetadataMethodInfo.cpp
-            src/main/cpp/SimpleProfiler.cpp
-            src/main/cpp/MetadataReader.cpp
-            src/main/cpp/FieldAccessor.cpp
-            src/main/cpp/ManualInstrumentation.cpp
-            src/main/cpp/JEnv.cpp
-            src/main/cpp/ReadWriteLock.cpp
-            src/main/cpp/MetadataNode.cpp
-            src/main/cpp/WeakRef.cpp
-            src/main/cpp/JsArgToArrayConverter.cpp
-            src/main/cpp/com_tns_Runtime.cpp
-            src/main/cpp/JniSignatureParser.cpp
-            src/main/cpp/Logger.cpp
-            src/main/cpp/ArgConverter.cpp
-            src/main/cpp/Constants.cpp
-            src/main/cpp/com_tns_AndroidJsV8Inspector.cpp
-            src/main/cpp/Profiler.cpp
-            src/main/cpp/ObjectManager.cpp
-            src/main/cpp/V8GlobalHelpers.cpp
-            src/main/cpp/MetadataTreeNode.cpp
+        # Runtime source
+        src/main/cpp/ArgConverter.cpp
+        src/main/cpp/ArrayBufferHelper.cpp
+        src/main/cpp/ArrayElementAccessor.cpp
+        src/main/cpp/ArrayHelper.cpp
+        src/main/cpp/AssetExtractor.cpp
+        src/main/cpp/CallbackHandlers.cpp
+        src/main/cpp/Constants.cpp
+        src/main/cpp/DOMDomainCallbackHandlers.cpp
+        src/main/cpp/DirectBuffer.cpp
+        src/main/cpp/FieldAccessor.cpp
+        src/main/cpp/File.cpp
+        src/main/cpp/JEnv.cpp
+        src/main/cpp/JType.cpp
+        src/main/cpp/JniSignatureParser.cpp
+        src/main/cpp/JsArgConverter.cpp
+        src/main/cpp/JsArgToArrayConverter.cpp
+        src/main/cpp/JsV8InspectorClient.cpp
+        src/main/cpp/Logger.cpp
+        src/main/cpp/ManualInstrumentation.cpp
+        src/main/cpp/MetadataMethodInfo.cpp
+        src/main/cpp/MetadataNode.cpp
+        src/main/cpp/MetadataReader.cpp
+        src/main/cpp/MetadataTreeNode.cpp
+        src/main/cpp/MethodCache.cpp
+        src/main/cpp/ModuleInternal.cpp
+        src/main/cpp/NativeScriptException.cpp
+        src/main/cpp/NetworkDomainCallbackHandlers.cpp
+        src/main/cpp/NumericCasts.cpp
+        src/main/cpp/ObjectManager.cpp
+        src/main/cpp/Profiler.cpp
+        src/main/cpp/ReadWriteLock.cpp
+        src/main/cpp/Runtime.cpp
+        src/main/cpp/SimpleAllocator.cpp
+        src/main/cpp/SimpleProfiler.cpp
+        src/main/cpp/Util.cpp
+        src/main/cpp/V8GlobalHelpers.cpp
+        src/main/cpp/V8StringConstants.cpp
+        src/main/cpp/WeakRef.cpp
+        src/main/cpp/com_tns_AndroidJsV8Inspector.cpp
+        src/main/cpp/com_tns_AssetExtractor.cpp
+        src/main/cpp/com_tns_Runtime.cpp
+        src/main/cpp/console/Console.cpp
 
-            # Inspector source (we build it because we've customized it a bit)
-            src/main/cpp/v8_inspector/src/inspector/string-16.cc
-            src/main/cpp/v8_inspector/src/inspector/string-util.cc
-            src/main/cpp/v8_inspector/src/inspector/v8-console-message.cc
-            src/main/cpp/v8_inspector/src/inspector/v8-profiler-agent-impl.cc
-            src/main/cpp/v8_inspector/src/inspector/v8-debugger-script.cc
-            src/main/cpp/v8_inspector/src/inspector/v8-function-call.cc
-            src/main/cpp/v8_inspector/src/inspector/v8-css-agent-impl.cpp
-            src/main/cpp/v8_inspector/src/inspector/v8-page-agent-impl.cpp
-            src/main/cpp/v8_inspector/src/inspector/v8-regex.cc
-            src/main/cpp/v8_inspector/src/inspector/v8-console-agent-impl.cc
-            src/main/cpp/v8_inspector/src/inspector/v8-network-agent-impl.cpp
-            src/main/cpp/v8_inspector/src/inspector/remote-object-id.cc
-            src/main/cpp/v8_inspector/src/inspector/v8-inspector-impl.cc
-            src/main/cpp/v8_inspector/src/inspector/search-util.cc
-            src/main/cpp/v8_inspector/src/inspector/v8-runtime-agent-impl.cc
-            src/main/cpp/v8_inspector/src/inspector/v8-dom-agent-impl.cpp
-            src/main/cpp/v8_inspector/src/inspector/v8-value-copier.cc
-            src/main/cpp/v8_inspector/src/inspector/v8-internal-value-type.cc
-            src/main/cpp/v8_inspector/src/inspector/v8-schema-agent-impl.cc
-            src/main/cpp/v8_inspector/src/inspector/java-script-call-frame.cc
-            src/main/cpp/v8_inspector/src/inspector/v8-injected-script-host.cc
-            src/main/cpp/v8_inspector/src/inspector/v8-console.cc
-            src/main/cpp/v8_inspector/src/inspector/v8-stack-trace-impl.cc
-            src/main/cpp/v8_inspector/src/inspector/inspected-context.cc
-            src/main/cpp/v8_inspector/src/inspector/v8-heap-profiler-agent-impl.cc
-            src/main/cpp/v8_inspector/src/inspector/v8-debugger.cc
-            src/main/cpp/v8_inspector/src/inspector/injected-script-native.cc
-            src/main/cpp/v8_inspector/src/inspector/v8-inspector-session-impl.cc
-            src/main/cpp/v8_inspector/src/inspector/v8-debugger-agent-impl.cc
-            src/main/cpp/v8_inspector/src/inspector/injected-script.cc
-            src/main/cpp/v8_inspector/src/inspector/protocol/DOM.cpp
-            src/main/cpp/v8_inspector/src/inspector/protocol/CSS.cpp
-            src/main/cpp/v8_inspector/src/inspector/protocol/Console.cpp
-            src/main/cpp/v8_inspector/src/inspector/protocol/Debugger.cpp
-            src/main/cpp/v8_inspector/src/inspector/protocol/Runtime.cpp
-            src/main/cpp/v8_inspector/src/inspector/protocol/Network.cpp
-            src/main/cpp/v8_inspector/src/inspector/protocol/Page.cpp
-            src/main/cpp/v8_inspector/src/inspector/protocol/Protocol.cpp
-            src/main/cpp/v8_inspector/src/inspector/protocol/Schema.cpp
-            src/main/cpp/v8_inspector/src/inspector/protocol/HeapProfiler.cpp
-            src/main/cpp/v8_inspector/src/inspector/protocol/GenericTypes.cpp
-            src/main/cpp/v8_inspector/src/inspector/protocol/Profiler.cpp
-            src/main/cpp/v8_inspector/src/inspector/utils/base64.cpp
-            src/main/cpp/v8_inspector/src/inspector/utils/v8-page-resources.cpp
-            src/main/cpp/v8_inspector/src/inspector/utils/v8-search-utils-public.cpp
-            src/main/cpp/v8_inspector/src/inspector/utils/v8-inspector-common.cpp
-            src/main/cpp/v8_inspector/src/inspector/utils/v8-network-request-data.cpp
-            )
+        #Inspector source
+        src/main/cpp/v8_inspector/src/inspector/protocol/CSS.cpp
+        src/main/cpp/v8_inspector/src/inspector/protocol/Console.cpp
+        src/main/cpp/v8_inspector/src/inspector/protocol/DOM.cpp
+        src/main/cpp/v8_inspector/src/inspector/protocol/Debugger.cpp
+        src/main/cpp/v8_inspector/src/inspector/protocol/GenericTypes.cpp
+        src/main/cpp/v8_inspector/src/inspector/protocol/HeapProfiler.cpp
+        src/main/cpp/v8_inspector/src/inspector/protocol/Log.cpp
+        src/main/cpp/v8_inspector/src/inspector/protocol/Network.cpp
+        src/main/cpp/v8_inspector/src/inspector/protocol/Overlay.cpp
+        src/main/cpp/v8_inspector/src/inspector/protocol/Page.cpp
+        src/main/cpp/v8_inspector/src/inspector/protocol/Profiler.cpp
+        src/main/cpp/v8_inspector/src/inspector/protocol/Protocol.cpp
+        src/main/cpp/v8_inspector/src/inspector/protocol/Runtime.cpp
+        src/main/cpp/v8_inspector/src/inspector/protocol/Schema.cpp
+        src/main/cpp/v8_inspector/src/inspector/utils/base64.cpp
+        src/main/cpp/v8_inspector/src/inspector/utils/v8-inspector-common.cpp
+        src/main/cpp/v8_inspector/src/inspector/utils/v8-network-request-data.cpp
+        src/main/cpp/v8_inspector/src/inspector/utils/v8-page-resources.cpp
+        src/main/cpp/v8_inspector/src/inspector/utils/v8-search-utils-public.cpp
+        src/main/cpp/v8_inspector/src/inspector/v8-css-agent-impl.cpp
+        src/main/cpp/v8_inspector/src/inspector/v8-dom-agent-impl.cpp
+        src/main/cpp/v8_inspector/src/inspector/v8-log-agent-impl.cpp
+        src/main/cpp/v8_inspector/src/inspector/v8-network-agent-impl.cpp
+        src/main/cpp/v8_inspector/src/inspector/v8-overlay-agent-impl.cpp
+        src/main/cpp/v8_inspector/src/inspector/v8-page-agent-impl.cpp
 
-set_target_properties(NativeScript PROPERTIES LINK_FLAGS -Wl,--allow-multiple-definition)
+        src/main/cpp/v8_inspector/src/inspector/injected-script.cc
+        src/main/cpp/v8_inspector/src/inspector/inspected-context.cc
+        src/main/cpp/v8_inspector/src/inspector/remote-object-id.cc
+        src/main/cpp/v8_inspector/src/inspector/search-util.cc
+        src/main/cpp/v8_inspector/src/inspector/string-16.cc
+        src/main/cpp/v8_inspector/src/inspector/string-util.cc
+        src/main/cpp/v8_inspector/src/inspector/test-interface.cc
+        src/main/cpp/v8_inspector/src/inspector/v8-console-agent-impl.cc
+        src/main/cpp/v8_inspector/src/inspector/v8-console-message.cc
+        src/main/cpp/v8_inspector/src/inspector/v8-console.cc
+        src/main/cpp/v8_inspector/src/inspector/v8-debugger-agent-impl.cc
+        src/main/cpp/v8_inspector/src/inspector/v8-debugger-script.cc
+        src/main/cpp/v8_inspector/src/inspector/v8-debugger.cc
+        src/main/cpp/v8_inspector/src/inspector/v8-function-call.cc
+        src/main/cpp/v8_inspector/src/inspector/v8-heap-profiler-agent-impl.cc
+        src/main/cpp/v8_inspector/src/inspector/v8-injected-script-host.cc
+        src/main/cpp/v8_inspector/src/inspector/v8-inspector-impl.cc
+        src/main/cpp/v8_inspector/src/inspector/v8-inspector-session-impl.cc
+        src/main/cpp/v8_inspector/src/inspector/v8-internal-value-type.cc
+        src/main/cpp/v8_inspector/src/inspector/v8-profiler-agent-impl.cc
+        src/main/cpp/v8_inspector/src/inspector/v8-regex.cc
+        src/main/cpp/v8_inspector/src/inspector/v8-runtime-agent-impl.cc
+        src/main/cpp/v8_inspector/src/inspector/v8-schema-agent-impl.cc
+        src/main/cpp/v8_inspector/src/inspector/v8-stack-trace-impl.cc
+        src/main/cpp/v8_inspector/src/inspector/v8-value-copier.cc
+        src/main/cpp/v8_inspector/src/inspector/v8-value-utils.cc
+        src/main/cpp/v8_inspector/src/inspector/wasm-translation.cc
+)
+
+if ( OPTIMIZED_BUILD )
+    set_target_properties(NativeScript PROPERTIES LINK_FLAGS -Wl,--allow-multiple-definition -Wl,--exclude-libs=ALL -Wl,--gc-sections)
+else()
+    set_target_properties(NativeScript PROPERTIES LINK_FLAGS -Wl,--allow-multiple-definition)
+endif()
 
 
 MESSAGE( STATUS "# General cmake Info" )
@@ -138,12 +157,13 @@ MESSAGE( STATUS "# CMAKE_CXX_FLAGS: " ${CMAKE_CXX_FLAGS} )
 # Command info: https://cmake.org/cmake/help/v3.4/command/target_link_libraries.html
 # linking v8 and inspector libraries to runtime(NativeScript library)
 target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libzip.a )
-target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libinspector.a )
 target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_base.a )
+target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_init.a )
+target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_initializers.a )
 target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_libplatform.a )
-target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_libbase.a )
 target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_libsampler.a )
-target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_nosnapshot.a )
+target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_libbase.a )
+target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_snapshot.a )
 
 # Command info: https://cmake.org/cmake/help/v3.4/command/find_library.html
 # Searches for a specified prebuilt library and stores the path as a

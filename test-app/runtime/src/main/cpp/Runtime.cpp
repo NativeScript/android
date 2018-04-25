@@ -22,6 +22,7 @@
 #include "include/zipconf.h"
 #include <sstream>
 #include <dlfcn.h>
+#include <console/Console.h>
 #include "NetworkDomainCallbackHandlers.h"
 #include "sys/system_properties.h"
 #include "JsV8InspectorClient.h"
@@ -183,7 +184,7 @@ jobject Runtime::RunScript(JNIEnv* _env, jobject obj, jstring scriptFile) {
     auto src = File::ReadText(filename);
     auto source = ArgConverter::ConvertToV8String(isolate, src);
 
-    TryCatch tc;
+    TryCatch tc(isolate);
 
     Local<Script> script;
     ScriptOrigin origin(ArgConverter::ConvertToV8String(isolate, filename));
@@ -380,6 +381,8 @@ static void InitializeV8() {
 }
 
 Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& nativeLibDir, const string& packageName, bool isDebuggable, const string& callingDir, const string& profilerOutputDir) {
+    tns::instrumentation::Frame frame("Runtime.PrepareV8Runtime");
+
     Isolate::CreateParams create_params;
     bool didInitializeV8 = false;
 
@@ -391,18 +394,19 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     char sdkVersion[PROP_VALUE_MAX];
     __system_property_get("ro.build.version.sdk", sdkVersion);
 
-    void* snapshotPtr;
+    void* snapshotPtr = nullptr;
+    string snapshotPath;
 
     // If device isn't running on Sdk 17
     if (strcmp(sdkVersion, string("17").c_str()) != 0) {
-        snapshotPtr = dlopen("libsnapshot.so", RTLD_LAZY | RTLD_LOCAL);
+        snapshotPath = "libsnapshot.so";
     } else {
         // If device is running on android Sdk 17
         // dlopen reads relative path to dynamic libraries or reads from folder different than the nativeLibsDirs on the android device
         string snapshotPath = nativeLibDir + "/libsnapshot.so";
-        snapshotPtr = dlopen(snapshotPath.c_str(), RTLD_LAZY | RTLD_LOCAL);
     }
 
+    snapshotPtr = dlopen(snapshotPath.c_str(), RTLD_LAZY | RTLD_LOCAL);
     if (snapshotPtr == nullptr) {
         DEBUG_WRITE_FORCE("Failed to load snapshot: %s", dlerror());
     }
@@ -428,11 +432,11 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
             m_heapSnapshotBlob = new MemoryMappedFile(MemoryMappedFile::Open(snapshotPath.c_str()));
             m_startupData->data = static_cast<const char*>(m_heapSnapshotBlob->memory);
             m_startupData->raw_size = m_heapSnapshotBlob->size;
+            create_params.snapshot_blob = m_startupData;
 
-            DEBUG_WRITE_FORCE("Snapshot read %s (%dB).", snapshotPath.c_str(), m_heapSnapshotBlob->size);
+            DEBUG_WRITE_FORCE("Snapshot read %s (%zuB).", snapshotPath.c_str(), m_heapSnapshotBlob->size);
         } else if (!saveSnapshot) {
             DEBUG_WRITE_FORCE("No snapshot file found at %s", snapshotPath.c_str());
-
         } else {
             // This should be executed before V8::Initialize, which calls it with false.
             NativeScriptExtension::CpuFeaturesProbe(true);
@@ -457,15 +461,15 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
                 if (!writeSuccess) {
                     DEBUG_WRITE_FORCE("Failed to save created snapshot.");
                 } else {
-                    DEBUG_WRITE_FORCE("Saved snapshot of %s (%dB) in %s (%dB)",
+                    DEBUG_WRITE_FORCE("Saved snapshot of %s (%zuB) in %s (%dB)",
                                       Constants::V8_HEAP_SNAPSHOT_SCRIPT.c_str(), customScript.size(),
                                       snapshotPath.c_str(), m_startupData->raw_size);
                 }
             }
+
+            create_params.snapshot_blob = m_startupData;
         }
     }
-
-    create_params.snapshot_blob = m_startupData;
 
     /*
      * Setup the V8Platform only once per process - once for the application lifetime
@@ -475,7 +479,11 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
         InitializeV8();
     }
 
+    tns::instrumentation::Frame isolateFrame("Isolate.New");
     auto isolate = Isolate::New(create_params);
+    isolateFrame.log("Isolate.New");
+    isolateFrame.disable();
+
     Isolate::Scope isolate_scope(isolate);
     HandleScope handleScope(isolate);
 
@@ -486,7 +494,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     isolate->SetData((uint32_t)Runtime::IsolateData::CONSTANTS, consts);
 
     V8::SetFlagsFromString(Constants::V8_STARTUP_FLAGS.c_str(), Constants::V8_STARTUP_FLAGS.size());
-    V8::SetCaptureStackTraceForUncaughtExceptions(true, 100, StackTrace::kOverview);
+    isolate->SetCaptureStackTraceForUncaughtExceptions(true, 100, StackTrace::kOverview);
 
     isolate->AddMessageListener(NativeScriptException::OnUncaughtError);
 
@@ -500,7 +508,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__log"), FunctionTemplate::New(isolate, CallbackHandlers::LogMethodCallback));
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__dumpReferenceTables"), FunctionTemplate::New(isolate, CallbackHandlers::DumpReferenceTablesMethodCallback));
-    globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__consoleMessage"), FunctionTemplate::New(isolate, JsV8InspectorClient::sendToFrontEndCallback));
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__enableVerboseLogging"), FunctionTemplate::New(isolate, CallbackHandlers::EnableVerboseLoggingMethodCallback));
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__disableVerboseLogging"), FunctionTemplate::New(isolate, CallbackHandlers::DisableVerboseLoggingMethodCallback));
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__exit"), FunctionTemplate::New(isolate, CallbackHandlers::ExitMethodCallback));
@@ -564,13 +571,19 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
         m_gcFunc = new Persistent<Function>(isolate, gcFunc.As<Function>());
     }
 
-    global->ForceSet(ArgConverter::ConvertToV8String(isolate, "global"), global, readOnlyFlags);
-    global->ForceSet(ArgConverter::ConvertToV8String(isolate, "__global"), global, readOnlyFlags);
+    global->DefineOwnProperty(context, ArgConverter::ConvertToV8String(isolate, "global"), global, readOnlyFlags);
+    global->DefineOwnProperty(context, ArgConverter::ConvertToV8String(isolate, "__global"), global, readOnlyFlags);
 
     // Do not set 'self' accessor to main thread JavaScript
     if (s_mainThreadInitialized) {
-        global->ForceSet(ArgConverter::ConvertToV8String(isolate, "self"), global, readOnlyFlags);
+        global->DefineOwnProperty(context, ArgConverter::ConvertToV8String(isolate, "self"), global, readOnlyFlags);
     }
+
+    /*
+     * Attach 'console' object to the global object
+     */
+    v8::Local<v8::Object> console = Console::createConsole(context, filesPath);
+    global->DefineOwnProperty(context, ArgConverter::ConvertToV8String(isolate, "console"), console, readOnlyFlags);
 
     ArgConverter::Init(isolate);
 

@@ -1,0 +1,24 @@
+{
+  "name": "static_analysis",
+  "version": "1.0.0",
+  "description": "",
+  "main": "project/parser",
+  "scripts": {
+    "test": "node run-tests.js"
+  },
+  "repository": "https://github.com/NativeScript/android-runtime/",
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "babel-traverse": "^6.4.5",
+    "babel-types": "^6.4.5",
+    "babylon": "^6.4.5",
+    "lazy": "^1.0.11"
+  },
+  "devDependencies": {
+    "jasmine": "^2.8.0",
+    "jasmine-node": "1.14.5",
+    "jasmine-reporters": "^2.3.0",
+    "jasmine-xml-reporter": "^1.1.0"
+  }
+}

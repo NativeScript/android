@@ -67,7 +67,7 @@ void SimpleProfiler::PrintProfilerDataCallback(const FunctionCallbackInfo<Value>
 void SimpleProfiler::PrintProfilerData() {
     std::sort(s_frames.begin(), s_frames.end());
     for (auto& f : s_frames) {
-        __android_log_print(ANDROID_LOG_DEBUG, "TNS.Native.Profiler", "Time: %lld, File: %s, Line: %d", f.time, f.fileName, f.lineNumber);
+        __android_log_print(ANDROID_LOG_DEBUG, "TNS.Native.Profiler", "Time: %lld, File: %s, Line: %d", (long long)f.time, f.fileName, f.lineNumber);
     }
 }
 

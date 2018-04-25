@@ -648,14 +648,14 @@ public class InsnList {
 
         @Override
         public void add(AbstractInsnNode o) {
-            InsnList.this.insertBefore(next, (AbstractInsnNode) o);
-            prev = (AbstractInsnNode) o;
+            InsnList.this.insertBefore(next, o);
+            prev = o;
         }
 
         @Override
         public void set(AbstractInsnNode o) {
-            InsnList.this.set(next.prev, (AbstractInsnNode) o);
-            prev = (AbstractInsnNode) o;
+            InsnList.this.set(next.prev, o);
+            prev = o;
         }
 
 

@@ -1,0 +1,121 @@
+def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
+def runOnDevice = project.hasProperty("runOnDevice");
+def runOnDeviceOrEmulator = runOnDevice ? "-d" : "-e";
+
+def onlyX86 = project.hasProperty("onlyX86")
+
+// task deleteDist(type: Delete) {
+//     doFirst {
+//         delete "$rootDir/dist"
+//     }
+// }
+
+task waitForEmulatorToStart(type: Exec) {
+    doFirst {
+        println "Waiting for emulator to start..."
+
+        if (isWinOs) {
+            commandLine "cmd", "/c", "node", "$rootDir\\tools\\make_sure_emulator_is_ready.js", runOnDeviceOrEmulator
+        } else {
+            commandLine "node", "$rootDir/tools/make_sure_emulator_is_ready.js", runOnDeviceOrEmulator
+        }
+    }
+}
+
+task installApk(type: Exec) {
+        doFirst {
+            println "Attempting to install buit apk"
+            if (onlyX86) {
+                if (isWinOs) {
+                    commandLine "cmd", "/c", "gradlew", ":app:installDebug", "-PonlyX86"
+                } else {
+                    commandLine "./gradlew", ":app:installDebug", "-PonlyX86"
+                }
+            } else {
+                if (isWinOs) {
+                    commandLine "cmd", "/c", "gradlew", ":app:installDebug"
+                } else {
+                    commandLine "./gradlew", ":app:installDebug"
+                }
+            }
+        }
+}
+
+task runAdbAsRoot(type: Exec) {
+    doFirst {
+        println "Removing previous android_unit_test_results.xml"
+
+        if (isWinOs) {
+            commandLine "cmd", "/c", "adb", "-e" , "root"
+        } else {
+            commandLine "adb", "-e" , "root"
+        }
+    }
+}
+
+task deletePreviousResultXml(type: Exec) {
+    doFirst {
+        println "Removing previous android_unit_test_results.xml"
+
+        if (isWinOs) {
+            commandLine "cmd", "/c", "adb", runOnDeviceOrEmulator, "-e" , "shell", "rm", "-rf", "/data/data/com.tns.testapplication/android_unit_test_results.xml"
+        } else {
+            commandLine "adb", runOnDeviceOrEmulator, "-e", "shell", "rm", "-rf", "/data/data/com.tns.testapplication/android_unit_test_results.xml"
+        }
+    }
+}
+
+task startInstalledApk(type: Exec) {
+    doFirst {
+        println "Starting test application"
+
+        if (isWinOs) {
+            commandLine "cmd", "/c", "adb", runOnDeviceOrEmulator, "-e", "shell", "am", "start", "-n", "com.tns.testapplication/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
+        } else {
+            commandLine "adb", runOnDeviceOrEmulator, "-e" , "shell", "am", "start", "-n", "com.tns.testapplication/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
+        }
+    }
+}
+
+task createDistFolder {
+    doLast {
+        def distDir = file("$rootDir/dist")
+        distDir.mkdirs()
+    }
+}
+
+task waitForUnitTestResultFile(type: Exec) {
+    doFirst {
+        println "Waiting for tests to finish..."
+
+        if (isWinOs) {
+            commandLine "cmd", "/c", "node", "$rootDir\\tools\\try_to_find_test_result_file.js", runOnDeviceOrEmulator
+        } else {
+            commandLine "node", "$rootDir/tools/try_to_find_test_result_file.js", runOnDeviceOrEmulator
+        }
+    }
+}
+
+task copyResultToDist(type: Copy) {
+    from "$rootDir/android_unit_test_results.xml"
+    into "$rootDir/dist"
+}
+
+task deleteRootLevelResult(type: Delete) {
+    delete "$rootDir/android_unit_test_results.xml"
+}
+
+
+// waitForEmulatorToStart.dependsOn(deleteDist)
+runAdbAsRoot.dependsOn(waitForEmulatorToStart)
+deletePreviousResultXml.dependsOn(runAdbAsRoot)
+installApk.dependsOn(deletePreviousResultXml)
+startInstalledApk.dependsOn(installApk)
+createDistFolder.dependsOn(startInstalledApk)
+waitForUnitTestResultFile.dependsOn(createDistFolder)
+copyResultToDist.dependsOn(waitForUnitTestResultFile)
+deleteRootLevelResult.dependsOn(copyResultToDist)
+
+task runtests {
+    dependsOn deleteRootLevelResult
+}

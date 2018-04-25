@@ -173,7 +173,7 @@ void NumericCasts::MarkAsLongCallback(const v8::FunctionCallbackInfo<Value>& arg
 
         Local<Value> value;
         if (args[0]->IsInt32()) {
-            value = args[0]->ToInt32();
+            value = args[0]->ToInt32(isolate);
         } else {
             value = args[0]->ToString();
         }
@@ -207,7 +207,7 @@ void NumericCasts::MarkAsByteCallback(const v8::FunctionCallbackInfo<Value>& arg
 
         Local<Value> value;
         if (args[0]->IsInt32()) {
-            value = args[0]->ToInt32();
+            value = args[0]->ToInt32(isolate);
         } else {
             value = args[0]->ToString();
         }
@@ -242,7 +242,7 @@ void NumericCasts::MarkAsShortCallback(const v8::FunctionCallbackInfo<Value>& ar
 
         Local<Value> value;
         if (args[0]->IsInt32()) {
-            value = args[0]->ToInt32();
+            value = args[0]->ToInt32(isolate);
         } else {
             value = args[0]->ToString();
         }
@@ -306,7 +306,7 @@ void NumericCasts::MarkAsFloatCallback(const v8::FunctionCallbackInfo<Value>& ar
             throw NativeScriptException(string("float(x) should be called with single parameter containing a float number representation"));
         }
 
-        auto value = args[0]->ToNumber();
+        auto value = args[0]->ToNumber(isolate);
         auto cast = Object::New(isolate);
         MarkJsObject(isolate, cast, CastType::Float, value);
         args.GetReturnValue().Set(cast);
@@ -334,7 +334,7 @@ void NumericCasts::MarkAsDoubleCallback(const v8::FunctionCallbackInfo<Value>& a
             throw NativeScriptException(string("double(x) should be called with single parameter containing a double number representation"));
         }
 
-        auto value = args[0]->ToNumber();
+        auto value = args[0]->ToNumber(isolate);
         auto cast = Object::New(isolate);
         MarkJsObject(isolate, cast, CastType::Double, value);
         args.GetReturnValue().Set(cast);

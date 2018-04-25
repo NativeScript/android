@@ -114,7 +114,9 @@ public final class RuntimeHelper {
                                 logger.write("Extracting snapshot blob");
                             }
 
-                            aE.extractAssets(app, "snapshots/" + Build.CPU_ABI, outputDir, extractPolicy, removePreviouslyInstalledAssets);
+                            @SuppressWarnings("deprecation")
+                            String cpu_abi = Build.CPU_ABI;
+                            aE.extractAssets(app, "snapshots/" + cpu_abi, outputDir, extractPolicy, removePreviouslyInstalledAssets);
                         }
 
                         extractPolicy.setAssetsThumb(app);
@@ -185,13 +187,18 @@ public final class RuntimeHelper {
                     // if app is in debuggable mode run livesync service
                     // runtime needs to be initialized before the NativeScriptSyncService is enabled because it uses runtime.runScript(...)
                     try {
+                        @SuppressWarnings("unchecked")
                         Class NativeScriptSyncService = Class.forName("com.tns.NativeScriptSyncService");
 
+                        @SuppressWarnings("unchecked")
                         Constructor cons = NativeScriptSyncService.getConstructor(new Class[] {Runtime.class, Logger.class, Context.class});
                         Object syncService = cons.newInstance(runtime, logger, app);
 
+                        @SuppressWarnings("unchecked")
                         Method syncMethod = NativeScriptSyncService.getMethod("sync");
                         syncMethod.invoke(syncService);
+
+                        @SuppressWarnings("unchecked")
                         Method startServerMethod = NativeScriptSyncService.getMethod("startServer");
                         startServerMethod.invoke(syncService);
                     } catch (ClassNotFoundException e) {

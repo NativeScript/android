@@ -196,7 +196,7 @@ void ModuleInternal::Load(const string& path) {
 void ModuleInternal::LoadWorker(const string& path) {
     TNSPERF();
     auto isolate = m_isolate;
-    TryCatch tc;
+    TryCatch tc(isolate);
 
     Load(path);
 
@@ -277,7 +277,7 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& moduleP
     auto poModuleObj = new Persistent<Object>(isolate, moduleObj);
     TempModule tempModule(this, modulePath, moduleCacheKey, poModuleObj);
 
-    TryCatch tc;
+    TryCatch tc(isolate);
 
     Local<Function> moduleFunc;
 
@@ -353,7 +353,7 @@ Local<Script> ModuleInternal::LoadScript(Isolate* isolate, const string& path, c
     tns::instrumentation::Frame frame(frameName.c_str());
     Local<Script> script;
 
-    TryCatch tc;
+    TryCatch tc(isolate);
 
     auto scriptText = ModuleInternal::WrapModuleContent(path);
 
@@ -399,7 +399,7 @@ Local<Object> ModuleInternal::LoadData(Isolate* isolate, const string& path) {
 
     auto jsonData = File::ReadText(path);
 
-    TryCatch tc;
+    TryCatch tc(isolate);
 
     auto jsonStr = ArgConverter::ConvertToV8String(isolate, jsonData);
 
@@ -490,3 +490,4 @@ jmethodID ModuleInternal::RESOLVE_PATH_METHOD_ID = nullptr;
 
 const char* ModuleInternal::MODULE_PROLOGUE = "(function(module, exports, require, __filename, __dirname){ ";
 const char* ModuleInternal::MODULE_EPILOGUE = "\n})";
+int ModuleInternal::MODULE_PROLOGUE_LENGTH = std::string(ModuleInternal::MODULE_PROLOGUE).length();

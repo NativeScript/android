@@ -247,7 +247,7 @@ public class Runtime {
                 WorkerGlobalOnMessageCallback(currentRuntime.runtimeId, msg.obj.toString());
             } else if (msg.arg1 == MessageType.TerminateThread) {
                 currentRuntime.isTerminating = true;
-                currentRuntime.gcListener.unsubscribe(currentRuntime);
+                GcListener.unsubscribe(currentRuntime);
 
                 runtimeCache.remove(currentRuntime.runtimeId);
 
@@ -266,7 +266,7 @@ public class Runtime {
                 currentRuntime.mainThreadHandler.sendMessage(msgToMain);
 
                 currentRuntime.isTerminating = true;
-                currentRuntime.gcListener.unsubscribe(currentRuntime);
+                GcListener.unsubscribe(currentRuntime);
 
                 runtimeCache.remove(currentRuntime.runtimeId);
 
@@ -483,7 +483,7 @@ public class Runtime {
 
             initNativeScript(getRuntimeId(), Module.getApplicationFilesPath(), nativeLibDir, logger.isEnabled(), isDebuggable, appName, appConfig.getAsArray(), callingJsDir);
 
-            clearStartupData(getRuntimeId()); // It's safe to delete the data after the V8 debugger is initialized
+            //clearStartupData(getRuntimeId()); // It's safe to delete the data after the V8 debugger is initialized
 
             if (logger.isEnabled()) {
                 Date d = new Date();
@@ -493,7 +493,7 @@ public class Runtime {
                 logger.write("init time=" + (d.getTime() - lastModDate.getTime()));
             }
 
-            gcListener.subscribe(this);
+            GcListener.subscribe(this);
 
             initialized = true;
         } finally {
@@ -577,8 +577,8 @@ public class Runtime {
     }
 
     @RuntimeCallable
-    private Class<?> resolveClass(String fullClassName, String[] methodOverrides, String[] implementedInterfaces, boolean isInterface) throws ClassNotFoundException, IOException {
-        Class<?> javaClass = classResolver.resolveClass(fullClassName, dexFactory, methodOverrides, implementedInterfaces, isInterface);
+    private Class<?> resolveClass(String baseClassName, String fullClassName, String[] methodOverrides, String[] implementedInterfaces, boolean isInterface) throws ClassNotFoundException, IOException {
+        Class<?> javaClass = classResolver.resolveClass(baseClassName, fullClassName, dexFactory, methodOverrides, implementedInterfaces, isInterface);
 
         return javaClass;
     }
@@ -1324,5 +1324,9 @@ public class Runtime {
 
         // TODO: Pete: Should we treat the message with higher priority?
         currentRuntime.mainThreadHandler.sendMessage(msg);
+    }
+
+    public void clearStartupData() {
+        clearStartupData(getRuntimeId());
     }
 }

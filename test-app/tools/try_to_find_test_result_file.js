@@ -10,7 +10,7 @@ var
 	processTimeout = 20 * 60 * 1000, // 20 minutes timeout (empirical constant :)) 
 	searchInterval = 10 * 1000;
 
-searchForFile("", getFile);
+searchForFile("empty", getFile);
 
 var runOnDeviceOrEmulator = process.argv[2];
 
@@ -25,8 +25,8 @@ function closeProcessAfter(timeout) {
 }
 
 function tryToGetFile() {
-	var checkApp = checkIfAppIsRunning("adb " + runOnDeviceOrEmulator + " shell \"ps | grep com.tns.testapplication\"", checkIfProcessIsRunning);
-	pullfile = execFindFile("adb " + runOnDeviceOrEmulator + " pull /data/data/com.tns.testapplication/android_unit_test_results.xml", checkIfFileExists);
+	var checkApp = checkIfAppIsRunning("adb " + runOnDeviceOrEmulator + " -e shell \"ps | grep com.tns.testapplication\"", checkIfProcessIsRunning);
+	pullfile = execFindFile("adb " + runOnDeviceOrEmulator + " -e pull /data/data/com.tns.testapplication/android_unit_test_results.xml", checkIfFileExists);
 	pullfile.stdout.pipe(process.stdout, { end: false });
 	pullfile.stderr.pipe(process.stderr, { end: false });
 }

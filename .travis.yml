@@ -1,7 +1,7 @@
 env:
   global:
   - NODE_VERSION=6.11.1
-  - NDK_VERSION=r15c
+  - NDK_VERSION=r16b
   - DATE=$(date +%Y-%m-%d)
   - PACKAGE_VERSION=next-$DATE-$TRAVIS_BUILD_NUMBER
   - EMULATOR_API_LEVEL=21
@@ -10,22 +10,6 @@ env:
 
 matrix:
   include:
-    - stage: "Static Binding Generator Parser Tests"
-      language: node_js 
-      node_js: "6"
-      git:
-        submodules: false
-      script:
-        - cd android-static-binding-generator
-        - npm install && node run-tests
-        - cd ..
-    - stage: "Static Binding Generator Class Generator Tests"
-      language: android
-      jdk: oraclejdk8
-      git:
-        submodules: false
-      script:
-        - "android-static-binding-generator/project/staticbindinggenerator/gradlew test --project-dir android-static-binding-generator/project/staticbindinggenerator/"    
     - stage: "Build and Tests"
       sudo: true
       language: android
@@ -41,15 +25,14 @@ matrix:
         submodules: false
       script:
         # (master branch) build the runtime twice - optimized, and regular packages, skip on PRs
-        # test-app/gradlew runtest will take care of building the runtime for its testing needs
+        # test-app/gradlew runtests will take care of building the runtime for its testing needs
         - 'if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then bash ./gradlew -PpreReleaseVersion=$PACKAGE_VERSION -PgitCommitVersion=$TRAVIS_COMMIT --stacktrace; fi'
         - echo no | android create avd --force -n $EMULATOR_NAME-$EMULATOR_API_LEVEL -t android-$EMULATOR_API_LEVEL --abi $ANDROID_ABI -c 12M
         - emulator -avd $EMULATOR_NAME-$EMULATOR_API_LEVEL -no-skin -no-audio -no-window &
         - android-wait-for-emulator
-        - cd test-app 
+        - "./gradlew runSbgTests --stacktrace"
         - "./gradlew runtest --stacktrace"
         - adb -e logcat -d 300
-        - cd ..
       before_install:
         - echo "y" | sdkmanager "cmake;3.6.4111459"
         - sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules
@@ -80,4 +63,3 @@ cache:
 
 install:
   - nvm install $NODE_VERSION
-  

@@ -1,0 +1,1 @@
+android.view.View.OnClickListener*MyActivity*54*32*AppClickListener*onClick***

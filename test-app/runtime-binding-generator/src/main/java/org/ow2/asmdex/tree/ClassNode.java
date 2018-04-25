@@ -242,12 +242,12 @@ public class ClassNode extends ClassVisitor {
         int n;
         n = visibleAnnotations == null ? 0 : visibleAnnotations.size();
         for (int i = 0; i < n; ++i) {
-            AnnotationNode an = (AnnotationNode) visibleAnnotations.get(i);
+            AnnotationNode an = visibleAnnotations.get(i);
             an.accept(cv.visitAnnotation(an.desc, true));
         }
         n = invisibleAnnotations == null ? 0 : invisibleAnnotations.size();
         for (int i = 0; i < n; ++i) {
-            AnnotationNode an = (AnnotationNode) invisibleAnnotations.get(i);
+            AnnotationNode an = invisibleAnnotations.get(i);
             an.accept(cv.visitAnnotation(an.desc, false));
         }
 

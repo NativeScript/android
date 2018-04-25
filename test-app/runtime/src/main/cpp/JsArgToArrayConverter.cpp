@@ -164,7 +164,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index) {
                 int byteArg = atoi(value.c_str());
                 byteValue = (jbyte) byteArg;
             } else if (castValue->IsInt32()) {
-                int byteArg = castValue->ToInt32()->Int32Value();
+                int byteArg = castValue->ToInt32(m_isolate)->Int32Value();
                 byteValue = (jbyte) byteArg;
             }
             javaObject = JType::NewByte(env, byteValue);
@@ -180,7 +180,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index) {
                 int shortArg = atoi(value.c_str());
                 shortValue = (jshort) shortArg;
             } else if (castValue->IsInt32()) {
-                jlong shortArg = castValue->ToInt32()->Int32Value();
+                jlong shortArg = castValue->ToInt32(m_isolate)->Int32Value();
                 shortValue = (jshort) shortArg;
             }
             javaObject = JType::NewShort(env, shortValue);
@@ -195,7 +195,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index) {
                 auto strValue = ArgConverter::ConvertToString(castValue->ToString());
                 longValue = atoll(strValue.c_str());
             } else if (castValue->IsInt32()) {
-                longValue = castValue->ToInt32()->Int32Value();
+                longValue = castValue->ToInt32(m_isolate)->Int32Value();
             }
             javaObject = JType::NewLong(env, longValue);
             SetConvertedObject(env, index, javaObject);
@@ -206,7 +206,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index) {
             castValue = NumericCasts::GetCastValue(jsObj);
             floatValue = 0;
             if (castValue->IsNumber()) {
-                double floatArg = castValue->ToNumber()->NumberValue();
+                double floatArg = castValue->ToNumber(m_isolate)->NumberValue();
                 floatValue = (jfloat) floatArg;
             }
             javaObject = JType::NewFloat(env, floatValue);
@@ -218,7 +218,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index) {
             castValue = NumericCasts::GetCastValue(jsObj);
             doubleValue = 0;
             if (castValue->IsNumber()) {
-                double doubleArg = castValue->ToNumber()->NumberValue();
+                double doubleArg = castValue->ToNumber(m_isolate)->NumberValue();
                 doubleValue = (jdouble) doubleArg;
             }
             javaObject = JType::NewDouble(env, doubleValue);

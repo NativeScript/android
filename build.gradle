@@ -1,5 +1,5 @@
 /*
-*	Usage: 
+*	Usage:
 *		gradlew - Builds the NativeScript Android App Package using an application project template.
 		gradlew -PgitCommitVersion - sets the commit version of the build
 		gradlew -PpreReleaseVersion - sets the pre-release version of the build (as per semver spec "-alpha" value results in 1.0.0-alpha)
@@ -13,12 +13,17 @@ import groovy.json.JsonSlurper
 import groovy.json.JsonBuilder
 import groovy.json.JsonOutput
 
+def onlyX86 = project.hasProperty("onlyX86")
+
 def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
-def localMetadataGen = "../android-metadata-generator/dist/tns-android-metadata-generator-0.0.1.tgz"
-def distDir = "$projectDir/dist"
 def pVersion = "no package version was provided by build.gradle build"
 def arVersion = "no commit sha was provided by build.gradle build"
 def generateRegularRuntimePackage = !project.hasProperty("skipUnoptimized");
+
+def DIST_PATH = "$rootDir/dist"
+def TEST_APP_PATH = "$rootDir/test-app"
+def BUILD_TOOLS_PATH = "$TEST_APP_PATH/build-tools"
+def DIST_FRAMEWORK_PATH = "$DIST_PATH/framework"
 
 task checkEnvironmentVariables {
     if ("$System.env.JAVA_HOME" == "" || "$System.env.JAVA_HOME" == "null") {
@@ -39,53 +44,16 @@ task checkEnvironmentVariables {
 }
 
 task cleanDistDir(type: Delete) {
-    delete distDir
+    delete DIST_PATH
 }
 
 task createDistDir {
+    dependsOn 'cleanDistDir'
+
     doLast {
-        def distF = new File(distDir)
+        def distF = new File(DIST_PATH)
         distF.mkdirs()
     }
-}
-
-task copyFilesToProjectTemeplate {
-    doLast {
-        copy {
-            from "$rootDir/test-app/app/src/main/java/com/tns/ErrorReport.java"
-            from "$rootDir/test-app/app/src/main/java/com/tns/ErrorReportActivity.java"
-            from "$rootDir/test-app/app/src/main/java/com/tns/NativeScriptSyncService.java"
-            into "$rootDir/build-artifacts/project-template-gradle/app/src/debug/java/com/tns/"
-        }
-        copy {
-            from "$rootDir/test-app/app/src/main/assets/internal"
-            into "$rootDir/build-artifacts/project-template-gradle/app/src/main/assets/internal"
-        }
-        copy {
-            from "$rootDir/test-app/app/src/main/java/com/tns/AndroidJsV8Inspector.java"
-            from "$rootDir/test-app/app/src/main/java/com/tns/DefaultExtractPolicy.java"
-            from "$rootDir/test-app/app/src/main/java/com/tns/LogcatLogger.java"
-            from "$rootDir/test-app/app/src/main/java/com/tns/NativeScriptApplication.java"
-            from "$rootDir/test-app/app/src/main/java/com/tns/NativeScriptUncaughtExceptionHandler.java"
-            from "$rootDir/test-app/app/src/main/java/com/tns/RuntimeHelper.java"
-            from "$rootDir/test-app/app/src/main/java/com/tns/Util.java"
-            into "$rootDir/build-artifacts/project-template-gradle/app/src/main/java/com/tns/"
-        }
-        copy {
-            from "$rootDir/test-app/app/src/main/java/com/tns/internal"
-            into "$rootDir/build-artifacts/project-template-gradle/app/src/main/java/com/tns/internal"
-        }
-    }
-}
-
-task copyProjectTemplate(type: Copy) {
-    from "$rootDir/build-artifacts/project-template-gradle"
-    into "$rootDir/dist/framework"
-}
-
-task copyPackageJson(type: Copy) {
-    from "$rootDir/package.json"
-    into "$rootDir/dist"
 }
 
 task getPackageVersion {
@@ -98,7 +66,7 @@ task getPackageVersion {
 
         println "Using runtime version from package.json '${pVersion}'"
 
-        if (project.hasProperty("packageVersion")) {
+        if (project.hasProperty("packageVersion") && packageVersion != "") {
             pVersion += "-" + packageVersion
 
             println "Using packageVersion property '${pVersion}'"
@@ -109,6 +77,10 @@ task getPackageVersion {
             pVersion += "-" + preReleaseVersion
 
             println "Adding preReleaseVersion property '${pVersion}' to package version"
+        }
+
+        if(onlyX86) {
+            pVersion += "-onlyX86"
         }
 
         println "The package version is '${pVersion}'"
@@ -128,6 +100,39 @@ task getCommitVersion {
     }
 }
 
+task generateDtsgJar(type: Exec) {
+    doFirst {
+        workingDir "$TEST_APP_PATH"
+        if (isWinOs) {
+            commandLine "cmd", "/c", "gradlew", ":dts-generator:jar"
+        } else {
+            commandLine "./gradlew", ":dts-generator:jar"
+        }
+    }
+}
+
+task generateSbgJar(type: Exec) {
+    doFirst {
+        workingDir "$TEST_APP_PATH"
+        if (isWinOs) {
+            commandLine "cmd", "/c", "gradlew", ":static-binding-generator:jar"
+        } else {
+            commandLine "./gradlew", ":static-binding-generator:jar"
+        }
+    }
+}
+
+task generateMdgJar(type: Exec) {
+    doFirst {
+        workingDir "$TEST_APP_PATH"
+        if (isWinOs) {
+            commandLine "cmd", "/c", "gradlew", ":android-metadata-generator:jar"
+        } else {
+            commandLine "./gradlew", ":android-metadata-generator:jar"
+        }
+    }
+}
+
 task generateRuntime {
     doFirst {
         tasks.generateOptimizedRuntimeAar.execute();
@@ -138,134 +143,126 @@ task generateRuntime {
     }
 }
 
-task generateOptimizedRuntimeAar(type: Exec) {
+task cleanRuntime (type: Exec) {
     doFirst {
-        workingDir "$rootDir/test-app"
+        workingDir "$TEST_APP_PATH"
         if (isWinOs) {
-            commandLine "cmd", "/c", "gradlew", "assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-Poptimized"
+            commandLine "cmd", "/c", "gradlew", ":runtime:clean"
         } else {
-            commandLine "./gradlew", "assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-Poptimized"
+            commandLine "./gradlew", ":runtime:clean"
         }
     }
 }
 
-task generateRuntimeAar(type: Exec) {
+task generateOptimizedRuntimeAar (type: Exec) {
     doFirst {
-        workingDir "$rootDir/test-app"
-        if (isWinOs) {
-            commandLine "cmd", "/c", "gradlew", "assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"
+        workingDir "$TEST_APP_PATH"
+        if(onlyX86) {
+            if (isWinOs) {
+                commandLine "cmd", "/c", "gradlew", ":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-Poptimized", "-PonlyX86"
+            } else {
+                commandLine "./gradlew", ":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-Poptimized", "-PonlyX86"
+            }
         } else {
-            commandLine "./gradlew", "assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"
+            if (isWinOs) {
+                commandLine "cmd", "/c", "gradlew", ":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-Poptimized"
+            } else {
+                commandLine "./gradlew", ":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-Poptimized"
+            }
         }
     }
 }
 
-task copyGeneratedRuntime {
+task generateRuntimeAar (type: Exec) {
+    doFirst {
+        workingDir "$TEST_APP_PATH"
+        if (isWinOs) {
+            commandLine "cmd", "/c", "gradlew", ":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"
+        } else {
+            commandLine "./gradlew", ":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"
+        }
+    }
+}
+
+task copyFilesToProjectTemeplate {
     doLast {
         copy {
-            from "$rootDir/test-app/runtime/build/outputs/aar/runtime-regular-release.aar"
-            into "$rootDir/dist/framework/app/libs/runtime-libs/"
+            from "$TEST_APP_PATH/app/src/debug"
+            into "$DIST_FRAMEWORK_PATH/app/src/debug"
+        }
+        copy {
+            from "$TEST_APP_PATH/app/src/main/assets/internal"
+            into "$DIST_FRAMEWORK_PATH/app/src/main/assets/internal"
+        }
+        copy {
+            from "$TEST_APP_PATH/app/src/main/java/com/tns/"
+            include "*.java"
+            exclude "NativeScriptApplication.java"
+            exclude "NativeScriptActivity.java"
+            into "$DIST_FRAMEWORK_PATH/app/src/main/java/com/tns"
+        }
+        copy {
+            from "$TEST_APP_PATH/app/src/main/java/com/tns/internal"
+            into "$DIST_FRAMEWORK_PATH/app/src/main/java/com/tns/internal"
+        }
+        copy {
+            from "$BUILD_TOOLS_PATH/static-binding-generator.jar"
+            into "$DIST_FRAMEWORK_PATH/build-tools"
+        }
+        copy {
+            from "$BUILD_TOOLS_PATH/dts-generator.jar"
+            into "$DIST_FRAMEWORK_PATH/build-tools"
+        }
+        copy {
+            from "$BUILD_TOOLS_PATH/jsparser"
+            exclude "logs", "node_modules", "out", "package.json", "tests"
+            into "$DIST_FRAMEWORK_PATH/build-tools/jsparser"
+        }
+        copy {
+            from "$BUILD_TOOLS_PATH/android-metadata-generator.jar"
+            into "$DIST_FRAMEWORK_PATH/build-tools"
+        }
+        copy {
+            from "$TEST_APP_PATH/runtime/build/outputs/aar/runtime-regular-release.aar"
+            into "$DIST_FRAMEWORK_PATH/app/libs/runtime-libs"
             rename "runtime-regular-release.aar", "nativescript-regular.aar"
         }
-
         copy {
-            from "$rootDir/test-app/runtime/build/outputs/aar/runtime-optimized-release.aar"
-            into "$rootDir/dist/framework/app/libs/runtime-libs/"
+            from "$TEST_APP_PATH/runtime/build/outputs/aar/runtime-optimized-release.aar"
+            into "$DIST_FRAMEWORK_PATH/app/libs/runtime-libs"
             rename "runtime-optimized-release.aar", "nativescript-optimized.aar"
         }
-    }
-}
-
-task generateMetadataGeneratorJar(type: Exec) {
-    doFirst {
-        workingDir "$rootDir/android-metadata-generator"
-
-        if (isWinOs) {
-            commandLine "cmd", "/c", "gradlew", "jarmg"
-        } else {
-            commandLine "./gradlew", "jarmg"
-        }
-    }
-}
-
-task copyGeneratedMetadataGeneratorJar {
-    doLast {
         copy {
-            from "$rootDir/android-metadata-generator/dist"
-            into "$rootDir/dist/framework/build-tools"
-            rename "android-metadata-generator.jar", "metadata-generator.jar"
+            from "$TEST_APP_PATH/app/build.gradle"
+            into "$DIST_FRAMEWORK_PATH/app"
         }
-    }
-}
-
-task generateInterfaceNameGenerator(type: Exec) {
-    doFirst {
-        workingDir "$rootDir/android-static-binding-generator/project/interface-name-generator"
-
-        if (isWinOs) {
-            commandLine "cmd", "/c", "gradlew", "assemble"
-        } else {
-            commandLine "./gradlew", "assemble"
-        }
-    }
-}
-
-task copyInterfaceNameGeneratorJar {
-    doLast {
         copy {
-            from "$rootDir/android-static-binding-generator/project/interface-name-generator/build/libs"
-            into "$rootDir/dist/framework/build-tools/android-static-binding-generator"
+            from "$TEST_APP_PATH/build.gradle"
+            into "$DIST_FRAMEWORK_PATH"
         }
-    }
-}
-
-task generateStaticBindingGeneratorJar(type: Exec) {
-    doFirst {
-        workingDir "$rootDir/android-static-binding-generator/project/staticbindinggenerator"
-
-        
-        def commandArgs = ["assemble"]
-
-        if (isWinOs) {
-            commandLine "cmd", "/c", "gradlew"
-        } else {
-            commandLine "./gradlew"
-        }
-
-        args commandArgs
-    }
-
-}
-task copyGeneratedStaticBindingGeneratorJar {
-    doLast {
         copy {
-            from "$rootDir/android-static-binding-generator/project/staticbindinggenerator/build/libs"
-            into "$rootDir/dist/framework/build-tools/android-static-binding-generator"
+            from "$TEST_APP_PATH/gradle"
+            into "$DIST_FRAMEWORK_PATH/gradle"
         }
-    }
-}
-
-task copyStaticBindingGeneratorProject {
-    doLast {
         copy {
-            from "$rootDir/android-static-binding-generator/project"
-            exclude "staticbindinggenerator", "interface-name-generator", "**/package.json", "*.txt", "**/logs", "**/out", "**/input_parced_typescript"
-
-            into "$rootDir/dist/framework/build-tools/android-static-binding-generator"
+            from "$TEST_APP_PATH/gradlew"
+            into "$DIST_FRAMEWORK_PATH"
+        }
+        copy {
+            from "$TEST_APP_PATH/gradlew.bat"
+            into "$DIST_FRAMEWORK_PATH"
         }
     }
 }
 
-task createNpmPackage(type: Exec) {
-    doFirst {
-        workingDir "$rootDir/dist"
+task copyProjectTemplate(type: Copy) {
+    from "$rootDir/build-artifacts/project-template-gradle"
+    into "$DIST_FRAMEWORK_PATH"
+}
 
-        if (isWinOs) {
-            commandLine "cmd", "/c", "npm", "pack"
-        } else {
-            commandLine "npm", "pack"
-        }
-    }
+task copyPackageJson(type: Copy) {
+    from "$rootDir/package.json"
+    into "$rootDir/dist"
 }
 
 task setPackageVersionInPackageJsonFile {
@@ -283,83 +280,79 @@ task copyReadme(type: Copy) {
     into "$rootDir/dist"
 }
 
-task cleanBuildArtefacts(type: Delete) {
-    delete "$rootDir/build-artifacts/project-template-gradle/app/src/debug/java"
-    delete "$rootDir/build-artifacts/project-template-gradle/app/src/main/java"
-    delete "$rootDir/build-artifacts/project-template-gradle/app/src/main/assets"
-}
+task createNpmPackage(type: Exec) {
+    doFirst {
+        workingDir "$rootDir/dist"
 
-//clean and set up dirs
-copyFilesToProjectTemeplate.dependsOn(cleanDistDir)
-
-//copy framework structure
-createDistDir.dependsOn(copyFilesToProjectTemeplate)
-copyProjectTemplate.dependsOn(createDistDir)
-copyPackageJson.dependsOn(copyProjectTemplate)
-
-copyStaticBindingGeneratorProject.dependsOn(copyPackageJson)
-//generate static binding generator and copy into project template
-generateInterfaceNameGenerator.dependsOn(copyStaticBindingGeneratorProject)
-copyInterfaceNameGeneratorJar.dependsOn(generateInterfaceNameGenerator)
-generateStaticBindingGeneratorJar.dependsOn(copyInterfaceNameGeneratorJar)
-copyGeneratedStaticBindingGeneratorJar.dependsOn(generateStaticBindingGeneratorJar)
-
-//get version from package json
-getPackageVersion.dependsOn(copyGeneratedStaticBindingGeneratorJar)
-getCommitVersion.dependsOn(getPackageVersion)
-
-//generate runtime and copy into framework structure
-generateRuntime.dependsOn(getCommitVersion)
-
-setPackageVersionInPackageJsonFile.dependsOn(generateRuntime)
-
-//generateRuntime.dependsOn(build)
-
-tasks.whenTaskAdded { task ->
-    if (task.getName() == "build") {
-        generateRuntime
+        if (isWinOs) {
+            commandLine "cmd", "/c", "npm", "pack"
+        } else {
+            commandLine "npm", "pack"
+        }
     }
 }
 
-copyGeneratedRuntime.dependsOn(generateRuntime)
+generateSbgJar.dependsOn(generateDtsgJar)
+generateMdgJar.dependsOn(generateSbgJar)
+createDistDir.dependsOn(generateMdgJar)
 
-//generate metadata generator and copy into framework structure
-generateMetadataGeneratorJar.dependsOn(copyGeneratedRuntime)
-copyGeneratedMetadataGeneratorJar.dependsOn(generateMetadataGeneratorJar)
+getPackageVersion.dependsOn(createDistDir)
+getCommitVersion.dependsOn(getPackageVersion)
+generateRuntime.dependsOn(getCommitVersion)
 
-copyReadme.dependsOn(copyGeneratedMetadataGeneratorJar)
-
-//pack runtime
-setPackageVersionInPackageJsonFile.dependsOn(copyReadme)
-createNpmPackage.dependsOn(setPackageVersionInPackageJsonFile)
-cleanBuildArtefacts.dependsOn(createNpmPackage)
+copyFilesToProjectTemeplate.dependsOn(generateRuntime)
+copyProjectTemplate.dependsOn(copyFilesToProjectTemeplate)
+copyPackageJson.dependsOn(copyProjectTemplate)
+setPackageVersionInPackageJsonFile.dependsOn(copyPackageJson)
+copyReadme.dependsOn(setPackageVersionInPackageJsonFile)
+createNpmPackage.dependsOn(copyReadme)
 
 task createPackage {
-    description "Builds the NativeScript Android App Package using an application project template."
-    dependsOn cleanDistDir,
-            createDistDir,
-
-            copyProjectTemplate,
-
-            copyPackageJson,
-
-            copyStaticBindingGeneratorProject,
-            generateStaticBindingGeneratorJar,
-            copyGeneratedStaticBindingGeneratorJar,
-
-            getPackageVersion,
-            getCommitVersion,
-
-            generateRuntime,
-
-            setPackageVersionInPackageJsonFile,
-
-            copyGeneratedRuntime,
-            generateMetadataGeneratorJar,
-            copyGeneratedMetadataGeneratorJar,
-            copyReadme,
-            createNpmPackage,
-            cleanBuildArtefacts
-
+    description "Builds the NativeScript Android cleanBuildArtefactsApp Package using an application project template."
+    dependsOn createNpmPackage
     println "Creating NativeScript Android Package"
 }
+
+task runAstTests (type: Exec) {
+    doFirst {
+        workingDir "$TEST_APP_PATH/build-tools/jsparser/tests"
+        if (isWinOs) {
+            commandLine "cmd", "/c", "npm", "test"
+        } else {
+            commandLine "npm", "test"
+        }
+    }
+}
+
+task runSbgTests (type: Exec, dependsOn: 'runAstTests') {
+    doFirst {
+        workingDir "$TEST_APP_PATH"
+        if (isWinOs) {
+            commandLine "cmd", "/c", "gradlew", ":static-binding-generator:test"
+        } else {
+            commandLine "./gradlew", ":static-binding-generator:test"
+        }
+    }
+}
+
+task runTests (type: Exec) {
+    doFirst {
+        workingDir "$TEST_APP_PATH"
+        if (onlyX86) {
+            if (isWinOs) {
+                commandLine "cmd", "/c", "gradlew", "-b", "runtests.gradle", "runtests", "-PonlyX86"
+            } else {
+                commandLine "./gradlew", "-b", "runtests.gradle", "runtests", "-PonlyX86"
+            }
+        } else {
+            if (isWinOs) {
+                commandLine "cmd", "/c", "gradlew", "-b", "runtests.gradle", "runtests"
+            } else {
+                commandLine "./gradlew", "-b", "runtests.gradle", "runtests"
+            }
+        }
+    }
+}
+
+runSbgTests.dependsOn(generateMdgJar)
+runTests.dependsOn(runSbgTests)

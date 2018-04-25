@@ -4,8 +4,12 @@ def optimized = project.hasProperty("optimized")
 if (optimized) {
     println "Optimized build triggered."
 }
+def onlyX86 = project.hasProperty("onlyX86")
+if (onlyX86) {
+    println "OnlyX86 build triggered."
+}
 
-project.ext._buildToolsVersion = "26.0.1"
+project.ext._buildToolsVersion = "27.0.1"
 
 android {
     sourceSets {
@@ -20,7 +24,6 @@ android {
     compileSdkVersion 26
     buildToolsVersion project.ext._buildToolsVersion
 
-    publishNonDefault true
     defaultConfig {
         minSdkVersion 17
         targetSdkVersion 26
@@ -46,7 +49,11 @@ android {
         }
 
         ndk {
-            abiFilters 'x86', 'armeabi-v7a'
+            if (onlyX86) {
+                abiFilters 'x86'
+            } else {
+                abiFilters 'x86', 'armeabi-v7a', 'arm64-v8a'
+            }
         }
     }
 
@@ -64,8 +71,16 @@ android {
     }
 }
 
+allprojects {
+    gradle.projectsEvaluated {
+        tasks.withType(JavaCompile) {
+            options.compilerArgs << "-Xlint:all" << "-Werror"
+        }
+    }
+}
+
 dependencies {
-    compile fileTree(include: ['*.jar'], dir: 'libs')
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
 }
 
 tasks.whenTaskAdded { task ->
