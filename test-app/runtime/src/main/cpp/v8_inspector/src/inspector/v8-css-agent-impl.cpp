@@ -211,5 +211,65 @@ DispatchResponse V8CSSAgentImpl::getStyleSheetText(const String& in_styleSheetId
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
+DispatchResponse V8CSSAgentImpl::addRule(const String& in_styleSheetId, const String& in_ruleText, std::unique_ptr<protocol::CSS::SourceRange> in_location, std::unique_ptr<protocol::CSS::CSSRule>* out_rule) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8CSSAgentImpl::collectClassNames(const String& in_styleSheetId, std::unique_ptr<protocol::Array<String>>* out_classNames) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8CSSAgentImpl::createStyleSheet(const String& in_frameId, String* out_styleSheetId) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8CSSAgentImpl::forcePseudoState(int in_nodeId, std::unique_ptr<protocol::Array<String>> in_forcedPseudoClasses) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8CSSAgentImpl::getBackgroundColors(int in_nodeId, Maybe<protocol::Array<String>>* out_backgroundColors, Maybe<String>* out_computedFontSize, Maybe<String>* out_computedFontWeight, Maybe<String>* out_computedBodyFontSize) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8CSSAgentImpl::getMediaQueries(std::unique_ptr<protocol::Array<protocol::CSS::CSSMedia>>* out_medias) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8CSSAgentImpl::setEffectivePropertyValueForNode(int in_nodeId, const String& in_propertyName, const String& in_value) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8CSSAgentImpl::setKeyframeKey(const String& in_styleSheetId, std::unique_ptr<protocol::CSS::SourceRange> in_range, const String& in_keyText, std::unique_ptr<protocol::CSS::Value>* out_keyText) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8CSSAgentImpl::setMediaText(const String& in_styleSheetId, std::unique_ptr<protocol::CSS::SourceRange> in_range, const String& in_text, std::unique_ptr<protocol::CSS::CSSMedia>* out_media) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8CSSAgentImpl::setRuleSelector(const String& in_styleSheetId, std::unique_ptr<protocol::CSS::SourceRange> in_range, const String& in_selector, std::unique_ptr<protocol::CSS::SelectorList>* out_selectorList) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8CSSAgentImpl::setStyleSheetText(const String& in_styleSheetId, const String& in_text, Maybe<String>* out_sourceMapURL) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8CSSAgentImpl::setStyleTexts(std::unique_ptr<protocol::Array<protocol::CSS::StyleDeclarationEdit>> in_edits, std::unique_ptr<protocol::Array<protocol::CSS::CSSStyle>>* out_styles) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8CSSAgentImpl::startRuleUsageTracking() {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8CSSAgentImpl::stopRuleUsageTracking(std::unique_ptr<protocol::Array<protocol::CSS::RuleUsage>>* out_ruleUsage) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8CSSAgentImpl::takeCoverageDelta(std::unique_ptr<protocol::Array<protocol::CSS::RuleUsage>>* out_coverage) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
 V8CSSAgentImpl* V8CSSAgentImpl::Instance = 0;
 }

@@ -28,9 +28,17 @@ class V8OverlayAgentImpl : public protocol::Overlay::Backend {
         DispatchResponse setShowFPSCounter(bool in_show) override;
         DispatchResponse setPausedInDebuggerMessage(const Maybe<String> in_message) override;
         DispatchResponse highlightNode(std::unique_ptr<protocol::Overlay::HighlightConfig> in_highlightConfig, const Maybe<int> in_nodeId, const Maybe<int> in_backendNodeId, const Maybe<String> in_objectId) override;
-        DispatchResponse highlightFrame(const String& in_frameId, const Maybe<protocol::DOM::RGBAColor> in_contentColor, const Maybe<protocol::DOM::RGBAColor> in_contentOutlineColor) override;
+        DispatchResponse highlightFrame(const String& in_frameId, Maybe<protocol::DOM::RGBA> in_contentColor, Maybe<protocol::DOM::RGBA> in_contentOutlineColor) override;
         DispatchResponse hideHighlight() override;
         DispatchResponse getHighlightObjectForTest(int in_nodeId, std::unique_ptr<protocol::DictionaryValue>* out_highlight) override;
+        DispatchResponse highlightQuad(std::unique_ptr<protocol::Array<double>> in_quad, Maybe<protocol::DOM::RGBA> in_color, Maybe<protocol::DOM::RGBA> in_outlineColor) override;
+        DispatchResponse highlightRect(int in_x, int in_y, int in_width, int in_height, Maybe<protocol::DOM::RGBA> in_color, Maybe<protocol::DOM::RGBA> in_outlineColor) override;
+        DispatchResponse setInspectMode(const String& in_mode, Maybe<protocol::Overlay::HighlightConfig> in_highlightConfig) override;
+        DispatchResponse setShowDebugBorders(bool in_show) override;
+        DispatchResponse setShowPaintRects(bool in_result) override;
+        DispatchResponse setShowScrollBottleneckRects(bool in_show) override;
+        DispatchResponse setShowViewportSizeOnResize(bool in_show) override;
+        DispatchResponse setSuspended(bool in_suspended) override;
 
         protocol::Overlay::Frontend m_frontend;
 

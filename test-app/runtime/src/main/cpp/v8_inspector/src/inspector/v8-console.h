@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef V8_INSPECTOR_V8CONSOLE_H_
-#define V8_INSPECTOR_V8CONSOLE_H_
+#ifndef V8_INSPECTOR_V8_CONSOLE_H_
+#define V8_INSPECTOR_V8_CONSOLE_H_
 
 #include "src/base/macros.h"
 
@@ -12,39 +12,39 @@
 
 namespace v8_inspector {
 
-    class InspectedContext;
-    class V8InspectorImpl;
+class InspectedContext;
+class V8InspectorImpl;
 
 // Console API
 // https://console.spec.whatwg.org/#console-interface
-    class V8Console : public v8::debug::ConsoleDelegate {
+class V8Console : public v8::debug::ConsoleDelegate {
     public:
         v8::Local<v8::Object> createCommandLineAPI(v8::Local<v8::Context> context,
-                                                   int sessionId);
+                int sessionId);
         void installMemoryGetter(v8::Local<v8::Context> context,
                                  v8::Local<v8::Object> console);
 
         class CommandLineAPIScope {
-        public:
-            CommandLineAPIScope(v8::Local<v8::Context>,
-                                v8::Local<v8::Object> commandLineAPI,
-                                v8::Local<v8::Object> global);
-            ~CommandLineAPIScope();
+            public:
+                CommandLineAPIScope(v8::Local<v8::Context>,
+                                    v8::Local<v8::Object> commandLineAPI,
+                                    v8::Local<v8::Object> global);
+                ~CommandLineAPIScope();
 
-        private:
-            static void accessorGetterCallback(
+            private:
+                static void accessorGetterCallback(
                     v8::Local<v8::Name>, const v8::PropertyCallbackInfo<v8::Value>&);
-            static void accessorSetterCallback(v8::Local<v8::Name>,
-                                               v8::Local<v8::Value>,
-                                               const v8::PropertyCallbackInfo<void>&);
+                static void accessorSetterCallback(v8::Local<v8::Name>,
+                                                   v8::Local<v8::Value>,
+                                                   const v8::PropertyCallbackInfo<void>&);
 
-            v8::Local<v8::Context> m_context;
-            v8::Local<v8::Object> m_commandLineAPI;
-            v8::Local<v8::Object> m_global;
-            v8::Local<v8::Set> m_installedMethods;
-            bool m_cleanup;
+                v8::Local<v8::Context> m_context;
+                v8::Local<v8::Object> m_commandLineAPI;
+                v8::Local<v8::Object> m_global;
+                v8::Local<v8::Set> m_installedMethods;
+                bool m_cleanup;
 
-            DISALLOW_COPY_AND_ASSIGN(CommandLineAPIScope);
+                DISALLOW_COPY_AND_ASSIGN(CommandLineAPIScope);
         };
 
         explicit V8Console(V8InspectorImpl* inspector);
@@ -100,7 +100,7 @@ namespace v8_inspector {
         template <void (V8Console::*func)(const v8::FunctionCallbackInfo<v8::Value>&)>
         static void call(const v8::FunctionCallbackInfo<v8::Value>& info) {
             V8Console* console =
-                    static_cast<V8Console*>(info.Data().As<v8::External>()->Value());
+                static_cast<V8Console*>(info.Data().As<v8::External>()->Value());
             (console->*func)(info);
         }
         using CommandLineAPIData = std::pair<V8Console*, int>;
@@ -108,14 +108,14 @@ namespace v8_inspector {
                                           int)>
         static void call(const v8::FunctionCallbackInfo<v8::Value>& info) {
             CommandLineAPIData* data = static_cast<CommandLineAPIData*>(
-                    info.Data().As<v8::ArrayBuffer>()->GetContents().Data());
+                                           info.Data().As<v8::ArrayBuffer>()->GetContents().Data());
             (data->first->*func)(info, data->second);
         }
         template <void (V8Console::*func)(const v8::debug::ConsoleCallArguments&,
                                           const v8::debug::ConsoleContext&)>
         static void call(const v8::FunctionCallbackInfo<v8::Value>& info) {
             CommandLineAPIData* data = static_cast<CommandLineAPIData*>(
-                    info.Data().As<v8::ArrayBuffer>()->GetContents().Data());
+                                           info.Data().As<v8::ArrayBuffer>()->GetContents().Data());
             v8::debug::ConsoleCallArguments args(info);
             (data->first->*func)(args, v8::debug::ConsoleContext());
         }
@@ -168,8 +168,8 @@ namespace v8_inspector {
                                   int sessionId);
 
         V8InspectorImpl* m_inspector;
-    };
+};
 
 }  // namespace v8_inspector
 
-#endif  // V8_INSPECTOR_V8CONSOLE_H_
+#endif  // V8_INSPECTOR_V8_CONSOLE_H_
