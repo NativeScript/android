@@ -66,6 +66,8 @@ public class Runtime {
 
     private static native void CallWorkerObjectOnErrorHandleMain(int runtimeId, int workerId, String message, String stackTrace, String filename, int lineno, String threadName) throws NativeScriptException;
 
+    private static native void ResetDateTimeConfigurationCache(int runtimeId);
+
     void passUncaughtExceptionToJs(Throwable ex, String stackTrace) {
         passUncaughtExceptionToJsNative(getRuntimeId(), ex, stackTrace);
     }
@@ -222,6 +224,13 @@ public class Runtime {
 
     public Handler getHandler() {
         return this.threadScheduler.getHandler();
+    }
+
+    public void ResetDateTimeConfigurationCache() {
+        Runtime runtime = getCurrentRuntime();
+        if (runtime != null) {
+            ResetDateTimeConfigurationCache(runtime.getRuntimeId());
+        }
     }
 
     private static class WorkerThreadHandler extends Handler {

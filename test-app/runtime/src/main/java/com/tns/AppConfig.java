@@ -16,7 +16,8 @@ class AppConfig {
         MemoryCheckInterval("memoryCheckInterval", 0),
         FreeMemoryRatio("freeMemoryRatio", 0.0),
         Profiling("profiling", ""),
-        MarkingMode("markingMode", com.tns.MarkingMode.full);
+        MarkingMode("markingMode", com.tns.MarkingMode.full),
+        HandleTimeZoneChanges("handleTimeZoneChanges", false);
 
         private final String name;
         private final Object defaultValue;
@@ -100,6 +101,9 @@ class AppConfig {
                             Log.v("JS", "Failed to parse marking mode. The default " + ((MarkingMode)KnownKeys.MarkingMode.getDefaultValue()).name() + " will be used.");
                         }
                     }
+                    if (androidObject.has(KnownKeys.HandleTimeZoneChanges.getName())) {
+                        values[KnownKeys.HandleTimeZoneChanges.ordinal()] = androidObject.getBoolean(KnownKeys.HandleTimeZoneChanges.getName());
+                    }
                 }
             }
         } catch (Exception e) {
@@ -137,5 +141,9 @@ class AppConfig {
 
     public MarkingMode getMarkingMode() {
         return (MarkingMode)values[KnownKeys.MarkingMode.ordinal()];
+    }
+
+    public boolean handleTimeZoneChanges() {
+        return (boolean)values[KnownKeys.HandleTimeZoneChanges.ordinal()];
     }
 }

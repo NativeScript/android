@@ -348,3 +348,13 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_CallWorkerObjectOnErrorHandleMain
         e.ReThrowToJava();
     }
 }
+
+extern "C" JNIEXPORT void Java_com_tns_Runtime_ResetDateTimeConfigurationCache(JNIEnv* _env, jobject obj, jint runtimeId) {
+    auto runtime = TryGetRuntime(runtimeId);
+    if (runtime == nullptr) {
+        return;
+    }
+
+    auto isolate = runtime->GetIsolate();
+    Date::DateTimeConfigurationChangeNotification(isolate);
+}
