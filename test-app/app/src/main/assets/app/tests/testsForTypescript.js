@@ -15,7 +15,7 @@ describe("Tests typescript", function () {
 		    __extends(NativeViewGroup, _super);
 		    function NativeViewGroup(view) {
 		        this._view = view;
-		        return __native(this);
+		        return this;
 		    }
 		    
 		    NativeViewGroup.prototype.Then = function () {
@@ -34,9 +34,9 @@ describe("Tests typescript", function () {
 	    var MyButton = (function (_super) {
 	        __extends(MyButton, _super);
 	        function MyButton() {
-	            _super.call(this);
-	            this.myName = "MyName";
-	            return __native(this);
+	            var _this = _super.call(this) || this;
+	            _this.myName = "MyName";
+	            return _this;
 	        }
 	        
 	        MyButton.prototype.echo = function (s) {
@@ -57,7 +57,7 @@ describe("Tests typescript", function () {
 	    var toStringResult = b.toString();
 	    expect(toStringResult).toBe("toString: MyName");
 	});
-	
+
 	it("When_creating_a_typescript_instance_it_should_support_overriden_members", function () {
 		
 		__log("TEST: When_creating_a_typescript_instance_it_should_support_overriden_members");
@@ -95,8 +95,8 @@ describe("Tests typescript", function () {
 		 var MyButton2 = (function (_super) {
 		        __extends(MyButton2, _super);
 		        function MyButton2() {
-		            _super.call(this);
-		            return __native(this);
+		            _this = _super.call(this) || this;
+		            return __native(_this);
 		        }
 		        
 		        MyButton2.prototype.superToString = function () {
@@ -242,9 +242,9 @@ describe("Tests typescript", function () {
 		 var MyButton4 = (function (_super) {
 		        __extends(MyButton4, _super);
 		        function MyButton4() {
-		            _super.call(this);
-		            this.my1 = "MyName";
-		            return __native(this);
+		            var _this = _super.call(this) || this;
+		            _this.my1 = "MyName";
+		            return __native(_this);
 		        }
 		        
 		        MyButton4.prototype.init = function () {
@@ -273,9 +273,9 @@ describe("Tests typescript", function () {
 		 var MyButton5 = (function (_super) {
 		        __extends(MyButton5, _super);
 		        function MyButton5() {
-		            _super.call(this);
-		            this.my1 = "MyName";
-		            return __native(this);
+		            var _this = _super.call(this) || this;
+		            _this.my1 = "MyName";
+		            return __native(_this);
 		        }
 		        
 		        MyButton5.prototype.init = function () {
@@ -510,17 +510,15 @@ describe("Tests typescript", function () {
 	        __extends(MyButton9, _super);
 	        
 	        function MyButton9() {
-	            _super.call(this);
+	            var _this = _super.call(this) || this;
 	            
-	            var that = __native(this);
-	            
-	            that.setOnClickListener(new android.view.View.OnClickListener({
+	            _this.setOnClickListener(new android.view.View.OnClickListener({
 	        		onClick : function() {
-	        			that.buttonClicked = true;
+	        			_this.buttonClicked = true;
 	        		}
 	            }));
 	            
-	            return that;
+	            return _this;
 	        }
 
 	        return MyButton9;
@@ -539,4 +537,111 @@ describe("Tests typescript", function () {
 		expect(button.buttonClicked).toBe(false);
 		expect(button1.buttonClicked).toBe(true);
 	});
+
+	it("When_inheriting_with_constructor_override_parent_constructor_should_be_called", function () {
+
+    		__log("TEST: When_inheriting_with_constructor_override_parent_constructor_should_be_called");
+
+            // typescript code:
+//            class Parent {
+//                x: number;
+//                parentConstructorCalled: boolean;
+//                constructor(x: number) {
+//                    this.x = x;
+//                    this.parentConstructorCalled = true;
+//                }
+//            }
+//            class Child extends Parent {
+//                constructor(x :number) {
+//                    super(x);
+//                    this.x = 5;
+//                }
+//            }
+//
+//            var b = new Child(3);
+
+    	    var Parent = /** @class */ (function () {
+                function Parent(x) {
+                    this.x = x;
+                    this.parentConstructorCalled = true;
+                }
+                return Parent;
+            }());
+            var Child = /** @class */ (function (_super) {
+                __extends(Child, _super);
+                function Child(x) {
+                    var _this = _super.call(this, x) || this;
+                    _this.x = 5;
+                    return _this;
+                }
+                return Child;
+            }(Parent));
+            var child = new Child(3);
+
+            isInstanceOf = child instanceof Parent;
+            expect(isInstanceOf).toEqual(true);
+
+    	    expect(child.x).toBe(5);
+    	    expect(child.parentConstructorCalled).toBe(true);
+    	});
+
+    	it("When_creating_a_typescript_instance_inheriting_class_old_way", function () {
+
+            __log("TEST: When_creating_a_typescript_instance_inheriting_class_old_way");
+            var MyButton10 = (function (_super) {
+                __extends(MyButton10, _super);
+                function MyButton10() {
+                    _super.call(this);
+                    this.myName = "MyName";
+                    return __native(this);
+                }
+
+                MyButton10.prototype.echo = function (s) {
+                    return "echo: " + this.myName;
+                };
+
+                MyButton10.prototype.toString = function (s) {
+                    return "toString: " + this.myName;
+                };
+
+                return MyButton10;
+            })(com.tns.tests.Button1);
+
+            var b = new MyButton10();
+            var exo = b.triggerEcho("exo");
+            expect(exo).toBe("echo: MyName");
+
+            var toStringResult = b.toString();
+            expect(toStringResult).toBe("toString: MyName");
+        });
+
+        it("When_creating_a_typescript_instance_inheriting_class_new_way", function () {
+
+            __log("TEST: When_creating_a_typescript_instance_inheriting_class_new_way");
+            var MyButton11 = (function (_super) {
+                __extends(MyButton11, _super);
+                function MyButton11() {
+                    var _this = _super.call(this) || this;
+                    _this.myName = "MyName";
+                    return _this;
+                }
+
+                MyButton11.prototype.echo = function (s) {
+                    return "echo: " + this.myName;
+                };
+
+                MyButton11.prototype.toString = function (s) {
+                    return "toString: " + this.myName;
+                };
+
+                return MyButton11;
+            })(com.tns.tests.Button1);
+
+            var b = new MyButton11();
+            var exo = b.triggerEcho("exo");
+            expect(exo).toBe("echo: MyName");
+
+            var toStringResult = b.toString();
+            expect(toStringResult).toBe("toString: MyName");
+        });
 });

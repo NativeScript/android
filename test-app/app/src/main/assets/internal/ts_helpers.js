@@ -28,7 +28,34 @@
 
 	// For backward compatibility.
 	var __native = function(thiz) {
-		return thiz;
+	    // we are setting the __container__ property to the base class when the super method is called
+    	// if the constructor returns the __native(this) call we will use the old implementation
+    	// copying all the properties to the result
+    	// otherwise if we are using the result from the super() method call we won't need such logic
+    	// as thiz already contains the parent properties
+    	// this way we now support both implementations in typescript generated constructors:
+    	// 1: super(); return __native(this);
+    	// 2: return super() || this;
+	    if(thiz.__container__) {
+            var result = thiz.__proto__;
+
+            for (var prop in thiz)
+            {
+                if (thiz.hasOwnProperty(prop))
+                {
+                    thiz.__proto__[prop] = thiz[prop];
+                    delete thiz[prop];
+                }
+            }
+
+            thiz.constructor = undefined;
+            thiz.__proto__ = undefined;
+            Object.freeze(thiz);
+            Object.preventExtensions(thiz);
+            return result;
+		} else {
+            return thiz;
+		}
 	};
 
 	var __extends = function(Child, Parent) {
@@ -58,27 +85,30 @@
 
 			Parent.call = function(thiz) {
 				var Extended = extend(thiz);
-
-				if (arguments.length > 1)
+				thiz.__container__ = true;
+                if (arguments.length > 1)
 				{
-					return new (Function.prototype.bind.apply(Extended, [null].concat(Array.prototype.slice.call(arguments, 1))));
+				    thiz.__proto__ = new (Function.prototype.bind.apply(Extended, [null].concat(Array.prototype.slice.call(arguments, 1))));
 				}
 				else
 				{
-					return new Extended();
+				    thiz.__proto__ = new Extended()
 				}
+				return thiz.__proto__;
 			};
 
 			Parent.apply = function(thiz, args) {
-				var Extended = extend(thiz);
+                var Extended = extend(thiz);
+                thiz.__container__ = true;
 				if (args && args.length > 0)
 				{
-					return new (Function.prototype.bind.apply(Extended, [null].concat(args)));
+					thiz.__proto__ = new (Function.prototype.bind.apply(Extended, [null].concat(args)));
 				}
 				else
 				{
-					return new Extended();
+					thiz.__proto__ = new Extended();
 				}
+				return thiz.__proto__;
 			};
 		}
 
@@ -87,8 +117,8 @@
 
 		if (Parent.extend) {
 			Child.__isPrototypeImplementationObject = true;
-			Child.__proto__ = Parent;
-			Child.prototype.__parent = Parent;
+            Child.__proto__ = Parent;
+            Child.prototype.__parent = Parent;
 			Child.prototype.__child = Child;
 		}
 	}

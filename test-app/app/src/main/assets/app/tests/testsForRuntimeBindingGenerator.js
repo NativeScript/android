@@ -139,8 +139,7 @@ describe("Tests for runtime binding generator", function () {
     	    var MyTSTranspiledObjectThatExtendsInterfaces = (function (_super) {
                 __extends(MyTSTranspiledObjectThatExtendsInterfaces, _super);
                 function MyTSTranspiledObjectThatExtendsInterfaces() {
-                    _super.apply(this, arguments);
-                    return global.__native(this);
+                    return _super.apply(this, arguments) || this;
                 }
                 MyTSTranspiledObjectThatExtendsInterfaces.prototype.greet = function (greeting) {
                     return "Hello, " + greeting;
