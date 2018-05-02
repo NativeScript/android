@@ -99,11 +99,11 @@ char (&ArraySizeHelper(const T (&array)[N]))[N];
 // is likely to surprise you.
 template <class Dest, class Source>
 V8_INLINE Dest bit_cast(Source const& source) {
-  static_assert(sizeof(Dest) == sizeof(Source),
-                "source and dest must be same size");
-  Dest dest;
-  memcpy(&dest, &source, sizeof(dest));
-  return dest;
+    static_assert(sizeof(Dest) == sizeof(Source),
+                  "source and dest must be same size");
+    Dest dest;
+    memcpy(&dest, &source, sizeof(dest));
+    return dest;
 }
 
 // Explicitly declare the assignment operator as deleted.
@@ -208,8 +208,8 @@ V8_INLINE Dest bit_cast(Source const& source) {
 // issued for (yet) unused variables (typically parameters).
 // The arguments are guaranteed to be evaluated from left to right.
 struct Use {
-  template <typename T>
-  Use(T&&) {}  // NOLINT(runtime/explicit)
+    template <typename T>
+    Use(T&&) {}  // NOLINT(runtime/explicit)
 };
 #define USE(...)                                         \
   do {                                                   \
@@ -274,7 +274,7 @@ struct Use {
 // 0-relative int offsets.
 template <typename T>
 constexpr inline intptr_t OffsetFrom(T x) {
-  return x - static_cast<T>(0);
+    return x - static_cast<T>(0);
 }
 
 
@@ -283,59 +283,59 @@ constexpr inline intptr_t OffsetFrom(T x) {
 // integral types.
 template <typename T>
 constexpr inline T AddressFrom(intptr_t x) {
-  return static_cast<T>(static_cast<T>(0) + x);
+    return static_cast<T>(static_cast<T>(0) + x);
 }
 
 
 // Return the largest multiple of m which is <= x.
 template <typename T>
 inline T RoundDown(T x, intptr_t m) {
-  // m must be a power of two.
-  DCHECK(m != 0 && ((m & (m - 1)) == 0));
-  return AddressFrom<T>(OffsetFrom(x) & -m);
+    // m must be a power of two.
+    DCHECK(m != 0 && ((m & (m - 1)) == 0));
+    return AddressFrom<T>(OffsetFrom(x) & -m);
 }
 template <intptr_t m, typename T>
 constexpr inline T RoundDown(T x) {
-  // m must be a power of two.
-  STATIC_ASSERT(m != 0 && ((m & (m - 1)) == 0));
-  return AddressFrom<T>(OffsetFrom(x) & -m);
+    // m must be a power of two.
+    STATIC_ASSERT(m != 0 && ((m & (m - 1)) == 0));
+    return AddressFrom<T>(OffsetFrom(x) & -m);
 }
 
 // Return the smallest multiple of m which is >= x.
 template <typename T>
 inline T RoundUp(T x, intptr_t m) {
-  return RoundDown<T>(static_cast<T>(x + m - 1), m);
+    return RoundDown<T>(static_cast<T>(x + m - 1), m);
 }
 template <intptr_t m, typename T>
 constexpr inline T RoundUp(T x) {
-  return RoundDown<m, T>(static_cast<T>(x + m - 1));
+    return RoundDown<m, T>(static_cast<T>(x + m - 1));
 }
 
 inline void* AlignedAddress(void* address, size_t alignment) {
-  // The alignment must be a power of two.
-  DCHECK_EQ(alignment & (alignment - 1), 0u);
-  return reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(address) &
-                                 ~static_cast<uintptr_t>(alignment - 1));
+    // The alignment must be a power of two.
+    DCHECK_EQ(alignment & (alignment - 1), 0u);
+    return reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(address) &
+                                   ~static_cast<uintptr_t>(alignment - 1));
 }
 
 // Bounds checks for float to integer conversions, which does truncation. Hence,
 // the range of legal values is (min - 1, max + 1).
 template <typename int_t, typename float_t, typename biggest_int_t = int64_t>
 bool is_inbounds(float_t v) {
-  static_assert(sizeof(int_t) < sizeof(biggest_int_t),
-                "int_t can't be bounds checked by the compiler");
-  constexpr float_t kLowerBound =
-      static_cast<float_t>(std::numeric_limits<int_t>::min()) - 1;
-  constexpr float_t kUpperBound =
-      static_cast<float_t>(std::numeric_limits<int_t>::max()) + 1;
-  constexpr bool kLowerBoundIsMin =
-      static_cast<biggest_int_t>(kLowerBound) ==
-      static_cast<biggest_int_t>(std::numeric_limits<int_t>::min());
-  constexpr bool kUpperBoundIsMax =
-      static_cast<biggest_int_t>(kUpperBound) ==
-      static_cast<biggest_int_t>(std::numeric_limits<int_t>::max());
-  return (kLowerBoundIsMin ? (kLowerBound <= v) : (kLowerBound < v)) &&
-         (kUpperBoundIsMax ? (v <= kUpperBound) : (v < kUpperBound));
+    static_assert(sizeof(int_t) < sizeof(biggest_int_t),
+                  "int_t can't be bounds checked by the compiler");
+    constexpr float_t kLowerBound =
+        static_cast<float_t>(std::numeric_limits<int_t>::min()) - 1;
+    constexpr float_t kUpperBound =
+        static_cast<float_t>(std::numeric_limits<int_t>::max()) + 1;
+    constexpr bool kLowerBoundIsMin =
+        static_cast<biggest_int_t>(kLowerBound) ==
+        static_cast<biggest_int_t>(std::numeric_limits<int_t>::min());
+    constexpr bool kUpperBoundIsMax =
+        static_cast<biggest_int_t>(kUpperBound) ==
+        static_cast<biggest_int_t>(std::numeric_limits<int_t>::max());
+    return (kLowerBoundIsMin ? (kLowerBound <= v) : (kLowerBound < v)) &&
+           (kUpperBoundIsMax ? (v <= kUpperBound) : (v < kUpperBound));
 }
 
-#endif   // V8_BASE_MACROS_H_
+#endif  // V8_BASE_MACROS_H_

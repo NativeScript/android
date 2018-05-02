@@ -4,7 +4,6 @@
 #include <string>
 #include <map>
 #include <vector>
-#include "v8-debug.h"
 #include "JEnv.h"
 #include "ArgsWrapper.h"
 #include "MetadataEntry.h"
