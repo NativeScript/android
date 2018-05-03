@@ -10,14 +10,13 @@
 #include <iomanip>
 #include <sstream>
 #include <V8GlobalHelpers.h>
-#include <v8_inspector/src/inspector/v8-log-agent-impl.h>
-#include <JsV8InspectorClient.h>
 #include <NativeScriptException.h>
 #include "Console.h"
 
 namespace tns {
 
-v8::Local<v8::Object> Console::createConsole(v8::Local<v8::Context> context, const std::string& filesPath) {
+v8::Local<v8::Object> Console::createConsole(v8::Local<v8::Context> context, ConsoleCallback callback) {
+    m_callback = callback;
     v8::Context::Scope contextScope(context);
     v8::Isolate* isolate = context->GetIsolate();
 
@@ -61,16 +60,9 @@ void Console::sendToADBLogcat(const std::string& message, android_LogPriority lo
 }
 
 void Console::sendToDevToolsFrontEnd(v8::Isolate* isolate, const std::string& message, const std::string& logLevel) {
-    if (!JsV8InspectorClient::inspectorIsConnected()) {
-        return;
+    if (m_callback != nullptr) {
+        m_callback(message, logLevel);
     }
-
-    auto stack = v8::StackTrace::CurrentStackTrace(isolate, 1, v8::StackTrace::StackTraceOptions::kDetailed);
-
-    auto frame = stack->GetFrame(0);
-
-    // will be no-op in non-debuggable builds
-    v8_inspector::V8LogAgentImpl::EntryAdded(message, logLevel, ArgConverter::ConvertToString(frame->GetScriptNameOrSourceURL()), frame->GetLineNumber());
 }
 
 const v8::Local<v8::String> transformJSObject(v8::Isolate* isolate, v8::Local<v8::Object> object) {
@@ -527,4 +519,5 @@ void Console::timeEndCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 
 const char* Console::LOG_TAG = "JS";
 std::map<v8::Isolate*, std::map<std::string, double>> Console::s_isolateToConsoleTimersMap;
+ConsoleCallback Console::m_callback = nullptr;
 }

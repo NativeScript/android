@@ -137,6 +137,8 @@ task generateRuntime {
     doFirst {
         tasks.generateOptimizedRuntimeAar.execute();
 
+        tasks.generateOptimizedWithInspectorRuntimeAar.execute();
+
         if (generateRegularRuntimePackage) {
             tasks.generateRuntimeAar.execute();
         }
@@ -157,7 +159,7 @@ task cleanRuntime (type: Exec) {
 task generateOptimizedRuntimeAar (type: Exec) {
     doFirst {
         workingDir "$TEST_APP_PATH"
-        if(onlyX86) {
+        if (onlyX86) {
             if (isWinOs) {
                 commandLine "cmd", "/c", "gradlew", ":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-Poptimized", "-PonlyX86"
             } else {
@@ -168,6 +170,25 @@ task generateOptimizedRuntimeAar (type: Exec) {
                 commandLine "cmd", "/c", "gradlew", ":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-Poptimized"
             } else {
                 commandLine "./gradlew", ":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-Poptimized"
+            }
+        }
+    }
+}
+
+task generateOptimizedWithInspectorRuntimeAar (type: Exec) {
+    doFirst {
+        workingDir "$TEST_APP_PATH"
+        if (onlyX86) {
+            if (isWinOs) {
+                commandLine "cmd", "/c", "gradlew", ":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-PoptimizedWithInspector", "-PonlyX86"
+            } else {
+                commandLine "./gradlew", ":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-PoptimizedWithInspector", "-PonlyX86"
+            }
+        } else {
+            if (isWinOs) {
+                commandLine "cmd", "/c", "gradlew", ":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-PoptimizedWithInspector"
+            } else {
+                commandLine "./gradlew", ":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-PoptimizedWithInspector"
             }
         }
     }
@@ -231,6 +252,11 @@ task copyFilesToProjectTemeplate {
             from "$TEST_APP_PATH/runtime/build/outputs/aar/runtime-optimized-release.aar"
             into "$DIST_FRAMEWORK_PATH/app/libs/runtime-libs"
             rename "runtime-optimized-release.aar", "nativescript-optimized.aar"
+        }
+        copy {
+            from "$TEST_APP_PATH/runtime/build/outputs/aar/runtime-optimized-with-inspector-release.aar"
+            into "$DIST_FRAMEWORK_PATH/app/libs/runtime-libs"
+            rename "runtime-optimized-with-inspector-release.aar", "nativescript-optimized-with-inspector.aar"
         }
         copy {
             from "$TEST_APP_PATH/app/build.gradle"
