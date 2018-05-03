@@ -644,4 +644,34 @@ describe("Tests typescript", function () {
             var toStringResult = b.toString();
             expect(toStringResult).toBe("toString: MyName");
         });
+
+        it("When_creating_a_typescript_instance_inheriting_class_new_way_with_native_call", function () {
+
+            __log("TEST: When_creating_a_typescript_instance_inheriting_class_new_way");
+            var MyButton11 = (function (_super) {
+                __extends(MyButton11, _super);
+                function MyButton11() {
+                    var _this = _super.call(this) || this;
+                    _this.myName = "MyName";
+                    return __native(_this);
+                }
+
+                MyButton11.prototype.echo = function (s) {
+                    return "echo: " + this.myName;
+                };
+
+                MyButton11.prototype.toString = function (s) {
+                    return "toString: " + this.myName;
+                };
+
+                return MyButton11;
+            })(com.tns.tests.Button1);
+
+            var b = new MyButton11();
+            var exo = b.triggerEcho("exo");
+            expect(exo).toBe("echo: MyName");
+
+            var toStringResult = b.toString();
+            expect(toStringResult).toBe("toString: MyName");
+        });
 });
