@@ -408,7 +408,12 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     snapshotPtr = dlopen(snapshotPath.c_str(), RTLD_LAZY | RTLD_LOCAL);
     if (snapshotPtr == nullptr) {
-        DEBUG_WRITE_FORCE("Failed to load snapshot: %s", dlerror());
+        auto ignoredSearchValue = string("library \"" + snapshotPath + "\" not found");
+        auto currentError = dlerror();
+        std::string stringError(currentError);
+        if (stringError.find(ignoredSearchValue) == std::string::npos) {
+            DEBUG_WRITE_FORCE("Failed to load snapshot: %s", currentError);
+        }
     }
 
     if (snapshotPtr) {
