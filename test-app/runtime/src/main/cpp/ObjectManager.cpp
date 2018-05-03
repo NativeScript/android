@@ -468,8 +468,12 @@ void ObjectManager::MarkReachableObjects(Isolate* isolate, const Local<Object>& 
     auto fromId = fromJsInfo->JavaObjectID;
 
     auto curGCNumValue = Integer::New(isolate, numberOfGC);
+    bool firstRun = true;
 
     while (!s.empty()) {
+        auto isInFirstRun = firstRun;
+        firstRun = false;
+
         auto top = s.top();
         s.pop();
 
@@ -478,6 +482,14 @@ void ObjectManager::MarkReachableObjects(Isolate* isolate, const Local<Object>& 
         }
 
         auto o = top.As<Object>();
+        if(!isInFirstRun) {
+            uint8_t* addr = NativeScriptExtension::GetAddress(o);
+            auto itFound = m_visited.find(addr);
+            if (itFound != m_visited.end()) {
+                continue;
+            }
+            m_visited.insert(addr); // set as processed only if the current object is not the object we are starting from
+        }
 
         auto jsInfo = GetJSInstanceInfo(o);
         if ((jsInfo != nullptr) && (jsInfo->JavaObjectID != fromId)) {
@@ -491,13 +503,6 @@ void ObjectManager::MarkReachableObjects(Isolate* isolate, const Local<Object>& 
 
             V8SetPrivateValue(isolate, o, propName, curGCNumValue);
         }
-
-        uint8_t* addr = NativeScriptExtension::GetAddress(o);
-        auto itFound = m_visited.find(addr);
-        if (itFound != m_visited.end()) {
-            continue;
-        }
-        m_visited.insert(addr);
 
         if (o->IsFunction()) {
             auto func = o.As<Function>();
