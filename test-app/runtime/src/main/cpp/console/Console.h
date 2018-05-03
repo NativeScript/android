@@ -32,6 +32,8 @@ class Console {
         static const char* LOG_TAG;
         static std::map<v8::Isolate*, std::map<std::string, double>> s_isolateToConsoleTimersMap;
 
+        static bool isApplicationInDebug;
+
         // heavily inspired by 'createBoundFunctionProperty' of V8's v8-console.h
         static void bindFunctionProperty(v8::Local<v8::Context> context,
                                          v8::Local<v8::Object> consoleInstance,

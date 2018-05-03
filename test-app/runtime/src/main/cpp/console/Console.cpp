@@ -158,6 +158,9 @@ const std::string buildLogString(const v8::FunctionCallbackInfo<v8::Value>& info
 }
 
 void Console::assertCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    if (!isApplicationInDebug) {
+        return;
+    }
     try {
         auto isolate = info.GetIsolate();
 
@@ -193,6 +196,9 @@ void Console::assertCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 }
 
 void Console::errorCallback(const v8::FunctionCallbackInfo <v8::Value>& info) {
+    if (!isApplicationInDebug) {
+        return;
+    }
     try {
         std::string log = buildLogString(info);
 
@@ -212,6 +218,9 @@ void Console::errorCallback(const v8::FunctionCallbackInfo <v8::Value>& info) {
 }
 
 void Console::infoCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    if (!isApplicationInDebug) {
+        return;
+    }
     try {
         std::string log = buildLogString(info);
 
@@ -231,6 +240,9 @@ void Console::infoCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 }
 
 void Console::logCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    if (!isApplicationInDebug) {
+        return;
+    }
     try {
         std::string log = buildLogString(info);
 
@@ -250,6 +262,9 @@ void Console::logCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 }
 
 void Console::warnCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    if (!isApplicationInDebug) {
+        return;
+    }
     try {
         std::string log = buildLogString(info);
 
@@ -269,6 +284,9 @@ void Console::warnCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 }
 
 void Console::dirCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    if (!isApplicationInDebug) {
+        return;
+    }
     try {
         auto isolate = info.GetIsolate();
         auto context = isolate->GetCurrentContext();
@@ -383,6 +401,9 @@ const std::string buildStacktraceFrameMessage(v8::Local<v8::StackFrame> frame) {
 }
 
 void Console::traceCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    if (!isApplicationInDebug) {
+        return;
+    }
     try {
         auto isolate = info.GetIsolate();
         std::stringstream ss;
@@ -426,6 +447,9 @@ void Console::traceCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 }
 
 void Console::timeCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    if (!isApplicationInDebug) {
+        return;
+    }
     try {
         auto isolate = info.GetIsolate();
 
@@ -462,6 +486,9 @@ void Console::timeCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 }
 
 void Console::timeEndCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    if (!isApplicationInDebug) {
+        return;
+    }
     try {
         auto isolate = info.GetIsolate();
 
@@ -520,4 +547,10 @@ void Console::timeEndCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 const char* Console::LOG_TAG = "JS";
 std::map<v8::Isolate*, std::map<std::string, double>> Console::s_isolateToConsoleTimersMap;
 ConsoleCallback Console::m_callback = nullptr;
+
+#ifdef APPLICATION_IN_DEBUG
+    bool Console::isApplicationInDebug = true;
+#else
+    bool Console::isApplicationInDebug = false;
+#endif
 }
