@@ -20,6 +20,7 @@
 #include "ArrayHelper.h"
 #include "include/libplatform/libplatform.h"
 #include "include/zipconf.h"
+#include <csignal>
 #include <sstream>
 #include <dlfcn.h>
 #include <console/Console.h>
@@ -38,6 +39,10 @@ using namespace tns;
 bool tns::LogEnabled = true;
 SimpleAllocator g_allocator;
 
+void SIGABRT_handler(int sigNumber) {
+   throw NativeScriptException("JNI Exception occurred (SIGABRT).\n=======\nCheck the 'adb logcat' for additional information about the error.\n=======\n");
+}
+
 void Runtime::Init(JavaVM* vm, void* reserved) {
     __android_log_print(ANDROID_LOG_INFO, "TNS.Native", "NativeScript Runtime Version %s, commit %s", NATIVE_SCRIPT_RUNTIME_VERSION, NATIVE_SCRIPT_RUNTIME_COMMIT_SHA);
     DEBUG_WRITE("JNI_ONLoad");
@@ -47,6 +52,11 @@ void Runtime::Init(JavaVM* vm, void* reserved) {
 
         JEnv::Init(s_jvm);
     }
+
+    // handle SIGABRT
+    struct sigaction action;
+    action.sa_handler = SIGABRT_handler;
+    sigaction(SIGABRT, &action, NULL);
 
     DEBUG_WRITE("JNI_ONLoad END");
 }
