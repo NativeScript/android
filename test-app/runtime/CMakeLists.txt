@@ -32,7 +32,7 @@ endif()
 
 if ( NOT OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD )
     # When building in Release mode we do not include the V8 inspector sources
-    add_definitions(-DINCLUDE_INSPECTOR)
+    add_definitions(-DAPPLICATION_IN_DEBUG)
 
     set(
         INSPECTOR_SOURCES

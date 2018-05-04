@@ -27,7 +27,7 @@
 #include "sys/system_properties.h"
 #include "ManualInstrumentation.h"
 
-#ifdef INCLUDE_INSPECTOR
+#ifdef APPLICATION_IN_DEBUG
 #include "JsV8InspectorClient.h"
 #endif
 
@@ -580,7 +580,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
         global->DefineOwnProperty(context, ArgConverter::ConvertToV8String(isolate, "self"), global, readOnlyFlags);
     }
 
-#ifdef INCLUDE_INSPECTOR
+#ifdef APPLICATION_IN_DEBUG
     /*
      * Attach __inspector object with function callbacks that report to the Chrome DevTools frontend
      */
