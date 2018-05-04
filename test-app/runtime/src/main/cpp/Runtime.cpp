@@ -552,6 +552,15 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
         globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "close"), closeFuncTemplate);
     }
 
+#ifdef APPLICATION_IN_DEBUG
+    /*
+     * Attach __inspector object with function callbacks that report to the Chrome DevTools frontend
+     */
+    if (isDebuggable) {
+        JsV8InspectorClient::attachInspectorCallbacks(isolate, globalTemplate);
+    }
+#endif
+
     m_weakRef.Init(isolate, globalTemplate, m_objectManager);
 
     SimpleProfiler::Init(isolate, globalTemplate);
@@ -581,13 +590,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     }
 
 #ifdef APPLICATION_IN_DEBUG
-    /*
-     * Attach __inspector object with function callbacks that report to the Chrome DevTools frontend
-     */
-    if (isDebuggable) {
-        JsV8InspectorClient::attachInspectorCallbacks(isolate, globalTemplate);
-    }
-
     v8::Local<v8::Object> console = Console::createConsole(context, JsV8InspectorClient::consoleLogCallback);
 #else
     v8::Local<v8::Object> console = Console::createConsole(context, nullptr);
