@@ -123,17 +123,17 @@ ObjectManager* Runtime::GetObjectManager() const {
     return m_objectManager;
 }
 
-void Runtime::Init(JNIEnv* _env, jobject obj, int runtimeId, jstring filesPath, jstring nativeLibDir, jboolean verboseLoggingEnabled, jboolean isDebuggable, jstring packageName, jobjectArray args, jstring callingDir) {
+void Runtime::Init(JNIEnv* _env, jobject obj, int runtimeId, jstring filesPath, jstring nativeLibDir, jboolean verboseLoggingEnabled, jboolean isDebuggable, jstring packageName, jobjectArray args, jstring callingDir, int maxLogcatObjectSize) {
     JEnv env(_env);
 
     auto runtime = new Runtime(env, obj, runtimeId);
 
     auto enableLog = verboseLoggingEnabled == JNI_TRUE;
 
-    runtime->Init(filesPath, nativeLibDir, enableLog, isDebuggable, packageName, args, callingDir);
+    runtime->Init(filesPath, nativeLibDir, enableLog, isDebuggable, packageName, args, callingDir, maxLogcatObjectSize);
 }
 
-void Runtime::Init(jstring filesPath, jstring nativeLibDir, bool verboseLoggingEnabled, bool isDebuggable, jstring packageName, jobjectArray args, jstring callingDir) {
+void Runtime::Init(jstring filesPath, jstring nativeLibDir, bool verboseLoggingEnabled, bool isDebuggable, jstring packageName, jobjectArray args, jstring callingDir, int maxLogcatObjectSize) {
     LogEnabled = verboseLoggingEnabled;
 
     auto filesRoot = ArgConverter::jstringToString(filesPath);
@@ -158,7 +158,7 @@ void Runtime::Init(jstring filesPath, jstring nativeLibDir, bool verboseLoggingE
     auto profilerOutputDirStr = ArgConverter::jstringToString(profilerOutputDir);
 
     NativeScriptException::Init(m_objectManager);
-    m_isolate = PrepareV8Runtime(filesRoot, nativeLibDirStr, packageNameStr, isDebuggable, callingDirStr, profilerOutputDirStr);
+    m_isolate = PrepareV8Runtime(filesRoot, nativeLibDirStr, packageNameStr, isDebuggable, callingDirStr, profilerOutputDirStr, maxLogcatObjectSize);
 
     s_isolate2RuntimesCache.insert(make_pair(m_isolate, this));
 }
@@ -383,7 +383,7 @@ static void InitializeV8() {
     V8::Initialize();
 }
 
-Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& nativeLibDir, const string& packageName, bool isDebuggable, const string& callingDir, const string& profilerOutputDir) {
+Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& nativeLibDir, const string& packageName, bool isDebuggable, const string& callingDir, const string& profilerOutputDir, const int maxLogcatObjectSize) {
     tns::instrumentation::Frame frame("Runtime.PrepareV8Runtime");
 
     Isolate::CreateParams create_params;
@@ -590,9 +590,9 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     }
 
 #ifdef APPLICATION_IN_DEBUG
-    v8::Local<v8::Object> console = Console::createConsole(context, JsV8InspectorClient::consoleLogCallback);
+    v8::Local<v8::Object> console = Console::createConsole(context, JsV8InspectorClient::consoleLogCallback, maxLogcatObjectSize);
 #else
-    v8::Local<v8::Object> console = Console::createConsole(context, nullptr);
+    v8::Local<v8::Object> console = Console::createConsole(context, nullptr, maxLogcatObjectSize);
 #endif
 
     /*

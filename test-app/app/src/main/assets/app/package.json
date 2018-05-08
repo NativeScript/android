@@ -6,6 +6,7 @@
 		"gcThrottleTime": 500,
 		"memoryCheckInterval": 10,
 		"freeMemoryRatio": 0.50,
-		"markingMode": "full"
+		"markingMode": "full",
+		"maxLogcatObjectSize": 1024
 	}
 }
