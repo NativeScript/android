@@ -15,8 +15,9 @@
 
 namespace tns {
 
-v8::Local<v8::Object> Console::createConsole(v8::Local<v8::Context> context, ConsoleCallback callback) {
+v8::Local<v8::Object> Console::createConsole(v8::Local<v8::Context> context, ConsoleCallback callback, const int maxLogcatObjectSize) {
     m_callback = callback;
+    m_maxLogcatObjectSize = maxLogcatObjectSize;
     v8::Context::Scope contextScope(context);
     v8::Isolate* isolate = context->GetIsolate();
 
@@ -42,17 +43,23 @@ v8::Local<v8::Object> Console::createConsole(v8::Local<v8::Context> context, Con
 }
 
 void Console::sendToADBLogcat(const std::string& message, android_LogPriority logPriority) {
+    // limit the size of the message that we send to logcat using the predefined value in package.json
+    auto messageToLog = message;
+    if (messageToLog.length() > m_maxLogcatObjectSize) {
+        messageToLog = messageToLog.erase(m_maxLogcatObjectSize, std::string::npos);
+        messageToLog = messageToLog + "...";
+    }
+
     // split strings into chunks of 4000 characters
     // __android_log_write can't send more than 4000 to the stdout at a time
-
-    auto messageLength = message.length();
+    auto messageLength = messageToLog.length();
     int maxStringLength = 4000;
 
     if (messageLength < maxStringLength) {
-        __android_log_write(logPriority, Console::LOG_TAG, message.c_str());
+        __android_log_write(logPriority, Console::LOG_TAG, messageToLog.c_str());
     } else {
         for (int i = 0; i < messageLength; i += maxStringLength) {
-            auto messagePart = message.substr(i, maxStringLength);
+            auto messagePart = messageToLog.substr(i, maxStringLength);
 
             __android_log_write(logPriority, Console::LOG_TAG, messagePart.c_str());
         }
@@ -547,10 +554,11 @@ void Console::timeEndCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 const char* Console::LOG_TAG = "JS";
 std::map<v8::Isolate*, std::map<std::string, double>> Console::s_isolateToConsoleTimersMap;
 ConsoleCallback Console::m_callback = nullptr;
+int Console::m_maxLogcatObjectSize;
 
 #ifdef APPLICATION_IN_DEBUG
-    bool Console::isApplicationInDebug = true;
+bool Console::isApplicationInDebug = true;
 #else
-    bool Console::isApplicationInDebug = false;
+bool Console::isApplicationInDebug = false;
 #endif
 }
