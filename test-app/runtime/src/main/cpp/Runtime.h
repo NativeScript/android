@@ -85,6 +85,8 @@ class Runtime {
 
         v8::Isolate* PrepareV8Runtime(const std::string& filesPath, const std::string& nativeLibsDir, const std::string& packageName, bool isDebuggable, const std::string& callingDir, const std::string& profilerOutputDir);
         jobject ConvertJsValueToJavaObject(JEnv& env, const v8::Local<v8::Value>& value, int classReturnType);
+        static int GetAndroidVersion();
+        static int m_androidVersion;
 
         static std::map<int, Runtime*> s_id2RuntimeCache;
 
@@ -95,8 +97,6 @@ class Runtime {
         static jmethodID GET_USED_MEMORY_METHOD_ID;
 
         static bool s_mainThreadInitialized;
-
-
 };
 }
 

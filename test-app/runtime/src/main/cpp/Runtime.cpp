@@ -53,12 +53,27 @@ void Runtime::Init(JavaVM* vm, void* reserved) {
         JEnv::Init(s_jvm);
     }
 
-    // handle SIGABRT
-    struct sigaction action;
-    action.sa_handler = SIGABRT_handler;
-    sigaction(SIGABRT, &action, NULL);
+    if(m_androidVersion > 25) {
+        // handle SIGABRT only on API level > 25 as the handling is not so efficient in older versions
+        struct sigaction action;
+        action.sa_handler = SIGABRT_handler;
+        sigaction(SIGABRT, &action, NULL);
+    }
 
     DEBUG_WRITE("JNI_ONLoad END");
+}
+
+int Runtime::GetAndroidVersion() {
+    char sdkVersion[PROP_VALUE_MAX];
+    __system_property_get("ro.build.version.sdk", sdkVersion);
+
+    stringstream strValue;
+    strValue << sdkVersion;
+
+    unsigned int intValue;
+    strValue >> intValue;
+
+    return intValue;
 }
 
 Runtime::Runtime(JNIEnv* env, jobject runtime, int id)
@@ -403,15 +418,11 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     m_startupData = new StartupData();
 
-    // Retrieve the device android Sdk version
-    char sdkVersion[PROP_VALUE_MAX];
-    __system_property_get("ro.build.version.sdk", sdkVersion);
-
     void* snapshotPtr = nullptr;
     string snapshotPath;
 
     // If device isn't running on Sdk 17
-    if (strcmp(sdkVersion, string("17").c_str()) != 0) {
+    if (m_androidVersion != 17) {
         snapshotPath = "libsnapshot.so";
     } else {
         // If device is running on android Sdk 17
@@ -664,3 +675,4 @@ map<int, Runtime*> Runtime::s_id2RuntimeCache;
 map<Isolate*, Runtime*> Runtime::s_isolate2RuntimesCache;
 bool Runtime::s_mainThreadInitialized = false;
 v8::Platform* Runtime::platform = nullptr;
+int Runtime::m_androidVersion = Runtime::GetAndroidVersion();
