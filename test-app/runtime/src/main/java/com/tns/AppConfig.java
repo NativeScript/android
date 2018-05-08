@@ -17,7 +17,8 @@ class AppConfig {
         FreeMemoryRatio("freeMemoryRatio", 0.0),
         Profiling("profiling", ""),
         MarkingMode("markingMode", com.tns.MarkingMode.full),
-        HandleTimeZoneChanges("handleTimeZoneChanges", false);
+        HandleTimeZoneChanges("handleTimeZoneChanges", false),
+        MaxLogcatObjectSize("maxLogcatObjectSize", 1024);
 
         private final String name;
         private final Object defaultValue;
@@ -104,6 +105,9 @@ class AppConfig {
                     if (androidObject.has(KnownKeys.HandleTimeZoneChanges.getName())) {
                         values[KnownKeys.HandleTimeZoneChanges.ordinal()] = androidObject.getBoolean(KnownKeys.HandleTimeZoneChanges.getName());
                     }
+                    if (androidObject.has(KnownKeys.MaxLogcatObjectSize.getName())) {
+                        values[KnownKeys.MaxLogcatObjectSize.ordinal()] = androidObject.getInt(KnownKeys.MaxLogcatObjectSize.getName());
+                    }
                 }
             }
         } catch (Exception e) {
@@ -145,5 +149,9 @@ class AppConfig {
 
     public boolean handleTimeZoneChanges() {
         return (boolean)values[KnownKeys.HandleTimeZoneChanges.ordinal()];
+    }
+
+    public int getMaxLogcatObjectSize() {
+        return (int)values[KnownKeys.MaxLogcatObjectSize.ordinal()];
     }
 }
