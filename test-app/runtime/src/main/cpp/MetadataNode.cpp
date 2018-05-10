@@ -1619,7 +1619,12 @@ void MetadataNode::CreateTopLevelNamespaces(Isolate* isolate, const Local<Object
             auto node = GetOrCreateInternal(treeNode);
 
             auto packageObj = node->CreateWrapper(isolate);
-            global->Set(ArgConverter::ConvertToV8String(isolate, node->m_treeNode->name), packageObj);
+            string nameSpace = node->m_treeNode->name;
+            // if the namespaces matches a javascript keyword, prefix it with $ to avoid TypeScript and JavaScript errors
+            if(IsJavascriptKeyword(nameSpace)) {
+                nameSpace = "$" + nameSpace;
+            }
+            global->Set(ArgConverter::ConvertToV8String(isolate, nameSpace), packageObj);
         }
     }
 }
@@ -1640,11 +1645,7 @@ void MetadataNode::EnableProfiler(bool enableProfiler) {
     s_profilerEnabled = enableProfiler;
 }
 
-Local<Function> MetadataNode::Wrap(Isolate* isolate, const Local<Function>& function, const string& name, const string& origin, bool isCtorFunc) {
-    if (!s_profilerEnabled || name == "<init>") {
-        return function;
-    }
-
+bool MetadataNode::IsJavascriptKeyword(std::string word) {
     static set<string> keywords;
 
     if (keywords.empty()) {
@@ -1652,13 +1653,21 @@ Local<Function> MetadataNode::Wrap(Isolate* isolate, const Local<Function>& func
                       "double", "else", "enum", "eval", "export", "extends", "false", "final", "finally", "float", "for", "function", "goto", "if", "implements",
                       "import", "in", "instanceof", "int", "interface", "let", "long", "native", "new", "null", "package", "private", "protected", "public", "return",
                       "short", "static", "super", "switch", "synchronized", "this", "throw", "throws", "transient", "true", "try", "typeof", "var", "void", "volatile", "while", "with", "yield"
-                    };
+        };
 
         keywords = set<string>(kw, kw + sizeof(kw)/sizeof(kw[0]));
     }
 
+    return keywords.find(word) != keywords.end();
+}
+
+Local<Function> MetadataNode::Wrap(Isolate* isolate, const Local<Function>& function, const string& name, const string& origin, bool isCtorFunc) {
+    if (!s_profilerEnabled || name == "<init>") {
+        return function;
+    }
+
     string actualName = name;
-    while (keywords.find(actualName) != keywords.end()) {
+    while (IsJavascriptKeyword(actualName)) {
         actualName.append("_");
     }
 
