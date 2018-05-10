@@ -129,7 +129,7 @@ def applyPluginGradleConfigurations = { ->
 
 def getAppIdentifier = { packageJsonMap ->
 	def appIdentifier = "";
-	if (packageJsonMap) {
+	if (packageJsonMap && packageJsonMap.nativescript) {
 		appIdentifier = packageJsonMap.nativescript.id;
 		if (!(appIdentifier instanceof String)) {
 			appIdentifier = appIdentifier.android;
