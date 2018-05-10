@@ -29,7 +29,7 @@
 #include <map>
 
 namespace tns {
-    class MetadataNode {
+class MetadataNode {
     public:
         static void Init(v8::Isolate* isolate);
 
@@ -129,6 +129,10 @@ namespace tns {
         static bool GetExtendLocation(std::string& extendLocation, bool isTypeScriptExtend);
         static ExtendedClassCacheData GetCachedExtendedClassData(v8::Isolate* isolate, const std::string& proxyClassName);
 
+        static void RegisterSymbolHasInstanceCallback(v8::Isolate* isolate, MetadataEntry entry, v8::Local<v8::Value> interface);
+        static void SymbolHasInstanceCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
+        static std::string GetJniClassName(MetadataEntry entry);
+
         v8::Local<v8::Function> Wrap(v8::Isolate* isolate, const v8::Local<v8::Function>& function, const std::string& name, const std::string& origin, bool isCtorFunc);
 
         bool CheckClassHierarchy(JEnv& env, jclass currentClass, MetadataTreeNode* curentTreeNode, MetadataTreeNode* baseTreeNode, std::vector<MetadataTreeNode*>& skippedBaseTypes);
@@ -150,13 +154,13 @@ namespace tns {
 
         struct MethodCallbackData {
             MethodCallbackData()
-                    :
-                    node(nullptr), parent(nullptr), isSuper(false) {
+                :
+                node(nullptr), parent(nullptr), isSuper(false) {
             }
 
             MethodCallbackData(MetadataNode* _node)
-                    :
-                    node(_node), parent(nullptr), isSuper(false) {
+                :
+                node(_node), parent(nullptr), isSuper(false) {
             }
 
             std::vector<MetadataEntry> candidates;
@@ -167,8 +171,8 @@ namespace tns {
 
         struct ExtendedClassCallbackData {
             ExtendedClassCallbackData(MetadataNode* _node, const std::string& _extendedName, const v8::Local<v8::Object>& _implementationObject, std::string _fullClassName)
-                    :
-                    node(_node), extendedName(_extendedName), fullClassName(_fullClassName) {
+                :
+                node(_node), extendedName(_extendedName), fullClassName(_fullClassName) {
                 implementationObject = new v8::Persistent<v8::Object>(_implementationObject->GetIsolate(), _implementationObject);
             }
 
@@ -181,8 +185,8 @@ namespace tns {
 
         struct TypeMetadata {
             TypeMetadata(const std::string& _name)
-                    :
-                    name(_name) {
+                :
+                name(_name) {
             }
 
             std::string name;
@@ -190,8 +194,8 @@ namespace tns {
 
         struct CtorCacheData {
             CtorCacheData(v8::Persistent<v8::FunctionTemplate>* _ft, std::vector<MethodCallbackData*> _instanceMethodCallbacks)
-                    :
-                    ft(_ft), instanceMethodCallbacks(_instanceMethodCallbacks) {
+                :
+                ft(_ft), instanceMethodCallbacks(_instanceMethodCallbacks) {
             }
 
             v8::Persistent<v8::FunctionTemplate>* ft;
@@ -200,12 +204,12 @@ namespace tns {
 
         struct ExtendedClassCacheData {
             ExtendedClassCacheData()
-                    :
-                    extendedCtorFunction(nullptr), node(nullptr) {
+                :
+                extendedCtorFunction(nullptr), node(nullptr) {
             }
             ExtendedClassCacheData(const v8::Local<v8::Function>& extCtorFunc, const std::string& _extendedName, MetadataNode* _node)
-                    :
-                    extendedName(_extendedName), node(_node) {
+                :
+                extendedName(_extendedName), node(_node) {
                 extendedCtorFunction = new v8::Persistent<v8::Function>(extCtorFunc->GetIsolate(), extCtorFunc);
             }
             v8::Persistent<v8::Function>* extendedCtorFunction;
@@ -220,5 +224,5 @@ namespace tns {
 
             std::map<std::string, MetadataNode::ExtendedClassCacheData> ExtendedCtorFuncCache;
         };
-    };
+};
 }
