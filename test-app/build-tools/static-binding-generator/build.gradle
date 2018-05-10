@@ -1,14 +1,14 @@
 apply plugin: 'java-library'
 
+sourceCompatibility = JavaVersion.VERSION_1_7
+targetCompatibility = JavaVersion.VERSION_1_7
+
 dependencies {
-    compile 'org.apache.bcel:bcel:5.2'
+    compile 'org.apache.bcel:bcel:6.0'
     compile group: 'org.json', name: 'json', version: '20090211'
     compile 'commons-io:commons-io:2.5'
     testCompile 'junit:junit:4.+'
 }
-
-sourceCompatibility = "1.7"
-targetCompatibility = "1.7"
 
 compileJava {
     options.compilerArgs << "-Xlint:all" << "-Xlint:-options" << "-Werror"
