@@ -263,7 +263,16 @@ dependencies {
         return packageJson.nativescript.useV8Symbols
     }
     if (!externalRuntimeExists) {
-        def runtime = useV8Symbols ? "nativescript-regular" : "nativescript-optimized"
+        def runtime = "nativescript-optimized-with-inspector"
+
+        if (project.gradle.startParameter.taskNames.any { it.toLowerCase().contains('release') }) {
+            runtime = "nativescript-optimized"
+        }
+
+        if (useV8Symbols) {
+            runtime = "nativescript-regular"
+        }
+
         println "\t + adding nativescript runtime package dependency: $runtime"
         project.dependencies.add("implementation", [name: runtime, ext: "aar"])
     } else {

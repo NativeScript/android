@@ -4,6 +4,12 @@ def optimized = project.hasProperty("optimized")
 if (optimized) {
     println "Optimized build triggered."
 }
+
+def optimizedWithInspector = project.hasProperty("optimizedWithInspector")
+if (optimizedWithInspector) {
+    println "Optimized build with inspector triggered."
+}
+
 def onlyX86 = project.hasProperty("onlyX86")
 if (onlyX86) {
     println "OnlyX86 build triggered."
@@ -30,16 +36,24 @@ android {
         versionCode 1
         versionName "1.0"
 
-        if (optimized) {
-            project.archivesBaseName = "${archivesBaseName}-optimized"
-        } else {
+        if (!optimized && !optimizedWithInspector) {
             project.archivesBaseName = "${archivesBaseName}-regular"
+        } else {
+            if (optimized) {
+                project.archivesBaseName = "${archivesBaseName}-optimized"
+            } else if (optimizedWithInspector) {
+                project.archivesBaseName = "${archivesBaseName}-optimized-with-inspector"
+            }
         }
 
         externalNativeBuild {
             cmake {
                 if (optimized) {
                     arguments.push("-DOPTIMIZED_BUILD=true")
+                }
+
+                if (optimizedWithInspector) {
+                    arguments.push("-DOPTIMIZED_WITH_INSPECTOR_BUILD=true")
                 }
 
                 //https://developer.android.com/ndk/guides/cmake.html

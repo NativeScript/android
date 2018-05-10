@@ -129,7 +129,7 @@ DispatchResponse V8PageAgentImpl::getResourceContent(const String& in_frameId, c
     return DispatchResponse::OK();
 }
 
-DispatchResponse V8PageAgentImpl::searchInResource(const String& in_frameId, const String& in_url, const String& in_query, Maybe<bool> in_caseSensitive, Maybe<bool> in_isRegex, Maybe<String> in_requestId, std::unique_ptr<protocol::Array<protocol::GenericTypes::SearchMatch>>* out_result) {
+DispatchResponse V8PageAgentImpl::searchInResource(const String& in_frameId, const String& in_url, const String& in_query, Maybe<bool> in_caseSensitive, Maybe<bool> in_isRegex, std::unique_ptr<protocol::Array<protocol::Debugger::SearchMatch>>* out_result) {
     bool isRegex = in_isRegex.fromMaybe(false);
     bool isCaseSensitive = in_caseSensitive.fromMaybe(false);
 
@@ -138,7 +138,7 @@ DispatchResponse V8PageAgentImpl::searchInResource(const String& in_frameId, con
         cachedPageResources = utils::PageResource::getPageResources();
     }
 
-    auto result = protocol::Array<protocol::GenericTypes::SearchMatch>::create();
+    auto result = protocol::Array<protocol::Debugger::SearchMatch>::create();
 
     auto it = cachedPageResources.find(in_url.utf8());
     if (it == cachedPageResources.end()) {
@@ -162,31 +162,6 @@ DispatchResponse V8PageAgentImpl::searchInResource(const String& in_frameId, con
     return DispatchResponse::Error(*errorString);
 }
 
-DispatchResponse V8PageAgentImpl::searchInResources(const String& in_text, Maybe<bool> in_caseSensitive, Maybe<bool> in_isRegex, std::unique_ptr<protocol::Array<protocol::Page::SearchResult>>* out_result) {
-    bool isRegex = in_isRegex.fromMaybe(false);
-    bool isCaseSensitive = in_caseSensitive.fromMaybe(false);
-
-    std::map<std::string, v8_inspector::utils::PageResource> cachedPageResources = utils::PageResource::s_cachedPageResources;
-    if (utils::PageResource::s_cachedPageResources.size() == 0) {
-        cachedPageResources = utils::PageResource::getPageResources();
-    }
-
-    std::vector<utils::PageResource> resourceObjects;
-
-    for (auto const& mapKVP : cachedPageResources) {
-        resourceObjects.push_back(mapKVP.second);
-    }
-
-    *out_result = utils::ResourceContentSearchUtils::getSearchMatches(m_session, resourceObjects, m_frameUrl.c_str(), in_text, isCaseSensitive, isRegex);
-
-    return DispatchResponse::OK();
-}
-
-DispatchResponse V8PageAgentImpl::setDocumentContent(const String& in_frameId, const String& in_html) {
-    return utils::Common::protocolCommandNotSupportedDispatchResponse();
-}
-
-
 void V8PageAgentImpl::restore() {
     if (!m_state->booleanProperty(PageAgentState::pageEnabled, false)) {
         return;
@@ -197,6 +172,102 @@ void V8PageAgentImpl::restore() {
 
 void V8PageAgentImpl::reset() {
 
+}
+
+DispatchResponse V8PageAgentImpl::setDocumentContent(const String& in_frameId, const String& in_html) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8PageAgentImpl::addScriptToEvaluateOnNewDocument(const String& in_source, String* out_identifier) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8PageAgentImpl::bringToFront() {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8PageAgentImpl::captureScreenshot(Maybe<String> in_format, Maybe<int> in_quality, Maybe<protocol::Page::Viewport> in_clip, Maybe<bool> in_fromSurface, String* out_data) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8PageAgentImpl::createIsolatedWorld(const String& in_frameId, Maybe<String> in_worldName, Maybe<bool> in_grantUniveralAccess, int* out_executionContextId) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8PageAgentImpl::getAppManifest(String* out_url, std::unique_ptr<protocol::Array<protocol::Page::AppManifestError>>* out_errors, Maybe<String>* out_data) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8PageAgentImpl::getFrameTree(std::unique_ptr<protocol::Page::FrameTree>* out_frameTree) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8PageAgentImpl::getLayoutMetrics(std::unique_ptr<protocol::Page::LayoutViewport>* out_layoutViewport, std::unique_ptr<protocol::Page::VisualViewport>* out_visualViewport, std::unique_ptr<protocol::DOM::Rect>* out_contentSize) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8PageAgentImpl::getNavigationHistory(int* out_currentIndex, std::unique_ptr<protocol::Array<protocol::Page::NavigationEntry>>* out_entries) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8PageAgentImpl::handleJavaScriptDialog(bool in_accept, Maybe<String> in_promptText) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8PageAgentImpl::navigate(const String& in_url, Maybe<String> in_referrer, Maybe<String> in_transitionType, Maybe<String> in_frameId, String* out_frameId, Maybe<String>* out_loaderId, Maybe<String>* out_errorText) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8PageAgentImpl::navigateToHistoryEntry(int in_entryId) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8PageAgentImpl::printToPDF(Maybe<bool> in_landscape, Maybe<bool> in_displayHeaderFooter, Maybe<bool> in_printBackground, Maybe<double> in_scale, Maybe<double> in_paperWidth, Maybe<double> in_paperHeight, Maybe<double> in_marginTop, Maybe<double> in_marginBottom, Maybe<double> in_marginLeft, Maybe<double> in_marginRight, Maybe<String> in_pageRanges, Maybe<bool> in_ignoreInvalidPageRanges, Maybe<String> in_headerTemplate, Maybe<String> in_footerTemplate, Maybe<bool> in_preferCSSPageSize, String* out_data) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8PageAgentImpl::removeScriptToEvaluateOnNewDocument(const String& in_identifier) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8PageAgentImpl::requestAppBanner() {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8PageAgentImpl::screencastFrameAck(int in_sessionId) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8PageAgentImpl::setAdBlockingEnabled(bool in_enabled) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8PageAgentImpl::setBypassCSP(bool in_enabled) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8PageAgentImpl::setDownloadBehavior(const String& in_behavior, Maybe<String> in_downloadPath) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8PageAgentImpl::setLifecycleEventsEnabled(bool in_enabled) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8PageAgentImpl::startScreencast(Maybe<String> in_format, Maybe<int> in_quality, Maybe<int> in_maxWidth, Maybe<int> in_maxHeight, Maybe<int> in_everyNthFrame) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8PageAgentImpl::stopLoading() {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8PageAgentImpl::crash() {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8PageAgentImpl::stopScreencast() {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
 }

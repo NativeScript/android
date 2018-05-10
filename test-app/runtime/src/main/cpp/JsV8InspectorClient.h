@@ -3,7 +3,6 @@
 
 #include <string>
 #include "v8.h"
-#include "v8-debug.h"
 #include "JEnv.h"
 #include "src/inspector/v8-inspector-impl.h"
 #include "src/inspector/v8-inspector-session-impl.h"
@@ -34,6 +33,7 @@ class JsV8InspectorClient : V8InspectorClient, v8_inspector::V8Inspector::Channe
         void flushProtocolNotifications() override;
 
         static void sendToFrontEndCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
+        static void consoleLogCallback(const std::string& message, const std::string& logLevel);
 
         void runMessageLoopOnPause(int context_group_id) override;
         void quitMessageLoopOnPause() override;

@@ -32,7 +32,7 @@ import android.util.SparseArray;
 import com.tns.bindings.ProxyGenerator;
 
 public class Runtime {
-    private native void initNativeScript(int runtimeId, String filesPath, String nativeLibDir, boolean verboseLoggingEnabled, boolean isDebuggable, String packageName, Object[] v8Options, String callingDir);
+    private native void initNativeScript(int runtimeId, String filesPath, String nativeLibDir, boolean verboseLoggingEnabled, boolean isDebuggable, String packageName, Object[] v8Options, String callingDir, int maxLogcatObjectSize);
 
     private native void runModule(int runtimeId, String filePath) throws NativeScriptException;
 
@@ -65,6 +65,8 @@ public class Runtime {
     private static native void ClearWorkerPersistent(int runtimeId, int workerId);
 
     private static native void CallWorkerObjectOnErrorHandleMain(int runtimeId, int workerId, String message, String stackTrace, String filename, int lineno, String threadName) throws NativeScriptException;
+
+    private static native void ResetDateTimeConfigurationCache(int runtimeId);
 
     void passUncaughtExceptionToJs(Throwable ex, String stackTrace) {
         passUncaughtExceptionToJsNative(getRuntimeId(), ex, stackTrace);
@@ -222,6 +224,13 @@ public class Runtime {
 
     public Handler getHandler() {
         return this.threadScheduler.getHandler();
+    }
+
+    public void ResetDateTimeConfigurationCache() {
+        Runtime runtime = getCurrentRuntime();
+        if (runtime != null) {
+            ResetDateTimeConfigurationCache(runtime.getRuntimeId());
+        }
     }
 
     private static class WorkerThreadHandler extends Handler {
@@ -481,7 +490,7 @@ public class Runtime {
                 throw new RuntimeException("Fail to initialize Require class", ex);
             }
 
-            initNativeScript(getRuntimeId(), Module.getApplicationFilesPath(), nativeLibDir, logger.isEnabled(), isDebuggable, appName, appConfig.getAsArray(), callingJsDir);
+            initNativeScript(getRuntimeId(), Module.getApplicationFilesPath(), nativeLibDir, logger.isEnabled(), isDebuggable, appName, appConfig.getAsArray(), callingJsDir, appConfig.getMaxLogcatObjectSize());
 
             //clearStartupData(getRuntimeId()); // It's safe to delete the data after the V8 debugger is initialized
 

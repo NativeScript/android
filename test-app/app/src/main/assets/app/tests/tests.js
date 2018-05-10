@@ -29,7 +29,7 @@ describe("Tests ", function () {
 		__log("TEST: Creating MyButton");
 		var MyButton = com.tns.tests.Button1.extend("MyButton", {
 			toString : function() {
-				return "button1";	
+				return "button1";
 			}
 		});
 
@@ -42,7 +42,7 @@ describe("Tests ", function () {
 		__log("TEST: Creating MyButton2 class");
 		var MyButton2 = com.tns.tests.Button1.extend("MyButton", {
 			toString : function() {
-				return "button2";	
+				return "button2";
 			}});
 
 		var button2 = new MyButton2();
@@ -68,7 +68,7 @@ describe("Tests ", function () {
 		__log("TEST: Creating MyButton");
 		var MyButton = com.tns.tests.Button1.extend({
 			toString : function() {
-				return "button1";	
+				return "button1";
 			}
 		});
 
@@ -81,7 +81,7 @@ describe("Tests ", function () {
 		__log("TEST: Creating MyButton2 class");
 		var MyButton2 = com.tns.tests.Button1.extend({
 			toString : function() {
-				return "button2";	
+				return "button2";
 			}});
 
 		var button2 = new MyButton2();
@@ -106,7 +106,7 @@ describe("Tests ", function () {
 		__log("TEST: Creating MyButton");
 		var MyButton = com.tns.tests.Button1.extend({
 			method2 : function(arg1) {
-				return arg1.toString();	
+				return arg1.toString();
 			}
 		});
 
@@ -138,8 +138,8 @@ describe("Tests ", function () {
 
 		var MyButton = com.tns.tests.Button1.extend("MyButton60", {
 			toString : function() {
-				return "button1";	
-			} 
+				return "button1";
+			}
 		});
 
 		var button1 = new MyButton();
@@ -160,7 +160,7 @@ describe("Tests ", function () {
 
 		var MyButton = com.tns.tests.Button1.extend("MyButton81", {
 			toString : function() {
-				return "button1";	
+				return "button1";
 			},
 		});
 
@@ -178,7 +178,7 @@ describe("Tests ", function () {
 
 		var MyButton = com.tns.tests.Button1.extend("MyButton98", {
 			toString : function() {
-				return "button1";	
+				return "button1";
 			},
 		});
 
@@ -198,7 +198,7 @@ describe("Tests ", function () {
 
 		var MyButton = com.tns.tests.Button1.extend("MyButton115", {
 			toString : function() {
-				return "button1";	
+				return "button1";
 			},
 
 			methodDummyClassAsObjectInArgs: function(object) {
@@ -212,7 +212,7 @@ describe("Tests ", function () {
 		expect(isInstanceOf).toEqual(true);
 	});
 
-	//originally wasn't run 
+	//originally wasn't run
 	it("When_calling_instanceof_on_interface_it_should_work", function () {
 
 		__log("TEST: When_calling_instanceof_on_interface_it_should_work");
@@ -253,7 +253,7 @@ describe("Tests ", function () {
 
 		var MyButton = com.tns.tests.Button1.extend("MyButton148", {
 			toString : function() {
-				return "button1";	
+				return "button1";
 			}
 		});
 
@@ -271,7 +271,7 @@ describe("Tests ", function () {
 		__log("TEST: When_calling_instance_and_static_member_with_same_name_the_calls_should_succeed");
 		var MyButton = com.tns.tests.Button1.extend("MyButton213", {
 			toString : function() {
-				return "button1";	
+				return "button1";
 			}
 		});
 
@@ -304,7 +304,7 @@ describe("Tests ", function () {
 		__log("TEST: When_calling_toString_on_an_java_object_that_has_overriden_toString_in_js_it_should_call_the_js_method");
 		var MyButton = com.tns.tests.Button1.extend("MyButton240", {
 			toString : function() {
-				return "button1";	
+				return "button1";
 			}
 		});
 
@@ -320,7 +320,7 @@ describe("Tests ", function () {
 
 		var MyButton = com.tns.tests.Button1.extend("MyButton257", {
 			toString : function() {
-				return "button1";	
+				return "button1";
 			}
 		});
 
@@ -383,7 +383,7 @@ describe("Tests ", function () {
 
 		var MyButton = com.tns.tests.Button1.extend("MyButton", {
 			toString : function() {
-				return this.super.toString() + this.super.echo("success");	
+				return this.super.toString() + this.super.echo("success");
 			},
 
 			echo : function(s) {
@@ -405,7 +405,7 @@ describe("Tests ", function () {
 		__log("TEST: When_extending_a_class_and_calling_super_method_it_should_work");
 		var MyButton = com.tns.tests.Button1.extend("MyButton318", {
 			toString : function() {
-				return "toString overriden";	
+				return "toString overriden";
 			},
 
 			getIMAGE_ID_PROP : function() {
@@ -428,13 +428,13 @@ describe("Tests ", function () {
 
 		var MyButton = com.tns.tests.Button1.extend("MyButton341", {
 			hashCode : function() {
-				return 5454;	
+				return 5454;
 			}
 		});
 
 		var MyButton2 = com.tns.tests.Button1.extend("MyButton347", {
 			hashCode : function() {
-				return 1212;	
+				return 1212;
 			}
 		});
 
@@ -455,8 +455,8 @@ describe("Tests ", function () {
 
 		var MyButton = com.tns.tests.Button1.extend({
 			toString : function() {
-				return "button1";	
-			} 
+				return "button1";
+			}
 		});
 
 		var button1 = new MyButton();
@@ -479,7 +479,7 @@ describe("Tests ", function () {
 
 		var MyButton = com.tns.tests.Button1.extend("MyButton381", {
 			toString : function() {
-				return "button1";	
+				return "button1";
 			}
 		});
 
@@ -488,7 +488,7 @@ describe("Tests ", function () {
 
 		var exceptionCaught = false;
 		try {
-			var res = dummy.dummyMethod(123); //this will fail if button2 is not valid proxy object and properly exposed to js	
+			var res = dummy.dummyMethod(123); //this will fail if button2 is not valid proxy object and properly exposed to js
 		}
 		catch (e) {
 			exceptionCaught = true;
@@ -503,7 +503,7 @@ describe("Tests ", function () {
 
 		var Button = com.tns.tests.Button1.extend("MyButton397", {
 			toString : function() {
-				return "button1";	
+				return "button1";
 			}
 		});
 
@@ -520,7 +520,7 @@ describe("Tests ", function () {
 
 		var Button = com.tns.tests.Button1.extend("MyButton413", {
 			toString : function() {
-				return "button1";	
+				return "button1";
 			}
 		});
 
@@ -538,7 +538,7 @@ describe("Tests ", function () {
 		var name = "";
 		var Button = com.tns.tests.Button1.extend("MyButton418", {
 			toString : function() {
-				return "button1";	
+				return "button1";
 			},
 
 			methodDummyClassAsObjectInArgs: function(object) {
@@ -559,7 +559,7 @@ describe("Tests ", function () {
 
 		var Button = com.tns.tests.Button1.extend("MyButton450", {
 			toString : function() {
-				return "button1";	
+				return "button1";
 			}
 		});
 
@@ -576,11 +576,11 @@ describe("Tests ", function () {
 
 		var MyButton = com.tns.tests.Button1.extend("MyButton455", {
 			hashCode : function() {
-				return 5454;	
+				return 5454;
 			},
 
 			toString : function() {
-				return "button1";	
+				return "button1";
 			},
 
 			equals : function() {
@@ -658,7 +658,7 @@ describe("Tests ", function () {
 			},
 
 			toString : function() {
-				return "button1";	
+				return "button1";
 			}
 		});
 
@@ -737,7 +737,7 @@ describe("Tests ", function () {
 
 		var MyButton = com.tns.tests.Button1.extend("MyButton726", {
 			toString : function() {
-				return "button1"	
+				return "button1"
 			}});
 
 		var button1 = new MyButton();
@@ -1020,7 +1020,7 @@ describe("Tests ", function () {
 		var javaValue = n.value;
 		expect(javaValue).toBe("9007199254740992");
 
-		var typeName = typeof n; 
+		var typeName = typeof n;
 		expect(typeName).toBe("object");
 	});
 
@@ -1251,7 +1251,7 @@ describe("Tests ", function () {
 		__log("TEST: TestRuntimeCurrentObjectIdIsResetProperlyWhenAnExceptionIsThrownWhileConstructingObject");
 
 		var exceptionCaught = false;
-		
+
 		try {
 			new java.io.FileInputStream("asdasd");
 		} catch (e) {
@@ -1263,11 +1263,11 @@ describe("Tests ", function () {
 				return "!!!" + s;
 			}
 		});
-		
+
 		var btn = MyButton.class.getConstructors()[0].newInstance(null);
 		var s = btn.triggerEcho("12345");
 		var expected = "!!!12345";
-		
+
 		expect(exceptionCaught).toBe(true);
 		expect(s).toContain(expected);
 	});
@@ -1345,7 +1345,7 @@ describe("Tests ", function () {
 		var MyButton = com.tns.tests.Button1.extend("btn1303", impl);
 		var btn = new MyButton();
 
-		var echo = com.tns.tests.Button1.prototype.echo; 
+		var echo = com.tns.tests.Button1.prototype.echo;
 		delete com.tns.tests.Button1.prototype.echo;
 		delete impl.echo;
 
@@ -1356,11 +1356,11 @@ describe("Tests ", function () {
 		catch (e)
 		{
 			exceptionCaught = true;
-		}	
+		}
 
 		expect(exceptionCaught).toBe(true);
 
-		exceptionCaught = false;	
+		exceptionCaught = false;
 
 		try
 		{
@@ -1369,7 +1369,7 @@ describe("Tests ", function () {
 		catch (e)
 		{
 			exceptionCaught = true;
-		}	
+		}
 
 		expect(exceptionCaught).toBe(true);
 
@@ -1400,11 +1400,11 @@ describe("Tests ", function () {
 		catch (e)
 		{
 			exceptionCaught = true;
-		}	
+		}
 
 		expect(exceptionCaught).toBe(true);
 
-		exceptionCaught = false;	
+		exceptionCaught = false;
 
 		try
 		{
@@ -1413,7 +1413,7 @@ describe("Tests ", function () {
 		catch (e)
 		{
 			exceptionCaught = true;
-		}	
+		}
 
 		expect(exceptionCaught).toBe(true);
 	});
@@ -1504,7 +1504,7 @@ describe("Tests ", function () {
 
 		try
 		{
-			d.setName(false);	
+			d.setName(false);
 		}
 		catch (e)
 		{
@@ -1518,7 +1518,7 @@ describe("Tests ", function () {
 
 		try
 		{
-			d.setName(true);	
+			d.setName(true);
 		}
 		catch (e)
 		{
@@ -1539,7 +1539,7 @@ describe("Tests ", function () {
 
 		try
 		{
-			d.setName(1);	
+			d.setName(1);
 		}
 		catch (e)
 		{
@@ -1649,7 +1649,7 @@ describe("Tests ", function () {
 
 		var MyButton = com.tns.tests.Button1.extend("MyButton1615", {
 			toString : function() {
-				return "button1"	
+				return "button1"
 			}});
 
 		var clazz1 = MyButton.class;
@@ -1664,7 +1664,7 @@ describe("Tests ", function () {
 
 	it("When_calling_non_existent_ctor_it_should_fail", function () {
 
-		__log("TEST: When_calling_non_existent_ctor_it_should_fail: Start"); 
+		__log("TEST: When_calling_non_existent_ctor_it_should_fail: Start");
 
 		try
 		{
@@ -1715,5 +1715,22 @@ describe("Tests ", function () {
         */
         var b = new com.tns.tests.Bundle();
         expect(b.getMyInt()).toBe(456);
+    });
+
+    it("should not truncate log if message is smaller than maxLogcatObjectSize", function () {
+        const maxLogcatObjectSize = 1025;
+        const str = Array(maxLogcatObjectSize).join("A");
+        console.log(str);
+        expect(com.tns.tests.LogcatUtil.logcatContainsString(str)).toBe(true);
+    });
+
+    it("should truncate log if message is larger than maxLogcatObjectSize", function () {
+        const maxLogcatObjectSize = 1025;
+        var str = Array(maxLogcatObjectSize).join("A") + "B";
+        console.log(str);
+        expect(com.tns.tests.LogcatUtil.logcatContainsString(str)).toBe(false);
+
+        console.log(str);
+        expect(com.tns.tests.LogcatUtil.logcatContainsString(str.slice(0, -1) + "...")).toBe(true);
     });
 });
