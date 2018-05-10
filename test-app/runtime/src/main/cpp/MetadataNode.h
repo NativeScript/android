@@ -56,7 +56,6 @@ namespace tns {
         static MetadataNode* GetOrCreate(const std::string& className);
 
         static std::string GetTypeMetadataName(v8::Isolate* isolate, v8::Local<v8::Value>& value);
-
     private:
         struct MethodCallbackData;
 
@@ -70,6 +69,7 @@ namespace tns {
 
         MetadataNode(MetadataTreeNode* treeNode);
 
+        static bool IsJavascriptKeyword(std::string word);
         v8::Local<v8::Object> CreatePackageObject(v8::Isolate* isolate);
 
         v8::Local<v8::Function> GetConstructorFunction(v8::Isolate* isolate);
