@@ -69,6 +69,7 @@ class V8DOMAgentImpl : public protocol::DOM::Backend {
         static V8DOMAgentImpl* Instance;
         protocol::DOM::Frontend m_frontend;
 
+        static std::u16string AddBackendNodeIdProperty(v8::Isolate* isolate, v8::Local<v8::Value> jsonInput);
     private:
         V8InspectorSessionImpl* m_session;
         protocol::DictionaryValue* m_state;

@@ -39,7 +39,10 @@ void DOMDomainCallbackHandlers::ChildNodeInsertedCallback(const v8::FunctionCall
         auto lastId = args[1]->ToNumber(isolate);
         auto node = args[2]->ToString(isolate);
 
-        auto nodeJson = protocol::StringUtil::parseJSON(v8_inspector::toProtocolString(node));
+        auto resultString = V8DOMAgentImpl::AddBackendNodeIdProperty(isolate, node);
+        auto resultUtf16Data = resultString.data();
+
+        auto nodeJson = protocol::StringUtil::parseJSON(String16((const uint16_t*) resultUtf16Data));
 
         protocol::ErrorSupport errorSupport;
         auto domNode = protocol::DOM::Node::fromValue(nodeJson.get(), &errorSupport);
@@ -48,6 +51,7 @@ void DOMDomainCallbackHandlers::ChildNodeInsertedCallback(const v8::FunctionCall
         if (!errorSupportString.empty()) {
             auto errorMessage = "Error while parsing debug `DOM Node` object. ";
             DEBUG_WRITE_FORCE("%s Error: %s", errorMessage, errorSupportString.c_str());
+            return;
         }
 
         domAgentInstance->m_frontend.childNodeInserted(parentId->Int32Value(), lastId->Int32Value(), std::move(domNode));
