@@ -1175,6 +1175,22 @@ void MetadataNode::PackageGetterCallback(Local<Name> property, const PropertyCal
             if (foundChild) {
                 auto childNode = MetadataNode::GetOrCreateInternal(child.treeNode);
                 cachedItem = childNode->CreateWrapper(isolate);
+
+                uint8_t childNodeType = s_metadataReader.GetNodeType(child.treeNode);
+                bool isInterface = s_metadataReader.IsNodeTypeInterface(childNodeType);
+                if (isInterface) {
+                    // For all java interfaces we register the special Symbol.hasInstance property
+                    // which is invoked by the instanceof operator (https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Symbol/hasInstance).
+                    // For example:
+                    //
+                    // Object.defineProperty(android.view.animation.Interpolator, Symbol.hasInstance, {
+                    //    value: function(obj) {
+                    //        return true;
+                    //    }
+                    // });
+                    RegisterSymbolHasInstanceCallback(isolate, child, cachedItem);
+                }
+
                 V8SetPrivateValue(isolate, thiz, strProperty, cachedItem);
             }
         }
@@ -1800,6 +1816,75 @@ void MetadataNode::SetMissingBaseMethods(Isolate* isolate, const vector<Metadata
     }
 }
 
+void MetadataNode::RegisterSymbolHasInstanceCallback(Isolate* isolate, MetadataEntry entry, Local<Value> interface) {
+    if (interface->IsNullOrUndefined()) {
+        return;
+    }
+
+    JEnv env;
+    auto className = GetJniClassName(entry);
+    auto clazz = env.FindClass(className);
+    if (clazz == nullptr) {
+        return;
+    }
+
+    auto extData = External::New(isolate, clazz);
+    auto hasInstanceTemplate = FunctionTemplate::New(isolate, MetadataNode::SymbolHasInstanceCallback, extData);
+    auto hasInstanceFunc = hasInstanceTemplate->GetFunction();
+    PropertyDescriptor descriptor(hasInstanceFunc, false);
+    auto hasInstanceSymbol = Symbol::GetHasInstance(isolate);
+    interface->ToObject()->DefineProperty(isolate->GetCurrentContext(), hasInstanceSymbol, descriptor);
+}
+
+void MetadataNode::SymbolHasInstanceCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    auto length = info.Length();
+    if (length != 1) {
+        throw NativeScriptException(string("Symbol.hasInstance must take exactly 1 argument"));
+    }
+
+    auto arg = info[0];
+    if (arg->IsNullOrUndefined()) {
+        info.GetReturnValue().Set(false);
+        return;
+    }
+
+    auto clazz = reinterpret_cast<jclass>(info.Data().As<External>()->Value());
+
+    auto isolate = info.GetIsolate();
+    auto runtime = Runtime::GetRuntime(isolate);
+    auto objectManager = runtime->GetObjectManager();
+    auto obj = objectManager->GetJavaObjectByJsObject(arg->ToObject());
+
+    if (obj.IsNull()) {
+        // Couldn't find a corresponding java instance counterpart. This could happen
+        // if the "instanceof" operator is invoked on a pure javascript instance
+        info.GetReturnValue().Set(false);
+        return;
+    }
+
+    JEnv env;
+    auto isInstanceOf = env.IsInstanceOf(obj, clazz);
+
+    info.GetReturnValue().Set(isInstanceOf);
+}
+
+std::string MetadataNode::GetJniClassName(MetadataEntry entry) {
+    std::stack<string> s;
+    MetadataTreeNode* n = entry.treeNode;
+    while (n != nullptr && n->name != "") {
+        s.push(n->name);
+        n = n->parent;
+    }
+
+    string fullClassName;
+    while (!s.empty()) {
+        auto top = s.top();
+        fullClassName = (fullClassName == "") ? top : fullClassName + "/" + top;
+        s.pop();
+    }
+
+    return fullClassName;
+}
 
 string MetadataNode::TNS_PREFIX = "com/tns/gen/";
 MetadataReader MetadataNode::s_metadataReader;
