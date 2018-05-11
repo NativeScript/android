@@ -68,7 +68,7 @@ def nativescriptDependencies = new JsonSlurper().parseText(dependenciesJson.text
 def computeCompileSdkVersion = { -> project.hasProperty("compileSdk") ? compileSdk : 26 }
 def computeTargetSdkVersion = { -> project.hasProperty("targetSdk") ? targetSdk : 26 }
 def computeBuildToolsVersion = { ->
-    project.hasProperty("buildToolsVersion") ? buildToolsVersion : "27.0.1"
+    project.hasProperty("buildToolsVersion") ? buildToolsVersion : "27.0.3"
 }
 
 project.ext.selectedBuildType = project.hasProperty("release") ? "release" : "debug"

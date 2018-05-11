@@ -15,7 +15,7 @@ if (onlyX86) {
     println "OnlyX86 build triggered."
 }
 
-project.ext._buildToolsVersion = "27.0.1"
+project.ext._buildToolsVersion = "27.0.3"
 
 android {
     sourceSets {
