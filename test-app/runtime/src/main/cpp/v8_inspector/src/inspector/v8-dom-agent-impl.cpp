@@ -95,42 +95,7 @@ DispatchResponse V8DOMAgentImpl::getDocument(Maybe<int> in_depth, Maybe<bool> in
 
                 if (!outResult->ToObject()->Has(context, ArgConverter::ConvertToV8String(isolate, "backendNodeId")).FromMaybe(false)) {
                     // Using an older version of the modules which doesn't set the backendNodeId required property
-                    auto scriptSource =
-                        "(function () {"
-                        "   function addBackendNodeId(node) {"
-                        "       if (!node.backendNodeId) {"
-                        "           node.backendNodeId = 0;"
-                        "       }"
-                        "       if (node.children) {"
-                        "           for (var i = 0; i < node.children.length; i++) {"
-                        "               addBackendNodeId(node.children[i]);"
-                        "           }"
-                        "       }"
-                        "   }"
-                        "   return function(stringifiedNode) {"
-                        "       try {"
-                        "           const node = JSON.parse(stringifiedNode);"
-                        "           addBackendNodeId(node);"
-                        "           return JSON.stringify(node);"
-                        "       } catch (e) {"
-                        "           return stringifiedNode;"
-                        "       }"
-                        "   }"
-                        "})()";
-
-                    auto source = ArgConverter::ConvertToV8String(isolate, scriptSource);
-                    v8::Local<v8::Script> script;
-                    v8::Script::Compile(context, source).ToLocal(&script);
-
-                    v8::Local<v8::Value> result;
-                    script->Run(context).ToLocal(&result);
-                    auto addBackendNodeIdFunction = result.As<v8::Function>();
-
-                    v8::Local<v8::Value> args[] = { outResult };
-                    v8::Local<v8::Value> scriptResult;
-                    addBackendNodeIdFunction->Call(context, context->Global(), 1, args).ToLocal(&scriptResult);
-
-                    resultString = ArgConverter::ConvertToUtf16String(scriptResult->ToString());
+                    resultString = AddBackendNodeIdProperty(isolate, outResult);
                 }
 
                 auto resultUtf16Data = resultString.data();
@@ -361,6 +326,47 @@ DispatchResponse V8DOMAgentImpl::undo() {
 
 DispatchResponse V8DOMAgentImpl::getFrameOwner(const String& in_frameId, int* out_nodeId) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+std::u16string V8DOMAgentImpl::AddBackendNodeIdProperty(v8::Isolate* isolate, v8::Local<v8::Value> jsonInput) {
+    auto scriptSource =
+        "(function () {"
+        "   function addBackendNodeId(node) {"
+        "       if (!node.backendNodeId) {"
+        "           node.backendNodeId = 0;"
+        "       }"
+        "       if (node.children) {"
+        "           for (var i = 0; i < node.children.length; i++) {"
+        "               addBackendNodeId(node.children[i]);"
+        "           }"
+        "       }"
+        "   }"
+        "   return function(stringifiedNode) {"
+        "       try {"
+        "           const node = JSON.parse(stringifiedNode);"
+        "           addBackendNodeId(node);"
+        "           return JSON.stringify(node);"
+        "       } catch (e) {"
+        "           return stringifiedNode;"
+        "       }"
+        "   }"
+        "})()";
+
+    auto source = ArgConverter::ConvertToV8String(isolate, scriptSource);
+    v8::Local<v8::Script> script;
+    auto context = isolate->GetCurrentContext();
+    v8::Script::Compile(context, source).ToLocal(&script);
+
+    v8::Local<v8::Value> result;
+    script->Run(context).ToLocal(&result);
+    auto addBackendNodeIdFunction = result.As<v8::Function>();
+
+    v8::Local<v8::Value> funcArguments[] = { jsonInput };
+    v8::Local<v8::Value> scriptResult;
+    addBackendNodeIdFunction->Call(context, context->Global(), 1, funcArguments).ToLocal(&scriptResult);
+
+    auto resultString = ArgConverter::ConvertToUtf16String(scriptResult->ToString());
+    return resultString;
 }
 
 V8DOMAgentImpl* V8DOMAgentImpl::Instance = 0;
