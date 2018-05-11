@@ -29,7 +29,7 @@ describe("instanceof operator tests", function () {
 		expect(actual).toBe(false);
 	});
 
-	it("should return false for instanceof", function () {
+	it("should return false for undefined", function () {
 		const actual = undefined instanceof com.tns.tests.MyInterface1;
 		expect(actual).toBe(false);
 	});
