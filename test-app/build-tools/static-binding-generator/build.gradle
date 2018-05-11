@@ -15,7 +15,7 @@ compileJava {
 }
 
 task copyJarToBuildTools (type: Copy) {
-    inputs.dir("$projectDir/build/libs/static-binding-generator.jar")
+    inputs.file("$projectDir/build/libs/static-binding-generator.jar")
     from "$projectDir/build/libs/static-binding-generator.jar"
     into "$projectDir/../"
 }
