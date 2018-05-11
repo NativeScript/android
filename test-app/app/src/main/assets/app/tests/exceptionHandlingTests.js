@@ -340,7 +340,7 @@ describe("Tests exception handling ", function () {
 	});
 
     // run this test only for API level bigger than 25 as we have handling there
-    if(android.os.Build.VERSION.SDK_INT > 25) {
+    if(android.os.Build.VERSION.SDK_INT > 25 && android.os.Build.CPU_ABI != "x86" && android.os.Build.CPU_ABI != "x86_64") {
         it("Should handle SIGABRT and throw a NativeScript exception when incorrectly calling JNI methods", function () {
             let myClassInstance = new com.tns.tests.MyTestBaseClass3();
             // public void callMeWithAString(java.lang.String[] stringArr, Runnable arbitraryInterface)
