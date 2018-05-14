@@ -490,8 +490,10 @@ public class Runtime {
                 throw new RuntimeException("Fail to initialize Require class", ex);
             }
 
-            initNativeScript(getRuntimeId(), Module.getApplicationFilesPath(), nativeLibDir, logger.isEnabled(), isDebuggable, appName, appConfig.getAsArray(), callingJsDir, appConfig.getMaxLogcatObjectSize(),
-                appConfig.getForceLog() || "timeline".equalsIgnoreCase(appConfig.getProfilingMode()));
+            boolean forceConsoleLog = appConfig.getForceLog() || "timeline".equalsIgnoreCase(appConfig.getProfilingMode());
+
+            initNativeScript(getRuntimeId(), Module.getApplicationFilesPath(), nativeLibDir, logger.isEnabled(), isDebuggable, appName, appConfig.getAsArray(),
+                    callingJsDir, appConfig.getMaxLogcatObjectSize(), forceConsoleLog);
 
             //clearStartupData(getRuntimeId()); // It's safe to delete the data after the V8 debugger is initialized
 
