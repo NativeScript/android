@@ -491,7 +491,7 @@ public class Runtime {
             }
 
             initNativeScript(getRuntimeId(), Module.getApplicationFilesPath(), nativeLibDir, logger.isEnabled(), isDebuggable, appName, appConfig.getAsArray(), callingJsDir, appConfig.getMaxLogcatObjectSize(),
-                appConfig.getForceLog() || appConfig.getProfilingMode() == "timeline");
+                appConfig.getForceLog() || "timeline".equalsIgnoreCase(appConfig.getProfilingMode()));
 
             //clearStartupData(getRuntimeId()); // It's safe to delete the data after the V8 debugger is initialized
 
