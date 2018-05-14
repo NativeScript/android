@@ -40,7 +40,7 @@ bool tns::LogEnabled = true;
 SimpleAllocator g_allocator;
 
 void SIGABRT_handler(int sigNumber) {
-   throw NativeScriptException("JNI Exception occurred (SIGABRT).\n=======\nCheck the 'adb logcat' for additional information about the error.\n=======\n");
+    throw NativeScriptException("JNI Exception occurred (SIGABRT).\n=======\nCheck the 'adb logcat' for additional information about the error.\n=======\n");
 }
 
 void Runtime::Init(JavaVM* vm, void* reserved) {
@@ -53,7 +53,7 @@ void Runtime::Init(JavaVM* vm, void* reserved) {
         JEnv::Init(s_jvm);
     }
 
-    if(m_androidVersion > 25) {
+    if (m_androidVersion > 25) {
         // handle SIGABRT only on API level > 25 as the handling is not so efficient in older versions
         struct sigaction action;
         action.sa_handler = SIGABRT_handler;
@@ -508,10 +508,9 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
         InitializeV8();
     }
 
-    tns::instrumentation::Frame isolateFrame("Isolate.New");
+    tns::instrumentation::Frame isolateFrame;
     auto isolate = Isolate::New(create_params);
     isolateFrame.log("Isolate.New");
-    isolateFrame.disable();
 
     Isolate::Scope isolate_scope(isolate);
     HandleScope handleScope(isolate);
