@@ -7,6 +7,7 @@
 		"memoryCheckInterval": 10,
 		"freeMemoryRatio": 0.50,
 		"markingMode": "full",
-		"maxLogcatObjectSize": 1024
+		"maxLogcatObjectSize": 1024,
+		"forceLog": false
 	}
 }

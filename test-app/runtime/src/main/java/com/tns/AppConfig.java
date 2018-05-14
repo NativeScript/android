@@ -18,7 +18,8 @@ class AppConfig {
         Profiling("profiling", ""),
         MarkingMode("markingMode", com.tns.MarkingMode.full),
         HandleTimeZoneChanges("handleTimeZoneChanges", false),
-        MaxLogcatObjectSize("maxLogcatObjectSize", 1024);
+        MaxLogcatObjectSize("maxLogcatObjectSize", 1024),
+        ForceLog("forceLog", false);
 
         private final String name;
         private final Object defaultValue;
@@ -108,6 +109,9 @@ class AppConfig {
                     if (androidObject.has(KnownKeys.MaxLogcatObjectSize.getName())) {
                         values[KnownKeys.MaxLogcatObjectSize.ordinal()] = androidObject.getInt(KnownKeys.MaxLogcatObjectSize.getName());
                     }
+                    if (androidObject.has(KnownKeys.ForceLog.getName())) {
+                        values[KnownKeys.ForceLog.ordinal()] = androidObject.getBoolean(KnownKeys.ForceLog.getName());
+                    }
                 }
             }
         } catch (Exception e) {
@@ -153,5 +157,9 @@ class AppConfig {
 
     public int getMaxLogcatObjectSize() {
         return (int)values[KnownKeys.MaxLogcatObjectSize.ordinal()];
+    }
+
+    public boolean getForceLog() {
+        return (boolean)values[KnownKeys.ForceLog.ordinal()];
     }
 }
