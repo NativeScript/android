@@ -149,17 +149,17 @@ ObjectManager* Runtime::GetObjectManager() const {
     return m_objectManager;
 }
 
-void Runtime::Init(JNIEnv* _env, jobject obj, int runtimeId, jstring filesPath, jstring nativeLibDir, jboolean verboseLoggingEnabled, jboolean isDebuggable, jstring packageName, jobjectArray args, jstring callingDir, int maxLogcatObjectSize, bool forceLog) {
+void Runtime::Init(JNIEnv* _env, jobject obj, int runtimeId, jstring filesPath, jstring nativeLibDir, jboolean verboseLoggingEnabled, jboolean isDebuggable, jstring packageName, jobjectArray args, jstring callingDir, int maxLogcatObjectSize, bool forceLog, const bool experimentalModules) {
     JEnv env(_env);
 
     auto runtime = new Runtime(env, obj, runtimeId);
 
     auto enableLog = verboseLoggingEnabled == JNI_TRUE;
 
-    runtime->Init(filesPath, nativeLibDir, enableLog, isDebuggable, packageName, args, callingDir, maxLogcatObjectSize, forceLog);
+    runtime->Init(filesPath, nativeLibDir, enableLog, isDebuggable, packageName, args, callingDir, maxLogcatObjectSize, forceLog, experimentalModules);
 }
 
-void Runtime::Init(jstring filesPath, jstring nativeLibDir, bool verboseLoggingEnabled, bool isDebuggable, jstring packageName, jobjectArray args, jstring callingDir, int maxLogcatObjectSize, bool forceLog) {
+void Runtime::Init(jstring filesPath, jstring nativeLibDir, bool verboseLoggingEnabled, bool isDebuggable, jstring packageName, jobjectArray args, jstring callingDir, int maxLogcatObjectSize, bool forceLog, const bool experimentalModules) {
     LogEnabled = verboseLoggingEnabled;
 
     auto filesRoot = ArgConverter::jstringToString(filesPath);
@@ -184,7 +184,7 @@ void Runtime::Init(jstring filesPath, jstring nativeLibDir, bool verboseLoggingE
     auto profilerOutputDirStr = ArgConverter::jstringToString(profilerOutputDir);
 
     NativeScriptException::Init();
-    m_isolate = PrepareV8Runtime(filesRoot, nativeLibDirStr, packageNameStr, isDebuggable, callingDirStr, profilerOutputDirStr, maxLogcatObjectSize, forceLog);
+    m_isolate = PrepareV8Runtime(filesRoot, nativeLibDirStr, packageNameStr, isDebuggable, callingDirStr, profilerOutputDirStr, maxLogcatObjectSize, forceLog, experimentalModules);
 
     s_isolate2RuntimesCache.insert(make_pair(m_isolate, this));
 }
@@ -443,7 +443,7 @@ static void InitializeV8() {
     V8::Initialize();
 }
 
-Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& nativeLibDir, const string& packageName, bool isDebuggable, const string& callingDir, const string& profilerOutputDir, const int maxLogcatObjectSize, const bool forceLog) {
+Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& nativeLibDir, const string& packageName, bool isDebuggable, const string& callingDir, const string& profilerOutputDir, const int maxLogcatObjectSize, const bool forceLog, const bool experimentalModules) {
     tns::instrumentation::Frame frame("Runtime.PrepareV8Runtime");
 
     Isolate::CreateParams create_params;
@@ -644,7 +644,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     m_objectManager->Init(isolate);
 
-    m_module.Init(isolate, callingDir);
+    m_module.Init(isolate, callingDir, experimentalModules);
 
     auto global = context->Global();
 

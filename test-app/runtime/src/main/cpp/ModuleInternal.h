@@ -14,14 +14,16 @@
 #include <string>
 #include <map>
 
+#include "ESModule.h"
+
 namespace tns {
 class ModuleInternal {
     public:
         ModuleInternal();
 
-        void Init(v8::Isolate* isolate, const std::string& baseDir = "");
+        void Init(v8::Isolate* isolate, const std::string& baseDir = "", const bool experimentalModules = false);
 
-        void Load(const std::string& path);
+        void Load(const std::string& path, const bool isWorkerScript = false);
 
         /*
          * Reuses `Load` logic and adds TryCatch exception handling to push any unhandled exceptions
@@ -37,6 +39,8 @@ class ModuleInternal {
 
         static int MODULE_PROLOGUE_LENGTH;
     private:
+        ESModule m_esModule;
+
         enum class ModulePathKind;
 
         struct ModuleCacheEntry;
@@ -55,7 +59,7 @@ class ModuleInternal {
 
         v8::Local<v8::Object> LoadData(v8::Isolate* isolate, const std::string& path);
 
-        v8::Local<v8::Script> LoadScript(v8::Isolate* isolate, const std::string& modulePath, const v8::Local<v8::String>& fullRequiredModulePath);
+        v8::Local<v8::Script> LoadScript(v8::Isolate* isolate, const std::string& modulePath);
 
         v8::Local<v8::Function> GetRequireFunction(v8::Isolate* isolate, const std::string& dirName);
 
@@ -75,6 +79,8 @@ class ModuleInternal {
         v8::Persistent<v8::Function>* m_requireFactoryFunction;
         std::map<std::string, v8::Persistent<v8::Function>*> m_requireCache;
         std::map<std::string, ModuleCacheEntry> m_loadedModules;
+        std::string m_baseDir;
+        bool m_experimentalModules;
 
         class TempModule {
             public:

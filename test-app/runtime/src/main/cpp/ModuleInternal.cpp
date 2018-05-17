@@ -31,7 +31,7 @@ ModuleInternal::ModuleInternal()
     : m_isolate(nullptr), m_requireFunction(nullptr), m_requireFactoryFunction(nullptr) {
 }
 
-void ModuleInternal::Init(Isolate* isolate, const string& baseDir) {
+void ModuleInternal::Init(Isolate* isolate, const string& baseDir, const bool experimentalModules) {
     JEnv env;
 
     if (MODULE_CLASS == nullptr) {
@@ -43,6 +43,8 @@ void ModuleInternal::Init(Isolate* isolate, const string& baseDir) {
     }
 
     m_isolate = isolate;
+    m_baseDir = baseDir.empty() ? Constants::APP_ROOT_FOLDER_PATH : baseDir;
+    m_experimentalModules = experimentalModules;
 
     string requireFactoryScript =
         "(function () { "
@@ -86,12 +88,11 @@ void ModuleInternal::Init(Isolate* isolate, const string& baseDir) {
 
     Local<Function> globalRequire;
 
-    if (!baseDir.empty()) {
-        globalRequire = GetRequireFunction(isolate, baseDir);
-    } else {
-        globalRequire = GetRequireFunction(isolate, Constants::APP_ROOT_FOLDER_PATH);
-    }
+    globalRequire = GetRequireFunction(isolate, m_baseDir);
+
     global->Set(ArgConverter::ConvertToV8String(isolate, "require"), globalRequire);
+
+    m_esModule.Init(isolate, m_baseDir);
 }
 
 Local<Function> ModuleInternal::GetRequireFunction(Isolate* isolate, const string& dirName) {
@@ -185,14 +186,18 @@ void ModuleInternal::RequireNativeCallback(const v8::FunctionCallbackInfo<v8::Va
     funcPtr(args);
 }
 
-void ModuleInternal::Load(const string& path) {
+void ModuleInternal::Load(const string& path, const bool isWorkerScript) {
     TNSPERF();
-    auto isolate = m_isolate;
-    auto context = isolate->GetCurrentContext();
-    auto globalObject = context->Global();
-    auto require = globalObject->Get(context, ArgConverter::ConvertToV8String(isolate, "require")).ToLocalChecked().As<Function>();
-    Local<Value> args[] = { ArgConverter::ConvertToV8String(isolate, path) };
-    require->Call(context, globalObject, 1, args);
+    if (m_experimentalModules && !isWorkerScript) {
+        m_esModule.Load(path);
+    } else {
+        auto isolate = m_isolate;
+        auto context = isolate->GetCurrentContext();
+        auto globalObject = context->Global();
+        auto require = globalObject->Get(context, ArgConverter::ConvertToV8String(isolate, "require")).ToLocalChecked().As<Function>();
+        Local<Value> args[] = { ArgConverter::ConvertToV8String(isolate, path) };
+        require->Call(context, globalObject, 1, args);
+    }
 }
 
 void ModuleInternal::LoadWorker(const string& path) {
@@ -200,7 +205,7 @@ void ModuleInternal::LoadWorker(const string& path) {
     auto isolate = m_isolate;
     TryCatch tc(isolate);
 
-    Load(path);
+    Load(path, true);
 
     if (tc.HasCaught()) {
         // This will handle any errors that occur when first loading a script (new worker)
@@ -284,7 +289,7 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& moduleP
     Local<Function> moduleFunc;
 
     if (Util::EndsWith(modulePath, ".js")) {
-        auto script = LoadScript(isolate, modulePath, fullRequiredModulePath);
+        auto script = LoadScript(isolate, modulePath);
 
         auto context = isolate->GetCurrentContext();
         moduleFunc = script->Run(context).ToLocalChecked().As<Function>();
@@ -351,7 +356,7 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& moduleP
     return result;
 }
 
-Local<Script> ModuleInternal::LoadScript(Isolate* isolate, const string& path, const Local<String>& fullRequiredModulePath) {
+Local<Script> ModuleInternal::LoadScript(Isolate* isolate, const string& path) {
     string frameName("LoadScript " + path);
     tns::instrumentation::Frame frame(frameName.c_str());
     Local<Script> script;

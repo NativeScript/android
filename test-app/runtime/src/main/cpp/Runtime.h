@@ -31,11 +31,11 @@ class Runtime {
         static void Init(JavaVM* vm, void* reserved);
 
         static void Init(JNIEnv* _env, jobject obj, int runtimeId, jstring filesPath, jstring nativeLibsDir, jboolean verboseLoggingEnabled, jboolean isDebuggable, jstring packageName, jobjectArray args, jstring callingDir, int maxLogcatObjectSize,
-                         bool forceLog);
+                         bool forceLog, const bool experimentalModules);
 
         static void SetManualInstrumentationMode(jstring mode);
 
-        void Init(jstring filesPath, jstring nativeLibsDir, bool verboseLoggingEnabled, bool isDebuggable, jstring packageName, jobjectArray args, jstring callingDir, int maxLogcatObjectSize, bool forceLog);
+        void Init(jstring filesPath, jstring nativeLibsDir, bool verboseLoggingEnabled, bool isDebuggable, jstring packageName, jobjectArray args, jstring callingDir, int maxLogcatObjectSize, bool forceLog, const bool experimentalModules);
 
         v8::Isolate* GetIsolate() const;
 
@@ -90,7 +90,7 @@ class Runtime {
         v8::Persistent<v8::Function>* m_gcFunc;
         volatile bool m_runGC;
 
-        v8::Isolate* PrepareV8Runtime(const std::string& filesPath, const std::string& nativeLibsDir, const std::string& packageName, bool isDebuggable, const std::string& callingDir, const std::string& profilerOutputDir, const int maxLogcatObjectSize, const bool forceLog);
+        v8::Isolate* PrepareV8Runtime(const std::string& filesPath, const std::string& nativeLibsDir, const std::string& packageName, bool isDebuggable, const std::string& callingDir, const std::string& profilerOutputDir, const int maxLogcatObjectSize, const bool forceLog, const bool experimentalModules);
         jobject ConvertJsValueToJavaObject(JEnv& env, const v8::Local<v8::Value>& value, int classReturnType);
         static v8::StartupData CreateSnapshotDataBlob(const char* embedded_source);
         static bool RunExtraCode(v8::Isolate* isolate, v8::Local<v8::Context> context, const char* utf8_source, const char* name);

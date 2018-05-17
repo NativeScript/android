@@ -153,6 +153,7 @@ add_library(
     src/main/cpp/MetadataTreeNode.cpp
     src/main/cpp/MethodCache.cpp
     src/main/cpp/ModuleInternal.cpp
+    src/main/cpp/ESModule.cpp
     src/main/cpp/NativeScriptException.cpp
     src/main/cpp/NumericCasts.cpp
     src/main/cpp/ObjectManager.cpp
