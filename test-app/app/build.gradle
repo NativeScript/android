@@ -18,6 +18,8 @@
 
 import groovy.json.JsonSlurper
 import java.nio.file.Paths
+import java.util.regex.Matcher
+import java.util.regex.Pattern
 
 apply plugin: "com.android.application"
 
@@ -403,12 +405,20 @@ task extractAllJars {
     outputs.dir extractedDependenciesDir
 
     doLast {
-        def iter;
-        if (project.selectedBuildType == "release") {
-            iter = configurations.releaseCompileClasspath.resolve()
-        } else {
-            iter = configurations.debugCompileClasspath.resolve()
+        def buildType = project.selectedBuildType == "release" ? "Release" : "Debug"
+        def iter = []
+        Pattern pattern = Pattern.compile("^(.+)${buildType}CompileClasspath\$")
+        configurations.all{ config ->
+            Matcher matcher = pattern.matcher(config.name)
+            if (matcher.find() || config.name == "${buildType.toLowerCase()}CompileClasspath") {
+                config.resolve().each {
+                    if (!iter.contains(it)) {
+                        iter.push(it)
+                    }
+                }
+            }
         }
+
         def dependencyCounter = 0
         iter.each {
             def nextDependency = it
