@@ -8,7 +8,8 @@ using namespace v8;
 using namespace tns;
 
 ArrayBufferHelper::ArrayBufferHelper()
-    : m_objectManager(nullptr), m_ByteBufferClass(nullptr), m_isDirectMethodID(nullptr) {
+        : m_objectManager(nullptr), m_ByteBufferClass(nullptr), m_isDirectMethodID(nullptr),
+          m_remainingMethodID(nullptr), m_getMethodID(nullptr) {
 }
 
 void ArrayBufferHelper::CreateConvertFunctions(Isolate* isolate, const Local<Object>& global, ObjectManager* objectManager) {
@@ -82,14 +83,34 @@ void ArrayBufferHelper::CreateFromCallbackImpl(const FunctionCallbackInfo<Value>
 
     auto isDirectBuffer = ret == JNI_TRUE;
 
-    if (!isDirectBuffer) {
-        throw NativeScriptException("Direct ByteBuffer expected)");
+    Local<ArrayBuffer> arrayBuffer;
+
+    if (isDirectBuffer) {
+        auto data = env.GetDirectBufferAddress(obj);
+        auto size = env.GetDirectBufferCapacity(obj);
+
+        arrayBuffer = ArrayBuffer::New(isolate, data, size);
+    } else {
+        if (m_remainingMethodID == nullptr) {
+            m_remainingMethodID = env.GetMethodID(m_ByteBufferClass, "remaining", "()I");
+            assert(m_remainingMethodID != nullptr);
+        }
+
+        int bufferRemainingSize = env.CallIntMethod(obj, m_remainingMethodID);
+
+        if (m_getMethodID == nullptr) {
+            m_getMethodID = env.GetMethodID(m_ByteBufferClass, "get", "([BII)Ljava/nio/ByteBuffer;");
+            assert(m_getMethodID != nullptr);
+        }
+
+        jbyteArray byteArray = env.NewByteArray(bufferRemainingSize);
+        env.CallObjectMethod(obj, m_getMethodID, byteArray, 0, bufferRemainingSize);
+
+        auto buffer = env.GetByteArrayElements(byteArray, 0);
+        arrayBuffer = ArrayBuffer::New(isolate, bufferRemainingSize);
+        memcpy(arrayBuffer->GetContents().Data(), buffer, bufferRemainingSize);
     }
 
-    auto data = env.GetDirectBufferAddress(obj);
-    auto size = env.GetDirectBufferCapacity(obj);
-
-    auto arrayBuffer = ArrayBuffer::New(isolate, data, size);
     auto ctx = isolate->GetCurrentContext();
     arrayBuffer->Set(ctx, ArgConverter::ConvertToV8String(isolate, "nativeObject"), argObj);
 
