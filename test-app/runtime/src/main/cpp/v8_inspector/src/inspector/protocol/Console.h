@@ -17,18 +17,17 @@ namespace protocol {
 namespace Console {
 
 // ------------- Forward and enum declarations.
-// Console message.
 class ConsoleMessage;
+class MessageAddedNotification;
 
 // ------------- Type and builder declarations.
 
-// Console message.
-class  ConsoleMessage {
+class  ConsoleMessage : public Serializable {
         PROTOCOL_DISALLOW_COPY(ConsoleMessage);
     public:
-        static std::unique_ptr<ConsoleMessage> parse(protocol::Value* value, ErrorSupport* errors);
+        static std::unique_ptr<ConsoleMessage> fromValue(protocol::Value* value, ErrorSupport* errors);
 
-        ~ConsoleMessage() { }
+        ~ConsoleMessage() override { }
 
         struct  SourceEnum {
             static const char* Xml;
@@ -103,7 +102,10 @@ class  ConsoleMessage {
             m_column = value;
         }
 
-        std::unique_ptr<protocol::DictionaryValue> serialize() const;
+        std::unique_ptr<protocol::DictionaryValue> toValue() const;
+        String serialize() override {
+            return toValue()->serialize();
+        }
         std::unique_ptr<ConsoleMessage> clone() const;
 
         template<int STATE>
@@ -184,15 +186,79 @@ class  ConsoleMessage {
 };
 
 
+class  MessageAddedNotification : public Serializable {
+        PROTOCOL_DISALLOW_COPY(MessageAddedNotification);
+    public:
+        static std::unique_ptr<MessageAddedNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+        ~MessageAddedNotification() override { }
+
+        protocol::Console::ConsoleMessage* getMessage() {
+            return m_message.get();
+        }
+        void setMessage(std::unique_ptr<protocol::Console::ConsoleMessage> value) {
+            m_message = std::move(value);
+        }
+
+        std::unique_ptr<protocol::DictionaryValue> toValue() const;
+        String serialize() override {
+            return toValue()->serialize();
+        }
+        std::unique_ptr<MessageAddedNotification> clone() const;
+
+        template<int STATE>
+        class MessageAddedNotificationBuilder {
+            public:
+                enum {
+                    NoFieldsSet = 0,
+                    MessageSet = 1 << 1,
+                    AllFieldsSet = (MessageSet | 0)
+                };
+
+
+                MessageAddedNotificationBuilder<STATE | MessageSet>& setMessage(std::unique_ptr<protocol::Console::ConsoleMessage> value) {
+                    static_assert(!(STATE & MessageSet), "property message should not be set yet");
+                    m_result->setMessage(std::move(value));
+                    return castState<MessageSet>();
+                }
+
+                std::unique_ptr<MessageAddedNotification> build() {
+                    static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+                    return std::move(m_result);
+                }
+
+            private:
+                friend class MessageAddedNotification;
+                MessageAddedNotificationBuilder() : m_result(new MessageAddedNotification()) { }
+
+                template<int STEP> MessageAddedNotificationBuilder<STATE | STEP>& castState() {
+                    return *reinterpret_cast<MessageAddedNotificationBuilder<STATE | STEP>*>(this);
+                }
+
+                std::unique_ptr<protocol::Console::MessageAddedNotification> m_result;
+        };
+
+        static MessageAddedNotificationBuilder<0> create() {
+            return MessageAddedNotificationBuilder<0>();
+        }
+
+    private:
+        MessageAddedNotification() {
+        }
+
+        std::unique_ptr<protocol::Console::ConsoleMessage> m_message;
+};
+
+
 // ------------- Backend interface.
 
 class  Backend {
     public:
         virtual ~Backend() { }
 
-        virtual void enable(ErrorString*) = 0;
-        virtual void disable(ErrorString*) = 0;
-        virtual void clearMessages(ErrorString*) = 0;
+        virtual DispatchResponse clearMessages() = 0;
+        virtual DispatchResponse disable() = 0;
+        virtual DispatchResponse enable() = 0;
 
 };
 
@@ -200,10 +266,11 @@ class  Backend {
 
 class  Frontend {
     public:
-        Frontend(FrontendChannel* frontendChannel) : m_frontendChannel(frontendChannel) { }
+        explicit Frontend(FrontendChannel* frontendChannel) : m_frontendChannel(frontendChannel) { }
         void messageAdded(std::unique_ptr<protocol::Console::ConsoleMessage> message);
 
         void flush();
+        void sendRawNotification(const String&);
     private:
         FrontendChannel* m_frontendChannel;
 };

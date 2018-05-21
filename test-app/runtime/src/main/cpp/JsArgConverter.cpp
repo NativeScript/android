@@ -126,7 +126,7 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index) {
                 jbyte value = (jbyte) byteArg;
                 success = ConvertFromCastFunctionObject(value, index);
             } else if (castValue->IsInt32()) {
-                jbyte value = (jbyte) castValue->ToInt32()->Int32Value();
+                jbyte value = (jbyte) castValue->ToInt32(m_isolate)->Int32Value();
                 success = ConvertFromCastFunctionObject(value, index);
             }
             break;
@@ -139,7 +139,7 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index) {
                 jshort value = (jshort) shortArg;
                 success = ConvertFromCastFunctionObject(value, index);
             } else if (castValue->IsInt32()) {
-                jshort value = (jshort) castValue->ToInt32()->Int32Value();
+                jshort value = (jshort) castValue->ToInt32(m_isolate)->Int32Value();
                 success = ConvertFromCastFunctionObject(value, index);
             }
             break;
@@ -152,7 +152,7 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index) {
                 jlong value = (jlong) longArg;
                 success = ConvertFromCastFunctionObject(value, index);
             } else if (castValue->IsInt32()) {
-                jlong value = (jlong) castValue->ToInt32()->IntegerValue();
+                jlong value = (jlong) castValue->ToInt32(m_isolate)->IntegerValue();
                 success = ConvertFromCastFunctionObject(value, index);
             }
             break;
@@ -160,7 +160,7 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index) {
         case CastType::Float:
             castValue = NumericCasts::GetCastValue(jsObject);
             if (castValue->IsNumber()) {
-                double floatArg = castValue->ToNumber()->NumberValue();
+                double floatArg = castValue->ToNumber(m_isolate)->NumberValue();
                 jfloat value = (jfloat) floatArg;
                 success = ConvertFromCastFunctionObject(value, index);
             }
@@ -169,7 +169,7 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index) {
         case CastType::Double:
             castValue = NumericCasts::GetCastValue(jsObject);
             if (castValue->IsNumber()) {
-                double doubleArg = castValue->ToNumber()->NumberValue();
+                double doubleArg = castValue->ToNumber(m_isolate)->NumberValue();
                 jdouble value = (jdouble) doubleArg;
                 success = ConvertFromCastFunctionObject(value, index);
             }

@@ -66,7 +66,8 @@ void ArgConverter::NativeScriptLongFunctionCallback(const v8::FunctionCallbackIn
         auto cache = GetTypeLongCache(isolate);
         V8SetPrivateValue(isolate, thiz, V8StringConstants::GetJavaLong(isolate), Boolean::New(isolate, true));
         NumericCasts::MarkAsLong(isolate, thiz, args[0]);
-        thiz->SetPrototype(Local<NumberObject>::New(isolate, *cache->NanNumberObject));
+        auto context = isolate->GetCurrentContext();
+        thiz->SetPrototype(context, Local<NumberObject>::New(isolate, *cache->NanNumberObject));
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -197,7 +198,8 @@ Local<Value> ArgConverter::ConvertFromJavaLong(Isolate* isolate, jlong value) {
         char strNumber[24];
         sprintf(strNumber, "%lld", longValue);
         Local<Value> strValue = ConvertToV8String(isolate, strNumber);
-        convertedValue = Local<Function>::New(isolate, *cache->LongNumberCtorFunc)->CallAsConstructor(1, &strValue);
+        auto context = isolate->GetCurrentContext();
+        convertedValue = Local<Function>::New(isolate, *cache->LongNumberCtorFunc)->CallAsConstructor(context, 1, &strValue).ToLocalChecked();
     }
 
     return convertedValue;

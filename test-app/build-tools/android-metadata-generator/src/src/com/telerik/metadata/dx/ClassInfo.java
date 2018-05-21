@@ -21,7 +21,7 @@ public class ClassInfo implements ClassDescriptor {
     private final DexFile dexFile;
     private final ClassDef classDef;
 
-    private final Comparator METHOD_NAME_COMPARATOR = new Comparator<MethodDescriptor>() {
+    private final Comparator<MethodDescriptor> METHOD_NAME_COMPARATOR = new Comparator<MethodDescriptor>() {
         @Override
         public int compare(MethodDescriptor m1, MethodDescriptor m2) {
             return m1.getName().compareTo(m2.getName());

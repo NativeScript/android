@@ -192,6 +192,8 @@ Local<Function> WeakRef::GetGetterFunction(Isolate* isolate) {
         NativeScriptException nsEx(std::string("Error: c++ exception!"));
         nsEx.ReThrowToV8();
     }
+    // this is only to avoid warnings, we should never come here
+    return Local<Function>();
 }
 
 Local<Function> WeakRef::GetClearFunction(Isolate* isolate) {
@@ -215,4 +217,6 @@ Local<Function> WeakRef::GetClearFunction(Isolate* isolate) {
         NativeScriptException nsEx(std::string("Error: c++ exception!"));
         nsEx.ReThrowToV8();
     }
+    // this is only to avoid warnings, we should never come here
+    return Local<Function>();
 }

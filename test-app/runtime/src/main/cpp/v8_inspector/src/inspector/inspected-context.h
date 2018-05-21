@@ -2,8 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef V8_INSPECTOR_INSPECTEDCONTEXT_H_
-#define V8_INSPECTOR_INSPECTEDCONTEXT_H_
+#ifndef V8_INSPECTOR_INSPECTED_CONTEXT_H_
+#define V8_INSPECTOR_INSPECTED_CONTEXT_H_
+
+#include <unordered_map>
+#include <unordered_set>
 
 #include "src/base/macros.h"
 #include "src/inspector/string-16.h"
@@ -20,6 +23,8 @@ class V8InspectorImpl;
 class InspectedContext {
     public:
         ~InspectedContext();
+
+        static int contextId(v8::Local<v8::Context>);
 
         v8::Local<v8::Context> context() const;
         int contextId() const {
@@ -38,30 +43,23 @@ class InspectedContext {
             return m_auxData;
         }
 
-        bool isReported() const {
-            return m_reported;
-        }
-        void setReported(bool reported) {
-            m_reported = reported;
-        }
+        bool isReported(int sessionId) const;
+        void setReported(int sessionId, bool reported);
 
         v8::Isolate* isolate() const;
         V8InspectorImpl* inspector() const {
             return m_inspector;
         }
 
-        InjectedScript* getInjectedScript() {
-            return m_injectedScript.get();
-        }
-        void createInjectedScript();
-        void discardInjectedScript();
+        InjectedScript* getInjectedScript(int sessionId);
+        bool createInjectedScript(int sessionId);
+        void discardInjectedScript(int sessionId);
 
     private:
         friend class V8InspectorImpl;
         InspectedContext(V8InspectorImpl*, const V8ContextInfo&, int contextId);
-        static void weakCallback(const v8::WeakCallbackInfo<InspectedContext>&);
-        static void consoleWeakCallback(
-            const v8::WeakCallbackInfo<InspectedContext>&);
+
+        class WeakCallbackData;
 
         V8InspectorImpl* m_inspector;
         v8::Global<v8::Context> m_context;
@@ -70,13 +68,13 @@ class InspectedContext {
         const String16 m_origin;
         const String16 m_humanReadableName;
         const String16 m_auxData;
-        bool m_reported;
-        std::unique_ptr<InjectedScript> m_injectedScript;
-        v8::Global<v8::Object> m_console;
+        std::unordered_set<int> m_reportedSessionIds;
+        std::unordered_map<int, std::unique_ptr<InjectedScript>> m_injectedScripts;
+        WeakCallbackData* m_weakCallbackData;
 
         DISALLOW_COPY_AND_ASSIGN(InspectedContext);
 };
 
 }  // namespace v8_inspector
 
-#endif  // V8_INSPECTOR_INSPECTEDCONTEXT_H_
+#endif  // V8_INSPECTOR_INSPECTED_CONTEXT_H_

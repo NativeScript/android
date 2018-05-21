@@ -225,12 +225,12 @@ public class Writer {
             if (n.nodeType == TreeNode.Package) {
                 n.offsetValue = 0;
             } else if ((n.nodeType & TreeNode.Primitive) == TreeNode.Primitive) {
-                n.offsetValue = (int) outValueStream.getPosition();
+                n.offsetValue = outValueStream.getPosition();
 
                 outValueStream.write(n.nodeType);
             } else if (((n.nodeType & TreeNode.Class) == TreeNode.Class)
                        || ((n.nodeType & TreeNode.Interface) == TreeNode.Interface)) {
-                n.offsetValue = (int) outValueStream.getPosition();
+                n.offsetValue = outValueStream.getPosition();
 
                 writeClassValue(outValueStream, uniqueStrings, n);
             } else if ((n.nodeType & TreeNode.Array) == TreeNode.Array) {

@@ -32,7 +32,7 @@ import android.util.SparseArray;
 import com.tns.bindings.ProxyGenerator;
 
 public class Runtime {
-    private native void initNativeScript(int runtimeId, String filesPath, String nativeLibDir, boolean verboseLoggingEnabled, boolean isDebuggable, String packageName, Object[] v8Options, String callingDir);
+    private native void initNativeScript(int runtimeId, String filesPath, String nativeLibDir, boolean verboseLoggingEnabled, boolean isDebuggable, String packageName, Object[] v8Options, String callingDir, int maxLogcatObjectSize, boolean forceLog);
 
     private native void runModule(int runtimeId, String filePath) throws NativeScriptException;
 
@@ -65,6 +65,8 @@ public class Runtime {
     private static native void ClearWorkerPersistent(int runtimeId, int workerId);
 
     private static native void CallWorkerObjectOnErrorHandleMain(int runtimeId, int workerId, String message, String stackTrace, String filename, int lineno, String threadName) throws NativeScriptException;
+
+    private static native void ResetDateTimeConfigurationCache(int runtimeId);
 
     void passUncaughtExceptionToJs(Throwable ex, String stackTrace) {
         passUncaughtExceptionToJsNative(getRuntimeId(), ex, stackTrace);
@@ -224,6 +226,13 @@ public class Runtime {
         return this.threadScheduler.getHandler();
     }
 
+    public void ResetDateTimeConfigurationCache() {
+        Runtime runtime = getCurrentRuntime();
+        if (runtime != null) {
+            ResetDateTimeConfigurationCache(runtime.getRuntimeId());
+        }
+    }
+
     private static class WorkerThreadHandler extends Handler {
         @Override
         public void handleMessage(Message msg) {
@@ -247,7 +256,7 @@ public class Runtime {
                 WorkerGlobalOnMessageCallback(currentRuntime.runtimeId, msg.obj.toString());
             } else if (msg.arg1 == MessageType.TerminateThread) {
                 currentRuntime.isTerminating = true;
-                currentRuntime.gcListener.unsubscribe(currentRuntime);
+                GcListener.unsubscribe(currentRuntime);
 
                 runtimeCache.remove(currentRuntime.runtimeId);
 
@@ -266,7 +275,7 @@ public class Runtime {
                 currentRuntime.mainThreadHandler.sendMessage(msgToMain);
 
                 currentRuntime.isTerminating = true;
-                currentRuntime.gcListener.unsubscribe(currentRuntime);
+                GcListener.unsubscribe(currentRuntime);
 
                 runtimeCache.remove(currentRuntime.runtimeId);
 
@@ -481,9 +490,12 @@ public class Runtime {
                 throw new RuntimeException("Fail to initialize Require class", ex);
             }
 
-            initNativeScript(getRuntimeId(), Module.getApplicationFilesPath(), nativeLibDir, logger.isEnabled(), isDebuggable, appName, appConfig.getAsArray(), callingJsDir);
+            boolean forceConsoleLog = appConfig.getForceLog() || "timeline".equalsIgnoreCase(appConfig.getProfilingMode());
 
-            clearStartupData(getRuntimeId()); // It's safe to delete the data after the V8 debugger is initialized
+            initNativeScript(getRuntimeId(), Module.getApplicationFilesPath(), nativeLibDir, logger.isEnabled(), isDebuggable, appName, appConfig.getAsArray(),
+                    callingJsDir, appConfig.getMaxLogcatObjectSize(), forceConsoleLog);
+
+            //clearStartupData(getRuntimeId()); // It's safe to delete the data after the V8 debugger is initialized
 
             if (logger.isEnabled()) {
                 Date d = new Date();
@@ -493,7 +505,7 @@ public class Runtime {
                 logger.write("init time=" + (d.getTime() - lastModDate.getTime()));
             }
 
-            gcListener.subscribe(this);
+            GcListener.subscribe(this);
 
             initialized = true;
         } finally {
@@ -1324,5 +1336,9 @@ public class Runtime {
 
         // TODO: Pete: Should we treat the message with higher priority?
         currentRuntime.mainThreadHandler.sendMessage(msg);
+    }
+
+    public void clearStartupData() {
+        clearStartupData(getRuntimeId());
     }
 }

@@ -34,9 +34,9 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_SetManualInstrumentationMode(JNIE
     }
 }
 
-extern "C" JNIEXPORT void Java_com_tns_Runtime_initNativeScript(JNIEnv* _env, jobject obj, jint runtimeId, jstring filesPath, jstring nativeLibDir, jboolean verboseLoggingEnabled, jboolean isDebuggable, jstring packageName, jobjectArray args, jstring callingDir) {
+extern "C" JNIEXPORT void Java_com_tns_Runtime_initNativeScript(JNIEnv* _env, jobject obj, jint runtimeId, jstring filesPath, jstring nativeLibDir, jboolean verboseLoggingEnabled, jboolean isDebuggable, jstring packageName, jobjectArray args, jstring callingDir, jint maxLogcatObjectSize, jboolean forceLog) {
     try {
-        Runtime::Init(_env, obj, runtimeId, filesPath, nativeLibDir, verboseLoggingEnabled, isDebuggable, packageName, args, callingDir);
+        Runtime::Init(_env, obj, runtimeId, filesPath, nativeLibDir, verboseLoggingEnabled, isDebuggable, packageName, args, callingDir, maxLogcatObjectSize, forceLog);
     } catch (NativeScriptException& e) {
         e.ReThrowToJava();
     } catch (std::exception e) {
@@ -217,6 +217,8 @@ extern "C" JNIEXPORT jint Java_com_tns_Runtime_generateNewObjectId(JNIEnv* env, 
         NativeScriptException nsEx(std::string("Error: c++ exception!"));
         nsEx.ReThrowToJava();
     }
+    // this is only to avoid warnings, we should never come here
+    return 0;
 }
 
 extern "C" JNIEXPORT jboolean Java_com_tns_Runtime_notifyGc(JNIEnv* env, jobject obj, jint runtimeId) {
@@ -345,4 +347,14 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_CallWorkerObjectOnErrorHandleMain
     } catch (NativeScriptException& e) {
         e.ReThrowToJava();
     }
+}
+
+extern "C" JNIEXPORT void Java_com_tns_Runtime_ResetDateTimeConfigurationCache(JNIEnv* _env, jobject obj, jint runtimeId) {
+    auto runtime = TryGetRuntime(runtimeId);
+    if (runtime == nullptr) {
+        return;
+    }
+
+    auto isolate = runtime->GetIsolate();
+    Date::DateTimeConfigurationChangeNotification(isolate);
 }

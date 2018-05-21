@@ -35,7 +35,7 @@ var Activity = (function (_super) {
     return Activity;
 }(android.support.v7.app.AppCompatActivity));
 Activity = __decorate([
-    JavaProxy("org.nativescript.a.MyCustomActivity"),
+    JavaProxy("org.nativescript.b.MyCustomActivity"),
     __metadata("design:paramtypes", [])
 ], Activity);
 //# sourceMappingURL=myCustomActivity.android.js.map

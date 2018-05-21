@@ -538,8 +538,7 @@ describe("Tests that app does not crashes (no hard-fail asserts)", function () {
 		var MyObject = (function (_super) {
 		    __extends(MyObject, _super);
 		    function MyObject(name) {
-		        _super.call(this);
-		        return __native(this);
+		        return _super.call(this) || this;
 		    }
 		    return MyObject;
 		})(java.lang.Object);

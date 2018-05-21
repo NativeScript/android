@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef V8_INSPECTOR_REMOTEOBJECTID_H_
-#define V8_INSPECTOR_REMOTEOBJECTID_H_
+#ifndef V8_INSPECTOR_REMOTE_OBJECT_ID_H_
+#define V8_INSPECTOR_REMOTE_OBJECT_ID_H_
 
 #include "src/inspector/protocol/Forward.h"
 
 namespace v8_inspector {
 
-using protocol::ErrorString;
+using protocol::Response;
 
 class RemoteObjectIdBase {
     public:
@@ -29,7 +29,7 @@ class RemoteObjectIdBase {
 
 class RemoteObjectId final : public RemoteObjectIdBase {
     public:
-        static std::unique_ptr<RemoteObjectId> parse(ErrorString*, const String16&);
+        static Response parse(const String16&, std::unique_ptr<RemoteObjectId>*);
         ~RemoteObjectId() {}
         int id() const {
             return m_id;
@@ -43,8 +43,7 @@ class RemoteObjectId final : public RemoteObjectIdBase {
 
 class RemoteCallFrameId final : public RemoteObjectIdBase {
     public:
-        static std::unique_ptr<RemoteCallFrameId> parse(ErrorString*,
-                const String16&);
+        static Response parse(const String16&, std::unique_ptr<RemoteCallFrameId>*);
         ~RemoteCallFrameId() {}
 
         int frameOrdinal() const {
@@ -61,4 +60,4 @@ class RemoteCallFrameId final : public RemoteObjectIdBase {
 
 }  // namespace v8_inspector
 
-#endif  // V8_INSPECTOR_REMOTEOBJECTID_H_
+#endif  // V8_INSPECTOR_REMOTE_OBJECT_ID_H_

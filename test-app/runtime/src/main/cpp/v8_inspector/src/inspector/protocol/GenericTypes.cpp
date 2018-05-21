@@ -16,41 +16,7 @@ namespace GenericTypes {
 
 const char Metainfo::domainName[] = "GenericTypes";
 const char Metainfo::commandPrefix[] = "GenericTypes.";
-const char Metainfo::version[] = "1.2";
-
-std::unique_ptr<SearchMatch> SearchMatch::parse(protocol::Value* value, ErrorSupport* errors) {
-    if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
-        return nullptr;
-    }
-
-    std::unique_ptr<SearchMatch> result(new SearchMatch());
-    protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
-    protocol::Value* lineNumberValue = object->get("lineNumber");
-    errors->setName("lineNumber");
-    result->m_lineNumber = ValueConversions<double>::parse(lineNumberValue, errors);
-    protocol::Value* lineContentValue = object->get("lineContent");
-    errors->setName("lineContent");
-    result->m_lineContent = ValueConversions<String>::parse(lineContentValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
-        return nullptr;
-    }
-    return result;
-}
-
-std::unique_ptr<protocol::DictionaryValue> SearchMatch::serialize() const {
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("lineNumber", ValueConversions<double>::serialize(m_lineNumber));
-    result->setValue("lineContent", ValueConversions<String>::serialize(m_lineContent));
-    return result;
-}
-
-std::unique_ptr<SearchMatch> SearchMatch::clone() const {
-    ErrorSupport errors;
-    return parse(serialize().get(), &errors);
-}
+const char Metainfo::version[] = "1.3";
 
 // ------------- Enum values from params.
 
@@ -61,41 +27,56 @@ void Frontend::flush() {
     m_frontendChannel->flushProtocolNotifications();
 }
 
+void Frontend::sendRawNotification(const String& notification) {
+    m_frontendChannel->sendProtocolNotification(InternalRawNotification::create(notification));
+}
+
 // --------------------- Dispatcher.
 
 class DispatcherImpl : public protocol::DispatcherBase {
     public:
-        DispatcherImpl(FrontendChannel* frontendChannel, Backend* backend)
+        DispatcherImpl(FrontendChannel* frontendChannel, Backend* backend, bool fallThroughForNotFound)
             : DispatcherBase(frontendChannel)
-            , m_backend(backend) {
+            , m_backend(backend)
+            , m_fallThroughForNotFound(fallThroughForNotFound) {
         }
         ~DispatcherImpl() override { }
-        void dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) override;
+        DispatchResponse::Status dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) override;
+        HashMap<String, String>& redirects() {
+            return m_redirects;
+        }
 
     protected:
-        using CallHandler = void (DispatcherImpl::*)(int callId, std::unique_ptr<DictionaryValue> messageObject, ErrorSupport* errors);
+        using CallHandler = DispatchResponse::Status (DispatcherImpl::*)(int callId, std::unique_ptr<DictionaryValue> messageObject, ErrorSupport* errors);
         using DispatchMap = protocol::HashMap<String, CallHandler>;
         DispatchMap m_dispatchMap;
+        HashMap<String, String> m_redirects;
 
 
         Backend* m_backend;
+        bool m_fallThroughForNotFound;
 };
 
-void DispatcherImpl::dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) {
+DispatchResponse::Status DispatcherImpl::dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) {
     protocol::HashMap<String, CallHandler>::iterator it = m_dispatchMap.find(method);
     if (it == m_dispatchMap.end()) {
-        reportProtocolError(callId, MethodNotFound, "'" + method + "' wasn't found", nullptr);
-        return;
+        if (m_fallThroughForNotFound) {
+            return DispatchResponse::kFallThrough;
+        }
+        reportProtocolError(callId, DispatchResponse::kMethodNotFound, "'" + method + "' wasn't found", nullptr);
+        return DispatchResponse::kError;
     }
 
     protocol::ErrorSupport errors;
-    (this->*(it->second))(callId, std::move(messageObject), &errors);
+    return (this->*(it->second))(callId, std::move(messageObject), &errors);
 }
 
 
 // static
-void Dispatcher::wire(UberDispatcher* dispatcher, Backend* backend) {
-    dispatcher->registerBackend("GenericTypes", wrapUnique(new DispatcherImpl(dispatcher->channel(), backend)));
+void Dispatcher::wire(UberDispatcher* uber, Backend* backend) {
+    std::unique_ptr<DispatcherImpl> dispatcher(new DispatcherImpl(uber->channel(), backend, uber->fallThroughForNotFound()));
+    uber->setupRedirects(dispatcher->redirects());
+    uber->registerBackend("GenericTypes", std::move(dispatcher));
 }
 
 } // GenericTypes

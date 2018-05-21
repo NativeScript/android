@@ -57,7 +57,7 @@ public class NativeScriptWeakHashMap<K, V> extends NativeScriptAbstractMap<K, V>
     volatile int modCount;
 
     // Simple utility method to isolate unchecked cast for array creation
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "rawtypes"})
     private static <K, V> Entry<K, V>[] newEntryArray(int size) {
         return new Entry[size];
     }

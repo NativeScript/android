@@ -19,18 +19,26 @@ namespace protocol {
 namespace Overlay {
 
 // ------------- Forward and enum declarations.
-// Configuration data for the highlighting of page elements.
 class HighlightConfig;
+using InspectMode = String;
+class InspectNodeRequestedNotification;
+class NodeHighlightRequestedNotification;
+class ScreenshotRequestedNotification;
+
+namespace InspectModeEnum {
+extern const char* SearchForNode;
+extern const char* SearchForUAShadowDOM;
+extern const char* None;
+} // namespace InspectModeEnum
 
 // ------------- Type and builder declarations.
 
-// Configuration data for the highlighting of page elements.
-class  HighlightConfig {
+class  HighlightConfig : public Serializable {
         PROTOCOL_DISALLOW_COPY(HighlightConfig);
     public:
-        static std::unique_ptr<HighlightConfig> parse(protocol::Value* value, ErrorSupport* errors);
+        static std::unique_ptr<HighlightConfig> fromValue(protocol::Value* value, ErrorSupport* errors);
 
-        ~HighlightConfig() { }
+        ~HighlightConfig() override { }
 
         bool hasShowInfo() {
             return m_showInfo.isJust();
@@ -162,7 +170,10 @@ class  HighlightConfig {
             m_cssGridColor = std::move(value);
         }
 
-        std::unique_ptr<protocol::DictionaryValue> serialize() const;
+        std::unique_ptr<protocol::DictionaryValue> toValue() const;
+        String serialize() override {
+            return toValue()->serialize();
+        }
         std::unique_ptr<HighlightConfig> clone() const;
 
         template<int STATE>
@@ -279,20 +290,222 @@ class  HighlightConfig {
 };
 
 
+class  InspectNodeRequestedNotification : public Serializable {
+        PROTOCOL_DISALLOW_COPY(InspectNodeRequestedNotification);
+    public:
+        static std::unique_ptr<InspectNodeRequestedNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+        ~InspectNodeRequestedNotification() override { }
+
+        int getBackendNodeId() {
+            return m_backendNodeId;
+        }
+        void setBackendNodeId(int value) {
+            m_backendNodeId = value;
+        }
+
+        std::unique_ptr<protocol::DictionaryValue> toValue() const;
+        String serialize() override {
+            return toValue()->serialize();
+        }
+        std::unique_ptr<InspectNodeRequestedNotification> clone() const;
+
+        template<int STATE>
+        class InspectNodeRequestedNotificationBuilder {
+            public:
+                enum {
+                    NoFieldsSet = 0,
+                    BackendNodeIdSet = 1 << 1,
+                    AllFieldsSet = (BackendNodeIdSet | 0)
+                };
+
+
+                InspectNodeRequestedNotificationBuilder<STATE | BackendNodeIdSet>& setBackendNodeId(int value) {
+                    static_assert(!(STATE & BackendNodeIdSet), "property backendNodeId should not be set yet");
+                    m_result->setBackendNodeId(value);
+                    return castState<BackendNodeIdSet>();
+                }
+
+                std::unique_ptr<InspectNodeRequestedNotification> build() {
+                    static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+                    return std::move(m_result);
+                }
+
+            private:
+                friend class InspectNodeRequestedNotification;
+                InspectNodeRequestedNotificationBuilder() : m_result(new InspectNodeRequestedNotification()) { }
+
+                template<int STEP> InspectNodeRequestedNotificationBuilder<STATE | STEP>& castState() {
+                    return *reinterpret_cast<InspectNodeRequestedNotificationBuilder<STATE | STEP>*>(this);
+                }
+
+                std::unique_ptr<protocol::Overlay::InspectNodeRequestedNotification> m_result;
+        };
+
+        static InspectNodeRequestedNotificationBuilder<0> create() {
+            return InspectNodeRequestedNotificationBuilder<0>();
+        }
+
+    private:
+        InspectNodeRequestedNotification() {
+            m_backendNodeId = 0;
+        }
+
+        int m_backendNodeId;
+};
+
+
+class  NodeHighlightRequestedNotification : public Serializable {
+        PROTOCOL_DISALLOW_COPY(NodeHighlightRequestedNotification);
+    public:
+        static std::unique_ptr<NodeHighlightRequestedNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+        ~NodeHighlightRequestedNotification() override { }
+
+        int getNodeId() {
+            return m_nodeId;
+        }
+        void setNodeId(int value) {
+            m_nodeId = value;
+        }
+
+        std::unique_ptr<protocol::DictionaryValue> toValue() const;
+        String serialize() override {
+            return toValue()->serialize();
+        }
+        std::unique_ptr<NodeHighlightRequestedNotification> clone() const;
+
+        template<int STATE>
+        class NodeHighlightRequestedNotificationBuilder {
+            public:
+                enum {
+                    NoFieldsSet = 0,
+                    NodeIdSet = 1 << 1,
+                    AllFieldsSet = (NodeIdSet | 0)
+                };
+
+
+                NodeHighlightRequestedNotificationBuilder<STATE | NodeIdSet>& setNodeId(int value) {
+                    static_assert(!(STATE & NodeIdSet), "property nodeId should not be set yet");
+                    m_result->setNodeId(value);
+                    return castState<NodeIdSet>();
+                }
+
+                std::unique_ptr<NodeHighlightRequestedNotification> build() {
+                    static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+                    return std::move(m_result);
+                }
+
+            private:
+                friend class NodeHighlightRequestedNotification;
+                NodeHighlightRequestedNotificationBuilder() : m_result(new NodeHighlightRequestedNotification()) { }
+
+                template<int STEP> NodeHighlightRequestedNotificationBuilder<STATE | STEP>& castState() {
+                    return *reinterpret_cast<NodeHighlightRequestedNotificationBuilder<STATE | STEP>*>(this);
+                }
+
+                std::unique_ptr<protocol::Overlay::NodeHighlightRequestedNotification> m_result;
+        };
+
+        static NodeHighlightRequestedNotificationBuilder<0> create() {
+            return NodeHighlightRequestedNotificationBuilder<0>();
+        }
+
+    private:
+        NodeHighlightRequestedNotification() {
+            m_nodeId = 0;
+        }
+
+        int m_nodeId;
+};
+
+
+class  ScreenshotRequestedNotification : public Serializable {
+        PROTOCOL_DISALLOW_COPY(ScreenshotRequestedNotification);
+    public:
+        static std::unique_ptr<ScreenshotRequestedNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+        ~ScreenshotRequestedNotification() override { }
+
+        protocol::Page::Viewport* getViewport() {
+            return m_viewport.get();
+        }
+        void setViewport(std::unique_ptr<protocol::Page::Viewport> value) {
+            m_viewport = std::move(value);
+        }
+
+        std::unique_ptr<protocol::DictionaryValue> toValue() const;
+        String serialize() override {
+            return toValue()->serialize();
+        }
+        std::unique_ptr<ScreenshotRequestedNotification> clone() const;
+
+        template<int STATE>
+        class ScreenshotRequestedNotificationBuilder {
+            public:
+                enum {
+                    NoFieldsSet = 0,
+                    ViewportSet = 1 << 1,
+                    AllFieldsSet = (ViewportSet | 0)
+                };
+
+
+                ScreenshotRequestedNotificationBuilder<STATE | ViewportSet>& setViewport(std::unique_ptr<protocol::Page::Viewport> value) {
+                    static_assert(!(STATE & ViewportSet), "property viewport should not be set yet");
+                    m_result->setViewport(std::move(value));
+                    return castState<ViewportSet>();
+                }
+
+                std::unique_ptr<ScreenshotRequestedNotification> build() {
+                    static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+                    return std::move(m_result);
+                }
+
+            private:
+                friend class ScreenshotRequestedNotification;
+                ScreenshotRequestedNotificationBuilder() : m_result(new ScreenshotRequestedNotification()) { }
+
+                template<int STEP> ScreenshotRequestedNotificationBuilder<STATE | STEP>& castState() {
+                    return *reinterpret_cast<ScreenshotRequestedNotificationBuilder<STATE | STEP>*>(this);
+                }
+
+                std::unique_ptr<protocol::Overlay::ScreenshotRequestedNotification> m_result;
+        };
+
+        static ScreenshotRequestedNotificationBuilder<0> create() {
+            return ScreenshotRequestedNotificationBuilder<0>();
+        }
+
+    private:
+        ScreenshotRequestedNotification() {
+        }
+
+        std::unique_ptr<protocol::Page::Viewport> m_viewport;
+};
+
+
 // ------------- Backend interface.
 
 class  Backend {
     public:
         virtual ~Backend() { }
 
-        virtual void enable(ErrorString*) = 0;
-        virtual void disable(ErrorString*) = 0;
-        virtual void setShowFPSCounter(ErrorString*, bool in_show) = 0;
-        virtual void setPausedInDebuggerMessage(ErrorString*, const Maybe<String>& in_message) = 0;
-        virtual void highlightNode(ErrorString*, std::unique_ptr<protocol::Overlay::HighlightConfig> in_highlightConfig, const Maybe<int>& in_nodeId, const Maybe<int>& in_backendNodeId, const Maybe<String>& in_objectId) = 0;
-        virtual void highlightFrame(ErrorString*, const String& in_frameId, const Maybe<protocol::DOM::RGBA>& in_contentColor, const Maybe<protocol::DOM::RGBA>& in_contentOutlineColor) = 0;
-        virtual void hideHighlight(ErrorString*) = 0;
-        virtual void getHighlightObjectForTest(ErrorString*, int in_nodeId, std::unique_ptr<protocol::DictionaryValue>* out_highlight) = 0;
+        virtual DispatchResponse disable() = 0;
+        virtual DispatchResponse enable() = 0;
+        virtual DispatchResponse getHighlightObjectForTest(int in_nodeId, std::unique_ptr<protocol::DictionaryValue>* out_highlight) = 0;
+        virtual DispatchResponse hideHighlight() = 0;
+        virtual DispatchResponse highlightFrame(const String& in_frameId, Maybe<protocol::DOM::RGBA> in_contentColor, Maybe<protocol::DOM::RGBA> in_contentOutlineColor) = 0;
+        virtual DispatchResponse highlightNode(std::unique_ptr<protocol::Overlay::HighlightConfig> in_highlightConfig, Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectId) = 0;
+        virtual DispatchResponse highlightQuad(std::unique_ptr<protocol::Array<double>> in_quad, Maybe<protocol::DOM::RGBA> in_color, Maybe<protocol::DOM::RGBA> in_outlineColor) = 0;
+        virtual DispatchResponse highlightRect(int in_x, int in_y, int in_width, int in_height, Maybe<protocol::DOM::RGBA> in_color, Maybe<protocol::DOM::RGBA> in_outlineColor) = 0;
+        virtual DispatchResponse setInspectMode(const String& in_mode, Maybe<protocol::Overlay::HighlightConfig> in_highlightConfig) = 0;
+        virtual DispatchResponse setPausedInDebuggerMessage(Maybe<String> in_message) = 0;
+        virtual DispatchResponse setShowDebugBorders(bool in_show) = 0;
+        virtual DispatchResponse setShowFPSCounter(bool in_show) = 0;
+        virtual DispatchResponse setShowPaintRects(bool in_result) = 0;
+        virtual DispatchResponse setShowScrollBottleneckRects(bool in_show) = 0;
+        virtual DispatchResponse setShowViewportSizeOnResize(bool in_show) = 0;
+        virtual DispatchResponse setSuspended(bool in_suspended) = 0;
 
 };
 
@@ -300,10 +513,13 @@ class  Backend {
 
 class  Frontend {
     public:
-        Frontend(FrontendChannel* frontendChannel) : m_frontendChannel(frontendChannel) { }
+        explicit Frontend(FrontendChannel* frontendChannel) : m_frontendChannel(frontendChannel) { }
+        void inspectNodeRequested(int backendNodeId);
+        void nodeHighlightRequested(int nodeId);
         void screenshotRequested(std::unique_ptr<protocol::Page::Viewport> viewport);
 
         void flush();
+        void sendRawNotification(const String&);
     private:
         FrontendChannel* m_frontendChannel;
 };

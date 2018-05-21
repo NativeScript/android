@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef V8_INSPECTOR_V8CONSOLEAGENTIMPL_H_
-#define V8_INSPECTOR_V8CONSOLEAGENTIMPL_H_
+#ifndef V8_INSPECTOR_V8_CONSOLE_AGENT_IMPL_H_
+#define V8_INSPECTOR_V8_CONSOLE_AGENT_IMPL_H_
 
 #include "src/base/macros.h"
 #include "src/inspector/protocol/Console.h"
@@ -14,7 +14,7 @@ namespace v8_inspector {
 class V8ConsoleMessage;
 class V8InspectorSessionImpl;
 
-using protocol::ErrorString;
+using protocol::Response;
 
 class V8ConsoleAgentImpl : public protocol::Console::Backend {
     public:
@@ -22,9 +22,9 @@ class V8ConsoleAgentImpl : public protocol::Console::Backend {
                            protocol::DictionaryValue* state);
         ~V8ConsoleAgentImpl() override;
 
-        void enable(ErrorString*) override;
-        void disable(ErrorString*) override;
-        void clearMessages(ErrorString*) override;
+        Response enable() override;
+        Response disable() override;
+        Response clearMessages() override;
 
         void restore();
         void messageAdded(V8ConsoleMessage*);
@@ -45,4 +45,4 @@ class V8ConsoleAgentImpl : public protocol::Console::Backend {
 
 }  // namespace v8_inspector
 
-#endif  // V8_INSPECTOR_V8CONSOLEAGENTIMPL_H_
+#endif  // V8_INSPECTOR_V8_CONSOLE_AGENT_IMPL_H_

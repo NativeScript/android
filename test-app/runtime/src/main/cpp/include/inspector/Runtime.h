@@ -19,17 +19,24 @@ namespace API {
 // ------------- Types.
 
 class V8_EXPORT RemoteObject {
-    public:
-        virtual std::unique_ptr<StringBuffer> toJSONString() const = 0;
-        virtual ~RemoteObject() { }
-        static std::unique_ptr<protocol::Runtime::API::RemoteObject> fromJSONString(const StringView& json);
+public:
+    virtual std::unique_ptr<StringBuffer> toJSONString() const = 0;
+    virtual ~RemoteObject() { }
+    static std::unique_ptr<protocol::Runtime::API::RemoteObject> fromJSONString(const StringView& json);
 };
 
 class V8_EXPORT StackTrace {
-    public:
-        virtual std::unique_ptr<StringBuffer> toJSONString() const = 0;
-        virtual ~StackTrace() { }
-        static std::unique_ptr<protocol::Runtime::API::StackTrace> fromJSONString(const StringView& json);
+public:
+    virtual std::unique_ptr<StringBuffer> toJSONString() const = 0;
+    virtual ~StackTrace() { }
+    static std::unique_ptr<protocol::Runtime::API::StackTrace> fromJSONString(const StringView& json);
+};
+
+class V8_EXPORT StackTraceId {
+public:
+    virtual std::unique_ptr<StringBuffer> toJSONString() const = 0;
+    virtual ~StackTraceId() { }
+    static std::unique_ptr<protocol::Runtime::API::StackTraceId> fromJSONString(const StringView& json);
 };
 
 } // namespace API

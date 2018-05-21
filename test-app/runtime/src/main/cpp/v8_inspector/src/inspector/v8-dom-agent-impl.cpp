@@ -29,27 +29,40 @@ V8DOMAgentImpl::V8DOMAgentImpl(V8InspectorSessionImpl* session,
 
 V8DOMAgentImpl::~V8DOMAgentImpl() { }
 
-void V8DOMAgentImpl::enable(ErrorString*) {
+DispatchResponse V8DOMAgentImpl::enable() {
     if (m_enabled) {
-        return;
+        return DispatchResponse::OK();
     }
 
     m_state->setBoolean(DOMAgentState::domEnabled, true);
 
     m_enabled = true;
+
+    return DispatchResponse::OK();
 }
 
-void V8DOMAgentImpl::disable(ErrorString*) {
+DispatchResponse V8DOMAgentImpl::disable() {
     if (!m_enabled) {
-        return;
+        return DispatchResponse::OK();
     }
 
     m_state->setBoolean(DOMAgentState::domEnabled, false);
 
     m_enabled = false;
+
+    return DispatchResponse::OK();
 }
 
-void V8DOMAgentImpl::getDocument(ErrorString* errorString, std::unique_ptr<protocol::DOM::Node>* out_root) {
+DispatchResponse V8DOMAgentImpl::getDocument(Maybe<int> in_depth, Maybe<bool> in_pierce, std::unique_ptr<protocol::DOM::Node>* out_root) {
+    std::unique_ptr<protocol::DOM::Node> defaultNode = protocol::DOM::Node::create()
+            .setNodeId(0)
+            .setBackendNodeId(0)
+            .setNodeType(9)
+            .setNodeName("Frame")
+            .setLocalName("Frame")
+            .setNodeValue("")
+            .build();
+
     std::string getDocumentFunctionString = "getDocument";
     // TODO: Pete: Find a better way to get a hold of the isolate
     auto isolate = v8::Isolate::GetCurrent();
@@ -64,14 +77,15 @@ void V8DOMAgentImpl::getDocument(ErrorString* errorString, std::unique_ptr<proto
         if (!getDocument.IsEmpty() && getDocument->IsFunction()) {
             auto getDocumentFunc = getDocument.As<v8::Function>();
             v8::Local<v8::Value> args[] = {  };
-            v8::TryCatch tc;
+            v8::TryCatch tc(isolate);
 
             auto maybeResult = getDocumentFunc->Call(context, global, 0, args);
 
             if (tc.HasCaught()) {
-                *errorString = utils::Common::getJSCallErrorMessage(getDocumentFunctionString, tc.Message()->Get()).c_str();
+                auto error = utils::Common::getJSCallErrorMessage(getDocumentFunctionString, tc.Message()->Get()).c_str();
 
-                return;
+                *out_root = std::move(defaultNode);
+                return DispatchResponse::Error(error);
             }
 
             v8::Local<v8::Value> outResult;
@@ -79,42 +93,39 @@ void V8DOMAgentImpl::getDocument(ErrorString* errorString, std::unique_ptr<proto
             if (maybeResult.ToLocal(&outResult)) {
                 auto resultString = ArgConverter::ConvertToUtf16String(outResult->ToString());
 
+                if (!outResult->ToObject()->Has(context, ArgConverter::ConvertToV8String(isolate, "backendNodeId")).FromMaybe(false)) {
+                    // Using an older version of the modules which doesn't set the backendNodeId required property
+                    resultString = AddBackendNodeIdProperty(isolate, outResult);
+                }
+
                 auto resultUtf16Data = resultString.data();
 
-                auto resultJson = protocol::parseJSON(String16((const uint16_t*) resultUtf16Data));
+                auto resultJson = protocol::StringUtil::parseJSON(String16((const uint16_t*) resultUtf16Data));
 
                 protocol::ErrorSupport errorSupport;
-                auto domNode = protocol::DOM::Node::parse(resultJson.get(), &errorSupport);
+                auto domNode = protocol::DOM::Node::fromValue(resultJson.get(), &errorSupport);
 
                 auto errorSupportString = errorSupport.errors().utf8();
-                *errorString = errorSupportString.c_str();
                 if (!errorSupportString.empty()) {
                     auto errorMessage = "Error while parsing debug `DOM Node` object. ";
-                    DEBUG_WRITE_FORCE("JS Error: %s", errorMessage, errorSupportString.c_str());
-                    *errorString = errorSupportString.c_str();
-
-                    return;
-                } else if (domNode->getChildren(protocol::Array<protocol::DOM::Node>::create().get())->length() == 0) {
-                    *errorString = "Root view empty.";
-
-                    return;
+                    DEBUG_WRITE_FORCE("JS Error: %s, Error support: %s", errorMessage, errorSupportString.c_str());
+                    return DispatchResponse::Error(errorMessage);
                 } else {
                     *out_root = std::move(domNode);
 
-                    return;
+                    return DispatchResponse::OK();
                 }
             } else {
-                *errorString = "Didn't get a proper result from __getDocument call. Returning empty visual tree.";
-
-                return;
+                return DispatchResponse::Error("Didn't get a proper result from __getDocument call. Returning empty visual tree.");
             }
         }
     }
 
-    *errorString = "getDocument function not available on the global object.";
+    *out_root = std::move(defaultNode);
+    return DispatchResponse::Error("Error getting DOM tree.");
 }
 
-void V8DOMAgentImpl::removeNode(ErrorString* errorString, int in_nodeId) {
+DispatchResponse V8DOMAgentImpl::removeNode(int in_nodeId) {
     std::string removeNodeFunctionString = "removeNode";
 
     // TODO: Pete: Find a better way to get a hold of the isolate
@@ -130,38 +141,27 @@ void V8DOMAgentImpl::removeNode(ErrorString* errorString, int in_nodeId) {
         if (!removeNode.IsEmpty() && removeNode->IsFunction()) {
             auto removeNodeFunc = removeNode.As<v8::Function>();
             v8::Local<v8::Value> args[] = { v8::Number::New(isolate, in_nodeId) };
-            v8::TryCatch tc;
+            v8::TryCatch tc(isolate);
 
             removeNodeFunc->Call(context, global, 1, args);
 
             if (tc.HasCaught()) {
-                *errorString = utils::Common::getJSCallErrorMessage(removeNodeFunctionString, tc.Message()->Get()).c_str();
+                auto error = utils::Common::getJSCallErrorMessage(removeNodeFunctionString, tc.Message()->Get()).c_str();
+                return DispatchResponse::Error(error);
             }
 
-            return;
+            return DispatchResponse::OK();
         }
     }
 
-    *errorString = "Couldn't remove the selected DOMNode from the visual tree.";
+    return DispatchResponse::Error("Couldn't remove the selected DOMNode from the visual tree. Global Inspector object not found.");
 }
 
-// Pete: return empty resolved object - prevents crashes when opening the 'properties', 'event listeners' tabs
-// Not supported
-void V8DOMAgentImpl::resolveNode(ErrorString*, int in_nodeId, const Maybe<String>& in_objectGroup, std::unique_ptr<protocol::Runtime::RemoteObject>* out_object) {
-    auto resolvedNode = protocol::Runtime::RemoteObject::create()
-                        .setType("View")
-                        .build();
-
-    *out_object = std::move(resolvedNode);
+DispatchResponse V8DOMAgentImpl::setAttributeValue(int in_nodeId, const String& in_name, const String& in_value) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-void V8DOMAgentImpl::setAttributeValue(ErrorString* errorString, int in_nodeId, const String& in_name,
-                                       const String& in_value) {
-    // Irrelevant
-}
-
-void V8DOMAgentImpl::setAttributesAsText(ErrorString* errorString, int in_nodeId, const String& in_text,
-        const Maybe<String>& in_name) {
+DispatchResponse V8DOMAgentImpl::setAttributesAsText(int in_nodeId, const String& in_text, Maybe<String> in_name) {
     // call modules' View class methods to modify view's attribute
     // TODO: Pete: Find a better way to get a hold of the isolate
     std::string setAttributeAsTextFunctionString = "setAttributeAsText";
@@ -182,40 +182,191 @@ void V8DOMAgentImpl::setAttributesAsText(ErrorString* errorString, int in_nodeId
                 v8_inspector::toV8String(isolate, in_text),
                 v8_inspector::toV8String(isolate, in_name.fromJust())
             };
-            v8::TryCatch tc;
+            v8::TryCatch tc(isolate);
 
             setAttributeAsTextFunc->Call(context, global, 3, args);
 
             if (tc.HasCaught()) {
-                *errorString = utils::Common::getJSCallErrorMessage(setAttributeAsTextFunctionString, tc.Message()->Get()).c_str();
+                auto error = utils::Common::getJSCallErrorMessage(setAttributeAsTextFunctionString, tc.Message()->Get()).c_str();
+                return DispatchResponse::Error(error);
             }
 
-            return;
+            return DispatchResponse::OK();
         }
     }
+
+    return DispatchResponse::Error("Couldn't change selected DOM node's attribute. Global Inspector object not found.");
 }
 
-void V8DOMAgentImpl::removeAttribute(ErrorString* errorString, int in_nodeId, const String& in_name) {
-    // Irrelevant
+DispatchResponse V8DOMAgentImpl::removeAttribute(int in_nodeId, const String& in_name) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-// Not supported
-void V8DOMAgentImpl::performSearch(ErrorString*, const String& in_query,
-                                   const Maybe<protocol::Array<int>>& in_nodeIds,
-                                   String* out_searchId, int* out_resultCount) {
-
+DispatchResponse V8DOMAgentImpl::performSearch(const String& in_query, Maybe<bool> in_includeUserAgentShadowDOM, String* out_searchId, int* out_resultCount) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-// Not supported
-void V8DOMAgentImpl::getSearchResults(ErrorString*, const String& in_searchId, int in_fromIndex,
-                                      int in_toIndex,
-                                      std::unique_ptr<protocol::Array<int>>* out_nodeIds) {
-
+DispatchResponse V8DOMAgentImpl::getSearchResults(const String& in_searchId, int in_fromIndex, int in_toIndex, std::unique_ptr<protocol::Array<int>>* out_nodeIds) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-// Not supported
-void V8DOMAgentImpl::discardSearchResults(ErrorString*, const String& in_searchId) {
+DispatchResponse V8DOMAgentImpl::discardSearchResults(const String& in_searchId) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
 
+DispatchResponse V8DOMAgentImpl::resolveNode(Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectGroup, std::unique_ptr<protocol::Runtime::RemoteObject>* out_object) {
+    auto resolvedNode = protocol::Runtime::RemoteObject::create()
+                        .setType("View")
+                        .build();
+
+    *out_object = std::move(resolvedNode);
+
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8DOMAgentImpl::collectClassNamesFromSubtree(int in_nodeId, std::unique_ptr<protocol::Array<String>>* out_classNames) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8DOMAgentImpl::copyTo(int in_nodeId, int in_targetNodeId, Maybe<int> in_insertBeforeNodeId, int* out_nodeId) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8DOMAgentImpl::describeNode(Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectId, Maybe<int> in_depth, Maybe<bool> in_pierce, std::unique_ptr<protocol::DOM::Node>* out_node) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8DOMAgentImpl::focus(Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectId) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8DOMAgentImpl::getAttributes(int in_nodeId, std::unique_ptr<protocol::Array<String>>* out_attributes) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8DOMAgentImpl::getBoxModel(Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectId, std::unique_ptr<protocol::DOM::BoxModel>* out_model) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8DOMAgentImpl::getFlattenedDocument(Maybe<int> in_depth, Maybe<bool> in_pierce, std::unique_ptr<protocol::Array<protocol::DOM::Node>>* out_nodes) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8DOMAgentImpl::getNodeForLocation(int in_x, int in_y, Maybe<bool> in_includeUserAgentShadowDOM, int* out_nodeId) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8DOMAgentImpl::getOuterHTML(Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectId, String* out_outerHTML) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8DOMAgentImpl::getRelayoutBoundary(int in_nodeId, int* out_nodeId) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8DOMAgentImpl::markUndoableState() {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8DOMAgentImpl::moveTo(int in_nodeId, int in_targetNodeId, Maybe<int> in_insertBeforeNodeId, int* out_nodeId) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8DOMAgentImpl::pushNodeByPathToFrontend(const String& in_path, int* out_nodeId) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8DOMAgentImpl::pushNodesByBackendIdsToFrontend(std::unique_ptr<protocol::Array<int>> in_backendNodeIds, std::unique_ptr<protocol::Array<int>>* out_nodeIds) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8DOMAgentImpl::querySelector(int in_nodeId, const String& in_selector, int* out_nodeId) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8DOMAgentImpl::querySelectorAll(int in_nodeId, const String& in_selector, std::unique_ptr<protocol::Array<int>>* out_nodeIds) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8DOMAgentImpl::redo() {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8DOMAgentImpl::requestChildNodes(int in_nodeId, Maybe<int> in_depth, Maybe<bool> in_pierce) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8DOMAgentImpl::requestNode(const String& in_objectId, int* out_nodeId) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8DOMAgentImpl::setFileInputFiles(std::unique_ptr<protocol::Array<String>> in_files, Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectId) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8DOMAgentImpl::setInspectedNode(int in_nodeId) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8DOMAgentImpl::setNodeName(int in_nodeId, const String& in_name, int* out_nodeId) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8DOMAgentImpl::setNodeValue(int in_nodeId, const String& in_value) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8DOMAgentImpl::setOuterHTML(int in_nodeId, const String& in_outerHTML) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8DOMAgentImpl::undo() {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8DOMAgentImpl::getFrameOwner(const String& in_frameId, int* out_nodeId) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+std::u16string V8DOMAgentImpl::AddBackendNodeIdProperty(v8::Isolate* isolate, v8::Local<v8::Value> jsonInput) {
+    auto scriptSource =
+        "(function () {"
+        "   function addBackendNodeId(node) {"
+        "       if (!node.backendNodeId) {"
+        "           node.backendNodeId = 0;"
+        "       }"
+        "       if (node.children) {"
+        "           for (var i = 0; i < node.children.length; i++) {"
+        "               addBackendNodeId(node.children[i]);"
+        "           }"
+        "       }"
+        "   }"
+        "   return function(stringifiedNode) {"
+        "       try {"
+        "           const node = JSON.parse(stringifiedNode);"
+        "           addBackendNodeId(node);"
+        "           return JSON.stringify(node);"
+        "       } catch (e) {"
+        "           return stringifiedNode;"
+        "       }"
+        "   }"
+        "})()";
+
+    auto source = ArgConverter::ConvertToV8String(isolate, scriptSource);
+    v8::Local<v8::Script> script;
+    auto context = isolate->GetCurrentContext();
+    v8::Script::Compile(context, source).ToLocal(&script);
+
+    v8::Local<v8::Value> result;
+    script->Run(context).ToLocal(&result);
+    auto addBackendNodeIdFunction = result.As<v8::Function>();
+
+    v8::Local<v8::Value> funcArguments[] = { jsonInput };
+    v8::Local<v8::Value> scriptResult;
+    addBackendNodeIdFunction->Call(context, context->Global(), 1, funcArguments).ToLocal(&scriptResult);
+
+    auto resultString = ArgConverter::ConvertToUtf16String(scriptResult->ToString());
+    return resultString;
 }
 
 V8DOMAgentImpl* V8DOMAgentImpl::Instance = 0;

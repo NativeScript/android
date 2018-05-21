@@ -18,8 +18,15 @@
 
 import groovy.json.JsonSlurper
 import java.nio.file.Paths
+import java.util.regex.Matcher
+import java.util.regex.Pattern
 
 apply plugin: "com.android.application"
+
+def onlyX86 = project.hasProperty("onlyX86")
+if (onlyX86) {
+    println "OnlyX86 build triggered."
+}
 
 //common
 def BUILD_TOOLS_PATH = "$rootDir/build-tools"
@@ -63,7 +70,7 @@ def nativescriptDependencies = new JsonSlurper().parseText(dependenciesJson.text
 def computeCompileSdkVersion = { -> project.hasProperty("compileSdk") ? compileSdk : 26 }
 def computeTargetSdkVersion = { -> project.hasProperty("targetSdk") ? targetSdk : 26 }
 def computeBuildToolsVersion = { ->
-    project.hasProperty("buildToolsVersion") ? buildToolsVersion : "27.0.1"
+    project.hasProperty("buildToolsVersion") ? buildToolsVersion : "27.0.3"
 }
 
 project.ext.selectedBuildType = project.hasProperty("release") ? "release" : "debug"
@@ -122,6 +129,36 @@ def applyPluginGradleConfigurations = { ->
     }
 }
 
+def getAppIdentifier = { packageJsonMap ->
+	def appIdentifier = "";
+	if (packageJsonMap && packageJsonMap.nativescript) {
+		appIdentifier = packageJsonMap.nativescript.id;
+		if (!(appIdentifier instanceof String)) {
+			appIdentifier = appIdentifier.android;
+		}
+	}
+
+	return appIdentifier;
+}
+
+def setAppIdentifier = { ->
+	println "\t + setting applicationId";
+	File packageJsonFile = new File("$rootDir/../../package.json");
+
+	if (packageJsonFile.exists()) {
+		def content = packageJsonFile.getText("UTF-8");
+		def jsonSlurper = new JsonSlurper();
+		def packageJsonMap = jsonSlurper.parseText(content);
+		def appIdentifier = getAppIdentifier(packageJsonMap);
+
+		if (appIdentifier) {
+			project.ext.nsApplicationIdentifier = appIdentifier;
+			android.defaultConfig.applicationId = appIdentifier;
+		}
+	}
+}
+
+
 android {
     compileSdkVersion computeCompileSdkVersion()
     buildToolsVersion computeBuildToolsVersion()
@@ -130,7 +167,14 @@ android {
         minSdkVersion 17
         targetSdkVersion computeTargetSdkVersion()
         ndk {
-            abiFilters "armeabi-v7a", "x86"
+            if (onlyX86) {
+                abiFilters 'x86'
+            } else {
+                abiFilters 'x86', 'armeabi-v7a'//, 'arm64-v8a'
+            }
+        }
+        dexOptions {
+            jumboMode = true
         }
     }
 
@@ -160,6 +204,7 @@ android {
         }
     }
 
+    setAppIdentifier()
     applyAppGradleConfiguration()
     applyPluginGradleConfigurations()
 }
@@ -223,7 +268,16 @@ dependencies {
         return packageJson.nativescript.useV8Symbols
     }
     if (!externalRuntimeExists) {
-        def runtime = useV8Symbols ? "nativescript-regular" : "nativescript-optimized"
+        def runtime = "nativescript-optimized-with-inspector"
+
+        if (project.gradle.startParameter.taskNames.any { it.toLowerCase().contains('release') }) {
+            runtime = "nativescript-optimized"
+        }
+
+        if (useV8Symbols) {
+            runtime = "nativescript-regular"
+        }
+
         println "\t + adding nativescript runtime package dependency: $runtime"
         project.dependencies.add("implementation", [name: runtime, ext: "aar"])
     } else {
@@ -289,7 +343,7 @@ tasks.whenTaskAdded({ org.gradle.api.DefaultTask currentTask ->
         currentTask.finalizedBy(ensureMetadataOutDir)
         ensureMetadataOutDir.finalizedBy(buildMetadata)
     }
-    if (currentTask =~ /assemble.+Debug/ || currentTask =~ /assemble.+Release/) {
+    if (currentTask =~ /assemble.*Debug/ || currentTask =~ /assemble.*Release/) {
         currentTask.finalizedBy("validateAppIdMatch")
     }
 })
@@ -351,12 +405,20 @@ task extractAllJars {
     outputs.dir extractedDependenciesDir
 
     doLast {
-        def iter;
-        if (project.selectedBuildType == "release") {
-            iter = configurations.releaseCompileClasspath.resolve()
-        } else {
-            iter = configurations.debugCompileClasspath.resolve()
+        def buildType = project.selectedBuildType == "release" ? "Release" : "Debug"
+        def iter = []
+        Pattern pattern = Pattern.compile("^(.+)${buildType}CompileClasspath\$")
+        configurations.all{ config ->
+            Matcher matcher = pattern.matcher(config.name)
+            if (matcher.find() || config.name == "${buildType.toLowerCase()}CompileClasspath") {
+                config.resolve().each {
+                    if (!iter.contains(it)) {
+                        iter.push(it)
+                    }
+                }
+            }
         }
+
         def dependencyCounter = 0
         iter.each {
             def nextDependency = it
@@ -502,23 +564,21 @@ copyTypings.onlyIf { generateTypescriptDefinitions.didWork }
 generateTypescriptDefinitions.finalizedBy(copyTypings)
 
 task validateAppIdMatch {
-    doLast {
-        def packageJsonFile = new File("$USER_PROJECT_ROOT/$PACKAGE_JSON")
-        def lineSeparator = System.getProperty("line.separator")
+	doLast {
+		def lineSeparator = System.getProperty("line.separator")
 
-        if (packageJsonFile.exists() && !project.hasProperty("release")) {
-            String content = packageJsonFile.getText("UTF-8")
-            def jsonSlurper = new JsonSlurper()
-            def packageJsonMap = jsonSlurper.parseText(content)
+		if (project.hasProperty("nsApplicationIdentifier") && !project.hasProperty("release")) {
+			if(project.nsApplicationIdentifier != android.defaultConfig.applicationId) {
+				def errorMessage = "${lineSeparator}WARNING: The Application identifier is different from the one inside \"package.json\" file.$lineSeparator" +
+					"NativeScript CLI might not work properly.$lineSeparator" +
+					"Remove applicationId from app.gradle and update the \"nativescript.id\" in package.json.$lineSeparator" +
+					"Actual: ${android.defaultConfig.applicationId}$lineSeparator" +
+					"Expected(from \"package.json\"): ${project.nsApplicationIdentifier}$lineSeparator";
 
-            if (packageJsonMap.nativescript.id != android.defaultConfig.applicationId) {
-                def errorMessage = "${lineSeparator}WARNING: The Application identifier is different from the one inside $PACKAGE_JSON file.$lineSeparator" +
-                        "NativeScript CLI might not work properly.$lineSeparator" +
-                        "Update the application identifier in $PACKAGE_JSON and app.gradle so that they match."
-                logger.error(errorMessage)
-            }
-        }
-    }
+				logger.error(errorMessage)
+			}
+		}
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////

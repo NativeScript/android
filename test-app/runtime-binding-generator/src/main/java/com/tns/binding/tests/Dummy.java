@@ -22,6 +22,7 @@ class Dummy {
         return new Object();
     }
 
+    @SuppressWarnings("unchecked")
     public static <T,T1, T2> T2 dummyGenMethod(Object thiz, String name, T arg1, T1 arg2) {
         return (T2)doMethod();
     }

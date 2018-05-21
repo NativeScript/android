@@ -1,7 +1,7 @@
 env:
   global:
   - NODE_VERSION=6.11.1
-  - NDK_VERSION=r15c
+  - NDK_VERSION=r16b
   - DATE=$(date +%Y-%m-%d)
   - PACKAGE_VERSION=next-$DATE-$TRAVIS_BUILD_NUMBER
   - EMULATOR_API_LEVEL=21
@@ -30,6 +30,7 @@ matrix:
         - echo no | android create avd --force -n $EMULATOR_NAME-$EMULATOR_API_LEVEL -t android-$EMULATOR_API_LEVEL --abi $ANDROID_ABI -c 12M
         - emulator -avd $EMULATOR_NAME-$EMULATOR_API_LEVEL -no-skin -no-audio -no-window &
         - android-wait-for-emulator
+        - "./gradlew runSbgTests --stacktrace"
         - "./gradlew runtest --stacktrace"
         - adb -e logcat -d 300
       before_install:
@@ -62,4 +63,3 @@ cache:
 
 install:
   - nvm install $NODE_VERSION
-  

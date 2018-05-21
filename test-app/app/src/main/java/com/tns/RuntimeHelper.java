@@ -3,9 +3,14 @@ package com.tns;
 import java.io.File;
 
 import android.app.Application;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.os.Build;
+import android.preference.PreferenceManager;
 import android.util.Log;
 
 import java.io.IOException;
@@ -13,6 +18,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.TimeZone;
 
 public final class RuntimeHelper {
     private RuntimeHelper() {
@@ -114,7 +120,9 @@ public final class RuntimeHelper {
                                 logger.write("Extracting snapshot blob");
                             }
 
-                            aE.extractAssets(app, "snapshots/" + Build.CPU_ABI, outputDir, extractPolicy, removePreviouslyInstalledAssets);
+                            @SuppressWarnings("deprecation")
+                            String cpu_abi = Build.CPU_ABI;
+                            aE.extractAssets(app, "snapshots/" + cpu_abi, outputDir, extractPolicy, removePreviouslyInstalledAssets);
                         }
 
                         extractPolicy.setAssetsThumb(app);
@@ -185,14 +193,18 @@ public final class RuntimeHelper {
                     // if app is in debuggable mode run livesync service
                     // runtime needs to be initialized before the NativeScriptSyncService is enabled because it uses runtime.runScript(...)
                     try {
+                        @SuppressWarnings("unchecked")
                         Class NativeScriptSyncService = Class.forName("com.tns.NativeScriptSyncService");
 
+                        @SuppressWarnings("unchecked")
                         Constructor cons = NativeScriptSyncService.getConstructor(new Class[] {Runtime.class, Logger.class, Context.class});
                         Object syncService = cons.newInstance(runtime, logger, app);
 
+                        @SuppressWarnings("unchecked")
                         Method syncMethod = NativeScriptSyncService.getMethod("sync");
                         syncMethod.invoke(syncService);
 
+                        @SuppressWarnings("unchecked")
                         Method startServerMethod = NativeScriptSyncService.getMethod("startServer");
                         startServerMethod.invoke(syncService);
                     } catch (ClassNotFoundException e) {
@@ -227,6 +239,13 @@ public final class RuntimeHelper {
                     }
                     e.printStackTrace();
                 }
+
+                if (appConfig.handleTimeZoneChanges()) {
+                    // If the user sets this flag, we will register a broadcast receiver
+                    // that will listen for the TIMEZONE_CHANGED event and update V8's cache
+                    // so that subsequent calls to "new Date()" return the new timezone
+                    registerTimezoneChangedListener(app, runtime);
+                }
             }
             return runtime;
         } finally {
@@ -234,5 +253,40 @@ public final class RuntimeHelper {
         }
     }
 
+    private static void registerTimezoneChangedListener(Context context, final Runtime runtime) {
+        IntentFilter timezoneFilter = new IntentFilter(Intent.ACTION_TIMEZONE_CHANGED);
+
+        BroadcastReceiver timezoneReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                String action = intent.getAction();
+                if (action == null || !action.equals(Intent.ACTION_TIMEZONE_CHANGED)) {
+                    return;
+                }
+
+                SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+
+                String oldTimezone = prefs.getString(PREF_TIMEZONE, null);
+                String newTimezone = TimeZone.getDefault().getID();
+                if (newTimezone == null) {
+                    newTimezone = "";
+                }
+
+                if (oldTimezone == null) {
+                    oldTimezone = "";
+                }
+
+                if (!oldTimezone.equals(newTimezone)) {
+                    prefs.edit().putString(PREF_TIMEZONE, newTimezone).commit();
+                    // Notify V8 for the timezone change
+                    runtime.ResetDateTimeConfigurationCache();
+                }
+            }
+        };
+
+        context.registerReceiver(timezoneReceiver, timezoneFilter);
+    }
+
     private static final String logTag = "MyApp";
+    private static final String PREF_TIMEZONE = "_android_runtime_pref_timezone_";
 }

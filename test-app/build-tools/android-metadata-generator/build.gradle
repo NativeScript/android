@@ -7,8 +7,8 @@
 */
 apply plugin: "java"
 
-sourceCompatibility = 1.6
-targetCompatibility = 1.6
+sourceCompatibility = JavaVersion.VERSION_1_6
+targetCompatibility = JavaVersion.VERSION_1_6
 
 buildscript {
     repositories {
@@ -17,7 +17,7 @@ buildscript {
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle:3.0.1'
+        classpath 'com.android.tools.build:gradle:3.1.2'
     }
 }
 
@@ -29,10 +29,14 @@ sourceSets {
     }
 }
 
+compileJava {
+    options.compilerArgs << "-Xlint:all" << "-Xlint:-options" << "-Werror"
+}
+
 compileJava.outputs.dir("$rootDir/dist/classes")
 
 dependencies {
-    compile files("./src/libs/bcel-5.2.jar")
+    compile 'org.apache.bcel:bcel:6.0'
     compile files("./src/libs/dx.jar")
 }
 

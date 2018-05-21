@@ -23,7 +23,6 @@ import com.tns.bindings.desc.ClassDescriptor;
 import com.tns.bindings.desc.reflection.ClassInfo;
 
 import dalvik.system.DexClassLoader;
-import dalvik.system.DexFile;
 
 public class DexFactory {
     private static final String COM_TNS_GEN_PREFIX = "com.tns.gen.";
@@ -156,7 +155,6 @@ public class DexFactory {
         //
 
         Class<?> result = null;
-        DexFile df = null;
         try {
             // use DexFile instead of DexClassLoader to allow class loading
             // within the default class loader
@@ -166,10 +164,12 @@ public class DexFactory {
             // loaded within the system class loader
 
             if (isInterface) {
-                df = DexFile.loadDex(jarFilePath, new File(this.odexDir, fullClassName).getAbsolutePath(), 0);
+                @SuppressWarnings("deprecation")
+                dalvik.system.DexFile df = dalvik.system.DexFile.loadDex(jarFilePath, new File(this.odexDir, fullClassName).getAbsolutePath(), 0);
                 result = df.loadClass(fullClassName, classLoader);
             } else {
-                df = DexFile.loadDex(jarFilePath, new File(this.odexDir, desiredDexClassName).getAbsolutePath(), 0);
+                @SuppressWarnings("deprecation")
+                dalvik.system.DexFile df = dalvik.system.DexFile.loadDex(jarFilePath, new File(this.odexDir, desiredDexClassName).getAbsolutePath(), 0);
                 result = df.loadClass(desiredDexClassName, classLoader);
             }
         } catch (IOException e) {
@@ -274,7 +274,7 @@ public class DexFactory {
         }
 
         AnnotationDescriptor[] annotations = null;
-        return proxyGenerator.generateProxy(proxyName, new ClassInfo(classToProxy) , methodOverridesSet, implementedInterfacesSet, isInterface, annotations);
+        return proxyGenerator.generateProxy(proxyName, new ClassInfo(classToProxy), methodOverridesSet, implementedInterfacesSet, isInterface, annotations);
     }
 
     private void updateDexThumbAndPurgeCache() {

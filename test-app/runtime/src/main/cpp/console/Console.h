@@ -10,9 +10,12 @@
 #include <ArgConverter.h>
 
 namespace tns {
+
+typedef void (*ConsoleCallback)(const std::string& message, const std::string& logLevel);
+
 class Console {
     public:
-        static v8::Local<v8::Object> createConsole(v8::Local<v8::Context> context, const std::string& filesPath);
+        static v8::Local<v8::Object> createConsole(v8::Local<v8::Context> context, ConsoleCallback callback, const int maxLogcatObjectSize, const bool forceLog);
 
         static void assertCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
         static void errorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
@@ -25,8 +28,16 @@ class Console {
         static void timeEndCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 
     private:
+        static int m_maxLogcatObjectSize;
+        static bool m_forceLog;
+        static ConsoleCallback m_callback;
         static const char* LOG_TAG;
         static std::map<v8::Isolate*, std::map<std::string, double>> s_isolateToConsoleTimersMap;
+
+        static bool isApplicationInDebug;
+        static bool shouldLog() {
+            return m_forceLog || isApplicationInDebug;
+        }
 
         // heavily inspired by 'createBoundFunctionProperty' of V8's v8-console.h
         static void bindFunctionProperty(v8::Local<v8::Context> context,

@@ -491,12 +491,12 @@ public class MethodNode extends MethodVisitor {
         // Visits the annotations.
         n = visibleAnnotations == null ? 0 : visibleAnnotations.size();
         for (i = 0; i < n; ++i) {
-            AnnotationNode an = (AnnotationNode) visibleAnnotations.get(i);
+            AnnotationNode an = visibleAnnotations.get(i);
             an.accept(mv.visitAnnotation(an.desc, true));
         }
         n = invisibleAnnotations == null ? 0 : invisibleAnnotations.size();
         for (i = 0; i < n; ++i) {
-            AnnotationNode an = (AnnotationNode) invisibleAnnotations.get(i);
+            AnnotationNode an = invisibleAnnotations.get(i);
             an.accept(mv.visitAnnotation(an.desc, false));
         }
 
@@ -508,7 +508,7 @@ public class MethodNode extends MethodVisitor {
                 continue;
             }
             for (j = 0; j < l.size(); ++j) {
-                AnnotationNode an = (AnnotationNode) l.get(j);
+                AnnotationNode an = l.get(j);
                 an.accept(mv.visitParameterAnnotation(i, an.desc, true));
             }
         }
@@ -520,7 +520,7 @@ public class MethodNode extends MethodVisitor {
                 continue;
             }
             for (j = 0; j < l.size(); ++j) {
-                AnnotationNode an = (AnnotationNode) l.get(j);
+                AnnotationNode an = l.get(j);
                 an.accept(mv.visitParameterAnnotation(i, an.desc, false));
             }
         }
@@ -533,7 +533,7 @@ public class MethodNode extends MethodVisitor {
             // visits try catch blocks
             n = tryCatchBlocks == null ? 0 : tryCatchBlocks.size();
             for (i = 0; i < n; ++i) {
-                ((TryCatchBlockNode) tryCatchBlocks.get(i)).accept(mv);
+                (tryCatchBlocks.get(i)).accept(mv);
             }
 
             // Visits Instructions.
@@ -542,7 +542,7 @@ public class MethodNode extends MethodVisitor {
             // Visits Local Variables.
             n = localVariables == null ? 0 : localVariables.size();
             for (i = 0; i < n; ++i) {
-                ((LocalVariableNode) localVariables.get(i)).accept(mv);
+                (localVariables.get(i)).accept(mv);
             }
 
             // Visits maxs.

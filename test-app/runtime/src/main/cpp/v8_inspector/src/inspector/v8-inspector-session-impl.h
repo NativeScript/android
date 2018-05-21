@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef V8_INSPECTOR_V8INSPECTORSESSIONIMPL_H_
-#define V8_INSPECTOR_V8INSPECTORSESSIONIMPL_H_
+#ifndef V8_INSPECTOR_V8_INSPECTOR_SESSION_IMPL_H_
+#define V8_INSPECTOR_V8_INSPECTOR_SESSION_IMPL_H_
 
 #include <vector>
 
@@ -38,14 +38,14 @@ class V8CSSAgentImpl;
 class V8OverlayAgentImpl;
 class V8LogAgentImpl;
 
-using protocol::ErrorString;
+using protocol::Response;
 
 class V8InspectorSessionImpl : public V8InspectorSession,
     public protocol::FrontendChannel {
     public:
         static std::unique_ptr<V8InspectorSessionImpl> create(
-            V8InspectorImpl*, int contextGroupId, V8Inspector::Channel*,
-            const StringView& state);
+            V8InspectorImpl*, int contextGroupId, int sessionId,
+            V8Inspector::Channel*, const StringView& state);
         ~V8InspectorSessionImpl();
 
         V8InspectorImpl* inspector() const {
@@ -87,9 +87,12 @@ class V8InspectorSessionImpl : public V8InspectorSession,
         int contextGroupId() const {
             return m_contextGroupId;
         }
+        int sessionId() const {
+            return m_sessionId;
+        }
 
-        InjectedScript* findInjectedScript(ErrorString*, int contextId);
-        InjectedScript* findInjectedScript(ErrorString*, RemoteObjectIdBase*);
+        Response findInjectedScript(int contextId, InjectedScript*&);
+        Response findInjectedScript(RemoteObjectIdBase*, InjectedScript*&);
         void reset();
         void discardInjectedScripts();
         void reportAllContexts(V8RuntimeAgentImpl*);
@@ -101,9 +104,8 @@ class V8InspectorSessionImpl : public V8InspectorSession,
             v8::Local<v8::Context>, v8::Local<v8::Value> table,
             v8::Local<v8::Value> columns);
         std::vector<std::unique_ptr<protocol::Schema::Domain>> supportedDomainsImpl();
-        bool unwrapObject(ErrorString*, const String16& objectId,
-                          v8::Local<v8::Value>*, v8::Local<v8::Context>*,
-                          String16* objectGroup);
+        Response unwrapObject(const String16& objectId, v8::Local<v8::Value>*,
+                              v8::Local<v8::Context>*, String16* objectGroup);
         void releaseObjectGroup(const String16& objectGroup);
 
         // V8InspectorSession implementation.
@@ -129,23 +131,26 @@ class V8InspectorSessionImpl : public V8InspectorSession,
                           v8::Local<v8::Value>*, v8::Local<v8::Context>*,
                           std::unique_ptr<StringBuffer>* objectGroup) override;
         std::unique_ptr<protocol::Runtime::API::RemoteObject> wrapObject(
-            v8::Local<v8::Context>, v8::Local<v8::Value>,
-            const StringView& groupName) override;
+            v8::Local<v8::Context>, v8::Local<v8::Value>, const StringView& groupName,
+            bool generatePreview) override;
 
         V8InspectorSession::Inspectable* inspectedObject(unsigned num);
         static const unsigned kInspectedObjectBufferSize = 5;
 
     private:
-        V8InspectorSessionImpl(V8InspectorImpl*, int contextGroupId,
+        V8InspectorSessionImpl(V8InspectorImpl*, int contextGroupId, int sessionId,
                                V8Inspector::Channel*, const StringView& state);
         protocol::DictionaryValue* agentState(const String16& name);
 
         // protocol::FrontendChannel implementation.
-        void sendProtocolResponse(int callId, const String16& message) override;
-        void sendProtocolNotification(const String16& message) override;
+        void sendProtocolResponse(
+            int callId, std::unique_ptr<protocol::Serializable> message) override;
+        void sendProtocolNotification(
+            std::unique_ptr<protocol::Serializable> message) override;
         void flushProtocolNotifications() override;
 
         int m_contextGroupId;
+        int m_sessionId;
         V8InspectorImpl* m_inspector;
         V8Inspector::Channel* m_channel;
         bool m_customObjectFormatterEnabled;
@@ -165,7 +170,6 @@ class V8InspectorSessionImpl : public V8InspectorSession,
         std::unique_ptr<V8CSSAgentImpl> m_cssAgent;
         std::unique_ptr<V8OverlayAgentImpl> m_overlayAgent;
         std::unique_ptr<V8LogAgentImpl> m_logAgent;
-
         std::vector<std::unique_ptr<V8InspectorSession::Inspectable>>
                 m_inspectedObjects;
 
@@ -174,4 +178,4 @@ class V8InspectorSessionImpl : public V8InspectorSession,
 
 }  // namespace v8_inspector
 
-#endif  // V8_INSPECTOR_V8INSPECTORSESSIONIMPL_H_
+#endif  // V8_INSPECTOR_V8_INSPECTOR_SESSION_IMPL_H_

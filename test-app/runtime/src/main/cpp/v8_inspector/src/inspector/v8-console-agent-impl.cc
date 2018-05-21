@@ -26,28 +26,29 @@ V8ConsoleAgentImpl::V8ConsoleAgentImpl(
 
 V8ConsoleAgentImpl::~V8ConsoleAgentImpl() {}
 
-void V8ConsoleAgentImpl::enable(ErrorString* errorString) {
-  if (m_enabled) return;
+Response V8ConsoleAgentImpl::enable() {
+  if (m_enabled) return Response::OK();
   m_state->setBoolean(ConsoleAgentState::consoleEnabled, true);
   m_enabled = true;
   m_session->inspector()->enableStackCapturingIfNeeded();
   reportAllMessages();
+  return Response::OK();
 }
 
-void V8ConsoleAgentImpl::disable(ErrorString* errorString) {
-  if (!m_enabled) return;
+Response V8ConsoleAgentImpl::disable() {
+  if (!m_enabled) return Response::OK();
   m_session->inspector()->disableStackCapturingIfNeeded();
   m_state->setBoolean(ConsoleAgentState::consoleEnabled, false);
   m_enabled = false;
+  return Response::OK();
 }
 
-void V8ConsoleAgentImpl::clearMessages(ErrorString* errorString) {}
+Response V8ConsoleAgentImpl::clearMessages() { return Response::OK(); }
 
 void V8ConsoleAgentImpl::restore() {
   if (!m_state->booleanProperty(ConsoleAgentState::consoleEnabled, false))
     return;
-  ErrorString ignored;
-  enable(&ignored);
+  enable();
 }
 
 void V8ConsoleAgentImpl::messageAdded(V8ConsoleMessage* message) {
@@ -69,7 +70,7 @@ void V8ConsoleAgentImpl::reportAllMessages() {
 
 bool V8ConsoleAgentImpl::reportMessage(V8ConsoleMessage* message,
                                        bool generatePreview) {
-  DCHECK(message->origin() == V8MessageOrigin::kConsole);
+  DCHECK_EQ(V8MessageOrigin::kConsole, message->origin());
   message->reportToFrontend(&m_frontend);
   m_frontend.flush();
   return m_session->inspector()->hasConsoleMessageStorage(

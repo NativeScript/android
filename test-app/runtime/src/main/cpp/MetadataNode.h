@@ -56,7 +56,6 @@ class MetadataNode {
         static MetadataNode* GetOrCreate(const std::string& className);
 
         static std::string GetTypeMetadataName(v8::Isolate* isolate, v8::Local<v8::Value>& value);
-
     private:
         struct MethodCallbackData;
 
@@ -70,6 +69,7 @@ class MetadataNode {
 
         MetadataNode(MetadataTreeNode* treeNode);
 
+        static bool IsJavascriptKeyword(std::string word);
         v8::Local<v8::Object> CreatePackageObject(v8::Isolate* isolate);
 
         v8::Local<v8::Function> GetConstructorFunction(v8::Isolate* isolate);
@@ -110,15 +110,15 @@ class MetadataNode {
         static bool ValidateExtendArguments(const v8::FunctionCallbackInfo<v8::Value>& info, bool extendLocationFound, std::string& extendLocation, v8::Local<v8::String>& extendName, v8::Local<v8::Object>& implementationObject, bool isTypeScriptExtend);
         static void ExtendedClassConstructorCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
 
-        static void NullObjectAccessorGetterCallback(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
+        static void NullObjectAccessorGetterCallback(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info);
         static void NullValueOfCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
 
-        static void FieldAccessorGetterCallback(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
-        static void FieldAccessorSetterCallback(v8::Local<v8::String> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info);
-        static void ClassAccessorGetterCallback(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
+        static void FieldAccessorGetterCallback(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info);
+        static void FieldAccessorSetterCallback(v8::Local<v8::Name> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info);
+        static void ClassAccessorGetterCallback(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info);
         static void SetClassAccessor(v8::Local<v8::Function>& ctorFunction);
-        static void SuperAccessorGetterCallback(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
-        static void ArrayLengthGetterCallack(v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info);
+        static void SuperAccessorGetterCallback(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info);
+        static void ArrayLengthGetterCallack(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info);
 
         static void PackageGetterCallback(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info);
 
@@ -128,6 +128,10 @@ class MetadataNode {
         static bool IsValidExtendName(const v8::Local<v8::String>& name);
         static bool GetExtendLocation(std::string& extendLocation, bool isTypeScriptExtend);
         static ExtendedClassCacheData GetCachedExtendedClassData(v8::Isolate* isolate, const std::string& proxyClassName);
+
+        static void RegisterSymbolHasInstanceCallback(v8::Isolate* isolate, MetadataEntry entry, v8::Local<v8::Value> interface);
+        static void SymbolHasInstanceCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
+        static std::string GetJniClassName(MetadataEntry entry);
 
         v8::Local<v8::Function> Wrap(v8::Isolate* isolate, const v8::Local<v8::Function>& function, const std::string& name, const std::string& origin, bool isCtorFunc);
 

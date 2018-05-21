@@ -2,6 +2,8 @@ def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
 def runOnDevice = project.hasProperty("runOnDevice");
 def runOnDeviceOrEmulator = runOnDevice ? "-d" : "-e";
 
+def onlyX86 = project.hasProperty("onlyX86")
+
 // task deleteDist(type: Delete) {
 //     doFirst {
 //         delete "$rootDir/dist"
@@ -23,11 +25,18 @@ task waitForEmulatorToStart(type: Exec) {
 task installApk(type: Exec) {
         doFirst {
             println "Attempting to install buit apk"
-
-            if (isWinOs) {
-                commandLine "cmd", "/c", "gradlew", ":app:installDebug"
+            if (onlyX86) {
+                if (isWinOs) {
+                    commandLine "cmd", "/c", "gradlew", ":app:installDebug", "-PonlyX86"
+                } else {
+                    commandLine "./gradlew", ":app:installDebug", "-PonlyX86"
+                }
             } else {
-                commandLine "./gradlew", ":app:installDebug"
+                if (isWinOs) {
+                    commandLine "cmd", "/c", "gradlew", ":app:installDebug"
+                } else {
+                    commandLine "./gradlew", ":app:installDebug"
+                }
             }
         }
 }
@@ -37,9 +46,9 @@ task runAdbAsRoot(type: Exec) {
         println "Removing previous android_unit_test_results.xml"
 
         if (isWinOs) {
-            commandLine "cmd", "/c", "adb", "root"
+            commandLine "cmd", "/c", "adb", "-e" , "root"
         } else {
-            commandLine "adb", "root"
+            commandLine "adb", "-e" , "root"
         }
     }
 }
@@ -49,9 +58,9 @@ task deletePreviousResultXml(type: Exec) {
         println "Removing previous android_unit_test_results.xml"
 
         if (isWinOs) {
-            commandLine "cmd", "/c", "adb", runOnDeviceOrEmulator, "shell", "rm", "-rf", "/data/data/com.tns.testapplication/android_unit_test_results.xml"
+            commandLine "cmd", "/c", "adb", runOnDeviceOrEmulator, "-e" , "shell", "rm", "-rf", "/data/data/com.tns.testapplication/android_unit_test_results.xml"
         } else {
-            commandLine "adb", runOnDeviceOrEmulator, "shell", "rm", "-rf", "/data/data/com.tns.testapplication/android_unit_test_results.xml"
+            commandLine "adb", runOnDeviceOrEmulator, "-e", "shell", "rm", "-rf", "/data/data/com.tns.testapplication/android_unit_test_results.xml"
         }
     }
 }
@@ -61,9 +70,9 @@ task startInstalledApk(type: Exec) {
         println "Starting test application"
 
         if (isWinOs) {
-            commandLine "cmd", "/c", "adb", runOnDeviceOrEmulator, "shell", "am", "start", "-n", "com.tns.testapplication/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
+            commandLine "cmd", "/c", "adb", runOnDeviceOrEmulator, "-e", "shell", "am", "start", "-n", "com.tns.testapplication/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
         } else {
-            commandLine "adb", runOnDeviceOrEmulator, "shell", "am", "start", "-n", "com.tns.testapplication/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
+            commandLine "adb", runOnDeviceOrEmulator, "-e" , "shell", "am", "start", "-n", "com.tns.testapplication/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
         }
     }
 }

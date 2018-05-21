@@ -1,0 +1,63 @@
+apply plugin: 'application'
+apply plugin: 'java-library'
+
+defaultTasks 'runSbg'
+
+repositories {
+    jcenter()
+    google()
+}
+
+dependencies {
+    compile 'org.apache.bcel:bcel:6.0'
+    compile group: 'org.json', name: 'json', version: '20090211'
+    compile 'commons-io:commons-io:2.5'
+}
+
+def appRoot = file(project.appRoot).getAbsolutePath()
+def generatedJavaClassesRoot = file(project.generatedJavaClassesRoot).getAbsolutePath()
+
+def inputFile = file('../sbg-input-file.txt')
+def outputFile = file('../sbg-output-file.txt')
+def javaDependenciesFile = file('../sbg-java-dependencies.txt')
+def interfaceNamesFile = file('../sbg-interfaces-names.txt')
+
+jar {
+    manifest {
+        attributes("Manifest-Version": "1.0",
+                "Main-Class": "org.nativescript.staticbindinggenerator.Main")
+    }
+    from {
+        configurations.runtime.collect {
+            it.isDirectory() ? it : zipTree(it)
+        }
+
+        configurations.compile.collect {
+            it.isDirectory() ? it : zipTree(it)
+        }
+    }
+}
+
+task copyJar(dependsOn: 'jar') {
+    doFirst {
+        def source = file("$projectDir/build/libs/static-binding-generator.jar").toPath()
+        print source.toFile().exists()
+        def dest = file("$projectDir/../static-binding-generator.jar").toPath()
+        java.nio.file.Files.copy(source, dest, java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+    }
+}
+
+task prepareInputFiles(dependsOn: 'copyJar') {
+    doFirst {
+        inputFile.write(appRoot)
+        outputFile.write(generatedJavaClassesRoot.toString())
+        javaDependenciesFile.write('')
+        interfaceNamesFile.write('')
+    }
+}
+
+task runSbg(type: JavaExec, dependsOn: 'prepareInputFiles') {
+    classpath = files('../static-binding-generator.jar', '../')
+    workingDir = "../"
+    main = "org.nativescript.staticbindinggenerator.Main"
+}

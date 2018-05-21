@@ -10,14 +10,15 @@
 #include <iomanip>
 #include <sstream>
 #include <V8GlobalHelpers.h>
-#include <v8_inspector/src/inspector/v8-log-agent-impl.h>
-#include <JsV8InspectorClient.h>
 #include <NativeScriptException.h>
 #include "Console.h"
 
 namespace tns {
 
-v8::Local<v8::Object> Console::createConsole(v8::Local<v8::Context> context, const std::string& filesPath) {
+v8::Local<v8::Object> Console::createConsole(v8::Local<v8::Context> context, ConsoleCallback callback, const int maxLogcatObjectSize, const bool forceLog) {
+    m_callback = callback;
+    m_maxLogcatObjectSize = maxLogcatObjectSize;
+    m_forceLog = forceLog;
     v8::Context::Scope contextScope(context);
     v8::Isolate* isolate = context->GetIsolate();
 
@@ -43,17 +44,23 @@ v8::Local<v8::Object> Console::createConsole(v8::Local<v8::Context> context, con
 }
 
 void Console::sendToADBLogcat(const std::string& message, android_LogPriority logPriority) {
+    // limit the size of the message that we send to logcat using the predefined value in package.json
+    auto messageToLog = message;
+    if (messageToLog.length() > m_maxLogcatObjectSize) {
+        messageToLog = messageToLog.erase(m_maxLogcatObjectSize, std::string::npos);
+        messageToLog = messageToLog + "...";
+    }
+
     // split strings into chunks of 4000 characters
     // __android_log_write can't send more than 4000 to the stdout at a time
-
-    auto messageLength = message.length();
+    auto messageLength = messageToLog.length();
     int maxStringLength = 4000;
 
     if (messageLength < maxStringLength) {
-        __android_log_write(logPriority, Console::LOG_TAG, message.c_str());
+        __android_log_write(logPriority, Console::LOG_TAG, messageToLog.c_str());
     } else {
         for (int i = 0; i < messageLength; i += maxStringLength) {
-            auto messagePart = message.substr(i, maxStringLength);
+            auto messagePart = messageToLog.substr(i, maxStringLength);
 
             __android_log_write(logPriority, Console::LOG_TAG, messagePart.c_str());
         }
@@ -61,16 +68,9 @@ void Console::sendToADBLogcat(const std::string& message, android_LogPriority lo
 }
 
 void Console::sendToDevToolsFrontEnd(v8::Isolate* isolate, const std::string& message, const std::string& logLevel) {
-    if (!JsV8InspectorClient::inspectorIsConnected()) {
-        return;
+    if (m_callback != nullptr) {
+        m_callback(message, logLevel);
     }
-
-    auto stack = v8::StackTrace::CurrentStackTrace(isolate, 1, v8::StackTrace::StackTraceOptions::kDetailed);
-
-    auto frame = stack->GetFrame(0);
-
-    // will be no-op in non-debuggable builds
-    v8_inspector::V8LogAgentImpl::EntryAdded(message, logLevel, ArgConverter::ConvertToString(frame->GetScriptNameOrSourceURL()), frame->GetLineNumber());
 }
 
 const v8::Local<v8::String> transformJSObject(v8::Isolate* isolate, v8::Local<v8::Object> object) {
@@ -82,6 +82,7 @@ const v8::Local<v8::String> transformJSObject(v8::Isolate* isolate, v8::Local<v8
     if (hasCustomToStringImplementation) {
         resultString = objToString;
     } else {
+        v8::HandleScope scope(isolate);
         resultString = JsonStringifyObject(isolate, object);
     }
 
@@ -165,6 +166,9 @@ const std::string buildLogString(const v8::FunctionCallbackInfo<v8::Value>& info
 }
 
 void Console::assertCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    if (!shouldLog()) {
+        return;
+    }
     try {
         auto isolate = info.GetIsolate();
 
@@ -200,6 +204,9 @@ void Console::assertCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 }
 
 void Console::errorCallback(const v8::FunctionCallbackInfo <v8::Value>& info) {
+    if (!shouldLog()) {
+        return;
+    }
     try {
         std::string log = buildLogString(info);
 
@@ -219,6 +226,9 @@ void Console::errorCallback(const v8::FunctionCallbackInfo <v8::Value>& info) {
 }
 
 void Console::infoCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    if (!shouldLog()) {
+        return;
+    }
     try {
         std::string log = buildLogString(info);
 
@@ -238,6 +248,9 @@ void Console::infoCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 }
 
 void Console::logCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    if (!shouldLog()) {
+        return;
+    }
     try {
         std::string log = buildLogString(info);
 
@@ -257,6 +270,9 @@ void Console::logCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 }
 
 void Console::warnCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    if (!shouldLog()) {
+        return;
+    }
     try {
         std::string log = buildLogString(info);
 
@@ -276,6 +292,9 @@ void Console::warnCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 }
 
 void Console::dirCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    if (!shouldLog()) {
+        return;
+    }
     try {
         auto isolate = info.GetIsolate();
         auto context = isolate->GetCurrentContext();
@@ -318,7 +337,7 @@ void Console::dirCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
                         }
                         ss << ": " << jsonStringifiedObject;
                     } else {
-                        ss << ": \"" << ArgConverter::ConvertToString(propertyValue->ToDetailString(isolate)) << "\"";
+                        ss << ": \"" << ArgConverter::ConvertToString(propertyValue->ToDetailString(context).ToLocalChecked()) << "\"";
                     }
 
                     ss << std::endl;
@@ -390,6 +409,9 @@ const std::string buildStacktraceFrameMessage(v8::Local<v8::StackFrame> frame) {
 }
 
 void Console::traceCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    if (!shouldLog()) {
+        return;
+    }
     try {
         auto isolate = info.GetIsolate();
         std::stringstream ss;
@@ -433,6 +455,9 @@ void Console::traceCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 }
 
 void Console::timeCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    if (!shouldLog()) {
+        return;
+    }
     try {
         auto isolate = info.GetIsolate();
 
@@ -469,6 +494,9 @@ void Console::timeCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 }
 
 void Console::timeEndCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    if (!shouldLog()) {
+        return;
+    }
     try {
         auto isolate = info.GetIsolate();
 
@@ -526,4 +554,13 @@ void Console::timeEndCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 
 const char* Console::LOG_TAG = "JS";
 std::map<v8::Isolate*, std::map<std::string, double>> Console::s_isolateToConsoleTimersMap;
+ConsoleCallback Console::m_callback = nullptr;
+int Console::m_maxLogcatObjectSize;
+bool Console::m_forceLog;
+
+#ifdef APPLICATION_IN_DEBUG
+bool Console::isApplicationInDebug = true;
+#else
+bool Console::isApplicationInDebug = false;
+#endif
 }

@@ -16,7 +16,10 @@ class AppConfig {
         MemoryCheckInterval("memoryCheckInterval", 0),
         FreeMemoryRatio("freeMemoryRatio", 0.0),
         Profiling("profiling", ""),
-        MarkingMode("markingMode", com.tns.MarkingMode.full);
+        MarkingMode("markingMode", com.tns.MarkingMode.full),
+        HandleTimeZoneChanges("handleTimeZoneChanges", false),
+        MaxLogcatObjectSize("maxLogcatObjectSize", 1024),
+        ForceLog("forceLog", false);
 
         private final String name;
         private final Object defaultValue;
@@ -72,7 +75,9 @@ class AppConfig {
                         File dir = new File(path);
                         if (dir.exists() && dir.isDirectory()) {
                             // this path is expected to be a directory, containing three sub-directories: armeabi-v7a, x86 and arm64-v8a
-                            path = path + "/" + Build.CPU_ABI + "/" + KnownKeys.SnapshotFile.getName();
+                            @SuppressWarnings("deprecation")
+                            String cpu_abi = Build.CPU_ABI;
+                            path = path + "/" + cpu_abi + "/" + KnownKeys.SnapshotFile.getName();
                             values[KnownKeys.SnapshotFile.ordinal()] = path;
                         }
                     }
@@ -97,6 +102,15 @@ class AppConfig {
                             e.printStackTrace();
                             Log.v("JS", "Failed to parse marking mode. The default " + ((MarkingMode)KnownKeys.MarkingMode.getDefaultValue()).name() + " will be used.");
                         }
+                    }
+                    if (androidObject.has(KnownKeys.HandleTimeZoneChanges.getName())) {
+                        values[KnownKeys.HandleTimeZoneChanges.ordinal()] = androidObject.getBoolean(KnownKeys.HandleTimeZoneChanges.getName());
+                    }
+                    if (androidObject.has(KnownKeys.MaxLogcatObjectSize.getName())) {
+                        values[KnownKeys.MaxLogcatObjectSize.ordinal()] = androidObject.getInt(KnownKeys.MaxLogcatObjectSize.getName());
+                    }
+                    if (androidObject.has(KnownKeys.ForceLog.getName())) {
+                        values[KnownKeys.ForceLog.ordinal()] = androidObject.getBoolean(KnownKeys.ForceLog.getName());
                     }
                 }
             }
@@ -135,5 +149,17 @@ class AppConfig {
 
     public MarkingMode getMarkingMode() {
         return (MarkingMode)values[KnownKeys.MarkingMode.ordinal()];
+    }
+
+    public boolean handleTimeZoneChanges() {
+        return (boolean)values[KnownKeys.HandleTimeZoneChanges.ordinal()];
+    }
+
+    public int getMaxLogcatObjectSize() {
+        return (int)values[KnownKeys.MaxLogcatObjectSize.ordinal()];
+    }
+
+    public boolean getForceLog() {
+        return (boolean)values[KnownKeys.ForceLog.ordinal()];
     }
 }

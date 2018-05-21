@@ -20,13 +20,17 @@
 #include "ArrayHelper.h"
 #include "include/libplatform/libplatform.h"
 #include "include/zipconf.h"
+#include <csignal>
 #include <sstream>
 #include <dlfcn.h>
 #include <console/Console.h>
 #include "NetworkDomainCallbackHandlers.h"
 #include "sys/system_properties.h"
-#include "JsV8InspectorClient.h"
 #include "ManualInstrumentation.h"
+
+#ifdef APPLICATION_IN_DEBUG
+#include "JsV8InspectorClient.h"
+#endif
 
 using namespace v8;
 using namespace std;
@@ -34,6 +38,10 @@ using namespace tns;
 
 bool tns::LogEnabled = true;
 SimpleAllocator g_allocator;
+
+void SIGABRT_handler(int sigNumber) {
+    throw NativeScriptException("JNI Exception occurred (SIGABRT).\n=======\nCheck the 'adb logcat' for additional information about the error.\n=======\n");
+}
 
 void Runtime::Init(JavaVM* vm, void* reserved) {
     __android_log_print(ANDROID_LOG_INFO, "TNS.Native", "NativeScript Runtime Version %s, commit %s", NATIVE_SCRIPT_RUNTIME_VERSION, NATIVE_SCRIPT_RUNTIME_COMMIT_SHA);
@@ -45,7 +53,27 @@ void Runtime::Init(JavaVM* vm, void* reserved) {
         JEnv::Init(s_jvm);
     }
 
+    if (m_androidVersion > 25) {
+        // handle SIGABRT only on API level > 25 as the handling is not so efficient in older versions
+        struct sigaction action;
+        action.sa_handler = SIGABRT_handler;
+        sigaction(SIGABRT, &action, NULL);
+    }
+
     DEBUG_WRITE("JNI_ONLoad END");
+}
+
+int Runtime::GetAndroidVersion() {
+    char sdkVersion[PROP_VALUE_MAX];
+    __system_property_get("ro.build.version.sdk", sdkVersion);
+
+    stringstream strValue;
+    strValue << sdkVersion;
+
+    unsigned int intValue;
+    strValue >> intValue;
+
+    return intValue;
 }
 
 Runtime::Runtime(JNIEnv* env, jobject runtime, int id)
@@ -120,17 +148,17 @@ ObjectManager* Runtime::GetObjectManager() const {
     return m_objectManager;
 }
 
-void Runtime::Init(JNIEnv* _env, jobject obj, int runtimeId, jstring filesPath, jstring nativeLibDir, jboolean verboseLoggingEnabled, jboolean isDebuggable, jstring packageName, jobjectArray args, jstring callingDir) {
+void Runtime::Init(JNIEnv* _env, jobject obj, int runtimeId, jstring filesPath, jstring nativeLibDir, jboolean verboseLoggingEnabled, jboolean isDebuggable, jstring packageName, jobjectArray args, jstring callingDir, int maxLogcatObjectSize, bool forceLog) {
     JEnv env(_env);
 
     auto runtime = new Runtime(env, obj, runtimeId);
 
     auto enableLog = verboseLoggingEnabled == JNI_TRUE;
 
-    runtime->Init(filesPath, nativeLibDir, enableLog, isDebuggable, packageName, args, callingDir);
+    runtime->Init(filesPath, nativeLibDir, enableLog, isDebuggable, packageName, args, callingDir, maxLogcatObjectSize, forceLog);
 }
 
-void Runtime::Init(jstring filesPath, jstring nativeLibDir, bool verboseLoggingEnabled, bool isDebuggable, jstring packageName, jobjectArray args, jstring callingDir) {
+void Runtime::Init(jstring filesPath, jstring nativeLibDir, bool verboseLoggingEnabled, bool isDebuggable, jstring packageName, jobjectArray args, jstring callingDir, int maxLogcatObjectSize, bool forceLog) {
     LogEnabled = verboseLoggingEnabled;
 
     auto filesRoot = ArgConverter::jstringToString(filesPath);
@@ -155,7 +183,7 @@ void Runtime::Init(jstring filesPath, jstring nativeLibDir, bool verboseLoggingE
     auto profilerOutputDirStr = ArgConverter::jstringToString(profilerOutputDir);
 
     NativeScriptException::Init(m_objectManager);
-    m_isolate = PrepareV8Runtime(filesRoot, nativeLibDirStr, packageNameStr, isDebuggable, callingDirStr, profilerOutputDirStr);
+    m_isolate = PrepareV8Runtime(filesRoot, nativeLibDirStr, packageNameStr, isDebuggable, callingDirStr, profilerOutputDirStr, maxLogcatObjectSize, forceLog);
 
     s_isolate2RuntimesCache.insert(make_pair(m_isolate, this));
 }
@@ -184,7 +212,7 @@ jobject Runtime::RunScript(JNIEnv* _env, jobject obj, jstring scriptFile) {
     auto src = File::ReadText(filename);
     auto source = ArgConverter::ConvertToV8String(isolate, src);
 
-    TryCatch tc;
+    TryCatch tc(isolate);
 
     Local<Script> script;
     ScriptOrigin origin(ArgConverter::ConvertToV8String(isolate, filename));
@@ -380,7 +408,9 @@ static void InitializeV8() {
     V8::Initialize();
 }
 
-Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& nativeLibDir, const string& packageName, bool isDebuggable, const string& callingDir, const string& profilerOutputDir) {
+Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& nativeLibDir, const string& packageName, bool isDebuggable, const string& callingDir, const string& profilerOutputDir, const int maxLogcatObjectSize, const bool forceLog) {
+    tns::instrumentation::Frame frame("Runtime.PrepareV8Runtime");
+
     Isolate::CreateParams create_params;
     bool didInitializeV8 = false;
 
@@ -388,24 +418,26 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     m_startupData = new StartupData();
 
-    // Retrieve the device android Sdk version
-    char sdkVersion[PROP_VALUE_MAX];
-    __system_property_get("ro.build.version.sdk", sdkVersion);
-
-    void* snapshotPtr;
+    void* snapshotPtr = nullptr;
+    string snapshotPath;
 
     // If device isn't running on Sdk 17
-    if (strcmp(sdkVersion, string("17").c_str()) != 0) {
-        snapshotPtr = dlopen("libsnapshot.so", RTLD_LAZY | RTLD_LOCAL);
+    if (m_androidVersion != 17) {
+        snapshotPath = "libsnapshot.so";
     } else {
         // If device is running on android Sdk 17
         // dlopen reads relative path to dynamic libraries or reads from folder different than the nativeLibsDirs on the android device
         string snapshotPath = nativeLibDir + "/libsnapshot.so";
-        snapshotPtr = dlopen(snapshotPath.c_str(), RTLD_LAZY | RTLD_LOCAL);
     }
 
+    snapshotPtr = dlopen(snapshotPath.c_str(), RTLD_LAZY | RTLD_LOCAL);
     if (snapshotPtr == nullptr) {
-        DEBUG_WRITE_FORCE("Failed to load snapshot: %s", dlerror());
+        auto ignoredSearchValue = string("library \"" + snapshotPath + "\" not found");
+        auto currentError = dlerror();
+        std::string stringError(currentError);
+        if (stringError.find(ignoredSearchValue) == std::string::npos) {
+            DEBUG_WRITE_FORCE("Failed to load snapshot: %s", currentError);
+        }
     }
 
     if (snapshotPtr) {
@@ -429,11 +461,11 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
             m_heapSnapshotBlob = new MemoryMappedFile(MemoryMappedFile::Open(snapshotPath.c_str()));
             m_startupData->data = static_cast<const char*>(m_heapSnapshotBlob->memory);
             m_startupData->raw_size = m_heapSnapshotBlob->size;
+            create_params.snapshot_blob = m_startupData;
 
-            DEBUG_WRITE_FORCE("Snapshot read %s (%dB).", snapshotPath.c_str(), m_heapSnapshotBlob->size);
+            DEBUG_WRITE_FORCE("Snapshot read %s (%zuB).", snapshotPath.c_str(), m_heapSnapshotBlob->size);
         } else if (!saveSnapshot) {
             DEBUG_WRITE_FORCE("No snapshot file found at %s", snapshotPath.c_str());
-
         } else {
             // This should be executed before V8::Initialize, which calls it with false.
             NativeScriptExtension::CpuFeaturesProbe(true);
@@ -458,15 +490,15 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
                 if (!writeSuccess) {
                     DEBUG_WRITE_FORCE("Failed to save created snapshot.");
                 } else {
-                    DEBUG_WRITE_FORCE("Saved snapshot of %s (%dB) in %s (%dB)",
+                    DEBUG_WRITE_FORCE("Saved snapshot of %s (%zuB) in %s (%dB)",
                                       Constants::V8_HEAP_SNAPSHOT_SCRIPT.c_str(), customScript.size(),
                                       snapshotPath.c_str(), m_startupData->raw_size);
                 }
             }
+
+            create_params.snapshot_blob = m_startupData;
         }
     }
-
-    create_params.snapshot_blob = m_startupData;
 
     /*
      * Setup the V8Platform only once per process - once for the application lifetime
@@ -476,7 +508,10 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
         InitializeV8();
     }
 
+    tns::instrumentation::Frame isolateFrame;
     auto isolate = Isolate::New(create_params);
+    isolateFrame.log("Isolate.New");
+
     Isolate::Scope isolate_scope(isolate);
     HandleScope handleScope(isolate);
 
@@ -487,7 +522,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     isolate->SetData((uint32_t)Runtime::IsolateData::CONSTANTS, consts);
 
     V8::SetFlagsFromString(Constants::V8_STARTUP_FLAGS.c_str(), Constants::V8_STARTUP_FLAGS.size());
-    V8::SetCaptureStackTraceForUncaughtExceptions(true, 100, StackTrace::kOverview);
+    isolate->SetCaptureStackTraceForUncaughtExceptions(true, 100, StackTrace::kOverview);
 
     isolate->AddMessageListener(NativeScriptException::OnUncaughtError);
 
@@ -537,12 +572,14 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
         globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "close"), closeFuncTemplate);
     }
 
+#ifdef APPLICATION_IN_DEBUG
     /*
      * Attach __inspector object with function callbacks that report to the Chrome DevTools frontend
      */
     if (isDebuggable) {
         JsV8InspectorClient::attachInspectorCallbacks(isolate, globalTemplate);
     }
+#endif
 
     m_weakRef.Init(isolate, globalTemplate, m_objectManager);
 
@@ -564,19 +601,24 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
         m_gcFunc = new Persistent<Function>(isolate, gcFunc.As<Function>());
     }
 
-    global->ForceSet(ArgConverter::ConvertToV8String(isolate, "global"), global, readOnlyFlags);
-    global->ForceSet(ArgConverter::ConvertToV8String(isolate, "__global"), global, readOnlyFlags);
+    global->DefineOwnProperty(context, ArgConverter::ConvertToV8String(isolate, "global"), global, readOnlyFlags);
+    global->DefineOwnProperty(context, ArgConverter::ConvertToV8String(isolate, "__global"), global, readOnlyFlags);
 
     // Do not set 'self' accessor to main thread JavaScript
     if (s_mainThreadInitialized) {
-        global->ForceSet(ArgConverter::ConvertToV8String(isolate, "self"), global, readOnlyFlags);
+        global->DefineOwnProperty(context, ArgConverter::ConvertToV8String(isolate, "self"), global, readOnlyFlags);
     }
+
+#ifdef APPLICATION_IN_DEBUG
+    v8::Local<v8::Object> console = Console::createConsole(context, JsV8InspectorClient::consoleLogCallback, maxLogcatObjectSize, forceLog);
+#else
+    v8::Local<v8::Object> console = Console::createConsole(context, nullptr, maxLogcatObjectSize, forceLog);
+#endif
 
     /*
      * Attach 'console' object to the global object
      */
-    v8::Local<v8::Object> console = Console::createConsole(context, filesPath);
-    global->ForceSet(context, ArgConverter::ConvertToV8String(isolate, "console"), console, readOnlyFlags);
+    global->DefineOwnProperty(context, ArgConverter::ConvertToV8String(isolate, "console"), console, readOnlyFlags);
 
     ArgConverter::Init(isolate);
 
@@ -632,3 +674,4 @@ map<int, Runtime*> Runtime::s_id2RuntimeCache;
 map<Isolate*, Runtime*> Runtime::s_isolate2RuntimesCache;
 bool Runtime::s_mainThreadInitialized = false;
 v8::Platform* Runtime::platform = nullptr;
+int Runtime::m_androidVersion = Runtime::GetAndroidVersion();
