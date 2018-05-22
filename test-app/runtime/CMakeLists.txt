@@ -6,7 +6,6 @@ cmake_minimum_required(VERSION 3.4.1)
 # Add the ccache to the build system
 find_program(CCACHE_FOUND ccache)
 if(CCACHE_FOUND)
-  MESSAGE( STATUS "CCache found!!!" )
   set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
   set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
 endif(CCACHE_FOUND)

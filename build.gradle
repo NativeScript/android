@@ -56,6 +56,20 @@ task createDistDir {
     }
 }
 
+def getCCacheVersion = { ->
+    try {
+        def ccacheVersionOutput = new ByteArrayOutputStream()
+        exec {
+            commandLine "ccache1", "--version"
+            standardOutput = ccacheVersionOutput
+        }
+
+        return ccacheVersionOutput.toString().trim()
+    } catch (all) {
+        return 'CCache not found!'
+    }
+}
+
 task getPackageVersion {
     doLast {
         String content = new File("$rootDir/package.json").getText("UTF-8")
@@ -334,6 +348,8 @@ copyReadme.dependsOn(setPackageVersionInPackageJsonFile)
 createNpmPackage.dependsOn(copyReadme)
 
 task createPackage {
+    println "CCache version: " + getCCacheVersion()
+
     description "Builds the NativeScript Android cleanBuildArtefactsApp Package using an application project template."
     dependsOn createNpmPackage
     println "Creating NativeScript Android Package"
