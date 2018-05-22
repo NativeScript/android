@@ -8,8 +8,10 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
+import java.security.DigestInputStream;
+import java.security.MessageDigest;
 import java.io.OutputStream;
+import java.util.Arrays;
 
 public class NativeScriptSyncServiceSocketIml {
     private static String DEVICE_APP_DIR;
@@ -63,6 +65,9 @@ public class NativeScriptSyncServiceSocketIml {
             } catch (IOException e) {
                 e.printStackTrace();
             }
+            catch (java.security.NoSuchAlgorithmException e) {
+                e.printStackTrace();
+            }
         }
 
         private Thread setUpLivesyncThread() {
@@ -91,6 +96,7 @@ public class NativeScriptSyncServiceSocketIml {
 
     private class LiveSyncWorker implements Runnable {
         public static final int OPERATION_BYTE_SIZE = 1;
+        public static final int HASH_BYTE_SIZE = 16;
         public static final int FILE_NAME_LENGTH_BYTE_SIZE = 5;
         public static final int CONTENT_LENGTH_BYTE_SIZE = 10;
         public static final int DELETE_FILE_OPERATION = 7;
@@ -119,13 +125,14 @@ public class NativeScriptSyncServiceSocketIml {
                 FILE_NAME,
                 FILE_CONTENT_LENGTH, CONTENT_LENGTH_BYTE_SIZE,
                 FILE_CONTENT);
-        private final InputStream input;
+        private final DigestInputStream input;
         private Closeable livesyncSocket;
         private OutputStream output;
 
-        public LiveSyncWorker(LocalSocket systemSocket) throws IOException {
+        public LiveSyncWorker(LocalSocket systemSocket) throws IOException, java.security.NoSuchAlgorithmException {
             this.livesyncSocket = systemSocket;
-            input = systemSocket.getInputStream();
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            input = new DigestInputStream(systemSocket.getInputStream(), md);
             output = systemSocket.getOutputStream();
         }
 
@@ -145,16 +152,20 @@ public class NativeScriptSyncServiceSocketIml {
                     if (operation == DELETE_FILE_OPERATION) {
 
                         String fileName = getFileName();
+                        validateData();
                         deleteRecursive(new File(DEVICE_APP_DIR, fileName));
 
                     } else if (operation == CREATE_FILE_OPERATION) {
 
                         String fileName = getFileName();
-                        byte[] content = getFileContent(fileName);
+                        byte[] contentLength = getFileContentLength(fileName);
+                        validateData();
+                        byte[] content = getFileContent(fileName, contentLength);
+                        validateData();
                         createOrOverrideFile(fileName, content);
 
                     } else if (operation == DO_SYNC_OPERATION) {
-
+                        validateData();
                         runtime.runScript(new File(NativeScriptSyncServiceSocketIml.this.context.getFilesDir(), "internal/livesync.js"));
 
                     } else if (operation == DEFAULT_OPERATION) {
@@ -179,6 +190,19 @@ public class NativeScriptSyncServiceSocketIml {
                 }
             }
 
+        }
+
+        private void validateData() throws IOException {
+            MessageDigest messageDigest = input.getMessageDigest();
+            byte[] digest = messageDigest.digest();
+            input.on(false);
+            byte[] inputMD5 = readNextBytes(HASH_BYTE_SIZE);
+            input.on(true);
+
+
+            if(!Arrays.equals(digest, inputMD5)){
+                throw new IllegalArgumentException(String.format("\nLiveSync: Operation not recognised. %s", LIVESYNC_ERROR_SUGGESTION));
+            }
         }
 
         private void flushInputStream() {
@@ -247,15 +271,20 @@ public class NativeScriptSyncServiceSocketIml {
             return fileName.trim();
         }
 
-        private byte[] getFileContent(String fileName) throws IllegalStateException {
-            byte[] contentBuff;
-            int contentL = -1;
+        private byte[] getFileContentLength(String fileName)throws IllegalStateException {
             byte[] contentLength;
             try {
                 contentLength = readNextBytes(CONTENT_LENGTH_BYTE_SIZE);
             } catch (Exception e) {
                 throw new IllegalStateException(String.format("\nLiveSync: failed to parse %s %s. %s\nOriginal Exception: %s", fileName, FILE_CONTENT_LENGTH, LIVESYNC_ERROR_SUGGESTION, e.toString()));
             }
+
+            return contentLength;
+        }
+
+        private byte[] getFileContent(String fileName, byte[] contentLength) throws IllegalStateException {
+            byte[] contentBuff;
+            int contentL = -1;
 
             if (contentLength == null) {
                 throw new IllegalStateException(String.format("\nLiveSync: Missing %s bytes. Did you send %s %s? %s", FILE_CONTENT_LENGTH, fileName, FILE_CONTENT_LENGTH, LIVESYNC_ERROR_SUGGESTION));
