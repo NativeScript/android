@@ -380,7 +380,7 @@ def getRunTestsBuildArguments = { ->
     } else {
         arguments.push("./gradlew")
     }
-    arguments.plus(["-b", "runtests.gradle", "runtests"])
+    arguments +=["-b", "runtests.gradle", "runtests"]
     if (onlyX86) {
         arguments.push("-PonlyX86")
     }
