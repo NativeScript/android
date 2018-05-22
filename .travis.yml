@@ -31,7 +31,7 @@ matrix:
         - emulator -avd $EMULATOR_NAME-$EMULATOR_API_LEVEL -no-skin -no-audio -no-window &
         - android-wait-for-emulator
         - "./gradlew runSbgTests --stacktrace"
-        - "./gradlew runtest --stacktrace"
+        - "./gradlew runtest -PnoCCache --stacktrace"
         - adb -e logcat -d 300
       before_install:
         - echo "y" | sdkmanager "cmake;3.6.4111459"
