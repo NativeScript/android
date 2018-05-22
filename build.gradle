@@ -3,6 +3,7 @@
 *		gradlew - Builds the NativeScript Android App Package using an application project template.
 		gradlew -PgitCommitVersion - sets the commit version of the build
 		gradlew -PpreReleaseVersion - sets the pre-release version of the build (as per semver spec "-alpha" value results in 1.0.0-alpha)
+        gradlew -PnoCCache - set this flag if you don't want CCache to be used in CMake build
 
 */
 
@@ -14,6 +15,7 @@ import groovy.json.JsonBuilder
 import groovy.json.JsonOutput
 
 def onlyX86 = project.hasProperty("onlyX86")
+def noCCache = project.hasProperty("noCCache")
 
 def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
 def pVersion = "no package version was provided by build.gradle build"
@@ -60,7 +62,7 @@ def getCCacheVersion = { ->
     try {
         def ccacheVersionOutput = new ByteArrayOutputStream()
         exec {
-            commandLine "ccache1", "--version"
+            commandLine "ccache", "--version"
             standardOutput = ccacheVersionOutput
         }
 
@@ -170,52 +172,46 @@ task cleanRuntime (type: Exec) {
     }
 }
 
+def getBuildArguments = { ->
+    def arguments = []
+    if (isWinOs) {
+        arguments += ["cmd", "/c", "gradlew"]
+    } else {
+        arguments.push("./gradlew")
+    }
+    arguments += [":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"]
+    if (onlyX86) {
+        arguments.push("-PonlyX86")
+    }
+    if (noCCache) {
+        arguments.push("-PnoCCache")
+    }
+    return arguments;
+}
+
 task generateOptimizedRuntimeAar (type: Exec) {
     doFirst {
         workingDir "$TEST_APP_PATH"
-        if (onlyX86) {
-            if (isWinOs) {
-                commandLine "cmd", "/c", "gradlew", ":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-Poptimized", "-PonlyX86"
-            } else {
-                commandLine "./gradlew", ":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-Poptimized", "-PonlyX86"
-            }
-        } else {
-            if (isWinOs) {
-                commandLine "cmd", "/c", "gradlew", ":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-Poptimized"
-            } else {
-                commandLine "./gradlew", ":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-Poptimized"
-            }
-        }
+        def arguments = getBuildArguments()
+        arguments.push("-Poptimized")
+        commandLine arguments
     }
 }
 
 task generateOptimizedWithInspectorRuntimeAar (type: Exec) {
     doFirst {
         workingDir "$TEST_APP_PATH"
-        if (onlyX86) {
-            if (isWinOs) {
-                commandLine "cmd", "/c", "gradlew", ":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-PoptimizedWithInspector", "-PonlyX86"
-            } else {
-                commandLine "./gradlew", ":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-PoptimizedWithInspector", "-PonlyX86"
-            }
-        } else {
-            if (isWinOs) {
-                commandLine "cmd", "/c", "gradlew", ":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-PoptimizedWithInspector"
-            } else {
-                commandLine "./gradlew", ":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-PoptimizedWithInspector"
-            }
-        }
+        def arguments = getBuildArguments()
+        arguments.push("-PoptimizedWithInspector")
+        commandLine arguments
     }
 }
 
 task generateRuntimeAar (type: Exec) {
     doFirst {
         workingDir "$TEST_APP_PATH"
-        if (isWinOs) {
-            commandLine "cmd", "/c", "gradlew", ":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"
-        } else {
-            commandLine "./gradlew", ":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"
-        }
+        def arguments = getBuildArguments()
+        commandLine arguments
     }
 }
 
