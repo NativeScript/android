@@ -172,7 +172,7 @@ task cleanRuntime (type: Exec) {
     }
 }
 
-def getBuildArguments = { ->
+def getAssembleReleaseBuildArguments = { ->
     def arguments = []
     if (isWinOs) {
         arguments += ["cmd", "/c", "gradlew"]
@@ -192,7 +192,7 @@ def getBuildArguments = { ->
 task generateOptimizedRuntimeAar (type: Exec) {
     doFirst {
         workingDir "$TEST_APP_PATH"
-        def arguments = getBuildArguments()
+        def arguments = getAssembleReleaseBuildArguments()
         arguments.push("-Poptimized")
         commandLine arguments
     }
@@ -201,7 +201,7 @@ task generateOptimizedRuntimeAar (type: Exec) {
 task generateOptimizedWithInspectorRuntimeAar (type: Exec) {
     doFirst {
         workingDir "$TEST_APP_PATH"
-        def arguments = getBuildArguments()
+        def arguments = getAssembleReleaseBuildArguments()
         arguments.push("-PoptimizedWithInspector")
         commandLine arguments
     }
@@ -210,7 +210,7 @@ task generateOptimizedWithInspectorRuntimeAar (type: Exec) {
 task generateRuntimeAar (type: Exec) {
     doFirst {
         workingDir "$TEST_APP_PATH"
-        def arguments = getBuildArguments()
+        def arguments = getAssembleReleaseBuildArguments()
         commandLine arguments
     }
 }
@@ -373,22 +373,27 @@ task runSbgTests (type: Exec, dependsOn: 'runAstTests') {
     }
 }
 
+def getRunTestsBuildArguments = { ->
+    def arguments = []
+    if (isWinOs) {
+        arguments += ["cmd", "/c", "gradlew"]
+    } else {
+        arguments.push("./gradlew")
+    }
+    arguments.plus(["-b", "runtests.gradle", "runtests"])
+    if (onlyX86) {
+        arguments.push("-PonlyX86")
+    }
+    if (noCCache) {
+        arguments.push("-PnoCCache")
+    }
+    return arguments;
+}
+
 task runTests (type: Exec) {
     doFirst {
         workingDir "$TEST_APP_PATH"
-        if (onlyX86) {
-            if (isWinOs) {
-                commandLine "cmd", "/c", "gradlew", "-b", "runtests.gradle", "runtests", "-PonlyX86"
-            } else {
-                commandLine "./gradlew", "-b", "runtests.gradle", "runtests", "-PonlyX86"
-            }
-        } else {
-            if (isWinOs) {
-                commandLine "cmd", "/c", "gradlew", "-b", "runtests.gradle", "runtests"
-            } else {
-                commandLine "./gradlew", "-b", "runtests.gradle", "runtests"
-            }
-        }
+        commandLine getRunTestsBuildArguments()
     }
 }
 
