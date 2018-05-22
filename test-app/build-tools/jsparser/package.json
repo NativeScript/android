@@ -9,8 +9,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "babel-traverse": "6.4.5",
-    "babel-types": "6.4.5",
+    "babel-traverse": "^6.26.0",
+    "babel-types": "^6.26.0",
     "babylon": "6.4.5",
     "filewalker": "0.1.2",
     "lazy": "1.0.11"
