@@ -50,9 +50,9 @@ for emulator in $listOfEmulators; do
     $ANDROID_HOME/platform-tools/adb -e logcat > consoleLog.txt&
 
     if [ "$1" != 'unit_tests_only' ]; then
-        ./gradlew runtest
+        ./gradlew runtests
     else
-        ./gradlew runtest -PonlyX86
+        ./gradlew runtests -PonlyX86
     fi
 
     echo "Rename unit test result"
