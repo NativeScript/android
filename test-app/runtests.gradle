@@ -111,6 +111,19 @@ task deleteRootLevelResult(type: Delete) {
     delete "$rootDir/android_unit_test_results.xml"
 }
 
+task verifyResults(type: Exec) {
+    doFirst {
+        if (isWinOs) {
+            commandLine "cmd", "/c", "node", "$rootDir\\tools\\check_if_tests_passed.js", "$rootDir\\dist\\android_unit_test_results.xml"
+        } else {
+            commandLine "node", "$rootDir/tools/check_if_tests_passed.js", "$rootDir/dist/android_unit_test_results.xml"
+        }
+    }
+}
+
+task runtests {
+    dependsOn deleteRootLevelResult
+}
 
 // waitForEmulatorToStart.dependsOn(deleteDist)
 runAdbAsRoot.dependsOn(waitForEmulatorToStart)
@@ -121,7 +134,8 @@ createDistFolder.dependsOn(startInstalledApk)
 waitForUnitTestResultFile.dependsOn(createDistFolder)
 copyResultToDist.dependsOn(waitForUnitTestResultFile)
 deleteRootLevelResult.dependsOn(copyResultToDist)
+verifyResults.dependsOn(runtests)
 
-task runtests {
-    dependsOn deleteRootLevelResult
+task runtestsAndVerifyResults {
+    dependsOn verifyResults
 }
