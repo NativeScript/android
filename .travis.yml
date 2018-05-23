@@ -26,12 +26,12 @@ matrix:
       script:
         # (master branch) build the runtime twice - optimized, and regular packages, skip on PRs
         # test-app/gradlew runtests will take care of building the runtime for its testing needs
-        - 'if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then bash ./gradlew -PpreReleaseVersion=$PACKAGE_VERSION -PgitCommitVersion=$TRAVIS_COMMIT --stacktrace; fi'
+        - 'if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then bash ./gradlew -PpreReleaseVersion=$PACKAGE_VERSION -PgitCommitVersion=$TRAVIS_COMMIT -PnoCCache --stacktrace; fi'
         - echo no | android create avd --force -n $EMULATOR_NAME-$EMULATOR_API_LEVEL -t android-$EMULATOR_API_LEVEL --abi $ANDROID_ABI -c 12M
         - emulator -avd $EMULATOR_NAME-$EMULATOR_API_LEVEL -no-skin -no-audio -no-window &
         - android-wait-for-emulator
         - "./gradlew runSbgTests --stacktrace"
-        - "./gradlew runtest --stacktrace"
+        - "./gradlew runtest -PnoCCache --stacktrace"
         - adb -e logcat -d 300
       before_install:
         - echo "y" | sdkmanager "cmake;3.6.4111459"

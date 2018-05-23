@@ -3,6 +3,7 @@ def runOnDevice = project.hasProperty("runOnDevice");
 def runOnDeviceOrEmulator = runOnDevice ? "-d" : "-e";
 
 def onlyX86 = project.hasProperty("onlyX86")
+def noCCache = project.hasProperty("noCCache")
 
 // task deleteDist(type: Delete) {
 //     doFirst {
@@ -22,22 +23,27 @@ task waitForEmulatorToStart(type: Exec) {
     }
 }
 
+def getBuildArguments = { ->
+    def arguments = []
+    if (isWinOs) {
+        arguments += ["cmd", "/c", "gradlew"]
+    } else {
+        arguments.push("./gradlew")
+    }
+    arguments.push(":app:installDebug")
+    if (onlyX86) {
+        arguments.push("-PonlyX86")
+    }
+    if (noCCache) {
+        arguments.push("-PnoCCache")
+    }
+    return arguments;
+}
+
 task installApk(type: Exec) {
         doFirst {
             println "Attempting to install buit apk"
-            if (onlyX86) {
-                if (isWinOs) {
-                    commandLine "cmd", "/c", "gradlew", ":app:installDebug", "-PonlyX86"
-                } else {
-                    commandLine "./gradlew", ":app:installDebug", "-PonlyX86"
-                }
-            } else {
-                if (isWinOs) {
-                    commandLine "cmd", "/c", "gradlew", ":app:installDebug"
-                } else {
-                    commandLine "./gradlew", ":app:installDebug"
-                }
-            }
+            commandLine getBuildArguments()
         }
 }
 
