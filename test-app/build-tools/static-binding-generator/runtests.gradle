@@ -4,8 +4,8 @@ apply plugin: 'java-library'
 defaultTasks 'runSbg'
 
 repositories {
-    jcenter()
     google()
+    jcenter()
 }
 
 dependencies {
