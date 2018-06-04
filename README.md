@@ -42,7 +42,7 @@ Following are the minimal prerequisites to build the runtime package.
 
 * Install the latest [Android Studio](https://developer.android.com/studio/index.html).
 * From the SDK Manager (Android Studio -> Tools -> Android -> SDK Manager) install the following components:
-    * Android API Level 23, 24, 25, 26
+    * Android API Level 23, 24, 25, 26, 27
     * Android NDK 
     * Android Support Repository
     * Download Build Tools 
