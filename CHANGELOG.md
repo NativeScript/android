@@ -1,3 +1,10 @@
+3.4.3
+==
+
+## Bug Fixes
+
+ - [Webview Crash With Android 8.1.0 / Chromium 67.0.3396.68 (#1075)](https://github.com/NativeScript/android-runtime/issues/1075)
+
 3.4.2
 ==
 
@@ -81,7 +88,7 @@
 ## Bug Fixes
 
  - [Javascript array not marshalling to Java long[] properly  (#696)](https://github.com/NativeScript/android-runtime/issues/696)
- 
+
 2.5.0-RC
 ==
 
@@ -180,7 +187,7 @@
  - [Add support for caching already compiled JS code](https://github.com/NativeScript/android-runtime/issues/257)
  - [Additional Intents Crashes app](https://github.com/NativeScript/android-runtime/issues/218)
  - [Enable Multidex support](https://github.com/NativeScript/android-runtime/issues/344)
- 
+
 ## Bug Fixes
 
  - [Wrong object lifecycle management (#382)](https://github.com/NativeScript/android-runtime/issues/382)
@@ -262,7 +269,7 @@
  - [Improved error handling](https://github.com/NativeScript/android-runtime/issues/221)
  - Use Gradle Wrapper
  - Use V8 code cache (experimental)
- 
+
  ## Bug Fixes
 
  - Proper handling of HTTP 401 status code
@@ -355,7 +362,7 @@
  - [Optimize Strings marshaling between Java and V8 (#160)](https://github.com/NativeScript/android-runtime/issues/160)
  - [Improve required module loading (#156)](https://github.com/NativeScript/android-runtime/issues/156)
  - [Improve JNI String marshalling (#126)](https://github.com/NativeScript/android-runtime/issues/126)
- - [Cache folder-as-module resolved path (#121)](https://github.com/NativeScript/android-runtime/issues/121) 
+ - [Cache folder-as-module resolved path (#121)](https://github.com/NativeScript/android-runtime/issues/121)
 
 
 ## 1.1.0 (2015, June 10)
