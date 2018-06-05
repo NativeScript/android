@@ -1,3 +1,10 @@
+4.1.2
+==
+
+## Bug Fixes
+
+ - [Webview Crash With Android 8.1.0 / Chromium 67.0.3396.68 (#1075)](https://github.com/NativeScript/android-runtime/issues/1075)
+
 4.1.1
 ==
 
