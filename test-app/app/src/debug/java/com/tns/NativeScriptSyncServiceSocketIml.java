@@ -12,6 +12,7 @@ import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.io.OutputStream;
 import java.util.Arrays;
+import java.nio.ByteBuffer;
 
 public class NativeScriptSyncServiceSocketIml {
     private static String DEVICE_APP_DIR;
@@ -97,8 +98,8 @@ public class NativeScriptSyncServiceSocketIml {
     private class LiveSyncWorker implements Runnable {
         public static final int OPERATION_BYTE_SIZE = 1;
         public static final int HASH_BYTE_SIZE = 16;
-        public static final int FILE_NAME_LENGTH_BYTE_SIZE = 5;
-        public static final int CONTENT_LENGTH_BYTE_SIZE = 10;
+        public static final int FILE_NAME_LENGTH_BYTE_SIZE = 1;
+        public static final int CONTENT_LENGTH_BYTE_SIZE = 1;
         public static final int DELETE_FILE_OPERATION = 7;
         public static final int CREATE_FILE_OPERATION = 8;
         public static final int DO_SYNC_OPERATION = 9;
@@ -125,6 +126,8 @@ public class NativeScriptSyncServiceSocketIml {
                 FILE_NAME,
                 FILE_CONTENT_LENGTH, CONTENT_LENGTH_BYTE_SIZE,
                 FILE_CONTENT);
+        private static final String PROTOCOL_VERSION = "0.1.0";
+        private byte[] handshakeMessage;
         private final DigestInputStream input;
         private Closeable livesyncSocket;
         private OutputStream output;
@@ -134,12 +137,12 @@ public class NativeScriptSyncServiceSocketIml {
             MessageDigest md = MessageDigest.getInstance("MD5");
             input = new DigestInputStream(systemSocket.getInputStream(), md);
             output = systemSocket.getOutputStream();
+            handshakeMessage = getHandshakeMessage();
         }
 
         public void run() {
             try {
-
-                output.write(context.getPackageName().getBytes());
+                output.write(handshakeMessage);
 
             } catch (IOException e) {
                 logger.write(String.format("Error while LiveSyncing: Client socket might be closed!", e.toString()));
@@ -192,6 +195,19 @@ public class NativeScriptSyncServiceSocketIml {
 
         }
 
+        private byte[] getHandshakeMessage() {
+            byte[] protocolVersionBytes = PROTOCOL_VERSION.getBytes();
+            byte[] versionLength = new byte[]{(byte)protocolVersionBytes.length};
+            byte[] packageNameBytes = context.getPackageName().getBytes();
+            byte[] combined = new byte[protocolVersionBytes.length + packageNameBytes.length + versionLength.length];
+
+            System.arraycopy(versionLength,0,combined, 0, versionLength.length);
+            System.arraycopy(protocolVersionBytes,0,combined, versionLength.length, protocolVersionBytes.length);
+            System.arraycopy(packageNameBytes,0,combined,protocolVersionBytes.length + versionLength.length,packageNameBytes.length);
+
+            return combined;
+        }
+
         private void validateData() throws IOException {
             MessageDigest messageDigest = input.getMessageDigest();
             byte[] digest = messageDigest.digest();
@@ -234,12 +250,14 @@ public class NativeScriptSyncServiceSocketIml {
 
         private String getFileName() {
             byte[] fileNameBuffer;
+            byte fileNameLengthSize;
             int fileNameLenth = -1;
             byte[] fileNameLengthBuffer;
 
             try {
 
-                fileNameLengthBuffer = readNextBytes(FILE_NAME_LENGTH_BYTE_SIZE);
+                fileNameLengthSize = readNextBytes(FILE_NAME_LENGTH_BYTE_SIZE)[0];
+                fileNameLengthBuffer = readNextBytes(fileNameLengthSize);
 
             } catch (Exception e) {
                 throw new IllegalStateException(String.format("\nLiveSync: failed to parse %s. %s\nOriginal Exception: %s", FILE_NAME_LENGTH, LIVESYNC_ERROR_SUGGESTION, e.toString()));
@@ -274,7 +292,8 @@ public class NativeScriptSyncServiceSocketIml {
         private byte[] getFileContentLength(String fileName)throws IllegalStateException {
             byte[] contentLength;
             try {
-                contentLength = readNextBytes(CONTENT_LENGTH_BYTE_SIZE);
+                byte contentLengthSize = readNextBytes(CONTENT_LENGTH_BYTE_SIZE)[0];
+                contentLength = readNextBytes(contentLengthSize);
             } catch (Exception e) {
                 throw new IllegalStateException(String.format("\nLiveSync: failed to parse %s %s. %s\nOriginal Exception: %s", fileName, FILE_CONTENT_LENGTH, LIVESYNC_ERROR_SUGGESTION, e.toString()));
             }
