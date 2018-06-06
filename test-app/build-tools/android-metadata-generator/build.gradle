@@ -12,8 +12,8 @@ targetCompatibility = JavaVersion.VERSION_1_6
 
 buildscript {
     repositories {
-        jcenter()
         google()
+        jcenter()
     }
 
     dependencies {
