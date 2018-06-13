@@ -5,11 +5,11 @@ cmake_minimum_required(VERSION 3.4.1)
 
 # Add the ccache to the build system
 find_program(CCACHE_FOUND ccache)
-if(CCACHE_FOUND AND (NOT NO_CCACHE))
+if(CCACHE_FOUND AND (USE_CCACHE))
   MESSAGE( STATUS "## Using CCache when building!")
   set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
   set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
-endif(CCACHE_FOUND AND (NOT NO_CCACHE))
+endif(CCACHE_FOUND AND (USE_CCACHE))
 
 # Command info: https://cmake.org/cmake/help/v3.4/command/message.html
 # we pass the android_ndk_root from gradle because for some reason

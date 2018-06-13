@@ -3,7 +3,7 @@ def runOnDevice = project.hasProperty("runOnDevice");
 def runOnDeviceOrEmulator = runOnDevice ? "-d" : "-e";
 
 def onlyX86 = project.hasProperty("onlyX86")
-def noCCache = project.hasProperty("noCCache")
+def useCCache = project.hasProperty("useCCache")
 
 // task deleteDist(type: Delete) {
 //     doFirst {
@@ -34,8 +34,8 @@ def getBuildArguments = { ->
     if (onlyX86) {
         arguments.push("-PonlyX86")
     }
-    if (noCCache) {
-        arguments.push("-PnoCCache")
+    if (useCCache) {
+        arguments.push("-PuseCCache")
     }
     return arguments;
 }
