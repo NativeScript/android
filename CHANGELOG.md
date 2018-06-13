@@ -1,3 +1,10 @@
+4.1.3
+==
+
+## Bug Fixes
+
+ - Use google repository as primary gradle repository
+
 4.1.2
 ==
 
