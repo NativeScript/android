@@ -56,7 +56,6 @@ if ( NOT OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD )
         src/main/cpp/v8_inspector/src/inspector/protocol/Console.cpp
         src/main/cpp/v8_inspector/src/inspector/protocol/DOM.cpp
         src/main/cpp/v8_inspector/src/inspector/protocol/Debugger.cpp
-        src/main/cpp/v8_inspector/src/inspector/protocol/GenericTypes.cpp
         src/main/cpp/v8_inspector/src/inspector/protocol/HeapProfiler.cpp
         src/main/cpp/v8_inspector/src/inspector/protocol/Log.cpp
         src/main/cpp/v8_inspector/src/inspector/protocol/Network.cpp
@@ -83,7 +82,6 @@ if ( NOT OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD )
         src/main/cpp/v8_inspector/src/inspector/search-util.cc
         src/main/cpp/v8_inspector/src/inspector/string-16.cc
         src/main/cpp/v8_inspector/src/inspector/string-util.cc
-        src/main/cpp/v8_inspector/src/inspector/test-interface.cc
         src/main/cpp/v8_inspector/src/inspector/v8-console.cc
         src/main/cpp/v8_inspector/src/inspector/v8-console-agent-impl.cc
         src/main/cpp/v8_inspector/src/inspector/v8-console-message.cc
