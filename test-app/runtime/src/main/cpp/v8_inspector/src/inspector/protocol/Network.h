@@ -12,6 +12,7 @@
 // and include Domain::API version from there.
 #include "src/inspector/protocol/Debugger.h"
 #include "src/inspector/protocol/Runtime.h"
+#include "src/inspector/protocol/Security.h"
 
 namespace v8_inspector {
 namespace protocol {

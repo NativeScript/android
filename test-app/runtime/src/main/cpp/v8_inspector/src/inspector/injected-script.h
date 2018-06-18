@@ -122,6 +122,7 @@ class InjectedScript final {
                 void installCommandLineAPI();
                 void ignoreExceptionsAndMuteConsole();
                 void pretendUserGesture();
+                void allowCodeGenerationFromStrings();
                 v8::Local<v8::Context> context() const {
                     return m_context;
                 }
@@ -152,6 +153,7 @@ class InjectedScript final {
                 bool m_ignoreExceptionsAndMuteConsole;
                 v8::debug::ExceptionBreakState m_previousPauseOnExceptionsState;
                 bool m_userGesture;
+                bool m_allowEval;
                 int m_contextGroupId;
                 int m_sessionId;
         };

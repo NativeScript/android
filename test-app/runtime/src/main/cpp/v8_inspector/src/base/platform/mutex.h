@@ -35,61 +35,61 @@ namespace base {
 // while still owned by some thread. The Mutex class is non-copyable.
 
 class V8_BASE_EXPORT Mutex final {
- public:
-  Mutex();
-  ~Mutex();
+    public:
+        Mutex();
+        ~Mutex();
 
-  // Locks the given mutex. If the mutex is currently unlocked, it becomes
-  // locked and owned by the calling thread, and immediately. If the mutex
-  // is already locked by another thread, suspends the calling thread until
-  // the mutex is unlocked.
-  void Lock();
+        // Locks the given mutex. If the mutex is currently unlocked, it becomes
+        // locked and owned by the calling thread, and immediately. If the mutex
+        // is already locked by another thread, suspends the calling thread until
+        // the mutex is unlocked.
+        void Lock();
 
-  // Unlocks the given mutex. The mutex is assumed to be locked and owned by
-  // the calling thread on entrance.
-  void Unlock();
+        // Unlocks the given mutex. The mutex is assumed to be locked and owned by
+        // the calling thread on entrance.
+        void Unlock();
 
-  // Tries to lock the given mutex. Returns whether the mutex was
-  // successfully locked.
-  bool TryLock() WARN_UNUSED_RESULT;
+        // Tries to lock the given mutex. Returns whether the mutex was
+        // successfully locked.
+        bool TryLock() V8_WARN_UNUSED_RESULT;
 
-  // The implementation-defined native handle type.
+        // The implementation-defined native handle type.
 #if V8_OS_POSIX
-  typedef pthread_mutex_t NativeHandle;
+        typedef pthread_mutex_t NativeHandle;
 #elif V8_OS_WIN
-  typedef SRWLOCK NativeHandle;
+        typedef SRWLOCK NativeHandle;
 #endif
 
-  NativeHandle& native_handle() {
-    return native_handle_;
-  }
-  const NativeHandle& native_handle() const {
-    return native_handle_;
-  }
+        NativeHandle& native_handle() {
+            return native_handle_;
+        }
+        const NativeHandle& native_handle() const {
+            return native_handle_;
+        }
 
- private:
-  NativeHandle native_handle_;
+    private:
+        NativeHandle native_handle_;
 #ifdef DEBUG
-  int level_;
+        int level_;
 #endif
 
-  V8_INLINE void AssertHeldAndUnmark() {
+        V8_INLINE void AssertHeldAndUnmark() {
 #ifdef DEBUG
-    DCHECK_EQ(1, level_);
-    level_--;
+            DCHECK_EQ(1, level_);
+            level_--;
 #endif
-  }
+        }
 
-  V8_INLINE void AssertUnheldAndMark() {
+        V8_INLINE void AssertUnheldAndMark() {
 #ifdef DEBUG
-    DCHECK_EQ(0, level_);
-    level_++;
+            DCHECK_EQ(0, level_);
+            level_++;
 #endif
-  }
+        }
 
-  friend class ConditionVariable;
+        friend class ConditionVariable;
 
-  DISALLOW_COPY_AND_ASSIGN(Mutex);
+        DISALLOW_COPY_AND_ASSIGN(Mutex);
 };
 
 
@@ -103,7 +103,7 @@ class V8_BASE_EXPORT Mutex final {
 //   }
 //
 typedef LazyStaticInstance<Mutex, DefaultConstructTrait<Mutex>,
-                           ThreadSafeInitOnceTrait>::type LazyMutex;
+        ThreadSafeInitOnceTrait>::type LazyMutex;
 
 #define LAZY_MUTEX_INITIALIZER LAZY_STATIC_INSTANCE_INITIALIZER
 
@@ -129,50 +129,50 @@ typedef LazyStaticInstance<Mutex, DefaultConstructTrait<Mutex>,
 // while still owned by some thread. The RecursiveMutex class is non-copyable.
 
 class V8_BASE_EXPORT RecursiveMutex final {
- public:
-  RecursiveMutex();
-  ~RecursiveMutex();
+    public:
+        RecursiveMutex();
+        ~RecursiveMutex();
 
-  // Locks the mutex. If another thread has already locked the mutex, a call to
-  // |Lock()| will block execution until the lock is acquired. A thread may call
-  // |Lock()| on a recursive mutex repeatedly. Ownership will only be released
-  // after the thread makes a matching number of calls to |Unlock()|.
-  // The behavior is undefined if the mutex is not unlocked before being
-  // destroyed, i.e. some thread still owns it.
-  void Lock();
+        // Locks the mutex. If another thread has already locked the mutex, a call to
+        // |Lock()| will block execution until the lock is acquired. A thread may call
+        // |Lock()| on a recursive mutex repeatedly. Ownership will only be released
+        // after the thread makes a matching number of calls to |Unlock()|.
+        // The behavior is undefined if the mutex is not unlocked before being
+        // destroyed, i.e. some thread still owns it.
+        void Lock();
 
-  // Unlocks the mutex if its level of ownership is 1 (there was exactly one
-  // more call to |Lock()| than there were calls to unlock() made by this
-  // thread), reduces the level of ownership by 1 otherwise. The mutex must be
-  // locked by the current thread of execution, otherwise, the behavior is
-  // undefined.
-  void Unlock();
+        // Unlocks the mutex if its level of ownership is 1 (there was exactly one
+        // more call to |Lock()| than there were calls to unlock() made by this
+        // thread), reduces the level of ownership by 1 otherwise. The mutex must be
+        // locked by the current thread of execution, otherwise, the behavior is
+        // undefined.
+        void Unlock();
 
-  // Tries to lock the given mutex. Returns whether the mutex was
-  // successfully locked.
-  bool TryLock() WARN_UNUSED_RESULT;
+        // Tries to lock the given mutex. Returns whether the mutex was
+        // successfully locked.
+        bool TryLock() V8_WARN_UNUSED_RESULT;
 
-  // The implementation-defined native handle type.
+        // The implementation-defined native handle type.
 #if V8_OS_POSIX
-  typedef pthread_mutex_t NativeHandle;
+        typedef pthread_mutex_t NativeHandle;
 #elif V8_OS_WIN
-  typedef CRITICAL_SECTION NativeHandle;
+        typedef CRITICAL_SECTION NativeHandle;
 #endif
 
-  NativeHandle& native_handle() {
-    return native_handle_;
-  }
-  const NativeHandle& native_handle() const {
-    return native_handle_;
-  }
+        NativeHandle& native_handle() {
+            return native_handle_;
+        }
+        const NativeHandle& native_handle() const {
+            return native_handle_;
+        }
 
- private:
-  NativeHandle native_handle_;
+    private:
+        NativeHandle native_handle_;
 #ifdef DEBUG
-  int level_;
+        int level_;
 #endif
 
-  DISALLOW_COPY_AND_ASSIGN(RecursiveMutex);
+        DISALLOW_COPY_AND_ASSIGN(RecursiveMutex);
 };
 
 
@@ -187,8 +187,8 @@ class V8_BASE_EXPORT RecursiveMutex final {
 //   }
 //
 typedef LazyStaticInstance<RecursiveMutex,
-                           DefaultConstructTrait<RecursiveMutex>,
-                           ThreadSafeInitOnceTrait>::type LazyRecursiveMutex;
+        DefaultConstructTrait<RecursiveMutex>,
+        ThreadSafeInitOnceTrait>::type LazyRecursiveMutex;
 
 #define LAZY_RECURSIVE_MUTEX_INITIALIZER LAZY_STATIC_INSTANCE_INITIALIZER
 
@@ -205,14 +205,18 @@ typedef LazyStaticInstance<RecursiveMutex,
 
 template <typename Mutex>
 class LockGuard final {
- public:
-  explicit LockGuard(Mutex* mutex) : mutex_(mutex) { mutex_->Lock(); }
-  ~LockGuard() { mutex_->Unlock(); }
+    public:
+        explicit LockGuard(Mutex* mutex) : mutex_(mutex) {
+            mutex_->Lock();
+        }
+        ~LockGuard() {
+            mutex_->Unlock();
+        }
 
- private:
-  Mutex* mutex_;
+    private:
+        Mutex* mutex_;
 
-  DISALLOW_COPY_AND_ASSIGN(LockGuard);
+        DISALLOW_COPY_AND_ASSIGN(LockGuard);
 };
 
 }  // namespace base
