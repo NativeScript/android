@@ -66,6 +66,8 @@ namespace v8 {
 class AccessorSignature;
 class Array;
 class ArrayBuffer;
+class BigInt;
+class BigIntObject;
 class Boolean;
 class BooleanObject;
 class Context;
@@ -1637,7 +1639,9 @@ class V8_EXPORT ScriptCompiler {
         static V8_WARN_UNUSED_RESULT MaybeLocal<Function> CompileFunctionInContext(
             Local<Context> context, Source* source, size_t arguments_count,
             Local<String> arguments[], size_t context_extension_count,
-            Local<Object> context_extensions[]);
+            Local<Object> context_extensions[],
+            CompileOptions options = kNoCompileOptions,
+            NoCacheReason no_cache_reason = kNoCacheNoReason);
 
         /**
          * Creates and returns code cache for the specified unbound_script.
@@ -1646,6 +1650,15 @@ class V8_EXPORT ScriptCompiler {
          */
         static CachedData* CreateCodeCache(Local<UnboundScript> unbound_script,
                                            Local<String> source);
+
+        /**
+         * Creates and returns code cache for the specified function that was
+         * previously produced by CompileFunctionInContext.
+         * This will return nullptr if the script cannot be serialized. The
+         * CachedData returned by this function should be owned by the caller.
+         */
+        static CachedData* CreateCodeCacheForFunction(Local<Function> function,
+                Local<String> source);
 
     private:
         static V8_WARN_UNUSED_RESULT MaybeLocal<UnboundScript> CompileUnboundInternal(
@@ -1711,13 +1724,14 @@ class V8_EXPORT Message {
          * Returns the index within the line of the first character where
          * the error occurred.
          */
-        V8_DEPRECATED("Use maybe version", int GetStartColumn() const);
+        int GetStartColumn() const;
         V8_WARN_UNUSED_RESULT Maybe<int> GetStartColumn(Local<Context> context) const;
 
         /**
          * Returns the index within the line of the last character where
          * the error occurred.
          */
+        int GetEndColumn() const;
         V8_WARN_UNUSED_RESULT Maybe<int> GetEndColumn(Local<Context> context) const;
 
         /**
@@ -2222,6 +2236,11 @@ class V8_EXPORT Value : public Data {
         bool IsObject() const;
 
         /**
+         * Returns true if this value is a bigint.
+         */
+        bool IsBigInt() const;
+
+        /**
          * Returns true if this value is boolean.
          */
         bool IsBoolean() const;
@@ -2255,6 +2274,11 @@ class V8_EXPORT Value : public Data {
          * Returns true if this value is an Arguments object.
          */
         bool IsArgumentsObject() const;
+
+        /**
+         * Returns true if this value is a BigInt object.
+         */
+        bool IsBigIntObject() const;
 
         /**
          * Returns true if this value is a Boolean object.
@@ -2424,6 +2448,8 @@ class V8_EXPORT Value : public Data {
 
         bool IsWebAssemblyCompiledModule() const;
 
+        V8_WARN_UNUSED_RESULT MaybeLocal<BigInt> ToBigInt(
+            Local<Context> context) const;
         V8_WARN_UNUSED_RESULT MaybeLocal<Boolean> ToBoolean(
             Local<Context> context) const;
         V8_WARN_UNUSED_RESULT MaybeLocal<Number> ToNumber(
@@ -3092,6 +3118,19 @@ class V8_EXPORT Uint32 : public Integer {
 };
 
 /**
+ * A JavaScript BigInt value (https://tc39.github.io/proposal-bigint)
+ */
+class V8_EXPORT BigInt : public Primitive {
+    public:
+        static Local<BigInt> New(Isolate* isolate, int64_t value);
+        V8_INLINE static BigInt* Cast(v8::Value* obj);
+
+    private:
+        BigInt();
+        static void CheckCast(v8::Value* obj);
+};
+
+/**
  * PropertyAttribute.
  */
 enum PropertyAttribute {
@@ -3157,6 +3196,15 @@ enum PropertyFilter {
 };
 
 /**
+ * Options for marking whether callbacks may trigger JS-observable side effects.
+ * Side-effect-free callbacks are whitelisted during debug evaluation with
+ * throwOnSideEffect. It applies when calling a Function, FunctionTemplate,
+ * or an Accessor's getter callback. For Interceptors, please see
+ * PropertyHandlerFlags's kHasNoSideEffect.
+ */
+enum class SideEffectType { kHasSideEffect, kHasNoSideEffect };
+
+/**
  * Keys/Properties filter enums:
  *
  * KeyCollectionMode limits the range of collected properties. kOwnOnly limits
@@ -3167,7 +3215,7 @@ enum class KeyCollectionMode { kOwnOnly, kIncludePrototypes };
 
 /**
  * kIncludesIndices allows for integer indices to be collected, while
- * kSkipIndices will exclude integer indicies from being collected.
+ * kSkipIndices will exclude integer indices from being collected.
  */
 enum class IndexFilter { kIncludeIndices, kSkipIndices };
 
@@ -3282,19 +3330,20 @@ class V8_EXPORT Object : public Value {
         V8_WARN_UNUSED_RESULT Maybe<bool> Delete(Local<Context> context,
                 Local<Value> key);
 
-        V8_WARN_UNUSED_RESULT Maybe<bool> Has(Local<Context> context,
-                                              uint32_t index);
+        V8_WARN_UNUSED_RESULT Maybe<bool> Has(Local<Context> context, uint32_t index);
 
         V8_WARN_UNUSED_RESULT Maybe<bool> Delete(Local<Context> context,
                 uint32_t index);
 
-        V8_WARN_UNUSED_RESULT Maybe<bool> SetAccessor(Local<Context> context,
-                Local<Name> name,
-                AccessorNameGetterCallback getter,
-                AccessorNameSetterCallback setter = 0,
-                MaybeLocal<Value> data = MaybeLocal<Value>(),
-                AccessControl settings = DEFAULT,
-                PropertyAttribute attribute = None);
+        /**
+         * Note: SideEffectType affects the getter only, not the setter.
+         */
+        V8_WARN_UNUSED_RESULT Maybe<bool> SetAccessor(
+            Local<Context> context, Local<Name> name,
+            AccessorNameGetterCallback getter, AccessorNameSetterCallback setter = 0,
+            MaybeLocal<Value> data = MaybeLocal<Value>(),
+            AccessControl settings = DEFAULT, PropertyAttribute attribute = None,
+            SideEffectType getter_side_effect_type = SideEffectType::kHasSideEffect);
 
         void SetAccessorProperty(Local<Name> name, Local<Function> getter,
                                  Local<Function> setter = Local<Function>(),
@@ -3309,7 +3358,8 @@ class V8_EXPORT Object : public Value {
             Local<Context> context, Local<Name> name,
             AccessorNameGetterCallback getter,
             AccessorNameSetterCallback setter = nullptr,
-            Local<Value> data = Local<Value>(), PropertyAttribute attributes = None);
+            Local<Value> data = Local<Value>(), PropertyAttribute attributes = None,
+            SideEffectType getter_side_effect_type = SideEffectType::kHasSideEffect);
 
         /**
          * Attempts to create a property with the given name which behaves like a data
@@ -3322,7 +3372,8 @@ class V8_EXPORT Object : public Value {
         V8_WARN_UNUSED_RESULT Maybe<bool> SetLazyDataProperty(
             Local<Context> context, Local<Name> name,
             AccessorNameGetterCallback getter, Local<Value> data = Local<Value>(),
-            PropertyAttribute attributes = None);
+            PropertyAttribute attributes = None,
+            SideEffectType getter_side_effect_type = SideEffectType::kHasSideEffect);
 
         /**
          * Functionality for private properties.
@@ -3577,7 +3628,7 @@ class V8_EXPORT Object : public Value {
         /**
          * Return the isolate to which the Object belongs to.
          */
-        V8_DEPRECATE_SOON("Keep track of isolate correctly", Isolate* GetIsolate());
+        Isolate* GetIsolate();
 
         static Local<Object> New(Isolate* isolate);
 
@@ -3916,7 +3967,8 @@ class V8_EXPORT Function : public Object {
         static MaybeLocal<Function> New(
             Local<Context> context, FunctionCallback callback,
             Local<Value> data = Local<Value>(), int length = 0,
-            ConstructorBehavior behavior = ConstructorBehavior::kAllow);
+            ConstructorBehavior behavior = ConstructorBehavior::kAllow,
+            SideEffectType side_effect_type = SideEffectType::kHasSideEffect);
         static V8_DEPRECATE_SOON(
             "Use maybe version",
             Local<Function> New(Isolate* isolate, FunctionCallback callback,
@@ -4357,40 +4409,17 @@ class V8_EXPORT ArrayBuffer : public Object {
                 virtual void* AllocateUninitialized(size_t length) = 0;
 
                 /**
-                 * Reserved |length| bytes, but do not commit the memory. Must call
-                 * |SetProtection| to make memory accessible.
-                 */
-                // TODO(eholk): make this pure virtual once blink implements this.
-                virtual void* Reserve(size_t length);
-
-                /**
                  * Free the memory block of size |length|, pointed to by |data|.
                  * That memory is guaranteed to be previously allocated by |Allocate|.
                  */
                 virtual void Free(void* data, size_t length) = 0;
 
+                /**
+                 * ArrayBuffer allocation mode. kNormal is a malloc/free style allocation,
+                 * while kReservation is for larger allocations with the ability to set
+                 * access permissions.
+                 */
                 enum class AllocationMode { kNormal, kReservation };
-
-                /**
-                 * Free the memory block of size |length|, pointed to by |data|.
-                 * That memory is guaranteed to be previously allocated by |Allocate| or
-                 * |Reserve|, depending on |mode|.
-                 */
-                // TODO(eholk): make this pure virtual once blink implements this.
-                virtual void Free(void* data, size_t length, AllocationMode mode);
-
-                enum class Protection { kNoAccess, kReadWrite };
-
-                /**
-                 * Change the protection on a region of memory.
-                 *
-                 * On platforms that make a distinction between reserving and committing
-                 * memory, changing the protection to kReadWrite must also ensure the memory
-                 * is committed.
-                 */
-                // TODO(eholk): make this pure virtual once blink implements this.
-                virtual void SetProtection(void* data, size_t length,
-                                           Protection protection);
 
                 /**
                  * malloc/free based convenience allocator.
@@ -4980,6 +5009,20 @@ class V8_EXPORT NumberObject : public Object {
         static void CheckCast(Value* obj);
 };
 
+/**
+ * A BigInt object (https://tc39.github.io/proposal-bigint)
+ */
+class V8_EXPORT BigIntObject : public Object {
+    public:
+        static Local<Value> New(Isolate* isolate, int64_t value);
+
+        Local<BigInt> ValueOf() const;
+
+        V8_INLINE static BigIntObject* Cast(Value* obj);
+
+    private:
+        static void CheckCast(Value* obj);
+};
 
 /**
  * A Boolean object (ECMA-262, 4.3.15).
@@ -5597,7 +5640,8 @@ class V8_EXPORT FunctionTemplate : public Template {
             Isolate* isolate, FunctionCallback callback = 0,
             Local<Value> data = Local<Value>(),
             Local<Signature> signature = Local<Signature>(), int length = 0,
-            ConstructorBehavior behavior = ConstructorBehavior::kAllow);
+            ConstructorBehavior behavior = ConstructorBehavior::kAllow,
+            SideEffectType side_effect_type = SideEffectType::kHasSideEffect);
 
         /** Get a template included in the snapshot by index. */
         static MaybeLocal<FunctionTemplate> FromSnapshot(Isolate* isolate,
@@ -5609,7 +5653,8 @@ class V8_EXPORT FunctionTemplate : public Template {
         static Local<FunctionTemplate> NewWithCache(
             Isolate* isolate, FunctionCallback callback,
             Local<Private> cache_property, Local<Value> data = Local<Value>(),
-            Local<Signature> signature = Local<Signature>(), int length = 0);
+            Local<Signature> signature = Local<Signature>(), int length = 0,
+            SideEffectType side_effect_type = SideEffectType::kHasSideEffect);
 
         /** Returns the unique function instance in the current execution context.*/
         V8_DEPRECATE_SOON("Use maybe version", Local<Function> GetFunction());
@@ -5630,8 +5675,9 @@ class V8_EXPORT FunctionTemplate : public Template {
          * callback is called whenever the function created from this
          * FunctionTemplate is called.
          */
-        void SetCallHandler(FunctionCallback callback,
-                            Local<Value> data = Local<Value>());
+        void SetCallHandler(
+            FunctionCallback callback, Local<Value> data = Local<Value>(),
+            SideEffectType side_effect_type = SideEffectType::kHasSideEffect);
 
         /** Set the predefined length property for the FunctionTemplate. */
         void SetLength(int length);
@@ -5641,7 +5687,7 @@ class V8_EXPORT FunctionTemplate : public Template {
 
         /**
          * Causes the function template to inherit from a parent function template.
-         * This means the the function's prototype.__proto__ is set to the parent
+         * This means the function's prototype.__proto__ is set to the parent
          * function's prototype.
          **/
         void Inherit(Local<FunctionTemplate> parent);
@@ -5742,6 +5788,11 @@ enum class PropertyHandlerFlags {
      * named interceptors.
      */
     kOnlyInterceptStrings = 1 << 2,
+
+    /**
+     * The getter, query, enumerator callbacks do not produce side effects.
+     */
+    kHasNoSideEffect = 1 << 3,
 };
 
 struct NamedPropertyHandlerConfiguration {
@@ -5929,7 +5980,7 @@ class V8_EXPORT ObjectTemplate : public Template {
          * \param data A piece of data that will be passed to the callbacks
          *   whenever they are invoked.
          */
-        V8_DEPRECATE_SOON(
+        V8_DEPRECATED(
             "Use SetHandler(const NamedPropertyHandlerConfiguration) "
             "with the kOnlyInterceptStrings flag set.",
             void SetNamedPropertyHandler(
@@ -6347,24 +6398,6 @@ typedef void* (*CreateHistogramCallback)(const char* name,
 
 typedef void (*AddHistogramSampleCallback)(void* histogram, int sample);
 
-// --- Memory Allocation Callback ---
-enum ObjectSpace {
-    kObjectSpaceNewSpace = 1 << 0,
-    kObjectSpaceOldSpace = 1 << 1,
-    kObjectSpaceCodeSpace = 1 << 2,
-    kObjectSpaceMapSpace = 1 << 3,
-    kObjectSpaceLoSpace = 1 << 4,
-    kObjectSpaceAll = kObjectSpaceNewSpace | kObjectSpaceOldSpace |
-                      kObjectSpaceCodeSpace | kObjectSpaceMapSpace |
-                      kObjectSpaceLoSpace
-};
-
-enum AllocationAction {
-    kAllocationActionAllocate = 1 << 0,
-    kAllocationActionFree = 1 << 1,
-    kAllocationActionAll = kAllocationActionAllocate | kAllocationActionFree
-};
-
 // --- Enter/Leave Script Callback ---
 typedef void (*BeforeCallEnteredCallback)(Isolate*);
 typedef void (*CallCompletedCallback)(Isolate*);
@@ -6589,6 +6622,15 @@ typedef void (*GCCallback)(GCType type, GCCallbackFlags flags);
 
 typedef void (*InterruptCallback)(Isolate* isolate, void* data);
 
+/**
+ * This callback is invoked when the heap size is close to the heap limit and
+ * V8 is likely to abort with out-of-memory error.
+ * The callback can extend the heap limit by returning a value that is greater
+ * than the current_heap_limit. The initial heap limit is the limit that was
+ * set after heap setup.
+ */
+typedef size_t (*NearHeapLimitCallback)(void* data, size_t current_heap_limit,
+                                        size_t initial_heap_limit);
 
 /**
  * Collection of V8 heap information.
@@ -6766,8 +6808,17 @@ struct JitCodeEvent {
     // statement, and is used to indicate possible break locations.
     enum PositionType { POSITION, STATEMENT_POSITION };
 
+    // There are two different kinds of JitCodeEvents, one for JIT code generated
+    // by the optimizing compiler, and one for byte code generated for the
+    // interpreter.  For JIT_CODE events, the |code_start| member of the event
+    // points to the beginning of jitted assembly code, while for BYTE_CODE
+    // events, |code_start| points to the first bytecode of the interpreted
+    // function.
+    enum CodeType { BYTE_CODE, JIT_CODE };
+
     // Type of event.
     EventType type;
+    CodeType code_type;
     // Start of the instructions.
     void* code_start;
     // Size of the instructions.
@@ -7470,6 +7521,11 @@ class V8_EXPORT Isolate {
         V8_DEPRECATED("CpuProfiler should be created with CpuProfiler::New call.",
                       CpuProfiler* GetCpuProfiler());
 
+        /**
+         * Tells the CPU profiler whether the embedder is idle.
+         */
+        void SetIdle(bool is_idle);
+
         /** Returns true if this isolate has a current context. */
         bool InContext();
 
@@ -7882,6 +7938,23 @@ class V8_EXPORT Isolate {
         void SetOOMErrorHandler(OOMErrorCallback that);
 
         /**
+         * Add a callback to invoke in case the heap size is close to the heap limit.
+         * If multiple callbacks are added, only the most recently added callback is
+         * invoked.
+         */
+        void AddNearHeapLimitCallback(NearHeapLimitCallback callback, void* data);
+
+        /**
+         * Remove the given callback and restore the heap limit to the
+         * given limit. If the given limit is zero, then it is ignored.
+         * If the current heap size is greater than the given limit,
+         * then the heap limit is restored to the minimal limit that
+         * is possible for the current heap size.
+         */
+        void RemoveNearHeapLimitCallback(NearHeapLimitCallback callback,
+                                         size_t heap_limit);
+
+        /**
          * Set the callback to invoke to check if code generation from
          * strings should be allowed.
          */
@@ -8138,6 +8211,15 @@ class V8_EXPORT V8 {
 
         /**
          * Initialize the ICU library bundled with V8. The embedder should only
+         * invoke this method when using the bundled ICU. Returns true on success.
+         *
+         * If V8 was compiled with the ICU data in an external file, the location
+         * of the data file has to be provided.
+         */
+        static bool InitializeICU(const char* icu_data_file = nullptr);
+
+        /**
+         * Initialize the ICU library bundled with V8. The embedder should only
          * invoke this method when using the bundled ICU. If V8 was compiled with
          * the ICU data in an external file and when the default location of that
          * file should be used, a path to the executable must be provided.
@@ -8209,7 +8291,16 @@ class V8_EXPORT V8 {
          * Enable the default signal handler rather than using one provided by the
          * embedder.
          */
-        static bool RegisterDefaultSignalHandler();
+        V8_DEPRECATE_SOON("Use EnableWebAssemblyTrapHandler",
+                          static bool RegisterDefaultSignalHandler());
+
+        /**
+         * Activate trap-based bounds checking for WebAssembly.
+         *
+         * \param use_v8_signal_handler Whether V8 should install its own signal
+         * handler or rely on the embedder's.
+         */
+        static bool EnableWebAssemblyTrapHandler(bool use_v8_signal_handler);
 
     private:
         V8();
@@ -8791,6 +8882,11 @@ class V8_EXPORT Context {
         enum EmbedderDataFields { kDebugIdIndex = 0 };
 
         /**
+         * Return the number of fields allocated for embedder data.
+         */
+        uint32_t GetNumberOfEmbedderDataFields();
+
+        /**
          * Gets the embedder data with the given index, which must have been set by a
          * previous call to SetEmbedderData with the same index.
          */
@@ -9051,6 +9147,7 @@ const int kApiInt64Size = sizeof(int64_t);  // NOLINT
 
 // Tag information for HeapObject.
 const int kHeapObjectTag = 1;
+const int kWeakHeapObjectTag = 3;
 const int kHeapObjectTagSize = 2;
 const intptr_t kHeapObjectTagMask = (1 << kHeapObjectTagSize) - 1;
 
@@ -9181,6 +9278,7 @@ class Internals {
         static const int kNodeStateIsWeakValue = 2;
         static const int kNodeStateIsPendingValue = 3;
         static const int kNodeStateIsNearDeathValue = 4;
+        static const int kNodeIsIndependentShift = 3;
         static const int kNodeIsActiveShift = 4;
 
         static const int kFirstNonstringType = 0x80;
@@ -9412,7 +9510,12 @@ void Persistent<T, M>::Copy(const Persistent<S, M2>& that) {
 
 template <class T>
 bool PersistentBase<T>::IsIndependent() const {
-    return true;
+    typedef internal::Internals I;
+    if (this->IsEmpty()) {
+        return false;
+    }
+    return I::GetNodeFlag(reinterpret_cast<internal::Object**>(this->val_),
+                          I::kNodeIsIndependentShift);
 }
 
 template <class T>
@@ -9513,7 +9616,14 @@ void PersistentBase<T>::RegisterExternalReference(Isolate* isolate) const {
 }
 
 template <class T>
-void PersistentBase<T>::MarkIndependent() {}
+void PersistentBase<T>::MarkIndependent() {
+    typedef internal::Internals I;
+    if (this->IsEmpty()) {
+        return;
+    }
+    I::UpdateNodeFlag(reinterpret_cast<internal::Object**>(this->val_), true,
+                      I::kNodeIsIndependentShift);
+}
 
 template <class T>
 void PersistentBase<T>::MarkActive() {
@@ -10126,6 +10236,12 @@ Uint32* Uint32::Cast(v8::Value* value) {
     return static_cast<Uint32*>(value);
 }
 
+BigInt* BigInt::Cast(v8::Value* value) {
+#ifdef V8_ENABLE_CHECKS
+    CheckCast(value);
+#endif
+    return static_cast<BigInt*>(value);
+}
 
 Date* Date::Cast(v8::Value* value) {
 #ifdef V8_ENABLE_CHECKS
@@ -10158,6 +10274,12 @@ NumberObject* NumberObject::Cast(v8::Value* value) {
     return static_cast<NumberObject*>(value);
 }
 
+BigIntObject* BigIntObject::Cast(v8::Value* value) {
+#ifdef V8_ENABLE_CHECKS
+    CheckCast(value);
+#endif
+    return static_cast<BigIntObject*>(value);
+}
 
 BooleanObject* BooleanObject::Cast(v8::Value* value) {
 #ifdef V8_ENABLE_CHECKS
@@ -10324,6 +10446,19 @@ Float64Array* Float64Array::Cast(v8::Value* value) {
     return static_cast<Float64Array*>(value);
 }
 
+BigInt64Array* BigInt64Array::Cast(v8::Value* value) {
+#ifdef V8_ENABLE_CHECKS
+    CheckCast(value);
+#endif
+    return static_cast<BigInt64Array*>(value);
+}
+
+BigUint64Array* BigUint64Array::Cast(v8::Value* value) {
+#ifdef V8_ENABLE_CHECKS
+    CheckCast(value);
+#endif
+    return static_cast<BigUint64Array*>(value);
+}
 
 Uint8ClampedArray* Uint8ClampedArray::Cast(v8::Value* value) {
 #ifdef V8_ENABLE_CHECKS

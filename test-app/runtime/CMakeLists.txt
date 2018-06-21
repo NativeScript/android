@@ -5,11 +5,11 @@ cmake_minimum_required(VERSION 3.4.1)
 
 # Add the ccache to the build system
 find_program(CCACHE_FOUND ccache)
-if(CCACHE_FOUND AND (NOT NO_CCACHE))
+if(CCACHE_FOUND AND (USE_CCACHE))
   MESSAGE( STATUS "## Using CCache when building!")
   set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
   set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
-endif(CCACHE_FOUND AND (NOT NO_CCACHE))
+endif(CCACHE_FOUND AND (USE_CCACHE))
 
 # Command info: https://cmake.org/cmake/help/v3.4/command/message.html
 # we pass the android_ndk_root from gradle because for some reason
@@ -56,7 +56,6 @@ if ( NOT OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD )
         src/main/cpp/v8_inspector/src/inspector/protocol/Console.cpp
         src/main/cpp/v8_inspector/src/inspector/protocol/DOM.cpp
         src/main/cpp/v8_inspector/src/inspector/protocol/Debugger.cpp
-        src/main/cpp/v8_inspector/src/inspector/protocol/GenericTypes.cpp
         src/main/cpp/v8_inspector/src/inspector/protocol/HeapProfiler.cpp
         src/main/cpp/v8_inspector/src/inspector/protocol/Log.cpp
         src/main/cpp/v8_inspector/src/inspector/protocol/Network.cpp
@@ -83,7 +82,6 @@ if ( NOT OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD )
         src/main/cpp/v8_inspector/src/inspector/search-util.cc
         src/main/cpp/v8_inspector/src/inspector/string-16.cc
         src/main/cpp/v8_inspector/src/inspector/string-util.cc
-        src/main/cpp/v8_inspector/src/inspector/test-interface.cc
         src/main/cpp/v8_inspector/src/inspector/v8-console.cc
         src/main/cpp/v8_inspector/src/inspector/v8-console-agent-impl.cc
         src/main/cpp/v8_inspector/src/inspector/v8-console-message.cc

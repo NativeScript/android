@@ -15,9 +15,9 @@ if (onlyX86) {
     println "OnlyX86 build triggered."
 }
 
-def noCCache = project.hasProperty("noCCache")
-if (noCCache) {
-    println "No CCache build triggered."
+def useCCache = project.hasProperty("useCCache")
+if (useCCache) {
+    println "Use CCache build triggered."
 }
 
 project.ext._buildToolsVersion = "27.0.3"
@@ -61,8 +61,8 @@ android {
                     arguments.push("-DOPTIMIZED_WITH_INSPECTOR_BUILD=true")
                 }
 
-                if(noCCache) {
-                    arguments.push("-DNO_CCACHE=true")
+                if(useCCache) {
+                    arguments.push("-DUSE_CCACHE=true")
                 }
 
                 //https://developer.android.com/ndk/guides/cmake.html

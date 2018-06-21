@@ -15,7 +15,7 @@ import groovy.json.JsonBuilder
 import groovy.json.JsonOutput
 
 def onlyX86 = project.hasProperty("onlyX86")
-def noCCache = project.hasProperty("noCCache")
+def useCCache = !project.hasProperty("noCCache")
 
 def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
 def pVersion = "no package version was provided by build.gradle build"
@@ -183,8 +183,8 @@ def getAssembleReleaseBuildArguments = { ->
     if (onlyX86) {
         arguments.push("-PonlyX86")
     }
-    if (noCCache) {
-        arguments.push("-PnoCCache")
+    if (useCCache) {
+        arguments.push("-PuseCCache")
     }
     return arguments;
 }
@@ -384,8 +384,8 @@ def getRunTestsBuildArguments = { taskName ->
     if (onlyX86) {
         arguments.push("-PonlyX86")
     }
-    if (noCCache) {
-        arguments.push("-PnoCCache")
+    if (useCCache) {
+        arguments.push("-PuseCCache")
     }
     return arguments;
 }
