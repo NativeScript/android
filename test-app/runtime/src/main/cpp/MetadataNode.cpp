@@ -302,7 +302,9 @@ void MetadataNode::FieldAccessorGetterCallback(Local<Name> property, const Prope
         auto thiz = info.This();
         auto fieldCallbackData = reinterpret_cast<FieldCallbackData*>(info.Data().As<External>()->Value());
 
-        if (!fieldCallbackData->isStatic && thiz->StrictEquals(info.Holder())) {
+        if ((!fieldCallbackData->isStatic && thiz->StrictEquals(info.Holder()))
+            // check whether there's a declaring type to get the class from it
+            || (fieldCallbackData->declaringType == "")) {
             info.GetReturnValue().SetUndefined();
             return;
         }
