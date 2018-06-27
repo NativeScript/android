@@ -168,8 +168,10 @@ public class NativeScriptSyncServiceSocketIml {
                         createOrOverrideFile(fileName, content);
 
                     } else if (operation == DO_SYNC_OPERATION) {
+                        byte[] operationUid = readNextBytes(32);
                         validateData();
                         runtime.runScript(new File(NativeScriptSyncServiceSocketIml.this.context.getFilesDir(), "internal/livesync.js"));
+                        output.write(operationUid);
 
                     } else if (operation == DEFAULT_OPERATION) {
                         logger.write("LiveSync: input stream is empty!");
@@ -302,24 +304,29 @@ public class NativeScriptSyncServiceSocketIml {
         }
 
         private byte[] getFileContent(String fileName, byte[] contentLength) throws IllegalStateException {
-            byte[] contentBuff;
-            int contentL = -1;
+            byte[] contentBuff = null;
+            int contentLengthInt = -1;
 
             if (contentLength == null) {
                 throw new IllegalStateException(String.format("\nLiveSync: Missing %s bytes. Did you send %s %s? %s", FILE_CONTENT_LENGTH, fileName, FILE_CONTENT_LENGTH, LIVESYNC_ERROR_SUGGESTION));
             }
 
             try {
-                contentL = Integer.parseInt(new String(contentLength));
-                contentBuff = readNextBytes(contentL);
+                contentLengthInt = Integer.parseInt(new String(contentLength));
+
+                if(contentLengthInt > 0) {
+                    contentBuff = readNextBytes(contentLengthInt);
+                } else if(contentLengthInt == 0){
+                    contentBuff = new byte[]{};
+                }
 
             } catch (NumberFormatException e) {
-                throw new IllegalStateException(String.format("\nLiveSync: failed to parse %s %s. %s\nOriginal Exception: %s", fileName, FILE_CONTENT_LENGTH, LIVESYNC_ERROR_SUGGESTION, e.toString()));
+                throw new IllegalStateException(String.format("\nLiveSync: failed to parse %s %s. %s\nOriginal Exception: %s", fileName, contentLength, contentLengthInt, e.toString()));
             } catch (Exception e) {
-                throw new IllegalStateException(String.format("\nLiveSync: failed to parse %s %s. %s\nOriginal Exception: %s", fileName, FILE_CONTENT, LIVESYNC_ERROR_SUGGESTION, e.toString()));
+                throw new IllegalStateException(String.format("\nLiveSync: failed to parse %s %s. %s\nOriginal Exception: %s", fileName, contentLength, LIVESYNC_ERROR_SUGGESTION, e.toString()));
             }
 
-            if (contentBuff == null) {
+            if (contentLengthInt != 0 && contentBuff == null) {
                 throw new IllegalStateException(String.format("\nLiveSync: Missing %s bytes. Did you send %s %s? %s", FILE_CONTENT, fileName, FILE_CONTENT, LIVESYNC_ERROR_SUGGESTION));
             }
 
