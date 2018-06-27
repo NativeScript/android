@@ -30,7 +30,12 @@ if (onlyX86) {
 
 //common
 def BUILD_TOOLS_PATH = "$rootDir/build-tools"
+def PASSED_TYPINGS_PATH = System.getenv("TNS_TYPESCRIPT_DECLARATIONS_PATH")
 def TYPINGS_PATH = "$BUILD_TOOLS_PATH/typings"
+if (PASSED_TYPINGS_PATH != null) {
+    TYPINGS_PATH = PASSED_TYPINGS_PATH
+}
+
 def USER_PROJECT_ROOT = "$rootDir/../.."
 def PLATFORMS_ANDROID = "platforms/android"
 def PACKAGE_JSON = "package.json"
@@ -526,15 +531,18 @@ task generateTypescriptDefinitions(type: JavaExec) {
         }
 
         paramz.add("-output")
-        paramz.add("typings")
+        paramz.add("$TYPINGS_PATH")
+
+        new File("$TYPINGS_PATH").mkdirs()
 
         logger.info("Task generateTypescriptDefinitions: Call dts-generator.jar with arguments: " + paramz.toString().replaceAll(',', ''))
+        println "Task generateTypescriptDefinitions: Call dts-generator.jar with arguments: " + paramz.toString().replaceAll(',', '')
         args paramz.toArray()
     }
 }
 
 generateTypescriptDefinitions.onlyIf {
-    project.hasProperty("generateTypings") && Boolean.parseBoolean(project.generateTypings)
+    (project.hasProperty("generateTypings") && Boolean.parseBoolean(project.generateTypings)) || PASSED_TYPINGS_PATH != null
 }
 
 collectAllJars.finalizedBy(generateTypescriptDefinitions)
