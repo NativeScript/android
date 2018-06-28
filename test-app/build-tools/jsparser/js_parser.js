@@ -17,7 +17,7 @@ if (arguments && arguments.length) {
 	}
 }
 loggingSettings = {
-	"logPath": require("path").dirname(require.main.filename) + "/logs/i.txt",
+	"logPath": require("path").join(__dirname, "logs", "i.txt"),
 	"strategy": "console",
 	"APP_NAME": "ast_parser",
 	"disable": disableLogger
@@ -27,16 +27,12 @@ var fs = require("fs"),
 	babelParser = require("babylon"),
 	traverse = require("babel-traverse"),
 	logger = require('./helpers/logger')(loggingSettings),
-	fileHelpers = require("./helpers/file_helpers")({ logger: logger }),
 	path = require("path"),
-	stringify = require("./helpers/json_extension"),
 	es5_visitors = require("./visitors/es5-visitors"),
-	t = require("babel-types"),
 	lazy = require("lazy"),
 	eol = require('os').EOL,
 
 	BUILD_TOOLS_DIR = `${__dirname}/../`,
-	appDir = path.dirname(require.main.filename),
 	extendDecoratorName = "JavaProxy",
 	interfacesDecoratorName = "Interfaces",
 	outFile = "out/out_parsed_typescript.txt", // default out file
