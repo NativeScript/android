@@ -215,6 +215,17 @@ task generateRuntimeAar (type: Exec) {
     }
 }
 
+task buildJsParser (type: Exec) {
+    workingDir "$BUILD_TOOLS_PATH/jsparser"
+    doFirst {
+        if (isWinOs) {
+            commandLine "cmd", "/c", "npm", "run", "build"
+        } else {
+            commandLine "npm", "run", "build"
+        }
+    }
+}
+
 task copyFilesToProjectTemeplate {
     doLast {
         copy {
@@ -245,8 +256,7 @@ task copyFilesToProjectTemeplate {
             into "$DIST_FRAMEWORK_PATH/build-tools"
         }
         copy {
-            from "$BUILD_TOOLS_PATH/jsparser"
-            exclude "logs", "node_modules", "out", "package.json", "tests"
+            from "$BUILD_TOOLS_PATH/jsparser/build/js_parser.js"
             into "$DIST_FRAMEWORK_PATH/build-tools/jsparser"
         }
         copy {
@@ -298,12 +308,12 @@ task copyProjectTemplate(type: Copy) {
 
 task copyPackageJson(type: Copy) {
     from "$rootDir/package.json"
-    into "$rootDir/dist"
+    into "$DIST_PATH"
 }
 
 task setPackageVersionInPackageJsonFile {
     doLast {
-        def inputFile = new File("$rootDir/dist/package.json")
+        def inputFile = new File("$DIST_PATH/package.json")
         def json = new JsonSlurper().parseText(inputFile.text)
         json.version = pVersion
         def jb = new JsonBuilder(json);
@@ -313,12 +323,12 @@ task setPackageVersionInPackageJsonFile {
 
 task copyReadme(type: Copy) {
     from "README.md"
-    into "$rootDir/dist"
+    into "$DIST_PATH"
 }
 
 task createNpmPackage(type: Exec) {
     doFirst {
-        workingDir "$rootDir/dist"
+        workingDir "$DIST_PATH"
 
         if (isWinOs) {
             commandLine "cmd", "/c", "npm", "pack"
@@ -336,7 +346,8 @@ getPackageVersion.dependsOn(createDistDir)
 getCommitVersion.dependsOn(getPackageVersion)
 generateRuntime.dependsOn(getCommitVersion)
 
-copyFilesToProjectTemeplate.dependsOn(generateRuntime)
+buildJsParser.dependsOn(generateRuntime)
+copyFilesToProjectTemeplate.dependsOn(buildJsParser)
 copyProjectTemplate.dependsOn(copyFilesToProjectTemeplate)
 copyPackageJson.dependsOn(copyProjectTemplate)
 setPackageVersionInPackageJsonFile.dependsOn(copyPackageJson)
