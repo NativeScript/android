@@ -100,6 +100,7 @@ public class NativeScriptSyncServiceSocketIml {
         public static final int HASH_BYTE_SIZE = 16;
         public static final int FILE_NAME_LENGTH_BYTE_SIZE = 1;
         public static final int CONTENT_LENGTH_BYTE_SIZE = 1;
+        public static final int OPERATION_ID_BYTE_SIZE = 32;
         public static final int DELETE_FILE_OPERATION = 7;
         public static final int CREATE_FILE_OPERATION = 8;
         public static final int DO_SYNC_OPERATION = 9;
@@ -168,9 +169,13 @@ public class NativeScriptSyncServiceSocketIml {
                         createOrOverrideFile(fileName, content);
 
                     } else if (operation == DO_SYNC_OPERATION) {
-                        byte[] operationUid = readNextBytes(32);
+                        byte[] operationUid = readNextBytes(OPERATION_ID_BYTE_SIZE);
+
                         validateData();
-                        runtime.runScript(new File(NativeScriptSyncServiceSocketIml.this.context.getFilesDir(), "internal/livesync.js"));
+                        if(runtime != null) {
+                            runtime.runScript(new File(NativeScriptSyncServiceSocketIml.this.context.getFilesDir(), "internal/livesync.js"));
+                        }
+
                         output.write(operationUid);
 
                     } else if (operation == DEFAULT_OPERATION) {

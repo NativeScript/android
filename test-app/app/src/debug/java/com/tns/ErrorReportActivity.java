@@ -1,5 +1,6 @@
 package com.tns;
 
+import android.app.Application;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
@@ -15,6 +16,10 @@ public class ErrorReportActivity extends AppCompatActivity {
         setTheme(android.support.v7.appcompat.R.style.Theme_AppCompat_NoActionBar);
 
         super.onCreate(savedInstanceState);
+        Application app = this.getApplication();
+        Logger logger = new LogcatLogger(app);
+
+        RuntimeHelper.initLiveSync(null, logger, app);
 
         new ErrorReport(this).buildUI();
     }
