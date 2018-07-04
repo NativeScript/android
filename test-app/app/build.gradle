@@ -169,7 +169,9 @@ android {
     buildToolsVersion computeBuildToolsVersion()
 
     defaultConfig {
-        minSdkVersion 17
+        def manifest = new XmlSlurper().parse(file(android.sourceSets.main.manifest.srcFile))
+        def minSdkVer = manifest."uses-sdk"."@android:minSdkVersion".text() ?: 17
+        minSdkVersion minSdkVer
         targetSdkVersion computeTargetSdkVersion()
         ndk {
             if (onlyX86) {
