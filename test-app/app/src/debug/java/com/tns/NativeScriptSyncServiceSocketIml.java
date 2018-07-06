@@ -190,10 +190,11 @@ public class NativeScriptSyncServiceSocketIml {
                     }
 
                 } while (true);
-            } catch (Throwable e) {
+            } catch (Exception e) {
                 String message = String.format("%s(%s): Error while LiveSyncing.\nOriginal Exception: %s", Thread.currentThread().getName(), Thread.currentThread().getId(), e.toString());
-                logger.write(message);
-                this.flushInputStream();
+                //TODO check blocking
+                //logger.write(message);
+                //.flushInputStream();
                 try {
                     output.write(getErrorMessageBytes(message));
                     output.flush();
