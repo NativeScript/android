@@ -58,9 +58,10 @@ public class NativeScriptSyncServiceSocketIml {
                 deviceSystemSocket = new LocalServerSocket(this.name);
                 while (running) {
                     LocalSocket systemSocket = deviceSystemSocket.accept();
+                    systemSocket.setSoTimeout(70000);
                     livesyncWorker = new LiveSyncWorker(systemSocket);
-                    Thread livesyncThread = setUpLivesyncThread();
-                    livesyncThread.start();
+                    Thread liveSyncThread = setUpLivesyncThread();
+                    liveSyncThread.start();
                 }
             } catch (IOException e) {
                 e.printStackTrace();
@@ -91,6 +92,7 @@ public class NativeScriptSyncServiceSocketIml {
     public void startServer() {
         localServerThread = new LocalServerSocketThread(context.getPackageName() + "-livesync");
         localServerJavaThread = new Thread(localServerThread);
+        localServerJavaThread.setName("Livesync Server Thread");
         localServerJavaThread.start();
     }
 
@@ -192,16 +194,8 @@ public class NativeScriptSyncServiceSocketIml {
                 } while (true);
             } catch (Exception e) {
                 String message = String.format("%s(%s): Error while LiveSyncing.\nOriginal Exception: %s", Thread.currentThread().getName(), Thread.currentThread().getId(), e.toString());
-                //TODO check blocking
-                //logger.write(message);
-                //.flushInputStream();
-                try {
-                    output.write(getErrorMessageBytes(message));
-                    output.flush();
-                    this.livesyncSocket.close();
-                } catch (IOException e1) {
-                    e1.printStackTrace();
-                }
+                logger.write(message);
+                this.closeWithError(message);
             }
 
         }
@@ -398,20 +392,39 @@ public class NativeScriptSyncServiceSocketIml {
             byte[] buffer = new byte[size];
             int bytesRead = 0;
             int bufferWriteOffset = bytesRead;
-            do {
+            try {
+                do {
 
-                bytesRead = this.input.read(buffer, bufferWriteOffset, size);
-                if (bytesRead == -1) {
-                    if (bufferWriteOffset == 0) {
-                        return null;
+                    bytesRead = this.input.read(buffer, bufferWriteOffset, size);
+                    if (bytesRead == -1) {
+                        if (bufferWriteOffset == 0) {
+                            return null;
+                        }
+                        break;
                     }
-                    break;
+                    size -= bytesRead;
+                    bufferWriteOffset += bytesRead;
+                } while (size > 0);
+            } catch (IOException e) {
+                String message = e.getMessage();
+                if (message != null && message.equals("Try again")) {
+                    throw new IllegalStateException("Error while LiveSyncing: Read operation timed out.");
+                } else {
+                    throw e;
                 }
-                size -= bytesRead;
-                bufferWriteOffset += bytesRead;
-            } while (size > 0);
+            }
 
             return buffer;
+        }
+
+        private void closeWithError(String message) {
+            try {
+                output.write(getErrorMessageBytes(message));
+                output.flush();
+                this.livesyncSocket.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
 
         @Override
