@@ -114,23 +114,6 @@ public class NativeScriptSyncServiceSocketIml {
         public static final String FILE_CONTENT = "fileContent";
         public static final String FILE_CONTENT_LENGTH = FILE_CONTENT + "Length";
         public static final int DEFAULT_OPERATION = -1;
-        public final String LIVESYNC_ERROR_SUGGESTION = String.format("\nMake sure you are following this protocol when transferring files." +
-                "\nTransfer protocol: \n\tdelete: (%s)(%s)(%s)" +
-                "\n\tcreate: (%s)(%s)(%s)(%s)(%s)" +
-                "\n\t%s: exactly %s btye (%s - delete, %s - create)" +
-                "\n\t%s: exactly %s bytes" +
-                "\n\t%s: relative to app folder" +
-                "\n\t%s: exactly %s bytes" +
-                "\n\t%s: byte buffer" +
-                "\n\tExample delete: 700003./a" +
-                "\n\tExample create: 800007./a.txt0000000011fileContent",
-                OPERATION, FILE_NAME_LENGTH, FILE_NAME,
-                OPERATION, FILE_NAME_LENGTH, FILE_NAME, FILE_CONTENT_LENGTH, FILE_CONTENT,
-                OPERATION, OPERATION_BYTE_SIZE, DELETE_FILE_OPERATION, CREATE_FILE_OPERATION,
-                FILE_NAME_LENGTH, FILE_NAME_LENGTH_BYTE_SIZE,
-                FILE_NAME,
-                FILE_CONTENT_LENGTH, CONTENT_LENGTH_BYTE_SIZE,
-                FILE_CONTENT);
         private static final String PROTOCOL_VERSION = "0.1.0";
         private byte[] handshakeMessage;
         private final DigestInputStream input;
@@ -188,13 +171,15 @@ public class NativeScriptSyncServiceSocketIml {
                         logger.write("LiveSync: input stream is empty!");
                         break;
                     } else {
-                        throw new IllegalArgumentException(String.format("\nLiveSync: Operation not recognised. %s", LIVESYNC_ERROR_SUGGESTION));
+                        throw new IllegalArgumentException(String.format("\nLiveSync: Operation not recognised. Received operation is %s.", operation));
                     }
 
                 } while (true);
             } catch (Exception e) {
+                String message = String.format("Error while LiveSyncing: %s", e.toString());
+                this.closeWithError(message);
+            } catch (Throwable e) {
                 String message = String.format("%s(%s): Error while LiveSyncing.\nOriginal Exception: %s", Thread.currentThread().getName(), Thread.currentThread().getId(), e.toString());
-                logger.write(message);
                 this.closeWithError(message);
             }
 
@@ -236,14 +221,7 @@ public class NativeScriptSyncServiceSocketIml {
 
 
             if(!Arrays.equals(digest, inputMD5)){
-                throw new IllegalStateException(String.format("\nLiveSync: Validation of data failed. Computed hash: %s, original hash: %s ", digest, inputMD5));
-            }
-        }
-
-        private void flushInputStream() {
-            try {
-                this.input.skip(Long.MAX_VALUE);
-            } catch (IOException e) {
+                throw new IllegalStateException(String.format("\nLiveSync: Validation of data failed.\nComputed hash: %s\nriginal hash: %s ", Arrays.toString(digest), Arrays.toString(inputMD5)));
             }
         }
 
@@ -262,7 +240,7 @@ public class NativeScriptSyncServiceSocketIml {
                 operation = Integer.parseInt(new String(operationBuff));
 
             } catch (Exception e) {
-                throw new IllegalStateException(String.format("\nLiveSync: failed to parse %s. Bytes read: $s %s\nOriginal Exception: %s", OPERATION, operationBuff, e.toString()));
+                throw new IllegalStateException(String.format("\nLiveSync: failed to parse %s. Bytes read: $s %s\nOriginal Exception: %s", OPERATION, Arrays.toString(operationBuff), e.toString()));
             }
             return operation;
         }
@@ -271,7 +249,7 @@ public class NativeScriptSyncServiceSocketIml {
             byte[] fileNameBuffer;
             byte fileNameLengthSize;
             int fileNameLengthSizeInt;
-            int fileNameLenth = -1;
+            int fileNameLength = -1;
             byte[] fileNameLengthBuffer;
 
             try {
@@ -281,29 +259,29 @@ public class NativeScriptSyncServiceSocketIml {
                 fileNameLengthBuffer = readNextBytes(fileNameLengthSizeInt);
 
             } catch (Exception e) {
-                throw new IllegalStateException(String.format("\nLiveSync: failed to parse %s. %s\nOriginal Exception: %s", FILE_NAME_LENGTH, LIVESYNC_ERROR_SUGGESTION, e.toString()));
+                throw new IllegalStateException(String.format("\nLiveSync: failed to parse %s. \nOriginal Exception: %s", FILE_NAME_LENGTH, e.toString()));
             }
 
             if (fileNameLengthBuffer == null) {
-                throw new IllegalStateException(String.format("\nLiveSync: Missing %s bytes. %s", FILE_NAME_LENGTH, LIVESYNC_ERROR_SUGGESTION));
+                throw new IllegalStateException(String.format("\nLiveSync: Missing %s bytes.", FILE_NAME_LENGTH));
             }
 
             try {
-                fileNameLenth = Integer.valueOf(new String(fileNameLengthBuffer));
-                fileNameBuffer = readNextBytes(fileNameLenth);
+                fileNameLength = Integer.valueOf(new String(fileNameLengthBuffer));
+                fileNameBuffer = readNextBytes(fileNameLength);
 
             } catch (NumberFormatException e) {
-                throw new IllegalStateException(String.format("\nLiveSync: failed to parse %s. %s\nOriginal Exception: %s", FILE_NAME, LIVESYNC_ERROR_SUGGESTION, e.toString()));
+                throw new IllegalStateException(String.format("\nLiveSync: failed to parse %s.\nOriginal Exception: %s", FILE_NAME_LENGTH, e.toString()));
             } catch (Exception e) {
-                throw new IllegalStateException(String.format("\nLiveSync: failed to parse %s. %s\nOriginal Exception: %s", FILE_NAME, LIVESYNC_ERROR_SUGGESTION, e.toString()));
+                throw new IllegalStateException(String.format("\nLiveSync: failed to parse %s.\nOriginal Exception: %s", FILE_NAME, e.toString()));
             }
 
             if (fileNameBuffer == null) {
-                throw new IllegalStateException(String.format("\nLiveSync: Missing %s bytes. %s", FILE_NAME, LIVESYNC_ERROR_SUGGESTION));
+                throw new IllegalStateException(String.format("\nLiveSync: Missing %s bytes.", FILE_NAME));
             }
 
             String fileName = new String(fileNameBuffer);
-            if (fileName.trim().length() < fileNameLenth) {
+            if (fileName.trim().length() < fileNameLength) {
                 logger.write(String.format("WARNING: %s parsed length is less than %s. We read less information than you specified!", FILE_NAME, FILE_NAME_LENGTH));
             }
 
@@ -318,7 +296,7 @@ public class NativeScriptSyncServiceSocketIml {
                 int contentLengthSizeInt = ((int)contentLengthSize) & 0xFF;
                 contentLength = readNextBytes(contentLengthSizeInt);
             } catch (Exception e) {
-                throw new IllegalStateException(String.format("\nLiveSync: failed to parse %s %s. %s\nOriginal Exception: %s", fileName, FILE_CONTENT_LENGTH, LIVESYNC_ERROR_SUGGESTION, e.toString()));
+                throw new IllegalStateException(String.format("\nLiveSync: failed to read %s for %s.\nOriginal Exception: %s", FILE_CONTENT_LENGTH, fileName, e.toString()));
             }
 
             return contentLength;
@@ -344,7 +322,7 @@ public class NativeScriptSyncServiceSocketIml {
             } catch (NumberFormatException e) {
                 throw new IllegalStateException(String.format("\nLiveSync: Failed to parse content length. for file: %s.\nOriginal Exception: %s",fileName,  e.toString()));
             } catch (Exception e) {
-                throw new IllegalStateException(String.format("\nLiveSync: failed to parse content of file: %s, with length: %s.\nOriginal Exception: %s", fileName, contentLength, e.toString()));
+                throw new IllegalStateException(String.format("\nLiveSync: failed to parse content of file: %s, with length in bytes: %s.\nOriginal Exception: %s", fileName, Arrays.toString(contentLength), e.toString()));
             }
 
             if (contentLengthInt != 0 && contentBuff == null) {
@@ -421,6 +399,7 @@ public class NativeScriptSyncServiceSocketIml {
             try {
                 output.write(getErrorMessageBytes(message));
                 output.flush();
+                logger.write(message);
                 this.livesyncSocket.close();
             } catch (IOException e) {
                 e.printStackTrace();
