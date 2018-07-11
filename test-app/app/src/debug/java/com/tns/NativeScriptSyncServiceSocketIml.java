@@ -99,8 +99,7 @@ public class NativeScriptSyncServiceSocketIml {
     private class LiveSyncWorker implements Runnable {
         public static final int OPERATION_BYTE_SIZE = 1;
         public static final int HASH_BYTE_SIZE = 16;
-        public static final int FILE_NAME_LENGTH_BYTE_SIZE = 1;
-        public static final int CONTENT_LENGTH_BYTE_SIZE = 1;
+        public static final int LENGTH_BYTE_SIZE = 1;
         public static final int OPERATION_ID_BYTE_SIZE = 32;
         public static final int DELETE_FILE_OPERATION = 7;
         public static final int CREATE_FILE_OPERATION = 8;
@@ -150,7 +149,7 @@ public class NativeScriptSyncServiceSocketIml {
                     } else if (operation == CREATE_FILE_OPERATION) {
 
                         String fileName = getFileName();
-                        byte[] contentLength = getFileContentLength(fileName);
+                        int contentLength = getFileContentLength(fileName);
                         validateData();
                         byte[] content = getFileContent(fileName, contentLength);
                         validateData();
@@ -230,7 +229,7 @@ public class NativeScriptSyncServiceSocketIml {
         * If the stream is empty, method returns -1
         * */
         private int getOperation() {
-            Integer operation = DEFAULT_OPERATION;
+            Integer operation;
             byte[] operationBuff = null;
             try {
                 operationBuff = readNextBytes(OPERATION_BYTE_SIZE);
@@ -240,6 +239,9 @@ public class NativeScriptSyncServiceSocketIml {
                 operation = Integer.parseInt(new String(operationBuff));
 
             } catch (Exception e) {
+                if(operationBuff == null){
+                    operationBuff = new byte[]{};
+                }
                 throw new IllegalStateException(String.format("\nLiveSync: failed to parse %s. Bytes read: $s %s\nOriginal Exception: %s", OPERATION, Arrays.toString(operationBuff), e.toString()));
             }
             return operation;
@@ -247,31 +249,20 @@ public class NativeScriptSyncServiceSocketIml {
 
         private String getFileName() {
             byte[] fileNameBuffer;
-            byte fileNameLengthSize;
-            int fileNameLengthSizeInt;
             int fileNameLength = -1;
-            byte[] fileNameLengthBuffer;
 
             try {
-
-                fileNameLengthSize = readNextBytes(FILE_NAME_LENGTH_BYTE_SIZE)[0];
-                fileNameLengthSizeInt = ((int)fileNameLengthSize) & 0xFF;
-                fileNameLengthBuffer = readNextBytes(fileNameLengthSizeInt);
-
+                fileNameLength = getLength();
             } catch (Exception e) {
                 throw new IllegalStateException(String.format("\nLiveSync: failed to parse %s. \nOriginal Exception: %s", FILE_NAME_LENGTH, e.toString()));
             }
 
-            if (fileNameLengthBuffer == null) {
-                throw new IllegalStateException(String.format("\nLiveSync: Missing %s bytes.", FILE_NAME_LENGTH));
+            if(fileNameLength <= 0) {
+                throw new IllegalStateException(String.format("\nLiveSync: File name length must be positive number or zero. Provided length: %s.", fileNameLength));
             }
 
             try {
-                fileNameLength = Integer.valueOf(new String(fileNameLengthBuffer));
                 fileNameBuffer = readNextBytes(fileNameLength);
-
-            } catch (NumberFormatException e) {
-                throw new IllegalStateException(String.format("\nLiveSync: failed to parse %s.\nOriginal Exception: %s", FILE_NAME_LENGTH, e.toString()));
             } catch (Exception e) {
                 throw new IllegalStateException(String.format("\nLiveSync: failed to parse %s.\nOriginal Exception: %s", FILE_NAME, e.toString()));
             }
@@ -288,48 +279,66 @@ public class NativeScriptSyncServiceSocketIml {
             return fileName.trim();
         }
 
-        private byte[] getFileContentLength(String fileName)throws IllegalStateException {
-            byte[] contentLength;
+        private int getFileContentLength(String fileName) throws IllegalStateException {
+            int contentLength;
+
             try {
-                byte contentLengthSize = readNextBytes(CONTENT_LENGTH_BYTE_SIZE)[0];
-                //Cast signed byte to unsigned int
-                int contentLengthSizeInt = ((int)contentLengthSize) & 0xFF;
-                contentLength = readNextBytes(contentLengthSizeInt);
+                contentLength = getLength();
             } catch (Exception e) {
                 throw new IllegalStateException(String.format("\nLiveSync: failed to read %s for %s.\nOriginal Exception: %s", FILE_CONTENT_LENGTH, fileName, e.toString()));
+            }
+
+            if(contentLength < 0){
+                throw new IllegalStateException(String.format("\nLiveSync: Content length must be positive number or zero. Provided content length: %s.", contentLength));
             }
 
             return contentLength;
         }
 
-        private byte[] getFileContent(String fileName, byte[] contentLength) throws IllegalStateException {
+        private byte[] getFileContent(String fileName, int contentLength) throws IllegalStateException {
             byte[] contentBuff = null;
-            int contentLengthInt = -1;
-
-            if (contentLength == null) {
-                throw new IllegalStateException(String.format("\nLiveSync: Missing content length for file: %s.", fileName));
-            }
 
             try {
-                contentLengthInt = Integer.parseInt(new String(contentLength));
-
-                if(contentLengthInt > 0) {
-                    contentBuff = readNextBytes(contentLengthInt);
-                } else if(contentLengthInt == 0){
+                if(contentLength > 0) {
+                    contentBuff = readNextBytes(contentLength);
+                } else if(contentLength == 0){
                     contentBuff = new byte[]{};
                 }
-
-            } catch (NumberFormatException e) {
-                throw new IllegalStateException(String.format("\nLiveSync: Failed to parse content length. for file: %s.\nOriginal Exception: %s",fileName,  e.toString()));
             } catch (Exception e) {
-                throw new IllegalStateException(String.format("\nLiveSync: failed to parse content of file: %s, with length in bytes: %s.\nOriginal Exception: %s", fileName, Arrays.toString(contentLength), e.toString()));
+                throw new IllegalStateException(String.format("\nLiveSync: failed to parse content of file: %s.\nOriginal Exception: %s", fileName, e.toString()));
             }
 
-            if (contentLengthInt != 0 && contentBuff == null) {
-                throw new IllegalStateException(String.format("\nLiveSync: Missing %s bytes for file: %s. Did you send %s bytes?", FILE_CONTENT, fileName, contentLengthInt));
+            if (contentLength != 0 && contentBuff == null) {
+                throw new IllegalStateException(String.format("\nLiveSync: Missing %s bytes for file: %s. Did you send %s bytes?", FILE_CONTENT, fileName, contentLength));
             }
 
             return contentBuff;
+        }
+
+        private int getLength() {
+            byte[] lengthBuffer;
+            int lengthInt;
+
+            try {
+                byte lengthSize = readNextBytes(LENGTH_BYTE_SIZE)[0];
+                //Cast signed byte to unsigned int
+                int lengthSizeInt = ((int) lengthSize) & 0xFF;
+                lengthBuffer = readNextBytes(lengthSizeInt);
+
+                if (lengthBuffer == null) {
+                    throw new IllegalStateException(String.format("\nLiveSync: Missing size length bytes."));
+                }
+            } catch (Exception e) {
+                throw new IllegalStateException(String.format("\nLiveSync: Failed to read size length. \nOriginal Exception: %s", e.toString()));
+            }
+
+            try {
+                lengthInt = Integer.valueOf(new String(lengthBuffer));
+            } catch (Exception e) {
+                throw new IllegalStateException(String.format("\nLiveSync: Failed to parse size length. \nOriginal Exception: %s", e.toString()));
+            }
+
+            return lengthInt;
         }
 
         private void createOrOverrideFile(String fileName, byte[] content) throws IOException {
