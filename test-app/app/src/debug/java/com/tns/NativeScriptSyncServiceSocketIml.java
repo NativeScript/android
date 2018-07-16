@@ -105,6 +105,7 @@ public class NativeScriptSyncServiceSocketIml {
         public static final int CREATE_FILE_OPERATION = 8;
         public static final int DO_SYNC_OPERATION = 9;
         public static final int ERROR_REPORT_CODE = 1;
+        public static final int OPERATION_END_NO_REFRESH_REPORT_CODE = 3;
         public static final int OPERATION_END_REPORT_CODE = 2;
         public static final int REPORT_CODE_SIZE = 1;
         public static final String FILE_NAME = "fileName";
@@ -157,13 +158,17 @@ public class NativeScriptSyncServiceSocketIml {
 
                     } else if (operation == DO_SYNC_OPERATION) {
                         byte[] operationUid = readNextBytes(OPERATION_ID_BYTE_SIZE);
+                        int operationReportCode;
 
                         validateData();
                         if(runtime != null) {
                             runtime.runScript(new File(NativeScriptSyncServiceSocketIml.this.context.getFilesDir(), "internal/livesync.js"));
+                            operationReportCode = OPERATION_END_REPORT_CODE;
+                        } else {
+                            operationReportCode = OPERATION_END_NO_REFRESH_REPORT_CODE;
                         }
 
-                        output.write(getReportMessageBytes(OPERATION_END_REPORT_CODE, operationUid));
+                        output.write(getReportMessageBytes(operationReportCode, operationUid));
                         output.flush();
 
                     } else if (operation == DEFAULT_OPERATION) {
