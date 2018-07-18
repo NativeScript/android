@@ -120,8 +120,8 @@ void JsV8InspectorClient::doDispatchMessage(v8::Isolate* isolate, const std::str
         return;
     }
 
-    const String16 msg(message.c_str());
-    v8_inspector::StringView message_view(reinterpret_cast<const uint16_t*>(msg.characters16()), msg.length());
+    const v8_inspector::String16 msg = v8_inspector::String16::fromUTF8(message.c_str(), message.length());
+    v8_inspector::StringView message_view = toStringView(msg);
     session_->dispatchProtocolMessage(message_view);
 }
 
