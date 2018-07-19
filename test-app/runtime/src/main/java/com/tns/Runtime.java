@@ -1098,7 +1098,12 @@ public class Runtime {
 
         if (isWorkThread) {
             Object[] packagedArgs = packageArgs(tmpArgs);
-            ret = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, isConstructor, packagedArgs);
+            try {
+                ret = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, isConstructor, packagedArgs);
+            } catch (NativeScriptException e) {
+                logger.write("Error on currentThread for callJSMethodNative:", e.getMessage());
+                e.printStackTrace();
+            }
         } else {
             final Object[] arr = new Object[2];
 
@@ -1110,6 +1115,9 @@ public class Runtime {
                         try {
                             final Object[] packagedArgs = packageArgs(tmpArgs);
                             arr[0] = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, isCtor, packagedArgs);
+                        } catch (NativeScriptException e) {
+                            logger.write("Error off currentThread for callJSMethodNative:", e.getMessage());
+                            e.printStackTrace();
                         } finally {
                             this.notify();
                             arr[1] = Boolean.TRUE;
