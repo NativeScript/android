@@ -108,6 +108,8 @@ public class NativeScriptSyncServiceSocketIml {
         public static final int OPERATION_END_NO_REFRESH_REPORT_CODE = 3;
         public static final int OPERATION_END_REPORT_CODE = 2;
         public static final int REPORT_CODE_SIZE = 1;
+        public static final int DO_REFRESH_LENGTH = 1;
+        public static final int DO_REFRESH_VALUE = 1;
         public static final String FILE_NAME = "fileName";
         public static final String FILE_NAME_LENGTH = FILE_NAME + "Length";
         public static final String OPERATION = "operation";
@@ -158,10 +160,12 @@ public class NativeScriptSyncServiceSocketIml {
 
                     } else if (operation == DO_SYNC_OPERATION) {
                         byte[] operationUid = readNextBytes(OPERATION_ID_BYTE_SIZE);
+                        byte doRefresh = readNextBytes(DO_REFRESH_LENGTH)[0];
+                        int doRefreshInt = (int)doRefresh;
                         int operationReportCode;
 
                         validateData();
-                        if(runtime != null) {
+                        if(runtime != null && doRefreshInt == DO_REFRESH_VALUE) {
                             runtime.runScript(new File(NativeScriptSyncServiceSocketIml.this.context.getFilesDir(), "internal/livesync.js"));
                             operationReportCode = OPERATION_END_REPORT_CODE;
                         } else {
@@ -225,7 +229,7 @@ public class NativeScriptSyncServiceSocketIml {
 
 
             if(!Arrays.equals(digest, inputMD5)){
-                throw new IllegalStateException(String.format("\nLiveSync: Validation of data failed.\nComputed hash: %s\nriginal hash: %s ", Arrays.toString(digest), Arrays.toString(inputMD5)));
+                throw new IllegalStateException(String.format("\nLiveSync: Validation of data failed.\nComputed hash: %s\nOriginal hash: %s ", Arrays.toString(digest), Arrays.toString(inputMD5)));
             }
         }
 
