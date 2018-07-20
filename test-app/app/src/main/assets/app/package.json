@@ -8,6 +8,7 @@
 		"freeMemoryRatio": 0.50,
 		"markingMode": "full",
 		"maxLogcatObjectSize": 1024,
-		"forceLog": false
+		"forceLog": false,
+		"autoCatchJSMethodNativeCalls": false
 	}
 }

@@ -32,7 +32,8 @@ import android.util.SparseArray;
 import com.tns.bindings.ProxyGenerator;
 
 public class Runtime {
-    private native void initNativeScript(int runtimeId, String filesPath, String nativeLibDir, boolean verboseLoggingEnabled, boolean isDebuggable, String packageName, Object[] v8Options, String callingDir, int maxLogcatObjectSize, boolean forceLog);
+    private native void initNativeScript(int runtimeId, String filesPath, String nativeLibDir, boolean verboseLoggingEnabled, boolean isDebuggable, String packageName,
+                                         Object[] v8Options, String callingDir, int maxLogcatObjectSize, boolean forceLog);
 
     private native void runModule(int runtimeId, String filePath) throws NativeScriptException;
 
@@ -1095,14 +1096,25 @@ public class Runtime {
         boolean isWorkThread = threadScheduler.getThread().equals(Thread.currentThread());
 
         final Object[] tmpArgs = extendConstructorArgs(methodName, isConstructor, args);
+        final boolean autoCatchJSMethodNativeCalls = this.config.appConfig.getAutoCatchJSMethodNativeCalls();
 
         if (isWorkThread) {
             Object[] packagedArgs = packageArgs(tmpArgs);
-            ret = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, isConstructor, packagedArgs);
+            try {
+                ret = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, isConstructor, packagedArgs);
+            } catch (NativeScriptException e) {
+                if(autoCatchJSMethodNativeCalls) {
+                    logger.write("Error on currentThread for callJSMethodNative:", e.getMessage());
+                    e.printStackTrace();
+                } else {
+                    throw e;
+                }
+            }
         } else {
             final Object[] arr = new Object[2];
 
             final boolean isCtor = isConstructor;
+
             Runnable r = new Runnable() {
                 @Override
                 public void run() {
@@ -1110,6 +1122,13 @@ public class Runtime {
                         try {
                             final Object[] packagedArgs = packageArgs(tmpArgs);
                             arr[0] = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, isCtor, packagedArgs);
+                        } catch (NativeScriptException e) {
+                            if(autoCatchJSMethodNativeCalls) {
+                                logger.write("Error off currentThread for callJSMethodNative:", e.getMessage());
+                                e.printStackTrace();
+                            } else {
+                                throw e;
+                            }
                         } finally {
                             this.notify();
                             arr[1] = Boolean.TRUE;
