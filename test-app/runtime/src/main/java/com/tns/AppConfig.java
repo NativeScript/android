@@ -19,7 +19,8 @@ class AppConfig {
         MarkingMode("markingMode", com.tns.MarkingMode.full),
         HandleTimeZoneChanges("handleTimeZoneChanges", false),
         MaxLogcatObjectSize("maxLogcatObjectSize", 1024),
-        ForceLog("forceLog", false);
+        ForceLog("forceLog", false),
+        AutoCatchJSMethodCalls("autoCatchJSMethodCalls", false);
 
         private final String name;
         private final Object defaultValue;
@@ -112,6 +113,9 @@ class AppConfig {
                     if (androidObject.has(KnownKeys.ForceLog.getName())) {
                         values[KnownKeys.ForceLog.ordinal()] = androidObject.getBoolean(KnownKeys.ForceLog.getName());
                     }
+                    if (androidObject.has(KnownKeys.AutoCatchJSMethodCalls.getName())) {
+                        values[KnownKeys.AutoCatchJSMethodCalls.ordinal()] = androidObject.getBoolean(KnownKeys.AutoCatchJSMethodCalls.getName());
+                    }
                 }
             }
         } catch (Exception e) {
@@ -161,5 +165,9 @@ class AppConfig {
 
     public boolean getForceLog() {
         return (boolean)values[KnownKeys.ForceLog.ordinal()];
+    }
+
+    public boolean getAutoCatchJSMethodCalls() {
+        return (boolean)values[KnownKeys.AutoCatchJSMethodCalls.ordinal()];
     }
 }
