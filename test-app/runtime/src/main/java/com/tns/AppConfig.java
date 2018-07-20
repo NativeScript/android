@@ -20,7 +20,7 @@ class AppConfig {
         HandleTimeZoneChanges("handleTimeZoneChanges", false),
         MaxLogcatObjectSize("maxLogcatObjectSize", 1024),
         ForceLog("forceLog", false),
-        AutoCatchJSMethodCalls("autoCatchJSMethodCalls", false);
+        AutoCatchJSMethodNativeCalls("autoCatchJSMethodNativeCalls", false);
 
         private final String name;
         private final Object defaultValue;
@@ -113,8 +113,8 @@ class AppConfig {
                     if (androidObject.has(KnownKeys.ForceLog.getName())) {
                         values[KnownKeys.ForceLog.ordinal()] = androidObject.getBoolean(KnownKeys.ForceLog.getName());
                     }
-                    if (androidObject.has(KnownKeys.AutoCatchJSMethodCalls.getName())) {
-                        values[KnownKeys.AutoCatchJSMethodCalls.ordinal()] = androidObject.getBoolean(KnownKeys.AutoCatchJSMethodCalls.getName());
+                    if (androidObject.has(KnownKeys.AutoCatchJSMethodNativeCalls.getName())) {
+                        values[KnownKeys.AutoCatchJSMethodNativeCalls.ordinal()] = androidObject.getBoolean(KnownKeys.AutoCatchJSMethodNativeCalls.getName());
                     }
                 }
             }
@@ -167,7 +167,7 @@ class AppConfig {
         return (boolean)values[KnownKeys.ForceLog.ordinal()];
     }
 
-    public boolean getAutoCatchJSMethodCalls() {
-        return (boolean)values[KnownKeys.AutoCatchJSMethodCalls.ordinal()];
+    public boolean getAutoCatchJSMethodNativeCalls() {
+        return (boolean)values[KnownKeys.AutoCatchJSMethodNativeCalls.ordinal()];
     }
 }

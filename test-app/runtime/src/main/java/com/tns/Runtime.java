@@ -1096,14 +1096,14 @@ public class Runtime {
         boolean isWorkThread = threadScheduler.getThread().equals(Thread.currentThread());
 
         final Object[] tmpArgs = extendConstructorArgs(methodName, isConstructor, args);
-        final boolean autoCatchJSMethodCalls = this.config.appConfig.getAutoCatchJSMethodCalls();
+        final boolean autoCatchJSMethodNativeCalls = this.config.appConfig.getAutoCatchJSMethodNativeCalls();
 
         if (isWorkThread) {
             Object[] packagedArgs = packageArgs(tmpArgs);
             try {
                 ret = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, isConstructor, packagedArgs);
             } catch (NativeScriptException e) {
-                if(autoCatchJSMethodCalls) {
+                if(autoCatchJSMethodNativeCalls) {
                     logger.write("Error on currentThread for callJSMethodNative:", e.getMessage());
                     e.printStackTrace();
                 } else {
@@ -1123,7 +1123,7 @@ public class Runtime {
                             final Object[] packagedArgs = packageArgs(tmpArgs);
                             arr[0] = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, isCtor, packagedArgs);
                         } catch (NativeScriptException e) {
-                            if(autoCatchJSMethodCalls) {
+                            if(autoCatchJSMethodNativeCalls) {
                                 logger.write("Error off currentThread for callJSMethodNative:", e.getMessage());
                                 e.printStackTrace();
                             } else {
