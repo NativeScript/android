@@ -4,16 +4,20 @@
   "description": "javascript static analysis tool",
   "main": "js_parser.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "webpack"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "babel-traverse": "6.4.5",
-    "babel-types": "6.4.5",
+    "babel-traverse": "^6.26.0",
+    "babel-types": "^6.26.0",
     "babylon": "6.4.5",
-    "filewalker": "0.1.2",
     "lazy": "1.0.11"
   },
-  "repository": "https://github.com/NativeScript/android-runtime"
+  "repository": "https://github.com/NativeScript/android-runtime",
+  "devDependencies": {
+    "webpack": "^4.12.2",
+    "webpack-cli": "^3.0.8"
+  }
 }

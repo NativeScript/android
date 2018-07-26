@@ -42,7 +42,7 @@ Following are the minimal prerequisites to build the runtime package.
 
 * Install the latest [Android Studio](https://developer.android.com/studio/index.html).
 * From the SDK Manager (Android Studio -> Tools -> Android -> SDK Manager) install the following components:
-    * Android API Level 23, 24, 25, 26
+    * Android API Level 23, 24, 25, 26, 27
     * Android NDK 
     * Android Support Repository
     * Download Build Tools 
@@ -89,6 +89,7 @@ gradlew runtest
 ```
 ## Contribute
 We love PRs! Check out the [contributing guidelines](CONTRIBUTING.md). If you want to contribute, but you are not sure where to start - look for [issues labeled `help wanted`](https://github.com/NativeScript/android-runtime/issues?q=is%3Aopen+is%3Aissue+label%3A%22help+wanted%22).
+
 
 ## Misc
 

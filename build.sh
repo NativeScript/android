@@ -22,12 +22,12 @@ for KILLPID in `ps ax | grep 'adb' | grep -v 'grep' | awk ' { print $1;}'`; do k
 
 ./gradlew cleanRuntime
 if [ "$1" != 'unit_tests_only' ]; then
-    echo "Building Android Runtime with paramerter packageVersion: $PACKAGE_VERSION and commit: $GIT_COMMIT"
-    ./gradlew -PpackageVersion=$PACKAGE_VERSION -PgitCommitVersion=$GIT_COMMIT
+    echo "Building Android Runtime with paramerter packageVersion: $ANDROID_PACKAGE_VERSION and commit: $GIT_COMMIT"
+    ./gradlew -PpackageVersion=$ANDROID_PACKAGE_VERSION -PgitCommitVersion=$GIT_COMMIT
     cp dist/tns-android-*.tgz dist/tns-android.tgz
 else
-    echo "Building Android Runtime for x86 unit tests with paramerter packageVersion: $PACKAGE_VERSION and commit: $GIT_COMMIT"
-    ./gradlew -PpackageVersion=$PACKAGE_VERSION -PgitCommitVersion=$GIT_COMMIT -PskipUnoptimized -PonlyX86
+    echo "Building Android Runtime for x86 unit tests with paramerter packageVersion: $ANDROID_PACKAGE_VERSION and commit: $GIT_COMMIT"
+    ./gradlew -PpackageVersion=$ANDROID_PACKAGE_VERSION -PgitCommitVersion=$GIT_COMMIT -PskipUnoptimized -PonlyX86
     cp dist/tns-android-*.tgz dist/tns-android.tgz
 fi
 
@@ -50,9 +50,9 @@ for emulator in $listOfEmulators; do
     $ANDROID_HOME/platform-tools/adb -e logcat > consoleLog.txt&
 
     if [ "$1" != 'unit_tests_only' ]; then
-        ./gradlew runtest
+        ./gradlew runtests
     else
-        ./gradlew runtest -PonlyX86
+        ./gradlew runtests -PonlyX86
     fi
 
     echo "Rename unit test result"

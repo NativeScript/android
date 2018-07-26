@@ -98,7 +98,10 @@ class AndroidJsV8Inspector {
 
     @RuntimeCallable
     private static void send(Object connection, String payload) throws IOException {
-        ((JsV8InspectorWebSocket) connection).send(payload);
+        JsV8InspectorWebSocket socketConnection = (JsV8InspectorWebSocket) connection;
+        if (socketConnection.isOpen()) {
+            socketConnection.send(payload);
+        }
     }
 
     @RuntimeCallable

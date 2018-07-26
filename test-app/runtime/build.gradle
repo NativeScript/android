@@ -15,6 +15,11 @@ if (onlyX86) {
     println "OnlyX86 build triggered."
 }
 
+def useCCache = project.hasProperty("useCCache")
+if (useCCache) {
+    println "Use CCache build triggered."
+}
+
 project.ext._buildToolsVersion = "27.0.3"
 
 android {
@@ -54,6 +59,10 @@ android {
 
                 if (optimizedWithInspector) {
                     arguments.push("-DOPTIMIZED_WITH_INSPECTOR_BUILD=true")
+                }
+
+                if(useCCache) {
+                    arguments.push("-DUSE_CCACHE=true")
                 }
 
                 //https://developer.android.com/ndk/guides/cmake.html
@@ -132,7 +141,6 @@ task setRuntimeCommit {
     }
 
     doFirst {
-
         println "Setting runtime commit: '${gitCommitVersion}'"
 
         def versionFile = "$projectDir/src/main/cpp//Version.h"

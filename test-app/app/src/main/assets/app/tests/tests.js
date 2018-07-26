@@ -1717,20 +1717,22 @@ describe("Tests ", function () {
         expect(b.getMyInt()).toBe(456);
     });
 
-    it("should not truncate log if message is smaller than maxLogcatObjectSize", function () {
-        const maxLogcatObjectSize = 1025;
-        const str = Array(maxLogcatObjectSize).join("A");
-        console.log(str);
-        expect(com.tns.tests.LogcatUtil.logcatContainsString(str)).toBe(true);
-    });
+    if (java.lang.System.getProperty("os.arch").toLowerCase() == "armeabi-v7a") {
+        it("should not truncate log if message is smaller than maxLogcatObjectSize", function () {
+            const maxLogcatObjectSize = 1025;
+            const str = Array(maxLogcatObjectSize).join("A");
+            console.log(str);
+            expect(com.tns.tests.LogcatUtil.logcatContainsString(str)).toBe(true);
+        });
 
-    it("should truncate log if message is larger than maxLogcatObjectSize", function () {
-        const maxLogcatObjectSize = 1025;
-        var str = Array(maxLogcatObjectSize).join("A") + "B";
-        console.log(str);
-        expect(com.tns.tests.LogcatUtil.logcatContainsString(str)).toBe(false);
+        it("should truncate log if message is larger than maxLogcatObjectSize", function () {
+            const maxLogcatObjectSize = 1025;
+            var str = Array(maxLogcatObjectSize).join("A") + "B";
+            console.log(str);
+            expect(com.tns.tests.LogcatUtil.logcatContainsString(str)).toBe(false);
 
-        console.log(str);
-        expect(com.tns.tests.LogcatUtil.logcatContainsString(str.slice(0, -1) + "...")).toBe(true);
-    });
+            console.log(str);
+            expect(com.tns.tests.LogcatUtil.logcatContainsString(str.slice(0, -1) + "...")).toBe(true);
+        });
+    }
 });

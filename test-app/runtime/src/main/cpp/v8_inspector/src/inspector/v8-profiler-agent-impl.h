@@ -59,9 +59,6 @@ class V8ProfilerAgentImpl : public protocol::Profiler::Backend {
         void consoleProfile(const String16& title);
         void consoleProfileEnd(const String16& title);
 
-        bool idleStarted();
-        bool idleFinished();
-
     private:
         String16 nextProfileId();
 
@@ -79,7 +76,6 @@ class V8ProfilerAgentImpl : public protocol::Profiler::Backend {
         class ProfileDescriptor;
         std::vector<ProfileDescriptor> m_startedProfiles;
         String16 m_frontendInitiatedProfileId;
-        bool m_idle = false;
         int m_startedProfilesCount = 0;
 
         DISALLOW_COPY_AND_ASSIGN(V8ProfilerAgentImpl);

@@ -3,6 +3,7 @@
 *		gradlew - Builds the NativeScript Android App Package using an application project template.
 		gradlew -PgitCommitVersion - sets the commit version of the build
 		gradlew -PpreReleaseVersion - sets the pre-release version of the build (as per semver spec "-alpha" value results in 1.0.0-alpha)
+        gradlew -PnoCCache - set this flag if you don't want CCache to be used in CMake build
 
 */
 
@@ -14,6 +15,7 @@ import groovy.json.JsonBuilder
 import groovy.json.JsonOutput
 
 def onlyX86 = project.hasProperty("onlyX86")
+def useCCache = !project.hasProperty("noCCache")
 
 def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
 def pVersion = "no package version was provided by build.gradle build"
@@ -53,6 +55,20 @@ task createDistDir {
     doLast {
         def distF = new File(DIST_PATH)
         distF.mkdirs()
+    }
+}
+
+def getCCacheVersion = { ->
+    try {
+        def ccacheVersionOutput = new ByteArrayOutputStream()
+        exec {
+            commandLine "ccache", "--version"
+            standardOutput = ccacheVersionOutput
+        }
+
+        return ccacheVersionOutput.toString().trim()
+    } catch (all) {
+        return 'CCache not found!'
     }
 }
 
@@ -156,51 +172,56 @@ task cleanRuntime (type: Exec) {
     }
 }
 
+def getAssembleReleaseBuildArguments = { ->
+    def arguments = []
+    if (isWinOs) {
+        arguments += ["cmd", "/c", "gradlew"]
+    } else {
+        arguments.push("./gradlew")
+    }
+    arguments += [":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"]
+    if (onlyX86) {
+        arguments.push("-PonlyX86")
+    }
+    if (useCCache) {
+        arguments.push("-PuseCCache")
+    }
+    return arguments;
+}
+
 task generateOptimizedRuntimeAar (type: Exec) {
     doFirst {
         workingDir "$TEST_APP_PATH"
-        if (onlyX86) {
-            if (isWinOs) {
-                commandLine "cmd", "/c", "gradlew", ":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-Poptimized", "-PonlyX86"
-            } else {
-                commandLine "./gradlew", ":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-Poptimized", "-PonlyX86"
-            }
-        } else {
-            if (isWinOs) {
-                commandLine "cmd", "/c", "gradlew", ":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-Poptimized"
-            } else {
-                commandLine "./gradlew", ":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-Poptimized"
-            }
-        }
+        def arguments = getAssembleReleaseBuildArguments()
+        arguments.push("-Poptimized")
+        commandLine arguments
     }
 }
 
 task generateOptimizedWithInspectorRuntimeAar (type: Exec) {
     doFirst {
         workingDir "$TEST_APP_PATH"
-        if (onlyX86) {
-            if (isWinOs) {
-                commandLine "cmd", "/c", "gradlew", ":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-PoptimizedWithInspector", "-PonlyX86"
-            } else {
-                commandLine "./gradlew", ":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-PoptimizedWithInspector", "-PonlyX86"
-            }
-        } else {
-            if (isWinOs) {
-                commandLine "cmd", "/c", "gradlew", ":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-PoptimizedWithInspector"
-            } else {
-                commandLine "./gradlew", ":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}", "-PoptimizedWithInspector"
-            }
-        }
+        def arguments = getAssembleReleaseBuildArguments()
+        arguments.push("-PoptimizedWithInspector")
+        commandLine arguments
     }
 }
 
 task generateRuntimeAar (type: Exec) {
     doFirst {
         workingDir "$TEST_APP_PATH"
+        def arguments = getAssembleReleaseBuildArguments()
+        commandLine arguments
+    }
+}
+
+task buildJsParser (type: Exec) {
+    workingDir "$BUILD_TOOLS_PATH/jsparser"
+    doFirst {
         if (isWinOs) {
-            commandLine "cmd", "/c", "gradlew", ":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"
+            commandLine "cmd", "/c", "npm", "run", "build"
         } else {
-            commandLine "./gradlew", ":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"
+            commandLine "npm", "run", "build"
         }
     }
 }
@@ -235,8 +256,7 @@ task copyFilesToProjectTemeplate {
             into "$DIST_FRAMEWORK_PATH/build-tools"
         }
         copy {
-            from "$BUILD_TOOLS_PATH/jsparser"
-            exclude "logs", "node_modules", "out", "package.json", "tests"
+            from "$BUILD_TOOLS_PATH/jsparser/build/js_parser.js"
             into "$DIST_FRAMEWORK_PATH/build-tools/jsparser"
         }
         copy {
@@ -288,12 +308,12 @@ task copyProjectTemplate(type: Copy) {
 
 task copyPackageJson(type: Copy) {
     from "$rootDir/package.json"
-    into "$rootDir/dist"
+    into "$DIST_PATH"
 }
 
 task setPackageVersionInPackageJsonFile {
     doLast {
-        def inputFile = new File("$rootDir/dist/package.json")
+        def inputFile = new File("$DIST_PATH/package.json")
         def json = new JsonSlurper().parseText(inputFile.text)
         json.version = pVersion
         def jb = new JsonBuilder(json);
@@ -303,12 +323,12 @@ task setPackageVersionInPackageJsonFile {
 
 task copyReadme(type: Copy) {
     from "README.md"
-    into "$rootDir/dist"
+    into "$DIST_PATH"
 }
 
 task createNpmPackage(type: Exec) {
     doFirst {
-        workingDir "$rootDir/dist"
+        workingDir "$DIST_PATH"
 
         if (isWinOs) {
             commandLine "cmd", "/c", "npm", "pack"
@@ -326,7 +346,8 @@ getPackageVersion.dependsOn(createDistDir)
 getCommitVersion.dependsOn(getPackageVersion)
 generateRuntime.dependsOn(getCommitVersion)
 
-copyFilesToProjectTemeplate.dependsOn(generateRuntime)
+buildJsParser.dependsOn(generateRuntime)
+copyFilesToProjectTemeplate.dependsOn(buildJsParser)
 copyProjectTemplate.dependsOn(copyFilesToProjectTemeplate)
 copyPackageJson.dependsOn(copyProjectTemplate)
 setPackageVersionInPackageJsonFile.dependsOn(copyPackageJson)
@@ -334,6 +355,8 @@ copyReadme.dependsOn(setPackageVersionInPackageJsonFile)
 createNpmPackage.dependsOn(copyReadme)
 
 task createPackage {
+    println "CCache version: " + getCCacheVersion()
+
     description "Builds the NativeScript Android cleanBuildArtefactsApp Package using an application project template."
     dependsOn createNpmPackage
     println "Creating NativeScript Android Package"
@@ -361,22 +384,34 @@ task runSbgTests (type: Exec, dependsOn: 'runAstTests') {
     }
 }
 
+def getRunTestsBuildArguments = { taskName ->
+    def arguments = []
+    if (isWinOs) {
+        arguments += ["cmd", "/c", "gradlew"]
+    } else {
+        arguments.push("./gradlew")
+    }
+    arguments +=["-b", "runtests.gradle", taskName]
+    if (onlyX86) {
+        arguments.push("-PonlyX86")
+    }
+    if (useCCache) {
+        arguments.push("-PuseCCache")
+    }
+    return arguments;
+}
+
 task runTests (type: Exec) {
     doFirst {
         workingDir "$TEST_APP_PATH"
-        if (onlyX86) {
-            if (isWinOs) {
-                commandLine "cmd", "/c", "gradlew", "-b", "runtests.gradle", "runtests", "-PonlyX86"
-            } else {
-                commandLine "./gradlew", "-b", "runtests.gradle", "runtests", "-PonlyX86"
-            }
-        } else {
-            if (isWinOs) {
-                commandLine "cmd", "/c", "gradlew", "-b", "runtests.gradle", "runtests"
-            } else {
-                commandLine "./gradlew", "-b", "runtests.gradle", "runtests"
-            }
-        }
+        commandLine getRunTestsBuildArguments("runtests")
+    }
+}
+
+task runTestsAndVerifyResults (type: Exec) {
+    doFirst {
+        workingDir "$TEST_APP_PATH"
+        commandLine getRunTestsBuildArguments("runtestsAndVerifyResults")
     }
 }
 

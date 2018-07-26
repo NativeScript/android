@@ -3,6 +3,7 @@ def runOnDevice = project.hasProperty("runOnDevice");
 def runOnDeviceOrEmulator = runOnDevice ? "-d" : "-e";
 
 def onlyX86 = project.hasProperty("onlyX86")
+def useCCache = project.hasProperty("useCCache")
 
 // task deleteDist(type: Delete) {
 //     doFirst {
@@ -22,22 +23,27 @@ task waitForEmulatorToStart(type: Exec) {
     }
 }
 
+def getBuildArguments = { ->
+    def arguments = []
+    if (isWinOs) {
+        arguments += ["cmd", "/c", "gradlew"]
+    } else {
+        arguments.push("./gradlew")
+    }
+    arguments.push(":app:installDebug")
+    if (onlyX86) {
+        arguments.push("-PonlyX86")
+    }
+    if (useCCache) {
+        arguments.push("-PuseCCache")
+    }
+    return arguments;
+}
+
 task installApk(type: Exec) {
         doFirst {
             println "Attempting to install buit apk"
-            if (onlyX86) {
-                if (isWinOs) {
-                    commandLine "cmd", "/c", "gradlew", ":app:installDebug", "-PonlyX86"
-                } else {
-                    commandLine "./gradlew", ":app:installDebug", "-PonlyX86"
-                }
-            } else {
-                if (isWinOs) {
-                    commandLine "cmd", "/c", "gradlew", ":app:installDebug"
-                } else {
-                    commandLine "./gradlew", ":app:installDebug"
-                }
-            }
+            commandLine getBuildArguments()
         }
 }
 
@@ -105,6 +111,19 @@ task deleteRootLevelResult(type: Delete) {
     delete "$rootDir/android_unit_test_results.xml"
 }
 
+task verifyResults(type: Exec) {
+    doFirst {
+        if (isWinOs) {
+            commandLine "cmd", "/c", "node", "$rootDir\\tools\\check_if_tests_passed.js", "$rootDir\\dist\\android_unit_test_results.xml"
+        } else {
+            commandLine "node", "$rootDir/tools/check_if_tests_passed.js", "$rootDir/dist/android_unit_test_results.xml"
+        }
+    }
+}
+
+task runtests {
+    dependsOn deleteRootLevelResult
+}
 
 // waitForEmulatorToStart.dependsOn(deleteDist)
 runAdbAsRoot.dependsOn(waitForEmulatorToStart)
@@ -115,7 +134,8 @@ createDistFolder.dependsOn(startInstalledApk)
 waitForUnitTestResultFile.dependsOn(createDistFolder)
 copyResultToDist.dependsOn(waitForUnitTestResultFile)
 deleteRootLevelResult.dependsOn(copyResultToDist)
+verifyResults.dependsOn(runtests)
 
-task runtests {
-    dependsOn deleteRootLevelResult
+task runtestsAndVerifyResults {
+    dependsOn verifyResults
 }
