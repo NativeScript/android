@@ -1,3 +1,20 @@
+4.2.0
+==
+
+## What's New
+- [Static binding generator now uses bundled npm packages(#1096)](https://github.com/NativeScript/android-runtime/issues/1096)
+- [Add gradle dependencies versions in package.json(#1102)](https://github.com/NativeScript/android-runtime/issues/1102)
+- [Introduce a setting for auto catching exceptions when calling JS method native(#1119)](https://github.com/NativeScript/android-runtime/issues/1119)
+- [Make livesync work entirely through named sockets(#932)](https://github.com/NativeScript/android-runtime/issues/932)
+
+## Bug Fixes
+
+ - [Unable to increase minSdk version by modifying AndroidManifest.xml(#1104)](https://github.com/NativeScript/android-runtime/issues/1104)
+ - [UTF8 symbols in inspector protocol are not properly encoded(#1116)](https://github.com/NativeScript/android-runtime/issues/1116)
+ - [ChromeDevTools: If you close the socket the app will crash on the device/emulator(#1122)](https://github.com/NativeScript/android-runtime/issues/1122)
+ - [App tries to write in /data/local/tmp(#828)](https://github.com/NativeScript/android-runtime/issues/828)
+ - [Rewrite livesync implementation(#929)](https://github.com/NativeScript/android-runtime/pull/929)
+
 4.1.3
 ==
 
