@@ -273,7 +273,7 @@ public final class RuntimeHelper {
         // runtime needs to be initialized before the NativeScriptSyncService is enabled because it uses runtime.runScript(...)
         try {
             @SuppressWarnings("unchecked")
-            Class NativeScriptSyncService = Class.forName("com.tns.NativeScriptSyncServiceSocketIml");
+            Class NativeScriptSyncService = Class.forName("com.tns.NativeScriptSyncServiceSocketImpl");
 
             @SuppressWarnings("unchecked")
             Constructor cons = NativeScriptSyncService.getConstructor(new Class[] {Runtime.class, Logger.class, Context.class});
