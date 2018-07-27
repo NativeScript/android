@@ -104,6 +104,14 @@ public class Runtime {
 
     private Logger logger;
 
+    private boolean isLiveSyncStarted;
+    public boolean getIsLiveSyncStarted() { return this.isLiveSyncStarted; }
+    public void setIsLiveSyncStarted(boolean value) { this.isLiveSyncStarted = value; }
+
+    public Logger getLogger() {
+        return this.logger;
+    }
+
     private ThreadScheduler threadScheduler;
 
     private DexFactory dexFactory;
