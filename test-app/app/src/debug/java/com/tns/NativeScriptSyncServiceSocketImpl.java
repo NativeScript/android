@@ -13,7 +13,7 @@ import java.security.MessageDigest;
 import java.io.OutputStream;
 import java.util.Arrays;
 
-public class NativeScriptSyncServiceSocketIml {
+public class NativeScriptSyncServiceSocketImpl {
     private static String DEVICE_APP_DIR;
 
     private final Runtime runtime;
@@ -23,7 +23,7 @@ public class NativeScriptSyncServiceSocketIml {
     private LocalServerSocketThread localServerThread;
     private Thread localServerJavaThread;
 
-    public NativeScriptSyncServiceSocketIml(Runtime runtime, Logger logger, Context context) {
+    public NativeScriptSyncServiceSocketImpl(Runtime runtime, Logger logger, Context context) {
         this.runtime = runtime;
         this.logger = logger;
         this.context = context;
@@ -166,7 +166,7 @@ public class NativeScriptSyncServiceSocketIml {
 
                         validateData();
                         if(runtime != null && doRefreshInt == DO_REFRESH_VALUE) {
-                            runtime.runScript(new File(NativeScriptSyncServiceSocketIml.this.context.getFilesDir(), "internal/livesync.js"));
+                            runtime.runScript(new File(NativeScriptSyncServiceSocketImpl.this.context.getFilesDir(), "internal/livesync.js"));
                             operationReportCode = OPERATION_END_REPORT_CODE;
                         } else {
                             operationReportCode = OPERATION_END_NO_REFRESH_REPORT_CODE;
