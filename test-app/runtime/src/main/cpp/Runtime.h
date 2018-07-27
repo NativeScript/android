@@ -56,7 +56,11 @@ class Runtime {
         void ClearStartupData(JNIEnv* env, jobject obj);
         void DestroyRuntime();
 
+        void Lock();
+        void Unlock();
+
         static v8::Platform* platform;
+        std::auto_ptr<v8::Locker> m_locker;
 
     private:
         Runtime(JNIEnv* env, jobject runtime, int id);

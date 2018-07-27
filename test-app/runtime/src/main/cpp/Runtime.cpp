@@ -188,6 +188,14 @@ void Runtime::Init(jstring filesPath, jstring nativeLibDir, bool verboseLoggingE
     s_isolate2RuntimesCache.insert(make_pair(m_isolate, this));
 }
 
+void Runtime::Lock() {
+    m_locker.reset(new v8::Locker(m_isolate));
+}
+
+void Runtime::Unlock() {
+    m_locker.reset(nullptr);
+}
+
 void Runtime::RunModule(JNIEnv* _env, jobject obj, jstring scriptFile) {
     JEnv env(_env);
 
