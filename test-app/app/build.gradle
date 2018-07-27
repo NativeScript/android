@@ -212,8 +212,8 @@ android {
     }
 
     setAppIdentifier()
-    applyAppGradleConfiguration()
     applyPluginGradleConfigurations()
+    applyAppGradleConfiguration()
 }
 
 def externalRuntimeExists = !findProject(':runtime').is(null)
