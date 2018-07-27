@@ -9,6 +9,6 @@
 		"markingMode": "full",
 		"maxLogcatObjectSize": 1024,
 		"forceLog": false,
-		"autoCatchJSMethodNativeCalls": false
+		"discardUncaughtJsExceptions": false
 	}
 }
