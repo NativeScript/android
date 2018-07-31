@@ -61,8 +61,10 @@ class Runtime {
         void Unlock();
 
         static v8::Platform* platform;
-        std::auto_ptr<std::lock_guard<std::mutex>> m_fileWriteLock;
-        std::mutex m_fileWriteMutex;
+
+#ifdef APPLICATION_IN_DEBUG
+        std::mutex& GetFileWriteMutex();
+#endif
 
     private:
         Runtime(JNIEnv* env, jobject runtime, int id);
@@ -104,6 +106,10 @@ class Runtime {
         static jmethodID GET_USED_MEMORY_METHOD_ID;
 
         static bool s_mainThreadInitialized;
+
+#ifdef APPLICATION_IN_DEBUG
+        std::mutex m_fileWriteMutex;
+#endif
 };
 }
 

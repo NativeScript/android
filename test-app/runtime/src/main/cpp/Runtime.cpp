@@ -189,15 +189,21 @@ void Runtime::Init(jstring filesPath, jstring nativeLibDir, bool verboseLoggingE
     s_isolate2RuntimesCache.insert(make_pair(m_isolate, this));
 }
 
+#ifdef APPLICATION_IN_DEBUG
+std::mutex& Runtime::GetFileWriteMutex() {
+    return m_fileWriteMutex;
+}
+#endif
+
 void Runtime::Lock() {
 #ifdef APPLICATION_IN_DEBUG
-    m_fileWriteLock.reset(new std::lock_guard<std::mutex>(m_fileWriteMutex));
+    m_fileWriteMutex.lock();
 #endif
 }
 
 void Runtime::Unlock() {
 #ifdef APPLICATION_IN_DEBUG
-    m_fileWriteLock.reset(nullptr);
+    m_fileWriteMutex.unlock();
 #endif
 }
 

@@ -19,6 +19,7 @@
 #include "ManualInstrumentation.h"
 #include "Runtime.h"
 #include <sstream>
+#include <mutex>
 #include <libgen.h>
 #include <dlfcn.h>
 
@@ -429,11 +430,11 @@ Local<Object> ModuleInternal::LoadData(Isolate* isolate, const string& path) {
 
 Local<String> ModuleInternal::WrapModuleContent(const string& path) {
     TNSPERF();
-    Runtime::GetRuntime(m_isolate)->Lock();
-    string content = File::ReadText(path);
-    Runtime::GetRuntime(m_isolate)->Unlock();
 
-    auto separatorIndex = path.find_last_of("/");
+#ifdef APPLICATION_IN_DEBUG
+    std::lock_guard<std::mutex> lock(Runtime::GetRuntime(m_isolate)->GetFileWriteMutex());
+#endif
+    string content = File::ReadText(path);
 
     // TODO: Use statically allocated buffer for better performance
     string result(MODULE_PROLOGUE);
