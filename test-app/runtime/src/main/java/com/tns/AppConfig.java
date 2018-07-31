@@ -20,7 +20,7 @@ class AppConfig {
         HandleTimeZoneChanges("handleTimeZoneChanges", false),
         MaxLogcatObjectSize("maxLogcatObjectSize", 1024),
         ForceLog("forceLog", false),
-        AutoCatchJSMethodNativeCalls("autoCatchJSMethodNativeCalls", false);
+        DiscardUncaughtJsExceptions("discardUncaughtJsExceptions", false);
 
         private final String name;
         private final Object defaultValue;
@@ -113,8 +113,8 @@ class AppConfig {
                     if (androidObject.has(KnownKeys.ForceLog.getName())) {
                         values[KnownKeys.ForceLog.ordinal()] = androidObject.getBoolean(KnownKeys.ForceLog.getName());
                     }
-                    if (androidObject.has(KnownKeys.AutoCatchJSMethodNativeCalls.getName())) {
-                        values[KnownKeys.AutoCatchJSMethodNativeCalls.ordinal()] = androidObject.getBoolean(KnownKeys.AutoCatchJSMethodNativeCalls.getName());
+                    if (androidObject.has(KnownKeys.DiscardUncaughtJsExceptions.getName())) {
+                        values[KnownKeys.DiscardUncaughtJsExceptions.ordinal()] = androidObject.getBoolean(KnownKeys.DiscardUncaughtJsExceptions.getName());
                     }
                 }
             }
@@ -167,7 +167,7 @@ class AppConfig {
         return (boolean)values[KnownKeys.ForceLog.ordinal()];
     }
 
-    public boolean getAutoCatchJSMethodNativeCalls() {
-        return (boolean)values[KnownKeys.AutoCatchJSMethodNativeCalls.ordinal()];
+    public boolean getDiscardUncaughtJsExceptions() {
+        return (boolean)values[KnownKeys.DiscardUncaughtJsExceptions.ordinal()];
     }
 }
