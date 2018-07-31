@@ -62,9 +62,7 @@ class Runtime {
 
         static v8::Platform* platform;
 
-#ifdef APPLICATION_IN_DEBUG
-        std::mutex& GetFileWriteMutex();
-#endif
+        std::string ReadFileText(const std::string& filePath);
 
     private:
         Runtime(JNIEnv* env, jobject runtime, int id);

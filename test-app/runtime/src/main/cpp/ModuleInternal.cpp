@@ -399,7 +399,7 @@ Local<Object> ModuleInternal::LoadData(Isolate* isolate, const string& path) {
     tns::instrumentation::Frame frame(frameName.c_str());
     Local<Object> json;
 
-    auto jsonData = File::ReadText(path);
+    auto jsonData = Runtime::GetRuntime(m_isolate)->ReadFileText(path);
 
     TryCatch tc(isolate);
 
@@ -431,10 +431,7 @@ Local<Object> ModuleInternal::LoadData(Isolate* isolate, const string& path) {
 Local<String> ModuleInternal::WrapModuleContent(const string& path) {
     TNSPERF();
 
-#ifdef APPLICATION_IN_DEBUG
-    std::lock_guard<std::mutex> lock(Runtime::GetRuntime(m_isolate)->GetFileWriteMutex());
-#endif
-    string content = File::ReadText(path);
+    string content = Runtime::GetRuntime(m_isolate)->ReadFileText(path);
 
     // TODO: Use statically allocated buffer for better performance
     string result(MODULE_PROLOGUE);

@@ -189,11 +189,13 @@ void Runtime::Init(jstring filesPath, jstring nativeLibDir, bool verboseLoggingE
     s_isolate2RuntimesCache.insert(make_pair(m_isolate, this));
 }
 
+std::string Runtime::ReadFileText(const std::string& filePath) {
 #ifdef APPLICATION_IN_DEBUG
-std::mutex& Runtime::GetFileWriteMutex() {
-    return m_fileWriteMutex;
-}
+    std::lock_guard<std::mutex> lock(m_fileWriteMutex);
 #endif
+    return File::ReadText(filePath);
+}
+
 
 void Runtime::Lock() {
 #ifdef APPLICATION_IN_DEBUG
@@ -228,7 +230,8 @@ jobject Runtime::RunScript(JNIEnv* _env, jobject obj, jstring scriptFile) {
     auto context = isolate->GetCurrentContext();
 
     auto filename = ArgConverter::jstringToString(scriptFile);
-    auto src = File::ReadText(filename);
+    auto src = ReadFileText(filename);
+
     auto source = ArgConverter::ConvertToV8String(isolate, src);
 
     TryCatch tc(isolate);
@@ -495,7 +498,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
             // check for custom script to include in the snapshot
             if (Constants::V8_HEAP_SNAPSHOT_SCRIPT.size() > 0 && File::Exists(Constants::V8_HEAP_SNAPSHOT_SCRIPT)) {
-                customScript = File::ReadText(Constants::V8_HEAP_SNAPSHOT_SCRIPT);
+                customScript = ReadFileText(Constants::V8_HEAP_SNAPSHOT_SCRIPT);
             }
 
             DEBUG_WRITE_FORCE("Creating heap snapshot");
