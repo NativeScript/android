@@ -342,6 +342,8 @@ public class Generator {
         w.writeln();
 
         boolean isApplicationClass = isApplicationClass(clazz, classes);
+        boolean isActivityClass = isActivityClass(clazz, classes);
+
         if (isApplicationClass && !packageName.equals("com.tns")) {
             w.writeln("import com.tns.RuntimeHelper;");
             w.writeln("import com.tns.Runtime;");
@@ -435,7 +437,7 @@ public class Generator {
             }
             for (Method m : ifaceMethods) {
                 if (!notImplementedObjectMethods.contains(m)) {
-                    writeMethodBody(m, w, isApplicationClass, true);
+                    writeMethodBody(m, w, isApplicationClass, isActivityClass, true);
                 }
             }
         } else {
@@ -449,7 +451,7 @@ public class Generator {
                         if (interfaceMethods.contains(m)) {
                             isInterfaceMethod = true;
                         }
-                        writeMethodBody(m, w, isApplicationClass, isInterfaceMethod);
+                        writeMethodBody(m, w, isApplicationClass, isActivityClass, isInterfaceMethod);
                     }
                 }
             }
@@ -479,7 +481,7 @@ public class Generator {
                className.equals("android.test.mock.MockApplication");
     }
 
-    private void writeMethodBody(Method m, Writer w, boolean isApplicationClass, boolean isInterfaceMethod) {
+    private void writeMethodBody(Method m, Writer w, boolean isApplicationClass, boolean isActivityClass, boolean isInterfaceMethod) {
         String visibility = m.isPublic() ? "public" : "protected";
         w.write("\t");
         w.write(visibility);
@@ -491,7 +493,7 @@ public class Generator {
         w.write(" ");
         writeThrowsClause(m, w);
         w.writeln(" {");
-        writeMethodBody(m, false, isApplicationClass, w, isInterfaceMethod);
+        writeMethodBody(m, false, isApplicationClass, isActivityClass, w, isInterfaceMethod);
         w.writeln("\t}");
         w.writeln();
     }
@@ -570,7 +572,7 @@ public class Generator {
                         w.writeln("\t\tcom.tns.Runtime.initInstance(this);");
                     }
                     if (hasInitMethod) {
-                        writeMethodBody(c, true, false, w, false);
+                        writeMethodBody(c, true, false, false, w, false);
                     }
                     if (isClassApplication(clazz)) {
                         //get instance method
@@ -584,7 +586,7 @@ public class Generator {
         }
     }
 
-    private void writeMethodBody(Method m, boolean isConstructor, boolean isApplicationClass, Writer w, boolean isInterfaceMethod) {
+    private void writeMethodBody(Method m, boolean isConstructor, boolean isApplicationClass, boolean isActivityClass, Writer w, boolean isInterfaceMethod) {
         if (m.getName().equals("onCreate") && isApplicationClass) {
             w.writeln("\t\tcom.tns.Runtime runtime = RuntimeHelper.initRuntime(this);");
         }
@@ -651,6 +653,11 @@ public class Generator {
             w.writeln("\t\t\truntime.run();");
             w.writeln("\t\t}");
         }
+
+        // call liveSync initialization
+        if (m.getName().equals("onCreate") && isActivityClass) {
+            w.writeln("\t\tcom.tns.RuntimeHelper.initLiveSync(this.getApplication());");
+        }
     }
 
     private void writeType(Type t, Writer w) {
@@ -713,6 +720,31 @@ public class Generator {
         }
 
         return isApplicationClass;
+    }
+
+    private boolean isActivityClass(JavaClass clazz, Map<String, JavaClass> classes) throws ClassNotFoundException {
+        boolean isActivityClass = false;
+
+        String activityClassname = "android.app.Activity";
+
+        JavaClass currentClass = clazz;
+        while (true) {
+            String currentClassname = currentClass.getClassName();
+
+            isActivityClass = currentClassname.equals(activityClassname);
+            if (isActivityClass) {
+                break;
+            }
+
+            if (currentClassname.endsWith("java.lang.Object")) {
+                break;
+            }
+
+            String superClassName = currentClass.getSuperclassName();
+            currentClass = getClass(superClassName);
+        }
+
+        return isActivityClass;
     }
 
     private JavaClass getClass(String className) throws ClassNotFoundException {

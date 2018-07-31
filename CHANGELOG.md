@@ -2,6 +2,7 @@
 ==
 
 ## What's New
+- [Upgrade v8 to 6.7.288.46(#1130)](https://github.com/NativeScript/android-runtime/issues/1130)
 - [Static binding generator now uses bundled npm packages(#1096)](https://github.com/NativeScript/android-runtime/issues/1096)
 - [Add gradle dependencies versions in package.json(#1102)](https://github.com/NativeScript/android-runtime/issues/1102)
 - [Introduce a setting for auto catching exceptions when calling JS method native(#1119)](https://github.com/NativeScript/android-runtime/issues/1119)
