@@ -17,6 +17,7 @@
 #include "include/v8.h"
 #include "CallbackHandlers.h"
 #include "ManualInstrumentation.h"
+#include "Runtime.h"
 #include <sstream>
 #include <libgen.h>
 #include <dlfcn.h>
@@ -428,7 +429,9 @@ Local<Object> ModuleInternal::LoadData(Isolate* isolate, const string& path) {
 
 Local<String> ModuleInternal::WrapModuleContent(const string& path) {
     TNSPERF();
+    Runtime::GetRuntime(m_isolate)->Lock();
     string content = File::ReadText(path);
+    Runtime::GetRuntime(m_isolate)->Unlock();
 
     auto separatorIndex = path.find_last_of("/");
 

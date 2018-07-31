@@ -22,6 +22,7 @@
 #include "include/zipconf.h"
 #include <csignal>
 #include <sstream>
+#include <mutex>
 #include <dlfcn.h>
 #include <console/Console.h>
 #include "NetworkDomainCallbackHandlers.h"
@@ -189,11 +190,15 @@ void Runtime::Init(jstring filesPath, jstring nativeLibDir, bool verboseLoggingE
 }
 
 void Runtime::Lock() {
-    m_locker.reset(new v8::Locker(m_isolate));
+#ifdef APPLICATION_IN_DEBUG
+    m_fileWriteLock.reset(new std::lock_guard<std::mutex>(m_fileWriteMutex));
+#endif
 }
 
 void Runtime::Unlock() {
-    m_locker.reset(nullptr);
+#ifdef APPLICATION_IN_DEBUG
+    m_fileWriteLock.reset(nullptr);
+#endif
 }
 
 void Runtime::RunModule(JNIEnv* _env, jobject obj, jstring scriptFile) {

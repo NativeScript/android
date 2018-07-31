@@ -10,6 +10,7 @@
 #include "Profiler.h"
 #include "ModuleInternal.h"
 #include "File.h"
+#include <mutex>
 
 jobject ConvertJsValueToJavaObject(tns::JEnv& env, const v8::Local<v8::Value>& value, int classReturnType);
 
@@ -60,7 +61,8 @@ class Runtime {
         void Unlock();
 
         static v8::Platform* platform;
-        std::auto_ptr<v8::Locker> m_locker;
+        std::auto_ptr<std::lock_guard<std::mutex>> m_fileWriteLock;
+        std::mutex m_fileWriteMutex;
 
     private:
         Runtime(JNIEnv* env, jobject runtime, int id);
