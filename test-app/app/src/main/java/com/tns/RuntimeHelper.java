@@ -193,6 +193,17 @@ public final class RuntimeHelper {
                     // if app is in debuggable mode run livesync service
                     // runtime needs to be initialized before the NativeScriptSyncService is enabled because it uses runtime.runScript(...)
                     initLiveSync(runtime, logger, app);
+
+                    // CLI will create this file when initial sync is needed and then will remove it after syncing the fails and restarting the app
+                    File liveSyncFile = new File("/data/local/tmp/" + app.getPackageName() + "-livesync-in-progress");
+                    if(liveSyncFile.exists()) {
+                        try {
+                            // wait for the livesync to complete
+                            Thread.sleep(30000);
+                        } catch (Exception ex) {
+
+                        }
+                    }
                 }
 
                 runtime.runScript(new File(appDir, "internal/ts_helpers.js"));

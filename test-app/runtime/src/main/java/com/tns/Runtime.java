@@ -645,6 +645,8 @@ public class Runtime {
             if (jsImpl != null) {
                 File jsFile = new File(jsImpl.javaScriptFile());
                 runModule(jsFile);
+            } else {
+                logger.write("Couldn't find JavaScriptImplementation annotation for class " + clazz.toString());
             }
             loadedJavaScriptExtends.put(clazz, jsImpl);
         }
