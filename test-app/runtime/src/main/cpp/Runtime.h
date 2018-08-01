@@ -10,6 +10,7 @@
 #include "Profiler.h"
 #include "ModuleInternal.h"
 #include "File.h"
+#include <mutex>
 
 jobject ConvertJsValueToJavaObject(tns::JEnv& env, const v8::Local<v8::Value>& value, int classReturnType);
 
@@ -56,7 +57,12 @@ class Runtime {
         void ClearStartupData(JNIEnv* env, jobject obj);
         void DestroyRuntime();
 
+        void Lock();
+        void Unlock();
+
         static v8::Platform* platform;
+
+        std::string ReadFileText(const std::string& filePath);
 
     private:
         Runtime(JNIEnv* env, jobject runtime, int id);
@@ -98,6 +104,10 @@ class Runtime {
         static jmethodID GET_USED_MEMORY_METHOD_ID;
 
         static bool s_mainThreadInitialized;
+
+#ifdef APPLICATION_IN_DEBUG
+        std::mutex m_fileWriteMutex;
+#endif
 };
 }
 

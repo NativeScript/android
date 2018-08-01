@@ -655,9 +655,9 @@ public class Generator {
         }
 
         // call liveSync initialization
-        if (m.getName().equals("onCreate") && isActivityClass) {
-            w.writeln("\t\tcom.tns.RuntimeHelper.initLiveSync(this.getApplication());");
-        }
+//        if (m.getName().equals("onCreate") && isActivityClass) {
+//            w.writeln("\t\tcom.tns.RuntimeHelper.initLiveSync(this.getApplication());");
+//        }
     }
 
     private void writeType(Type t, Writer w) {
