@@ -356,14 +356,18 @@ public class NativeScriptSyncServiceSocketImpl {
 
                 fileToCreate.getParentFile().mkdirs();
                 FileOutputStream fos = new FileOutputStream(fileToCreate.getCanonicalPath());
-                runtime.lock();
+                if(runtime != null) {
+                    runtime.lock();
+                }
                 fos.write(content);
                 fos.close();
 
             } catch (Exception e) {
                 throw new IOException(String.format("\nLiveSync: failed to write file: %s\nOriginal Exception: %s", fileName, e.toString()));
             } finally {
-                runtime.unlock();
+                if(runtime != null) {
+                    runtime.unlock();
+                }
             }
         }
 
