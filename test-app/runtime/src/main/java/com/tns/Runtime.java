@@ -48,6 +48,8 @@ public class Runtime {
     private native int generateNewObjectId(int runtimeId);
 
     private native boolean notifyGc(int runtimeId);
+    private native void lock(int runtimeId);
+    private native void unlock(int runtimeId);
 
     private native void passUncaughtExceptionToJsNative(int runtimeId, Throwable ex, String stackTrace);
 
@@ -610,9 +612,9 @@ public class Runtime {
         return usedMemory;
     }
 
-    public void notifyGc() {
-        notifyGc(runtimeId);
-    }
+    public void notifyGc() { notifyGc(runtimeId); }
+    public void lock() { lock(runtimeId); }
+    public void unlock() { unlock(runtimeId); }
 
     public static void initInstance(Object instance) {
         ManualInstrumentation.Frame frame = ManualInstrumentation.start("Runtime.initInstance");
@@ -643,6 +645,8 @@ public class Runtime {
             if (jsImpl != null) {
                 File jsFile = new File(jsImpl.javaScriptFile());
                 runModule(jsFile);
+            } else {
+                logger.write("Couldn't find JavaScriptImplementation annotation for class " + clazz.toString());
             }
             loadedJavaScriptExtends.put(clazz, jsImpl);
         }

@@ -58,6 +58,9 @@ class AppConfig {
                     String profiling = rootObject.getString(KnownKeys.Profiling.getName());
                     values[KnownKeys.Profiling.ordinal()] = profiling;
                 }
+                if (rootObject.has(KnownKeys.DiscardUncaughtJsExceptions.getName())) {
+                    values[KnownKeys.DiscardUncaughtJsExceptions.ordinal()] = rootObject.getBoolean(KnownKeys.DiscardUncaughtJsExceptions.getName());
+                }
                 if (rootObject.has(AndroidKey)) {
                     JSONObject androidObject = rootObject.getJSONObject(AndroidKey);
                     if (androidObject.has(KnownKeys.V8FlagsKey.getName())) {
@@ -112,9 +115,6 @@ class AppConfig {
                     }
                     if (androidObject.has(KnownKeys.ForceLog.getName())) {
                         values[KnownKeys.ForceLog.ordinal()] = androidObject.getBoolean(KnownKeys.ForceLog.getName());
-                    }
-                    if (androidObject.has(KnownKeys.DiscardUncaughtJsExceptions.getName())) {
-                        values[KnownKeys.DiscardUncaughtJsExceptions.ordinal()] = androidObject.getBoolean(KnownKeys.DiscardUncaughtJsExceptions.getName());
                     }
                 }
             }

@@ -17,7 +17,9 @@
 #include "include/v8.h"
 #include "CallbackHandlers.h"
 #include "ManualInstrumentation.h"
+#include "Runtime.h"
 #include <sstream>
+#include <mutex>
 #include <libgen.h>
 #include <dlfcn.h>
 
@@ -397,7 +399,7 @@ Local<Object> ModuleInternal::LoadData(Isolate* isolate, const string& path) {
     tns::instrumentation::Frame frame(frameName.c_str());
     Local<Object> json;
 
-    auto jsonData = File::ReadText(path);
+    auto jsonData = Runtime::GetRuntime(m_isolate)->ReadFileText(path);
 
     TryCatch tc(isolate);
 
@@ -428,9 +430,8 @@ Local<Object> ModuleInternal::LoadData(Isolate* isolate, const string& path) {
 
 Local<String> ModuleInternal::WrapModuleContent(const string& path) {
     TNSPERF();
-    string content = File::ReadText(path);
 
-    auto separatorIndex = path.find_last_of("/");
+    string content = Runtime::GetRuntime(m_isolate)->ReadFileText(path);
 
     // TODO: Use statically allocated buffer for better performance
     string result(MODULE_PROLOGUE);

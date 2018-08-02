@@ -192,7 +192,9 @@ public final class RuntimeHelper {
 
                     // if app is in debuggable mode run livesync service
                     // runtime needs to be initialized before the NativeScriptSyncService is enabled because it uses runtime.runScript(...)
-                    // initLiveSync(runtime, logger, app);
+                    initLiveSync(runtime, logger, app);
+
+                    waitForLiveSync(app);
                 }
 
                 runtime.runScript(new File(appDir, "internal/ts_helpers.js"));
@@ -225,6 +227,32 @@ public final class RuntimeHelper {
             return runtime;
         } finally {
             frame.close();
+        }
+    }
+
+    private static void waitForLiveSync(Application app) {
+        boolean needToWait = false;
+
+        // CLI will create this file when initial sync is needed and then will remove it after syncing the fails and restarting the app
+        File liveSyncFile = new File("/data/local/tmp/" + app.getPackageName() + "-livesync-in-progress");
+        if(liveSyncFile.exists()) {
+            needToWait = true;
+            Long lastModified = liveSyncFile.lastModified();
+            // we check for lastModified == 0 as this might happen if we cannot get the actual modified date
+            if(lastModified > 0) {
+                Long fileCreatedBeforeMillis = System.currentTimeMillis() - lastModified;
+                // if last modified date is more than a minute before the current time discard the file as most probably this is a leftover
+                if (fileCreatedBeforeMillis > 60000) {
+                    needToWait = false;
+                }
+            }
+        }
+
+        if(needToWait) {
+            try {
+                // wait for the livesync to complete and it should restart the app after deleting the livesync-in-progress file
+                Thread.sleep(30000);
+            } catch (Exception ex) { }
         }
     }
 
