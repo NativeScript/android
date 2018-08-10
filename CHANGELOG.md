@@ -1,3 +1,10 @@
+4.2.1
+==
+
+## Bug Fixes
+
+ - [Exceptions in Android app entry point are sporadically not shown in the terminal(#1150)](https://github.com/NativeScript/android-runtime/issues/1150)
+
 4.2.0
 ==
 
