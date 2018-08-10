@@ -135,6 +135,12 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
             Log.d("ErrorReport", "Couldn't send pending intent! Exception: " + e.getMessage());
         }
 
+        try {
+            Thread.sleep(500);
+        } catch (InterruptedException ex) {
+            Log.d("ErrorReport", "failed to sleep: " + ex.getMessage());
+        }
+
         killProcess(context);
 
         return true;
