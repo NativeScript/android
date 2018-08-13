@@ -371,7 +371,7 @@ var es5_visitors = (function () {
             }
             else {
                 throw {
-                    message: "Not enough or too many arguments passed(" + path.node.arguments.length + ") when trying to extend interface in file: " + config.filePath,
+                    message: "Not enough or too many arguments passed(" + path.node.arguments.length + ") when trying to extend interface: " + interfaceName + " in file: " + config.filePath,
                     errCode: 1
                 }
             }
@@ -451,7 +451,7 @@ var es5_visitors = (function () {
                     // don't throw here, because there can be a valid js extend that has nothing to do with NS
                     return;
                     throw {
-                        message: "Not enough or too many arguments passed(" + extendArguments.length + ") when trying to extend class in file: " + config.filePath,
+                        message: "Not enough or too many arguments passed(" + extendArguments.length + ") when trying to extend class: " + extendClass + " in file: " + config.filePath,
                         errCode: 1
                     }
                 }
@@ -460,7 +460,7 @@ var es5_visitors = (function () {
                 // don't throw here, because there can be a valid js extend that has nothing to do with NS
                 return;
                 throw {
-                    message: "You need to call the extend with parameters. Example: '...extend(\"a.b.C\", {...overrides...})') in file: " + config.filePath,
+                    message: "You need to call the extend with parameters. Example: '...extend(\"a.b.C\", {...overrides...})') for class: " + extendClass + " in file: " + config.filePath,
                     errCode: 1
                 }
             }
