@@ -1638,6 +1638,12 @@ DispatchResponse::Status DispatcherImpl::evaluate(int callId, std::unique_ptr<Di
         errors->setName("throwOnSideEffect");
         in_throwOnSideEffect = ValueConversions<bool>::fromValue(throwOnSideEffectValue, errors);
     }
+    protocol::Value* timeoutValue = object ? object->get("timeout") : nullptr;
+    Maybe<double> in_timeout;
+    if (timeoutValue) {
+        errors->setName("timeout");
+        in_timeout = ValueConversions<double>::fromValue(timeoutValue, errors);
+    }
     errors->pop();
     if (errors->hasErrors()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
@@ -1646,7 +1652,7 @@ DispatchResponse::Status DispatcherImpl::evaluate(int callId, std::unique_ptr<Di
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     std::unique_ptr<EvaluateCallbackImpl> callback(new EvaluateCallbackImpl(weakPtr(), callId, nextCallbackId()));
-    m_backend->evaluate(in_expression, std::move(in_objectGroup), std::move(in_includeCommandLineAPI), std::move(in_silent), std::move(in_contextId), std::move(in_returnByValue), std::move(in_generatePreview), std::move(in_userGesture), std::move(in_awaitPromise), std::move(in_throwOnSideEffect), std::move(callback));
+    m_backend->evaluate(in_expression, std::move(in_objectGroup), std::move(in_includeCommandLineAPI), std::move(in_silent), std::move(in_contextId), std::move(in_returnByValue), std::move(in_generatePreview), std::move(in_userGesture), std::move(in_awaitPromise), std::move(in_throwOnSideEffect), std::move(in_timeout), std::move(callback));
     return (weak->get() && weak->get()->lastCallbackFallThrough()) ? DispatchResponse::kFallThrough : DispatchResponse::kAsync;
 }
 
