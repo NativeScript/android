@@ -111,6 +111,9 @@ public class Main {
             e.printStackTrace();
             throw new InterruptedIOException("A problem occured while waiting for the jsparser to finish.");
         }
+        if(p.exitValue() != 0) {
+            System.exit(p.exitValue());
+        }
     }
 
     private static Boolean rootTraversed = false;

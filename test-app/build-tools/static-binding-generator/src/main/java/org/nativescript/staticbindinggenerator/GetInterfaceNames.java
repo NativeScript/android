@@ -8,6 +8,8 @@ import java.io.PrintWriter;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.jar.JarEntry;
@@ -25,18 +27,32 @@ public class GetInterfaceNames {
         String outputFileName = Main.SBG_INTERFACE_NAMES;
 
         PrintWriter out = ensureOutputFile(outputFileName);
+        List<String> interfacesList = Collections.synchronizedList(new ArrayList<>());
 
-        for (DataRow dr : rows) {
+        final ThrowingConsumer<DataRow> consumer = dr -> {
             String pathToDependency = dr.getRow();
-            if (pathToDependency .endsWith(".jar")) {
-                generateInterfaceNames(pathToDependency, out);
+            if (pathToDependency.endsWith(".jar")) {
+                generateInterfaceNames(pathToDependency, interfacesList);
             }
+        };
+
+        rows.parallelStream().forEach(consumer);
+
+//        for (DataRow dr : rows) {
+//            String pathToDependency = dr.getRow();
+//            if (pathToDependency.endsWith(".jar")) {
+//                generateInterfaceNames(pathToDependency, interfacesList);
+//            }
+//        }
+
+        for(String line: interfacesList) {
+            out.println(line);
         }
 
         out.close();
     }
 
-    private static void generateInterfaceNames(String pathToJar, PrintWriter out) throws IOException, ClassNotFoundException {
+    private static void generateInterfaceNames(String pathToJar, List<String> interfacesList) throws IOException, ClassNotFoundException {
         if (pathToJar == null) {
             return;
         }
@@ -62,8 +78,7 @@ public class GetInterfaceNames {
                 }
                 if ((c != null) && (c.isInterface() == true)) {
                     String res = c.getName().replace('$', '.');
-
-                    out.println(res);
+                    interfacesList.add(res);
                 }
             }
         }
