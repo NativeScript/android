@@ -58,7 +58,6 @@ public class NativeScriptSyncServiceSocketImpl {
                 deviceSystemSocket = new LocalServerSocket(this.name);
                 while (running) {
                     LocalSocket systemSocket = deviceSystemSocket.accept();
-                    systemSocket.setSoTimeout(70000);
                     livesyncWorker = new LiveSyncWorker(systemSocket);
                     Thread liveSyncThread = setUpLivesyncThread();
                     liveSyncThread.start();
@@ -116,7 +115,7 @@ public class NativeScriptSyncServiceSocketImpl {
         public static final String FILE_CONTENT = "fileContent";
         public static final String FILE_CONTENT_LENGTH = FILE_CONTENT + "Length";
         public static final int DEFAULT_OPERATION = -1;
-        private static final String PROTOCOL_VERSION = "0.1.0";
+        private static final String PROTOCOL_VERSION = "0.2.0";
         private byte[] handshakeMessage;
         private final DigestInputStream input;
         private Closeable livesyncSocket;
