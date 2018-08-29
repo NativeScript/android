@@ -304,7 +304,7 @@ var es5_visitors = (function() {
             if (isDecorateStatement(ci)) {
                 // returns the node of the decorate (node.expression.right.callee)
                 // __decorate([..])
-                return ci.expression.right.arguments[0].elements;
+                return getRightExpression(ci.expression).arguments[0].elements;
             }
         }
 
@@ -319,20 +319,33 @@ var es5_visitors = (function() {
             if (isDecorateStatement(sibling)) {
                 // returns the node of the decorate (node.expression.right.callee)
                 // __decorate([..])
-                return sibling.expression.right.arguments[0].elements;
+                return getRightExpression(sibling.expression).arguments[0].elements;
             }
         }
 
         return null;
     }
 
+    function getRightExpression(expression) {
+        if(!expression) {
+            return null;
+        }
+        var rightExpression = expression.right;
+        // if the right expression is a new assignment, get the right expression from that assignment
+        while (types.isAssignmentExpression(rightExpression)) {
+            rightExpression = rightExpression.right;
+        }
+        return rightExpression;
+    }
+
     function isDecorateStatement(node) {
+        var rightExpression = getRightExpression(node.expression);
         return types.isExpressionStatement(node) &&
             types.isAssignmentExpression(node.expression) &&
-            node.expression.right.callee &&
-            node.expression.right.callee.name === "__decorate" &&
-            node.expression.right.arguments &&
-            types.isArrayExpression(node.expression.right.arguments[0])
+            rightExpression.callee &&
+            rightExpression.callee.name === "__decorate" &&
+            rightExpression.arguments &&
+            types.isArrayExpression(rightExpression.arguments[0])
     }
 
     /*
