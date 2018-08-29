@@ -243,6 +243,42 @@ describe("parser/js_parser tests", function () {
             });
         });
 
+        it("Generated metadata for bindings should return proper JavaClass name when there is a static property and double assignment", function (done) {
+            let input = path.normalize(path.join(prefix, "decorated_double_assignment_ts", "app")),
+                generatedJavaClassesRoot = path.normalize(path.join(prefix, "decorated_double_assignment_ts", "src", "main", "java"));
+
+            const newClassNames = [
+                "org.nativescript.MyCustomActivity",
+            ];
+
+            clearOutput();
+
+            execGradle(input, generatedJavaClassesRoot, function (error, stdout, stderr) {
+                if (error) {
+                    console.error(`exec error: ${error}`);
+                    return;
+                }
+
+                logExecResult(stdout, stderr)
+
+                let bindingsContent = fs.readFileSync(sbgBindingOutoutFile, "utf-8").toString().trim().split('\n');
+
+                expect(bindingsContent.length).toBe(1);
+
+
+                for (let line of bindingsContent) {
+                    var lineParts = line.split("*");
+                    var tsExtendsPart = lineParts[1];
+                    expect(tsExtendsPart).toBeFalsy();
+
+                    var newClassNamePart = lineParts[6];
+                    expect(newClassNames).toContain(newClassNamePart);
+                }
+
+                done();
+            });
+        });
+
         it("Generate valid metadata for bindings where multiple interfaces are implemented using array", function (done) {
             let input = path.normalize(path.join(prefix, "extends_with_interfaces", "app"));
                 generatedJavaClassesRoot = path.normalize(path.join(prefix, "extends_with_interfaces", "src", "main", "java"));
