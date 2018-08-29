@@ -327,6 +327,9 @@ var es5_visitors = (function() {
     }
 
     function getRightExpression(expression) {
+        if(!expression) {
+            return null;
+        }
         var rightExpression = expression.right;
         // if the right expression is a new assignment, get the right expression from that assignment
         while (types.isAssignmentExpression(rightExpression)) {
