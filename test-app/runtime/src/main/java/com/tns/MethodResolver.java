@@ -112,11 +112,19 @@ class MethodResolver {
                 methodOverloadsForClass.put(c, finder);
             }
 
-            ArrayList<Method> matchingMethods = finder.getMatchingMethods(methodName);
-            tryFindMatches(methodName, candidates, args, argLength, matchingMethods);
-            if (candidates.size() > iterationIndex && candidates.get(iterationIndex).y == 0) {
-                // direct matching (distance 0) found
-                break;
+            if(!finder.errorGettingMethods()) {
+                ArrayList<Method> matchingMethods = finder.getMatchingMethods(methodName);
+                tryFindMatches(methodName, candidates, args, argLength, matchingMethods);
+                if (candidates.size() > iterationIndex && candidates.get(iterationIndex).y == 0) {
+                    // direct matching (distance 0) found
+                    break;
+                }
+            } else {
+                Method method = finder.getMatchingMethodWithArguments(methodName, args);
+                if(method != null) {
+                    candidates.add(new Tuple<>(method, 0));
+                    break;
+                }
             }
 
             c = c.getSuperclass();
@@ -479,11 +487,34 @@ class MethodResolver {
     static class MethodFinder {
         private Method[] declaredMethods;
         private HashMap<String, ArrayList<Method>> matchingMethods = new HashMap<String, ArrayList<Method>>();
+        private final Class<?> clazz;
+        private final boolean couldNotGetMethods;
+
         public MethodFinder(Class<?> clazz) {
-            this.declaredMethods = clazz.getDeclaredMethods();
+            this.clazz = clazz;
+            boolean errorGettingMethods = false;
+            try {
+                this.declaredMethods = clazz.getDeclaredMethods();
+            } catch (NoClassDefFoundError error) {
+                // it is not a good practice to catch Errors in Java, but we have the following case:
+                // when using support library > 26.0.0 and android API < 23
+                // if we try to create android.support.design.widget.TextInputLayout and call its addView method
+                // such error is thrown for android.view.ViewStructure as it is not present in older APIs
+                // but it is used as a parameter in one of the TextInputLayout methods and this cause NoClassDefFoundError
+                this.declaredMethods = new Method[]{};
+                errorGettingMethods = true;
+            }
+            this.couldNotGetMethods = errorGettingMethods;
+        }
+
+        public boolean errorGettingMethods() {
+            return couldNotGetMethods;
         }
 
         public ArrayList<Method> getMatchingMethods(String methodName) {
+            if(this.errorGettingMethods()) {
+                return null;
+            }
             ArrayList<Method> matches = this.matchingMethods.get(methodName);
             if (matches == null) {
                 matches = new ArrayList<Method>();
@@ -504,6 +535,20 @@ class MethodResolver {
             }
 
             return matches;
+        }
+
+        public Method getMatchingMethodWithArguments(String methodName, Object[] args) {
+            // this method is not so useful as the arguments need to match the method types directly, but still it can find a method in some cases
+            Class<?>[] types = new Class<?>[args.length];
+            for (int i = 0; i < args.length; i++) {
+                types[i] = args[i].getClass();
+            }
+
+            try {
+                return this.clazz.getDeclaredMethod(methodName, types);
+            } catch (NoSuchMethodException ex) {
+                return null;
+            }
         }
     }
 }
