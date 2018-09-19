@@ -2,8 +2,8 @@
 name: Bug report
 about: 'We really appreciate your effort to provide feedback. Before opening a new
   issue, please make sure that this case is not already reported in GitHub as an
-  issue or in StackOverflow as a question. '
-
+  issue or in StackOverflow as a question.'
+  
 ---
 
 **Environment**
