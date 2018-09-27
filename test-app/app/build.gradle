@@ -251,8 +251,6 @@ dependencies {
         supportVer = supportVersion
     }
 
-    println "Using supportVersion: " + supportVer
-
     implementation "com.android.support:multidex:1.0.2"
     implementation "com.android.support:support-v4:$supportVer"
     implementation "com.android.support:appcompat-v7:$supportVer"
