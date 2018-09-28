@@ -481,6 +481,10 @@ task buildMetadata(type: JavaExec) {
     inputs.files("$MDG_JAVA_DEPENDENCIES")
 
     def classesDir = "$buildDir/intermediates/javac"
+
+    println "Listing $buildDir/intermediates subfolders"
+    new File("$buildDir/intermediates").eachDir{ println it}
+
     assert file(classesDir).exists()
 
     inputs.dir(classesDir)
