@@ -481,12 +481,6 @@ task buildMetadata(type: JavaExec) {
     inputs.files("$MDG_JAVA_DEPENDENCIES")
 
     def classesDir = "$buildDir/intermediates/javac"
-
-    println "Listing $buildDir/intermediates subfolders"
-    new File("$buildDir/intermediates").eachDir{ println it}
-
-    assert file(classesDir).exists()
-
     inputs.dir(classesDir)
 
     outputs.files("$METADATA_OUT_PATH/treeNodeStream.dat", "$METADATA_OUT_PATH/treeStringsStream.dat", "$METADATA_OUT_PATH/treeValueStream.dat")
@@ -494,6 +488,8 @@ task buildMetadata(type: JavaExec) {
     doFirst {
         // get compiled classes to pass to metadata generator
         // these need to be called after the classes have compiled
+        assert file(classesDir).exists()
+
         def classesSubDirs = new File(classesDir).listFiles()
         def selectedBuildType = project.ext.selectedBuildType
 
