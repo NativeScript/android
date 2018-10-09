@@ -111,7 +111,17 @@ def getAppResourcesPath = { ->
     project.ext.appResourcesPath = absolutePathToAppResources
 
     return absolutePathToAppResources
-};
+}
+
+def applyBeforePluginGradleConfiguration = { ->
+    def appResourcesPath = getAppResourcesPath()
+    def pathToBeforePluginGradle = "$appResourcesPath/Android/before-plugins.gradle"
+    def beforePluginGradle = file(pathToBeforePluginGradle)
+    if (beforePluginGradle.exists()) {
+        println "\t + applying user-defined configuration from ${beforePluginGradle}"
+        apply from: pathToBeforePluginGradle
+    }
+}
 
 def applyAppGradleConfiguration = { ->
     def appResourcesPath = getAppResourcesPath()
@@ -212,6 +222,7 @@ android {
     }
 
     setAppIdentifier()
+    applyBeforePluginGradleConfiguration()
     applyPluginGradleConfigurations()
     applyAppGradleConfiguration()
 }
@@ -251,7 +262,7 @@ dependencies {
         supportVer = supportVersion
     }
 
-    println "Using support version $supportVer"
+    println "Using support library version $supportVer"
 
     implementation "com.android.support:multidex:1.0.2"
     implementation "com.android.support:support-v4:$supportVer"
