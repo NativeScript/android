@@ -1,4 +1,4 @@
-var es5_visitors = (function () {
+var es5_visitors = (function() {
 
     var types = require("babel-types"),
 
@@ -12,14 +12,14 @@ var es5_visitors = (function () {
 
         customExtendsArrGlobal = [];
 
-	/* 	ENTRY POINT!
-	*	Traverses each passed node with several visitors.
-	*	Result from visit can be got from static methods.
-	*
-	*	Input parameters: 
-	*		path - node to visit
-	*		config - filename, decorator name ...
-	*/
+    /* 	ENTRY POINT!
+     *	Traverses each passed node with several visitors.
+     *	Result from visit can be got from static methods.
+     *
+     *	Input parameters:
+     *		path - node to visit
+     *		config - filename, decorator name ...
+     */
     function es5Visitor(path, config) {
 
         if (!config.filePath) {
@@ -31,7 +31,7 @@ var es5_visitors = (function () {
         }
 
         // ES5 Syntax
-        // anchor is extend (normal extend pattern + custom extend pattern) 
+        // anchor is extend (normal extend pattern + custom extend pattern)
         if (types.isMemberExpression(path) && path.node.property.name === "extend") {
             traverseEs5Extend(path, config);
         }
@@ -59,19 +59,19 @@ var es5_visitors = (function () {
 
     }
 
-	/*
-	*	Returns the custom extends array generated from visitor
-	*/
-    es5Visitor.getProxyExtendInfo = function () {
+    /*
+     *	Returns the custom extends array generated from visitor
+     */
+    es5Visitor.getProxyExtendInfo = function() {
         var res = customExtendsArr.slice();
         customExtendsArr = [];
         return res;
     }
 
     /*
-   *       Returns the common extends array generated from visitor
-   */
-    es5Visitor.getCommonExtendInfo = function () {
+     *       Returns the common extends array generated from visitor
+     */
+    es5Visitor.getCommonExtendInfo = function() {
         var res = [];
         for (var index in normalExtendsArr) {
             if (normalExtendsArr[index][0] !== "*") {
@@ -83,19 +83,19 @@ var es5_visitors = (function () {
         return res;
     }
 
-	/*
-	*	Returns the extended interfaces array generated from visitor
-	*/
-    es5Visitor.getInterfaceInfo = function () {
+    /*
+     *	Returns the extended interfaces array generated from visitor
+     */
+    es5Visitor.getInterfaceInfo = function() {
         var res = interfacesArr.slice();
         interfacesArr = [];
         return res;
     }
 
-	/* 
-	*	Traverses the typescript extend case (__extends())
-	*	Write results in "normalExtendsArr" or "customExtendsArr".
-	*/
+    /*
+     *	Traverses the typescript extend case (__extends())
+     *	Write results in "normalExtendsArr" or "customExtendsArr".
+     */
     function traverseTsExtend(path, config) {
         // information for normal extend (unnamed)
         var extendClass;
@@ -226,15 +226,15 @@ var es5_visitors = (function () {
                 if possibleExpressionStatements[0].expression.right is logical expression
                 if possibleExpressionStatements[0].expression.right.left is Call expression
                 if possibleExpressionStatements[0].expression.right.left.callee.object.name === superVariableIdentifier
-                if the above is valid, then variableRHS = possibleVariableDeclarations[0].expression.right.left 
+                if the above is valid, then variableRHS = possibleVariableDeclarations[0].expression.right.left
              */
             function getThisAssignmentSuperCallLineNode(nodes, superIdentifier) {
                 var matchingNodes = nodes.filter(
                     (node) => {
-                        return types.isAssignmentExpression(node.expression)
-                            && types.isLogicalExpression(node.expression.right)
-                            && types.isCallExpression(node.expression.right.left)
-                            && node.expression.right.left.callee.object.name === superIdentifier;
+                        return types.isAssignmentExpression(node.expression) &&
+                            types.isLogicalExpression(node.expression.right) &&
+                            types.isCallExpression(node.expression.right.left) &&
+                            node.expression.right.left.callee.object.name === superIdentifier;
                     });
 
                 return matchingNodes.length > 0 ? matchingNodes[0].expression.right.left : null;
@@ -250,9 +250,9 @@ var es5_visitors = (function () {
             function getThisDeclarationSuperCallLineNode(nodes, superIdentifier) {
                 var matchingNodes = nodes.filter(
                     (node) => {
-                        return types.isLogicalExpression(node.declarations[0].init)
-                            && types.isCallExpression(node.declarations[0].init.left)
-                            && node.declarations[0].init.left.callee.object.name === superIdentifier;
+                        return types.isLogicalExpression(node.declarations[0].init) &&
+                            types.isCallExpression(node.declarations[0].init.left) &&
+                            node.declarations[0].init.left.callee.object.name === superIdentifier;
                     });
 
                 return matchingNodes.length > 0 ? matchingNodes[0].declarations[0].init.left : null;
@@ -272,8 +272,8 @@ var es5_visitors = (function () {
                 });
 
                 if (possibleVariableDeclarations.length > 0 || possibleExpressionStatements.length > 0) {
-                    var superCallRHS = getThisDeclarationSuperCallLineNode(possibleVariableDeclarations, superVariableIdentifier)
-                        || getThisAssignmentSuperCallLineNode(possibleExpressionStatements, superVariableIdentifier);
+                    var superCallRHS = getThisDeclarationSuperCallLineNode(possibleVariableDeclarations, superVariableIdentifier) ||
+                        getThisAssignmentSuperCallLineNode(possibleExpressionStatements, superVariableIdentifier);
 
                     if (superCallRHS) {
                         var superCallee = superCallRHS.callee.property;
@@ -304,7 +304,7 @@ var es5_visitors = (function () {
             if (isDecorateStatement(ci)) {
                 // returns the node of the decorate (node.expression.right.callee)
                 // __decorate([..])
-                return ci.expression.right.arguments[0].elements;
+                return getRightExpression(ci.expression).arguments[0].elements;
             }
         }
 
@@ -319,29 +319,42 @@ var es5_visitors = (function () {
             if (isDecorateStatement(sibling)) {
                 // returns the node of the decorate (node.expression.right.callee)
                 // __decorate([..])
-                return sibling.expression.right.arguments[0].elements;
+                return getRightExpression(sibling.expression).arguments[0].elements;
             }
         }
 
         return null;
     }
 
-    function isDecorateStatement(node) {
-        return types.isExpressionStatement(node) &&
-            types.isAssignmentExpression(node.expression) &&
-            node.expression.right.callee &&
-            node.expression.right.callee.name === "__decorate" &&
-            node.expression.right.arguments &&
-            types.isArrayExpression(node.expression.right.arguments[0])
+    function getRightExpression(expression) {
+        if(!expression) {
+            return null;
+        }
+        var rightExpression = expression.right;
+        // if the right expression is a new assignment, get the right expression from that assignment
+        while (types.isAssignmentExpression(rightExpression)) {
+            rightExpression = rightExpression.right;
+        }
+        return rightExpression;
     }
 
-	/* 
-	*	Traverses the node, which is a "new" expression and find if it's a native interface or not.
-	*	Write results in "interfacesArr".
-	*/
+    function isDecorateStatement(node) {
+        var rightExpression = getRightExpression(node.expression);
+        return types.isExpressionStatement(node) &&
+            types.isAssignmentExpression(node.expression) &&
+            rightExpression.callee &&
+            rightExpression.callee.name === "__decorate" &&
+            rightExpression.arguments &&
+            types.isArrayExpression(rightExpression.arguments[0])
+    }
+
+    /*
+     *	Traverses the node, which is a "new" expression and find if it's a native interface or not.
+     *	Write results in "interfacesArr".
+     */
     function traverseInterface(path, config) {
         if (!config.interfaceNames) {
-            throw "No interface names are provided! You can pass them in config.interfaceNames as an array!"
+            throw "JSParser Error: No interface names are provided! You can pass them in config.interfaceNames as an array!"
         }
 
         var o = path.node.callee,
@@ -364,14 +377,12 @@ var es5_visitors = (function () {
                 arg1;
             if (path.node.arguments.length === 1) {
                 arg1 = path.node.arguments[0];
-            }
-            else if (path.node.arguments.length === 2) {
+            } else if (path.node.arguments.length === 2) {
                 arg0 = path.node.arguments[0];
                 arg1 = path.node.arguments[1];
-            }
-            else {
+            } else {
                 throw {
-                    message: "Not enough or too many arguments passed(" + path.node.arguments.length + ") when trying to extend interface in file: " + config.filePath,
+                    message: "JSParser Error: Not enough or too many arguments passed(" + path.node.arguments.length + ") when trying to extend interface: " + interfaceName + " in file: " + config.filePath,
                     errCode: 1
                 }
             }
@@ -393,16 +404,16 @@ var es5_visitors = (function () {
         }
     }
 
-	/* 
-	*	Finds the java proxy name from custom class decorator.
-	*	Write results in "customExtendsArr"
-	*/
+    /*
+     *	Finds the java proxy name from custom class decorator.
+     *	Write results in "customExtendsArr"
+     */
     function traverseJavaProxyExtend(path, config, customDecoratorName, extendClass, overriddenMethodNames, implementedInterfaces) {
         if (config.logger) {
             config.logger.info("\t+in " + customDecoratorName + " anchor");
         }
 
-        var classNameFromDecorator = path;//_getDecoratorArgument(path, config, customDecoratorName);
+        var classNameFromDecorator = path; //_getDecoratorArgument(path, config, customDecoratorName);
 
         var lineToWrite = _generateLineToWrite(classNameFromDecorator, extendClass, overriddenMethodNames, "", config.fullPathName, implementedInterfaces);
         if (config.logger) {
@@ -411,11 +422,11 @@ var es5_visitors = (function () {
         addCustomExtend(classNameFromDecorator, config.fullPathName, lineToWrite)
     }
 
-	/* 
-	*	Finds the normal extend name, overridden methods and possibly java proxy name from passed node.
-	*	Writes to "customExtendsArr" or "normalExtendsArr".
-	*	Left whole for readability.
-	*/
+    /*
+     *	Finds the normal extend name, overridden methods and possibly java proxy name from passed node.
+     *	Writes to "customExtendsArr" or "normalExtendsArr".
+     *	Left whole for readability.
+     */
     function traverseEs5Extend(path, config) {
         var callee = path.parent.callee;
 
@@ -428,8 +439,7 @@ var es5_visitors = (function () {
                 arg1;
             if (extendArguments.length === 1 && types.isObjectExpression(arg0)) {
                 arg0 = extendArguments[0];
-            }
-            else if (types.isStringLiteral(arg0)) {
+            } else if (types.isStringLiteral(arg0)) {
 
             }
 
@@ -446,21 +456,19 @@ var es5_visitors = (function () {
                         arg0 = extendArguments[0];
                         arg1 = extendArguments[1];
                     }
-                }
-                else {
+                } else {
                     // don't throw here, because there can be a valid js extend that has nothing to do with NS
                     return;
                     throw {
-                        message: "Not enough or too many arguments passed(" + extendArguments.length + ") when trying to extend class in file: " + config.filePath,
+                        message: "JSParser Error: Not enough or too many arguments passed(" + extendArguments.length + ") when trying to extend class: " + extendClass + " in file: " + config.filePath,
                         errCode: 1
                     }
                 }
-            }
-            else {
+            } else {
                 // don't throw here, because there can be a valid js extend that has nothing to do with NS
                 return;
                 throw {
-                    message: "You need to call the extend with parameters. Example: '...extend(\"a.b.C\", {...overrides...})') in file: " + config.filePath,
+                    message: "JSParser Error: You need to call the extend with parameters. Example: '...extend(\"a.b.C\", {...overrides...})') for class: " + extendClass + " in file: " + config.filePath,
                     errCode: 1
                 }
             }
@@ -476,7 +484,7 @@ var es5_visitors = (function () {
             var isCorrectClassName = _testClassName(className);
             if (className && !isCorrectClassName && !isCorrectExtendClassName) {
                 throw {
-                    message: "The 'extend' you are trying to make has an invalid name. Example: '...extend(\"a.b.C\", {...overrides...})'), file: " + config.filePath,
+                    message: "JSParser Error: The 'extend' you are trying to make has an invalid name. Example: '...extend(\"a.b.C\", {...overrides...})'), for class: " + extendClass + " file: " + config.filePath,
                     errCode: 1
                 }
             }
@@ -505,20 +513,19 @@ var es5_visitors = (function () {
             };
             lineToWrite = _generateLineToWrite(isCorrectExtendClassName ? className : "", extendClass.reverse().join("."), overriddenMethodNames, extendInfo, "", implementedInterfaces);
             normalExtendsArr.push(lineToWrite)
-        }
-        else {
+        } else {
             // don't throw here, because there can be a valid js extend that has nothing to do with NS
             return;
             throw {
-                message: "You need to call the extend '...extend(\"extend_name\", {...overrides...})'), file: " + config.filePath,
+                message: "JSParser Error: You need to call the extend '...extend(\"extend_name\", {...overrides...})'), for class: " + extendClass + " file: " + config.filePath,
                 errCode: 1
             }
         }
     }
 
-	/* 
-	*	HELPER METHODS
-	*/
+    /*
+     *	HELPER METHODS
+     */
     function _getOverriddenMethods(node, config) {
         var overriddenMethodNames = [];
         if (types.isObjectExpression(node)) {
@@ -534,7 +541,7 @@ var es5_visitors = (function () {
 
     // NOTE: It's a near-identical method to _getOverridenMethods for optimisation reasons
     // we do not want to check for interfaces while creating an interface
-    // and likewise, we do not want to iterate twice through the impl. object's properties to read the interfaces 
+    // and likewise, we do not want to iterate twice through the impl. object's properties to read the interfaces
     function _getOverridenMethodsAndImplementedInterfaces(node, config) {
         var result = [];
         var overriddenMethodNames = [];
@@ -545,25 +552,25 @@ var es5_visitors = (function () {
         if (types.isObjectExpression(node)) {
             var objectProperties = node.properties;
 
-			/*
-				Iterates through all properties of the implementation object, e.g.
-				
-					{
-						method1: function() {
-							
-						},
-						method3: function() {
-							
-						}
-					}
-				
-				will get 'method1' and 'method3'	 
-			*/
+            /*
+            	Iterates through all properties of the implementation object, e.g.
+
+            		{
+            			method1: function() {
+
+            			},
+            			method3: function() {
+
+            			}
+            		}
+
+            	will get 'method1' and 'method3'
+            */
             for (var index in objectProperties) {
                 // if the user has declared interfaces that he is implementing
-                if (!interfacesFound
-                    && objectProperties[index].key.name.toLowerCase() === "interfaces"
-                    && types.isArrayExpression(objectProperties[index].value)) {
+                if (!interfacesFound &&
+                    objectProperties[index].key.name.toLowerCase() === "interfaces" &&
+                    types.isArrayExpression(objectProperties[index].value)) {
                     interfacesFound = true;
                     var interfaces = objectProperties[index].value.elements;
 
@@ -638,10 +645,9 @@ var es5_visitors = (function () {
         if (extendedClass) {
             if (types.isCallExpression(extendedClass.node)) {
                 var o = extendedClass.node.arguments[0];
-            }
-            else {
+            } else {
                 throw {
-                    message: "Node type is not a call expression. File=" + config.filePath + " line=" + path.node.loc.start.line,
+                    message: "JSParser Error: Node type is not a call expression. File=" + config.filePath + " line=" + path.node.loc.start.line,
                     errCode: 1
                 }
             }
@@ -661,24 +667,21 @@ var es5_visitors = (function () {
                 var isCorrectExtendClassName = _testJavaProxyName(classNameFromDecorator);
                 if (isCorrectExtendClassName) {
                     return path.parent.arguments[0].value;
-                }
-                else {
+                } else {
                     throw {
-                        message: "The first argument '" + classNameFromDecorator + "' of the " + customDecoratorName + " decorator is not following the right pattern which is: '[namespace.]ClassName'. Example: '" + customDecoratorName + "(\"a.b.ClassName\", {overrides...})', file: " + config.filePath,
+                        message: "JSParser Error: The first argument '" + classNameFromDecorator + "' of the " + customDecoratorName + " decorator is not following the right pattern which is: '[namespace.]ClassName'. Example: '" + customDecoratorName + "(\"a.b.ClassName\", {overrides...})', file: " + config.filePath,
                         errCode: 1
                     }
                 }
-            }
-            else {
+            } else {
                 throw {
-                    message: "No arguments passed to " + customDecoratorName + " decorator. Example: '" + customDecoratorName + "(\"a.b.ClassName\", {overrides...})', file: " + config.filePath,
+                    message: "JSParser Error: No arguments passed to " + customDecoratorName + " decorator. Example: '" + customDecoratorName + "(\"a.b.ClassName\", {overrides...})', file: " + config.filePath,
                     errCode: 1
                 }
             }
-        }
-        else {
+        } else {
             throw {
-                message: "Decorator " + customDecoratorName + " must be called with parameters: Example: '" + customDecoratorName + "(\"a.b.ClassName\", {overrides...})', file: " + config.filePath,
+                message: "JSParser Error: Decorator " + customDecoratorName + " must be called with parameters: Example: '" + customDecoratorName + "(\"a.b.ClassName\", {overrides...})', file: " + config.filePath,
                 errCode: 1
             }
         }
@@ -708,7 +711,7 @@ var es5_visitors = (function () {
     function _getParent(node, numberOfParents, config) {
         if (!node) {
             throw {
-                message: "No parent found for node in file: " + config.filePath,
+                message: "JSParser Error: No parent found for node in file: " + config.filePath,
                 errCode: 1
             }
         }
@@ -739,15 +742,15 @@ var es5_visitors = (function () {
         const extendInfoColumn = extendInfo.column ? extendInfo.column : "";
         const extendInfoNewClassName = extendInfo.className ? extendInfo.className : "";
 
-        var lineToWrite = `${extendClass}${ASTERISK_SEPARATOR}`
-            + `${extendInfoFile}${ASTERISK_SEPARATOR}`
-            + `${extendInfoLine}${ASTERISK_SEPARATOR}`
-            + `${extendInfoColumn}${ASTERISK_SEPARATOR}`
-            + `${extendInfoNewClassName}${ASTERISK_SEPARATOR}`
-            + `${overriddenMethodNames}${ASTERISK_SEPARATOR}`
-            + `${classNameFromDecorator}${ASTERISK_SEPARATOR}`
-            + `${filePath}${ASTERISK_SEPARATOR}`
-            + `${implementedInterfaces}`
+        var lineToWrite = `${extendClass}${ASTERISK_SEPARATOR}` +
+            `${extendInfoFile}${ASTERISK_SEPARATOR}` +
+            `${extendInfoLine}${ASTERISK_SEPARATOR}` +
+            `${extendInfoColumn}${ASTERISK_SEPARATOR}` +
+            `${extendInfoNewClassName}${ASTERISK_SEPARATOR}` +
+            `${overriddenMethodNames}${ASTERISK_SEPARATOR}` +
+            `${classNameFromDecorator}${ASTERISK_SEPARATOR}` +
+            `${filePath}${ASTERISK_SEPARATOR}` +
+            `${implementedInterfaces}`
 
         return lineToWrite;
     }

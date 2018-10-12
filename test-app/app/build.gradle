@@ -75,7 +75,7 @@ def nativescriptDependencies = new JsonSlurper().parseText(dependenciesJson.text
 def computeCompileSdkVersion = { -> project.hasProperty("compileSdk") ? compileSdk : 26 }
 def computeTargetSdkVersion = { -> project.hasProperty("targetSdk") ? targetSdk : 26 }
 def computeBuildToolsVersion = { ->
-    project.hasProperty("buildToolsVersion") ? buildToolsVersion : "27.0.3"
+    project.hasProperty("buildToolsVersion") ? buildToolsVersion : "28.0.2"
 }
 
 project.ext.selectedBuildType = project.hasProperty("release") ? "release" : "debug"
@@ -111,7 +111,17 @@ def getAppResourcesPath = { ->
     project.ext.appResourcesPath = absolutePathToAppResources
 
     return absolutePathToAppResources
-};
+}
+
+def applyBeforePluginGradleConfiguration = { ->
+    def appResourcesPath = getAppResourcesPath()
+    def pathToBeforePluginGradle = "$appResourcesPath/Android/before-plugins.gradle"
+    def beforePluginGradle = file(pathToBeforePluginGradle)
+    if (beforePluginGradle.exists()) {
+        println "\t + applying user-defined configuration from ${beforePluginGradle}"
+        apply from: pathToBeforePluginGradle
+    }
+}
 
 def applyAppGradleConfiguration = { ->
     def appResourcesPath = getAppResourcesPath()
@@ -212,8 +222,9 @@ android {
     }
 
     setAppIdentifier()
-    applyAppGradleConfiguration()
+    applyBeforePluginGradleConfiguration()
     applyPluginGradleConfigurations()
+    applyAppGradleConfiguration()
 }
 
 def externalRuntimeExists = !findProject(':runtime').is(null)
@@ -250,6 +261,8 @@ dependencies {
     if (project.hasProperty("supportVersion")) {
         supportVer = supportVersion
     }
+
+    println "Using support library version $supportVer"
 
     implementation "com.android.support:multidex:1.0.2"
     implementation "com.android.support:support-v4:$supportVer"
@@ -477,14 +490,16 @@ task buildMetadata(type: JavaExec) {
     description "builds metadata with provided jar dependencies"
 
     inputs.files("$MDG_JAVA_DEPENDENCIES")
-    inputs.dir("$buildDir/intermediates/classes")
+
+    def classesDir = "$buildDir/intermediates/javac"
+    inputs.dir(classesDir)
 
     outputs.files("$METADATA_OUT_PATH/treeNodeStream.dat", "$METADATA_OUT_PATH/treeStringsStream.dat", "$METADATA_OUT_PATH/treeValueStream.dat")
 
     doFirst {
         // get compiled classes to pass to metadata generator
         // these need to be called after the classes have compiled
-        def classesDir = "$buildDir/intermediates/classes"
+        assert file(classesDir).exists()
 
         def classesSubDirs = new File(classesDir).listFiles()
         def selectedBuildType = project.ext.selectedBuildType

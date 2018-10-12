@@ -1,3 +1,18 @@
+5.0.0
+==
+
+## What's New
+- [Upgrade v8 to 6.9.427.23(#1168)](https://github.com/NativeScript/android-runtime/issues/1168)
+- [Added support for before-plugins.gradle file applied before plugin(#1183)](https://github.com/NativeScript/android-runtime/pull/1185)
+- [Make JSParser in SBG fail the build when failing(#1152)](https://github.com/NativeScript/android-runtime/issues/1152)
+- [Generate interface names list in SBG in parallel(#1132)](https://github.com/NativeScript/android-runtime/issues/1132)
+- [Upgrade android gradle plugin to 3.2.0(#1147)](https://github.com/NativeScript/android-runtime/issues/1147)
+
+## Bug Fixes
+
+ - [Static Binding Generator fails if class has static properties that are used within the class(#1160)](https://github.com/NativeScript/android-runtime/issues/1160)
+ - [Fixing NoClassDefFoundError when using older API(#1164)](https://github.com/NativeScript/android-runtime/pull/1164)
+
 4.2.0
 ==
 
