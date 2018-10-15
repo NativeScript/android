@@ -11,8 +11,6 @@
 
 namespace v8_inspector {
 
-int V8StackTraceImpl::maxCallStackSizeToCapture = 200;
-
 namespace {
 
 static const v8::StackTrace::StackTraceOptions stackTraceOptions =
@@ -25,9 +23,9 @@ std::vector<std::shared_ptr<StackFrame>> toFramesVector(
     int maxStackSize) {
   DCHECK(debugger->isolate()->InContext());
   int frameCount = std::min(v8StackTrace->GetFrameCount(), maxStackSize);
-  std::vector<std::shared_ptr<StackFrame>> frames(frameCount);
+  std::vector<std::shared_ptr<StackFrame>> frames;
   for (int i = 0; i < frameCount; ++i) {
-    frames[i] = debugger->symbolize(v8StackTrace->GetFrame(i));
+    frames.push_back(debugger->symbolize(v8StackTrace->GetFrame(i)));
   }
   return frames;
 }
@@ -218,12 +216,10 @@ std::unique_ptr<V8StackTrace> V8StackTraceImpl::clone() {
 }
 
 StringView V8StackTraceImpl::firstNonEmptySourceURL() const {
-  StackFrameIterator current(this);
-  while (!current.done()) {
-    if (current.frame()->sourceURL().length()) {
-      return toStringView(current.frame()->sourceURL());
+  for (size_t i = 0; i < m_frames.size(); ++i) {
+    if (m_frames[i]->sourceURL().length()) {
+      return toStringView(m_frames[i]->sourceURL());
     }
-    current.next();
   }
   return StringView();
 }
@@ -373,7 +369,6 @@ AsyncStackTrace::AsyncStackTrace(
     const V8StackTraceId& externalParent)
     : m_contextGroupId(contextGroupId),
       m_id(0),
-      m_suspendedTaskId(nullptr),
       m_description(description),
       m_frames(std::move(frames)),
       m_asyncParent(asyncParent),
@@ -390,12 +385,6 @@ AsyncStackTrace::buildInspectorObject(V8Debugger* debugger,
 }
 
 int AsyncStackTrace::contextGroupId() const { return m_contextGroupId; }
-
-void AsyncStackTrace::setSuspendedTaskId(void* task) {
-  m_suspendedTaskId = task;
-}
-
-void* AsyncStackTrace::suspendedTaskId() const { return m_suspendedTaskId; }
 
 uintptr_t AsyncStackTrace::store(V8Debugger* debugger,
                                  std::shared_ptr<AsyncStackTrace> stack) {

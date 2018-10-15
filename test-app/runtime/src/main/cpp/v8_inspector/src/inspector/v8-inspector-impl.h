@@ -33,7 +33,6 @@
 
 #include <functional>
 #include <map>
-#include <unordered_map>
 
 #include "src/base/macros.h"
 #include "src/base/platform/mutex.h"
@@ -158,23 +157,23 @@ class V8InspectorImpl : public V8Inspector {
         int m_lastSessionId = 0;
         uint64_t m_isolateId;
 
-        using MuteExceptionsMap = std::unordered_map<int, int>;
+        using MuteExceptionsMap = protocol::HashMap<int, int>;
         MuteExceptionsMap m_muteExceptionsMap;
 
         using ContextByIdMap =
-            std::unordered_map<int, std::unique_ptr<InspectedContext>>;
+            protocol::HashMap<int, std::unique_ptr<InspectedContext>>;
         using ContextsByGroupMap =
-            std::unordered_map<int, std::unique_ptr<ContextByIdMap>>;
+            protocol::HashMap<int, std::unique_ptr<ContextByIdMap>>;
         ContextsByGroupMap m_contexts;
 
         // contextGroupId -> sessionId -> session
-        std::unordered_map<int, std::map<int, V8InspectorSessionImpl*>> m_sessions;
+        protocol::HashMap<int, std::map<int, V8InspectorSessionImpl*>> m_sessions;
 
         using ConsoleStorageMap =
-            std::unordered_map<int, std::unique_ptr<V8ConsoleMessageStorage>>;
+            protocol::HashMap<int, std::unique_ptr<V8ConsoleMessageStorage>>;
         ConsoleStorageMap m_consoleStorageMap;
 
-        std::unordered_map<int, int> m_contextIdToGroupIdMap;
+        protocol::HashMap<int, int> m_contextIdToGroupIdMap;
 
         std::unique_ptr<V8Console> m_console;
 

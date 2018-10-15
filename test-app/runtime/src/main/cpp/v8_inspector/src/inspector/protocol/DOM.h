@@ -43,27 +43,27 @@ class ShadowRootPoppedNotification;
 class ShadowRootPushedNotification;
 
 namespace PseudoTypeEnum {
-extern const char FirstLine[];
-extern const char FirstLetter[];
-extern const char Before[];
-extern const char After[];
-extern const char Backdrop[];
-extern const char Selection[];
-extern const char FirstLineInherited[];
-extern const char Scrollbar[];
-extern const char ScrollbarThumb[];
-extern const char ScrollbarButton[];
-extern const char ScrollbarTrack[];
-extern const char ScrollbarTrackPiece[];
-extern const char ScrollbarCorner[];
-extern const char Resizer[];
-extern const char InputListButton[];
+extern const char* FirstLine;
+extern const char* FirstLetter;
+extern const char* Before;
+extern const char* After;
+extern const char* Backdrop;
+extern const char* Selection;
+extern const char* FirstLineInherited;
+extern const char* Scrollbar;
+extern const char* ScrollbarThumb;
+extern const char* ScrollbarButton;
+extern const char* ScrollbarTrack;
+extern const char* ScrollbarTrackPiece;
+extern const char* ScrollbarCorner;
+extern const char* Resizer;
+extern const char* InputListButton;
 } // namespace PseudoTypeEnum
 
 namespace ShadowRootTypeEnum {
-extern const char UserAgent[];
-extern const char Open[];
-extern const char Closed[];
+extern const char* UserAgent;
+extern const char* Open;
+extern const char* Closed;
 } // namespace ShadowRootTypeEnum
 
 // ------------- Type and builder declarations.

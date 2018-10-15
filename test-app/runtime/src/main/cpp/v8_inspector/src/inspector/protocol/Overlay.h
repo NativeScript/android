@@ -26,9 +26,9 @@ class NodeHighlightRequestedNotification;
 class ScreenshotRequestedNotification;
 
 namespace InspectModeEnum {
-extern const char SearchForNode[];
-extern const char SearchForUAShadowDOM[];
-extern const char None[];
+extern const char* SearchForNode;
+extern const char* SearchForUAShadowDOM;
+extern const char* None;
 } // namespace InspectModeEnum
 
 // ------------- Type and builder declarations.

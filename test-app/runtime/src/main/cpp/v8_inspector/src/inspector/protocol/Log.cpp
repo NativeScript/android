@@ -238,15 +238,15 @@ class DispatcherImpl : public protocol::DispatcherBase {
         }
         ~DispatcherImpl() override { }
         DispatchResponse::Status dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) override;
-        std::unordered_map<String, String>& redirects() {
+        HashMap<String, String>& redirects() {
             return m_redirects;
         }
 
     protected:
         using CallHandler = DispatchResponse::Status (DispatcherImpl::*)(int callId, std::unique_ptr<DictionaryValue> messageObject, ErrorSupport* errors);
-        using DispatchMap = std::unordered_map<String, CallHandler>;
+        using DispatchMap = protocol::HashMap<String, CallHandler>;
         DispatchMap m_dispatchMap;
-        std::unordered_map<String, String> m_redirects;
+        HashMap<String, String> m_redirects;
 
         DispatchResponse::Status clear(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
         DispatchResponse::Status disable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
@@ -259,7 +259,7 @@ class DispatcherImpl : public protocol::DispatcherBase {
 };
 
 DispatchResponse::Status DispatcherImpl::dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) {
-    std::unordered_map<String, CallHandler>::iterator it = m_dispatchMap.find(method);
+    protocol::HashMap<String, CallHandler>::iterator it = m_dispatchMap.find(method);
     if (it == m_dispatchMap.end()) {
         if (m_fallThroughForNotFound) {
             return DispatchResponse::kFallThrough;
