@@ -420,8 +420,8 @@ protocol::Response V8InspectorImpl::EvaluateScope::setTimeout(double timeout) {
     return protocol::Response::Error("Execution was terminated");
   }
   m_cancelToken.reset(new CancelToken());
-  v8::debug::GetCurrentPlatform()->CallDelayedOnWorkerThread(
-      v8::base::make_unique<TerminateTask>(m_isolate, m_cancelToken), timeout);
+//  v8::debug::GetCurrentPlatform()->CallDelayedOnWorkerThread(
+//      v8::base::make_unique<TerminateTask>(m_isolate, m_cancelToken), timeout);
   return protocol::Response::OK();
 }
 
