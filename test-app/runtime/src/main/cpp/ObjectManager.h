@@ -201,7 +201,7 @@ class ObjectManager {
 
         PersistentObjectIdSet m_released;
 
-        std::set<unsigned long> m_visited;
+        std::set<uint8_t*> m_visited;
 
         LRUCache<int, jweak> m_cache;
 
