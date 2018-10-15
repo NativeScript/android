@@ -41,7 +41,7 @@ bool V8InspectorSession::canDispatchMethod(const StringView& method) {
                               protocol::Console::Metainfo::commandPrefix) ||
          stringViewStartsWith(method,
                               protocol::Schema::Metainfo::commandPrefix) ||
-         stringViewStartsWith(method,
+        stringViewStartsWith(method,
                               protocol::Page::Metainfo::commandPrefix) ||
          stringViewStartsWith(method,
                               protocol::Network::Metainfo::commandPrefix) ||
@@ -410,29 +410,29 @@ V8InspectorSessionImpl::supportedDomainsImpl() {
                        .setVersion(protocol::Schema::Metainfo::version)
                        .build());
   result.push_back(protocol::Schema::Domain::create()
-                       .setName(protocol::Page::Metainfo::domainName)
-                       .setVersion(protocol::Page::Metainfo::version)
-                       .build());
+                         .setName(protocol::Page::Metainfo::domainName)
+                         .setVersion(protocol::Page::Metainfo::version)
+                         .build());
   result.push_back(protocol::Schema::Domain::create()
-                       .setName(protocol::Network::Metainfo::domainName)
-                       .setVersion(protocol::Network::Metainfo::version)
-                       .build());
+                           .setName(protocol::Network::Metainfo::domainName)
+                           .setVersion(protocol::Network::Metainfo::version)
+                           .build());
   result.push_back(protocol::Schema::Domain::create()
-                       .setName(protocol::DOM::Metainfo::domainName)
-                       .setVersion(protocol::DOM::Metainfo::version)
-                       .build());
+                           .setName(protocol::DOM::Metainfo::domainName)
+                           .setVersion(protocol::DOM::Metainfo::version)
+                           .build());
   result.push_back(protocol::Schema::Domain::create()
-                       .setName(protocol::CSS::Metainfo::domainName)
-                       .setVersion(protocol::CSS::Metainfo::version)
-                       .build());
+                           .setName(protocol::CSS::Metainfo::domainName)
+                           .setVersion(protocol::CSS::Metainfo::version)
+                           .build());
   result.push_back(protocol::Schema::Domain::create()
-                       .setName(protocol::Overlay::Metainfo::domainName)
-                       .setVersion(protocol::Overlay::Metainfo::version)
-                       .build());
+                           .setName(protocol::Overlay::Metainfo::domainName)
+                           .setVersion(protocol::Overlay::Metainfo::version)
+                           .build());
   result.push_back(protocol::Schema::Domain::create()
-                       .setName(protocol::Log::Metainfo::domainName)
-                       .setVersion(protocol::Log::Metainfo::version)
-                       .build());
+                           .setName(protocol::Log::Metainfo::domainName)
+                           .setVersion(protocol::Log::Metainfo::version)
+                           .build());
   return result;
 }
 

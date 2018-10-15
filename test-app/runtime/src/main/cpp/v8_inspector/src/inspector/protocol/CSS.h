@@ -47,10 +47,10 @@ class StyleSheetChangedNotification;
 class StyleSheetRemovedNotification;
 
 namespace StyleSheetOriginEnum {
-extern const char Injected[];
-extern const char UserAgent[];
-extern const char Inspector[];
-extern const char Regular[];
+extern const char* Injected;
+extern const char* UserAgent;
+extern const char* Inspector;
+extern const char* Regular;
 } // namespace StyleSheetOriginEnum
 
 // ------------- Type and builder declarations.

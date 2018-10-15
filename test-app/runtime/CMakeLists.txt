@@ -179,12 +179,12 @@ MESSAGE( STATUS "# CMAKE_CXX_FLAGS: " ${CMAKE_CXX_FLAGS} )
 # linking v8 and inspector libraries to runtime(NativeScript library)
 target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libzip.a )
 target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_base.a )
-target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_snapshot.a )
 target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_init.a )
 target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_initializers.a )
 target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_libplatform.a )
 target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_libsampler.a )
 target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_libbase.a )
+target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_snapshot.a )
 
 # Command info: https://cmake.org/cmake/help/v3.4/command/find_library.html
 # Searches for a specified prebuilt library and stores the path as a
@@ -195,6 +195,7 @@ target_link_libraries( NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROI
 find_library( system-log log )
 find_library( system-android android )
 find_library( system-dl dl )
+find_library( system-atomic atomic ) # TODO: plamen5kov: can't be found in ndk for some reasong ... look at it later (maybe deprecated in newer NDK versions)
 find_library( system-z z )
 
 # Command info: https://cmake.org/cmake/help/v3.4/command/target_link_libraries.html

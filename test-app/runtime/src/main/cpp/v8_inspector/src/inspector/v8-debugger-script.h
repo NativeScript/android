@@ -81,7 +81,7 @@ class V8DebuggerScript {
         void setSourceURL(const String16&);
         virtual void setSourceMappingURL(const String16&) = 0;
         virtual void setSource(const String16& source, bool preview,
-                               v8::debug::LiveEditResult* result) = 0;
+                               bool* stackChanged) = 0;
 
         virtual bool getPossibleBreakpoints(
             const v8::debug::Location& start, const v8::debug::Location& end,

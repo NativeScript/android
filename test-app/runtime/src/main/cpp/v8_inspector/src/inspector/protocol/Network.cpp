@@ -19,35 +19,35 @@ const char Metainfo::commandPrefix[] = "Network.";
 const char Metainfo::version[] = "1.3";
 
 namespace ErrorReasonEnum {
-const char Failed[] = "Failed";
-const char Aborted[] = "Aborted";
-const char TimedOut[] = "TimedOut";
-const char AccessDenied[] = "AccessDenied";
-const char ConnectionClosed[] = "ConnectionClosed";
-const char ConnectionReset[] = "ConnectionReset";
-const char ConnectionRefused[] = "ConnectionRefused";
-const char ConnectionAborted[] = "ConnectionAborted";
-const char ConnectionFailed[] = "ConnectionFailed";
-const char NameNotResolved[] = "NameNotResolved";
-const char InternetDisconnected[] = "InternetDisconnected";
-const char AddressUnreachable[] = "AddressUnreachable";
+const char* Failed = "Failed";
+const char* Aborted = "Aborted";
+const char* TimedOut = "TimedOut";
+const char* AccessDenied = "AccessDenied";
+const char* ConnectionClosed = "ConnectionClosed";
+const char* ConnectionReset = "ConnectionReset";
+const char* ConnectionRefused = "ConnectionRefused";
+const char* ConnectionAborted = "ConnectionAborted";
+const char* ConnectionFailed = "ConnectionFailed";
+const char* NameNotResolved = "NameNotResolved";
+const char* InternetDisconnected = "InternetDisconnected";
+const char* AddressUnreachable = "AddressUnreachable";
 } // namespace ErrorReasonEnum
 
 namespace ConnectionTypeEnum {
-const char None[] = "none";
-const char Cellular2g[] = "cellular2g";
-const char Cellular3g[] = "cellular3g";
-const char Cellular4g[] = "cellular4g";
-const char Bluetooth[] = "bluetooth";
-const char Ethernet[] = "ethernet";
-const char Wifi[] = "wifi";
-const char Wimax[] = "wimax";
-const char Other[] = "other";
+const char* None = "none";
+const char* Cellular2g = "cellular2g";
+const char* Cellular3g = "cellular3g";
+const char* Cellular4g = "cellular4g";
+const char* Bluetooth = "bluetooth";
+const char* Ethernet = "ethernet";
+const char* Wifi = "wifi";
+const char* Wimax = "wimax";
+const char* Other = "other";
 } // namespace ConnectionTypeEnum
 
 namespace CookieSameSiteEnum {
-const char Strict[] = "Strict";
-const char Lax[] = "Lax";
+const char* Strict = "Strict";
+const char* Lax = "Lax";
 } // namespace CookieSameSiteEnum
 
 std::unique_ptr<ResourceTiming> ResourceTiming::fromValue(protocol::Value* value, ErrorSupport* errors) {
@@ -141,11 +141,11 @@ std::unique_ptr<ResourceTiming> ResourceTiming::clone() const {
 }
 
 namespace ResourcePriorityEnum {
-const char VeryLow[] = "VeryLow";
-const char Low[] = "Low";
-const char Medium[] = "Medium";
-const char High[] = "High";
-const char VeryHigh[] = "VeryHigh";
+const char* VeryLow = "VeryLow";
+const char* Low = "Low";
+const char* Medium = "Medium";
+const char* High = "High";
+const char* VeryHigh = "VeryHigh";
 } // namespace ResourcePriorityEnum
 
 const char* Request::ReferrerPolicyEnum::UnsafeUrl = "unsafe-url";
@@ -380,18 +380,18 @@ std::unique_ptr<SecurityDetails> SecurityDetails::clone() const {
 }
 
 namespace CertificateTransparencyComplianceEnum {
-const char Unknown[] = "unknown";
-const char NotCompliant[] = "not-compliant";
-const char Compliant[] = "compliant";
+const char* Unknown = "unknown";
+const char* NotCompliant = "not-compliant";
+const char* Compliant = "compliant";
 } // namespace CertificateTransparencyComplianceEnum
 
 namespace BlockedReasonEnum {
-const char Csp[] = "csp";
-const char MixedContent[] = "mixed-content";
-const char Origin[] = "origin";
-const char Inspector[] = "inspector";
-const char SubresourceFilter[] = "subresource-filter";
-const char Other[] = "other";
+const char* Csp = "csp";
+const char* MixedContent = "mixed-content";
+const char* Origin = "origin";
+const char* Inspector = "inspector";
+const char* SubresourceFilter = "subresource-filter";
+const char* Other = "other";
 } // namespace BlockedReasonEnum
 
 std::unique_ptr<Response> Response::fromValue(protocol::Value* value, ErrorSupport* errors) {
@@ -985,8 +985,8 @@ std::unique_ptr<AuthChallengeResponse> AuthChallengeResponse::clone() const {
 }
 
 namespace InterceptionStageEnum {
-const char Request[] = "Request";
-const char HeadersReceived[] = "HeadersReceived";
+const char* Request = "Request";
+const char* HeadersReceived = "HeadersReceived";
 } // namespace InterceptionStageEnum
 
 std::unique_ptr<RequestPattern> RequestPattern::fromValue(protocol::Value* value, ErrorSupport* errors) {
@@ -2089,15 +2089,15 @@ class DispatcherImpl : public protocol::DispatcherBase {
         }
         ~DispatcherImpl() override { }
         DispatchResponse::Status dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) override;
-        std::unordered_map<String, String>& redirects() {
+        HashMap<String, String>& redirects() {
             return m_redirects;
         }
 
     protected:
         using CallHandler = DispatchResponse::Status (DispatcherImpl::*)(int callId, std::unique_ptr<DictionaryValue> messageObject, ErrorSupport* errors);
-        using DispatchMap = std::unordered_map<String, CallHandler>;
+        using DispatchMap = protocol::HashMap<String, CallHandler>;
         DispatchMap m_dispatchMap;
-        std::unordered_map<String, String> m_redirects;
+        HashMap<String, String> m_redirects;
 
         DispatchResponse::Status canClearBrowserCache(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
         DispatchResponse::Status canClearBrowserCookies(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
@@ -2132,7 +2132,7 @@ class DispatcherImpl : public protocol::DispatcherBase {
 };
 
 DispatchResponse::Status DispatcherImpl::dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) {
-    std::unordered_map<String, CallHandler>::iterator it = m_dispatchMap.find(method);
+    protocol::HashMap<String, CallHandler>::iterator it = m_dispatchMap.find(method);
     if (it == m_dispatchMap.end()) {
         if (m_fallThroughForNotFound) {
             return DispatchResponse::kFallThrough;

@@ -64,63 +64,63 @@ class WebSocketHandshakeResponseReceivedNotification;
 class WebSocketWillSendHandshakeRequestNotification;
 
 namespace ErrorReasonEnum {
-extern const char Failed[];
-extern const char Aborted[];
-extern const char TimedOut[];
-extern const char AccessDenied[];
-extern const char ConnectionClosed[];
-extern const char ConnectionReset[];
-extern const char ConnectionRefused[];
-extern const char ConnectionAborted[];
-extern const char ConnectionFailed[];
-extern const char NameNotResolved[];
-extern const char InternetDisconnected[];
-extern const char AddressUnreachable[];
+extern const char* Failed;
+extern const char* Aborted;
+extern const char* TimedOut;
+extern const char* AccessDenied;
+extern const char* ConnectionClosed;
+extern const char* ConnectionReset;
+extern const char* ConnectionRefused;
+extern const char* ConnectionAborted;
+extern const char* ConnectionFailed;
+extern const char* NameNotResolved;
+extern const char* InternetDisconnected;
+extern const char* AddressUnreachable;
 } // namespace ErrorReasonEnum
 
 namespace ConnectionTypeEnum {
-extern const char None[];
-extern const char Cellular2g[];
-extern const char Cellular3g[];
-extern const char Cellular4g[];
-extern const char Bluetooth[];
-extern const char Ethernet[];
-extern const char Wifi[];
-extern const char Wimax[];
-extern const char Other[];
+extern const char* None;
+extern const char* Cellular2g;
+extern const char* Cellular3g;
+extern const char* Cellular4g;
+extern const char* Bluetooth;
+extern const char* Ethernet;
+extern const char* Wifi;
+extern const char* Wimax;
+extern const char* Other;
 } // namespace ConnectionTypeEnum
 
 namespace CookieSameSiteEnum {
-extern const char Strict[];
-extern const char Lax[];
+extern const char* Strict;
+extern const char* Lax;
 } // namespace CookieSameSiteEnum
 
 namespace ResourcePriorityEnum {
-extern const char VeryLow[];
-extern const char Low[];
-extern const char Medium[];
-extern const char High[];
-extern const char VeryHigh[];
+extern const char* VeryLow;
+extern const char* Low;
+extern const char* Medium;
+extern const char* High;
+extern const char* VeryHigh;
 } // namespace ResourcePriorityEnum
 
 namespace CertificateTransparencyComplianceEnum {
-extern const char Unknown[];
-extern const char NotCompliant[];
-extern const char Compliant[];
+extern const char* Unknown;
+extern const char* NotCompliant;
+extern const char* Compliant;
 } // namespace CertificateTransparencyComplianceEnum
 
 namespace BlockedReasonEnum {
-extern const char Csp[];
-extern const char MixedContent[];
-extern const char Origin[];
-extern const char Inspector[];
-extern const char SubresourceFilter[];
-extern const char Other[];
+extern const char* Csp;
+extern const char* MixedContent;
+extern const char* Origin;
+extern const char* Inspector;
+extern const char* SubresourceFilter;
+extern const char* Other;
 } // namespace BlockedReasonEnum
 
 namespace InterceptionStageEnum {
-extern const char Request[];
-extern const char HeadersReceived[];
+extern const char* Request;
+extern const char* HeadersReceived;
 } // namespace InterceptionStageEnum
 
 // ------------- Type and builder declarations.
