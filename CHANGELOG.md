@@ -2,7 +2,6 @@
 ==
 
 ## What's New
-- [Upgrade v8 to 6.9.427.23(#1168)](https://github.com/NativeScript/android-runtime/issues/1168)
 - [Added support for before-plugins.gradle file applied before plugin(#1183)](https://github.com/NativeScript/android-runtime/pull/1185)
 - [Make JSParser in SBG fail the build when failing(#1152)](https://github.com/NativeScript/android-runtime/issues/1152)
 - [Generate interface names list in SBG in parallel(#1132)](https://github.com/NativeScript/android-runtime/issues/1132)
