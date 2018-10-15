@@ -79,10 +79,10 @@ char* StrNDup(const char* str, int n);
 // and free. Used as the default policy for lists.
 class FreeStoreAllocationPolicy {
     public:
-        V8_INLINE void* New(size_t size) {
+        INLINE(void* New(size_t size)) {
             return Malloced::New(size);
         }
-        V8_INLINE static void Delete(void* p) {
+        INLINE(static void Delete(void* p)) {
             Malloced::Delete(p);
         }
 };
@@ -138,10 +138,6 @@ V8_WARN_UNUSED_RESULT bool ReleasePages(void* address, size_t size,
 V8_EXPORT_PRIVATE
 V8_WARN_UNUSED_RESULT bool SetPermissions(void* address, size_t size,
         PageAllocator::Permission access);
-inline bool SetPermissions(Address address, size_t size,
-                           PageAllocator::Permission access) {
-    return SetPermissions(reinterpret_cast<void*>(address), size, access);
-}
 
 // Convenience function that allocates a single system page with read and write
 // permissions. |address| is a hint. Returns the base address of the memory and
@@ -167,8 +163,7 @@ class V8_EXPORT_PRIVATE VirtualMemory {
 
         // Construct a virtual memory by assigning it some already mapped address
         // and size.
-        VirtualMemory(Address address, size_t size)
-            : address_(address), size_(size) {}
+        VirtualMemory(void* address, size_t size) : address_(address), size_(size) {}
 
         // Releases the reserved memory, if any, controlled by this VirtualMemory
         // object.
@@ -176,7 +171,7 @@ class V8_EXPORT_PRIVATE VirtualMemory {
 
         // Returns whether the memory has been reserved.
         bool IsReserved() const {
-            return address_ != kNullAddress;
+            return address_ != nullptr;
         }
 
         // Initialize or resets an embedded VirtualMemory object.
@@ -186,14 +181,15 @@ class V8_EXPORT_PRIVATE VirtualMemory {
         // If the memory was reserved with an alignment, this address is not
         // necessarily aligned. The user might need to round it up to a multiple of
         // the alignment to get the start of the aligned block.
-        Address address() const {
+        void* address() const {
             DCHECK(IsReserved());
             return address_;
         }
 
-        Address end() const {
+        void* end() const {
             DCHECK(IsReserved());
-            return address_ + size_;
+            return reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(address_) +
+                                           size_);
         }
 
         // Returns the size of the reserved memory. The returned value is only
@@ -206,11 +202,11 @@ class V8_EXPORT_PRIVATE VirtualMemory {
 
         // Sets permissions according to the access argument. address and size must be
         // multiples of CommitPageSize(). Returns true on success, otherwise false.
-        bool SetPermissions(Address address, size_t size,
+        bool SetPermissions(void* address, size_t size,
                             PageAllocator::Permission access);
 
         // Releases memory after |free_start|. Returns the number of bytes released.
-        size_t Release(Address free_start);
+        size_t Release(void* free_start);
 
         // Frees all memory.
         void Free();
@@ -219,12 +215,15 @@ class V8_EXPORT_PRIVATE VirtualMemory {
         // The old object is no longer functional (IsReserved() returns false).
         void TakeControl(VirtualMemory* from);
 
-        bool InVM(Address address, size_t size) {
-            return (address_ <= address) && ((address_ + size_) >= (address + size));
+        bool InVM(void* address, size_t size) {
+            return (reinterpret_cast<uintptr_t>(address_) <=
+                    reinterpret_cast<uintptr_t>(address)) &&
+                   ((reinterpret_cast<uintptr_t>(address_) + size_) >=
+                    (reinterpret_cast<uintptr_t>(address) + size));
         }
 
     private:
-        Address address_;  // Start address of the virtual memory.
+        void* address_;  // Start address of the virtual memory.
         size_t size_;    // Size of the virtual memory.
 };
 

@@ -82,12 +82,12 @@ void Profiler::StopCPUProfilerCallbackImpl(const v8::FunctionCallbackInfo<v8::Va
 }
 
 void Profiler::StartCPUProfiler(Isolate* isolate, const Local<String>& name) {
-    auto v8prof = CpuProfiler::New(isolate);
+    auto v8prof = isolate->GetCpuProfiler();
     v8prof->StartProfiling(name, true);
 }
 
 bool Profiler::StopCPUProfiler(Isolate* isolate, const Local<String>& name) {
-    auto v8prof = CpuProfiler::New(isolate);
+    auto v8prof = isolate->GetCpuProfiler();
     auto cpuProfile = v8prof->StopProfiling(name);
 
     auto success = false;

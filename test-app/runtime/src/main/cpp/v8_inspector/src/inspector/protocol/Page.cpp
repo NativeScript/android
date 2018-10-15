@@ -19,19 +19,19 @@ const char Metainfo::commandPrefix[] = "Page.";
 const char Metainfo::version[] = "1.3";
 
 namespace ResourceTypeEnum {
-const char Document[] = "Document";
-const char Stylesheet[] = "Stylesheet";
-const char Image[] = "Image";
-const char Media[] = "Media";
-const char Font[] = "Font";
-const char Script[] = "Script";
-const char TextTrack[] = "TextTrack";
-const char XHR[] = "XHR";
-const char Fetch[] = "Fetch";
-const char EventSource[] = "EventSource";
-const char WebSocket[] = "WebSocket";
-const char Manifest[] = "Manifest";
-const char Other[] = "Other";
+const char* Document = "Document";
+const char* Stylesheet = "Stylesheet";
+const char* Image = "Image";
+const char* Media = "Media";
+const char* Font = "Font";
+const char* Script = "Script";
+const char* TextTrack = "TextTrack";
+const char* XHR = "XHR";
+const char* Fetch = "Fetch";
+const char* EventSource = "EventSource";
+const char* WebSocket = "WebSocket";
+const char* Manifest = "Manifest";
+const char* Other = "Other";
 } // namespace ResourceTypeEnum
 
 std::unique_ptr<Frame> Frame::fromValue(protocol::Value* value, ErrorSupport* errors) {
@@ -255,18 +255,18 @@ std::unique_ptr<FrameTree> FrameTree::clone() const {
 }
 
 namespace TransitionTypeEnum {
-const char Link[] = "link";
-const char Typed[] = "typed";
-const char Auto_bookmark[] = "auto_bookmark";
-const char Auto_subframe[] = "auto_subframe";
-const char Manual_subframe[] = "manual_subframe";
-const char Generated[] = "generated";
-const char Auto_toplevel[] = "auto_toplevel";
-const char Form_submit[] = "form_submit";
-const char Reload[] = "reload";
-const char Keyword[] = "keyword";
-const char Keyword_generated[] = "keyword_generated";
-const char Other[] = "other";
+const char* Link = "link";
+const char* Typed = "typed";
+const char* Auto_bookmark = "auto_bookmark";
+const char* Auto_subframe = "auto_subframe";
+const char* Manual_subframe = "manual_subframe";
+const char* Generated = "generated";
+const char* Auto_toplevel = "auto_toplevel";
+const char* Form_submit = "form_submit";
+const char* Reload = "reload";
+const char* Keyword = "keyword";
+const char* Keyword_generated = "keyword_generated";
+const char* Other = "other";
 } // namespace TransitionTypeEnum
 
 std::unique_ptr<NavigationEntry> NavigationEntry::fromValue(protocol::Value* value, ErrorSupport* errors) {
@@ -374,10 +374,10 @@ std::unique_ptr<ScreencastFrameMetadata> ScreencastFrameMetadata::clone() const 
 }
 
 namespace DialogTypeEnum {
-const char Alert[] = "alert";
-const char Confirm[] = "confirm";
-const char Prompt[] = "prompt";
-const char Beforeunload[] = "beforeunload";
+const char* Alert = "alert";
+const char* Confirm = "confirm";
+const char* Prompt = "prompt";
+const char* Beforeunload = "beforeunload";
 } // namespace DialogTypeEnum
 
 std::unique_ptr<AppManifestError> AppManifestError::fromValue(protocol::Value* value, ErrorSupport* errors) {
@@ -1446,15 +1446,15 @@ class DispatcherImpl : public protocol::DispatcherBase {
         }
         ~DispatcherImpl() override { }
         DispatchResponse::Status dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) override;
-        std::unordered_map<String, String>& redirects() {
+        HashMap<String, String>& redirects() {
             return m_redirects;
         }
 
     protected:
         using CallHandler = DispatchResponse::Status (DispatcherImpl::*)(int callId, std::unique_ptr<DictionaryValue> messageObject, ErrorSupport* errors);
-        using DispatchMap = std::unordered_map<String, CallHandler>;
+        using DispatchMap = protocol::HashMap<String, CallHandler>;
         DispatchMap m_dispatchMap;
-        std::unordered_map<String, String> m_redirects;
+        HashMap<String, String> m_redirects;
 
         DispatchResponse::Status addScriptToEvaluateOnLoad(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
         DispatchResponse::Status addScriptToEvaluateOnNewDocument(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
@@ -1494,7 +1494,7 @@ class DispatcherImpl : public protocol::DispatcherBase {
 };
 
 DispatchResponse::Status DispatcherImpl::dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) {
-    std::unordered_map<String, CallHandler>::iterator it = m_dispatchMap.find(method);
+    protocol::HashMap<String, CallHandler>::iterator it = m_dispatchMap.find(method);
     if (it == m_dispatchMap.end()) {
         if (m_fallThroughForNotFound) {
             return DispatchResponse::kFallThrough;

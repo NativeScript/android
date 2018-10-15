@@ -10,7 +10,7 @@
     "**/*"
   ],
   "gradle": {
-      "version": "4.4",
-      "android": "3.1.4"
+      "version": "4.10.2",
+      "android": "3.2.0"
   }
 }

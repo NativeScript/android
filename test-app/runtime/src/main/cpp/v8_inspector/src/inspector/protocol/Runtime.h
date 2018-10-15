@@ -32,12 +32,10 @@ using ExecutionContextId = int;
 class ExecutionContextDescription;
 class ExceptionDetails;
 using Timestamp = double;
-using TimeDelta = double;
 class CallFrame;
 class StackTrace;
 using UniqueDebuggerId = String;
 class StackTraceId;
-class BindingCalledNotification;
 class ConsoleAPICalledNotification;
 class ExceptionRevokedNotification;
 class ExceptionThrownNotification;
@@ -1830,101 +1828,6 @@ class  StackTraceId : public Serializable, public API::StackTraceId {
 };
 
 
-class  BindingCalledNotification : public Serializable {
-        PROTOCOL_DISALLOW_COPY(BindingCalledNotification);
-    public:
-        static std::unique_ptr<BindingCalledNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
-
-        ~BindingCalledNotification() override { }
-
-        String getName() {
-            return m_name;
-        }
-        void setName(const String& value) {
-            m_name = value;
-        }
-
-        String getPayload() {
-            return m_payload;
-        }
-        void setPayload(const String& value) {
-            m_payload = value;
-        }
-
-        int getExecutionContextId() {
-            return m_executionContextId;
-        }
-        void setExecutionContextId(int value) {
-            m_executionContextId = value;
-        }
-
-        std::unique_ptr<protocol::DictionaryValue> toValue() const;
-        String serialize() override {
-            return toValue()->serialize();
-        }
-        std::unique_ptr<BindingCalledNotification> clone() const;
-
-        template<int STATE>
-        class BindingCalledNotificationBuilder {
-            public:
-                enum {
-                    NoFieldsSet = 0,
-                    NameSet = 1 << 1,
-                    PayloadSet = 1 << 2,
-                    ExecutionContextIdSet = 1 << 3,
-                    AllFieldsSet = (NameSet | PayloadSet | ExecutionContextIdSet | 0)
-                };
-
-
-                BindingCalledNotificationBuilder<STATE | NameSet>& setName(const String& value) {
-                    static_assert(!(STATE & NameSet), "property name should not be set yet");
-                    m_result->setName(value);
-                    return castState<NameSet>();
-                }
-
-                BindingCalledNotificationBuilder<STATE | PayloadSet>& setPayload(const String& value) {
-                    static_assert(!(STATE & PayloadSet), "property payload should not be set yet");
-                    m_result->setPayload(value);
-                    return castState<PayloadSet>();
-                }
-
-                BindingCalledNotificationBuilder<STATE | ExecutionContextIdSet>& setExecutionContextId(int value) {
-                    static_assert(!(STATE & ExecutionContextIdSet), "property executionContextId should not be set yet");
-                    m_result->setExecutionContextId(value);
-                    return castState<ExecutionContextIdSet>();
-                }
-
-                std::unique_ptr<BindingCalledNotification> build() {
-                    static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
-                    return std::move(m_result);
-                }
-
-            private:
-                friend class BindingCalledNotification;
-                BindingCalledNotificationBuilder() : m_result(new BindingCalledNotification()) { }
-
-                template<int STEP> BindingCalledNotificationBuilder<STATE | STEP>& castState() {
-                    return *reinterpret_cast<BindingCalledNotificationBuilder<STATE | STEP>*>(this);
-                }
-
-                std::unique_ptr<protocol::Runtime::BindingCalledNotification> m_result;
-        };
-
-        static BindingCalledNotificationBuilder<0> create() {
-            return BindingCalledNotificationBuilder<0>();
-        }
-
-    private:
-        BindingCalledNotification() {
-            m_executionContextId = 0;
-        }
-
-        String m_name;
-        String m_payload;
-        int m_executionContextId;
-};
-
-
 class  ConsoleAPICalledNotification : public Serializable {
         PROTOCOL_DISALLOW_COPY(ConsoleAPICalledNotification);
     public:
@@ -2490,7 +2393,7 @@ class  Backend {
                 virtual void fallThrough() = 0;
                 virtual ~EvaluateCallback() { }
         };
-        virtual void evaluate(const String& in_expression, Maybe<String> in_objectGroup, Maybe<bool> in_includeCommandLineAPI, Maybe<bool> in_silent, Maybe<int> in_contextId, Maybe<bool> in_returnByValue, Maybe<bool> in_generatePreview, Maybe<bool> in_userGesture, Maybe<bool> in_awaitPromise, Maybe<bool> in_throwOnSideEffect, Maybe<double> in_timeout, std::unique_ptr<EvaluateCallback> callback) = 0;
+        virtual void evaluate(const String& in_expression, Maybe<String> in_objectGroup, Maybe<bool> in_includeCommandLineAPI, Maybe<bool> in_silent, Maybe<int> in_contextId, Maybe<bool> in_returnByValue, Maybe<bool> in_generatePreview, Maybe<bool> in_userGesture, Maybe<bool> in_awaitPromise, Maybe<bool> in_throwOnSideEffect, std::unique_ptr<EvaluateCallback> callback) = 0;
         virtual DispatchResponse getIsolateId(String* out_id) = 0;
         virtual DispatchResponse getHeapUsage(double* out_usedSize, double* out_totalSize) = 0;
         virtual DispatchResponse getProperties(const String& in_objectId, Maybe<bool> in_ownProperties, Maybe<bool> in_accessorPropertiesOnly, Maybe<bool> in_generatePreview, std::unique_ptr<protocol::Array<protocol::Runtime::PropertyDescriptor>>* out_result, Maybe<protocol::Array<protocol::Runtime::InternalPropertyDescriptor>>* out_internalProperties, Maybe<protocol::Runtime::ExceptionDetails>* out_exceptionDetails) = 0;
@@ -2508,7 +2411,6 @@ class  Backend {
         };
         virtual void runScript(const String& in_scriptId, Maybe<int> in_executionContextId, Maybe<String> in_objectGroup, Maybe<bool> in_silent, Maybe<bool> in_includeCommandLineAPI, Maybe<bool> in_returnByValue, Maybe<bool> in_generatePreview, Maybe<bool> in_awaitPromise, std::unique_ptr<RunScriptCallback> callback) = 0;
         virtual DispatchResponse setCustomObjectFormatterEnabled(bool in_enabled) = 0;
-        virtual DispatchResponse setMaxCallStackSizeToCapture(int in_size) = 0;
         class  TerminateExecutionCallback {
             public:
                 virtual void sendSuccess() = 0;
@@ -2517,8 +2419,6 @@ class  Backend {
                 virtual ~TerminateExecutionCallback() { }
         };
         virtual void terminateExecution(std::unique_ptr<TerminateExecutionCallback> callback) = 0;
-        virtual DispatchResponse addBinding(const String& in_name, Maybe<int> in_executionContextId) = 0;
-        virtual DispatchResponse removeBinding(const String& in_name) = 0;
 
 };
 
@@ -2527,7 +2427,6 @@ class  Backend {
 class  Frontend {
     public:
         explicit Frontend(FrontendChannel* frontendChannel) : m_frontendChannel(frontendChannel) { }
-        void bindingCalled(const String& name, const String& payload, int executionContextId);
         void consoleAPICalled(const String& type, std::unique_ptr<protocol::Array<protocol::Runtime::RemoteObject>> args, int executionContextId, double timestamp, Maybe<protocol::Runtime::StackTrace> stackTrace = Maybe<protocol::Runtime::StackTrace>(), Maybe<String> context = Maybe<String>());
         void exceptionRevoked(const String& reason, int exceptionId);
         void exceptionThrown(double timestamp, std::unique_ptr<protocol::Runtime::ExceptionDetails> exceptionDetails);

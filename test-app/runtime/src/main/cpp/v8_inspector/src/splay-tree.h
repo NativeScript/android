@@ -39,15 +39,15 @@ class SplayTree {
             : root_(nullptr), allocator_(allocator) {}
         ~SplayTree();
 
-        V8_INLINE void* operator new(
-            size_t size, AllocationPolicy allocator = AllocationPolicy()) {
+        INLINE(void* operator new(size_t size,
+                                  AllocationPolicy allocator = AllocationPolicy())) {
             return allocator.New(static_cast<int>(size));
         }
-        V8_INLINE void operator delete(void* p) {
+        INLINE(void operator delete(void* p)) {
             AllocationPolicy::Delete(p);
         }
         // Please the MSVC compiler.  We should never have to execute this.
-        V8_INLINE void operator delete(void* p, AllocationPolicy policy) {
+        INLINE(void operator delete(void* p, AllocationPolicy policy)) {
             UNREACHABLE();
         }
 
@@ -108,15 +108,15 @@ class SplayTree {
                 Node(const Key& key, const Value& value)
                     : key_(key), value_(value), left_(nullptr), right_(nullptr) {}
 
-                V8_INLINE void* operator new(size_t size, AllocationPolicy allocator) {
+                INLINE(void* operator new(size_t size, AllocationPolicy allocator)) {
                     return allocator.New(static_cast<int>(size));
                 }
-                V8_INLINE void operator delete(void* p) {
+                INLINE(void operator delete(void* p)) {
                     return AllocationPolicy::Delete(p);
                 }
                 // Please the MSVC compiler.  We should never have to execute
                 // this.
-                V8_INLINE void operator delete(void* p, AllocationPolicy allocator) {
+                INLINE(void operator delete(void* p, AllocationPolicy allocator)) {
                     UNREACHABLE();
                 }
 

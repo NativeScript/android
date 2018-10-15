@@ -26,22 +26,22 @@ class CertificateErrorNotification;
 class SecurityStateChangedNotification;
 
 namespace MixedContentTypeEnum {
-extern const char Blockable[];
-extern const char OptionallyBlockable[];
-extern const char None[];
+extern const char* Blockable;
+extern const char* OptionallyBlockable;
+extern const char* None;
 } // namespace MixedContentTypeEnum
 
 namespace SecurityStateEnum {
-extern const char Unknown[];
-extern const char Neutral[];
-extern const char Insecure[];
-extern const char Secure[];
-extern const char Info[];
+extern const char* Unknown;
+extern const char* Neutral;
+extern const char* Insecure;
+extern const char* Secure;
+extern const char* Info;
 } // namespace SecurityStateEnum
 
 namespace CertificateErrorActionEnum {
-extern const char Continue[];
-extern const char Cancel[];
+extern const char* Continue;
+extern const char* Cancel;
 } // namespace CertificateErrorActionEnum
 
 // ------------- Type and builder declarations.

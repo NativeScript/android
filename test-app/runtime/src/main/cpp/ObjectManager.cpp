@@ -482,8 +482,8 @@ void ObjectManager::MarkReachableObjects(Isolate* isolate, const Local<Object>& 
         }
 
         auto o = top.As<Object>();
-        if (!isInFirstRun) {
-            unsigned long addr = NativeScriptExtension::GetAddress(o);
+        if(!isInFirstRun) {
+            uint8_t* addr = NativeScriptExtension::GetAddress(o);
             auto itFound = m_visited.find(addr);
             if (itFound != m_visited.end()) {
                 continue;

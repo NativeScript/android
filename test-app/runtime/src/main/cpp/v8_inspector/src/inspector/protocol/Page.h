@@ -55,41 +55,41 @@ class ScreencastVisibilityChangedNotification;
 class WindowOpenNotification;
 
 namespace ResourceTypeEnum {
-extern const char Document[];
-extern const char Stylesheet[];
-extern const char Image[];
-extern const char Media[];
-extern const char Font[];
-extern const char Script[];
-extern const char TextTrack[];
-extern const char XHR[];
-extern const char Fetch[];
-extern const char EventSource[];
-extern const char WebSocket[];
-extern const char Manifest[];
-extern const char Other[];
+extern const char* Document;
+extern const char* Stylesheet;
+extern const char* Image;
+extern const char* Media;
+extern const char* Font;
+extern const char* Script;
+extern const char* TextTrack;
+extern const char* XHR;
+extern const char* Fetch;
+extern const char* EventSource;
+extern const char* WebSocket;
+extern const char* Manifest;
+extern const char* Other;
 } // namespace ResourceTypeEnum
 
 namespace TransitionTypeEnum {
-extern const char Link[];
-extern const char Typed[];
-extern const char Auto_bookmark[];
-extern const char Auto_subframe[];
-extern const char Manual_subframe[];
-extern const char Generated[];
-extern const char Auto_toplevel[];
-extern const char Form_submit[];
-extern const char Reload[];
-extern const char Keyword[];
-extern const char Keyword_generated[];
-extern const char Other[];
+extern const char* Link;
+extern const char* Typed;
+extern const char* Auto_bookmark;
+extern const char* Auto_subframe;
+extern const char* Manual_subframe;
+extern const char* Generated;
+extern const char* Auto_toplevel;
+extern const char* Form_submit;
+extern const char* Reload;
+extern const char* Keyword;
+extern const char* Keyword_generated;
+extern const char* Other;
 } // namespace TransitionTypeEnum
 
 namespace DialogTypeEnum {
-extern const char Alert[];
-extern const char Confirm[];
-extern const char Prompt[];
-extern const char Beforeunload[];
+extern const char* Alert;
+extern const char* Confirm;
+extern const char* Prompt;
+extern const char* Beforeunload;
 } // namespace DialogTypeEnum
 
 namespace CaptureScreenshot {

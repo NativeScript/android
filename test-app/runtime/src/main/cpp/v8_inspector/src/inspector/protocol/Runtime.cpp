@@ -883,44 +883,6 @@ std::unique_ptr<API::StackTraceId> API::StackTraceId::fromJSONString(const Strin
     return protocol::Runtime::StackTraceId::fromValue(value.get(), &errors);
 }
 
-std::unique_ptr<BindingCalledNotification> BindingCalledNotification::fromValue(protocol::Value* value, ErrorSupport* errors) {
-    if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
-        return nullptr;
-    }
-
-    std::unique_ptr<BindingCalledNotification> result(new BindingCalledNotification());
-    protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
-    protocol::Value* nameValue = object->get("name");
-    errors->setName("name");
-    result->m_name = ValueConversions<String>::fromValue(nameValue, errors);
-    protocol::Value* payloadValue = object->get("payload");
-    errors->setName("payload");
-    result->m_payload = ValueConversions<String>::fromValue(payloadValue, errors);
-    protocol::Value* executionContextIdValue = object->get("executionContextId");
-    errors->setName("executionContextId");
-    result->m_executionContextId = ValueConversions<int>::fromValue(executionContextIdValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
-        return nullptr;
-    }
-    return result;
-}
-
-std::unique_ptr<protocol::DictionaryValue> BindingCalledNotification::toValue() const {
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    result->setValue("name", ValueConversions<String>::toValue(m_name));
-    result->setValue("payload", ValueConversions<String>::toValue(m_payload));
-    result->setValue("executionContextId", ValueConversions<int>::toValue(m_executionContextId));
-    return result;
-}
-
-std::unique_ptr<BindingCalledNotification> BindingCalledNotification::clone() const {
-    ErrorSupport errors;
-    return fromValue(toValue().get(), &errors);
-}
-
 const char* ConsoleAPICalledNotification::TypeEnum::Log = "log";
 const char* ConsoleAPICalledNotification::TypeEnum::Debug = "debug";
 const char* ConsoleAPICalledNotification::TypeEnum::Info = "info";
@@ -1188,18 +1150,6 @@ const char* TimeEnd = "timeEnd";
 
 // ------------- Frontend notifications.
 
-void Frontend::bindingCalled(const String& name, const String& payload, int executionContextId) {
-    if (!m_frontendChannel) {
-        return;
-    }
-    std::unique_ptr<BindingCalledNotification> messageData = BindingCalledNotification::create()
-            .setName(name)
-            .setPayload(payload)
-            .setExecutionContextId(executionContextId)
-            .build();
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Runtime.bindingCalled", std::move(messageData)));
-}
-
 void Frontend::consoleAPICalled(const String& type, std::unique_ptr<protocol::Array<protocol::Runtime::RemoteObject>> args, int executionContextId, double timestamp, Maybe<protocol::Runtime::StackTrace> stackTrace, Maybe<String> context) {
     if (!m_frontendChannel) {
         return;
@@ -1311,24 +1261,20 @@ class DispatcherImpl : public protocol::DispatcherBase {
             m_dispatchMap["Runtime.releaseObjectGroup"] = &DispatcherImpl::releaseObjectGroup;
             m_dispatchMap["Runtime.runIfWaitingForDebugger"] = &DispatcherImpl::runIfWaitingForDebugger;
             m_dispatchMap["Runtime.runScript"] = &DispatcherImpl::runScript;
-            m_redirects["Runtime.setAsyncCallStackDepth"] = "Debugger.setAsyncCallStackDepth";
             m_dispatchMap["Runtime.setCustomObjectFormatterEnabled"] = &DispatcherImpl::setCustomObjectFormatterEnabled;
-            m_dispatchMap["Runtime.setMaxCallStackSizeToCapture"] = &DispatcherImpl::setMaxCallStackSizeToCapture;
             m_dispatchMap["Runtime.terminateExecution"] = &DispatcherImpl::terminateExecution;
-            m_dispatchMap["Runtime.addBinding"] = &DispatcherImpl::addBinding;
-            m_dispatchMap["Runtime.removeBinding"] = &DispatcherImpl::removeBinding;
         }
         ~DispatcherImpl() override { }
         DispatchResponse::Status dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) override;
-        std::unordered_map<String, String>& redirects() {
+        HashMap<String, String>& redirects() {
             return m_redirects;
         }
 
     protected:
         using CallHandler = DispatchResponse::Status (DispatcherImpl::*)(int callId, std::unique_ptr<DictionaryValue> messageObject, ErrorSupport* errors);
-        using DispatchMap = std::unordered_map<String, CallHandler>;
+        using DispatchMap = protocol::HashMap<String, CallHandler>;
         DispatchMap m_dispatchMap;
-        std::unordered_map<String, String> m_redirects;
+        HashMap<String, String> m_redirects;
 
         DispatchResponse::Status awaitPromise(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
         DispatchResponse::Status callFunctionOn(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
@@ -1347,17 +1293,14 @@ class DispatcherImpl : public protocol::DispatcherBase {
         DispatchResponse::Status runIfWaitingForDebugger(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
         DispatchResponse::Status runScript(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
         DispatchResponse::Status setCustomObjectFormatterEnabled(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status setMaxCallStackSizeToCapture(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
         DispatchResponse::Status terminateExecution(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status addBinding(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status removeBinding(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
 
         Backend* m_backend;
         bool m_fallThroughForNotFound;
 };
 
 DispatchResponse::Status DispatcherImpl::dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) {
-    std::unordered_map<String, CallHandler>::iterator it = m_dispatchMap.find(method);
+    protocol::HashMap<String, CallHandler>::iterator it = m_dispatchMap.find(method);
     if (it == m_dispatchMap.end()) {
         if (m_fallThroughForNotFound) {
             return DispatchResponse::kFallThrough;
@@ -1695,12 +1638,6 @@ DispatchResponse::Status DispatcherImpl::evaluate(int callId, std::unique_ptr<Di
         errors->setName("throwOnSideEffect");
         in_throwOnSideEffect = ValueConversions<bool>::fromValue(throwOnSideEffectValue, errors);
     }
-    protocol::Value* timeoutValue = object ? object->get("timeout") : nullptr;
-    Maybe<double> in_timeout;
-    if (timeoutValue) {
-        errors->setName("timeout");
-        in_timeout = ValueConversions<double>::fromValue(timeoutValue, errors);
-    }
     errors->pop();
     if (errors->hasErrors()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
@@ -1709,7 +1646,7 @@ DispatchResponse::Status DispatcherImpl::evaluate(int callId, std::unique_ptr<Di
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     std::unique_ptr<EvaluateCallbackImpl> callback(new EvaluateCallbackImpl(weakPtr(), callId, nextCallbackId()));
-    m_backend->evaluate(in_expression, std::move(in_objectGroup), std::move(in_includeCommandLineAPI), std::move(in_silent), std::move(in_contextId), std::move(in_returnByValue), std::move(in_generatePreview), std::move(in_userGesture), std::move(in_awaitPromise), std::move(in_throwOnSideEffect), std::move(in_timeout), std::move(callback));
+    m_backend->evaluate(in_expression, std::move(in_objectGroup), std::move(in_includeCommandLineAPI), std::move(in_silent), std::move(in_contextId), std::move(in_returnByValue), std::move(in_generatePreview), std::move(in_userGesture), std::move(in_awaitPromise), std::move(in_throwOnSideEffect), std::move(callback));
     return (weak->get() && weak->get()->lastCallbackFallThrough()) ? DispatchResponse::kFallThrough : DispatchResponse::kAsync;
 }
 
@@ -2048,30 +1985,6 @@ DispatchResponse::Status DispatcherImpl::setCustomObjectFormatterEnabled(int cal
     return response.status();
 }
 
-DispatchResponse::Status DispatcherImpl::setMaxCallStackSizeToCapture(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
-    // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* sizeValue = object ? object->get("size") : nullptr;
-    errors->setName("size");
-    int in_size = ValueConversions<int>::fromValue(sizeValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return DispatchResponse::kError;
-    }
-
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->setMaxCallStackSizeToCapture(in_size);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
-    }
-    if (weak->get()) {
-        weak->get()->sendResponse(callId, response);
-    }
-    return response.status();
-}
-
 class TerminateExecutionCallbackImpl : public Backend::TerminateExecutionCallback, public DispatcherBase::Callback {
     public:
         TerminateExecutionCallbackImpl(std::unique_ptr<DispatcherBase::WeakPtr> backendImpl, int callId, int callbackId)
@@ -2098,60 +2011,6 @@ DispatchResponse::Status DispatcherImpl::terminateExecution(int callId, std::uni
     std::unique_ptr<TerminateExecutionCallbackImpl> callback(new TerminateExecutionCallbackImpl(weakPtr(), callId, nextCallbackId()));
     m_backend->terminateExecution(std::move(callback));
     return (weak->get() && weak->get()->lastCallbackFallThrough()) ? DispatchResponse::kFallThrough : DispatchResponse::kAsync;
-}
-
-DispatchResponse::Status DispatcherImpl::addBinding(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
-    // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* nameValue = object ? object->get("name") : nullptr;
-    errors->setName("name");
-    String in_name = ValueConversions<String>::fromValue(nameValue, errors);
-    protocol::Value* executionContextIdValue = object ? object->get("executionContextId") : nullptr;
-    Maybe<int> in_executionContextId;
-    if (executionContextIdValue) {
-        errors->setName("executionContextId");
-        in_executionContextId = ValueConversions<int>::fromValue(executionContextIdValue, errors);
-    }
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return DispatchResponse::kError;
-    }
-
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->addBinding(in_name, std::move(in_executionContextId));
-    if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
-    }
-    if (weak->get()) {
-        weak->get()->sendResponse(callId, response);
-    }
-    return response.status();
-}
-
-DispatchResponse::Status DispatcherImpl::removeBinding(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
-    // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* nameValue = object ? object->get("name") : nullptr;
-    errors->setName("name");
-    String in_name = ValueConversions<String>::fromValue(nameValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return DispatchResponse::kError;
-    }
-
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->removeBinding(in_name);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
-    }
-    if (weak->get()) {
-        weak->get()->sendResponse(callId, response);
-    }
-    return response.status();
 }
 
 // static
