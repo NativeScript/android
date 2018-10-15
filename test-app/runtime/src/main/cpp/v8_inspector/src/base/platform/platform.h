@@ -159,7 +159,6 @@ class V8_BASE_EXPORT OS {
         // v8::PageAllocator.
         enum class MemoryPermission {
             kNoAccess,
-            kRead,
             kReadWrite,
             // TODO(hpayer): Remove this flag. Memory should never be rwx.
             kReadWriteExecute,

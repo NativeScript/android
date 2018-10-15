@@ -16,7 +16,7 @@ class InspectedContext;
 class V8InspectorImpl;
 
 // Console API
-// https://console.spec.whatwg.org/#console-namespace
+// https://console.spec.whatwg.org/#console-interface
 class V8Console : public v8::debug::ConsoleDelegate {
     public:
         v8::Local<v8::Object> createCommandLineAPI(v8::Local<v8::Context> context,
@@ -78,8 +78,6 @@ class V8Console : public v8::debug::ConsoleDelegate {
                    const v8::debug::ConsoleContext& consoleContext) override;
         void Count(const v8::debug::ConsoleCallArguments&,
                    const v8::debug::ConsoleContext& consoleContext) override;
-        void CountReset(const v8::debug::ConsoleCallArguments&,
-                        const v8::debug::ConsoleContext& consoleContext) override;
         void Assert(const v8::debug::ConsoleCallArguments&,
                     const v8::debug::ConsoleContext& consoleContext) override;
         void MarkTimeline(const v8::debug::ConsoleCallArguments&,

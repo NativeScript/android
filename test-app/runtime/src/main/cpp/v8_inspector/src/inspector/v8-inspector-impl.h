@@ -35,7 +35,6 @@
 #include <map>
 
 #include "src/base/macros.h"
-#include "src/base/platform/mutex.h"
 #include "src/inspector/protocol/Protocol.h"
 
 #include "include/v8-inspector.h"
@@ -130,21 +129,6 @@ class V8InspectorImpl : public V8Inspector {
                             std::function<void(InspectedContext*)> callback);
         void forEachSession(int contextGroupId,
                             std::function<void(V8InspectorSessionImpl*)> callback);
-
-        class EvaluateScope {
-            public:
-                explicit EvaluateScope(v8::Isolate* isolate);
-                ~EvaluateScope();
-
-                protocol::Response setTimeout(double timeout);
-
-            private:
-                v8::Isolate* m_isolate;
-                class TerminateTask;
-                struct CancelToken;
-                std::shared_ptr<CancelToken> m_cancelToken;
-                v8::Isolate::SafeForTerminationScope m_safeForTerminationScope;
-        };
 
     private:
         v8::Isolate* m_isolate;

@@ -32,7 +32,6 @@ using ExecutionContextId = int;
 class ExecutionContextDescription;
 class ExceptionDetails;
 using Timestamp = double;
-using TimeDelta = double;
 class CallFrame;
 class StackTrace;
 using UniqueDebuggerId = String;
@@ -2394,7 +2393,7 @@ class  Backend {
                 virtual void fallThrough() = 0;
                 virtual ~EvaluateCallback() { }
         };
-        virtual void evaluate(const String& in_expression, Maybe<String> in_objectGroup, Maybe<bool> in_includeCommandLineAPI, Maybe<bool> in_silent, Maybe<int> in_contextId, Maybe<bool> in_returnByValue, Maybe<bool> in_generatePreview, Maybe<bool> in_userGesture, Maybe<bool> in_awaitPromise, Maybe<bool> in_throwOnSideEffect, Maybe<double> in_timeout, std::unique_ptr<EvaluateCallback> callback) = 0;
+        virtual void evaluate(const String& in_expression, Maybe<String> in_objectGroup, Maybe<bool> in_includeCommandLineAPI, Maybe<bool> in_silent, Maybe<int> in_contextId, Maybe<bool> in_returnByValue, Maybe<bool> in_generatePreview, Maybe<bool> in_userGesture, Maybe<bool> in_awaitPromise, Maybe<bool> in_throwOnSideEffect, std::unique_ptr<EvaluateCallback> callback) = 0;
         virtual DispatchResponse getIsolateId(String* out_id) = 0;
         virtual DispatchResponse getHeapUsage(double* out_usedSize, double* out_totalSize) = 0;
         virtual DispatchResponse getProperties(const String& in_objectId, Maybe<bool> in_ownProperties, Maybe<bool> in_accessorPropertiesOnly, Maybe<bool> in_generatePreview, std::unique_ptr<protocol::Array<protocol::Runtime::PropertyDescriptor>>* out_result, Maybe<protocol::Array<protocol::Runtime::InternalPropertyDescriptor>>* out_internalProperties, Maybe<protocol::Runtime::ExceptionDetails>* out_exceptionDetails) = 0;
