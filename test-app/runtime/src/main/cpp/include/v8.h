@@ -71,7 +71,6 @@ class BigIntObject;
 class Boolean;
 class BooleanObject;
 class Context;
-class CpuProfiler;
 class Data;
 class Date;
 class External;
@@ -146,6 +145,8 @@ class DeferredHandles;
 class Heap;
 class HeapObject;
 class Isolate;
+class LocalEmbedderHeapTracer;
+class NeverReadOnlySpaceObject;
 class Object;
 struct ScriptStreamingData;
 template<typename T> class CustomArguments;
@@ -154,6 +155,7 @@ class FunctionCallbackArguments;
 class GlobalHandles;
 
 namespace wasm {
+class CompilationResultResolver;
 class StreamingDecoder;
 }  // namespace wasm
 
@@ -176,18 +178,18 @@ const int kSmiTag = 0;
 const int kSmiTagSize = 1;
 const intptr_t kSmiTagMask = (1 << kSmiTagSize) - 1;
 
-template <size_t ptr_size>
+template <size_t tagged_ptr_size>
 struct SmiTagging;
 
 template <int kSmiShiftSize>
 V8_INLINE internal::Object* IntToSmi(int value) {
     int smi_shift_bits = kSmiTagSize + kSmiShiftSize;
-    uintptr_t tagged_value =
-        (static_cast<uintptr_t>(value) << smi_shift_bits) | kSmiTag;
+    intptr_t tagged_value =
+        (static_cast<intptr_t>(value) << smi_shift_bits) | kSmiTag;
     return reinterpret_cast<internal::Object*>(tagged_value);
 }
 
-// Smi constants for 32-bit systems.
+// Smi constants for systems where tagged pointer is a 32-bit value.
 template <>
 struct SmiTagging<4> {
     enum { kSmiShiftSize = 0, kSmiValueSize = 31 };
@@ -221,7 +223,7 @@ struct SmiTagging<4> {
     }
 };
 
-// Smi constants for 64-bit systems.
+// Smi constants for systems where tagged pointer is a 64-bit value.
 template <>
 struct SmiTagging<8> {
     enum { kSmiShiftSize = 31, kSmiValueSize = 32 };
@@ -245,7 +247,15 @@ struct SmiTagging<8> {
     }
 };
 
+#if V8_COMPRESS_POINTERS
+static_assert(
+    kApiPointerSize == kApiInt64Size,
+    "Pointer compression can be enabled only for 64-bit architectures");
+typedef SmiTagging<4> PlatformSmiTagging;
+#else
 typedef SmiTagging<kApiPointerSize> PlatformSmiTagging;
+#endif
+
 const int kSmiShiftSize = PlatformSmiTagging::kSmiShiftSize;
 const int kSmiValueSize = PlatformSmiTagging::kSmiValueSize;
 const int kSmiMinValue = (static_cast<unsigned int>(-1)) << (kSmiValueSize - 1);
@@ -1051,8 +1061,8 @@ class V8_EXPORT HandleScope {
         void operator delete[](void*, size_t);
 
         // Uses heap_object to obtain the current Isolate.
-        static internal::Object** CreateHandle(internal::HeapObject* heap_object,
-                                               internal::Object* value);
+        static internal::Object** CreateHandle(
+            internal::NeverReadOnlySpaceObject* heap_object, internal::Object* value);
 
         internal::Isolate* isolate_;
         internal::Object** prev_next_;
@@ -1086,6 +1096,11 @@ class V8_EXPORT EscapableHandleScope : public HandleScope {
             internal::Object** slot =
                 Escape(reinterpret_cast<internal::Object**>(*value));
             return Local<T>(reinterpret_cast<T*>(slot));
+        }
+
+        template <class T>
+        V8_INLINE MaybeLocal<T> EscapeMaybe(MaybeLocal<T> value) {
+            return Escape(value.FromMaybe(Local<T>()));
         }
 
         EscapableHandleScope(const EscapableHandleScope&) = delete;
@@ -1174,8 +1189,12 @@ class V8_EXPORT PrimitiveArray {
     public:
         static Local<PrimitiveArray> New(Isolate* isolate, int length);
         int Length() const;
-        void Set(int index, Local<Primitive> item);
-        Local<Primitive> Get(int index);
+        void Set(Isolate* isolate, int index, Local<Primitive> item);
+        Local<Primitive> Get(Isolate* isolate, int index);
+
+        V8_DEPRECATE_SOON("Use Isolate version",
+                          void Set(int index, Local<Primitive> item));
+        V8_DEPRECATE_SOON("Use Isolate version", Local<Primitive> Get(int index));
 };
 
 /**
@@ -1548,6 +1567,10 @@ class V8_EXPORT ScriptCompiler {
                  * more than two data chunks. The embedder can avoid this problem by always
                  * returning at least 2 bytes of data.
                  *
+                 * When streaming UTF-16 data, V8 does not handle characters split between
+                 * two data chunks. The embedder has to make sure that chunks have an even
+                 * length.
+                 *
                  * If the embedder wants to cancel the streaming, they should make the next
                  * GetMoreData call return 0. V8 will interpret it as end of data (and most
                  * probably, parsing will fail). The streaming task will return as soon as
@@ -1733,7 +1756,9 @@ class V8_EXPORT ScriptCompiler {
          * ECMAScript specification.
          */
         static V8_WARN_UNUSED_RESULT MaybeLocal<Module> CompileModule(
-            Isolate* isolate, Source* source);
+            Isolate* isolate, Source* source,
+            CompileOptions options = kNoCompileOptions,
+            NoCacheReason no_cache_reason = kNoCacheNoReason);
 
         /**
          * Compile a function for a given context. This is equivalent to running
@@ -1910,7 +1935,9 @@ class V8_EXPORT StackTrace {
         /**
          * Returns a StackFrame at a particular index.
          */
-        Local<StackFrame> GetFrame(uint32_t index) const;
+        V8_DEPRECATE_SOON("Use Isolate version",
+                          Local<StackFrame> GetFrame(uint32_t index) const);
+        Local<StackFrame> GetFrame(Isolate* isolate, uint32_t index) const;
 
         /**
          * Returns the number of StackFrames.
@@ -2754,7 +2781,9 @@ class V8_EXPORT String : public Name {
          * Returns the number of bytes in the UTF-8 encoded
          * representation of this string.
          */
-        int Utf8Length() const;
+        V8_DEPRECATE_SOON("Use Isolate version instead", int Utf8Length() const);
+
+        int Utf8Length(Isolate* isolate) const;
 
         /**
          * Returns whether this string is known to contain only one byte data,
@@ -2808,20 +2837,25 @@ class V8_EXPORT String : public Name {
         };
 
         // 16-bit character codes.
-        int Write(uint16_t* buffer,
-                  int start = 0,
-                  int length = -1,
+        int Write(Isolate* isolate, uint16_t* buffer, int start = 0, int length = -1,
                   int options = NO_OPTIONS) const;
+        V8_DEPRECATE_SOON("Use Isolate* version",
+                          int Write(uint16_t* buffer, int start = 0, int length = -1,
+                                    int options = NO_OPTIONS) const);
         // One byte characters.
-        int WriteOneByte(uint8_t* buffer,
-                         int start = 0,
-                         int length = -1,
-                         int options = NO_OPTIONS) const;
+        int WriteOneByte(Isolate* isolate, uint8_t* buffer, int start = 0,
+                         int length = -1, int options = NO_OPTIONS) const;
+        V8_DEPRECATE_SOON("Use Isolate* version",
+                          int WriteOneByte(uint8_t* buffer, int start = 0,
+                                           int length = -1, int options = NO_OPTIONS)
+                          const);
         // UTF-8 encoded characters.
-        int WriteUtf8(char* buffer,
-                      int length = -1,
-                      int* nchars_ref = NULL,
-                      int options = NO_OPTIONS) const;
+        int WriteUtf8(Isolate* isolate, char* buffer, int length = -1,
+                      int* nchars_ref = NULL, int options = NO_OPTIONS) const;
+        V8_DEPRECATE_SOON("Use Isolate* version",
+                          int WriteUtf8(char* buffer, int length = -1,
+                                        int* nchars_ref = NULL,
+                                        int options = NO_OPTIONS) const);
 
         /**
          * A zero length string.
@@ -2987,7 +3021,11 @@ class V8_EXPORT String : public Name {
          * Creates a new string by concatenating the left and the right strings
          * passed in as parameters.
          */
-        static Local<String> Concat(Local<String> left, Local<String> right);
+        static Local<String> Concat(Isolate* isolate, Local<String> left,
+                                    Local<String> right);
+        static V8_DEPRECATE_SOON("Use Isolate* version",
+                                 Local<String> Concat(Local<String> left,
+                                         Local<String> right));
 
         /**
          * Creates a new external string using the data defined in the given
@@ -3263,6 +3301,48 @@ class V8_EXPORT Uint32 : public Integer {
 class V8_EXPORT BigInt : public Primitive {
     public:
         static Local<BigInt> New(Isolate* isolate, int64_t value);
+        static Local<BigInt> NewFromUnsigned(Isolate* isolate, uint64_t value);
+        /**
+         * Creates a new BigInt object using a specified sign bit and a
+         * specified list of digits/words.
+         * The resulting number is calculated as:
+         *
+         * (-1)^sign_bit * (words[0] * (2^64)^0 + words[1] * (2^64)^1 + ...)
+         */
+        static MaybeLocal<BigInt> NewFromWords(Local<Context> context, int sign_bit,
+                                               int word_count, const uint64_t* words);
+
+        /**
+         * Returns the value of this BigInt as an unsigned 64-bit integer.
+         * If `lossless` is provided, it will reflect whether the return value was
+         * truncated or wrapped around. In particular, it is set to `false` if this
+         * BigInt is negative.
+         */
+        uint64_t Uint64Value(bool* lossless = nullptr) const;
+
+        /**
+         * Returns the value of this BigInt as a signed 64-bit integer.
+         * If `lossless` is provided, it will reflect whether this BigInt was
+         * truncated or not.
+         */
+        int64_t Int64Value(bool* lossless = nullptr) const;
+
+        /**
+         * Returns the number of 64-bit words needed to store the result of
+         * ToWordsArray().
+         */
+        int WordCount() const;
+
+        /**
+         * Writes the contents of this BigInt to a specified memory location.
+         * `sign_bit` must be provided and will be set to 1 if this BigInt is
+         * negative.
+         * `*word_count` has to be initialized to the length of the `words` array.
+         * Upon return, it will be set to the actual number of words that would
+         * be needed to store this BigInt (i.e. the return value of `WordCount()`).
+         */
+        void ToWordsArray(int* sign_bit, int* word_count, uint64_t* words) const;
+
         V8_INLINE static BigInt* Cast(v8::Value* obj);
 
     private:
@@ -4396,10 +4476,29 @@ class V8_EXPORT Proxy : public Object {
 class V8_EXPORT WasmCompiledModule : public Object {
     public:
         typedef std::pair<std::unique_ptr<const uint8_t[]>, size_t> SerializedModule;
+
+// The COMMA macro allows us to use ',' inside of the V8_DEPRECATE_SOON macro.
+#define COMMA ,
+        V8_DEPRECATE_SOON(
+            "Use BufferReference.",
+            typedef std::pair<const uint8_t* COMMA size_t> CallerOwnedBuffer);
+#undef COMMA
+
         /**
-         * A buffer that is owned by the caller.
+         * A unowned reference to a byte buffer.
          */
-        typedef std::pair<const uint8_t*, size_t> CallerOwnedBuffer;
+        struct BufferReference {
+            const uint8_t* start;
+            size_t size;
+            BufferReference(const uint8_t* start, size_t size)
+                : start(start), size(size) {}
+            // Temporarily allow conversion to and from CallerOwnedBuffer.
+            V8_DEPRECATE_SOON(
+                "Use BufferReference directly.",
+                inline BufferReference(CallerOwnedBuffer));  // NOLINT(runtime/explicit)
+            V8_DEPRECATE_SOON("Use BufferReference directly.",
+                              inline operator CallerOwnedBuffer());
+        };
 
         /**
          * An opaque, native heap object for transferring wasm modules. It
@@ -4416,7 +4515,7 @@ class V8_EXPORT WasmCompiledModule : public Object {
             private:
                 typedef std::pair<std::unique_ptr<const uint8_t[]>, size_t> OwnedBuffer;
                 friend class WasmCompiledModule;
-                TransferrableModule(OwnedBuffer&& code, OwnedBuffer&& bytes)
+                TransferrableModule(OwnedBuffer code, OwnedBuffer bytes)
                     : compiled_code(std::move(code)), wire_bytes(std::move(bytes)) {}
 
                 OwnedBuffer compiled_code = {nullptr, 0};
@@ -4440,7 +4539,9 @@ class V8_EXPORT WasmCompiledModule : public Object {
         /**
          * Get the wasm-encoded bytes that were used to compile this module.
          */
-        Local<String> GetWasmWireBytes();
+        BufferReference GetWasmWireBytesRef();
+        V8_DEPRECATE_SOON("Use GetWasmWireBytesRef version.",
+                          Local<String> GetWasmWireBytes());
 
         /**
          * Serialize the compiled module. The serialized data does not include the
@@ -4453,24 +4554,79 @@ class V8_EXPORT WasmCompiledModule : public Object {
          * uncompiled bytes.
          */
         static MaybeLocal<WasmCompiledModule> DeserializeOrCompile(
-            Isolate* isolate, const CallerOwnedBuffer& serialized_module,
-            const CallerOwnedBuffer& wire_bytes);
+            Isolate* isolate, BufferReference serialized_module,
+            BufferReference wire_bytes);
         V8_INLINE static WasmCompiledModule* Cast(Value* obj);
 
     private:
         static MaybeLocal<WasmCompiledModule> Deserialize(
-            Isolate* isolate, const CallerOwnedBuffer& serialized_module,
-            const CallerOwnedBuffer& wire_bytes);
+            Isolate* isolate, BufferReference serialized_module,
+            BufferReference wire_bytes);
         static MaybeLocal<WasmCompiledModule> Compile(Isolate* isolate,
                 const uint8_t* start,
                 size_t length);
-        static CallerOwnedBuffer AsCallerOwned(
+        static BufferReference AsReference(
             const TransferrableModule::OwnedBuffer& buff) {
             return {buff.first.get(), buff.second};
         }
 
         WasmCompiledModule();
         static void CheckCast(Value* obj);
+};
+
+// TODO(clemensh): Remove after M69 branch.
+WasmCompiledModule::BufferReference::BufferReference(
+    WasmCompiledModule::CallerOwnedBuffer buf)
+    : BufferReference(buf.first, buf.second) {}
+WasmCompiledModule::BufferReference::
+operator WasmCompiledModule::CallerOwnedBuffer() {
+    return {start, size};
+}
+
+/**
+ * The V8 interface for WebAssembly streaming compilation. When streaming
+ * compilation is initiated, V8 passes a {WasmStreaming} object to the embedder
+ * such that the embedder can pass the input butes for streaming compilation to
+ * V8.
+ */
+class V8_EXPORT WasmStreaming final {
+    public:
+        class WasmStreamingImpl;
+
+        WasmStreaming(std::unique_ptr<WasmStreamingImpl> impl);
+
+        ~WasmStreaming();
+
+        /**
+         * Pass a new chunck of bytes to WebAssembly streaming compilation.
+         * The buffer passed into {OnBytesReceived} is owned by the caller.
+         */
+        void OnBytesReceived(const uint8_t* bytes, size_t size);
+
+        /**
+         * {Finish} should be called after all received bytes where passed to
+         * {OnBytesReceived} to tell V8 that there will be no more bytes. {Finish}
+         * does not have to be called after {Abort} has been called already.
+         */
+        void Finish();
+
+        /**
+         * Abort streaming compilation. If {exception} has a value, then the promise
+         * associated with streaming compilation is rejected with that value. If
+         * {exception} does not have value, the promise does not get rejected.
+         */
+        void Abort(MaybeLocal<Value> exception);
+
+        /**
+         * Unpacks a {WasmStreaming} object wrapped in a  {Managed} for the embedder.
+         * Since the embedder is on the other side of the API, it cannot unpack the
+         * {Managed} itself.
+         */
+        static std::shared_ptr<WasmStreaming> Unpack(Isolate* isolate,
+                Local<Value> value);
+
+    private:
+        std::unique_ptr<WasmStreamingImpl> impl_;
 };
 
 // TODO(mtrofin): when streaming compilation is done, we can rename this
@@ -5200,7 +5356,9 @@ class V8_EXPORT BooleanObject : public Object {
  */
 class V8_EXPORT StringObject : public Object {
     public:
-        static Local<Value> New(Local<String> value);
+        static Local<Value> New(Isolate* isolate, Local<String> value);
+        static V8_DEPRECATE_SOON("Use Isolate* version",
+                                 Local<Value> New(Local<String> value));
 
         Local<String> ValueOf() const;
 
@@ -6322,7 +6480,8 @@ class V8_EXPORT AccessorSignature : public Data {
 
 
 // --- Extensions ---
-
+V8_DEPRECATE_SOON("Implementation detail",
+                  class ExternalOneByteStringResourceImpl);
 class V8_EXPORT ExternalOneByteStringResourceImpl
     : public String::ExternalOneByteStringResource {
     public:
@@ -6353,7 +6512,9 @@ class V8_EXPORT Extension {  // NOLINT
                   int dep_count = 0,
                   const char** deps = 0,
                   int source_length = -1);
-        virtual ~Extension() { }
+        virtual ~Extension() {
+            delete source_;
+        }
         virtual Local<FunctionTemplate> GetNativeFunctionTemplate(
             Isolate* isolate, Local<String> name) {
             return Local<FunctionTemplate>();
@@ -6366,7 +6527,7 @@ class V8_EXPORT Extension {  // NOLINT
             return source_length_;
         }
         const String::ExternalOneByteStringResource* source() const {
-            return &source_;
+            return source_;
         }
         int dependency_count() {
             return dep_count_;
@@ -6388,7 +6549,7 @@ class V8_EXPORT Extension {  // NOLINT
     private:
         const char* name_;
         size_t source_length_;  // expected to initialize before source_
-        ExternalOneByteStringResourceImpl source_;
+        String::ExternalOneByteStringResource* source_;
         int dep_count_;
         const char** deps_;
         bool auto_enable_;
@@ -6625,7 +6786,9 @@ typedef void (*PromiseHook)(PromiseHookType type, Local<Promise> promise,
 // --- Promise Reject Callback ---
 enum PromiseRejectEvent {
     kPromiseRejectWithNoHandler = 0,
-    kPromiseHandlerAddedAfterReject = 1
+    kPromiseHandlerAddedAfterReject = 1,
+    kPromiseRejectAfterResolved = 2,
+    kPromiseResolveAfterResolved = 3,
 };
 
 class PromiseRejectMessage {
@@ -6735,6 +6898,9 @@ typedef bool (*AllowWasmCodeGenerationCallback)(Local<Context> context,
 // --- Callback for APIs defined on v8-supported objects, but implemented
 // by the embedder. Example: WebAssembly.{compile|instantiate}Streaming ---
 typedef void (*ApiImplementationCallback)(const FunctionCallbackInfo<Value>&);
+
+// --- Callback for WebAssembly.compileStreaming ---
+typedef void (*WasmStreamingCallback)(const FunctionCallbackInfo<Value>&);
 
 // --- Garbage Collection Callbacks ---
 
@@ -7022,6 +7188,8 @@ struct JitCodeEvent {
         // New location of instructions. Only valid for CODE_MOVED.
         void* new_code_start;
     };
+
+    Isolate* isolate;
 };
 
 /**
@@ -7143,6 +7311,14 @@ class V8_EXPORT EmbedderHeapTracer {
         virtual bool AdvanceTracing(double deadline_in_ms,
                                     AdvanceTracingActions actions) = 0;
 
+        /*
+         * Returns true if there no more tracing work to be done (see AdvanceTracing)
+         * and false otherwise.
+         */
+        virtual bool IsTracingDone() {
+            return NumberOfWrappersToTrace() == 0;
+        }
+
         /**
          * Called at the end of a GC cycle.
          *
@@ -7164,15 +7340,39 @@ class V8_EXPORT EmbedderHeapTracer {
          */
         virtual void AbortTracing() = 0;
 
+        /*
+         * Called by the embedder to request immediaet finalization of the currently
+         * running tracing phase that has been started with TracePrologue and not
+         * yet finished with TraceEpilogue.
+         *
+         * Will be a noop when currently not in tracing.
+         *
+         * This is an experimental feature.
+         */
+        void FinalizeTracing();
+
+        /*
+         * Returns the v8::Isolate this tracer is attached too and |nullptr| if it
+         * is not attached to any v8::Isolate.
+         */
+        v8::Isolate* isolate() const {
+            return isolate_;
+        }
+
         /**
          * Returns the number of wrappers that are still to be traced by the embedder.
          */
+        V8_DEPRECATE_SOON("Use IsTracingDone",
         virtual size_t NumberOfWrappersToTrace() {
             return 0;
-        }
+        });
 
     protected:
         virtual ~EmbedderHeapTracer() = default;
+
+        v8::Isolate* isolate_ = nullptr;
+
+        friend class internal::LocalEmbedderHeapTracer;
 };
 
 /**
@@ -7468,6 +7668,7 @@ class V8_EXPORT Isolate {
             kWebAssemblyInstantiation = 46,
             kDeoptimizerDisableSpeculation = 47,
             kArrayPrototypeSortJSArrayModifiedPrototype = 48,
+            kFunctionTokenOffsetTooLongForToString = 49,
 
             // If you add new values here, you'll also need to update Chromium's:
             // web_feature.mojom, UseCounterCallback.cpp, and enums.xml. V8 changes to
@@ -7723,15 +7924,7 @@ class V8_EXPORT Isolate {
         HeapProfiler* GetHeapProfiler();
 
         /**
-         * Returns CPU profiler for this isolate. Will return NULL unless the isolate
-         * is initialized. It is the embedder's responsibility to stop all CPU
-         * profiling activities if it has started any.
-         */
-        V8_DEPRECATED("CpuProfiler should be created with CpuProfiler::New call.",
-                      CpuProfiler* GetCpuProfiler());
-
-        /**
-         * Tells the CPU profiler whether the embedder is idle.
+         * Tells the VM whether the embedder is idle or not.
          */
         void SetIdle(bool is_idle);
 
@@ -7809,6 +8002,85 @@ class V8_EXPORT Isolate {
          * Sets the embedder heap tracer for the isolate.
          */
         void SetEmbedderHeapTracer(EmbedderHeapTracer* tracer);
+
+        /**
+         * Use for |AtomicsWaitCallback| to indicate the type of event it receives.
+         */
+        enum class AtomicsWaitEvent {
+            /** Indicates that this call is happening before waiting. */
+            kStartWait,
+            /** `Atomics.wait()` finished because of an `Atomics.wake()` call. */
+            kWokenUp,
+            /** `Atomics.wait()` finished because it timed out. */
+            kTimedOut,
+            /** `Atomics.wait()` was interrupted through |TerminateExecution()|. */
+            kTerminatedExecution,
+            /** `Atomics.wait()` was stopped through |AtomicsWaitWakeHandle|. */
+            kAPIStopped,
+            /** `Atomics.wait()` did not wait, as the initial condition was not met. */
+            kNotEqual
+        };
+
+        /**
+         * Passed to |AtomicsWaitCallback| as a means of stopping an ongoing
+         * `Atomics.wait` call.
+         */
+        class V8_EXPORT AtomicsWaitWakeHandle {
+            public:
+                /**
+                 * Stop this `Atomics.wait()` call and call the |AtomicsWaitCallback|
+                 * with |kAPIStopped|.
+                 *
+                 * This function may be called from another thread. The caller has to ensure
+                 * through proper synchronization that it is not called after
+                 * the finishing |AtomicsWaitCallback|.
+                 *
+                 * Note that the ECMAScript specification does not plan for the possibility
+                 * of wakeups that are neither coming from a timeout or an `Atomics.wake()`
+                 * call, so this may invalidate assumptions made by existing code.
+                 * The embedder may accordingly wish to schedule an exception in the
+                 * finishing |AtomicsWaitCallback|.
+                 */
+                void Wake();
+        };
+
+        /**
+         * Embedder callback for `Atomics.wait()` that can be added through
+         * |SetAtomicsWaitCallback|.
+         *
+         * This will be called just before starting to wait with the |event| value
+         * |kStartWait| and after finishing waiting with one of the other
+         * values of |AtomicsWaitEvent| inside of an `Atomics.wait()` call.
+         *
+         * |array_buffer| will refer to the underlying SharedArrayBuffer,
+         * |offset_in_bytes| to the location of the waited-on memory address inside
+         * the SharedArrayBuffer.
+         *
+         * |value| and |timeout_in_ms| will be the values passed to
+         * the `Atomics.wait()` call. If no timeout was used, |timeout_in_ms|
+         * will be `INFINITY`.
+         *
+         * In the |kStartWait| callback, |stop_handle| will be an object that
+         * is only valid until the corresponding finishing callback and that
+         * can be used to stop the wait process while it is happening.
+         *
+         * This callback may schedule exceptions, *unless* |event| is equal to
+         * |kTerminatedExecution|.
+         */
+        typedef void (*AtomicsWaitCallback)(AtomicsWaitEvent event,
+                                            Local<SharedArrayBuffer> array_buffer,
+                                            size_t offset_in_bytes, int32_t value,
+                                            double timeout_in_ms,
+                                            AtomicsWaitWakeHandle* stop_handle,
+                                            void* data);
+
+        /**
+         * Set a new |AtomicsWaitCallback|. This overrides an earlier
+         * |AtomicsWaitCallback|, if there was any. If |callback| is nullptr,
+         * this unsets the callback. |data| will be passed to the callback
+         * as its last parameter.
+         */
+        void SetAtomicsWaitCallback(AtomicsWaitCallback callback, void* data);
 
         /**
          * Enables the host application to receive a notification after a
@@ -8064,6 +8336,18 @@ class V8_EXPORT Isolate {
         void IsolateInBackgroundNotification();
 
         /**
+         * Optional notification which will enable the memory savings mode.
+         * V8 uses this notification to guide heuristics which may result in a
+         * smaller memory footprint at the cost of reduced runtime performance.
+         */
+        void EnableMemorySavingsMode();
+
+        /**
+         * Optional notification which will disable the memory savings mode.
+         */
+        void DisableMemorySavingsMode();
+
+        /**
          * Optional notification to tell V8 the current performance requirements
          * of the embedder based on RAIL.
          * V8 uses these notifications to guide heuristics.
@@ -8185,6 +8469,8 @@ class V8_EXPORT Isolate {
         void SetWasmInstanceCallback(ExtensionCallback callback);
 
         void SetWasmCompileStreamingCallback(ApiImplementationCallback callback);
+
+        void SetWasmStreamingCallback(WasmStreamingCallback callback);
 
         /**
         * Check if V8 is dead and therefore unusable.  This is the case after
@@ -10101,7 +10387,6 @@ AccessorSignature* AccessorSignature::Cast(Data* data) {
 Local<Value> Object::GetInternalField(int index) {
 #ifndef V8_ENABLE_CHECKS
     typedef internal::Object O;
-    typedef internal::HeapObject HO;
     typedef internal::Internals I;
     O* obj = *reinterpret_cast<O**>(this);
     // Fast path: If the object is a plain JSObject, which is the common case, we
@@ -10112,7 +10397,8 @@ Local<Value> Object::GetInternalField(int index) {
             instance_type == I::kJSSpecialApiObjectType) {
         int offset = I::kJSObjectHeaderSize + (internal::kApiPointerSize * index);
         O* value = I::ReadField<O*>(obj, offset);
-        O** result = HandleScope::CreateHandle(reinterpret_cast<HO*>(obj), value);
+        O** result = HandleScope::CreateHandle(
+                         reinterpret_cast<internal::NeverReadOnlySpaceObject*>(obj), value);
         return Local<Value>(reinterpret_cast<Value*>(result));
     }
 #endif
@@ -10768,9 +11054,8 @@ int64_t Isolate::AdjustAmountOfExternalAllocatedMemory(
 Local<Value> Context::GetEmbedderData(int index) {
 #ifndef V8_ENABLE_CHECKS
     typedef internal::Object O;
-    typedef internal::HeapObject HO;
     typedef internal::Internals I;
-    HO* context = *reinterpret_cast<HO**>(this);
+    auto* context = *reinterpret_cast<internal::NeverReadOnlySpaceObject**>(this);
     O** result =
         HandleScope::CreateHandle(context, I::ReadEmbedderData<O*>(this, index));
     return Local<Value>(reinterpret_cast<Value*>(result));
