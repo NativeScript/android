@@ -203,14 +203,22 @@ typedef LazyStaticInstance<RecursiveMutex,
 // object was created, the LockGuard is destructed and the mutex is released.
 // The LockGuard class is non-copyable.
 
-template <typename Mutex>
+// Controls whether a LockGuard always requires a valid Mutex or will just
+// ignore it if it's nullptr.
+enum class NullBehavior { kRequireNotNull, kIgnoreIfNull };
+
+template <typename Mutex, NullBehavior Behavior = NullBehavior::kRequireNotNull>
 class LockGuard final {
     public:
         explicit LockGuard(Mutex* mutex) : mutex_(mutex) {
-            mutex_->Lock();
+            if (Behavior == NullBehavior::kRequireNotNull || mutex_ != nullptr) {
+                mutex_->Lock();
+            }
         }
         ~LockGuard() {
-            mutex_->Unlock();
+            if (mutex_ != nullptr) {
+                mutex_->Unlock();
+            }
         }
 
     private:
