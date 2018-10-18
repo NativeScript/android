@@ -2,10 +2,11 @@
 ==
 
 ## What's New
-- [Added support for before-plugins.gradle file applied before plugin(#1183)](https://github.com/NativeScript/android-runtime/pull/1185)
-- [Make JSParser in SBG fail the build when failing(#1152)](https://github.com/NativeScript/android-runtime/issues/1152)
-- [Generate interface names list in SBG in parallel(#1132)](https://github.com/NativeScript/android-runtime/issues/1132)
-- [Upgrade android gradle plugin to 3.2.0(#1147)](https://github.com/NativeScript/android-runtime/issues/1147)
+ - [Upgrade v8 to 6.9.427.23(#1168)](https://github.com/NativeScript/android-runtime/issues/1168)
+ - [Added support for before-plugins.gradle file applied before plugin(#1183)](https://github.com/NativeScript/android-runtime/pull/1185)
+ - [Make JSParser in SBG fail the build when failing(#1152)](https://github.com/NativeScript/android-runtime/issues/1152)
+ - [Generate interface names list in SBG in parallel(#1132)](https://github.com/NativeScript/android-runtime/issues/1132)
+ - [Upgrade android gradle plugin to 3.2.0(#1147)](https://github.com/NativeScript/android-runtime/issues/1147)
 
 ## Bug Fixes
 
@@ -16,11 +17,11 @@
 ==
 
 ## What's New
-- [Upgrade v8 to 6.7.288.46(#1130)](https://github.com/NativeScript/android-runtime/issues/1130)
-- [Static binding generator now uses bundled npm packages(#1096)](https://github.com/NativeScript/android-runtime/issues/1096)
-- [Add gradle dependencies versions in package.json(#1102)](https://github.com/NativeScript/android-runtime/issues/1102)
-- [Introduce a setting for auto catching exceptions when calling JS method native(#1119)](https://github.com/NativeScript/android-runtime/issues/1119)
-- [Make livesync work entirely through named sockets(#932)](https://github.com/NativeScript/android-runtime/issues/932)
+ - [Upgrade v8 to 6.7.288.46(#1130)](https://github.com/NativeScript/android-runtime/issues/1130)
+ - [Static binding generator now uses bundled npm packages(#1096)](https://github.com/NativeScript/android-runtime/issues/1096)
+ - [Add gradle dependencies versions in package.json(#1102)](https://github.com/NativeScript/android-runtime/issues/1102)
+ - [Introduce a setting for auto catching exceptions when calling JS method native(#1119)](https://github.com/NativeScript/android-runtime/issues/1119)
+ - [Make livesync work entirely through named sockets(#932)](https://github.com/NativeScript/android-runtime/issues/932)
 
 ## Bug Fixes
 
