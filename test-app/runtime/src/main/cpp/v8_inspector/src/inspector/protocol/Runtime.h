@@ -112,6 +112,8 @@ class  RemoteObject : public Serializable, public API::RemoteObject {
             static const char* Proxy;
             static const char* Promise;
             static const char* Typedarray;
+            static const char* Arraybuffer;
+            static const char* Dataview;
         }; // SubtypeEnum
 
         bool hasSubtype() {
@@ -307,35 +309,14 @@ class  CustomPreview : public Serializable {
             m_header = value;
         }
 
-        bool getHasBody() {
-            return m_hasBody;
+        bool hasBodyGetterId() {
+            return m_bodyGetterId.isJust();
         }
-        void setHasBody(bool value) {
-            m_hasBody = value;
+        String getBodyGetterId(const String& defaultValue) {
+            return m_bodyGetterId.isJust() ? m_bodyGetterId.fromJust() : defaultValue;
         }
-
-        String getFormatterObjectId() {
-            return m_formatterObjectId;
-        }
-        void setFormatterObjectId(const String& value) {
-            m_formatterObjectId = value;
-        }
-
-        String getBindRemoteObjectFunctionId() {
-            return m_bindRemoteObjectFunctionId;
-        }
-        void setBindRemoteObjectFunctionId(const String& value) {
-            m_bindRemoteObjectFunctionId = value;
-        }
-
-        bool hasConfigObjectId() {
-            return m_configObjectId.isJust();
-        }
-        String getConfigObjectId(const String& defaultValue) {
-            return m_configObjectId.isJust() ? m_configObjectId.fromJust() : defaultValue;
-        }
-        void setConfigObjectId(const String& value) {
-            m_configObjectId = value;
+        void setBodyGetterId(const String& value) {
+            m_bodyGetterId = value;
         }
 
         std::unique_ptr<protocol::DictionaryValue> toValue() const;
@@ -350,10 +331,7 @@ class  CustomPreview : public Serializable {
                 enum {
                     NoFieldsSet = 0,
                     HeaderSet = 1 << 1,
-                    HasBodySet = 1 << 2,
-                    FormatterObjectIdSet = 1 << 3,
-                    BindRemoteObjectFunctionIdSet = 1 << 4,
-                    AllFieldsSet = (HeaderSet | HasBodySet | FormatterObjectIdSet | BindRemoteObjectFunctionIdSet | 0)
+                    AllFieldsSet = (HeaderSet | 0)
                 };
 
 
@@ -363,26 +341,8 @@ class  CustomPreview : public Serializable {
                     return castState<HeaderSet>();
                 }
 
-                CustomPreviewBuilder<STATE | HasBodySet>& setHasBody(bool value) {
-                    static_assert(!(STATE & HasBodySet), "property hasBody should not be set yet");
-                    m_result->setHasBody(value);
-                    return castState<HasBodySet>();
-                }
-
-                CustomPreviewBuilder<STATE | FormatterObjectIdSet>& setFormatterObjectId(const String& value) {
-                    static_assert(!(STATE & FormatterObjectIdSet), "property formatterObjectId should not be set yet");
-                    m_result->setFormatterObjectId(value);
-                    return castState<FormatterObjectIdSet>();
-                }
-
-                CustomPreviewBuilder<STATE | BindRemoteObjectFunctionIdSet>& setBindRemoteObjectFunctionId(const String& value) {
-                    static_assert(!(STATE & BindRemoteObjectFunctionIdSet), "property bindRemoteObjectFunctionId should not be set yet");
-                    m_result->setBindRemoteObjectFunctionId(value);
-                    return castState<BindRemoteObjectFunctionIdSet>();
-                }
-
-                CustomPreviewBuilder<STATE>& setConfigObjectId(const String& value) {
-                    m_result->setConfigObjectId(value);
+                CustomPreviewBuilder<STATE>& setBodyGetterId(const String& value) {
+                    m_result->setBodyGetterId(value);
                     return *this;
                 }
 
@@ -408,14 +368,10 @@ class  CustomPreview : public Serializable {
 
     private:
         CustomPreview() {
-            m_hasBody = false;
         }
 
         String m_header;
-        bool m_hasBody;
-        String m_formatterObjectId;
-        String m_bindRemoteObjectFunctionId;
-        Maybe<String> m_configObjectId;
+        Maybe<String> m_bodyGetterId;
 };
 
 

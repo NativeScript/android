@@ -33,6 +33,9 @@ std::unique_ptr<SamplingHeapProfileNode> SamplingHeapProfileNode::fromValue(prot
     protocol::Value* selfSizeValue = object->get("selfSize");
     errors->setName("selfSize");
     result->m_selfSize = ValueConversions<double>::fromValue(selfSizeValue, errors);
+    protocol::Value* idValue = object->get("id");
+    errors->setName("id");
+    result->m_id = ValueConversions<int>::fromValue(idValue, errors);
     protocol::Value* childrenValue = object->get("children");
     errors->setName("children");
     result->m_children = ValueConversions<protocol::Array<protocol::HeapProfiler::SamplingHeapProfileNode>>::fromValue(childrenValue, errors);
@@ -47,11 +50,50 @@ std::unique_ptr<protocol::DictionaryValue> SamplingHeapProfileNode::toValue() co
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("callFrame", ValueConversions<protocol::Runtime::CallFrame>::toValue(m_callFrame.get()));
     result->setValue("selfSize", ValueConversions<double>::toValue(m_selfSize));
+    result->setValue("id", ValueConversions<int>::toValue(m_id));
     result->setValue("children", ValueConversions<protocol::Array<protocol::HeapProfiler::SamplingHeapProfileNode>>::toValue(m_children.get()));
     return result;
 }
 
 std::unique_ptr<SamplingHeapProfileNode> SamplingHeapProfileNode::clone() const {
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
+
+std::unique_ptr<SamplingHeapProfileSample> SamplingHeapProfileSample::fromValue(protocol::Value* value, ErrorSupport* errors) {
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->addError("object expected");
+        return nullptr;
+    }
+
+    std::unique_ptr<SamplingHeapProfileSample> result(new SamplingHeapProfileSample());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->push();
+    protocol::Value* sizeValue = object->get("size");
+    errors->setName("size");
+    result->m_size = ValueConversions<double>::fromValue(sizeValue, errors);
+    protocol::Value* nodeIdValue = object->get("nodeId");
+    errors->setName("nodeId");
+    result->m_nodeId = ValueConversions<int>::fromValue(nodeIdValue, errors);
+    protocol::Value* ordinalValue = object->get("ordinal");
+    errors->setName("ordinal");
+    result->m_ordinal = ValueConversions<double>::fromValue(ordinalValue, errors);
+    errors->pop();
+    if (errors->hasErrors()) {
+        return nullptr;
+    }
+    return result;
+}
+
+std::unique_ptr<protocol::DictionaryValue> SamplingHeapProfileSample::toValue() const {
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("size", ValueConversions<double>::toValue(m_size));
+    result->setValue("nodeId", ValueConversions<int>::toValue(m_nodeId));
+    result->setValue("ordinal", ValueConversions<double>::toValue(m_ordinal));
+    return result;
+}
+
+std::unique_ptr<SamplingHeapProfileSample> SamplingHeapProfileSample::clone() const {
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
@@ -68,6 +110,9 @@ std::unique_ptr<SamplingHeapProfile> SamplingHeapProfile::fromValue(protocol::Va
     protocol::Value* headValue = object->get("head");
     errors->setName("head");
     result->m_head = ValueConversions<protocol::HeapProfiler::SamplingHeapProfileNode>::fromValue(headValue, errors);
+    protocol::Value* samplesValue = object->get("samples");
+    errors->setName("samples");
+    result->m_samples = ValueConversions<protocol::Array<protocol::HeapProfiler::SamplingHeapProfileSample>>::fromValue(samplesValue, errors);
     errors->pop();
     if (errors->hasErrors()) {
         return nullptr;
@@ -78,6 +123,7 @@ std::unique_ptr<SamplingHeapProfile> SamplingHeapProfile::fromValue(protocol::Va
 std::unique_ptr<protocol::DictionaryValue> SamplingHeapProfile::toValue() const {
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("head", ValueConversions<protocol::HeapProfiler::SamplingHeapProfileNode>::toValue(m_head.get()));
+    result->setValue("samples", ValueConversions<protocol::Array<protocol::HeapProfiler::SamplingHeapProfileSample>>::toValue(m_samples.get()));
     return result;
 }
 

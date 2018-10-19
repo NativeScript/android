@@ -22,7 +22,17 @@ else ()
     set(ARCH_INCLUDE_DIR "arm-linux-androideabi")
 endif ()
 
-set(COMMON_CMAKE_ARGUMENTS "-std=c++11 -Werror -Wno-unused-result -mstackrealign -fexceptions -fno-builtin-stpcpy -fno-rtti")
+set(COMMON_CMAKE_ARGUMENTS "-std=c++11 -stdlib=libc++ -Werror -Wno-unused-result -mstackrealign -fexceptions -fno-builtin-stpcpy -fno-rtti")
+
+# AOSP has switched to using LLD by default and the NDK will use it by default in the next release.
+# BFD and Gold will be removed once LLD has been through a release cycle with no major unresolved issues (estimated r21)
+# Note: lld does not currently work on Windows: https://github.com/android-ndk/ndk/issues/888
+if (NOT CMAKE_HOST_SYSTEM_NAME MATCHES "Windows")
+  MESSAGE(STATUS "## Using LLD linker")
+  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fuse-ld=lld")
+else ()
+  MESSAGE(STATUS "## Using default linker")
+endif ()
 
 # Command info: https://cmake.org/cmake/help/v3.4/command/include_directories.html
 include_directories(
@@ -32,6 +42,8 @@ include_directories(
 
         # hack to find some libraries from the ndk
         ${ANDROID_NDK_ROOT}/sysroot/usr/include/${ARCH_INCLUDE_DIR}/
+
+        src/main/libs/${ANDROID_ABI}/include
 )
 
 if (OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
@@ -76,6 +88,7 @@ if (NOT OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
             src/main/cpp/v8_inspector/src/inspector/v8-overlay-agent-impl.cpp
             src/main/cpp/v8_inspector/src/inspector/v8-page-agent-impl.cpp
 
+            src/main/cpp/v8_inspector/src/inspector/custom-preview.cc
             src/main/cpp/v8_inspector/src/inspector/injected-script.cc
             src/main/cpp/v8_inspector/src/inspector/inspected-context.cc
             src/main/cpp/v8_inspector/src/inspector/remote-object-id.cc
@@ -88,18 +101,16 @@ if (NOT OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
             src/main/cpp/v8_inspector/src/inspector/v8-debugger.cc
             src/main/cpp/v8_inspector/src/inspector/v8-debugger-agent-impl.cc
             src/main/cpp/v8_inspector/src/inspector/v8-debugger-script.cc
-            src/main/cpp/v8_inspector/src/inspector/v8-function-call.cc
             src/main/cpp/v8_inspector/src/inspector/v8-heap-profiler-agent-impl.cc
-            src/main/cpp/v8_inspector/src/inspector/v8-injected-script-host.cc
             src/main/cpp/v8_inspector/src/inspector/v8-inspector-impl.cc
             src/main/cpp/v8_inspector/src/inspector/v8-inspector-session-impl.cc
-            src/main/cpp/v8_inspector/src/inspector/v8-internal-value-type.cc
             src/main/cpp/v8_inspector/src/inspector/v8-profiler-agent-impl.cc
             src/main/cpp/v8_inspector/src/inspector/v8-regex.cc
             src/main/cpp/v8_inspector/src/inspector/v8-runtime-agent-impl.cc
             src/main/cpp/v8_inspector/src/inspector/v8-schema-agent-impl.cc
             src/main/cpp/v8_inspector/src/inspector/v8-stack-trace-impl.cc
             src/main/cpp/v8_inspector/src/inspector/v8-value-utils.cc
+            src/main/cpp/v8_inspector/src/inspector/value-mirror.cc
             src/main/cpp/v8_inspector/src/inspector/wasm-translation.cc
     )
 else ()
@@ -162,10 +173,19 @@ add_library(
         ${INSPECTOR_SOURCES}
 )
 
+set(NATIVES_BLOB_INCLUDE_DIRECTORIES ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/include)
+
 if (OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
-    set_target_properties(NativeScript PROPERTIES LINK_FLAGS -Wl,--allow-multiple-definition -Wl,--exclude-libs=ALL -Wl,--gc-sections)
+    set_target_properties(
+        NativeScript
+        PROPERTIES LINK_FLAGS -Wl,--allow-multiple-definition -Wl,--exclude-libs=ALL -Wl,--gc-sections
+        INTERFACE_INCLUDE_DIRECTORIES NATIVES_BLOB_INCLUDE_DIRECTORIES
+    )
 else ()
-    set_target_properties(NativeScript PROPERTIES LINK_FLAGS -Wl,--allow-multiple-definition)
+    set_target_properties(
+        NativeScript PROPERTIES LINK_FLAGS -Wl,--allow-multiple-definition
+        INTERFACE_INCLUDE_DIRECTORIES NATIVES_BLOB_INCLUDE_DIRECTORIES
+    )
 endif ()
 
 MESSAGE(STATUS "# General cmake Info")
@@ -180,7 +200,7 @@ MESSAGE(STATUS "# CMAKE_CXX_FLAGS: " ${CMAKE_CXX_FLAGS})
 # linking v8 and inspector libraries to runtime(NativeScript library)
 target_link_libraries(NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libzip.a)
 target_link_libraries(NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_base.a)
-target_link_libraries(NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_snapshot.a)
+target_link_libraries(NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_external_snapshot.a)
 target_link_libraries(NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_init.a)
 target_link_libraries(NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_initializers.a)
 target_link_libraries(NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID_ABI}/libv8_libplatform.a)
@@ -194,10 +214,8 @@ target_link_libraries(NativeScript ${PROJECT_SOURCE_DIR}/src/main/libs/${ANDROID
 # you want to add. CMake verifies that the library exists before
 # completing its build.
 find_library(system-log log)
-find_library(system-android android)
-find_library(system-dl dl)
 find_library(system-z z)
 
 # Command info: https://cmake.org/cmake/help/v3.4/command/target_link_libraries.html
 # Specifies libraries CMake should link to your target library.
-target_link_libraries(NativeScript ${system-log} ${system-android} ${system-dl} ${system-z})
+target_link_libraries(NativeScript ${system-log} ${system-z})
