@@ -59,18 +59,19 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index) {
     JEnv env;
 
     Type returnType = JType::getClassType(m_return_type);
+    auto context = m_isolate->GetCurrentContext();
 
     if (arg.IsEmpty()) {
         s << "Cannot convert empty JavaScript object";
         success = false;
     } else if (arg->IsInt32() && (returnType == Type::Int || returnType == Type::Null)) {
-        jint value = arg->Int32Value();
+        jint value = arg->Int32Value(context).ToChecked();
         auto javaObject = JType::NewInt(env, value);
         SetConvertedObject(env, index, javaObject);
 
         success = true;
     } else if (arg->IsNumber() || arg->IsNumberObject()) {
-        double d = arg->NumberValue();
+        double d = arg->NumberValue(context).ToChecked();
         int64_t i = (int64_t) d;
 
         //if returnType isNumber and this check is true, the number we'll try to convert is whole(integer)
@@ -109,13 +110,13 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index) {
             success = true;
         }
     } else if (arg->IsBoolean()) {
-        jboolean value = arg->BooleanValue();
+        jboolean value = arg->BooleanValue(context).ToChecked();
         auto javaObject = JType::NewBoolean(env, value);
         SetConvertedObject(env, index, javaObject);
         success = true;
     } else if (arg->IsBooleanObject()) {
         auto boolObj = Local<BooleanObject>::Cast(arg);
-        jboolean value = boolObj->BooleanValue() ? JNI_TRUE : JNI_FALSE;
+        jboolean value = boolObj->BooleanValue(context).ToChecked() ? JNI_TRUE : JNI_FALSE;
         auto javaObject = JType::NewBoolean(env, value);
         SetConvertedObject(env, index, javaObject);
 
@@ -126,7 +127,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index) {
 
         success = true;
     } else if (arg->IsObject()) {
-        auto jsObj = arg->ToObject();
+        auto jsObj = arg->ToObject(m_isolate);
 
         auto castType = NumericCasts::GetCastType(m_isolate, jsObj);
 
@@ -148,7 +149,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index) {
             castValue = NumericCasts::GetCastValue(jsObj);
             charValue = '\0';
             if (castValue->IsString()) {
-                string str = ArgConverter::ConvertToString(castValue->ToString());
+                string str = ArgConverter::ConvertToString(castValue->ToString(m_isolate));
                 charValue = (jchar) str[0];
             }
             javaObject = JType::NewChar(env, charValue);
@@ -160,11 +161,11 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index) {
             castValue = NumericCasts::GetCastValue(jsObj);
             byteValue = 0;
             if (castValue->IsString()) {
-                string value = ArgConverter::ConvertToString(castValue->ToString());
+                string value = ArgConverter::ConvertToString(castValue->ToString(m_isolate));
                 int byteArg = atoi(value.c_str());
                 byteValue = (jbyte) byteArg;
             } else if (castValue->IsInt32()) {
-                int byteArg = castValue->ToInt32(m_isolate)->Int32Value();
+                int byteArg = castValue->ToInt32(m_isolate)->Int32Value(context).ToChecked();
                 byteValue = (jbyte) byteArg;
             }
             javaObject = JType::NewByte(env, byteValue);
@@ -176,11 +177,11 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index) {
             castValue = NumericCasts::GetCastValue(jsObj);
             shortValue = 0;
             if (castValue->IsString()) {
-                string value = ArgConverter::ConvertToString(castValue->ToString());
+                string value = ArgConverter::ConvertToString(castValue->ToString(m_isolate));
                 int shortArg = atoi(value.c_str());
                 shortValue = (jshort) shortArg;
             } else if (castValue->IsInt32()) {
-                jlong shortArg = castValue->ToInt32(m_isolate)->Int32Value();
+                jlong shortArg = castValue->ToInt32(m_isolate)->Int32Value(context).ToChecked();
                 shortValue = (jshort) shortArg;
             }
             javaObject = JType::NewShort(env, shortValue);
@@ -192,10 +193,10 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index) {
             castValue = NumericCasts::GetCastValue(jsObj);
             longValue = 0;
             if (castValue->IsString()) {
-                auto strValue = ArgConverter::ConvertToString(castValue->ToString());
+                auto strValue = ArgConverter::ConvertToString(castValue->ToString(m_isolate));
                 longValue = atoll(strValue.c_str());
             } else if (castValue->IsInt32()) {
-                longValue = castValue->ToInt32(m_isolate)->Int32Value();
+                longValue = castValue->ToInt32(m_isolate)->Int32Value(context).ToChecked();
             }
             javaObject = JType::NewLong(env, longValue);
             SetConvertedObject(env, index, javaObject);
@@ -206,7 +207,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index) {
             castValue = NumericCasts::GetCastValue(jsObj);
             floatValue = 0;
             if (castValue->IsNumber()) {
-                double floatArg = castValue->ToNumber(m_isolate)->NumberValue();
+                double floatArg = castValue->ToNumber(m_isolate)->NumberValue(context).ToChecked();
                 floatValue = (jfloat) floatArg;
             }
             javaObject = JType::NewFloat(env, floatValue);
@@ -218,7 +219,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index) {
             castValue = NumericCasts::GetCastValue(jsObj);
             doubleValue = 0;
             if (castValue->IsNumber()) {
-                double doubleArg = castValue->ToNumber(m_isolate)->NumberValue();
+                double doubleArg = castValue->ToNumber(m_isolate)->NumberValue(context).ToChecked();
                 doubleValue = (jdouble) doubleArg;
             }
             javaObject = JType::NewDouble(env, doubleValue);
@@ -263,7 +264,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index) {
             if (success) {
                 SetConvertedObject(env, index, obj.Move(), obj.IsGlobal());
             } else {
-                String::Utf8Value jsObjStr(jsObj);
+                String::Utf8Value jsObjStr(m_isolate, jsObj);
                 s << "Cannot marshal JavaScript argument " << (*jsObjStr ? *jsObjStr : "<failed-to-string>") << " at index " << index << " to Java type.";
             }
             break;

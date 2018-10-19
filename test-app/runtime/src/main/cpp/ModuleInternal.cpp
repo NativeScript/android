@@ -286,7 +286,8 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& moduleP
     if (Util::EndsWith(modulePath, ".js")) {
         auto script = LoadScript(isolate, modulePath, fullRequiredModulePath);
 
-        moduleFunc = script->Run().As<Function>();
+        auto context = isolate->GetCurrentContext();
+        moduleFunc = script->Run(context).ToLocalChecked().As<Function>();
         if (tc.HasCaught()) {
             throw NativeScriptException(tc, "Error running script " + modulePath);
         }

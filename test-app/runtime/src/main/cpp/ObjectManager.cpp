@@ -420,7 +420,8 @@ void ObjectManager::ReleaseRegularObjects() {
         bool isReachableFromImplementationObject = false;
 
         if (!gcNum.IsEmpty()) {
-            int objGcNum = gcNum->Int32Value();
+            auto context = m_isolate->GetCurrentContext();
+            int objGcNum = gcNum->Int32Value(context).ToChecked();
 
             // done so we can release only java objects from this GC stack and pass all objects that will be released in parent GC stacks
             isReachableFromImplementationObject = objGcNum >= numberOfGC;

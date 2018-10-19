@@ -476,6 +476,41 @@ struct ValueConversions<ListValue> {
 #ifndef v8_inspector_protocol_Maybe_h
 #define v8_inspector_protocol_Maybe_h
 
+// This macro allows to test for the version of the GNU C++ compiler.
+// Note that this also applies to compilers that masquerade as GCC,
+// for example clang and the Intel C++ compiler for Linux.
+// Use like:
+//  #if IP_GNUC_PREREQ(4, 3, 1)
+//   ...
+//  #endif
+#if defined(__GNUC__) && defined(__GNUC_MINOR__) && defined(__GNUC_PATCHLEVEL__)
+#define IP_GNUC_PREREQ(major, minor, patchlevel)                      \
+  ((__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__) >= \
+   ((major)*10000 + (minor)*100 + (patchlevel)))
+#elif defined(__GNUC__) && defined(__GNUC_MINOR__)
+#define IP_GNUC_PREREQ(major, minor, patchlevel) \
+  ((__GNUC__ * 10000 + __GNUC_MINOR__ * 100) >=  \
+   ((major)*10000 + (minor)*100 + (patchlevel)))
+#else
+#define IP_GNUC_PREREQ(major, minor, patchlevel) 0
+#endif
+
+#if defined(__mips64)
+#define IP_TARGET_ARCH_MIPS64 1
+#elif defined(__MIPSEB__) || defined(__MIPSEL__)
+#define IP_TARGET_ARCH_MIPS 1
+#endif
+
+// Allowing the use of noexcept by removing the keyword on older compilers that
+// do not support adding noexcept to default members.
+#if ((IP_GNUC_PREREQ(4, 9, 0) && !defined(IP_TARGET_ARCH_MIPS) && \
+      !defined(IP_TARGET_ARCH_MIPS64)) ||                         \
+     (defined(__clang__) && __cplusplus > 201300L))
+#define IP_NOEXCEPT noexcept
+#else
+#define IP_NOEXCEPT
+#endif
+
 //#include "Forward.h"
 
 namespace v8_inspector {
@@ -486,7 +521,8 @@ class Maybe {
     public:
         Maybe() : m_value() { }
         Maybe(std::unique_ptr<T> value) : m_value(std::move(value)) { }
-        Maybe(Maybe&& other) : m_value(std::move(other.m_value)) { }
+    Maybe(Maybe&& other) IP_NOEXCEPT :
+        m_value(std::move(other.m_value)) {}
         void operator=(std::unique_ptr<T> value) {
             m_value = std::move(value);
         }
@@ -513,7 +549,10 @@ class MaybeBase {
     public:
         MaybeBase() : m_isJust(false) { }
         MaybeBase(T value) : m_isJust(true), m_value(value) { }
-        MaybeBase(MaybeBase&& other) : m_isJust(other.m_isJust), m_value(std::move(other.m_value)) { }
+        MaybeBase(MaybeBase&& other) IP_NOEXCEPT
+    :
+        m_isJust(other.m_isJust),
+        m_value(std::move(other.m_value)) {}
         void operator=(T value) {
             m_value = value;
             m_isJust = true;
@@ -543,7 +582,8 @@ class Maybe<bool> : public MaybeBase<bool> {
     public:
         Maybe() { }
         Maybe(bool value) : MaybeBase(value) { }
-        Maybe(Maybe&& other) : MaybeBase(std::move(other)) { }
+    Maybe(Maybe&& other) IP_NOEXCEPT :
+        MaybeBase(std::move(other)) {}
         using MaybeBase::operator=;
 };
 
@@ -552,7 +592,8 @@ class Maybe<int> : public MaybeBase<int> {
     public:
         Maybe() { }
         Maybe(int value) : MaybeBase(value) { }
-        Maybe(Maybe&& other) : MaybeBase(std::move(other)) { }
+    Maybe(Maybe&& other) IP_NOEXCEPT :
+        MaybeBase(std::move(other)) {}
         using MaybeBase::operator=;
 };
 
@@ -561,7 +602,8 @@ class Maybe<double> : public MaybeBase<double> {
     public:
         Maybe() { }
         Maybe(double value) : MaybeBase(value) { }
-        Maybe(Maybe&& other) : MaybeBase(std::move(other)) { }
+    Maybe(Maybe&& other) IP_NOEXCEPT :
+        MaybeBase(std::move(other)) {}
         using MaybeBase::operator=;
 };
 
@@ -570,12 +612,18 @@ class Maybe<String> : public MaybeBase<String> {
     public:
         Maybe() { }
         Maybe(const String& value) : MaybeBase(value) { }
-        Maybe(Maybe&& other) : MaybeBase(std::move(other)) { }
+    Maybe(Maybe&& other) IP_NOEXCEPT :
+        MaybeBase(std::move(other)) {}
         using MaybeBase::operator=;
 };
 
 } // namespace v8_inspector
 } // namespace protocol
+
+#undef IP_GNUC_PREREQ
+#undef IP_TARGET_ARCH_MIPS64
+#undef IP_TARGET_ARCH_MIPS
+#undef IP_NOEXCEPT
 
 #endif // !defined(v8_inspector_protocol_Maybe_h)
 
@@ -730,7 +778,6 @@ class  DispatchResponse {
             kSuccess = 0,
             kError = 1,
             kFallThrough = 2,
-            kAsync = 3
         };
 
         enum ErrorCode {
@@ -788,7 +835,7 @@ class  DispatcherBase {
 
         class  Callback {
             public:
-                Callback(std::unique_ptr<WeakPtr> backendImpl, int callId, int callbackId);
+                Callback(std::unique_ptr<WeakPtr> backendImpl, int callId, const String& method, const String& message);
                 virtual ~Callback();
                 void dispose();
 
@@ -799,13 +846,18 @@ class  DispatcherBase {
             private:
                 std::unique_ptr<WeakPtr> m_backendImpl;
                 int m_callId;
-                int m_callbackId;
+                String m_method;
+                String m_message;
         };
 
         explicit DispatcherBase(FrontendChannel*);
         virtual ~DispatcherBase();
 
-        virtual DispatchResponse::Status dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) = 0;
+        virtual bool canDispatch(const String& method) = 0;
+        virtual void dispatch(int callId, const String& method, const String& rawMessage, std::unique_ptr<protocol::DictionaryValue> messageObject) = 0;
+        FrontendChannel* channel() {
+            return m_frontendChannel;
+        }
 
         void sendResponse(int callId, const DispatchResponse&, std::unique_ptr<protocol::DictionaryValue> result);
         void sendResponse(int callId, const DispatchResponse&);
@@ -815,17 +867,9 @@ class  DispatcherBase {
 
         std::unique_ptr<WeakPtr> weakPtr();
 
-        int nextCallbackId();
-        void markFallThrough(int callbackId);
-        bool lastCallbackFallThrough() {
-            return m_lastCallbackFallThrough;
-        }
-
     private:
         FrontendChannel* m_frontendChannel;
         std::unordered_set<WeakPtr*> m_weakPtrs;
-        int m_lastCallbackId;
-        bool m_lastCallbackFallThrough;
 };
 
 class  UberDispatcher {
@@ -834,20 +878,17 @@ class  UberDispatcher {
         explicit UberDispatcher(FrontendChannel*);
         void registerBackend(const String& name, std::unique_ptr<protocol::DispatcherBase>);
         void setupRedirects(const std::unordered_map<String, String>&);
-        DispatchResponse::Status dispatch(std::unique_ptr<Value> message, int* callId = nullptr, String* method = nullptr);
+        bool parseCommand(Value* message, int* callId, String* method);
+        bool canDispatch(const String& method);
+        void dispatch(int callId, const String& method, std::unique_ptr<Value> message, const String& rawMessage);
         FrontendChannel* channel() {
             return m_frontendChannel;
         }
-        bool fallThroughForNotFound() {
-            return m_fallThroughForNotFound;
-        }
-        void setFallThroughForNotFound(bool);
-        bool getCommandName(const String& message, String* method, std::unique_ptr<protocol::DictionaryValue>* parsedMessage);
         virtual ~UberDispatcher();
 
     private:
+        protocol::DispatcherBase* findDispatcher(const String& method);
         FrontendChannel* m_frontendChannel;
-        bool m_fallThroughForNotFound;
         std::unordered_map<String, String> m_redirects;
         std::unordered_map<String, std::unique_ptr<protocol::DispatcherBase>> m_dispatchers;
 };

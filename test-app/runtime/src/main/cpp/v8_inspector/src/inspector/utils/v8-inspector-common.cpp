@@ -21,7 +21,7 @@ v8::Local<v8::Object> Common::getGlobalInspectorObject(v8::Isolate* isolate) {
     auto maybeInspectorObj = global->Get(context, ArgConverter::ConvertToV8String(isolate, inspectorObjectString));
 
     if (maybeInspectorObj.ToLocal(&outInspector)) {
-        return outInspector->ToObject();
+        return outInspector->ToObject(context).ToLocalChecked();
     }
 
     return v8::Local<v8::Object>();

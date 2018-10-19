@@ -40,10 +40,6 @@ class ArgConverter {
 
         static v8::Local<v8::String> ConvertToV8String(v8::Isolate* isolate, const char* data, int length);
 
-        static v8::Local<v8::String> ConvertToV8UTF16String(v8::Isolate* isolate, const std::string& string);
-
-        static v8::Local<v8::String> ConvertToV8UTF16String(v8::Isolate* isolate, const uint16_t* utf16string, int size);
-
         static v8::Local<v8::String> ConvertToV8UTF16String(v8::Isolate* isolate, const std::u16string& utf16string);
 
     private:

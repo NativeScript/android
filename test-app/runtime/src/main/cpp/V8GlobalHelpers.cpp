@@ -11,15 +11,6 @@ using namespace std;
 
 static std::map<v8::Isolate*, v8::Persistent<v8::Function>*> isolateToPersistentSmartJSONStringify = std::map<v8::Isolate*, v8::Persistent<v8::Function>*>();
 
-string tns::ConvertToString(const Local<v8::String>& s) {
-    if (s.IsEmpty()) {
-        return string();
-    } else {
-        String::Utf8Value str(s);
-        return string(*str);
-    }
-}
-
 Local<Function> GetSmartJSONStringifyFunction(Isolate* isolate) {
     auto it = isolateToPersistentSmartJSONStringify.find(isolate);
     if (it != isolateToPersistentSmartJSONStringify.end()) {
@@ -87,11 +78,11 @@ Local<String> tns::JsonStringifyObject(Isolate* isolate, Handle<v8::Value> value
             v8::Local<v8::Value> resultValue;
             v8::TryCatch tc(isolate);
 
-            Local<Value> args[] = { value->ToObject() };
+            Local<Value> args[] = { value->ToObject(isolate) };
             auto success = smartJSONStringifyFunction->Call(isolate->GetCurrentContext(), Undefined(isolate), 1, args).ToLocal(&resultValue);
 
             if (success && !tc.HasCaught()) {
-                return resultValue->ToString();
+                return resultValue->ToString(isolate);
             }
         }
     }
@@ -102,58 +93,10 @@ Local<String> tns::JsonStringifyObject(Isolate* isolate, Handle<v8::Value> value
 
     if (!success && tc.HasCaught()) {
         auto message = tc.Message()->Get();
-        resultString = v8::String::Concat(ArgConverter::ConvertToV8String(isolate, "Couldn't convert object to a JSON string: "), message);
+        resultString = v8::String::Concat(isolate, ArgConverter::ConvertToV8String(isolate, "Couldn't convert object to a JSON string: "), message);
     }
 
     return resultString;
-}
-
-jstring tns::ConvertToJavaString(const Local<Value>& value) {
-    JEnv env;
-    String::Value stringValue(value);
-    return env.NewString((const jchar*) *stringValue, stringValue.length());
-}
-
-Local<String> tns::ConvertToV8String(const jchar* data, int length) {
-    auto isolate = Isolate::GetCurrent();
-    return String::NewFromTwoByte(isolate, (const uint16_t*) data, String::kNormalString, length);
-}
-
-Local<String> tns::ConvertToV8String(const string& s) {
-    auto isolate = Isolate::GetCurrent();
-    Local<v8::String> str = String::NewFromUtf8(isolate, s.c_str(), NewStringType::kNormal, s.length()).ToLocalChecked();
-    return str;
-}
-
-Local<String> tns::ConvertToV8String(const char* data, int length) {
-    auto isolate = Isolate::GetCurrent();
-    return String::NewFromUtf8(isolate, (const char*) data, String::kNormalString, length);
-}
-
-bool tns::V8HasPrivateValue(Isolate* isolate, const Local<Object>& obj, const Local<String>& propName) {
-
-    if (obj.IsEmpty()) {
-        return false;
-    }
-
-    auto privateKey = Private::ForApi(isolate, propName);
-
-    auto hasPrivate = obj->HasPrivate(isolate->GetCurrentContext(), privateKey);
-
-    if (hasPrivate.IsNothing()) {
-        return false;
-    }
-
-    if (!hasPrivate.FromMaybe(false)) {
-        return false;
-    }
-
-    auto res = obj->GetPrivate(isolate->GetCurrentContext(), privateKey);
-    if (res.IsEmpty()) {
-        return false;
-    }
-
-    return true;
 }
 
 bool tns::V8GetPrivateValue(Isolate* isolate, const Local<Object>& obj, const Local<String>& propName, Local<Value>& out) {
@@ -163,7 +106,7 @@ bool tns::V8GetPrivateValue(Isolate* isolate, const Local<Object>& obj, const Lo
 
     if (hasPrivate.IsNothing()) {
         stringstream ss;
-        ss << "Failed to Get Private Value for prop: " << tns::ConvertToString(propName).c_str() << endl;
+        ss << "Failed to Get Private Value for prop: " << ArgConverter::ConvertToString(propName).c_str() << endl;
         throw tns::NativeScriptException(ss.str());
     }
 
@@ -175,7 +118,7 @@ bool tns::V8GetPrivateValue(Isolate* isolate, const Local<Object>& obj, const Lo
 
     if (res.IsEmpty()) {
         stringstream ss;
-        ss << "Failed to Get Private Value for prop: " << tns::ConvertToString(propName).c_str() << endl;
+        ss << "Failed to Get Private Value for prop: " << ArgConverter::ConvertToString(propName).c_str() << endl;
         throw tns::NativeScriptException(ss.str());
     }
 
@@ -188,7 +131,7 @@ bool tns::V8SetPrivateValue(Isolate* isolate, const Local<Object>& obj, const Lo
 
     if (res.IsNothing()) {
         stringstream ss;
-        ss << "Failed to Set Private Value for prop: " << tns::ConvertToString(propName).c_str() << endl;
+        ss << "Failed to Set Private Value for prop: " << ArgConverter::ConvertToString(propName).c_str() << endl;
         throw tns::NativeScriptException(ss.str());
     }
 

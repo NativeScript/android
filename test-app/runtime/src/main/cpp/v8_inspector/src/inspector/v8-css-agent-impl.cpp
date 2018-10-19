@@ -165,7 +165,7 @@ DispatchResponse V8CSSAgentImpl::getComputedStyleForNode(int in_nodeId, std::uni
             v8::Local<v8::Value> outResult;
 
             if (maybeResult.ToLocal(&outResult)) {
-                auto resultString = ArgConverter::ConvertToString(outResult->ToString());
+                auto resultString = ArgConverter::ConvertToString(outResult->ToString(context).ToLocalChecked());
                 auto resultCStr = resultString.c_str();
                 auto resultJson = protocol::StringUtil::parseJSON(resultCStr);
 
