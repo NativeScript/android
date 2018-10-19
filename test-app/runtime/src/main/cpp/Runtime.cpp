@@ -451,6 +451,11 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     m_startupData = new StartupData();
 
+    auto* nativesBlobStartupData = new StartupData();
+    nativesBlobStartupData->data = reinterpret_cast<const char*>(&natives_blob_bin[0]);
+    nativesBlobStartupData->raw_size = natives_blob_bin_len;
+    V8::SetNativesDataBlob(nativesBlobStartupData);
+
     void* snapshotPtr = nullptr;
     string snapshotPath;
 
@@ -460,7 +465,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     } else {
         // If device is running on android Sdk 17
         // dlopen reads relative path to dynamic libraries or reads from folder different than the nativeLibsDirs on the android device
-        string snapshotPath = nativeLibDir + "/libsnapshot.so";
+        snapshotPath = nativeLibDir + "/libsnapshot.so";
     }
 
     snapshotPtr = dlopen(snapshotPath.c_str(), RTLD_LAZY | RTLD_LOCAL);
@@ -473,18 +478,19 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
         }
     }
 
+    bool isCustomSnapshotFound = false;
     if (snapshotPtr) {
         m_startupData->data = static_cast<const char*>(dlsym(snapshotPtr, "TNSSnapshot_blob"));
         m_startupData->raw_size = *static_cast<const unsigned int*>(dlsym(snapshotPtr, "TNSSnapshot_blob_len"));
-        create_params.snapshot_blob = m_startupData;
+        V8::SetSnapshotDataBlob(m_startupData);
+        isCustomSnapshotFound = true;
         DEBUG_WRITE_FORCE("Snapshot library read %p (%dB).", m_startupData->data, m_startupData->raw_size);
     } else if (!Constants::V8_HEAP_SNAPSHOT_BLOB.empty() || !Constants::V8_HEAP_SNAPSHOT_SCRIPT.empty()) {
         DEBUG_WRITE_FORCE("Snapshot enabled.");
 
-        string snapshotPath;
         bool saveSnapshot = true;
         // we have a precompiled snapshot blob provided - try to load it directly
-        if (Constants::V8_HEAP_SNAPSHOT_BLOB.size() > 0) {
+        if (!Constants::V8_HEAP_SNAPSHOT_BLOB.empty()) {
             snapshotPath = Constants::V8_HEAP_SNAPSHOT_BLOB;
             saveSnapshot = false;
         } else {
@@ -495,8 +501,8 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
             m_heapSnapshotBlob = new MemoryMappedFile(MemoryMappedFile::Open(snapshotPath.c_str()));
             m_startupData->data = static_cast<const char*>(m_heapSnapshotBlob->memory);
             m_startupData->raw_size = m_heapSnapshotBlob->size;
-            create_params.snapshot_blob = m_startupData;
-
+            V8::SetSnapshotDataBlob(m_startupData);
+            isCustomSnapshotFound = true;
             DEBUG_WRITE_FORCE("Snapshot read %s (%zuB).", snapshotPath.c_str(), m_heapSnapshotBlob->size);
         } else if (!saveSnapshot) {
             DEBUG_WRITE_FORCE("No snapshot file found at %s", snapshotPath.c_str());
@@ -509,7 +515,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
             string customScript;
 
             // check for custom script to include in the snapshot
-            if (Constants::V8_HEAP_SNAPSHOT_SCRIPT.size() > 0 && File::Exists(Constants::V8_HEAP_SNAPSHOT_SCRIPT)) {
+            if (!Constants::V8_HEAP_SNAPSHOT_SCRIPT.empty() && File::Exists(Constants::V8_HEAP_SNAPSHOT_SCRIPT)) {
                 customScript = ReadFileText(Constants::V8_HEAP_SNAPSHOT_SCRIPT);
             }
 
@@ -530,8 +536,17 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
                 }
             }
 
-            create_params.snapshot_blob = m_startupData;
+            V8::SetSnapshotDataBlob(m_startupData);
+            isCustomSnapshotFound = true;
         }
+    }
+
+    if (!isCustomSnapshotFound) {
+        // Load V8's built-in snapshot
+        auto* snapshotBlobStartupData = new StartupData();
+        snapshotBlobStartupData->data = reinterpret_cast<const char*>(&snapshot_blob_bin[0]);
+        snapshotBlobStartupData->raw_size = snapshot_blob_bin_len;
+        V8::SetSnapshotDataBlob(snapshotBlobStartupData);
     }
 
     /*
@@ -552,7 +567,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     m_objectManager->SetInstanceIsolate(isolate);
 
     // Sets a structure with v8 String constants on the isolate object at slot 1
-    V8StringConstants::PerIsolateV8Constants* consts = new V8StringConstants::PerIsolateV8Constants(isolate);
+    auto consts = new V8StringConstants::PerIsolateV8Constants(isolate);
     isolate->SetData((uint32_t)Runtime::IsolateData::CONSTANTS, consts);
 
     V8::SetFlagsFromString(Constants::V8_STARTUP_FLAGS.c_str(), Constants::V8_STARTUP_FLAGS.size());

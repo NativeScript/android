@@ -297,12 +297,12 @@ namespace protocol {
 class  Object {
     public:
         static std::unique_ptr<Object> fromValue(protocol::Value*, ErrorSupport*);
+        explicit Object(std::unique_ptr<protocol::DictionaryValue>);
         ~Object();
 
         std::unique_ptr<protocol::DictionaryValue> toValue() const;
         std::unique_ptr<Object> clone() const;
     private:
-        explicit Object(std::unique_ptr<protocol::DictionaryValue>);
         std::unique_ptr<protocol::DictionaryValue> m_object;
 };
 
@@ -402,6 +402,27 @@ struct ValueConversions<String> {
 
     static std::unique_ptr<protocol::Value> toValue(const String& value) {
         return StringValue::create(value);
+    }
+};
+
+template<>
+struct ValueConversions<Binary> {
+    static Binary fromValue(protocol::Value* value, ErrorSupport* errors) {
+        String result;
+        bool success = value ? value->asString(&result) : false;
+        if (!success) {
+            errors->addError("string value expected");
+            return Binary();
+        }
+        Binary out = Binary::fromBase64(result, &success);
+        if (!success) {
+            errors->addError("base64 decoding error");
+        }
+        return out;
+    }
+
+    static std::unique_ptr<protocol::Value> toValue(const Binary& value) {
+        return StringValue::create(value.toBase64());
     }
 };
 
@@ -612,6 +633,16 @@ class Maybe<String> : public MaybeBase<String> {
     public:
         Maybe() { }
         Maybe(const String& value) : MaybeBase(value) { }
+    Maybe(Maybe&& other) IP_NOEXCEPT :
+        MaybeBase(std::move(other)) {}
+        using MaybeBase::operator=;
+};
+
+template<>
+class Maybe<Binary> : public MaybeBase<Binary> {
+    public:
+        Maybe() { }
+        Maybe(Binary value) : MaybeBase(value) { }
     Maybe(Maybe&& other) IP_NOEXCEPT :
         MaybeBase(std::move(other)) {}
         using MaybeBase::operator=;

@@ -42,6 +42,8 @@ const char* RemoteObject::SubtypeEnum::Error = "error";
 const char* RemoteObject::SubtypeEnum::Proxy = "proxy";
 const char* RemoteObject::SubtypeEnum::Promise = "promise";
 const char* RemoteObject::SubtypeEnum::Typedarray = "typedarray";
+const char* RemoteObject::SubtypeEnum::Arraybuffer = "arraybuffer";
+const char* RemoteObject::SubtypeEnum::Dataview = "dataview";
 
 std::unique_ptr<RemoteObject> RemoteObject::fromValue(protocol::Value* value, ErrorSupport* errors) {
     if (!value || value->type() != protocol::Value::TypeObject) {
@@ -164,19 +166,10 @@ std::unique_ptr<CustomPreview> CustomPreview::fromValue(protocol::Value* value, 
     protocol::Value* headerValue = object->get("header");
     errors->setName("header");
     result->m_header = ValueConversions<String>::fromValue(headerValue, errors);
-    protocol::Value* hasBodyValue = object->get("hasBody");
-    errors->setName("hasBody");
-    result->m_hasBody = ValueConversions<bool>::fromValue(hasBodyValue, errors);
-    protocol::Value* formatterObjectIdValue = object->get("formatterObjectId");
-    errors->setName("formatterObjectId");
-    result->m_formatterObjectId = ValueConversions<String>::fromValue(formatterObjectIdValue, errors);
-    protocol::Value* bindRemoteObjectFunctionIdValue = object->get("bindRemoteObjectFunctionId");
-    errors->setName("bindRemoteObjectFunctionId");
-    result->m_bindRemoteObjectFunctionId = ValueConversions<String>::fromValue(bindRemoteObjectFunctionIdValue, errors);
-    protocol::Value* configObjectIdValue = object->get("configObjectId");
-    if (configObjectIdValue) {
-        errors->setName("configObjectId");
-        result->m_configObjectId = ValueConversions<String>::fromValue(configObjectIdValue, errors);
+    protocol::Value* bodyGetterIdValue = object->get("bodyGetterId");
+    if (bodyGetterIdValue) {
+        errors->setName("bodyGetterId");
+        result->m_bodyGetterId = ValueConversions<String>::fromValue(bodyGetterIdValue, errors);
     }
     errors->pop();
     if (errors->hasErrors()) {
@@ -188,11 +181,8 @@ std::unique_ptr<CustomPreview> CustomPreview::fromValue(protocol::Value* value, 
 std::unique_ptr<protocol::DictionaryValue> CustomPreview::toValue() const {
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     result->setValue("header", ValueConversions<String>::toValue(m_header));
-    result->setValue("hasBody", ValueConversions<bool>::toValue(m_hasBody));
-    result->setValue("formatterObjectId", ValueConversions<String>::toValue(m_formatterObjectId));
-    result->setValue("bindRemoteObjectFunctionId", ValueConversions<String>::toValue(m_bindRemoteObjectFunctionId));
-    if (m_configObjectId.isJust()) {
-        result->setValue("configObjectId", ValueConversions<String>::toValue(m_configObjectId.fromJust()));
+    if (m_bodyGetterId.isJust()) {
+        result->setValue("bodyGetterId", ValueConversions<String>::toValue(m_bodyGetterId.fromJust()));
     }
     return result;
 }

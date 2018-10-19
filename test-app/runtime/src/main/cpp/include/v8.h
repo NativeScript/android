@@ -118,7 +118,6 @@ class HeapObject;
 class Isolate;
 class LocalEmbedderHeapTracer;
 class NeverReadOnlySpaceObject;
-class Object;
 struct ScriptStreamingData;
 template<typename T> class CustomArguments;
 class PropertyCallbackArguments;
@@ -220,8 +219,8 @@ class Local {
          */
         template <class S>
         V8_INLINE bool operator==(const Local<S>& that) const {
-            internal::Object** a = reinterpret_cast<internal::Object**>(this->val_);
-            internal::Object** b = reinterpret_cast<internal::Object**>(that.val_);
+            internal::Address* a = reinterpret_cast<internal::Address*>(this->val_);
+            internal::Address* b = reinterpret_cast<internal::Address*>(that.val_);
             if (a == nullptr) {
                 return b == nullptr;
             }
@@ -233,8 +232,8 @@ class Local {
 
         template <class S> V8_INLINE bool operator==(
             const PersistentBase<S>& that) const {
-            internal::Object** a = reinterpret_cast<internal::Object**>(this->val_);
-            internal::Object** b = reinterpret_cast<internal::Object**>(that.val_);
+            internal::Address* a = reinterpret_cast<internal::Address*>(this->val_);
+            internal::Address* b = reinterpret_cast<internal::Address*>(that.val_);
             if (a == nullptr) {
                 return b == nullptr;
             }
@@ -509,8 +508,8 @@ template <class T> class PersistentBase {
 
         template <class S>
         V8_INLINE bool operator==(const PersistentBase<S>& that) const {
-            internal::Object** a = reinterpret_cast<internal::Object**>(this->val_);
-            internal::Object** b = reinterpret_cast<internal::Object**>(that.val_);
+            internal::Address* a = reinterpret_cast<internal::Address*>(this->val_);
+            internal::Address* b = reinterpret_cast<internal::Address*>(that.val_);
             if (a == nullptr) {
                 return b == nullptr;
             }
@@ -522,8 +521,8 @@ template <class T> class PersistentBase {
 
         template <class S>
         V8_INLINE bool operator==(const Local<S>& that) const {
-            internal::Object** a = reinterpret_cast<internal::Object**>(this->val_);
-            internal::Object** b = reinterpret_cast<internal::Object**>(that.val_);
+            internal::Address* a = reinterpret_cast<internal::Address*>(this->val_);
+            internal::Address* b = reinterpret_cast<internal::Address*>(that.val_);
             if (a == nullptr) {
                 return b == nullptr;
             }
@@ -913,8 +912,8 @@ class V8_EXPORT HandleScope {
 
         void Initialize(Isolate* isolate);
 
-        static internal::Object** CreateHandle(internal::Isolate* isolate,
-                                               internal::Object* value);
+        static internal::Address* CreateHandle(internal::Isolate* isolate,
+                                               internal::Address value);
 
     private:
         // Declaring operator new and delete as deleted is not spec compliant.
@@ -925,12 +924,12 @@ class V8_EXPORT HandleScope {
         void operator delete[](void*, size_t);
 
         // Uses heap_object to obtain the current Isolate.
-        static internal::Object** CreateHandle(
-            internal::NeverReadOnlySpaceObject* heap_object, internal::Object* value);
+        static internal::Address* CreateHandle(
+            internal::NeverReadOnlySpaceObject* heap_object, internal::Address value);
 
         internal::Isolate* isolate_;
-        internal::Object** prev_next_;
-        internal::Object** prev_limit_;
+        internal::Address* prev_next_;
+        internal::Address* prev_limit_;
 
         // Local::New uses CreateHandle with an Isolate* parameter.
         template<class F> friend class Local;
@@ -957,8 +956,8 @@ class V8_EXPORT EscapableHandleScope : public HandleScope {
          */
         template <class T>
         V8_INLINE Local<T> Escape(Local<T> value) {
-            internal::Object** slot =
-                Escape(reinterpret_cast<internal::Object**>(*value));
+            internal::Address* slot =
+                Escape(reinterpret_cast<internal::Address*>(*value));
             return Local<T>(reinterpret_cast<T*>(slot));
         }
 
@@ -978,8 +977,8 @@ class V8_EXPORT EscapableHandleScope : public HandleScope {
         void operator delete(void*, size_t);
         void operator delete[](void*, size_t);
 
-        internal::Object** Escape(internal::Object** escape_value);
-        internal::Object** escape_slot_;
+        internal::Address* Escape(internal::Address* escape_value);
+        internal::Address* escape_slot_;
 };
 
 /**
@@ -1004,7 +1003,7 @@ class V8_EXPORT SealHandleScope {
         void operator delete[](void*, size_t);
 
         internal::Isolate* const isolate_;
-        internal::Object** prev_limit_;
+        internal::Address* prev_limit_;
         int prev_sealed_level_;
 };
 
@@ -1496,10 +1495,6 @@ class V8_EXPORT ScriptCompiler {
 
         enum CompileOptions {
             kNoCompileOptions = 0,
-            kProduceParserCache,
-            kConsumeParserCache,
-            kProduceCodeCache,
-            kProduceFullCodeCache,
             kConsumeCodeCache,
             kEagerCompile
         };
@@ -1897,8 +1892,18 @@ struct SampleInfo {
 };
 
 struct MemoryRange {
-    const void* start;
-    size_t length_in_bytes;
+    const void* start = nullptr;
+    size_t length_in_bytes = 0;
+};
+
+struct JSEntryStub {
+    MemoryRange code;
+};
+
+struct UnwindState {
+    MemoryRange code_range;
+    MemoryRange embedded_code_range;
+    JSEntryStub js_entry_stub;
 };
 
 /**
@@ -2601,7 +2606,7 @@ enum class NewStringType {
  */
 class V8_EXPORT String : public Name {
     public:
-        static constexpr int kMaxLength = internal::kApiPointerSize == 4
+        static constexpr int kMaxLength = internal::kApiTaggedSize == 4
                                           ? (1 << 28) - 16
                                           : internal::kSmiMaxValue / 2 - 24;
 
@@ -2701,8 +2706,7 @@ class V8_EXPORT String : public Name {
             public:
                 virtual ~ExternalStringResourceBase() = default;
 
-                V8_DEPRECATE_SOON("Use IsCacheable().",
-                                  virtual bool IsCompressible() const) {
+                V8_DEPRECATED("Use IsCacheable().", virtual bool IsCompressible() const) {
                     return false;
                 }
 
@@ -2712,14 +2716,7 @@ class V8_EXPORT String : public Name {
                  * expected to be stable beyond the current top-level task.
                  */
                 virtual bool IsCacheable() const {
-#if __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-#endif
-                    return !IsCompressible();
-#if __clang__
-#pragma clang diagnostic pop
-#endif
+                    return true;
                 }
 
             protected:
@@ -3009,8 +3006,6 @@ class V8_EXPORT String : public Name {
         ExternalStringResource* GetExternalStringResourceSlow() const;
         ExternalStringResourceBase* GetExternalStringResourceBaseSlow(
             String::Encoding* encoding_out) const;
-        const ExternalOneByteStringResource* GetExternalOneByteStringResourceSlow()
-        const;
 
         static void CheckCast(v8::Value* obj);
 };
@@ -3401,7 +3396,7 @@ class V8_EXPORT Object : public Value {
         V8_WARN_UNUSED_RESULT MaybeLocal<Value> GetOwnPropertyDescriptor(
             Local<Context> context, Local<Name> key);
 
-        V8_DEPRECATE_SOON("Use maybe version", bool Has(Local<Value> key));
+        V8_DEPRECATED("Use maybe version", bool Has(Local<Value> key));
         /**
          * Object::Has() calls the abstract operation HasProperty(O, P) described
          * in ECMA-262, 7.3.10. Has() returns
@@ -3420,7 +3415,7 @@ class V8_EXPORT Object : public Value {
         V8_WARN_UNUSED_RESULT Maybe<bool> Has(Local<Context> context,
                                               Local<Value> key);
 
-        V8_DEPRECATE_SOON("Use maybe version", bool Delete(Local<Value> key));
+        V8_DEPRECATED("Use maybe version", bool Delete(Local<Value> key));
         V8_WARN_UNUSED_RESULT Maybe<bool> Delete(Local<Context> context,
                 Local<Value> key);
 
@@ -3741,6 +3736,18 @@ class V8_EXPORT Object : public Value {
 
         static Local<Object> New(Isolate* isolate);
 
+        /**
+         * Creates a JavaScript object with the given properties, and
+         * a the given prototype_or_null (which can be any JavaScript
+         * value, and if it's null, the newly created object won't have
+         * a prototype at all). This is similar to Object.create().
+         * All properties will be created as enumerable, configurable
+         * and writable properties.
+         */
+        static Local<Object> New(Isolate* isolate, Local<Value> prototype_or_null,
+                                 Local<Name>* names, Local<Value>* values,
+                                 size_t length);
+
         V8_INLINE static Object* Cast(Value* obj);
 
     private:
@@ -3764,6 +3771,12 @@ class V8_EXPORT Array : public Object {
          */
         static Local<Array> New(Isolate* isolate, int length = 0);
 
+        /**
+         * Creates a JavaScript array out of a Local<Value> array in C++
+         * with a known length.
+         */
+        static Local<Array> New(Isolate* isolate, Local<Value>* elements,
+                                size_t length);
         V8_INLINE static Array* Cast(Value* obj);
     private:
         Array();
@@ -3848,8 +3861,8 @@ class ReturnValue {
         }
         // Local setters
         template <typename S>
-        V8_INLINE V8_DEPRECATE_SOON("Use Global<> instead",
-                                    void Set(const Persistent<S>& handle));
+        V8_INLINE V8_DEPRECATED("Use Global<> instead",
+                                void Set(const Persistent<S>& handle));
         template <typename S>
         V8_INLINE void Set(const Global<S>& handle);
         template <typename S>
@@ -3881,12 +3894,12 @@ class ReturnValue {
         template<class F> friend class PropertyCallbackInfo;
         template <class F, class G, class H>
         friend class PersistentValueMapBase;
-        V8_INLINE void SetInternal(internal::Object* value) {
+        V8_INLINE void SetInternal(internal::Address value) {
             *value_ = value;
         }
-        V8_INLINE internal::Object* GetDefaultValue();
-        V8_INLINE explicit ReturnValue(internal::Object** slot);
-        internal::Object** value_;
+        V8_INLINE internal::Address GetDefaultValue();
+        V8_INLINE explicit ReturnValue(internal::Address* slot);
+        internal::Address* value_;
 };
 
 
@@ -3940,10 +3953,10 @@ class FunctionCallbackInfo {
         static const int kDataIndex = 4;
         static const int kNewTargetIndex = 5;
 
-        V8_INLINE FunctionCallbackInfo(internal::Object** implicit_args,
-                                       internal::Object** values, int length);
-        internal::Object** implicit_args_;
-        internal::Object** values_;
+        V8_INLINE FunctionCallbackInfo(internal::Address* implicit_args,
+                                       internal::Address* values, int length);
+        internal::Address* implicit_args_;
+        internal::Address* values_;
         int length_;
 };
 
@@ -4055,8 +4068,8 @@ class PropertyCallbackInfo {
         static const int kDataIndex = 5;
         static const int kThisIndex = 6;
 
-        V8_INLINE PropertyCallbackInfo(internal::Object** args) : args_(args) {}
-        internal::Object** args_;
+        V8_INLINE PropertyCallbackInfo(internal::Address* args) : args_(args) {}
+        internal::Address* args_;
 };
 
 
@@ -4078,10 +4091,11 @@ class V8_EXPORT Function : public Object {
             Local<Value> data = Local<Value>(), int length = 0,
             ConstructorBehavior behavior = ConstructorBehavior::kAllow,
             SideEffectType side_effect_type = SideEffectType::kHasSideEffect);
-        static V8_DEPRECATE_SOON(
-            "Use maybe version",
-            Local<Function> New(Isolate* isolate, FunctionCallback callback,
-                                Local<Value> data = Local<Value>(), int length = 0));
+        static V8_DEPRECATED("Use maybe version",
+                             Local<Function> New(Isolate* isolate,
+                                     FunctionCallback callback,
+                                     Local<Value> data = Local<Value>(),
+                                     int length = 0));
 
         V8_WARN_UNUSED_RESULT MaybeLocal<Object> NewInstance(
             Local<Context> context, int argc, Local<Value> argv[]) const;
@@ -4100,9 +4114,9 @@ class V8_EXPORT Function : public Object {
             Local<Context> context, int argc, Local<Value> argv[],
             SideEffectType side_effect_type = SideEffectType::kHasSideEffect) const;
 
-        V8_DEPRECATE_SOON("Use maybe version",
-                          Local<Value> Call(Local<Value> recv, int argc,
-                                            Local<Value> argv[]));
+        V8_DEPRECATED("Use maybe version",
+                      Local<Value> Call(Local<Value> recv, int argc,
+                                        Local<Value> argv[]));
         V8_WARN_UNUSED_RESULT MaybeLocal<Value> Call(Local<Context> context,
                 Local<Value> recv, int argc,
                 Local<Value> argv[]);
@@ -4235,6 +4249,11 @@ class V8_EXPORT Promise : public Object {
          * Returns the value of the [[PromiseState]] field.
          */
         PromiseState State();
+
+        /**
+         * Marks this promise as handled to avoid reporting unhandled rejections.
+         */
+        void MarkAsHandled();
 
         V8_INLINE static Promise* Cast(Value* obj);
 
@@ -4440,7 +4459,7 @@ class V8_EXPORT WasmCompiledModule : public Object {
 /**
  * The V8 interface for WebAssembly streaming compilation. When streaming
  * compilation is initiated, V8 passes a {WasmStreaming} object to the embedder
- * such that the embedder can pass the input butes for streaming compilation to
+ * such that the embedder can pass the input bytes for streaming compilation to
  * V8.
  */
 class V8_EXPORT WasmStreaming final {
@@ -4452,7 +4471,7 @@ class V8_EXPORT WasmStreaming final {
         ~WasmStreaming();
 
         /**
-         * Pass a new chunck of bytes to WebAssembly streaming compilation.
+         * Pass a new chunk of bytes to WebAssembly streaming compilation.
          * The buffer passed into {OnBytesReceived} is owned by the caller.
          */
         void OnBytesReceived(const uint8_t* bytes, size_t size);
@@ -4470,6 +4489,29 @@ class V8_EXPORT WasmStreaming final {
          * {exception} does not have value, the promise does not get rejected.
          */
         void Abort(MaybeLocal<Value> exception);
+
+        /**
+         * Callback for module compiled notifications. |data| is the identifier
+         * passed to {SetModuleCompiledCallback}, |compiled_module| is the result.
+         */
+        typedef void (*ModuleCompiledCallback)(
+            intptr_t data, Local<WasmCompiledModule> compiled_module);
+
+        /**
+         * Sets a callback for when compilation of the Wasm module has been completed
+         * to the highest tier. |data| will be passed as the first callback parameter.
+         */
+        void SetModuleCompiledCallback(ModuleCompiledCallback callback,
+                                       intptr_t data);
+
+        /**
+         * Passes previously compiled module bytes. This must be called before calling
+         * any non-static methods of this class. Returns true if the module bytes can
+         * be used, false otherwise. The buffer passed into {SetCompiledModuleBytes}
+         * is owned by the caller. If {SetCompiledModuleBytes} returns true, the
+         * buffer must remain valid until either {Finish} or {Abort} completes.
+         */
+        bool SetCompiledModuleBytes(const uint8_t* bytes, size_t size);
 
         /**
          * Unpacks a {WasmStreaming} object wrapped in a  {Managed} for the embedder.
@@ -5811,7 +5853,7 @@ class V8_EXPORT FunctionTemplate : public Template {
             SideEffectType side_effect_type = SideEffectType::kHasSideEffect);
 
         /** Returns the unique function instance in the current execution context.*/
-        V8_DEPRECATE_SOON("Use maybe version", Local<Function> GetFunction());
+        V8_DEPRECATED("Use maybe version", Local<Function> GetFunction());
         V8_WARN_UNUSED_RESULT MaybeLocal<Function> GetFunction(
             Local<Context> context);
 
@@ -6108,7 +6150,7 @@ class V8_EXPORT ObjectTemplate : public Template {
                 size_t index);
 
         /** Creates a new instance of this template.*/
-        V8_DEPRECATE_SOON("Use maybe version", Local<Object> NewInstance());
+        V8_DEPRECATED("Use maybe version", Local<Object> NewInstance());
         V8_WARN_UNUSED_RESULT MaybeLocal<Object> NewInstance(Local<Context> context);
 
         /**
@@ -6328,7 +6370,7 @@ class V8_EXPORT AccessorSignature : public Data {
 
 
 // --- Extensions ---
-V8_DEPRECATE_SOON("Implementation detail", class)
+V8_DEPRECATED("Implementation detail", class)
 V8_EXPORT ExternalOneByteStringResourceImpl
 :
 public String::ExternalOneByteStringResource {
@@ -6606,10 +6648,12 @@ typedef void (*HostInitializeImportMetaObjectCallback)(Local<Context> context,
  * PrepareStackTraceCallback is called when the stack property of an error is
  * first accessed. The return value will be used as the stack value. If this
  * callback is registed, the |Error.prepareStackTrace| API will be disabled.
+ * |sites| is an array of call sites, specified in
+ * https://github.com/v8/v8/wiki/Stack-Trace-API
  */
 typedef MaybeLocal<Value> (*PrepareStackTraceCallback)(Local<Context> context,
         Local<Value> error,
-        Local<StackTrace> trace);
+        Local<Array> sites);
 
 /**
  * PromiseHook with type kInit is called when a new promise is
@@ -7134,15 +7178,6 @@ class V8_EXPORT EmbedderHeapTracer {
             kEmpty,
         };
 
-        enum ForceCompletionAction { FORCE_COMPLETION, DO_NOT_FORCE_COMPLETION };
-
-        struct AdvanceTracingActions {
-            explicit AdvanceTracingActions(ForceCompletionAction force_completion_)
-                : force_completion(force_completion_) {}
-
-            ForceCompletionAction force_completion;
-        };
-
         virtual ~EmbedderHeapTracer() = default;
 
         /**
@@ -7160,25 +7195,6 @@ class V8_EXPORT EmbedderHeapTracer {
         virtual void TracePrologue() = 0;
 
         /**
-         * Called to make a tracing step in the embedder.
-         *
-         * The embedder is expected to trace its heap starting from wrappers reported
-         * by RegisterV8References method, and report back all reachable wrappers.
-         * Furthermore, the embedder is expected to stop tracing by the given
-         * deadline.
-         *
-         * Returns true if there is still work to do.
-         *
-         * Note: Only one of the AdvanceTracing methods needs to be overriden by the
-         * embedder.
-         */
-        V8_DEPRECATED("Use void AdvanceTracing(deadline_in_ms)",
-                      virtual bool AdvanceTracing(double deadline_in_ms,
-                              AdvanceTracingActions actions)) {
-            return false;
-        }
-
-        /**
          * Called to advance tracing in the embedder.
          *
          * The embedder is expected to trace its heap starting from wrappers reported
@@ -7187,17 +7203,14 @@ class V8_EXPORT EmbedderHeapTracer {
          * deadline. A deadline of infinity means that tracing should be finished.
          *
          * Returns |true| if tracing is done, and false otherwise.
-         *
-         * Note: Only one of the AdvanceTracing methods needs to be overriden by the
-         * embedder.
          */
-        virtual bool AdvanceTracing(double deadline_in_ms);
+        virtual bool AdvanceTracing(double deadline_in_ms) = 0;
 
         /*
          * Returns true if there no more tracing work to be done (see AdvanceTracing)
          * and false otherwise.
          */
-        virtual bool IsTracingDone();
+        virtual bool IsTracingDone() = 0;
 
         /**
          * Called at the end of a GC cycle.
@@ -7209,13 +7222,8 @@ class V8_EXPORT EmbedderHeapTracer {
         /**
          * Called upon entering the final marking pause. No more incremental marking
          * steps will follow this call.
-         *
-         * Note: Only one of the EnterFinalPause methods needs to be overriden by the
-         * embedder.
          */
-        V8_DEPRECATED("Use void EnterFinalPause(EmbedderStackState)",
-                      virtual void EnterFinalPause()) {}
-        virtual void EnterFinalPause(EmbedderStackState stack_state);
+        virtual void EnterFinalPause(EmbedderStackState stack_state) = 0;
 
         /**
          * Called when tracing is aborted.
@@ -7223,8 +7231,8 @@ class V8_EXPORT EmbedderHeapTracer {
          * The embedder is expected to throw away all intermediate data and reset to
          * the initial state.
          */
-        V8_DEPRECATE_SOON("Obsolete as V8 will not abort tracing anymore.",
-                          virtual void AbortTracing()) {}
+        V8_DEPRECATED("Obsolete as V8 will not abort tracing anymore.",
+                      virtual void AbortTracing()) {}
 
         /*
          * Called by the embedder to request immediate finalization of the currently
@@ -7252,13 +7260,6 @@ class V8_EXPORT EmbedderHeapTracer {
             return isolate_;
         }
 
-        /**
-         * Returns the number of wrappers that are still to be traced by the embedder.
-         */
-        V8_DEPRECATED("Use IsTracingDone", virtual size_t NumberOfWrappersToTrace()) {
-            return 0;
-        }
-
     protected:
         v8::Isolate* isolate_ = nullptr;
 
@@ -7268,6 +7269,10 @@ class V8_EXPORT EmbedderHeapTracer {
 /**
  * Callback and supporting data used in SnapshotCreator to implement embedder
  * logic to serialize internal fields.
+ * Internal fields that directly reference V8 objects are serialized without
+ * calling this callback. Internal fields that contain aligned pointers are
+ * serialized by this callback if it returns non-zero result. Otherwise it is
+ * serialized verbatim.
  */
 struct SerializeInternalFieldsCallback {
     typedef StartupData (*CallbackFunction)(Local<Object> holder, int index,
@@ -7331,6 +7336,7 @@ class V8_EXPORT Isolate {
              * generated function.
              * An entry_hook can only be provided in no-snapshot builds; in snapshot
              * builds it must be nullptr.
+             * TODO(v8:8503): Remove entry_hook.
              */
             FunctionEntryHook entry_hook;
 
@@ -7421,7 +7427,7 @@ class V8_EXPORT Isolate {
          */
         class V8_EXPORT DisallowJavascriptExecutionScope {
             public:
-                enum OnFailure { CRASH_ON_FAILURE, THROW_ON_FAILURE };
+                enum OnFailure { CRASH_ON_FAILURE, THROW_ON_FAILURE, DUMP_ON_FAILURE };
 
                 DisallowJavascriptExecutionScope(Isolate* isolate, OnFailure on_failure);
                 ~DisallowJavascriptExecutionScope();
@@ -7433,7 +7439,7 @@ class V8_EXPORT Isolate {
                     const DisallowJavascriptExecutionScope&) = delete;
 
             private:
-                bool on_failure_;
+                OnFailure on_failure_;
                 void* internal_;
         };
 
@@ -7455,6 +7461,7 @@ class V8_EXPORT Isolate {
             private:
                 void* internal_throws_;
                 void* internal_assert_;
+                void* internal_dump_;
         };
 
         /**
@@ -7578,6 +7585,9 @@ class V8_EXPORT Isolate {
             kDateToLocaleString = 66,
             kDateToLocaleDateString = 67,
             kDateToLocaleTimeString = 68,
+            kAttemptOverrideReadOnlyOnPrototypeSloppy = 69,
+            kAttemptOverrideReadOnlyOnPrototypeStrict = 70,
+            kOptimizedFunctionWithOneShotBytecode = 71,
 
             // If you add new values here, you'll also need to update Chromium's:
             // web_feature.mojom, UseCounterCallback.cpp, and enums.xml. V8 changes to
@@ -8328,13 +8338,9 @@ class V8_EXPORT Isolate {
         void GetCodeRange(void** start, size_t* length_in_bytes);
 
         /**
-         * Returns a memory range containing the code for V8's embedded functions
-         * (e.g. builtins) which are shared across isolates.
-         *
-         * If embedded builtins are disabled, then the memory range will be a null
-         * pointer with 0 length.
+         * Returns the UnwindState necessary for use with the Unwinder API.
          */
-        MemoryRange GetEmbeddedCodeRange();
+        UnwindState GetUnwindState();
 
         /** Set the callback to invoke in case of fatal errors. */
         void SetFatalErrorHandler(FatalErrorCallback that);
@@ -8380,7 +8386,9 @@ class V8_EXPORT Isolate {
         void SetWasmModuleCallback(ExtensionCallback callback);
         void SetWasmInstanceCallback(ExtensionCallback callback);
 
-        void SetWasmCompileStreamingCallback(ApiImplementationCallback callback);
+        V8_DEPRECATE_SOON(
+            "The callback set in SetWasmStreamingCallback is used now",
+            void SetWasmCompileStreamingCallback(ApiImplementationCallback callback));
 
         void SetWasmStreamingCallback(WasmStreamingCallback callback);
 
@@ -8492,7 +8500,7 @@ class V8_EXPORT Isolate {
         template <class K, class V, class Traits>
         friend class PersistentValueMapBase;
 
-        internal::Object** GetDataFromSnapshotOnce(size_t index);
+        internal::Address* GetDataFromSnapshotOnce(size_t index);
         void ReportExternalAllocationLimitReached();
         void CheckMemoryPressure();
 };
@@ -8674,15 +8682,17 @@ class V8_EXPORT V8 {
          * \param context The third argument passed to the Linux signal handler, which
          * points to a ucontext_t structure.
          */
-        static bool TryHandleSignal(int signal_number, void* info, void* context);
+        V8_DEPRECATE_SOON("Use TryHandleWebAssemblyTrapPosix",
+                          static bool TryHandleSignal(int signal_number, void* info,
+                                  void* context));
 #endif  // V8_OS_POSIX
 
         /**
          * Enable the default signal handler rather than using one provided by the
          * embedder.
          */
-        V8_DEPRECATE_SOON("Use EnableWebAssemblyTrapHandler",
-                          static bool RegisterDefaultSignalHandler());
+        V8_DEPRECATED("Use EnableWebAssemblyTrapHandler",
+                      static bool RegisterDefaultSignalHandler());
 
         /**
          * Activate trap-based bounds checking for WebAssembly.
@@ -8695,26 +8705,20 @@ class V8_EXPORT V8 {
     private:
         V8();
 
-        static internal::Object** GlobalizeReference(internal::Isolate* isolate,
-                internal::Object** handle);
-        static internal::Object** CopyPersistent(internal::Object** handle);
-        static void DisposeGlobal(internal::Object** global_handle);
-        static void MakeWeak(internal::Object** location, void* data,
+        static internal::Address* GlobalizeReference(internal::Isolate* isolate,
+                internal::Address* handle);
+        static internal::Address* CopyPersistent(internal::Address* handle);
+        static void DisposeGlobal(internal::Address* global_handle);
+        static void MakeWeak(internal::Address* location, void* data,
                              WeakCallbackInfo<void>::Callback weak_callback,
                              WeakCallbackType type);
-        static void MakeWeak(internal::Object** location, void* data,
-                             // Must be 0 or -1.
-                             int internal_field_index1,
-                             // Must be 1 or -1.
-                             int internal_field_index2,
-                             WeakCallbackInfo<void>::Callback weak_callback);
-        static void MakeWeak(internal::Object** * location_addr);
-        static void* ClearWeak(internal::Object** location);
-        static void AnnotateStrongRetainer(internal::Object** location,
+        static void MakeWeak(internal::Address** location_addr);
+        static void* ClearWeak(internal::Address* location);
+        static void AnnotateStrongRetainer(internal::Address* location,
                                            const char* label);
         static Value* Eternalize(Isolate* isolate, Value* handle);
 
-        static void RegisterExternallyReferencedObject(internal::Object** object,
+        static void RegisterExternallyReferencedObject(internal::Address* location,
                 internal::Isolate* isolate);
 
         template <class K, class V, class T>
@@ -8835,8 +8839,8 @@ class V8_EXPORT SnapshotCreator {
         void operator=(const SnapshotCreator&) = delete;
 
     private:
-        size_t AddData(Local<Context> context, internal::Object* object);
-        size_t AddData(internal::Object* object);
+        size_t AddData(Local<Context> context, internal::Address object);
+        size_t AddData(internal::Address object);
 
         void* data_;
 };
@@ -9403,7 +9407,7 @@ class V8_EXPORT Context {
         friend class Object;
         friend class Function;
 
-        internal::Object** GetDataFromSnapshotOnce(size_t index);
+        internal::Address* GetDataFromSnapshotOnce(size_t index);
         Local<Value> SlowGetEmbedderData(int index);
         void* SlowGetAlignedPointerFromEmbedderData(int index);
 };
@@ -9536,6 +9540,51 @@ class V8_EXPORT Locker {
         internal::Isolate* isolate_;
 };
 
+/**
+ * Various helpers for skipping over V8 frames in a given stack.
+ *
+ * The unwinder API is only supported on the x64 architecture.
+ */
+class V8_EXPORT Unwinder {
+    public:
+        /**
+         * Attempt to unwind the stack to the most recent C++ frame. This function is
+         * signal-safe and does not access any V8 state and thus doesn't require an
+         * Isolate.
+         *
+         * The unwinder needs to know the location of the JS Entry Stub (a piece of
+         * code that is run when C++ code calls into generated JS code). This is used
+         * for edge cases where the current frame is being constructed or torn down
+         * when the stack sample occurs.
+         *
+         * The unwinder also needs the virtual memory range of all possible V8 code
+         * objects. There are two ranges required - the heap code range and the range
+         * for code embedded in the binary. The V8 API provides all required inputs
+         * via an UnwindState object through the Isolate::GetUnwindState() API. These
+         * values will not change after Isolate initialization, so the same
+         * |unwind_state| can be used for multiple calls.
+         *
+         * \param unwind_state Input state for the Isolate that the stack comes from.
+         * \param register_state The current registers. This is an in-out param that
+         * will be overwritten with the register values after unwinding, on success.
+         * \param stack_base Currently unused.
+         *
+         * \return True on success.
+         */
+        static bool TryUnwindV8Frames(const UnwindState& unwind_state,
+                                      RegisterState* register_state,
+                                      const void* stack_base);
+
+        /**
+         * Whether the PC is within the V8 code range represented by code_range or
+         * embedded_code_range in |unwind_state|.
+         *
+         * If this returns false, then calling UnwindV8Frames() with the same PC
+         * and unwind_state will always fail. If it returns true, then unwinding may
+         * (but not necessarily) be successful.
+         */
+        static bool PCIsInV8(const UnwindState& unwind_state, void* pc);
+};
 
 // --- Implementation ---
 
@@ -9556,7 +9605,7 @@ Local<T> Local<T>::New(Isolate* isolate, T* that) {
         return Local<T>();
     }
     T* that_ptr = that;
-    internal::Object** p = reinterpret_cast<internal::Object**>(that_ptr);
+    internal::Address* p = reinterpret_cast<internal::Address*>(that_ptr);
     return Local<T>(reinterpret_cast<T*>(HandleScope::CreateHandle(
             reinterpret_cast<internal::Isolate*>(isolate), *p)));
 }
@@ -9603,7 +9652,7 @@ T* PersistentBase<T>::New(Isolate* isolate, T* that) {
     if (that == nullptr) {
         return nullptr;
     }
-    internal::Object** p = reinterpret_cast<internal::Object**>(that);
+    internal::Address* p = reinterpret_cast<internal::Address*>(that);
     return reinterpret_cast<T*>(
                V8::GlobalizeReference(reinterpret_cast<internal::Isolate*>(isolate),
                                       p));
@@ -9618,7 +9667,7 @@ void Persistent<T, M>::Copy(const Persistent<S, M2>& that) {
     if (that.IsEmpty()) {
         return;
     }
-    internal::Object** p = reinterpret_cast<internal::Object**>(that.val_);
+    internal::Address* p = reinterpret_cast<internal::Address*>(that.val_);
     this->val_ = reinterpret_cast<T*>(V8::CopyPersistent(p));
     M::Copy(that, this);
 }
@@ -9629,7 +9678,7 @@ bool PersistentBase<T>::IsIndependent() const {
     if (this->IsEmpty()) {
         return false;
     }
-    return I::GetNodeFlag(reinterpret_cast<internal::Object**>(this->val_),
+    return I::GetNodeFlag(reinterpret_cast<internal::Address*>(this->val_),
                           I::kNodeIsIndependentShift);
 }
 
@@ -9640,7 +9689,7 @@ bool PersistentBase<T>::IsNearDeath() const {
         return false;
     }
     uint8_t node_state =
-        I::GetNodeState(reinterpret_cast<internal::Object**>(this->val_));
+        I::GetNodeState(reinterpret_cast<internal::Address*>(this->val_));
     return node_state == I::kNodeStateIsNearDeathValue ||
            node_state == I::kNodeStateIsPendingValue;
 }
@@ -9652,7 +9701,7 @@ bool PersistentBase<T>::IsWeak() const {
     if (this->IsEmpty()) {
         return false;
     }
-    return I::GetNodeState(reinterpret_cast<internal::Object**>(this->val_)) ==
+    return I::GetNodeState(reinterpret_cast<internal::Address*>(this->val_)) ==
            I::kNodeStateIsWeakValue;
 }
 
@@ -9662,7 +9711,7 @@ void PersistentBase<T>::Reset() {
     if (this->IsEmpty()) {
         return;
     }
-    V8::DisposeGlobal(reinterpret_cast<internal::Object**>(this->val_));
+    V8::DisposeGlobal(reinterpret_cast<internal::Address*>(this->val_));
     val_ = nullptr;
 }
 
@@ -9698,25 +9747,25 @@ V8_INLINE void PersistentBase<T>::SetWeak(
     P* parameter, typename WeakCallbackInfo<P>::Callback callback,
     WeakCallbackType type) {
     typedef typename WeakCallbackInfo<void>::Callback Callback;
-    V8::MakeWeak(reinterpret_cast<internal::Object**>(this->val_), parameter,
+    V8::MakeWeak(reinterpret_cast<internal::Address*>(this->val_), parameter,
                  reinterpret_cast<Callback>(callback), type);
 }
 
 template <class T>
 void PersistentBase<T>::SetWeak() {
-    V8::MakeWeak(reinterpret_cast<internal::Object***>(&this->val_));
+    V8::MakeWeak(reinterpret_cast<internal::Address**>(&this->val_));
 }
 
 template <class T>
 template <typename P>
 P* PersistentBase<T>::ClearWeak() {
     return reinterpret_cast<P*>(
-               V8::ClearWeak(reinterpret_cast<internal::Object**>(this->val_)));
+               V8::ClearWeak(reinterpret_cast<internal::Address*>(this->val_)));
 }
 
 template <class T>
 void PersistentBase<T>::AnnotateStrongRetainer(const char* label) {
-    V8::AnnotateStrongRetainer(reinterpret_cast<internal::Object**>(this->val_),
+    V8::AnnotateStrongRetainer(reinterpret_cast<internal::Address*>(this->val_),
                                label);
 }
 
@@ -9726,7 +9775,7 @@ void PersistentBase<T>::RegisterExternalReference(Isolate* isolate) const {
         return;
     }
     V8::RegisterExternallyReferencedObject(
-        reinterpret_cast<internal::Object**>(this->val_),
+        reinterpret_cast<internal::Address*>(this->val_),
         reinterpret_cast<internal::Isolate*>(isolate));
 }
 
@@ -9736,7 +9785,7 @@ void PersistentBase<T>::MarkIndependent() {
     if (this->IsEmpty()) {
         return;
     }
-    I::UpdateNodeFlag(reinterpret_cast<internal::Object**>(this->val_), true,
+    I::UpdateNodeFlag(reinterpret_cast<internal::Address*>(this->val_), true,
                       I::kNodeIsIndependentShift);
 }
 
@@ -9746,7 +9795,7 @@ void PersistentBase<T>::MarkActive() {
     if (this->IsEmpty()) {
         return;
     }
-    I::UpdateNodeFlag(reinterpret_cast<internal::Object**>(this->val_), true,
+    I::UpdateNodeFlag(reinterpret_cast<internal::Address*>(this->val_), true,
                       I::kNodeIsActiveShift);
 }
 
@@ -9757,7 +9806,7 @@ void PersistentBase<T>::SetWrapperClassId(uint16_t class_id) {
     if (this->IsEmpty()) {
         return;
     }
-    internal::Object** obj = reinterpret_cast<internal::Object**>(this->val_);
+    internal::Address* obj = reinterpret_cast<internal::Address*>(this->val_);
     uint8_t* addr = reinterpret_cast<uint8_t*>(obj) + I::kNodeClassIdOffset;
     *reinterpret_cast<uint16_t*>(addr) = class_id;
 }
@@ -9769,14 +9818,13 @@ uint16_t PersistentBase<T>::WrapperClassId() const {
     if (this->IsEmpty()) {
         return 0;
     }
-    internal::Object** obj = reinterpret_cast<internal::Object**>(this->val_);
+    internal::Address* obj = reinterpret_cast<internal::Address*>(this->val_);
     uint8_t* addr = reinterpret_cast<uint8_t*>(obj) + I::kNodeClassIdOffset;
     return *reinterpret_cast<uint16_t*>(addr);
 }
 
-
-template<typename T>
-ReturnValue<T>::ReturnValue(internal::Object** slot) : value_(slot) {}
+template <typename T>
+ReturnValue<T>::ReturnValue(internal::Address* slot) : value_(slot) {}
 
 template<typename T>
 template<typename S>
@@ -9785,7 +9833,7 @@ void ReturnValue<T>::Set(const Persistent<S>& handle) {
     if (V8_UNLIKELY(handle.IsEmpty())) {
         *value_ = GetDefaultValue();
     } else {
-        *value_ = *reinterpret_cast<internal::Object**>(*handle);
+        *value_ = *reinterpret_cast<internal::Address*>(*handle);
     }
 }
 
@@ -9796,7 +9844,7 @@ void ReturnValue<T>::Set(const Global<S>& handle) {
     if (V8_UNLIKELY(handle.IsEmpty())) {
         *value_ = GetDefaultValue();
     } else {
-        *value_ = *reinterpret_cast<internal::Object**>(*handle);
+        *value_ = *reinterpret_cast<internal::Address*>(*handle);
     }
 }
 
@@ -9807,7 +9855,7 @@ void ReturnValue<T>::Set(const Local<S> handle) {
     if (V8_UNLIKELY(handle.IsEmpty())) {
         *value_ = GetDefaultValue();
     } else {
-        *value_ = *reinterpret_cast<internal::Object**>(*handle);
+        *value_ = *reinterpret_cast<internal::Address*>(*handle);
     }
 }
 
@@ -9896,15 +9944,15 @@ void ReturnValue<T>::Set(S* whatever) {
     TYPE_CHECK(S*, Primitive);
 }
 
-template<typename T>
-internal::Object* ReturnValue<T>::GetDefaultValue() {
+template <typename T>
+internal::Address ReturnValue<T>::GetDefaultValue() {
     // Default value is always the pointer below value_ on the stack.
     return value_[-1];
 }
 
 template <typename T>
-FunctionCallbackInfo<T>::FunctionCallbackInfo(internal::Object** implicit_args,
-        internal::Object** values,
+FunctionCallbackInfo<T>::FunctionCallbackInfo(internal::Address* implicit_args,
+        internal::Address* values,
         int length)
     : implicit_args_(implicit_args), values_(values), length_(length) {}
 
@@ -10081,20 +10129,20 @@ AccessorSignature* AccessorSignature::Cast(Data* data) {
 }
 
 Local<Value> Object::GetInternalField(int index) {
-#ifndef V8_ENABLE_CHECKS
-    typedef internal::Object O;
+#if !defined(V8_ENABLE_CHECKS) && !defined(V8_COMPRESS_POINTERS)
+    typedef internal::Address A;
     typedef internal::Internals I;
-    O* obj = *reinterpret_cast<O**>(this);
+    A obj = *reinterpret_cast<A*>(this);
     // Fast path: If the object is a plain JSObject, which is the common case, we
     // know where to find the internal fields and can return the value directly.
     auto instance_type = I::GetInstanceType(obj);
     if (instance_type == I::kJSObjectType ||
             instance_type == I::kJSApiObjectType ||
             instance_type == I::kJSSpecialApiObjectType) {
-        int offset = I::kJSObjectHeaderSize + (internal::kApiPointerSize * index);
-        O* value = I::ReadField<O*>(obj, offset);
-        O** result = HandleScope::CreateHandle(
-                         reinterpret_cast<internal::NeverReadOnlySpaceObject*>(obj), value);
+        int offset = I::kJSObjectHeaderSize + (I::kEmbedderDataSlotSize * index);
+        A value = I::ReadField<A>(obj, offset);
+        A* result = HandleScope::CreateHandle(
+                        reinterpret_cast<internal::NeverReadOnlySpaceObject*>(obj), value);
         return Local<Value>(reinterpret_cast<Value*>(result));
     }
 #endif
@@ -10103,17 +10151,17 @@ Local<Value> Object::GetInternalField(int index) {
 
 
 void* Object::GetAlignedPointerFromInternalField(int index) {
-#ifndef V8_ENABLE_CHECKS
-    typedef internal::Object O;
+#if !defined(V8_ENABLE_CHECKS) && !defined(V8_COMPRESS_POINTERS)
+    typedef internal::Address A;
     typedef internal::Internals I;
-    O* obj = *reinterpret_cast<O**>(this);
+    A obj = *reinterpret_cast<A*>(this);
     // Fast path: If the object is a plain JSObject, which is the common case, we
     // know where to find the internal fields and can return the value directly.
     auto instance_type = I::GetInstanceType(obj);
     if (V8_LIKELY(instance_type == I::kJSObjectType ||
                   instance_type == I::kJSApiObjectType ||
                   instance_type == I::kJSSpecialApiObjectType)) {
-        int offset = I::kJSObjectHeaderSize + (internal::kApiPointerSize * index);
+        int offset = I::kJSObjectHeaderSize + (I::kEmbedderDataSlotSize * index);
         return I::ReadField<void*>(obj, offset);
     }
 #endif
@@ -10129,7 +10177,7 @@ String* String::Cast(v8::Value* value) {
 
 
 Local<String> String::Empty(Isolate* isolate) {
-    typedef internal::Object* S;
+    typedef internal::Address S;
     typedef internal::Internals I;
     I::CheckInitialized(isolate);
     S* slot = I::GetRoot(isolate, I::kEmptyStringRootIndex);
@@ -10138,9 +10186,9 @@ Local<String> String::Empty(Isolate* isolate) {
 
 
 String::ExternalStringResource* String::GetExternalStringResource() const {
-    typedef internal::Object O;
+    typedef internal::Address A;
     typedef internal::Internals I;
-    O* obj = *reinterpret_cast<O* const*>(this);
+    A obj = *reinterpret_cast<const A*>(this);
 
     ExternalStringResource* result;
     if (I::IsExternalTwoByteString(I::GetInstanceType(obj))) {
@@ -10158,9 +10206,9 @@ String::ExternalStringResource* String::GetExternalStringResource() const {
 
 String::ExternalStringResourceBase* String::GetExternalStringResourceBase(
     String::Encoding* encoding_out) const {
-    typedef internal::Object O;
+    typedef internal::Address A;
     typedef internal::Internals I;
-    O* obj = *reinterpret_cast<O* const*>(this);
+    A obj = *reinterpret_cast<const A*>(this);
     int type = I::GetInstanceType(obj) & I::kFullStringRepresentationMask;
     *encoding_out = static_cast<Encoding>(type & I::kStringEncodingMask);
     ExternalStringResourceBase* resource;
@@ -10187,9 +10235,9 @@ bool Value::IsUndefined() const {
 }
 
 bool Value::QuickIsUndefined() const {
-    typedef internal::Object O;
+    typedef internal::Address A;
     typedef internal::Internals I;
-    O* obj = *reinterpret_cast<O* const*>(this);
+    A obj = *reinterpret_cast<const A*>(this);
     if (!I::HasHeapObjectTag(obj)) {
         return false;
     }
@@ -10209,9 +10257,9 @@ bool Value::IsNull() const {
 }
 
 bool Value::QuickIsNull() const {
-    typedef internal::Object O;
+    typedef internal::Address A;
     typedef internal::Internals I;
-    O* obj = *reinterpret_cast<O* const*>(this);
+    A obj = *reinterpret_cast<const A*>(this);
     if (!I::HasHeapObjectTag(obj)) {
         return false;
     }
@@ -10230,9 +10278,9 @@ bool Value::IsNullOrUndefined() const {
 }
 
 bool Value::QuickIsNullOrUndefined() const {
-    typedef internal::Object O;
+    typedef internal::Address A;
     typedef internal::Internals I;
-    O* obj = *reinterpret_cast<O* const*>(this);
+    A obj = *reinterpret_cast<const A*>(this);
     if (!I::HasHeapObjectTag(obj)) {
         return false;
     }
@@ -10252,9 +10300,9 @@ bool Value::IsString() const {
 }
 
 bool Value::QuickIsString() const {
-    typedef internal::Object O;
+    typedef internal::Address A;
     typedef internal::Internals I;
-    O* obj = *reinterpret_cast<O* const*>(this);
+    A obj = *reinterpret_cast<const A*>(this);
     if (!I::HasHeapObjectTag(obj)) {
         return false;
     }
@@ -10631,7 +10679,7 @@ bool PropertyCallbackInfo<T>::ShouldThrowOnError() const {
 
 
 Local<Primitive> Undefined(Isolate* isolate) {
-    typedef internal::Object* S;
+    typedef internal::Address S;
     typedef internal::Internals I;
     I::CheckInitialized(isolate);
     S* slot = I::GetRoot(isolate, I::kUndefinedValueRootIndex);
@@ -10640,7 +10688,7 @@ Local<Primitive> Undefined(Isolate* isolate) {
 
 
 Local<Primitive> Null(Isolate* isolate) {
-    typedef internal::Object* S;
+    typedef internal::Address S;
     typedef internal::Internals I;
     I::CheckInitialized(isolate);
     S* slot = I::GetRoot(isolate, I::kNullValueRootIndex);
@@ -10649,7 +10697,7 @@ Local<Primitive> Null(Isolate* isolate) {
 
 
 Local<Boolean> True(Isolate* isolate) {
-    typedef internal::Object* S;
+    typedef internal::Address S;
     typedef internal::Internals I;
     I::CheckInitialized(isolate);
     S* slot = I::GetRoot(isolate, I::kTrueValueRootIndex);
@@ -10658,7 +10706,7 @@ Local<Boolean> True(Isolate* isolate) {
 
 
 Local<Boolean> False(Isolate* isolate) {
-    typedef internal::Object* S;
+    typedef internal::Address S;
     typedef internal::Internals I;
     I::CheckInitialized(isolate);
     S* slot = I::GetRoot(isolate, I::kFalseValueRootIndex);
@@ -10695,7 +10743,7 @@ MaybeLocal<T> Isolate::GetDataFromSnapshotOnce(size_t index) {
 int64_t Isolate::AdjustAmountOfExternalAllocatedMemory(
     int64_t change_in_bytes) {
     typedef internal::Internals I;
-    const int64_t kMemoryReducerActivationLimit = 32 * 1024 * 1024;
+    constexpr int64_t kMemoryReducerActivationLimit = 32 * 1024 * 1024;
     int64_t* external_memory = reinterpret_cast<int64_t*>(
                                    reinterpret_cast<uint8_t*>(this) + I::kExternalMemoryOffset);
     int64_t* external_memory_limit = reinterpret_cast<int64_t*>(
@@ -10703,15 +10751,14 @@ int64_t Isolate::AdjustAmountOfExternalAllocatedMemory(
     int64_t* external_memory_at_last_mc =
         reinterpret_cast<int64_t*>(reinterpret_cast<uint8_t*>(this) +
                                    I::kExternalMemoryAtLastMarkCompactOffset);
-    const int64_t amount = *external_memory + change_in_bytes;
 
+    const int64_t amount = *external_memory + change_in_bytes;
     *external_memory = amount;
 
     int64_t allocation_diff_since_last_mc =
-        *external_memory_at_last_mc - *external_memory;
-    allocation_diff_since_last_mc = allocation_diff_since_last_mc < 0
-                                    ? -allocation_diff_since_last_mc
-                                    : allocation_diff_since_last_mc;
+        *external_memory - *external_memory_at_last_mc;
+    // Only check memory pressure and potentially trigger GC if the amount of
+    // external memory increased.
     if (allocation_diff_since_last_mc > kMemoryReducerActivationLimit) {
         CheckMemoryPressure();
     }
@@ -10728,12 +10775,12 @@ int64_t Isolate::AdjustAmountOfExternalAllocatedMemory(
 }
 
 Local<Value> Context::GetEmbedderData(int index) {
-#ifndef V8_ENABLE_CHECKS
-    typedef internal::Object O;
+#if !defined(V8_ENABLE_CHECKS) && !defined(V8_COMPRESS_POINTERS)
+    typedef internal::Address A;
     typedef internal::Internals I;
     auto* context = *reinterpret_cast<internal::NeverReadOnlySpaceObject**>(this);
-    O** result =
-        HandleScope::CreateHandle(context, I::ReadEmbedderData<O*>(this, index));
+    A* result =
+        HandleScope::CreateHandle(context, I::ReadEmbedderData<A>(this, index));
     return Local<Value>(reinterpret_cast<Value*>(result));
 #else
     return SlowGetEmbedderData(index);
@@ -10742,7 +10789,7 @@ Local<Value> Context::GetEmbedderData(int index) {
 
 
 void* Context::GetAlignedPointerFromEmbedderData(int index) {
-#ifndef V8_ENABLE_CHECKS
+#if !defined(V8_ENABLE_CHECKS) && !defined(V8_COMPRESS_POINTERS)
     typedef internal::Internals I;
     return I::ReadEmbedderData<void*>(this, index);
 #else
@@ -10762,14 +10809,14 @@ MaybeLocal<T> Context::GetDataFromSnapshotOnce(size_t index) {
 template <class T>
 size_t SnapshotCreator::AddData(Local<Context> context, Local<T> object) {
     T* object_ptr = *object;
-    internal::Object** p = reinterpret_cast<internal::Object**>(object_ptr);
+    internal::Address* p = reinterpret_cast<internal::Address*>(object_ptr);
     return AddData(context, *p);
 }
 
 template <class T>
 size_t SnapshotCreator::AddData(Local<T> object) {
     T* object_ptr = *object;
-    internal::Object** p = reinterpret_cast<internal::Object**>(object_ptr);
+    internal::Address* p = reinterpret_cast<internal::Address*>(object_ptr);
     return AddData(*p);
 }
 
