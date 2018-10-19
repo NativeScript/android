@@ -1,3 +1,4 @@
 {
-    "v8Version": "7.1.302.32"
+    "v8Version": "7.2.502.25",
+    "mksnapshotParams": "--profile_deserialization --turbo_instruction_scheduling"
 }

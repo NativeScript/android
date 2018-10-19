@@ -1,7 +1,7 @@
 env:
   global:
   - NODE_VERSION=6.11.1
-  - NDK_VERSION=r18b
+  - NDK_VERSION=r19
   - DATE=$(date +%Y-%m-%d)
   - PACKAGE_VERSION=next-$DATE-$TRAVIS_BUILD_NUMBER
   - EMULATOR_API_LEVEL=21

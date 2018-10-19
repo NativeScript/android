@@ -342,6 +342,12 @@ class V8_EXPORT CpuProfiler {
         V8_DEPRECATED("Use Isolate::SetIdle(bool) instead.",
                       void SetIdle(bool is_idle));
 
+        /**
+         * Generate more detailed source positions to code objects. This results in
+         * better results when mapping profiling samples to script source.
+         */
+        static void UseDetailedSourcePositionsForProfiling(Isolate* isolate);
+
     private:
         CpuProfiler();
         ~CpuProfiler();
@@ -609,6 +615,11 @@ class V8_EXPORT AllocationProfile {
             int column_number;
 
             /**
+             * Unique id of the node.
+             */
+            uint32_t node_id;
+
+            /**
              * List of callees called from this node for which we have sampled
              * allocations. The lifetime of the children is scoped to the containing
              * AllocationProfile.
@@ -622,11 +633,38 @@ class V8_EXPORT AllocationProfile {
         };
 
         /**
+         * Represent a single sample recorded for an allocation.
+         */
+        struct Sample {
+            /**
+             * id of the node in the profile tree.
+             */
+            uint32_t node_id;
+
+            /**
+             * Size of the sampled allocation object.
+             */
+            size_t size;
+
+            /**
+             * The number of objects of such size that were sampled.
+             */
+            unsigned int count;
+
+            /**
+             * Unique time-ordered id of the allocation sample. Can be used to track
+             * what samples were added or removed between two snapshots.
+             */
+            uint64_t sample_id;
+        };
+
+        /**
          * Returns the root node of the call-graph. The root node corresponds to an
          * empty JS call-stack. The lifetime of the returned Node* is scoped to the
          * containing AllocationProfile.
          */
         virtual Node* GetRootNode() = 0;
+        virtual const std::vector<Sample>& GetSamples() = 0;
 
         virtual ~AllocationProfile() = default;
 
