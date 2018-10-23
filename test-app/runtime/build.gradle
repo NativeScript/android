@@ -20,7 +20,7 @@ if (useCCache) {
     println "Use CCache build triggered."
 }
 
-project.ext._buildToolsVersion = "28.0.2"
+project.ext._buildToolsVersion = "28.0.3"
 
 android {
     sourceSets {
