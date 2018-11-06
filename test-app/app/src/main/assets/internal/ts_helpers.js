@@ -1,5 +1,5 @@
 (function() {
-	var __extends_ts = function (d, b) {
+	var __extends_ns = function (d, b) {
 		if (!b.extend) {
 			for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
 		}
@@ -8,6 +8,17 @@
 		__.prototype = b.prototype;
 		d.prototype = new __();
 	};
+
+	var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+
+	var __extends_ts = function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+
 
 	var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
 		var c = arguments.length;
@@ -59,68 +70,65 @@
 	};
 
 	var __extends = function(Child, Parent) {
+		var extendNativeClass = !!Parent.extend && /native/.test(Parent.extend.toString());
+		if (!extendNativeClass)	{
+			__extends_ts(Child, Parent);
+			return;
+		}
+		if	(Parent.__isPrototypeImplementationObject) {
+			throw new Error("Can not extend an already extended native object.");
+		}
 
-		if (Parent.extend)	{
-			if	(Parent.__isPrototypeImplementationObject) {
-				throw new Error("Can not extend an already extended native object.");
+		function extend(thiz) {
+			var child = thiz.__proto__.__child;
+			if (!child.__extended) {
+				var parent = thiz.__proto__.__parent;
+				child.__extended = parent.extend(child.name, child.prototype, true);
+				// This will deal with "i instanceof child"
+				child[Symbol.hasInstance] = function(instance) {
+					return instance instanceof this.__extended;
+				}
 			}
+			return child.__extended;
+		};
 
-			function extend(thiz) {
-				var child = thiz.__proto__.__child;
-				if (!child.__extended) {
-					var parent = thiz.__proto__.__parent;
-					child.__extended = parent.extend(child.name, child.prototype, true);
-					// This will deal with "i instanceof child"
-					child[Symbol.hasInstance] = function(instance) {
-						return instance instanceof this.__extended;
-					}
-				}
-				return child.__extended;
-			};
+		Parent.__activityExtend = function(parent, name, implementationObject) {
+			__log("__activityExtend called");
+			return parent.extend(name, implementationObject);
+		};
 
-			Parent.__activityExtend = function(parent, name, implementationObject) {
-				__log("__activityExtend called");
-				return parent.extend(name, implementationObject);
-			};
+		Parent.call = function(thiz) {
+			var Extended = extend(thiz);
+			thiz.__container__ = true;
+			if (arguments.length > 1)
+			{
+				thiz.__proto__ = new (Function.prototype.bind.apply(Extended, [null].concat(Array.prototype.slice.call(arguments, 1))));
+			}
+			else
+			{
+				thiz.__proto__ = new Extended()
+			}
+			return thiz.__proto__;
+		};
 
-			Parent.call = function(thiz) {
-				var Extended = extend(thiz);
-				thiz.__container__ = true;
-                if (arguments.length > 1)
-				{
-				    thiz.__proto__ = new (Function.prototype.bind.apply(Extended, [null].concat(Array.prototype.slice.call(arguments, 1))));
-				}
-				else
-				{
-				    thiz.__proto__ = new Extended()
-				}
-				return thiz.__proto__;
-			};
-
-			Parent.apply = function(thiz, args) {
-                var Extended = extend(thiz);
-                thiz.__container__ = true;
-				if (args && args.length > 0)
-				{
-					thiz.__proto__ = new (Function.prototype.bind.apply(Extended, [null].concat(args)));
-				}
-				else
-				{
-					thiz.__proto__ = new Extended();
-				}
-				return thiz.__proto__;
-			};
-		}
-
-		__extends_ts(Child, Parent);
-
-
-		if (Parent.extend) {
-			Child.__isPrototypeImplementationObject = true;
-            Child.__proto__ = Parent;
-            Child.prototype.__parent = Parent;
-			Child.prototype.__child = Child;
-		}
+		Parent.apply = function(thiz, args) {
+			var Extended = extend(thiz);
+			thiz.__container__ = true;
+			if (args && args.length > 0)
+			{
+				thiz.__proto__ = new (Function.prototype.bind.apply(Extended, [null].concat(args)));
+			}
+			else
+			{
+				thiz.__proto__ = new Extended();
+			}
+			return thiz.__proto__;
+		};
+		__extends_ns(Child, Parent);
+		Child.__isPrototypeImplementationObject = true;
+		Child.__proto__ = Parent;
+		Child.prototype.__parent = Parent;
+		Child.prototype.__child = Child;
 	}
 
 	function JavaProxy(className) {
