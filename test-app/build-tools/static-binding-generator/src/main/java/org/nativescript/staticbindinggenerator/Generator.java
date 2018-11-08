@@ -26,6 +26,7 @@ import java.util.zip.ZipEntry;
 import org.apache.bcel.classfile.ClassParser;
 import org.apache.bcel.classfile.JavaClass;
 import org.apache.bcel.classfile.Method;
+import org.apache.bcel.generic.BasicType;
 import org.apache.bcel.generic.Type;
 
 public class Generator {
@@ -47,15 +48,17 @@ public class Generator {
     private final File outputDir;
     private final List<DataRow>  libs;
     private final Map<String, JavaClass> classes;
+    private final boolean suppressCallJSMethodExceptions;
 
     public Generator(File outputDir, List<DataRow> libs) throws IOException {
-        this(outputDir, libs, false);
+        this(outputDir, libs, false, false);
     }
 
-    public Generator(File outputDir, List<DataRow> libs, boolean throwOnError) throws IOException {
+    public Generator(File outputDir, List<DataRow> libs, boolean suppressCallJSMethodExceptions, boolean throwOnError) throws IOException {
         this.outputDir = outputDir;
         this.libs = libs;
         this.classes = readClasses(libs, throwOnError);
+        this.suppressCallJSMethodExceptions = suppressCallJSMethodExceptions;
     }
 
     public void writeBindings(String filename) throws IOException, ClassNotFoundException {
@@ -638,6 +641,12 @@ public class Generator {
         }
         w.write("\t\t");
         Type ret = m.getReturnType();
+
+        if(this.suppressCallJSMethodExceptions) {
+            w.writeln("try {");
+            w.write("\t\t\t");
+        }
+
         if (!ret.equals(Type.VOID)) {
             w.write("return (");
             writeType(ret, w);
@@ -648,6 +657,19 @@ public class Generator {
         w.write("\", ");
         writeType(ret, w);
         w.writeln(".class, args);");
+
+        if(this.suppressCallJSMethodExceptions) {
+            w.writeln("\t\t} catch (Throwable t) {");
+            w.writeln("\t\t\tandroid.util.Log.w(\"Error\", t);");
+            if (!ret.equals(Type.VOID)) {
+                w.write("\t\t\t");
+                w.write("return ");
+                w.write(DefaultValues.defaultStringValueFor(ret));
+                w.writeln(";");
+            }
+            w.writeln("\t\t}");
+        }
+
         if (m.getName().equals("onCreate") && isApplicationClass) {
             w.writeln("\t\tif (runtime != null) {");
             w.writeln("\t\t\truntime.run();");
