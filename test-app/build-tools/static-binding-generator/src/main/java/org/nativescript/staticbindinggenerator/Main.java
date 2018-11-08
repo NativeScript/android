@@ -68,6 +68,9 @@ public class Main {
 
     private static boolean isSuppressCallJSMethodExceptionsEnabled() throws IOException{
         File jsonFile = new File(inputDir, "package.json");
+        if (!jsonFile.exists()) {
+            return false;
+        }
         String jsonContent = FileUtils.readFileToString(jsonFile, "UTF-8");
         JSONObject pjson = null;
         try {
