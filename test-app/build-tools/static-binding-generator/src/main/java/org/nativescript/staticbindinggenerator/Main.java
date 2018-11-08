@@ -74,7 +74,7 @@ public class Main {
             pjson = new JSONObject(jsonContent);
             if (pjson.has("android")) {
                 JSONObject androidSettings = (JSONObject) pjson.get("android");
-                if(androidSettings.has("suppressCallJSMethodExceptions") && androidSettings.get("suppressCallJSMethodExceptions").toString() == "true") {
+                if(androidSettings.has("suppressCallJSMethodExceptions") && androidSettings.get("suppressCallJSMethodExceptions").toString().equals("true")) {
                     return true;
                 }
             }
