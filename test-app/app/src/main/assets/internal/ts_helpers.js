@@ -1,24 +1,4 @@
 (function() {
-	var __extends_ns = function (d, b) {
-		if (!b.extend) {
-			for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-		}
-
-		function __() { this.constructor = d; }
-		__.prototype = b.prototype;
-		d.prototype = new __();
-	};
-
-	var extendStatics = Object.setPrototypeOf ||
-        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
-
-	var __extends_ts = function (d, b) {
-        extendStatics(d, b);
-        function __() { this.constructor = d; }
-        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-    };
-
 
 	var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
 		var c = arguments.length;
@@ -70,7 +50,8 @@
 	};
 
 	var __extends = function(Child, Parent) {
-		var extendNativeClass = !!Parent.extend && /native/.test(Parent.extend.toString());
+		const NATIVE_CODE_REGEX = /\{\s*\[native code\]\s*\}/g;
+		var extendNativeClass = !!Parent.extend && NATIVE_CODE_REGEX.test(Parent.extend.toString());
 		if (!extendNativeClass)	{
 			__extends_ts(Child, Parent);
 			return;
@@ -130,6 +111,50 @@
 		Child.prototype.__parent = Parent;
 		Child.prototype.__child = Child;
 	}
+
+	var __extends_ts = function (child, parent) {
+		extendStaticFunctions(child, parent);
+		assignPrototypeFromParentToChild(parent, child);
+	};
+
+	var __extends_ns = function (child, parent) {
+		if (!parent.extend) {
+			assignPropertiesFromParentToChild(parent, child);
+		}
+
+		assignPrototypeFromParentToChild(parent, child);
+	};
+
+	var extendStaticFunctions =
+			Object.setPrototypeOf
+        	|| (hasInternalProtoProperty() && function (child, parent) { child.__proto__ = parent; })
+         	|| assignPropertiesFromParentToChild;
+
+	function hasInternalProtoProperty(){
+		return { __proto__: [] } instanceof Array;
+	}
+
+	function assignPropertiesFromParentToChild(parent, child){
+		for (var property in parent){
+			if (parent.hasOwnProperty(property)) {
+				child[property] = parent[property];
+			}
+		}
+	}
+
+	function assignPrototypeFromParentToChild(parent, child){
+		function __() {
+			this.constructor = child;
+		}
+
+		if(parent === null){
+			child.prototype = Object.create(null);
+		} else {
+			__.prototype = parent.prototype;
+		child.prototype = new __();
+		}
+	}
+
 
 	function JavaProxy(className) {
 		return function (target) {

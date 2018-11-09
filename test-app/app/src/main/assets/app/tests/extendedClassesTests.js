@@ -1,6 +1,6 @@
 describe("Tests extended classes ", function () {
 
-	it("Instance_with_no_extension_shouldnt_use_previously_defined_implementation_object", function () {
+	it("Instance with no extension shouldn't use previously defined implementation object", function () {
 		var MyButton = com.tns.tests.Button1.extend({
 			toString: function () {
 				return "overriden toString method of chronometer instance";
@@ -21,8 +21,56 @@ describe("Tests extended classes ", function () {
 		expect(labelToString).not.toBe(labelToString1);
 		expect(labelgetIMAGE_ID_PROP).not.toBe(labelgetIMAGE_ID_PROP1);
 	});
+
+	it("Having a class with static method named 'extend' and overriding it in a child class shouldn't  crash the app", function (){
+
+        /*  JS below the comment is generated from the following TS code
+
+        class Base{
+            static extend(){
+                return "expectedValue";
+            }
+        }
+
+        class Child extends Base{}
+
+        const superProto = Object.getPrototypeOf(Child.prototype)
+        const Super = superProto.constructor;
+        Super.extend();
+
+        var child = Object.create(Child);
+        child.extend();
+        Child.extend();
+
+        */
+
+        var Base = /** @class */ (function () {
+            function Base() {
+            }
+            Base.extend = function () {
+                return "expectedValue";
+            };
+            return Base;
+        }());
+        var Child = /** @class */ (function (_super) {
+            __extends(Child, _super);
+            function Child() {
+                return _super !== null && _super.apply(this, arguments) || this;
+            }
+            return Child;
+        }(Base));
+
+        var superProto = Object.getPrototypeOf(Child.prototype);
+        var Super = superProto.constructor;
+        expect(Super.extend()).toBe("expectedValue");
+
+        var child = Object.create(Child);
+        expect(child.extend()).toBe("expectedValue");
+
+        expect(Child.extend()).toBe("expectedValue");
+	});
 	
-	it("Instance_with_extension_shouldnt_use_previously_defined_implementation_object", function () {
+	it("Instance with extension shouldn't use previously defined implementation object", function () {
 		
 		var MyButton = com.tns.tests.Button1.extend({
 			toString: function () {
@@ -53,7 +101,7 @@ describe("Tests extended classes ", function () {
 		expect(labelgetIMAGE_ID_PROP).not.toBe(labelgetIMAGE_ID_PROP1);
 	});
 	
-	it("Newly_created_instances_should_behave_the_same_and_not_use_previously_defined_implementation_objects", function () {
+	it("Newly created instances should behave the same and not use previously defined implementation objects", function () {
 
 		var button1 = new com.tns.tests.Button1();
 		var labelgetIMAGE_ID_PROP1 = button1.getIMAGE_ID_PROP();
@@ -74,7 +122,7 @@ describe("Tests extended classes ", function () {
 		expect(labelgetIMAGE_ID_PROP1).toBe(labelgetIMAGE_ID_PROP2);
 	});
 
-	it("should not crash with no exception when incorrectly calling extended class constructor", function () {
+	it("Should not crash with no exception when incorrectly calling extended class constructor", function () {
 	    let MyObj = java.lang.Object.extend({
                         toString: () => { return "It's MyObj" }
                     });
