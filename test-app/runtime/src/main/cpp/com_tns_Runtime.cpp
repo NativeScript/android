@@ -2,6 +2,8 @@
 #include "Runtime.h"
 #include "NativeScriptException.h"
 #include "CallbackHandlers.h"
+#include "NativeScriptAssert.h"
+#include "ArgConverter.h"
 #include <sstream>
 
 using namespace std;

@@ -22,6 +22,9 @@ class JEnv {
 
         jmethodID GetMethodID(jclass clazz, const std::string& name, const std::string& sig);
         jmethodID GetStaticMethodID(jclass clazz, const std::string& name, const std::string& sig);
+        std::pair<jmethodID,jclass> GetInterfaceStaticMethodIDAndJClass(
+                const std::string &interfaceName, const std::string &methodName,
+                const std::string &sig);
 
         jfieldID GetFieldID(jclass clazz, const std::string& name, const std::string& sig);
         jfieldID GetStaticFieldID(jclass clazz, const std::string& name, const std::string& sig);

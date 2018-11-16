@@ -39,6 +39,8 @@ class MetadataNode {
 
         std::string GetName();
 
+        bool IsNodeTypeInterface();
+
         v8::Local<v8::Object> CreateWrapper(v8::Isolate* isolate);
 
         v8::Local<v8::Object> CreateJSWrapper(v8::Isolate* isolate, ObjectManager* objectManager);

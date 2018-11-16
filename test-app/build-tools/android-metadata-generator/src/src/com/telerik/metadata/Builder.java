@@ -1,10 +1,15 @@
 package com.telerik.metadata;
 
 import java.io.File;
+import java.lang.reflect.Array;
+import java.lang.reflect.Method;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -124,7 +129,9 @@ public class Builder {
         }
 
         MethodDescriptor[] allMethods = ClassUtil.getAllMethods(clazz);
-        MethodDescriptor[] methods = clazz.getMethods();
+        MethodDescriptor[] classImplementedMethods = clazz.getMethods();
+        MethodDescriptor[] interfaceImplementedMethods = getDefaultMethodsFromImplementedInterfaces(clazz, classImplementedMethods);
+        MethodDescriptor[] methods = concatenate(classImplementedMethods, interfaceImplementedMethods);
 
         Arrays.sort(methods, methodNameComparator);
 
@@ -151,8 +158,8 @@ public class Builder {
                             && (m1.isPublic() || m1.isProtected())
                             && (isStatic == m1IsStatic)
                             && (m1.getName().equals(mi.name) && (m1
-                                    .getArgumentTypes().length == m
-                                    .getArgumentTypes().length))) {
+                            .getArgumentTypes().length == m
+                            .getArgumentTypes().length))) {
                         if (++countUnique > 1) {
                             break;
                         }
@@ -162,7 +169,7 @@ public class Builder {
 
                 TypeDescriptor[] params = m.getArgumentTypes();
                 mi.signature = getMethodSignature(root, m.getReturnType(),
-                                                  params);
+                        params);
 
                 if (mi.signature != null) {
                     if (isStatic) {
@@ -195,7 +202,7 @@ public class Builder {
                 TypeDescriptor t = f.getType();
                 boolean isPrimitive = ClassUtil.isPrimitive(t);
 
-                fi.valueType = isPrimitive ? TreeNode.getPrimitive(t): getOrCreateNode(root, t);
+                fi.valueType = isPrimitive ? TreeNode.getPrimitive(t) : getOrCreateNode(root, t);
                 fi.isFinalType = f.isFinal();
 
                 if (f.isStatic()) {
@@ -242,8 +249,38 @@ public class Builder {
         }
     }
 
+    private static MethodDescriptor[] getDefaultMethodsFromImplementedInterfaces(ClassDescriptor clazz, MethodDescriptor[] originalClassMethodDescriptors) {
+        HashSet<MethodDescriptor> defaultMethods = getAllDefaultMethodsFromImplementedInterfaces(clazz);
+        HashSet<MethodDescriptor> classMethods = new HashSet<MethodDescriptor>(Arrays.asList(originalClassMethodDescriptors));
+        defaultMethods.removeAll(classMethods);
+
+        return defaultMethods.toArray(new MethodDescriptor[0]);
+    }
+
+    private static HashSet<MethodDescriptor> getAllDefaultMethodsFromImplementedInterfaces(ClassDescriptor clazz) {
+        return getAllDefaultMethodsFromImplementedInterfacesRecursively(clazz, new HashSet<MethodDescriptor>());
+    }
+
+    private static HashSet<MethodDescriptor> getAllDefaultMethodsFromImplementedInterfacesRecursively(ClassDescriptor clazz, HashSet<MethodDescriptor> collectedDefaultMethods) {
+        String[] implementedInterfacesNames = clazz.getInterfaceNames();
+
+        for (String implementedInterfaceName : implementedInterfacesNames) {
+            ClassDescriptor interfaceClass = ClassRepo.findClass(implementedInterfaceName);
+
+            for (MethodDescriptor md : interfaceClass.getMethods()) {
+                if (!md.isStatic() && !md.isAbstract()) {
+                    collectedDefaultMethods.add(md);
+                }
+            }
+
+            collectedDefaultMethods.addAll(getAllDefaultMethodsFromImplementedInterfacesRecursively(interfaceClass, new HashSet<MethodDescriptor>()));
+        }
+
+        return collectedDefaultMethods;
+    }
+
     private static TreeNode getOrCreateNode(TreeNode root, TypeDescriptor type)
-    throws Exception {
+            throws Exception {
         TreeNode node;
 
         String typeName = type.getSignature();
@@ -272,7 +309,7 @@ public class Builder {
 
         if (ClassUtil.isArray(clazz)) {
             throw new UnsupportedOperationException("unexpected class="
-                                                    + clazz.getClassName());
+                    + clazz.getClassName());
         }
 
         TreeNode node = root;
@@ -307,7 +344,7 @@ public class Builder {
                 if (child == null) {
                     child = node.createChild(outerClassname);
                     child.nodeType = outer.isInterface() ? TreeNode.Interface
-                                     : TreeNode.Class;
+                            : TreeNode.Class;
                     if (outer.isStatic()) {
                         child.nodeType |= TreeNode.Static;
                     }
@@ -324,7 +361,7 @@ public class Builder {
                 child.nodeType = tmp.nodeType;
             } else {
                 child.nodeType = clazz.isInterface() ? TreeNode.Interface
-                                 : TreeNode.Class;
+                        : TreeNode.Class;
                 if (clazz.isStatic()) {
                     child.nodeType |= TreeNode.Static;
                 }
@@ -337,8 +374,8 @@ public class Builder {
                 baseClass = ClassUtil.getClassByName(predefinedSuperClassname);
             } else {
                 baseClass = clazz.isInterface()
-                            ? ClassUtil.getClassByName("java.lang.Object")
-                            : ClassUtil.getSuperclass(clazz);
+                        ? ClassUtil.getClassByName("java.lang.Object")
+                        : ClassUtil.getSuperclass(clazz);
             }
             if (baseClass != null) {
                 node.baseClassNode = getOrCreateNode(root, baseClass, null);
@@ -358,7 +395,7 @@ public class Builder {
     }
 
     private static TreeNode createArrayNode(TreeNode root, String className)
-    throws Exception {
+            throws Exception {
         TreeNode currentNode = root;
         String currentClassname = className;
 
@@ -385,7 +422,7 @@ public class Builder {
             } else {
                 ClassDescriptor clazz = ClassRepo.findClass(name);
                 child.nodeType = clazz.isInterface() ? TreeNode.Interface
-                                 : TreeNode.Class;
+                        : TreeNode.Class;
                 if (clazz.isStatic()) {
                     child.nodeType |= TreeNode.Static;
                 }
@@ -397,7 +434,7 @@ public class Builder {
     }
 
     private static ArrayList<TreeNode> getMethodSignature(TreeNode root,
-            TypeDescriptor retType, TypeDescriptor[] params) throws Exception {
+                                                          TypeDescriptor retType, TypeDescriptor[] params) throws Exception {
         ArrayList<TreeNode> sig = new ArrayList<TreeNode>();
         boolean isVoid = retType.equals(TypeDescriptor.VOID);
 
@@ -405,14 +442,14 @@ public class Builder {
         if (!isVoid) {
             boolean isPrimitive = ClassUtil.isPrimitive(retType);
             node = isPrimitive ? TreeNode.getPrimitive(retType)
-                   : getOrCreateNode(root, retType);
+                    : getOrCreateNode(root, retType);
         }
         sig.add(node);
 
         for (TypeDescriptor param : params) {
             boolean isPrimitive = ClassUtil.isPrimitive(param);
             node = isPrimitive ? TreeNode.getPrimitive(param)
-                   : getOrCreateNode(root, param);
+                    : getOrCreateNode(root, param);
             if (node == null) {
                 return null;
             }
@@ -420,5 +457,17 @@ public class Builder {
         }
 
         return sig;
+    }
+
+    private static <T> T[] concatenate(T[] a, T[] b) {
+        int aLen = a.length;
+        int bLen = b.length;
+
+        @SuppressWarnings("unchecked")
+        T[] c = (T[]) Array.newInstance(a.getClass().getComponentType(), aLen + bLen);
+        System.arraycopy(a, 0, c, 0, aLen);
+        System.arraycopy(b, 0, c, aLen, bLen);
+
+        return c;
     }
 }

@@ -119,6 +119,11 @@ string MetadataNode::GetName() {
     return m_name;
 }
 
+bool MetadataNode::IsNodeTypeInterface() {
+    uint8_t nodeType = s_metadataReader.GetNodeType(m_treeNode);
+    return s_metadataReader.IsNodeTypeInterface(nodeType);
+}
+
 string MetadataNode::GetTypeMetadataName(Isolate* isolate, Local<Value>& value) {
     auto data = GetTypeMetadata(isolate, value.As<Function>());
 
@@ -419,6 +424,22 @@ vector<MetadataNode::MethodCallbackData*> MetadataNode::SetInstanceMethodsFromSt
 
     uint8_t* curPtr = s_metadataReader.GetValueData() + treeNode->offsetValue + 1;
 
+    auto origin = Constants::APP_ROOT_FOLDER_PATH + GetOrCreateInternal(treeNode)->m_name;
+
+    if(origin == "/data/data/org.nativescript.tsapp/files/app/com/vm/java/statics/test/impl/CarProducer"){
+        DEBUG_WRITE_FORCE("::entry CarProducer");
+        for(int i= 0; i<baseInstanceMethodsCallbackData.size(); i+=1){
+            auto asd = baseInstanceMethodsCallbackData.at(i);
+
+            for(int k=0; k<asd->candidates.size(); k+=1){
+                auto entry22 = asd->candidates.at(k);
+                DEBUG_WRITE_FORCE("::entry    %s", entry22.name.c_str());
+            }
+
+        }
+    }
+
+
     auto nodeType = s_metadataReader.GetNodeType(treeNode);
 
     auto curType = s_metadataReader.ReadTypeName(treeNode);
@@ -435,7 +456,7 @@ vector<MetadataNode::MethodCallbackData*> MetadataNode::SetInstanceMethodsFromSt
     string lastMethodName;
     MethodCallbackData* callbackData = nullptr;
 
-    auto origin = Constants::APP_ROOT_FOLDER_PATH + GetOrCreateInternal(treeNode)->m_name;
+    //auto origin = Constants::APP_ROOT_FOLDER_PATH + GetOrCreateInternal(treeNode)->m_name;
     for (auto i = 0; i < instanceMethodCount; i++) {
         auto entry = s_metadataReader.ReadInstanceMethodEntry(&curPtr);
 
@@ -455,6 +476,7 @@ vector<MetadataNode::MethodCallbackData*> MetadataNode::SetInstanceMethodsFromSt
             }
 
             auto funcData = External::New(isolate, callbackData);
+            DEBUG_WRITE_FORCE("::test!!!!!!!!!!!!!! %s ::::::  %s",origin.c_str(), entry.name.c_str());
             auto funcTemplate = FunctionTemplate::New(isolate, MethodCallback, funcData);
 
             auto funcName = ConvertToV8String(entry.name);
@@ -1006,7 +1028,8 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
         if ((argLength == 0) && (methodName == V8StringConstants::VALUE_OF)) {
             info.GetReturnValue().Set(thiz);
         } else {
-            CallbackHandlers::CallJavaMethod(thiz, *className, methodName, entry, first.isStatic, isSuper, info);
+            bool isFromInterface = callbackData->node->IsNodeTypeInterface();
+            CallbackHandlers::CallJavaMethod(thiz, *className, methodName, entry, isFromInterface, first.isStatic, isSuper, info);
         }
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
@@ -1895,3 +1918,4 @@ std::map<std::string, MetadataTreeNode*> MetadataNode::s_name2TreeNodeCache;
 std::map<MetadataTreeNode*, MetadataNode*> MetadataNode::s_treeNode2NodeCache;
 map<Isolate*, MetadataNode::MetadataNodeCache*> MetadataNode::s_metadata_node_cache;
 bool MetadataNode::s_profilerEnabled = false;
+

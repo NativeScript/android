@@ -1,6 +1,7 @@
 package com.tns;
 
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -8,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 class MethodResolver {
@@ -512,7 +514,36 @@ class MethodResolver {
                     errorGettingMethods = true;
                 }
             }
+            Method[] interfaceDefaultMethods = getInterfaceDefaultMethods(clazz);
+            declaredMethods = concatenate(declaredMethods, interfaceDefaultMethods);
             this.couldNotGetMethods = errorGettingMethods;
+        }
+
+        private static <T> T[] concatenate(T[] a, T[] b) {
+            int aLen = a.length;
+            int bLen = b.length;
+
+            @SuppressWarnings("unchecked")
+            T[] c = (T[]) Array.newInstance(a.getClass().getComponentType(), aLen + bLen);
+            System.arraycopy(a, 0, c, 0, aLen);
+            System.arraycopy(b, 0, c, aLen, bLen);
+
+            return c;
+        }
+
+        private Method[] getInterfaceDefaultMethods(Class<?> clazz){
+            List<Method> interfaceDefaultMethods = new ArrayList<>();
+            Class<?>[] interfaces = clazz.getInterfaces();
+            for(Class<?> interfaze: interfaces){
+                for(Method method: interfaze.getMethods()) {
+                    int methodModifiers = method.getModifiers();
+                    if(!Modifier.isAbstract(methodModifiers) && !Modifier.isStatic(methodModifiers)){
+                        interfaceDefaultMethods.add(method);
+                    }
+                }
+            }
+
+            return interfaceDefaultMethods.toArray(new Method[0]);
         }
 
         public boolean errorGettingMethods() {

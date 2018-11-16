@@ -22,7 +22,7 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
-void CallbackHandlers::Init(Isolate* isolate) {
+void CallbackHandlers::Init(Isolate *isolate) {
     JEnv env;
 
     JAVA_LANG_STRING = env.FindClass("java/lang/String");
@@ -32,29 +32,30 @@ void CallbackHandlers::Init(Isolate* isolate) {
     assert(RUNTIME_CLASS != nullptr);
 
     RESOLVE_CLASS_METHOD_ID = env.GetMethodID(RUNTIME_CLASS, "resolveClass",
-                              "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;[Ljava/lang/String;Z)Ljava/lang/Class;");
+                                              "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;[Ljava/lang/String;Z)Ljava/lang/Class;");
     assert(RESOLVE_CLASS_METHOD_ID != nullptr);
 
     CURRENT_OBJECTID_FIELD_ID = env.GetFieldID(RUNTIME_CLASS, "currentObjectId", "I");
     assert(CURRENT_OBJECTID_FIELD_ID != nullptr);
 
     MAKE_INSTANCE_STRONG_ID = env.GetMethodID(RUNTIME_CLASS, "makeInstanceStrong",
-                              "(Ljava/lang/Object;I)V");
+                                              "(Ljava/lang/Object;I)V");
     assert(MAKE_INSTANCE_STRONG_ID != nullptr);
 
     GET_TYPE_METADATA = env.GetStaticMethodID(RUNTIME_CLASS, "getTypeMetadata",
-                        "(Ljava/lang/String;I)[Ljava/lang/String;");
+                                              "(Ljava/lang/String;I)[Ljava/lang/String;");
     assert(GET_TYPE_METADATA != nullptr);
 
     ENABLE_VERBOSE_LOGGING_METHOD_ID = env.GetMethodID(RUNTIME_CLASS, "enableVerboseLogging",
-                                       "()V");
+                                                       "()V");
     assert(ENABLE_VERBOSE_LOGGING_METHOD_ID != nullptr);
 
     DISABLE_VERBOSE_LOGGING_METHOD_ID = env.GetMethodID(RUNTIME_CLASS, "disableVerboseLogging",
-                                        "()V");
+                                                        "()V");
     assert(ENABLE_VERBOSE_LOGGING_METHOD_ID != nullptr);
 
-    INIT_WORKER_METHOD_ID = env.GetStaticMethodID(RUNTIME_CLASS, "initWorker", "(Ljava/lang/String;Ljava/lang/String;I)V");
+    INIT_WORKER_METHOD_ID = env.GetStaticMethodID(RUNTIME_CLASS, "initWorker",
+                                                  "(Ljava/lang/String;Ljava/lang/String;I)V");
 
     assert(INIT_WORKER_METHOD_ID != nullptr);
 
@@ -63,12 +64,12 @@ void CallbackHandlers::Init(Isolate* isolate) {
     MethodCache::Init();
 }
 
-bool CallbackHandlers::RegisterInstance(Isolate* isolate, const Local<Object>& jsObject,
-                                        const std::string& fullClassName,
-                                        const ArgsWrapper& argWrapper,
-                                        const Local<Object>& implementationObject,
+bool CallbackHandlers::RegisterInstance(Isolate *isolate, const Local<Object> &jsObject,
+                                        const std::string &fullClassName,
+                                        const ArgsWrapper &argWrapper,
+                                        const Local<Object> &implementationObject,
                                         bool isInterface,
-                                        const std::string& baseClassName) {
+                                        const std::string &baseClassName) {
     bool success;
 
     DEBUG_WRITE("RegisterInstance called for '%s'", fullClassName.c_str());
@@ -78,8 +79,9 @@ bool CallbackHandlers::RegisterInstance(Isolate* isolate, const Local<Object>& j
 
     JEnv env;
 
-    jclass generatedJavaClass = ResolveClass(isolate, baseClassName, fullClassName, implementationObject,
-                                isInterface);
+    jclass generatedJavaClass = ResolveClass(isolate, baseClassName, fullClassName,
+                                             implementationObject,
+                                             isInterface);
 
     int javaObjectID = objectManager->GenerateNewObjectID();
 
@@ -87,7 +89,7 @@ bool CallbackHandlers::RegisterInstance(Isolate* isolate, const Local<Object>& j
 
     // resolve constructor
     auto mi = MethodCache::ResolveConstructorSignature(argWrapper, fullClassName,
-              generatedJavaClass, isInterface);
+                                                       generatedJavaClass, isInterface);
 
     // while the "instance" is being created, if an exception is thrown during the construction
     // this scope will guarantee the "javaObjectID" will be set to -1 and won't have an invalid value
@@ -118,14 +120,16 @@ bool CallbackHandlers::RegisterInstance(Isolate* isolate, const Local<Object>& j
         jclass instanceClass = env.FindClass(fullClassName);
         objectManager->SetJavaClass(jsObject, instanceClass);
     } else {
-        DEBUG_WRITE_FORCE("RegisterInstance failed with null new instance class: %s", fullClassName.c_str());
+        DEBUG_WRITE_FORCE("RegisterInstance failed with null new instance class: %s",
+                          fullClassName.c_str());
     }
 
     return success;
 }
 
-jclass CallbackHandlers::ResolveClass(Isolate* isolate, const string& baseClassName, const string& fullClassName,
-                                      const Local<Object>& implementationObject, bool isInterface) {
+jclass CallbackHandlers::ResolveClass(Isolate *isolate, const string &baseClassName,
+                                      const string &fullClassName,
+                                      const Local<Object> &implementationObject, bool isInterface) {
     JEnv env;
     jclass globalRefToGeneratedClass = env.CheckForClassInCache(fullClassName);
 
@@ -142,13 +146,13 @@ jclass CallbackHandlers::ResolveClass(Isolate* isolate, const string& baseClassN
         auto runtime = Runtime::GetRuntime(isolate);
 
         // create or load generated binding (java class)
-        jclass generatedClass = (jclass)env.CallObjectMethod(runtime->GetJavaRuntime(),
-                                RESOLVE_CLASS_METHOD_ID,
-                                (jstring) javaBaseClassName,
-                                (jstring) javaFullClassName,
-                                methodOverrides,
-                                implementedInterfaces,
-                                isInterface);
+        jclass generatedClass = (jclass) env.CallObjectMethod(runtime->GetJavaRuntime(),
+                                                              RESOLVE_CLASS_METHOD_ID,
+                                                              (jstring) javaBaseClassName,
+                                                              (jstring) javaFullClassName,
+                                                              methodOverrides,
+                                                              implementedInterfaces,
+                                                              isInterface);
 
         globalRefToGeneratedClass = env.InsertClassIntoCache(fullClassName, generatedClass);
 
@@ -160,46 +164,47 @@ jclass CallbackHandlers::ResolveClass(Isolate* isolate, const string& baseClassN
 }
 
 // Called by ExtendMethodCallback when extending a class
-string CallbackHandlers::ResolveClassName(Isolate* isolate, jclass& clazz) {
+string CallbackHandlers::ResolveClassName(Isolate *isolate, jclass &clazz) {
     auto runtime = Runtime::GetRuntime(isolate);
     auto objectManager = runtime->GetObjectManager();
     auto className = objectManager->GetClassName(clazz);
     return className;
 }
 
-Local<Value> CallbackHandlers::GetArrayElement(Isolate* isolate, const Local<Object>& array,
-        uint32_t index, const string& arraySignature) {
+Local<Value> CallbackHandlers::GetArrayElement(Isolate *isolate, const Local<Object> &array,
+                                               uint32_t index, const string &arraySignature) {
     return arrayElementAccessor.GetArrayElement(isolate, array, index, arraySignature);
 }
 
-void CallbackHandlers::SetArrayElement(Isolate* isolate, const Local<Object>& array, uint32_t index,
-                                       const string& arraySignature, Local<Value>& value) {
+void CallbackHandlers::SetArrayElement(Isolate *isolate, const Local<Object> &array, uint32_t index,
+                                       const string &arraySignature, Local<Value> &value) {
 
     arrayElementAccessor.SetArrayElement(isolate, array, index, arraySignature, value);
 }
 
-Local<Value> CallbackHandlers::GetJavaField(Isolate* isolate, const Local<Object>& caller,
-        FieldCallbackData* fieldData) {
+Local<Value> CallbackHandlers::GetJavaField(Isolate *isolate, const Local<Object> &caller,
+                                            FieldCallbackData *fieldData) {
     return fieldAccessor.GetJavaField(isolate, caller, fieldData);
 }
 
-void CallbackHandlers::SetJavaField(Isolate* isolate, const Local<Object>& target,
-                                    const Local<Value>& value, FieldCallbackData* fieldData) {
+void CallbackHandlers::SetJavaField(Isolate *isolate, const Local<Object> &target,
+                                    const Local<Value> &value, FieldCallbackData *fieldData) {
     fieldAccessor.SetJavaField(isolate, target, value, fieldData);
 }
 
-void CallbackHandlers::CallJavaMethod(const Local<Object>& caller, const string& className,
-                                      const string& methodName, MetadataEntry* entry, bool isStatic,
+void CallbackHandlers::CallJavaMethod(const Local<Object> &caller, const string &className,
+                                      const string &methodName, MetadataEntry *entry,
+                                      bool isFromInterface, bool isStatic,
                                       bool isSuper,
-                                      const v8::FunctionCallbackInfo<v8::Value>& args) {
+                                      const v8::FunctionCallbackInfo<v8::Value> &args) {
     SET_PROFILER_FRAME();
 
     JEnv env;
 
     jclass clazz;
     jmethodID mid;
-    string* sig = nullptr;
-    string* returnType = nullptr;
+    string *sig = nullptr;
+    string *returnType = nullptr;
     auto retType = MethodReturnType::Unknown;
     MethodCache::CacheMethodInfo mi;
 
@@ -208,8 +213,9 @@ void CallbackHandlers::CallJavaMethod(const Local<Object>& caller, const string&
 
         if (entry->memberId == nullptr) {
             clazz = env.FindClass(className);
+
             if (clazz == nullptr) {
-                MetadataNode* callerNode = MetadataNode::GetNodeFromHandle(caller);
+                MetadataNode *callerNode = MetadataNode::GetNodeFromHandle(caller);
                 const string callerClassName = callerNode->GetName();
 
                 DEBUG_WRITE("Cannot resolve class: %s while calling method: %s callerClassName: %s",
@@ -221,9 +227,19 @@ void CallbackHandlers::CallJavaMethod(const Local<Object>& caller, const string&
                     return;
                 }
 
-                entry->memberId = isStatic ?
-                                  env.GetStaticMethodID(clazz, methodName, entry->sig) :
-                                  env.GetMethodID(clazz, methodName, entry->sig);
+                if (isStatic) {
+                    if (isFromInterface) {
+                        auto methodAndClassPair = env.GetInterfaceStaticMethodIDAndJClass(className,
+                                                                                          methodName,
+                                                                                          entry->sig);
+                        entry->memberId = methodAndClassPair.first;
+                        clazz = methodAndClassPair.second;
+                    } else {
+                        entry->memberId = env.GetStaticMethodID(clazz, methodName, entry->sig);
+                    }
+                } else {
+                    entry->memberId = env.GetMethodID(clazz, methodName, entry->sig);
+                }
 
                 if (entry->memberId == nullptr) {
                     //todo: plamen5kov: throw exception here
@@ -232,9 +248,19 @@ void CallbackHandlers::CallJavaMethod(const Local<Object>& caller, const string&
                     return;
                 }
             } else {
-                entry->memberId = isStatic ?
-                                  env.GetStaticMethodID(clazz, methodName, entry->sig) :
-                                  env.GetMethodID(clazz, methodName, entry->sig);
+                if (isStatic) {
+                    if (isFromInterface) {
+                        auto methodAndClassPair = env.GetInterfaceStaticMethodIDAndJClass(className,
+                                                                                          methodName,
+                                                                                          entry->sig);
+                        entry->memberId = methodAndClassPair.first;
+                        clazz = methodAndClassPair.second;
+                    } else {
+                        entry->memberId = env.GetStaticMethodID(clazz, methodName, entry->sig);
+                    }
+                } else {
+                    entry->memberId = env.GetMethodID(clazz, methodName, entry->sig);
+                }
 
                 if (entry->memberId == nullptr) {
                     //todo: plamen5kov: throw exception here
@@ -263,16 +289,16 @@ void CallbackHandlers::CallJavaMethod(const Local<Object>& caller, const string&
                 return;
             }
         } else {
-            MetadataNode* callerNode = MetadataNode::GetNodeFromHandle(caller);
+            MetadataNode *callerNode = MetadataNode::GetNodeFromHandle(caller);
             const string callerClassName = callerNode->GetName();
             DEBUG_WRITE("Resolving method on caller class: %s.%s on className %s",
                         callerClassName.c_str(), methodName.c_str(), className.c_str());
             mi = MethodCache::ResolveMethodSignature(callerClassName, methodName, args, isStatic);
             if (mi.mid == nullptr) {
                 DEBUG_WRITE(
-                    "Cannot resolve class=%s, method=%s, isStatic=%d, isSuper=%d, callerClass=%s",
-                    className.c_str(), methodName.c_str(), isStatic, isSuper,
-                    callerClassName.c_str());
+                        "Cannot resolve class=%s, method=%s, isStatic=%d, isSuper=%d, callerClass=%s",
+                        className.c_str(), methodName.c_str(), isStatic, isSuper,
+                        callerClassName.c_str());
                 return;
             }
         }
@@ -304,7 +330,7 @@ void CallbackHandlers::CallJavaMethod(const Local<Object>& caller, const string&
 
     JniLocalRef callerJavaObject;
 
-    jvalue* javaArgs = argConverter.ToArgs();
+    jvalue *javaArgs = argConverter.ToArgs();
 
     auto runtime = Runtime::GetRuntime(isolate);
     auto objectManager = runtime->GetObjectManager();
@@ -314,190 +340,193 @@ void CallbackHandlers::CallJavaMethod(const Local<Object>& caller, const string&
         if (callerJavaObject.IsNull()) {
             stringstream ss;
             if (args.IsConstructCall()) {
-                ss << "No java object found on which to call \"" << methodName << "\" method. It is possible your Javascript object is not linked with the corresponding Java class. Try passing context(this) to the constructor function.";
+                ss << "No java object found on which to call \"" << methodName
+                   << "\" method. It is possible your Javascript object is not linked with the corresponding Java class. Try passing context(this) to the constructor function.";
             } else {
-                ss << "Failed calling " << methodName << " on a " << className << " instance. The JavaScript instance no longer has available Java instance counterpart.";
+                ss << "Failed calling " << methodName << " on a " << className
+                   << " instance. The JavaScript instance no longer has available Java instance counterpart.";
             }
             throw NativeScriptException(ss.str());
         }
     }
 
     switch (retType) {
-    case MethodReturnType::Void: {
-        if (isStatic) {
-            env.CallStaticVoidMethodA(clazz, mid, javaArgs);
-        } else if (isSuper) {
-            env.CallNonvirtualVoidMethodA(callerJavaObject, clazz, mid, javaArgs);
-        } else {
-            env.CallVoidMethodA(callerJavaObject, mid, javaArgs);
-        }
-        break;
-    }
-    case MethodReturnType::Boolean: {
-        jboolean result;
-        if (isStatic) {
-            result = env.CallStaticBooleanMethodA(clazz, mid, javaArgs);
-        } else if (isSuper) {
-            result = env.CallNonvirtualBooleanMethodA(callerJavaObject, clazz, mid, javaArgs);
-        } else {
-            result = env.CallBooleanMethodA(callerJavaObject, mid, javaArgs);
-        }
-        args.GetReturnValue().Set(result != 0 ? True(isolate) : False(isolate));
-        break;
-    }
-    case MethodReturnType::Byte: {
-        jbyte result;
-        if (isStatic) {
-            result = env.CallStaticByteMethodA(clazz, mid, javaArgs);
-        } else if (isSuper) {
-            result = env.CallNonvirtualByteMethodA(callerJavaObject, clazz, mid, javaArgs);
-        } else {
-            result = env.CallByteMethodA(callerJavaObject, mid, javaArgs);
-        }
-        args.GetReturnValue().Set(result);
-        break;
-    }
-    case MethodReturnType::Char: {
-        jchar result;
-        if (isStatic) {
-            result = env.CallStaticCharMethodA(clazz, mid, javaArgs);
-        } else if (isSuper) {
-            result = env.CallNonvirtualCharMethodA(callerJavaObject, clazz, mid, javaArgs);
-        } else {
-            result = env.CallCharMethodA(callerJavaObject, mid, javaArgs);
-        }
-
-        JniLocalRef str(env.NewString(&result, 1));
-        jboolean bol = true;
-        const char* resP = env.GetStringUTFChars(str, &bol);
-        args.GetReturnValue().Set(ArgConverter::ConvertToV8String(isolate, resP, 1));
-        env.ReleaseStringUTFChars(str, resP);
-        break;
-    }
-    case MethodReturnType::Short: {
-        jshort result;
-        if (isStatic) {
-            result = env.CallStaticShortMethodA(clazz, mid, javaArgs);
-        } else if (isSuper) {
-            result = env.CallNonvirtualShortMethodA(callerJavaObject, clazz, mid, javaArgs);
-        } else {
-            result = env.CallShortMethodA(callerJavaObject, mid, javaArgs);
-        }
-        args.GetReturnValue().Set(result);
-        break;
-    }
-    case MethodReturnType::Int: {
-        jint result;
-        if (isStatic) {
-            result = env.CallStaticIntMethodA(clazz, mid, javaArgs);
-        } else if (isSuper) {
-            result = env.CallNonvirtualIntMethodA(callerJavaObject, clazz, mid, javaArgs);
-        } else {
-            result = env.CallIntMethodA(callerJavaObject, mid, javaArgs);
-        }
-        args.GetReturnValue().Set(result);
-        break;
-
-    }
-    case MethodReturnType::Long: {
-        jlong result;
-        if (isStatic) {
-            result = env.CallStaticLongMethodA(clazz, mid, javaArgs);
-        } else if (isSuper) {
-            result = env.CallNonvirtualLongMethodA(callerJavaObject, clazz, mid, javaArgs);
-        } else {
-            result = env.CallLongMethodA(callerJavaObject, mid, javaArgs);
-        }
-        auto jsLong = ArgConverter::ConvertFromJavaLong(isolate, result);
-        args.GetReturnValue().Set(jsLong);
-        break;
-    }
-    case MethodReturnType::Float: {
-        jfloat result;
-        if (isStatic) {
-            result = env.CallStaticFloatMethodA(clazz, mid, javaArgs);
-        } else if (isSuper) {
-            result = env.CallNonvirtualFloatMethodA(callerJavaObject, clazz, mid, javaArgs);
-        } else {
-            result = env.CallFloatMethodA(callerJavaObject, mid, javaArgs);
-        }
-        args.GetReturnValue().Set((double) result); //TODO: handle float value here correctly.
-        break;
-    }
-    case MethodReturnType::Double: {
-        jdouble result;
-        if (isStatic) {
-            result = env.CallStaticDoubleMethodA(clazz, mid, javaArgs);
-        } else if (isSuper) {
-            result = env.CallNonvirtualDoubleMethodA(callerJavaObject, clazz, mid, javaArgs);
-        } else {
-            result = env.CallDoubleMethodA(callerJavaObject, mid, javaArgs);
-        }
-        args.GetReturnValue().Set(result);
-        break;
-    }
-    case MethodReturnType::String: {
-        jobject result = nullptr;
-        bool exceptionOccurred;
-
-        if (isStatic) {
-            result = env.CallStaticObjectMethodA(clazz, mid, javaArgs);
-        } else if (isSuper) {
-            result = env.CallNonvirtualObjectMethodA(callerJavaObject, clazz, mid, javaArgs);
-        } else {
-            result = env.CallObjectMethodA(callerJavaObject, mid, javaArgs);
-        }
-
-        if (result != nullptr) {
-            auto objectResult = ArgConverter::jstringToV8String(isolate, static_cast<jstring>(result));
-            args.GetReturnValue().Set(objectResult);
-            env.DeleteLocalRef(result);
-        } else {
-            args.GetReturnValue().Set(Null(isolate));
-        }
-
-        break;
-    }
-    case MethodReturnType::Object: {
-        jobject result = nullptr;
-        bool exceptionOccurred;
-
-        if (isStatic) {
-            result = env.CallStaticObjectMethodA(clazz, mid, javaArgs);
-        } else if (isSuper) {
-            result = env.CallNonvirtualObjectMethodA(callerJavaObject, clazz, mid, javaArgs);
-        } else {
-            result = env.CallObjectMethodA(callerJavaObject, mid, javaArgs);
-        }
-
-        if (result != nullptr) {
-            auto isString = env.IsInstanceOf(result, JAVA_LANG_STRING);
-
-            Local<Value> objectResult;
-            if (isString) {
-                objectResult = ArgConverter::jstringToV8String(isolate, (jstring) result);
+        case MethodReturnType::Void: {
+            if (isStatic) {
+                env.CallStaticVoidMethodA(clazz, mid, javaArgs);
+            } else if (isSuper) {
+                env.CallNonvirtualVoidMethodA(callerJavaObject, clazz, mid, javaArgs);
             } else {
-                jint javaObjectID = objectManager->GetOrCreateObjectId(result);
-                objectResult = objectManager->GetJsObjectByJavaObject(javaObjectID);
-
-                if (objectResult.IsEmpty()) {
-                    objectResult = objectManager->CreateJSWrapper(javaObjectID, *returnType,
-                                   result);
-                }
+                env.CallVoidMethodA(callerJavaObject, mid, javaArgs);
+            }
+            break;
+        }
+        case MethodReturnType::Boolean: {
+            jboolean result;
+            if (isStatic) {
+                result = env.CallStaticBooleanMethodA(clazz, mid, javaArgs);
+            } else if (isSuper) {
+                result = env.CallNonvirtualBooleanMethodA(callerJavaObject, clazz, mid, javaArgs);
+            } else {
+                result = env.CallBooleanMethodA(callerJavaObject, mid, javaArgs);
+            }
+            args.GetReturnValue().Set(result != 0 ? True(isolate) : False(isolate));
+            break;
+        }
+        case MethodReturnType::Byte: {
+            jbyte result;
+            if (isStatic) {
+                result = env.CallStaticByteMethodA(clazz, mid, javaArgs);
+            } else if (isSuper) {
+                result = env.CallNonvirtualByteMethodA(callerJavaObject, clazz, mid, javaArgs);
+            } else {
+                result = env.CallByteMethodA(callerJavaObject, mid, javaArgs);
+            }
+            args.GetReturnValue().Set(result);
+            break;
+        }
+        case MethodReturnType::Char: {
+            jchar result;
+            if (isStatic) {
+                result = env.CallStaticCharMethodA(clazz, mid, javaArgs);
+            } else if (isSuper) {
+                result = env.CallNonvirtualCharMethodA(callerJavaObject, clazz, mid, javaArgs);
+            } else {
+                result = env.CallCharMethodA(callerJavaObject, mid, javaArgs);
             }
 
-            args.GetReturnValue().Set(objectResult);
-            env.DeleteLocalRef(result);
-        } else {
-            args.GetReturnValue().Set(Null(isolate));
+            JniLocalRef str(env.NewString(&result, 1));
+            jboolean bol = true;
+            const char *resP = env.GetStringUTFChars(str, &bol);
+            args.GetReturnValue().Set(ArgConverter::ConvertToV8String(isolate, resP, 1));
+            env.ReleaseStringUTFChars(str, resP);
+            break;
         }
+        case MethodReturnType::Short: {
+            jshort result;
+            if (isStatic) {
+                result = env.CallStaticShortMethodA(clazz, mid, javaArgs);
+            } else if (isSuper) {
+                result = env.CallNonvirtualShortMethodA(callerJavaObject, clazz, mid, javaArgs);
+            } else {
+                result = env.CallShortMethodA(callerJavaObject, mid, javaArgs);
+            }
+            args.GetReturnValue().Set(result);
+            break;
+        }
+        case MethodReturnType::Int: {
+            jint result;
+            if (isStatic) {
+                result = env.CallStaticIntMethodA(clazz, mid, javaArgs);
+            } else if (isSuper) {
+                result = env.CallNonvirtualIntMethodA(callerJavaObject, clazz, mid, javaArgs);
+            } else {
+                result = env.CallIntMethodA(callerJavaObject, mid, javaArgs);
+            }
+            args.GetReturnValue().Set(result);
+            break;
 
-        break;
-    }
-    default: {
-        assert(false);
-        break;
-    }
+        }
+        case MethodReturnType::Long: {
+            jlong result;
+            if (isStatic) {
+                result = env.CallStaticLongMethodA(clazz, mid, javaArgs);
+            } else if (isSuper) {
+                result = env.CallNonvirtualLongMethodA(callerJavaObject, clazz, mid, javaArgs);
+            } else {
+                result = env.CallLongMethodA(callerJavaObject, mid, javaArgs);
+            }
+            auto jsLong = ArgConverter::ConvertFromJavaLong(isolate, result);
+            args.GetReturnValue().Set(jsLong);
+            break;
+        }
+        case MethodReturnType::Float: {
+            jfloat result;
+            if (isStatic) {
+                result = env.CallStaticFloatMethodA(clazz, mid, javaArgs);
+            } else if (isSuper) {
+                result = env.CallNonvirtualFloatMethodA(callerJavaObject, clazz, mid, javaArgs);
+            } else {
+                result = env.CallFloatMethodA(callerJavaObject, mid, javaArgs);
+            }
+            args.GetReturnValue().Set((double) result); //TODO: handle float value here correctly.
+            break;
+        }
+        case MethodReturnType::Double: {
+            jdouble result;
+            if (isStatic) {
+                result = env.CallStaticDoubleMethodA(clazz, mid, javaArgs);
+            } else if (isSuper) {
+                result = env.CallNonvirtualDoubleMethodA(callerJavaObject, clazz, mid, javaArgs);
+            } else {
+                result = env.CallDoubleMethodA(callerJavaObject, mid, javaArgs);
+            }
+            args.GetReturnValue().Set(result);
+            break;
+        }
+        case MethodReturnType::String: {
+            jobject result = nullptr;
+            bool exceptionOccurred;
+
+            if (isStatic) {
+                result = env.CallStaticObjectMethodA(clazz, mid, javaArgs);
+            } else if (isSuper) {
+                result = env.CallNonvirtualObjectMethodA(callerJavaObject, clazz, mid, javaArgs);
+            } else {
+                result = env.CallObjectMethodA(callerJavaObject, mid, javaArgs);
+            }
+
+            if (result != nullptr) {
+                auto objectResult = ArgConverter::jstringToV8String(isolate,
+                                                                    static_cast<jstring>(result));
+                args.GetReturnValue().Set(objectResult);
+                env.DeleteLocalRef(result);
+            } else {
+                args.GetReturnValue().Set(Null(isolate));
+            }
+
+            break;
+        }
+        case MethodReturnType::Object: {
+            jobject result = nullptr;
+            bool exceptionOccurred;
+
+            if (isStatic) {
+                result = env.CallStaticObjectMethodA(clazz, mid, javaArgs);
+            } else if (isSuper) {
+                result = env.CallNonvirtualObjectMethodA(callerJavaObject, clazz, mid, javaArgs);
+            } else {
+                result = env.CallObjectMethodA(callerJavaObject, mid, javaArgs);
+            }
+
+            if (result != nullptr) {
+                auto isString = env.IsInstanceOf(result, JAVA_LANG_STRING);
+
+                Local<Value> objectResult;
+                if (isString) {
+                    objectResult = ArgConverter::jstringToV8String(isolate, (jstring) result);
+                } else {
+                    jint javaObjectID = objectManager->GetOrCreateObjectId(result);
+                    objectResult = objectManager->GetJsObjectByJavaObject(javaObjectID);
+
+                    if (objectResult.IsEmpty()) {
+                        objectResult = objectManager->CreateJSWrapper(javaObjectID, *returnType,
+                                                                      result);
+                    }
+                }
+
+                args.GetReturnValue().Set(objectResult);
+                env.DeleteLocalRef(result);
+            } else {
+                args.GetReturnValue().Set(Null(isolate));
+            }
+
+            break;
+        }
+        default: {
+            assert(false);
+            break;
+        }
     }
 
     static uint32_t adjustMemCount = 0;
@@ -507,14 +536,14 @@ void CallbackHandlers::CallJavaMethod(const Local<Object>& caller, const string&
     }
 }
 
-void CallbackHandlers::AdjustAmountOfExternalAllocatedMemory(JEnv& env, Isolate* isolate) {
+void CallbackHandlers::AdjustAmountOfExternalAllocatedMemory(JEnv &env, Isolate *isolate) {
     auto runtime = Runtime::GetRuntime(isolate);
     runtime->AdjustAmountOfExternalAllocatedMemory();
     runtime->TryCallGC();
 }
 
-Local<Object> CallbackHandlers::CreateJSWrapper(Isolate* isolate, jint javaObjectID,
-        const string& typeName) {
+Local<Object> CallbackHandlers::CreateJSWrapper(Isolate *isolate, jint javaObjectID,
+                                                const string &typeName) {
     auto runtime = Runtime::GetRuntime(isolate);
     auto objectManager = runtime->GetObjectManager();
 
@@ -522,12 +551,13 @@ Local<Object> CallbackHandlers::CreateJSWrapper(Isolate* isolate, jint javaObjec
 }
 
 
-jobjectArray CallbackHandlers::GetImplementedInterfaces(JEnv& env, const Local<Object>& implementationObject) {
+jobjectArray
+CallbackHandlers::GetImplementedInterfaces(JEnv &env, const Local<Object> &implementationObject) {
     if (implementationObject.IsEmpty()) {
         return CallbackHandlers::GetJavaStringArray(env, 0);
     }
 
-    vector <jstring> interfacesToImplement;
+    vector<jstring> interfacesToImplement;
     auto propNames = implementationObject->GetOwnPropertyNames();
     for (int i = 0; i < propNames->Length(); i++) {
         auto name = propNames->Get(i).As<String>();
@@ -542,7 +572,8 @@ jobjectArray CallbackHandlers::GetImplementedInterfaces(JEnv& env, const Local<O
                 auto interfacesArr = prop->ToObject();
 
                 auto isolate = implementationObject->GetIsolate();
-                int length = interfacesArr->Get(v8::String::NewFromUtf8(isolate, "length"))->ToObject()->Uint32Value();
+                int length = interfacesArr->Get(
+                        v8::String::NewFromUtf8(isolate, "length"))->ToObject()->Uint32Value();
 
                 if (length > 0) {
                     for (int i = 0; i < length; i++) {
@@ -576,12 +607,13 @@ jobjectArray CallbackHandlers::GetImplementedInterfaces(JEnv& env, const Local<O
     return implementedInterfaces;
 }
 
-jobjectArray CallbackHandlers::GetMethodOverrides(JEnv& env, const Local<Object>& implementationObject) {
+jobjectArray
+CallbackHandlers::GetMethodOverrides(JEnv &env, const Local<Object> &implementationObject) {
     if (implementationObject.IsEmpty()) {
         return CallbackHandlers::GetJavaStringArray(env, 0);
     }
 
-    vector <jstring> methodNames;
+    vector<jstring> methodNames;
     auto propNames = implementationObject->GetOwnPropertyNames();
     for (int i = 0; i < propNames->Length(); i++) {
         auto name = propNames->Get(i).As<String>();
@@ -610,13 +642,13 @@ jobjectArray CallbackHandlers::GetMethodOverrides(JEnv& env, const Local<Object>
     return methodOverrides;
 }
 
-void CallbackHandlers::LogMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
+void CallbackHandlers::LogMethodCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
     try {
         if ((args.Length() > 0) && args[0]->IsString()) {
             String::Utf8Value message(args[0]->ToString());
             DEBUG_WRITE("%s", *message);
         }
-    } catch (NativeScriptException& e) {
+    } catch (NativeScriptException &e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
         stringstream ss;
@@ -629,14 +661,15 @@ void CallbackHandlers::LogMethodCallback(const v8::FunctionCallbackInfo<v8::Valu
     }
 }
 
-void CallbackHandlers::TimeCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
-    auto nano = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now());
+void CallbackHandlers::TimeCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
+    auto nano = std::chrono::time_point_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now());
     double duration = nano.time_since_epoch().count();
     args.GetReturnValue().Set(duration);
 }
 
 void CallbackHandlers::DumpReferenceTablesMethodCallback(
-    const v8::FunctionCallbackInfo<v8::Value>& args) {
+        const v8::FunctionCallbackInfo<v8::Value> &args) {
     DumpReferenceTablesMethod();
 }
 
@@ -650,7 +683,7 @@ void CallbackHandlers::DumpReferenceTablesMethod() {
                 env.CallStaticVoidMethod(vmDbgClass, mid);
             }
         }
-    } catch (NativeScriptException& e) {
+    } catch (NativeScriptException &e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
         stringstream ss;
@@ -664,14 +697,14 @@ void CallbackHandlers::DumpReferenceTablesMethod() {
 }
 
 void CallbackHandlers::EnableVerboseLoggingMethodCallback(
-    const v8::FunctionCallbackInfo<v8::Value>& args) {
+        const v8::FunctionCallbackInfo<v8::Value> &args) {
     try {
         auto isolate = args.GetIsolate();
         auto runtume = Runtime::GetRuntime(isolate);
         tns::LogEnabled = true;
         JEnv env;
         env.CallVoidMethod(runtume->GetJavaRuntime(), ENABLE_VERBOSE_LOGGING_METHOD_ID);
-    } catch (NativeScriptException& e) {
+    } catch (NativeScriptException &e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
         stringstream ss;
@@ -685,14 +718,14 @@ void CallbackHandlers::EnableVerboseLoggingMethodCallback(
 }
 
 void CallbackHandlers::DisableVerboseLoggingMethodCallback(
-    const v8::FunctionCallbackInfo<v8::Value>& args) {
+        const v8::FunctionCallbackInfo<v8::Value> &args) {
     try {
         auto isolate = args.GetIsolate();
         auto runtume = Runtime::GetRuntime(isolate);
         tns::LogEnabled = false;
         JEnv env;
         env.CallVoidMethod(runtume->GetJavaRuntime(), DISABLE_VERBOSE_LOGGING_METHOD_ID);
-    } catch (NativeScriptException& e) {
+    } catch (NativeScriptException &e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
         stringstream ss;
@@ -705,17 +738,18 @@ void CallbackHandlers::DisableVerboseLoggingMethodCallback(
     }
 }
 
-void CallbackHandlers::ExitMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
+void CallbackHandlers::ExitMethodCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
     auto msg = ArgConverter::ConvertToString(args[0].As<String>());
     DEBUG_WRITE_FATAL("FORCE EXIT: %s", msg.c_str());
     exit(-1);
 }
 
-void CallbackHandlers::CreateGlobalCastFunctions(Isolate* isolate, const Local<ObjectTemplate>& globalTemplate) {
+void CallbackHandlers::CreateGlobalCastFunctions(Isolate *isolate,
+                                                 const Local<ObjectTemplate> &globalTemplate) {
     castFunctions.CreateGlobalCastFunctions(isolate, globalTemplate);
 }
 
-vector <string> CallbackHandlers::GetTypeMetadata(const string& name, int index) {
+vector<string> CallbackHandlers::GetTypeMetadata(const string &name, int index) {
     JEnv env;
 
     string canonicalName = Util::ConvertFromJniToCanonicalName(name);
@@ -724,17 +758,17 @@ vector <string> CallbackHandlers::GetTypeMetadata(const string& name, int index)
     jint idx = index;
 
     JniLocalRef pubApi(
-        env.CallStaticObjectMethod(RUNTIME_CLASS, GET_TYPE_METADATA, (jstring) className, idx));
+            env.CallStaticObjectMethod(RUNTIME_CLASS, GET_TYPE_METADATA, (jstring) className, idx));
 
     jsize length = env.GetArrayLength(pubApi);
 
     assert(length > 0);
 
-    vector <string> result;
+    vector<string> result;
 
     for (jsize i = 0; i < length; i++) {
         JniLocalRef s(env.GetObjectArrayElement(pubApi, i));
-        const char* pc = env.GetStringUTFChars(s, nullptr);
+        const char *pc = env.GetStringUTFChars(s, nullptr);
         result.push_back(string(pc));
         env.ReleaseStringUTFChars(s, pc);
     }
@@ -742,9 +776,9 @@ vector <string> CallbackHandlers::GetTypeMetadata(const string& name, int index)
     return result;
 }
 
-Local<Value> CallbackHandlers::CallJSMethod(Isolate* isolate, JNIEnv* _env,
-        const Local<Object>& jsObject, const string& methodName,
-        jobjectArray args) {
+Local<Value> CallbackHandlers::CallJSMethod(Isolate *isolate, JNIEnv *_env,
+                                            const Local<Object> &jsObject, const string &methodName,
+                                            jobjectArray args) {
     SET_PROFILER_FRAME();
 
     JEnv env(_env);
@@ -793,7 +827,7 @@ Local<Value> CallbackHandlers::CallJSMethod(Isolate* isolate, JNIEnv* _env,
     return result;
 }
 
-Local<Object> CallbackHandlers::FindClass(Isolate* isolate, const string& className) {
+Local<Object> CallbackHandlers::FindClass(Isolate *isolate, const string &className) {
     Local<Object> clazz;
     JEnv env;
 
@@ -812,7 +846,7 @@ Local<Object> CallbackHandlers::FindClass(Isolate* isolate, const string& classN
     return clazz;
 }
 
-int CallbackHandlers::GetArrayLength(Isolate* isolate, const Local<Object>& arr) {
+int CallbackHandlers::GetArrayLength(Isolate *isolate, const Local<Object> &arr) {
     auto runtime = Runtime::GetRuntime(isolate);
     auto objectManager = runtime->GetObjectManager();
 
@@ -825,10 +859,11 @@ int CallbackHandlers::GetArrayLength(Isolate* isolate, const Local<Object>& arr)
     return length;
 }
 
-jobjectArray CallbackHandlers::GetJavaStringArray(JEnv& env, int length) {
+jobjectArray CallbackHandlers::GetJavaStringArray(JEnv &env, int length) {
     if (length > CallbackHandlers::MAX_JAVA_STRING_ARRAY_LENGTH) {
         stringstream ss;
-        ss << "You are trying to override more methods than the limit of " <<  CallbackHandlers::MAX_JAVA_STRING_ARRAY_LENGTH;
+        ss << "You are trying to override more methods than the limit of "
+           << CallbackHandlers::MAX_JAVA_STRING_ARRAY_LENGTH;
         throw NativeScriptException(ss.str());
     }
 
@@ -836,21 +871,25 @@ jobjectArray CallbackHandlers::GetJavaStringArray(JEnv& env, int length) {
     return (jobjectArray) env.NewGlobalRef(tmpArr);
 }
 
-void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
+void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
     try {
         if (!args.IsConstructCall()) {
             throw NativeScriptException("Worker should be called as a constructor!");
         }
 
         if (args.Length() > 1 || !args[0]->IsString()) {
-            throw NativeScriptException("Worker should be called with one string parameter (name of file to run)!");
+            throw NativeScriptException(
+                    "Worker should be called with one string parameter (name of file to run)!");
         }
 
         auto thiz = args.This();
         auto isolate = thiz->GetIsolate();
 
-        auto currentExecutingScriptName = StackTrace::CurrentStackTrace(isolate, 1, StackTrace::kScriptName)->GetFrame(0)->GetScriptName();
-        auto currentExecutingScriptNameStr = ArgConverter::ConvertToString(currentExecutingScriptName);
+        auto currentExecutingScriptName = StackTrace::CurrentStackTrace(isolate, 1,
+                                                                        StackTrace::kScriptName)->GetFrame(
+                0)->GetScriptName();
+        auto currentExecutingScriptNameStr = ArgConverter::ConvertToString(
+                currentExecutingScriptName);
         auto lastForwardSlash = currentExecutingScriptNameStr.find_last_of("/");
         auto currentDir = currentExecutingScriptNameStr.substr(0, lastForwardSlash + 1);
         string fileSchema("file://");
@@ -864,7 +903,8 @@ void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Valu
         ModuleInternal::CheckFileExists(isolate, workerPath, currentDir);
 
         auto workerId = nextWorkerId++;
-        V8SetPrivateValue(isolate, thiz, ArgConverter::ConvertToV8String(isolate, "workerId"), Number::New(isolate, workerId));
+        V8SetPrivateValue(isolate, thiz, ArgConverter::ConvertToV8String(isolate, "workerId"),
+                          Number::New(isolate, workerId));
 
         auto persistentWorker = new Persistent<Object>(isolate, thiz);
 
@@ -876,8 +916,9 @@ void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Valu
         JniLocalRef filePath(ArgConverter::ConvertToJavaString(args[0]));
         JniLocalRef dirPath(env.NewStringUTF(currentDir.c_str()));
 
-        env.CallStaticVoidMethod(RUNTIME_CLASS, INIT_WORKER_METHOD_ID, (jstring) filePath, (jstring) dirPath, workerId);
-    } catch (NativeScriptException& e) {
+        env.CallStaticVoidMethod(RUNTIME_CLASS, INIT_WORKER_METHOD_ID, (jstring) filePath,
+                                 (jstring) dirPath, workerId);
+    } catch (NativeScriptException &e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
         stringstream ss;
@@ -890,7 +931,8 @@ void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Valu
     }
 }
 
-void CallbackHandlers::WorkerObjectPostMessageCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
+void
+CallbackHandlers::WorkerObjectPostMessageCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
     auto isolate = args.GetIsolate();
 
     HandleScope scope(isolate);
@@ -898,7 +940,7 @@ void CallbackHandlers::WorkerObjectPostMessageCallback(const v8::FunctionCallbac
     try {
         if (args.Length() != 1) {
             isolate->ThrowException(ArgConverter::ConvertToV8String(isolate,
-                                    "Failed to execute 'postMessage' on 'Worker': 1 argument required."));
+                                                                    "Failed to execute 'postMessage' on 'Worker': 1 argument required."));
             return;
         }
 
@@ -923,8 +965,10 @@ void CallbackHandlers::WorkerObjectPostMessageCallback(const v8::FunctionCallbac
 
         env.CallStaticVoidMethod(RUNTIME_CLASS, mId, id, (jstring) jmsgRef);
 
-        DEBUG_WRITE("MAIN: WorkerObjectPostMessageCallback called postMessage on Worker object(id=%d)", id);
-    } catch (NativeScriptException& ex) {
+        DEBUG_WRITE(
+                "MAIN: WorkerObjectPostMessageCallback called postMessage on Worker object(id=%d)",
+                id);
+    } catch (NativeScriptException &ex) {
         ex.ReThrowToV8();
     } catch (std::exception e) {
         stringstream ss;
@@ -937,7 +981,7 @@ void CallbackHandlers::WorkerObjectPostMessageCallback(const v8::FunctionCallbac
     }
 }
 
-void CallbackHandlers::WorkerGlobalOnMessageCallback(Isolate* isolate, jstring message) {
+void CallbackHandlers::WorkerGlobalOnMessageCallback(Isolate *isolate, jstring message) {
     auto context = isolate->GetCurrentContext();
 
     try {
@@ -965,14 +1009,14 @@ void CallbackHandlers::WorkerGlobalOnMessageCallback(Isolate* isolate, jstring m
             func->Call(Undefined(isolate), 1, args1);
         } else {
             DEBUG_WRITE(
-                "WORKER: WorkerGlobalOnMessageCallback couldn't fire a worker's `onmessage` callback because it isn't implemented!");
+                    "WORKER: WorkerGlobalOnMessageCallback couldn't fire a worker's `onmessage` callback because it isn't implemented!");
         }
 
         if (tc.HasCaught()) {
             // TODO: Pete: Will catch exceptions thrown artificially in postMessage callbacks inside of 'onmessage' implementation
             CallWorkerScopeOnErrorHandle(isolate, tc);
         }
-    } catch (NativeScriptException& ex) {
+    } catch (NativeScriptException &ex) {
         ex.ReThrowToV8();
     } catch (std::exception e) {
         stringstream ss;
@@ -985,7 +1029,8 @@ void CallbackHandlers::WorkerGlobalOnMessageCallback(Isolate* isolate, jstring m
     }
 }
 
-void CallbackHandlers::WorkerGlobalPostMessageCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
+void
+CallbackHandlers::WorkerGlobalPostMessageCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
     auto isolate = args.GetIsolate();
 
     HandleScope scope(isolate);
@@ -996,7 +1041,7 @@ void CallbackHandlers::WorkerGlobalPostMessageCallback(const v8::FunctionCallbac
         // TODO: Pete: Discuss whether this is the way to go
         if (args.Length() != 1) {
             isolate->ThrowException(ArgConverter::ConvertToV8String(isolate,
-                                    "Failed to execute 'postMessage' on WorkerGlobalScope: 1 argument required."));
+                                                                    "Failed to execute 'postMessage' on WorkerGlobalScope: 1 argument required."));
         }
 
         if (tc.HasCaught()) {
@@ -1016,7 +1061,7 @@ void CallbackHandlers::WorkerGlobalPostMessageCallback(const v8::FunctionCallbac
         env.CallStaticVoidMethod(RUNTIME_CLASS, mId, (jstring) jmsgRef);
 
         DEBUG_WRITE("WORKER: WorkerGlobalPostMessageCallback called.");
-    } catch (NativeScriptException& ex) {
+    } catch (NativeScriptException &ex) {
         ex.ReThrowToV8();
     } catch (std::exception e) {
         stringstream ss;
@@ -1029,15 +1074,16 @@ void CallbackHandlers::WorkerGlobalPostMessageCallback(const v8::FunctionCallbac
     }
 }
 
-void CallbackHandlers::WorkerObjectOnMessageCallback(Isolate* isolate, jint workerId, jstring message) {
+void
+CallbackHandlers::WorkerObjectOnMessageCallback(Isolate *isolate, jint workerId, jstring message) {
     try {
         auto workerFound = CallbackHandlers::id2WorkerMap.find(workerId);
 
         if (workerFound == CallbackHandlers::id2WorkerMap.end()) {
             // TODO: Pete: Throw exception
             DEBUG_WRITE(
-                "MAIN: WorkerObjectOnMessageCallback no worker instance was found with workerId=%d.",
-                workerId);
+                    "MAIN: WorkerObjectOnMessageCallback no worker instance was found with workerId=%d.",
+                    workerId);
             return;
         }
 
@@ -1045,8 +1091,8 @@ void CallbackHandlers::WorkerObjectOnMessageCallback(Isolate* isolate, jint work
 
         if (workerPersistent->IsEmpty()) {// Object has been collected
             DEBUG_WRITE(
-                "MAIN: WorkerObjectOnMessageCallback couldn't fire a worker(id=%d) object's `onmessage` callback because the worker has been Garbage Collected.",
-                workerId);
+                    "MAIN: WorkerObjectOnMessageCallback couldn't fire a worker(id=%d) object's `onmessage` callback because the worker has been Garbage Collected.",
+                    workerId);
             CallbackHandlers::id2WorkerMap.erase(workerId);
             return;
         }
@@ -1073,10 +1119,10 @@ void CallbackHandlers::WorkerObjectOnMessageCallback(Isolate* isolate, jint work
             func->Call(Undefined(isolate), 1, args1);
         } else {
             DEBUG_WRITE(
-                "MAIN: WorkerObjectOnMessageCallback couldn't fire a worker(id=%d) object's `onmessage` callback because it isn't implemented.",
-                workerId);
+                    "MAIN: WorkerObjectOnMessageCallback couldn't fire a worker(id=%d) object's `onmessage` callback because it isn't implemented.",
+                    workerId);
         }
-    } catch (NativeScriptException& ex) {
+    } catch (NativeScriptException &ex) {
         ex.ReThrowToV8();
     } catch (std::exception e) {
         stringstream ss;
@@ -1089,7 +1135,8 @@ void CallbackHandlers::WorkerObjectOnMessageCallback(Isolate* isolate, jint work
     }
 }
 
-void CallbackHandlers::WorkerObjectTerminateCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
+void
+CallbackHandlers::WorkerObjectTerminateCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
     auto isolate = args.GetIsolate();
 
     DEBUG_WRITE("WORKER: WorkerObjectTerminateCallback called.");
@@ -1114,8 +1161,8 @@ void CallbackHandlers::WorkerObjectTerminateCallback(const v8::FunctionCallbackI
 
         if (!isTerminated.IsEmpty() && isTerminated->BooleanValue()) {
             DEBUG_WRITE(
-                "Main: WorkerObjectTerminateCallback - Worker(id=%d)'s terminate has already been called.",
-                id);
+                    "Main: WorkerObjectTerminateCallback - Worker(id=%d)'s terminate has already been called.",
+                    id);
             return;
         }
 
@@ -1130,7 +1177,7 @@ void CallbackHandlers::WorkerObjectTerminateCallback(const v8::FunctionCallbackI
 
         // Remove persistent handle from id2WorkerMap
         CallbackHandlers::ClearWorkerPersistent(id);
-    } catch (NativeScriptException& ex) {
+    } catch (NativeScriptException &ex) {
         ex.ReThrowToV8();
     } catch (std::exception e) {
         stringstream ss;
@@ -1143,7 +1190,7 @@ void CallbackHandlers::WorkerObjectTerminateCallback(const v8::FunctionCallbackI
     }
 }
 
-void CallbackHandlers::WorkerGlobalCloseCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
+void CallbackHandlers::WorkerGlobalCloseCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
     auto isolate = args.GetIsolate();
 
     DEBUG_WRITE("WORKER: WorkerThreadCloseCallback called.");
@@ -1155,7 +1202,7 @@ void CallbackHandlers::WorkerGlobalCloseCallback(const v8::FunctionCallbackInfo<
         auto globalObject = context->Global();
 
         auto isTerminating = globalObject->Get(
-                                 ArgConverter::ConvertToV8String(isolate, "isTerminating"));
+                ArgConverter::ConvertToV8String(isolate, "isTerminating"));
 
         if (!isTerminating.IsEmpty() && isTerminating->BooleanValue()) {
             DEBUG_WRITE("WORKER: WorkerThreadCloseCallback - Worker is currently terminating...");
@@ -1191,7 +1238,7 @@ void CallbackHandlers::WorkerGlobalCloseCallback(const v8::FunctionCallbackInfo<
                                          "()V");
 
         env.CallStaticVoidMethod(RUNTIME_CLASS, mId);
-    } catch (NativeScriptException& ex) {
+    } catch (NativeScriptException &ex) {
         ex.ReThrowToV8();
     } catch (std::exception e) {
         stringstream ss;
@@ -1204,7 +1251,7 @@ void CallbackHandlers::WorkerGlobalCloseCallback(const v8::FunctionCallbackInfo<
     }
 }
 
-void CallbackHandlers::CallWorkerScopeOnErrorHandle(Isolate* isolate, TryCatch& tc) {
+void CallbackHandlers::CallWorkerScopeOnErrorHandle(Isolate *isolate, TryCatch &tc) {
     try {
         TryCatch innerTc(isolate);
 
@@ -1259,7 +1306,7 @@ void CallbackHandlers::CallWorkerScopeOnErrorHandle(Isolate* isolate, TryCatch& 
 
         auto runtime = Runtime::GetRuntime(isolate);
         runtime->PassUncaughtExceptionFromWorkerToMainHandler(msg, stackTrace, source, lno);
-    } catch (NativeScriptException& ex) {
+    } catch (NativeScriptException &ex) {
         ex.ReThrowToV8();
     } catch (std::exception e) {
         stringstream ss;
@@ -1272,15 +1319,18 @@ void CallbackHandlers::CallWorkerScopeOnErrorHandle(Isolate* isolate, TryCatch& 
     }
 }
 
-void CallbackHandlers::CallWorkerObjectOnErrorHandle(Isolate* isolate, jint workerId, jstring message, jstring stackTrace, jstring filename, jint lineno, jstring threadName) {
+void
+CallbackHandlers::CallWorkerObjectOnErrorHandle(Isolate *isolate, jint workerId, jstring message,
+                                                jstring stackTrace, jstring filename, jint lineno,
+                                                jstring threadName) {
     try {
         auto workerFound = CallbackHandlers::id2WorkerMap.find(workerId);
 
         if (workerFound == CallbackHandlers::id2WorkerMap.end()) {
             // TODO: Pete: Throw exception
             DEBUG_WRITE(
-                "MAIN: CallWorkerObjectOnErrorHandle no worker instance was found with workerId=%d.",
-                workerId);
+                    "MAIN: CallWorkerObjectOnErrorHandle no worker instance was found with workerId=%d.",
+                    workerId);
             return;
         }
 
@@ -1288,8 +1338,8 @@ void CallbackHandlers::CallWorkerObjectOnErrorHandle(Isolate* isolate, jint work
 
         if (workerPersistent->IsEmpty()) {// Object has been collected
             DEBUG_WRITE(
-                "MAIN: WorkerObjectOnMessageCallback couldn't fire a worker(id=%d) object's `onmessage` callback because the worker has been Garbage Collected.",
-                workerId);
+                    "MAIN: WorkerObjectOnMessageCallback couldn't fire a worker(id=%d) object's `onmessage` callback because the worker has been Garbage Collected.",
+                    workerId);
             CallbackHandlers::id2WorkerMap.erase(workerId);
             return;
         }
@@ -1329,8 +1379,10 @@ void CallbackHandlers::CallWorkerObjectOnErrorHandle(Isolate* isolate, jint work
         auto strThreadname = ArgConverter::jstringToString(threadName);
         auto strStackTrace = ArgConverter::jstringToString(stackTrace);
 
-        DEBUG_WRITE("Unhandled exception in '%s' thread. file: %s, line %d, message: %s\nStackTrace: %s",
-                    strThreadname.c_str(), strFilename.c_str(), lineno, strMessage.c_str(), strStackTrace.c_str());
+        DEBUG_WRITE(
+                "Unhandled exception in '%s' thread. file: %s, line %d, message: %s\nStackTrace: %s",
+                strThreadname.c_str(), strFilename.c_str(), lineno, strMessage.c_str(),
+                strStackTrace.c_str());
 
         // Do not throw exception?
 //    stringstream ss;
@@ -1338,7 +1390,7 @@ void CallbackHandlers::CallWorkerObjectOnErrorHandle(Isolate* isolate, jint work
 //    ", line: " << lineno << endl << strMessage << endl;
 //    NativeScriptException ex(ss.str());
 //    throw ex;
-    } catch (NativeScriptException& ex) {
+    } catch (NativeScriptException &ex) {
         ex.ReThrowToV8();
     } catch (std::exception e) {
         stringstream ss;
@@ -1357,7 +1409,9 @@ void CallbackHandlers::ClearWorkerPersistent(int workerId) {
     auto workerFound = CallbackHandlers::id2WorkerMap.find(workerId);
 
     if (workerFound == CallbackHandlers::id2WorkerMap.end()) {
-        DEBUG_WRITE("MAIN | WORKER: ClearWorkerPersistent no worker instance was found with workerId=%d ! The worker may already be terminated.", workerId);
+        DEBUG_WRITE(
+                "MAIN | WORKER: ClearWorkerPersistent no worker instance was found with workerId=%d ! The worker may already be terminated.",
+                workerId);
         return;
     }
 
@@ -1367,7 +1421,7 @@ void CallbackHandlers::ClearWorkerPersistent(int workerId) {
     id2WorkerMap.erase(workerId);
 }
 
-void CallbackHandlers::TerminateWorkerThread(Isolate* isolate) {
+void CallbackHandlers::TerminateWorkerThread(Isolate *isolate) {
     auto context = isolate->GetCurrentContext();
     context->Exit();
 
@@ -1375,7 +1429,7 @@ void CallbackHandlers::TerminateWorkerThread(Isolate* isolate) {
 }
 
 int CallbackHandlers::nextWorkerId = 0;
-std::map<int, Persistent<Object>*> CallbackHandlers::id2WorkerMap;
+std::map<int, Persistent<Object> *> CallbackHandlers::id2WorkerMap;
 
 short CallbackHandlers::MAX_JAVA_STRING_ARRAY_LENGTH = 100;
 jclass CallbackHandlers::RUNTIME_CLASS = nullptr;
@@ -1387,6 +1441,7 @@ jmethodID CallbackHandlers::GET_TYPE_METADATA = nullptr;
 jmethodID CallbackHandlers::ENABLE_VERBOSE_LOGGING_METHOD_ID = nullptr;
 jmethodID CallbackHandlers::DISABLE_VERBOSE_LOGGING_METHOD_ID = nullptr;
 jmethodID CallbackHandlers::INIT_WORKER_METHOD_ID = nullptr;
+
 NumericCasts CallbackHandlers::castFunctions;
 ArrayElementAccessor CallbackHandlers::arrayElementAccessor;
 FieldAccessor CallbackHandlers::fieldAccessor;

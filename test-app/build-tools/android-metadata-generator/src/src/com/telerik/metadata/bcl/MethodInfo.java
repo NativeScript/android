@@ -6,6 +6,8 @@ import com.telerik.metadata.desc.TypeDescriptor;
 import org.apache.bcel.classfile.Method;
 import org.apache.bcel.generic.Type;
 
+import java.lang.reflect.Modifier;
+
 public class MethodInfo implements MethodDescriptor {
     private final Method m;
 
@@ -31,6 +33,11 @@ public class MethodInfo implements MethodDescriptor {
     @Override
     public boolean isStatic() {
         return m.isStatic();
+    }
+
+    @Override
+    public boolean isAbstract() {
+        return m.isAbstract();
     }
 
     @Override
@@ -61,5 +68,20 @@ public class MethodInfo implements MethodDescriptor {
     @Override
     public MetadataInfoAnnotationDescriptor getMetadataInfoAnnotation() {
         return null;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        MethodInfo that = (MethodInfo) o;
+
+        return m.equals(that.m);
+    }
+
+    @Override
+    public int hashCode() {
+        return m.hashCode();
     }
 }
