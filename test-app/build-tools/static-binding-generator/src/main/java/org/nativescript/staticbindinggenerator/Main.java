@@ -33,7 +33,6 @@ public class Main {
     }
 
     public static void main(String[] args) throws IOException, ClassNotFoundException {
-
         validateInput();
 
         getWorkerExcludeFile();
@@ -45,7 +44,7 @@ public class Main {
 
         // generate java bindings
         String inputBindingFilename = Paths.get(System.getProperty("user.dir"), SBG_BINDINGS_NAME).toString();
-        new Generator(outputDir, rows).writeBindings(inputBindingFilename);
+        new Generator(outputDir, rows, isSuppressCallJSMethodExceptionsEnabled(), false).writeBindings(inputBindingFilename);
     }
 
     /*
@@ -65,6 +64,27 @@ public class Main {
         }
         pw.flush();
         pw.close();
+    }
+
+    private static boolean isSuppressCallJSMethodExceptionsEnabled() throws IOException{
+        File jsonFile = new File(inputDir, "package.json");
+        if (!jsonFile.exists()) {
+            return false;
+        }
+        String jsonContent = FileUtils.readFileToString(jsonFile, "UTF-8");
+        JSONObject pjson = null;
+        try {
+            pjson = new JSONObject(jsonContent);
+            if (pjson.has("android")) {
+                JSONObject androidSettings = (JSONObject) pjson.get("android");
+                if(androidSettings.has("suppressCallJSMethodExceptions") && androidSettings.get("suppressCallJSMethodExceptions").toString().equals("true")) {
+                    return true;
+                }
+            }
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 
     private static void validateInput() throws IOException {
