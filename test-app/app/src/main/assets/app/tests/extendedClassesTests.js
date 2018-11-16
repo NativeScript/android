@@ -22,25 +22,30 @@ describe("Tests extended classes ", function () {
 		expect(labelgetIMAGE_ID_PROP).not.toBe(labelgetIMAGE_ID_PROP1);
 	});
 
-	it("Having a class with static method named 'extend' and overriding it in a child class shouldn't  crash the app", function (){
+	it("Having a class with static method named 'extend' and extending it in a child class shouldn't crash the app", function (){
 
         /*  JS below the comment is generated from the following TS code
 
-        class Base{
-            static extend(){
-                return "expectedValue";
+            class Base{
+                static extend(){
+                    return "expectedValue";
+                }
             }
-        }
+            class Child extends Base{
+            }
 
-        class Child extends Base{}
+            class SecondChild extends Child{
+            }
 
-        const superProto = Object.getPrototypeOf(Child.prototype)
-        const Super = superProto.constructor;
-        Super.extend();
 
-        var child = Object.create(Child);
-        child.extend();
-        Child.extend();
+            const superProto = Object.getPrototypeOf(Child.prototype)
+            const Super = superProto.constructor;
+            //console.log(Super.extend());
+
+            var child = Object.create(Child);
+            //console.log(child.extend());
+
+            //console.log(Child.extend());
 
         */
 
@@ -59,6 +64,13 @@ describe("Tests extended classes ", function () {
             }
             return Child;
         }(Base));
+        var SecondChild = /** @class */ (function (_super) {
+            __extends(SecondChild, _super);
+            function SecondChild() {
+                return _super !== null && _super.apply(this, arguments) || this;
+            }
+            return SecondChild;
+        }(Child));
 
         var superProto = Object.getPrototypeOf(Child.prototype);
         var Super = superProto.constructor;
