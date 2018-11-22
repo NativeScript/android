@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.telerik.metadata.TreeNode.FieldInfo;
 import com.telerik.metadata.TreeNode.MethodInfo;
@@ -22,6 +23,7 @@ import com.telerik.metadata.desc.FieldDescriptor;
 import com.telerik.metadata.desc.MethodDescriptor;
 import com.telerik.metadata.desc.TypeDescriptor;
 import com.telerik.metadata.dx.DexFile;
+import com.telerik.metadata.parsing.ClassParser;
 
 public class Builder {
     private static class MethodNameComparator implements Comparator<MethodDescriptor> {
@@ -250,33 +252,14 @@ public class Builder {
     }
 
     private static MethodDescriptor[] getDefaultMethodsFromImplementedInterfaces(ClassDescriptor clazz, MethodDescriptor[] originalClassMethodDescriptors) {
-        HashSet<MethodDescriptor> defaultMethods = getAllDefaultMethodsFromImplementedInterfaces(clazz);
-        HashSet<MethodDescriptor> classMethods = new HashSet<MethodDescriptor>(Arrays.asList(originalClassMethodDescriptors));
+        ClassParser parser = ClassParser.forClassDescriptor(clazz);
+
+        Set<MethodDescriptor> defaultMethods = parser.getAllDefaultMethodsFromImplementedInterfaces();
+        Set<MethodDescriptor> classMethods = new HashSet<MethodDescriptor>(Arrays.asList(originalClassMethodDescriptors));
+
         defaultMethods.removeAll(classMethods);
 
         return defaultMethods.toArray(new MethodDescriptor[0]);
-    }
-
-    private static HashSet<MethodDescriptor> getAllDefaultMethodsFromImplementedInterfaces(ClassDescriptor clazz) {
-        return getAllDefaultMethodsFromImplementedInterfacesRecursively(clazz, new HashSet<MethodDescriptor>());
-    }
-
-    private static HashSet<MethodDescriptor> getAllDefaultMethodsFromImplementedInterfacesRecursively(ClassDescriptor clazz, HashSet<MethodDescriptor> collectedDefaultMethods) {
-        String[] implementedInterfacesNames = clazz.getInterfaceNames();
-
-        for (String implementedInterfaceName : implementedInterfacesNames) {
-            ClassDescriptor interfaceClass = ClassRepo.findClass(implementedInterfaceName);
-
-            for (MethodDescriptor md : interfaceClass.getMethods()) {
-                if (!md.isStatic() && !md.isAbstract()) {
-                    collectedDefaultMethods.add(md);
-                }
-            }
-
-            collectedDefaultMethods.addAll(getAllDefaultMethodsFromImplementedInterfacesRecursively(interfaceClass, new HashSet<MethodDescriptor>()));
-        }
-
-        return collectedDefaultMethods;
     }
 
     private static TreeNode getOrCreateNode(TreeNode root, TypeDescriptor type)
