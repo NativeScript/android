@@ -8,7 +8,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.security.InvalidParameterException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 public class Generator {
@@ -24,14 +23,12 @@ public class Generator {
         List<String> params = null;
 
         try {
-            //metadataOutputDir = getFileRows(MDG_OUTPUT_DIR).get(0);
-            metadataOutputDir = "/Users/vmutafov/work/metadata-gen-out/";
+            metadataOutputDir = getFileRows(MDG_OUTPUT_DIR).get(0);
         } catch (Exception e) {
             throw new InvalidParameterException(String.format("You need to pass a file containing a single line: the output dir for the metadata generator1\n", e.getMessage()));
         }
         try {
-            //params = getFileRows(MDG_JAVA_DEPENDENCIES);
-            params = Arrays.asList("/Users/vmutafov/work/java_apps/jarTest/java-statics-test/target/java-statics-test-1.0-SNAPSHOT.jar");
+            params = getFileRows(MDG_JAVA_DEPENDENCIES);
         } catch (Exception e) {
             throw new InvalidParameterException(String.format("You need to pass a file containing a list of jar/class paths, so metadata can be generated for them!\n", e.getMessage()));
         }
