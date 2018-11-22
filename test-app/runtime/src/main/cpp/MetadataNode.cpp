@@ -968,6 +968,7 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
         auto e = info.Data().As<External>();
 
         auto callbackData = reinterpret_cast<MethodCallbackData*>(e->Value());
+        auto initialCallbackData = reinterpret_cast<MethodCallbackData*>(e->Value());
 
         // Number of arguments the method is invoked with
         int argLength = info.Length();
@@ -1011,7 +1012,7 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
         if ((argLength == 0) && (methodName == V8StringConstants::VALUE_OF)) {
             info.GetReturnValue().Set(thiz);
         } else {
-            bool isFromInterface = callbackData->node->IsNodeTypeInterface();
+            bool isFromInterface = initialCallbackData->node->IsNodeTypeInterface();
             CallbackHandlers::CallJavaMethod(thiz, *className, methodName, entry, isFromInterface, first.isStatic, isSuper, info);
         }
     } catch (NativeScriptException& e) {
