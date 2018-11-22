@@ -1,7 +1,3 @@
-//
-// Created by Vladimir Mutafov on 16.11.18.
-//
-
 #include "DesugaredInterfaceCompanionClassNameResolver.h"
 
 std::string DesugaredInterfaceCompanionClassNameResolver::resolveD8InterfaceCompanionClassName(

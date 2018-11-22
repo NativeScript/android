@@ -6,8 +6,6 @@ import com.telerik.metadata.desc.TypeDescriptor;
 import org.apache.bcel.classfile.Method;
 import org.apache.bcel.generic.Type;
 
-import java.lang.reflect.Modifier;
-
 public class MethodInfo implements MethodDescriptor {
     private final Method m;
 

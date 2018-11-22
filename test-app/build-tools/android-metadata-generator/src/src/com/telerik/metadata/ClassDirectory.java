@@ -40,8 +40,7 @@ public class ClassDirectory implements ClassMapProvider {
     throws IOException {
         List<File> subDirs = new ArrayList<File>();
         File currentDir = new File(path);
-        File[] files = currentDir.listFiles();
-        for (File file : files) {
+        for (File file : currentDir.listFiles()) {
             if (file.isFile()) {
                 String name = file.getName();
                 if (name.endsWith(CLASS_EXT)) {

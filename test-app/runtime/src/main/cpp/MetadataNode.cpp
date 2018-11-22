@@ -424,22 +424,6 @@ vector<MetadataNode::MethodCallbackData*> MetadataNode::SetInstanceMethodsFromSt
 
     uint8_t* curPtr = s_metadataReader.GetValueData() + treeNode->offsetValue + 1;
 
-    auto origin = Constants::APP_ROOT_FOLDER_PATH + GetOrCreateInternal(treeNode)->m_name;
-
-    if(origin == "/data/data/org.nativescript.tsapp/files/app/com/vm/java/statics/test/impl/CarProducer"){
-        DEBUG_WRITE_FORCE("::entry CarProducer");
-        for(int i= 0; i<baseInstanceMethodsCallbackData.size(); i+=1){
-            auto asd = baseInstanceMethodsCallbackData.at(i);
-
-            for(int k=0; k<asd->candidates.size(); k+=1){
-                auto entry22 = asd->candidates.at(k);
-                DEBUG_WRITE_FORCE("::entry    %s", entry22.name.c_str());
-            }
-
-        }
-    }
-
-
     auto nodeType = s_metadataReader.GetNodeType(treeNode);
 
     auto curType = s_metadataReader.ReadTypeName(treeNode);
@@ -456,7 +440,7 @@ vector<MetadataNode::MethodCallbackData*> MetadataNode::SetInstanceMethodsFromSt
     string lastMethodName;
     MethodCallbackData* callbackData = nullptr;
 
-    //auto origin = Constants::APP_ROOT_FOLDER_PATH + GetOrCreateInternal(treeNode)->m_name;
+    auto origin = Constants::APP_ROOT_FOLDER_PATH + GetOrCreateInternal(treeNode)->m_name;
     for (auto i = 0; i < instanceMethodCount; i++) {
         auto entry = s_metadataReader.ReadInstanceMethodEntry(&curPtr);
 
@@ -476,7 +460,6 @@ vector<MetadataNode::MethodCallbackData*> MetadataNode::SetInstanceMethodsFromSt
             }
 
             auto funcData = External::New(isolate, callbackData);
-            DEBUG_WRITE_FORCE("::test!!!!!!!!!!!!!! %s ::::::  %s",origin.c_str(), entry.name.c_str());
             auto funcTemplate = FunctionTemplate::New(isolate, MethodCallback, funcData);
 
             auto funcName = ConvertToV8String(entry.name);
