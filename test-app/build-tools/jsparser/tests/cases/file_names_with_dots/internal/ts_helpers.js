@@ -48,8 +48,7 @@
 	};
 
 	var __extends = function (Child, Parent) {
-		const NATIVE_CODE_REGEX = /\{\s*\[native code\]\s*\}/g;
-		var extendNativeClass = !!Parent.extend && NATIVE_CODE_REGEX.test(Parent.extend.toString());
+		var extendNativeClass = !!Parent.extend && (Parent.extend.toString().indexOf("[native code]") > -1);
 		if (!extendNativeClass) {
 			__extends_ts(Child, Parent);
 			return;
