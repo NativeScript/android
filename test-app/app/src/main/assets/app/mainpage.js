@@ -20,6 +20,8 @@ shared.runRequireTests();
 shared.runWeakRefTests();
 shared.runRuntimeTests();
 shared.runWorkerTests();
+require("./tests/testInterfaceDefaultMethods");
+require("./tests/testInterfaceStaticMethods");
 require("./tests/testMetadata");
 require("./tests/testAsserts");
 require("./tests/testWeakRef");
