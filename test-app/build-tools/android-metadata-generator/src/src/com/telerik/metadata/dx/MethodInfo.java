@@ -44,6 +44,11 @@ public class MethodInfo implements MethodDescriptor {
     }
 
     @Override
+    public boolean isAbstract() {
+        return AccessFlags.isAbstract(method.getAccessFlags());
+    }
+
+    @Override
     public String getName() {
         Dex dex = dexFile.getDex();
         List<String> strings = dex.strings();
@@ -59,12 +64,12 @@ public class MethodInfo implements MethodDescriptor {
         MethodId methodId = dex.methodIds().get(method.getMethodIndex());
         ProtoId methodProtoId = dex.protoIds().get(methodId.getProtoIndex());
         short[] parameterTypes = dex.readTypeList(methodProtoId.getParametersOffset()).getTypes();
-        String signature = "(";
+        StringBuilder signature = new StringBuilder("(");
         for (short paramId: parameterTypes) {
-            signature += typeNames.get(paramId);
+            signature.append(typeNames.get(paramId));
         }
-        signature += ")" + getReturnType().getSignature();
-        return signature;
+        signature.append(")").append(getReturnType().getSignature());
+        return signature.toString();
     }
 
     @Override
@@ -155,5 +160,20 @@ public class MethodInfo implements MethodDescriptor {
         }
 
         return null;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        MethodInfo that = (MethodInfo) o;
+
+        return getSignature().equals(that.getSignature());
+    }
+
+    @Override
+    public int hashCode() {
+        return getSignature().hashCode();
     }
 }

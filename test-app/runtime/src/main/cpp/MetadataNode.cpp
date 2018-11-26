@@ -119,6 +119,11 @@ string MetadataNode::GetName() {
     return m_name;
 }
 
+bool MetadataNode::IsNodeTypeInterface() {
+    uint8_t nodeType = s_metadataReader.GetNodeType(m_treeNode);
+    return s_metadataReader.IsNodeTypeInterface(nodeType);
+}
+
 string MetadataNode::GetTypeMetadataName(Isolate* isolate, Local<Value>& value) {
     auto data = GetTypeMetadata(isolate, value.As<Function>());
 
@@ -963,6 +968,7 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
         auto e = info.Data().As<External>();
 
         auto callbackData = reinterpret_cast<MethodCallbackData*>(e->Value());
+        auto initialCallbackData = reinterpret_cast<MethodCallbackData*>(e->Value());
 
         // Number of arguments the method is invoked with
         int argLength = info.Length();
@@ -1006,7 +1012,8 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
         if ((argLength == 0) && (methodName == V8StringConstants::VALUE_OF)) {
             info.GetReturnValue().Set(thiz);
         } else {
-            CallbackHandlers::CallJavaMethod(thiz, *className, methodName, entry, first.isStatic, isSuper, info);
+            bool isFromInterface = initialCallbackData->node->IsNodeTypeInterface();
+            CallbackHandlers::CallJavaMethod(thiz, *className, methodName, entry, isFromInterface, first.isStatic, isSuper, info);
         }
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
@@ -1895,3 +1902,4 @@ std::map<std::string, MetadataTreeNode*> MetadataNode::s_name2TreeNodeCache;
 std::map<MetadataTreeNode*, MetadataNode*> MetadataNode::s_treeNode2NodeCache;
 map<Isolate*, MetadataNode::MetadataNodeCache*> MetadataNode::s_metadata_node_cache;
 bool MetadataNode::s_profilerEnabled = false;
+

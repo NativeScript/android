@@ -1,6 +1,7 @@
 package com.tns;
 
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -8,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 class MethodResolver {
@@ -112,7 +114,7 @@ class MethodResolver {
                 methodOverloadsForClass.put(c, finder);
             }
 
-            if(!finder.errorGettingMethods()) {
+            if (!finder.errorGettingMethods()) {
                 ArrayList<Method> matchingMethods = finder.getMatchingMethods(methodName);
                 tryFindMatches(methodName, candidates, args, argLength, matchingMethods);
                 if (candidates.size() > iterationIndex && candidates.get(iterationIndex).y == 0) {
@@ -121,7 +123,7 @@ class MethodResolver {
                 }
             } else {
                 Method method = finder.getMatchingMethodWithArguments(methodName, args);
-                if(method != null) {
+                if (method != null) {
                     candidates.add(new Tuple<>(method, 0));
                     break;
                 }
@@ -157,8 +159,8 @@ class MethodResolver {
                     for (int i = 0; i < params.length; i++) {
                         if (args[i] != null) {
                             Class<?> argClass = args[i] instanceof NullObject ?
-                                                ((NullObject)args[i]).getNullObjectClass()
-                                                : args[i].getClass();
+                                    ((NullObject) args[i]).getNullObjectClass()
+                                    : args[i].getClass();
 
                             Tuple<Boolean, Integer> res = isAssignableFrom(params[i], argClass);
                             success = res.x.booleanValue();
@@ -224,8 +226,8 @@ class MethodResolver {
                 for (int i = 0; i < args.length; i++) {
                     if (args[i] != null) {
                         Class<?> argClass = args[i] instanceof NullObject ?
-                                            ((NullObject)args[i]).getNullObjectClass()
-                                            : args[i].getClass();
+                                ((NullObject) args[i]).getNullObjectClass()
+                                : args[i].getClass();
 
                         Tuple<Boolean, Integer> res = isAssignableFrom(paramTypes[i], argClass);
                         success = res.x.booleanValue();
@@ -512,7 +514,36 @@ class MethodResolver {
                     errorGettingMethods = true;
                 }
             }
+            Method[] interfaceDefaultMethods = (!clazz.isInterface()) ? getInterfaceDefaultMethods(clazz) : new Method[0];
+            declaredMethods = concatenate(declaredMethods, interfaceDefaultMethods);
             this.couldNotGetMethods = errorGettingMethods;
+        }
+
+        private static <T> T[] concatenate(T[] a, T[] b) {
+            int aLen = a.length;
+            int bLen = b.length;
+
+            @SuppressWarnings("unchecked")
+            T[] c = (T[]) Array.newInstance(a.getClass().getComponentType(), aLen + bLen);
+            System.arraycopy(a, 0, c, 0, aLen);
+            System.arraycopy(b, 0, c, aLen, bLen);
+
+            return c;
+        }
+
+        private Method[] getInterfaceDefaultMethods(Class<?> clazz) {
+            List<Method> interfaceDefaultMethods = new ArrayList<>();
+            Class<?>[] interfaces = clazz.getInterfaces();
+            for (Class<?> interfaze : interfaces) {
+                for (Method method : interfaze.getMethods()) {
+                    int methodModifiers = method.getModifiers();
+                    if (!Modifier.isAbstract(methodModifiers) && !Modifier.isStatic(methodModifiers)) {
+                        interfaceDefaultMethods.add(method);
+                    }
+                }
+            }
+
+            return interfaceDefaultMethods.toArray(new Method[0]);
         }
 
         public boolean errorGettingMethods() {
@@ -520,7 +551,7 @@ class MethodResolver {
         }
 
         public ArrayList<Method> getMatchingMethods(String methodName) {
-            if(this.errorGettingMethods()) {
+            if (this.errorGettingMethods()) {
                 return null;
             }
             ArrayList<Method> matches = this.matchingMethods.get(methodName);

@@ -34,6 +34,11 @@ public class MethodInfo implements MethodDescriptor {
     }
 
     @Override
+    public boolean isAbstract() {
+        return m.isAbstract();
+    }
+
+    @Override
     public String getName() {
         return m.getName();
     }
@@ -61,5 +66,20 @@ public class MethodInfo implements MethodDescriptor {
     @Override
     public MetadataInfoAnnotationDescriptor getMetadataInfoAnnotation() {
         return null;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        MethodInfo that = (MethodInfo) o;
+
+        return m.equals(that.m);
+    }
+
+    @Override
+    public int hashCode() {
+        return m.hashCode();
     }
 }

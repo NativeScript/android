@@ -2,14 +2,15 @@
 #include <assert.h>
 #include "Util.h"
 #include "NativeScriptException.h"
+#include "DesugaredInterfaceCompanionClassNameResolver.h"
 
 using namespace tns;
 using namespace std;
 
 JEnv::JEnv()
-    : m_env(nullptr) {
-    JNIEnv* env = nullptr;
-    jint ret = s_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+        : m_env(nullptr) {
+    JNIEnv *env = nullptr;
+    jint ret = s_jvm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6);
 
     if ((ret != JNI_OK) || (env == nullptr)) {
         ret = s_jvm->AttachCurrentThread(&env, nullptr);
@@ -20,8 +21,8 @@ JEnv::JEnv()
     m_env = env;
 }
 
-JEnv::JEnv(JNIEnv* jniEnv) {
-    jint ret = s_jvm->GetEnv(reinterpret_cast<void**>(&jniEnv), JNI_VERSION_1_6);
+JEnv::JEnv(JNIEnv *jniEnv) {
+    jint ret = s_jvm->GetEnv(reinterpret_cast<void **>(&jniEnv), JNI_VERSION_1_6);
 
     if ((ret != JNI_OK) || (jniEnv == nullptr)) {
         ret = s_jvm->AttachCurrentThread(&jniEnv, nullptr);
@@ -39,182 +40,209 @@ JEnv::operator JNIEnv* () const {
     return m_env;
 }
 
-jmethodID JEnv::GetMethodID(jclass clazz, const string& name, const string& sig) {
+jmethodID JEnv::GetMethodID(jclass clazz, const string &name, const string &sig) {
     jmethodID mid = m_env->GetMethodID(clazz, name.c_str(), sig.c_str());
     CheckForJavaException();
     return mid;
 }
-jmethodID JEnv::GetStaticMethodID(jclass clazz, const string& name, const string& sig) {
+
+jmethodID JEnv::GetStaticMethodID(jclass clazz, const string &name, const string &sig) {
     jmethodID mid = m_env->GetStaticMethodID(clazz, name.c_str(), sig.c_str());
     CheckForJavaException();
     return mid;
 }
 
-jfieldID JEnv::GetFieldID(jclass clazz, const string& name, const string& sig) {
+jfieldID JEnv::GetFieldID(jclass clazz, const string &name, const string &sig) {
     jfieldID fid = m_env->GetFieldID(clazz, name.c_str(), sig.c_str());
     CheckForJavaException();
     return fid;
 }
-jfieldID JEnv::GetStaticFieldID(jclass clazz, const string& name, const string& sig) {
+
+jfieldID JEnv::GetStaticFieldID(jclass clazz, const string &name, const string &sig) {
     jfieldID fid = m_env->GetStaticFieldID(clazz, name.c_str(), sig.c_str());
     CheckForJavaException();
     return fid;
 }
 
-void JEnv::CallStaticVoidMethodA(jclass clazz, jmethodID methodID, jvalue* args) {
+void JEnv::CallStaticVoidMethodA(jclass clazz, jmethodID methodID, jvalue *args) {
     m_env->CallStaticVoidMethodA(clazz, methodID, args);
     CheckForJavaException();
 }
-void JEnv::CallNonvirtualVoidMethodA(jobject obj, jclass clazz, jmethodID methodID, jvalue* args) {
+
+void JEnv::CallNonvirtualVoidMethodA(jobject obj, jclass clazz, jmethodID methodID, jvalue *args) {
     m_env->CallNonvirtualVoidMethodA(obj, clazz, methodID, args);
     CheckForJavaException();
 }
-void JEnv::CallVoidMethodA(jobject obj, jmethodID methodID, jvalue* args) {
+
+void JEnv::CallVoidMethodA(jobject obj, jmethodID methodID, jvalue *args) {
     m_env->CallVoidMethodA(obj, methodID, args);
     CheckForJavaException();
 }
 
-jboolean JEnv::CallStaticBooleanMethodA(jclass clazz, jmethodID methodID, jvalue* args) {
+jboolean JEnv::CallStaticBooleanMethodA(jclass clazz, jmethodID methodID, jvalue *args) {
     jboolean jbl = m_env->CallStaticBooleanMethodA(clazz, methodID, args);
     CheckForJavaException();
     return jbl;
 }
-jboolean JEnv::CallNonvirtualBooleanMethodA(jobject obj, jclass clazz, jmethodID methodID, jvalue* args) {
+
+jboolean
+JEnv::CallNonvirtualBooleanMethodA(jobject obj, jclass clazz, jmethodID methodID, jvalue *args) {
     jboolean jbl = m_env->CallNonvirtualBooleanMethodA(obj, clazz, methodID, args);
     CheckForJavaException();
     return jbl;
 }
-jboolean JEnv::CallBooleanMethodA(jobject obj, jmethodID methodID, jvalue* args) {
+
+jboolean JEnv::CallBooleanMethodA(jobject obj, jmethodID methodID, jvalue *args) {
     jboolean jbl = m_env->CallBooleanMethodA(obj, methodID, args);
     CheckForJavaException();
     return jbl;
 }
 
-jbyte JEnv::CallStaticByteMethodA(jclass clazz, jmethodID methodID, jvalue* args) {
+jbyte JEnv::CallStaticByteMethodA(jclass clazz, jmethodID methodID, jvalue *args) {
     jbyte jbt = m_env->CallStaticByteMethodA(clazz, methodID, args);
     CheckForJavaException();
     return jbt;
 }
-jbyte JEnv::CallNonvirtualByteMethodA(jobject obj, jclass clazz, jmethodID methodID, jvalue* args) {
+
+jbyte JEnv::CallNonvirtualByteMethodA(jobject obj, jclass clazz, jmethodID methodID, jvalue *args) {
     jbyte jbt = m_env->CallNonvirtualByteMethodA(obj, clazz, methodID, args);
     CheckForJavaException();
     return jbt;
 }
-jbyte JEnv::CallByteMethodA(jobject obj, jmethodID methodID, jvalue* args) {
+
+jbyte JEnv::CallByteMethodA(jobject obj, jmethodID methodID, jvalue *args) {
     jbyte jbt = m_env->CallByteMethodA(obj, methodID, args);
     CheckForJavaException();
     return jbt;
 }
 
-jchar JEnv::CallStaticCharMethodA(jclass clazz, jmethodID methodID, jvalue* args) {
+jchar JEnv::CallStaticCharMethodA(jclass clazz, jmethodID methodID, jvalue *args) {
     jchar jch = m_env->CallStaticCharMethodA(clazz, methodID, args);
     CheckForJavaException();
     return jch;
 }
-jchar JEnv::CallNonvirtualCharMethodA(jobject obj, jclass clazz, jmethodID methodID, jvalue* args) {
+
+jchar JEnv::CallNonvirtualCharMethodA(jobject obj, jclass clazz, jmethodID methodID, jvalue *args) {
     jchar jch = m_env->CallNonvirtualCharMethodA(obj, clazz, methodID, args);
     CheckForJavaException();
     return jch;
 }
-jchar JEnv::CallCharMethodA(jobject obj, jmethodID methodID, jvalue* args) {
+
+jchar JEnv::CallCharMethodA(jobject obj, jmethodID methodID, jvalue *args) {
     jchar jch = m_env->CallCharMethodA(obj, methodID, args);
     CheckForJavaException();
     return jch;
 }
 
-jshort JEnv::CallStaticShortMethodA(jclass clazz, jmethodID methodID, jvalue* args) {
+jshort JEnv::CallStaticShortMethodA(jclass clazz, jmethodID methodID, jvalue *args) {
     jshort jsh = m_env->CallStaticShortMethodA(clazz, methodID, args);
     CheckForJavaException();
     return jsh;
 
 }
-jshort JEnv::CallNonvirtualShortMethodA(jobject obj, jclass clazz, jmethodID methodID, jvalue* args) {
+
+jshort
+JEnv::CallNonvirtualShortMethodA(jobject obj, jclass clazz, jmethodID methodID, jvalue *args) {
     jshort jsh = m_env->CallNonvirtualShortMethodA(obj, clazz, methodID, args);
     CheckForJavaException();
     return jsh;
 }
-jshort JEnv::CallShortMethodA(jobject obj, jmethodID methodID, jvalue* args) {
+
+jshort JEnv::CallShortMethodA(jobject obj, jmethodID methodID, jvalue *args) {
     jshort jsh = m_env->CallShortMethodA(obj, methodID, args);
     CheckForJavaException();
     return jsh;
 }
 
-jint JEnv::CallStaticIntMethodA(jclass clazz, jmethodID methodID, jvalue* args) {
+jint JEnv::CallStaticIntMethodA(jclass clazz, jmethodID methodID, jvalue *args) {
     jint ji = m_env->CallStaticIntMethodA(clazz, methodID, args);
     CheckForJavaException();
     return ji;
 
 }
-jint JEnv::CallNonvirtualIntMethodA(jobject obj, jclass clazz, jmethodID methodID, jvalue* args) {
+
+jint JEnv::CallNonvirtualIntMethodA(jobject obj, jclass clazz, jmethodID methodID, jvalue *args) {
     jint ji = m_env->CallNonvirtualIntMethodA(obj, clazz, methodID, args);
     CheckForJavaException();
     return ji;
 }
-jint JEnv::CallIntMethodA(jobject obj, jmethodID methodID, jvalue* args) {
+
+jint JEnv::CallIntMethodA(jobject obj, jmethodID methodID, jvalue *args) {
     jint ji = m_env->CallIntMethodA(obj, methodID, args);
     CheckForJavaException();
     return ji;
 }
 
-jlong JEnv::CallStaticLongMethodA(jclass clazz, jmethodID methodID, jvalue* args) {
+jlong JEnv::CallStaticLongMethodA(jclass clazz, jmethodID methodID, jvalue *args) {
     jlong jl = m_env->CallStaticLongMethodA(clazz, methodID, args);
     CheckForJavaException();
     return jl;
 }
-jlong JEnv::CallNonvirtualLongMethodA(jobject obj, jclass clazz, jmethodID methodID, jvalue* args) {
+
+jlong JEnv::CallNonvirtualLongMethodA(jobject obj, jclass clazz, jmethodID methodID, jvalue *args) {
     jlong jl = m_env->CallNonvirtualLongMethodA(obj, clazz, methodID, args);
     CheckForJavaException();
     return jl;
 }
-jlong JEnv::CallLongMethodA(jobject obj, jmethodID methodID, jvalue* args) {
+
+jlong JEnv::CallLongMethodA(jobject obj, jmethodID methodID, jvalue *args) {
     jlong jl = m_env->CallLongMethodA(obj, methodID, args);
     CheckForJavaException();
     return jl;
 }
 
-jfloat JEnv::CallStaticFloatMethodA(jclass clazz, jmethodID methodID, jvalue* args) {
+jfloat JEnv::CallStaticFloatMethodA(jclass clazz, jmethodID methodID, jvalue *args) {
     jfloat jfl = m_env->CallStaticFloatMethodA(clazz, methodID, args);
     CheckForJavaException();
     return jfl;
 }
-jfloat JEnv::CallNonvirtualFloatMethodA(jobject obj, jclass clazz, jmethodID methodID, jvalue* args) {
+
+jfloat
+JEnv::CallNonvirtualFloatMethodA(jobject obj, jclass clazz, jmethodID methodID, jvalue *args) {
     jfloat jfl = m_env->CallNonvirtualFloatMethodA(obj, clazz, methodID, args);
     CheckForJavaException();
     return jfl;
 }
-jfloat JEnv::CallFloatMethodA(jobject obj, jmethodID methodID, jvalue* args) {
+
+jfloat JEnv::CallFloatMethodA(jobject obj, jmethodID methodID, jvalue *args) {
     jfloat jfl = m_env->CallFloatMethodA(obj, methodID, args);
     CheckForJavaException();
     return jfl;
 }
 
-jdouble JEnv::CallStaticDoubleMethodA(jclass clazz, jmethodID methodID, jvalue* args) {
+jdouble JEnv::CallStaticDoubleMethodA(jclass clazz, jmethodID methodID, jvalue *args) {
     jdouble jdb = m_env->CallStaticDoubleMethodA(clazz, methodID, args);
     CheckForJavaException();
     return jdb;
 }
-jdouble JEnv::CallNonvirtualDoubleMethodA(jobject obj, jclass clazz, jmethodID methodID, jvalue* args) {
+
+jdouble
+JEnv::CallNonvirtualDoubleMethodA(jobject obj, jclass clazz, jmethodID methodID, jvalue *args) {
     jdouble jdb = m_env->CallNonvirtualDoubleMethodA(obj, clazz, methodID, args);
     CheckForJavaException();
     return jdb;
 }
-jdouble JEnv::CallDoubleMethodA(jobject obj, jmethodID methodID, jvalue* args) {
+
+jdouble JEnv::CallDoubleMethodA(jobject obj, jmethodID methodID, jvalue *args) {
     jdouble jdb = m_env->CallDoubleMethodA(obj, methodID, args);
     CheckForJavaException();
     return jdb;
 }
 
-jobject JEnv::CallStaticObjectMethodA(jclass clazz, jmethodID methodID, jvalue* args) {
+jobject JEnv::CallStaticObjectMethodA(jclass clazz, jmethodID methodID, jvalue *args) {
     jobject jo = m_env->CallStaticObjectMethodA(clazz, methodID, args);
     CheckForJavaException();
     return jo;
 }
-jobject JEnv::CallNonvirtualObjectMethodA(jobject obj, jclass clazz, jmethodID methodID, jvalue* args) {
+
+jobject
+JEnv::CallNonvirtualObjectMethodA(jobject obj, jclass clazz, jmethodID methodID, jvalue *args) {
     jobject jo = m_env->CallNonvirtualObjectMethodA(obj, clazz, methodID, args);
     CheckForJavaException();
     return jo;
 }
-jobject JEnv::CallObjectMethodA(jobject obj, jmethodID methodID, jvalue* args) {
+
+jobject JEnv::CallObjectMethodA(jobject obj, jmethodID methodID, jvalue *args) {
     jobject jo = m_env->CallObjectMethodA(obj, methodID, args);
     CheckForJavaException();
     return jo;
@@ -225,41 +253,49 @@ jobject JEnv::GetStaticObjectField(jclass clazz, jfieldID fieldID) {
     CheckForJavaException();
     return jo;
 }
+
 jboolean JEnv::GetStaticBooleanField(jclass clazz, jfieldID fieldID) {
     jboolean jbl = m_env->GetStaticBooleanField(clazz, fieldID);
     CheckForJavaException();
     return jbl;
 }
+
 jbyte JEnv::GetStaticByteField(jclass clazz, jfieldID fieldID) {
     jbyte jbt = m_env->GetStaticByteField(clazz, fieldID);
     CheckForJavaException();
     return jbt;
 }
+
 jchar JEnv::GetStaticCharField(jclass clazz, jfieldID fieldID) {
     jchar jch = m_env->GetStaticCharField(clazz, fieldID);
     CheckForJavaException();
     return jch;
 }
+
 jshort JEnv::GetStaticShortField(jclass clazz, jfieldID fieldID) {
     jshort jsh = m_env->GetStaticShortField(clazz, fieldID);
     CheckForJavaException();
     return jsh;
 }
+
 jint JEnv::GetStaticIntField(jclass clazz, jfieldID fieldID) {
     jint ji = m_env->GetStaticIntField(clazz, fieldID);
     CheckForJavaException();
     return ji;
 }
+
 jlong JEnv::GetStaticLongField(jclass clazz, jfieldID fieldID) {
     jlong jl = m_env->GetStaticLongField(clazz, fieldID);
     CheckForJavaException();
     return jl;
 }
+
 jfloat JEnv::GetStaticFloatField(jclass clazz, jfieldID fieldID) {
     jfloat jfl = m_env->GetStaticFloatField(clazz, fieldID);
     CheckForJavaException();
     return jfl;
 }
+
 jdouble JEnv::GetStaticDoubleField(jclass clazz, jfieldID fieldID) {
     jdouble jd = m_env->GetStaticDoubleField(clazz, fieldID);
     CheckForJavaException();
@@ -270,34 +306,42 @@ void JEnv::SetStaticObjectField(jclass clazz, jfieldID fieldID, jobject value) {
     m_env->SetStaticObjectField(clazz, fieldID, value);
     CheckForJavaException();
 }
+
 void JEnv::SetStaticBooleanField(jclass clazz, jfieldID fieldID, jboolean value) {
     m_env->SetStaticBooleanField(clazz, fieldID, value);
     CheckForJavaException();
 }
+
 void JEnv::SetStaticByteField(jclass clazz, jfieldID fieldID, jbyte value) {
     m_env->SetStaticByteField(clazz, fieldID, value);
     CheckForJavaException();
 }
+
 void JEnv::SetStaticCharField(jclass clazz, jfieldID fieldID, jchar value) {
     m_env->SetStaticCharField(clazz, fieldID, value);
     CheckForJavaException();
 }
+
 void JEnv::SetStaticShortField(jclass clazz, jfieldID fieldID, jshort value) {
     m_env->SetStaticShortField(clazz, fieldID, value);
     CheckForJavaException();
 }
+
 void JEnv::SetStaticIntField(jclass clazz, jfieldID fieldID, jint value) {
     m_env->SetStaticIntField(clazz, fieldID, value);
     CheckForJavaException();
 }
+
 void JEnv::SetStaticLongField(jclass clazz, jfieldID fieldID, jlong value) {
     m_env->SetStaticLongField(clazz, fieldID, value);
     CheckForJavaException();
 }
+
 void JEnv::SetStaticFloatField(jclass clazz, jfieldID fieldID, jfloat value) {
     m_env->SetStaticFloatField(clazz, fieldID, value);
     CheckForJavaException();
 }
+
 void JEnv::SetStaticDoubleField(jclass clazz, jfieldID fieldID, jdouble value) {
     m_env->SetStaticDoubleField(clazz, fieldID, value);
     CheckForJavaException();
@@ -308,41 +352,49 @@ jobject JEnv::GetObjectField(jobject obj, jfieldID fieldID) {
     CheckForJavaException();
     return jo;
 }
+
 jboolean JEnv::GetBooleanField(jobject obj, jfieldID fieldID) {
     jboolean jbl = m_env->GetBooleanField(obj, fieldID);
     CheckForJavaException();
     return jbl;
 }
+
 jbyte JEnv::GetByteField(jobject obj, jfieldID fieldID) {
     jbyte jbt = m_env->GetByteField(obj, fieldID);
     CheckForJavaException();
     return jbt;
 }
+
 jchar JEnv::GetCharField(jobject obj, jfieldID fieldID) {
     jchar jch = m_env->GetCharField(obj, fieldID);
     CheckForJavaException();
     return jch;
 }
+
 jshort JEnv::GetShortField(jobject obj, jfieldID fieldID) {
     jshort jsh = m_env->GetShortField(obj, fieldID);
     CheckForJavaException();
     return jsh;
 }
+
 jint JEnv::GetIntField(jobject obj, jfieldID fieldID) {
     jint ji = m_env->GetIntField(obj, fieldID);
     CheckForJavaException();
     return ji;
 }
+
 jlong JEnv::GetLongField(jobject obj, jfieldID fieldID) {
     jlong jl = m_env->GetLongField(obj, fieldID);
     CheckForJavaException();
     return jl;
 }
+
 jfloat JEnv::GetFloatField(jobject obj, jfieldID fieldID) {
     jfloat jfl = m_env->GetFloatField(obj, fieldID);
     CheckForJavaException();
     return jfl;
 }
+
 jdouble JEnv::GetDoubleField(jobject obj, jfieldID fieldID) {
     jdouble jd = m_env->GetDoubleField(obj, fieldID);
     CheckForJavaException();
@@ -353,45 +405,54 @@ void JEnv::SetObjectField(jobject obj, jfieldID fieldID, jobject value) {
     m_env->SetObjectField(obj, fieldID, value);
     CheckForJavaException();
 }
+
 void JEnv::SetBooleanField(jobject obj, jfieldID fieldID, jboolean value) {
     m_env->SetBooleanField(obj, fieldID, value);
     CheckForJavaException();
 }
+
 void JEnv::SetByteField(jobject obj, jfieldID fieldID, jbyte value) {
     m_env->SetByteField(obj, fieldID, value);
     CheckForJavaException();
 }
+
 void JEnv::SetCharField(jobject obj, jfieldID fieldID, jchar value) {
     m_env->SetCharField(obj, fieldID, value);
     CheckForJavaException();
 }
+
 void JEnv::SetShortField(jobject obj, jfieldID fieldID, jshort value) {
     m_env->SetShortField(obj, fieldID, value);
     CheckForJavaException();
 }
+
 void JEnv::SetIntField(jobject obj, jfieldID fieldID, jint value) {
     m_env->SetIntField(obj, fieldID, value);
     CheckForJavaException();
 }
+
 void JEnv::SetLongField(jobject obj, jfieldID fieldID, jlong value) {
     m_env->SetLongField(obj, fieldID, value);
     CheckForJavaException();
 }
+
 void JEnv::SetFloatField(jobject obj, jfieldID fieldID, jfloat value) {
     m_env->SetFloatField(obj, fieldID, value);
     CheckForJavaException();
 }
+
 void JEnv::SetDoubleField(jobject obj, jfieldID fieldID, jdouble value) {
     m_env->SetDoubleField(obj, fieldID, value);
     CheckForJavaException();
 }
 
-jstring JEnv::NewString(const jchar* unicodeChars, jsize len) {
+jstring JEnv::NewString(const jchar *unicodeChars, jsize len) {
     jstring jst = m_env->NewString(unicodeChars, len);
     CheckForJavaException();
     return jst;
 }
-jstring JEnv::NewStringUTF(const char* bytes) {
+
+jstring JEnv::NewStringUTF(const char *bytes) {
     jstring jst = m_env->NewStringUTF(bytes);
     CheckForJavaException();
     return jst;
@@ -408,27 +469,30 @@ jobject JEnv::GetObjectArrayElement(jobjectArray array, jsize index) {
     CheckForJavaException();
     return jo;
 }
+
 void JEnv::SetObjectArrayElement(jobjectArray array, jsize index, jobject value) {
     m_env->SetObjectArrayElement(array, index, value);
     CheckForJavaException();
 }
 
-const char* JEnv::GetStringUTFChars(jstring str, jboolean* isCopy) {
-    const char* cc = m_env->GetStringUTFChars(str, isCopy);
+const char *JEnv::GetStringUTFChars(jstring str, jboolean *isCopy) {
+    const char *cc = m_env->GetStringUTFChars(str, isCopy);
     CheckForJavaException();
     return cc;
 }
-void JEnv::ReleaseStringUTFChars(jstring str, const char* utf) {
+
+void JEnv::ReleaseStringUTFChars(jstring str, const char *utf) {
     m_env->ReleaseStringUTFChars(str, utf);
     CheckForJavaException();
 }
 
-const jchar* JEnv::GetStringChars(jstring str, jboolean* isCopy) {
-    const jchar* cjc = m_env->GetStringChars(str, isCopy);
+const jchar *JEnv::GetStringChars(jstring str, jboolean *isCopy) {
+    const jchar *cjc = m_env->GetStringChars(str, isCopy);
     CheckForJavaException();
     return cjc;
 }
-void JEnv::ReleaseStringChars(jstring str, const jchar* chars) {
+
+void JEnv::ReleaseStringChars(jstring str, const jchar *chars) {
     m_env->ReleaseStringChars(str, chars);
     CheckForJavaException();
 }
@@ -445,7 +509,7 @@ const int JEnv::GetStringUTFLength(jstring str) {
     return ci;
 }
 
-void JEnv::GetStringUTFRegion(jstring str, jsize start, jsize len, char* buf) {
+void JEnv::GetStringUTFRegion(jstring str, jsize start, jsize len, char *buf) {
     m_env->GetStringUTFRegion(str, start, len, buf);
     CheckForJavaException();
 }
@@ -454,7 +518,7 @@ jint JEnv::Throw(jthrowable obj) {
     return m_env->Throw(obj);
 }
 
-jint JEnv::ThrowNew(jclass clazz, const string& message) {
+jint JEnv::ThrowNew(jclass clazz, const string &message) {
     return m_env->ThrowNew(clazz, message.c_str());
 }
 
@@ -462,10 +526,12 @@ jthrowable JEnv::ExceptionOccurred() {
     jthrowable jt = m_env->ExceptionOccurred();
     return jt;
 }
+
 void JEnv::ExceptionDescribe() {
     m_env->ExceptionDescribe();
     CheckForJavaException();
 }
+
 void JEnv::ExceptionClear() {
     m_env->ExceptionClear();
 }
@@ -487,15 +553,18 @@ jobject JEnv::NewGlobalRef(jobject obj) {
 //	CheckForJavaException();
     return jo;
 }
+
 jweak JEnv::NewWeakGlobalRef(jobject obj) {
     jweak jw = m_env->NewWeakGlobalRef(obj);
     CheckForJavaException();
     return jw;
 }
+
 void JEnv::DeleteGlobalRef(jobject globalRef) {
     m_env->DeleteGlobalRef(globalRef);
     CheckForJavaException();
 }
+
 void JEnv::DeleteWeakGlobalRef(jweak obj) {
     m_env->DeleteWeakGlobalRef(obj);
     CheckForJavaException();
@@ -506,6 +575,7 @@ jobject JEnv::NewLocalRef(jobject ref) {
     CheckForJavaException();
     return jo;
 }
+
 void JEnv::DeleteLocalRef(jobject localRef) {
     m_env->DeleteLocalRef(localRef);
 }
@@ -515,119 +585,141 @@ jbyteArray JEnv::NewByteArray(jsize length) {
     CheckForJavaException();
     return jba;
 }
+
 jbooleanArray JEnv::NewBooleanArray(jsize length) {
     jbooleanArray jba = m_env->NewBooleanArray(length);
     CheckForJavaException();
     return jba;
 }
+
 jcharArray JEnv::NewCharArray(jsize length) {
     jcharArray jca = m_env->NewCharArray(length);
     CheckForJavaException();
     return jca;
 }
+
 jshortArray JEnv::NewShortArray(jsize length) {
     jshortArray jsa = m_env->NewShortArray(length);
     CheckForJavaException();
     return jsa;
 }
+
 jintArray JEnv::NewIntArray(jsize length) {
     jintArray jia = m_env->NewIntArray(length);
     CheckForJavaException();
     return jia;
 }
+
 jlongArray JEnv::NewLongArray(jsize length) {
     jlongArray jla = m_env->NewLongArray(length);
     CheckForJavaException();
     return jla;
 }
+
 jfloatArray JEnv::NewFloatArray(jsize length) {
     jfloatArray jfa = m_env->NewFloatArray(length);
     CheckForJavaException();
     return jfa;
 }
+
 jdoubleArray JEnv::NewDoubleArray(jsize length) {
     jdoubleArray jda = m_env->NewDoubleArray(length);
     CheckForJavaException();
     return jda;
 }
 
-jbyte* JEnv::GetByteArrayElements(jbyteArray array, jboolean* isCopy) {
-    jbyte* jbt = m_env->GetByteArrayElements(array, isCopy);
+jbyte *JEnv::GetByteArrayElements(jbyteArray array, jboolean *isCopy) {
+    jbyte *jbt = m_env->GetByteArrayElements(array, isCopy);
     CheckForJavaException();
     return jbt;
 }
-void JEnv::ReleaseByteArrayElements(jbyteArray array, jbyte* elems, jint mode) {
+
+void JEnv::ReleaseByteArrayElements(jbyteArray array, jbyte *elems, jint mode) {
     m_env->ReleaseByteArrayElements(array, elems, mode);
     CheckForJavaException();
 }
 
-void JEnv::GetBooleanArrayRegion(jbooleanArray array, jsize start, jsize len, jboolean* buf) {
+void JEnv::GetBooleanArrayRegion(jbooleanArray array, jsize start, jsize len, jboolean *buf) {
     m_env->GetBooleanArrayRegion(array, start, len, buf);
     CheckForJavaException();
 }
-void JEnv::GetByteArrayRegion(jbyteArray array, jsize start, jsize len, jbyte* buf) {
+
+void JEnv::GetByteArrayRegion(jbyteArray array, jsize start, jsize len, jbyte *buf) {
     m_env->GetByteArrayRegion(array, start, len, buf);
     CheckForJavaException();
 }
-void JEnv::GetCharArrayRegion(jcharArray array, jsize start, jsize len, jchar* buf) {
+
+void JEnv::GetCharArrayRegion(jcharArray array, jsize start, jsize len, jchar *buf) {
     m_env->GetCharArrayRegion(array, start, len, buf);
     CheckForJavaException();
 }
-void JEnv::GetShortArrayRegion(jshortArray array, jsize start, jsize len, jshort* buf) {
+
+void JEnv::GetShortArrayRegion(jshortArray array, jsize start, jsize len, jshort *buf) {
     m_env->GetShortArrayRegion(array, start, len, buf);
     CheckForJavaException();
 }
-void JEnv::GetIntArrayRegion(jintArray array, jsize start, jsize len, jint* buf) {
+
+void JEnv::GetIntArrayRegion(jintArray array, jsize start, jsize len, jint *buf) {
     m_env->GetIntArrayRegion(array, start, len, buf);
     CheckForJavaException();
 }
-void JEnv::GetLongArrayRegion(jlongArray array, jsize start, jsize len, jlong* buf) {
+
+void JEnv::GetLongArrayRegion(jlongArray array, jsize start, jsize len, jlong *buf) {
     m_env->GetLongArrayRegion(array, start, len, buf);
     CheckForJavaException();
 }
-void JEnv::GetFloatArrayRegion(jfloatArray array, jsize start, jsize len, jfloat* buf) {
+
+void JEnv::GetFloatArrayRegion(jfloatArray array, jsize start, jsize len, jfloat *buf) {
     m_env->GetFloatArrayRegion(array, start, len, buf);
     CheckForJavaException();
 }
-void JEnv::GetDoubleArrayRegion(jdoubleArray array, jsize start, jsize len, jdouble* buf) {
+
+void JEnv::GetDoubleArrayRegion(jdoubleArray array, jsize start, jsize len, jdouble *buf) {
     m_env->GetDoubleArrayRegion(array, start, len, buf);
     CheckForJavaException();
 }
 
-void JEnv::SetByteArrayRegion(jbyteArray array, jsize start, jsize len, const jbyte* buf) {
+void JEnv::SetByteArrayRegion(jbyteArray array, jsize start, jsize len, const jbyte *buf) {
     m_env->SetByteArrayRegion(array, start, len, buf);
     CheckForJavaException();
 }
-void JEnv::SetBooleanArrayRegion(jbooleanArray array, jsize start, jsize len, const jboolean* buf) {
+
+void JEnv::SetBooleanArrayRegion(jbooleanArray array, jsize start, jsize len, const jboolean *buf) {
     m_env->SetBooleanArrayRegion(array, start, len, buf);
     CheckForJavaException();
 }
-void JEnv::SetCharArrayRegion(jcharArray array, jsize start, jsize len, const jchar* buf) {
+
+void JEnv::SetCharArrayRegion(jcharArray array, jsize start, jsize len, const jchar *buf) {
     m_env->SetCharArrayRegion(array, start, len, buf);
     CheckForJavaException();
 }
-void JEnv::SetShortArrayRegion(jshortArray array, jsize start, jsize len, const jshort* buf) {
+
+void JEnv::SetShortArrayRegion(jshortArray array, jsize start, jsize len, const jshort *buf) {
     m_env->SetShortArrayRegion(array, start, len, buf);
     CheckForJavaException();
 }
-void JEnv::SetIntArrayRegion(jintArray array, jsize start, jsize len, const jint* buf) {
+
+void JEnv::SetIntArrayRegion(jintArray array, jsize start, jsize len, const jint *buf) {
     m_env->SetIntArrayRegion(array, start, len, buf);
     CheckForJavaException();
 }
-void JEnv::SetLongArrayRegion(jlongArray array, jsize start, jsize len, const jlong* buf) {
+
+void JEnv::SetLongArrayRegion(jlongArray array, jsize start, jsize len, const jlong *buf) {
     m_env->SetLongArrayRegion(array, start, len, buf);
     CheckForJavaException();
 }
-void JEnv::SetFloatArrayRegion(jfloatArray array, jsize start, jsize len, const jfloat* buf) {
+
+void JEnv::SetFloatArrayRegion(jfloatArray array, jsize start, jsize len, const jfloat *buf) {
     m_env->SetFloatArrayRegion(array, start, len, buf);
     CheckForJavaException();
 }
-void JEnv::SetDoubleArrayRegion(jdoubleArray array, jsize start, jsize len, const jdouble* buf) {
+
+void JEnv::SetDoubleArrayRegion(jdoubleArray array, jsize start, jsize len, const jdouble *buf) {
     m_env->SetDoubleArrayRegion(array, start, len, buf);
     CheckForJavaException();
 }
 
-jclass JEnv::FindClass(const string& className) {
+jclass JEnv::FindClass(const string &className) {
     jclass global_class = CheckForClassInCache(className);
 
     if (global_class == nullptr) {
@@ -637,7 +729,8 @@ jclass JEnv::FindClass(const string& className) {
             m_env->ExceptionClear();
             string cannonicalClassName = Util::ConvertFromJniToCanonicalName(className);
             jstring s = m_env->NewStringUTF(cannonicalClassName.c_str());
-            tmp = static_cast<jclass>(m_env->CallStaticObjectMethod(RUNTIME_CLASS, GET_CACHED_CLASS_METHOD_ID, s));
+            tmp = static_cast<jclass>(m_env->CallStaticObjectMethod(RUNTIME_CLASS,
+                                                                    GET_CACHED_CLASS_METHOD_ID, s));
 
             m_env->DeleteLocalRef(s);
         }
@@ -648,7 +741,7 @@ jclass JEnv::FindClass(const string& className) {
     return global_class;
 }
 
-jclass JEnv::CheckForClassInCache(const string& className) {
+jclass JEnv::CheckForClassInCache(const string &className) {
     jclass global_class = nullptr;
     auto itFound = s_classCache.find(className);
 
@@ -659,21 +752,22 @@ jclass JEnv::CheckForClassInCache(const string& className) {
     return global_class;
 }
 
-jclass JEnv::InsertClassIntoCache(const string& className, jclass& tmp) {
-    auto global_class= reinterpret_cast<jclass>(m_env->NewGlobalRef(tmp));
+jclass JEnv::InsertClassIntoCache(const string &className, jclass &tmp) {
+    auto global_class = reinterpret_cast<jclass>(m_env->NewGlobalRef(tmp));
     s_classCache.insert(make_pair(className, global_class));
     m_env->DeleteLocalRef(tmp);
 
     return global_class;
 }
 
-jobject JEnv::NewDirectByteBuffer(void* address, jlong capacity) {
+jobject JEnv::NewDirectByteBuffer(void *address, jlong capacity) {
     jobject jo = m_env->NewDirectByteBuffer(address, capacity);
     CheckForJavaException();
     return jo;
 }
-void* JEnv::GetDirectBufferAddress(jobject buf) {
-    void* v = m_env->GetDirectBufferAddress(buf);
+
+void *JEnv::GetDirectBufferAddress(jobject buf) {
+    void *v = m_env->GetDirectBufferAddress(buf);
     CheckForJavaException();
     return v;
 }
@@ -690,14 +784,15 @@ jboolean JEnv::IsAssignableFrom(jclass clazz1, jclass clazz2) {
     return jbl;
 }
 
-void JEnv::Init(JavaVM* jvm) {
+void JEnv::Init(JavaVM *jvm) {
     assert(jvm != nullptr);
     s_jvm = jvm;
 
     JEnv env;
     RUNTIME_CLASS = env.FindClass("com/tns/Runtime");
     assert(RUNTIME_CLASS != nullptr);
-    GET_CACHED_CLASS_METHOD_ID = env.GetStaticMethodID(RUNTIME_CLASS, "getCachedClass", "(Ljava/lang/String;)Ljava/lang/Class;");
+    GET_CACHED_CLASS_METHOD_ID = env.GetStaticMethodID(RUNTIME_CLASS, "getCachedClass",
+                                                       "(Ljava/lang/String;)Ljava/lang/Class;");
     assert(GET_CACHED_CLASS_METHOD_ID != nullptr);
 }
 
@@ -725,7 +820,40 @@ void JEnv::CheckForJavaException() {
     }
 }
 
-JavaVM* JEnv::s_jvm = nullptr;
+JavaVM *JEnv::s_jvm = nullptr;
 map<string, jclass> JEnv::s_classCache;
 jclass JEnv::RUNTIME_CLASS = nullptr;
 jmethodID JEnv::GET_CACHED_CLASS_METHOD_ID = nullptr;
+
+std::pair<jmethodID, jclass>
+JEnv::GetInterfaceStaticMethodIDAndJClass(const std::string &interfaceName,
+                                          const std::string &methodName,
+                                          const std::string &sig) {
+
+    auto companionClassNameResolver = new DesugaredInterfaceCompanionClassNameResolver();
+    std::string possibleCalleeNames[] = {interfaceName,
+                                         companionClassNameResolver->resolveBazelInterfaceCompanionClassName(
+                                                 interfaceName),
+                                         companionClassNameResolver->resolveD8InterfaceCompanionClassName(
+                                                 interfaceName)};
+
+    for (std::string calleeName: possibleCalleeNames) {
+        jclass clazz = this->FindClass(calleeName);
+
+        if (clazz != NULL) {
+            jmethodID methodId = m_env->GetStaticMethodID(clazz, methodName.c_str(), sig.c_str());
+
+            if (ExceptionCheck() == JNI_FALSE) {
+                return std::make_pair(methodId, clazz);
+            }
+
+            ExceptionClear();
+        }
+    }
+
+    throw NativeScriptException(
+            "Could not call static interface method with name: " + methodName + " and signature: " +
+            sig + " for interface: " + interfaceName);
+}
+
+

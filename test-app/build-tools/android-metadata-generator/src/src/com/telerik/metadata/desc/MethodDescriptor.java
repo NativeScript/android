@@ -5,6 +5,7 @@ public interface MethodDescriptor {
     boolean isProtected();
     boolean isSynthetic();
     boolean isStatic();
+    boolean isAbstract();
 
     String getName();
     String getSignature();
