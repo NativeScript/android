@@ -1,12 +1,14 @@
 env:
   global:
-  - NODE_VERSION=6.11.1
-  - NDK_VERSION=r17b
+  - NODE_VERSION=10
+  - NDK_VERSION=r17c
   - DATE=$(date +%Y-%m-%d)
   - PACKAGE_VERSION=next-$DATE-$TRAVIS_BUILD_NUMBER
-  - EMULATOR_API_LEVEL=28
-  - ANDROID_ABI=x86
+  - EMULATOR_API_LEVEL=21
+  - ANDROID_ABI=armeabi-v7a
   - EMULATOR_NAME=runtime-emu
+  - BUILD_TOOLS=28.0.3
+  - ANDROID_API=28
 
 matrix:
   include:
@@ -49,8 +51,8 @@ android:
   components:
     - platform-tools
     - tools
-    - build-tools-28.0.3
-    - android-$EMULATOR_API_LEVEL
+    - build-tools-$BUILD_TOOLS
+    - android-$ANDROID_API
   licenses:
     - 'android-sdk-preview-license-52d11cd2'
     - 'android-sdk-license-.+'

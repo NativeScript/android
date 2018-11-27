@@ -627,19 +627,43 @@ describe("Tests ", function () {
 
 		var size = 10 * 1024 * 1024;
 
+		var runtime = java.lang.Runtime.getRuntime();
+
 		for (var i = 0; i < 100; i++) {
 
-			var arr = java.lang.reflect.Array.newInstance(java.lang.Byte.class.getField("TYPE").get(null), size);
+		    var usedMemInMB=(runtime.totalMemory() - runtime.freeMemory()) / 1048576;
+            var maxHeapSizeInMB=runtime.maxMemory() / 1048576;
+            var availHeapSizeInMB = maxHeapSizeInMB - usedMemInMB;
 
-			var length = arr.length;
+            __log(":Iteration: " + i);
+            console.log(":Iteration: " + i);
 
-			expect(length).toEqual(size);
+            __log(":Used mem: " + usedMemInMB);
+            __log(":Max heap size in MB: " + maxHeapSizeInMB);
+            __log(":Available heap size in MB: " + availHeapSizeInMB);
+            console.log(":Used mem: " + usedMemInMB);
+            console.log(":Max heap size in MB: " + maxHeapSizeInMB);
+            console.log(":Available heap size in MB: " + availHeapSizeInMB);
 
-			arr[0] = 123;
+            try{
+                var arr = java.lang.reflect.Array.newInstance(java.lang.Byte.class.getField("TYPE").get(null), size);
 
-			var el = arr[0];
+                var length = arr.length;
 
-			expect(el).toEqual(123);
+                expect(length).toEqual(size);
+
+                arr[0] = 123;
+
+                var el = arr[0];
+
+                expect(el).toEqual(123);
+
+            } catch(err){
+                android.os.Debug.dumpHprofData("/sdcard/dump.hprof");
+                throw err;
+            }
+
+
 		}
 	});
 
