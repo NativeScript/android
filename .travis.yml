@@ -5,7 +5,7 @@ env:
   - DATE=$(date +%Y-%m-%d)
   - PACKAGE_VERSION=next-$DATE-$TRAVIS_BUILD_NUMBER
   - EMULATOR_API_LEVEL=28
-  - ANDROID_ABI=armeabi-v7a
+  - ANDROID_ABI=x86
   - EMULATOR_NAME=runtime-emu
 
 matrix:
