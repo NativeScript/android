@@ -368,6 +368,9 @@ tasks.whenTaskAdded({ org.gradle.api.DefaultTask currentTask ->
         currentTask.finalizedBy(ensureMetadataOutDir)
         ensureMetadataOutDir.finalizedBy(buildMetadata)
     }
+    if (currentTask =~ /merge.*Assets/) {
+        currentTask.dependsOn(buildMetadata);
+    }
     if (currentTask =~ /assemble.*Debug/ || currentTask =~ /assemble.*Release/) {
         currentTask.finalizedBy("validateAppIdMatch")
     }
