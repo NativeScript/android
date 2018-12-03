@@ -5,7 +5,7 @@
 ###############################################################################################
 
 echo "Ensure adb is in PATH"
-export PATH=$ANDROID_HOME/platform-tools:$PATH
+export PATH="$ANDROID_HOME/platform-tools:$PATH"
 adb version
 
 echo "Update submodule"
