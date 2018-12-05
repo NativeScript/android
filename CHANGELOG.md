@@ -1,3 +1,16 @@
+5.1.0
+==
+
+## What's New
+ - [Add a setting to wrap calls to CallJSMethod in try catch(#1223)](https://github.com/NativeScript/android-runtime/issues/12238)
+ - [Support for abstract interface with static methods(#1157)](https://github.com/NativeScript/android-runtime/issues/1157)
+ - [Use gradle plugin 3.2.1 instead of 3.2.0(#1209)](https://github.com/NativeScript/android-runtime/pull/1209)
+ - [Add a concrete exception when the runtime cannot be found(#1201)](https://github.com/NativeScript/android-runtime/pull/1201)
+
+## Bug Fixes
+
+ - [__extends not working as expected for non native inheritance(#1181)](https://github.com/NativeScript/android-runtime/issues/1181)
+
 5.0.0
 ==
 
