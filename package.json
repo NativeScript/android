@@ -11,6 +11,6 @@
   ],
   "gradle": {
       "version": "4.10.2",
-      "android": "3.2.0"
+      "android": "3.2.1"
   }
 }
