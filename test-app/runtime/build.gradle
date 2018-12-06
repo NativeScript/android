@@ -32,7 +32,7 @@ android {
             java.srcDirs = [bindingGeneratorSourcePath, defaultSrcPath]
         }
     }
-    compileSdkVersion 26
+    compileSdkVersion 28
     buildToolsVersion project.ext._buildToolsVersion
 
     defaultConfig {
