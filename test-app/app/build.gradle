@@ -402,7 +402,6 @@ tasks.whenTaskAdded({ org.gradle.api.DefaultTask currentTask ->
 ////////////////////////////////////////////////////////////////////////////////////
 
 task runSbg(type: JavaExec) {
-    println "execute runSbg"
     inputs.dir(INPUT_JS_DIR)
 
     workingDir "$BUILD_TOOLS_PATH"
