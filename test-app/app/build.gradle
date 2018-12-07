@@ -267,7 +267,7 @@ dependencies {
         supportVer = supportVersion
     }
 
-    if (project.hasProperty("useAndroidX")) {
+    if (project.hasProperty("useAndroidX") && (useAndroidX || useAndroidX.toBoolean())) {
         def androidXLegacyVersion = "1.0.0"
         if (project.hasProperty("androidXLegacy")) {
             androidXLegacyVersion = androidXLegacy
@@ -560,9 +560,7 @@ task buildMetadata(type: JavaExec) {
 }
 
 task makeAndroidXChanges << {
-    if (project.hasProperty("useAndroidX")) {
-        println "Executing makeAndroidXChanges"
-
+    if (project.hasProperty("useAndroidX") && (useAndroidX || useAndroidX.toBoolean())) {
         // code changes
         def codeTuples = new ArrayList<Tuple2<String, String>>()
         codeTuples.add(new Tuple2<String, String>('android\\.support\\.annotation\\.NonNull', 'androidx.annotation.NonNull'))
