@@ -165,24 +165,24 @@ def getAssembleReleaseBuildArguments = { ->
     if (isWinOs) {
         arguments += ["cmd", "/c", "gradlew"]
     } else {
-        arguments.push("./gradlew")
+        arguments.add("./gradlew")
     }
     arguments += [":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"]
     if (onlyX86) {
-        arguments.push("-PonlyX86")
+        arguments.add("-PonlyX86")
     }
     if (useCCache) {
-        arguments.push("-PuseCCache")
+        arguments.add("-PuseCCache")
     }
     arguments += ["--warning-mode", "all"]
-    return arguments;
+    return arguments
 }
 
 task generateOptimizedRuntimeAar (type: Exec) {
     doFirst {
         workingDir "$TEST_APP_PATH"
         def arguments = getAssembleReleaseBuildArguments()
-        arguments.push("-Poptimized")
+        arguments.add("-Poptimized")
         commandLine arguments
     }
 }
@@ -191,7 +191,7 @@ task generateOptimizedWithInspectorRuntimeAar (type: Exec) {
     doFirst {
         workingDir "$TEST_APP_PATH"
         def arguments = getAssembleReleaseBuildArguments()
-        arguments.push("-PoptimizedWithInspector")
+        arguments.add("-PoptimizedWithInspector")
         commandLine arguments
     }
 }
@@ -386,14 +386,14 @@ def getRunTestsBuildArguments = { taskName ->
     if (isWinOs) {
         arguments += ["cmd", "/c", "gradlew"]
     } else {
-        arguments.push("./gradlew")
+        arguments.add("./gradlew")
     }
     arguments += ["-b", "runtests.gradle", taskName]
     if (onlyX86) {
-        arguments.push("-PonlyX86")
+        arguments.add("-PonlyX86")
     }
     if (useCCache) {
-        arguments.push("-PuseCCache")
+        arguments.add("-PuseCCache")
     }
     arguments += ["--warning-mode", "all"]
     return arguments;
