@@ -267,9 +267,11 @@ dependencies {
         supportVer = supportVersion
     }
 
-    // the initial version of the androidXLegacy is 1.0.0
-    if (project.hasProperty("androidXLegacy")) {
-        println "\t + using andorid X library with legacy version $androidXLegacy"
+    if (project.hasProperty("useAndroidX")) {
+        def androidXLegacyVersion = "1.0.0"
+        if (project.hasProperty("androidXLegacy")) {
+            androidXLegacyVersion = androidXLegacy
+        }
 
         def androidXAppCompatVersion = "1.1.0-alpha01"
         if (project.hasProperty("androidXAppCompat")) {
@@ -281,8 +283,10 @@ dependencies {
             androidXMaterialVersion = androidXMaterial
         }
 
+        println "\t + using andorid X library androidx.legacy:legacy-support-v4:$androidXLegacyVersion"
+
         implementation "androidx.multidex:multidex:2.0.0"
-        implementation "androidx.legacy:legacy-support-v4:$androidXLegacy"
+        implementation "androidx.legacy:legacy-support-v4:$androidXLegacyVersion"
         implementation "androidx.appcompat:appcompat:$androidXAppCompatVersion"
         implementation "com.google.android.material:material:$androidXMaterialVersion"
     } else {
@@ -556,7 +560,7 @@ task buildMetadata(type: JavaExec) {
 }
 
 task makeAndroidXChanges << {
-    if (project.hasProperty("androidXLegacy")) {
+    if (project.hasProperty("useAndroidX")) {
         println "Executing makeAndroidXChanges"
 
         // code changes
