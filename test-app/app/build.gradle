@@ -559,7 +559,7 @@ task buildMetadata(type: JavaExec) {
     }
 }
 
-task makeAndroidXChanges << {
+task makeAndroidXChanges {
     if (project.hasProperty("useAndroidX") && (useAndroidX || useAndroidX.toBoolean())) {
         // code changes
         def codeTuples = new ArrayList<Tuple2<String, String>>()
