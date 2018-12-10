@@ -571,10 +571,14 @@ task makeAndroidXChanges << {
         codeTuples.add(new Tuple2<String, String>('android\\.support\\.v4\\.app\\.Fragment', 'androidx.fragment.app.Fragment'))
         codeTuples.add(new Tuple2<String, String>('android\\.support\\.v4\\.view\\.ViewPager', 'androidx.viewpager.widget.ViewPager'))
         codeTuples.add(new Tuple2<String, String>('android\\.support\\.v7\\.widget\\.Toolbar', 'androidx.appcompat.widget.Toolbar'))
+        codeTuples.add(new Tuple2<String, String>('android\\.support\\.multidex\\.MultiDex', 'androidx.multidex.MultiDex'))
 
         codeTuples.each { tuple ->
             ant.replaceregexp(match: tuple.first, replace: tuple.second, flags: 'g', byline: true) {
-                fileset(dir: "$projectDir/src/debug/java/com/tns/", includes: 'ErrorReport*.java')
+                fileset(dir: "$projectDir/src/debug/java/com/tns/", includes: '*.java')
+            }
+            ant.replaceregexp(match: tuple.first, replace: tuple.second, flags: 'g', byline: true) {
+                fileset(dir: "$projectDir/src/main/java/com/tns/", includes: '*.java')
             }
         }
 
