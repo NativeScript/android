@@ -13,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -747,15 +748,17 @@ public class Generator {
     private boolean isActivityClass(JavaClass clazz, Map<String, JavaClass> classes) throws ClassNotFoundException {
         boolean isActivityClass = false;
 
-        String activityClassname = "android.app.Activity";
+        List<String> activityClassNames = Arrays.asList("android.app.Activity", "android.support.v7.app.AppCompatActivity", "androidx.appcompat.app.AppCompatActivity");
 
         JavaClass currentClass = clazz;
         while (true) {
             String currentClassname = currentClass.getClassName();
 
-            isActivityClass = currentClassname.equals(activityClassname);
-            if (isActivityClass) {
-                break;
+            for (String activityClassName: activityClassNames) {
+                isActivityClass = currentClassname.equals(activityClassName);
+                if (isActivityClass) {
+                    return true;
+                }
             }
 
             if (currentClassname.endsWith("java.lang.Object")) {

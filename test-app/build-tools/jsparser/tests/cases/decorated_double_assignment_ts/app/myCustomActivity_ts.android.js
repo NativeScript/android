@@ -16,5 +16,5 @@ var TestActivity = (function (_super) {
         JavaProxy('org.nativescript.MyCustomActivity')
     ], TestActivity);
     return TestActivity;
-}(android.app.Activity));
+}(android.support.v7.app.AppCompatActivity));
 exports.TestActivity = TestActivity;
