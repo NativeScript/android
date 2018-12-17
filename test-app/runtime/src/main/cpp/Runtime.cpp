@@ -477,6 +477,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     if (snapshotPtr) {
         m_startupData->data = static_cast<const char*>(dlsym(snapshotPtr, "TNSSnapshot_blob"));
         m_startupData->raw_size = *static_cast<const unsigned int*>(dlsym(snapshotPtr, "TNSSnapshot_blob_len"));
+        create_params.snapshot_blob = m_startupData;
         DEBUG_WRITE_FORCE("Snapshot library read %p (%dB).", m_startupData->data, m_startupData->raw_size);
     } else if (!Constants::V8_HEAP_SNAPSHOT_BLOB.empty() || !Constants::V8_HEAP_SNAPSHOT_SCRIPT.empty()) {
         DEBUG_WRITE_FORCE("Snapshot enabled.");
