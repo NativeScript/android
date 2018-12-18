@@ -379,15 +379,12 @@ Local<Script> ModuleInternal::LoadScript(Isolate* isolate, const string& path, c
         script = maybeScript.ToLocalChecked();
     } else {
         tns::instrumentation::Frame frame("Compile, no cache");
-        if (Constants::V8_CACHE_COMPILED_CODE) {
-            option = ScriptCompiler::kProduceCodeCache;
-        }
         auto maybeScript = ScriptCompiler::Compile(isolate->GetCurrentContext(), &source, option);
         if (maybeScript.IsEmpty() || tc.HasCaught()) {
             throw NativeScriptException(tc, "Cannot compile " + path);
         }
         script = maybeScript.ToLocalChecked();
-        SaveScriptCache(source, path);
+        SaveScriptCache(script, path);
     }
 
     DEBUG_WRITE("Compiled script (module %s)", path.c_str());
@@ -459,16 +456,19 @@ ScriptCompiler::CachedData* ModuleInternal::TryLoadScriptCache(const std::string
     return new ScriptCompiler::CachedData(reinterpret_cast<uint8_t*>(data), length, ScriptCompiler::CachedData::BufferOwned);
 }
 
-void ModuleInternal::SaveScriptCache(const ScriptCompiler::Source& source, const std::string& path) {
+void ModuleInternal::SaveScriptCache(const Local<Script> script, const std::string& path) {
     if (!Constants::V8_CACHE_COMPILED_CODE) {
         return;
     }
 
     tns::instrumentation::Frame frame("SaveScriptCache");
 
-    int length = source.GetCachedData()->length;
+    Local<UnboundScript> unboundScript = script->GetUnboundScript();
+    ScriptCompiler::CachedData* cachedData = ScriptCompiler::CreateCodeCache(unboundScript);
+
+    int length = cachedData->length;
     auto cachePath = path + ".cache";
-    File::WriteBinary(cachePath, source.GetCachedData()->data, length);
+    File::WriteBinary(cachePath, cachedData->data, length);
 }
 
 ModuleInternal::ModulePathKind ModuleInternal::GetModulePathKind(const std::string& path) {
