@@ -83,6 +83,7 @@ void ArrayElementAccessor::SetArrayElement(Isolate* isolate, const Local<Object>
     HandleScope handleScope(isolate);
     auto runtime = Runtime::GetRuntime(isolate);
     auto objectManager = runtime->GetObjectManager();
+    auto context = isolate->GetCurrentContext();
 
     auto arr = objectManager->GetJavaObjectByJsObject(array);
 
@@ -90,15 +91,15 @@ void ArrayElementAccessor::SetArrayElement(Isolate* isolate, const Local<Object>
     jboolean isCopy = false;
 
     if (elementSignature == "Z") { //bool
-        jboolean boolElementValue = (jboolean) value->BooleanValue();
+        jboolean boolElementValue = (jboolean) value->BooleanValue(context).ToChecked();
         jbooleanArray boolArr = static_cast<jbooleanArray>(arr);
         env.SetBooleanArrayRegion(boolArr, index, 1, &boolElementValue);
     } else if (elementSignature == "B") { //byte
-        jbyte byteElementValue = (jbyte) value->Int32Value();
+        jbyte byteElementValue = (jbyte) value->Int32Value(context).ToChecked();
         jbyteArray byteArr = static_cast<jbyteArray>(arr);
         env.SetByteArrayRegion(byteArr, index, 1, &byteElementValue);
     } else if (elementSignature == "C") { //char
-        String::Utf8Value utf8(value->ToString());
+        String::Utf8Value utf8(isolate, value->ToString(isolate));
         JniLocalRef s(env.NewString((jchar*) *utf8, 1));
         const char* singleChar = env.GetStringUTFChars(s, &isCopy);
         jchar charElementValue = *singleChar;
@@ -106,11 +107,11 @@ void ArrayElementAccessor::SetArrayElement(Isolate* isolate, const Local<Object>
         jcharArray charArr = static_cast<jcharArray>(arr);
         env.SetCharArrayRegion(charArr, index, 1, &charElementValue);
     } else if (elementSignature == "S") { //short
-        jshort shortElementValue = (jshort) value->Int32Value();
+        jshort shortElementValue = (jshort) value->Int32Value(context).ToChecked();
         jshortArray shortArr = static_cast<jshortArray>(arr);
         env.SetShortArrayRegion(shortArr, index, 1, &shortElementValue);
     } else if (elementSignature == "I") { //int
-        jint intElementValue = value->Int32Value();
+        jint intElementValue = value->Int32Value(context).ToChecked();
         jintArray intArr = static_cast<jintArray>(arr);
         env.SetIntArrayRegion(intArr, index, 1, &intElementValue);
     } else if (elementSignature == "J") { //long
@@ -118,16 +119,16 @@ void ArrayElementAccessor::SetArrayElement(Isolate* isolate, const Local<Object>
         if (value->IsObject()) {
             longElementValue = (jlong) ArgConverter::ConvertToJavaLong(isolate, value);
         } else {
-            longElementValue = (jlong) value->IntegerValue();
+            longElementValue = (jlong) value->IntegerValue(context).ToChecked();
         }
         jlongArray longArr = static_cast<jlongArray>(arr);
         env.SetLongArrayRegion(longArr, index, 1, &longElementValue);
     } else if (elementSignature == "F") { //float
-        jfloat floatElementValue = (jfloat) value->NumberValue();
+        jfloat floatElementValue = (jfloat) value->NumberValue(context).ToChecked();
         jfloatArray floatArr = static_cast<jfloatArray>(arr);
         env.SetFloatArrayRegion(floatArr, index, 1, &floatElementValue);
     } else if (elementSignature == "D") { //double
-        jdouble doubleElementValue = (jdouble) value->NumberValue();
+        jdouble doubleElementValue = (jdouble) value->NumberValue(context).ToChecked();
         jdoubleArray doubleArr = static_cast<jdoubleArray>(arr);
         env.SetDoubleArrayRegion(doubleArr, index, 1, &doubleElementValue);
     } else { //string or object

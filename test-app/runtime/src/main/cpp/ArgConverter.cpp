@@ -216,7 +216,7 @@ int64_t ArgConverter::ConvertToJavaLong(Isolate* isolate, const Local<Value>& va
 
     assert(!valueProp.IsEmpty());
 
-    string num = ConvertToString(valueProp->ToString());
+    string num = ConvertToString(valueProp->ToString(isolate));
 
     int64_t longValue = atoll(num.c_str());
 
@@ -241,7 +241,8 @@ string ArgConverter::ConvertToString(const v8::Local<String>& s) {
     if (s.IsEmpty()) {
         return string();
     } else {
-        String::Utf8Value str(s);
+        auto isolate = v8::Isolate::GetCurrent();
+        String::Utf8Value str(isolate, s);
         return string(*str);
     }
 }
@@ -259,7 +260,8 @@ u16string ArgConverter::ConvertToUtf16String(const v8::Local<String>& s) {
 
 jstring ArgConverter::ConvertToJavaString(const Local<Value>& value) {
     JEnv env;
-    String::Value stringValue(value);
+    auto isolate = v8::Isolate::GetCurrent();
+    String::Value stringValue(isolate, value);
     return env.NewString((const jchar*) *stringValue, stringValue.length());
 }
 
@@ -276,18 +278,8 @@ Local<String> ArgConverter::ConvertToV8String(Isolate* isolate, const char* data
     return String::NewFromUtf8(isolate, (const char*) data, String::kNormalString, length);
 }
 
-Local<String> ArgConverter::ConvertToV8UTF16String(Isolate* isolate, const string& string) {
-    auto utf16str = Util::ConvertFromUtf8ToUtf16(string);
-
-    return ConvertToV8UTF16String(isolate, utf16str);
-}
-
 Local<String> ArgConverter::ConvertToV8UTF16String(Isolate* isolate, const u16string& utf16string) {
     return String::NewFromTwoByte(isolate, ((const uint16_t*) utf16string.data()));
-}
-
-Local<String> ArgConverter::ConvertToV8UTF16String(v8::Isolate* isolate, const uint16_t* utf16string, int size) {
-    return String::NewFromTwoByte(isolate, utf16string, NewStringType::kNormal, size).ToLocalChecked();
 }
 
 std::map<Isolate*, ArgConverter::TypeLongOperationsCache*> ArgConverter::s_type_long_operations_cache;

@@ -95,7 +95,7 @@ const v8::Local<v8::String> buildStringFromArg(v8::Isolate* isolate, const v8::L
         val->ToDetailString(isolate->GetCurrentContext()).ToLocal(&argString);
     } else if (val->IsArray()) {
         auto cachedSelf = val;
-        auto array = val->ToObject();
+        auto array = val->ToObject(isolate);
         auto arrayEntryKeys = array->GetPropertyNames(isolate->GetCurrentContext()).ToLocalChecked();
         auto context = isolate->GetCurrentContext();
 
@@ -110,20 +110,20 @@ const v8::Local<v8::String> buildStringFromArg(v8::Isolate* isolate, const v8::L
 
             // avoid bottomless recursion with cyclic reference to the same array
             if (propertyValue->StrictEquals(cachedSelf)) {
-                argString = v8::String::Concat(argString, ArgConverter::ConvertToV8String(isolate, "[Circular]"));
+                argString = v8::String::Concat(isolate, argString, ArgConverter::ConvertToV8String(isolate, "[Circular]"));
                 continue;
             }
 
             auto objectString = buildStringFromArg(isolate, propertyValue);
 
-            argString = v8::String::Concat(argString, objectString);
+            argString = v8::String::Concat(isolate, argString, objectString);
 
             if (i != arrayLength - 1) {
-                argString = v8::String::Concat(argString, ArgConverter::ConvertToV8String(isolate, ", "));
+                argString = v8::String::Concat(isolate, argString, ArgConverter::ConvertToV8String(isolate, ", "));
             }
         }
 
-        argString = v8::String::Concat(argString, ArgConverter::ConvertToV8String(isolate, "]"));
+        argString = v8::String::Concat(isolate, argString, ArgConverter::ConvertToV8String(isolate, "]"));
     } else if (val->IsObject()) {
         v8::Local<v8::Object> obj = val.As<v8::Object>();
 
@@ -173,7 +173,8 @@ void Console::assertCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
         auto isolate = info.GetIsolate();
 
         auto argLen = info.Length();
-        auto expressionPasses = argLen && info[0]->BooleanValue();
+        auto context = isolate->GetCurrentContext();
+        auto expressionPasses = argLen && info[0]->BooleanValue(context).ToChecked();
 
         if (!expressionPasses) {
             std::stringstream assertionError;
@@ -433,7 +434,7 @@ void Console::traceCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
         auto framesCount = stack->GetFrameCount();
 
         for (int i = 0; i < framesCount; i++) {
-            auto frame = stack->GetFrame(i);
+            auto frame = stack->GetFrame(isolate, i);
 
             ss << buildStacktraceFrameMessage(frame) << std::endl;
         }

@@ -204,6 +204,7 @@ class InjectedScript::ProtocolPromiseHandler {
     v8::Isolate* isolate = session->inspector()->isolate();
     if (result->IsNativeError()) {
       message = " " + toProtocolString(
+                          isolate,
                           result->ToDetailString(isolate->GetCurrentContext())
                               .ToLocalChecked());
       v8::Local<v8::StackTrace> stackTrace = v8::debug::GetDetailedStackTrace(
@@ -564,7 +565,9 @@ Response InjectedScript::createExceptionDetails(
   v8::Local<v8::Message> message = tryCatch.Message();
   v8::Local<v8::Value> exception = tryCatch.Exception();
   String16 messageText =
-      message.IsEmpty() ? String16() : toProtocolString(message->Get());
+      message.IsEmpty()
+          ? String16()
+          : toProtocolString(m_context->isolate(), message->Get());
   std::unique_ptr<protocol::Runtime::ExceptionDetails> exceptionDetails =
       protocol::Runtime::ExceptionDetails::create()
           .setExceptionId(m_context->inspector()->nextExceptionId())
@@ -735,7 +738,7 @@ InjectedScript::ContextScope::ContextScope(V8InspectorSessionImpl* session,
     : InjectedScript::Scope(session),
       m_executionContextId(executionContextId) {}
 
-InjectedScript::ContextScope::~ContextScope() {}
+InjectedScript::ContextScope::~ContextScope() = default;
 
 Response InjectedScript::ContextScope::findInjectedScript(
     V8InspectorSessionImpl* session) {
@@ -746,7 +749,7 @@ InjectedScript::ObjectScope::ObjectScope(V8InspectorSessionImpl* session,
                                          const String16& remoteObjectId)
     : InjectedScript::Scope(session), m_remoteObjectId(remoteObjectId) {}
 
-InjectedScript::ObjectScope::~ObjectScope() {}
+InjectedScript::ObjectScope::~ObjectScope() = default;
 
 Response InjectedScript::ObjectScope::findInjectedScript(
     V8InspectorSessionImpl* session) {
@@ -767,7 +770,7 @@ InjectedScript::CallFrameScope::CallFrameScope(V8InspectorSessionImpl* session,
                                                const String16& remoteObjectId)
     : InjectedScript::Scope(session), m_remoteCallFrameId(remoteObjectId) {}
 
-InjectedScript::CallFrameScope::~CallFrameScope() {}
+InjectedScript::CallFrameScope::~CallFrameScope() = default;
 
 Response InjectedScript::CallFrameScope::findInjectedScript(
     V8InspectorSessionImpl* session) {

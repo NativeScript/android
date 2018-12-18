@@ -211,17 +211,18 @@ DEFINE_IMPLICATION(harmony_class_fields, harmony_private_fields)
 // Update bootstrapper.cc whenever adding a new feature flag.
 
 // Features that are still work in progress (behind individual flags).
-#define HARMONY_INPROGRESS_BASE(V)                                    \
-  V(harmony_do_expressions, "harmony do-expressions")                 \
-  V(harmony_class_fields, "harmony fields in class literals")         \
-  V(harmony_static_fields, "harmony static fields in class literals") \
-  V(harmony_await_optimization, "harmony await taking 1 tick")
+#define HARMONY_INPROGRESS_BASE(V)                             \
+  V(harmony_do_expressions, "harmony do-expressions")          \
+  V(harmony_class_fields, "harmony fields in class literals")  \
+  V(harmony_await_optimization, "harmony await taking 1 tick") \
+  V(harmony_regexp_sequence, "RegExp Unicode sequence properties")
 
 #ifdef V8_INTL_SUPPORT
-#define HARMONY_INPROGRESS(V)      \
-  HARMONY_INPROGRESS_BASE(V)       \
-  V(harmony_locale, "Intl.Locale") \
-  V(harmony_intl_relative_time_format, "Intl.RelativeTimeFormat")
+#define HARMONY_INPROGRESS(V)                    \
+  HARMONY_INPROGRESS_BASE(V)                     \
+  V(harmony_locale, "Intl.Locale")               \
+  V(harmony_intl_list_format, "Intl.ListFormat") \
+  V(harmony_intl_segmenter, "Intl.Segmenter")
 #else
 #define HARMONY_INPROGRESS(V) HARMONY_INPROGRESS_BASE(V)
 #endif
@@ -232,18 +233,26 @@ DEFINE_IMPLICATION(harmony_class_fields, harmony_private_fields)
   V(harmony_private_fields, "harmony private fields in class literals")    \
   V(harmony_numeric_separator, "harmony numeric separator between digits") \
   V(harmony_string_matchall, "harmony String.prototype.matchAll")          \
-  V(harmony_symbol_description, "harmony Symbol.prototype.description")
+  V(harmony_static_fields, "harmony static fields in class literals")      \
+  V(harmony_json_stringify, "Well-formed JSON.stringify")
 
 // Features that are shipping (turned on by default, but internal flag remains).
-#define HARMONY_SHIPPING(V)                                                   \
-  V(harmony_string_trimming, "harmony String.prototype.trim{Start,End}")      \
-  V(harmony_sharedarraybuffer, "harmony sharedarraybuffer")                   \
-  V(harmony_function_tostring, "harmony Function.prototype.toString")         \
-  V(harmony_import_meta, "harmony import.meta property")                      \
-  V(harmony_bigint, "harmony arbitrary precision integers")                   \
-  V(harmony_dynamic_import, "harmony dynamic import")                         \
-  V(harmony_array_prototype_values, "harmony Array.prototype.values")         \
-  V(harmony_array_flat, "harmony Array.prototype.{flat,flatMap}")
+#define HARMONY_SHIPPING_BASE(V)                                         \
+  V(harmony_sharedarraybuffer, "harmony sharedarraybuffer")              \
+  V(harmony_import_meta, "harmony import.meta property")                 \
+  V(harmony_dynamic_import, "harmony dynamic import")                    \
+  V(harmony_array_prototype_values, "harmony Array.prototype.values")    \
+  V(harmony_array_flat, "harmony Array.prototype.{flat,flatMap}")        \
+  V(harmony_symbol_description, "harmony Symbol.prototype.description")  \
+  V(harmony_global, "harmony global")
+
+#ifdef V8_INTL_SUPPORT
+#define HARMONY_SHIPPING(V) \
+  HARMONY_SHIPPING_BASE(V)  \
+  V(harmony_intl_relative_time_format, "Intl.RelativeTimeFormat")
+#else
+#define HARMONY_SHIPPING(V) HARMONY_SHIPPING_BASE(V)
+#endif
 
 // Once a shipping feature has proved stable in the wild, it will be dropped
 // from HARMONY_SHIPPING, all occurrences of the FLAG_ variable are removed,
@@ -316,6 +325,11 @@ DEFINE_BOOL(optimize_for_size, false,
             "Enables optimizations which favor memory size over execution "
             "speed")
 
+// Flag for one shot optimiztions.
+DEFINE_BOOL(enable_one_shot_optimization, true,
+            "Enable size optimizations for the code that will "
+            "only be executed once")
+
 DEFINE_VALUE_IMPLICATION(optimize_for_size, max_semi_space_size, 1)
 
 // Flags for data representation optimizations
@@ -382,6 +396,11 @@ DEFINE_INT(concurrent_recompilation_delay, 0,
            "artificial compilation delay in ms")
 DEFINE_BOOL(block_concurrent_recompilation, false,
             "block queued jobs until released")
+DEFINE_BOOL(concurrent_compiler_frontend, false,
+            "run optimizing compiler's frontend phases on a separate thread")
+DEFINE_IMPLICATION(future, concurrent_compiler_frontend)
+DEFINE_BOOL(strict_heap_broker, false, "fail on incomplete serialization")
+DEFINE_BOOL(trace_heap_broker, false, "trace the heap broker")
 
 // Flags for stress-testing the compiler.
 DEFINE_INT(stress_runs, 0, "number of stress runs")
@@ -431,6 +450,8 @@ DEFINE_BOOL(trace_verify_csa, false, "trace code stubs verification")
 DEFINE_STRING(csa_trap_on_node, nullptr,
               "trigger break point when a node with given id is created in "
               "given stub. The format is: StubName,NodeId")
+DEFINE_BOOL_READONLY(fixed_array_bounds_checks, DEBUG_BOOL,
+                     "enable FixedArray bounds checks")
 DEFINE_BOOL(turbo_stats, false, "print TurboFan statistics")
 DEFINE_BOOL(turbo_stats_nvp, false,
             "print TurboFan statistics in machine-readable format")
@@ -506,9 +527,6 @@ DEFINE_BOOL(untrusted_code_mitigations, V8_DEFAULT_UNTRUSTED_CODE_MITIGATIONS,
             "Enable mitigations for executing untrusted code")
 #undef V8_DEFAULT_UNTRUSTED_CODE_MITIGATIONS
 
-DEFINE_BOOL(branch_load_poisoning, false, "Mask loads with branch conditions.")
-DEFINE_IMPLICATION(future, branch_load_poisoning)
-
 // Flags to help platform porters
 DEFINE_BOOL(minimal, false,
             "simplifies execution model to make porting "
@@ -524,18 +542,18 @@ DEFINE_BOOL(wasm_disable_structured_cloning, false,
             "disable wasm structured cloning")
 DEFINE_INT(wasm_num_compilation_tasks, 10,
            "number of parallel compilation tasks for wasm")
-DEFINE_DEBUG_BOOL(wasm_trace_native_heap, false,
+DEFINE_DEBUG_BOOL(trace_wasm_native_heap, false,
                   "trace wasm native heap events")
 DEFINE_BOOL(wasm_write_protect_code_memory, false,
             "write protect code memory on the wasm native heap")
-DEFINE_BOOL(wasm_trace_serialization, false,
+DEFINE_BOOL(trace_wasm_serialization, false,
             "trace serialization/deserialization")
 DEFINE_BOOL(wasm_async_compilation, true,
             "enable actual asynchronous compilation for WebAssembly.compile")
 DEFINE_BOOL(wasm_test_streaming, false,
             "use streaming compilation instead of async compilation for tests")
 DEFINE_UINT(wasm_max_mem_pages, v8::internal::wasm::kV8MaxWasmMemoryPages,
-            "maximum memory size of a wasm instance")
+            "maximum number of 64KiB memory pages of a wasm instance")
 DEFINE_UINT(wasm_max_table_size, v8::internal::wasm::kV8MaxWasmTableSize,
             "maximum table size of a wasm instance")
 // Enable Liftoff by default on ia32 and x64. More architectures will follow
@@ -568,7 +586,7 @@ DEFINE_DEBUG_BOOL(trace_liftoff, false,
                   "trace Liftoff, the baseline compiler for WebAssembly")
 DEFINE_DEBUG_BOOL(wasm_break_on_decoder_error, false,
                   "debug break when wasm decoder encounters an error")
-DEFINE_BOOL(wasm_trace_memory, false,
+DEFINE_BOOL(trace_wasm_memory, false,
             "print all memory updates performed in wasm code")
 // Fuzzers use {wasm_tier_mask_for_testing} together with {liftoff} and
 // {no_wasm_tier_up} to force some functions to be compiled with Turbofan.
@@ -588,22 +606,18 @@ DEFINE_DEBUG_BOOL(dump_wasm_module, false, "dump wasm module bytes")
 DEFINE_STRING(dump_wasm_module_path, nullptr,
               "directory to dump wasm modules to")
 
-DEFINE_BOOL(experimental_wasm_simd, false,
-            "enable prototype simd opcodes for wasm")
-DEFINE_BOOL(experimental_wasm_eh, false,
-            "enable prototype exception handling opcodes for wasm")
-DEFINE_BOOL(experimental_wasm_mv, false,
-            "enable prototype multi-value support for wasm")
-DEFINE_BOOL(experimental_wasm_threads, false,
-            "enable prototype threads for wasm")
-DEFINE_BOOL(experimental_wasm_sat_f2i_conversions, false,
-            "enable non-trapping float-to-int conversions for wasm")
-DEFINE_BOOL(experimental_wasm_se, true,
-            "enable prototype sign extension opcodes for wasm")
-DEFINE_BOOL(experimental_wasm_anyref, false,
-            "enable prototype anyref support for wasm")
-DEFINE_BOOL(experimental_wasm_mut_global, true,
-            "enable prototype import/export mutable global support for wasm")
+// Declare command-line flags for WASM features. Warning: avoid using these
+// flags directly in the implementation. Instead accept wasm::WasmFeatures
+// for configurability.
+#include "src/wasm/wasm-feature-flags.h"
+
+#define SPACE
+#define DECL_WASM_FLAG(feat, desc, val)      \
+  DEFINE_BOOL(experimental_wasm_##feat, val, \
+              "enable prototype " desc " for wasm")
+FOREACH_WASM_FEATURE_FLAG(DECL_WASM_FLAG, SPACE)
+#undef DECL_WASM_FLAG
+#undef SPACE
 
 DEFINE_BOOL(wasm_opt, false, "enable wasm optimization")
 DEFINE_BOOL(wasm_no_bounds_checks, false,
@@ -611,6 +625,12 @@ DEFINE_BOOL(wasm_no_bounds_checks, false,
 DEFINE_BOOL(wasm_no_stack_checks, false,
             "disable stack checks (performance testing only)")
 
+DEFINE_BOOL(wasm_shared_engine, true,
+            "shares one wasm engine between all isolates within a process")
+DEFINE_IMPLICATION(future, wasm_shared_engine)
+DEFINE_BOOL(wasm_shared_code, true,
+            "shares code underlying a wasm module when it is transferred")
+DEFINE_IMPLICATION(future, wasm_shared_code)
 DEFINE_BOOL(wasm_trap_handler, true,
             "use signal handlers to catch out of bounds memory access in wasm"
             " (currently Linux x86_64 only)")
@@ -823,11 +843,11 @@ DEFINE_BOOL(enable_popcnt, true,
 DEFINE_STRING(arm_arch, ARM_ARCH_DEFAULT,
               "generate instructions for the selected ARM architecture if "
               "available: armv6, armv7, armv7+sudiv or armv8")
-DEFINE_BOOL(enable_vldr_imm, false,
-            "enable use of constant pools for double immediate (ARM only)")
 DEFINE_BOOL(force_long_branches, false,
             "force all emitted branches to be in long mode (MIPS/PPC only)")
 DEFINE_STRING(mcpu, "auto", "enable optimization for specific cpu")
+DEFINE_BOOL(partial_constant_pool, true,
+            "enable use of partial constant pools (X64 only)")
 
 // Deprecated ARM flags (replaced by arm_arch).
 DEFINE_MAYBE_BOOL(enable_armv7, "deprecated (use --arm_arch instead)")
@@ -860,8 +880,6 @@ DEFINE_BOOL(expose_trigger_failure, false, "expose trigger-failure extension")
 DEFINE_INT(stack_trace_limit, 10, "number of stack frames to capture")
 DEFINE_BOOL(builtins_in_stack_traces, false,
             "show built-in functions in stack traces")
-DEFINE_BOOL(enable_experimental_builtins, false,
-            "enable new csa-based experimental builtins")
 DEFINE_BOOL(disallow_code_generation_from_strings, false,
             "disallow eval and friends")
 DEFINE_BOOL(expose_async_hooks, false, "expose async_hooks object")
@@ -907,11 +925,6 @@ DEFINE_BOOL(cache_prototype_transitions, true, "cache prototype transitions")
 DEFINE_BOOL(compiler_dispatcher, false, "enable compiler dispatcher")
 DEFINE_BOOL(trace_compiler_dispatcher, false,
             "trace compiler dispatcher activity")
-
-// compiler-dispatcher-job.cc
-DEFINE_BOOL(
-    trace_compiler_dispatcher_jobs, false,
-    "trace progress of individual jobs managed by the compiler dispatcher")
 
 // cpu-profiler.cc
 DEFINE_INT(cpu_profiler_sampling_interval, 1000,
@@ -964,7 +977,6 @@ DEFINE_INT(heap_snapshot_string_limit, 1024,
 // sampling-heap-profiler.cc
 DEFINE_BOOL(sampling_heap_profiler_suppress_randomness, false,
             "Use constant sample intervals to eliminate test flakiness")
-
 
 // v8.cc
 DEFINE_BOOL(use_idle_notification, true,
@@ -1030,6 +1042,9 @@ DEFINE_BOOL(trace_sim_messages, false,
             "Trace simulator debug messages. Implied by --trace-sim.")
 
 // isolate.cc
+DEFINE_BOOL(async_stack_traces, false,
+            "include async stack traces in Error.stack")
+DEFINE_IMPLICATION(async_stack_traces, harmony_await_optimization)
 DEFINE_BOOL(stack_trace_on_illegal, false,
             "print stack trace when an illegal exception is thrown")
 DEFINE_BOOL(abort_on_uncaught_exception, false,
@@ -1071,12 +1086,15 @@ DEFINE_VALUE_IMPLICATION(runtime_call_stats, runtime_stats, 1)
 #endif
 DEFINE_BOOL_READONLY(embedded_builtins, V8_EMBEDDED_BUILTINS_BOOL,
                      "Embed builtin code into the binary.")
+// TODO(jgruber,v8:6666): Remove once ia32 has full embedded builtin support.
+DEFINE_BOOL_READONLY(
+    ia32_verify_root_register, false,
+    "Check that the value of the root register was not clobbered.")
+// TODO(jgruber,v8:6666): Remove once ia32 has full embedded builtin support.
+DEFINE_BOOL(print_embedded_builtin_candidates, false,
+            "Prints builtins that are not yet embedded but could be.")
 DEFINE_BOOL(lazy_deserialization, true,
             "Deserialize code lazily from the snapshot.")
-DEFINE_BOOL(lazy_handler_deserialization, true,
-            "Deserialize bytecode handlers lazily from the snapshot.")
-DEFINE_IMPLICATION(lazy_handler_deserialization, lazy_deserialization)
-DEFINE_IMPLICATION(future, lazy_handler_deserialization)
 DEFINE_BOOL(trace_lazy_deserialization, false, "Trace lazy deserialization.")
 DEFINE_BOOL(profile_deserialization, false,
             "Print the time it takes to deserialize the snapshot.")
@@ -1132,6 +1150,11 @@ DEFINE_BOOL(use_external_strings, false, "Use external strings for source code")
 DEFINE_STRING(map_counters, "", "Map counters to a file")
 DEFINE_ARGS(js_arguments,
             "Pass all remaining arguments to the script. Alias for \"--\".")
+DEFINE_BOOL(mock_arraybuffer_allocator, false,
+            "Use a mock ArrayBuffer allocator for testing.")
+DEFINE_SIZE_T(mock_arraybuffer_allocator_limit, 0,
+              "Memory limit for mock ArrayBuffer allocator used to simulate "
+              "OOM for testing.")
 
 //
 // GDB JIT integration flags.
@@ -1244,6 +1267,9 @@ DEFINE_BOOL(log_function_events, false,
             "(parse, compile, execute) separately.")
 DEFINE_BOOL(prof, false,
             "Log statistical profiling information (implies --log-code).")
+
+DEFINE_BOOL(detailed_line_info, false,
+            "Always generate detailed line information for CPU profiling.")
 
 #if defined(ANDROID)
 // Phones and tablets have processors that are much slower than desktop

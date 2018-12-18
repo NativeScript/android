@@ -522,10 +522,9 @@ void Frontend::sendRawNotification(const String& notification) {
 
 class DispatcherImpl : public protocol::DispatcherBase {
     public:
-        DispatcherImpl(FrontendChannel* frontendChannel, Backend* backend, bool fallThroughForNotFound)
+        DispatcherImpl(FrontendChannel* frontendChannel, Backend* backend)
             : DispatcherBase(frontendChannel)
-            , m_backend(backend)
-            , m_fallThroughForNotFound(fallThroughForNotFound) {
+            , m_backend(backend) {
             m_dispatchMap["Profiler.disable"] = &DispatcherImpl::disable;
             m_dispatchMap["Profiler.enable"] = &DispatcherImpl::enable;
             m_dispatchMap["Profiler.getBestEffortCoverage"] = &DispatcherImpl::getBestEffortCoverage;
@@ -540,83 +539,83 @@ class DispatcherImpl : public protocol::DispatcherBase {
             m_dispatchMap["Profiler.takeTypeProfile"] = &DispatcherImpl::takeTypeProfile;
         }
         ~DispatcherImpl() override { }
-        DispatchResponse::Status dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) override;
+        bool canDispatch(const String& method) override;
+        void dispatch(int callId, const String& method, const String& message, std::unique_ptr<protocol::DictionaryValue> messageObject) override;
         std::unordered_map<String, String>& redirects() {
             return m_redirects;
         }
 
     protected:
-        using CallHandler = DispatchResponse::Status (DispatcherImpl::*)(int callId, std::unique_ptr<DictionaryValue> messageObject, ErrorSupport* errors);
+        using CallHandler = void (DispatcherImpl::*)(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> messageObject, ErrorSupport* errors);
         using DispatchMap = std::unordered_map<String, CallHandler>;
         DispatchMap m_dispatchMap;
         std::unordered_map<String, String> m_redirects;
 
-        DispatchResponse::Status disable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status enable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status getBestEffortCoverage(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status setSamplingInterval(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status start(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status startPreciseCoverage(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status startTypeProfile(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status stop(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status stopPreciseCoverage(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status stopTypeProfile(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status takePreciseCoverage(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status takeTypeProfile(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void disable(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void enable(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void getBestEffortCoverage(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void setSamplingInterval(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void start(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void startPreciseCoverage(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void startTypeProfile(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void stop(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void stopPreciseCoverage(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void stopTypeProfile(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void takePreciseCoverage(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void takeTypeProfile(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
 
         Backend* m_backend;
-        bool m_fallThroughForNotFound;
 };
 
-DispatchResponse::Status DispatcherImpl::dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) {
-    std::unordered_map<String, CallHandler>::iterator it = m_dispatchMap.find(method);
-    if (it == m_dispatchMap.end()) {
-        if (m_fallThroughForNotFound) {
-            return DispatchResponse::kFallThrough;
-        }
-        reportProtocolError(callId, DispatchResponse::kMethodNotFound, "'" + method + "' wasn't found", nullptr);
-        return DispatchResponse::kError;
-    }
+bool DispatcherImpl::canDispatch(const String& method) {
+    return m_dispatchMap.find(method) != m_dispatchMap.end();
+}
 
+void DispatcherImpl::dispatch(int callId, const String& method, const String& message, std::unique_ptr<protocol::DictionaryValue> messageObject) {
+    std::unordered_map<String, CallHandler>::iterator it = m_dispatchMap.find(method);
+    DCHECK(it != m_dispatchMap.end());
     protocol::ErrorSupport errors;
-    return (this->*(it->second))(callId, std::move(messageObject), &errors);
+    (this->*(it->second))(callId, method, message, std::move(messageObject), &errors);
 }
 
 
-DispatchResponse::Status DispatcherImpl::disable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::disable(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->disable();
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     if (weak->get()) {
         weak->get()->sendResponse(callId, response);
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::enable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::enable(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->enable();
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     if (weak->get()) {
         weak->get()->sendResponse(callId, response);
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::getBestEffortCoverage(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::getBestEffortCoverage(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Declare output parameters.
     std::unique_ptr<protocol::Array<protocol::Profiler::ScriptCoverage>> out_result;
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getBestEffortCoverage(&out_result);
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     if (response.status() == DispatchResponse::kSuccess) {
@@ -625,10 +624,10 @@ DispatchResponse::Status DispatcherImpl::getBestEffortCoverage(int callId, std::
     if (weak->get()) {
         weak->get()->sendResponse(callId, response, std::move(result));
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::setSamplingInterval(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::setSamplingInterval(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -638,34 +637,36 @@ DispatchResponse::Status DispatcherImpl::setSamplingInterval(int callId, std::un
     errors->pop();
     if (errors->hasErrors()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return DispatchResponse::kError;
+        return;
     }
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setSamplingInterval(in_interval);
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     if (weak->get()) {
         weak->get()->sendResponse(callId, response);
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::start(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::start(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->start();
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     if (weak->get()) {
         weak->get()->sendResponse(callId, response);
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::startPreciseCoverage(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::startPreciseCoverage(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -684,41 +685,44 @@ DispatchResponse::Status DispatcherImpl::startPreciseCoverage(int callId, std::u
     errors->pop();
     if (errors->hasErrors()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return DispatchResponse::kError;
+        return;
     }
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->startPreciseCoverage(std::move(in_callCount), std::move(in_detailed));
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     if (weak->get()) {
         weak->get()->sendResponse(callId, response);
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::startTypeProfile(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::startTypeProfile(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->startTypeProfile();
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     if (weak->get()) {
         weak->get()->sendResponse(callId, response);
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::stop(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::stop(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Declare output parameters.
     std::unique_ptr<protocol::Profiler::Profile> out_profile;
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->stop(&out_profile);
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     if (response.status() == DispatchResponse::kSuccess) {
@@ -727,43 +731,46 @@ DispatchResponse::Status DispatcherImpl::stop(int callId, std::unique_ptr<Dictio
     if (weak->get()) {
         weak->get()->sendResponse(callId, response, std::move(result));
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::stopPreciseCoverage(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::stopPreciseCoverage(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->stopPreciseCoverage();
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     if (weak->get()) {
         weak->get()->sendResponse(callId, response);
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::stopTypeProfile(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::stopTypeProfile(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->stopTypeProfile();
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     if (weak->get()) {
         weak->get()->sendResponse(callId, response);
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::takePreciseCoverage(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::takePreciseCoverage(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Declare output parameters.
     std::unique_ptr<protocol::Array<protocol::Profiler::ScriptCoverage>> out_result;
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->takePreciseCoverage(&out_result);
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     if (response.status() == DispatchResponse::kSuccess) {
@@ -772,17 +779,18 @@ DispatchResponse::Status DispatcherImpl::takePreciseCoverage(int callId, std::un
     if (weak->get()) {
         weak->get()->sendResponse(callId, response, std::move(result));
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::takeTypeProfile(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::takeTypeProfile(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Declare output parameters.
     std::unique_ptr<protocol::Array<protocol::Profiler::ScriptTypeProfile>> out_result;
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->takeTypeProfile(&out_result);
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     if (response.status() == DispatchResponse::kSuccess) {
@@ -791,12 +799,12 @@ DispatchResponse::Status DispatcherImpl::takeTypeProfile(int callId, std::unique
     if (weak->get()) {
         weak->get()->sendResponse(callId, response, std::move(result));
     }
-    return response.status();
+    return;
 }
 
 // static
 void Dispatcher::wire(UberDispatcher* uber, Backend* backend) {
-    std::unique_ptr<DispatcherImpl> dispatcher(new DispatcherImpl(uber->channel(), backend, uber->fallThroughForNotFound()));
+    std::unique_ptr<DispatcherImpl> dispatcher(new DispatcherImpl(uber->channel(), backend));
     uber->setupRedirects(dispatcher->redirects());
     uber->registerBackend("Profiler", std::move(dispatcher));
 }

@@ -28,7 +28,8 @@ CastType NumericCasts::GetCastType(Isolate* isolate, const Local<Object>& object
     Local<Value> hidden;
     V8GetPrivateValue(isolate, object, key, hidden);
     if (!hidden.IsEmpty()) {
-        ret = static_cast<CastType>(hidden->Int32Value());
+        auto context = isolate->GetCurrentContext();
+        ret = static_cast<CastType>(hidden->Int32Value(context).ToChecked());
     }
 
     return ret;
@@ -175,7 +176,7 @@ void NumericCasts::MarkAsLongCallback(const v8::FunctionCallbackInfo<Value>& arg
         if (args[0]->IsInt32()) {
             value = args[0]->ToInt32(isolate);
         } else {
-            value = args[0]->ToString();
+            value = args[0]->ToString(isolate);
         }
 
         auto cast = Object::New(isolate);
@@ -209,7 +210,7 @@ void NumericCasts::MarkAsByteCallback(const v8::FunctionCallbackInfo<Value>& arg
         if (args[0]->IsInt32()) {
             value = args[0]->ToInt32(isolate);
         } else {
-            value = args[0]->ToString();
+            value = args[0]->ToString(isolate);
         }
 
         auto cast = Object::New(isolate);
@@ -244,7 +245,7 @@ void NumericCasts::MarkAsShortCallback(const v8::FunctionCallbackInfo<Value>& ar
         if (args[0]->IsInt32()) {
             value = args[0]->ToInt32(isolate);
         } else {
-            value = args[0]->ToString();
+            value = args[0]->ToString(isolate);
         }
 
         auto cast = Object::New(isolate);
@@ -274,7 +275,7 @@ void NumericCasts::MarkAsCharCallback(const v8::FunctionCallbackInfo<Value>& arg
             throw NativeScriptException(string("char(x) should be called with single parameter containing a char representation"));
         }
 
-        auto value = args[0]->ToString();
+        auto value = args[0]->ToString(isolate);
         if (value->Length() != 1) {
             throw NativeScriptException(string("char(x) should be called with single parameter containing a single char"));
         }

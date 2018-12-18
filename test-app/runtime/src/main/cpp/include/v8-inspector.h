@@ -70,7 +70,7 @@ class V8_EXPORT StringView {
 
 class V8_EXPORT StringBuffer {
     public:
-        virtual ~StringBuffer() {}
+        virtual ~StringBuffer() = default;
         virtual const StringView& string() = 0;
         // This method copies contents.
         static std::unique_ptr<StringBuffer> create(const StringView&);
@@ -115,7 +115,7 @@ class V8_EXPORT V8StackTrace {
         virtual StringView topScriptId() const = 0;
         virtual StringView topFunctionName() const = 0;
 
-        virtual ~V8StackTrace() {}
+        virtual ~V8StackTrace() = default;
         virtual std::unique_ptr<protocol::Runtime::API::StackTrace>
         buildInspectorObject() const = 0;
         virtual std::unique_ptr<StringBuffer> toString() const = 0;
@@ -126,13 +126,13 @@ class V8_EXPORT V8StackTrace {
 
 class V8_EXPORT V8InspectorSession {
     public:
-        virtual ~V8InspectorSession() {}
+        virtual ~V8InspectorSession() = default;
 
         // Cross-context inspectable values (DOM nodes in different worlds, etc.).
         class V8_EXPORT Inspectable {
             public:
                 virtual v8::Local<v8::Value> get(v8::Local<v8::Context>) = 0;
-                virtual ~Inspectable() {}
+                virtual ~Inspectable() = default;
         };
         virtual void addInspectedObject(std::unique_ptr<Inspectable>) = 0;
 
@@ -170,7 +170,7 @@ class V8_EXPORT V8InspectorSession {
 
 class V8_EXPORT V8InspectorClient {
     public:
-        virtual ~V8InspectorClient() {}
+        virtual ~V8InspectorClient() = default;
 
         virtual void runMessageLoopOnPause(int contextGroupId) {}
         virtual void quitMessageLoopOnPause() {}
@@ -229,6 +229,11 @@ class V8_EXPORT V8InspectorClient {
         }
 
         virtual void maxAsyncCallStackDepthChanged(int depth) {}
+
+        virtual std::unique_ptr<StringBuffer> resourceNameToUrl(
+            const StringView& resourceName) {
+            return nullptr;
+        }
 };
 
 // These stack trace ids are intended to be passed between debuggers and be
@@ -248,12 +253,14 @@ struct V8_EXPORT V8StackTraceId {
 class V8_EXPORT V8Inspector {
     public:
         static std::unique_ptr<V8Inspector> create(v8::Isolate*, V8InspectorClient*);
-        virtual ~V8Inspector() {}
+        virtual ~V8Inspector() = default;
 
         // Contexts instrumentation.
         virtual void contextCreated(const V8ContextInfo&) = 0;
         virtual void contextDestroyed(v8::Local<v8::Context>) = 0;
         virtual void resetContextGroup(int contextGroupId) = 0;
+        virtual v8::MaybeLocal<v8::Context> contextById(int groupId,
+                v8::Maybe<int> contextId) = 0;
 
         // Various instrumentation.
         virtual void idleStarted() = 0;
@@ -284,7 +291,7 @@ class V8_EXPORT V8Inspector {
         // Connection.
         class V8_EXPORT Channel {
             public:
-                virtual ~Channel() {}
+                virtual ~Channel() = default;
                 virtual void sendResponse(int callId,
                                           std::unique_ptr<StringBuffer> message) = 0;
                 virtual void sendNotification(std::unique_ptr<StringBuffer> message) = 0;

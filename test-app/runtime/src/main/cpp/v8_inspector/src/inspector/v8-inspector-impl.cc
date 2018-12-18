@@ -188,6 +188,17 @@ InspectedContext* V8InspectorImpl::getContext(int contextId) const {
   return getContext(contextGroupId(contextId), contextId);
 }
 
+v8::MaybeLocal<v8::Context> V8InspectorImpl::contextById(
+    int groupId, v8::Maybe<int> contextId) {
+  if (contextId.IsNothing()) {
+    v8::Local<v8::Context> context =
+        client()->ensureDefaultContextInGroup(groupId);
+    return context.IsEmpty() ? v8::MaybeLocal<v8::Context>() : context;
+  }
+  InspectedContext* context = getContext(contextId.FromJust());
+  return context ? context->context() : v8::MaybeLocal<v8::Context>();
+}
+
 void V8InspectorImpl::contextCreated(const V8ContextInfo& info) {
   int contextId = ++m_lastContextId;
   InspectedContext* context = new InspectedContext(this, info, contextId);
@@ -348,7 +359,8 @@ V8Console* V8InspectorImpl::console() {
 }
 
 void V8InspectorImpl::forEachContext(
-    int contextGroupId, std::function<void(InspectedContext*)> callback) {
+    int contextGroupId,
+    const std::function<void(InspectedContext*)>& callback) {
   auto it = m_contexts.find(contextGroupId);
   if (it == m_contexts.end()) return;
   std::vector<int> ids;
@@ -365,7 +377,8 @@ void V8InspectorImpl::forEachContext(
 }
 
 void V8InspectorImpl::forEachSession(
-    int contextGroupId, std::function<void(V8InspectorSessionImpl*)> callback) {
+    int contextGroupId,
+    const std::function<void(V8InspectorSessionImpl*)>& callback) {
   auto it = m_sessions.find(contextGroupId);
   if (it == m_sessions.end()) return;
   std::vector<int> ids;
@@ -400,9 +413,9 @@ V8InspectorImpl::EvaluateScope::~EvaluateScope() {
 class V8InspectorImpl::EvaluateScope::TerminateTask : public v8::Task {
  public:
   TerminateTask(v8::Isolate* isolate, std::shared_ptr<CancelToken> token)
-      : m_isolate(isolate), m_token(token) {}
+      : m_isolate(isolate), m_token(std::move(token)) {}
 
-  void Run() {
+  void Run() override {
     // CancelToken contains m_canceled bool which may be changed from main
     // thread, so lock mutex first.
     v8::base::LockGuard<v8::base::Mutex> lock(&m_token->m_mutex);
@@ -420,8 +433,8 @@ protocol::Response V8InspectorImpl::EvaluateScope::setTimeout(double timeout) {
     return protocol::Response::Error("Execution was terminated");
   }
   m_cancelToken.reset(new CancelToken());
-//  v8::debug::GetCurrentPlatform()->CallDelayedOnWorkerThread(
-//      v8::base::make_unique<TerminateTask>(m_isolate, m_cancelToken), timeout);
+  v8::debug::GetCurrentPlatform()->CallDelayedOnWorkerThread(
+      v8::base::make_unique<TerminateTask>(m_isolate, m_cancelToken), timeout);
   return protocol::Response::OK();
 }
 

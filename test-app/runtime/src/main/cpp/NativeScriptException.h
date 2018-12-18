@@ -28,7 +28,7 @@ class NativeScriptException {
         void ReThrowToV8();
         void ReThrowToJava();
 
-        static void Init(ObjectManager* objectManager);
+        static void Init();
 
         /*
          * This handler is attached to v8 to handle uncaught javascript exceptions.
