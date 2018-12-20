@@ -129,13 +129,13 @@ public class Generator {
 
         String normalizedName = getNormalizedName(name);
 
-        Writer w = new Writer();
+        Writer writer = new Writer();
 
-        writeBinding(w, dataRow, clazz, packageName, name);
+        writeBinding(writer, dataRow, clazz, packageName, name);
 
         String classname = dataRow.getFilename();
 
-        return new Binding(new File(baseDir, normalizedName + JAVA_EXT), w.toString(), classname);
+        return new Binding(new File(baseDir, normalizedName + JAVA_EXT), writer.toString(), classname);
     }
 
     public Binding generateBinding(DataRow dataRow) throws ClassNotFoundException {
