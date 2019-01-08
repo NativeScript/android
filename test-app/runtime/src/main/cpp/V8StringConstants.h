@@ -41,6 +41,8 @@ class V8StringConstants {
 
         static v8::Local<v8::String> GetUncaughtError(v8::Isolate* isolate);
 
+        static v8::Local<v8::String> GetDiscardedError(v8::Isolate* isolate);
+
         static v8::Local<v8::String> GetImplementationObject(v8::Isolate* isolate);
 
         static const std::string CLASS_IMPLEMENTATION_OBJECT;
@@ -60,6 +62,7 @@ class V8StringConstants {
         static const std::string VALUE_OF;
         static const std::string VALUE;
         static const std::string UNCAUGHT_ERROR;
+        static const std::string DISCARDED_ERROR;
         static const std::string IMPLEMENTATION_OBJECT;
 
         /*
@@ -133,6 +136,9 @@ class V8StringConstants {
                 str = String::NewFromUtf8(isolate, UNCAUGHT_ERROR.c_str());
                 UNCAUGHT_ERROR_PERSISTENT = new Persistent<String>(isolate, str);
 
+                str = String::NewFromUtf8(isolate, DISCARDED_ERROR.c_str());
+                DISCARDED_ERROR_PERSISTENT = new Persistent<String>(isolate, str);
+
                 str = String::NewFromUtf8(isolate, IMPLEMENTATION_OBJECT.c_str());
                 IMPLEMENTATION_OBJECT_PERSISTENT = new Persistent<String>(isolate, str);
             };
@@ -175,6 +181,7 @@ class V8StringConstants {
             v8::Persistent<v8::String>* VALUE_OF_PERSISTENT;
             v8::Persistent<v8::String>* VALUE_PERSISTENT;
             v8::Persistent<v8::String>* UNCAUGHT_ERROR_PERSISTENT;
+            v8::Persistent<v8::String>* DISCARDED_ERROR_PERSISTENT;
             v8::Persistent<v8::String>* IMPLEMENTATION_OBJECT_PERSISTENT;
         };
 

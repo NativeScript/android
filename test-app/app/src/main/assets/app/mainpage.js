@@ -34,6 +34,7 @@ require("./tests/testPrimitiveTypeConversion");
 require("./tests/numericConversionTests");
 require("./tests/inheritanceChainResolutionTest");
 require("./tests/exceptionHandlingTests");
+require("./tests/discardedExceptionsTest");
 require("./tests/dispatchCallbacksOnUiThreadTests");
 require("./tests/stringConversionTests");
 require("./tests/testsForTypescript");

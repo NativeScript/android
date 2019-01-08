@@ -371,11 +371,13 @@ bool Runtime::TryCallGC() {
     return success;
 }
 
-void Runtime::PassUncaughtExceptionToJsNative(JNIEnv* env, jobject obj, jthrowable exception, jstring stackTrace) {
+void Runtime::PassExceptionToJsNative(JNIEnv* env, jobject obj, jthrowable exception, jstring stackTrace, jboolean isDiscarded) {
     auto isolate = m_isolate;
 
     //create error message
-    string errMsg = "The application crashed because of an uncaught exception. You can look at \"stackTrace\" or \"nativeException\" for more detailed information about the exception.";
+    string errMsg = isDiscarded ? "An exception was caught and discarded. You can look at \"stackTrace\" or \"nativeException\" for more detailed information about the exception.":
+        "The application crashed because of an uncaught exception. You can look at \"stackTrace\" or \"nativeException\" for more detailed information about the exception.";
+
     auto errObj = Exception::Error(ArgConverter::ConvertToV8String(isolate, errMsg)).As<Object>();
 
     //create a new native exception js object
@@ -399,7 +401,7 @@ void Runtime::PassUncaughtExceptionToJsNative(JNIEnv* env, jobject obj, jthrowab
     errObj->Set(V8StringConstants::GetStackTrace(isolate), ArgConverter::jstringToV8String(isolate, stackTrace));
 
     //pass err to JS
-    NativeScriptException::CallJsFuncWithErr(errObj);
+    NativeScriptException::CallJsFuncWithErr(errObj, isDiscarded);
 }
 
 void Runtime::PassUncaughtExceptionFromWorkerToMainHandler(Local<v8::String> message, Local<v8::String> stackTrace, Local<v8::String> filename, int lineno) {
