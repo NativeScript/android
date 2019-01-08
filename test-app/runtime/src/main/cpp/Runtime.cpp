@@ -371,7 +371,7 @@ bool Runtime::TryCallGC() {
     return success;
 }
 
-void Runtime::PassUncaughtExceptionToJsNative(JNIEnv* env, jobject obj, jthrowable exception, jstring stackTrace, jboolean isDiscarded) {
+void Runtime::PassExceptionToJsNative(JNIEnv* env, jobject obj, jthrowable exception, jstring stackTrace, jboolean isDiscarded) {
     auto isolate = m_isolate;
 
     //create error message

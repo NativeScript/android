@@ -51,7 +51,7 @@ public class Runtime {
     private native void lock(int runtimeId);
     private native void unlock(int runtimeId);
 
-    private native void passUncaughtExceptionToJsNative(int runtimeId, Throwable ex, String stackTrace, boolean isDiscarded);
+    private native void passExceptionToJsNative(int runtimeId, Throwable ex, String stackTrace, boolean isDiscarded);
 
     private native void clearStartupData(int runtimeId);
 
@@ -72,12 +72,12 @@ public class Runtime {
     private static native void ResetDateTimeConfigurationCache(int runtimeId);
 
     void passUncaughtExceptionToJs(Throwable ex, String stackTrace) {
-        passUncaughtExceptionToJsNative(getRuntimeId(), ex, stackTrace, false);
+        passExceptionToJsNative(getRuntimeId(), ex, stackTrace, false);
     }
 
     void passDiscardedExceptionToJs(Throwable ex, String message) {
         String stackTrace = message + Runtime.getStackTraceErrorMessage(ex);
-        passUncaughtExceptionToJsNative(getRuntimeId(), ex, stackTrace, true);
+        passExceptionToJsNative(getRuntimeId(), ex, stackTrace, true);
     }
 
     public static void passSuppressedExceptionToJs(Throwable ex, String methodName) {
