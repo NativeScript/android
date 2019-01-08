@@ -660,7 +660,8 @@ public class Generator {
 
         if (this.suppressCallJSMethodExceptions) {
             w.writeln("\t\t} catch (Throwable t) {");
-            w.writeln("\t\t\tandroid.util.Log.w(\"Error\", t);");
+            w.writeln("\t\t\tcom.tns.Runtime.passSuppressedExceptionToJs(t, \"" + m.getName() + "\");");
+            w.writeln("\t\t\tandroid.util.Log.w(\"Warning\", \"NativeScript discarding uncaught JS exception!\");");
             if (!ret.equals(Type.VOID)) {
                 w.write("\t\t\t");
                 w.write("return ");

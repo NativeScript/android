@@ -133,14 +133,15 @@ void NativeScriptException::OnUncaughtError(Local<Message> message, Local<Value>
     e.ReThrowToJava();
 }
 
-void NativeScriptException::CallJsFuncWithErr(Local<Value> errObj) {
+void NativeScriptException::CallJsFuncWithErr(Local<Value> errObj, jboolean isDiscarded) {
     auto isolate = Isolate::GetCurrent();
     HandleScope scope(isolate);
 
     auto context = isolate->GetCurrentContext();
     auto globalHandle = context->Global();
 
-    auto handler = globalHandle->Get(V8StringConstants::GetUncaughtError(isolate));
+    auto handler = isDiscarded ?
+       globalHandle->Get(V8StringConstants::GetDiscardedError(isolate)) : globalHandle->Get(V8StringConstants::GetUncaughtError(isolate));
     auto isEmpty = handler.IsEmpty();
     auto isFunction = handler->IsFunction();
 
