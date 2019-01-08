@@ -5,7 +5,7 @@ describe("Tests discarded exception ", function () {
       originalOnDiscardedError = global.__onDiscardedError;
     });
 
-	it("should report discarded exception", function () {
+    it("should report discarded exception", function () {
         var reportedException = null;
 
         global.__onDiscardedError = (error) => {
