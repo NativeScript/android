@@ -1157,8 +1157,7 @@ public class Runtime {
             } catch (NativeScriptException e) {
                 if(discardUncaughtJsExceptions) {
                     String errorMessage = "Error on \"" + Thread.currentThread().getName() + "\" thread for callJSMethodNative\n";
-//                    logger.write(errorMessage);
-//                    e.printStackTrace();
+                    android.util.Log.w("Warning", "NativeScript discarding uncaught JS exception!");
                     passDiscardedExceptionToJs(e, errorMessage);
                 } else {
                     throw e;
@@ -1180,9 +1179,7 @@ public class Runtime {
                             if(discardUncaughtJsExceptions) {
                                 String errorMessage = "Error on \"" + Thread.currentThread().getName() + "\" thread for callJSMethodNative\n";
                                 passDiscardedExceptionToJs(e, errorMessage);
-//                                logger.write(errorMessage);
-//                                e.printStackTrace();
-
+                                android.util.Log.w("Warning", "NativeScript discarding uncaught JS exception!");
                             } else {
                                 throw e;
                             }
