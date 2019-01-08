@@ -36,9 +36,9 @@ class NativeScriptException {
         static void OnUncaughtError(v8::Local<v8::Message> message, v8::Local<v8::Value> error);
 
         /*
-         * Calls the global "__onUncaughtError" if such is provided
+         * Calls the global "__onUncaughtError" or "__onDiscardedError" if such is provided
          */
-        static void CallJsFuncWithErr(v8::Local<v8::Value> errObj);
+        static void CallJsFuncWithErr(v8::Local<v8::Value> errObj, jboolean isDiscarded);
 
     private:
         /*

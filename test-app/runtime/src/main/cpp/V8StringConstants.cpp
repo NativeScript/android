@@ -111,6 +111,12 @@ Local<String> V8StringConstants::GetUncaughtError(Isolate* isolate) {
     return Local<String>::New(isolate, *consts->UNCAUGHT_ERROR_PERSISTENT);
 }
 
+Local<String> V8StringConstants::GetDiscardedError(Isolate* isolate) {
+    auto consts = GetConstantsForIsolate(isolate);
+
+    return Local<String>::New(isolate, *consts->DISCARDED_ERROR_PERSISTENT);
+}
+
 Local<String> V8StringConstants::GetImplementationObject(Isolate* isolate) {
     auto consts = GetConstantsForIsolate(isolate);
 
@@ -133,5 +139,6 @@ const string V8StringConstants::JAVA_LONG = "t::JavaLong";
 const string V8StringConstants::VALUE = "value";
 const string V8StringConstants::VALUE_OF = "valueOf";
 const string V8StringConstants::UNCAUGHT_ERROR = "__onUncaughtError";
+const string V8StringConstants::DISCARDED_ERROR = "__onDiscardedError";
 const string V8StringConstants::IMPLEMENTATION_OBJECT = "t::implObj";
 }

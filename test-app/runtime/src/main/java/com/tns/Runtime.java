@@ -51,7 +51,7 @@ public class Runtime {
     private native void lock(int runtimeId);
     private native void unlock(int runtimeId);
 
-    private native void passUncaughtExceptionToJsNative(int runtimeId, Throwable ex, String stackTrace);
+    private native void passUncaughtExceptionToJsNative(int runtimeId, Throwable ex, String stackTrace, boolean isDiscarded);
 
     private native void clearStartupData(int runtimeId);
 
@@ -72,7 +72,20 @@ public class Runtime {
     private static native void ResetDateTimeConfigurationCache(int runtimeId);
 
     void passUncaughtExceptionToJs(Throwable ex, String stackTrace) {
-        passUncaughtExceptionToJsNative(getRuntimeId(), ex, stackTrace);
+        passUncaughtExceptionToJsNative(getRuntimeId(), ex, stackTrace, false);
+    }
+
+    void passDiscardedExceptionToJs(Throwable ex, String message) {
+        String stackTrace = message + Runtime.getStackTraceErrorMessage(ex);
+        passUncaughtExceptionToJsNative(getRuntimeId(), ex, stackTrace, true);
+    }
+
+    public static void passSuppressedExceptionToJs(Throwable ex, String methodName) {
+        com.tns.Runtime runtime = com.tns.Runtime.getCurrentRuntime();
+        if (runtime != null) {
+            String errorMessage = "Error on \"" + Thread.currentThread().getName() + "\" thread for " + methodName + "\n";
+            runtime.passDiscardedExceptionToJs(ex, errorMessage);
+        }
     }
 
     private boolean initialized;
@@ -209,6 +222,29 @@ public class Runtime {
         }
 
         return runtime;
+    }
+
+    public static String getStackTraceErrorMessage(Throwable ex) {
+        String content;
+        java.io.PrintStream ps = null;
+
+        try {
+            java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+            ps = new java.io.PrintStream(baos);
+            ex.printStackTrace(ps);
+
+            try {
+                content = baos.toString("US-ASCII");
+            } catch (java.io.UnsupportedEncodingException e) {
+                content = e.getMessage();
+            }
+        } finally {
+            if (ps != null) {
+                ps.close();
+            }
+        }
+
+        return content;
     }
 
     public DynamicConfiguration getDynamicConfig() {
@@ -1120,8 +1156,10 @@ public class Runtime {
                 ret = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, isConstructor, packagedArgs);
             } catch (NativeScriptException e) {
                 if(discardUncaughtJsExceptions) {
-                    logger.write("Error on currentThread for callJSMethodNative:", e.getMessage());
-                    e.printStackTrace();
+                    String errorMessage = "Error on \"" + Thread.currentThread().getName() + "\" thread for callJSMethodNative\n";
+//                    logger.write(errorMessage);
+//                    e.printStackTrace();
+                    passDiscardedExceptionToJs(e, errorMessage);
                 } else {
                     throw e;
                 }
@@ -1140,8 +1178,11 @@ public class Runtime {
                             arr[0] = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, isCtor, packagedArgs);
                         } catch (NativeScriptException e) {
                             if(discardUncaughtJsExceptions) {
-                                logger.write("Error off currentThread for callJSMethodNative:", e.getMessage());
-                                e.printStackTrace();
+                                String errorMessage = "Error on \"" + Thread.currentThread().getName() + "\" thread for callJSMethodNative\n";
+                                passDiscardedExceptionToJs(e, errorMessage);
+//                                logger.write(errorMessage);
+//                                e.printStackTrace();
+
                             } else {
                                 throw e;
                             }

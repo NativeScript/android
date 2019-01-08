@@ -21,7 +21,7 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
     public void uncaughtException(Thread thread, Throwable ex) {
         String currentThreadMessage = "An uncaught Exception occurred on \"" + thread.getName() + "\" thread.\n";
 
-        String errorMessage = currentThreadMessage + getErrorMessage(ex);
+        String errorMessage = currentThreadMessage + Runtime.getStackTraceErrorMessage(ex);
 
         if (Runtime.isInitialized()) {
             try {
@@ -63,28 +63,5 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
         if (!res && defaultHandler != null) {
             defaultHandler.uncaughtException(thread, ex);
         }
-    }
-
-    private static String getErrorMessage(Throwable ex) {
-        String content;
-        java.io.PrintStream ps = null;
-
-        try {
-            java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
-            ps = new java.io.PrintStream(baos);
-            ex.printStackTrace(ps);
-
-            try {
-                content = baos.toString("US-ASCII");
-            } catch (java.io.UnsupportedEncodingException e) {
-                content = e.getMessage();
-            }
-        } finally {
-            if (ps != null) {
-                ps.close();
-            }
-        }
-
-        return content;
     }
 }

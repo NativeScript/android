@@ -661,6 +661,7 @@ public class Generator {
 
         if(this.suppressCallJSMethodExceptions) {
             w.writeln("\t\t} catch (Throwable t) {");
+            w.writeln("\t\t\tcom.tns.Runtime.passSuppressedExceptionToJs(t, \"" + m.getName() + "\");");
             w.writeln("\t\t\tandroid.util.Log.w(\"Error\", t);");
             if (!ret.equals(Type.VOID)) {
                 w.write("\t\t\t");
