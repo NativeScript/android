@@ -590,6 +590,10 @@ public class Runtime {
     }
 
     public Object runScript(File jsFile) throws NativeScriptException {
+        return this.runScript(jsFile, true);
+    }
+
+    public Object runScript(File jsFile, final boolean waitForResultOnMainThread) throws NativeScriptException {
         Object result = null;
 
         if (jsFile.exists() && jsFile.isFile()) {
@@ -621,7 +625,7 @@ public class Runtime {
                 if (success) {
                     synchronized (r) {
                         try {
-                            if (arr[1] == null) {
+                            if (arr[1] == null && waitForResultOnMainThread) {
                                 r.wait();
                             }
                         } catch (InterruptedException e) {
