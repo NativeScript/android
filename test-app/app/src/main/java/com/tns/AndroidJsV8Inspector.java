@@ -218,6 +218,8 @@ class AndroidJsV8Inspector {
             super(name);
         }
 
+        private JsV8InspectorWebSocket webSocket;
+
         @Override
         protected Response serveHttp(IHTTPSession session) {
             if (DEBUG_LOG_ENABLED) {
@@ -228,7 +230,18 @@ class AndroidJsV8Inspector {
 
         @Override
         protected WebSocket openWebSocket(IHTTPSession handshake) {
-            return new JsV8InspectorWebSocket(handshake);
+            // close the previous webSocket
+            if(this.webSocket != null) {
+                try {
+                    this.webSocket.close(WebSocketFrame.CloseCode.NormalClosure, "New browser connection is open", false);
+                } catch (IOException ioException) {
+                    if(this.webSocket.getState() != State.CLOSED) {
+                        Log.e("{N}.v8-inspector", "Error closing previous connection", ioException);
+                    }
+                }
+            }
+            this.webSocket = new JsV8InspectorWebSocket(handshake);
+            return this.webSocket;
         }
     }
 

@@ -12,6 +12,7 @@ JNIEXPORT extern "C" void Java_com_tns_AndroidJsV8Inspector_init(JNIEnv* env, jo
 }
 
 JNIEXPORT extern "C" void Java_com_tns_AndroidJsV8Inspector_connect(JNIEnv* env, jobject instance, jobject connection) {
+    JsV8InspectorClient::GetInstance()->disconnect();
     JsV8InspectorClient::GetInstance()->connect(connection);
 }
 
