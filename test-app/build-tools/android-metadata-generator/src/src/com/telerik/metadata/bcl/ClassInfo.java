@@ -7,6 +7,8 @@ import com.telerik.metadata.desc.FieldDescriptor;
 import com.telerik.metadata.desc.MethodDescriptor;
 
 import org.apache.bcel.classfile.Attribute;
+import org.apache.bcel.classfile.ConstantClass;
+import org.apache.bcel.classfile.ConstantPool;
 import org.apache.bcel.classfile.ConstantUtf8;
 import org.apache.bcel.classfile.Field;
 import org.apache.bcel.classfile.InnerClass;
@@ -36,19 +38,14 @@ public class ClassInfo implements ClassDescriptor {
                 return;
             }
             boolean found = false;
+            String fullClassName = this.getClassName(clazz.getClassNameIndex());
             for (Attribute a : clazz.getAttributes()) {
                 if (a instanceof InnerClasses) {
                     InnerClass[] i = ((InnerClasses) a).getInnerClasses();
                     for (InnerClass ic : i) {
+                        String innerClassName = this.getClassName(ic.getInnerClassIndex());
 
-                        ConstantUtf8 cname = (ConstantUtf8) clazz
-                                             .getConstantPool().getConstant(ic.getInnerNameIndex());
-                        if (cname == null) {
-                            continue;
-                        }
-
-                        String innerClassname = cname.getBytes();
-                        if (name.equals(innerClassname)) {
+                        if (fullClassName.equals(innerClassName)) {
                             int flags = ic.getInnerAccessFlags();
                             clazz.setAccessFlags(flags);
                             found = true;
@@ -61,6 +58,19 @@ public class ClassInfo implements ClassDescriptor {
                 }
             }
         }
+    }
+
+    private String getClassName(int classIndex) {
+        ConstantPool constantPool = clazz.getConstantPool();
+        ConstantClass innerClassNameIndex = (ConstantClass)constantPool.getConstant(classIndex);
+        if (innerClassNameIndex == null) {
+            return null;
+        }
+        ConstantUtf8 className = (ConstantUtf8)constantPool.getConstant(innerClassNameIndex.getNameIndex());
+        if (className == null) {
+            return null;
+        }
+        return className.getBytes();
     }
 
     @Override
