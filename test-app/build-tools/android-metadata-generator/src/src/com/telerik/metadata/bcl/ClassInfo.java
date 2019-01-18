@@ -39,6 +39,10 @@ public class ClassInfo implements ClassDescriptor {
             }
             boolean found = false;
             String fullClassName = this.getClassName(clazz.getClassNameIndex());
+            if (fullClassName == null) {
+                return;
+            }
+
             for (Attribute a : clazz.getAttributes()) {
                 if (a instanceof InnerClasses) {
                     InnerClass[] i = ((InnerClasses) a).getInnerClasses();
