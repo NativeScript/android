@@ -29,19 +29,19 @@ def DIST_FRAMEWORK_PATH = "$DIST_PATH/framework"
 
 task checkEnvironmentVariables {
     if ("$System.env.JAVA_HOME" == "" || "$System.env.JAVA_HOME" == "null") {
-        throw new GradleException("Set JAVA_HOME to point to the correct Jdk location\n");
+        throw new GradleException("Set JAVA_HOME to point to the correct Jdk location\n")
     }
 
     if ("$System.env.ANDROID_HOME" == "" || "$System.env.ANDROID_HOME" == "null") {
-        throw new GradleException("Set ANDROID_HOME to point to the correct Android SDK location\n");
+        throw new GradleException("Set ANDROID_HOME to point to the correct Android SDK location\n")
     }
 
     if ("$System.env.GIT_COMMIT" == "null" && !project.hasProperty("gitCommitVersion")) {
-        logger.warn("Warning: The GIT_COMMIT is not set. This NativeScript Android Runtime will not be tagged with the git commit it is build from\n");
+        logger.warn("Warning: The GIT_COMMIT is not set. This NativeScript Android Runtime will not be tagged with the git commit it is build from\n")
     }
 
     if (project.hasProperty("metadataGen") && !file("../android-metadata-generator/dist/tns-android-metadata-generator-0.0.1.tgz").exists()) {
-        throw new GradleException("android-metadata-generator build output not found and no metadataGen option specified. Build android-metadata-generator first.\n");
+        throw new GradleException("android-metadata-generator build output not found and no metadataGen option specified. Build android-metadata-generator first.\n")
     }
 }
 
@@ -305,7 +305,7 @@ task setPackageVersionInPackageJsonFile {
         def inputFile = new File("$DIST_PATH/package.json")
         def json = new JsonSlurper().parseText(inputFile.text)
         json.version = pVersion
-        def jb = new JsonBuilder(json);
+        def jb = new JsonBuilder(json)
         inputFile.text = JsonOutput.prettyPrint(jb.toString())
     }
 }
@@ -396,7 +396,7 @@ def getRunTestsBuildArguments = { taskName ->
         arguments.add("-PuseCCache")
     }
     arguments += ["--warning-mode", "all"]
-    return arguments;
+    return arguments
 }
 
 task runTests (type: Exec) {

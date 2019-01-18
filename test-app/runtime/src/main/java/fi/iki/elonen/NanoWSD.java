@@ -101,6 +101,8 @@ public abstract class NanoWSD extends NanoHTTPD {
             return state == State.OPEN;
         }
 
+        public State getState() { return this.state; }
+
         protected abstract void onOpen();
 
         protected abstract void onClose(CloseCode code, String reason, boolean initiatedByRemote);
