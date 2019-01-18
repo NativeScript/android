@@ -145,30 +145,30 @@ def applyPluginGradleConfigurations = { ->
 }
 
 def getAppIdentifier = { packageJsonMap ->
-	def appIdentifier = "";
+	def appIdentifier = ""
 	if (packageJsonMap && packageJsonMap.nativescript) {
-		appIdentifier = packageJsonMap.nativescript.id;
+		appIdentifier = packageJsonMap.nativescript.id
 		if (!(appIdentifier instanceof String)) {
-			appIdentifier = appIdentifier.android;
+			appIdentifier = appIdentifier.android
 		}
 	}
 
-	return appIdentifier;
+	return appIdentifier
 }
 
 def setAppIdentifier = { ->
-	println "\t + setting applicationId";
-	File packageJsonFile = new File("$rootDir/../../package.json");
+	println "\t + setting applicationId"
+	File packageJsonFile = new File("$rootDir/../../package.json")
 
 	if (packageJsonFile.exists()) {
-		def content = packageJsonFile.getText("UTF-8");
-		def jsonSlurper = new JsonSlurper();
-		def packageJsonMap = jsonSlurper.parseText(content);
-		def appIdentifier = getAppIdentifier(packageJsonMap);
+		def content = packageJsonFile.getText("UTF-8")
+		def jsonSlurper = new JsonSlurper()
+		def packageJsonMap = jsonSlurper.parseText(content)
+		def appIdentifier = getAppIdentifier(packageJsonMap)
 
 		if (appIdentifier) {
-			project.ext.nsApplicationIdentifier = appIdentifier;
-			android.defaultConfig.applicationId = appIdentifier;
+			project.ext.nsApplicationIdentifier = appIdentifier
+			android.defaultConfig.applicationId = appIdentifier
 		}
 	}
 }
@@ -413,7 +413,7 @@ task runSbg(type: JavaExec) {
     args "static-binding-generator.jar"
 
     doFirst {
-        new File("$OUTPUT_JAVA_DIR/com/tns/gen").deleteDir();
+        new File("$OUTPUT_JAVA_DIR/com/tns/gen").deleteDir()
     }
 }
 
@@ -668,7 +668,7 @@ task validateAppIdMatch {
 					"NativeScript CLI might not work properly.$lineSeparator" +
 					"Remove applicationId from app.gradle and update the \"nativescript.id\" in package.json.$lineSeparator" +
 					"Actual: ${android.defaultConfig.applicationId}$lineSeparator" +
-					"Expected(from \"package.json\"): ${project.nsApplicationIdentifier}$lineSeparator";
+					"Expected(from \"package.json\"): ${project.nsApplicationIdentifier}$lineSeparator"
 
 				logger.error(errorMessage)
 			}
