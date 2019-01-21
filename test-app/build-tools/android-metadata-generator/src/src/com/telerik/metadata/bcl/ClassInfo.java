@@ -38,7 +38,7 @@ public class ClassInfo implements ClassDescriptor {
                 return;
             }
             boolean found = false;
-            String fullClassName = this.getClassName(clazz.getClassNameIndex());
+            String fullClassName = getClassName(clazz.getClassNameIndex());
             if (fullClassName == null) {
                 return;
             }
@@ -47,7 +47,7 @@ public class ClassInfo implements ClassDescriptor {
                 if (a instanceof InnerClasses) {
                     InnerClass[] i = ((InnerClasses) a).getInnerClasses();
                     for (InnerClass ic : i) {
-                        String innerClassName = this.getClassName(ic.getInnerClassIndex());
+                        String innerClassName = getClassName(ic.getInnerClassIndex());
 
                         if (fullClassName.equals(innerClassName)) {
                             int flags = ic.getInnerAccessFlags();
