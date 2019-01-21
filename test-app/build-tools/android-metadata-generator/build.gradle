@@ -36,7 +36,7 @@ compileJava {
 compileJava.outputs.dir("$rootDir/dist/classes")
 
 dependencies {
-    compile 'org.apache.bcel:bcel:6.0'
+    compile 'org.apache.bcel:bcel:6.2'
     compile files("./src/libs/dx.jar")
 }
 
