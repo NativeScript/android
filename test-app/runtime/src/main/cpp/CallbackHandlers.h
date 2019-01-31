@@ -111,6 +111,8 @@ namespace tns {
         static void
         DisableVerboseLoggingMethodCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
 
+        static void ReleaseNativeCounterpartCallback(const v8::FunctionCallbackInfo<v8::Value> &info);
+
         static v8::Local<v8::Object> FindClass(v8::Isolate *isolate, const std::string &className);
 
         static void NewThreadCallback(const v8::FunctionCallbackInfo<v8::Value> &args);
@@ -194,6 +196,8 @@ namespace tns {
          */
         static jobjectArray GetJavaStringArray(JEnv &env, int length);
 
+        static void validateProvidedArgumentsLength(const v8::FunctionCallbackInfo<v8::Value> &args, int expectedSize);
+
         static short MAX_JAVA_STRING_ARRAY_LENGTH;
 
         static jclass RUNTIME_CLASS;
@@ -235,6 +239,8 @@ namespace tns {
             jfieldID _fieldID;
             jobject _runtime;
         };
+
+
     };
 }
 

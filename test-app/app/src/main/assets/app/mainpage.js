@@ -53,3 +53,4 @@ require("./tests/dex-interface-implementation");
 require("./tests/testInterfaceImplementation");
 require("./tests/testRuntimeImplementedAPIs");
 require("./tests/testsInstanceOfOperator");
+require("./tests/testReleaseNativeCounterpart");
