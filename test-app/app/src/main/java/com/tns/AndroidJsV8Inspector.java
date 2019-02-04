@@ -23,8 +23,6 @@ import fi.iki.elonen.NanoHTTPD;
 import fi.iki.elonen.NanoWSD;
 
 class AndroidJsV8Inspector {
-    private static boolean DEBUG_LOG_ENABLED = false;
-
     private JsV8InspectorServer server;
     private static String ApplicationDir;
     private String packageName;
@@ -43,6 +41,8 @@ class AndroidJsV8Inspector {
 
     private final Object debugBrkLock;
 
+    private Logger currentRuntimeLogger;
+
     private static AtomicBoolean ReadyToProcessMessages = new AtomicBoolean(false);
 
     private LinkedBlockingQueue<String> inspectorMessages = new LinkedBlockingQueue<String>();
@@ -60,10 +60,12 @@ class AndroidJsV8Inspector {
 
             mainHandler = currentRuntime.getHandler();
 
-            this.server = new JsV8InspectorServer(this.packageName + "-inspectorServer");
+            currentRuntimeLogger = currentRuntime.getLogger();
+
+            this.server = new JsV8InspectorServer(this.packageName + "-inspectorServer", currentRuntimeLogger);
             this.server.start(-1);
 
-            if (DEBUG_LOG_ENABLED) {
+            if (currentRuntimeLogger.isEnabled()) {
                 Log.d("V8Inspector", "start debugger ThreadId:" + Thread.currentThread().getId());
             }
 
@@ -158,22 +160,22 @@ class AndroidJsV8Inspector {
             // getMimeType may sometime return incorrect results in the context of NativeScript
             // e.g. `.ts` returns video/MP2TS
             switch (extension) {
-            case "js":
-                type = "text/javascript";
-                break;
-            case "json":
-                type = "application/json";
-                break;
-            case "css":
-                type = "text/css";
-                break;
-            case "ts":
-                type = "text/typescript";
-                break;
-            // handle shared libraries so they are marked properly and don't appear in the sources tab
-            case "so":
-                type = "application/binary";
-                break;
+                case "js":
+                    type = "text/javascript";
+                    break;
+                case "json":
+                    type = "application/json";
+                    break;
+                case "css":
+                    type = "text/css";
+                    break;
+                case "ts":
+                    type = "text/typescript";
+                    break;
+                // handle shared libraries so they are marked properly and don't appear in the sources tab
+                case "so":
+                    type = "application/binary";
+                    break;
             }
         }
 
@@ -214,15 +216,16 @@ class AndroidJsV8Inspector {
     }
 
     private class JsV8InspectorServer extends NanoWSD {
-        JsV8InspectorServer(String name) {
-            super(name);
-        }
+        private Logger currentRuntimeLogger;
 
-        private JsV8InspectorWebSocket webSocket;
+        JsV8InspectorServer(String name, Logger runtimeLogger) {
+            super(name);
+            currentRuntimeLogger = runtimeLogger;
+        }
 
         @Override
         protected Response serveHttp(IHTTPSession session) {
-            if (DEBUG_LOG_ENABLED) {
+            if (currentRuntimeLogger.isEnabled()) {
                 Log.d("{N}.v8-inspector", "http request for " + session.getUri());
             }
             return super.serveHttp(session);
@@ -230,29 +233,21 @@ class AndroidJsV8Inspector {
 
         @Override
         protected WebSocket openWebSocket(IHTTPSession handshake) {
-            // close the previous webSocket
-            if(this.webSocket != null) {
-                try {
-                    this.webSocket.close(WebSocketFrame.CloseCode.NormalClosure, "New browser connection is open", false);
-                } catch (IOException ioException) {
-                    if(this.webSocket.getState() != State.CLOSED) {
-                        Log.e("{N}.v8-inspector", "Error closing previous connection", ioException);
-                    }
-                }
-            }
-            this.webSocket = new JsV8InspectorWebSocket(handshake);
-            return this.webSocket;
+            return new JsV8InspectorWebSocket(handshake, currentRuntimeLogger);
         }
     }
 
     private class JsV8InspectorWebSocket extends NanoWSD.WebSocket {
-        JsV8InspectorWebSocket(NanoHTTPD.IHTTPSession handshakeRequest) {
+        private Logger currentRuntimeLogger;
+
+        JsV8InspectorWebSocket(NanoHTTPD.IHTTPSession handshakeRequest, Logger runtimeLogger) {
             super(handshakeRequest);
+            currentRuntimeLogger = runtimeLogger;
         }
 
         @Override
         protected void onOpen() {
-            if (DEBUG_LOG_ENABLED) {
+            if (currentRuntimeLogger.isEnabled()) {
                 Log.d("V8Inspector", "onOpen: ThreadID:  " + Thread.currentThread().getId());
             }
 
@@ -261,14 +256,14 @@ class AndroidJsV8Inspector {
 
         @Override
         protected void onClose(NanoWSD.WebSocketFrame.CloseCode code, String reason, boolean initiatedByRemote) {
-            if (DEBUG_LOG_ENABLED) {
+            if (currentRuntimeLogger.isEnabled()) {
                 Log.d("V8Inspector", "onClose");
             }
 
             mainHandler.post(new Runnable() {
                 @Override
                 public void run() {
-                    if (DEBUG_LOG_ENABLED) {
+                    if (currentRuntimeLogger.isEnabled()) {
                         Log.d("V8Inspector", "Disconnecting");
                     }
                     disconnect();
@@ -278,7 +273,7 @@ class AndroidJsV8Inspector {
 
         @Override
         protected void onMessage(final NanoWSD.WebSocketFrame message) {
-            if (DEBUG_LOG_ENABLED) {
+            if (currentRuntimeLogger.isEnabled()) {
                 Log.d("V8Inspector", "To dbg backend: " + message.getTextPayload() + " ThreadId:" + Thread.currentThread().getId());
             }
 
@@ -312,7 +307,7 @@ class AndroidJsV8Inspector {
 
         @Override
         public void send(String payload) throws IOException {
-            if (DEBUG_LOG_ENABLED) {
+            if (currentRuntimeLogger.isEnabled()) {
                 Log.d("V8Inspector", "To dbg client: " + payload);
             }
 
@@ -335,7 +330,10 @@ class AndroidJsV8Inspector {
 
         @Override
         protected void onException(IOException exception) {
-            exception.printStackTrace();
+            // when the chrome inspector is disconnected by closing the tab a "Broken pipe" exception is thrown which we don't need to log, only in verbose logging mode
+            if(!exception.getMessage().equals("Broken pipe") || currentRuntimeLogger.isEnabled()) {
+                exception.printStackTrace();
+            }
             disconnect();
         }
     }
