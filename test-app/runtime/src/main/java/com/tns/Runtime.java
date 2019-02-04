@@ -938,7 +938,7 @@ public class Runtime {
                 if (instance == null) {
                     // The Java was moved from strong to weak, and then the Java instance was collected.
                     weakInstances.remove(javaObjectID);
-                    weakJavaObjectToID.remove(javaObjectID);
+                    weakJavaObjectToID.remove(ref);
                     return false;
                 } else {
                     return true;
