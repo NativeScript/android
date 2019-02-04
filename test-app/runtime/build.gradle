@@ -61,7 +61,7 @@ android {
                     arguments.push("-DOPTIMIZED_WITH_INSPECTOR_BUILD=true")
                 }
 
-                if(useCCache) {
+                if (useCCache) {
                     arguments.push("-DUSE_CCACHE=true")
                 }
 
@@ -104,6 +104,8 @@ allprojects {
 
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
+    testImplementation 'junit:junit:4.12'
+    testImplementation 'org.mockito:mockito-core:1.10.19'
 }
 
 tasks.whenTaskAdded { task ->
@@ -112,6 +114,11 @@ tasks.whenTaskAdded { task ->
         setRuntimeCommit.dependsOn(setPackageVersion)
         task.dependsOn(setRuntimeCommit)
     }
+
+    if(taskName.contains("bundleReleaseAar")){
+        task.dependsOn("testDebugUnitTest")
+    }
+
     if (taskName.contains("Strip")) {
         task.finalizedBy(revertVersionFile)
     }
