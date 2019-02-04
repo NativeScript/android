@@ -46,8 +46,7 @@ void SIGABRT_handler(int sigNumber) {
 }
 
 void Runtime::Init(JavaVM* vm, void* reserved) {
-    __android_log_print(ANDROID_LOG_INFO, "TNS.Native", "NativeScript Runtime Version %s, commit %s", NATIVE_SCRIPT_RUNTIME_VERSION, NATIVE_SCRIPT_RUNTIME_COMMIT_SHA);
-    DEBUG_WRITE("JNI_ONLoad");
+    __android_log_print(ANDROID_LOG_INFO, "TNS.Runtime", "NativeScript Runtime Version %s, commit %s", NATIVE_SCRIPT_RUNTIME_VERSION, NATIVE_SCRIPT_RUNTIME_COMMIT_SHA);
 
     if (Runtime::s_jvm == nullptr) {
         s_jvm = vm;
@@ -61,8 +60,6 @@ void Runtime::Init(JavaVM* vm, void* reserved) {
         action.sa_handler = SIGABRT_handler;
         sigaction(SIGABRT, &action, NULL);
     }
-
-    DEBUG_WRITE("JNI_ONLoad END");
 }
 
 int Runtime::GetAndroidVersion() {
@@ -376,7 +373,7 @@ void Runtime::PassExceptionToJsNative(JNIEnv* env, jobject obj, jthrowable excep
 
     //create error message
     string errMsg = isDiscarded ? "An exception was caught and discarded. You can look at \"stackTrace\" or \"nativeException\" for more detailed information about the exception.":
-        "The application crashed because of an uncaught exception. You can look at \"stackTrace\" or \"nativeException\" for more detailed information about the exception.";
+                    "The application crashed because of an uncaught exception. You can look at \"stackTrace\" or \"nativeException\" for more detailed information about the exception.";
 
     auto errObj = Exception::Error(ArgConverter::ConvertToV8String(isolate, errMsg)).As<Object>();
 
@@ -563,7 +560,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     isolate->AddMessageListener(NativeScriptException::OnUncaughtError);
 
-    __android_log_print(ANDROID_LOG_DEBUG, "TNS.Native", "V8 version %s", V8::GetVersion());
+    __android_log_print(ANDROID_LOG_DEBUG, "TNS.Runtime", "V8 version %s", V8::GetVersion());
 
     auto globalFunctionTemplate = FunctionTemplate::New(isolate);
     globalFunctionTemplate->SetClassName(ArgConverter::ConvertToV8String(isolate, "NativeScriptGlobalObject"));

@@ -1615,12 +1615,12 @@ void MetadataNode::BuildMetadata(const string& filesPath) {
     timeval time2;
     gettimeofday(&time2, nullptr);
 
-    __android_log_print(ANDROID_LOG_DEBUG, "TNS.Native", "lenNodes=%d, lenNames=%d, lenValues=%d", lenNodes, lenNames, lenValues);
+    DEBUG_WRITE("lenNodes=%d, lenNames=%d, lenValues=%d", lenNodes, lenNames, lenValues);
 
     long millis1 = (time1.tv_sec * 1000) + (time1.tv_usec / 1000);
     long millis2 = (time2.tv_sec * 1000) + (time2.tv_usec / 1000);
 
-    __android_log_print(ANDROID_LOG_DEBUG, "TNS.Native", "time=%ld", (millis2 - millis1));
+    DEBUG_WRITE("time=%ld", (millis2 - millis1));
 
     BuildMetadata(lenNodes, reinterpret_cast<uint8_t*>(nodes), lenNames, reinterpret_cast<uint8_t*>(names), lenValues, reinterpret_cast<uint8_t*>(values));
 
