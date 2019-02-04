@@ -573,7 +573,9 @@ CallbackHandlers::GetImplementedInterfaces(JEnv &env, const Local<Object> &imple
                 auto interfacesArr = prop->ToObject(isolate);
 
                 auto context = isolate->GetCurrentContext();
-                int length = interfacesArr->Get(v8::String::NewFromUtf8(isolate, "length"))->ToObject(isolate)->Uint32Value(context).ToChecked();
+                int length = interfacesArr->Get(
+                        v8::String::NewFromUtf8(isolate, "length"))->ToObject(isolate)->Uint32Value(
+                        context).ToChecked();
 
                 if (length > 0) {
                     for (int i = 0; i < length; i++) {
@@ -668,6 +670,38 @@ void CallbackHandlers::TimeCallback(const v8::FunctionCallbackInfo<v8::Value> &a
             std::chrono::system_clock::now());
     double duration = nano.time_since_epoch().count();
     args.GetReturnValue().Set(duration);
+}
+
+void CallbackHandlers::ReleaseNativeCounterpartCallback(
+        const v8::FunctionCallbackInfo<v8::Value> &info) {
+    try {
+        SET_PROFILER_FRAME();
+
+        validateProvidedArgumentsLength(info, 1);
+
+        auto isolate = info.GetIsolate();
+        Handle<Object> obj = info[0].As<Object>();
+
+        auto runtime = Runtime::GetRuntime(isolate);
+        auto objectManager = runtime->GetObjectManager();
+        objectManager->ReleaseNativeCounterpart(obj);
+    } catch (NativeScriptException &e) {
+        e.ReThrowToV8();
+    } catch (std::exception e) {
+        stringstream ss;
+        ss << "Error: c++ exception: " << e.what() << endl;
+        NativeScriptException nsEx(ss.str());
+        nsEx.ReThrowToV8();
+    } catch (...) {
+        NativeScriptException nsEx(std::string("Error: c++ exception!"));
+        nsEx.ReThrowToV8();
+    }
+}
+
+void CallbackHandlers::validateProvidedArgumentsLength(const v8::FunctionCallbackInfo<v8::Value> &args, int expectedSize) {
+    if(args.Length() != expectedSize){
+        throw NativeScriptException("Unexpected arguments count!");
+    }
 }
 
 void CallbackHandlers::DumpReferenceTablesMethodCallback(
@@ -887,8 +921,11 @@ void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Valu
         auto thiz = args.This();
         auto isolate = thiz->GetIsolate();
 
-        auto currentExecutingScriptName = StackTrace::CurrentStackTrace(isolate, 1, StackTrace::kScriptName)->GetFrame(isolate, 0)->GetScriptName();
-        auto currentExecutingScriptNameStr = ArgConverter::ConvertToString(currentExecutingScriptName);
+        auto currentExecutingScriptName = StackTrace::CurrentStackTrace(isolate, 1,
+                                                                        StackTrace::kScriptName)->GetFrame(
+                isolate, 0)->GetScriptName();
+        auto currentExecutingScriptNameStr = ArgConverter::ConvertToString(
+                currentExecutingScriptName);
         auto lastForwardSlash = currentExecutingScriptNameStr.find_last_of("/");
         auto currentDir = currentExecutingScriptNameStr.substr(0, lastForwardSlash + 1);
         string fileSchema("file://");
@@ -1443,6 +1480,8 @@ jmethodID CallbackHandlers::GET_TYPE_METADATA = nullptr;
 jmethodID CallbackHandlers::ENABLE_VERBOSE_LOGGING_METHOD_ID = nullptr;
 jmethodID CallbackHandlers::DISABLE_VERBOSE_LOGGING_METHOD_ID = nullptr;
 jmethodID CallbackHandlers::INIT_WORKER_METHOD_ID = nullptr;
+
+
 
 NumericCasts CallbackHandlers::castFunctions;
 ArrayElementAccessor CallbackHandlers::arrayElementAccessor;

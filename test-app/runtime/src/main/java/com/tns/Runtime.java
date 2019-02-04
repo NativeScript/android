@@ -48,7 +48,9 @@ public class Runtime {
     private native int generateNewObjectId(int runtimeId);
 
     private native boolean notifyGc(int runtimeId);
+
     private native void lock(int runtimeId);
+
     private native void unlock(int runtimeId);
 
     private native void passExceptionToJsNative(int runtimeId, Throwable ex, String stackTrace, boolean isDiscarded);
@@ -98,13 +100,13 @@ public class Runtime {
             "Primitive types need to be manually wrapped in their respective Object wrappers.\n" +
             "If you are creating an instance of an inner class, make sure to always provide reference to the outer `this` as the first argument.";
 
-    private final HashMap<Integer, Object> strongInstances = new HashMap<>();
+    private HashMap<Integer, Object> strongInstances = new HashMap<>();
 
-    private final HashMap<Integer, WeakReference<Object>> weakInstances = new HashMap<>();
+    private HashMap<Integer, WeakReference<Object>> weakInstances = new HashMap<>();
 
-    private final NativeScriptHashMap<Object, Integer> strongJavaObjectToID = new NativeScriptHashMap<Object, Integer>();
+    private NativeScriptHashMap<Object, Integer> strongJavaObjectToID = new NativeScriptHashMap<Object, Integer>();
 
-    private final NativeScriptWeakHashMap<Object, Integer> weakJavaObjectToID = new NativeScriptWeakHashMap<Object, Integer>();
+    private NativeScriptWeakHashMap<Object, Integer> weakJavaObjectToID = new NativeScriptWeakHashMap<Object, Integer>();
 
     private final Map<Class<?>, JavaScriptImplementation> loadedJavaScriptExtends = new HashMap<Class<?>, JavaScriptImplementation>();
 
@@ -120,8 +122,14 @@ public class Runtime {
     private Logger logger;
 
     private boolean isLiveSyncStarted;
-    public boolean getIsLiveSyncStarted() { return this.isLiveSyncStarted; }
-    public void setIsLiveSyncStarted(boolean value) { this.isLiveSyncStarted = value; }
+
+    public boolean getIsLiveSyncStarted() {
+        return this.isLiveSyncStarted;
+    }
+
+    public void setIsLiveSyncStarted(boolean value) {
+        this.isLiveSyncStarted = value;
+    }
 
     public Logger getLogger() {
         return this.logger;
@@ -170,6 +178,19 @@ public class Runtime {
         Note: Should only be used on the main thread
      */
     private Map<Integer, Handler> workerIdToHandler = new HashMap<>();
+
+    public Runtime(ClassResolver classResolver, GcListener gcListener, StaticConfiguration config, DynamicConfiguration dynamicConfig, int runtimeId, int workerId, HashMap<Integer, Object> strongInstances, HashMap<Integer, WeakReference<Object>> weakInstances, NativeScriptHashMap<Object, Integer> strongJavaObjectToId, NativeScriptWeakHashMap<Object, Integer> weakJavaObjectToId) {
+        this.classResolver = classResolver;
+        this.gcListener = gcListener;
+        this.config = config;
+        this.dynamicConfig = dynamicConfig;
+        this.runtimeId = runtimeId;
+        this.workerId = workerId;
+        this.strongInstances = strongInstances;
+        this.weakInstances = weakInstances;
+        this.strongJavaObjectToID = strongJavaObjectToId;
+        this.weakJavaObjectToID = weakJavaObjectToId;
+    }
 
     public Runtime(StaticConfiguration config, DynamicConfiguration dynamicConfiguration) {
         synchronized (Runtime.currentRuntime) {
@@ -256,7 +277,7 @@ public class Runtime {
         if (staticConfiguration != null && staticConfiguration.appConfig != null) {
             return staticConfiguration.appConfig.getMarkingMode().ordinal();
         } else {
-            return ((MarkingMode)AppConfig.KnownKeys.MarkingMode.getDefaultValue()).ordinal();
+            return ((MarkingMode) AppConfig.KnownKeys.MarkingMode.getDefaultValue()).ordinal();
         }
     }
 
@@ -277,6 +298,20 @@ public class Runtime {
         Runtime runtime = getCurrentRuntime();
         if (runtime != null) {
             ResetDateTimeConfigurationCache(runtime.getRuntimeId());
+        }
+    }
+
+    public void releaseNativeCounterpart(int nativeObjectId) {
+        Object strongRef = strongInstances.get(nativeObjectId);
+        if (strongRef != null) {
+            strongInstances.remove(nativeObjectId);
+            strongJavaObjectToID.remove(strongRef);
+        }
+
+        WeakReference<Object> weakRef = weakInstances.get(nativeObjectId);
+        if (weakRef != null) {
+            weakInstances.remove(nativeObjectId);
+            weakJavaObjectToID.remove(weakRef);
         }
     }
 
@@ -652,9 +687,17 @@ public class Runtime {
         return usedMemory;
     }
 
-    public void notifyGc() { notifyGc(runtimeId); }
-    public void lock() { lock(runtimeId); }
-    public void unlock() { unlock(runtimeId); }
+    public void notifyGc() {
+        notifyGc(runtimeId);
+    }
+
+    public void lock() {
+        lock(runtimeId);
+    }
+
+    public void unlock() {
+        unlock(runtimeId);
+    }
 
     public static void initInstance(Object instance) {
         ManualInstrumentation.Frame frame = ManualInstrumentation.start("Runtime.initInstance");
@@ -1128,7 +1171,7 @@ public class Runtime {
         if (methodName.equals("init")) {
             if (args == null) {
                 arr = new Object[]
-                {isConstructor};
+                        {isConstructor};
             } else {
                 arr = new Object[args.length + 1];
                 System.arraycopy(args, 0, arr, 0, args.length);
@@ -1159,7 +1202,7 @@ public class Runtime {
             try {
                 ret = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, isConstructor, packagedArgs);
             } catch (NativeScriptException e) {
-                if(discardUncaughtJsExceptions) {
+                if (discardUncaughtJsExceptions) {
                     String errorMessage = "Error on \"" + Thread.currentThread().getName() + "\" thread for callJSMethodNative\n";
                     android.util.Log.w("Warning", "NativeScript discarding uncaught JS exception!");
                     passDiscardedExceptionToJs(e, errorMessage);
@@ -1180,7 +1223,7 @@ public class Runtime {
                             final Object[] packagedArgs = packageArgs(tmpArgs);
                             arr[0] = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, isCtor, packagedArgs);
                         } catch (NativeScriptException e) {
-                            if(discardUncaughtJsExceptions) {
+                            if (discardUncaughtJsExceptions) {
                                 String errorMessage = "Error on \"" + Thread.currentThread().getName() + "\" thread for callJSMethodNative\n";
                                 passDiscardedExceptionToJs(e, errorMessage);
                                 android.util.Log.w("Warning", "NativeScript discarding uncaught JS exception!");
