@@ -116,13 +116,15 @@ exports.run = function(cntxt)
 		it("TestOldAPIForGettingMethodsListForMethodsWithParametersFromMissingType", function () {
             __log("TEST: TestOldAPIForGettingMethodsListForMethodsWithParametersFromMissingType");
 
-            var til = new android.support.design.widget.TextInputLayout(context);
-            var editText = new android.widget.EditText(context);
-            var relativeLayout = new android.widget.RelativeLayout(context);
-            var relativeLayoutParams = new android.widget.RelativeLayout.LayoutParams(android.widget.RelativeLayout.LayoutParams.MATCH_PARENT, android.widget.RelativeLayout.LayoutParams.MATCH_PARENT);
-            relativeLayout.setLayoutParams(relativeLayoutParams);
-            editText.setHint("TEST");
-            til.addView(editText);
+            if(android.support.design && android.support.design.widget) {
+                var til = new android.support.design.widget.TextInputLayout(context);
+                var editText = new android.widget.EditText(context);
+                var relativeLayout = new android.widget.RelativeLayout(context);
+                var relativeLayoutParams = new android.widget.RelativeLayout.LayoutParams(android.widget.RelativeLayout.LayoutParams.MATCH_PARENT, android.widget.RelativeLayout.LayoutParams.MATCH_PARENT);
+                relativeLayout.setLayoutParams(relativeLayoutParams);
+                editText.setHint("TEST");
+                til.addView(editText);
+            }
         });
 	});
 };

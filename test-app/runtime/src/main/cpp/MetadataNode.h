@@ -128,7 +128,7 @@ class MetadataNode {
         static void ArrayIndexedPropertySetterCallback(uint32_t index, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<v8::Value>& info);
 
         static bool IsValidExtendName(const v8::Local<v8::String>& name);
-        static bool GetExtendLocation(std::string& extendLocation, bool isTypeScriptExtend);
+        static bool GetExtendLocation(v8::Isolate* isolate, std::string& extendLocation, bool isTypeScriptExtend);
         static ExtendedClassCacheData GetCachedExtendedClassData(v8::Isolate* isolate, const std::string& proxyClassName);
 
         static void RegisterSymbolHasInstanceCallback(v8::Isolate* isolate, MetadataEntry entry, v8::Local<v8::Value> interface);

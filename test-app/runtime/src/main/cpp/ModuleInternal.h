@@ -61,7 +61,7 @@ class ModuleInternal {
 
         v8::ScriptCompiler::CachedData* TryLoadScriptCache(const std::string& path);
 
-        void SaveScriptCache(const v8::ScriptCompiler::Source& source, const std::string& path);
+        void SaveScriptCache(const v8::Local<v8::Script> script, const std::string& path);
 
         ModulePathKind GetModulePathKind(const std::string& path);
 

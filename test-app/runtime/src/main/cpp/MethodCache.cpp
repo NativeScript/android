@@ -118,7 +118,7 @@ string MethodCache::GetType(Isolate* isolate, const v8::Local<v8::Value>& value)
     string type;
 
     if (value->IsObject()) {
-        auto objVal = value->ToObject();
+        auto objVal = value->ToObject(isolate);
         Local<Value> nullNode; //out
         V8GetPrivateValue(isolate, objVal, V8StringConstants::GetNullNodeName(isolate), nullNode);
 
@@ -152,13 +152,14 @@ string MethodCache::GetType(Isolate* isolate, const v8::Local<v8::Value>& value)
     } else if (value->IsString() || value->IsStringObject()) {
         type = "string";
     } else if (value->IsNumber() || value->IsNumberObject()) {
-        double d = value->NumberValue();
+        auto context = isolate->GetCurrentContext();
+        double d = value->NumberValue(context).ToChecked();
         int64_t i = (int64_t) d;
         bool isInteger = d == i;
 
         type = isInteger ? "intnumber" : "doublenumber";
     } else if (value->IsObject()) {
-        auto object = value->ToObject();
+        auto object = value->ToObject(isolate);
         auto castType = NumericCasts::GetCastType(isolate, object);
         MetadataNode* node;
 

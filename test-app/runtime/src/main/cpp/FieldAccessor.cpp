@@ -234,28 +234,29 @@ void FieldAccessor::SetJavaField(Isolate* isolate, const Local<Object>& target, 
     auto clazz = fieldData->clazz;
 
     if (isPrimitiveType) {
+        auto context = isolate->GetCurrentContext();
         switch (fieldTypeName[0]) {
         case 'Z': { //bool
             //TODO: validate value is a boolean before calling
             if (isStatic) {
-                env.SetStaticBooleanField(clazz, fieldId, value->BooleanValue());
+                env.SetStaticBooleanField(clazz, fieldId, value->BooleanValue(context).ToChecked());
             } else {
-                env.SetBooleanField(targetJavaObject, fieldId, value->BooleanValue());
+                env.SetBooleanField(targetJavaObject, fieldId, value->BooleanValue(context).ToChecked());
             }
             break;
         }
         case 'B': { //byte
             //TODO: validate value is a byte before calling
             if (isStatic) {
-                env.SetStaticByteField(clazz, fieldId, value->Int32Value());
+                env.SetStaticByteField(clazz, fieldId, value->Int32Value(context).ToChecked());
             } else {
-                env.SetByteField(targetJavaObject, fieldId, value->Int32Value());
+                env.SetByteField(targetJavaObject, fieldId, value->Int32Value(context).ToChecked());
             }
             break;
         }
         case 'C': { //char
             //TODO: validate value is a single char
-            String::Utf8Value stringValue(value->ToString());
+            String::Utf8Value stringValue(isolate, value->ToString(isolate));
             JniLocalRef strValue(env.NewStringUTF(*stringValue));
             const char* chars = env.GetStringUTFChars(strValue, 0);
 
@@ -270,18 +271,18 @@ void FieldAccessor::SetJavaField(Isolate* isolate, const Local<Object>& target, 
         case 'S': { //short
             //TODO: validate value is a short before calling
             if (isStatic) {
-                env.SetStaticShortField(clazz, fieldId, value->Int32Value());
+                env.SetStaticShortField(clazz, fieldId, value->Int32Value(context).ToChecked());
             } else {
-                env.SetShortField(targetJavaObject, fieldId, value->Int32Value());
+                env.SetShortField(targetJavaObject, fieldId, value->Int32Value(context).ToChecked());
             }
             break;
         }
         case 'I': { //int
             //TODO: validate value is a int before calling
             if (isStatic) {
-                env.SetStaticIntField(clazz, fieldId, value->Int32Value());
+                env.SetStaticIntField(clazz, fieldId, value->Int32Value(context).ToChecked());
             } else {
-                env.SetIntField(targetJavaObject, fieldId, value->Int32Value());
+                env.SetIntField(targetJavaObject, fieldId, value->Int32Value(context).ToChecked());
             }
             break;
 
@@ -297,17 +298,17 @@ void FieldAccessor::SetJavaField(Isolate* isolate, const Local<Object>& target, 
         }
         case 'F': { //float
             if (isStatic) {
-                env.SetStaticFloatField(clazz, fieldId, static_cast<jfloat>(value->NumberValue()));
+                env.SetStaticFloatField(clazz, fieldId, static_cast<jfloat>(value->NumberValue(context).ToChecked()));
             } else {
-                env.SetFloatField(targetJavaObject, fieldId, static_cast<jfloat>(value->NumberValue()));
+                env.SetFloatField(targetJavaObject, fieldId, static_cast<jfloat>(value->NumberValue(context).ToChecked()));
             }
             break;
         }
         case 'D': { //double
             if (isStatic) {
-                env.SetStaticDoubleField(clazz, fieldId, value->NumberValue());
+                env.SetStaticDoubleField(clazz, fieldId, value->NumberValue(context).ToChecked());
             } else {
-                env.SetDoubleField(targetJavaObject, fieldId, value->NumberValue());
+                env.SetDoubleField(targetJavaObject, fieldId, value->NumberValue(context).ToChecked());
             }
             break;
         }
@@ -326,7 +327,7 @@ void FieldAccessor::SetJavaField(Isolate* isolate, const Local<Object>& target, 
                 //TODO: validate valie is a string;
                 result = ArgConverter::ConvertToJavaString(value);
             } else {
-                auto objectWithHiddenID = value->ToObject();
+                auto objectWithHiddenID = value->ToObject(isolate);
                 result = objectManager->GetJavaObjectByJsObject(objectWithHiddenID);
             }
         }

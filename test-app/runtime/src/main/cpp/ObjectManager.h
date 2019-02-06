@@ -37,7 +37,11 @@ class ObjectManager {
 
         void Link(const v8::Local<v8::Object>& object, uint32_t javaObjectID, jclass clazz);
 
+        void ReleaseNativeCounterpart(v8::Local<v8::Object>& object);
+
         bool CloneLink(const v8::Local<v8::Object>& src, const v8::Local<v8::Object>& dest);
+
+        bool IsJsRuntimeObject(const v8::Local<v8::Object>& object);
 
         std::string GetClassName(jobject javaObject);
 
@@ -139,7 +143,7 @@ class ObjectManager {
             int javaObjectId;
         };
 
-        bool IsJsRuntimeObject(const v8::Local<v8::Object>& object);
+
 
         JSInstanceInfo* GetJSInstanceInfo(const v8::Local<v8::Object>& object);
 
@@ -230,6 +234,8 @@ class ObjectManager {
         jmethodID MAKE_INSTANCE_WEAK_BATCH_METHOD_ID;
 
         jmethodID MAKE_INSTANCE_WEAK_AND_CHECK_IF_ALIVE_METHOD_ID;
+
+        jmethodID RELEASE_NATIVE_INSTANCE_METHOD_ID;
 
         jmethodID CHECK_WEAK_OBJECTS_ARE_ALIVE_METHOD_ID;
 

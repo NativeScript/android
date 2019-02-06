@@ -1,8 +1,29 @@
+5.2.0
+==
+
+## What's New
+ - [Upgrade v8 to 7.1.302.32(#1237)](https://github.com/NativeScript/android-runtime/issues/1237)
+ - [Add OnDiscardedError handler(#1245)](https://github.com/NativeScript/android-runtime/issues/1245)
+ - [Upgrade the android gradle plugin to the latest 3.3.0 version(#1251)](https://github.com/NativeScript/android-runtime/issues/1251)
+  - [Add android X support(#1226)](https://github.com/NativeScript/android-runtime/issues/1226)
+ - [Provide a JS helper function on the global object to release the native object wrapped by a JS instance(#1254)](https://github.com/NativeScript/android-runtime/issues/1254)
+
+## Bug Fixes
+
+ - [ClassNotFound exception when calling nested static class with correct argument(#1195)](https://github.com/NativeScript/android-runtime/issues/1195)
+ - [If you refresh or close the chrome dev tools window an error will be log in the console (#1202)](https://github.com/NativeScript/android-runtime/issues/1202)
+ - [Debug on Android fails when stopped on breakpoint and change in .xml/.css/.html is applied(#1243)](https://github.com/NativeScript/android-runtime/issues/1243)
+ - [Breakpoint stop to hit when you have two open tabs and close one(#1247)](https://github.com/NativeScript/android-runtime/issues/1247)
+ - [ClassNotFound exception when calling nested static class with correct argument(#1195)](https://github.com/NativeScript/android-runtime/issues/1195)
+ - [Upgrade V8 to v7 to fix unstable sort() method(#1176)](https://github.com/NativeScript/android-runtime/issues/1176)
+ - [CodeCache option is broken since Android Runtime 4.1.0(#1235)](https://github.com/NativeScript/android-runtime/issues/1235)
+ - [Snapshots with ABI splits do not work since Android Runtime 4.1.0(#1234)](https://github.com/NativeScript/android-runtime/issues/1234)
+
 5.1.0
 ==
 
 ## What's New
- - [Add a setting to wrap calls to CallJSMethod in try catch(#1223)](https://github.com/NativeScript/android-runtime/issues/12238)
+ - [Add a setting to wrap calls to CallJSMethod in try catch(#1223)](https://github.com/NativeScript/android-runtime/issues/1223)
  - [Support for abstract interface with static methods(#1157)](https://github.com/NativeScript/android-runtime/issues/1157)
  - [Use gradle plugin 3.2.1 instead of 3.2.0(#1209)](https://github.com/NativeScript/android-runtime/pull/1209)
  - [Add a concrete exception when the runtime cannot be found(#1201)](https://github.com/NativeScript/android-runtime/pull/1201)

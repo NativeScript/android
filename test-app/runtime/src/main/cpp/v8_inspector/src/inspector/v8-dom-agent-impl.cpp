@@ -91,9 +91,9 @@ DispatchResponse V8DOMAgentImpl::getDocument(Maybe<int> in_depth, Maybe<bool> in
             v8::Local<v8::Value> outResult;
 
             if (maybeResult.ToLocal(&outResult)) {
-                auto resultString = ArgConverter::ConvertToUtf16String(outResult->ToString());
+                auto resultString = ArgConverter::ConvertToUtf16String(outResult->ToString(context).ToLocalChecked());
 
-                if (!outResult->ToObject()->Has(context, ArgConverter::ConvertToV8String(isolate, "backendNodeId")).FromMaybe(false)) {
+                if (!outResult->ToObject(context).ToLocalChecked()->Has(context, ArgConverter::ConvertToV8String(isolate, "backendNodeId")).FromMaybe(false)) {
                     // Using an older version of the modules which doesn't set the backendNodeId required property
                     resultString = AddBackendNodeIdProperty(isolate, outResult);
                 }
@@ -365,7 +365,7 @@ std::u16string V8DOMAgentImpl::AddBackendNodeIdProperty(v8::Isolate* isolate, v8
     v8::Local<v8::Value> scriptResult;
     addBackendNodeIdFunction->Call(context, context->Global(), 1, funcArguments).ToLocal(&scriptResult);
 
-    auto resultString = ArgConverter::ConvertToUtf16String(scriptResult->ToString());
+    auto resultString = ArgConverter::ConvertToUtf16String(scriptResult->ToString(context).ToLocalChecked());
     return resultString;
 }
 

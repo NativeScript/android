@@ -20,7 +20,7 @@ def useCCache = !project.hasProperty("noCCache")
 def isWinOs = System.properties['os.name'].toLowerCase().contains('windows')
 def pVersion = "no package version was provided by build.gradle build"
 def arVersion = "no commit sha was provided by build.gradle build"
-def generateRegularRuntimePackage = !project.hasProperty("skipUnoptimized");
+def generateRegularRuntimePackage = !project.hasProperty("skipUnoptimized")
 
 def DIST_PATH = "$rootDir/dist"
 def TEST_APP_PATH = "$rootDir/test-app"
@@ -29,19 +29,19 @@ def DIST_FRAMEWORK_PATH = "$DIST_PATH/framework"
 
 task checkEnvironmentVariables {
     if ("$System.env.JAVA_HOME" == "" || "$System.env.JAVA_HOME" == "null") {
-        throw new GradleException("Set JAVA_HOME to point to the correct Jdk location\n");
+        throw new GradleException("Set JAVA_HOME to point to the correct Jdk location\n")
     }
 
     if ("$System.env.ANDROID_HOME" == "" || "$System.env.ANDROID_HOME" == "null") {
-        throw new GradleException("Set ANDROID_HOME to point to the correct Android SDK location\n");
+        throw new GradleException("Set ANDROID_HOME to point to the correct Android SDK location\n")
     }
 
     if ("$System.env.GIT_COMMIT" == "null" && !project.hasProperty("gitCommitVersion")) {
-        logger.warn("Warning: The GIT_COMMIT is not set. This NativeScript Android Runtime will not be tagged with the git commit it is build from\n");
+        logger.warn("Warning: The GIT_COMMIT is not set. This NativeScript Android Runtime will not be tagged with the git commit it is build from\n")
     }
 
     if (project.hasProperty("metadataGen") && !file("../android-metadata-generator/dist/tns-android-metadata-generator-0.0.1.tgz").exists()) {
-        throw new GradleException("android-metadata-generator build output not found and no metadataGen option specified. Build android-metadata-generator first.\n");
+        throw new GradleException("android-metadata-generator build output not found and no metadataGen option specified. Build android-metadata-generator first.\n")
     }
 }
 
@@ -120,9 +120,9 @@ task generateDtsgJar(type: Exec) {
     doFirst {
         workingDir "$TEST_APP_PATH"
         if (isWinOs) {
-            commandLine "cmd", "/c", "gradlew", ":dts-generator:jar"
+            commandLine "cmd", "/c", "gradlew", ":dts-generator:jar", "--warning-mode", "all"
         } else {
-            commandLine "./gradlew", ":dts-generator:jar"
+            commandLine "./gradlew", ":dts-generator:jar", "--warning-mode", "all"
         }
     }
 }
@@ -131,9 +131,9 @@ task generateSbgJar(type: Exec) {
     doFirst {
         workingDir "$TEST_APP_PATH"
         if (isWinOs) {
-            commandLine "cmd", "/c", "gradlew", ":static-binding-generator:jar"
+            commandLine "cmd", "/c", "gradlew", ":static-binding-generator:jar", "--warning-mode", "all"
         } else {
-            commandLine "./gradlew", ":static-binding-generator:jar"
+            commandLine "./gradlew", ":static-binding-generator:jar", "--warning-mode", "all"
         }
     }
 }
@@ -142,21 +142,9 @@ task generateMdgJar(type: Exec) {
     doFirst {
         workingDir "$TEST_APP_PATH"
         if (isWinOs) {
-            commandLine "cmd", "/c", "gradlew", ":android-metadata-generator:jar"
+            commandLine "cmd", "/c", "gradlew", ":android-metadata-generator:jar", "--warning-mode", "all"
         } else {
-            commandLine "./gradlew", ":android-metadata-generator:jar"
-        }
-    }
-}
-
-task generateRuntime {
-    doFirst {
-        tasks.generateOptimizedRuntimeAar.execute();
-
-        tasks.generateOptimizedWithInspectorRuntimeAar.execute();
-
-        if (generateRegularRuntimePackage) {
-            tasks.generateRuntimeAar.execute();
+            commandLine "./gradlew", ":android-metadata-generator:jar", "--warning-mode", "all"
         }
     }
 }
@@ -165,9 +153,9 @@ task cleanRuntime (type: Exec) {
     doFirst {
         workingDir "$TEST_APP_PATH"
         if (isWinOs) {
-            commandLine "cmd", "/c", "gradlew", ":runtime:clean"
+            commandLine "cmd", "/c", "gradlew", ":runtime:clean", "--warning-mode", "all"
         } else {
-            commandLine "./gradlew", ":runtime:clean"
+            commandLine "./gradlew", ":runtime:clean", "--warning-mode", "all"
         }
     }
 }
@@ -177,23 +165,24 @@ def getAssembleReleaseBuildArguments = { ->
     if (isWinOs) {
         arguments += ["cmd", "/c", "gradlew"]
     } else {
-        arguments.push("./gradlew")
+        arguments.add("./gradlew")
     }
     arguments += [":runtime:assembleRelease", "-PpackageVersion=${pVersion}", "-PgitCommitVersion=${arVersion}"]
     if (onlyX86) {
-        arguments.push("-PonlyX86")
+        arguments.add("-PonlyX86")
     }
     if (useCCache) {
-        arguments.push("-PuseCCache")
+        arguments.add("-PuseCCache")
     }
-    return arguments;
+    arguments += ["--warning-mode", "all"]
+    return arguments
 }
 
 task generateOptimizedRuntimeAar (type: Exec) {
     doFirst {
         workingDir "$TEST_APP_PATH"
         def arguments = getAssembleReleaseBuildArguments()
-        arguments.push("-Poptimized")
+        arguments.add("-Poptimized")
         commandLine arguments
     }
 }
@@ -202,7 +191,7 @@ task generateOptimizedWithInspectorRuntimeAar (type: Exec) {
     doFirst {
         workingDir "$TEST_APP_PATH"
         def arguments = getAssembleReleaseBuildArguments()
-        arguments.push("-PoptimizedWithInspector")
+        arguments.add("-PoptimizedWithInspector")
         commandLine arguments
     }
 }
@@ -316,7 +305,7 @@ task setPackageVersionInPackageJsonFile {
         def inputFile = new File("$DIST_PATH/package.json")
         def json = new JsonSlurper().parseText(inputFile.text)
         json.version = pVersion
-        def jb = new JsonBuilder(json);
+        def jb = new JsonBuilder(json)
         inputFile.text = JsonOutput.prettyPrint(jb.toString())
     }
 }
@@ -344,9 +333,17 @@ createDistDir.dependsOn(generateMdgJar)
 
 getPackageVersion.dependsOn(createDistDir)
 getCommitVersion.dependsOn(getPackageVersion)
-generateRuntime.dependsOn(getCommitVersion)
+generateOptimizedRuntimeAar.dependsOn(getCommitVersion)
 
-buildJsParser.dependsOn(generateRuntime)
+generateOptimizedWithInspectorRuntimeAar.dependsOn(generateOptimizedRuntimeAar)
+
+if (generateRegularRuntimePackage) {
+    generateRuntimeAar.dependsOn(generateOptimizedWithInspectorRuntimeAar)
+    buildJsParser.dependsOn(generateRuntimeAar)
+} else {
+    buildJsParser.dependsOn(generateOptimizedWithInspectorRuntimeAar)
+}
+
 copyFilesToProjectTemeplate.dependsOn(buildJsParser)
 copyProjectTemplate.dependsOn(copyFilesToProjectTemeplate)
 copyPackageJson.dependsOn(copyProjectTemplate)
@@ -377,9 +374,9 @@ task runSbgTests (type: Exec, dependsOn: 'runAstTests') {
     doFirst {
         workingDir "$TEST_APP_PATH"
         if (isWinOs) {
-            commandLine "cmd", "/c", "gradlew", ":static-binding-generator:test"
+            commandLine "cmd", "/c", "gradlew", ":static-binding-generator:test", "--warning-mode", "all"
         } else {
-            commandLine "./gradlew", ":static-binding-generator:test"
+            commandLine "./gradlew", ":static-binding-generator:test", "--warning-mode", "all"
         }
     }
 }
@@ -389,16 +386,17 @@ def getRunTestsBuildArguments = { taskName ->
     if (isWinOs) {
         arguments += ["cmd", "/c", "gradlew"]
     } else {
-        arguments.push("./gradlew")
+        arguments.add("./gradlew")
     }
-    arguments +=["-b", "runtests.gradle", taskName]
+    arguments += ["-b", "runtests.gradle", taskName]
     if (onlyX86) {
-        arguments.push("-PonlyX86")
+        arguments.add("-PonlyX86")
     }
     if (useCCache) {
-        arguments.push("-PuseCCache")
+        arguments.add("-PuseCCache")
     }
-    return arguments;
+    arguments += ["--warning-mode", "all"]
+    return arguments
 }
 
 task runTests (type: Exec) {

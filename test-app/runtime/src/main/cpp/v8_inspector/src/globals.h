@@ -11,37 +11,11 @@
 #include <limits>
 #include <ostream>
 
-#include "include/v8.h"
+#include "include/v8-internal.h"
 #include "src/base/build_config.h"
 #include "src/base/flags.h"
 #include "src/base/logging.h"
 #include "src/base/macros.h"
-
-#ifdef V8_OS_WIN
-
-// Setup for Windows shared library export.
-#ifdef BUILDING_V8_SHARED
-#define V8_EXPORT_PRIVATE __declspec(dllexport)
-#elif USING_V8_SHARED
-#define V8_EXPORT_PRIVATE __declspec(dllimport)
-#else
-#define V8_EXPORT_PRIVATE
-#endif  // BUILDING_V8_SHARED
-
-#else  // V8_OS_WIN
-
-// Setup for Linux shared library export.
-#if V8_HAS_ATTRIBUTE_VISIBILITY
-#ifdef BUILDING_V8_SHARED
-#define V8_EXPORT_PRIVATE __attribute__((visibility("default")))
-#else
-#define V8_EXPORT_PRIVATE
-#endif
-#else
-#define V8_EXPORT_PRIVATE
-#endif
-
-#endif  // V8_OS_WIN
 
 #define V8_INFINITY std::numeric_limits<double>::infinity()
 
@@ -81,9 +55,9 @@ namespace internal {
 // Determine whether the architecture uses an embedded constant pool
 // (contiguous constant pool embedded in code object).
 #if V8_TARGET_ARCH_PPC
-#define V8_EMBEDDED_CONSTANT_POOL 1
+#define V8_EMBEDDED_CONSTANT_POOL true
 #else
-#define V8_EMBEDDED_CONSTANT_POOL 0
+#define V8_EMBEDDED_CONSTANT_POOL false
 #endif
 
 #ifdef V8_TARGET_ARCH_ARM
@@ -102,14 +76,14 @@ constexpr int kStackSpaceRequiredForCompilation = 40;
 
 // Determine whether double field unboxing feature is enabled.
 #if V8_TARGET_ARCH_64_BIT
-#define V8_DOUBLE_FIELDS_UNBOXING 1
+#define V8_DOUBLE_FIELDS_UNBOXING true
 #else
-#define V8_DOUBLE_FIELDS_UNBOXING 0
+#define V8_DOUBLE_FIELDS_UNBOXING false
 #endif
 
 // Some types of tracing require the SFI to store a unique ID.
 #if defined(V8_TRACE_MAPS) || defined(V8_TRACE_IGNITION)
-#define V8_SFI_HAS_UNIQUE_ID 1
+#define V8_SFI_HAS_UNIQUE_ID true
 #endif
 
 // Superclass for classes only using static method functions.
@@ -120,10 +94,6 @@ class AllStatic {
         AllStatic() = delete;
 #endif
 };
-
-// DEPRECATED
-// TODO(leszeks): Delete this during a quiet period
-#define BASE_EMBEDDED
 
 typedef uint8_t byte;
 typedef uintptr_t Address;
@@ -183,7 +153,7 @@ constexpr int kDoubleSizeLog2 = 3;
 // ARM64 only supports direct calls within a 128 MB range.
 constexpr size_t kMaxWasmCodeMemory = 128 * MB;
 #else
-constexpr size_t kMaxWasmCodeMemory = 512 * MB;
+constexpr size_t kMaxWasmCodeMemory = 1024 * MB;
 #endif
 
 #if V8_HOST_ARCH_64_BIT
@@ -192,13 +162,7 @@ constexpr intptr_t kIntptrSignBit =
     static_cast<intptr_t>(uintptr_t{0x8000000000000000});
 constexpr uintptr_t kUintptrAllBitsSet = uintptr_t{0xFFFFFFFFFFFFFFFF};
 constexpr bool kRequiresCodeRange = true;
-#if V8_TARGET_ARCH_MIPS64
-// To use pseudo-relative jumps such as j/jal instructions which have 28-bit
-// encoded immediate, the addresses have to be in range of 256MB aligned
-// region. Used only for large object space.
-constexpr size_t kMaximalCodeRangeSize = 256 * MB;
-constexpr size_t kCodeRangeAreaAlignment = 256 * MB;
-#elif V8_HOST_ARCH_PPC && V8_TARGET_ARCH_PPC && V8_OS_LINUX
+#if V8_HOST_ARCH_PPC && V8_TARGET_ARCH_PPC && V8_OS_LINUX
 constexpr size_t kMaximalCodeRangeSize = 512 * MB;
 constexpr size_t kCodeRangeAreaAlignment = 64 * KB;  // OS page on PPC Linux
 #elif V8_TARGET_ARCH_ARM64
@@ -239,8 +203,8 @@ constexpr size_t kCodeRangeAreaAlignment = 4 * KB;  // OS page.
 constexpr size_t kReservedCodeRangePages = 0;
 #endif
 
-// Trigger an incremental GCs once the external memory reaches this limit.
-constexpr int kExternalAllocationSoftLimit = 64 * MB;
+constexpr int kExternalAllocationSoftLimit =
+    internal::Internals::kExternalAllocationSoftLimit;
 
 // Maximum object size that gets allocated into regular pages. Objects larger
 // than that size are allocated in large object space and are never moved in
@@ -365,6 +329,10 @@ inline LanguageMode stricter_language_mode(LanguageMode mode1,
                                      static_cast<int>(mode2));
 }
 
+// A non-keyed store is of the form a.x = foo or a["x"] = foo whereas
+// a keyed store is of the form a[expression] = foo.
+enum class StoreOrigin { kMaybeKeyed, kNamed };
+
 enum TypeofMode : int { INSIDE_TYPEOF, NOT_INSIDE_TYPEOF };
 
 // Enums used by CEntry.
@@ -487,6 +455,9 @@ constexpr uint32_t kFreeListZapValue = 0xfeed1eaf;
 
 constexpr int kCodeZapValue = 0xbadc0de;
 constexpr uint32_t kPhantomReferenceZap = 0xca11bac;
+
+// Page constants.
+static const intptr_t kPageAlignmentMask = (intptr_t{1} << kPageSizeBits) - 1;
 
 // On Intel architecture, cache line size is 64 bytes.
 // On ARM it may be less (32 bytes), but as far this constant is
@@ -652,11 +623,13 @@ enum Movability { kMovable, kImmovable };
 
 enum VisitMode {
     VISIT_ALL,
+    VISIT_ALL_BUT_READ_ONLY,
     VISIT_ALL_IN_MINOR_MC_MARK,
     VISIT_ALL_IN_MINOR_MC_UPDATE,
     VISIT_ALL_IN_SCAVENGE,
     VISIT_ALL_IN_SWEEP_NEWSPACE,
     VISIT_ONLY_STRONG,
+    VISIT_ONLY_STRONG_FOR_SERIALIZATION,
     VISIT_FOR_SERIALIZATION,
 };
 
@@ -731,6 +704,27 @@ enum InlineCacheState {
     // A generic handler is installed and no extra typefeedback is recorded.
     GENERIC,
 };
+
+// Printing support.
+inline const char* InlineCacheState2String(InlineCacheState state) {
+    switch (state) {
+    case UNINITIALIZED:
+        return "UNINITIALIZED";
+    case PREMONOMORPHIC:
+        return "PREMONOMORPHIC";
+    case MONOMORPHIC:
+        return "MONOMORPHIC";
+    case RECOMPUTE_HANDLER:
+        return "RECOMPUTE_HANDLER";
+    case POLYMORPHIC:
+        return "POLYMORPHIC";
+    case MEGAMORPHIC:
+        return "MEGAMORPHIC";
+    case GENERIC:
+        return "GENERIC";
+    }
+    UNREACHABLE();
+}
 
 enum WhereToStart { kStartAtReceiver, kStartAtPrototype };
 
@@ -953,6 +947,8 @@ enum AllocationSiteMode {
     LAST_ALLOCATION_SITE_MODE = TRACK_ALLOCATION_SITE
 };
 
+enum class AllocationSiteUpdateMode { kUpdate, kCheckOnly };
+
 // The mips architecture prior to revision 5 has inverted encoding for sNaN.
 #if (V8_TARGET_ARCH_MIPS && !defined(_MIPS_ARCH_MIPS32R6) &&           \
      (!defined(USE_SIMULATOR) || !defined(_MIPS_TARGET_SIMULATOR))) || \
@@ -1101,7 +1097,6 @@ enum InitializationFlag : uint8_t { kNeedsInitialization, kCreatedInitialized };
 
 enum MaybeAssignedFlag : uint8_t { kNotAssigned, kMaybeAssigned };
 
-// Serialized in PreparseData, so numeric values should not be changed.
 enum ParseErrorType { kSyntaxError = 0, kReferenceError = 1 };
 
 enum FunctionKind : uint8_t {
@@ -1561,7 +1556,7 @@ V8_INLINE static bool HasWeakHeapObjectTag(const Object* value) {
             kWeakHeapObjectTag);
 }
 
-V8_INLINE static bool IsClearedWeakHeapObject(MaybeObject* value) {
+V8_INLINE static bool IsClearedWeakHeapObject(const MaybeObject* value) {
     return reinterpret_cast<intptr_t>(value) == kClearedWeakHeapObject;
 }
 
@@ -1604,6 +1599,7 @@ enum class LoadSensitivity {
 #define FOREACH_WASM_TRAPREASON(V) \
   V(TrapUnreachable)               \
   V(TrapMemOutOfBounds)            \
+  V(TrapUnalignedAccess)           \
   V(TrapDivByZero)                 \
   V(TrapDivUnrepresentable)        \
   V(TrapRemByZero)                 \
@@ -1611,6 +1607,65 @@ enum class LoadSensitivity {
   V(TrapFuncInvalid)               \
   V(TrapFuncSigMismatch)
 
+enum KeyedAccessLoadMode {
+    STANDARD_LOAD,
+    LOAD_IGNORE_OUT_OF_BOUNDS,
+};
+
+enum KeyedAccessStoreMode {
+    STANDARD_STORE,
+    STORE_TRANSITION_TO_OBJECT,
+    STORE_TRANSITION_TO_DOUBLE,
+    STORE_AND_GROW_NO_TRANSITION_HANDLE_COW,
+    STORE_AND_GROW_TRANSITION_TO_OBJECT,
+    STORE_AND_GROW_TRANSITION_TO_DOUBLE,
+    STORE_NO_TRANSITION_IGNORE_OUT_OF_BOUNDS,
+    STORE_NO_TRANSITION_HANDLE_COW
+};
+
+enum MutableMode { MUTABLE, IMMUTABLE };
+
+static inline bool IsTransitionStoreMode(KeyedAccessStoreMode store_mode) {
+    return store_mode == STORE_TRANSITION_TO_OBJECT ||
+           store_mode == STORE_TRANSITION_TO_DOUBLE ||
+           store_mode == STORE_AND_GROW_TRANSITION_TO_OBJECT ||
+           store_mode == STORE_AND_GROW_TRANSITION_TO_DOUBLE;
+}
+
+static inline bool IsCOWHandlingStoreMode(KeyedAccessStoreMode store_mode) {
+    return store_mode == STORE_NO_TRANSITION_HANDLE_COW ||
+           store_mode == STORE_AND_GROW_NO_TRANSITION_HANDLE_COW;
+}
+
+static inline KeyedAccessStoreMode GetNonTransitioningStoreMode(
+    KeyedAccessStoreMode store_mode, bool receiver_was_cow) {
+    switch (store_mode) {
+    case STORE_AND_GROW_NO_TRANSITION_HANDLE_COW:
+    case STORE_AND_GROW_TRANSITION_TO_OBJECT:
+    case STORE_AND_GROW_TRANSITION_TO_DOUBLE:
+        store_mode = STORE_AND_GROW_NO_TRANSITION_HANDLE_COW;
+        break;
+    case STANDARD_STORE:
+    case STORE_TRANSITION_TO_OBJECT:
+    case STORE_TRANSITION_TO_DOUBLE:
+        store_mode =
+            receiver_was_cow ? STORE_NO_TRANSITION_HANDLE_COW : STANDARD_STORE;
+        break;
+    case STORE_NO_TRANSITION_IGNORE_OUT_OF_BOUNDS:
+    case STORE_NO_TRANSITION_HANDLE_COW:
+        break;
+    }
+    DCHECK(!IsTransitionStoreMode(store_mode));
+    DCHECK_IMPLIES(receiver_was_cow, IsCOWHandlingStoreMode(store_mode));
+    return store_mode;
+}
+
+static inline bool IsGrowStoreMode(KeyedAccessStoreMode store_mode) {
+    return store_mode >= STORE_AND_GROW_NO_TRANSITION_HANDLE_COW &&
+           store_mode <= STORE_AND_GROW_TRANSITION_TO_DOUBLE;
+}
+
+enum IcCheckType { ELEMENT, PROPERTY };
 }  // namespace internal
 }  // namespace v8
 

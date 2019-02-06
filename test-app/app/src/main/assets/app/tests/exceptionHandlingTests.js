@@ -31,12 +31,10 @@ describe("Tests exception handling ", function () {
 
 		var eh = new EH();
 
-		try
-		{
+		try {
 			eh.triggerEvent1("test", 5);
 		}
-		catch (e)
-		{
+		catch (e) {
 			exceptionCaught = true;
 			sameExObject = e === ex;
 			__log("e=" + e);
@@ -71,16 +69,13 @@ describe("Tests exception handling ", function () {
 
 		var eh = new EH();
 
-		try
-		{
+		try {
 			eh.triggerEvent1("test", 5);
 		}
-		catch (e)
-		{
+		catch (e) {
 			exceptionCaught = true;
 			nativeExceptionFound = e.nativeException !== undefined;
-			if (nativeExceptionFound)
-			{
+			if (nativeExceptionFound) {
 				exMsg = e.nativeException.getMessage();
 			}
 		}
@@ -111,13 +106,11 @@ describe("Tests exception handling ", function () {
 
 		var eh = new EH();
 
-		try
-		{
+		try {
 			eh.triggerEvent1WithCatchClause("test", 5);
 			exceptionCaught = false;
 		}
-		catch (e)
-		{
+		catch (e) {
 			exceptionCaught = true;
 		}
 
@@ -147,13 +140,11 @@ describe("Tests exception handling ", function () {
 
 		var eh = new EH();
 
-		try
-		{
+		try {
 			eh.triggerEvent1WithCatchClause("test", 5);
 			exceptionCaught = false;
 		}
-		catch (e)
-		{
+		catch (e) {
 			exceptionCaught = true;
 		}
 
@@ -169,12 +160,10 @@ describe("Tests exception handling ", function () {
 
 		var dummy = new com.tns.tests.DummyClass();
 
-		try
-		{
+		try {
 			dummy.methodThatThrowsException();
 		}
-		catch (e)
-		{
+		catch (e) {
 			exceptionCaught = true;
 		}
 
@@ -190,12 +179,10 @@ describe("Tests exception handling ", function () {
 
 		var dummy = new com.tns.tests.DummyClass();
 
-		try
-		{
+		try {
 			dummy.methodThatThrowsException();
 		}
-		catch (e)
-		{
+		catch (e) {
 			var nativeException = e.nativeException;
 		}
 
@@ -214,12 +201,10 @@ describe("Tests exception handling ", function () {
 
 		var exceptionCaught = false;
 
-		try
-		{
+		try {
 			var dummy = new com.tns.tests.DummyClass(true /* throwsException */);
 		}
-		catch (e)
-		{
+		catch (e) {
 			exceptionCaught = true;
 		}
 
@@ -240,14 +225,12 @@ describe("Tests exception handling ", function () {
 
 		expect(arrLength).toEqual(1);
 
-		try
-		{
+		try {
 			var dummy = arr[arrLength];
 
 			var name = dummy.getName();
 		}
-		catch (e)
-		{
+		catch (e) {
 			exceptionCaught = true;
 		}
 
@@ -270,12 +253,10 @@ describe("Tests exception handling ", function () {
 
 		var last = arr[arrLength - 1];
 
-		try
-		{
+		try {
 			arr[arrLength] = last;
 		}
-		catch (e)
-		{
+		catch (e) {
 			exceptionCaught = true;
 		}
 
@@ -335,8 +316,8 @@ describe("Tests exception handling ", function () {
 	    }
 	    expect(exceptionCaught).toBe(true);
 	    expect(errMsg).toContain("Cannot compile /data/data/com.tns.testapplication/files/app/tests/syntaxErrors.js");
-	    expect(errMsg).toContain("SyntaxError: Unexpected token =");
-	    expect(errMsg).toContain("File: \"file:///data/data/com.tns.testapplication/files/app/tests/syntaxErrors.js, line: 3, column: 10");
+	    expect(errMsg).toContain("SyntaxError: Unexpected token class");
+	    expect(errMsg).toContain("File: \"file:///data/data/com.tns.testapplication/files/app/tests/syntaxErrors.js, line: 3, column: 4");
 	});
 
     // run this test only for API level bigger than 25 as we have handling there

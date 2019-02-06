@@ -31,6 +31,7 @@
 
 #ifdef APPLICATION_IN_DEBUG
 #include "JsV8InspectorClient.h"
+#include "v8_inspector/src/inspector/v8-inspector-platform.h"
 #endif
 
 using namespace v8;
@@ -45,8 +46,7 @@ void SIGABRT_handler(int sigNumber) {
 }
 
 void Runtime::Init(JavaVM* vm, void* reserved) {
-    __android_log_print(ANDROID_LOG_INFO, "TNS.Native", "NativeScript Runtime Version %s, commit %s", NATIVE_SCRIPT_RUNTIME_VERSION, NATIVE_SCRIPT_RUNTIME_COMMIT_SHA);
-    DEBUG_WRITE("JNI_ONLoad");
+    __android_log_print(ANDROID_LOG_INFO, "TNS.Runtime", "NativeScript Runtime Version %s, commit %s", NATIVE_SCRIPT_RUNTIME_VERSION, NATIVE_SCRIPT_RUNTIME_COMMIT_SHA);
 
     if (Runtime::s_jvm == nullptr) {
         s_jvm = vm;
@@ -60,8 +60,6 @@ void Runtime::Init(JavaVM* vm, void* reserved) {
         action.sa_handler = SIGABRT_handler;
         sigaction(SIGABRT, &action, NULL);
     }
-
-    DEBUG_WRITE("JNI_ONLoad END");
 }
 
 int Runtime::GetAndroidVersion() {
@@ -183,7 +181,7 @@ void Runtime::Init(jstring filesPath, jstring nativeLibDir, bool verboseLoggingE
 
     auto profilerOutputDirStr = ArgConverter::jstringToString(profilerOutputDir);
 
-    NativeScriptException::Init(m_objectManager);
+    NativeScriptException::Init();
     m_isolate = PrepareV8Runtime(filesRoot, nativeLibDirStr, packageNameStr, isDebuggable, callingDirStr, profilerOutputDirStr, maxLogcatObjectSize, forceLog);
 
     s_isolate2RuntimesCache.insert(make_pair(m_isolate, this));
@@ -370,11 +368,13 @@ bool Runtime::TryCallGC() {
     return success;
 }
 
-void Runtime::PassUncaughtExceptionToJsNative(JNIEnv* env, jobject obj, jthrowable exception, jstring stackTrace) {
+void Runtime::PassExceptionToJsNative(JNIEnv* env, jobject obj, jthrowable exception, jstring stackTrace, jboolean isDiscarded) {
     auto isolate = m_isolate;
 
     //create error message
-    string errMsg = "The application crashed because of an uncaught exception. You can look at \"stackTrace\" or \"nativeException\" for more detailed information about the exception.";
+    string errMsg = isDiscarded ? "An exception was caught and discarded. You can look at \"stackTrace\" or \"nativeException\" for more detailed information about the exception.":
+                    "The application crashed because of an uncaught exception. You can look at \"stackTrace\" or \"nativeException\" for more detailed information about the exception.";
+
     auto errObj = Exception::Error(ArgConverter::ConvertToV8String(isolate, errMsg)).As<Object>();
 
     //create a new native exception js object
@@ -398,7 +398,7 @@ void Runtime::PassUncaughtExceptionToJsNative(JNIEnv* env, jobject obj, jthrowab
     errObj->Set(V8StringConstants::GetStackTrace(isolate), ArgConverter::jstringToV8String(isolate, stackTrace));
 
     //pass err to JS
-    NativeScriptException::CallJsFuncWithErr(errObj);
+    NativeScriptException::CallJsFuncWithErr(errObj, isDiscarded);
 }
 
 void Runtime::PassUncaughtExceptionFromWorkerToMainHandler(Local<v8::String> message, Local<v8::String> stackTrace, Local<v8::String> filename, int lineno) {
@@ -425,7 +425,18 @@ void Runtime::ClearStartupData(JNIEnv* env, jobject obj) {
 }
 
 static void InitializeV8() {
-    Runtime::platform = v8::platform::CreateDefaultPlatform();
+    Runtime::platform =
+#ifdef APPLICATION_IN_DEBUG
+        // The default V8 platform isn't Chrome DevTools compatible. The frontend uses the
+        // Runtime.evaluate protocol command with timeout flag for every execution in the console.
+        // The default platform doesn't implement executing delayed javascript code from a background
+        // thread. To avoid implementing a full blown scheduler, we use the default platform with a
+        // timeout=0 flag.
+        V8InspectorPlatform::CreateDefaultPlatform();
+#else
+        v8::platform::CreateDefaultPlatform();
+#endif
+
     V8::InitializePlatform(Runtime::platform);
     V8::Initialize();
 }
@@ -465,6 +476,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     if (snapshotPtr) {
         m_startupData->data = static_cast<const char*>(dlsym(snapshotPtr, "TNSSnapshot_blob"));
         m_startupData->raw_size = *static_cast<const unsigned int*>(dlsym(snapshotPtr, "TNSSnapshot_blob_len"));
+        create_params.snapshot_blob = m_startupData;
         DEBUG_WRITE_FORCE("Snapshot library read %p (%dB).", m_startupData->data, m_startupData->raw_size);
     } else if (!Constants::V8_HEAP_SNAPSHOT_BLOB.empty() || !Constants::V8_HEAP_SNAPSHOT_SCRIPT.empty()) {
         DEBUG_WRITE_FORCE("Snapshot enabled.");
@@ -502,7 +514,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
             }
 
             DEBUG_WRITE_FORCE("Creating heap snapshot");
-            *m_startupData = V8::CreateSnapshotDataBlob(customScript.c_str());
+            *m_startupData = Runtime::CreateSnapshotDataBlob(customScript.c_str());
 
             if (m_startupData->raw_size == 0) {
                 DEBUG_WRITE_FORCE("Failed to create heap snapshot.");
@@ -548,7 +560,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     isolate->AddMessageListener(NativeScriptException::OnUncaughtError);
 
-    __android_log_print(ANDROID_LOG_DEBUG, "TNS.Native", "V8 version %s", V8::GetVersion());
+    __android_log_print(ANDROID_LOG_DEBUG, "TNS.Runtime", "V8 version %s", V8::GetVersion());
 
     auto globalFunctionTemplate = FunctionTemplate::New(isolate);
     globalFunctionTemplate->SetClassName(ArgConverter::ConvertToV8String(isolate, "NativeScriptGlobalObject"));
@@ -563,6 +575,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__exit"), FunctionTemplate::New(isolate, CallbackHandlers::ExitMethodCallback));
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__runtimeVersion"), ArgConverter::ConvertToV8String(isolate, NATIVE_SCRIPT_RUNTIME_VERSION), readOnlyFlags);
     globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__time"), FunctionTemplate::New(isolate, CallbackHandlers::TimeCallback));
+    globalTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__releaseNativeCounterpart"), FunctionTemplate::New(isolate, CallbackHandlers::ReleaseNativeCounterpartCallback));
 
     /*
      * Attach `Worker` object constructor only to the main thread (isolate)'s global object
@@ -618,7 +631,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     auto global = context->Global();
 
-    auto gcFunc = global->Get(ConvertToV8String("gc"));
+    auto gcFunc = global->Get(ArgConverter::ConvertToV8String(isolate, "gc"));
     if (!gcFunc.IsEmpty() && gcFunc->IsFunction()) {
         m_gcFunc = new Persistent<Function>(isolate, gcFunc.As<Function>());
     }
@@ -683,6 +696,60 @@ void Runtime::SetManualInstrumentationMode(jstring mode) {
     if (modeStr == "timeline") {
         tns::instrumentation::Frame::enable();
     }
+}
+
+StartupData Runtime::CreateSnapshotDataBlob(const char* embedded_source) {
+    // Create a new isolate and a new context from scratch, optionally run
+    // a script to embed, and serialize to create a snapshot blob.
+    StartupData result = {nullptr, 0};
+    {
+        SnapshotCreator snapshot_creator;
+        Isolate* isolate = snapshot_creator.GetIsolate();
+        {
+            HandleScope scope(isolate);
+            Local<Context> context = Context::New(isolate);
+            if (embedded_source != nullptr &&
+                    !Runtime::RunExtraCode(isolate, context, embedded_source, "<embedded>")) {
+                return result;
+            }
+            snapshot_creator.SetDefaultContext(context);
+        }
+        result = snapshot_creator.CreateBlob(
+                     SnapshotCreator::FunctionCodeHandling::kClear);
+    }
+
+    return result;
+}
+
+bool Runtime::RunExtraCode(Isolate* isolate, Local<Context> context, const char* utf8_source, const char* name) {
+    Context::Scope context_scope(context);
+    TryCatch try_catch(isolate);
+    Local<v8::String> source_string;
+    if (!v8::String::NewFromUtf8(isolate, utf8_source, NewStringType::kNormal).ToLocal(&source_string)) {
+        return false;
+    }
+    Local<v8::String> resource_name = v8::String::NewFromUtf8(isolate, name, NewStringType::kNormal).ToLocalChecked();
+    ScriptOrigin origin(resource_name);
+    ScriptCompiler::Source source(source_string, origin);
+    Local<Script> script;
+    if (!ScriptCompiler::Compile(context, &source).ToLocal(&script)) {
+        DEBUG_WRITE_FORCE("# Script compile failed in %s@%d:%d\n%s\n",
+                          *v8::String::Utf8Value(isolate, try_catch.Message()->GetScriptResourceName()),
+                          try_catch.Message()->GetLineNumber(context).FromJust(),
+                          try_catch.Message()->GetStartColumn(context).FromJust(),
+                          *v8::String::Utf8Value(isolate, try_catch.Exception()));
+        return false;
+    }
+    if (script->Run(context).IsEmpty()) {
+        DEBUG_WRITE_FORCE("# Script run failed in %s@%d:%d\n%s\n",
+                          *v8::String::Utf8Value(isolate, try_catch.Message()->GetScriptResourceName()),
+                          try_catch.Message()->GetLineNumber(context).FromJust(),
+                          try_catch.Message()->GetStartColumn(context).FromJust(),
+                          *v8::String::Utf8Value(isolate, try_catch.Exception()));
+        return false;
+    }
+    CHECK(!try_catch.HasCaught());
+    return true;
 }
 
 void Runtime::DestroyRuntime() {

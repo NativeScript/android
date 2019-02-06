@@ -145,30 +145,30 @@ def applyPluginGradleConfigurations = { ->
 }
 
 def getAppIdentifier = { packageJsonMap ->
-	def appIdentifier = "";
+	def appIdentifier = ""
 	if (packageJsonMap && packageJsonMap.nativescript) {
-		appIdentifier = packageJsonMap.nativescript.id;
+		appIdentifier = packageJsonMap.nativescript.id
 		if (!(appIdentifier instanceof String)) {
-			appIdentifier = appIdentifier.android;
+			appIdentifier = appIdentifier.android
 		}
 	}
 
-	return appIdentifier;
+	return appIdentifier
 }
 
 def setAppIdentifier = { ->
-	println "\t + setting applicationId";
-	File packageJsonFile = new File("$rootDir/../../package.json");
+	println "\t + setting applicationId"
+	File packageJsonFile = new File("$rootDir/../../package.json")
 
 	if (packageJsonFile.exists()) {
-		def content = packageJsonFile.getText("UTF-8");
-		def jsonSlurper = new JsonSlurper();
-		def packageJsonMap = jsonSlurper.parseText(content);
-		def appIdentifier = getAppIdentifier(packageJsonMap);
+		def content = packageJsonFile.getText("UTF-8")
+		def jsonSlurper = new JsonSlurper()
+		def packageJsonMap = jsonSlurper.parseText(content)
+		def appIdentifier = getAppIdentifier(packageJsonMap)
 
 		if (appIdentifier) {
-			project.ext.nsApplicationIdentifier = appIdentifier;
-			android.defaultConfig.applicationId = appIdentifier;
+			project.ext.nsApplicationIdentifier = appIdentifier
+			android.defaultConfig.applicationId = appIdentifier
 		}
 	}
 }
@@ -267,12 +267,36 @@ dependencies {
         supportVer = supportVersion
     }
 
-    println "Using support library version $supportVer"
+    if (project.hasProperty("useAndroidX") && (useAndroidX || useAndroidX.toBoolean())) {
+        def androidXLegacyVersion = "1.0.0"
+        if (project.hasProperty("androidXLegacy")) {
+            androidXLegacyVersion = androidXLegacy
+        }
 
-    implementation "com.android.support:multidex:1.0.2"
-    implementation "com.android.support:support-v4:$supportVer"
-    implementation "com.android.support:appcompat-v7:$supportVer"
-    implementation "com.android.support:design:$supportVer"
+        def androidXAppCompatVersion = "1.1.0-alpha01"
+        if (project.hasProperty("androidXAppCompat")) {
+            androidXAppCompatVersion = androidXAppCompat
+        }
+
+        def androidXMaterialVersion = "1.1.0-alpha01"
+        if (project.hasProperty("androidXMaterial")) {
+            androidXMaterialVersion = androidXMaterial
+        }
+
+        println "\t + using andorid X library androidx.legacy:legacy-support-v4:$androidXLegacyVersion"
+
+        implementation "androidx.multidex:multidex:2.0.0"
+        implementation "androidx.legacy:legacy-support-v4:$androidXLegacyVersion"
+        implementation "androidx.appcompat:appcompat:$androidXAppCompatVersion"
+        implementation "com.google.android.material:material:$androidXMaterialVersion"
+    } else {
+        println "\t + using support library version $supportVer"
+
+        implementation "com.android.support:multidex:1.0.2"
+        implementation "com.android.support:support-v4:$supportVer"
+        implementation "com.android.support:appcompat-v7:$supportVer"
+        implementation "com.android.support:design:$supportVer"
+    }
 
     def sbgProjectExists = !findProject(':static-binding-generator').is(null)
     if (sbgProjectExists) {
@@ -364,12 +388,13 @@ tasks.whenTaskAdded({ org.gradle.api.DefaultTask currentTask ->
         extractAllJars.finalizedBy(collectAllJars)
     }
     if (currentTask =~ /compile.+JavaWithJavac/) {
+        currentTask.dependsOn(makeAndroidXChanges)
         currentTask.dependsOn(runSbg)
         currentTask.finalizedBy(ensureMetadataOutDir)
         ensureMetadataOutDir.finalizedBy(buildMetadata)
     }
     if (currentTask =~ /merge.*Assets/) {
-        currentTask.shouldRunAfter(buildMetadata);
+        currentTask.shouldRunAfter(buildMetadata)
     }
     if (currentTask =~ /assemble.*Debug/ || currentTask =~ /assemble.*Release/) {
         currentTask.finalizedBy("validateAppIdMatch")
@@ -388,7 +413,7 @@ task runSbg(type: JavaExec) {
     args "static-binding-generator.jar"
 
     doFirst {
-        new File("$OUTPUT_JAVA_DIR/com/tns/gen").deleteDir();
+        new File("$OUTPUT_JAVA_DIR/com/tns/gen").deleteDir()
     }
 }
 
@@ -534,6 +559,43 @@ task buildMetadata(type: JavaExec) {
     }
 }
 
+task makeAndroidXChanges {
+    if (project.hasProperty("useAndroidX") && (useAndroidX || useAndroidX.toBoolean())) {
+        // code changes
+        def codeTuples = new ArrayList<Tuple2<String, String>>()
+        codeTuples.add(new Tuple2<String, String>('android\\.support\\.annotation\\.NonNull', 'androidx.annotation.NonNull'))
+        codeTuples.add(new Tuple2<String, String>('android\\.support\\.v7\\.app\\.AppCompatActivity', 'androidx.appcompat.app.AppCompatActivity'))
+        codeTuples.add(new Tuple2<String, String>('android\\.support\\.v7\\.appcompat\\.R', 'androidx.appcompat.R'))
+        codeTuples.add(new Tuple2<String, String>('android\\.support\\.design\\.widget\\.TabLayout', 'com.google.android.material.tabs.TabLayout'))
+        codeTuples.add(new Tuple2<String, String>('android\\.support\\.v4\\.app\\.ActivityCompat', 'androidx.core.app.ActivityCompat'))
+        codeTuples.add(new Tuple2<String, String>('android\\.support\\.v4\\.app\\.Fragment', 'androidx.fragment.app.Fragment'))
+        codeTuples.add(new Tuple2<String, String>('android\\.support\\.v4\\.view\\.ViewPager', 'androidx.viewpager.widget.ViewPager'))
+        codeTuples.add(new Tuple2<String, String>('android\\.support\\.v7\\.widget\\.Toolbar', 'androidx.appcompat.widget.Toolbar'))
+        codeTuples.add(new Tuple2<String, String>('android\\.support\\.multidex\\.MultiDex', 'androidx.multidex.MultiDex'))
+
+        codeTuples.each { tuple ->
+            ant.replaceregexp(match: tuple.first, replace: tuple.second, flags: 'g', byline: true) {
+                fileset(dir: "$projectDir/src/debug/java/com/tns/", includes: '*.java')
+            }
+            ant.replaceregexp(match: tuple.first, replace: tuple.second, flags: 'g', byline: true) {
+                fileset(dir: "$projectDir/src/main/java/com/tns/", includes: '*.java')
+            }
+        }
+
+        // resource changes
+        def resourceTuples = new ArrayList<Tuple2<String, String>>()
+        resourceTuples.add(new Tuple2<String, String>('android\\.support\\.v7\\.widget\\.Toolbar', 'androidx.appcompat.widget.Toolbar'))
+        resourceTuples.add(new Tuple2<String, String>('android\\.support\\.v4\\.view\\.ViewPager', 'androidx.viewpager.widget.ViewPager'))
+        resourceTuples.add(new Tuple2<String, String>('android\\.support\\.design\\.widget\\.TabLayout', 'com.google.android.material.tabs.TabLayout'))
+
+        resourceTuples.each { tuple ->
+            ant.replaceregexp(match: tuple.first, replace: tuple.second, flags: 'g', byline: true) {
+                fileset(dir: "$projectDir/src/debug/res/layout/", includes: 'error_activity.xml')
+            }
+        }
+    }
+}
+
 task generateTypescriptDefinitions(type: JavaExec) {
     def paramz = new ArrayList<String>()
     def includeDirs = ["com.android.support", "/platforms/" + android.compileSdkVersion]
@@ -606,7 +668,7 @@ task validateAppIdMatch {
 					"NativeScript CLI might not work properly.$lineSeparator" +
 					"Remove applicationId from app.gradle and update the \"nativescript.id\" in package.json.$lineSeparator" +
 					"Actual: ${android.defaultConfig.applicationId}$lineSeparator" +
-					"Expected(from \"package.json\"): ${project.nsApplicationIdentifier}$lineSeparator";
+					"Expected(from \"package.json\"): ${project.nsApplicationIdentifier}$lineSeparator"
 
 				logger.error(errorMessage)
 			}

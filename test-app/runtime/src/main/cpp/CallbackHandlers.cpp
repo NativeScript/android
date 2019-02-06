@@ -559,6 +559,7 @@ CallbackHandlers::GetImplementedInterfaces(JEnv &env, const Local<Object> &imple
 
     vector<jstring> interfacesToImplement;
     auto propNames = implementationObject->GetOwnPropertyNames();
+    auto isolate = implementationObject->GetIsolate();
     for (int i = 0; i < propNames->Length(); i++) {
         auto name = propNames->Get(i).As<String>();
         auto prop = implementationObject->Get(name);
@@ -566,14 +567,15 @@ CallbackHandlers::GetImplementedInterfaces(JEnv &env, const Local<Object> &imple
         bool arrFound = !prop.IsEmpty() && prop->IsArray();
 
         if (arrFound) {
-            v8::String::Utf8Value propName(name);
+            v8::String::Utf8Value propName(isolate, name);
             std::string arrNameC = std::string(*propName);
             if (arrNameC == "interfaces") {
-                auto interfacesArr = prop->ToObject();
+                auto interfacesArr = prop->ToObject(isolate);
 
-                auto isolate = implementationObject->GetIsolate();
+                auto context = isolate->GetCurrentContext();
                 int length = interfacesArr->Get(
-                        v8::String::NewFromUtf8(isolate, "length"))->ToObject()->Uint32Value();
+                        v8::String::NewFromUtf8(isolate, "length"))->ToObject(isolate)->Uint32Value(
+                        context).ToChecked();
 
                 if (length > 0) {
                     for (int i = 0; i < length; i++) {
@@ -615,6 +617,7 @@ CallbackHandlers::GetMethodOverrides(JEnv &env, const Local<Object> &implementat
 
     vector<jstring> methodNames;
     auto propNames = implementationObject->GetOwnPropertyNames();
+    auto isolate = implementationObject->GetIsolate();
     for (int i = 0; i < propNames->Length(); i++) {
         auto name = propNames->Get(i).As<String>();
         auto method = implementationObject->Get(name);
@@ -622,7 +625,7 @@ CallbackHandlers::GetMethodOverrides(JEnv &env, const Local<Object> &implementat
         bool methodFound = !method.IsEmpty() && method->IsFunction();
 
         if (methodFound) {
-            String::Utf8Value stringValue(name);
+            String::Utf8Value stringValue(isolate, name);
             jstring value = env.NewStringUTF(*stringValue);
             methodNames.push_back(value);
         }
@@ -645,7 +648,8 @@ CallbackHandlers::GetMethodOverrides(JEnv &env, const Local<Object> &implementat
 void CallbackHandlers::LogMethodCallback(const v8::FunctionCallbackInfo<v8::Value> &args) {
     try {
         if ((args.Length() > 0) && args[0]->IsString()) {
-            String::Utf8Value message(args[0]->ToString());
+            auto isolate = args.GetIsolate();
+            String::Utf8Value message(isolate, args[0]->ToString(isolate));
             DEBUG_WRITE("%s", *message);
         }
     } catch (NativeScriptException &e) {
@@ -666,6 +670,38 @@ void CallbackHandlers::TimeCallback(const v8::FunctionCallbackInfo<v8::Value> &a
             std::chrono::system_clock::now());
     double duration = nano.time_since_epoch().count();
     args.GetReturnValue().Set(duration);
+}
+
+void CallbackHandlers::ReleaseNativeCounterpartCallback(
+        const v8::FunctionCallbackInfo<v8::Value> &info) {
+    try {
+        SET_PROFILER_FRAME();
+
+        validateProvidedArgumentsLength(info, 1);
+
+        auto isolate = info.GetIsolate();
+        Handle<Object> obj = info[0].As<Object>();
+
+        auto runtime = Runtime::GetRuntime(isolate);
+        auto objectManager = runtime->GetObjectManager();
+        objectManager->ReleaseNativeCounterpart(obj);
+    } catch (NativeScriptException &e) {
+        e.ReThrowToV8();
+    } catch (std::exception e) {
+        stringstream ss;
+        ss << "Error: c++ exception: " << e.what() << endl;
+        NativeScriptException nsEx(ss.str());
+        nsEx.ReThrowToV8();
+    } catch (...) {
+        NativeScriptException nsEx(std::string("Error: c++ exception!"));
+        nsEx.ReThrowToV8();
+    }
+}
+
+void CallbackHandlers::validateProvidedArgumentsLength(const v8::FunctionCallbackInfo<v8::Value> &args, int expectedSize) {
+    if(args.Length() != expectedSize){
+        throw NativeScriptException("Unexpected arguments count!");
+    }
 }
 
 void CallbackHandlers::DumpReferenceTablesMethodCallback(
@@ -887,7 +923,7 @@ void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Valu
 
         auto currentExecutingScriptName = StackTrace::CurrentStackTrace(isolate, 1,
                                                                         StackTrace::kScriptName)->GetFrame(
-                0)->GetScriptName();
+                isolate, 0)->GetScriptName();
         auto currentExecutingScriptNameStr = ArgConverter::ConvertToString(
                 currentExecutingScriptName);
         auto lastForwardSlash = currentExecutingScriptNameStr.find_last_of("/");
@@ -952,9 +988,10 @@ CallbackHandlers::WorkerObjectPostMessageCallback(const v8::FunctionCallbackInfo
                                            ArgConverter::ConvertToV8String(isolate, "workerId"),
                                            jsId);
 
-        Local<String> msg = tns::JsonStringifyObject(isolate, args[0])->ToString();
+        Local<String> msg = tns::JsonStringifyObject(isolate, args[0])->ToString(isolate);
+        auto context = isolate->GetCurrentContext();
         // get worker's ID that is associated on the other side - in Java
-        auto id = jsId->Int32Value();
+        auto id = jsId->Int32Value(context).ToChecked();
 
         JEnv env;
         auto mId = env.GetStaticMethodID(RUNTIME_CLASS, "sendMessageFromMainToWorker",
@@ -1049,7 +1086,7 @@ CallbackHandlers::WorkerGlobalPostMessageCallback(const v8::FunctionCallbackInfo
             return;
         }
 
-        Local<String> msg = tns::JsonStringifyObject(isolate, args[0])->ToString();
+        Local<String> msg = tns::JsonStringifyObject(isolate, args[0])->ToString(isolate);
 
         JEnv env;
         auto mId = env.GetStaticMethodID(RUNTIME_CLASS, "sendMessageFromWorkerToMain",
@@ -1145,6 +1182,7 @@ CallbackHandlers::WorkerObjectTerminateCallback(const v8::FunctionCallbackInfo<v
         HandleScope scope(isolate);
 
         auto thiz = args.This(); // Worker instance
+        auto context = isolate->GetCurrentContext();
 
         Local<Value> jsId;
 
@@ -1153,13 +1191,13 @@ CallbackHandlers::WorkerObjectTerminateCallback(const v8::FunctionCallbackInfo<v
                                            jsId);
 
         // get worker's ID that is associated on the other side - in Java
-        auto id = jsId->Int32Value();
+        auto id = jsId->Int32Value(context).ToChecked();
 
         Local<Value> isTerminated;
         V8GetPrivateValue(isolate, thiz, ArgConverter::ConvertToV8String(isolate, "isTerminated"),
                           isTerminated);
 
-        if (!isTerminated.IsEmpty() && isTerminated->BooleanValue()) {
+        if (!isTerminated.IsEmpty() && isTerminated->BooleanValue(context).ToChecked()) {
             DEBUG_WRITE(
                     "Main: WorkerObjectTerminateCallback - Worker(id=%d)'s terminate has already been called.",
                     id);
@@ -1204,7 +1242,7 @@ void CallbackHandlers::WorkerGlobalCloseCallback(const v8::FunctionCallbackInfo<
         auto isTerminating = globalObject->Get(
                 ArgConverter::ConvertToV8String(isolate, "isTerminating"));
 
-        if (!isTerminating.IsEmpty() && isTerminating->BooleanValue()) {
+        if (!isTerminating.IsEmpty() && isTerminating->BooleanValue(context).ToChecked()) {
             DEBUG_WRITE("WORKER: WorkerThreadCloseCallback - Worker is currently terminating...");
             return;
         }
@@ -1273,7 +1311,7 @@ void CallbackHandlers::CallWorkerScopeOnErrorHandle(Isolate *isolate, TryCatch &
             auto result = func->Call(Undefined(isolate), 1, args1);
 
             // return 'true'-like value, don't bubble up to main Worker.onerror
-            if (!result.IsEmpty() && result->BooleanValue()) {
+            if (!result.IsEmpty() && result->BooleanValue(context).ToChecked()) {
                 // Do nothing, exception has been handled
                 return;
             }
@@ -1281,7 +1319,7 @@ void CallbackHandlers::CallWorkerScopeOnErrorHandle(Isolate *isolate, TryCatch &
 
         // will account for exceptions thrown inside the error handler
         if (innerTc.HasCaught()) {
-            auto lno = innerTc.Message()->GetLineNumber();
+            auto lno = innerTc.Message()->GetLineNumber(context).ToChecked();
             auto msg = innerTc.Message()->Get();
             Local<Value> outStackTrace = innerTc.StackTrace(context).FromMaybe(Local<Value>());
             Local<String> stackTrace;
@@ -1295,7 +1333,7 @@ void CallbackHandlers::CallWorkerScopeOnErrorHandle(Isolate *isolate, TryCatch &
         }
 
         // throw so that it may bubble up to main
-        auto lno = tc.Message()->GetLineNumber();
+        auto lno = tc.Message()->GetLineNumber(context).ToChecked();
         auto msg = tc.Message()->Get();
         auto source = tc.Message()->GetScriptResourceName()->ToString(isolate);
         Local<Value> outStackTrace = tc.StackTrace(context).FromMaybe(Local<Value>());
@@ -1367,7 +1405,8 @@ CallbackHandlers::CallWorkerObjectOnErrorHandle(Isolate *isolate, jint workerId,
 
             // Handle exceptions thrown in onmessage with the worker.onerror handler, if present
             auto result = func->Call(Undefined(isolate), 1, args1);
-            if (!result.IsEmpty() && result->BooleanValue()) {
+            auto context = isolate->GetCurrentContext();
+            if (!result.IsEmpty() && result->BooleanValue(context).ToChecked()) {
                 // Do nothing, exception is handled and does not need to be raised to application level
                 return;
             }
@@ -1441,6 +1480,8 @@ jmethodID CallbackHandlers::GET_TYPE_METADATA = nullptr;
 jmethodID CallbackHandlers::ENABLE_VERBOSE_LOGGING_METHOD_ID = nullptr;
 jmethodID CallbackHandlers::DISABLE_VERBOSE_LOGGING_METHOD_ID = nullptr;
 jmethodID CallbackHandlers::INIT_WORKER_METHOD_ID = nullptr;
+
+
 
 NumericCasts CallbackHandlers::castFunctions;
 ArrayElementAccessor CallbackHandlers::arrayElementAccessor;

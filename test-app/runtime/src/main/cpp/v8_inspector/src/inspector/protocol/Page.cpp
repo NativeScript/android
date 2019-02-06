@@ -1398,10 +1398,9 @@ void Frontend::sendRawNotification(const String& notification) {
 
 class DispatcherImpl : public protocol::DispatcherBase {
     public:
-        DispatcherImpl(FrontendChannel* frontendChannel, Backend* backend, bool fallThroughForNotFound)
+        DispatcherImpl(FrontendChannel* frontendChannel, Backend* backend)
             : DispatcherBase(frontendChannel)
-            , m_backend(backend)
-            , m_fallThroughForNotFound(fallThroughForNotFound) {
+            , m_backend(backend) {
             m_dispatchMap["Page.addScriptToEvaluateOnLoad"] = &DispatcherImpl::addScriptToEvaluateOnLoad;
             m_dispatchMap["Page.addScriptToEvaluateOnNewDocument"] = &DispatcherImpl::addScriptToEvaluateOnNewDocument;
             m_dispatchMap["Page.bringToFront"] = &DispatcherImpl::bringToFront;
@@ -1445,70 +1444,67 @@ class DispatcherImpl : public protocol::DispatcherBase {
             m_dispatchMap["Page.stopScreencast"] = &DispatcherImpl::stopScreencast;
         }
         ~DispatcherImpl() override { }
-        DispatchResponse::Status dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) override;
+        bool canDispatch(const String& method) override;
+        void dispatch(int callId, const String& method, const String& message, std::unique_ptr<protocol::DictionaryValue> messageObject) override;
         std::unordered_map<String, String>& redirects() {
             return m_redirects;
         }
 
     protected:
-        using CallHandler = DispatchResponse::Status (DispatcherImpl::*)(int callId, std::unique_ptr<DictionaryValue> messageObject, ErrorSupport* errors);
+        using CallHandler = void (DispatcherImpl::*)(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> messageObject, ErrorSupport* errors);
         using DispatchMap = std::unordered_map<String, CallHandler>;
         DispatchMap m_dispatchMap;
         std::unordered_map<String, String> m_redirects;
 
-        DispatchResponse::Status addScriptToEvaluateOnLoad(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status addScriptToEvaluateOnNewDocument(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status bringToFront(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status captureScreenshot(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status createIsolatedWorld(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status disable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status enable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status getAppManifest(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status getFrameTree(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status getLayoutMetrics(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status getNavigationHistory(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status getResourceContent(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status getResourceTree(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status handleJavaScriptDialog(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status navigate(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status navigateToHistoryEntry(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status printToPDF(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status reload(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status removeScriptToEvaluateOnLoad(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status removeScriptToEvaluateOnNewDocument(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status requestAppBanner(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status screencastFrameAck(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status searchInResource(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status setAdBlockingEnabled(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status setBypassCSP(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status setDocumentContent(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status setDownloadBehavior(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status setLifecycleEventsEnabled(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status startScreencast(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status stopLoading(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status crash(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        DispatchResponse::Status stopScreencast(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void addScriptToEvaluateOnLoad(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void addScriptToEvaluateOnNewDocument(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void bringToFront(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void captureScreenshot(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void createIsolatedWorld(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void disable(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void enable(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void getAppManifest(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void getFrameTree(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void getLayoutMetrics(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void getNavigationHistory(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void getResourceContent(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void getResourceTree(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void handleJavaScriptDialog(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void navigate(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void navigateToHistoryEntry(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void printToPDF(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void reload(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void removeScriptToEvaluateOnLoad(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void removeScriptToEvaluateOnNewDocument(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void requestAppBanner(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void screencastFrameAck(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void searchInResource(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void setAdBlockingEnabled(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void setBypassCSP(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void setDocumentContent(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void setDownloadBehavior(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void setLifecycleEventsEnabled(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void startScreencast(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void stopLoading(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void crash(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+        void stopScreencast(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
 
         Backend* m_backend;
-        bool m_fallThroughForNotFound;
 };
 
-DispatchResponse::Status DispatcherImpl::dispatch(int callId, const String& method, std::unique_ptr<protocol::DictionaryValue> messageObject) {
-    std::unordered_map<String, CallHandler>::iterator it = m_dispatchMap.find(method);
-    if (it == m_dispatchMap.end()) {
-        if (m_fallThroughForNotFound) {
-            return DispatchResponse::kFallThrough;
-        }
-        reportProtocolError(callId, DispatchResponse::kMethodNotFound, "'" + method + "' wasn't found", nullptr);
-        return DispatchResponse::kError;
-    }
+bool DispatcherImpl::canDispatch(const String& method) {
+    return m_dispatchMap.find(method) != m_dispatchMap.end();
+}
 
+void DispatcherImpl::dispatch(int callId, const String& method, const String& message, std::unique_ptr<protocol::DictionaryValue> messageObject) {
+    std::unordered_map<String, CallHandler>::iterator it = m_dispatchMap.find(method);
+    DCHECK(it != m_dispatchMap.end());
     protocol::ErrorSupport errors;
-    return (this->*(it->second))(callId, std::move(messageObject), &errors);
+    (this->*(it->second))(callId, method, message, std::move(messageObject), &errors);
 }
 
 
-DispatchResponse::Status DispatcherImpl::addScriptToEvaluateOnLoad(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::addScriptToEvaluateOnLoad(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -1518,7 +1514,7 @@ DispatchResponse::Status DispatcherImpl::addScriptToEvaluateOnLoad(int callId, s
     errors->pop();
     if (errors->hasErrors()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return DispatchResponse::kError;
+        return;
     }
     // Declare output parameters.
     String out_identifier;
@@ -1526,7 +1522,8 @@ DispatchResponse::Status DispatcherImpl::addScriptToEvaluateOnLoad(int callId, s
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->addScriptToEvaluateOnLoad(in_scriptSource, &out_identifier);
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     if (response.status() == DispatchResponse::kSuccess) {
@@ -1535,10 +1532,10 @@ DispatchResponse::Status DispatcherImpl::addScriptToEvaluateOnLoad(int callId, s
     if (weak->get()) {
         weak->get()->sendResponse(callId, response, std::move(result));
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::addScriptToEvaluateOnNewDocument(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::addScriptToEvaluateOnNewDocument(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -1548,7 +1545,7 @@ DispatchResponse::Status DispatcherImpl::addScriptToEvaluateOnNewDocument(int ca
     errors->pop();
     if (errors->hasErrors()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return DispatchResponse::kError;
+        return;
     }
     // Declare output parameters.
     String out_identifier;
@@ -1556,7 +1553,8 @@ DispatchResponse::Status DispatcherImpl::addScriptToEvaluateOnNewDocument(int ca
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->addScriptToEvaluateOnNewDocument(in_source, &out_identifier);
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     if (response.status() == DispatchResponse::kSuccess) {
@@ -1565,23 +1563,24 @@ DispatchResponse::Status DispatcherImpl::addScriptToEvaluateOnNewDocument(int ca
     if (weak->get()) {
         weak->get()->sendResponse(callId, response, std::move(result));
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::bringToFront(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::bringToFront(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->bringToFront();
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     if (weak->get()) {
         weak->get()->sendResponse(callId, response);
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::captureScreenshot(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::captureScreenshot(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -1612,7 +1611,7 @@ DispatchResponse::Status DispatcherImpl::captureScreenshot(int callId, std::uniq
     errors->pop();
     if (errors->hasErrors()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return DispatchResponse::kError;
+        return;
     }
     // Declare output parameters.
     String out_data;
@@ -1620,7 +1619,8 @@ DispatchResponse::Status DispatcherImpl::captureScreenshot(int callId, std::uniq
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->captureScreenshot(std::move(in_format), std::move(in_quality), std::move(in_clip), std::move(in_fromSurface), &out_data);
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     if (response.status() == DispatchResponse::kSuccess) {
@@ -1629,10 +1629,10 @@ DispatchResponse::Status DispatcherImpl::captureScreenshot(int callId, std::uniq
     if (weak->get()) {
         weak->get()->sendResponse(callId, response, std::move(result));
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::createIsolatedWorld(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::createIsolatedWorld(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -1654,7 +1654,7 @@ DispatchResponse::Status DispatcherImpl::createIsolatedWorld(int callId, std::un
     errors->pop();
     if (errors->hasErrors()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return DispatchResponse::kError;
+        return;
     }
     // Declare output parameters.
     int out_executionContextId;
@@ -1662,7 +1662,8 @@ DispatchResponse::Status DispatcherImpl::createIsolatedWorld(int callId, std::un
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->createIsolatedWorld(in_frameId, std::move(in_worldName), std::move(in_grantUniveralAccess), &out_executionContextId);
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     if (response.status() == DispatchResponse::kSuccess) {
@@ -1671,36 +1672,38 @@ DispatchResponse::Status DispatcherImpl::createIsolatedWorld(int callId, std::un
     if (weak->get()) {
         weak->get()->sendResponse(callId, response, std::move(result));
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::disable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::disable(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->disable();
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     if (weak->get()) {
         weak->get()->sendResponse(callId, response);
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::enable(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::enable(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->enable();
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     if (weak->get()) {
         weak->get()->sendResponse(callId, response);
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::getAppManifest(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::getAppManifest(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Declare output parameters.
     String out_url;
     std::unique_ptr<protocol::Array<protocol::Page::AppManifestError>> out_errors;
@@ -1709,7 +1712,8 @@ DispatchResponse::Status DispatcherImpl::getAppManifest(int callId, std::unique_
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getAppManifest(&out_url, &out_errors, &out_data);
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     if (response.status() == DispatchResponse::kSuccess) {
@@ -1722,17 +1726,18 @@ DispatchResponse::Status DispatcherImpl::getAppManifest(int callId, std::unique_
     if (weak->get()) {
         weak->get()->sendResponse(callId, response, std::move(result));
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::getFrameTree(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::getFrameTree(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Declare output parameters.
     std::unique_ptr<protocol::Page::FrameTree> out_frameTree;
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getFrameTree(&out_frameTree);
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     if (response.status() == DispatchResponse::kSuccess) {
@@ -1741,10 +1746,10 @@ DispatchResponse::Status DispatcherImpl::getFrameTree(int callId, std::unique_pt
     if (weak->get()) {
         weak->get()->sendResponse(callId, response, std::move(result));
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::getLayoutMetrics(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::getLayoutMetrics(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Declare output parameters.
     std::unique_ptr<protocol::Page::LayoutViewport> out_layoutViewport;
     std::unique_ptr<protocol::Page::VisualViewport> out_visualViewport;
@@ -1753,7 +1758,8 @@ DispatchResponse::Status DispatcherImpl::getLayoutMetrics(int callId, std::uniqu
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getLayoutMetrics(&out_layoutViewport, &out_visualViewport, &out_contentSize);
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     if (response.status() == DispatchResponse::kSuccess) {
@@ -1764,10 +1770,10 @@ DispatchResponse::Status DispatcherImpl::getLayoutMetrics(int callId, std::uniqu
     if (weak->get()) {
         weak->get()->sendResponse(callId, response, std::move(result));
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::getNavigationHistory(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::getNavigationHistory(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Declare output parameters.
     int out_currentIndex;
     std::unique_ptr<protocol::Array<protocol::Page::NavigationEntry>> out_entries;
@@ -1775,7 +1781,8 @@ DispatchResponse::Status DispatcherImpl::getNavigationHistory(int callId, std::u
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getNavigationHistory(&out_currentIndex, &out_entries);
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     if (response.status() == DispatchResponse::kSuccess) {
@@ -1785,10 +1792,10 @@ DispatchResponse::Status DispatcherImpl::getNavigationHistory(int callId, std::u
     if (weak->get()) {
         weak->get()->sendResponse(callId, response, std::move(result));
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::getResourceContent(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::getResourceContent(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -1801,7 +1808,7 @@ DispatchResponse::Status DispatcherImpl::getResourceContent(int callId, std::uni
     errors->pop();
     if (errors->hasErrors()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return DispatchResponse::kError;
+        return;
     }
     // Declare output parameters.
     String out_content;
@@ -1810,7 +1817,8 @@ DispatchResponse::Status DispatcherImpl::getResourceContent(int callId, std::uni
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getResourceContent(in_frameId, in_url, &out_content, &out_base64Encoded);
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     if (response.status() == DispatchResponse::kSuccess) {
@@ -1820,17 +1828,18 @@ DispatchResponse::Status DispatcherImpl::getResourceContent(int callId, std::uni
     if (weak->get()) {
         weak->get()->sendResponse(callId, response, std::move(result));
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::getResourceTree(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::getResourceTree(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Declare output parameters.
     std::unique_ptr<protocol::Page::FrameResourceTree> out_frameTree;
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getResourceTree(&out_frameTree);
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     if (response.status() == DispatchResponse::kSuccess) {
@@ -1839,10 +1848,10 @@ DispatchResponse::Status DispatcherImpl::getResourceTree(int callId, std::unique
     if (weak->get()) {
         weak->get()->sendResponse(callId, response, std::move(result));
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::handleJavaScriptDialog(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::handleJavaScriptDialog(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -1858,21 +1867,22 @@ DispatchResponse::Status DispatcherImpl::handleJavaScriptDialog(int callId, std:
     errors->pop();
     if (errors->hasErrors()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return DispatchResponse::kError;
+        return;
     }
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->handleJavaScriptDialog(in_accept, std::move(in_promptText));
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     if (weak->get()) {
         weak->get()->sendResponse(callId, response);
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::navigate(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::navigate(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -1900,7 +1910,7 @@ DispatchResponse::Status DispatcherImpl::navigate(int callId, std::unique_ptr<Di
     errors->pop();
     if (errors->hasErrors()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return DispatchResponse::kError;
+        return;
     }
     // Declare output parameters.
     String out_frameId;
@@ -1910,7 +1920,8 @@ DispatchResponse::Status DispatcherImpl::navigate(int callId, std::unique_ptr<Di
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->navigate(in_url, std::move(in_referrer), std::move(in_transitionType), std::move(in_frameId), &out_frameId, &out_loaderId, &out_errorText);
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     if (response.status() == DispatchResponse::kSuccess) {
@@ -1925,10 +1936,10 @@ DispatchResponse::Status DispatcherImpl::navigate(int callId, std::unique_ptr<Di
     if (weak->get()) {
         weak->get()->sendResponse(callId, response, std::move(result));
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::navigateToHistoryEntry(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::navigateToHistoryEntry(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -1938,21 +1949,22 @@ DispatchResponse::Status DispatcherImpl::navigateToHistoryEntry(int callId, std:
     errors->pop();
     if (errors->hasErrors()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return DispatchResponse::kError;
+        return;
     }
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->navigateToHistoryEntry(in_entryId);
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     if (weak->get()) {
         weak->get()->sendResponse(callId, response);
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::printToPDF(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::printToPDF(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -2049,7 +2061,7 @@ DispatchResponse::Status DispatcherImpl::printToPDF(int callId, std::unique_ptr<
     errors->pop();
     if (errors->hasErrors()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return DispatchResponse::kError;
+        return;
     }
     // Declare output parameters.
     String out_data;
@@ -2057,7 +2069,8 @@ DispatchResponse::Status DispatcherImpl::printToPDF(int callId, std::unique_ptr<
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->printToPDF(std::move(in_landscape), std::move(in_displayHeaderFooter), std::move(in_printBackground), std::move(in_scale), std::move(in_paperWidth), std::move(in_paperHeight), std::move(in_marginTop), std::move(in_marginBottom), std::move(in_marginLeft), std::move(in_marginRight), std::move(in_pageRanges), std::move(in_ignoreInvalidPageRanges), std::move(in_headerTemplate), std::move(in_footerTemplate), std::move(in_preferCSSPageSize), &out_data);
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     if (response.status() == DispatchResponse::kSuccess) {
@@ -2066,10 +2079,10 @@ DispatchResponse::Status DispatcherImpl::printToPDF(int callId, std::unique_ptr<
     if (weak->get()) {
         weak->get()->sendResponse(callId, response, std::move(result));
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::reload(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::reload(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -2088,21 +2101,22 @@ DispatchResponse::Status DispatcherImpl::reload(int callId, std::unique_ptr<Dict
     errors->pop();
     if (errors->hasErrors()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return DispatchResponse::kError;
+        return;
     }
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->reload(std::move(in_ignoreCache), std::move(in_scriptToEvaluateOnLoad));
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     if (weak->get()) {
         weak->get()->sendResponse(callId, response);
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::removeScriptToEvaluateOnLoad(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::removeScriptToEvaluateOnLoad(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -2112,21 +2126,22 @@ DispatchResponse::Status DispatcherImpl::removeScriptToEvaluateOnLoad(int callId
     errors->pop();
     if (errors->hasErrors()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return DispatchResponse::kError;
+        return;
     }
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->removeScriptToEvaluateOnLoad(in_identifier);
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     if (weak->get()) {
         weak->get()->sendResponse(callId, response);
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::removeScriptToEvaluateOnNewDocument(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::removeScriptToEvaluateOnNewDocument(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -2136,34 +2151,36 @@ DispatchResponse::Status DispatcherImpl::removeScriptToEvaluateOnNewDocument(int
     errors->pop();
     if (errors->hasErrors()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return DispatchResponse::kError;
+        return;
     }
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->removeScriptToEvaluateOnNewDocument(in_identifier);
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     if (weak->get()) {
         weak->get()->sendResponse(callId, response);
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::requestAppBanner(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::requestAppBanner(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->requestAppBanner();
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     if (weak->get()) {
         weak->get()->sendResponse(callId, response);
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::screencastFrameAck(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::screencastFrameAck(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -2173,21 +2190,22 @@ DispatchResponse::Status DispatcherImpl::screencastFrameAck(int callId, std::uni
     errors->pop();
     if (errors->hasErrors()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return DispatchResponse::kError;
+        return;
     }
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->screencastFrameAck(in_sessionId);
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     if (weak->get()) {
         weak->get()->sendResponse(callId, response);
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::searchInResource(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::searchInResource(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -2215,7 +2233,7 @@ DispatchResponse::Status DispatcherImpl::searchInResource(int callId, std::uniqu
     errors->pop();
     if (errors->hasErrors()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return DispatchResponse::kError;
+        return;
     }
     // Declare output parameters.
     std::unique_ptr<protocol::Array<protocol::Debugger::SearchMatch>> out_result;
@@ -2223,7 +2241,8 @@ DispatchResponse::Status DispatcherImpl::searchInResource(int callId, std::uniqu
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->searchInResource(in_frameId, in_url, in_query, std::move(in_caseSensitive), std::move(in_isRegex), &out_result);
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     if (response.status() == DispatchResponse::kSuccess) {
@@ -2232,10 +2251,10 @@ DispatchResponse::Status DispatcherImpl::searchInResource(int callId, std::uniqu
     if (weak->get()) {
         weak->get()->sendResponse(callId, response, std::move(result));
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::setAdBlockingEnabled(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::setAdBlockingEnabled(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -2245,21 +2264,22 @@ DispatchResponse::Status DispatcherImpl::setAdBlockingEnabled(int callId, std::u
     errors->pop();
     if (errors->hasErrors()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return DispatchResponse::kError;
+        return;
     }
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setAdBlockingEnabled(in_enabled);
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     if (weak->get()) {
         weak->get()->sendResponse(callId, response);
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::setBypassCSP(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::setBypassCSP(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -2269,21 +2289,22 @@ DispatchResponse::Status DispatcherImpl::setBypassCSP(int callId, std::unique_pt
     errors->pop();
     if (errors->hasErrors()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return DispatchResponse::kError;
+        return;
     }
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setBypassCSP(in_enabled);
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     if (weak->get()) {
         weak->get()->sendResponse(callId, response);
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::setDocumentContent(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::setDocumentContent(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -2296,21 +2317,22 @@ DispatchResponse::Status DispatcherImpl::setDocumentContent(int callId, std::uni
     errors->pop();
     if (errors->hasErrors()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return DispatchResponse::kError;
+        return;
     }
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setDocumentContent(in_frameId, in_html);
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     if (weak->get()) {
         weak->get()->sendResponse(callId, response);
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::setDownloadBehavior(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::setDownloadBehavior(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -2326,21 +2348,22 @@ DispatchResponse::Status DispatcherImpl::setDownloadBehavior(int callId, std::un
     errors->pop();
     if (errors->hasErrors()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return DispatchResponse::kError;
+        return;
     }
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setDownloadBehavior(in_behavior, std::move(in_downloadPath));
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     if (weak->get()) {
         weak->get()->sendResponse(callId, response);
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::setLifecycleEventsEnabled(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::setLifecycleEventsEnabled(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -2350,21 +2373,22 @@ DispatchResponse::Status DispatcherImpl::setLifecycleEventsEnabled(int callId, s
     errors->pop();
     if (errors->hasErrors()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return DispatchResponse::kError;
+        return;
     }
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setLifecycleEventsEnabled(in_enabled);
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     if (weak->get()) {
         weak->get()->sendResponse(callId, response);
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::startScreencast(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::startScreencast(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
     // Prepare input parameters.
     protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
     errors->push();
@@ -2401,62 +2425,66 @@ DispatchResponse::Status DispatcherImpl::startScreencast(int callId, std::unique
     errors->pop();
     if (errors->hasErrors()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return DispatchResponse::kError;
+        return;
     }
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->startScreencast(std::move(in_format), std::move(in_quality), std::move(in_maxWidth), std::move(in_maxHeight), std::move(in_everyNthFrame));
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     if (weak->get()) {
         weak->get()->sendResponse(callId, response);
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::stopLoading(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::stopLoading(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->stopLoading();
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     if (weak->get()) {
         weak->get()->sendResponse(callId, response);
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::crash(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::crash(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->crash();
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     if (weak->get()) {
         weak->get()->sendResponse(callId, response);
     }
-    return response.status();
+    return;
 }
 
-DispatchResponse::Status DispatcherImpl::stopScreencast(int callId, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
+void DispatcherImpl::stopScreencast(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->stopScreencast();
     if (response.status() == DispatchResponse::kFallThrough) {
-        return response.status();
+        channel()->fallThrough(callId, method, message);
+        return;
     }
     if (weak->get()) {
         weak->get()->sendResponse(callId, response);
     }
-    return response.status();
+    return;
 }
 
 // static
 void Dispatcher::wire(UberDispatcher* uber, Backend* backend) {
-    std::unique_ptr<DispatcherImpl> dispatcher(new DispatcherImpl(uber->channel(), backend, uber->fallThroughForNotFound()));
+    std::unique_ptr<DispatcherImpl> dispatcher(new DispatcherImpl(uber->channel(), backend));
     uber->setupRedirects(dispatcher->redirects());
     uber->registerBackend("Page", std::move(dispatcher));
 }

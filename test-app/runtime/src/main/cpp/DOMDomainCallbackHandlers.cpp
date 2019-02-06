@@ -54,7 +54,8 @@ void DOMDomainCallbackHandlers::ChildNodeInsertedCallback(const v8::FunctionCall
             return;
         }
 
-        domAgentInstance->m_frontend.childNodeInserted(parentId->Int32Value(), lastId->Int32Value(), std::move(domNode));
+        auto context = isolate->GetCurrentContext();
+        domAgentInstance->m_frontend.childNodeInserted(parentId->Int32Value(context).ToChecked(), lastId->Int32Value(context).ToChecked(), std::move(domNode));
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -87,7 +88,8 @@ void DOMDomainCallbackHandlers::ChildNodeRemovedCallback(const v8::FunctionCallb
         auto parentId = args[0]->ToNumber(isolate);
         auto nodeId = args[1]->ToNumber(isolate);
 
-        domAgentInstance->m_frontend.childNodeRemoved(parentId->Int32Value(), nodeId->Int32Value());
+        auto context = isolate->GetCurrentContext();
+        domAgentInstance->m_frontend.childNodeRemoved(parentId->Int32Value(context).ToChecked(), nodeId->Int32Value(context).ToChecked());
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -118,12 +120,13 @@ void DOMDomainCallbackHandlers::AttributeModifiedCallback(const v8::FunctionCall
         }
 
         auto nodeId = args[0]->ToNumber(isolate);
-        auto attributeName = args[1]->ToString();
-        auto attributeValue = args[2]->ToString();
+        auto attributeName = args[1]->ToString(isolate);
+        auto attributeValue = args[2]->ToString(isolate);
 
-        domAgentInstance->m_frontend.attributeModified(nodeId->Int32Value(),
-                v8_inspector::toProtocolString(attributeName),
-                v8_inspector::toProtocolString(attributeValue));
+        auto context = isolate->GetCurrentContext();
+        domAgentInstance->m_frontend.attributeModified(nodeId->Int32Value(context).ToChecked(),
+                v8_inspector::toProtocolString(isolate, attributeName),
+                v8_inspector::toProtocolString(isolate, attributeValue));
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -153,10 +156,11 @@ void DOMDomainCallbackHandlers::AttributeRemovedCallback(const v8::FunctionCallb
         }
 
         auto nodeId = args[0]->ToNumber(isolate);
-        auto attributeName = args[1]->ToString();
+        auto attributeName = args[1]->ToString(isolate);
 
-        domAgentInstance->m_frontend.attributeRemoved(nodeId->Int32Value(),
-                v8_inspector::toProtocolString(attributeName));
+        auto context = isolate->GetCurrentContext();
+        domAgentInstance->m_frontend.attributeRemoved(nodeId->Int32Value(context).ToChecked(),
+                v8_inspector::toProtocolString(isolate, attributeName));
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {

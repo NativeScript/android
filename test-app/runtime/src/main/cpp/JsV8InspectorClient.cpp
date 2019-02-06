@@ -205,12 +205,13 @@ void JsV8InspectorClient::sendToFrontEndCallback(const v8::FunctionCallbackInfo<
     }
 
     try {
+        auto isolate = args.GetIsolate();
         if ((args.Length() > 0) && args[0]->IsString()) {
-            std::string message = ArgConverter::ConvertToString(args[0]->ToString());
+            std::string message = ArgConverter::ConvertToString(args[0]->ToString(isolate));
 
             std::string level = "log";
             if (args.Length() > 1  && args[1]->IsString()) {
-                level = ArgConverter::ConvertToString(args[1]->ToString());
+                level = ArgConverter::ConvertToString(args[1]->ToString(isolate));
             }
 
             JEnv env;
@@ -239,7 +240,7 @@ void JsV8InspectorClient::consoleLogCallback(const string& message, const string
     auto isolate = Runtime::GetRuntime(0)->GetIsolate();
     auto stack = v8::StackTrace::CurrentStackTrace(isolate, 1, v8::StackTrace::StackTraceOptions::kDetailed);
 
-    auto frame = stack->GetFrame(0);
+    auto frame = stack->GetFrame(isolate, 0);
 
     // will be no-op in non-debuggable builds
     v8_inspector::V8LogAgentImpl::EntryAdded(message, logLevel, ArgConverter::ConvertToString(frame->GetScriptNameOrSourceURL()), frame->GetLineNumber());

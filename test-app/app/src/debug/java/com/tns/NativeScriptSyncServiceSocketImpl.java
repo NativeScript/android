@@ -165,7 +165,7 @@ public class NativeScriptSyncServiceSocketImpl {
 
                         validateData();
                         if(runtime != null && doRefreshInt == DO_REFRESH_VALUE) {
-                            runtime.runScript(new File(NativeScriptSyncServiceSocketImpl.this.context.getFilesDir(), "internal/livesync.js"));
+                            runtime.runScript(new File(NativeScriptSyncServiceSocketImpl.this.context.getFilesDir(), "internal/livesync.js"), false);
                             operationReportCode = OPERATION_END_REPORT_CODE;
                         } else {
                             operationReportCode = OPERATION_END_NO_REFRESH_REPORT_CODE;
