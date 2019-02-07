@@ -4,8 +4,8 @@
 ## What's New
  - [Upgrade v8 to 7.1.302.32(#1237)](https://github.com/NativeScript/android-runtime/issues/1237)
  - [Add OnDiscardedError handler(#1245)](https://github.com/NativeScript/android-runtime/issues/1245)
- - [Upgrade the android gradle plugin to the latest 3.3.0 version(#1251)](https://github.com/NativeScript/android-runtime/issues/1251)
-  - [Add android X support(#1226)](https://github.com/NativeScript/android-runtime/issues/1226)
+ - [Upgrade the android gradle plugin to the latest 3.3.1 version(#1251)](https://github.com/NativeScript/android-runtime/issues/1251)
+ - [Add android X support(#1226)](https://github.com/NativeScript/android-runtime/issues/1226)
  - [Provide a JS helper function on the global object to release the native object wrapped by a JS instance(#1254)](https://github.com/NativeScript/android-runtime/issues/1254)
 
 ## Bug Fixes
