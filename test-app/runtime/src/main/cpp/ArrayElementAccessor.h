@@ -15,6 +15,7 @@ class ArrayElementAccessor {
 
     private:
         v8::Local<v8::Value> ConvertToJsValue(v8::Isolate* isolate, ObjectManager* objectManager, JEnv& env, const std::string& elementSignature, const void* value);
+        void assertNonNullNativeArray(tns::JniLocalRef& arrayReference);
 };
 }
 
