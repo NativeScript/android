@@ -18,6 +18,8 @@ Local<Value> ArrayElementAccessor::GetArrayElement(Isolate* isolate, const Local
 
     auto arr = objectManager->GetJavaObjectByJsObject(array);
 
+    assertNonNullNativeArray(arr);
+
     Local<Value> value;
     jsize startIndex = index;
     const jsize length = 1;
@@ -85,7 +87,9 @@ void ArrayElementAccessor::SetArrayElement(Isolate* isolate, const Local<Object>
     auto objectManager = runtime->GetObjectManager();
     auto context = isolate->GetCurrentContext();
 
-    auto arr = objectManager->GetJavaObjectByJsObject(array);
+    tns::JniLocalRef arr = objectManager->GetJavaObjectByJsObject(array);
+
+    assertNonNullNativeArray(arr);
 
     const string elementSignature = arraySignature.substr(1);
     jboolean isCopy = false;
@@ -197,4 +201,10 @@ Local<Value> ArrayElementAccessor::ConvertToJsValue(Isolate* isolate, ObjectMana
     }
 
     return jsValue;
+}
+
+void ArrayElementAccessor::assertNonNullNativeArray(tns::JniLocalRef& arrayReference) {
+    if(arrayReference.IsNull()){
+        throw NativeScriptException("Failed calling indexer operator on native array. The JavaScript instance no longer has available Java instance counterpart.");
+    }
 }

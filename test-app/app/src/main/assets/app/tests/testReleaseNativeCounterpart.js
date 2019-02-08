@@ -25,6 +25,21 @@ describe("Test native counterpart release", function () {
 		expect(errorMessage).toBe("Failed calling toString on a java/lang/Object instance. The JavaScript instance no longer has available Java instance counterpart.");
 	});
 
+	it("Calling the indexer operator on a released native array should throw an exception", function(){
+	    var errorMessage = "";
+
+	    try{
+	        var arr = new java.lang.reflect.Array.newInstance(java.lang.Object.class, 10);
+            global.__releaseNativeCounterpart(arr);
+            arr[1];
+	    } catch(e){
+	        errorMessage = e.message;
+	    }
+
+	    expect(errorMessage).toBe("Failed calling indexer operator on native array. The JavaScript instance no longer has available Java instance counterpart.");
+
+	});
+
     it("Calling release on a non native object should throw exception", function () {
 
         var errorMessage = "";
