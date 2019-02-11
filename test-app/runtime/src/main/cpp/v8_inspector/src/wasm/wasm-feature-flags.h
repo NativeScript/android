@@ -21,7 +21,7 @@
   SEPARATOR                                                            \
   V(anyref, "anyref opcodes", false)                                   \
   SEPARATOR                                                            \
-  V(mut_global, "import/export mutable global support", true)          \
+  V(bigint, "JS BigInt support", false)                                \
   SEPARATOR                                                            \
   V(bulk_memory, "bulk memory opcodes", false)
 

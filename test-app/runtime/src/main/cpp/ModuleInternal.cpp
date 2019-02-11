@@ -403,7 +403,8 @@ Local<Object> ModuleInternal::LoadData(Isolate* isolate, const string& path) {
 
     auto jsonStr = ArgConverter::ConvertToV8String(isolate, jsonData);
 
-    auto maybeValue = JSON::Parse(isolate, jsonStr);
+    auto context = isolate->GetCurrentContext();
+    auto maybeValue = JSON::Parse(context, jsonStr);
 
     if (maybeValue.IsEmpty() || tc.HasCaught()) {
         string errMsg = "Cannot parse JSON file " + path;
