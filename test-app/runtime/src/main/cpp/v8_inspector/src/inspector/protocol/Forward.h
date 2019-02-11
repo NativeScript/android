@@ -8,6 +8,7 @@
 #include "src/inspector/string-util.h"
 
 #include <cstddef>
+#include <memory>
 #include <vector>
 #include <unordered_map>
 #include <unordered_set>
@@ -46,13 +47,6 @@ namespace v8_inspector {
 namespace protocol {
 
 enum NotNullTagEnum { NotNullLiteral };
-
-#define PROTOCOL_DISALLOW_NEW()                                 \
-    private:                                                    \
-        void* operator new(size_t) = delete;                    \
-        void* operator new(size_t, NotNullTagEnum, void*) = delete; \
-        void* operator new(size_t, void*) = delete;             \
-    public:
 
 #define PROTOCOL_DISALLOW_COPY(ClassName) \
     private: \
