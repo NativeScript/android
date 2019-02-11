@@ -1575,14 +1575,6 @@ class  Backend {
         virtual DispatchResponse removeBreakpoint(const String& in_breakpointId) = 0;
         virtual DispatchResponse restartFrame(const String& in_callFrameId, std::unique_ptr<protocol::Array<protocol::Debugger::CallFrame>>* out_callFrames, Maybe<protocol::Runtime::StackTrace>* out_asyncStackTrace, Maybe<protocol::Runtime::StackTraceId>* out_asyncStackTraceId) = 0;
         virtual DispatchResponse resume() = 0;
-        class  ScheduleStepIntoAsyncCallback {
-            public:
-                virtual void sendSuccess() = 0;
-                virtual void sendFailure(const DispatchResponse&) = 0;
-                virtual void fallThrough() = 0;
-                virtual ~ScheduleStepIntoAsyncCallback() { }
-        };
-        virtual void scheduleStepIntoAsync(std::unique_ptr<ScheduleStepIntoAsyncCallback> callback) = 0;
         virtual DispatchResponse searchInContent(const String& in_scriptId, const String& in_query, Maybe<bool> in_caseSensitive, Maybe<bool> in_isRegex, std::unique_ptr<protocol::Array<protocol::Debugger::SearchMatch>>* out_result) = 0;
         virtual DispatchResponse setAsyncCallStackDepth(int in_maxDepth) = 0;
         virtual DispatchResponse setBlackboxPatterns(std::unique_ptr<protocol::Array<String>> in_patterns) = 0;

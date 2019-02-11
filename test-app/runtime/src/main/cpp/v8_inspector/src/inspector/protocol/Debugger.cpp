@@ -866,7 +866,6 @@ class DispatcherImpl : public protocol::DispatcherBase {
             m_dispatchMap["Debugger.removeBreakpoint"] = &DispatcherImpl::removeBreakpoint;
             m_dispatchMap["Debugger.restartFrame"] = &DispatcherImpl::restartFrame;
             m_dispatchMap["Debugger.resume"] = &DispatcherImpl::resume;
-            m_dispatchMap["Debugger.scheduleStepIntoAsync"] = &DispatcherImpl::scheduleStepIntoAsync;
             m_dispatchMap["Debugger.searchInContent"] = &DispatcherImpl::searchInContent;
             m_dispatchMap["Debugger.setAsyncCallStackDepth"] = &DispatcherImpl::setAsyncCallStackDepth;
             m_dispatchMap["Debugger.setBlackboxPatterns"] = &DispatcherImpl::setBlackboxPatterns;
@@ -909,7 +908,6 @@ class DispatcherImpl : public protocol::DispatcherBase {
         void removeBreakpoint(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
         void restartFrame(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
         void resume(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-        void scheduleStepIntoAsync(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
         void searchInContent(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
         void setAsyncCallStackDepth(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
         void setBlackboxPatterns(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
@@ -1306,34 +1304,6 @@ void DispatcherImpl::resume(int callId, const String& method, const String& mess
     if (weak->get()) {
         weak->get()->sendResponse(callId, response);
     }
-    return;
-}
-
-class ScheduleStepIntoAsyncCallbackImpl : public Backend::ScheduleStepIntoAsyncCallback, public DispatcherBase::Callback {
-    public:
-        ScheduleStepIntoAsyncCallbackImpl(std::unique_ptr<DispatcherBase::WeakPtr> backendImpl, int callId, const String& method, const String& message)
-            : DispatcherBase::Callback(std::move(backendImpl), callId, method, message) { }
-
-        void sendSuccess() override {
-            std::unique_ptr<protocol::DictionaryValue> resultObject = DictionaryValue::create();
-            sendIfActive(std::move(resultObject), DispatchResponse::OK());
-        }
-
-        void fallThrough() override {
-            fallThroughIfActive();
-        }
-
-        void sendFailure(const DispatchResponse& response) override {
-            DCHECK(response.status() == DispatchResponse::kError);
-            sendIfActive(nullptr, response);
-        }
-};
-
-void DispatcherImpl::scheduleStepIntoAsync(int callId, const String& method, const String& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors) {
-
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    std::unique_ptr<ScheduleStepIntoAsyncCallbackImpl> callback(new ScheduleStepIntoAsyncCallbackImpl(weakPtr(), callId, method, message));
-    m_backend->scheduleStepIntoAsync(std::move(callback));
     return;
 }
 

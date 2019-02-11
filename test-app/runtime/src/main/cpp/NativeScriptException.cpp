@@ -141,7 +141,7 @@ void NativeScriptException::CallJsFuncWithErr(Local<Value> errObj, jboolean isDi
     auto globalHandle = context->Global();
 
     auto handler = isDiscarded ?
-       globalHandle->Get(V8StringConstants::GetDiscardedError(isolate)) : globalHandle->Get(V8StringConstants::GetUncaughtError(isolate));
+                   globalHandle->Get(V8StringConstants::GetDiscardedError(isolate)) : globalHandle->Get(V8StringConstants::GetUncaughtError(isolate));
     auto isEmpty = handler.IsEmpty();
     auto isFunction = handler->IsFunction();
 
@@ -278,7 +278,7 @@ string NativeScriptException::GetErrorMessage(const Local<Message>& message, Loc
     //get whole error message from previous stack
     string errMessage;
     auto v8FullMessage = ArgConverter::ConvertToV8String(isolate, "fullMessage");
-    if (error->IsObject() && error.As<Object>()->Has(v8FullMessage)) {
+    if (error->IsObject() && error.As<Object>()->Has(context, v8FullMessage).ToChecked()) {
         errMessage = ArgConverter::ConvertToString(error.As<Object>()->Get(v8FullMessage).As<String>());
     }
 

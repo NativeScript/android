@@ -142,6 +142,9 @@ class InjectedScript final {
                 const v8::TryCatch& tryCatch() const {
                     return m_tryCatch;
                 }
+                V8InspectorImpl* inspector() const {
+                    return m_inspector;
+                }
 
             protected:
                 explicit Scope(V8InspectorSessionImpl*);

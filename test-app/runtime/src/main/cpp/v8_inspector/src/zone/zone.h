@@ -321,7 +321,14 @@ class ZoneList final {
         // Drops all but the first 'pos' elements from the list.
         V8_INLINE void Rewind(int pos);
 
-        inline bool Contains(const T& elm) const;
+        inline bool Contains(const T& elm) const {
+            for (int i = 0; i < length_; i++) {
+                if (data_[i] == elm) {
+                    return true;
+                }
+            }
+            return false;
+        }
 
         // Iterate through all list entries, starting at index 0.
         template <class Visitor>
@@ -387,11 +394,19 @@ class ScopedPtrList final {
             end_ = start_;
         }
 
+        void MergeInto(ScopedPtrList* parent) {
+            DCHECK_EQ(parent->end_, start_);
+            parent->end_ = end_;
+            start_ = end_;
+            DCHECK_EQ(0, length());
+        }
+
         int length() const {
             return static_cast<int>(end_ - start_);
         }
         T* at(int i) const {
             size_t index = start_ + i;
+            DCHECK_LE(start_, index);
             DCHECK_LT(index, buffer_.size());
             return reinterpret_cast<T*>(buffer_[index]);
         }
