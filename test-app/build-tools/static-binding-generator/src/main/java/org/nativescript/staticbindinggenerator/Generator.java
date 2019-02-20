@@ -86,11 +86,15 @@ public class Generator {
     }
 
     public Binding[] generateBindings(String filename) throws IOException, ClassNotFoundException {
-        List<DataRow> rows = getRows(filename);
+        try {
+            List<DataRow> rows = getRows(filename);
+            Binding[] generatedFiles = processRows(rows);
 
-        Binding[] generatedFiles = processRows(rows);
-
-        return generatedFiles;
+            return generatedFiles;
+        } catch (FileNotFoundException exception) {
+            String jsParserPath = Paths.get(System.getProperty("user.dir"), "jsparser", "js_parser.js").toString();
+            throw new IOException(String.format("Couldn't find '%s' bindings input file. Most probably there's an error in the JS Parser execution. You can run JS Parser with verbose logging by executing \"node '%s' enableVerboseLogging\".", filename, jsParserPath));
+        }
     }
 
     public Binding generateBinding(DataRow dataRow, HashSet<String> interfaceNames) throws ClassNotFoundException {
@@ -152,8 +156,8 @@ public class Generator {
                 DataRow row = new DataRow(line);
                 rows.add(row);
             }
-        } catch (Exception e) {
-            e.printStackTrace();
+//        } catch (Exception e) {
+//            e.printStackTrace();
         } finally {
             if (br != null) {
                 br.close();
