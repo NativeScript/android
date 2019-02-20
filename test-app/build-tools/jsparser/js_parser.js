@@ -6,7 +6,7 @@
 ///////////////// CONFIGURATION /////////////////
 
 const enableLogger = (process.env.AST_PARSER_ENABLE_LOGGING && process.env.AST_PARSER_ENABLE_LOGGING.trim() === "true")
-    || (process.argv && process.argv.includes("enableVerboseLogging"));
+	|| (process.argv && process.argv.includes("enableVerboseLogging"));
 
 loggingSettings = {
 	"logPath": require("path").join(__dirname, "logs", "i.txt"),
@@ -161,8 +161,8 @@ function traverseFiles(filesToTraverse) {
 		readFile(fp)
 			.then(astFromFileContent)
 			.then(visitAst)
-            .then(writeToFile)
-            .catch(exceptionHandler)
+			.then(writeToFile)
+			.catch(exceptionHandler)
 	}
 }
 
@@ -247,7 +247,7 @@ var visitAst = function (data, err) {
 
 var writeToFile = function (data, err) {
 	return new Promise(function (resolve, reject) {
-        if (data.trim() != "") {
+		if (data.trim() != "") {
 			// fs.appendFile(outFile, stringify(data), function (writeFileError) {
 			fs.appendFile(outFile, data + eol, function (writeFileError) {
 				if (err) {
