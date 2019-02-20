@@ -156,8 +156,6 @@ public class Generator {
                 DataRow row = new DataRow(line);
                 rows.add(row);
             }
-//        } catch (Exception e) {
-//            e.printStackTrace();
         } finally {
             if (br != null) {
                 br.close();
