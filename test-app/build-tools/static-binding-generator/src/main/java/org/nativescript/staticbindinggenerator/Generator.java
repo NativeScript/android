@@ -93,7 +93,7 @@ public class Generator {
             return generatedFiles;
         } catch (FileNotFoundException exception) {
             String jsParserPath = Paths.get(System.getProperty("user.dir"), "jsparser", "js_parser.js").toString();
-            throw new IOException(String.format("Couldn't find '%s' bindings input file. Most probably there's an error in the JS Parser execution. You can run JS Parser with verbose logging by executing \"node '%s' enableVerboseLogging\".", filename, jsParserPath));
+            throw new IOException(String.format("Couldn't find '%s' bindings input file. Most probably there's an error in the JS Parser execution. You can run JS Parser with verbose logging by executing \"node '%s' enableErrorLogging\".", filename, jsParserPath));
         }
     }
 
