@@ -11,8 +11,6 @@
 #include "ModuleInternal.h"
 #include "File.h"
 #include <mutex>
-#include <natives_blob.h>
-#include <snapshot_blob.h>
 
 jobject ConvertJsValueToJavaObject(tns::JEnv& env, const v8::Local<v8::Value>& value, int classReturnType);
 
