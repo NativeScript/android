@@ -24,7 +24,7 @@ module.exports = function (setting) {
 
     if (setting.disable) {
         for (var prop in appLog) {
-            if(prop != 'error' || !setting.showErrorLogs) {
+            if((prop != 'error' && prop != 'warn') || !setting.showErrorsAndWarnings) {
                 appLog[prop] = function () { };
             }
         }

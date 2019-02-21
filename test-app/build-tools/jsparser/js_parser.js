@@ -8,13 +8,13 @@
 const enableLogger = (process.env.AST_PARSER_ENABLE_LOGGING && process.env.AST_PARSER_ENABLE_LOGGING.trim() === "true")
     || (process.argv && process.argv.includes("enableVerboseLogging"));
 
-var showErrorLogs = !enableLogger && (process.argv && process.argv.includes("enableErrorLogging"))
+const showErrorsAndWarnings = !enableLogger && (process.argv && process.argv.includes("enableErrorLogging"));
 
 loggingSettings = {
     "logPath": require("path").join(__dirname, "logs", "i.txt"),
     "strategy": "console",
     "APP_NAME": "ast_parser",
-    "showErrorLogs": showErrorLogs,
+    "showErrorsAndWarnings": showErrorsAndWarnings,
     "disable": !enableLogger
 };
 
@@ -69,6 +69,22 @@ function getRelativeToBuildTools(relativePath) {
 
 /////////////// EXECUTE ////////////////
 var tsHelpersFilePath = path.join(inputDir, "..", "internal", "ts_helpers.js");
+
+/*
+*	If there is an exception anywhere down the line it's caught here
+*	If the error is criticalthe process is exited.
+*/
+var exceptionHandler = function (path, reason) {
+    if (reason.errCode && reason.errCode === 1) {
+        logger.error(`Error processing '${path}': ${reason.message}`);
+        logger.error("PROCESS EXITING...");
+        process.stderr.write(reason.message);
+        process.exit(4);
+    }
+    else {
+        logger.error(`Error processing '${path}:' ` + reason);
+    }
+}
 
 // ENTRY POINT!
 readLinesFromFile(inputFilesPath, inputFiles, tsHelpersFilePath)
@@ -162,8 +178,8 @@ function traverseFiles(filesToTraverse) {
         logger.info("Visiting JavaScript file: " + fp);
 
         readFile(fp)
-            .then(astFromFileContent)
-            .then(visitAst)
+            .then(astFromFileContent.bind(null, fp))
+            .then(visitAst.bind(null, fp))
             .then(writeToFile)
             .catch(exceptionHandler.bind(null, fp));
     }
@@ -177,7 +193,7 @@ var readFile = function (filePath, err) {
     return new Promise(function (resolve, reject) {
         fs.readFile(filePath, function (err, data) {
             if (err) {
-                logger.warn("+DIDN'T get content of file: " + filePath);
+                logger.warn(`+DIDN'T get content of file: ${filePath}!`);
                 return reject(err);
             }
 
@@ -193,10 +209,10 @@ var readFile = function (filePath, err) {
 /*
 *	Get's the AST (https://en.wikipedia.org/wiki/Abstract_syntax_tree) from the file content and passes it down the line.
 */
-var astFromFileContent = function (data, err) {
+var astFromFileContent = function (path, data, err) {
     return new Promise(function (resolve, reject) {
         if (err) {
-            logger.warn("+DIDN'T parse ast from file!");
+            logger.warn(`+DIDN'T parse ast from file: ${path}!`);
             return reject(err);
         }
 
@@ -218,10 +234,10 @@ function onlyUnique(value, index, self) {
 *	Visist's the passed AST with a given visitor and extracts nativescript speciffic data.
 *	Passes the extracted bindings data down the line.
 */
-var visitAst = function (data, err) {
+var visitAst = function (path, data, err) {
     return new Promise(function (resolve, reject) {
         if (err) {
-            logger.warn("+DIDN'T visit ast!");
+            logger.warn(`+DIDN'T visit ast for file: ${path}!`);
             return reject(err);
         }
 
@@ -271,20 +287,4 @@ var writeToFile = function (data, err) {
             logger.info("No need to generate anything. (UP-TO-DATE)");
         }
     });
-}
-
-/*
-*	If there is an exception anywhere down the line it's caught here
-*	If the error is criticalthe process is exited.
-*/
-var exceptionHandler = function (path, reason) {
-    if (reason.errCode && reason.errCode === 1) {
-        logger.error(`Error processing '${path}': ${reason.message}`);
-        logger.error("PROCESS EXITING...");
-        process.stderr.write(reason.message);
-        process.exit(4);
-    }
-    else {
-        logger.error(`Error processing '${path}:' ` + reason);
-    }
 }
