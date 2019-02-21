@@ -28,6 +28,8 @@
 #include "NetworkDomainCallbackHandlers.h"
 #include "sys/system_properties.h"
 #include "ManualInstrumentation.h"
+#include <natives_blob.h>
+#include <snapshot_blob.h>
 
 #ifdef APPLICATION_IN_DEBUG
 #include "JsV8InspectorClient.h"
