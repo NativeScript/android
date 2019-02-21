@@ -102,7 +102,7 @@ var es5_visitors = (function() {
         try {
             extendClass = _getArgumentFromNodeAsString(path, 5, config)
         } catch (e) {
-            config.logger.info(e.message)
+            config.logger.warn(e.message)
             return;
         }
 
@@ -382,7 +382,7 @@ var es5_visitors = (function() {
                 arg1 = path.node.arguments[1];
             } else {
                 throw {
-                    message: "JSParser Error: Not enough or too many arguments passed(" + path.node.arguments.length + ") when trying to extend interface: " + interfaceName + " in file: " + config.filePath,
+                    message: "JSParser Error: Not enough or too many arguments passed(" + path.node.arguments.length + ") when trying to extend interface: " + interfaceName + " in file: " + config.fullPathName,
                     errCode: 1
                 }
             }
@@ -460,7 +460,7 @@ var es5_visitors = (function() {
                     // don't throw here, because there can be a valid js extend that has nothing to do with NS
                     return;
                     throw {
-                        message: "JSParser Error: Not enough or too many arguments passed(" + extendArguments.length + ") when trying to extend class: " + extendClass + " in file: " + config.filePath,
+                        message: "JSParser Error: Not enough or too many arguments passed(" + extendArguments.length + ") when trying to extend class: " + extendClass + " in file: " + config.fullPathName,
                         errCode: 1
                     }
                 }
@@ -468,7 +468,7 @@ var es5_visitors = (function() {
                 // don't throw here, because there can be a valid js extend that has nothing to do with NS
                 return;
                 throw {
-                    message: "JSParser Error: You need to call the extend with parameters. Example: '...extend(\"a.b.C\", {...overrides...})') for class: " + extendClass + " in file: " + config.filePath,
+                    message: "JSParser Error: You need to call the extend with parameters. Example: '...extend(\"a.b.C\", {...overrides...})') for class: " + extendClass + " in file: " + config.fullPathName,
                     errCode: 1
                 }
             }
@@ -484,7 +484,7 @@ var es5_visitors = (function() {
             var isCorrectClassName = _testClassName(className);
             if (className && !isCorrectClassName && !isCorrectExtendClassName) {
                 throw {
-                    message: "JSParser Error: The 'extend' you are trying to make has an invalid name. Example: '...extend(\"a.b.C\", {...overrides...})'), for class: " + extendClass + " file: " + config.filePath,
+                    message: "JSParser Error: The 'extend' you are trying to make has an invalid name. Example: '...extend(\"a.b.C\", {...overrides...})'), for class: " + extendClass + " file: " + config.fullPathName,
                     errCode: 1
                 }
             }
@@ -517,7 +517,7 @@ var es5_visitors = (function() {
             // don't throw here, because there can be a valid js extend that has nothing to do with NS
             return;
             throw {
-                message: "JSParser Error: You need to call the extend '...extend(\"extend_name\", {...overrides...})'), for class: " + extendClass + " file: " + config.filePath,
+                message: "JSParser Error: You need to call the extend '...extend(\"extend_name\", {...overrides...})'), for class: " + extendClass + " file: " + config.fullPathName,
                 errCode: 1
             }
         }
@@ -647,7 +647,7 @@ var es5_visitors = (function() {
                 var o = extendedClass.node.arguments[0];
             } else {
                 throw {
-                    message: "JSParser Error: Node type is not a call expression. File=" + config.filePath + " line=" + path.node.loc.start.line,
+                    message: "JSParser Error: Node type is not a call expression. File=" + config.fullPathName + " line=" + path.node.loc.start.line,
                     errCode: 1
                 }
             }
@@ -669,19 +669,19 @@ var es5_visitors = (function() {
                     return path.parent.arguments[0].value;
                 } else {
                     throw {
-                        message: "JSParser Error: The first argument '" + classNameFromDecorator + "' of the " + customDecoratorName + " decorator is not following the right pattern which is: '[namespace.]ClassName'. Example: '" + customDecoratorName + "(\"a.b.ClassName\", {overrides...})', file: " + config.filePath,
+                        message: "JSParser Error: The first argument '" + classNameFromDecorator + "' of the " + customDecoratorName + " decorator is not following the right pattern which is: '[namespace.]ClassName'. Example: '" + customDecoratorName + "(\"a.b.ClassName\", {overrides...})', file: " + config.fullPathName,
                         errCode: 1
                     }
                 }
             } else {
                 throw {
-                    message: "JSParser Error: No arguments passed to " + customDecoratorName + " decorator. Example: '" + customDecoratorName + "(\"a.b.ClassName\", {overrides...})', file: " + config.filePath,
+                    message: "JSParser Error: No arguments passed to " + customDecoratorName + " decorator. Example: '" + customDecoratorName + "(\"a.b.ClassName\", {overrides...})', file: " + config.fullPathName,
                     errCode: 1
                 }
             }
         } else {
             throw {
-                message: "JSParser Error: Decorator " + customDecoratorName + " must be called with parameters: Example: '" + customDecoratorName + "(\"a.b.ClassName\", {overrides...})', file: " + config.filePath,
+                message: "JSParser Error: Decorator " + customDecoratorName + " must be called with parameters: Example: '" + customDecoratorName + "(\"a.b.ClassName\", {overrides...})', file: " + config.fullPathName,
                 errCode: 1
             }
         }
@@ -711,7 +711,7 @@ var es5_visitors = (function() {
     function _getParent(node, numberOfParents, config) {
         if (!node) {
             throw {
-                message: "JSParser Error: No parent found for node in file: " + config.filePath,
+                message: "JSParser Error: No parent found for node in file: " + config.fullPathName,
                 errCode: 1
             }
         }

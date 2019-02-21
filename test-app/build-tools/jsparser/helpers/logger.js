@@ -7,7 +7,7 @@ module.exports = function (setting) {
     var logDirectory = path.dirname(setting.logPath);
 
     // TODO: Logging to file disabled temporarily, console output is default
-    
+
     // if (!fs.existsSync(logDirectory)) {
     //     console.error("couldn't find logDirectory so it will be created in place:" + setting.logPath);
     //     fileHelpers.ensureDirectories(setting.logPath);
@@ -24,7 +24,9 @@ module.exports = function (setting) {
 
     if (setting.disable) {
         for (var prop in appLog) {
-            appLog[prop] = function () { };
+            if((prop != 'error' && prop != 'warn') || !setting.showErrorsAndWarnings) {
+                appLog[prop] = function () { };
+            }
         }
     }
 
