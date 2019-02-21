@@ -5,15 +5,16 @@
 
 ///////////////// CONFIGURATION /////////////////
 
-const enableLogger = (process.env.AST_PARSER_ENABLE_LOGGING && process.env.AST_PARSER_ENABLE_LOGGING.trim() === "true")
+const enableLogger = (process.env.JS_PARSER_ENABLE_LOGGING && process.env.JS_PARSER_ENABLE_LOGGING.trim() === "true")
     || (process.argv && process.argv.includes("enableVerboseLogging"));
 
-const showErrorsAndWarnings = !enableLogger && (process.argv && process.argv.includes("enableErrorLogging"));
+const showErrorsAndWarnings = (process.env.JS_PARSER_ERROR_LOGGING && process.env.JS_PARSER_ERROR_LOGGING.trim() === "true")
+    || (!enableLogger && (process.argv && process.argv.includes("enableErrorLogging")));
 
 loggingSettings = {
     "logPath": require("path").join(__dirname, "logs", "i.txt"),
     "strategy": "console",
-    "APP_NAME": "ast_parser",
+    "APP_NAME": "js_parser",
     "showErrorsAndWarnings": showErrorsAndWarnings,
     "disable": !enableLogger
 };
@@ -42,14 +43,14 @@ var fs = require("fs"),
     inputFiles = [];
 
 //env variables
-if (process.env.AST_PARSER_OUT_FILE) {
-    outFile = process.env.AST_PARSER_OUT_FILE.trim();
+if (process.env.JS_PARSER_OUT_FILE) {
+    outFile = process.env.JS_PARSER_OUT_FILE.trim();
 }
-if (process.env.AST_PARSER_INPUT_DIR) {
-    inputDir = process.env.AST_PARSER_INPUT_DIR.trim();
+if (process.env.JS_PARSER_INPUT_DIR) {
+    inputDir = process.env.JS_PARSER_INPUT_DIR.trim();
 }
-if (process.env.AST_PARSER_INTERFACE_FILE_PATH) {
-    interfacesNamesFilePath = process.env.AST_PARSER_INTERFACE_FILE_PATH.trim();
+if (process.env.JS_PARSER_INTERFACE_FILE_PATH) {
+    interfacesNamesFilePath = process.env.JS_PARSER_INTERFACE_FILE_PATH.trim();
 }
 
 inputDir = fs.readFileSync(getRelativeToBuildTools(SBG_INPUT_FILE), "UTF-8").trim();
