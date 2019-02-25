@@ -1,3 +1,9 @@
+5.2.1
+==
+
+## Bug Fixes
+ - [Breakpoint stop to hit when you have two open tabs and close one(#1247)](https://github.com/NativeScript/android-runtime/issues/1247)
+
 5.2.0
 ==
 
@@ -13,8 +19,6 @@
  - [ClassNotFound exception when calling nested static class with correct argument(#1195)](https://github.com/NativeScript/android-runtime/issues/1195)
  - [If you refresh or close the chrome dev tools window an error will be log in the console (#1202)](https://github.com/NativeScript/android-runtime/issues/1202)
  - [Debug on Android fails when stopped on breakpoint and change in .xml/.css/.html is applied(#1243)](https://github.com/NativeScript/android-runtime/issues/1243)
- - [Breakpoint stop to hit when you have two open tabs and close one(#1247)](https://github.com/NativeScript/android-runtime/issues/1247)
- - [ClassNotFound exception when calling nested static class with correct argument(#1195)](https://github.com/NativeScript/android-runtime/issues/1195)
  - [Upgrade V8 to v7 to fix unstable sort() method(#1176)](https://github.com/NativeScript/android-runtime/issues/1176)
  - [CodeCache option is broken since Android Runtime 4.1.0(#1235)](https://github.com/NativeScript/android-runtime/issues/1235)
  - [Snapshots with ABI splits do not work since Android Runtime 4.1.0(#1234)](https://github.com/NativeScript/android-runtime/issues/1234)
