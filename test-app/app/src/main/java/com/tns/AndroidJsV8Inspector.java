@@ -245,7 +245,7 @@ class AndroidJsV8Inspector {
                     }
                 }
             }
-            this.webSocket = new JsV8InspectorWebSocket(handshake);
+            this.webSocket = new JsV8InspectorWebSocket(handshake, currentRuntimeLogger);
             return this.webSocket;
         }
     }
