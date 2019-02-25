@@ -22,7 +22,6 @@
  - [Upgrade V8 to v7 to fix unstable sort() method(#1176)](https://github.com/NativeScript/android-runtime/issues/1176)
  - [CodeCache option is broken since Android Runtime 4.1.0(#1235)](https://github.com/NativeScript/android-runtime/issues/1235)
  - [Snapshots with ABI splits do not work since Android Runtime 4.1.0(#1234)](https://github.com/NativeScript/android-runtime/issues/1234)
- - [Upgrade V8 to v7 to fix unstable sort() method(#1176)](https://github.com/NativeScript/android-runtime/issues/1176)
 
 5.1.0
 ==
