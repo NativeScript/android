@@ -27,12 +27,18 @@ set(COMMON_CMAKE_ARGUMENTS "-std=c++11 -stdlib=libc++ -Werror -Wno-unused-result
 # AOSP has switched to using LLD by default and the NDK will use it by default in the next release.
 # BFD and Gold will be removed once LLD has been through a release cycle with no major unresolved issues (estimated r21)
 # Note: lld does not currently work on Windows: https://github.com/android-ndk/ndk/issues/888
-if (NOT CMAKE_HOST_SYSTEM_NAME MATCHES "Windows")
-  MESSAGE(STATUS "## Using LLD linker")
-  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fuse-ld=lld")
-else ()
-  MESSAGE(STATUS "## Using default linker")
-endif ()
+
+# On MacOS using LLD seems problematic as it does not add the correct path for the libNativeScript.so dSYM.
+# This issue affects debugging the C++ part of the runtime.
+# Manually performing "add-dsym <lib-path>" in the LLDB console seems to fix that.
+# We should try using LLD again once it's the default linker for the NDK.
+
+#if (NOT CMAKE_HOST_SYSTEM_NAME MATCHES "Windows")
+#  MESSAGE(STATUS "## Using LLD linker")
+#  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fuse-ld=lld")
+#else ()
+#  MESSAGE(STATUS "## Using default linker")
+#endif ()
 
 # Command info: https://cmake.org/cmake/help/v3.4/command/include_directories.html
 include_directories(
@@ -183,7 +189,7 @@ if (OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
     )
 else ()
     set_target_properties(
-        NativeScript PROPERTIES LINK_FLAGS -Wl,--allow-multiple-definition
+        NativeScript PROPERTIES LINK_FLAGS "-Wl,--allow-multiple-definition"
         INTERFACE_INCLUDE_DIRECTORIES NATIVES_BLOB_INCLUDE_DIRECTORIES
     )
 endif ()
