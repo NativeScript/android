@@ -26,6 +26,8 @@ describe("Tests array operations", function () {
 			var el = arr[0];
 			
 			expect(el).toEqual(123);
+
+			global.__releaseNativeCounterpart(arr);
 		}
 	});
 
