@@ -95,14 +95,14 @@ version of the {N} CLI install a previous version of the runtime package - 'tns 
                 nsConfig = new JsonSlurper().parseText(nsConfigFile.getText("UTF-8"))
             }
 
-            if(nsConfig != null && nsConfig.appPath != null){
+            if (nsConfig != null && nsConfig.appPath != null) {
                 relativePathToApp = nsConfig.appPath
             }
 
-            if(nsConfig != null && nsConfig.appResourcesPath != null ) {
+            if (nsConfig != null && nsConfig.appResourcesPath != null) {
                 relativePathToAppResources = nsConfig.appResourcesPath
             } else {
-                relativePathToAppResources  = "$relativePathToApp/App_Resources"
+                relativePathToAppResources = "$relativePathToApp/App_Resources"
             }
 
             absolutePathToAppResources = java.nio.file.Paths.get(USER_PROJECT_ROOT).resolve(relativePathToAppResources).toAbsolutePath()
@@ -121,10 +121,10 @@ version of the {N} CLI install a previous version of the runtime package - 'tns 
             apply from: pathToBuildScriptGradle, to: buildscript
         }
 
-        nativescriptDependencies.each {dep ->
+        nativescriptDependencies.each { dep ->
             def pathToPluginBuildScriptGradle = "$rootDir/${dep.directory}/$PLATFORMS_ANDROID/buildscript.gradle"
             def pluginBuildScriptGradle = file(pathToPluginBuildScriptGradle)
-            if(pluginBuildScriptGradle.exists()) {
+            if (pluginBuildScriptGradle.exists()) {
                 println "\t + applying user-defined buildscript from dependency ${pluginBuildScriptGradle}"
                 apply from: pathToPluginBuildScriptGradle, to: buildscript
             }
@@ -161,9 +161,9 @@ def applyAppGradleConfiguration = { ->
 }
 
 def applyPluginGradleConfigurations = { ->
-    nativescriptDependencies.each {dep ->
+    nativescriptDependencies.each { dep ->
         def includeGradlePath = "$rootDir/${dep.directory}/$PLATFORMS_ANDROID/include.gradle"
-        if(file(includeGradlePath).exists()) {
+        if (file(includeGradlePath).exists()) {
             apply from: includeGradlePath
         }
     }
@@ -290,7 +290,6 @@ dependencies {
     if (project.hasProperty("supportVersion")) {
         supportVer = supportVersion
     }
-
     if (project.hasProperty("useAndroidX") && (useAndroidX || useAndroidX.toBoolean())) {
         def androidXLegacyVersion = "1.0.0"
         if (project.hasProperty("androidXLegacy")) {
@@ -321,20 +320,6 @@ dependencies {
         implementation "com.android.support:appcompat-v7:$supportVer"
         implementation "com.android.support:design:$supportVer"
     }
-
-    def sbgProjectExists = !findProject(':static-binding-generator').is(null)
-    if (sbgProjectExists) {
-        compileOnly project(':static-binding-generator')
-    }
-    def mdgProjectExists = !findProject(':android-metadata-generator').is(null)
-    if (mdgProjectExists) {
-        compileOnly project(':android-metadata-generator')
-    }
-    def dtsgProjectExists = !findProject(':dts-generator').is(null)
-    if (dtsgProjectExists) {
-        compileOnly project(':dts-generator')
-    }
-
     def useV8Symbols = nativescriptDependencies.any {
         def packageJsonPath = file("$rootDir/${it.directory}/$PACKAGE_JSON")
         def packageJson = new JsonSlurper().parseText(packageJsonPath.text)
@@ -356,6 +341,7 @@ dependencies {
     } else {
         implementation project(path: ':runtime', configuration: 'default')
     }
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
@@ -430,6 +416,10 @@ tasks.whenTaskAdded({ org.gradle.api.DefaultTask currentTask ->
 ////////////////////////////////////////////////////////////////////////////////////
 
 task runSbg(type: JavaExec) {
+    if (!findProject(':static-binding-generator').is(null)) {
+        dependsOn ':static-binding-generator:jar'
+    }
+
     inputs.dir(INPUT_JS_DIR)
 
     workingDir "$BUILD_TOOLS_PATH"
@@ -485,7 +475,7 @@ task extractAllJars {
         def buildType = project.selectedBuildType == "release" ? "Release" : "Debug"
         def iter = []
         Pattern pattern = Pattern.compile("^(.+)${buildType}CompileClasspath\$")
-        configurations.all{ config ->
+        configurations.all { config ->
             Matcher matcher = pattern.matcher(config.name)
             if (matcher.find() || config.name == "${buildType.toLowerCase()}CompileClasspath") {
                 config.resolve().each {
@@ -544,6 +534,10 @@ task collectAllJars {
 }
 
 task buildMetadata(type: JavaExec) {
+    if (!findProject(':android-metadata-generator').is(null)) {
+        dependsOn ':android-metadata-generator:jar'
+    }
+
     description "builds metadata with provided jar dependencies"
 
     inputs.files("$MDG_JAVA_DEPENDENCIES")
@@ -621,6 +615,10 @@ task makeAndroidXChanges {
 }
 
 task generateTypescriptDefinitions(type: JavaExec) {
+    if (!findProject(':dts-generator').is(null)) {
+        dependsOn ':dts-generator:jar'
+    }
+
     def paramz = new ArrayList<String>()
     def includeDirs = ["com.android.support", "/platforms/" + android.compileSdkVersion]
 
@@ -687,7 +685,7 @@ task validateAppIdMatch {
         def lineSeparator = System.getProperty("line.separator")
 
         if (project.hasProperty("nsApplicationIdentifier") && !project.hasProperty("release")) {
-            if(project.nsApplicationIdentifier != android.defaultConfig.applicationId) {
+            if (project.nsApplicationIdentifier != android.defaultConfig.applicationId) {
                 def errorMessage = "${lineSeparator}WARNING: The Application identifier is different from the one inside \"package.json\" file.$lineSeparator" +
                         "NativeScript CLI might not work properly.$lineSeparator" +
                         "Remove applicationId from app.gradle and update the \"nativescript.id\" in package.json.$lineSeparator" +
