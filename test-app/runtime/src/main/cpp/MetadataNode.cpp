@@ -267,7 +267,8 @@ void MetadataNode::NullObjectAccessorGetterCallback(Local<Name> property,const P
             auto node = reinterpret_cast<MetadataNode*>(info.Data().As<External>()->Value());
             V8SetPrivateValue(isolate, thiz, V8StringConstants::GetNullNodeName(isolate), External::New(isolate, node));
             auto funcTemplate = FunctionTemplate::New(isolate, MetadataNode::NullValueOfCallback);
-            thiz->Delete(V8StringConstants::GetValueOf(isolate));
+            auto context = isolate->GetCurrentContext();
+            thiz->Delete(context, V8StringConstants::GetValueOf(isolate));
             thiz->Set(V8StringConstants::GetValueOf(isolate), funcTemplate->GetFunction());
         }
 
@@ -375,13 +376,13 @@ void MetadataNode::SuperAccessorGetterCallback(Local<Name> property, const Prope
         if (superValue.IsEmpty()) {
             auto runtime = Runtime::GetRuntime(isolate);
             auto objectManager = runtime->GetObjectManager();
+            auto context = isolate->GetCurrentContext();
 
             superValue = objectManager->GetEmptyObject(isolate);
-            superValue->Delete(V8StringConstants::GetToString(isolate));
-            superValue->Delete(V8StringConstants::GetValueOf(isolate));
+            superValue->Delete(context, V8StringConstants::GetToString(isolate));
+            superValue->Delete(context, V8StringConstants::GetValueOf(isolate));
             superValue->SetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::CallSuper), True(isolate));
 
-            auto context = isolate->GetCurrentContext();
             superValue->SetPrototype(context, thiz->GetPrototype().As<Object>()->GetPrototype().As<Object>()->GetPrototype());
             V8SetPrivateValue(isolate, thiz, key, superValue);
             objectManager->CloneLink(thiz, superValue);

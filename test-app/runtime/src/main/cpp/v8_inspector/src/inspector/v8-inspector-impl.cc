@@ -188,14 +188,8 @@ InspectedContext* V8InspectorImpl::getContext(int contextId) const {
   return getContext(contextGroupId(contextId), contextId);
 }
 
-v8::MaybeLocal<v8::Context> V8InspectorImpl::contextById(
-    int groupId, v8::Maybe<int> contextId) {
-  if (contextId.IsNothing()) {
-    v8::Local<v8::Context> context =
-        client()->ensureDefaultContextInGroup(groupId);
-    return context.IsEmpty() ? v8::MaybeLocal<v8::Context>() : context;
-  }
-  InspectedContext* context = getContext(contextId.FromJust());
+v8::MaybeLocal<v8::Context> V8InspectorImpl::contextById(int contextId) {
+  InspectedContext* context = getContext(contextId);
   return context ? context->context() : v8::MaybeLocal<v8::Context>();
 }
 
@@ -399,8 +393,11 @@ void V8InspectorImpl::forEachSession(
   }
 }
 
-V8InspectorImpl::EvaluateScope::EvaluateScope(v8::Isolate* isolate)
-    : m_isolate(isolate), m_safeForTerminationScope(isolate) {}
+V8InspectorImpl::EvaluateScope::EvaluateScope(
+    const InjectedScript::Scope& scope)
+    : m_scope(scope),
+      m_isolate(scope.inspector()->isolate()),
+      m_safeForTerminationScope(m_isolate) {}
 
 struct V8InspectorImpl::EvaluateScope::CancelToken {
   v8::base::Mutex m_mutex;
@@ -408,6 +405,9 @@ struct V8InspectorImpl::EvaluateScope::CancelToken {
 };
 
 V8InspectorImpl::EvaluateScope::~EvaluateScope() {
+  if (m_scope.tryCatch().HasTerminated()) {
+    m_scope.inspector()->debugger()->reportTermination();
+  }
   if (m_cancelToken) {
     v8::base::MutexGuard lock(&m_cancelToken->m_mutex);
     m_cancelToken->m_canceled = true;

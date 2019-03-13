@@ -35,24 +35,24 @@ bool V8InspectorSession::canDispatchMethod(const StringView& method) {
                               protocol::Debugger::Metainfo::commandPrefix) ||
          stringViewStartsWith(method,
                               protocol::Profiler::Metainfo::commandPrefix) ||
-         stringViewStartsWith(
-             method, protocol::HeapProfiler::Metainfo::commandPrefix) ||
+         stringViewStartsWith(method,
+                              protocol::HeapProfiler::Metainfo::commandPrefix) ||
          stringViewStartsWith(method,
                               protocol::Console::Metainfo::commandPrefix) ||
          stringViewStartsWith(method,
-                                protocol::Schema::Metainfo::commandPrefix) ||
-           stringViewStartsWith(method,
-                                protocol::Page::Metainfo::commandPrefix) ||
-           stringViewStartsWith(method,
-                                protocol::Network::Metainfo::commandPrefix) ||
-           stringViewStartsWith(method,
-                                protocol::DOM::Metainfo::commandPrefix) ||
-           stringViewStartsWith(method,
-                                protocol::CSS::Metainfo::commandPrefix) ||
-           stringViewStartsWith(method,
-                                protocol::Overlay::Metainfo::commandPrefix) ||
-           stringViewStartsWith(method,
-                                protocol::Log::Metainfo::commandPrefix);
+                              protocol::Schema::Metainfo::commandPrefix) ||
+         stringViewStartsWith(method,
+                              protocol::Page::Metainfo::commandPrefix) ||
+         stringViewStartsWith(method,
+                              protocol::Network::Metainfo::commandPrefix) ||
+         stringViewStartsWith(method,
+                              protocol::DOM::Metainfo::commandPrefix) ||
+         stringViewStartsWith(method,
+                              protocol::CSS::Metainfo::commandPrefix) ||
+         stringViewStartsWith(method,
+                              protocol::Overlay::Metainfo::commandPrefix) ||
+         stringViewStartsWith(method,
+                              protocol::Log::Metainfo::commandPrefix);
 }
 
 // static
@@ -420,31 +420,31 @@ V8InspectorSessionImpl::supportedDomainsImpl() {
                        .setName(protocol::Schema::Metainfo::domainName)
                        .setVersion(protocol::Schema::Metainfo::version)
                        .build());
-    result.push_back(protocol::Schema::Domain::create()
-                     .setName(protocol::Page::Metainfo::domainName)
-                     .setVersion(protocol::Page::Metainfo::version)
-                     .build());
-    result.push_back(protocol::Schema::Domain::create()
-                     .setName(protocol::Network::Metainfo::domainName)
-                     .setVersion(protocol::Network::Metainfo::version)
-                     .build());
-    result.push_back(protocol::Schema::Domain::create()
-                     .setName(protocol::DOM::Metainfo::domainName)
-                     .setVersion(protocol::DOM::Metainfo::version)
-                     .build());
-    result.push_back(protocol::Schema::Domain::create()
-                     .setName(protocol::CSS::Metainfo::domainName)
-                     .setVersion(protocol::CSS::Metainfo::version)
-                     .build());
-    result.push_back(protocol::Schema::Domain::create()
-                     .setName(protocol::Overlay::Metainfo::domainName)
-                     .setVersion(protocol::Overlay::Metainfo::version)
-                     .build());
-    result.push_back(protocol::Schema::Domain::create()
-                     .setName(protocol::Log::Metainfo::domainName)
-                     .setVersion(protocol::Log::Metainfo::version)
-                     .build());
-    return result;
+  result.push_back(protocol::Schema::Domain::create()
+                       .setName(protocol::Page::Metainfo::domainName)
+                       .setVersion(protocol::Page::Metainfo::version)
+                       .build());
+  result.push_back(protocol::Schema::Domain::create()
+                       .setName(protocol::Network::Metainfo::domainName)
+                       .setVersion(protocol::Network::Metainfo::version)
+                       .build());
+  result.push_back(protocol::Schema::Domain::create()
+                       .setName(protocol::DOM::Metainfo::domainName)
+                       .setVersion(protocol::DOM::Metainfo::version)
+                       .build());
+  result.push_back(protocol::Schema::Domain::create()
+                       .setName(protocol::CSS::Metainfo::domainName)
+                       .setVersion(protocol::CSS::Metainfo::version)
+                       .build());
+  result.push_back(protocol::Schema::Domain::create()
+                       .setName(protocol::Overlay::Metainfo::domainName)
+                       .setVersion(protocol::Overlay::Metainfo::version)
+                       .build());
+  result.push_back(protocol::Schema::Domain::create()
+                       .setName(protocol::Log::Metainfo::domainName)
+                       .setVersion(protocol::Log::Metainfo::version)
+                       .build());
+  return result;
 }
 
 void V8InspectorSessionImpl::addInspectedObject(

@@ -33,8 +33,6 @@ struct V8StackTraceId;
 enum class WrapMode { kForceValue, kNoPreview, kWithPreview };
 
 using protocol::Response;
-using ScheduleStepIntoAsyncCallback =
-    protocol::Debugger::Backend::ScheduleStepIntoAsyncCallback;
 using TerminateExecutionCallback =
     protocol::Runtime::Backend::TerminateExecutionCallback;
 
@@ -63,9 +61,6 @@ class V8Debugger : public v8::debug::DebugDelegate,
         void stepIntoStatement(int targetContextGroupId, bool breakOnAsyncCall);
         void stepOverStatement(int targetContextGroupId);
         void stepOutOfFunction(int targetContextGroupId);
-        void scheduleStepIntoAsync(
-            std::unique_ptr<ScheduleStepIntoAsyncCallback> callback,
-            int targetContextGroupId);
         void pauseOnAsyncCall(int targetContextGroupId, uintptr_t task,
                               const String16& debuggerId);
 
@@ -146,6 +141,8 @@ class V8Debugger : public v8::debug::DebugDelegate,
         std::shared_ptr<AsyncStackTrace> stackTraceFor(int contextGroupId,
                 const V8StackTraceId& id);
 
+        void reportTermination();
+
     private:
         bool addInternalObject(v8::Local<v8::Context> context,
                                v8::Local<v8::Object> object,
@@ -157,7 +154,6 @@ class V8Debugger : public v8::debug::DebugDelegate,
         static size_t nearHeapLimitCallback(void* data, size_t current_heap_limit,
                                             size_t initial_heap_limit);
         static void terminateExecutionCompletedCallback(v8::Isolate* isolate);
-
         void handleProgramBreak(
             v8::Local<v8::Context> pausedContext, v8::Local<v8::Value> exception,
             const std::vector<v8::debug::BreakpointId>& hitBreakpoints,
@@ -212,6 +208,7 @@ class V8Debugger : public v8::debug::DebugDelegate,
         v8::Isolate* m_isolate;
         V8InspectorImpl* m_inspector;
         int m_enableCount;
+
         int m_breakpointsActiveCount = 0;
         int m_ignoreScriptParsedEventsCounter;
         size_t m_originalHeapLimit = 0;
@@ -246,7 +243,6 @@ class V8Debugger : public v8::debug::DebugDelegate,
         void* m_taskWithScheduledBreak = nullptr;
         String16 m_taskWithScheduledBreakDebuggerId;
 
-        std::unique_ptr<ScheduleStepIntoAsyncCallback> m_stepIntoAsyncCallback;
         bool m_breakRequested = false;
 
         v8::debug::ExceptionBreakState m_pauseOnExceptionsState;

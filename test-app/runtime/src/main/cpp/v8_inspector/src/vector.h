@@ -229,7 +229,10 @@ class OwnedVector {
                   typename = typename std::enable_if<std::is_convertible<
                               std::unique_ptr<U>, std::unique_ptr<T>>::value>::type>
         OwnedVector(OwnedVector<U>&& other)
-            : data_(other.ReleaseData()), length_(other.size()) {}
+            : data_(std::move(other.data_)), length_(other.length_) {
+            STATIC_ASSERT(sizeof(U) == sizeof(T));
+            other.length_ = 0;
+        }
 
         // Returns the length of the vector as a size_t.
         constexpr size_t size() const {
@@ -253,8 +256,9 @@ class OwnedVector {
         }
 
         // Releases the backing data from this vector and transfers ownership to the
-        // caller. This vectors data can no longer be used afterwards.
+        // caller. This vector will be empty afterwards.
         std::unique_ptr<T[]> ReleaseData() {
+            length_ = 0;
             return std::move(data_);
         }
 
@@ -278,7 +282,17 @@ class OwnedVector {
             return vec;
         }
 
+        bool operator==(std::nullptr_t) const {
+            return data_ == nullptr;
+        }
+        bool operator!=(std::nullptr_t) const {
+            return data_ != nullptr;
+        }
+
     private:
+        template <typename U>
+        friend class OwnedVector;
+
         std::unique_ptr<T[]> data_;
         size_t length_ = 0;
 };
@@ -289,10 +303,10 @@ inline int StrLength(const char* string) {
     return static_cast<int>(length);
 }
 
-
-#define STATIC_CHAR_VECTOR(x)                                              \
-  v8::internal::Vector<const uint8_t>(reinterpret_cast<const uint8_t*>(x), \
-                                      arraysize(x) - 1)
+template <size_t N>
+constexpr Vector<const uint8_t> StaticCharVector(const char (&array)[N]) {
+    return Vector<const uint8_t>::cast(Vector<const char>(array, N - 1));
+}
 
 inline Vector<const char> CStrVector(const char* data) {
     return Vector<const char>(data, StrLength(data));
@@ -320,13 +334,17 @@ inline constexpr Vector<T> ArrayVector(T (&arr)[N]) {
     return Vector<T>(arr);
 }
 
+// Construct a Vector from a start pointer and a size.
+template <typename T>
+inline constexpr Vector<T> VectorOf(T* start, size_t size) {
+    return Vector<T>(start, size);
+}
+
 // Construct a Vector from anything providing a {data()} and {size()} accessor.
-template <typename Container,
-          typename T = typename std::remove_reference<
-              decltype(*(std::declval<Container>()).data())>::type,
-          typename = decltype((std::declval<Container>()).size())>
-inline constexpr Vector<T> VectorOf(Container&& c) {
-    return Vector<T>(c.data(), c.size());
+template <typename Container>
+inline constexpr auto VectorOf(Container&& c)
+-> decltype(VectorOf(c.data(), c.size())) {
+    return VectorOf(c.data(), c.size());
 }
 
 }  // namespace internal
