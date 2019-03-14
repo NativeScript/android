@@ -1,26 +1,29 @@
 /*
-*	Script builds apk in release or debug mode
-*	To run:
-*			gradle assembleRelease -Prelease (release mode)
-*			gradle assembleDebug (debug mode -> default)
-* 	Options:
-*			-Prelease  //this flag will run build in release mode
-*			-PksPath=[path_to_keystore_file]
-*			-PksPassword=[password_for_keystore_file]
-*			-Palias=[alias_to_use_from_keystore_file]
-*			-Ppassword=[password_for_alias]
+*    Script builds apk in release or debug mode
+*    To run:
+*            gradle assembleRelease -Prelease (release mode)
+*            gradle assembleDebug (debug mode -> default)
+*     Options:
+*            -Prelease  //this flag will run build in release mode
+*            -PksPath=[path_to_keystore_file]
+*            -PksPassword=[password_for_keystore_file]
+*            -Palias=[alias_to_use_from_keystore_file]
+*            -Ppassword=[password_for_alias]
 *
-*			-PtargetSdk=[target_sdk]
-*			-PbuildToolsVersion=[build_tools_version]
-*			-PsupportVersion=[support_version]
-*			-PcompileSdk=[compile_sdk_version]
+*            -PtargetSdk=[target_sdk]
+*            -PbuildToolsVersion=[build_tools_version]
+*            -PsupportVersion=[support_version]
+*            -PcompileSdk=[compile_sdk_version]
 */
 
 import groovy.json.JsonSlurper
+import java.nio.file.Files
 import java.nio.file.Paths
+import java.nio.file.StandardCopyOption
 import java.util.regex.Matcher
 import java.util.regex.Pattern
-
+import java.security.MessageDigest
+import javax.inject.Inject
 apply plugin: "com.android.application"
 
 def onlyX86 = project.hasProperty("onlyX86")
@@ -80,6 +83,8 @@ version of the {N} CLI install a previous version of the runtime package - 'tns 
         }
 
         project.ext.extractedDependenciesDir = "${project.buildDir}/exploded-dependencies"
+        project.ext.cleanupAllJarsTimestamp = "${project.buildDir}/cleanupAllJars.timestamp"
+        project.ext.extractAllJarsTimestamp = "${project.buildDir}/extractAllJars.timestamp"
         project.ext.nativescriptDependencies = new JsonSlurper().parseText(dependenciesJson.text)
         project.ext.PLATFORMS_ANDROID = "platforms/android"
         project.ext.USER_PROJECT_ROOT = "$rootDir/../.."
@@ -257,10 +262,11 @@ android {
 }
 
 def externalRuntimeExists = !findProject(':runtime').is(null)
+def pluginDependencies
 
 repositories {
     // used for local *.AAR files
-    def pluginDependencies = nativescriptDependencies.collect {
+    pluginDependencies = nativescriptDependencies.collect {
         "$rootDir/${it.directory}/$PLATFORMS_ANDROID"
     }
 
@@ -416,11 +422,14 @@ tasks.whenTaskAdded({ org.gradle.api.DefaultTask currentTask ->
 ////////////////////////////////////////////////////////////////////////////////////
 
 task runSbg(type: JavaExec) {
+    dependsOn "collectAllJars"
     if (!findProject(':static-binding-generator').is(null)) {
         dependsOn ':static-binding-generator:jar'
     }
 
+    outputs.dir(OUTPUT_JAVA_DIR)
     inputs.dir(INPUT_JS_DIR)
+    inputs.dir(extractedDependenciesDir)
 
     workingDir "$BUILD_TOOLS_PATH"
     main "-jar"
@@ -438,22 +447,19 @@ task ensureMetadataOutDir {
     }
 }
 
-def explodeAar(File compileDependency, String outputDir) {
+def explodeAar(File compileDependency, File outputDir) {
+    logger.info("explodeAar: Extracting ${compileDependency.path} -> ${outputDir.path}")
+	
     if (compileDependency.name.endsWith(".aar")) {
         java.util.jar.JarFile jar = new java.util.jar.JarFile(compileDependency)
         Enumeration enumEntries = jar.entries()
         while (enumEntries.hasMoreElements()) {
             java.util.jar.JarEntry file = (java.util.jar.JarEntry) enumEntries.nextElement()
             if (file.name.endsWith(".jar")) {
-                def f = new File(outputDir, file.name)
-                new File(f.parent).mkdirs()
-                InputStream is = jar.getInputStream(file)
-                FileOutputStream fos = new FileOutputStream(f)
-                while (is.available() > 0) {
-                    fos.write(is.read())
-                }
-                fos.close()
-                is.close()
+                def targetFile = new File(outputDir, file.name)
+                InputStream inputStream = jar.getInputStream(file)
+                new File(targetFile.parent).mkdirs()
+                Files.copy(inputStream, targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
             }
             if (file.isDirectory()) {
                 continue
@@ -468,40 +474,111 @@ def explodeAar(File compileDependency, String outputDir) {
     }
 }
 
-task extractAllJars {
-    outputs.dir extractedDependenciesDir
+def md5(String string) {
+    MessageDigest digest = MessageDigest.getInstance("MD5") ;
+    digest.update(string.bytes); 
+    return new BigInteger(1, digest.digest()).toString(16).padLeft(32, '0');
+}
 
-    doLast {
-        def buildType = project.selectedBuildType == "release" ? "Release" : "Debug"
-        def iter = []
-        Pattern pattern = Pattern.compile("^(.+)${buildType}CompileClasspath\$")
-        def artifactType = Attribute.of('artifactType', String)
-        configurations.all { config ->
-            Matcher matcher = pattern.matcher(config.name)
-            if (matcher.find() || config.name == "${buildType.toLowerCase()}CompileClasspath") {
-                config.incoming.artifactView {
-                    attributes {
-                        it.attribute(artifactType, 'jar')
+class WorkerTask extends DefaultTask {
+    @Inject
+    WorkerExecutor getWorkerExecutor() {
+        throw new UnsupportedOperationException()
+    }
+}
+
+class EmptyRunnable implements Runnable {
+    void run() {
+    }
+}
+
+// Discover all jars and dynamically create tasks for the extraction of each of them
+def allJars = []
+afterEvaluate { project -> 
+    def buildType = project.selectedBuildType == "release" ? "Release" : "Debug"
+    def jars = []
+    Pattern pattern = Pattern.compile("^(.+)${buildType}CompileClasspath\$")
+    def artifactType = Attribute.of('artifactType', String)
+    configurations.all { config ->
+        Matcher matcher = pattern.matcher(config.name)
+        if (matcher.find() || config.name == "${buildType.toLowerCase()}CompileClasspath") {
+            config.incoming.artifactView {
+                attributes {
+                    it.attribute(artifactType, 'jar')
+                }
+            }.artifacts.each {
+                def jar = it.file;
+                if (!jars.contains(jar)) {
+                    jars.push(jar)
+                    def destDir = md5(jar.path);
+                    def outputDir = new File(Paths.get(extractedDependenciesDir, destDir).normalize().toString())
+
+                    def taskName = "extract_${jar.name}_to_${destDir}"
+                    logger.debug("Creating dynamic task ${taskName}")
+                    task "${taskName}" (type: WorkerTask) {
+                        dependsOn cleanupAllJars
+                        extractAllJars.dependsOn it
+
+                        // This dependency seems redundant but probably due to some Gradle issue with workers, 
+                        // without it `runSbg` sporadically starts before all extraction tasks have finished and
+                        // fails due to missing JARs
+                        runSbg.dependsOn it
+
+                        inputs.files jar
+                        outputs.dir outputDir
+
+                        doLast {
+                            // Runing in parallel no longer seems to bring any benefit.
+                            // It mattered only when we were extracting JARs from AARs.
+                            // To try it simply remove the following comments.
+                            // workerExecutor.submit(EmptyRunnable.class) {
+                                explodeAar(jar, outputDir)
+                            // }
+                        }
                     }
-                }.artifacts.each {
-                    if (!iter.contains(it.file)) {
-                        iter.push(it.file)
-                    }
+                    allJars.push([file: jar, outputDir: outputDir])
                 }
             }
-        }
-
-        def dependencyCounter = 0
-        iter.each {
-            def nextDependency = it
-            def outputDir = java.nio.file.Paths.get(extractedDependenciesDir, "" + dependencyCounter).normalize().toString()
-            explodeAar(nextDependency, outputDir)
-            dependencyCounter++
         }
     }
 }
 
+task cleanupAllJars {
+    // Ideally we would depend on the list of all discovered jars, but we cannot discover them before 
+    // the execution phase of the build begins, so instead we depend on the list of libs directories that might 
+    // contain aar or jar files.
+    inputs.files(pluginDependencies)
+    outputs.files cleanupAllJarsTimestamp
+
+    doLast {
+        def allDests = allJars*.outputDir*.name;
+        def dir = new File(extractedDependenciesDir)
+        if (dir.exists()) {
+            dir.eachDir {
+                // An old directory which is no longer a dependency (e.g. orphaned by a deleted plugin)
+                if (!allDests.contains(it.name)) {
+                    logger.info("Task cleanupAllJars: Deleting orphaned ${it.path}")
+                    org.apache.commons.io.FileUtils.deleteDirectory(it)
+                }
+            }
+        }
+        new File(cleanupAllJarsTimestamp).write ""
+    }
+}
+
+
+// Placeholder task which depends on all dynamically generated extraction tasks
+task extractAllJars {
+    dependsOn cleanupAllJars
+    outputs.files extractAllJarsTimestamp
+
+    doLast {
+        new File(cleanupAllJarsTimestamp).write ""
+    }
+}
+
 task collectAllJars {
+    dependsOn extractAllJars
     description "gathers all paths to jar dependencies before building metadata with them"
 
     def sdkPath = android.sdkDirectory.getAbsolutePath()
