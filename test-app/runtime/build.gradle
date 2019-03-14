@@ -25,10 +25,10 @@ project.ext._buildToolsVersion = "28.0.3"
 android {
     sourceSets {
         main {
-            def defaultSrcPath = "src/main/java";
+            def defaultSrcPath = "src/main/java"
             def bindingGeneratorSourcePath = new File(project(":runtime-binding-generator").projectDir, defaultSrcPath)
 
-            // embedd runtime binding generator in runtime, while keeping it in a sperate project
+            // embed runtime binding generator in runtime, while keeping it in a separate project
             java.srcDirs = [bindingGeneratorSourcePath, defaultSrcPath]
         }
     }
