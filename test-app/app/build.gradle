@@ -339,7 +339,7 @@ dependencies {
         println "\t + adding nativescript runtime package dependency: $runtime"
         project.dependencies.add("implementation", [name: runtime, ext: "aar"])
     } else {
-        implementation project(path: ':runtime', configuration: 'default')
+        implementation project(':runtime')
     }
 
 }
@@ -475,12 +475,17 @@ task extractAllJars {
         def buildType = project.selectedBuildType == "release" ? "Release" : "Debug"
         def iter = []
         Pattern pattern = Pattern.compile("^(.+)${buildType}CompileClasspath\$")
+        def artifactType = Attribute.of('artifactType', String)
         configurations.all { config ->
             Matcher matcher = pattern.matcher(config.name)
             if (matcher.find() || config.name == "${buildType.toLowerCase()}CompileClasspath") {
-                config.resolve().each {
-                    if (!iter.contains(it)) {
-                        iter.push(it)
+                config.incoming.artifactView {
+                    attributes {
+                        it.attribute(artifactType, 'jar')
+                    }
+                }.artifacts.each {
+                    if (!iter.contains(it.file)) {
+                        iter.push(it.file)
                     }
                 }
             }
