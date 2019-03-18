@@ -427,7 +427,7 @@ task runSbg(type: JavaExec) {
         dependsOn ':static-binding-generator:jar'
     }
 
-    outputs.dir(OUTPUT_JAVA_DIR)
+    outputs.dir("$OUTPUT_JAVA_DIR/com/tns/gen")
     inputs.dir(INPUT_JS_DIR)
     inputs.dir(extractedDependenciesDir)
 
