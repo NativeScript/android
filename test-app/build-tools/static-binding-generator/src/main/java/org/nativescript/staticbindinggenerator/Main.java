@@ -153,7 +153,7 @@ public class Main {
                 if (pJsonFile) {
                     File jsonFile = new File(currentDir, "package.json");
                     String jsonContent = FileUtils.readFileToString(jsonFile, "UTF-8");
-                    JSONObject pjson = null;
+                    JSONObject pjson;
                     try {
                         pjson = new JSONObject(jsonContent);
                     } catch (JSONException e) {
@@ -166,7 +166,7 @@ public class Main {
                     } else {
                         JSONObject nsValue = (JSONObject) pjson.get("nativescript");
                         if (nsValue.has("recursive-static-bindings")) {
-//                            System.out.println(String.format("Task: traverseDirectory: Folder will be traversed completely: %s", currentDir));
+                            System.out.println(String.format("Task: traverseDirectory: Folder will be traversed completely: %s", currentDir));
                             traverseExplicitly = true;
                         }
                     }
@@ -221,6 +221,6 @@ public class Main {
     }
 
     private static boolean isJsFile(String fileName) {
-        return fileName.substring(fileName.length() - 3, fileName.length()).equals(".js");
+        return fileName.substring(fileName.length() - 3).equals(".js");
     }
 }

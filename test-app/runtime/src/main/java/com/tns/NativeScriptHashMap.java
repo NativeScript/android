@@ -36,10 +36,8 @@ import java.io.Serializable;
  * <p>
  * The {@code Iterator} created by calling the {@code iterator} method may throw a {@code ConcurrentModificationException} if the map is structurally changed while an iterator is used to iterate over the elements. Only the {@code remove} method that is provided by the iterator allows for removal of elements during iteration. It is not possible to guarantee that this mechanism works in all cases of unsynchronized concurrent modification. It should only be used for debugging purposes.
  *
- * @param <K>
- *            the type of keys maintained by this map
- * @param <V>
- *            the type of mapped values
+ * @param <K> the type of keys maintained by this map
+ * @param <V> the type of mapped values
  */
 
 public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Cloneable, Serializable {
@@ -119,10 +117,8 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
     /**
      * Constructs a new {@code HashMap} instance with the specified capacity.
      *
-     * @param capacity
-     *            the initial capacity of this hash map.
-     * @throws IllegalArgumentException
-     *             when the capacity is less than zero.
+     * @param capacity the initial capacity of this hash map.
+     * @throws IllegalArgumentException when the capacity is less than zero.
      */
     public NativeScriptHashMap(int capacity) {
         if (capacity < 0) {
@@ -151,13 +147,10 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
      * Constructs a new {@code HashMap} instance with the specified capacity and
      * load factor.
      *
-     * @param capacity
-     *            the initial capacity of this hash map.
-     * @param loadFactor
-     *            the initial load factor.
-     * @throws IllegalArgumentException
-     *             when the capacity is less than zero or the load factor is
-     *             less or equal to zero or NaN.
+     * @param capacity   the initial capacity of this hash map.
+     * @param loadFactor the initial load factor.
+     * @throws IllegalArgumentException when the capacity is less than zero or the load factor is
+     *                                  less or equal to zero or NaN.
      */
     public NativeScriptHashMap(int capacity, float loadFactor) {
         this(capacity);
@@ -177,8 +170,7 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
      * Constructs a new {@code HashMap} instance containing the mappings from
      * the specified map.
      *
-     * @param map
-     *            the mappings to add.
+     * @param map the mappings to add.
      */
     public NativeScriptHashMap(Map<? extends K, ? extends V> map) {
         this(capacityForInitSize(map.size()));
@@ -278,8 +270,7 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
     /**
      * Returns the value of the mapping with the specified key.
      *
-     * @param key
-     *            the key.
+     * @param key the key.
      * @return the value of the mapping with the specified key, or {@code null} if no mapping for the specified key is found.
      */
     public V get(Object key) {
@@ -302,8 +293,7 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
     /**
      * Returns whether this map contains the specified key.
      *
-     * @param key
-     *            the key to search for.
+     * @param key the key to search for.
      * @return {@code true} if this map contains the specified key, {@code false} otherwise.
      */
     @Override
@@ -326,8 +316,7 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
     /**
      * Returns whether this map contains the specified value.
      *
-     * @param value
-     *            the value to search for.
+     * @param value the value to search for.
      * @return {@code true} if this map contains the specified value, {@code false} otherwise.
      */
     @Override
@@ -359,10 +348,8 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
     /**
      * Maps the specified key to the specified value.
      *
-     * @param key
-     *            the key.
-     * @param value
-     *            the value.
+     * @param key   the key.
+     * @param value the value.
      * @return the value of any previous mapping with the specified key or {@code null} if there was no such mapping.
      */
     @Override
@@ -413,8 +400,7 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
      * Give LinkedHashMap a chance to take action when we modify an existing
      * entry.
      *
-     * @param e
-     *            the entry we're about to modify.
+     * @param e the entry we're about to modify.
      */
     void preModify(HashMapEntry<K, V> e) {
     }
@@ -486,8 +472,7 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
      * will replace all mappings that this map had for any of the keys currently
      * in the given map.
      *
-     * @param map
-     *            the map to copy mappings from.
+     * @param map the map to copy mappings from.
      */
     @Override
     public void putAll(Map<? extends K, ? extends V> map) {
@@ -523,7 +508,7 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
         if (size != 0) {
             int newMask = newCapacity - 1;
             for (int i = 0; i < oldCapacity; i++) {
-                for (HashMapEntry<K, V> e = oldTable[i]; e != null;) {
+                for (HashMapEntry<K, V> e = oldTable[i]; e != null; ) {
                     HashMapEntry<K, V> oldNext = e.next;
                     int newIndex = e.hash & newMask;
                     HashMapEntry<K, V> newNext = newTable[newIndex];
@@ -538,8 +523,7 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
     /**
      * Allocate a table of the given capacity and set the threshold accordingly.
      *
-     * @param newCapacity
-     *            must be a power of two
+     * @param newCapacity must be a power of two
      */
     private HashMapEntry<K, V>[] makeTable(int newCapacity) {
         @SuppressWarnings({"unchecked", "rawtypes"})
@@ -601,10 +585,9 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
     /**
      * Removes the mapping with the specified key from this map.
      *
-     * @param key
-     *            the key of the mapping to remove.
+     * @param key the key of the mapping to remove.
      * @return the value of the removed mapping or {@code null} if no mapping
-     *         for the specified key was found.
+     * for the specified key was found.
      */
     @Override
     public V remove(Object key) {
@@ -986,7 +969,7 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
     private static final long serialVersionUID = 362498820763181265L;
 
     private static final ObjectStreamField[] serialPersistentFields =
-    { new ObjectStreamField("loadFactor", float.class) };
+            {new ObjectStreamField("loadFactor", float.class)};
 
     private void writeObject(ObjectOutputStream stream) throws IOException {
         // Emulate loadFactor field for other implementations to read
@@ -1049,12 +1032,14 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
 
     private static int secondaryHashForObject(Object key) {
         int intHash;
+
         if (key instanceof NativeScriptHashCodeProvider) {
             NativeScriptHashCodeProvider provider = (NativeScriptHashCodeProvider) key;
             intHash = provider.hashCode__super();
         } else {
             intHash = System.identityHashCode(key);
         }
+
         return secondaryHashForInt(intHash);
     }
 

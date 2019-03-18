@@ -701,12 +701,14 @@ public class NativeScriptWeakHashMap<K, V> extends NativeScriptAbstractMap<K, V>
 
     private static int secondaryHashForObject(Object key) {
         int intHash;
+
         if (key instanceof NativeScriptHashCodeProvider) {
             NativeScriptHashCodeProvider provider = (NativeScriptHashCodeProvider) key;
             intHash = provider.hashCode__super();
         } else {
             intHash = System.identityHashCode(key);
         }
+
         return secondaryHashForInt(intHash);
     }
 

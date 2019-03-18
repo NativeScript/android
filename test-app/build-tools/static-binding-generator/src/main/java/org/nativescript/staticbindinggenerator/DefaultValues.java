@@ -5,7 +5,7 @@ import org.apache.bcel.generic.Type;
 import java.util.HashMap;
 import java.util.Map;
 
-class DefaultValues {
+public class DefaultValues {
     static final Map<Type, String> defaultValues = new HashMap<>();
 
     // load

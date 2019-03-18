@@ -1,5 +1,7 @@
 package org.nativescript.staticbindinggenerator;
 
+import java.util.Arrays;
+
 public class DataRow {
     private final String DELIMITER = "\\*";
     private final int ELEMENT_NUMBER = 9;
@@ -85,5 +87,24 @@ public class DataRow {
         filename = data[newClassNameIndex + 2];
         jsFilename = data[newClassNameIndex + 3];
         interfaces = data[newClassNameIndex + 4].split(",");
+    }
+
+    @Override
+    public String toString() {
+        return "DataRow{" +
+                "DELIMITER='" + DELIMITER + '\'' +
+                ", ELEMENT_NUMBER=" + ELEMENT_NUMBER +
+                ", row='" + row + '\'' +
+                ", baseClassname='" + baseClassname + '\'' +
+                ", suffix='" + suffix + '\'' +
+                ", file='" + file + '\'' +
+                ", line='" + line + '\'' +
+                ", column='" + column + '\'' +
+                ", newClassName='" + newClassName + '\'' +
+                ", methods=" + Arrays.toString(methods) +
+                ", filename='" + filename + '\'' +
+                ", jsFilename='" + jsFilename + '\'' +
+                ", interfaces=" + Arrays.toString(interfaces) +
+                '}';
     }
 }

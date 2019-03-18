@@ -6,6 +6,7 @@
 #include "NumericCasts.h"
 #include "Runtime.h"
 #include "V8GlobalHelpers.h"
+#include "NativeScriptAssert.h"
 #include <sstream>
 
 using namespace v8;

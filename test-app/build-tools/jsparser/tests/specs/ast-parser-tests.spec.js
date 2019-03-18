@@ -30,7 +30,7 @@ function clearOutput() {
 
 describe("parser/js_parser tests", function () {
     beforeAll(() => {
-        jasmine.DEFAULT_TIMEOUT_INTERVAL = 20 * 1000; // give enough time to start the gradle daemon
+        jasmine.DEFAULT_TIMEOUT_INTERVAL = 100 * 1000; // give enough time to start the gradle daemon
     });
 
     describe("Traversal tests", function () {
