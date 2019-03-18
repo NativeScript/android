@@ -13,11 +13,11 @@ describe("Tests extended classes ", function () {
 		var labelToString = button.toString();
 		var labelgetIMAGE_ID_PROP = button.getIMAGE_ID_PROP();
 		//
-		
+
 		var button1 = new com.tns.tests.Button1();
 		var labelToString1 = button1.toString();
 		var labelgetIMAGE_ID_PROP1 = button1.getIMAGE_ID_PROP();
-		
+
 		expect(labelToString).not.toBe(labelToString1);
 		expect(labelgetIMAGE_ID_PROP).not.toBe(labelgetIMAGE_ID_PROP1);
 	});
@@ -81,9 +81,9 @@ describe("Tests extended classes ", function () {
 
         expect(Child.extend()).toBe("expectedValue");
 	});
-	
+
 	it("Instance with extension shouldn't use previously defined implementation object", function () {
-		
+
 		var MyButton = com.tns.tests.Button1.extend({
 			toString: function () {
 				return "overriden toString method of button instance";
@@ -96,7 +96,7 @@ describe("Tests extended classes ", function () {
 		var labelToString = button.toString();
 		var labelgetIMAGE_ID_PROP = button.getIMAGE_ID_PROP();
 		//
-		
+
 		var MyButton1 = com.tns.tests.Button1.extend({
 			toString: function () {
 				return "overriden toString method of button1 instance ";
@@ -112,12 +112,12 @@ describe("Tests extended classes ", function () {
 		expect(labelToString).not.toBe(labelToString1);
 		expect(labelgetIMAGE_ID_PROP).not.toBe(labelgetIMAGE_ID_PROP1);
 	});
-	
+
 	it("Newly created instances should behave the same and not use previously defined implementation objects", function () {
 
 		var button1 = new com.tns.tests.Button1();
 		var labelgetIMAGE_ID_PROP1 = button1.getIMAGE_ID_PROP();
-		
+
 		//
 		var MyButton = com.tns.tests.Button1.extend({
 			getIMAGE_ID_PROP: function () {
@@ -127,10 +127,10 @@ describe("Tests extended classes ", function () {
 		var button = new MyButton();
 		var labelgetIMAGE_ID_PROP = button.getIMAGE_ID_PROP();
 		//
-		
+
 		var button2 = new com.tns.tests.Button1();
 		var labelgetIMAGE_ID_PROP2 = button2.getIMAGE_ID_PROP();
-		
+
 		expect(labelgetIMAGE_ID_PROP1).toBe(labelgetIMAGE_ID_PROP2);
 	});
 

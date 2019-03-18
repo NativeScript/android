@@ -8,55 +8,55 @@ describe("Tests typescript", function () {
 		jasmine.addCustomEqualityTester(myCustomEquality);
 	});
 	
-	it("When_creating_a_typescript_instance_with_constructor_property_it_should_support_this", function () {
-	
-		__log("TEST: When_creating_a_typescript_instance_with_constructor_property_it_should_support_this");
-		var NativeViewGroup = (function (_super) {
-		    __extends(NativeViewGroup, _super);
-		    function NativeViewGroup(view) {
-		        this._view = view;
-		        return this;
-		    }
-		    
-		    NativeViewGroup.prototype.Then = function () {
-		    	this._view.Do();
-		    };
-		    
-		    return NativeViewGroup;
-		})(android.view.ViewGroup);
-		
-		var doCalled = false;
-
-	    var myView = new NativeViewGroup({ Do: function() { doCalled = true; }});
-	    myView.Then();
-	    expect(doCalled).toEqual(true);
-	    
-	    var MyButton = (function (_super) {
-	        __extends(MyButton, _super);
-	        function MyButton() {
-	            var _this = _super.call(this) || this;
-	            _this.myName = "MyName";
-	            return _this;
-	        }
-	        
-	        MyButton.prototype.echo = function (s) {
-	            return "echo: " + this.myName;
-	        };
-	        
-	        MyButton.prototype.toString = function (s) {
-	            return "toString: " + this.myName;
-	        };
-	        
-	        return MyButton;
-	    })(com.tns.tests.Button1);
-
-	    var b = new MyButton();
-	    var exo = b.triggerEcho("exo");
-	    expect(exo).toBe("echo: MyName");
-	    
-	    var toStringResult = b.toString();
-	    expect(toStringResult).toBe("toString: MyName");
-	});
+//	it("When_creating_a_typescript_instance_with_constructor_property_it_should_support_this", function () {
+//
+//		__log("TEST: When_creating_a_typescript_instance_with_constructor_property_it_should_support_this");
+//		var NativeViewGroup = (function (_super) {
+//		    __extends(NativeViewGroup, _super);
+//		    function NativeViewGroup(view) {
+//		        this._view = view;
+//		        return this;
+//		    }
+//
+//		    NativeViewGroup.prototype.Then = function () {
+//		    	this._view.Do();
+//		    };
+//
+//		    return NativeViewGroup;
+//		})(android.view.ViewGroup);
+//
+//		var doCalled = false;
+//
+//	    var myView = new NativeViewGroup({ Do: function() { doCalled = true; }});
+//	    myView.Then();
+//	    expect(doCalled).toEqual(true);
+//
+//	    var MyButton = (function (_super) {
+//	        __extends(MyButton, _super);
+//	        function MyButton() {
+//	            var _this = _super.call(this) || this;
+//	            _this.myName = "MyName";
+//	            return _this;
+//	        }
+//
+//	        MyButton.prototype.echo = function (s) {
+//	            return "echo: " + this.myName;
+//	        };
+//
+//	        MyButton.prototype.toString = function (s) {
+//	            return "toString: " + this.myName;
+//	        };
+//
+//	        return MyButton;
+//	    })(com.tns.tests.Button1);
+//
+//	    var b = new MyButton();
+//	    var exo = b.triggerEcho("exo");
+//	    expect(exo).toBe("echo: MyName");
+//
+//	    var toStringResult = b.toString();
+//	    expect(toStringResult).toBe("toString: MyName");
+//	});
 
 	it("When_creating_a_typescript_instance_it_should_support_overriden_members", function () {
 		

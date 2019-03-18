@@ -56,6 +56,15 @@ var MyActivity = (function (_super) {
     			button.setBackgroundColor(colors[taps % colors.length]);
     			taps++;
     		}}));
+
+    	let ClickListener = java.lang.Object.extend({
+                interfaces: [android.view.View.OnClickListener],
+                onClick: function() {
+                    // Perform action on click
+                }
+            });
+
+        let clickListener = new ClickListener();
     };
     MyActivity = __decorate([
         JavaProxy("com.tns.NativeScriptActivity")

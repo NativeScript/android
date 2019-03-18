@@ -166,7 +166,7 @@ public class Main {
                     } else {
                         JSONObject nsValue = (JSONObject) pjson.get("nativescript");
                         if (nsValue.has("recursive-static-bindings")) {
-//                            System.out.println(String.format("Task: traverseDirectory: Folder will be traversed completely: %s", currentDir));
+                            System.out.println(String.format("Task: traverseDirectory: Folder will be traversed completely: %s", currentDir));
                             traverseExplicitly = true;
                         }
                     }

@@ -1,0 +1,2 @@
+Example tests the case when a class extends another one with a generic argument T and implements an interface with generic argument T.
+Child class should have its formal type parameter resolved only once.

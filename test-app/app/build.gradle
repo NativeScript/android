@@ -187,7 +187,7 @@ android {
             if (onlyX86) {
                 abiFilters 'x86'
             } else {
-                abiFilters 'x86', 'armeabi-v7a'//, 'arm64-v8a'
+                abiFilters 'x86'//, 'armeabi-v7a'//, 'arm64-v8a'
             }
         }
         dexOptions {
@@ -266,7 +266,6 @@ dependencies {
     if (project.hasProperty("supportVersion")) {
         supportVer = supportVersion
     }
-
     if (project.hasProperty("useAndroidX") && (useAndroidX || useAndroidX.toBoolean())) {
         def androidXLegacyVersion = "1.0.0"
         if (project.hasProperty("androidXLegacy")) {
@@ -297,20 +296,6 @@ dependencies {
         implementation "com.android.support:appcompat-v7:$supportVer"
         implementation "com.android.support:design:$supportVer"
     }
-
-    def sbgProjectExists = !findProject(':static-binding-generator').is(null)
-    if (sbgProjectExists) {
-        compileOnly project(':static-binding-generator')
-    }
-    def mdgProjectExists = !findProject(':android-metadata-generator').is(null)
-    if (mdgProjectExists) {
-        compileOnly project(':android-metadata-generator')
-    }
-    def dtsgProjectExists = !findProject(':dts-generator').is(null)
-    if (dtsgProjectExists) {
-        compileOnly project(':dts-generator')
-    }
-
     def useV8Symbols = nativescriptDependencies.any {
         def packageJsonPath = file("$rootDir/${it.directory}/$PACKAGE_JSON")
         def packageJson = new JsonSlurper().parseText(packageJsonPath.text)
@@ -406,11 +391,16 @@ tasks.whenTaskAdded({ org.gradle.api.DefaultTask currentTask ->
 ////////////////////////////////////////////////////////////////////////////////////
 
 task runSbg(type: JavaExec) {
+    if (!findProject(':static-binding-generator').is(null)) {
+        dependsOn ':static-binding-generator:jar'
+    }
+
     inputs.dir(INPUT_JS_DIR)
 
     workingDir "$BUILD_TOOLS_PATH"
     main "-jar"
     args "static-binding-generator.jar"
+    jvmArgs "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=6006"
 
     doFirst {
         new File("$OUTPUT_JAVA_DIR/com/tns/gen").deleteDir();
@@ -492,6 +482,7 @@ task collectAllJars {
         def allJarPaths = new LinkedList<String>()
         allJarPaths.add(androidJar)
         allJarPaths.addAll(pluginsJarLibraries)
+
         def ft = fileTree(dir: extractedDependenciesDir, include: "**/*.jar")
         ft.each { currentJarFile ->
             allJarPaths.add(currentJarFile.getAbsolutePath())
@@ -520,6 +511,10 @@ task collectAllJars {
 }
 
 task buildMetadata(type: JavaExec) {
+    if (!findProject(':android-metadata-generator').is(null)) {
+        dependsOn ':android-metadata-generator:jar'
+    }
+
     description "builds metadata with provided jar dependencies"
 
     inputs.files("$MDG_JAVA_DEPENDENCIES")
@@ -597,6 +592,10 @@ task makeAndroidXChanges {
 }
 
 task generateTypescriptDefinitions(type: JavaExec) {
+    if (!findProject(':dts-generator').is(null)) {
+        dependsOn ':dts-generator:jar'
+    }
+
     def paramz = new ArrayList<String>()
     def includeDirs = ["com.android.support", "/platforms/" + android.compileSdkVersion]
 

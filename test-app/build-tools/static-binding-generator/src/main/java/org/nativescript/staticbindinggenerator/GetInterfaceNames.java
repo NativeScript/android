@@ -1,5 +1,7 @@
 package org.nativescript.staticbindinggenerator;
 
+import com.google.common.base.Charsets;
+
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
@@ -8,7 +10,11 @@ import java.io.PrintWriter;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
@@ -19,10 +25,10 @@ public class GetInterfaceNames {
     private static String currentDir;
 
     /*
-    * generate interfaceNames.txt file, needed for js analyzer
-    * */
+     * generate interfaceNames.txt file, needed for js analyzer
+     * */
     public static void generateInterfaceFile(List<DataRow> rows)
-    throws IOException, ClassNotFoundException {
+            throws IOException, ClassNotFoundException {
         currentDir = System.getProperty("user.dir");
         String outputFileName = Main.SBG_INTERFACE_NAMES;
 
@@ -45,7 +51,7 @@ public class GetInterfaceNames {
 //            }
 //        }
 
-        for(String line: interfacesList) {
+        for (String line : interfacesList) {
             out.println(line);
         }
 
@@ -99,7 +105,7 @@ public class GetInterfaceNames {
     }
 
     private static URLClassLoader getClassLoader(String pathToJar) throws MalformedURLException {
-        URL[] urls = { new URL("jar:file:" + pathToJar + "!/") };
+        URL[] urls = {new URL("jar:file:" + pathToJar + "!/")};
         URLClassLoader cl = URLClassLoader.newInstance(urls);
         return cl;
     }

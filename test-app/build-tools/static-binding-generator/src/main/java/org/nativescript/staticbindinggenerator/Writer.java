@@ -7,12 +7,14 @@ public class Writer {
         sb = new StringBuilder();
     }
 
-    public String getSting() {
-        return sb.toString();
-    }
-
     public void write(char c) {
         sb.append(c);
+    }
+
+    public void write(char c, int count) {
+        for (int i = 0; i < count; i += 1) {
+            sb.append(c);
+        }
     }
 
     public void write(int i) {
@@ -33,6 +35,11 @@ public class Writer {
 
     public void writeln(String text) {
         write(text);
+        appendLineEnding();
+    }
+
+    public void writeln(char c) {
+        write(c);
         appendLineEnding();
     }
 

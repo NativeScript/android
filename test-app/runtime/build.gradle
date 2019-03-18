@@ -67,7 +67,7 @@ android {
 
                 //https://developer.android.com/ndk/guides/cmake.html
                 //TODO: plamen5kov: figure out why can't ANDROID_TOOLCHAIN and ANDROID_STL be set in CMakeLists.txt
-                arguments "-DANDROID_TOOLCHAIN=clang", "-DANDROID_STL=c++_static", "-DANDROID_NDK_ROOT=${android.ndkDirectory}"
+                arguments "-DANDROID_TOOLCHAIN=clang", "-DANDROID_STL=c++_static", "-DANDROID_NDK_ROOT=/Users/vmutafov/work/ndk/android-ndk-r18b"
             }
         }
 
@@ -75,7 +75,7 @@ android {
             if (onlyX86) {
                 abiFilters 'x86'
             } else {
-                abiFilters 'x86', 'armeabi-v7a', 'arm64-v8a'
+                abiFilters 'x86'//, 'armeabi-v7a', 'arm64-v8a'
             }
         }
     }
