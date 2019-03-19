@@ -13,7 +13,7 @@
 	}
 	
 	@JavaProxy("com.tns.NativeScriptActivity")
-	class MyActivity extends android.support.v7.app.AppCompatActivity
+	class MyActivity extends android.app.Activity
 	{
 		onCreate(bundle: android.os.Bundle) 
 		{
@@ -61,4 +61,4 @@ var MyActivity = (function (_super) {
         JavaProxy("com.tns.NativeScriptActivity")
     ], MyActivity);
     return MyActivity;
-})(android.support.v7.app.AppCompatActivity);
+})(android.app.Activity);
