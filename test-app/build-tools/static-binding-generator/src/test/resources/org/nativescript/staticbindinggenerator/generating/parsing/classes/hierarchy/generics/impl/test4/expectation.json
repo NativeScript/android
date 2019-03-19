@@ -1,0 +1,31 @@
+{
+  "allImplementedInterfaces": {
+    "org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl.test4.Interface2": {
+      "genericParameters": {
+        "V": "org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl.test4.Concrete",
+        "K": "java.util.List\u003cjava.lang.String\u003e"
+      }
+    },
+    "org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl.test4.Interface3": {
+      "genericParameters": {
+        "P": "java.util.List\u003cjava.lang.String\u003e",
+        "M": "java.util.Map\u003cjava.util.List\u003cjava.lang.String\u003e, org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl.test4.Concrete\u003e",
+        "N": "org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl.test4.Concrete"
+      }
+    },
+    "org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl.test4.Interface4": {
+      "genericParameters": {
+        "A": "java.util.Map\u003cjava.util.List\u003cjava.lang.String\u003e, org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl.test4.Concrete\u003e",
+        "B": "org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl.test4.Concrete",
+        "C": "java.util.List\u003cjava.lang.String\u003e",
+        "D": "java.util.List\u003cjava.util.List\u003cjava.util.List\u003cjava.util.Map\u003cjava.util.List\u003cjava.lang.String\u003e, org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl.test4.Concrete\u003e\u003e\u003e\u003e"
+      }
+    },
+    "org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl.test4.Interface1": {
+      "genericParameters": {
+        "T": "org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl.test4.Concrete"
+      }
+    }
+  },
+  "allParentClasses": {}
+}

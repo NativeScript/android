@@ -1,0 +1,33 @@
+{
+  "allImplementedInterfaces": {
+    "org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl.test3.GenericInterface2": {
+      "genericParameters": {
+        "T": "java.lang.String",
+        "E": "java.util.Map\u003cjava.lang.String, java.lang.String\u003e",
+        "V": "java.lang.String",
+        "K": "java.util.Map\u003cjava.lang.String, java.lang.String\u003e"
+      }
+    },
+    "org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl.test3.GenericInterface1": {
+      "genericParameters": {
+        "T": "java.util.List\u003cjava.lang.String\u003e"
+      }
+    }
+  },
+  "allParentClasses": {
+    "org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl.test3.GenericBase1": {
+      "genericParameters": {
+        "T": "java.lang.String"
+      }
+    },
+    "org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl.test3.GenericBase2": {
+      "genericParameters": {
+        "A": "java.util.Map\u003cjava.lang.String, java.lang.String\u003e",
+        "B": "java.lang.String"
+      }
+    },
+    "org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl.test3.Base": {
+      "genericParameters": {}
+    }
+  }
+}

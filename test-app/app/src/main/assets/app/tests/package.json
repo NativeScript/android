@@ -1,2 +1,5 @@
 {
+  "nativescript": {
+    "recursive-static-bindings": true
+  }
 }

@@ -1,0 +1,16 @@
+{
+  "allImplementedInterfaces": {},
+  "allParentClasses": {
+    "org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl.test1.GenericBase2": {
+      "genericParameters": {
+        "A": "java.lang.String",
+        "B": "java.lang.String"
+      }
+    },
+    "org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl.test1.GenericBase": {
+      "genericParameters": {
+        "T": "java.lang.String"
+      }
+    }
+  }
+}

@@ -19,10 +19,10 @@ public class GetInterfaceNames {
     private static String currentDir;
 
     /*
-    * generate interfaceNames.txt file, needed for js analyzer
-    * */
+     * generate interfaceNames.txt file, needed for js analyzer
+     * */
     public static void generateInterfaceFile(List<DataRow> rows)
-    throws IOException, ClassNotFoundException {
+            throws IOException {
         currentDir = System.getProperty("user.dir");
         String outputFileName = Main.SBG_INTERFACE_NAMES;
 
@@ -38,14 +38,7 @@ public class GetInterfaceNames {
 
         rows.parallelStream().forEach(consumer);
 
-//        for (DataRow dr : rows) {
-//            String pathToDependency = dr.getRow();
-//            if (pathToDependency.endsWith(".jar")) {
-//                generateInterfaceNames(pathToDependency, interfacesList);
-//            }
-//        }
-
-        for(String line: interfacesList) {
+        for (String line : interfacesList) {
             out.println(line);
         }
 
@@ -94,13 +87,11 @@ public class GetInterfaceNames {
             checkFile.createNewFile();
         }
 
-        PrintWriter out = new PrintWriter(new BufferedWriter(new FileWriter(checkFile.getAbsolutePath(), true)));
-        return out;
+        return new PrintWriter(new BufferedWriter(new FileWriter(checkFile.getAbsolutePath(), true)));
     }
 
     private static URLClassLoader getClassLoader(String pathToJar) throws MalformedURLException {
-        URL[] urls = { new URL("jar:file:" + pathToJar + "!/") };
-        URLClassLoader cl = URLClassLoader.newInstance(urls);
-        return cl;
+        URL[] urls = {new URL("jar:file:" + pathToJar + "!/")};
+        return URLClassLoader.newInstance(urls);
     }
 }

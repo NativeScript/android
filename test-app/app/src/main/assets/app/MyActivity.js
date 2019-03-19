@@ -56,6 +56,7 @@ var MyActivity = (function (_super) {
     			button.setBackgroundColor(colors[taps % colors.length]);
     			taps++;
     		}}));
+
     };
     MyActivity = __decorate([
         JavaProxy("com.tns.NativeScriptActivity")
