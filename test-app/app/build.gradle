@@ -26,6 +26,9 @@ import java.security.MessageDigest
 import javax.inject.Inject
 apply plugin: "com.android.application"
 
+// this is a temporary change of default value in order to create a package using android X by default
+project.ext.useAndroidX = true
+
 def onlyX86 = project.hasProperty("onlyX86")
 if (onlyX86) {
     println "OnlyX86 build triggered."
