@@ -83,6 +83,7 @@ public class Runtime {
     }
 
     public static void passSuppressedExceptionToJs(Throwable ex, String methodName) {
+        System.out.println("asd");
         com.tns.Runtime runtime = com.tns.Runtime.getCurrentRuntime();
         if (runtime != null) {
             String errorMessage = "Error on \"" + Thread.currentThread().getName() + "\" thread for " + methodName + "\n";
