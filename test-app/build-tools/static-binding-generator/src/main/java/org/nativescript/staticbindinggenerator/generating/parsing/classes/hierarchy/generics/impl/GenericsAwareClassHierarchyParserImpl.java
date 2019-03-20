@@ -276,7 +276,7 @@ public class GenericsAwareClassHierarchyParserImpl implements GenericsAwareClass
         Pattern cachedPattern = NESTED_GENERICS_REGEX_CACHE.get(providedFormalTypeParameterKey);
 
         if (cachedPattern == null) {
-            Pattern pattern = Pattern.compile("([^\\w\\[]*)" + providedFormalTypeParameterKey + "([^\\w\\[]*)");
+            Pattern pattern = Pattern.compile("([^\\w\\.])" + providedFormalTypeParameterKey + "(\\W)");
             NESTED_GENERICS_REGEX_CACHE.put(providedFormalTypeParameterKey, pattern);
             return pattern;
         }
