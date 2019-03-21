@@ -4,6 +4,7 @@ import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierar
 import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.GenericParameters;
 import org.nativescript.staticbindinggenerator.generating.parsing.methods.JavaMethod;
 import org.nativescript.staticbindinggenerator.generating.parsing.methods.ReifiedJavaMethod;
+import org.nativescript.staticbindinggenerator.naming.BcelNamingUtil;
 import org.nativescript.staticbindinggenerator.naming.JavaClassNames;
 import org.objectweb.asm.signature.SignatureReader;
 import org.objectweb.asm.util.TraceSignatureVisitor;
@@ -72,7 +73,7 @@ public class MethodSignatureReifier {
             return initialJavaClassGenericHierarchyView.getAllImplementedInterfaces().get(interfaceName);
         } else {
             String className = javaMethod.getDeclaringClassName();
-            if(initialJavaClassGenericHierarchyView.getInitialClassName().equals(className)){
+            if (initialJavaClassGenericHierarchyView.getInitialClassName().equals(className)) {
                 return initialJavaClassGenericHierarchyView.getInitialClassGenericParameters();
             }
             return initialJavaClassGenericHierarchyView.getAllParentClasses().get(className);
@@ -84,11 +85,12 @@ public class MethodSignatureReifier {
         String reifiedDeclaration = declaration;
 
         for (Map.Entry<String, String> resolvedFormalTypeParameter : resolvedFormalTypeParameters.getGenericParameters().entrySet()) {
-            Pattern pattern = Pattern.compile("(\\W)" + resolvedFormalTypeParameter.getKey() + "(\\W)");
+            Pattern pattern = Pattern.compile("([^\\w\\.])" + resolvedFormalTypeParameter.getKey() + "(\\W)");
 
             Matcher m = pattern.matcher(declaration);
             if (m.find()) {
-                reifiedDeclaration = m.replaceAll("$1" + resolvedFormalTypeParameter.getValue() + "$2");
+                String replacement = BcelNamingUtil.resolveClassName(resolvedFormalTypeParameter.getValue());
+                reifiedDeclaration = m.replaceAll("$1" + replacement + "$2");
             }
         }
 
@@ -102,15 +104,16 @@ public class MethodSignatureReifier {
             if (returnType.equals(resolvedFormalTypeParameter.getKey())) {
                 return resolvedFormalTypeParameter.getValue();
             } else {
-                Pattern pattern = Pattern.compile("(\\W)" + resolvedFormalTypeParameter.getKey() + "(\\W)");
+                Pattern pattern = Pattern.compile("([^\\w\\.])" + resolvedFormalTypeParameter.getKey() + "(\\W)");
                 Matcher m = pattern.matcher(returnType);
                 if (m.find()) {
-                    reifiedReturnType = m.replaceAll("$1" + resolvedFormalTypeParameter.getValue() + "$2");
+                    String replacement = BcelNamingUtil.resolveClassName(resolvedFormalTypeParameter.getValue());
+                    reifiedReturnType = m.replaceAll("$1" + replacement + "$2");
                 }
             }
         }
 
-        return reifiedReturnType;
+        return reifiedReturnType.replaceAll("\\$", ".");
     }
 
     private List<String> getReifiedArgumentsFromReifiedDeclaration(String reifiedDeclaration) {
@@ -148,6 +151,8 @@ public class MethodSignatureReifier {
                 } else {
                     reifiedArgumentBuffer.append(c);
                 }
+            } else if (c == '$') {
+                reifiedArgumentBuffer.append('.');
             } else {
                 reifiedArgumentBuffer.append(c);
             }

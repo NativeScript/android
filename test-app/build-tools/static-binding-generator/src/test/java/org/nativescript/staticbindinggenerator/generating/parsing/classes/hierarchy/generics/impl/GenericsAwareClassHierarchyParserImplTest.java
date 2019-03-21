@@ -1,7 +1,5 @@
 package org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl;
 
-import com.google.gson.GsonBuilder;
-
 import org.apache.bcel.classfile.JavaClass;
 import org.junit.Before;
 import org.junit.Rule;
@@ -10,7 +8,6 @@ import org.junit.rules.TestName;
 import org.nativescript.staticbindinggenerator.files.FileSystemHelper;
 import org.nativescript.staticbindinggenerator.files.impl.FileSystemHelperImpl;
 import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.GenericHierarchyView;
-import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.GenericParameters;
 import java.util.Map;
 
 public class GenericsAwareClassHierarchyParserImplTest {
