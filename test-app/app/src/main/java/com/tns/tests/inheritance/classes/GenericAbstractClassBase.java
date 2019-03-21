@@ -2,7 +2,7 @@ package com.tns.tests.inheritance.classes;
 
 import java.util.List;
 
-public abstract class GenericAbstractClass<K extends List<T>, T> {
+public abstract class GenericAbstractClassBase<K extends List<T>, T> {
 
     public abstract void workGeneric(T item);
 
