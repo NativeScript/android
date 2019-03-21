@@ -2,7 +2,7 @@ package com.tns.tests.inheritance.classes;
 
 import java.util.List;
 
-public class GenericSimpleClass<T, K extends List<T>> {
+public class GenericSimpleClassBase<T, K extends List<T>> {
 
     public void workGeneric(T item){
         System.out.println("public void workGeneric(T item)");

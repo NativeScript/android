@@ -1,6 +1,6 @@
 package com.tns.tests.inheritance.classes;
 
-public abstract class NonGenericAbstractClass {
+public abstract class NonGenericAbstractClassBase {
     public void work() {
         System.out.println("public void work()");
     }
