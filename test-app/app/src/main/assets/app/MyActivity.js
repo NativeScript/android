@@ -55,6 +55,26 @@ var MyActivity = (function (_super) {
     		onClick:  function() {
     			button.setBackgroundColor(colors[taps % colors.length]);
     			taps++;
+    			var NonGenericAbstractClassBase = com.tns.sgbtestclasses.inheritance.classes.NonGenericAbstractClassBase.extend({
+                                workAbstract: function() {
+                                    console.log("korrrr----->dddd")
+                                    throw new Error("ErrorMessage");
+                                },
+                                workAbstract: function(arg) {
+                                    console.log("korrrr111----->" + arg)
+                                    throw new Error(arg);
+                                },
+                                workAbstract: function(arg, numberValue) {
+                                    console.log("ddddddd----->" + arg)
+                                    var ErrorMessage = arg + numberValue.toString()
+                                    throw new Error(ErrorMessage);
+                                }
+                            });
+
+                var nonGenericAbstractClassBase = new NonGenericAbstractClassBase();
+//                nonGenericAbstractClassBase.workAbstract();
+                var user = new com.tns.sgbtestclasses.User();
+                user.work(nonGenericAbstractClassBase);
     		}}));
 
     };

@@ -311,11 +311,11 @@ void CallbackHandlers::CallJavaMethod(const Local<Object>& caller, const string&
     }
 
     if (!isStatic) {
-        DEBUG_WRITE("CallJavaMethod called %s.%s. Instance id: %d, isSuper=%d", className.c_str(),
+        DEBUG_WRITE_FORCE("!!!!!!! VM: CallJavaMethod called %s.%s. Instance id: %d, isSuper=%d", className.c_str(),
                     methodName.c_str(), caller.IsEmpty() ? -42 : caller->GetIdentityHash(),
                     isSuper);
     } else {
-        DEBUG_WRITE("CallJavaMethod called %s.%s. static method", className.c_str(),
+        DEBUG_WRITE_FORCE("!!!!!!! VM: CallJavaMethod called %s.%s. static method", className.c_str(),
                     methodName.c_str());
     }
 
