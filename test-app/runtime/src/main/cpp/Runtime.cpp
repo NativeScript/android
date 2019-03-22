@@ -270,7 +270,7 @@ jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj, jint javaObjectID
 
     JEnv env(_env);
 
-    DEBUG_WRITE("CallJSMethodNative called javaObjectID=%d", javaObjectID);
+    DEBUG_WRITE_FORCE("CallJSMethodNative called javaObjectID=%d", javaObjectID);
 
     auto jsObject = m_objectManager->GetJsObjectByJavaObject(javaObjectID);
     if (jsObject.IsEmpty()) {
@@ -282,12 +282,12 @@ jobject Runtime::CallJSMethodNative(JNIEnv* _env, jobject obj, jint javaObjectID
     }
 
     if (isConstructor) {
-        DEBUG_WRITE("CallJSMethodNative: Updating linked instance with its real class");
+        DEBUG_WRITE_FORCE("CallJSMethodNative: Updating linked instance with its real class");
         jclass instanceClass = env.GetObjectClass(obj);
         m_objectManager->SetJavaClass(jsObject, instanceClass);
     }
 
-    DEBUG_WRITE("CallJSMethodNative called jsObject=%d", jsObject->GetIdentityHash());
+    DEBUG_WRITE_FORCE("CallJSMethodNative called jsObject=%d", jsObject->GetIdentityHash());
 
     string method_name = ArgConverter::jstringToString(methodName);
     auto jsResult = CallbackHandlers::CallJSMethod(m_isolate, env, jsObject, method_name, packagedArgs);
