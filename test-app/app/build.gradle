@@ -50,11 +50,13 @@ def SBG_BINDINGS_NAME = "sbg-bindings.txt"
 def SBG_INTERFACE_NAMES = "sbg-interface-names.txt"
 def INPUT_JS_DIR = "$projectDir/src/main/assets/app"
 def OUTPUT_JAVA_DIR = "$projectDir/src/main/java"
+def OUTPUT_TESTS_JAVA_DIR = "$projectDir/src/main/java/com/tns/tests"
 
 //metadata generator
 def MDG_OUTPUT_DIR = "mdg-output-dir.txt"
 def MDG_JAVA_DEPENDENCIES = "mdg-java-dependencies.txt"
 def METADATA_OUT_PATH = "$projectDir/src/main/assets/metadata"
+def TEST_CLASSES_COMPILED = "$projectDir/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/tns/tests/"
 
 // paths to jar libraries
 def pluginsJarLibraries = new LinkedList<String>()
@@ -331,6 +333,7 @@ dependencies {
         def packageJson = new JsonSlurper().parseText(packageJsonPath.text)
         return packageJson.nativescript.useV8Symbols
     }
+
     if (!externalRuntimeExists) {
         def runtime = "nativescript-optimized-with-inspector"
 
@@ -346,6 +349,9 @@ dependencies {
         project.dependencies.add("implementation", [name: runtime, ext: "aar"])
     } else {
         implementation project(':runtime')
+//        implementation project(':sbgTestClasses')
+        compile project(path: ':sbgTestClasses')
+
     }
 
 }
@@ -434,6 +440,7 @@ task runSbg(type: JavaExec) {
     workingDir "$BUILD_TOOLS_PATH"
     main "-jar"
     args "static-binding-generator.jar"
+    jvmArgs "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=6060"
 
     doFirst {
         new File("$OUTPUT_JAVA_DIR/com/tns/gen").deleteDir()
@@ -494,7 +501,8 @@ class EmptyRunnable implements Runnable {
 
 // Discover all jars and dynamically create tasks for the extraction of each of them
 def allJars = []
-afterEvaluate { project -> 
+afterEvaluate { project ->
+
     def buildType = project.selectedBuildType == "release" ? "Release" : "Debug"
     def jars = []
     Pattern pattern = Pattern.compile("^(.+)${buildType}CompileClasspath\$")
@@ -504,6 +512,7 @@ afterEvaluate { project ->
         if (matcher.find() || config.name == "${buildType.toLowerCase()}CompileClasspath") {
             config.incoming.artifactView {
                 attributes {
+                    System.out.println("!!!! asd: " + it)
                     it.attribute(artifactType, 'jar')
                 }
             }.artifacts.each {
@@ -584,7 +593,15 @@ task collectAllJars {
     def sdkPath = android.sdkDirectory.getAbsolutePath()
     def androidJar = sdkPath + "/platforms/" + android.compileSdkVersion + "/android.jar"
 
+    if (!findProject(':sbgTestClasses').is(null)) {
+        dependsOn ':sbgTestClasses:jar'
+    }
+
+
+
     doFirst {
+
+
         def allJarPaths = new LinkedList<String>()
         allJarPaths.add(androidJar)
         allJarPaths.addAll(pluginsJarLibraries)
@@ -595,12 +612,18 @@ task collectAllJars {
 
         new File("$BUILD_TOOLS_PATH/$SBG_JAVA_DEPENDENCIES").withWriter { out ->
             allJarPaths.each { out.println it }
+            if (!findProject(':sbgTestClasses').is(null)) {
+                out.println "$rootDir/sbgTestClasses/build/libs/sbgTestClasses.jar"
+            }
         }
         new File("$BUILD_TOOLS_PATH/$MDG_JAVA_DEPENDENCIES").withWriter { out ->
             allJarPaths.each {
                 if (it.endsWith(".jar")) {
                     out.println it
                 }
+            }
+            if (!findProject(':sbgTestClasses').is(null)) {
+                out.println "$rootDir/sbgTestClasses/build/libs/sbgTestClasses.jar"
             }
         }
 
@@ -656,6 +679,7 @@ task buildMetadata(type: JavaExec) {
         main "-jar"
 
         args "android-metadata-generator.jar"
+        jvmArgs "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=6061"
     }
 }
 

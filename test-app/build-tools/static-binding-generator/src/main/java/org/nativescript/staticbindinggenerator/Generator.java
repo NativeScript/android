@@ -81,6 +81,13 @@ public class Generator {
         this.libs = libs;
         this.fileSystemHelper = new FileSystemHelperImpl(throwOnError);
         this.classes = readClasses(libs);
+
+
+        for(Map.Entry<String, JavaClass> entry: classes.entrySet()){
+            System.out.println("!!!! key: " + entry.getKey());
+        }
+
+
         androidClassChecker = new AndroidClassCheckerImpl(classes);
         this.suppressCallJSMethodExceptions = suppressCallJSMethodExceptions;
     }
@@ -157,6 +164,10 @@ public class Generator {
         String normalizedName = getNormalizedName(name);
 
         Writer w = new Writer();
+
+        if(clazz.getClassName().contains("NonGenericAbstractClassBase")){
+            int a = 5;
+        }
 
         writeBinding(w, dataRow, clazz, packageName, name);
 

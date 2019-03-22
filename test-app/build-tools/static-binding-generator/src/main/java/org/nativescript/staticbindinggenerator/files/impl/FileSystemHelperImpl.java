@@ -28,6 +28,9 @@ public class FileSystemHelperImpl implements FileSystemHelper {
     @Override
     public Map<String, JavaClass> readClassesFromJar(String jarPath) {
         Map<String, JavaClass> classes = new HashMap<String, JavaClass>();
+        if(jarPath.contains("sbg")){
+            int a = 5;
+        }
         JarInputStream jis = null;
         try {
             String name = null;
@@ -36,6 +39,13 @@ public class FileSystemHelperImpl implements FileSystemHelper {
                 try {
                     name = ze.getName();
                     if (name.endsWith(CLASS_EXT)) {
+
+
+                        if(name.contains("DerivedChild")){
+                            System.out.println("!!!!! VM: " + jarPath);
+                        }
+
+
                         name = name.substring(0, name.length() - CLASS_EXT.length()).replace('/', '.').replace('$', '.');
                         ClassParser cp = new ClassParser(jis, name);
                         JavaClass clazz = cp.parse();
@@ -70,6 +80,9 @@ public class FileSystemHelperImpl implements FileSystemHelper {
     @Override
     public Map<String, JavaClass> readClassesFromDirectory(String directoryPath) {
         Map<String, JavaClass> classes = new HashMap<String, JavaClass>();
+        if(directoryPath.contains("sbg")){
+            int a = 5;
+        }
 
         ArrayDeque<File> d = new ArrayDeque<File>();
         d.add(new File(directoryPath));
@@ -79,6 +92,10 @@ public class FileSystemHelperImpl implements FileSystemHelper {
             File[] files = cur.listFiles();
             for (File f : files) {
                 if (f.isFile() && f.getName().endsWith(CLASS_EXT)) {
+                    if(f.getName().contains("DerivedChild")){
+                        System.out.println("!!!!! VM: " + f.getPath());
+                    }
+
                     ClassParser cp = new ClassParser(f.getAbsolutePath());
                     JavaClass clazz = null;
                     try {

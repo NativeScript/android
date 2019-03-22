@@ -3,9 +3,11 @@ include ':app',
         ':runtime-binding-generator',
         ':static-binding-generator',
         ':android-metadata-generator',
-        ':dts-generator'
+        ':dts-generator',
+        ':sbgTestClasses'
 
 project(':static-binding-generator').projectDir = new File('build-tools/static-binding-generator')
+project(':sbgTestClasses').projectDir = new File('./sbgTestClasses')
 project(':android-metadata-generator').projectDir = new File('build-tools/android-metadata-generator')
 project(':dts-generator').projectDir = new File('build-tools/android-dts-generator/dts-generator')
 
