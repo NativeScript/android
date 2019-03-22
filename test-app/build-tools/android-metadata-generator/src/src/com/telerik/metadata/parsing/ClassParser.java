@@ -27,6 +27,10 @@ public final class ClassParser {
         String[] implementedInterfacesNames = clazz.getInterfaceNames();
 
         for (String implementedInterfaceName : implementedInterfacesNames) {
+            if(implementedInterfaceName.equals("com.tns.NativeScriptHashCodeProvider")){
+                continue;
+            }
+
             ClassDescriptor interfaceClass = ClassRepo.findClass(implementedInterfaceName);
 
             for (MethodDescriptor md : interfaceClass.getMethods()) {

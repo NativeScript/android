@@ -39,7 +39,6 @@ public class FileSystemHelperImpl implements FileSystemHelper {
     public ClassesCollection readClassesFromJar(String jarPath) {
         Map<String, JavaClass> classes = new HashMap<String, JavaClass>();
         Set<String> nonPublicNestedClasses = new HashSet<>();
-
         JarInputStream jis = null;
         try {
             String name;
@@ -48,6 +47,13 @@ public class FileSystemHelperImpl implements FileSystemHelper {
                 try {
                     name = ze.getName();
                     if (name.endsWith(CLASS_EXT)) {
+
+
+                        if(name.contains("DerivedChild")){
+                            System.out.println("!!!!! VM: " + jarPath);
+                        }
+
+
                         name = name.substring(0, name.length() - CLASS_EXT.length()).replace('/', '.').replace('$', '.');
                         ClassParser cp = new ClassParser(jis, name);
                         JavaClass clazz = cp.parse();
@@ -114,7 +120,13 @@ public class FileSystemHelperImpl implements FileSystemHelper {
     @Override
     public ClassesCollection readClassesFromDirectory(String directoryPath) {
         Map<String, JavaClass> classes = new HashMap<String, JavaClass>();
+<<<<<<< HEAD
         Set<String> nonPublicNestedClasses = new HashSet<>();
+=======
+        if(directoryPath.contains("sbg")){
+            int a = 5;
+        }
+>>>>>>> Add project module for SBG test java classes
 
         ArrayDeque<File> d = new ArrayDeque<File>();
         d.add(new File(directoryPath));
@@ -124,6 +136,10 @@ public class FileSystemHelperImpl implements FileSystemHelper {
             File[] files = cur.listFiles();
             for (File f : files) {
                 if (f.isFile() && f.getName().endsWith(CLASS_EXT)) {
+                    if(f.getName().contains("DerivedChild")){
+                        System.out.println("!!!!! VM: " + f.getPath());
+                    }
+
                     ClassParser cp = new ClassParser(f.getAbsolutePath());
                     JavaClass clazz = null;
                     try {

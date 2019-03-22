@@ -168,6 +168,10 @@ public class Generator {
 
         Writer w = new Writer();
 
+        if(clazz.getClassName().contains("NonGenericAbstractClassBase")){
+            int a = 5;
+        }
+
         writeBinding(w, dataRow, clazz, packageName, name);
         String classname = dataRow.getFilename();
 
