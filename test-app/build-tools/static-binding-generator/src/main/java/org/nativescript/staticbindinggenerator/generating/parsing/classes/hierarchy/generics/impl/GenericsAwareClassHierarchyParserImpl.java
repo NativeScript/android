@@ -7,10 +7,10 @@ import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierar
 import org.nativescript.staticbindinggenerator.naming.BcelNamingUtil;
 import org.nativescript.staticbindinggenerator.naming.JavaClassNames;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
@@ -34,7 +34,6 @@ public class GenericsAwareClassHierarchyParserImpl implements GenericsAwareClass
 
     @Override
     public GenericHierarchyView getClassHierarchy(JavaClass javaClass) {
-        ArrayDeque<GenericSignatureView> collectedGenericSignatureViews = new ArrayDeque<>();
         HashMap<String, GenericParameters> collectedParentClasses = new HashMap<>();
         HashMap<String, GenericParameters> collectedParentInterfaces = new HashMap<>();
         GenericParameters initialClassGenericParameters = null;
@@ -45,16 +44,17 @@ public class GenericsAwareClassHierarchyParserImpl implements GenericsAwareClass
         if (hasGenericSignature(genericSignatureView)) {
             if (genericSignatureView.hasFormalTypeParameters()) {
                     GenericParameters erasedFormalParameters = getGenericParametersForInitialClass(genericSignatureView);
+                    initialClassGenericParameters = erasedFormalParameters;
                     GenericSignatureView reifiedSignatureView = reifyGenericSignatureView(genericSignatureView, erasedFormalParameters);
-                    collectedGenericSignatureViews.addLast(reifiedSignatureView);
-            } else {
-                collectedGenericSignatureViews.addLast(genericSignatureView);
+                genericSignatureView = reifiedSignatureView;
             }
         }
 
-        getClassHierarchyRecursively(javaClass, collectedParentClasses, collectedParentInterfaces, visitedInterfaces, collectedGenericSignatureViews);
+        getClassHierarchyRecursively(javaClass, collectedParentClasses, collectedParentInterfaces, visitedInterfaces, genericSignatureView);
 
-        return new GenericHierarchyView(collectedParentInterfaces, collectedParentClasses, javaClass.getClassName(), initialClassGenericParameters);
+        GenericHierarchyView genericHierarchyView = new GenericHierarchyView(collectedParentInterfaces, collectedParentClasses, javaClass.getClassName(), initialClassGenericParameters);
+
+        return genericHierarchyView;
     }
 
     private GenericParameters getGenericParametersForInitialClass(GenericSignatureView genericSignatureView) {
@@ -110,14 +110,21 @@ public class GenericsAwareClassHierarchyParserImpl implements GenericsAwareClass
             }
         }
 
-        return new GenericParameters(resolvedParameters);
+        // need to return a map with same order of items as the provided formal type parameters collection
+        LinkedHashMap<String, String> insertionSortedGenericParameters = new LinkedHashMap<>();
+        for(String genericParameter: formalTypeParameters){
+            String erasure = resolvedParameters.get(genericParameter);
+            insertionSortedGenericParameters.put(genericParameter, erasure);
+        }
+
+        return new GenericParameters(insertionSortedGenericParameters);
     }
 
     private String getGenericsErasure(String genericArgument) {
         return GENERICS_ERASURE_PATTERN.matcher(genericArgument).replaceAll("");
     }
 
-    private void getClassHierarchyRecursively(JavaClass forClass, HashMap<String, GenericParameters> collectedParentClasses, HashMap<String, GenericParameters> collectedParentInterfaces, HashSet<JavaClass> visitedInterfaces, ArrayDeque<GenericSignatureView> genericSignatureViewsStack) {
+    private void getClassHierarchyRecursively(JavaClass forClass, HashMap<String, GenericParameters> collectedParentClasses, HashMap<String, GenericParameters> collectedParentInterfaces, HashSet<JavaClass> visitedInterfaces, GenericSignatureView previousGenericSignatureView) {
         if (forClass.getClassName().equals(JavaClassNames.BASE_JAVA_CLASS_NAME)) {
             return;
         }
@@ -129,13 +136,13 @@ public class GenericsAwareClassHierarchyParserImpl implements GenericsAwareClass
             GenericSignatureView parentClassGenericSignatureView = genericSignatureReader.readGenericSignature(parentClass);
 
             if (hasGenericSignature(parentClassGenericSignatureView)) {
-                GenericParameters reifiedClass = reifyGenericClass(parentClass, parentClassGenericSignatureView, genericSignatureViewsStack);
+                GenericParameters reifiedClass = reifyGenericClass(parentClass, parentClassGenericSignatureView, previousGenericSignatureView);
                 collectedParentClasses.put(parentClassName, reifiedClass);
                 GenericSignatureView reifiedSignatureView = reifyGenericSignatureView(parentClassGenericSignatureView, reifiedClass);
-                genericSignatureViewsStack.addLast(reifiedSignatureView);
+                getClassHierarchyRecursively(parentClass, collectedParentClasses, collectedParentInterfaces, visitedInterfaces, reifiedSignatureView);
+            } else {
+                getClassHierarchyRecursively(parentClass, collectedParentClasses, collectedParentInterfaces, visitedInterfaces, parentClassGenericSignatureView);
             }
-
-            getClassHierarchyRecursively(parentClass, collectedParentClasses, collectedParentInterfaces, visitedInterfaces, genericSignatureViewsStack);
         }
 
 
@@ -146,26 +153,26 @@ public class GenericsAwareClassHierarchyParserImpl implements GenericsAwareClass
                 GenericSignatureView parentInterfaceGenericSignatureView = genericSignatureReader.readGenericSignature(interfaze);
 
                 if (hasGenericSignature(parentInterfaceGenericSignatureView)) {
-                    GenericParameters reifiedClass = reifyGenericClass(interfaze, parentInterfaceGenericSignatureView, genericSignatureViewsStack);
+                    GenericParameters reifiedClass = reifyGenericClass(interfaze, parentInterfaceGenericSignatureView, previousGenericSignatureView);
                     collectedParentInterfaces.put(parentInterfaceName, reifiedClass);
                     GenericSignatureView reifiedSignatureView = reifyGenericSignatureView(parentInterfaceGenericSignatureView, reifiedClass);
-                    genericSignatureViewsStack.add(reifiedSignatureView);
+                    visitedInterfaces.add(interfaze);
+                    getClassHierarchyRecursively(interfaze, collectedParentClasses, collectedParentInterfaces, visitedInterfaces, reifiedSignatureView);
+                } else {
+                    visitedInterfaces.add(interfaze);
+                    getClassHierarchyRecursively(interfaze, collectedParentClasses, collectedParentInterfaces, visitedInterfaces, parentInterfaceGenericSignatureView);
                 }
 
-                visitedInterfaces.add(interfaze);
-                getClassHierarchyRecursively(interfaze, collectedParentClasses, collectedParentInterfaces, visitedInterfaces, genericSignatureViewsStack);
             }
         }
-
-        if (genericSignatureViewsStack.size() > 0) {
-            genericSignatureViewsStack.removeLast();
-        }
     }
+    private GenericParameters reifyGenericClass(JavaClass javaClass, GenericSignatureView genericSignatureView, GenericSignatureView previousGenericSignatureView) {
+        if (previousGenericSignatureView != null) {
+            ClassGenericDefinition genericDefinitionFromPreviousSignature = getGenericDefinitionFromView(javaClass, previousGenericSignatureView);
 
-    private GenericParameters reifyGenericClass(JavaClass javaClass, GenericSignatureView genericSignatureView, ArrayDeque<GenericSignatureView> genericSignatureViewsStack) {
-        if (genericSignatureViewsStack.size() != 0) {
-            GenericSignatureView previousSignature = genericSignatureViewsStack.peekLast();
-            ClassGenericDefinition genericDefinitionFromPreviousSignature = getGenericDefinitionFromView(javaClass, previousSignature);
+            if(genericDefinitionFromPreviousSignature == null){
+                return getGenericParametersForInitialClass(genericSignatureView);
+            }
 
             List<String> providedGenericArguments = genericDefinitionFromPreviousSignature.getGenericArguments();
             List<String> currentClassFormalTypeParameters = genericSignatureView.getFormalTypeParameterNames();
@@ -179,7 +186,7 @@ public class GenericsAwareClassHierarchyParserImpl implements GenericsAwareClass
             return new GenericParameters(genericFormalParameters);
         }
 
-        return new GenericParameters();
+        return getGenericParametersForInitialClass(genericSignatureView);
     }
 
     private List<String> mapValuesToList(Map<String, String> map) {

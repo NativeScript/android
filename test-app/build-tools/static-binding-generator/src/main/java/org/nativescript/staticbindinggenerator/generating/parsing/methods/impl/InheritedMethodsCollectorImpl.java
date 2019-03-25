@@ -2,8 +2,10 @@ package org.nativescript.staticbindinggenerator.generating.parsing.methods.impl;
 
 import org.apache.bcel.classfile.JavaClass;
 import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.GenericHierarchyView;
-import org.nativescript.staticbindinggenerator.generating.parsing.methods.InheritedMethodsView;
+import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl.GenericSignatureReader;
+import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl.GenericsAwareClassHierarchyParserImpl;
 import org.nativescript.staticbindinggenerator.generating.parsing.methods.InheritedMethodsCollector;
+import org.nativescript.staticbindinggenerator.generating.parsing.methods.InheritedMethodsView;
 import org.nativescript.staticbindinggenerator.generating.parsing.methods.ReifiedJavaMethod;
 import org.nativescript.staticbindinggenerator.naming.BcelNamingUtil;
 
@@ -43,9 +45,13 @@ public class InheritedMethodsCollectorImpl implements InheritedMethodsCollector 
         JavaClass superClass = javaClass;
         while (superClass != null) {
 
-            ReifiedJavaMethod[] typeMethods = javaClassUtils.getReifiedMethodsFromClass(superClass, genericHierarchyView);
-            for (int i = 0; i < typeMethods.length; i++) {
-                ReifiedJavaMethod curr = typeMethods[i];
+            List<ReifiedJavaMethod> typeMethods = javaClassUtils.getReifiedMethodsFromClass(superClass, genericHierarchyView);
+            for (int i = 0; i < typeMethods.size(); i++) {
+                ReifiedJavaMethod curr = typeMethods.get(i);
+
+                String methodName = curr.getName();
+                int a = 5;
+
                 if (!curr.isConstructor() && !curr.isStatic() && !curr.isPrivate()) {
                     if (!curr.isSynthetic()) {
                         if (findMethodBinding(curr, allMethods) == null) {
@@ -72,7 +78,8 @@ public class InheritedMethodsCollectorImpl implements InheritedMethodsCollector 
         HashSet<JavaClass> visited = new HashSet<>(); // saves some interface traversing
 
         for (JavaClass interfaze : implementedInterfaces) {
-            findUnimplementedInterfaceMethods(interfaze, visited, allMethods, packageName, toImplement, overridable, genericHierarchyView);
+            GenericHierarchyView interfaceGenView = new GenericsAwareClassHierarchyParserImpl(new GenericSignatureReader(), classesCache).getClassHierarchy(interfaze);
+            findUnimplementedInterfaceMethods(interfaze, visited, allMethods, packageName, toImplement, overridable, interfaceGenView);
         }
 
         JavaClass curr = javaClass;
@@ -94,6 +101,33 @@ public class InheritedMethodsCollectorImpl implements InheritedMethodsCollector 
         return new InheritedMethodsView(overridable, toImplement);
     }
 
+    @Override
+    public List<ReifiedJavaMethod> collectConstructors() {
+        ArrayList<ReifiedJavaMethod> allMethods = new ArrayList<>();
+
+
+        JavaClass superClass = javaClass;
+        while (superClass != null) {
+
+            List<ReifiedJavaMethod> typeMethods = javaClassUtils.getReifiedMethodsFromClass(superClass, genericHierarchyView);
+            for (int i = 0; i < typeMethods.size(); i++) {
+                ReifiedJavaMethod curr = typeMethods.get(i);
+                if (curr.isConstructor() && !curr.isStatic() && !curr.isPrivate()) {
+                    if (!curr.isSynthetic()) {
+                        if (findMethodBinding(curr, allMethods) == null) {
+                            allMethods.add(curr);
+                        }
+                    }
+                }
+            }
+
+
+            superClass = javaClassUtils.getSuperClass(superClass);
+        }
+
+        return allMethods;
+    }
+
     private ReifiedJavaMethod findMethodBinding(ReifiedJavaMethod method, List<ReifiedJavaMethod> allMethods) {
         for (int i = 0; i < allMethods.size(); i++) {
             ReifiedJavaMethod curr = allMethods.get(i);
@@ -109,13 +143,16 @@ public class InheritedMethodsCollectorImpl implements InheritedMethodsCollector 
     private void findUnimplementedInterfaceMethods(JavaClass typeBinding, HashSet<JavaClass> visited,
                                                    ArrayList<ReifiedJavaMethod> allMethods, String packageName, ArrayList<ReifiedJavaMethod> toImplement, ArrayList<ReifiedJavaMethod> overridable, GenericHierarchyView initialClassGenericHierarchyView) {
         if (visited.add(typeBinding)) {
-            ReifiedJavaMethod[] typeMethods = javaClassUtils.getReifiedMethodsFromClass(typeBinding, initialClassGenericHierarchyView);
+            List<ReifiedJavaMethod> typeMethods = javaClassUtils.getReifiedMethodsFromClass(typeBinding, initialClassGenericHierarchyView);
 
             nextMethod:
-            for (int i = 0; i < typeMethods.length; i++) {
-                ReifiedJavaMethod current = typeMethods[i];
+            for (int i = 0; i < typeMethods.size(); i++) {
+                ReifiedJavaMethod current = typeMethods.get(i);
+                String currentName = current.getName();
+                int a = 5;
                 for (Iterator<ReifiedJavaMethod> allIter = allMethods.iterator(); allIter.hasNext(); ) {
                     ReifiedJavaMethod oneMethod = allIter.next();
+                    String oneMethodName = oneMethod.getName();
                     if (javaMethodUtils.isSubSignature(oneMethod, current)) {
                         // we've matched a method which is a subsignature of current
                         if (!javaMethodUtils.isSubSignature(current, oneMethod)) {
@@ -204,7 +241,7 @@ public class InheritedMethodsCollectorImpl implements InheritedMethodsCollector 
             return this;
         }
 
-        public InheritedMethodsCollector build(){
+        public InheritedMethodsCollector build() {
             return new InheritedMethodsCollectorImpl(this);
         }
     }

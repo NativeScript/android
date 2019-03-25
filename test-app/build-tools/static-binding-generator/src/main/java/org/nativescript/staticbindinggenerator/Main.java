@@ -44,7 +44,8 @@ public class Main {
 
         // generate java bindings
         String inputBindingFilename = Paths.get(System.getProperty("user.dir"), SBG_BINDINGS_NAME).toString();
-        new Generator(outputDir, rows, isSuppressCallJSMethodExceptionsEnabled(), false).writeBindings(inputBindingFilename);
+        Generator generator = new Generator(outputDir, rows, isSuppressCallJSMethodExceptionsEnabled(), false);
+        generator.writeBindings(inputBindingFilename);
     }
 
     /*

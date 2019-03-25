@@ -3,28 +3,18 @@ package org.nativescript.staticbindinggenerator;
 import com.google.googlejavaformat.java.Formatter;
 import com.google.googlejavaformat.java.FormatterException;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintStream;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
 import org.apache.bcel.classfile.JavaClass;
 import org.apache.bcel.classfile.Method;
+import org.apache.commons.io.FileUtils;
 import org.nativescript.staticbindinggenerator.files.FileSystemHelper;
+import org.nativescript.staticbindinggenerator.files.impl.ClassesCollection;
 import org.nativescript.staticbindinggenerator.files.impl.FileSystemHelperImpl;
+import org.nativescript.staticbindinggenerator.generating.parsing.checkers.AndroidClassChecker;
+import org.nativescript.staticbindinggenerator.generating.parsing.checkers.ImplementationObjectChecker;
+import org.nativescript.staticbindinggenerator.generating.parsing.checkers.impl.AndroidClassCheckerImpl;
+import org.nativescript.staticbindinggenerator.generating.parsing.checkers.impl.ImplementationObjectCheckerImpl;
 import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.GenericHierarchyView;
+import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.GenericParameters;
 import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl.GenericSignatureReader;
 import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl.GenericsAwareClassHierarchyParserImpl;
 import org.nativescript.staticbindinggenerator.generating.parsing.methods.InheritedMethodsCollector;
@@ -45,10 +35,24 @@ import org.nativescript.staticbindinggenerator.generating.writing.impl.ImportsWr
 import org.nativescript.staticbindinggenerator.generating.writing.impl.MethodsWriterImpl;
 import org.nativescript.staticbindinggenerator.generating.writing.impl.PackageNameWriterImpl;
 import org.nativescript.staticbindinggenerator.naming.BcelNamingUtil;
-import org.nativescript.staticbindinggenerator.generating.parsing.checkers.AndroidClassChecker;
-import org.nativescript.staticbindinggenerator.generating.parsing.checkers.ImplementationObjectChecker;
-import org.nativescript.staticbindinggenerator.generating.parsing.checkers.impl.AndroidClassCheckerImpl;
-import org.nativescript.staticbindinggenerator.generating.parsing.checkers.impl.ImplementationObjectCheckerImpl;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintStream;
+import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public class Generator {
 
@@ -71,6 +75,7 @@ public class Generator {
     private final FileSystemHelper fileSystemHelper;
     private final boolean suppressCallJSMethodExceptions;
     private final AndroidClassChecker androidClassChecker;
+    private Set<String> nonPublicNestedClasses;
 
     public Generator(File outputDir, List<DataRow> libs) throws IOException {
         this(outputDir, libs, false, false);
@@ -80,9 +85,35 @@ public class Generator {
         this.outputDir = outputDir;
         this.libs = libs;
         this.fileSystemHelper = new FileSystemHelperImpl(throwOnError);
-        this.classes = readClasses(libs);
+        ClassesCollection classesCollection = readClasses(libs);
+        this.classes = classesCollection.getRegularClasses();
+        this.nonPublicNestedClasses = classesCollection.getNonPublicNestedClasses();
         androidClassChecker = new AndroidClassCheckerImpl(classes);
         this.suppressCallJSMethodExceptions = suppressCallJSMethodExceptions;
+    }
+
+    private void writeJsExtend(List<String> classNames) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("describe(\"SBG testing\", function () {");
+
+        for (String className : classNames) {
+            className = BcelNamingUtil.resolveClassName(className);
+
+            String testCaseBeginningDeclaration = "it(\"" + className + " extending should work with SBG\", function () {";
+            String extend = "var a = " + className + ".extend({});";
+
+            sb.append(testCaseBeginningDeclaration);
+            sb.append(extend);
+            sb.append("}); ");
+        }
+
+        sb.append("});");
+
+        try {
+            FileUtils.write(new File("/Users/vmutafov/work/jsExtendGen.js"), sb.toString(), Charset.forName("UTF-8"));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     public void writeBindings(String filename) throws IOException, ClassNotFoundException {
@@ -122,6 +153,9 @@ public class Generator {
 
     public Binding generateBinding(DataRow dataRow, HashSet<String> interfaceNames) throws ClassNotFoundException {
         JavaClass clazz = getClass(dataRow.getBaseClassname());
+        if (!canClassBeExtended(clazz)) {
+            return null;
+        }
 
         boolean hasSpecifiedName = !dataRow.getFilename().isEmpty();
         String packageName = hasSpecifiedName ? getBaseDir(dataRow.getFilename()) : (DEFAULT_PACKAGE_NAME + "." + clazz.getPackageName());
@@ -159,7 +193,6 @@ public class Generator {
         Writer w = new Writer();
 
         writeBinding(w, dataRow, clazz, packageName, name);
-
         String classname = dataRow.getFilename();
 
         try {
@@ -168,8 +201,28 @@ public class Generator {
         } catch (FormatterException e) {
             return new Binding(new File(baseDir, normalizedName + JAVA_EXT), w.toString(), classname);
         }
+    }
 
+    private boolean canClassBeExtended(JavaClass javaClass) {
+        if (javaClass.isInterface() && (javaClass.isProtected() || javaClass.isPublic())) {
+            return true;
+        }
 
+        if (javaClass.isFinal() || (!javaClass.isProtected() && !javaClass.isPublic())) {
+            return false;
+        }
+
+        nextMethod:
+        for (Method method : javaClass.getMethods()) {
+            if (method.getName().equals("<init>")
+                    && !method.isStatic()
+                    && (method.isPublic() || method.isProtected())) {
+
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public Binding generateBinding(DataRow dataRow) throws ClassNotFoundException {
@@ -223,17 +276,19 @@ public class Generator {
         return sb.toString();
     }
 
-    private Map<String, JavaClass> readClasses(List<DataRow> libs) {
+    private ClassesCollection readClasses(List<DataRow> libs) {
         Map<String, JavaClass> map = new HashMap<String, JavaClass>();
+        Set<String> nonPublicNestedClasses = new HashSet<>();
         if (libs != null) {
             for (DataRow dr : libs) {
                 String lib = dr.getRow();
                 File f = new File(lib);
-                Map<String, JavaClass> classes = f.isFile() ? fileSystemHelper.readClassesFromJar(lib) : fileSystemHelper.readClassesFromDirectory(lib);
-                map.putAll(classes);
+                ClassesCollection classes = f.isFile() ? fileSystemHelper.readClassesFromJar(lib) : fileSystemHelper.readClassesFromDirectory(lib);
+                map.putAll(classes.getRegularClasses());
+                nonPublicNestedClasses.addAll(classes.getNonPublicNestedClasses());
             }
         }
-        return map;
+        return new ClassesCollection(map, nonPublicNestedClasses);
     }
 
 
@@ -248,24 +303,48 @@ public class Generator {
     }
 
     private void writeBinding(Writer w, DataRow dataRow, JavaClass clazz, String packageName, String name) {
+        GenericHierarchyView genView = new GenericsAwareClassHierarchyParserImpl(new GenericSignatureReader(), classes).getClassHierarchy(clazz);
+
         writePackageNameToWriter(w, packageName);
         writeImportsToWriter(w, clazz, packageName);
-        writeClassBeginningToWriter(w, clazz, dataRow.getInterfaces(), name, dataRow);
+        writeClassBeginningToWriter(w, clazz, dataRow.getInterfaces(), name, dataRow, genView);
         writeFieldsToWriter(w, clazz);
-
-        GenericHierarchyView genView = new GenericsAwareClassHierarchyParserImpl(new GenericSignatureReader(), classes).getClassHierarchy(clazz);
         writeConstructorsToWriter(w, clazz, dataRow, name, genView);
         writeMethodsToWriter(w, genView, clazz, Arrays.asList(dataRow.getMethods()), Arrays.asList(dataRow.getInterfaces()), packageName);
         writeClassEndToWriter(w);
     }
 
-    private void writeClassBeginningToWriter(Writer writer, JavaClass clazz, String[] implementedInterfacesNames, String generatedClassName, DataRow dataRow) {
+    private void writeClassBeginningToWriter(Writer writer, JavaClass clazz, String[] implementedInterfacesNames, String generatedClassName, DataRow dataRow, GenericHierarchyView genericHierarchyView) {
         ClassWriter classWriter = new ClassWriterImpl(writer);
-        String extendedClassName;
-        extendedClassName = BcelNamingUtil.resolveClassName(clazz.getClassName());
+        StringBuilder extendedClassNameBuilder = new StringBuilder();
+        extendedClassNameBuilder.append(BcelNamingUtil.resolveClassName(clazz.getClassName()));
+
+        GenericParameters initialClassGenericParameters = genericHierarchyView.getInitialClassGenericParameters();
+
+        if (initialClassGenericParameters != null) {
+            Map<String, String> initialClassGenericParametersMap = initialClassGenericParameters.getGenericParameters();
+            int initialClassGenericParametersMapCount = initialClassGenericParametersMap.size();
+
+            if (initialClassGenericParametersMapCount > 0) {
+                extendedClassNameBuilder.append('<');
+                int parameterCounter = 0;
+                for (Map.Entry<String, String> genericParameter : initialClassGenericParametersMap.entrySet()) {
+                    String resolvedGeneriParameterValue = BcelNamingUtil.resolveClassName(genericParameter.getValue());
+                    extendedClassNameBuilder.append(resolvedGeneriParameterValue);
+
+                    if (parameterCounter != initialClassGenericParametersMapCount - 1) {
+                        extendedClassNameBuilder.append(", ");
+                        parameterCounter += 1;
+                    }
+                }
+                extendedClassNameBuilder.append('>');
+            }
+
+        }
 
         boolean hasCustomJsName = !dataRow.getFilename().isEmpty();
 
+        String extendedClassName = extendedClassNameBuilder.toString();
         if (hasCustomJsName) {
             if (clazz.isInterface()) { // extending an interface
                 classWriter.writeBeginningOfNamedClassImplementingSingleInterface(generatedClassName, dataRow.getJsFilename(), extendedClassName);
@@ -358,13 +437,14 @@ public class Generator {
         for (ReifiedJavaMethod overridableMethod : inheritedMethodsView.getOverridableImplementedMethods()) {
             for (String userImplementedMethodName : userImplementedMethods) {
                 if (overridableMethod.getName().equals(userImplementedMethodName)) {
-                    writer.writeln();
-                    writer.writeln();
-                    methodsWriter.writeMethod(overridableMethod);
+                    if (areAllArgumentsAndReturnTypePublic(overridableMethod)) {
+                        writer.writeln();
+                        writer.writeln();
+                        methodsWriter.writeMethod(overridableMethod);
+                    }
                 }
             }
         }
-
 
         if (isApplicationClass) {
             String normalizedClassName = BcelNamingUtil.resolveClassName(clazz.getClassName());
@@ -375,6 +455,36 @@ public class Generator {
             methodsWriter.writeInternalRuntimeHashCodeMethod();
             methodsWriter.writeInternalRuntimeEqualsMethod();
         }
+    }
+
+    private boolean areAllArgumentsAndReturnTypePublic(ReifiedJavaMethod method) {
+        String returnType = BcelNamingUtil.resolveClassName(method.getReifiedReturnType());
+        if (nonPublicNestedClasses.contains(returnType)) {
+            return false;
+        }
+
+        JavaClass returnTypeClass = classes.get(returnType);
+        if (returnTypeClass != null && (!returnTypeClass.isPublic() && !returnTypeClass.isProtected())) {
+            return false;
+        }
+
+        List<String> argumentTypes = method.getReifiedArguments();
+        for (String argumentType : argumentTypes) {
+            argumentType = argumentType.trim();
+            int indexOfSpace = argumentType.indexOf(' ');
+            String withoutParamName = argumentType.substring(0, indexOfSpace);
+            String resolvedName = BcelNamingUtil.resolveClassName(withoutParamName);
+            if (nonPublicNestedClasses.contains(resolvedName)) {
+                return false;
+            }
+
+            JavaClass argumentTypeClass = classes.get(resolvedName);
+            if (argumentTypeClass != null && (!argumentTypeClass.isPublic() && !argumentTypeClass.isProtected())) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private List<JavaClass> getInterfacesFromCache(List<String> interfacesNames) {

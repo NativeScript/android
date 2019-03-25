@@ -1,11 +1,15 @@
 package org.nativescript.staticbindinggenerator.generating.parsing.methods.impl;
 
+import org.apache.bcel.classfile.ExceptionTable;
 import org.apache.bcel.classfile.JavaClass;
 import org.apache.bcel.classfile.Method;
 import org.apache.bcel.generic.Type;
 import org.nativescript.staticbindinggenerator.generating.parsing.methods.JavaMethod;
 
 import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 public class JavaMethodImpl implements JavaMethod {
 
@@ -99,7 +103,7 @@ public class JavaMethodImpl implements JavaMethod {
     }
 
     @Override
-    public JavaClass getDeclaringClass(){
+    public JavaClass getDeclaringClass() {
         return declaringClass;
     }
 
@@ -111,6 +115,16 @@ public class JavaMethodImpl implements JavaMethod {
     @Override
     public String getDeclaringClassPackageName() {
         return declaringClass.getPackageName();
+    }
+
+    @Override
+    public List<String> getDeclaredThrownExceptions() {
+        ExceptionTable exceptionTable = method.getExceptionTable();
+        if (exceptionTable != null) {
+            String[] exceptionNames = exceptionTable.getExceptionNames();
+            return Arrays.asList(exceptionNames);
+        }
+        return Collections.emptyList();
     }
 
     @Override

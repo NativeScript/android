@@ -3,19 +3,11 @@ package org.nativescript.staticbindinggenerator.generating.writing.impl;
 import org.apache.bcel.generic.Type;
 import org.nativescript.staticbindinggenerator.DefaultValues;
 import org.nativescript.staticbindinggenerator.Writer;
-import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.GenericHierarchyView;
-import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.GenericParameters;
-import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl.MethodSignatureVisitor;
 import org.nativescript.staticbindinggenerator.generating.parsing.methods.ReifiedJavaMethod;
 import org.nativescript.staticbindinggenerator.generating.writing.MethodsWriter;
 import org.nativescript.staticbindinggenerator.naming.BcelNamingUtil;
-import org.nativescript.staticbindinggenerator.generating.parsing.methods.JavaMethod;
-import org.objectweb.asm.signature.SignatureReader;
 
-import java.lang.reflect.Method;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 public class MethodsWriterImpl implements MethodsWriter {
 
@@ -88,6 +80,7 @@ public class MethodsWriterImpl implements MethodsWriter {
         writer.write(OPENING_ROUND_BRACKET_LITERAL);
         writeMethodArguments(method);
         writer.write(CLOSING_ROUND_BRACKET_LITERAL);
+        writer.write(getThrowsDeclaration(method));
         writer.write(OPENING_CURLY_BRACKET_LITERAL);
         writer.write(SUPER_KEYWORD);
         writer.write(OPENING_ROUND_BRACKET_LITERAL);
@@ -111,6 +104,27 @@ public class MethodsWriterImpl implements MethodsWriter {
         }
 
         writer.write(CLOSING_CURLY_BRACKET_LITERAL);
+    }
+
+    private String getThrowsDeclaration(ReifiedJavaMethod method) {
+        List<String> declaredExceptions = method.getDeclaredThrownExceptions();
+        int declaredExceptionsCount = declaredExceptions.size();
+        if (declaredExceptionsCount > 0) {
+            StringBuilder throwsDeclarationBuilder = new StringBuilder();
+            throwsDeclarationBuilder.append(" throws ");
+
+            for (int i = 0; i < declaredExceptionsCount; i += 1) {
+                String exceptionClass = BcelNamingUtil.resolveClassName(declaredExceptions.get(i));
+                throwsDeclarationBuilder.append(exceptionClass);
+                if (i != declaredExceptionsCount - 1) {
+                    throwsDeclarationBuilder.append(", ");
+                }
+            }
+
+            return throwsDeclarationBuilder.toString();
+        } else {
+            return "";
+        }
     }
 
     @Override
@@ -145,6 +159,7 @@ public class MethodsWriterImpl implements MethodsWriter {
         if (isForApplicationClass && !method.isFromInterface()) {
             writeIfStatementBeginning(NEGATE_LITERAL + RUNTIME_IS_INITIALIZED_METHOD_CALL);
             writer.write(OPENING_CURLY_BRACKET_LITERAL);
+            writer.write(" try{ ");
 
             boolean isVoid = method.getReturnType().equals(Type.VOID);
 
@@ -166,6 +181,9 @@ public class MethodsWriterImpl implements MethodsWriter {
                 writer.write(END_OF_STATEMENT_LITERAL);
             }
 
+            writer.write("} catch (Throwable t){\n" +
+                    "        throw new RuntimeException(t);\n" +
+                    "      }");
             writer.writeln(CLOSING_CURLY_BRACKET_LITERAL);
         }
     }
@@ -189,6 +207,8 @@ public class MethodsWriterImpl implements MethodsWriter {
 
     private void writeMethodSignature(ReifiedJavaMethod method) {
         writer.write(getMethodVisibilityModifier(method));
+        writer.write(SPACE_LITERAL);
+        writer.write(method.getOwnGenericArgumentsDeclaration());
         writer.write(SPACE_LITERAL);
         writer.write(BcelNamingUtil.resolveBcelTypeName(method.getReifiedReturnType()));
         writer.write(SPACE_LITERAL);
@@ -227,7 +247,7 @@ public class MethodsWriterImpl implements MethodsWriter {
         String runtimeCallJsMethodCall = String.format(methodCallPattern, getMethodName(method), BcelNamingUtil.resolveBcelTypeName(returnType));
 
         if (!returnType.equals(Type.VOID)) {
-            writeReturnStatementWithCast(returnType, runtimeCallJsMethodCall);
+            writeReturnStatementWithCast(method.getReifiedReturnType(), runtimeCallJsMethodCall);
         } else {
             writer.write(runtimeCallJsMethodCall);
             writer.write(END_OF_STATEMENT_LITERAL);
@@ -261,7 +281,7 @@ public class MethodsWriterImpl implements MethodsWriter {
         }
     }
 
-    private void writeReturnStatementWithCast(Type typeForCasting, String value) {
+    private void writeReturnStatementWithCast(String typeForCasting, String value) {
         writer.write(RETURN_KEYWORD);
         writer.write(OPENING_ROUND_BRACKET_LITERAL);
         writer.write(BcelNamingUtil.resolveBcelTypeName(typeForCasting));

@@ -1,16 +1,25 @@
 package org.nativescript.staticbindinggenerator.files.impl;
 
+import org.apache.bcel.classfile.Attribute;
 import org.apache.bcel.classfile.ClassParser;
+import org.apache.bcel.classfile.InnerClass;
+import org.apache.bcel.classfile.InnerClasses;
 import org.apache.bcel.classfile.JavaClass;
+import org.apache.bcel.classfile.Utility;
 import org.nativescript.staticbindinggenerator.Generator;
 import org.nativescript.staticbindinggenerator.files.FileSystemHelper;
+import org.nativescript.staticbindinggenerator.naming.BcelNamingUtil;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.jar.JarInputStream;
 import java.util.zip.ZipEntry;
 
@@ -26,8 +35,10 @@ public class FileSystemHelperImpl implements FileSystemHelper {
 
 
     @Override
-    public Map<String, JavaClass> readClassesFromJar(String jarPath) {
+    public ClassesCollection readClassesFromJar(String jarPath) {
         Map<String, JavaClass> classes = new HashMap<String, JavaClass>();
+        Set<String> nonPublicNestedClasses = new HashSet<>();
+
         JarInputStream jis = null;
         try {
             String name = null;
@@ -39,7 +50,9 @@ public class FileSystemHelperImpl implements FileSystemHelper {
                         name = name.substring(0, name.length() - CLASS_EXT.length()).replace('/', '.').replace('$', '.');
                         ClassParser cp = new ClassParser(jis, name);
                         JavaClass clazz = cp.parse();
+                        Set<String> currentClassNonPublicNestedClasses = collectNonPublicNestedClasses(clazz);
                         classes.put(name, clazz);
+                        nonPublicNestedClasses.addAll(currentClassNonPublicNestedClasses);
                     }
                 } catch (IOException e) {
                     if (shouldThrowOnError) {
@@ -64,12 +77,54 @@ public class FileSystemHelperImpl implements FileSystemHelper {
                 }
             }
         }
-        return classes;
+        return new ClassesCollection(classes, nonPublicNestedClasses);
+    }
+
+    private Set<String> collectNonPublicNestedClasses(JavaClass javaClass) {
+        if(javaClass.getClassName().contains("MediaBrowserServiceCompat")){
+            int asddsa = 5;
+        }
+
+        Set<String> foundInners = new HashSet<>();
+        Attribute attrs[] = javaClass.getAttributes();
+        for (int i = 0; i < attrs.length; i++) {
+            // Find the InnerClasses attribute, if any.
+            if (attrs[i] instanceof InnerClasses) {
+                // The InnerClasses attribute is found.
+                InnerClasses innerClasses = (InnerClasses) attrs[i];
+
+                // Get an array of the inner classes.
+                InnerClass inners[] = innerClasses.getInnerClasses();
+                for (int j = 0; j < inners.length; j++) {
+                    InnerClass innerClass = inners[j];
+                    int accessFlags = innerClass.getInnerAccessFlags();
+                    if ((accessFlags & 0x0001) == 0 && (accessFlags & 0x0004) == 0) { // magic numbers - TOP, trololo
+                        // Get the inner class name from a constant pool.
+                        String innerClassName = Utility.compactClassName(
+                                innerClasses.getConstantPool().getConstantString(
+                                        innerClass.getInnerClassIndex(),
+                                        (byte) 7), //Constants.CONSTANT_Class
+                                false);
+
+                        // The inner class has the InnerClasses attribute as well
+                        // as its outer class. So, we should ignore such an inner
+                        // class.
+                        if (!innerClassName.equals(javaClass.getClassName())) {
+                            foundInners.add(BcelNamingUtil.resolveClassName(innerClassName));
+                        }
+                    }
+                }
+                break;
+            }
+        }
+
+        return foundInners;
     }
 
     @Override
-    public Map<String, JavaClass> readClassesFromDirectory(String directoryPath) {
+    public ClassesCollection readClassesFromDirectory(String directoryPath) {
         Map<String, JavaClass> classes = new HashMap<String, JavaClass>();
+        Set<String> nonPublicNestedClasses = new HashSet<>();
 
         ArrayDeque<File> d = new ArrayDeque<File>();
         d.add(new File(directoryPath));
@@ -92,14 +147,18 @@ public class FileSystemHelperImpl implements FileSystemHelper {
                     }
                     String name = clazz.getClassName();
                     name = name.replace('/', '.').replace('$', '.');
+
+                    Set<String> currentClassNonPublicNestedClasses = collectNonPublicNestedClasses(clazz);
+
                     classes.put(name, clazz);
+                    nonPublicNestedClasses.addAll(currentClassNonPublicNestedClasses);
                 } else if (f.isDirectory()) {
                     d.addLast(f);
                 }
             }
         }
 
-        return classes;
+        return new ClassesCollection(classes, nonPublicNestedClasses);
     }
 
     @Override

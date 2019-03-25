@@ -18,6 +18,7 @@ import java.util.regex.Pattern;
 public class MethodSignatureReifier {
 
     private final GenericHierarchyView initialJavaClassGenericHierarchyView;
+    private static final Pattern UNBOUNDED_WILDCARD_PATTERN = Pattern.compile("\\?(?! [es])"); // matches declarations like <?,?> but not <? extends SomeType> ot <? super SomeType>
 
     public MethodSignatureReifier(GenericHierarchyView initialJavaClassGenericHierarchyView) {
         this.initialJavaClassGenericHierarchyView = initialJavaClassGenericHierarchyView;
@@ -31,11 +32,30 @@ public class MethodSignatureReifier {
             if (genericParameters != null) {
                 return transformGenericJavaMethod(javaMethod, genericParameters, declaringClassAccessFlags);
             } else {
-                return transformRegularJavaMethod(javaMethod, declaringClassAccessFlags);
+//                if (!javaMethod.getDeclaringClassName().equals(initialJavaClassGenericHierarchyView.getInitialClassName())) {
+                return transformGenericJavaMethodWithoutReification(javaMethod, declaringClassAccessFlags);
+//                }
+//                return transformRegularJavaMethod(javaMethod, declaringClassAccessFlags);
             }
         } else {
             return transformRegularJavaMethod(javaMethod, declaringClassAccessFlags);
         }
+    }
+
+    private ReifiedJavaMethod transformGenericJavaMethodWithoutReification(JavaMethod javaMethod, int declaringClassAccessFlags) {
+        DeclarationAndReturnType declarationAndReturnType = getSignatureDeclarationAndReturnType(javaMethod.getGenericSignature(), declaringClassAccessFlags);
+
+        String argumentsDeclaration = declarationAndReturnType.getDeclaration();
+        argumentsDeclaration = replaceAllUnboundedWildcardsIfAny(argumentsDeclaration);
+
+        String ownGenericArgumentsDeclaration = getMethodTypeParametersDeclaration(argumentsDeclaration);
+        ownGenericArgumentsDeclaration = replaceBoundsSeparatorInMethodTypeParametersDeclaration(ownGenericArgumentsDeclaration);
+
+        String returnType = declarationAndReturnType.getReturnType();
+        returnType = replaceAllUnboundedWildcardsIfAny(returnType);
+
+        List<String> argumentsList = getReifiedArgumentsFromReifiedDeclaration(argumentsDeclaration);
+        return new ReifiedJavaMethodImpl(javaMethod, argumentsList, ownGenericArgumentsDeclaration, returnType);
     }
 
     private ReifiedJavaMethod transformRegularJavaMethod(JavaMethod javaMethod, int declaringClassAccessFlags) {
@@ -48,9 +68,17 @@ public class MethodSignatureReifier {
     private ReifiedJavaMethod transformGenericJavaMethod(JavaMethod javaMethod, GenericParameters classGenericParameters, int declaringClassAccessFlags) {
         DeclarationAndReturnType declarationAndReturnType = getSignatureDeclarationAndReturnType(javaMethod.getGenericSignature(), declaringClassAccessFlags);
         String reifiedGenericArgumentsDeclaration = reifyArgumentsDeclarationIfNecessary(declarationAndReturnType.getDeclaration(), classGenericParameters);
+
+        String ownGenericArgumentsDeclaration = getMethodTypeParametersDeclaration(reifiedGenericArgumentsDeclaration);
+        ownGenericArgumentsDeclaration = replaceBoundsSeparatorInMethodTypeParametersDeclaration(ownGenericArgumentsDeclaration);
+
+        reifiedGenericArgumentsDeclaration = replaceAllUnboundedWildcardsIfAny(reifiedGenericArgumentsDeclaration);
         List<String> reifiedGenericArguments = getReifiedArgumentsFromReifiedDeclaration(reifiedGenericArgumentsDeclaration);
+
         String reifiedGenericReturnType = reifyReturnTypeIfNecessary(declarationAndReturnType.getReturnType(), classGenericParameters);
-        return new ReifiedJavaMethodImpl(javaMethod, reifiedGenericArguments, reifiedGenericReturnType);
+        reifiedGenericReturnType = replaceAllUnboundedWildcardsIfAny(reifiedGenericReturnType);
+
+        return new ReifiedJavaMethodImpl(javaMethod, reifiedGenericArguments, ownGenericArgumentsDeclaration, reifiedGenericReturnType);
     }
 
     private DeclarationAndReturnType getSignatureDeclarationAndReturnType(String signature, int declaringClassAccessFlags) {
@@ -68,16 +96,21 @@ public class MethodSignatureReifier {
     }
 
     private GenericParameters getResolvedFormalTypeParametersFromDeclaringClass(JavaMethod javaMethod) {
-        if (javaMethod.isFromInterface()) {
-            String interfaceName = javaMethod.getDeclaringClassName();
-            return initialJavaClassGenericHierarchyView.getAllImplementedInterfaces().get(interfaceName);
-        } else {
-            String className = javaMethod.getDeclaringClassName();
-            if (initialJavaClassGenericHierarchyView.getInitialClassName().equals(className)) {
-                return initialJavaClassGenericHierarchyView.getInitialClassGenericParameters();
-            }
-            return initialJavaClassGenericHierarchyView.getAllParentClasses().get(className);
+        String javaMethodDeclaringClassName = javaMethod.getDeclaringClassName();
+
+        if (initialJavaClassGenericHierarchyView.getInitialClassName().equals(javaMethodDeclaringClassName)) {
+            return initialJavaClassGenericHierarchyView.getInitialClassGenericParameters();
         }
+
+        if (javaMethod.isFromInterface()) {
+            return initialJavaClassGenericHierarchyView.getAllImplementedInterfaces().get(javaMethodDeclaringClassName);
+        } else {
+            return initialJavaClassGenericHierarchyView.getAllParentClasses().get(javaMethodDeclaringClassName);
+        }
+    }
+
+    private String replaceAllUnboundedWildcardsIfAny(String declaration) {
+        return UNBOUNDED_WILDCARD_PATTERN.matcher(declaration).replaceAll("? extends java.lang.Object");
     }
 
     private String reifyArgumentsDeclarationIfNecessary(String declaration, GenericParameters resolvedFormalTypeParameters) {
@@ -87,7 +120,7 @@ public class MethodSignatureReifier {
         for (Map.Entry<String, String> resolvedFormalTypeParameter : resolvedFormalTypeParameters.getGenericParameters().entrySet()) {
             Pattern pattern = Pattern.compile("([^\\w\\.])" + resolvedFormalTypeParameter.getKey() + "(\\W)");
 
-            Matcher m = pattern.matcher(declaration);
+            Matcher m = pattern.matcher(reifiedDeclaration);
             if (m.find()) {
                 String replacement = BcelNamingUtil.resolveClassName(resolvedFormalTypeParameter.getValue());
                 reifiedDeclaration = m.replaceAll("$1" + replacement + "$2");
@@ -101,11 +134,11 @@ public class MethodSignatureReifier {
         String reifiedReturnType = returnType;
 
         for (Map.Entry<String, String> resolvedFormalTypeParameter : resolvedFormalTypeParameters.getGenericParameters().entrySet()) {
-            if (returnType.equals(resolvedFormalTypeParameter.getKey())) {
+            if (reifiedReturnType.equals(resolvedFormalTypeParameter.getKey())) {
                 return resolvedFormalTypeParameter.getValue();
             } else {
                 Pattern pattern = Pattern.compile("([^\\w\\.])" + resolvedFormalTypeParameter.getKey() + "(\\W)");
-                Matcher m = pattern.matcher(returnType);
+                Matcher m = pattern.matcher(reifiedReturnType);
                 if (m.find()) {
                     String replacement = BcelNamingUtil.resolveClassName(resolvedFormalTypeParameter.getValue());
                     reifiedReturnType = m.replaceAll("$1" + replacement + "$2");
@@ -116,51 +149,136 @@ public class MethodSignatureReifier {
         return reifiedReturnType.replaceAll("\\$", ".");
     }
 
+    private String getMethodTypeParametersDeclaration(String reifiedDeclaration) {
+        StringBuilder methodTypeParametersDeclarationBuilder = new StringBuilder();
+
+        for (int i = 0; i < reifiedDeclaration.length(); i += 1) {
+            char c = reifiedDeclaration.charAt(i);
+            if (c == '(') {
+                break;
+            } else {
+                methodTypeParametersDeclarationBuilder.append(c);
+            }
+        }
+
+        return methodTypeParametersDeclarationBuilder.toString();
+    }
+
     private List<String> getReifiedArgumentsFromReifiedDeclaration(String reifiedDeclaration) {
         List<String> res = new ArrayList<>();
         StringBuilder reifiedArgumentBuffer = new StringBuilder();
         int parameterCounter = 0;
         int openingAngleBracketsCounter = 0;
         int closingAngleBracketsCounter = 0;
+        boolean hasMethodArgumentsParsingStarted = false;
 
         for (int i = 0; i < reifiedDeclaration.length(); i += 1) {
             char c = reifiedDeclaration.charAt(i);
-            if (c == '<') {
-                openingAngleBracketsCounter += 1;
-                reifiedArgumentBuffer.append(c);
-            } else if (c == '>') {
-                closingAngleBracketsCounter += 1;
-                reifiedArgumentBuffer.append(c);
-            } else if (c == '(') {
-                // do nothing
-            } else if (c == ')') {
-                if (reifiedArgumentBuffer.length() > 0) {
-                    reifiedArgumentBuffer.append(" param_");
-                    reifiedArgumentBuffer.append(parameterCounter);
-                    res.add(reifiedArgumentBuffer.toString());
-                }
-            } else if (c == ',') {
-                if (openingAngleBracketsCounter == closingAngleBracketsCounter) {
-                    reifiedArgumentBuffer.append(" param_");
-                    reifiedArgumentBuffer.append(parameterCounter);
-                    parameterCounter += 1;
-                    res.add(reifiedArgumentBuffer.toString());
-                    reifiedArgumentBuffer = new StringBuilder();
-                    openingAngleBracketsCounter = 0;
-                    closingAngleBracketsCounter = 0;
+            if (c == '(') {
+                hasMethodArgumentsParsingStarted = true;
+            } else if (hasMethodArgumentsParsingStarted) {
+                if (c == '<') {
+                    openingAngleBracketsCounter += 1;
+                    reifiedArgumentBuffer.append(c);
+                } else if (c == '>') {
+                    closingAngleBracketsCounter += 1;
+                    reifiedArgumentBuffer.append(c);
+                } else if (c == ')') {
+                    if (reifiedArgumentBuffer.length() > 0) {
+                        reifiedArgumentBuffer.append(" param_");
+                        reifiedArgumentBuffer.append(parameterCounter);
+                        res.add(reifiedArgumentBuffer.toString());
+                    }
+                } else if (c == ',') {
+                    if (openingAngleBracketsCounter == closingAngleBracketsCounter) {
+                        reifiedArgumentBuffer.append(" param_");
+                        reifiedArgumentBuffer.append(parameterCounter);
+                        parameterCounter += 1;
+                        res.add(reifiedArgumentBuffer.toString());
+                        reifiedArgumentBuffer = new StringBuilder();
+                        openingAngleBracketsCounter = 0;
+                        closingAngleBracketsCounter = 0;
+                    } else {
+                        reifiedArgumentBuffer.append(c);
+                    }
+                } else if (c == '$') {
+                    reifiedArgumentBuffer.append('.');
                 } else {
                     reifiedArgumentBuffer.append(c);
                 }
-            } else if (c == '$') {
-                reifiedArgumentBuffer.append('.');
-            } else {
-                reifiedArgumentBuffer.append(c);
             }
+
         }
 
         return res;
     }
+
+    // <T extends android.graphics.drawable.Drawable extends android.graphics.drawable.Animatable>(int, int, T, boolean)
+    // <T extends android.graphics.drawable.Drawable, android.graphics.drawable.Animatable>(int, int, T, boolean)
+    // <T extends android.graphics.drawable.Drawable<K extends O> extends android.graphics.drawable.Animatable>(int, int, T, boolean)
+    private String replaceBoundsSeparatorInMethodTypeParametersDeclaration(String methodTypeParametersDeclaration) {
+        if (methodTypeParametersDeclaration == null || methodTypeParametersDeclaration.equals("")) {
+            return methodTypeParametersDeclaration;
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append('<');
+
+        boolean shouldReplaceExtendsKeyword = false;
+        int openingAngleBracketsCounter = 0;
+        int closingAngleBracketsCounter = 0;
+
+        for (int i = 1; i < methodTypeParametersDeclaration.length() - 1; i += 1) { // skip opening and closing angle brackets
+            char c = methodTypeParametersDeclaration.charAt(i);
+            if (c == '<') {
+                openingAngleBracketsCounter += 1;
+                sb.append(c);
+            } else if (c == '>') {
+                closingAngleBracketsCounter += 1;
+                sb.append(c);
+            } else if (c == ',') {
+                if (openingAngleBracketsCounter == closingAngleBracketsCounter) {
+                    shouldReplaceExtendsKeyword = false;
+                    openingAngleBracketsCounter = 0;
+                    closingAngleBracketsCounter = 0;
+                    sb.append(" & ");
+                } else {
+                    sb.append(c);
+                }
+            } else if (c == 'e') {
+                if (i + 7 < methodTypeParametersDeclaration.length() - 1) {
+                    if (methodTypeParametersDeclaration.charAt(i + 1) == 'x'
+                            && methodTypeParametersDeclaration.charAt(i + 2) == 't'
+                            && methodTypeParametersDeclaration.charAt(i + 3) == 'e'
+                            && methodTypeParametersDeclaration.charAt(i + 4) == 'n'
+                            && methodTypeParametersDeclaration.charAt(i + 5) == 'd'
+                            && methodTypeParametersDeclaration.charAt(i + 6) == 's'
+                            && methodTypeParametersDeclaration.charAt(i + 7) == ' ') {
+                        if (shouldReplaceExtendsKeyword && openingAngleBracketsCounter == closingAngleBracketsCounter) {
+                            sb.append(" & ");
+                            i = i + 7;
+                        } else {
+                            shouldReplaceExtendsKeyword = true;
+                            sb.append(c);
+                        }
+                    } else {
+                        sb.append(c);
+                    }
+                } else {
+                    sb.append(c);
+                }
+            } else if (c == '$') {
+                sb.append('.');
+            } else {
+                sb.append(c);
+            }
+        }
+
+        sb.append('>');
+        return sb.toString();
+    }
 }
+
 
 class DeclarationAndReturnType {
     private final String declaration;
@@ -179,3 +297,16 @@ class DeclarationAndReturnType {
         return returnType;
     }
 }
+//class Parent{
+//    void work(List<?> data){
+//
+//    }
+//}
+//
+//class Child extends Parent{
+//
+//    @Override
+//    void work(List data){
+//
+//    }
+//}
