@@ -4,6 +4,8 @@ import org.apache.bcel.classfile.JavaClass;
 import org.apache.bcel.classfile.Method;
 import org.apache.bcel.generic.Type;
 
+import java.util.List;
+
 public interface JavaMethod {
     Method getMethod();
     String getName();
@@ -24,4 +26,5 @@ public interface JavaMethod {
     String getDeclaringClassName();
     JavaClass getDeclaringClass();
     String getDeclaringClassPackageName();
+    List<String> getDeclaredThrownExceptions();
 }

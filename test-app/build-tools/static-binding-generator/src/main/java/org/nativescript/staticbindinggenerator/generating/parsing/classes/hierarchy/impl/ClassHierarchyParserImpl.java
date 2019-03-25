@@ -48,7 +48,7 @@ public class ClassHierarchyParserImpl implements ClassHierarchyParser {
         String[] parentInterfacesNames = currentClass.getInterfaceNames();
 
         for (String parentInterfaceName : parentInterfacesNames) {
-            if(!visitedInterfaces.add(parentInterfaceName)){ // add returns true if element already in set
+            if(visitedInterfaces.add(parentInterfaceName)){ //  .add() returns 'true' if this set did not already contain the specified element
                 implementedInterfacesNames.add(parentInterfaceName);
                 JavaClass parentInterface = getClassFromCache(parentInterfaceName);
                 collectParentsRecursively(parentInterface, parentClassesNames, implementedInterfacesNames, visitedInterfaces);

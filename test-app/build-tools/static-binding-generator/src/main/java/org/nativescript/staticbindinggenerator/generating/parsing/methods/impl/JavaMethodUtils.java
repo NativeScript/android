@@ -4,9 +4,6 @@ import org.apache.bcel.classfile.JavaClass;
 import org.apache.bcel.generic.Type;
 import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.ClassHierarchyParser;
 import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.HierarchyView;
-import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.GenericHierarchyView;
-import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.GenericParameters;
-import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl.GenericSignatureView;
 import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.impl.ClassHierarchyParserImpl;
 import org.nativescript.staticbindinggenerator.generating.parsing.methods.JavaMethod;
 import org.nativescript.staticbindinggenerator.generating.parsing.methods.ReifiedJavaMethod;
@@ -21,7 +18,7 @@ import java.util.regex.Pattern;
 class JavaMethodUtils {
 
     private static final Map<String, String> PRIMITIVE_TO_BOXED_TYPE_NAME = new HashMap<>();
-    private static final Pattern GENERICS_ERASURE_PATTERN = Pattern.compile("<[^\\.]*>");
+    private static final Pattern GENERICS_ERASURE_PATTERN = Pattern.compile("<.*>");
 
     static {
         PRIMITIVE_TO_BOXED_TYPE_NAME.put(Type.BOOLEAN.toString(), "java.lang.Boolean");
@@ -97,10 +94,6 @@ class JavaMethodUtils {
     }
 
     private boolean isSubTypeCompatible(JavaClass overriddenType, JavaClass overridingType) {
-        if (overriddenType.isClass() && overridingType.isInterface()) {
-            return false;
-        }
-
         String overriddenTypeClassName = overriddenType.getClassName();
 
         if (overriddenTypeClassName.equals(JavaClassNames.BASE_JAVA_CLASS_NAME)) {
@@ -151,14 +144,14 @@ class JavaMethodUtils {
             }
         }
 
-        if(isSubSignature){
+        if (isSubSignature) {
             return true;
         }
 
         for (int i = 0; i < argumentsCount; i += 1) {
             String m1MethodArgumentType = m1ReifiedArguments.get(i);
             String m2MethodArgumentType = m2ReifiedArguments.get(i);
-            if(m2.hasGenericSignature()){
+            if (m2.hasGenericSignature()) {
                 m2MethodArgumentType = getGenericsErasure(m2MethodArgumentType);
             }
 

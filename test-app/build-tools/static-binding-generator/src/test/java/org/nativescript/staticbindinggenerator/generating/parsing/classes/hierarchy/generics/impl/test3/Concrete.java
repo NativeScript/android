@@ -3,4 +3,5 @@ package org.nativescript.staticbindinggenerator.generating.parsing.classes.hiera
 import java.util.List;
 
 public class Concrete extends Base implements GenericInterface1<List<String>>{
+
 }

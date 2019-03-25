@@ -4,5 +4,6 @@ import java.util.List;
 
 public interface ReifiedJavaMethod extends JavaMethod {
     List<String> getReifiedArguments();
+    String getOwnGenericArgumentsDeclaration();
     String getReifiedReturnType();
 }
