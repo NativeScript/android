@@ -85,7 +85,7 @@ public class GenericsAwareClassHierarchyParserImplTest {
 
     private Map<String, JavaClass> createClassesCache(String directory) {
         FileSystemHelper fileSystemHelper = new FileSystemHelperImpl(false);
-        return fileSystemHelper.readClassesFromDirectory(directory);
+        return fileSystemHelper.readClassesFromDirectory(directory).getRegularClasses();
     }
 
 }

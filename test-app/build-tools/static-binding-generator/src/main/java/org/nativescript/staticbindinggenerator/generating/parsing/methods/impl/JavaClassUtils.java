@@ -8,6 +8,8 @@ import org.nativescript.staticbindinggenerator.generating.parsing.methods.Reifie
 import org.nativescript.staticbindinggenerator.naming.BcelNamingUtil;
 import org.nativescript.staticbindinggenerator.naming.JavaClassNames;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 class JavaClassUtils {
@@ -28,20 +30,24 @@ class JavaClassUtils {
         return interfaces;
     }
 
-    ReifiedJavaMethod[] getReifiedMethodsFromClass(JavaClass javaClass, GenericHierarchyView initialClassGenericHierarchyView){
+    List<ReifiedJavaMethod> getReifiedMethodsFromClass(JavaClass javaClass, GenericHierarchyView initialClassGenericHierarchyView) {
         Method[] classMethods = javaClass.getMethods();
         MethodSignatureReifier methodSignatureReifier = new MethodSignatureReifier(initialClassGenericHierarchyView);
-        ReifiedJavaMethod[] methods = new ReifiedJavaMethod[classMethods.length];
+        List<ReifiedJavaMethod> methods = new ArrayList<>();
         for (int i = 0; i < classMethods.length; i += 1) {
-            JavaMethod javaMethod = new JavaMethodImpl(classMethods[i], javaClass);
-            methods[i] = methodSignatureReifier.transformJavaMethod(javaMethod);
+            Method method = classMethods[i];
+            if (!method.isSynthetic()) {
+                JavaMethod javaMethod = new JavaMethodImpl(method, javaClass);
+                ReifiedJavaMethod reifiedJavaMethod = methodSignatureReifier.transformJavaMethod(javaMethod);
+                methods.add(reifiedJavaMethod);
+            }
         }
 
         return methods;
     }
 
-    JavaClass getSuperClass(JavaClass javaClass){
-        if(javaClass.getClassName().equals(JavaClassNames.BASE_JAVA_CLASS_NAME)){
+    JavaClass getSuperClass(JavaClass javaClass) {
+        if (javaClass.getClassName().equals(JavaClassNames.BASE_JAVA_CLASS_NAME)) {
             return null;
         }
 

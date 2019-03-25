@@ -12,17 +12,28 @@ public class ReifiedJavaMethodImpl implements ReifiedJavaMethod {
 
     private final JavaMethod javaMethod;
     private final List<String> reifiedArguments;
+    private final String ownGenericArgumentsDeclaration;
     private final String reifiedReturnType;
 
-    public ReifiedJavaMethodImpl(JavaMethod javaMethod, List<String> reifiedArguments, String reifiedReturnType){
+    public ReifiedJavaMethodImpl(JavaMethod javaMethod, List<String> reifiedArguments, String ownGenericArgumentsDeclaration, String reifiedReturnType) {
         this.javaMethod = javaMethod;
         this.reifiedArguments = reifiedArguments;
+        this.ownGenericArgumentsDeclaration = ownGenericArgumentsDeclaration;
         this.reifiedReturnType = reifiedReturnType;
+    }
+
+    public ReifiedJavaMethodImpl(JavaMethod javaMethod, List<String> reifiedArguments, String reifiedReturnType){
+        this(javaMethod, reifiedArguments, "", reifiedReturnType);
     }
 
     @Override
     public List<String> getReifiedArguments() {
         return reifiedArguments;
+    }
+
+    @Override
+    public String getOwnGenericArgumentsDeclaration() {
+        return ownGenericArgumentsDeclaration;
     }
 
     @Override
@@ -123,5 +134,10 @@ public class ReifiedJavaMethodImpl implements ReifiedJavaMethod {
     @Override
     public String getDeclaringClassPackageName() {
         return javaMethod.getDeclaringClassPackageName();
+    }
+
+    @Override
+    public List<String> getDeclaredThrownExceptions() {
+        return javaMethod.getDeclaredThrownExceptions();
     }
 }

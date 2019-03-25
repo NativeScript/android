@@ -7,6 +7,12 @@ import org.objectweb.asm.signature.SignatureReader;
 
 public class GenericSignatureReader {
 
+    public static boolean isGenericClass(JavaClass javaClass){
+        GenericSignatureReader reader = new GenericSignatureReader();
+        String classSignature = reader.tryGetGenericSignature(javaClass);
+        return reader.isGenericClass(classSignature);
+    }
+
     GenericSignatureView readGenericSignature(JavaClass javaClass) {
         String classSignature = tryGetGenericSignature(javaClass);
 
