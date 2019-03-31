@@ -92,6 +92,7 @@ public class GetInterfaceNames {
 
     private static URLClassLoader getClassLoader(String pathToJar) throws MalformedURLException {
         URL[] urls = {new URL("jar:file:" + pathToJar + "!/")};
-        return URLClassLoader.newInstance(urls);
+        return URLClassLoader.newInstance(urls, null);
+        // do not delegate later class loading for the parent class loader to do it first
     }
 }
