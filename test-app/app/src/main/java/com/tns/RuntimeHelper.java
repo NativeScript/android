@@ -30,7 +30,7 @@ public final class RuntimeHelper {
     // exception) raised from ErrorReport
     private static boolean hasErrorIntent(Application app) {
         boolean hasErrorIntent = false;
-
+	int b = 5;
         try {
             // empty file just to check if there was a raised uncaught error by
             // ErrorReport
