@@ -1,22 +1,23 @@
 package com.tns.sgbtestclasses.inheritance.classes;
 import com.tns.sgbtestclasses.inheritance.classes.NonGenericSimpleClassBase;
 public class NonGenericSimpleClassBaseHelper {
-    public void work(NonGenericAbstractClassBase arg){
-        arg.workAbstract();
+    public void work(NonGenericSimpleClassBase arg){
+        arg.work();
     }
-    public void work(NonGenericAbstractClassBase arg, String expectedMessage){
-        arg.workAbstract(expectedMessage);
+    public void work(NonGenericSimpleClassBase arg, String expectedMessage){
+        arg.work(expectedMessage);
     }
-    public void work(NonGenericAbstractClassBase arg, String expectedMessage, int number){
-        arg.workAbstract(expectedMessage, number);
+    public void work(NonGenericSimpleClassBase arg, String expectedMessage, int number) {
+        arg.work(expectedMessage, number);
     }
-    public void getStringAbstract(NonGenericAbstractClassBase arg){
-        arg.getStringAbstract();
+    public String getString(NonGenericSimpleClassBase arg){
+        return arg.getString();
     }
-    public void getStringAbstract(NonGenericAbstractClassBase arg, String expectedMessage){
-        arg.getStringAbstract(expectedMessage);
+
+    public String getString(NonGenericSimpleClassBase arg, String expectedMessage){
+        return arg.getString(expectedMessage);
     }
-    public void getStringAbstract(NonGenericAbstractClassBase arg, String expectedMessage, int number){
-        arg.getStringAbstract(expectedMessage, number);
+    public String getString(NonGenericSimpleClassBase arg, String expectedMessage, int number){
+        return arg.getString(expectedMessage, number);
     }
 }
