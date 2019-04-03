@@ -1,21 +1,22 @@
 package org.nativescript.staticbindinggenerator;
 
+import org.apache.bcel.classfile.ClassParser;
+import org.apache.bcel.classfile.JavaClass;
+
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Enumeration;
 import java.util.List;
-import java.util.jar.JarEntry;
-import java.util.jar.JarFile;
+import java.util.jar.JarInputStream;
+import java.util.zip.ZipEntry;
 
 public class GetInterfaceNames {
+    private static final String CLASS_EXT = ".class";
     private static String currentDir;
 
     /*
@@ -45,37 +46,41 @@ public class GetInterfaceNames {
         out.close();
     }
 
-    private static void generateInterfaceNames(String pathToJar, List<String> interfacesList) throws IOException, ClassNotFoundException {
+    private static void generateInterfaceNames(String pathToJar, List<String> interfacesList) {
         if (pathToJar == null) {
             return;
         }
-
-        JarFile jarFile = new JarFile(pathToJar);
-        Enumeration<JarEntry> currentJarFile = jarFile.entries();
-
-        URLClassLoader cl = getClassLoader(pathToJar);
-
-        while (currentJarFile.hasMoreElements()) {
-            JarEntry jarEntry = currentJarFile.nextElement();
-
-            if ((!jarEntry.isDirectory()) && (jarEntry.getName().endsWith(".class"))) {
-                String className = jarEntry.getName().substring(0, jarEntry.getName().length() - 6);
-                className = className.replace('/', '.');
-
-                @SuppressWarnings("rawtypes")
-                Class c = null;
+        JarInputStream jis = null;
+        try {
+            String name;
+            jis = new JarInputStream(new FileInputStream(pathToJar));
+            for (ZipEntry ze = jis.getNextEntry(); ze != null; ze = jis.getNextEntry()) {
                 try {
-                    c = cl.loadClass(className);
-                } catch (IllegalAccessError e) {
-                } catch (NoClassDefFoundError localNoClassDefFoundError) {
+                    name = ze.getName();
+                    if (name.endsWith(CLASS_EXT)) {
+                        name = name.substring(0, name.length() - CLASS_EXT.length()).replace('/', '.').replace('$', '.');
+                        ClassParser cp = new ClassParser(jis, name);
+                        JavaClass clazz = cp.parse();
+                        if (clazz.isInterface()) {
+                            String res = clazz.getClassName().replace('$', '.');
+                            interfacesList.add(res);
+                        }
+                    }
+                } catch (IOException e) {
+                    throw new RuntimeException("Error while parsing class file!", e);
                 }
-                if ((c != null) && (c.isInterface() == true)) {
-                    String res = c.getName().replace('$', '.');
-                    interfacesList.add(res);
+            }
+        } catch (IOException ioe) {
+            throw new RuntimeException("Error while reading JAR entry!", ioe);
+        } finally {
+            if (jis != null) {
+                try {
+                    jis.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
             }
         }
-        jarFile.close();
     }
 
     public static PrintWriter ensureOutputFile(String outputFileName) throws IOException {
@@ -88,10 +93,5 @@ public class GetInterfaceNames {
         }
 
         return new PrintWriter(new BufferedWriter(new FileWriter(checkFile.getAbsolutePath(), true)));
-    }
-
-    private static URLClassLoader getClassLoader(String pathToJar) throws MalformedURLException {
-        URL[] urls = {new URL("jar:file:" + pathToJar + "!/")};
-        return URLClassLoader.newInstance(urls);
     }
 }

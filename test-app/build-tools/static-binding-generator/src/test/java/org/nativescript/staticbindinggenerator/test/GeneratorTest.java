@@ -86,7 +86,7 @@ public class GeneratorTest {
         Class<?> helloClass = InMemoryJavaCompiler.compile("com.tns.gen.com.example.MyInterface", sourceCode.toString(), options);
 
         Assert.assertNotNull(helloClass);
-        Assert.assertEquals(1, helloClass.getDeclaredMethods().length);
+        Assert.assertEquals(3, helloClass.getDeclaredMethods().length);  // 3 methods (includes 'hashCode__super' and 'equals__super')
     }
 
     @Test

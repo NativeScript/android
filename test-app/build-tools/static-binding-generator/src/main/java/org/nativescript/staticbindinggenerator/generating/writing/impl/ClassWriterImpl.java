@@ -19,17 +19,6 @@ public class ClassWriterImpl implements ClassWriter {
         this.writer = writer;
     }
 
-    @Override
-    public void writeBeginningOfClassImplementingSingleInterface(String className, String implementedInterfaceName) {
-        writeClassWithName(className);
-        writer.write(SPACE_LITERAL);
-        writer.write(IMPLEMENTS_KEYWORD);
-        writer.write(SPACE_LITERAL);
-        writer.write(implementedInterfaceName);
-        writer.write(SPACE_LITERAL);
-        writer.writeln(OPENING_CURLY_BRACKET_LITERAL);
-    }
-
     private void writeClassWithName(String className) {
         writer.write(PUBLIC_CLASS_KEYWORD);
         writer.write(SPACE_LITERAL);
@@ -70,12 +59,6 @@ public class ClassWriterImpl implements ClassWriter {
         }
 
         writer.write(OPENING_CURLY_BRACKET_LITERAL);
-    }
-
-    @Override
-    public void writeBeginningOfNamedClassImplementingSingleInterface(String className, String jsFileName, String implementedInterfaceName) {
-        writer.writeln(String.format(JAVASCRIPT_IMPLEMENTATION_FILE_NAME_PATTERN, jsFileName));
-        writeBeginningOfClassImplementingSingleInterface(className, implementedInterfaceName);
     }
 
     @Override

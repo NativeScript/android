@@ -130,18 +130,6 @@ public class MethodsWriterImpl implements MethodsWriter {
         }
     }
 
-    @Override
-    public void writeDefaultConstructor(String className) {
-        writer.write(PUBLIC_MODIFIER);
-        writer.write(SPACE_LITERAL);
-        writer.write(className);
-        writer.write(OPENING_ROUND_BRACKET_LITERAL);
-        writer.write(CLOSING_ROUND_BRACKET_LITERAL);
-        writer.write(OPENING_CURLY_BRACKET_LITERAL);
-        writer.write(RUNTIME_INIT_INSTANCE_METHOD_CALL_STATEMENT);
-        writer.write(CLOSING_CURLY_BRACKET_LITERAL);
-    }
-
     private void writeRuntimeInitCallIfNecessary(ReifiedJavaMethod method) {
         if (method.getName().equals(ON_CREATE_METHOD_NAME) && isForApplicationClass) {
             writer.write(RUNTIME_INIT_METHOD_CALL_STATEMENT);

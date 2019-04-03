@@ -5,7 +5,6 @@ import com.google.googlejavaformat.java.FormatterException;
 
 import org.apache.bcel.classfile.JavaClass;
 import org.apache.bcel.classfile.Method;
-import org.apache.commons.io.FileUtils;
 import org.nativescript.staticbindinggenerator.files.FileSystemHelper;
 import org.nativescript.staticbindinggenerator.files.impl.ClassesCollection;
 import org.nativescript.staticbindinggenerator.files.impl.FileSystemHelperImpl;
@@ -15,6 +14,7 @@ import org.nativescript.staticbindinggenerator.generating.parsing.checkers.impl.
 import org.nativescript.staticbindinggenerator.generating.parsing.checkers.impl.ImplementationObjectCheckerImpl;
 import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.GenericHierarchyView;
 import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.GenericParameters;
+import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.GenericsAwareClassHierarchyParser;
 import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl.GenericSignatureReader;
 import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl.GenericsAwareClassHierarchyParserImpl;
 import org.nativescript.staticbindinggenerator.generating.parsing.methods.InheritedMethodsCollector;
@@ -35,6 +35,7 @@ import org.nativescript.staticbindinggenerator.generating.writing.impl.ImportsWr
 import org.nativescript.staticbindinggenerator.generating.writing.impl.MethodsWriterImpl;
 import org.nativescript.staticbindinggenerator.generating.writing.impl.PackageNameWriterImpl;
 import org.nativescript.staticbindinggenerator.naming.BcelNamingUtil;
+import org.nativescript.staticbindinggenerator.naming.JavaClassNames;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -43,7 +44,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
-import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -279,61 +279,99 @@ public class Generator {
     }
 
     private void writeBinding(Writer w, DataRow dataRow, JavaClass clazz, String packageName, String name) {
-        GenericHierarchyView genView = new GenericsAwareClassHierarchyParserImpl(new GenericSignatureReader(), classes).getClassHierarchy(clazz);
+        GenericsAwareClassHierarchyParser genericsAwareClassHierarchyParser = new GenericsAwareClassHierarchyParserImpl(new GenericSignatureReader(), classes);
+        List<JavaClass> userImplementedInterfaces = getInterfacesFromCache(Arrays.asList(dataRow.getInterfaces()));
+
+        if (clazz.isInterface()) {
+            userImplementedInterfaces.add(clazz);
+            clazz = getClass(JavaClassNames.BASE_JAVA_CLASS_NAME);
+        }
+
+        GenericHierarchyView genView = createExtendedClassGenericHierarchyView(genericsAwareClassHierarchyParser, clazz);
+        Map<JavaClass, GenericHierarchyView> interfaceGenericHierarchyViews = createInterfaceGenericHierarchyViews(genericsAwareClassHierarchyParser, userImplementedInterfaces);
 
         writePackageNameToWriter(w, packageName);
         writeImportsToWriter(w, clazz, packageName);
-        writeClassBeginningToWriter(w, clazz, dataRow.getInterfaces(), name, dataRow, genView);
+        writeClassBeginningToWriter(w, clazz, userImplementedInterfaces, name, dataRow, genView, interfaceGenericHierarchyViews);
         writeFieldsToWriter(w, clazz);
         writeConstructorsToWriter(w, clazz, dataRow, name, genView);
-        writeMethodsToWriter(w, genView, clazz, Arrays.asList(dataRow.getMethods()), Arrays.asList(dataRow.getInterfaces()), packageName);
+        writeMethodsToWriter(w, genView, interfaceGenericHierarchyViews, clazz, Arrays.asList(dataRow.getMethods()), userImplementedInterfaces, packageName);
         writeClassEndToWriter(w);
     }
 
-    private void writeClassBeginningToWriter(Writer writer, JavaClass clazz, String[] implementedInterfacesNames, String generatedClassName, DataRow dataRow, GenericHierarchyView genericHierarchyView) {
-        ClassWriter classWriter = new ClassWriterImpl(writer);
-        StringBuilder extendedClassNameBuilder = new StringBuilder();
-        extendedClassNameBuilder.append(BcelNamingUtil.resolveClassName(clazz.getClassName()));
+    private Map<JavaClass, GenericHierarchyView> createInterfaceGenericHierarchyViews(GenericsAwareClassHierarchyParser genericsAwareClassHierarchyParser, List<JavaClass> implementedInterfaces) {
+        Map<JavaClass, GenericHierarchyView> interfaceGenericHierarchyViews = new HashMap<>(implementedInterfaces.size());
 
-        GenericParameters initialClassGenericParameters = genericHierarchyView.getInitialClassGenericParameters();
+        for (JavaClass implementedInterface : implementedInterfaces) {
+            GenericHierarchyView genericHierarchyView = genericsAwareClassHierarchyParser.getClassHierarchy(implementedInterface);
+            interfaceGenericHierarchyViews.put(implementedInterface, genericHierarchyView);
+        }
+
+        return interfaceGenericHierarchyViews;
+    }
+
+    private GenericHierarchyView createExtendedClassGenericHierarchyView(GenericsAwareClassHierarchyParser genericsAwareClassHierarchyParser, JavaClass extendedClass) {
+        return genericsAwareClassHierarchyParser.getClassHierarchy(extendedClass);
+    }
+
+    private void writeClassBeginningToWriter(Writer writer, JavaClass clazz, List<JavaClass> implementedInterfaces, String generatedClassName, DataRow dataRow, GenericHierarchyView genericHierarchyView, Map<JavaClass, GenericHierarchyView> interfaceGenericHierarchyViews) {
+        ClassWriter classWriter = new ClassWriterImpl(writer);
+
+        boolean hasCustomJsName = !dataRow.getFilename().isEmpty();
+
+        List<String> implementedInterfacesNames = mapNamesWithGenericArgumentsIfNecessary(implementedInterfaces, interfaceGenericHierarchyViews);
+        String extendedClassName = mapNameWithGenericArgumentsIfNecessary(clazz, genericHierarchyView);
+
+        if (hasCustomJsName) {
+            classWriter.writeBeginningOfNamedChildClass(generatedClassName, dataRow.getJsFilename(), extendedClassName, implementedInterfacesNames);
+        } else {
+            classWriter.writeBeginningOfChildClass(generatedClassName, extendedClassName, implementedInterfacesNames);
+        }
+    }
+
+    private String mapNameWithGenericArgumentsIfNecessary(JavaClass extendedClass, GenericHierarchyView extendedClassGenericHierarchyView) {
+        return getClassNameWithPossibleGenericArguments(extendedClass, extendedClassGenericHierarchyView);
+    }
+
+    private List<String> mapNamesWithGenericArgumentsIfNecessary(List<JavaClass> implementedInterfaces, Map<JavaClass, GenericHierarchyView> interfaceGenericHierarchyViews) {
+        List<String> res = new ArrayList<>();
+
+        for (JavaClass implementedInterface : implementedInterfaces) {
+            GenericHierarchyView genericHierarchyView = interfaceGenericHierarchyViews.get(implementedInterface);
+            String className = getClassNameWithPossibleGenericArguments(implementedInterface, genericHierarchyView);
+            res.add(className);
+        }
+
+        return res;
+    }
+
+    private String getClassNameWithPossibleGenericArguments(JavaClass classToCheck, GenericHierarchyView classToCheckGenericHierarchyView) {
+        GenericParameters initialClassGenericParameters = classToCheckGenericHierarchyView.getInitialClassGenericParameters();
+        StringBuilder classNameBuilder = new StringBuilder();
+        classNameBuilder.append(BcelNamingUtil.resolveClassName(classToCheck.getClassName()));
 
         if (initialClassGenericParameters != null) {
             Map<String, String> initialClassGenericParametersMap = initialClassGenericParameters.getGenericParameters();
             int initialClassGenericParametersMapCount = initialClassGenericParametersMap.size();
 
             if (initialClassGenericParametersMapCount > 0) {
-                extendedClassNameBuilder.append('<');
+                classNameBuilder.append('<');
                 int parameterCounter = 0;
                 for (Map.Entry<String, String> genericParameter : initialClassGenericParametersMap.entrySet()) {
                     String resolvedGeneriParameterValue = BcelNamingUtil.resolveClassName(genericParameter.getValue());
-                    extendedClassNameBuilder.append(resolvedGeneriParameterValue);
+                    classNameBuilder.append(resolvedGeneriParameterValue);
 
                     if (parameterCounter != initialClassGenericParametersMapCount - 1) {
-                        extendedClassNameBuilder.append(", ");
+                        classNameBuilder.append(", ");
                         parameterCounter += 1;
                     }
                 }
-                extendedClassNameBuilder.append('>');
+                classNameBuilder.append('>');
             }
 
         }
 
-        boolean hasCustomJsName = !dataRow.getFilename().isEmpty();
-
-        String extendedClassName = extendedClassNameBuilder.toString();
-        if (hasCustomJsName) {
-            if (clazz.isInterface()) { // extending an interface
-                classWriter.writeBeginningOfNamedClassImplementingSingleInterface(generatedClassName, dataRow.getJsFilename(), extendedClassName);
-            } else {
-                classWriter.writeBeginningOfNamedChildClass(generatedClassName, dataRow.getJsFilename(), extendedClassName, Arrays.asList(implementedInterfacesNames));
-            }
-        } else {
-            if (clazz.isInterface()) { // extending an interface
-                classWriter.writeBeginningOfClassImplementingSingleInterface(generatedClassName, extendedClassName);
-            } else {
-                classWriter.writeBeginningOfChildClass(generatedClassName, extendedClassName, Arrays.asList(implementedInterfacesNames));
-            }
-        }
+        return classNameBuilder.toString();
     }
 
     private void writeImportsToWriter(Writer writer, JavaClass clazz, String packageName) {
@@ -372,32 +410,26 @@ public class Generator {
         boolean hasInitMethod = implementationObjectChecker.hasInitMethod(implObjectMethods);
         boolean hasInitMethod2 = !isApplicationClass && hasInitMethod;
 
-        boolean isInterface = clazz.isInterface();
-        if (isInterface) {
-            methodsWriter.writeDefaultConstructor(generatedClassName);
-        } else {
-            for (Method method : clazz.getMethods()) {
-                if (method.getName().equals("<init>") && (method.isPublic() || method.isProtected())) {
-                    JavaMethod javaMethod = new JavaMethodImpl(method, clazz);
-                    ReifiedJavaMethod reifiedJavaMethod = methodSignatureReifier.transformJavaMethod(javaMethod);
-                    methodsWriter.writeConstructor(generatedClassName, reifiedJavaMethod, hasInitMethod2);
-                }
+        for (Method method : clazz.getMethods()) {
+            if (method.getName().equals("<init>") && (method.isPublic() || method.isProtected())) {
+                JavaMethod javaMethod = new JavaMethodImpl(method, clazz);
+                ReifiedJavaMethod reifiedJavaMethod = methodSignatureReifier.transformJavaMethod(javaMethod);
+                methodsWriter.writeConstructor(generatedClassName, reifiedJavaMethod, hasInitMethod2);
             }
         }
     }
 
-    private void writeMethodsToWriter(Writer writer, GenericHierarchyView genericHierarchyView, JavaClass clazz, List<String> userImplementedMethods, List<String> userImplementedInterfacesNames, String packageName) {
-        boolean isInterface = clazz.isInterface();
+    private void writeMethodsToWriter(Writer writer, GenericHierarchyView genericHierarchyView, Map<JavaClass, GenericHierarchyView> interfaceGenericHierarchyViews, JavaClass clazz, List<String> userImplementedMethods, List<JavaClass> userImplementedInterfaces, String packageName) {
         boolean isApplicationClass = androidClassChecker.isApplicationClass(clazz);
 
         MethodsWriter methodsWriter = new MethodsWriterImpl(writer, suppressCallJSMethodExceptions, isApplicationClass);
 
-        List<JavaClass> userImplementedInterfaces = getInterfacesFromCache(userImplementedInterfacesNames);
         InheritedMethodsCollector inheritedMethodsCollector = new InheritedMethodsCollectorImpl.Builder()
                 .forJavaClass(clazz)
                 .withClassesCache(classes)
                 .withAdditionalImplementedInterfaces(userImplementedInterfaces)
                 .withGenericHierarchyView(genericHierarchyView)
+                .withInterfacesGenericHierarchyViews(interfaceGenericHierarchyViews)
                 .withPackageName(packageName)
                 .build();
 
@@ -427,10 +459,8 @@ public class Generator {
             methodsWriter.writeGetInstanceMethod(normalizedClassName);
         }
 
-        if (!isInterface) {
-            methodsWriter.writeInternalRuntimeHashCodeMethod();
-            methodsWriter.writeInternalRuntimeEqualsMethod();
-        }
+        methodsWriter.writeInternalRuntimeHashCodeMethod();
+        methodsWriter.writeInternalRuntimeEqualsMethod();
     }
 
     private boolean areAllArgumentsAndReturnTypePublic(ReifiedJavaMethod method) {
