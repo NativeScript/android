@@ -20,6 +20,7 @@ public class InheritedMethodsCollectorImpl implements InheritedMethodsCollector 
     private final JavaMethodUtils javaMethodUtils;
     private final JavaClassUtils javaClassUtils;
     private final GenericHierarchyView genericHierarchyView;
+    private final Map<JavaClass, GenericHierarchyView> interfacesGenericHierarchyViews;
     private final String packageName;
     private final JavaClass javaClass;
     private final List<JavaClass> implementedInterfaces;
@@ -27,6 +28,7 @@ public class InheritedMethodsCollectorImpl implements InheritedMethodsCollector 
     private InheritedMethodsCollectorImpl(Builder builder) {
         this.classesCache = builder.classesCache;
         this.genericHierarchyView = builder.genericHierarchyView;
+        this.interfacesGenericHierarchyViews = builder.interfacesGenericHierarchyViews;
         this.packageName = builder.packageName;
         this.javaClass = builder.javaClass;
         this.implementedInterfaces = builder.interfaces;
@@ -75,7 +77,7 @@ public class InheritedMethodsCollectorImpl implements InheritedMethodsCollector 
         HashSet<JavaClass> visited = new HashSet<>(); // saves some interface traversing
 
         for (JavaClass interfaze : implementedInterfaces) {
-            GenericHierarchyView interfaceGenView = new GenericsAwareClassHierarchyParserImpl(new GenericSignatureReader(), classesCache).getClassHierarchy(interfaze);
+            GenericHierarchyView interfaceGenView = interfacesGenericHierarchyViews.get(interfaze);
             findUnimplementedInterfaceMethods(interfaze, visited, allMethods, packageName, toImplement, overridable, interfaceGenView);
         }
 
@@ -180,6 +182,7 @@ public class InheritedMethodsCollectorImpl implements InheritedMethodsCollector 
     public static class Builder {
         private Map<String, JavaClass> classesCache;
         private GenericHierarchyView genericHierarchyView;
+        private Map<JavaClass, GenericHierarchyView> interfacesGenericHierarchyViews;
         private JavaClass javaClass;
         private List<JavaClass> interfaces;
         private String packageName;
@@ -191,6 +194,11 @@ public class InheritedMethodsCollectorImpl implements InheritedMethodsCollector 
 
         public Builder withGenericHierarchyView(GenericHierarchyView genericHierarchyView) {
             this.genericHierarchyView = genericHierarchyView;
+            return this;
+        }
+
+        public Builder withInterfacesGenericHierarchyViews(Map<JavaClass, GenericHierarchyView> interfacesGenericHierarchyViews){
+            this.interfacesGenericHierarchyViews = interfacesGenericHierarchyViews;
             return this;
         }
 
