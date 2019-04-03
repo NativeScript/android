@@ -4,7 +4,6 @@ import org.nativescript.staticbindinggenerator.generating.parsing.methods.Reifie
 
 public interface MethodsWriter extends JavaCodeWriter {
     void writeMethod(ReifiedJavaMethod method);
-    void writeDefaultConstructor(String className);
     void writeConstructor(String className, ReifiedJavaMethod method, boolean hasUserImplementedInitMethod);
     void writeGetInstanceMethod(String className);
     void writeInternalRuntimeEqualsMethod();
