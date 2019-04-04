@@ -1,3 +1,9 @@
+5.3.1
+==
+## Bug Fixes
+ - [5.3 build failing (Android) (#1329)](https://github.com/NativeScript/android-runtime/issues/1329)
+ - [fix(build): Correct dependencies of `cleanupAllJars` gradle task (#1338)](https://github.com/NativeScript/android-runtime/pull/1338)
+
 5.3.0
 ==
 
