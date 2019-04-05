@@ -2,8 +2,10 @@ package org.nativescript.staticbindinggenerator.generating.parsing.methods.impl;
 
 import org.apache.bcel.classfile.JavaClass;
 import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.GenericHierarchyView;
-import org.nativescript.staticbindinggenerator.generating.parsing.methods.InheritedMethodsView;
+import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl.GenericSignatureReader;
+import org.nativescript.staticbindinggenerator.generating.parsing.classes.hierarchy.generics.impl.GenericsAwareClassHierarchyParserImpl;
 import org.nativescript.staticbindinggenerator.generating.parsing.methods.InheritedMethodsCollector;
+import org.nativescript.staticbindinggenerator.generating.parsing.methods.InheritedMethodsView;
 import org.nativescript.staticbindinggenerator.generating.parsing.methods.ReifiedJavaMethod;
 import org.nativescript.staticbindinggenerator.naming.BcelNamingUtil;
 
@@ -18,6 +20,7 @@ public class InheritedMethodsCollectorImpl implements InheritedMethodsCollector 
     private final JavaMethodUtils javaMethodUtils;
     private final JavaClassUtils javaClassUtils;
     private final GenericHierarchyView genericHierarchyView;
+    private final Map<JavaClass, GenericHierarchyView> interfacesGenericHierarchyViews;
     private final String packageName;
     private final JavaClass javaClass;
     private final List<JavaClass> implementedInterfaces;
@@ -25,6 +28,7 @@ public class InheritedMethodsCollectorImpl implements InheritedMethodsCollector 
     private InheritedMethodsCollectorImpl(Builder builder) {
         this.classesCache = builder.classesCache;
         this.genericHierarchyView = builder.genericHierarchyView;
+        this.interfacesGenericHierarchyViews = builder.interfacesGenericHierarchyViews;
         this.packageName = builder.packageName;
         this.javaClass = builder.javaClass;
         this.implementedInterfaces = builder.interfaces;
@@ -43,9 +47,10 @@ public class InheritedMethodsCollectorImpl implements InheritedMethodsCollector 
         JavaClass superClass = javaClass;
         while (superClass != null) {
 
-            ReifiedJavaMethod[] typeMethods = javaClassUtils.getReifiedMethodsFromClass(superClass, genericHierarchyView);
-            for (int i = 0; i < typeMethods.length; i++) {
-                ReifiedJavaMethod curr = typeMethods[i];
+            List<ReifiedJavaMethod> typeMethods = javaClassUtils.getReifiedMethodsFromClass(superClass, genericHierarchyView);
+            for (int i = 0; i < typeMethods.size(); i++) {
+                ReifiedJavaMethod curr = typeMethods.get(i);
+
                 if (!curr.isConstructor() && !curr.isStatic() && !curr.isPrivate()) {
                     if (!curr.isSynthetic()) {
                         if (findMethodBinding(curr, allMethods) == null) {
@@ -72,7 +77,8 @@ public class InheritedMethodsCollectorImpl implements InheritedMethodsCollector 
         HashSet<JavaClass> visited = new HashSet<>(); // saves some interface traversing
 
         for (JavaClass interfaze : implementedInterfaces) {
-            findUnimplementedInterfaceMethods(interfaze, visited, allMethods, packageName, toImplement, overridable, genericHierarchyView);
+            GenericHierarchyView interfaceGenView = interfacesGenericHierarchyViews.get(interfaze);
+            findUnimplementedInterfaceMethods(interfaze, visited, allMethods, packageName, toImplement, overridable, interfaceGenView);
         }
 
         JavaClass curr = javaClass;
@@ -109,11 +115,12 @@ public class InheritedMethodsCollectorImpl implements InheritedMethodsCollector 
     private void findUnimplementedInterfaceMethods(JavaClass typeBinding, HashSet<JavaClass> visited,
                                                    ArrayList<ReifiedJavaMethod> allMethods, String packageName, ArrayList<ReifiedJavaMethod> toImplement, ArrayList<ReifiedJavaMethod> overridable, GenericHierarchyView initialClassGenericHierarchyView) {
         if (visited.add(typeBinding)) {
-            ReifiedJavaMethod[] typeMethods = javaClassUtils.getReifiedMethodsFromClass(typeBinding, initialClassGenericHierarchyView);
+            List<ReifiedJavaMethod> typeMethods = javaClassUtils.getReifiedMethodsFromClass(typeBinding, initialClassGenericHierarchyView);
 
             nextMethod:
-            for (int i = 0; i < typeMethods.length; i++) {
-                ReifiedJavaMethod current = typeMethods[i];
+            for (int i = 0; i < typeMethods.size(); i++) {
+                ReifiedJavaMethod current = typeMethods.get(i);
+
                 for (Iterator<ReifiedJavaMethod> allIter = allMethods.iterator(); allIter.hasNext(); ) {
                     ReifiedJavaMethod oneMethod = allIter.next();
                     if (javaMethodUtils.isSubSignature(oneMethod, current)) {
@@ -175,6 +182,7 @@ public class InheritedMethodsCollectorImpl implements InheritedMethodsCollector 
     public static class Builder {
         private Map<String, JavaClass> classesCache;
         private GenericHierarchyView genericHierarchyView;
+        private Map<JavaClass, GenericHierarchyView> interfacesGenericHierarchyViews;
         private JavaClass javaClass;
         private List<JavaClass> interfaces;
         private String packageName;
@@ -186,6 +194,11 @@ public class InheritedMethodsCollectorImpl implements InheritedMethodsCollector 
 
         public Builder withGenericHierarchyView(GenericHierarchyView genericHierarchyView) {
             this.genericHierarchyView = genericHierarchyView;
+            return this;
+        }
+
+        public Builder withInterfacesGenericHierarchyViews(Map<JavaClass, GenericHierarchyView> interfacesGenericHierarchyViews){
+            this.interfacesGenericHierarchyViews = interfacesGenericHierarchyViews;
             return this;
         }
 
@@ -204,7 +217,7 @@ public class InheritedMethodsCollectorImpl implements InheritedMethodsCollector 
             return this;
         }
 
-        public InheritedMethodsCollector build(){
+        public InheritedMethodsCollector build() {
             return new InheritedMethodsCollectorImpl(this);
         }
     }

@@ -1,3 +1,9 @@
+5.3.1
+==
+## Bug Fixes
+ - [5.3 build failing (Android) (#1329)](https://github.com/NativeScript/android-runtime/issues/1329)
+ - [fix(build): Correct dependencies of `cleanupAllJars` gradle task (#1338)](https://github.com/NativeScript/android-runtime/pull/1338)
+
 5.3.0
 ==
 
@@ -15,6 +21,7 @@
  - [App crashes after tns debug android --debug-brk and trying to debug with "Step into/over"(#892)](https://github.com/NativeScript/android-runtime/issues/892)
  - [Unable to call plugin's native code if application has been build before adding the plugin(#1293)](https://github.com/NativeScript/android-runtime/issues/1293)
  - [Android build fails when tns-core-modules is updated(#1257)](https://github.com/NativeScript/android-runtime/issues/1257)
+ - [Generate better code(#689)](https://github.com/NativeScript/android-runtime/issues/689)
 
 5.2.1
 ==

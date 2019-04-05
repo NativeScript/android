@@ -456,7 +456,7 @@ task ensureMetadataOutDir {
 
 def explodeAar(File compileDependency, File outputDir) {
     logger.info("explodeAar: Extracting ${compileDependency.path} -> ${outputDir.path}")
-	
+
     if (compileDependency.name.endsWith(".aar")) {
         java.util.jar.JarFile jar = new java.util.jar.JarFile(compileDependency)
         Enumeration enumEntries = jar.entries()
@@ -483,7 +483,7 @@ def explodeAar(File compileDependency, File outputDir) {
 
 def md5(String string) {
     MessageDigest digest = MessageDigest.getInstance("MD5") ;
-    digest.update(string.bytes); 
+    digest.update(string.bytes);
     return new BigInteger(1, digest.digest()).toString(16).padLeft(32, '0');
 }
 
@@ -502,7 +502,6 @@ class EmptyRunnable implements Runnable {
 // Discover all jars and dynamically create tasks for the extraction of each of them
 def allJars = []
 afterEvaluate { project ->
-
     def buildType = project.selectedBuildType == "release" ? "Release" : "Debug"
     def jars = []
     Pattern pattern = Pattern.compile("^(.+)${buildType}CompileClasspath\$")
@@ -524,11 +523,18 @@ afterEvaluate { project ->
 
                     def taskName = "extract_${jar.name}_to_${destDir}"
                     logger.debug("Creating dynamic task ${taskName}")
+
+                    // Add discovered jars as dependencies of cleanupAllJars.
+                    // This is cruicial for cloud builds because they are different
+                    // on each incremental build (as each time the gradle user home
+                    // directory is a randomly generated string)
+                    cleanupAllJars.inputs.files jar
+
                     task "${taskName}" (type: WorkerTask) {
                         dependsOn cleanupAllJars
                         extractAllJars.dependsOn it
 
-                        // This dependency seems redundant but probably due to some Gradle issue with workers, 
+                        // This dependency seems redundant but probably due to some Gradle issue with workers,
                         // without it `runSbg` sporadically starts before all extraction tasks have finished and
                         // fails due to missing JARs
                         runSbg.dependsOn it
@@ -553,10 +559,10 @@ afterEvaluate { project ->
 }
 
 task cleanupAllJars {
-    // Ideally we would depend on the list of all discovered jars, but we cannot discover them before 
-    // the execution phase of the build begins, so instead we depend on the list of libs directories that might 
-    // contain aar or jar files.
+    // We depend on the list of libs directories that might contain aar or jar files
+    // and on the list of all discovered jars
     inputs.files(pluginDependencies)
+
     outputs.files cleanupAllJarsTimestamp
 
     doLast {
