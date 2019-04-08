@@ -750,7 +750,7 @@ void ObjectManager::MakeRegularObjectsWeak(const set<int> &instances, DirectBuff
  * so we tell java to take the JAVA objects out of strong, BUT KEEP THEM AS WEEK REFERENCES,
  * so that if java needs to release them, it can, on a later stage.
  * */
-void ObjectManager::MakeImplObjectsWeak(const map<int, Persistent<Object> *> &instances,
+void ObjectManager::MakeImplObjectsWeak(const unordered_map<int, Persistent<Object> *> &instances,
                                         DirectBuffer &inputBuff) {
     jboolean keepAsWeak = JNI_TRUE;
 
