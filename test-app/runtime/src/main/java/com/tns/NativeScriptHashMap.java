@@ -40,7 +40,7 @@ import java.io.Serializable;
  * @param <V> the type of mapped values
  */
 
-public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Cloneable, Serializable {
+public class NativeScriptHashMap<K, V extends Number> extends AbstractMap<K, V> implements Cloneable, Serializable {
     /**
      * Min capacity (other than zero) for a HashMap. Must be a power of two
      * greater than 1 (and less than 1 << 30).
@@ -283,7 +283,7 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
         HashMapEntry<K, V>[] tab = table;
         for (HashMapEntry<K, V> e = tab[hash & (tab.length - 1)]; e != null; e = e.next) {
             K eKey = e.key;
-            if (eKey == key || (e.hash == hash && key.equals(eKey))) {
+            if (eKey == key) {
                 return e.value;
             }
         }
@@ -306,7 +306,7 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
         HashMapEntry<K, V>[] tab = table;
         for (HashMapEntry<K, V> e = tab[hash & (tab.length - 1)]; e != null; e = e.next) {
             K eKey = e.key;
-            if (eKey == key || (e.hash == hash && key.equals(eKey))) {
+            if (eKey == key) {
                 return true;
             }
         }
@@ -337,7 +337,7 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
         // value is non-null
         for (int i = 0; i < len; i++) {
             for (HashMapEntry<K, V> e = tab[i]; e != null; e = e.next) {
-                if (value.equals(e.value)) {
+                if (value == e.value) {
                     return true;
                 }
             }
@@ -363,7 +363,7 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
         int index = hash & (tab.length - 1);
         for (HashMapEntry<K, V> e = tab[index]; e != null; e = e.next) {
             K eKey = e.key;
-            if (eKey == key || (e.hash == hash && key.equals(eKey))) {
+            if (eKey == key) {
                 preModify(e);
                 V oldValue = e.value;
                 e.value = value;
@@ -428,7 +428,7 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
         int index = hash & (tab.length - 1);
         HashMapEntry<K, V> first = tab[index];
         for (HashMapEntry<K, V> e = first; e != null; e = e.next) {
-            if (e.hash == hash && key.equals(e.key)) {
+            if (key == e.key) {
                 e.value = value;
                 return;
             }
@@ -599,7 +599,7 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
         int index = hash & (tab.length - 1);
         for (HashMapEntry<K, V> e = tab[index], prev = null; e != null; prev = e, e = e.next) {
             K eKey = e.key;
-            if (eKey == key || (e.hash == hash && key.equals(eKey))) {
+            if (eKey == key) {
                 if (prev == null) {
                     tab[index] = e.next;
                 } else {
@@ -726,7 +726,7 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
                 return false;
             }
             Entry<?, ?> e = (Entry<?, ?>) o;
-            return Objects.equal(e.getKey(), key) && Objects.equal(e.getValue(), value);
+            return key == e.getKey() && value == e.getValue();
         }
 
         @Override
@@ -823,7 +823,7 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
         HashMapEntry<K, V>[] tab = table;
         int index = hash & (tab.length - 1);
         for (HashMapEntry<K, V> e = tab[index]; e != null; e = e.next) {
-            if (e.hash == hash && key.equals(e.key)) {
+            if (key == e.key) {
                 return Objects.equal(value, e.value);
             }
         }
@@ -851,7 +851,7 @@ public class NativeScriptHashMap<K, V> extends AbstractMap<K, V> implements Clon
         HashMapEntry<K, V>[] tab = table;
         int index = hash & (tab.length - 1);
         for (HashMapEntry<K, V> e = tab[index], prev = null; e != null; prev = e, e = e.next) {
-            if (e.hash == hash && key.equals(e.key)) {
+            if (key == e.key) {
                 if (!Objects.equal(value, e.value)) {
                     return false; // Map has wrong value for key
                 }
