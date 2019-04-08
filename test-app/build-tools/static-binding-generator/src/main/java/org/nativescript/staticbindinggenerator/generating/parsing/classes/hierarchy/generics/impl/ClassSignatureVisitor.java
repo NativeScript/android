@@ -11,8 +11,6 @@ import java.util.regex.Pattern;
 
 
 public class ClassSignatureVisitor extends SignatureVisitor {
-    private static final Pattern GENERICS_ERASURE_PATTERN = Pattern.compile("<[^\\.]*>");
-
     private static final String COMMA_SEPARATOR = ", ";
     private static final String EXTENDS_SEPARATOR = " extends ";
     private static final String IMPLEMENTS_SEPARATOR = " implements ";
@@ -28,7 +26,6 @@ public class ClassSignatureVisitor extends SignatureVisitor {
 
     private final boolean isInterface;
     private final StringBuilder dataBuffer;
-    private final StringBuilder formalTypeParametersTempBuffer;
     private StringBuilder parentClassGenericArgumentsBuffer;
     private StringBuilder parentInterfaceGenericArgumentsBuffer;
 
@@ -49,12 +46,11 @@ public class ClassSignatureVisitor extends SignatureVisitor {
 
     public ClassSignatureVisitor(String parsedClassName, int accessFlags) {
         super(Opcodes.ASM7);
-        this.isInterface = (accessFlags & Opcodes.ACC_INTERFACE) != 0;
-        this.dataBuffer = new StringBuilder();
+        isInterface = (accessFlags & Opcodes.ACC_INTERFACE) != 0;
+        dataBuffer = new StringBuilder();
         dataBuffer.append(parsedClassName);
-        this.formalTypeParameterDeclarations = new ArrayList<>();
+        formalTypeParameterDeclarations = new ArrayList<>();
         formalTypeParameterBounds = new HashMap<>();
-        formalTypeParametersTempBuffer = new StringBuilder();
         parentClassGenericArgumentsBuffer = new StringBuilder();
         parentInterfaceGenericArgumentsBuffer = new StringBuilder();
         parentInterfacesDefinitions = new ArrayList<>();
@@ -108,9 +104,9 @@ public class ClassSignatureVisitor extends SignatureVisitor {
     @Override
     public SignatureVisitor visitSuperclass() {
         endFormals();
-        flushFormalTypeBoundsBuffer();
         resetVisitFlags();
         startVisitingParentClass();
+        flushFormalTypeBoundsBuffer();
         separator = EXTENDS_SEPARATOR;
         startType();
         return this;
@@ -200,7 +196,7 @@ public class ClassSignatureVisitor extends SignatureVisitor {
             writeToBuffer('<');
             startVisitingGenericArguments();
         } else if (argumentStack == 1) {
-            writeToBuffer("===");
+            writeToBuffer(OUTER_GENERIC_ARGUMENT_SEPARATOR);
             storeCollectedGenericArguments();
         } else {
             writeToBuffer(COMMA_SEPARATOR);
@@ -244,11 +240,6 @@ public class ClassSignatureVisitor extends SignatureVisitor {
             int formalTypeParameterDeclarationsSize = formalTypeParameterDeclarations.size();
             if (formalTypeParameterDeclarationsSize > 0) {
                 String lastParameter = formalTypeParameterDeclarations.get(formalTypeParameterDeclarationsSize - 1);
-
-                if (formalTypeParameterBoundsBuffer.charAt(formalTypeParameterBoundsBufferSize - 1) == '>') {
-                    formalTypeParameterBoundsBuffer.deleteCharAt(formalTypeParameterBoundsBufferSize - 1);
-                }
-
                 String collectedBounds = formalTypeParameterBoundsBuffer.substring(" extends ".length());
                 formalTypeParameterBounds.put(lastParameter, collectedBounds);
                 formalTypeParameterBoundsBuffer = new StringBuilder();
@@ -317,8 +308,10 @@ public class ClassSignatureVisitor extends SignatureVisitor {
     }
 
     private void writeFormalTypeInformation(String data) {
-        formalTypeParametersTempBuffer.append(data);
         if (classBoundVisited || interfaceBoundVisited) {
+            if(OUTER_GENERIC_ARGUMENT_SEPARATOR.equals(data)){
+                data = ", ";
+            }
             formalTypeParameterBoundsBuffer.append(data);
         }
     }
@@ -348,6 +341,7 @@ public class ClassSignatureVisitor extends SignatureVisitor {
 
     private void endFormals() {
         if (formalTypeParameterVisited) {
+            isVisitingFormalTypeParameters = false;
             writeToBuffer('>');
             formalTypeParameterVisited = false;
         }
