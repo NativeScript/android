@@ -40,7 +40,7 @@ import java.util.Set;
  * @see HashMap
  * @see WeakReference
  */
-public class NativeScriptWeakHashMap<K, V> extends NativeScriptAbstractMap<K, V> implements Map<K, V> {
+public class NativeScriptWeakHashMap<K, V extends Number> extends NativeScriptAbstractMap<K, V> implements Map<K, V> {
 
     private static final int DEFAULT_SIZE = 16;
 
@@ -103,7 +103,7 @@ public class NativeScriptWeakHashMap<K, V> extends NativeScriptAbstractMap<K, V>
             }
             Map.Entry<?, ?> entry = (Map.Entry<?, ?>) other;
             Object key = super.get();
-            return (key == null ? key == entry.getKey() : key.equals(entry.getKey())) && (value == null ? value == entry.getValue() : value.equals(entry.getValue()));
+            return (key == null ? key == entry.getKey() : key == entry.getKey()) && (value == null ? value == entry.getValue() : value == entry.getValue());
         }
 
         @Override
@@ -449,7 +449,7 @@ public class NativeScriptWeakHashMap<K, V> extends NativeScriptAbstractMap<K, V>
             int index = (secondaryHashForObject(key) & 0x7FFFFFFF) % elementData.length;
             Entry<K, V> entry = elementData[index];
             while (entry != null) {
-                if (key.equals(entry.get())) {
+                if (key == entry.get()) {
                     return entry.value;
                 }
                 entry = entry.next;
@@ -472,7 +472,7 @@ public class NativeScriptWeakHashMap<K, V> extends NativeScriptAbstractMap<K, V>
             int index = (secondaryHashForObject(key) & 0x7FFFFFFF) % elementData.length;
             Entry<K, V> entry = elementData[index];
             while (entry != null) {
-                if (key.equals(entry.get())) {
+                if (key == entry.get()) {
                     return entry;
                 }
                 entry = entry.next;
@@ -504,7 +504,7 @@ public class NativeScriptWeakHashMap<K, V> extends NativeScriptAbstractMap<K, V>
                 Entry<K, V> entry = elementData[i];
                 while (entry != null) {
                     K key = entry.get();
-                    if ((key != null || entry.isNull) && value.equals(entry.value)) {
+                    if ((key != null || entry.isNull) && value == entry.value) {
                         return true;
                     }
                     entry = entry.next;
@@ -582,7 +582,7 @@ public class NativeScriptWeakHashMap<K, V> extends NativeScriptAbstractMap<K, V>
         if (key != null) {
             index = (secondaryHashForObject(key) & 0x7FFFFFFF) % elementData.length;
             entry = elementData[index];
-            while (entry != null && !key.equals(entry.get())) {
+            while (entry != null && key != entry.get()) {
                 entry = entry.next;
             }
         } else {
@@ -658,7 +658,7 @@ public class NativeScriptWeakHashMap<K, V> extends NativeScriptAbstractMap<K, V>
         if (key != null) {
             index = (secondaryHashForObject(key) & 0x7FFFFFFF) % elementData.length;
             entry = elementData[index];
-            while (entry != null && !key.equals(entry.get())) {
+            while (entry != null && key != entry.get()) {
                 last = entry;
                 entry = entry.next;
             }
