@@ -279,7 +279,8 @@ public class GenericsAwareClassHierarchyParserImpl implements GenericsAwareClass
 
     private boolean hasFormalTypeParameterInsideBound(String bound, String formalTypeParameter) {
         Pattern p = getNestedGenericArgumentRegexPattern(formalTypeParameter);
-        return p.matcher(bound).matches();
+        Matcher matcher = p.matcher(bound);
+        return matcher.find();
     }
 
     private Pattern getNestedGenericArgumentRegexPattern(String providedFormalTypeParameterKey) {
