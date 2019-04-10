@@ -367,7 +367,7 @@ describe("Test extending just classes in JS", function() {
     });
 
 
-it("Extend generic abstract Java class without implementing any interfaces in JS: Implement some of its abstract methods ", function() {
+    it("Extend generic abstract Java class without implementing any interfaces in JS: Implement some of its abstract methods ", function() {
         var expectedMessage = "ErrorMessage";
         var testList = new java.util.ArrayList();
         testList.add(expectedMessage);
@@ -397,7 +397,7 @@ it("Extend generic abstract Java class without implementing any interfaces in JS
         }
         expect(value).toBe("4");
         try {
-            genericAbstractClassBaseHelper.workGeneric(genericAbstractClassBase, "4",  testList);
+            genericAbstractClassBaseHelper.workGeneric(genericAbstractClassBase, "4", testList);
         } catch (e) {
             value = e.message;
         }
@@ -442,10 +442,10 @@ it("Extend generic abstract Java class without implementing any interfaces in JS
                 }
             },
             getGenericItem: function() {
-                 throw new Error(arguments[0].toString());
+                throw new Error(arguments[0].toString());
             },
             getGenericCollection: function() {
-                 throw new Error(arguments[0].get(0).toString());
+                throw new Error(arguments[0].get(0).toString());
             }
         });
 
@@ -460,14 +460,14 @@ it("Extend generic abstract Java class without implementing any interfaces in JS
         }
         expect(value).toBe("4");
         try {
-            genericAbstractClassBaseHelper.workGeneric(genericAbstractClassBase, "4",  testList);
+            genericAbstractClassBaseHelper.workGeneric(genericAbstractClassBase, "4", testList);
         } catch (e) {
             value = e.message;
         }
         expect(value).toBe("4" + expectedMessage);
         try {
-        //Why int could not be resolved to java.lang.object ?
-        //fails when you add string instead of int. Some random value is add.
+            //Why int could not be resolved to java.lang.object ?
+            //fails when you add string instead of int. Some random value is add.
             genericAbstractClassBaseHelper.workGeneric(genericAbstractClassBase, "4", testList, "8");
         } catch (e) {
             value = e.message;
@@ -490,55 +490,54 @@ it("Extend generic abstract Java class without implementing any interfaces in JS
     });
 
     it("Extend generic abstract Java class without implementing any interfaces in JS: Don’t override any methods ", function() {
-            var expectedMessage = "ErrorMessage";
-            var testList = new java.util.ArrayList();
-            testList.add(expectedMessage);
-            var GenericAbstractClassBase = com.tns.sgbtestclasses.inheritance.classes.GenericAbstractClassBase.extend({
-            });
+        var expectedMessage = "ErrorMessage";
+        var testList = new java.util.ArrayList();
+        testList.add(expectedMessage);
+        var GenericAbstractClassBase = com.tns.sgbtestclasses.inheritance.classes.GenericAbstractClassBase.extend({});
 
-            var genericAbstractClassBase = new GenericAbstractClassBase();
-            var genericAbstractClassBaseHelper = new com.tns.sgbtestclasses.inheritance.classes.GenericAbstractClassBaseHelper()
-            var value = "Not Working!"
-            try {
+        var genericAbstractClassBase = new GenericAbstractClassBase();
+        var genericAbstractClassBaseHelper = new com.tns.sgbtestclasses.inheritance.classes.GenericAbstractClassBaseHelper()
+        var value = "Not Working!"
+        try {
 
-                genericAbstractClassBaseHelper.workGeneric(genericAbstractClassBase, "4");
-            } catch (e) {
-                value = e.message;
-            }
-            expect(value).toContain("Error: java.lang.AbstractMethodError: abstract method \"java.lang.String com.tns.sgbtestclasses.inheritance.classes.GenericAbstractClassBase.workGeneric(java.lang.Object)\"");
-            try {
-                genericAbstractClassBaseHelper.workGeneric(genericAbstractClassBase, "4",  testList);
-            } catch (e) {
-                value = e.message;
-            }
-            expect(value).toContain("Error: java.lang.AbstractMethodError: abstract method \"java.lang.String com.tns.sgbtestclasses.inheritance.classes.GenericAbstractClassBase.workGeneric(java.lang.Object, java.util.List)\"");
-            try {
-                genericAbstractClassBaseHelper.workGeneric(genericAbstractClassBase, "4", testList, 8);
-            } catch (e) {
-                value = e.message;
-            }
-            expect(value).toContain("Error: java.lang.AbstractMethodError: abstract method \"java.lang.String com.tns.sgbtestclasses.inheritance.classes.GenericAbstractClassBase.workGeneric(java.lang.Object, java.util.List, int)\"");
-            try {
+            genericAbstractClassBaseHelper.workGeneric(genericAbstractClassBase, "4");
+        } catch (e) {
+            value = e.message;
+        }
+        expect(value).toContain("Error: java.lang.AbstractMethodError: abstract method \"java.lang.String com.tns.sgbtestclasses.inheritance.classes.GenericAbstractClassBase.workGeneric(java.lang.Object)\"");
+        try {
+            genericAbstractClassBaseHelper.workGeneric(genericAbstractClassBase, "4", testList);
+        } catch (e) {
+            value = e.message;
+        }
+        expect(value).toContain("Error: java.lang.AbstractMethodError: abstract method \"java.lang.String com.tns.sgbtestclasses.inheritance.classes.GenericAbstractClassBase.workGeneric(java.lang.Object, java.util.List)\"");
+        try {
+            genericAbstractClassBaseHelper.workGeneric(genericAbstractClassBase, "4", testList, 8);
+        } catch (e) {
+            value = e.message;
+        }
+        expect(value).toContain("Error: java.lang.AbstractMethodError: abstract method \"java.lang.String com.tns.sgbtestclasses.inheritance.classes.GenericAbstractClassBase.workGeneric(java.lang.Object, java.util.List, int)\"");
+        try {
 
-                genericAbstractClassBaseHelper.getGenericItem(genericAbstractClassBase, "4");
-            } catch (e) {
-                value = e.message;
-            }
-            expect(value).toContain("Error: java.lang.AbstractMethodError: abstract method \"java.lang.Object com.tns.sgbtestclasses.inheritance.classes.GenericAbstractClassBase.getGenericItem(java.lang.Object)\"");
-            try {
+            genericAbstractClassBaseHelper.getGenericItem(genericAbstractClassBase, "4");
+        } catch (e) {
+            value = e.message;
+        }
+        expect(value).toContain("Error: java.lang.AbstractMethodError: abstract method \"java.lang.Object com.tns.sgbtestclasses.inheritance.classes.GenericAbstractClassBase.getGenericItem(java.lang.Object)\"");
+        try {
 
-                genericAbstractClassBaseHelper.getGenericCollection(genericAbstractClassBase, testList);
-            } catch (e) {
-                value = e.message;
-            }
-            expect(value).toContain("Error: java.lang.AbstractMethodError: abstract method \"java.util.List com.tns.sgbtestclasses.inheritance.classes.GenericAbstractClassBase.getGenericCollection(java.util.List)\"");
-        });
+            genericAbstractClassBaseHelper.getGenericCollection(genericAbstractClassBase, testList);
+        } catch (e) {
+            value = e.message;
+        }
+        expect(value).toContain("Error: java.lang.AbstractMethodError: abstract method \"java.util.List com.tns.sgbtestclasses.inheritance.classes.GenericAbstractClassBase.getGenericCollection(java.util.List)\"");
+    });
 
     it("Extend generic Java class without implementing any interfaces in JS: Implement all supported methods", function() {
-            var expectedMessage = "ErrorMessage";
-            var testList = new java.util.ArrayList();
-            testList.add(expectedMessage);
-            var GenericSimpleClassBase = com.tns.sgbtestclasses.inheritance.classes.GenericSimpleClassBase.extend({
+        var expectedMessage = "ErrorMessage";
+        var testList = new java.util.ArrayList();
+        testList.add(expectedMessage);
+        var GenericSimpleClassBase = com.tns.sgbtestclasses.inheritance.classes.GenericSimpleClassBase.extend({
             workGeneric: function() {
                 if (arguments.length == 3) {
                     var ErrorMessage = arguments[0] + arguments[1].get(0).toString() + arguments[2];
@@ -553,39 +552,39 @@ it("Extend generic abstract Java class without implementing any interfaces in JS
             }
         });
 
-            var genericSimpleClassBase = new GenericSimpleClassBase();
-            var genericSimpleClassBaseHelper = new com.tns.sgbtestclasses.inheritance.classes.GenericSimpleClassBaseHelper()
-            var value = "Not Working!"
-            try {
+        var genericSimpleClassBase = new GenericSimpleClassBase();
+        var genericSimpleClassBaseHelper = new com.tns.sgbtestclasses.inheritance.classes.GenericSimpleClassBaseHelper()
+        var value = "Not Working!"
+        try {
 
-                genericSimpleClassBaseHelper.workGeneric(genericSimpleClassBase, "4");
-            } catch (e) {
-                value = e.message;
-            }
-            expect(value).toBe("4");
-            try {
-                genericSimpleClassBaseHelper.workGeneric(genericSimpleClassBase, "4",  testList);
-            } catch (e) {
-                value = e.message;
-            }
-            expect(value).toBe("4" + expectedMessage);
-            try {
-                genericSimpleClassBaseHelper.workGeneric(genericSimpleClassBase, "4", testList, 8);
-            } catch (e) {
-                value = e.message;
-            }
-            expect(value).toBe("4" + expectedMessage + "8");
-            value = genericSimpleClassBaseHelper.getGenericItem(genericSimpleClassBase, "4");
-            expect(value).toBe("4");
-            value = genericSimpleClassBaseHelper.getGenericCollection(genericSimpleClassBase, testList);
-            expect(value).toBe(expectedMessage);
-        });
+            genericSimpleClassBaseHelper.workGeneric(genericSimpleClassBase, "4");
+        } catch (e) {
+            value = e.message;
+        }
+        expect(value).toBe("4");
+        try {
+            genericSimpleClassBaseHelper.workGeneric(genericSimpleClassBase, "4", testList);
+        } catch (e) {
+            value = e.message;
+        }
+        expect(value).toBe("4" + expectedMessage);
+        try {
+            genericSimpleClassBaseHelper.workGeneric(genericSimpleClassBase, "4", testList, 8);
+        } catch (e) {
+            value = e.message;
+        }
+        expect(value).toBe("4" + expectedMessage + "8");
+        value = genericSimpleClassBaseHelper.getGenericItem(genericSimpleClassBase, "4");
+        expect(value).toBe("4");
+        value = genericSimpleClassBaseHelper.getGenericCollection(genericSimpleClassBase, testList);
+        expect(value).toBe(expectedMessage);
+    });
 
-            it("Extend generic Java class without implementing any interfaces in JS: Implement some of its methods", function() {
-                    var expectedMessage = "ErrorMessage";
-                    var testList = new java.util.ArrayList();
-                    testList.add(expectedMessage);
-                    var GenericSimpleClassBase = com.tns.sgbtestclasses.inheritance.classes.GenericSimpleClassBase.extend({
+    it("Extend generic Java class without implementing any interfaces in JS: Implement some of its methods", function() {
+        var expectedMessage = "ErrorMessage";
+        var testList = new java.util.ArrayList();
+        testList.add(expectedMessage);
+        var GenericSimpleClassBase = com.tns.sgbtestclasses.inheritance.classes.GenericSimpleClassBase.extend({
             workGeneric: function() {
                 if (arguments.length == 3) {
                     var ErrorMessage = arguments[0].toString() + arguments[1].get(0).toString() + arguments[2].toString()
@@ -599,71 +598,68 @@ it("Extend generic abstract Java class without implementing any interfaces in JS
                 }
             },
             getGenericItem: function() {
-                 throw new Error(arguments[0].toString());
+                throw new Error(arguments[0].toString());
             },
             getGenericCollection: function() {
-                 throw new Error(arguments[0].get(0).toString());
+                throw new Error(arguments[0].get(0).toString());
             }
         });
 
-                    var genericSimpleClassBase = new GenericSimpleClassBase();
-                    var genericSimpleClassBaseHelper = new com.tns.sgbtestclasses.inheritance.classes.GenericSimpleClassBaseHelper()
-                    var value = "Not Working!"
-                    try {
+        var genericSimpleClassBase = new GenericSimpleClassBase();
+        var genericSimpleClassBaseHelper = new com.tns.sgbtestclasses.inheritance.classes.GenericSimpleClassBaseHelper()
+        var value = "Not Working!"
+        try {
 
-                        genericSimpleClassBaseHelper.workGeneric(genericSimpleClassBase, "4");
-                    } catch (e) {
-                        value = e.message;
-                    }
-                    expect(value).toBe("4");
-                    try {
-                        genericSimpleClassBaseHelper.workGeneric(genericSimpleClassBase, "4",  testList);
-                    } catch (e) {
-                        value = e.message;
-                    }
-                    expect(value).toBe("4" + expectedMessage);
-                    try {
-                        genericSimpleClassBaseHelper.workGeneric(genericSimpleClassBase, "4", testList, 8);
-                    } catch (e) {
-                        value = e.message;
-                    }
-                    expect(value).toBe("4" + expectedMessage + "8");
-                    try {
-                        genericSimpleClassBaseHelper.getGenericItem(genericSimpleClassBase, "4");
-                    } catch (e) {
-                        value = e.message;
-                    }
-                    expect(value).toBe("4");
-                    try {
-                        genericSimpleClassBaseHelper.getGenericCollection(genericSimpleClassBase, testList);
-                    } catch (e) {
-                        value = e.message;
-                    }
-                    expect(value).toBe(expectedMessage);
-                });
+            genericSimpleClassBaseHelper.workGeneric(genericSimpleClassBase, "4");
+        } catch (e) {
+            value = e.message;
+        }
+        expect(value).toBe("4");
+        try {
+            genericSimpleClassBaseHelper.workGeneric(genericSimpleClassBase, "4", testList);
+        } catch (e) {
+            value = e.message;
+        }
+        expect(value).toBe("4" + expectedMessage);
+        try {
+            genericSimpleClassBaseHelper.workGeneric(genericSimpleClassBase, "4", testList, 8);
+        } catch (e) {
+            value = e.message;
+        }
+        expect(value).toBe("4" + expectedMessage + "8");
+        try {
+            genericSimpleClassBaseHelper.getGenericItem(genericSimpleClassBase, "4");
+        } catch (e) {
+            value = e.message;
+        }
+        expect(value).toBe("4");
+        try {
+            genericSimpleClassBaseHelper.getGenericCollection(genericSimpleClassBase, testList);
+        } catch (e) {
+            value = e.message;
+        }
+        expect(value).toBe(expectedMessage);
+    });
 
-            it("Extend generic Java class without implementing any interfaces in JS: Don’t implement any abstract methods", function() {
-                    var expectedMessage = "ErrorMessage";
-                    var testList = new java.util.ArrayList();
-                    testList.add(expectedMessage);
-                    var GenericSimpleClassBase = com.tns.sgbtestclasses.inheritance.classes.GenericSimpleClassBase.extend({
-                    });
+    it("Extend generic Java class without implementing any interfaces in JS: Don’t implement any abstract methods", function() {
+        var expectedMessage = "ErrorMessage";
+        var testList = new java.util.ArrayList();
+        testList.add(expectedMessage);
+        var GenericSimpleClassBase = com.tns.sgbtestclasses.inheritance.classes.GenericSimpleClassBase.extend({});
 
-                    var genericSimpleClassBase = new GenericSimpleClassBase();
-                    var genericSimpleClassBaseHelper = new com.tns.sgbtestclasses.inheritance.classes.GenericSimpleClassBaseHelper()
-                    var value = "Not Working!"
+        var genericSimpleClassBase = new GenericSimpleClassBase();
+        var genericSimpleClassBaseHelper = new com.tns.sgbtestclasses.inheritance.classes.GenericSimpleClassBaseHelper()
+        var value = "Not Working!"
 
-                    value = genericSimpleClassBaseHelper.workGeneric(genericSimpleClassBase, "4");
-                    expect(value).toBe("4");
-                    value = genericSimpleClassBaseHelper.workGeneric(genericSimpleClassBase, "4",  testList);
-                    expect(value).toBe("4" + expectedMessage);
-                    value = genericSimpleClassBaseHelper.workGeneric(genericSimpleClassBase, "4", testList, 0);
-                    expect(value).toBe("4" + expectedMessage);
-                    value = genericSimpleClassBaseHelper.getGenericItem(genericSimpleClassBase, "4");
-                    expect(value).toBe("4");
-                    value = genericSimpleClassBaseHelper.getGenericCollection(genericSimpleClassBase, testList);
-                    expect(value).toBe(expectedMessage);
-                });
+        value = genericSimpleClassBaseHelper.workGeneric(genericSimpleClassBase, "4");
+        expect(value).toBe("4");
+        value = genericSimpleClassBaseHelper.workGeneric(genericSimpleClassBase, "4", testList);
+        expect(value).toBe("4" + expectedMessage);
+        value = genericSimpleClassBaseHelper.workGeneric(genericSimpleClassBase, "4", testList, 0);
+        expect(value).toBe("4" + expectedMessage);
+        value = genericSimpleClassBaseHelper.getGenericItem(genericSimpleClassBase, "4");
+        expect(value).toBe("4");
+        value = genericSimpleClassBaseHelper.getGenericCollection(genericSimpleClassBase, testList);
+        expect(value).toBe(expectedMessage);
+    });
 });
-
-
