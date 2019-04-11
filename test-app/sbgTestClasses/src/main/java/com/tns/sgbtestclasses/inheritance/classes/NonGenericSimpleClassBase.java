@@ -1,29 +1,30 @@
 package com.tns.sgbtestclasses.inheritance.classes;
 
 public class NonGenericSimpleClassBase {
-    public void work(){
+
+    public void work() {
         System.out.println("public void work()");
     }
 
-    public void work(String str){
+    public void work(String str) {
         System.out.println("public void work(String str)");
     }
 
-    public void work(String str, int i){
+    public void work(String str, int i) {
         System.out.println("public void work(String str, int i)");
     }
 
-    public String getString(){
+    public String getString() {
         System.out.println("public String getString()");
         return "string";
     }
 
-    public String getString(String str){
+    public String getString(String str) {
         System.out.println("public String getString(String str)");
         return str;
     }
 
-    public String getString(String str, int i){
+    public String getString(String str, int i) {
         System.out.println("public String getString(String str, int i)");
         return str + i;
     }
