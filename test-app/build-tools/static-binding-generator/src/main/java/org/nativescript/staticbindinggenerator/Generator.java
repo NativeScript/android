@@ -378,8 +378,9 @@ public class Generator {
         ImportsWriter importsWriter = new ImportsWriterImpl(writer);
 
         boolean isApplicationClass = androidClassChecker.isApplicationClass(clazz);
+        boolean isServiceClass = androidClassChecker.isServiceClass(clazz);
 
-        if (isApplicationClass && !packageName.equals("com.tns")) {
+        if ((isServiceClass || isApplicationClass) && !packageName.equals("com.tns")) {
             importsWriter.writeRuntimeHelperImport();
             importsWriter.writeRuntimeImport();
         }
@@ -402,8 +403,10 @@ public class Generator {
 
     private void writeConstructorsToWriter(Writer writer, JavaClass clazz, DataRow dataRow, String generatedClassName, GenericHierarchyView genericHierarchyView) {
         boolean isApplicationClass = androidClassChecker.isApplicationClass(clazz);
+        boolean isServiceClass = androidClassChecker.isServiceClass(clazz);
+
         MethodSignatureReifier methodSignatureReifier = new MethodSignatureReifier(genericHierarchyView);
-        MethodsWriter methodsWriter = new MethodsWriterImpl(writer, suppressCallJSMethodExceptions, isApplicationClass);
+        MethodsWriter methodsWriter = new MethodsWriterImpl(writer, suppressCallJSMethodExceptions, isApplicationClass, isServiceClass);
         ImplementationObjectChecker implementationObjectChecker = new ImplementationObjectCheckerImpl();
 
         List<String> implObjectMethods = Arrays.asList(dataRow.getMethods());
@@ -421,8 +424,9 @@ public class Generator {
 
     private void writeMethodsToWriter(Writer writer, GenericHierarchyView genericHierarchyView, Map<JavaClass, GenericHierarchyView> interfaceGenericHierarchyViews, JavaClass clazz, List<String> userImplementedMethods, List<JavaClass> userImplementedInterfaces, String packageName) {
         boolean isApplicationClass = androidClassChecker.isApplicationClass(clazz);
+        boolean isServiceClass = androidClassChecker.isServiceClass(clazz);
 
-        MethodsWriter methodsWriter = new MethodsWriterImpl(writer, suppressCallJSMethodExceptions, isApplicationClass);
+        MethodsWriter methodsWriter = new MethodsWriterImpl(writer, suppressCallJSMethodExceptions, isApplicationClass, isServiceClass);
 
         InheritedMethodsCollector inheritedMethodsCollector = new InheritedMethodsCollectorImpl.Builder()
                 .forJavaClass(clazz)
