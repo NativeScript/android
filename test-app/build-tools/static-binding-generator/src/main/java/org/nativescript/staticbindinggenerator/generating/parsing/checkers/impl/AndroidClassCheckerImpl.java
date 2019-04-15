@@ -13,6 +13,7 @@ import java.util.Map;
 public class AndroidClassCheckerImpl implements AndroidClassChecker {
 
     private static final String APPLICATION_CLASS_NAME = "android.app.Application";
+    private static final String SERVICE_CLASS_NAME = "android.app.Service";
     private static final List<String> ACTIVITY_TYPES = Arrays.asList("android.app.Activity","android.support.v7.app.AppCompatActivity","androidx.appcompat.app.AppCompatActivity");
 
     private final ClassHierarchyParser classHierarchyParser;
@@ -46,5 +47,15 @@ public class AndroidClassCheckerImpl implements AndroidClassChecker {
 
         HierarchyView hierarchyView = classHierarchyParser.getClassHierarchy(javaClass);
         return hierarchyView.getAllParentClassesNames().contains(APPLICATION_CLASS_NAME);
+    }
+
+    @Override
+    public boolean isServiceClass(JavaClass javaClass){
+        if(javaClass.getClassName().equals(SERVICE_CLASS_NAME)){
+            return true;
+        }
+
+        HierarchyView hierarchyView = classHierarchyParser.getClassHierarchy(javaClass);
+        return hierarchyView.getAllParentClassesNames().contains(SERVICE_CLASS_NAME);
     }
 }

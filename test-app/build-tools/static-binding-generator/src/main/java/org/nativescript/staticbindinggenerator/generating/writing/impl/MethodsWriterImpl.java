@@ -27,7 +27,7 @@ public class MethodsWriterImpl implements MethodsWriter {
     private static final String TRY_BLOCK_NAME_BEGINNING = "try {";
     private static final String GENERIC_CATCH_BLOCK_ARGUMENT_NAME = "throwable";
     private static final String GENERIC_CATCH_BLOCK_BEGINNING = "catch (Throwable " + GENERIC_CATCH_BLOCK_ARGUMENT_NAME + ") {";
-    private static final String RETHROW_AS_RUNTIME_EXCEPTION_STATEMENT = "throw new RuntimeException("+GENERIC_CATCH_BLOCK_ARGUMENT_NAME+");";
+    private static final String RETHROW_AS_RUNTIME_EXCEPTION_STATEMENT = "throw new RuntimeException(" + GENERIC_CATCH_BLOCK_ARGUMENT_NAME + ");";
 
     private static final String APPLICATION_INSTANCE_VARIABLE_NAME = "thiz";
     private static final String INSTANCE_VARIABLE_NAME = "this";
@@ -55,22 +55,34 @@ public class MethodsWriterImpl implements MethodsWriter {
     private final Writer writer;
     private final boolean shouldSuppressCallJsMethodExceptions;
     private final boolean isForApplicationClass;
+    private final boolean isForServiceClass;
 
 
-    public MethodsWriterImpl(final Writer writer, boolean shouldSuppressCallJsMethodExceptions, boolean isForApplicationClass) {
+    public MethodsWriterImpl(final Writer writer, boolean shouldSuppressCallJsMethodExceptions, boolean isForApplicationClass, boolean isForServiceClass) {
         this.writer = writer;
         this.shouldSuppressCallJsMethodExceptions = shouldSuppressCallJsMethodExceptions;
         this.isForApplicationClass = isForApplicationClass;
+        this.isForServiceClass = isForServiceClass;
     }
 
     @Override
     public void writeMethod(ReifiedJavaMethod method) {
         writeMethodSignature(method);
         writer.write(OPENING_CURLY_BRACKET_LITERAL);
-        writeRuntimeInitCallIfNecessary(method);
-        writeRuntimeInitializationCheckIfNecessary(method);
+
+        if (isForApplicationClass) {
+            writeRuntimeInitCallForApplication(method);
+            writeRuntimeInitializationCheckForApplication(method);
+        } else if (isForServiceClass) {
+            writeRuntimeInitializationForService(method);
+        }
+
         writeMethodBody(method);
-        writeRuntimeRunCallIfNecessary(method);
+
+        if (isForApplicationClass) {
+            writeRuntimeRunCallForApplication(method);
+        }
+
         writer.write(CLOSING_CURLY_BRACKET_LITERAL);
     }
 
@@ -90,7 +102,7 @@ public class MethodsWriterImpl implements MethodsWriter {
         writer.write(CLOSING_ROUND_BRACKET_LITERAL);
         writer.write(END_OF_STATEMENT_LITERAL);
 
-        if (!isForApplicationClass) {
+        if (!isForApplicationClass && !isForServiceClass) {
             writer.write(RUNTIME_INIT_INSTANCE_METHOD_CALL_STATEMENT);
         }
 
@@ -130,14 +142,14 @@ public class MethodsWriterImpl implements MethodsWriter {
         }
     }
 
-    private void writeRuntimeInitCallIfNecessary(ReifiedJavaMethod method) {
-        if (method.getName().equals(ON_CREATE_METHOD_NAME) && isForApplicationClass) {
+    private void writeRuntimeInitCallForApplication(ReifiedJavaMethod method) {
+        if (method.getName().equals(ON_CREATE_METHOD_NAME)) {
             writer.write(RUNTIME_INIT_METHOD_CALL_STATEMENT);
         }
     }
 
-    private void writeRuntimeRunCallIfNecessary(ReifiedJavaMethod method) {
-        if (method.getName().equals(ON_CREATE_METHOD_NAME) && isForApplicationClass) {
+    private void writeRuntimeRunCallForApplication(ReifiedJavaMethod method) {
+        if (method.getName().equals(ON_CREATE_METHOD_NAME)) {
             writeIfStatementBeginning(RUNTIME_VARIABLE_NAME + NOT_EQUALS_OPERATOR + NULL_VALUE);
             writer.write(OPENING_CURLY_BRACKET_LITERAL);
             writer.writeln(RUNTIME_RUN_METHOD_CALL_STATEMENT);
@@ -145,9 +157,27 @@ public class MethodsWriterImpl implements MethodsWriter {
         }
     }
 
-    private void writeRuntimeInitializationCheckIfNecessary(ReifiedJavaMethod method) {
+    private void writeRuntimeInitializationForService(ReifiedJavaMethod method) {
+        if (method.getName().equals(ON_CREATE_METHOD_NAME)) {
+            writer.write(IF_STATEMENT_BEGINNING);
+            writer.write(OPENING_ROUND_BRACKET_LITERAL);
+            writer.write(NEGATE_LITERAL);
+            writer.write(RUNTIME_IS_INITIALIZED_METHOD_CALL);
+            writer.write(CLOSING_ROUND_BRACKET_LITERAL);
+            writer.write(OPENING_CURLY_BRACKET_LITERAL);
 
-        if (isForApplicationClass && !method.isFromInterface()) {
+            writer.write(RUNTIME_INIT_METHOD_CALL_STATEMENT);
+            writer.write(RUNTIME_RUN_METHOD_CALL_STATEMENT);
+            
+            writer.write(CLOSING_CURLY_BRACKET_LITERAL);
+
+            writer.write(RUNTIME_INIT_INSTANCE_METHOD_CALL_STATEMENT);
+        }
+    }
+
+    private void writeRuntimeInitializationCheckForApplication(ReifiedJavaMethod method) {
+
+        if (!method.isFromInterface()) {
             writeIfStatementBeginning(NEGATE_LITERAL + RUNTIME_IS_INITIALIZED_METHOD_CALL);
             writer.write(OPENING_CURLY_BRACKET_LITERAL);
             writer.write(TRY_BLOCK_NAME_BEGINNING);
@@ -175,7 +205,8 @@ public class MethodsWriterImpl implements MethodsWriter {
             writer.write(CLOSING_CURLY_BRACKET_LITERAL);
             writer.write(GENERIC_CATCH_BLOCK_BEGINNING);
             writer.write(RETHROW_AS_RUNTIME_EXCEPTION_STATEMENT);
-            writer.write(CLOSING_CURLY_BRACKET_LITERAL);;
+            writer.write(CLOSING_CURLY_BRACKET_LITERAL);
+            ;
 
             writer.writeln(CLOSING_CURLY_BRACKET_LITERAL);
         }
