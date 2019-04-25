@@ -292,7 +292,7 @@ bool JsArgConverter::ConvertJavaScriptBoolean(const Local<Value>& jsValue, int i
             auto boolObj = Local<BooleanObject>::Cast(jsValue);
             auto val = boolObj->Get(V8StringConstants::GetValueOf(m_isolate));
             if (!val.IsEmpty() && val->IsFunction()) {
-                argValue = val.As<Function>()->Call(boolObj, 0, nullptr)->BooleanValue(context).ToChecked();
+                argValue = val.As<Function>()->Call(context, boolObj, 0, nullptr).ToLocalChecked()->BooleanValue(context).ToChecked();
             } else {
                 argValue = false;
             }

@@ -1,10 +1,9 @@
 // -*- C++ -*-
 //===--------------------- support/win32/locale_win32.h -------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is dual licensed under the MIT and the University of Illinois Open
-// Source Licenses. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -30,101 +29,99 @@
                      | LC_TIME_MASK )
 
 class locale_t {
-    public:
-        locale_t()
-            : __locale(nullptr), __locale_str(nullptr) {}
-        locale_t(std::nullptr_t)
-            : __locale(nullptr), __locale_str(nullptr) {}
-        locale_t(_locale_t __xlocale, const char* __xlocale_str)
-            : __locale(__xlocale), __locale_str(__xlocale_str) {}
+public:
+    locale_t()
+        : __locale(nullptr), __locale_str(nullptr) {}
+    locale_t(std::nullptr_t)
+        : __locale(nullptr), __locale_str(nullptr) {}
+    locale_t(_locale_t __xlocale, const char* __xlocale_str)
+        : __locale(__xlocale), __locale_str(__xlocale_str) {}
 
-        friend bool operator==(const locale_t& __left, const locale_t& __right) {
-            return __left.__locale == __right.__locale;
-        }
+    friend bool operator==(const locale_t& __left, const locale_t& __right) {
+        return __left.__locale == __right.__locale;
+    }
 
-        friend bool operator==(const locale_t& __left, int __right) {
-            return __left.__locale == nullptr && __right == 0;
-        }
+    friend bool operator==(const locale_t& __left, int __right) {
+        return __left.__locale == nullptr && __right == 0;
+    }
 
-        friend bool operator==(const locale_t& __left, long long __right) {
-            return __left.__locale == nullptr && __right == 0;
-        }
+    friend bool operator==(const locale_t& __left, long long __right) {
+        return __left.__locale == nullptr && __right == 0;
+    }
 
-        friend bool operator==(const locale_t& __left, std::nullptr_t) {
-            return __left.__locale == nullptr;
-        }
+    friend bool operator==(const locale_t& __left, std::nullptr_t) {
+        return __left.__locale == nullptr;
+    }
 
-        friend bool operator==(int __left, const locale_t& __right) {
-            return __left == 0 && nullptr == __right.__locale;
-        }
+    friend bool operator==(int __left, const locale_t& __right) {
+        return __left == 0 && nullptr == __right.__locale;
+    }
 
-        friend bool operator==(std::nullptr_t, const locale_t& __right) {
-            return nullptr == __right.__locale;
-        }
+    friend bool operator==(std::nullptr_t, const locale_t& __right) {
+        return nullptr == __right.__locale;
+    }
 
-        friend bool operator!=(const locale_t& __left, const locale_t& __right) {
-            return !(__left == __right);
-        }
+    friend bool operator!=(const locale_t& __left, const locale_t& __right) {
+        return !(__left == __right);
+    }
 
-        friend bool operator!=(const locale_t& __left, int __right) {
-            return !(__left == __right);
-        }
+    friend bool operator!=(const locale_t& __left, int __right) {
+        return !(__left == __right);
+    }
 
-        friend bool operator!=(const locale_t& __left, long long __right) {
-            return !(__left == __right);
-        }
+    friend bool operator!=(const locale_t& __left, long long __right) {
+        return !(__left == __right);
+    }
 
-        friend bool operator!=(const locale_t& __left, std::nullptr_t __right) {
-            return !(__left == __right);
-        }
+    friend bool operator!=(const locale_t& __left, std::nullptr_t __right) {
+        return !(__left == __right);
+    }
 
-        friend bool operator!=(int __left, const locale_t& __right) {
-            return !(__left == __right);
-        }
+    friend bool operator!=(int __left, const locale_t& __right) {
+        return !(__left == __right);
+    }
 
-        friend bool operator!=(std::nullptr_t __left, const locale_t& __right) {
-            return !(__left == __right);
-        }
+    friend bool operator!=(std::nullptr_t __left, const locale_t& __right) {
+        return !(__left == __right);
+    }
 
-        operator bool() const {
-            return __locale != nullptr;
-        }
+    operator bool() const {
+        return __locale != nullptr;
+    }
 
-        const char* __get_locale() const {
-            return __locale_str;
-        }
+    const char* __get_locale() const { return __locale_str; }
 
-        operator _locale_t() const {
-            return __locale;
-        }
-    private:
-        _locale_t __locale;
-        const char* __locale_str;
+    operator _locale_t() const {
+        return __locale;
+    }
+private:
+    _locale_t __locale;
+    const char* __locale_str;
 };
 
 // Locale management functions
 #define freelocale _free_locale
 // FIXME: base currently unused. Needs manual work to construct the new locale
-locale_t newlocale( int mask, const char* locale, locale_t base );
+locale_t newlocale( int mask, const char * locale, locale_t base );
 // uselocale can't be implemented on Windows because Windows allows partial modification
 // of thread-local locale and so _get_current_locale() returns a copy while uselocale does
 // not create any copies.
 // We can still implement raii even without uselocale though.
 
 
-lconv* localeconv_l( locale_t loc );
-size_t mbrlen_l( const char* __restrict s, size_t n,
-                 mbstate_t* __restrict ps, locale_t loc);
-size_t mbsrtowcs_l( wchar_t* __restrict dst, const char** __restrict src,
-                    size_t len, mbstate_t* __restrict ps, locale_t loc );
-size_t wcrtomb_l( char* __restrict s, wchar_t wc, mbstate_t* __restrict ps,
+lconv *localeconv_l( locale_t loc );
+size_t mbrlen_l( const char *__restrict s, size_t n,
+                 mbstate_t *__restrict ps, locale_t loc);
+size_t mbsrtowcs_l( wchar_t *__restrict dst, const char **__restrict src,
+                    size_t len, mbstate_t *__restrict ps, locale_t loc );
+size_t wcrtomb_l( char *__restrict s, wchar_t wc, mbstate_t *__restrict ps,
                   locale_t loc);
-size_t mbrtowc_l( wchar_t* __restrict pwc, const char* __restrict s,
-                  size_t n, mbstate_t* __restrict ps, locale_t loc);
-size_t mbsnrtowcs_l( wchar_t* __restrict dst, const char** __restrict src,
-                     size_t nms, size_t len, mbstate_t* __restrict ps, locale_t loc);
-size_t wcsnrtombs_l( char* __restrict dst, const wchar_t** __restrict src,
-                     size_t nwc, size_t len, mbstate_t* __restrict ps, locale_t loc);
+size_t mbrtowc_l( wchar_t *__restrict pwc, const char *__restrict s,
+                  size_t n, mbstate_t *__restrict ps, locale_t loc);
+size_t mbsnrtowcs_l( wchar_t *__restrict dst, const char **__restrict src,
+                     size_t nms, size_t len, mbstate_t *__restrict ps, locale_t loc);
+size_t wcsnrtombs_l( char *__restrict dst, const wchar_t **__restrict src,
+                     size_t nwc, size_t len, mbstate_t *__restrict ps, locale_t loc);
 wint_t btowc_l( int c, locale_t loc );
 int wctob_l( wint_t c, locale_t loc );
 
@@ -144,14 +141,16 @@ long double strtold_l(const char*, char**, locale_t);
 #endif
 inline _LIBCPP_INLINE_VISIBILITY
 int
-islower_l(int c, _locale_t loc) {
-    return _islower_l((int)c, loc);
+islower_l(int c, _locale_t loc)
+{
+ return _islower_l((int)c, loc);
 }
 
 inline _LIBCPP_INLINE_VISIBILITY
 int
-isupper_l(int c, _locale_t loc) {
-    return _isupper_l((int)c, loc);
+isupper_l(int c, _locale_t loc)
+{
+ return _isupper_l((int)c, loc);
 }
 
 #define isdigit_l _isdigit_l
@@ -182,15 +181,17 @@ isupper_l(int c, _locale_t loc) {
 #define sprintf_l( __s, __l, __f, ... ) _sprintf_l( __s, __f, __l, __VA_ARGS__ )
 #define vsprintf_l( __s, __l, __f, ... ) _vsprintf_l( __s, __f, __l, __VA_ARGS__ )
 #define vsnprintf_l( __s, __n, __l, __f, ... ) _vsnprintf_l( __s, __n, __f, __l, __VA_ARGS__ )
-_LIBCPP_FUNC_VIS int snprintf_l(char* ret, size_t n, locale_t loc, const char* format, ...);
-_LIBCPP_FUNC_VIS int asprintf_l( char** ret, locale_t loc, const char* format, ... );
-_LIBCPP_FUNC_VIS int vasprintf_l( char** ret, locale_t loc, const char* format, va_list ap );
+_LIBCPP_FUNC_VIS int snprintf_l(char *ret, size_t n, locale_t loc, const char *format, ...);
+_LIBCPP_FUNC_VIS int asprintf_l( char **ret, locale_t loc, const char *format, ... );
+_LIBCPP_FUNC_VIS int vasprintf_l( char **ret, locale_t loc, const char *format, va_list ap );
 
 // not-so-pressing FIXME: use locale to determine blank characters
-inline int isblank_l( int c, locale_t /*loc*/ ) {
+inline int isblank_l( int c, locale_t /*loc*/ )
+{
     return ( c == ' ' || c == '\t' );
 }
-inline int iswblank_l( wint_t c, locale_t /*loc*/ ) {
+inline int iswblank_l( wint_t c, locale_t /*loc*/ )
+{
     return ( c == L' ' || c == L'\t' );
 }
 

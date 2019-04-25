@@ -436,7 +436,7 @@ static void InitializeV8() {
         // timeout=0 flag.
         V8InspectorPlatform::CreateDefaultPlatform();
 #else
-        v8::platform::CreateDefaultPlatform();
+        v8::platform::NewDefaultPlatform().release();
 #endif
 
     V8::InitializePlatform(Runtime::platform);

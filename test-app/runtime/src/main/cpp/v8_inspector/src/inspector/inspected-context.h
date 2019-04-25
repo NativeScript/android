@@ -24,63 +24,51 @@ class V8InspectorImpl;
 enum class V8InternalValueType { kNone, kEntry, kScope, kScopeList };
 
 class InspectedContext {
-    public:
-        ~InspectedContext();
+ public:
+  ~InspectedContext();
 
-        static int contextId(v8::Local<v8::Context>);
+  static int contextId(v8::Local<v8::Context>);
 
-        v8::Local<v8::Context> context() const;
-        int contextId() const {
-            return m_contextId;
-        }
-        int contextGroupId() const {
-            return m_contextGroupId;
-        }
-        String16 origin() const {
-            return m_origin;
-        }
-        String16 humanReadableName() const {
-            return m_humanReadableName;
-        }
-        String16 auxData() const {
-            return m_auxData;
-        }
+  v8::Local<v8::Context> context() const;
+  int contextId() const { return m_contextId; }
+  int contextGroupId() const { return m_contextGroupId; }
+  String16 origin() const { return m_origin; }
+  String16 humanReadableName() const { return m_humanReadableName; }
+  String16 auxData() const { return m_auxData; }
 
-        bool isReported(int sessionId) const;
-        void setReported(int sessionId, bool reported);
+  bool isReported(int sessionId) const;
+  void setReported(int sessionId, bool reported);
 
-        v8::Isolate* isolate() const;
-        V8InspectorImpl* inspector() const {
-            return m_inspector;
-        }
+  v8::Isolate* isolate() const;
+  V8InspectorImpl* inspector() const { return m_inspector; }
 
-        InjectedScript* getInjectedScript(int sessionId);
-        InjectedScript* createInjectedScript(int sessionId);
-        void discardInjectedScript(int sessionId);
+  InjectedScript* getInjectedScript(int sessionId);
+  InjectedScript* createInjectedScript(int sessionId);
+  void discardInjectedScript(int sessionId);
 
-        bool addInternalObject(v8::Local<v8::Object> object,
-                               V8InternalValueType type);
-        V8InternalValueType getInternalType(v8::Local<v8::Object> object);
+  bool addInternalObject(v8::Local<v8::Object> object,
+                         V8InternalValueType type);
+  V8InternalValueType getInternalType(v8::Local<v8::Object> object);
 
-    private:
-        friend class V8InspectorImpl;
-        InspectedContext(V8InspectorImpl*, const V8ContextInfo&, int contextId);
+ private:
+  friend class V8InspectorImpl;
+  InspectedContext(V8InspectorImpl*, const V8ContextInfo&, int contextId);
 
-        class WeakCallbackData;
+  class WeakCallbackData;
 
-        V8InspectorImpl* m_inspector;
-        v8::Global<v8::Context> m_context;
-        int m_contextId;
-        int m_contextGroupId;
-        const String16 m_origin;
-        const String16 m_humanReadableName;
-        const String16 m_auxData;
-        std::unordered_set<int> m_reportedSessionIds;
-        std::unordered_map<int, std::unique_ptr<InjectedScript>> m_injectedScripts;
-        WeakCallbackData* m_weakCallbackData;
-        v8::Global<v8::debug::WeakMap> m_internalObjects;
+  V8InspectorImpl* m_inspector;
+  v8::Global<v8::Context> m_context;
+  int m_contextId;
+  int m_contextGroupId;
+  const String16 m_origin;
+  const String16 m_humanReadableName;
+  const String16 m_auxData;
+  std::unordered_set<int> m_reportedSessionIds;
+  std::unordered_map<int, std::unique_ptr<InjectedScript>> m_injectedScripts;
+  WeakCallbackData* m_weakCallbackData;
+  v8::Global<v8::debug::WeakMap> m_internalObjects;
 
-        DISALLOW_COPY_AND_ASSIGN(InspectedContext);
+  DISALLOW_COPY_AND_ASSIGN(InspectedContext);
 };
 
 }  // namespace v8_inspector

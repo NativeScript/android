@@ -23,82 +23,68 @@ namespace base {
 // int.
 template <typename T, typename S = int>
 class Flags final {
-    public:
-        typedef T flag_type;
-        typedef S mask_type;
+ public:
+  typedef T flag_type;
+  typedef S mask_type;
 
-        constexpr Flags() : mask_(0) {}
-        constexpr Flags(flag_type flag)  // NOLINT(runtime/explicit)
-            : mask_(static_cast<S>(flag)) {}
-        constexpr explicit Flags(mask_type mask) : mask_(static_cast<S>(mask)) {}
+  constexpr Flags() : mask_(0) {}
+  constexpr Flags(flag_type flag)  // NOLINT(runtime/explicit)
+      : mask_(static_cast<S>(flag)) {}
+  constexpr explicit Flags(mask_type mask) : mask_(static_cast<S>(mask)) {}
 
-        constexpr bool operator==(flag_type flag) const {
-            return mask_ == static_cast<S>(flag);
-        }
-        constexpr bool operator!=(flag_type flag) const {
-            return mask_ != static_cast<S>(flag);
-        }
+  constexpr bool operator==(flag_type flag) const {
+    return mask_ == static_cast<S>(flag);
+  }
+  constexpr bool operator!=(flag_type flag) const {
+    return mask_ != static_cast<S>(flag);
+  }
 
-        Flags& operator&=(const Flags& flags) {
-            mask_ &= flags.mask_;
-            return *this;
-        }
-        Flags& operator|=(const Flags& flags) {
-            mask_ |= flags.mask_;
-            return *this;
-        }
-        Flags& operator^=(const Flags& flags) {
-            mask_ ^= flags.mask_;
-            return *this;
-        }
+  Flags& operator&=(const Flags& flags) {
+    mask_ &= flags.mask_;
+    return *this;
+  }
+  Flags& operator|=(const Flags& flags) {
+    mask_ |= flags.mask_;
+    return *this;
+  }
+  Flags& operator^=(const Flags& flags) {
+    mask_ ^= flags.mask_;
+    return *this;
+  }
 
-        constexpr Flags operator&(const Flags& flags) const {
-            return Flags(*this) &= flags;
-        }
-        constexpr Flags operator|(const Flags& flags) const {
-            return Flags(*this) |= flags;
-        }
-        constexpr Flags operator^(const Flags& flags) const {
-            return Flags(*this) ^= flags;
-        }
+  constexpr Flags operator&(const Flags& flags) const {
+    return Flags(*this) &= flags;
+  }
+  constexpr Flags operator|(const Flags& flags) const {
+    return Flags(*this) |= flags;
+  }
+  constexpr Flags operator^(const Flags& flags) const {
+    return Flags(*this) ^= flags;
+  }
 
-        Flags& operator&=(flag_type flag) {
-            return operator&=(Flags(flag));
-        }
-        Flags& operator|=(flag_type flag) {
-            return operator|=(Flags(flag));
-        }
-        Flags& operator^=(flag_type flag) {
-            return operator^=(Flags(flag));
-        }
+  Flags& operator&=(flag_type flag) { return operator&=(Flags(flag)); }
+  Flags& operator|=(flag_type flag) { return operator|=(Flags(flag)); }
+  Flags& operator^=(flag_type flag) { return operator^=(Flags(flag)); }
 
-        constexpr Flags operator&(flag_type flag) const {
-            return operator&(Flags(flag));
-        }
-        constexpr Flags operator|(flag_type flag) const {
-            return operator|(Flags(flag));
-        }
-        constexpr Flags operator^(flag_type flag) const {
-            return operator^(Flags(flag));
-        }
+  constexpr Flags operator&(flag_type flag) const {
+    return operator&(Flags(flag));
+  }
+  constexpr Flags operator|(flag_type flag) const {
+    return operator|(Flags(flag));
+  }
+  constexpr Flags operator^(flag_type flag) const {
+    return operator^(Flags(flag));
+  }
 
-        constexpr Flags operator~() const {
-            return Flags(~mask_);
-        }
+  constexpr Flags operator~() const { return Flags(~mask_); }
 
-        constexpr operator mask_type() const {
-            return mask_;
-        }
-        constexpr bool operator!() const {
-            return !mask_;
-        }
+  constexpr operator mask_type() const { return mask_; }
+  constexpr bool operator!() const { return !mask_; }
 
-        friend size_t hash_value(const Flags& flags) {
-            return flags.mask_;
-        }
+  friend size_t hash_value(const Flags& flags) { return flags.mask_; }
 
-    private:
-        mask_type mask_;
+ private:
+  mask_type mask_;
 };
 
 #define DEFINE_OPERATORS_FOR_FLAGS(Type)                             \

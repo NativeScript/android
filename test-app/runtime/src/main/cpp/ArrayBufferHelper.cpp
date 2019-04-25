@@ -15,7 +15,8 @@ ArrayBufferHelper::ArrayBufferHelper()
 void ArrayBufferHelper::CreateConvertFunctions(Isolate* isolate, const Local<Object>& global, ObjectManager* objectManager) {
     m_objectManager = objectManager;
     auto extData = External::New(isolate, this);
-    auto fromFunc = FunctionTemplate::New(isolate, CreateFromCallbackStatic, extData)->GetFunction();
+    auto context = isolate->GetCurrentContext();
+    auto fromFunc = FunctionTemplate::New(isolate, CreateFromCallbackStatic, extData)->GetFunction(context).ToLocalChecked();
     auto ctx = isolate->GetCurrentContext();
     auto arrBufferCtorFunc = global->Get(ArgConverter::ConvertToV8String(isolate, "ArrayBuffer")).As<Function>();
     arrBufferCtorFunc->Set(ctx, ArgConverter::ConvertToV8String(isolate, "from"), fromFunc);

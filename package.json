@@ -13,5 +13,5 @@
     "version": "5.1.1",
     "android": "3.4.0"
   },
-  "android_ndk_version": "19b"
+  "android_ndk_version": "19c"
 }

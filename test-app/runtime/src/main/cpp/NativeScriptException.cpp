@@ -149,7 +149,7 @@ void NativeScriptException::CallJsFuncWithErr(Local<Value> errObj, jboolean isDi
         auto thiz = Object::New(isolate);
         auto func = handler.As<Function>();
 
-        func->Call(thiz, 1, &errObj);
+        func->Call(context, thiz, 1, &errObj);
     }
 }
 

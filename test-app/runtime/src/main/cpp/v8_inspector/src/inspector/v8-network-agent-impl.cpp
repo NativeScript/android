@@ -54,19 +54,19 @@ DispatchResponse V8NetworkAgentImpl::setExtraHTTPHeaders(std::unique_ptr<protoco
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8NetworkAgentImpl::getResponseBody(const String& in_requestId, String* out_body, bool* out_base64Encoded) {
+void V8NetworkAgentImpl::getResponseBody(const String& in_requestId, std::unique_ptr<GetResponseBodyCallback> callback) {
     auto it = m_responses.find(in_requestId.utf8());
 
     if (it == m_responses.end()) {
         auto error = "Response not found for requestId = " + in_requestId;
-        return DispatchResponse::Error(error);
-    } else {
-        v8_inspector::utils::NetworkRequestData* response = it->second;
-        *out_body = String16((const uint16_t*) response->getData());
-        *out_base64Encoded = !response->hasTextContent();
+        callback->sendFailure(DispatchResponse::Error(error));
+        return;
     }
 
-    return DispatchResponse::OK();
+    v8_inspector::utils::NetworkRequestData* response = it->second;
+    auto body = String16((const uint16_t*) response->getData());
+    auto base64Encoded = !response->hasTextContent();
+    callback->sendSuccess(body, base64Encoded);
 }
 
 DispatchResponse V8NetworkAgentImpl::setCacheDisabled(bool in_cacheDisabled) {
@@ -81,31 +81,7 @@ DispatchResponse V8NetworkAgentImpl::canClearBrowserCookies(bool* out_result) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8NetworkAgentImpl::canEmulateNetworkConditions(bool* out_result) {
-    return utils::Common::protocolCommandNotSupportedDispatchResponse();
-}
-
-DispatchResponse V8NetworkAgentImpl::clearBrowserCache() {
-    return utils::Common::protocolCommandNotSupportedDispatchResponse();
-}
-
-DispatchResponse V8NetworkAgentImpl::clearBrowserCookies() {
-    return utils::Common::protocolCommandNotSupportedDispatchResponse();
-}
-
-DispatchResponse V8NetworkAgentImpl::continueInterceptedRequest(const String& in_interceptionId, Maybe<String> in_errorReason, Maybe<String> in_rawResponse, Maybe<String> in_url, Maybe<String> in_method, Maybe<String> in_postData, Maybe<protocol::Network::Headers> in_headers, Maybe<protocol::Network::AuthChallengeResponse> in_authChallengeResponse) {
-    return utils::Common::protocolCommandNotSupportedDispatchResponse();
-}
-
-DispatchResponse V8NetworkAgentImpl::deleteCookies(const String& in_name, Maybe<String> in_url, Maybe<String> in_domain, Maybe<String> in_path) {
-    return utils::Common::protocolCommandNotSupportedDispatchResponse();
-}
-
 DispatchResponse V8NetworkAgentImpl::emulateNetworkConditions(bool in_offline, double in_latency, double in_downloadThroughput, double in_uploadThroughput, Maybe<String> in_connectionType) {
-    return utils::Common::protocolCommandNotSupportedDispatchResponse();
-}
-
-DispatchResponse V8NetworkAgentImpl::getAllCookies(std::unique_ptr<protocol::Array<protocol::Network::Cookie>>* out_cookies) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
@@ -113,16 +89,7 @@ DispatchResponse V8NetworkAgentImpl::getCertificate(const String& in_origin, std
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8NetworkAgentImpl::getCookies(Maybe<protocol::Array<String>> in_urls, std::unique_ptr<protocol::Array<protocol::Network::Cookie>>* out_cookies) {
-    return utils::Common::protocolCommandNotSupportedDispatchResponse();
-}
-
-DispatchResponse V8NetworkAgentImpl::getRequestPostData(const String& in_requestId, String* out_postData) {
-    return utils::Common::protocolCommandNotSupportedDispatchResponse();
-}
-
-DispatchResponse V8NetworkAgentImpl::getResponseBodyForInterception(const String& in_interceptionId, String* out_body, bool* out_base64Encoded) {
-    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+void V8NetworkAgentImpl::getRequestPostData(const String& in_requestId, std::unique_ptr<GetRequestPostDataCallback> callback) {
 }
 
 DispatchResponse V8NetworkAgentImpl::replayXHR(const String& in_requestId) {
@@ -141,23 +108,7 @@ DispatchResponse V8NetworkAgentImpl::setBypassServiceWorker(bool in_bypass) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8NetworkAgentImpl::setCookie(const String& in_name, const String& in_value, Maybe<String> in_url, Maybe<String> in_domain, Maybe<String> in_path, Maybe<bool> in_secure, Maybe<bool> in_httpOnly, Maybe<String> in_sameSite, Maybe<double> in_expires, bool* out_success) {
-    return utils::Common::protocolCommandNotSupportedDispatchResponse();
-}
-
-DispatchResponse V8NetworkAgentImpl::setCookies(std::unique_ptr<protocol::Array<protocol::Network::CookieParam>> in_cookies) {
-    return utils::Common::protocolCommandNotSupportedDispatchResponse();
-}
-
 DispatchResponse V8NetworkAgentImpl::setDataSizeLimitsForTest(int in_maxTotalSize, int in_maxResourceSize) {
-    return utils::Common::protocolCommandNotSupportedDispatchResponse();
-}
-
-DispatchResponse V8NetworkAgentImpl::setRequestInterception(std::unique_ptr<protocol::Array<protocol::Network::RequestPattern>> in_patterns) {
-    return utils::Common::protocolCommandNotSupportedDispatchResponse();
-}
-
-DispatchResponse V8NetworkAgentImpl::setUserAgentOverride(const String& in_userAgent) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
