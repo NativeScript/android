@@ -509,7 +509,7 @@ afterEvaluate { project ->
             }.artifacts.each {
                 def jar = it.file;
                 if (!jars.contains(jar)) {
-                    jars.push(jar)
+                    jars.add(jar)
                     def destDir = md5(jar.path);
                     def outputDir = new File(Paths.get(extractedDependenciesDir, destDir).normalize().toString())
 
@@ -543,7 +543,7 @@ afterEvaluate { project ->
                             // }
                         }
                     }
-                    allJars.push([file: jar, outputDir: outputDir])
+                    allJars.add([file: jar, outputDir: outputDir])
                 }
             }
         }

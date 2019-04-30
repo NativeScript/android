@@ -54,15 +54,15 @@ android {
         externalNativeBuild {
             cmake {
                 if (optimized) {
-                    arguments.push("-DOPTIMIZED_BUILD=true")
+                    arguments.add("-DOPTIMIZED_BUILD=true")
                 }
 
                 if (optimizedWithInspector) {
-                    arguments.push("-DOPTIMIZED_WITH_INSPECTOR_BUILD=true")
+                    arguments.add("-DOPTIMIZED_WITH_INSPECTOR_BUILD=true")
                 }
 
                 if (useCCache) {
-                    arguments.push("-DUSE_CCACHE=true")
+                    arguments.add("-DUSE_CCACHE=true")
                 }
 
                 //https://developer.android.com/ndk/guides/cmake.html
