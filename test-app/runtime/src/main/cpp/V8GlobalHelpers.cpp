@@ -22,7 +22,7 @@ Local<Function> GetSmartJSONStringifyFunction(Isolate* isolate) {
     string smartStringifyFunctionScript =
         "(function () {\n"
         "    function smartStringify(object) {\n"
-        "        seen = [];\n"
+        "        const seen = [];\n"
         "        var replacer = function (key, value) {\n"
         "            if (value != null && typeof value == \"object\") {\n"
         "                if (seen.indexOf(value) >= 0) {\n"
