@@ -25,7 +25,13 @@ matrix:
           - sys-img-$ANDROID_ABI-android-$EMULATOR_API_LEVEL
       git:
         submodules: false
+      addons:
+        sonarcloud:
+          organization: "vmutafov-github" # the key of the org you chose at step #3
+          token:
+            secure: "hxrrHyBORv5frJWyZsnt3+s9gUDaTtK+nZrIplLZelPHPc66fLMx2dGEBzE/hfgGRIQzIk+8foaTXfZQQDayD8Qgr9Fy3DmbIpuvM5YDDaKvYq/PG63lRuaE9lzNarHdhwZyr7lTOqw8RWUbIYsAmLk9BzCUsKU7VEnHixkKtJQ="
       script:
+        - sonar-scanner
         # (master branch) build the runtime twice - optimized, and regular packages, skip on PRs
         # test-app/gradlew runtests will take care of building the runtime for its testing needs
         - 'if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then bash ./gradlew -PpreReleaseVersion=$PACKAGE_VERSION -PgitCommitVersion=$TRAVIS_COMMIT -PnoCCache --stacktrace; fi'
