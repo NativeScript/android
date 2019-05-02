@@ -80,7 +80,8 @@ void ObjectManager::Init(Isolate *isolate) {
     auto jsWrapperFuncTemplate = FunctionTemplate::New(isolate, JSWrapperConstructorCallback);
     jsWrapperFuncTemplate->InstanceTemplate()->SetInternalFieldCount(
             static_cast<int>(MetadataNodeKeys::END));
-    auto jsWrapperFunc = jsWrapperFuncTemplate->GetFunction();
+    auto context = isolate->GetCurrentContext();
+    auto jsWrapperFunc = jsWrapperFuncTemplate->GetFunction(context).ToLocalChecked();
     m_poJsWrapperFunc = new Persistent<Function>(isolate, jsWrapperFunc);
 
     if (m_markingMode != JavaScriptMarkingMode::None) {
@@ -569,7 +570,7 @@ void ObjectManager::MarkReachableObjects(Isolate *isolate, const Local<Object> &
             if (propName->IsString()) {
                 auto name = propName.As<String>();
 
-                bool isPropDescriptor = o->HasRealNamedCallbackProperty(name);
+                bool isPropDescriptor = o->HasRealNamedCallbackProperty(context, name).ToChecked();
                 if (isPropDescriptor) {
                     Local<Value> getter;
                     Local<Value> setter;

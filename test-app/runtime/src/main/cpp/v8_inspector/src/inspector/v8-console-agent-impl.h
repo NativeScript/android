@@ -17,30 +17,30 @@ class V8InspectorSessionImpl;
 using protocol::Response;
 
 class V8ConsoleAgentImpl : public protocol::Console::Backend {
-    public:
-        V8ConsoleAgentImpl(V8InspectorSessionImpl*, protocol::FrontendChannel*,
-                           protocol::DictionaryValue* state);
-        ~V8ConsoleAgentImpl() override;
+ public:
+  V8ConsoleAgentImpl(V8InspectorSessionImpl*, protocol::FrontendChannel*,
+                     protocol::DictionaryValue* state);
+  ~V8ConsoleAgentImpl() override;
 
-        Response enable() override;
-        Response disable() override;
-        Response clearMessages() override;
+  Response enable() override;
+  Response disable() override;
+  Response clearMessages() override;
 
-        void restore();
-        void messageAdded(V8ConsoleMessage*);
-        void reset();
-        bool enabled();
+  void restore();
+  void messageAdded(V8ConsoleMessage*);
+  void reset();
+  bool enabled();
 
-    private:
-        void reportAllMessages();
-        bool reportMessage(V8ConsoleMessage*, bool generatePreview);
+ private:
+  void reportAllMessages();
+  bool reportMessage(V8ConsoleMessage*, bool generatePreview);
 
-        V8InspectorSessionImpl* m_session;
-        protocol::DictionaryValue* m_state;
-        protocol::Console::Frontend m_frontend;
-        bool m_enabled;
+  V8InspectorSessionImpl* m_session;
+  protocol::DictionaryValue* m_state;
+  protocol::Console::Frontend m_frontend;
+  bool m_enabled;
 
-        DISALLOW_COPY_AND_ASSIGN(V8ConsoleAgentImpl);
+  DISALLOW_COPY_AND_ASSIGN(V8ConsoleAgentImpl);
 };
 
 }  // namespace v8_inspector

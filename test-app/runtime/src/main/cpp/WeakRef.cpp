@@ -177,7 +177,8 @@ Local<Function> WeakRef::GetGetterFunction(Isolate* isolate) {
             return Local<Function>::New(isolate, *m_poGetterFunc);
         } else {
             auto extData = External::New(isolate, this);
-            auto getterFunc = FunctionTemplate::New(isolate, GettertCallback, extData)->GetFunction();
+            Local<Context> context = isolate->GetCurrentContext();
+            auto getterFunc = FunctionTemplate::New(isolate, GettertCallback, extData)->GetFunction(context).ToLocalChecked();
             m_poGetterFunc = new Persistent<Function>(isolate, getterFunc);
             return getterFunc;
         }
@@ -202,7 +203,8 @@ Local<Function> WeakRef::GetClearFunction(Isolate* isolate) {
             return Local<Function>::New(isolate, *m_poClearFunc);
         } else {
             auto extData = External::New(isolate, this);
-            auto clearFunc = FunctionTemplate::New(isolate, ClearCallback, extData)->GetFunction();
+            Local<Context> context = isolate->GetCurrentContext();
+            auto clearFunc = FunctionTemplate::New(isolate, ClearCallback, extData)->GetFunction(context).ToLocalChecked();
             m_poClearFunc = new Persistent<Function>(isolate, clearFunc);
             return clearFunc;
         }

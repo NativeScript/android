@@ -15,9 +15,9 @@ class PageResource {
     public:
         PageResource(std::string filePath, std::string mimeType);
         bool hasTextContent() {
-            return strcmp(m_type, protocol::Page::ResourceTypeEnum::Document) == 0 ||
-                   strcmp(m_type, protocol::Page::ResourceTypeEnum::Stylesheet) == 0 ||
-                   strcmp(m_type, protocol::Page::ResourceTypeEnum::Script) == 0;
+            return strcmp(m_type, protocol::Network::ResourceTypeEnum::Document) == 0 ||
+                   strcmp(m_type, protocol::Network::ResourceTypeEnum::Stylesheet) == 0 ||
+                   strcmp(m_type, protocol::Network::ResourceTypeEnum::Script) == 0;
         };
         const char* getMimeType() {
             return m_mimeType.c_str();

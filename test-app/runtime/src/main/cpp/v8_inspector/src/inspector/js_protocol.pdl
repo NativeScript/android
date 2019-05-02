@@ -1,0 +1,4568 @@
+# Copyright 2017 The Chromium Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+version
+  major 1
+  minor 3
+
+# This domain is deprecated - use Runtime or Log instead.
+deprecated domain Console
+  depends on Runtime
+
+  # Console message.
+  type ConsoleMessage extends object
+    properties
+      # Message source.
+      enum source
+        xml
+        javascript
+        network
+        console-api
+        storage
+        appcache
+        rendering
+        security
+        other
+        deprecation
+        worker
+      # Message severity.
+      enum level
+        log
+        warning
+        error
+        debug
+        info
+      # Message text.
+      string text
+      # URL of the message origin.
+      optional string url
+      # Line number in the resource that generated this message (1-based).
+      optional integer line
+      # Column number in the resource that generated this message (1-based).
+      optional integer column
+
+  # Does nothing.
+  command clearMessages
+
+  # Disables console domain, prevents further console messages from being reported to the client.
+  command disable
+
+  # Enables console domain, sends the messages collected so far to the client by means of the
+  # `messageAdded` notification.
+  command enable
+
+  # Issued when new console message is added.
+  event messageAdded
+    parameters
+      # Console message that has been added.
+      ConsoleMessage message
+
+# Debugger domain exposes JavaScript debugging capabilities. It allows setting and removing
+# breakpoints, stepping through execution, exploring stack traces, etc.
+domain Debugger
+  depends on Runtime
+
+  # Breakpoint identifier.
+  type BreakpointId extends string
+
+  # Call frame identifier.
+  type CallFrameId extends string
+
+  # Location in the source code.
+  type Location extends object
+    properties
+      # Script identifier as reported in the `Debugger.scriptParsed`.
+      Runtime.ScriptId scriptId
+      # Line number in the script (0-based).
+      integer lineNumber
+      # Column number in the script (0-based).
+      optional integer columnNumber
+
+  # Location in the source code.
+  experimental type ScriptPosition extends object
+    properties
+      integer lineNumber
+      integer columnNumber
+
+  # JavaScript call frame. Array of call frames form the call stack.
+  type CallFrame extends object
+    properties
+      # Call frame identifier. This identifier is only valid while the virtual machine is paused.
+      CallFrameId callFrameId
+      # Name of the JavaScript function called on this call frame.
+      string functionName
+      # Location in the source code.
+      optional Location functionLocation
+      # Location in the source code.
+      Location location
+      # JavaScript script name or url.
+      string url
+      # Scope chain for this call frame.
+      array of Scope scopeChain
+      # `this` object for this call frame.
+      Runtime.RemoteObject this
+      # The value being returned, if the function is at return point.
+      optional Runtime.RemoteObject returnValue
+
+  # Scope description.
+  type Scope extends object
+    properties
+      # Scope type.
+      enum type
+        global
+        local
+        with
+        closure
+        catch
+        block
+        script
+        eval
+        module
+      # Object representing the scope. For `global` and `with` scopes it represents the actual
+      # object; for the rest of the scopes, it is artificial transient object enumerating scope
+      # variables as its properties.
+      Runtime.RemoteObject object
+      optional string name
+      # Location in the source code where scope starts
+      optional Location startLocation
+      # Location in the source code where scope ends
+      optional Location endLocation
+
+  # Search match for resource.
+  type SearchMatch extends object
+    properties
+      # Line number in resource content.
+      number lineNumber
+      # Line with match content.
+      string lineContent
+
+  type BreakLocation extends object
+    properties
+      # Script identifier as reported in the `Debugger.scriptParsed`.
+      Runtime.ScriptId scriptId
+      # Line number in the script (0-based).
+      integer lineNumber
+      # Column number in the script (0-based).
+      optional integer columnNumber
+      optional enum type
+        debuggerStatement
+        call
+        return
+
+  # Continues execution until specific location is reached.
+  command continueToLocation
+    parameters
+      # Location to continue to.
+      Location location
+      optional enum targetCallFrames
+        any
+        current
+
+  # Disables debugger for given page.
+  command disable
+
+  # Enables debugger for the given page. Clients should not assume that the debugging has been
+  # enabled until the result for this command is received.
+  command enable
+    returns
+      # Unique identifier of the debugger.
+      experimental Runtime.UniqueDebuggerId debuggerId
+
+  # Evaluates expression on a given call frame.
+  command evaluateOnCallFrame
+    parameters
+      # Call frame identifier to evaluate on.
+      CallFrameId callFrameId
+      # Expression to evaluate.
+      string expression
+      # String object group name to put result into (allows rapid releasing resulting object handles
+      # using `releaseObjectGroup`).
+      optional string objectGroup
+      # Specifies whether command line API should be available to the evaluated expression, defaults
+      # to false.
+      optional boolean includeCommandLineAPI
+      # In silent mode exceptions thrown during evaluation are not reported and do not pause
+      # execution. Overrides `setPauseOnException` state.
+      optional boolean silent
+      # Whether the result is expected to be a JSON object that should be sent by value.
+      optional boolean returnByValue
+      # Whether preview should be generated for the result.
+      experimental optional boolean generatePreview
+      # Whether to throw an exception if side effect cannot be ruled out during evaluation.
+      optional boolean throwOnSideEffect
+      # Terminate execution after timing out (number of milliseconds).
+      experimental optional Runtime.TimeDelta timeout
+    returns
+      # Object wrapper for the evaluation result.
+      Runtime.RemoteObject result
+      # Exception details.
+      optional Runtime.ExceptionDetails exceptionDetails
+
+  # Returns possible locations for breakpoint. scriptId in start and end range locations should be
+  # the same.
+  command getPossibleBreakpoints
+    parameters
+      # Start of range to search possible breakpoint locations in.
+      Location start
+      # End of range to search possible breakpoint locations in (excluding). When not specified, end
+      # of scripts is used as end of range.
+      optional Location end
+      # Only consider locations which are in the same (non-nested) function as start.
+      optional boolean restrictToFunction
+    returns
+      # List of the possible breakpoint locations.
+      array of BreakLocation locations
+
+  # Returns source for the script with given id.
+  command getScriptSource
+    parameters
+      # Id of the script to get source for.
+      Runtime.ScriptId scriptId
+    returns
+      # Script source.
+      string scriptSource
+
+  # Returns stack trace with given `stackTraceId`.
+  experimental command getStackTrace
+    parameters
+      Runtime.StackTraceId stackTraceId
+    returns
+      Runtime.StackTrace stackTrace
+
+  # Stops on the next JavaScript statement.
+  command pause
+
+  experimental command pauseOnAsyncCall
+    parameters
+      # Debugger will pause when async call with given stack trace is started.
+      Runtime.StackTraceId parentStackTraceId
+
+  # Removes JavaScript breakpoint.
+  command removeBreakpoint
+    parameters
+      BreakpointId breakpointId
+
+  # Restarts particular call frame from the beginning.
+  command restartFrame
+    parameters
+      # Call frame identifier to evaluate on.
+      CallFrameId callFrameId
+    returns
+      # New stack trace.
+      array of CallFrame callFrames
+      # Async stack trace, if any.
+      optional Runtime.StackTrace asyncStackTrace
+      # Async stack trace, if any.
+      experimental optional Runtime.StackTraceId asyncStackTraceId
+
+  # Resumes JavaScript execution.
+  command resume
+
+  # Searches for given string in script content.
+  command searchInContent
+    parameters
+      # Id of the script to search in.
+      Runtime.ScriptId scriptId
+      # String to search for.
+      string query
+      # If true, search is case sensitive.
+      optional boolean caseSensitive
+      # If true, treats string parameter as regex.
+      optional boolean isRegex
+    returns
+      # List of search matches.
+      array of SearchMatch result
+
+  # Enables or disables async call stacks tracking.
+  command setAsyncCallStackDepth
+    parameters
+      # Maximum depth of async call stacks. Setting to `0` will effectively disable collecting async
+      # call stacks (default).
+      integer maxDepth
+
+  # Replace previous blackbox patterns with passed ones. Forces backend to skip stepping/pausing in
+  # scripts with url matching one of the patterns. VM will try to leave blackboxed script by
+  # performing 'step in' several times, finally resorting to 'step out' if unsuccessful.
+  experimental command setBlackboxPatterns
+    parameters
+      # Array of regexps that will be used to check script url for blackbox state.
+      array of string patterns
+
+  # Makes backend skip steps in the script in blackboxed ranges. VM will try leave blacklisted
+  # scripts by performing 'step in' several times, finally resorting to 'step out' if unsuccessful.
+  # Positions array contains positions where blackbox state is changed. First interval isn't
+  # blackboxed. Array should be sorted.
+  experimental command setBlackboxedRanges
+    parameters
+      # Id of the script.
+      Runtime.ScriptId scriptId
+      array of ScriptPosition positions
+
+  # Sets JavaScript breakpoint at a given location.
+  command setBreakpoint
+    parameters
+      # Location to set breakpoint in.
+      Location location
+      # Expression to use as a breakpoint condition. When specified, debugger will only stop on the
+      # breakpoint if this expression evaluates to true.
+      optional string condition
+    returns
+      # Id of the created breakpoint for further reference.
+      BreakpointId breakpointId
+      # Location this breakpoint resolved into.
+      Location actualLocation
+
+  # Sets JavaScript breakpoint at given location specified either by URL or URL regex. Once this
+  # command is issued, all existing parsed scripts will have breakpoints resolved and returned in
+  # `locations` property. Further matching script parsing will result in subsequent
+  # `breakpointResolved` events issued. This logical breakpoint will survive page reloads.
+  command setBreakpointByUrl
+    parameters
+      # Line number to set breakpoint at.
+      integer lineNumber
+      # URL of the resources to set breakpoint on.
+      optional string url
+      # Regex pattern for the URLs of the resources to set breakpoints on. Either `url` or
+      # `urlRegex` must be specified.
+      optional string urlRegex
+      # Script hash of the resources to set breakpoint on.
+      optional string scriptHash
+      # Offset in the line to set breakpoint at.
+      optional integer columnNumber
+      # Expression to use as a breakpoint condition. When specified, debugger will only stop on the
+      # breakpoint if this expression evaluates to true.
+      optional string condition
+    returns
+      # Id of the created breakpoint for further reference.
+      BreakpointId breakpointId
+      # List of the locations this breakpoint resolved into upon addition.
+      array of Location locations
+
+  # Sets JavaScript breakpoint before each call to the given function.
+  # If another function was created from the same source as a given one,
+  # calling it will also trigger the breakpoint.
+  experimental command setBreakpointOnFunctionCall
+    parameters
+      # Function object id.
+      Runtime.RemoteObjectId objectId
+      # Expression to use as a breakpoint condition. When specified, debugger will
+      # stop on the breakpoint if this expression evaluates to true.
+      optional string condition
+    returns
+      # Id of the created breakpoint for further reference.
+      BreakpointId breakpointId
+
+  # Activates / deactivates all breakpoints on the page.
+  command setBreakpointsActive
+    parameters
+      # New value for breakpoints active state.
+      boolean active
+
+  # Defines pause on exceptions state. Can be set to stop on all exceptions, uncaught exceptions or
+  # no exceptions. Initial pause on exceptions state is `none`.
+  command setPauseOnExceptions
+    parameters
+      # Pause on exceptions mode.
+      enum state
+        none
+        uncaught
+        all
+
+  # Changes return value in top frame. Available only at return break position.
+  experimental command setReturnValue
+    parameters
+      # New return value.
+      Runtime.CallArgument newValue
+
+  # Edits JavaScript source live.
+  command setScriptSource
+    parameters
+      # Id of the script to edit.
+      Runtime.ScriptId scriptId
+      # New content of the script.
+      string scriptSource
+      #  If true the change will not actually be applied. Dry run may be used to get result
+      # description without actually modifying the code.
+      optional boolean dryRun
+    returns
+      # New stack trace in case editing has happened while VM was stopped.
+      optional array of CallFrame callFrames
+      # Whether current call stack  was modified after applying the changes.
+      optional boolean stackChanged
+      # Async stack trace, if any.
+      optional Runtime.StackTrace asyncStackTrace
+      # Async stack trace, if any.
+      experimental optional Runtime.StackTraceId asyncStackTraceId
+      # Exception details if any.
+      optional Runtime.ExceptionDetails exceptionDetails
+
+  # Makes page not interrupt on any pauses (breakpoint, exception, dom exception etc).
+  command setSkipAllPauses
+    parameters
+      # New value for skip pauses state.
+      boolean skip
+
+  # Changes value of variable in a callframe. Object-based scopes are not supported and must be
+  # mutated manually.
+  command setVariableValue
+    parameters
+      # 0-based number of scope as was listed in scope chain. Only 'local', 'closure' and 'catch'
+      # scope types are allowed. Other scopes could be manipulated manually.
+      integer scopeNumber
+      # Variable name.
+      string variableName
+      # New variable value.
+      Runtime.CallArgument newValue
+      # Id of callframe that holds variable.
+      CallFrameId callFrameId
+
+  # Steps into the function call.
+  command stepInto
+    parameters
+      # Debugger will issue additional Debugger.paused notification if any async task is scheduled
+      # before next pause.
+      experimental optional boolean breakOnAsyncCall
+
+  # Steps out of the function call.
+  command stepOut
+
+  # Steps over the statement.
+  command stepOver
+
+  # Fired when breakpoint is resolved to an actual script and location.
+  event breakpointResolved
+    parameters
+      # Breakpoint unique identifier.
+      BreakpointId breakpointId
+      # Actual breakpoint location.
+      Location location
+
+  # Fired when the virtual machine stopped on breakpoint or exception or any other stop criteria.
+  event paused
+    parameters
+      # Call stack the virtual machine stopped on.
+      array of CallFrame callFrames
+      # Pause reason.
+      enum reason
+        XHR
+        DOM
+        EventListener
+        exception
+        assert
+        debugCommand
+        promiseRejection
+        OOM
+        other
+        ambiguous
+      # Object containing break-specific auxiliary properties.
+      optional object data
+      # Hit breakpoints IDs
+      optional array of string hitBreakpoints
+      # Async stack trace, if any.
+      optional Runtime.StackTrace asyncStackTrace
+      # Async stack trace, if any.
+      experimental optional Runtime.StackTraceId asyncStackTraceId
+      # Just scheduled async call will have this stack trace as parent stack during async execution.
+      # This field is available only after `Debugger.stepInto` call with `breakOnAsynCall` flag.
+      experimental optional Runtime.StackTraceId asyncCallStackTraceId
+
+  # Fired when the virtual machine resumed execution.
+  event resumed
+
+  # Fired when virtual machine fails to parse the script.
+  event scriptFailedToParse
+    parameters
+      # Identifier of the script parsed.
+      Runtime.ScriptId scriptId
+      # URL or name of the script parsed (if any).
+      string url
+      # Line offset of the script within the resource with given URL (for script tags).
+      integer startLine
+      # Column offset of the script within the resource with given URL.
+      integer startColumn
+      # Last line of the script.
+      integer endLine
+      # Length of the last line of the script.
+      integer endColumn
+      # Specifies script creation context.
+      Runtime.ExecutionContextId executionContextId
+      # Content hash of the script.
+      string hash
+      # Embedder-specific auxiliary data.
+      optional object executionContextAuxData
+      # URL of source map associated with script (if any).
+      optional string sourceMapURL
+      # True, if this script has sourceURL.
+      optional boolean hasSourceURL
+      # True, if this script is ES6 module.
+      optional boolean isModule
+      # This script length.
+      optional integer length
+      # JavaScript top stack frame of where the script parsed event was triggered if available.
+      experimental optional Runtime.StackTrace stackTrace
+
+  # Fired when virtual machine parses script. This event is also fired for all known and uncollected
+  # scripts upon enabling debugger.
+  event scriptParsed
+    parameters
+      # Identifier of the script parsed.
+      Runtime.ScriptId scriptId
+      # URL or name of the script parsed (if any).
+      string url
+      # Line offset of the script within the resource with given URL (for script tags).
+      integer startLine
+      # Column offset of the script within the resource with given URL.
+      integer startColumn
+      # Last line of the script.
+      integer endLine
+      # Length of the last line of the script.
+      integer endColumn
+      # Specifies script creation context.
+      Runtime.ExecutionContextId executionContextId
+      # Content hash of the script.
+      string hash
+      # Embedder-specific auxiliary data.
+      optional object executionContextAuxData
+      # True, if this script is generated as a result of the live edit operation.
+      experimental optional boolean isLiveEdit
+      # URL of source map associated with script (if any).
+      optional string sourceMapURL
+      # True, if this script has sourceURL.
+      optional boolean hasSourceURL
+      # True, if this script is ES6 module.
+      optional boolean isModule
+      # This script length.
+      optional integer length
+      # JavaScript top stack frame of where the script parsed event was triggered if available.
+      experimental optional Runtime.StackTrace stackTrace
+
+experimental domain HeapProfiler
+  depends on Runtime
+
+  # Heap snapshot object id.
+  type HeapSnapshotObjectId extends string
+
+  # Sampling Heap Profile node. Holds callsite information, allocation statistics and child nodes.
+  type SamplingHeapProfileNode extends object
+    properties
+      # Function location.
+      Runtime.CallFrame callFrame
+      # Allocations size in bytes for the node excluding children.
+      number selfSize
+      # Node id. Ids are unique across all profiles collected between startSampling and stopSampling.
+      integer id
+      # Child nodes.
+      array of SamplingHeapProfileNode children
+
+  # A single sample from a sampling profile.
+  type SamplingHeapProfileSample extends object
+    properties
+      # Allocation size in bytes attributed to the sample.
+      number size
+      # Id of the corresponding profile tree node.
+      integer nodeId
+      # Time-ordered sample ordinal number. It is unique across all profiles retrieved
+      # between startSampling and stopSampling.
+      number ordinal
+
+  # Sampling profile.
+  type SamplingHeapProfile extends object
+    properties
+      SamplingHeapProfileNode head
+      array of SamplingHeapProfileSample samples
+
+  # Enables console to refer to the node with given id via $x (see Command Line API for more details
+  # $x functions).
+  command addInspectedHeapObject
+    parameters
+      # Heap snapshot object id to be accessible by means of $x command line API.
+      HeapSnapshotObjectId heapObjectId
+
+  command collectGarbage
+
+  command disable
+
+  command enable
+
+  command getHeapObjectId
+    parameters
+      # Identifier of the object to get heap object id for.
+      Runtime.RemoteObjectId objectId
+    returns
+      # Id of the heap snapshot object corresponding to the passed remote object id.
+      HeapSnapshotObjectId heapSnapshotObjectId
+
+  command getObjectByHeapObjectId
+    parameters
+      HeapSnapshotObjectId objectId
+      # Symbolic group name that can be used to release multiple objects.
+      optional string objectGroup
+    returns
+      # Evaluation result.
+      Runtime.RemoteObject result
+
+  command getSamplingProfile
+    returns
+      # Return the sampling profile being collected.
+      SamplingHeapProfile profile
+
+  command startSampling
+    parameters
+      # Average sample interval in bytes. Poisson distribution is used for the intervals. The
+      # default value is 32768 bytes.
+      optional number samplingInterval
+
+  command startTrackingHeapObjects
+    parameters
+      optional boolean trackAllocations
+
+  command stopSampling
+    returns
+      # Recorded sampling heap profile.
+      SamplingHeapProfile profile
+
+  command stopTrackingHeapObjects
+    parameters
+      # If true 'reportHeapSnapshotProgress' events will be generated while snapshot is being taken
+      # when the tracking is stopped.
+      optional boolean reportProgress
+
+  command takeHeapSnapshot
+    parameters
+      # If true 'reportHeapSnapshotProgress' events will be generated while snapshot is being taken.
+      optional boolean reportProgress
+
+  event addHeapSnapshotChunk
+    parameters
+      string chunk
+
+  # If heap objects tracking has been started then backend may send update for one or more fragments
+  event heapStatsUpdate
+    parameters
+      # An array of triplets. Each triplet describes a fragment. The first integer is the fragment
+      # index, the second integer is a total count of objects for the fragment, the third integer is
+      # a total size of the objects for the fragment.
+      array of integer statsUpdate
+
+  # If heap objects tracking has been started then backend regularly sends a current value for last
+  # seen object id and corresponding timestamp. If the were changes in the heap since last event
+  # then one or more heapStatsUpdate events will be sent before a new lastSeenObjectId event.
+  event lastSeenObjectId
+    parameters
+      integer lastSeenObjectId
+      number timestamp
+
+  event reportHeapSnapshotProgress
+    parameters
+      integer done
+      integer total
+      optional boolean finished
+
+  event resetProfiles
+
+domain Profiler
+  depends on Runtime
+  depends on Debugger
+
+  # Profile node. Holds callsite information, execution statistics and child nodes.
+  type ProfileNode extends object
+    properties
+      # Unique id of the node.
+      integer id
+      # Function location.
+      Runtime.CallFrame callFrame
+      # Number of samples where this node was on top of the call stack.
+      optional integer hitCount
+      # Child node ids.
+      optional array of integer children
+      # The reason of being not optimized. The function may be deoptimized or marked as don't
+      # optimize.
+      optional string deoptReason
+      # An array of source position ticks.
+      optional array of PositionTickInfo positionTicks
+
+  # Profile.
+  type Profile extends object
+    properties
+      # The list of profile nodes. First item is the root node.
+      array of ProfileNode nodes
+      # Profiling start timestamp in microseconds.
+      number startTime
+      # Profiling end timestamp in microseconds.
+      number endTime
+      # Ids of samples top nodes.
+      optional array of integer samples
+      # Time intervals between adjacent samples in microseconds. The first delta is relative to the
+      # profile startTime.
+      optional array of integer timeDeltas
+
+  # Specifies a number of samples attributed to a certain source position.
+  type PositionTickInfo extends object
+    properties
+      # Source line number (1-based).
+      integer line
+      # Number of samples attributed to the source line.
+      integer ticks
+
+  # Coverage data for a source range.
+  type CoverageRange extends object
+    properties
+      # JavaScript script source offset for the range start.
+      integer startOffset
+      # JavaScript script source offset for the range end.
+      integer endOffset
+      # Collected execution count of the source range.
+      integer count
+
+  # Coverage data for a JavaScript function.
+  type FunctionCoverage extends object
+    properties
+      # JavaScript function name.
+      string functionName
+      # Source ranges inside the function with coverage data.
+      array of CoverageRange ranges
+      # Whether coverage data for this function has block granularity.
+      boolean isBlockCoverage
+
+  # Coverage data for a JavaScript script.
+  type ScriptCoverage extends object
+    properties
+      # JavaScript script id.
+      Runtime.ScriptId scriptId
+      # JavaScript script name or url.
+      string url
+      # Functions contained in the script that has coverage data.
+      array of FunctionCoverage functions
+
+  # Describes a type collected during runtime.
+  experimental type TypeObject extends object
+    properties
+      # Name of a type collected with type profiling.
+      string name
+
+  # Source offset and types for a parameter or return value.
+  experimental type TypeProfileEntry extends object
+    properties
+      # Source offset of the parameter or end of function for return values.
+      integer offset
+      # The types for this parameter or return value.
+      array of TypeObject types
+
+  # Type profile data collected during runtime for a JavaScript script.
+  experimental type ScriptTypeProfile extends object
+    properties
+      # JavaScript script id.
+      Runtime.ScriptId scriptId
+      # JavaScript script name or url.
+      string url
+      # Type profile entries for parameters and return values of the functions in the script.
+      array of TypeProfileEntry entries
+
+  command disable
+
+  command enable
+
+  # Collect coverage data for the current isolate. The coverage data may be incomplete due to
+  # garbage collection.
+  command getBestEffortCoverage
+    returns
+      # Coverage data for the current isolate.
+      array of ScriptCoverage result
+
+  # Changes CPU profiler sampling interval. Must be called before CPU profiles recording started.
+  command setSamplingInterval
+    parameters
+      # New sampling interval in microseconds.
+      integer interval
+
+  command start
+
+  # Enable precise code coverage. Coverage data for JavaScript executed before enabling precise code
+  # coverage may be incomplete. Enabling prevents running optimized code and resets execution
+  # counters.
+  command startPreciseCoverage
+    parameters
+      # Collect accurate call counts beyond simple 'covered' or 'not covered'.
+      optional boolean callCount
+      # Collect block-based coverage.
+      optional boolean detailed
+
+  # Enable type profile.
+  experimental command startTypeProfile
+
+  command stop
+    returns
+      # Recorded profile.
+      Profile profile
+
+  # Disable precise code coverage. Disabling releases unnecessary execution count records and allows
+  # executing optimized code.
+  command stopPreciseCoverage
+
+  # Disable type profile. Disabling releases type profile data collected so far.
+  experimental command stopTypeProfile
+
+  # Collect coverage data for the current isolate, and resets execution counters. Precise code
+  # coverage needs to have started.
+  command takePreciseCoverage
+    returns
+      # Coverage data for the current isolate.
+      array of ScriptCoverage result
+
+  # Collect type profile.
+  experimental command takeTypeProfile
+    returns
+      # Type profile for all scripts since startTypeProfile() was turned on.
+      array of ScriptTypeProfile result
+
+  event consoleProfileFinished
+    parameters
+      string id
+      # Location of console.profileEnd().
+      Debugger.Location location
+      Profile profile
+      # Profile title passed as an argument to console.profile().
+      optional string title
+
+  # Sent when new profile recording is started using console.profile() call.
+  event consoleProfileStarted
+    parameters
+      string id
+      # Location of console.profile().
+      Debugger.Location location
+      # Profile title passed as an argument to console.profile().
+      optional string title
+
+# Runtime domain exposes JavaScript runtime by means of remote evaluation and mirror objects.
+# Evaluation results are returned as mirror object that expose object type, string representation
+# and unique identifier that can be used for further object reference. Original objects are
+# maintained in memory unless they are either explicitly released or are released along with the
+# other objects in their object group.
+domain Runtime
+
+  # Unique script identifier.
+  type ScriptId extends string
+
+  # Unique object identifier.
+  type RemoteObjectId extends string
+
+  # Primitive value which cannot be JSON-stringified. Includes values `-0`, `NaN`, `Infinity`,
+  # `-Infinity`, and bigint literals.
+  type UnserializableValue extends string
+
+  # Mirror object referencing original JavaScript object.
+  type RemoteObject extends object
+    properties
+      # Object type.
+      enum type
+        object
+        function
+        undefined
+        string
+        number
+        boolean
+        symbol
+        bigint
+      # Object subtype hint. Specified for `object` type values only.
+      optional enum subtype
+        array
+        null
+        node
+        regexp
+        date
+        map
+        set
+        weakmap
+        weakset
+        iterator
+        generator
+        error
+        proxy
+        promise
+        typedarray
+        arraybuffer
+        dataview
+      # Object class (constructor) name. Specified for `object` type values only.
+      optional string className
+      # Remote object value in case of primitive values or JSON values (if it was requested).
+      optional any value
+      # Primitive value which can not be JSON-stringified does not have `value`, but gets this
+      # property.
+      optional UnserializableValue unserializableValue
+      # String representation of the object.
+      optional string description
+      # Unique object identifier (for non-primitive values).
+      optional RemoteObjectId objectId
+      # Preview containing abbreviated property values. Specified for `object` type values only.
+      experimental optional ObjectPreview preview
+      experimental optional CustomPreview customPreview
+
+  experimental type CustomPreview extends object
+    properties
+      # The JSON-stringified result of formatter.header(object, config) call.
+      # It contains json ML array that represents RemoteObject.
+      string header
+      # If formatter returns true as a result of formatter.hasBody call then bodyGetterId will
+      # contain RemoteObjectId for the function that returns result of formatter.body(object, config) call.
+      # The result value is json ML array.
+      optional RemoteObjectId bodyGetterId
+
+  # Object containing abbreviated remote object value.
+  experimental type ObjectPreview extends object
+    properties
+      # Object type.
+      enum type
+        object
+        function
+        undefined
+        string
+        number
+        boolean
+        symbol
+        bigint
+      # Object subtype hint. Specified for `object` type values only.
+      optional enum subtype
+        array
+        null
+        node
+        regexp
+        date
+        map
+        set
+        weakmap
+        weakset
+        iterator
+        generator
+        error
+      # String representation of the object.
+      optional string description
+      # True iff some of the properties or entries of the original object did not fit.
+      boolean overflow
+      # List of the properties.
+      array of PropertyPreview properties
+      # List of the entries. Specified for `map` and `set` subtype values only.
+      optional array of EntryPreview entries
+
+  experimental type PropertyPreview extends object
+    properties
+      # Property name.
+      string name
+      # Object type. Accessor means that the property itself is an accessor property.
+      enum type
+        object
+        function
+        undefined
+        string
+        number
+        boolean
+        symbol
+        accessor
+        bigint
+      # User-friendly property value string.
+      optional string value
+      # Nested value preview.
+      optional ObjectPreview valuePreview
+      # Object subtype hint. Specified for `object` type values only.
+      optional enum subtype
+        array
+        null
+        node
+        regexp
+        date
+        map
+        set
+        weakmap
+        weakset
+        iterator
+        generator
+        error
+
+  experimental type EntryPreview extends object
+    properties
+      # Preview of the key. Specified for map-like collection entries.
+      optional ObjectPreview key
+      # Preview of the value.
+      ObjectPreview value
+
+  # Object property descriptor.
+  type PropertyDescriptor extends object
+    properties
+      # Property name or symbol description.
+      string name
+      # The value associated with the property.
+      optional RemoteObject value
+      # True if the value associated with the property may be changed (data descriptors only).
+      optional boolean writable
+      # A function which serves as a getter for the property, or `undefined` if there is no getter
+      # (accessor descriptors only).
+      optional RemoteObject get
+      # A function which serves as a setter for the property, or `undefined` if there is no setter
+      # (accessor descriptors only).
+      optional RemoteObject set
+      # True if the type of this property descriptor may be changed and if the property may be
+      # deleted from the corresponding object.
+      boolean configurable
+      # True if this property shows up during enumeration of the properties on the corresponding
+      # object.
+      boolean enumerable
+      # True if the result was thrown during the evaluation.
+      optional boolean wasThrown
+      # True if the property is owned for the object.
+      optional boolean isOwn
+      # Property symbol object, if the property is of the `symbol` type.
+      optional RemoteObject symbol
+
+  # Object internal property descriptor. This property isn't normally visible in JavaScript code.
+  type InternalPropertyDescriptor extends object
+    properties
+      # Conventional property name.
+      string name
+      # The value associated with the property.
+      optional RemoteObject value
+
+  # Represents function call argument. Either remote object id `objectId`, primitive `value`,
+  # unserializable primitive value or neither of (for undefined) them should be specified.
+  type CallArgument extends object
+    properties
+      # Primitive value or serializable javascript object.
+      optional any value
+      # Primitive value which can not be JSON-stringified.
+      optional UnserializableValue unserializableValue
+      # Remote object handle.
+      optional RemoteObjectId objectId
+
+  # Id of an execution context.
+  type ExecutionContextId extends integer
+
+  # Description of an isolated world.
+  type ExecutionContextDescription extends object
+    properties
+      # Unique id of the execution context. It can be used to specify in which execution context
+      # script evaluation should be performed.
+      ExecutionContextId id
+      # Execution context origin.
+      string origin
+      # Human readable name describing given context.
+      string name
+      # Embedder-specific auxiliary data.
+      optional object auxData
+
+  # Detailed information about exception (or error) that was thrown during script compilation or
+  # execution.
+  type ExceptionDetails extends object
+    properties
+      # Exception id.
+      integer exceptionId
+      # Exception text, which should be used together with exception object when available.
+      string text
+      # Line number of the exception location (0-based).
+      integer lineNumber
+      # Column number of the exception location (0-based).
+      integer columnNumber
+      # Script ID of the exception location.
+      optional ScriptId scriptId
+      # URL of the exception location, to be used when the script was not reported.
+      optional string url
+      # JavaScript stack trace if available.
+      optional StackTrace stackTrace
+      # Exception object if available.
+      optional RemoteObject exception
+      # Identifier of the context where exception happened.
+      optional ExecutionContextId executionContextId
+
+  # Number of milliseconds since epoch.
+  type Timestamp extends number
+
+  # Number of milliseconds.
+  type TimeDelta extends number
+
+  # Stack entry for runtime errors and assertions.
+  type CallFrame extends object
+    properties
+      # JavaScript function name.
+      string functionName
+      # JavaScript script id.
+      ScriptId scriptId
+      # JavaScript script name or url.
+      string url
+      # JavaScript script line number (0-based).
+      integer lineNumber
+      # JavaScript script column number (0-based).
+      integer columnNumber
+
+  # Call frames for assertions or error messages.
+  type StackTrace extends object
+    properties
+      # String label of this stack trace. For async traces this may be a name of the function that
+      # initiated the async call.
+      optional string description
+      # JavaScript function name.
+      array of CallFrame callFrames
+      # Asynchronous JavaScript stack trace that preceded this stack, if available.
+      optional StackTrace parent
+      # Asynchronous JavaScript stack trace that preceded this stack, if available.
+      experimental optional StackTraceId parentId
+
+  # Unique identifier of current debugger.
+  experimental type UniqueDebuggerId extends string
+
+  # If `debuggerId` is set stack trace comes from another debugger and can be resolved there. This
+  # allows to track cross-debugger calls. See `Runtime.StackTrace` and `Debugger.paused` for usages.
+  experimental type StackTraceId extends object
+    properties
+      string id
+      optional UniqueDebuggerId debuggerId
+
+  # Add handler to promise with given promise object id.
+  command awaitPromise
+    parameters
+      # Identifier of the promise.
+      RemoteObjectId promiseObjectId
+      # Whether the result is expected to be a JSON object that should be sent by value.
+      optional boolean returnByValue
+      # Whether preview should be generated for the result.
+      optional boolean generatePreview
+    returns
+      # Promise result. Will contain rejected value if promise was rejected.
+      RemoteObject result
+      # Exception details if stack strace is available.
+      optional ExceptionDetails exceptionDetails
+
+  # Calls function with given declaration on the given object. Object group of the result is
+  # inherited from the target object.
+  command callFunctionOn
+    parameters
+      # Declaration of the function to call.
+      string functionDeclaration
+      # Identifier of the object to call function on. Either objectId or executionContextId should
+      # be specified.
+      optional RemoteObjectId objectId
+      # Call arguments. All call arguments must belong to the same JavaScript world as the target
+      # object.
+      optional array of CallArgument arguments
+      # In silent mode exceptions thrown during evaluation are not reported and do not pause
+      # execution. Overrides `setPauseOnException` state.
+      optional boolean silent
+      # Whether the result is expected to be a JSON object which should be sent by value.
+      optional boolean returnByValue
+      # Whether preview should be generated for the result.
+      experimental optional boolean generatePreview
+      # Whether execution should be treated as initiated by user in the UI.
+      optional boolean userGesture
+      # Whether execution should `await` for resulting value and return once awaited promise is
+      # resolved.
+      optional boolean awaitPromise
+      # Specifies execution context which global object will be used to call function on. Either
+      # executionContextId or objectId should be specified.
+      optional ExecutionContextId executionContextId
+      # Symbolic group name that can be used to release multiple objects. If objectGroup is not
+      # specified and objectId is, objectGroup will be inherited from object.
+      optional string objectGroup
+    returns
+      # Call result.
+      RemoteObject result
+      # Exception details.
+      optional ExceptionDetails exceptionDetails
+
+  # Compiles expression.
+  command compileScript
+    parameters
+      # Expression to compile.
+      string expression
+      # Source url to be set for the script.
+      string sourceURL
+      # Specifies whether the compiled script should be persisted.
+      boolean persistScript
+      # Specifies in which execution context to perform script run. If the parameter is omitted the
+      # evaluation will be performed in the context of the inspected page.
+      optional ExecutionContextId executionContextId
+    returns
+      # Id of the script.
+      optional ScriptId scriptId
+      # Exception details.
+      optional ExceptionDetails exceptionDetails
+
+  # Disables reporting of execution contexts creation.
+  command disable
+
+  # Discards collected exceptions and console API calls.
+  command discardConsoleEntries
+
+  # Enables reporting of execution contexts creation by means of `executionContextCreated` event.
+  # When the reporting gets enabled the event will be sent immediately for each existing execution
+  # context.
+  command enable
+
+  # Evaluates expression on global object.
+  command evaluate
+    parameters
+      # Expression to evaluate.
+      string expression
+      # Symbolic group name that can be used to release multiple objects.
+      optional string objectGroup
+      # Determines whether Command Line API should be available during the evaluation.
+      optional boolean includeCommandLineAPI
+      # In silent mode exceptions thrown during evaluation are not reported and do not pause
+      # execution. Overrides `setPauseOnException` state.
+      optional boolean silent
+      # Specifies in which execution context to perform evaluation. If the parameter is omitted the
+      # evaluation will be performed in the context of the inspected page.
+      optional ExecutionContextId contextId
+      # Whether the result is expected to be a JSON object that should be sent by value.
+      optional boolean returnByValue
+      # Whether preview should be generated for the result.
+      experimental optional boolean generatePreview
+      # Whether execution should be treated as initiated by user in the UI.
+      optional boolean userGesture
+      # Whether execution should `await` for resulting value and return once awaited promise is
+      # resolved.
+      optional boolean awaitPromise
+      # Whether to throw an exception if side effect cannot be ruled out during evaluation.
+      experimental optional boolean throwOnSideEffect
+      # Terminate execution after timing out (number of milliseconds).
+      experimental optional TimeDelta timeout
+    returns
+      # Evaluation result.
+      RemoteObject result
+      # Exception details.
+      optional ExceptionDetails exceptionDetails
+
+  # Returns the isolate id.
+  experimental command getIsolateId
+    returns
+      # The isolate id.
+      string id
+
+  # Returns the JavaScript heap usage.
+  # It is the total usage of the corresponding isolate not scoped to a particular Runtime.
+  experimental command getHeapUsage
+    returns
+      # Used heap size in bytes.
+      number usedSize
+      # Allocated heap size in bytes.
+      number totalSize
+
+  # Returns properties of a given object. Object group of the result is inherited from the target
+  # object.
+  command getProperties
+    parameters
+      # Identifier of the object to return properties for.
+      RemoteObjectId objectId
+      # If true, returns properties belonging only to the element itself, not to its prototype
+      # chain.
+      optional boolean ownProperties
+      # If true, returns accessor properties (with getter/setter) only; internal properties are not
+      # returned either.
+      experimental optional boolean accessorPropertiesOnly
+      # Whether preview should be generated for the results.
+      experimental optional boolean generatePreview
+    returns
+      # Object properties.
+      array of PropertyDescriptor result
+      # Internal object properties (only of the element itself).
+      optional array of InternalPropertyDescriptor internalProperties
+      # Exception details.
+      optional ExceptionDetails exceptionDetails
+
+  # Returns all let, const and class variables from global scope.
+  command globalLexicalScopeNames
+    parameters
+      # Specifies in which execution context to lookup global scope variables.
+      optional ExecutionContextId executionContextId
+    returns
+      array of string names
+
+  command queryObjects
+    parameters
+      # Identifier of the prototype to return objects for.
+      RemoteObjectId prototypeObjectId
+      # Symbolic group name that can be used to release the results.
+      optional string objectGroup
+    returns
+      # Array with objects.
+      RemoteObject objects
+
+  # Releases remote object with given id.
+  command releaseObject
+    parameters
+      # Identifier of the object to release.
+      RemoteObjectId objectId
+
+  # Releases all remote objects that belong to a given group.
+  command releaseObjectGroup
+    parameters
+      # Symbolic object group name.
+      string objectGroup
+
+  # Tells inspected instance to run if it was waiting for debugger to attach.
+  command runIfWaitingForDebugger
+
+  # Runs script with given id in a given context.
+  command runScript
+    parameters
+      # Id of the script to run.
+      ScriptId scriptId
+      # Specifies in which execution context to perform script run. If the parameter is omitted the
+      # evaluation will be performed in the context of the inspected page.
+      optional ExecutionContextId executionContextId
+      # Symbolic group name that can be used to release multiple objects.
+      optional string objectGroup
+      # In silent mode exceptions thrown during evaluation are not reported and do not pause
+      # execution. Overrides `setPauseOnException` state.
+      optional boolean silent
+      # Determines whether Command Line API should be available during the evaluation.
+      optional boolean includeCommandLineAPI
+      # Whether the result is expected to be a JSON object which should be sent by value.
+      optional boolean returnByValue
+      # Whether preview should be generated for the result.
+      optional boolean generatePreview
+      # Whether execution should `await` for resulting value and return once awaited promise is
+      # resolved.
+      optional boolean awaitPromise
+    returns
+      # Run result.
+      RemoteObject result
+      # Exception details.
+      optional ExceptionDetails exceptionDetails
+
+  # Enables or disables async call stacks tracking.
+  command setAsyncCallStackDepth
+    redirect Debugger
+    parameters
+      # Maximum depth of async call stacks. Setting to `0` will effectively disable collecting async
+      # call stacks (default).
+      integer maxDepth
+
+  experimental command setCustomObjectFormatterEnabled
+    parameters
+      boolean enabled
+
+  experimental command setMaxCallStackSizeToCapture
+    parameters
+      integer size
+
+  # Terminate current or next JavaScript execution.
+  # Will cancel the termination when the outer-most script execution ends.
+  experimental command terminateExecution
+
+  # If executionContextId is empty, adds binding with the given name on the
+  # global objects of all inspected contexts, including those created later,
+  # bindings survive reloads.
+  # If executionContextId is specified, adds binding only on global object of
+  # given execution context.
+  # Binding function takes exactly one argument, this argument should be string,
+  # in case of any other input, function throws an exception.
+  # Each binding function call produces Runtime.bindingCalled notification.
+  experimental command addBinding
+    parameters
+      string name
+      optional ExecutionContextId executionContextId
+
+  # This method does not remove binding function from global object but
+  # unsubscribes current runtime agent from Runtime.bindingCalled notifications.
+  experimental command removeBinding
+    parameters
+      string name
+
+  # Notification is issued every time when binding is called.
+  experimental event bindingCalled
+    parameters
+      string name
+      string payload
+      # Identifier of the context where the call was made.
+      ExecutionContextId executionContextId
+
+  # Issued when console API was called.
+  event consoleAPICalled
+    parameters
+      # Type of the call.
+      enum type
+        log
+        debug
+        info
+        error
+        warning
+        dir
+        dirxml
+        table
+        trace
+        clear
+        startGroup
+        startGroupCollapsed
+        endGroup
+        assert
+        profile
+        profileEnd
+        count
+        timeEnd
+      # Call arguments.
+      array of RemoteObject args
+      # Identifier of the context where the call was made.
+      ExecutionContextId executionContextId
+      # Call timestamp.
+      Timestamp timestamp
+      # Stack trace captured when the call was made.
+      optional StackTrace stackTrace
+      # Console context descriptor for calls on non-default console context (not console.*):
+      # 'anonymous#unique-logger-id' for call on unnamed context, 'name#unique-logger-id' for call
+      # on named context.
+      experimental optional string context
+
+  # Issued when unhandled exception was revoked.
+  event exceptionRevoked
+    parameters
+      # Reason describing why exception was revoked.
+      string reason
+      # The id of revoked exception, as reported in `exceptionThrown`.
+      integer exceptionId
+
+  # Issued when exception was thrown and unhandled.
+  event exceptionThrown
+    parameters
+      # Timestamp of the exception.
+      Timestamp timestamp
+      ExceptionDetails exceptionDetails
+
+  # Issued when new execution context is created.
+  event executionContextCreated
+    parameters
+      # A newly created execution context.
+      ExecutionContextDescription context
+
+  # Issued when execution context is destroyed.
+  event executionContextDestroyed
+    parameters
+      # Id of the destroyed context
+      ExecutionContextId executionContextId
+
+  # Issued when all executionContexts were cleared in browser
+  event executionContextsCleared
+
+  # Issued when object should be inspected (for example, as a result of inspect() command line API
+  # call).
+  event inspectRequested
+    parameters
+      RemoteObject object
+      object hints
+
+# This domain is deprecated.
+deprecated domain Schema
+
+  # Description of the protocol domain.
+  type Domain extends object
+    properties
+      # Domain name.
+      string name
+      # Domain version.
+      string version
+
+  # Returns supported domains.
+  command getDomains
+    returns
+      # List of supported domains.
+      array of Domain domains
+
+# Actions and events related to the inspected page belong to the page domain.
+domain Page
+  depends on Debugger
+  depends on DOM
+  depends on Network
+  depends on Runtime
+  # Unique frame identifier.
+  type FrameId extends string
+  # Information about the Frame on the page.
+  type Frame extends object
+    properties
+      # Frame unique identifier.
+      string id
+      # Parent frame identifier.
+      optional string parentId
+      # Identifier of the loader associated with this frame.
+      Network.LoaderId loaderId
+      # Frame's name as specified in the tag.
+      optional string name
+      # Frame document's URL.
+      string url
+      # Frame document's security origin.
+      string securityOrigin
+      # Frame document's mimeType as determined by the browser.
+      string mimeType
+      # If the frame failed to load, this contains the URL that could not be loaded.
+      experimental optional string unreachableUrl
+  # Information about the Resource on the page.
+  experimental type FrameResource extends object
+    properties
+      # Resource URL.
+      string url
+      # Type of this resource.
+      Network.ResourceType type
+      # Resource mimeType as determined by the browser.
+      string mimeType
+      # last-modified timestamp as reported by server.
+      optional Network.TimeSinceEpoch lastModified
+      # Resource content size.
+      optional number contentSize
+      # True if the resource failed to load.
+      optional boolean failed
+      # True if the resource was canceled during loading.
+      optional boolean canceled
+  # Information about the Frame hierarchy along with their cached resources.
+  experimental type FrameResourceTree extends object
+    properties
+      # Frame information for this tree item.
+      Frame frame
+      # Child frames.
+      optional array of FrameResourceTree childFrames
+      # Information about frame resources.
+      array of FrameResource resources
+  # Information about the Frame hierarchy.
+  type FrameTree extends object
+    properties
+      # Frame information for this tree item.
+      Frame frame
+      # Child frames.
+      optional array of FrameTree childFrames
+  # Unique script identifier.
+  type ScriptIdentifier extends string
+  # Transition type.
+  type TransitionType extends string
+    enum
+      link
+      typed
+      address_bar
+      auto_bookmark
+      auto_subframe
+      manual_subframe
+      generated
+      auto_toplevel
+      form_submit
+      reload
+      keyword
+      keyword_generated
+      other
+  # Navigation history entry.
+  type NavigationEntry extends object
+    properties
+      # Unique id of the navigation history entry.
+      integer id
+      # URL of the navigation history entry.
+      string url
+      # URL that the user typed in the url bar.
+      string userTypedURL
+      # Title of the navigation history entry.
+      string title
+      # Transition type.
+      TransitionType transitionType
+  # Screencast frame metadata.
+  experimental type ScreencastFrameMetadata extends object
+    properties
+      # Top offset in DIP.
+      number offsetTop
+      # Page scale factor.
+      number pageScaleFactor
+      # Device screen width in DIP.
+      number deviceWidth
+      # Device screen height in DIP.
+      number deviceHeight
+      # Position of horizontal scroll in CSS pixels.
+      number scrollOffsetX
+      # Position of vertical scroll in CSS pixels.
+      number scrollOffsetY
+      # Frame swap timestamp.
+      optional Network.TimeSinceEpoch timestamp
+  # Javascript dialog type.
+  type DialogType extends string
+    enum
+      alert
+      confirm
+      prompt
+      beforeunload
+  # Error while paring app manifest.
+  type AppManifestError extends object
+    properties
+      # Error message.
+      string message
+      # If criticial, this is a non-recoverable parse error.
+      integer critical
+      # Error line.
+      integer line
+      # Error column.
+      integer column
+  # Layout viewport position and dimensions.
+  type LayoutViewport extends object
+    properties
+      # Horizontal offset relative to the document (CSS pixels).
+      integer pageX
+      # Vertical offset relative to the document (CSS pixels).
+      integer pageY
+      # Width (CSS pixels), excludes scrollbar if present.
+      integer clientWidth
+      # Height (CSS pixels), excludes scrollbar if present.
+      integer clientHeight
+  # Visual viewport position, dimensions, and scale.
+  type VisualViewport extends object
+    properties
+      # Horizontal offset relative to the layout viewport (CSS pixels).
+      number offsetX
+      # Vertical offset relative to the layout viewport (CSS pixels).
+      number offsetY
+      # Horizontal offset relative to the document (CSS pixels).
+      number pageX
+      # Vertical offset relative to the document (CSS pixels).
+      number pageY
+      # Width (CSS pixels), excludes scrollbar if present.
+      number clientWidth
+      # Height (CSS pixels), excludes scrollbar if present.
+      number clientHeight
+      # Scale relative to the ideal viewport (size at width=device-width).
+      number scale
+      # Page zoom factor (CSS to device independent pixels ratio).
+      optional number zoom
+  # Viewport for capturing screenshot.
+  type Viewport extends object
+    properties
+      # X offset in device independent pixels (dip).
+      number x
+      # Y offset in device independent pixels (dip).
+      number y
+      # Rectangle width in device independent pixels (dip).
+      number width
+      # Rectangle height in device independent pixels (dip).
+      number height
+      # Page scale factor.
+      number scale
+  # Generic font families collection.
+  experimental type FontFamilies extends object
+    properties
+      # The standard font-family.
+      optional string standard
+      # The fixed font-family.
+      optional string fixed
+      # The serif font-family.
+      optional string serif
+      # The sansSerif font-family.
+      optional string sansSerif
+      # The cursive font-family.
+      optional string cursive
+      # The fantasy font-family.
+      optional string fantasy
+      # The pictograph font-family.
+      optional string pictograph
+  # Default font sizes.
+  experimental type FontSizes extends object
+    properties
+      # Default standard font size.
+      optional integer standard
+      # Default fixed font size.
+      optional integer fixed
+  # Deprecated, please use addScriptToEvaluateOnNewDocument instead.
+  experimental deprecated command addScriptToEvaluateOnLoad
+    parameters
+      string scriptSource
+    returns
+      # Identifier of the added script.
+      ScriptIdentifier identifier
+  # Evaluates given script in every frame upon creation (before loading frame's scripts).
+  command addScriptToEvaluateOnNewDocument
+    parameters
+      string source
+      # If specified, creates an isolated world with the given name and evaluates given script in it.
+      # This world name will be used as the ExecutionContextDescription::name when the corresponding
+      # event is emitted.
+      experimental optional string worldName
+    returns
+      # Identifier of the added script.
+      ScriptIdentifier identifier
+  # Brings page to front (activates tab).
+  command bringToFront
+  # Capture page screenshot.
+  command captureScreenshot
+    parameters
+      # Image compression format (defaults to png).
+      optional enum format
+        jpeg
+        png
+      # Compression quality from range [0..100] (jpeg only).
+      optional integer quality
+      # Capture the screenshot of a given region only.
+      optional Viewport clip
+      # Capture the screenshot from the surface, rather than the view. Defaults to true.
+      experimental optional boolean fromSurface
+    returns
+      # Base64-encoded image data.
+      binary data
+  # Returns a snapshot of the page as a string. For MHTML format, the serialization includes
+  # iframes, shadow DOM, external resources, and element-inline styles.
+  experimental command captureSnapshot
+    parameters
+      # Format (defaults to mhtml).
+      optional enum format
+        mhtml
+    returns
+      # Serialized page data.
+      string data
+  # Clears the overriden device metrics.
+  experimental deprecated command clearDeviceMetricsOverride
+    # Use 'Emulation.clearDeviceMetricsOverride' instead
+    redirect Emulation
+  # Clears the overridden Device Orientation.
+  experimental deprecated command clearDeviceOrientationOverride
+    # Use 'DeviceOrientation.clearDeviceOrientationOverride' instead
+    redirect DeviceOrientation
+  # Clears the overriden Geolocation Position and Error.
+  deprecated command clearGeolocationOverride
+    # Use 'Emulation.clearGeolocationOverride' instead
+    redirect Emulation
+  # Creates an isolated world for the given frame.
+  command createIsolatedWorld
+    parameters
+      # Id of the frame in which the isolated world should be created.
+      FrameId frameId
+      # An optional name which is reported in the Execution Context.
+      optional string worldName
+      # Whether or not universal access should be granted to the isolated world. This is a powerful
+      # option, use with caution.
+      optional boolean grantUniveralAccess
+    returns
+      # Execution context of the isolated world.
+      Runtime.ExecutionContextId executionContextId
+  # Deletes browser cookie with given name, domain and path.
+  experimental deprecated command deleteCookie
+    # Use 'Network.deleteCookie' instead
+    redirect Network
+    parameters
+      # Name of the cookie to remove.
+      string cookieName
+      # URL to match cooke domain and path.
+      string url
+  # Disables page domain notifications.
+  command disable
+  # Enables page domain notifications.
+  command enable
+  command getAppManifest
+    returns
+      # Manifest location.
+      string url
+      array of AppManifestError errors
+      # Manifest content.
+      optional string data
+  # Returns all browser cookies. Depending on the backend support, will return detailed cookie
+  # information in the `cookies` field.
+  experimental deprecated command getCookies
+    # Use 'Network.getCookies' instead
+    redirect Network
+    returns
+      # Array of cookie objects.
+      array of Network.Cookie cookies
+  # Returns present frame tree structure.
+  command getFrameTree
+    returns
+      # Present frame tree structure.
+      FrameTree frameTree
+  # Returns metrics relating to the layouting of the page, such as viewport bounds/scale.
+  command getLayoutMetrics
+    returns
+      # Metrics relating to the layout viewport.
+      LayoutViewport layoutViewport
+      # Metrics relating to the visual viewport.
+      VisualViewport visualViewport
+      # Size of scrollable area.
+      DOM.Rect contentSize
+  # Returns navigation history for the current page.
+  command getNavigationHistory
+    returns
+      # Index of the current navigation history entry.
+      integer currentIndex
+      # Array of navigation history entries.
+      array of NavigationEntry entries
+  # Resets navigation history for the current page.
+  command resetNavigationHistory
+  # Returns content of the given resource.
+  experimental command getResourceContent
+    parameters
+      # Frame id to get resource for.
+      FrameId frameId
+      # URL of the resource to get content for.
+      string url
+    returns
+      # Resource content.
+      string content
+      # True, if content was served as base64.
+      boolean base64Encoded
+  # Returns present frame / resource tree structure.
+  experimental command getResourceTree
+    returns
+      # Present frame / resource tree structure.
+      FrameResourceTree frameTree
+  # Accepts or dismisses a JavaScript initiated dialog (alert, confirm, prompt, or onbeforeunload).
+  command handleJavaScriptDialog
+    parameters
+      # Whether to accept or dismiss the dialog.
+      boolean accept
+      # The text to enter into the dialog prompt before accepting. Used only if this is a prompt
+      # dialog.
+      optional string promptText
+  # Navigates current page to the given URL.
+  command navigate
+    parameters
+      # URL to navigate the page to.
+      string url
+      # Referrer URL.
+      optional string referrer
+      # Intended transition type.
+      optional TransitionType transitionType
+      # Frame id to navigate, if not specified navigates the top frame.
+      optional FrameId frameId
+    returns
+      # Frame id that has navigated (or failed to navigate)
+      FrameId frameId
+      # Loader identifier.
+      optional Network.LoaderId loaderId
+      # User friendly error message, present if and only if navigation has failed.
+      optional string errorText
+  # Navigates current page to the given history entry.
+  command navigateToHistoryEntry
+    parameters
+      # Unique id of the entry to navigate to.
+      integer entryId
+  # Print page as PDF.
+  command printToPDF
+    parameters
+      # Paper orientation. Defaults to false.
+      optional boolean landscape
+      # Display header and footer. Defaults to false.
+      optional boolean displayHeaderFooter
+      # Print background graphics. Defaults to false.
+      optional boolean printBackground
+      # Scale of the webpage rendering. Defaults to 1.
+      optional number scale
+      # Paper width in inches. Defaults to 8.5 inches.
+      optional number paperWidth
+      # Paper height in inches. Defaults to 11 inches.
+      optional number paperHeight
+      # Top margin in inches. Defaults to 1cm (~0.4 inches).
+      optional number marginTop
+      # Bottom margin in inches. Defaults to 1cm (~0.4 inches).
+      optional number marginBottom
+      # Left margin in inches. Defaults to 1cm (~0.4 inches).
+      optional number marginLeft
+      # Right margin in inches. Defaults to 1cm (~0.4 inches).
+      optional number marginRight
+      # Paper ranges to print, e.g., '1-5, 8, 11-13'. Defaults to the empty string, which means
+      # print all pages.
+      optional string pageRanges
+      # Whether to silently ignore invalid but successfully parsed page ranges, such as '3-2'.
+      # Defaults to false.
+      optional boolean ignoreInvalidPageRanges
+      # HTML template for the print header. Should be valid HTML markup with following
+      # classes used to inject printing values into them:
+      # - `date`: formatted print date
+      # - `title`: document title
+      # - `url`: document location
+      # - `pageNumber`: current page number
+      # - `totalPages`: total pages in the document
+      #
+      # For example, `<span class=title></span>` would generate span containing the title.
+      optional string headerTemplate
+      # HTML template for the print footer. Should use the same format as the `headerTemplate`.
+      optional string footerTemplate
+      # Whether or not to prefer page size as defined by css. Defaults to false,
+      # in which case the content will be scaled to fit the paper size.
+      optional boolean preferCSSPageSize
+    returns
+      # Base64-encoded pdf data.
+      binary data
+  # Reloads given page optionally ignoring the cache.
+  command reload
+    parameters
+      # If true, browser cache is ignored (as if the user pressed Shift+refresh).
+      optional boolean ignoreCache
+      # If set, the script will be injected into all frames of the inspected page after reload.
+      # Argument will be ignored if reloading dataURL origin.
+      optional string scriptToEvaluateOnLoad
+  # Deprecated, please use removeScriptToEvaluateOnNewDocument instead.
+  experimental deprecated command removeScriptToEvaluateOnLoad
+    parameters
+      ScriptIdentifier identifier
+  # Removes given script from the list.
+  command removeScriptToEvaluateOnNewDocument
+    parameters
+      ScriptIdentifier identifier
+  # Acknowledges that a screencast frame has been received by the frontend.
+  experimental command screencastFrameAck
+    parameters
+      # Frame number.
+      integer sessionId
+  # Searches for given string in resource content.
+  experimental command searchInResource
+    parameters
+      # Frame id for resource to search in.
+      FrameId frameId
+      # URL of the resource to search in.
+      string url
+      # String to search for.
+      string query
+      # If true, search is case sensitive.
+      optional boolean caseSensitive
+      # If true, treats string parameter as regex.
+      optional boolean isRegex
+    returns
+      # List of search matches.
+      array of Debugger.SearchMatch result
+  # Enable Chrome's experimental ad filter on all sites.
+  experimental command setAdBlockingEnabled
+    parameters
+      # Whether to block ads.
+      boolean enabled
+  # Enable page Content Security Policy by-passing.
+  experimental command setBypassCSP
+    parameters
+      # Whether to bypass page CSP.
+      boolean enabled
+  # Overrides the values of device screen dimensions (window.screen.width, window.screen.height,
+  # window.innerWidth, window.innerHeight, and "device-width"/"device-height"-related CSS media
+  # query results).
+  experimental deprecated command setDeviceMetricsOverride
+    # Use 'Emulation.setDeviceMetricsOverride' instead
+    redirect Emulation
+    parameters
+      # Overriding width value in pixels (minimum 0, maximum 10000000). 0 disables the override.
+      integer width
+      # Overriding height value in pixels (minimum 0, maximum 10000000). 0 disables the override.
+      integer height
+      # Overriding device scale factor value. 0 disables the override.
+      number deviceScaleFactor
+      # Whether to emulate mobile device. This includes viewport meta tag, overlay scrollbars, text
+      # autosizing and more.
+      boolean mobile
+      # Scale to apply to resulting view image.
+      optional number scale
+      # Overriding screen width value in pixels (minimum 0, maximum 10000000).
+      optional integer screenWidth
+      # Overriding screen height value in pixels (minimum 0, maximum 10000000).
+      optional integer screenHeight
+      # Overriding view X position on screen in pixels (minimum 0, maximum 10000000).
+      optional integer positionX
+      # Overriding view Y position on screen in pixels (minimum 0, maximum 10000000).
+      optional integer positionY
+      # Do not set visible view size, rely upon explicit setVisibleSize call.
+      optional boolean dontSetVisibleSize
+      # Screen orientation override.
+      optional Emulation.ScreenOrientation screenOrientation
+      # The viewport dimensions and scale. If not set, the override is cleared.
+      optional Viewport viewport
+  # Overrides the Device Orientation.
+  experimental deprecated command setDeviceOrientationOverride
+    # Use 'DeviceOrientation.setDeviceOrientationOverride' instead
+    redirect DeviceOrientation
+    parameters
+      # Mock alpha
+      number alpha
+      # Mock beta
+      number beta
+      # Mock gamma
+      number gamma
+  # Set generic font families.
+  experimental command setFontFamilies
+    parameters
+      # Specifies font families to set. If a font family is not specified, it won't be changed.
+      FontFamilies fontFamilies
+  # Set default font sizes.
+  experimental command setFontSizes
+    parameters
+      # Specifies font sizes to set. If a font size is not specified, it won't be changed.
+      FontSizes fontSizes
+  # Sets given markup as the document's HTML.
+  command setDocumentContent
+    parameters
+      # Frame id to set HTML for.
+      FrameId frameId
+      # HTML content to set.
+      string html
+  # Set the behavior when downloading a file.
+  experimental command setDownloadBehavior
+    parameters
+      # Whether to allow all or deny all download requests, or use default Chrome behavior if
+      # available (otherwise deny).
+      enum behavior
+        deny
+        allow
+        default
+      # The default path to save downloaded files to. This is requred if behavior is set to 'allow'
+      optional string downloadPath
+  # Overrides the Geolocation Position or Error. Omitting any of the parameters emulates position
+  # unavailable.
+  deprecated command setGeolocationOverride
+    # Use 'Emulation.setGeolocationOverride' instead
+    redirect Emulation
+    parameters
+      # Mock latitude
+      optional number latitude
+      # Mock longitude
+      optional number longitude
+      # Mock accuracy
+      optional number accuracy
+  # Controls whether page will emit lifecycle events.
+  experimental command setLifecycleEventsEnabled
+    parameters
+      # If true, starts emitting lifecycle events.
+      boolean enabled
+  # Toggles mouse event-based touch event emulation.
+  experimental deprecated command setTouchEmulationEnabled
+    # Use 'Emulation.setTouchEmulationEnabled' instead
+    redirect Emulation
+    parameters
+      # Whether the touch event emulation should be enabled.
+      boolean enabled
+      # Touch/gesture events configuration. Default: current platform.
+      optional enum configuration
+        mobile
+        desktop
+  # Starts sending each frame using the `screencastFrame` event.
+  experimental command startScreencast
+    parameters
+      # Image compression format.
+      optional enum format
+        jpeg
+        png
+      # Compression quality from range [0..100].
+      optional integer quality
+      # Maximum screenshot width.
+      optional integer maxWidth
+      # Maximum screenshot height.
+      optional integer maxHeight
+      # Send every n-th frame.
+      optional integer everyNthFrame
+  # Force the page stop all navigations and pending resource fetches.
+  command stopLoading
+  # Crashes renderer on the IO thread, generates minidumps.
+  experimental command crash
+  # Tries to close page, running its beforeunload hooks, if any.
+  experimental command close
+  # Tries to update the web lifecycle state of the page.
+  # It will transition the page to the given state according to:
+  # https://github.com/WICG/web-lifecycle/
+  experimental command setWebLifecycleState
+    parameters
+      # Target lifecycle state
+      enum state
+        frozen
+        active
+  # Stops sending each frame in the `screencastFrame`.
+  experimental command stopScreencast
+  # Forces compilation cache to be generated for every subresource script.
+  experimental command setProduceCompilationCache
+    parameters
+      boolean enabled
+  # Seeds compilation cache for given url. Compilation cache does not survive
+  # cross-process navigation.
+  experimental command addCompilationCache
+    parameters
+      string url
+      # Base64-encoded data
+      binary data
+  # Clears seeded compilation cache.
+  experimental command clearCompilationCache
+  # Generates a report for testing.
+  experimental command generateTestReport
+    parameters
+      # Message to be displayed in the report.
+      string message
+      # Specifies the endpoint group to deliver the report to.
+      optional string group
+  # Pauses page execution. Can be resumed using generic Runtime.runIfWaitingForDebugger.
+  experimental command waitForDebugger
+  event domContentEventFired
+    parameters
+      Network.MonotonicTime timestamp
+  # Fired when frame has been attached to its parent.
+  event frameAttached
+    parameters
+      # Id of the frame that has been attached.
+      FrameId frameId
+      # Parent frame identifier.
+      FrameId parentFrameId
+      # JavaScript stack trace of when frame was attached, only set if frame initiated from script.
+      optional Runtime.StackTrace stack
+  # Fired when frame no longer has a scheduled navigation.
+  experimental event frameClearedScheduledNavigation
+    parameters
+      # Id of the frame that has cleared its scheduled navigation.
+      FrameId frameId
+  # Fired when frame has been detached from its parent.
+  event frameDetached
+    parameters
+      # Id of the frame that has been detached.
+      FrameId frameId
+  # Fired once navigation of the frame has completed. Frame is now associated with the new loader.
+  event frameNavigated
+    parameters
+      # Frame object.
+      Frame frame
+  experimental event frameResized
+  # Fired when frame schedules a potential navigation.
+  experimental event frameScheduledNavigation
+    parameters
+      # Id of the frame that has scheduled a navigation.
+      FrameId frameId
+      # Delay (in seconds) until the navigation is scheduled to begin. The navigation is not
+      # guaranteed to start.
+      number delay
+      # The reason for the navigation.
+      enum reason
+        formSubmissionGet
+        formSubmissionPost
+        httpHeaderRefresh
+        scriptInitiated
+        metaTagRefresh
+        pageBlockInterstitial
+        reload
+      # The destination URL for the scheduled navigation.
+      string url
+  # Fired when frame has started loading.
+  experimental event frameStartedLoading
+    parameters
+      # Id of the frame that has started loading.
+      FrameId frameId
+  # Fired when frame has stopped loading.
+  experimental event frameStoppedLoading
+    parameters
+      # Id of the frame that has stopped loading.
+      FrameId frameId
+  # Fired when interstitial page was hidden
+  event interstitialHidden
+  # Fired when interstitial page was shown
+  event interstitialShown
+  # Fired when a JavaScript initiated dialog (alert, confirm, prompt, or onbeforeunload) has been
+  # closed.
+  event javascriptDialogClosed
+    parameters
+      # Whether dialog was confirmed.
+      boolean result
+      # User input in case of prompt.
+      string userInput
+  # Fired when a JavaScript initiated dialog (alert, confirm, prompt, or onbeforeunload) is about to
+  # open.
+  event javascriptDialogOpening
+    parameters
+      # Frame url.
+      string url
+      # Message that will be displayed by the dialog.
+      string message
+      # Dialog type.
+      DialogType type
+      # True iff browser is capable showing or acting on the given dialog. When browser has no
+      # dialog handler for given target, calling alert while Page domain is engaged will stall
+      # the page execution. Execution can be resumed via calling Page.handleJavaScriptDialog.
+      boolean hasBrowserHandler
+      # Default dialog prompt.
+      optional string defaultPrompt
+  # Fired for top level page lifecycle events such as navigation, load, paint, etc.
+  event lifecycleEvent
+    parameters
+      # Id of the frame.
+      FrameId frameId
+      # Loader identifier. Empty string if the request is fetched from worker.
+      Network.LoaderId loaderId
+      string name
+      Network.MonotonicTime timestamp
+  event loadEventFired
+    parameters
+      Network.MonotonicTime timestamp
+  # Fired when same-document navigation happens, e.g. due to history API usage or anchor navigation.
+  experimental event navigatedWithinDocument
+    parameters
+      # Id of the frame.
+      FrameId frameId
+      # Frame's new url.
+      string url
+  # Compressed image data requested by the `startScreencast`.
+  experimental event screencastFrame
+    parameters
+      # Base64-encoded compressed image.
+      binary data
+      # Screencast frame metadata.
+      ScreencastFrameMetadata metadata
+      # Frame number.
+      integer sessionId
+  # Fired when the page with currently enabled screencast was shown or hidden `.
+  experimental event screencastVisibilityChanged
+    parameters
+      # True if the page is visible.
+      boolean visible
+  # Fired when a new window is going to be opened, via window.open(), link click, form submission,
+  # etc.
+  event windowOpen
+    parameters
+      # The URL for the new window.
+      string url
+      # Window name.
+      string windowName
+      # An array of enabled window features.
+      array of string windowFeatures
+      # Whether or not it was triggered by user gesture.
+      boolean userGesture
+  # Issued for every compilation cache generated. Is only available
+  # if Page.setGenerateCompilationCache is enabled.
+  experimental event compilationCacheProduced
+    parameters
+      string url
+      # Base64-encoded data
+      binary data
+
+# Network domain allows tracking network activities of the page. It exposes information about http,
+# file, data and other requests and responses, their headers, bodies, timing, etc.
+domain Network
+  depends on Debugger
+  depends on Runtime
+  depends on Security
+  # Resource type as it was perceived by the rendering engine.
+  type ResourceType extends string
+    enum
+      Document
+      Stylesheet
+      Image
+      Media
+      Font
+      Script
+      TextTrack
+      XHR
+      Fetch
+      EventSource
+      WebSocket
+      Manifest
+      SignedExchange
+      Ping
+      CSPViolationReport
+      Other
+  # Unique loader identifier.
+  type LoaderId extends string
+  # Unique request identifier.
+  type RequestId extends string
+  # Unique intercepted request identifier.
+  type InterceptionId extends string
+  # Network level fetch failure reason.
+  type ErrorReason extends string
+    enum
+      Failed
+      Aborted
+      TimedOut
+      AccessDenied
+      ConnectionClosed
+      ConnectionReset
+      ConnectionRefused
+      ConnectionAborted
+      ConnectionFailed
+      NameNotResolved
+      InternetDisconnected
+      AddressUnreachable
+      BlockedByClient
+      BlockedByResponse
+  # UTC time in seconds, counted from January 1, 1970.
+  type TimeSinceEpoch extends number
+  # Monotonically increasing time in seconds since an arbitrary point in the past.
+  type MonotonicTime extends number
+  # Request / response headers as keys / values of JSON object.
+  type Headers extends object
+  # The underlying connection technology that the browser is supposedly using.
+  type ConnectionType extends string
+    enum
+      none
+      cellular2g
+      cellular3g
+      cellular4g
+      bluetooth
+      ethernet
+      wifi
+      wimax
+      other
+  # Represents the cookie's 'SameSite' status:
+  # https://tools.ietf.org/html/draft-west-first-party-cookies
+  type CookieSameSite extends string
+    enum
+      Strict
+      Lax
+  # Timing information for the request.
+  type ResourceTiming extends object
+    properties
+      # Timing's requestTime is a baseline in seconds, while the other numbers are ticks in
+      # milliseconds relatively to this requestTime.
+      number requestTime
+      # Started resolving proxy.
+      number proxyStart
+      # Finished resolving proxy.
+      number proxyEnd
+      # Started DNS address resolve.
+      number dnsStart
+      # Finished DNS address resolve.
+      number dnsEnd
+      # Started connecting to the remote host.
+      number connectStart
+      # Connected to the remote host.
+      number connectEnd
+      # Started SSL handshake.
+      number sslStart
+      # Finished SSL handshake.
+      number sslEnd
+      # Started running ServiceWorker.
+      experimental number workerStart
+      # Finished Starting ServiceWorker.
+      experimental number workerReady
+      # Started sending request.
+      number sendStart
+      # Finished sending request.
+      number sendEnd
+      # Time the server started pushing request.
+      experimental number pushStart
+      # Time the server finished pushing request.
+      experimental number pushEnd
+      # Finished receiving response headers.
+      number receiveHeadersEnd
+  # Loading priority of a resource request.
+  type ResourcePriority extends string
+    enum
+      VeryLow
+      Low
+      Medium
+      High
+      VeryHigh
+  # HTTP request data.
+  type Request extends object
+    properties
+      # Request URL (without fragment).
+      string url
+      # Fragment of the requested URL starting with hash, if present.
+      optional string urlFragment
+      # HTTP request method.
+      string method
+      # HTTP request headers.
+      Headers headers
+      # HTTP POST request data.
+      optional string postData
+      # True when the request has POST data. Note that postData might still be omitted when this flag is true when the data is too long.
+      optional boolean hasPostData
+      # The mixed content type of the request.
+      optional Security.MixedContentType mixedContentType
+      # Priority of the resource request at the time request is sent.
+      ResourcePriority initialPriority
+      # The referrer policy of the request, as defined in https://www.w3.org/TR/referrer-policy/
+      enum referrerPolicy
+        unsafe-url
+        no-referrer-when-downgrade
+        no-referrer
+        origin
+        origin-when-cross-origin
+        same-origin
+        strict-origin
+        strict-origin-when-cross-origin
+      # Whether is loaded via link preload.
+      optional boolean isLinkPreload
+  # Details of a signed certificate timestamp (SCT).
+  type SignedCertificateTimestamp extends object
+    properties
+      # Validation status.
+      string status
+      # Origin.
+      string origin
+      # Log name / description.
+      string logDescription
+      # Log ID.
+      string logId
+      # Issuance date.
+      TimeSinceEpoch timestamp
+      # Hash algorithm.
+      string hashAlgorithm
+      # Signature algorithm.
+      string signatureAlgorithm
+      # Signature data.
+      string signatureData
+  # Security details about a request.
+  type SecurityDetails extends object
+    properties
+      # Protocol name (e.g. "TLS 1.2" or "QUIC").
+      string protocol
+      # Key Exchange used by the connection, or the empty string if not applicable.
+      string keyExchange
+      # (EC)DH group used by the connection, if applicable.
+      optional string keyExchangeGroup
+      # Cipher name.
+      string cipher
+      # TLS MAC. Note that AEAD ciphers do not have separate MACs.
+      optional string mac
+      # Certificate ID value.
+      Security.CertificateId certificateId
+      # Certificate subject name.
+      string subjectName
+      # Subject Alternative Name (SAN) DNS names and IP addresses.
+      array of string sanList
+      # Name of the issuing CA.
+      string issuer
+      # Certificate valid from date.
+      TimeSinceEpoch validFrom
+      # Certificate valid to (expiration) date
+      TimeSinceEpoch validTo
+      # List of signed certificate timestamps (SCTs).
+      array of SignedCertificateTimestamp signedCertificateTimestampList
+      # Whether the request complied with Certificate Transparency policy
+      CertificateTransparencyCompliance certificateTransparencyCompliance
+  # Whether the request complied with Certificate Transparency policy.
+  type CertificateTransparencyCompliance extends string
+    enum
+      unknown
+      not-compliant
+      compliant
+  # The reason why request was blocked.
+  type BlockedReason extends string
+    enum
+      other
+      csp
+      mixed-content
+      origin
+      inspector
+      subresource-filter
+      content-type
+      collapsed-by-client
+  # HTTP response data.
+  type Response extends object
+    properties
+      # Response URL. This URL can be different from CachedResource.url in case of redirect.
+      string url
+      # HTTP response status code.
+      integer status
+      # HTTP response status text.
+      string statusText
+      # HTTP response headers.
+      Headers headers
+      # HTTP response headers text.
+      optional string headersText
+      # Resource mimeType as determined by the browser.
+      string mimeType
+      # Refined HTTP request headers that were actually transmitted over the network.
+      optional Headers requestHeaders
+      # HTTP request headers text.
+      optional string requestHeadersText
+      # Specifies whether physical connection was actually reused for this request.
+      boolean connectionReused
+      # Physical connection id that was actually used for this request.
+      number connectionId
+      # Remote IP address.
+      optional string remoteIPAddress
+      # Remote port.
+      optional integer remotePort
+      # Specifies that the request was served from the disk cache.
+      optional boolean fromDiskCache
+      # Specifies that the request was served from the ServiceWorker.
+      optional boolean fromServiceWorker
+      # Total number of bytes received for this request so far.
+      number encodedDataLength
+      # Timing information for the given request.
+      optional ResourceTiming timing
+      # Protocol used to fetch this request.
+      optional string protocol
+      # Security state of the request resource.
+      Security.SecurityState securityState
+      # Security details for the request.
+      optional SecurityDetails securityDetails
+  # WebSocket request data.
+  type WebSocketRequest extends object
+    properties
+      # HTTP request headers.
+      Headers headers
+  # WebSocket response data.
+  type WebSocketResponse extends object
+    properties
+      # HTTP response status code.
+      integer status
+      # HTTP response status text.
+      string statusText
+      # HTTP response headers.
+      Headers headers
+      # HTTP response headers text.
+      optional string headersText
+      # HTTP request headers.
+      optional Headers requestHeaders
+      # HTTP request headers text.
+      optional string requestHeadersText
+  # WebSocket message data. This represents an entire WebSocket message, not just a fragmented frame as the name suggests.
+  type WebSocketFrame extends object
+    properties
+      # WebSocket message opcode.
+      number opcode
+      # WebSocket message mask.
+      boolean mask
+      # WebSocket message payload data.
+      # If the opcode is 1, this is a text message and payloadData is a UTF-8 string.
+      # If the opcode isn't 1, then payloadData is a base64 encoded string representing binary data.
+      string payloadData
+  # Information about the cached resource.
+  type CachedResource extends object
+    properties
+      # Resource URL. This is the url of the original network request.
+      string url
+      # Type of this resource.
+      ResourceType type
+      # Cached response data.
+      optional Response response
+      # Cached response body size.
+      number bodySize
+  # Information about the request initiator.
+  type Initiator extends object
+    properties
+      # Type of this initiator.
+      enum type
+        parser
+        script
+        preload
+        SignedExchange
+        other
+      # Initiator JavaScript stack trace, set for Script only.
+      optional Runtime.StackTrace stack
+      # Initiator URL, set for Parser type or for Script type (when script is importing module) or for SignedExchange type.
+      optional string url
+      # Initiator line number, set for Parser type or for Script type (when script is importing
+      # module) (0-based).
+      optional number lineNumber
+  # Cookie object
+  type Cookie extends object
+    properties
+      # Cookie name.
+      string name
+      # Cookie value.
+      string value
+      # Cookie domain.
+      string domain
+      # Cookie path.
+      string path
+      # Cookie expiration date as the number of seconds since the UNIX epoch.
+      number expires
+      # Cookie size.
+      integer size
+      # True if cookie is http-only.
+      boolean httpOnly
+      # True if cookie is secure.
+      boolean secure
+      # True in case of session cookie.
+      boolean session
+      # Cookie SameSite type.
+      optional CookieSameSite sameSite
+  # Cookie parameter object
+  type CookieParam extends object
+    properties
+      # Cookie name.
+      string name
+      # Cookie value.
+      string value
+      # The request-URI to associate with the setting of the cookie. This value can affect the
+      # default domain and path values of the created cookie.
+      optional string url
+      # Cookie domain.
+      optional string domain
+      # Cookie path.
+      optional string path
+      # True if cookie is secure.
+      optional boolean secure
+      # True if cookie is http-only.
+      optional boolean httpOnly
+      # Cookie SameSite type.
+      optional CookieSameSite sameSite
+      # Cookie expiration date, session cookie if not set
+      optional TimeSinceEpoch expires
+  # Authorization challenge for HTTP status code 401 or 407.
+  experimental type AuthChallenge extends object
+    properties
+      # Source of the authentication challenge.
+      optional enum source
+        Server
+        Proxy
+      # Origin of the challenger.
+      string origin
+      # The authentication scheme used, such as basic or digest
+      string scheme
+      # The realm of the challenge. May be empty.
+      string realm
+  # Response to an AuthChallenge.
+  experimental type AuthChallengeResponse extends object
+    properties
+      # The decision on what to do in response to the authorization challenge.  Default means
+      # deferring to the default behavior of the net stack, which will likely either the Cancel
+      # authentication or display a popup dialog box.
+      enum response
+        Default
+        CancelAuth
+        ProvideCredentials
+      # The username to provide, possibly empty. Should only be set if response is
+      # ProvideCredentials.
+      optional string username
+      # The password to provide, possibly empty. Should only be set if response is
+      # ProvideCredentials.
+      optional string password
+  # Stages of the interception to begin intercepting. Request will intercept before the request is
+  # sent. Response will intercept after the response is received.
+  experimental type InterceptionStage extends string
+    enum
+      Request
+      HeadersReceived
+  # Request pattern for interception.
+  experimental type RequestPattern extends object
+    properties
+      # Wildcards ('*' -> zero or more, '?' -> exactly one) are allowed. Escape character is
+      # backslash. Omitting is equivalent to "*".
+      optional string urlPattern
+      # If set, only requests for matching resource types will be intercepted.
+      optional ResourceType resourceType
+      # Stage at wich to begin intercepting requests. Default is Request.
+      optional InterceptionStage interceptionStage
+  # Information about a signed exchange signature.
+  # https://wicg.github.io/webpackage/draft-yasskin-httpbis-origin-signed-exchanges-impl.html#rfc.section.3.1
+  experimental type SignedExchangeSignature extends object
+    properties
+      # Signed exchange signature label.
+      string label
+      # The hex string of signed exchange signature.
+      string signature
+      # Signed exchange signature integrity.
+      string integrity
+      # Signed exchange signature cert Url.
+      optional string certUrl
+      # The hex string of signed exchange signature cert sha256.
+      optional string certSha256
+      # Signed exchange signature validity Url.
+      string validityUrl
+      # Signed exchange signature date.
+      integer date
+      # Signed exchange signature expires.
+      integer expires
+      # The encoded certificates.
+      optional array of string certificates
+  # Information about a signed exchange header.
+  # https://wicg.github.io/webpackage/draft-yasskin-httpbis-origin-signed-exchanges-impl.html#cbor-representation
+  experimental type SignedExchangeHeader extends object
+    properties
+      # Signed exchange request URL.
+      string requestUrl
+      # Signed exchange response code.
+      integer responseCode
+      # Signed exchange response headers.
+      Headers responseHeaders
+      # Signed exchange response signature.
+      array of SignedExchangeSignature signatures
+  # Field type for a signed exchange related error.
+  experimental type SignedExchangeErrorField extends string
+    enum
+      signatureSig
+      signatureIntegrity
+      signatureCertUrl
+      signatureCertSha256
+      signatureValidityUrl
+      signatureTimestamps
+  # Information about a signed exchange response.
+  experimental type SignedExchangeError extends object
+    properties
+      # Error message.
+      string message
+      # The index of the signature which caused the error.
+      optional integer signatureIndex
+      # The field which caused the error.
+      optional SignedExchangeErrorField errorField
+  # Information about a signed exchange response.
+  experimental type SignedExchangeInfo extends object
+    properties
+      # The outer response of signed HTTP exchange which was received from network.
+      Response outerResponse
+      # Information about the signed exchange header.
+      optional SignedExchangeHeader header
+      # Security details for the signed exchange header.
+      optional SecurityDetails securityDetails
+      # Errors occurred while handling the signed exchagne.
+      optional array of SignedExchangeError errors
+  # Tells whether clearing browser cache is supported.
+  deprecated command canClearBrowserCache
+    returns
+      # True if browser cache can be cleared.
+      boolean result
+  # Tells whether clearing browser cookies is supported.
+  deprecated command canClearBrowserCookies
+    returns
+      # True if browser cookies can be cleared.
+      boolean result
+  # Tells whether emulation of network conditions is supported.
+  deprecated command canEmulateNetworkConditions
+    returns
+      # True if emulation of network conditions is supported.
+      boolean result
+  # Clears browser cache.
+  command clearBrowserCache
+  # Clears browser cookies.
+  command clearBrowserCookies
+  # Response to Network.requestIntercepted which either modifies the request to continue with any
+  # modifications, or blocks it, or completes it with the provided response bytes. If a network
+  # fetch occurs as a result which encounters a redirect an additional Network.requestIntercepted
+  # event will be sent with the same InterceptionId.
+  experimental command continueInterceptedRequest
+    parameters
+      InterceptionId interceptionId
+      # If set this causes the request to fail with the given reason. Passing `Aborted` for requests
+      # marked with `isNavigationRequest` also cancels the navigation. Must not be set in response
+      # to an authChallenge.
+      optional ErrorReason errorReason
+      # If set the requests completes using with the provided base64 encoded raw response, including
+      # HTTP status line and headers etc... Must not be set in response to an authChallenge.
+      optional binary rawResponse
+      # If set the request url will be modified in a way that's not observable by page. Must not be
+      # set in response to an authChallenge.
+      optional string url
+      # If set this allows the request method to be overridden. Must not be set in response to an
+      # authChallenge.
+      optional string method
+      # If set this allows postData to be set. Must not be set in response to an authChallenge.
+      optional string postData
+      # If set this allows the request headers to be changed. Must not be set in response to an
+      # authChallenge.
+      optional Headers headers
+      # Response to a requestIntercepted with an authChallenge. Must not be set otherwise.
+      optional AuthChallengeResponse authChallengeResponse
+  # Deletes browser cookies with matching name and url or domain/path pair.
+  command deleteCookies
+    parameters
+      # Name of the cookies to remove.
+      string name
+      # If specified, deletes all the cookies with the given name where domain and path match
+      # provided URL.
+      optional string url
+      # If specified, deletes only cookies with the exact domain.
+      optional string domain
+      # If specified, deletes only cookies with the exact path.
+      optional string path
+  # Disables network tracking, prevents network events from being sent to the client.
+  command disable
+  # Activates emulation of network conditions.
+  command emulateNetworkConditions
+    parameters
+      # True to emulate internet disconnection.
+      boolean offline
+      # Minimum latency from request sent to response headers received (ms).
+      number latency
+      # Maximal aggregated download throughput (bytes/sec). -1 disables download throttling.
+      number downloadThroughput
+      # Maximal aggregated upload throughput (bytes/sec).  -1 disables upload throttling.
+      number uploadThroughput
+      # Connection type if known.
+      optional ConnectionType connectionType
+  # Enables network tracking, network events will now be delivered to the client.
+  command enable
+    parameters
+      # Buffer size in bytes to use when preserving network payloads (XHRs, etc).
+      experimental optional integer maxTotalBufferSize
+      # Per-resource buffer size in bytes to use when preserving network payloads (XHRs, etc).
+      experimental optional integer maxResourceBufferSize
+      # Longest post body size (in bytes) that would be included in requestWillBeSent notification
+      optional integer maxPostDataSize
+  # Returns all browser cookies. Depending on the backend support, will return detailed cookie
+  # information in the `cookies` field.
+  command getAllCookies
+    returns
+      # Array of cookie objects.
+      array of Cookie cookies
+  # Returns the DER-encoded certificate.
+  experimental command getCertificate
+    parameters
+      # Origin to get certificate for.
+      string origin
+    returns
+      array of string tableNames
+  # Returns all browser cookies for the current URL. Depending on the backend support, will return
+  # detailed cookie information in the `cookies` field.
+  command getCookies
+    parameters
+      # The list of URLs for which applicable cookies will be fetched
+      optional array of string urls
+    returns
+      # Array of cookie objects.
+      array of Cookie cookies
+  # Returns content served for the given request.
+  command getResponseBody
+    parameters
+      # Identifier of the network request to get content for.
+      RequestId requestId
+    returns
+      # Response body.
+      string body
+      # True, if content was sent as base64.
+      boolean base64Encoded
+  # Returns post data sent with the request. Returns an error when no data was sent with the request.
+  command getRequestPostData
+    parameters
+      # Identifier of the network request to get content for.
+      RequestId requestId
+    returns
+      # Request body string, omitting files from multipart requests
+      string postData
+  # Returns content served for the given currently intercepted request.
+  experimental command getResponseBodyForInterception
+    parameters
+      # Identifier for the intercepted request to get body for.
+      InterceptionId interceptionId
+    returns
+      # Response body.
+      string body
+      # True, if content was sent as base64.
+      boolean base64Encoded
+  # Returns a handle to the stream representing the response body. Note that after this command,
+  # the intercepted request can't be continued as is -- you either need to cancel it or to provide
+  # the response body. The stream only supports sequential read, IO.read will fail if the position
+  # is specified.
+  experimental command takeResponseBodyForInterceptionAsStream
+    parameters
+      InterceptionId interceptionId
+    returns
+      IO.StreamHandle stream
+  # This method sends a new XMLHttpRequest which is identical to the original one. The following
+  # parameters should be identical: method, url, async, request body, extra headers, withCredentials
+  # attribute, user, password.
+  experimental command replayXHR
+    parameters
+      # Identifier of XHR to replay.
+      RequestId requestId
+  # Searches for given string in response content.
+  experimental command searchInResponseBody
+    parameters
+      # Identifier of the network response to search.
+      RequestId requestId
+      # String to search for.
+      string query
+      # If true, search is case sensitive.
+      optional boolean caseSensitive
+      # If true, treats string parameter as regex.
+      optional boolean isRegex
+    returns
+      # List of search matches.
+      array of Debugger.SearchMatch result
+  # Blocks URLs from loading.
+  experimental command setBlockedURLs
+    parameters
+      # URL patterns to block. Wildcards ('*') are allowed.
+      array of string urls
+  # Toggles ignoring of service worker for each request.
+  experimental command setBypassServiceWorker
+    parameters
+      # Bypass service worker and load from network.
+      boolean bypass
+  # Toggles ignoring cache for each request. If `true`, cache will not be used.
+  command setCacheDisabled
+    parameters
+      # Cache disabled state.
+      boolean cacheDisabled
+  # Sets a cookie with the given cookie data; may overwrite equivalent cookies if they exist.
+  command setCookie
+    parameters
+      # Cookie name.
+      string name
+      # Cookie value.
+      string value
+      # The request-URI to associate with the setting of the cookie. This value can affect the
+      # default domain and path values of the created cookie.
+      optional string url
+      # Cookie domain.
+      optional string domain
+      # Cookie path.
+      optional string path
+      # True if cookie is secure.
+      optional boolean secure
+      # True if cookie is http-only.
+      optional boolean httpOnly
+      # Cookie SameSite type.
+      optional CookieSameSite sameSite
+      # Cookie expiration date, session cookie if not set
+      optional TimeSinceEpoch expires
+    returns
+      # True if successfully set cookie.
+      boolean success
+  # Sets given cookies.
+  command setCookies
+    parameters
+      # Cookies to be set.
+      array of CookieParam cookies
+  # For testing.
+  experimental command setDataSizeLimitsForTest
+    parameters
+      # Maximum total buffer size.
+      integer maxTotalSize
+      # Maximum per-resource size.
+      integer maxResourceSize
+  # Specifies whether to always send extra HTTP headers with the requests from this page.
+  command setExtraHTTPHeaders
+    parameters
+      # Map with extra HTTP headers.
+      Headers headers
+  # Sets the requests to intercept that match a the provided patterns and optionally resource types.
+  experimental command setRequestInterception
+    parameters
+      # Requests matching any of these patterns will be forwarded and wait for the corresponding
+      # continueInterceptedRequest call.
+      array of RequestPattern patterns
+  # Allows overriding user agent with the given string.
+  command setUserAgentOverride
+    redirect Emulation
+    parameters
+      # User agent to use.
+      string userAgent
+      # Browser langugage to emulate.
+      optional string acceptLanguage
+      # The platform navigator.platform should return.
+      optional string platform
+  # Fired when data chunk was received over the network.
+  event dataReceived
+    parameters
+      # Request identifier.
+      RequestId requestId
+      # Timestamp.
+      MonotonicTime timestamp
+      # Data chunk length.
+      integer dataLength
+      # Actual bytes received (might be less than dataLength for compressed encodings).
+      integer encodedDataLength
+  # Fired when EventSource message is received.
+  event eventSourceMessageReceived
+    parameters
+      # Request identifier.
+      RequestId requestId
+      # Timestamp.
+      MonotonicTime timestamp
+      # Message type.
+      string eventName
+      # Message identifier.
+      string eventId
+      # Message content.
+      string data
+  # Fired when HTTP request has failed to load.
+  event loadingFailed
+    parameters
+      # Request identifier.
+      RequestId requestId
+      # Timestamp.
+      MonotonicTime timestamp
+      # Resource type.
+      ResourceType type
+      # User friendly error message.
+      string errorText
+      # True if loading was canceled.
+      optional boolean canceled
+      # The reason why loading was blocked, if any.
+      optional BlockedReason blockedReason
+  # Fired when HTTP request has finished loading.
+  event loadingFinished
+    parameters
+      # Request identifier.
+      RequestId requestId
+      # Timestamp.
+      MonotonicTime timestamp
+      # Total number of bytes received for this request.
+      number encodedDataLength
+      # Set when 1) response was blocked by Cross-Origin Read Blocking and also
+      # 2) this needs to be reported to the DevTools console.
+      optional boolean shouldReportCorbBlocking
+  # Details of an intercepted HTTP request, which must be either allowed, blocked, modified or
+  # mocked.
+  experimental event requestIntercepted
+    parameters
+      # Each request the page makes will have a unique id, however if any redirects are encountered
+      # while processing that fetch, they will be reported with the same id as the original fetch.
+      # Likewise if HTTP authentication is needed then the same fetch id will be used.
+      InterceptionId interceptionId
+      Request request
+      # The id of the frame that initiated the request.
+      Page.FrameId frameId
+      # How the requested resource will be used.
+      ResourceType resourceType
+      # Whether this is a navigation request, which can abort the navigation completely.
+      boolean isNavigationRequest
+      # Set if the request is a navigation that will result in a download.
+      # Only present after response is received from the server (i.e. HeadersReceived stage).
+      optional boolean isDownload
+      # Redirect location, only sent if a redirect was intercepted.
+      optional string redirectUrl
+      # Details of the Authorization Challenge encountered. If this is set then
+      # continueInterceptedRequest must contain an authChallengeResponse.
+      optional AuthChallenge authChallenge
+      # Response error if intercepted at response stage or if redirect occurred while intercepting
+      # request.
+      optional ErrorReason responseErrorReason
+      # Response code if intercepted at response stage or if redirect occurred while intercepting
+      # request or auth retry occurred.
+      optional integer responseStatusCode
+      # Response headers if intercepted at the response stage or if redirect occurred while
+      # intercepting request or auth retry occurred.
+      optional Headers responseHeaders
+  # Fired if request ended up loading from cache.
+  event requestServedFromCache
+    parameters
+      # Request identifier.
+      RequestId requestId
+  # Fired when page is about to send HTTP request.
+  event requestWillBeSent
+    parameters
+      # Request identifier.
+      RequestId requestId
+      # Loader identifier. Empty string if the request is fetched from worker.
+      LoaderId loaderId
+      # URL of the document this request is loaded for.
+      string documentURL
+      # Request data.
+      Request request
+      # Timestamp.
+      MonotonicTime timestamp
+      # Timestamp.
+      TimeSinceEpoch wallTime
+      # Request initiator.
+      Initiator initiator
+      # Redirect response data.
+      optional Response redirectResponse
+      # Type of this resource.
+      optional ResourceType type
+      # Frame identifier.
+      optional Page.FrameId frameId
+      # Whether the request is initiated by a user gesture. Defaults to false.
+      optional boolean hasUserGesture
+  # Fired when resource loading priority is changed
+  experimental event resourceChangedPriority
+    parameters
+      # Request identifier.
+      RequestId requestId
+      # New priority
+      ResourcePriority newPriority
+      # Timestamp.
+      MonotonicTime timestamp
+  # Fired when a signed exchange was received over the network
+  experimental event signedExchangeReceived
+    parameters
+      # Request identifier.
+      RequestId requestId
+      # Information about the signed exchange response.
+      SignedExchangeInfo info
+  # Fired when HTTP response is available.
+  event responseReceived
+    parameters
+      # Request identifier.
+      RequestId requestId
+      # Loader identifier. Empty string if the request is fetched from worker.
+      LoaderId loaderId
+      # Timestamp.
+      MonotonicTime timestamp
+      # Resource type.
+      ResourceType type
+      # Response data.
+      Response response
+      # Frame identifier.
+      optional Page.FrameId frameId
+  # Fired when WebSocket is closed.
+  event webSocketClosed
+    parameters
+      # Request identifier.
+      RequestId requestId
+      # Timestamp.
+      MonotonicTime timestamp
+  # Fired upon WebSocket creation.
+  event webSocketCreated
+    parameters
+      # Request identifier.
+      RequestId requestId
+      # WebSocket request URL.
+      string url
+      # Request initiator.
+      optional Initiator initiator
+  # Fired when WebSocket message error occurs.
+  event webSocketFrameError
+    parameters
+      # Request identifier.
+      RequestId requestId
+      # Timestamp.
+      MonotonicTime timestamp
+      # WebSocket error message.
+      string errorMessage
+  # Fired when WebSocket message is received.
+  event webSocketFrameReceived
+    parameters
+      # Request identifier.
+      RequestId requestId
+      # Timestamp.
+      MonotonicTime timestamp
+      # WebSocket response data.
+      WebSocketFrame response
+  # Fired when WebSocket message is sent.
+  event webSocketFrameSent
+    parameters
+      # Request identifier.
+      RequestId requestId
+      # Timestamp.
+      MonotonicTime timestamp
+      # WebSocket response data.
+      WebSocketFrame response
+  # Fired when WebSocket handshake response becomes available.
+  event webSocketHandshakeResponseReceived
+    parameters
+      # Request identifier.
+      RequestId requestId
+      # Timestamp.
+      MonotonicTime timestamp
+      # WebSocket response data.
+      WebSocketResponse response
+  # Fired when WebSocket is about to initiate handshake.
+  event webSocketWillSendHandshakeRequest
+    parameters
+      # Request identifier.
+      RequestId requestId
+      # Timestamp.
+      MonotonicTime timestamp
+      # UTC Timestamp.
+      TimeSinceEpoch wallTime
+      # WebSocket request data.
+      WebSocketRequest request
+
+# This domain exposes DOM read/write operations. Each DOM Node is represented with its mirror object
+# that has an `id`. This `id` can be used to get additional information on the Node, resolve it into
+# the JavaScript object wrapper, etc. It is important that client receives DOM events only for the
+# nodes that are known to the client. Backend keeps track of the nodes that were sent to the client
+# and never sends the same node twice. It is client's responsibility to collect information about
+# the nodes that were sent to the client.<p>Note that `iframe` owner elements will return
+# corresponding document elements as their child nodes.</p>
+domain DOM
+  depends on Runtime
+  # Unique DOM node identifier.
+  type NodeId extends integer
+  # Unique DOM node identifier used to reference a node that may not have been pushed to the
+  # front-end.
+  type BackendNodeId extends integer
+  # Backend node with a friendly name.
+  type BackendNode extends object
+    properties
+      # `Node`'s nodeType.
+      integer nodeType
+      # `Node`'s nodeName.
+      string nodeName
+      BackendNodeId backendNodeId
+  # Pseudo element type.
+  type PseudoType extends string
+    enum
+      first-line
+      first-letter
+      before
+      after
+      backdrop
+      selection
+      first-line-inherited
+      scrollbar
+      scrollbar-thumb
+      scrollbar-button
+      scrollbar-track
+      scrollbar-track-piece
+      scrollbar-corner
+      resizer
+      input-list-button
+  # Shadow root type.
+  type ShadowRootType extends string
+    enum
+      user-agent
+      open
+      closed
+  # DOM interaction is implemented in terms of mirror objects that represent the actual DOM nodes.
+  # DOMNode is a base node mirror type.
+  type Node extends object
+    properties
+      # Node identifier that is passed into the rest of the DOM messages as the `nodeId`. Backend
+      # will only push node with given `id` once. It is aware of all requested nodes and will only
+      # fire DOM events for nodes known to the client.
+      NodeId nodeId
+      # The id of the parent node if any.
+      optional NodeId parentId
+      # The BackendNodeId for this node.
+      BackendNodeId backendNodeId
+      # `Node`'s nodeType.
+      integer nodeType
+      # `Node`'s nodeName.
+      string nodeName
+      # `Node`'s localName.
+      string localName
+      # `Node`'s nodeValue.
+      string nodeValue
+      # Child count for `Container` nodes.
+      optional integer childNodeCount
+      # Child nodes of this node when requested with children.
+      optional array of Node children
+      # Attributes of the `Element` node in the form of flat array `[name1, value1, name2, value2]`.
+      optional array of string attributes
+      # Document URL that `Document` or `FrameOwner` node points to.
+      optional string documentURL
+      # Base URL that `Document` or `FrameOwner` node uses for URL completion.
+      optional string baseURL
+      # `DocumentType`'s publicId.
+      optional string publicId
+      # `DocumentType`'s systemId.
+      optional string systemId
+      # `DocumentType`'s internalSubset.
+      optional string internalSubset
+      # `Document`'s XML version in case of XML documents.
+      optional string xmlVersion
+      # `Attr`'s name.
+      optional string name
+      # `Attr`'s value.
+      optional string value
+      # Pseudo element type for this node.
+      optional PseudoType pseudoType
+      # Shadow root type.
+      optional ShadowRootType shadowRootType
+      # Frame ID for frame owner elements.
+      optional Page.FrameId frameId
+      # Content document for frame owner elements.
+      optional Node contentDocument
+      # Shadow root list for given element host.
+      optional array of Node shadowRoots
+      # Content document fragment for template elements.
+      optional Node templateContent
+      # Pseudo elements associated with this node.
+      optional array of Node pseudoElements
+      # Import document for the HTMLImport links.
+      optional Node importedDocument
+      # Distributed nodes for given insertion point.
+      optional array of BackendNode distributedNodes
+      # Whether the node is SVG.
+      optional boolean isSVG
+  # A structure holding an RGBA color.
+  type RGBA extends object
+    properties
+      # The red component, in the [0-255] range.
+      integer r
+      # The green component, in the [0-255] range.
+      integer g
+      # The blue component, in the [0-255] range.
+      integer b
+      # The alpha component, in the [0-1] range (default: 1).
+      optional number a
+  # An array of quad vertices, x immediately followed by y for each point, points clock-wise.
+  type Quad extends array of number
+  # Box model.
+  type BoxModel extends object
+    properties
+      # Content box
+      Quad content
+      # Padding box
+      Quad padding
+      # Border box
+      Quad border
+      # Margin box
+      Quad margin
+      # Node width
+      integer width
+      # Node height
+      integer height
+      # Shape outside coordinates
+      optional ShapeOutsideInfo shapeOutside
+  # CSS Shape Outside details.
+  type ShapeOutsideInfo extends object
+    properties
+      # Shape bounds
+      Quad bounds
+      # Shape coordinate details
+      array of any shape
+      # Margin shape bounds
+      array of any marginShape
+  # Rectangle.
+  type Rect extends object
+    properties
+      # X coordinate
+      number x
+      # Y coordinate
+      number y
+      # Rectangle width
+      number width
+      # Rectangle height
+      number height
+  # Collects class names for the node with given id and all of it's child nodes.
+  experimental command collectClassNamesFromSubtree
+    parameters
+      # Id of the node to collect class names.
+      NodeId nodeId
+    returns
+      # Class name list.
+      array of string classNames
+  # Creates a deep copy of the specified node and places it into the target container before the
+  # given anchor.
+  experimental command copyTo
+    parameters
+      # Id of the node to copy.
+      NodeId nodeId
+      # Id of the element to drop the copy into.
+      NodeId targetNodeId
+      # Drop the copy before this node (if absent, the copy becomes the last child of
+      # `targetNodeId`).
+      optional NodeId insertBeforeNodeId
+    returns
+      # Id of the node clone.
+      NodeId nodeId
+  # Describes node given its id, does not require domain to be enabled. Does not start tracking any
+  # objects, can be used for automation.
+  command describeNode
+    parameters
+      # Identifier of the node.
+      optional NodeId nodeId
+      # Identifier of the backend node.
+      optional BackendNodeId backendNodeId
+      # JavaScript object id of the node wrapper.
+      optional Runtime.RemoteObjectId objectId
+      # The maximum depth at which children should be retrieved, defaults to 1. Use -1 for the
+      # entire subtree or provide an integer larger than 0.
+      optional integer depth
+      # Whether or not iframes and shadow roots should be traversed when returning the subtree
+      # (default is false).
+      optional boolean pierce
+    returns
+      # Node description.
+      Node node
+  # Disables DOM agent for the given page.
+  command disable
+  # Discards search results from the session with the given id. `getSearchResults` should no longer
+  # be called for that search.
+  experimental command discardSearchResults
+    parameters
+      # Unique search session identifier.
+      string searchId
+  # Enables DOM agent for the given page.
+  command enable
+  # Focuses the given element.
+  command focus
+    parameters
+      # Identifier of the node.
+      optional NodeId nodeId
+      # Identifier of the backend node.
+      optional BackendNodeId backendNodeId
+      # JavaScript object id of the node wrapper.
+      optional Runtime.RemoteObjectId objectId
+  # Returns attributes for the specified node.
+  command getAttributes
+    parameters
+      # Id of the node to retrieve attibutes for.
+      NodeId nodeId
+    returns
+      # An interleaved array of node attribute names and values.
+      array of string attributes
+  # Returns boxes for the given node.
+  command getBoxModel
+    parameters
+      # Identifier of the node.
+      optional NodeId nodeId
+      # Identifier of the backend node.
+      optional BackendNodeId backendNodeId
+      # JavaScript object id of the node wrapper.
+      optional Runtime.RemoteObjectId objectId
+    returns
+      # Box model for the node.
+      BoxModel model
+  # Returns quads that describe node position on the page. This method
+  # might return multiple quads for inline nodes.
+  experimental command getContentQuads
+    parameters
+      # Identifier of the node.
+      optional NodeId nodeId
+      # Identifier of the backend node.
+      optional BackendNodeId backendNodeId
+      # JavaScript object id of the node wrapper.
+      optional Runtime.RemoteObjectId objectId
+    returns
+      # Quads that describe node layout relative to viewport.
+      array of Quad quads
+  # Returns the root DOM node (and optionally the subtree) to the caller.
+  command getDocument
+    parameters
+      # The maximum depth at which children should be retrieved, defaults to 1. Use -1 for the
+      # entire subtree or provide an integer larger than 0.
+      optional integer depth
+      # Whether or not iframes and shadow roots should be traversed when returning the subtree
+      # (default is false).
+      optional boolean pierce
+    returns
+      # Resulting node.
+      Node root
+  # Returns the root DOM node (and optionally the subtree) to the caller.
+  command getFlattenedDocument
+    parameters
+      # The maximum depth at which children should be retrieved, defaults to 1. Use -1 for the
+      # entire subtree or provide an integer larger than 0.
+      optional integer depth
+      # Whether or not iframes and shadow roots should be traversed when returning the subtree
+      # (default is false).
+      optional boolean pierce
+    returns
+      # Resulting node.
+      array of Node nodes
+  # Returns node id at given location. Depending on whether DOM domain is enabled, nodeId is
+  # either returned or not.
+  experimental command getNodeForLocation
+    parameters
+      # X coordinate.
+      integer x
+      # Y coordinate.
+      integer y
+      # False to skip to the nearest non-UA shadow root ancestor (default: false).
+      optional boolean includeUserAgentShadowDOM
+    returns
+      # Resulting node.
+      BackendNodeId backendNodeId
+      # Id of the node at given coordinates, only when enabled and requested document.
+      optional NodeId nodeId
+  # Returns node's HTML markup.
+  command getOuterHTML
+    parameters
+      # Identifier of the node.
+      optional NodeId nodeId
+      # Identifier of the backend node.
+      optional BackendNodeId backendNodeId
+      # JavaScript object id of the node wrapper.
+      optional Runtime.RemoteObjectId objectId
+    returns
+      # Outer HTML markup.
+      string outerHTML
+  # Returns the id of the nearest ancestor that is a relayout boundary.
+  experimental command getRelayoutBoundary
+    parameters
+      # Id of the node.
+      NodeId nodeId
+    returns
+      # Relayout boundary node id for the given node.
+      NodeId nodeId
+  # Returns search results from given `fromIndex` to given `toIndex` from the search with the given
+  # identifier.
+  experimental command getSearchResults
+    parameters
+      # Unique search session identifier.
+      string searchId
+      # Start index of the search result to be returned.
+      integer fromIndex
+      # End index of the search result to be returned.
+      integer toIndex
+    returns
+      # Ids of the search result nodes.
+      array of NodeId nodeIds
+  # Hides any highlight.
+  command hideHighlight
+    # Use 'Overlay.hideHighlight' instead
+    redirect Overlay
+  # Highlights DOM node.
+  command highlightNode
+    # Use 'Overlay.highlightNode' instead
+    redirect Overlay
+  # Highlights given rectangle.
+  command highlightRect
+    # Use 'Overlay.highlightRect' instead
+    redirect Overlay
+  # Marks last undoable state.
+  experimental command markUndoableState
+  # Moves node into the new container, places it before the given anchor.
+  command moveTo
+    parameters
+      # Id of the node to move.
+      NodeId nodeId
+      # Id of the element to drop the moved node into.
+      NodeId targetNodeId
+      # Drop node before this one (if absent, the moved node becomes the last child of
+      # `targetNodeId`).
+      optional NodeId insertBeforeNodeId
+    returns
+      # New id of the moved node.
+      NodeId nodeId
+  # Searches for a given string in the DOM tree. Use `getSearchResults` to access search results or
+  # `cancelSearch` to end this search session.
+  experimental command performSearch
+    parameters
+      # Plain text or query selector or XPath search query.
+      string query
+      # True to search in user agent shadow DOM.
+      optional boolean includeUserAgentShadowDOM
+    returns
+      # Unique search session identifier.
+      string searchId
+      # Number of search results.
+      integer resultCount
+  # Requests that the node is sent to the caller given its path. // FIXME, use XPath
+  experimental command pushNodeByPathToFrontend
+    parameters
+      # Path to node in the proprietary format.
+      string path
+    returns
+      # Id of the node for given path.
+      NodeId nodeId
+  # Requests that a batch of nodes is sent to the caller given their backend node ids.
+  experimental command pushNodesByBackendIdsToFrontend
+    parameters
+      # The array of backend node ids.
+      array of BackendNodeId backendNodeIds
+    returns
+      # The array of ids of pushed nodes that correspond to the backend ids specified in
+      # backendNodeIds.
+      array of NodeId nodeIds
+  # Executes `querySelector` on a given node.
+  command querySelector
+    parameters
+      # Id of the node to query upon.
+      NodeId nodeId
+      # Selector string.
+      string selector
+    returns
+      # Query selector result.
+      NodeId nodeId
+  # Executes `querySelectorAll` on a given node.
+  command querySelectorAll
+    parameters
+      # Id of the node to query upon.
+      NodeId nodeId
+      # Selector string.
+      string selector
+    returns
+      # Query selector result.
+      array of NodeId nodeIds
+  # Re-does the last undone action.
+  experimental command redo
+  # Removes attribute with given name from an element with given id.
+  command removeAttribute
+    parameters
+      # Id of the element to remove attribute from.
+      NodeId nodeId
+      # Name of the attribute to remove.
+      string name
+  # Removes node with given id.
+  command removeNode
+    parameters
+      # Id of the node to remove.
+      NodeId nodeId
+  # Requests that children of the node with given id are returned to the caller in form of
+  # `setChildNodes` events where not only immediate children are retrieved, but all children down to
+  # the specified depth.
+  command requestChildNodes
+    parameters
+      # Id of the node to get children for.
+      NodeId nodeId
+      # The maximum depth at which children should be retrieved, defaults to 1. Use -1 for the
+      # entire subtree or provide an integer larger than 0.
+      optional integer depth
+      # Whether or not iframes and shadow roots should be traversed when returning the sub-tree
+      # (default is false).
+      optional boolean pierce
+  # Requests that the node is sent to the caller given the JavaScript node object reference. All
+  # nodes that form the path from the node to the root are also sent to the client as a series of
+  # `setChildNodes` notifications.
+  command requestNode
+    parameters
+      # JavaScript object id to convert into node.
+      Runtime.RemoteObjectId objectId
+    returns
+      # Node id for given object.
+      NodeId nodeId
+  # Resolves the JavaScript node object for a given NodeId or BackendNodeId.
+  command resolveNode
+    parameters
+      # Id of the node to resolve.
+      optional NodeId nodeId
+      # Backend identifier of the node to resolve.
+      optional DOM.BackendNodeId backendNodeId
+      # Symbolic group name that can be used to release multiple objects.
+      optional string objectGroup
+      # Execution context in which to resolve the node.
+      optional Runtime.ExecutionContextId executionContextId
+    returns
+      # JavaScript object wrapper for given node.
+      Runtime.RemoteObject object
+  # Sets attribute for an element with given id.
+  command setAttributeValue
+    parameters
+      # Id of the element to set attribute for.
+      NodeId nodeId
+      # Attribute name.
+      string name
+      # Attribute value.
+      string value
+  # Sets attributes on element with given id. This method is useful when user edits some existing
+  # attribute value and types in several attribute name/value pairs.
+  command setAttributesAsText
+    parameters
+      # Id of the element to set attributes for.
+      NodeId nodeId
+      # Text with a number of attributes. Will parse this text using HTML parser.
+      string text
+      # Attribute name to replace with new attributes derived from text in case text parsed
+      # successfully.
+      optional string name
+  # Sets files for the given file input element.
+  command setFileInputFiles
+    parameters
+      # Array of file paths to set.
+      array of string files
+      # Identifier of the node.
+      optional NodeId nodeId
+      # Identifier of the backend node.
+      optional BackendNodeId backendNodeId
+      # JavaScript object id of the node wrapper.
+      optional Runtime.RemoteObjectId objectId
+  # Returns file information for the given
+  # File wrapper.
+  experimental command getFileInfo
+    parameters
+      # JavaScript object id of the node wrapper.
+      Runtime.RemoteObjectId objectId
+    returns
+      string path
+  # Enables console to refer to the node with given id via $x (see Command Line API for more details
+  # $x functions).
+  experimental command setInspectedNode
+    parameters
+      # DOM node id to be accessible by means of $x command line API.
+      NodeId nodeId
+  # Sets node name for a node with given id.
+  command setNodeName
+    parameters
+      # Id of the node to set name for.
+      NodeId nodeId
+      # New node's name.
+      string name
+    returns
+      # New node's id.
+      NodeId nodeId
+  # Sets node value for a node with given id.
+  command setNodeValue
+    parameters
+      # Id of the node to set value for.
+      NodeId nodeId
+      # New node's value.
+      string value
+  # Sets node HTML markup, returns new node id.
+  command setOuterHTML
+    parameters
+      # Id of the node to set markup for.
+      NodeId nodeId
+      # Outer HTML markup to set.
+      string outerHTML
+  # Undoes the last performed action.
+  experimental command undo
+  # Returns iframe node that owns iframe with the given domain.
+  experimental command getFrameOwner
+    parameters
+      Page.FrameId frameId
+    returns
+      # Resulting node.
+      BackendNodeId backendNodeId
+      # Id of the node at given coordinates, only when enabled and requested document.
+      optional NodeId nodeId
+  # Fired when `Element`'s attribute is modified.
+  event attributeModified
+    parameters
+      # Id of the node that has changed.
+      NodeId nodeId
+      # Attribute name.
+      string name
+      # Attribute value.
+      string value
+  # Fired when `Element`'s attribute is removed.
+  event attributeRemoved
+    parameters
+      # Id of the node that has changed.
+      NodeId nodeId
+      # A ttribute name.
+      string name
+  # Mirrors `DOMCharacterDataModified` event.
+  event characterDataModified
+    parameters
+      # Id of the node that has changed.
+      NodeId nodeId
+      # New text value.
+      string characterData
+  # Fired when `Container`'s child node count has changed.
+  event childNodeCountUpdated
+    parameters
+      # Id of the node that has changed.
+      NodeId nodeId
+      # New node count.
+      integer childNodeCount
+  # Mirrors `DOMNodeInserted` event.
+  event childNodeInserted
+    parameters
+      # Id of the node that has changed.
+      NodeId parentNodeId
+      # If of the previous siblint.
+      NodeId previousNodeId
+      # Inserted node data.
+      Node node
+  # Mirrors `DOMNodeRemoved` event.
+  event childNodeRemoved
+    parameters
+      # Parent id.
+      NodeId parentNodeId
+      # Id of the node that has been removed.
+      NodeId nodeId
+  # Called when distrubution is changed.
+  experimental event distributedNodesUpdated
+    parameters
+      # Insertion point where distrubuted nodes were updated.
+      NodeId insertionPointId
+      # Distributed nodes for given insertion point.
+      array of BackendNode distributedNodes
+  # Fired when `Document` has been totally updated. Node ids are no longer valid.
+  event documentUpdated
+  # Fired when `Element`'s inline style is modified via a CSS property modification.
+  experimental event inlineStyleInvalidated
+    parameters
+      # Ids of the nodes for which the inline styles have been invalidated.
+      array of NodeId nodeIds
+  # Called when a pseudo element is added to an element.
+  experimental event pseudoElementAdded
+    parameters
+      # Pseudo element's parent element id.
+      NodeId parentId
+      # The added pseudo element.
+      Node pseudoElement
+  # Called when a pseudo element is removed from an element.
+  experimental event pseudoElementRemoved
+    parameters
+      # Pseudo element's parent element id.
+      NodeId parentId
+      # The removed pseudo element id.
+      NodeId pseudoElementId
+  # Fired when backend wants to provide client with the missing DOM structure. This happens upon
+  # most of the calls requesting node ids.
+  event setChildNodes
+    parameters
+      # Parent node id to populate with children.
+      NodeId parentId
+      # Child nodes array.
+      array of Node nodes
+  # Called when shadow root is popped from the element.
+  experimental event shadowRootPopped
+    parameters
+      # Host element id.
+      NodeId hostId
+      # Shadow root id.
+      NodeId rootId
+  # Called when shadow root is pushed into the element.
+  experimental event shadowRootPushed
+    parameters
+      # Host element id.
+      NodeId hostId
+      # Shadow root.
+      Node root
+
+# This domain exposes CSS read/write operations. All CSS objects (stylesheets, rules, and styles)
+# have an associated `id` used in subsequent operations on the related object. Each object type has
+# a specific `id` structure, and those are not interchangeable between objects of different kinds.
+# CSS objects can be loaded using the `get*ForNode()` calls (which accept a DOM node id). A client
+# can also keep track of stylesheets via the `styleSheetAdded`/`styleSheetRemoved` events and
+# subsequently load the required stylesheet contents using the `getStyleSheet[Text]()` methods.
+experimental domain CSS
+  depends on DOM
+  type StyleSheetId extends string
+  # Stylesheet type: "injected" for stylesheets injected via extension, "user-agent" for user-agent
+  # stylesheets, "inspector" for stylesheets created by the inspector (i.e. those holding the "via
+  # inspector" rules), "regular" for regular stylesheets.
+  type StyleSheetOrigin extends string
+    enum
+      injected
+      user-agent
+      inspector
+      regular
+  # CSS rule collection for a single pseudo style.
+  type PseudoElementMatches extends object
+    properties
+      # Pseudo element type.
+      DOM.PseudoType pseudoType
+      # Matches of CSS rules applicable to the pseudo style.
+      array of RuleMatch matches
+  # Inherited CSS rule collection from ancestor node.
+  type InheritedStyleEntry extends object
+    properties
+      # The ancestor node's inline style, if any, in the style inheritance chain.
+      optional CSSStyle inlineStyle
+      # Matches of CSS rules matching the ancestor node in the style inheritance chain.
+      array of RuleMatch matchedCSSRules
+  # Match data for a CSS rule.
+  type RuleMatch extends object
+    properties
+      # CSS rule in the match.
+      CSSRule rule
+      # Matching selector indices in the rule's selectorList selectors (0-based).
+      array of integer matchingSelectors
+  # Data for a simple selector (these are delimited by commas in a selector list).
+  type Value extends object
+    properties
+      # Value text.
+      string text
+      # Value range in the underlying resource (if available).
+      optional SourceRange range
+  # Selector list data.
+  type SelectorList extends object
+    properties
+      # Selectors in the list.
+      array of Value selectors
+      # Rule selector text.
+      string text
+  # CSS stylesheet metainformation.
+  type CSSStyleSheetHeader extends object
+    properties
+      # The stylesheet identifier.
+      StyleSheetId styleSheetId
+      # Owner frame identifier.
+      Page.FrameId frameId
+      # Stylesheet resource URL.
+      string sourceURL
+      # URL of source map associated with the stylesheet (if any).
+      optional string sourceMapURL
+      # Stylesheet origin.
+      StyleSheetOrigin origin
+      # Stylesheet title.
+      string title
+      # The backend id for the owner node of the stylesheet.
+      optional DOM.BackendNodeId ownerNode
+      # Denotes whether the stylesheet is disabled.
+      boolean disabled
+      # Whether the sourceURL field value comes from the sourceURL comment.
+      optional boolean hasSourceURL
+      # Whether this stylesheet is created for STYLE tag by parser. This flag is not set for
+      # document.written STYLE tags.
+      boolean isInline
+      # Line offset of the stylesheet within the resource (zero based).
+      number startLine
+      # Column offset of the stylesheet within the resource (zero based).
+      number startColumn
+      # Size of the content (in characters).
+      number length
+  # CSS rule representation.
+  type CSSRule extends object
+    properties
+      # The css style sheet identifier (absent for user agent stylesheet and user-specified
+      # stylesheet rules) this rule came from.
+      optional StyleSheetId styleSheetId
+      # Rule selector data.
+      SelectorList selectorList
+      # Parent stylesheet's origin.
+      StyleSheetOrigin origin
+      # Associated style declaration.
+      CSSStyle style
+      # Media list array (for rules involving media queries). The array enumerates media queries
+      # starting with the innermost one, going outwards.
+      optional array of CSSMedia media
+  # CSS coverage information.
+  type RuleUsage extends object
+    properties
+      # The css style sheet identifier (absent for user agent stylesheet and user-specified
+      # stylesheet rules) this rule came from.
+      StyleSheetId styleSheetId
+      # Offset of the start of the rule (including selector) from the beginning of the stylesheet.
+      number startOffset
+      # Offset of the end of the rule body from the beginning of the stylesheet.
+      number endOffset
+      # Indicates whether the rule was actually used by some element in the page.
+      boolean used
+  # Text range within a resource. All numbers are zero-based.
+  type SourceRange extends object
+    properties
+      # Start line of range.
+      integer startLine
+      # Start column of range (inclusive).
+      integer startColumn
+      # End line of range
+      integer endLine
+      # End column of range (exclusive).
+      integer endColumn
+  type ShorthandEntry extends object
+    properties
+      # Shorthand name.
+      string name
+      # Shorthand value.
+      string value
+      # Whether the property has "!important" annotation (implies `false` if absent).
+      optional boolean important
+  type CSSComputedStyleProperty extends object
+    properties
+      # Computed style property name.
+      string name
+      # Computed style property value.
+      string value
+  # CSS style representation.
+  type CSSStyle extends object
+    properties
+      # The css style sheet identifier (absent for user agent stylesheet and user-specified
+      # stylesheet rules) this rule came from.
+      optional StyleSheetId styleSheetId
+      # CSS properties in the style.
+      array of CSSProperty cssProperties
+      # Computed values for all shorthands found in the style.
+      array of ShorthandEntry shorthandEntries
+      # Style declaration text (if available).
+      optional string cssText
+      # Style declaration range in the enclosing stylesheet (if available).
+      optional SourceRange range
+  # CSS property declaration data.
+  type CSSProperty extends object
+    properties
+      # The property name.
+      string name
+      # The property value.
+      string value
+      # Whether the property has "!important" annotation (implies `false` if absent).
+      optional boolean important
+      # Whether the property is implicit (implies `false` if absent).
+      optional boolean implicit
+      # The full property text as specified in the style.
+      optional string text
+      # Whether the property is understood by the browser (implies `true` if absent).
+      optional boolean parsedOk
+      # Whether the property is disabled by the user (present for source-based properties only).
+      optional boolean disabled
+      # The entire property range in the enclosing style declaration (if available).
+      optional SourceRange range
+  # CSS media rule descriptor.
+  type CSSMedia extends object
+    properties
+      # Media query text.
+      string text
+      # Source of the media query: "mediaRule" if specified by a @media rule, "importRule" if
+      # specified by an @import rule, "linkedSheet" if specified by a "media" attribute in a linked
+      # stylesheet's LINK tag, "inlineSheet" if specified by a "media" attribute in an inline
+      # stylesheet's STYLE tag.
+      enum source
+        mediaRule
+        importRule
+        linkedSheet
+        inlineSheet
+      # URL of the document containing the media query description.
+      optional string sourceURL
+      # The associated rule (@media or @import) header range in the enclosing stylesheet (if
+      # available).
+      optional SourceRange range
+      # Identifier of the stylesheet containing this object (if exists).
+      optional StyleSheetId styleSheetId
+      # Array of media queries.
+      optional array of MediaQuery mediaList
+  # Media query descriptor.
+  type MediaQuery extends object
+    properties
+      # Array of media query expressions.
+      array of MediaQueryExpression expressions
+      # Whether the media query condition is satisfied.
+      boolean active
+  # Media query expression descriptor.
+  type MediaQueryExpression extends object
+    properties
+      # Media query expression value.
+      number value
+      # Media query expression units.
+      string unit
+      # Media query expression feature.
+      string feature
+      # The associated range of the value text in the enclosing stylesheet (if available).
+      optional SourceRange valueRange
+      # Computed length of media query expression (if applicable).
+      optional number computedLength
+  # Information about amount of glyphs that were rendered with given font.
+  type PlatformFontUsage extends object
+    properties
+      # Font's family name reported by platform.
+      string familyName
+      # Indicates if the font was downloaded or resolved locally.
+      boolean isCustomFont
+      # Amount of glyphs that were rendered with this font.
+      number glyphCount
+  # Properties of a web font: https://www.w3.org/TR/2008/REC-CSS2-20080411/fonts.html#font-descriptions
+  type FontFace extends object
+    properties
+      # The font-family.
+      string fontFamily
+      # The font-style.
+      string fontStyle
+      # The font-variant.
+      string fontVariant
+      # The font-weight.
+      string fontWeight
+      # The font-stretch.
+      string fontStretch
+      # The unicode-range.
+      string unicodeRange
+      # The src.
+      string src
+      # The resolved platform font family
+      string platformFontFamily
+  # CSS keyframes rule representation.
+  type CSSKeyframesRule extends object
+    properties
+      # Animation name.
+      Value animationName
+      # List of keyframes.
+      array of CSSKeyframeRule keyframes
+  # CSS keyframe rule representation.
+  type CSSKeyframeRule extends object
+    properties
+      # The css style sheet identifier (absent for user agent stylesheet and user-specified
+      # stylesheet rules) this rule came from.
+      optional StyleSheetId styleSheetId
+      # Parent stylesheet's origin.
+      StyleSheetOrigin origin
+      # Associated key text.
+      Value keyText
+      # Associated style declaration.
+      CSSStyle style
+  # A descriptor of operation to mutate style declaration text.
+  type StyleDeclarationEdit extends object
+    properties
+      # The css style sheet identifier.
+      StyleSheetId styleSheetId
+      # The range of the style text in the enclosing stylesheet.
+      SourceRange range
+      # New style text.
+      string text
+  # Inserts a new rule with the given `ruleText` in a stylesheet with given `styleSheetId`, at the
+  # position specified by `location`.
+  command addRule
+    parameters
+      # The css style sheet identifier where a new rule should be inserted.
+      StyleSheetId styleSheetId
+      # The text of a new rule.
+      string ruleText
+      # Text position of a new rule in the target style sheet.
+      SourceRange location
+    returns
+      # The newly created rule.
+      CSSRule rule
+  # Returns all class names from specified stylesheet.
+  command collectClassNames
+    parameters
+      StyleSheetId styleSheetId
+    returns
+      # Class name list.
+      array of string classNames
+  # Creates a new special "via-inspector" stylesheet in the frame with given `frameId`.
+  command createStyleSheet
+    parameters
+      # Identifier of the frame where "via-inspector" stylesheet should be created.
+      Page.FrameId frameId
+    returns
+      # Identifier of the created "via-inspector" stylesheet.
+      StyleSheetId styleSheetId
+  # Disables the CSS agent for the given page.
+  command disable
+  # Enables the CSS agent for the given page. Clients should not assume that the CSS agent has been
+  # enabled until the result of this command is received.
+  command enable
+  # Ensures that the given node will have specified pseudo-classes whenever its style is computed by
+  # the browser.
+  command forcePseudoState
+    parameters
+      # The element id for which to force the pseudo state.
+      DOM.NodeId nodeId
+      # Element pseudo classes to force when computing the element's style.
+      array of string forcedPseudoClasses
+  command getBackgroundColors
+    parameters
+      # Id of the node to get background colors for.
+      DOM.NodeId nodeId
+    returns
+      # The range of background colors behind this element, if it contains any visible text. If no
+      # visible text is present, this will be undefined. In the case of a flat background color,
+      # this will consist of simply that color. In the case of a gradient, this will consist of each
+      # of the color stops. For anything more complicated, this will be an empty array. Images will
+      # be ignored (as if the image had failed to load).
+      optional array of string backgroundColors
+      # The computed font size for this node, as a CSS computed value string (e.g. '12px').
+      optional string computedFontSize
+      # The computed font weight for this node, as a CSS computed value string (e.g. 'normal' or
+      # '100').
+      optional string computedFontWeight
+  # Returns the computed style for a DOM node identified by `nodeId`.
+  command getComputedStyleForNode
+    parameters
+      DOM.NodeId nodeId
+    returns
+      # Computed style for the specified DOM node.
+      array of CSSComputedStyleProperty computedStyle
+  # Returns the styles defined inline (explicitly in the "style" attribute and implicitly, using DOM
+  # attributes) for a DOM node identified by `nodeId`.
+  command getInlineStylesForNode
+    parameters
+      DOM.NodeId nodeId
+    returns
+      # Inline style for the specified DOM node.
+      optional CSSStyle inlineStyle
+      # Attribute-defined element style (e.g. resulting from "width=20 height=100%").
+      optional CSSStyle attributesStyle
+  # Returns requested styles for a DOM node identified by `nodeId`.
+  command getMatchedStylesForNode
+    parameters
+      DOM.NodeId nodeId
+    returns
+      # Inline style for the specified DOM node.
+      optional CSSStyle inlineStyle
+      # Attribute-defined element style (e.g. resulting from "width=20 height=100%").
+      optional CSSStyle attributesStyle
+      # CSS rules matching this node, from all applicable stylesheets.
+      optional array of RuleMatch matchedCSSRules
+      # Pseudo style matches for this node.
+      optional array of PseudoElementMatches pseudoElements
+      # A chain of inherited styles (from the immediate node parent up to the DOM tree root).
+      optional array of InheritedStyleEntry inherited
+      # A list of CSS keyframed animations matching this node.
+      optional array of CSSKeyframesRule cssKeyframesRules
+  # Returns all media queries parsed by the rendering engine.
+  command getMediaQueries
+    returns
+      array of CSSMedia medias
+  # Requests information about platform fonts which we used to render child TextNodes in the given
+  # node.
+  command getPlatformFontsForNode
+    parameters
+      DOM.NodeId nodeId
+    returns
+      # Usage statistics for every employed platform font.
+      array of PlatformFontUsage fonts
+  # Returns the current textual content for a stylesheet.
+  command getStyleSheetText
+    parameters
+      StyleSheetId styleSheetId
+    returns
+      # The stylesheet text.
+      string text
+  # Find a rule with the given active property for the given node and set the new value for this
+  # property
+  command setEffectivePropertyValueForNode
+    parameters
+      # The element id for which to set property.
+      DOM.NodeId nodeId
+      string propertyName
+      string value
+  # Modifies the keyframe rule key text.
+  command setKeyframeKey
+    parameters
+      StyleSheetId styleSheetId
+      SourceRange range
+      string keyText
+    returns
+      # The resulting key text after modification.
+      Value keyText
+  # Modifies the rule selector.
+  command setMediaText
+    parameters
+      StyleSheetId styleSheetId
+      SourceRange range
+      string text
+    returns
+      # The resulting CSS media rule after modification.
+      CSSMedia media
+  # Modifies the rule selector.
+  command setRuleSelector
+    parameters
+      StyleSheetId styleSheetId
+      SourceRange range
+      string selector
+    returns
+      # The resulting selector list after modification.
+      SelectorList selectorList
+  # Sets the new stylesheet text.
+  command setStyleSheetText
+    parameters
+      StyleSheetId styleSheetId
+      string text
+    returns
+      # URL of source map associated with script (if any).
+      optional string sourceMapURL
+  # Applies specified style edits one after another in the given order.
+  command setStyleTexts
+    parameters
+      array of StyleDeclarationEdit edits
+    returns
+      # The resulting styles after modification.
+      array of CSSStyle styles
+  # Enables the selector recording.
+  command startRuleUsageTracking
+  # Stop tracking rule usage and return the list of rules that were used since last call to
+  # `takeCoverageDelta` (or since start of coverage instrumentation)
+  command stopRuleUsageTracking
+    returns
+      array of RuleUsage ruleUsage
+  # Obtain list of rules that became used since last call to this method (or since start of coverage
+  # instrumentation)
+  command takeCoverageDelta
+    returns
+      array of RuleUsage coverage
+  # Fires whenever a web font is updated.  A non-empty font parameter indicates a successfully loaded
+  # web font
+  event fontsUpdated
+    parameters
+      # The web font that has loaded.
+      optional FontFace font
+  # Fires whenever a MediaQuery result changes (for example, after a browser window has been
+  # resized.) The current implementation considers only viewport-dependent media features.
+  event mediaQueryResultChanged
+  # Fired whenever an active document stylesheet is added.
+  event styleSheetAdded
+    parameters
+      # Added stylesheet metainfo.
+      CSSStyleSheetHeader header
+  # Fired whenever a stylesheet is changed as a result of the client operation.
+  event styleSheetChanged
+    parameters
+      StyleSheetId styleSheetId
+  # Fired whenever an active document stylesheet is removed.
+  event styleSheetRemoved
+    parameters
+      # Identifier of the removed stylesheet.
+      StyleSheetId styleSheetId
+
+# This domain provides various functionality related to drawing atop the inspected page.
+experimental domain Overlay
+  depends on DOM
+  depends on Page
+  depends on Runtime
+  # Configuration data for the highlighting of page elements.
+  type HighlightConfig extends object
+    properties
+      # Whether the node info tooltip should be shown (default: false).
+      optional boolean showInfo
+      # Whether the node styles in the tooltip (default: false).
+      optional boolean showStyles
+      # Whether the rulers should be shown (default: false).
+      optional boolean showRulers
+      # Whether the extension lines from node to the rulers should be shown (default: false).
+      optional boolean showExtensionLines
+      # The content box highlight fill color (default: transparent).
+      optional DOM.RGBA contentColor
+      # The padding highlight fill color (default: transparent).
+      optional DOM.RGBA paddingColor
+      # The border highlight fill color (default: transparent).
+      optional DOM.RGBA borderColor
+      # The margin highlight fill color (default: transparent).
+      optional DOM.RGBA marginColor
+      # The event target element highlight fill color (default: transparent).
+      optional DOM.RGBA eventTargetColor
+      # The shape outside fill color (default: transparent).
+      optional DOM.RGBA shapeColor
+      # The shape margin fill color (default: transparent).
+      optional DOM.RGBA shapeMarginColor
+      # The grid layout color (default: transparent).
+      optional DOM.RGBA cssGridColor
+  type InspectMode extends string
+    enum
+      searchForNode
+      searchForUAShadowDOM
+      captureAreaScreenshot
+      none
+  # Disables domain notifications.
+  command disable
+  # Enables domain notifications.
+  command enable
+  # For testing.
+  command getHighlightObjectForTest
+    parameters
+      # Id of the node to get highlight object for.
+      DOM.NodeId nodeId
+    returns
+      # Highlight data for the node.
+      object highlight
+  # Hides any highlight.
+  command hideHighlight
+  # Highlights owner element of the frame with given id.
+  command highlightFrame
+    parameters
+      # Identifier of the frame to highlight.
+      Page.FrameId frameId
+      # The content box highlight fill color (default: transparent).
+      optional DOM.RGBA contentColor
+      # The content box highlight outline color (default: transparent).
+      optional DOM.RGBA contentOutlineColor
+  # Highlights DOM node with given id or with the given JavaScript object wrapper. Either nodeId or
+  # objectId must be specified.
+  command highlightNode
+    parameters
+      # A descriptor for the highlight appearance.
+      HighlightConfig highlightConfig
+      # Identifier of the node to highlight.
+      optional DOM.NodeId nodeId
+      # Identifier of the backend node to highlight.
+      optional DOM.BackendNodeId backendNodeId
+      # JavaScript object id of the node to be highlighted.
+      optional Runtime.RemoteObjectId objectId
+      # Selectors to highlight relevant nodes.
+      optional string selector
+  # Highlights given quad. Coordinates are absolute with respect to the main frame viewport.
+  command highlightQuad
+    parameters
+      # Quad to highlight
+      DOM.Quad quad
+      # The highlight fill color (default: transparent).
+      optional DOM.RGBA color
+      # The highlight outline color (default: transparent).
+      optional DOM.RGBA outlineColor
+  # Highlights given rectangle. Coordinates are absolute with respect to the main frame viewport.
+  command highlightRect
+    parameters
+      # X coordinate
+      integer x
+      # Y coordinate
+      integer y
+      # Rectangle width
+      integer width
+      # Rectangle height
+      integer height
+      # The highlight fill color (default: transparent).
+      optional DOM.RGBA color
+      # The highlight outline color (default: transparent).
+      optional DOM.RGBA outlineColor
+  # Enters the 'inspect' mode. In this mode, elements that user is hovering over are highlighted.
+  # Backend then generates 'inspectNodeRequested' event upon element selection.
+  command setInspectMode
+    parameters
+      # Set an inspection mode.
+      InspectMode mode
+      # A descriptor for the highlight appearance of hovered-over nodes. May be omitted if `enabled
+      # == false`.
+      optional HighlightConfig highlightConfig
+  # Highlights owner element of all frames detected to be ads.
+  command setShowAdHighlights
+    parameters
+      # True for showing ad highlights
+      boolean show
+  command setPausedInDebuggerMessage
+    parameters
+      # The message to display, also triggers resume and step over controls.
+      optional string message
+  # Requests that backend shows debug borders on layers
+  command setShowDebugBorders
+    parameters
+      # True for showing debug borders
+      boolean show
+  # Requests that backend shows the FPS counter
+  command setShowFPSCounter
+    parameters
+      # True for showing the FPS counter
+      boolean show
+  # Requests that backend shows paint rectangles
+  command setShowPaintRects
+    parameters
+      # True for showing paint rectangles
+      boolean result
+  # Requests that backend shows scroll bottleneck rects
+  command setShowScrollBottleneckRects
+    parameters
+      # True for showing scroll bottleneck rects
+      boolean show
+  # Requests that backend shows hit-test borders on layers
+  command setShowHitTestBorders
+    parameters
+      # True for showing hit-test borders
+      boolean show
+  # Paints viewport size upon main frame resize.
+  command setShowViewportSizeOnResize
+    parameters
+      # Whether to paint size or not.
+      boolean show
+  command setSuspended
+    parameters
+      # Whether overlay should be suspended and not consume any resources until resumed.
+      boolean suspended
+  # Fired when the node should be inspected. This happens after call to `setInspectMode` or when
+  # user manually inspects an element.
+  event inspectNodeRequested
+    parameters
+      # Id of the node to inspect.
+      DOM.BackendNodeId backendNodeId
+  # Fired when the node should be highlighted. This happens after call to `setInspectMode`.
+  event nodeHighlightRequested
+    parameters
+      DOM.NodeId nodeId
+  # Fired when user asks to capture screenshot of some area on the page.
+  event screenshotRequested
+    parameters
+      # Viewport to capture, in device independent pixels (dip).
+      Page.Viewport viewport
+  # Fired when user cancels the inspect mode.
+  event inspectModeCanceled
+
+# Provides access to log entries.
+domain Log
+  depends on Runtime
+  depends on Network
+  # Log entry.
+  type LogEntry extends object
+    properties
+      # Log entry source.
+      enum source
+        xml
+        javascript
+        network
+        storage
+        appcache
+        rendering
+        security
+        deprecation
+        worker
+        violation
+        intervention
+        recommendation
+        other
+      # Log entry severity.
+      enum level
+        verbose
+        info
+        warning
+        error
+      # Logged text.
+      string text
+      # Timestamp when this entry was added.
+      Runtime.Timestamp timestamp
+      # URL of the resource if known.
+      optional string url
+      # Line number in the resource.
+      optional integer lineNumber
+      # JavaScript stack trace.
+      optional Runtime.StackTrace stackTrace
+      # Identifier of the network request associated with this entry.
+      optional Network.RequestId networkRequestId
+      # Identifier of the worker associated with this entry.
+      optional string workerId
+      # Call arguments.
+      optional array of Runtime.RemoteObject args
+  # Violation configuration setting.
+  type ViolationSetting extends object
+    properties
+      # Violation type.
+      enum name
+        longTask
+        longLayout
+        blockedEvent
+        blockedParser
+        discouragedAPIUse
+        handler
+        recurringHandler
+      # Time threshold to trigger upon.
+      number threshold
+  # Clears the log.
+  command clear
+  # Disables log domain, prevents further log entries from being reported to the client.
+  command disable
+  # Enables log domain, sends the entries collected so far to the client by means of the
+  # `entryAdded` notification.
+  command enable
+  # start violation reporting.
+  command startViolationsReport
+    parameters
+      # Configuration for violations.
+      array of ViolationSetting config
+  # Stop violation reporting.
+  command stopViolationsReport
+  # Issued when new message was logged.
+  event entryAdded
+    parameters
+      # The entry.
+      LogEntry entry
+
+# Security
+domain Security
+  # An internal certificate ID value.
+  type CertificateId extends integer
+  # A description of mixed content (HTTP resources on HTTPS pages), as defined by
+  # https://www.w3.org/TR/mixed-content/#categories
+  type MixedContentType extends string
+    enum
+      blockable
+      optionally-blockable
+      none
+  # The security level of a page or resource.
+  type SecurityState extends string
+    enum
+      unknown
+      neutral
+      insecure
+      secure
+      info
+  # An explanation of an factor contributing to the security state.
+  type SecurityStateExplanation extends object
+    properties
+      # Security state representing the severity of the factor being explained.
+      SecurityState securityState
+      # Title describing the type of factor.
+      string title
+      # Short phrase describing the type of factor.
+      string summary
+      # Full text explanation of the factor.
+      string description
+      # The type of mixed content described by the explanation.
+      MixedContentType mixedContentType
+      # Page certificate.
+      array of string certificate
+      # Recommendations to fix any issues.
+      optional array of string recommendations
+  # Information about insecure content on the page.
+  type InsecureContentStatus extends object
+    properties
+      # True if the page was loaded over HTTPS and ran mixed (HTTP) content such as scripts.
+      boolean ranMixedContent
+      # True if the page was loaded over HTTPS and displayed mixed (HTTP) content such as images.
+      boolean displayedMixedContent
+      # True if the page was loaded over HTTPS and contained a form targeting an insecure url.
+      boolean containedMixedForm
+      # True if the page was loaded over HTTPS without certificate errors, and ran content such as
+      # scripts that were loaded with certificate errors.
+      boolean ranContentWithCertErrors
+      # True if the page was loaded over HTTPS without certificate errors, and displayed content
+      # such as images that were loaded with certificate errors.
+      boolean displayedContentWithCertErrors
+      # Security state representing a page that ran insecure content.
+      SecurityState ranInsecureContentStyle
+      # Security state representing a page that displayed insecure content.
+      SecurityState displayedInsecureContentStyle
+  # The action to take when a certificate error occurs. continue will continue processing the
+  # request and cancel will cancel the request.
+  type CertificateErrorAction extends string
+    enum
+      continue
+      cancel
+  # Disables tracking security state changes.
+  command disable
+  # Enables tracking security state changes.
+  command enable
+  # Enable/disable whether all certificate errors should be ignored.
+  experimental command setIgnoreCertificateErrors
+    parameters
+      # If true, all certificate errors will be ignored.
+      boolean ignore
+  # Handles a certificate error that fired a certificateError event.
+  deprecated command handleCertificateError
+    parameters
+      # The ID of the event.
+      integer eventId
+      # The action to take on the certificate error.
+      CertificateErrorAction action
+  # Enable/disable overriding certificate errors. If enabled, all certificate error events need to
+  # be handled by the DevTools client and should be answered with `handleCertificateError` commands.
+  deprecated command setOverrideCertificateErrors
+    parameters
+      # If true, certificate errors will be overridden.
+      boolean override
+  # There is a certificate error. If overriding certificate errors is enabled, then it should be
+  # handled with the `handleCertificateError` command. Note: this event does not fire if the
+  # certificate error has been allowed internally. Only one client per target should override
+  # certificate errors at the same time.
+  deprecated event certificateError
+    parameters
+      # The ID of the event.
+      integer eventId
+      # The type of the error.
+      string errorType
+      # The url that was requested.
+      string requestURL
+  # The security state of the page changed.
+  event securityStateChanged
+    parameters
+      # Security state.
+      SecurityState securityState
+      # True if the page was loaded over cryptographic transport such as HTTPS.
+      boolean schemeIsCryptographic
+      # List of explanations for the security state. If the overall security state is `insecure` or
+      # `warning`, at least one corresponding explanation should be included.
+      array of SecurityStateExplanation explanations
+      # Information about insecure content on the page.
+      InsecureContentStatus insecureContentStatus
+      # Overrides user-visible description of the state.
+      optional string summary

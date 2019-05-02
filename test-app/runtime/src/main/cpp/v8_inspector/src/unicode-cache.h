@@ -15,18 +15,16 @@ namespace internal {
 
 // Caching predicates used by scanners.
 class UnicodeCache {
-    public:
-        UnicodeCache() = default;
-        typedef unibrow::Utf8Decoder<512> Utf8Decoder;
+ public:
+  UnicodeCache() = default;
+  typedef unibrow::Utf8Decoder<512> Utf8Decoder;
 
-        StaticResource<Utf8Decoder>* utf8_decoder() {
-            return &utf8_decoder_;
-        }
+  StaticResource<Utf8Decoder>* utf8_decoder() { return &utf8_decoder_; }
 
-    private:
-        StaticResource<Utf8Decoder> utf8_decoder_;
+ private:
+  StaticResource<Utf8Decoder> utf8_decoder_;
 
-        DISALLOW_COPY_AND_ASSIGN(UnicodeCache);
+  DISALLOW_COPY_AND_ASSIGN(UnicodeCache);
 };
 
 }  // namespace internal
