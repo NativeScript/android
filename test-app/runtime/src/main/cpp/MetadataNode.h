@@ -78,6 +78,7 @@ class MetadataNode {
         v8::Local<v8::FunctionTemplate> GetConstructorFunctionTemplate(v8::Isolate* isolate, MetadataTreeNode* treeNode);
         v8::Local<v8::FunctionTemplate> GetConstructorFunctionTemplate(v8::Isolate* isolate, MetadataTreeNode* treeNode, std::vector<MethodCallbackData*>& instanceMethodsCallbackData);
         v8::Persistent<v8::Function>* GetPersistentConstructorFunction(v8::Isolate* isolate);
+        v8::Local<v8::ObjectTemplate> GetOrCreateArrayObjectTemplate(v8::Isolate* isolate);
 
         std::vector<MethodCallbackData*> SetInstanceMembers(v8::Isolate* isolate, v8::Local<v8::FunctionTemplate>& ctorFuncTemplate, v8::Local<v8::ObjectTemplate>& prototypeTemplate, std::vector<MethodCallbackData*>& instanceMethodsCallbackData, const std::vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode* treeNode);
         std::vector<MethodCallbackData*> SetInstanceMethodsFromStaticMetadata(v8::Isolate* isolate, v8::Local<v8::FunctionTemplate>& ctorFuncTemplate, v8::Local<v8::ObjectTemplate>& prototypeTemplate, std::vector<MethodCallbackData*>& instanceMethodsCallbackData, const std::vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode* treeNode);
@@ -152,6 +153,7 @@ class MetadataNode {
         static std::map<std::string, MetadataTreeNode*> s_name2TreeNodeCache;
         static std::map<MetadataTreeNode*, MetadataNode*> s_treeNode2NodeCache;
         static std::map<v8::Isolate*, MetadataNodeCache*> s_metadata_node_cache;
+        static std::map<v8::Isolate*, v8::Persistent<v8::ObjectTemplate>*> s_arrayObjectTemplates;
         static bool s_profilerEnabled;
 
         struct MethodCallbackData {
