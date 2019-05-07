@@ -89,10 +89,8 @@ version of the {N} CLI install a previous version of the runtime package - 'tns 
         project.ext.PLATFORMS_ANDROID = "platforms/android"
         project.ext.USER_PROJECT_ROOT = "$rootDir/../.."
 
-        project.ext.getAppResourcesPath = { ->
+        project.ext.getAppPath = { ->
             def relativePathToApp = "app"
-            def relativePathToAppResources
-            def absolutePathToAppResources
             def nsConfigFile = file("$USER_PROJECT_ROOT/nsconfig.json")
             def nsConfig
 
@@ -104,13 +102,27 @@ version of the {N} CLI install a previous version of the runtime package - 'tns 
                 relativePathToApp = nsConfig.appPath
             }
 
-            if (nsConfig != null && nsConfig.appResourcesPath != null) {
-                relativePathToAppResources = nsConfig.appResourcesPath
-            } else {
-                relativePathToAppResources = "$relativePathToApp/App_Resources"
+            project.ext.appPath = java.nio.file.Paths.get(USER_PROJECT_ROOT).resolve(relativePathToApp).toAbsolutePath()
+
+            return project.ext.appPath
+        }
+
+        project.ext.getAppResourcesPath = { ->
+            def relativePathToAppResources
+            def absolutePathToAppResources
+            def nsConfigFile = file("$USER_PROJECT_ROOT/nsconfig.json")
+            def nsConfig
+
+            if (nsConfigFile.exists()) {
+                nsConfig = new JsonSlurper().parseText(nsConfigFile.getText("UTF-8"))
             }
 
-            absolutePathToAppResources = java.nio.file.Paths.get(USER_PROJECT_ROOT).resolve(relativePathToAppResources).toAbsolutePath()
+            if (nsConfig != null && nsConfig.appResourcesPath != null) {
+                relativePathToAppResources = nsConfig.appResourcesPath
+                absolutePathToAppResources = java.nio.file.Paths.get(USER_PROJECT_ROOT).resolve(relativePathToAppResources).toAbsolutePath()
+            } else {
+                absolutePathToAppResources = "${getAppPath()}/App_Resources"
+            }
 
             project.ext.appResourcesPath = absolutePathToAppResources
 
@@ -188,7 +200,7 @@ def getAppIdentifier = { packageJsonMap ->
 
 def setAppIdentifier = { ->
     println "\t + setting applicationId"
-    File packageJsonFile = new File("$rootDir/../../package.json")
+    File packageJsonFile = new File("$USER_PROJECT_ROOT/$PACKAGE_JSON")
 
     if (packageJsonFile.exists()) {
         def content = packageJsonFile.getText("UTF-8")
@@ -326,11 +338,24 @@ dependencies {
         implementation "com.android.support:appcompat-v7:$supportVer"
         implementation "com.android.support:design:$supportVer"
     }
-    def useV8Symbols = nativescriptDependencies.any {
-        def packageJsonPath = file("$rootDir/${it.directory}/$PACKAGE_JSON")
-        def packageJson = new JsonSlurper().parseText(packageJsonPath.text)
-        return packageJson.nativescript.useV8Symbols
+
+    def useV8Symbols = false
+
+    def appPackageJsonFile = file("${getAppPath()}/$PACKAGE_JSON")
+    if (appPackageJsonFile.exists()) {
+        def appPackageJson = new JsonSlurper().parseText(appPackageJsonFile.text)
+        useV8Symbols = appPackageJson.android && appPackageJson.android.useV8Symbols
     }
+
+    if (!useV8Symbols) {
+        // check whether any of the dependencies require v8 symbols
+        useV8Symbols = nativescriptDependencies.any {
+            def packageJsonFile = file("$rootDir/${it.directory}/$PACKAGE_JSON")
+            def packageJson = new JsonSlurper().parseText(packageJsonFile.text)
+            return packageJson.nativescript && packageJson.nativescript.useV8Symbols
+        }
+    }
+
     if (!externalRuntimeExists) {
         def runtime = "nativescript-optimized-with-inspector"
 
@@ -539,7 +564,7 @@ afterEvaluate { project ->
                             // It mattered only when we were extracting JARs from AARs.
                             // To try it simply remove the following comments.
                             // workerExecutor.submit(EmptyRunnable.class) {
-                                explodeAar(jar, outputDir)
+                            explodeAar(jar, outputDir)
                             // }
                         }
                     }
