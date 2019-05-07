@@ -344,15 +344,15 @@ dependencies {
     def appPackageJsonFile = file("${getAppPath()}/$PACKAGE_JSON")
     if (appPackageJsonFile.exists()) {
         def appPackageJson = new JsonSlurper().parseText(appPackageJsonFile.text)
-        useV8Symbols = appPackageJson.android.useV8Symbols
+        useV8Symbols = appPackageJson.android && appPackageJson.android.useV8Symbols
     }
 
     if (!useV8Symbols) {
         // check whether any of the dependencies require v8 symbols
         useV8Symbols = nativescriptDependencies.any {
-            packageJsonFile = file("$rootDir/${it.directory}/$PACKAGE_JSON")
-            packageJson = new JsonSlurper().parseText(packageJsonFile.text)
-            return packageJson.nativescript.useV8Symbols
+            def packageJsonFile = file("$rootDir/${it.directory}/$PACKAGE_JSON")
+            def packageJson = new JsonSlurper().parseText(packageJsonFile.text)
+            return packageJson.nativescript && packageJson.nativescript.useV8Symbols
         }
     }
 
