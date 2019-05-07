@@ -25,6 +25,21 @@ void MetadataNode::Init(Isolate* isolate) {
     cache->MetadataKey = new Persistent<String>(isolate, key);
 }
 
+Local<ObjectTemplate> MetadataNode::GetOrCreateArrayObjectTemplate(Isolate* isolate) {
+    auto it = s_arrayObjectTemplates.find(isolate);
+    if (it != s_arrayObjectTemplates.end()) {
+        return it->second->Get(isolate);
+    }
+
+    auto arrayObjectTemplate = ObjectTemplate::New(isolate);
+    arrayObjectTemplate->SetInternalFieldCount(static_cast<int>(ObjectManager::MetadataNodeKeys::END));
+    arrayObjectTemplate->SetIndexedPropertyHandler(ArrayIndexedPropertyGetterCallback, ArrayIndexedPropertySetterCallback);
+
+    s_arrayObjectTemplates.emplace(std::make_pair(isolate, new Persistent<ObjectTemplate>(isolate, arrayObjectTemplate)));
+
+    return arrayObjectTemplate;
+}
+
 MetadataNode::MetadataNode(MetadataTreeNode* treeNode) :
     m_treeNode(treeNode) {
     uint8_t nodeType = s_metadataReader.GetNodeType(treeNode);
@@ -195,9 +210,7 @@ Local<Object> MetadataNode::CreateArrayWrapper(Isolate* isolate) {
     auto node = GetOrCreate("java/lang/Object");
     auto ctorFunc = node->GetConstructorFunction(isolate);
 
-    auto arrayObjectTemplate = ObjectTemplate::New(isolate);
-    arrayObjectTemplate->SetInternalFieldCount(static_cast<int>(ObjectManager::MetadataNodeKeys::END));
-    arrayObjectTemplate->SetIndexedPropertyHandler(ArrayIndexedPropertyGetterCallback, ArrayIndexedPropertySetterCallback);
+    auto arrayObjectTemplate = GetOrCreateArrayObjectTemplate(isolate);
 
     auto context = isolate->GetCurrentContext();
     auto arr = arrayObjectTemplate->NewInstance(context).ToLocalChecked();
@@ -1908,4 +1921,5 @@ std::map<std::string, MetadataTreeNode*> MetadataNode::s_name2TreeNodeCache;
 std::map<MetadataTreeNode*, MetadataNode*> MetadataNode::s_treeNode2NodeCache;
 map<Isolate*, MetadataNode::MetadataNodeCache*> MetadataNode::s_metadata_node_cache;
 bool MetadataNode::s_profilerEnabled = false;
+std::map<Isolate*, Persistent<ObjectTemplate>*> MetadataNode::s_arrayObjectTemplates;
 
