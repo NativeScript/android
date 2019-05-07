@@ -1,10 +1,9 @@
 // -*- C++ -*-
 //===--------------------------- stdlib.h ---------------------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is dual licensed under the MIT and the University of Illinois Open
-// Source Licenses. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -108,14 +107,14 @@ extern "C++" {
 
 // MSVCRT already has the correct prototype in <stdlib.h> if __cplusplus is defined
 #if !defined(_LIBCPP_MSVCRT) && !defined(__sun__) && !defined(_AIX)
-    inline _LIBCPP_INLINE_VISIBILITY long      abs(     long __x) _NOEXCEPT {return  labs(__x);}
+inline _LIBCPP_INLINE_VISIBILITY long      abs(     long __x) _NOEXCEPT {return  labs(__x);}
 #ifndef _LIBCPP_HAS_NO_LONG_LONG
-    inline _LIBCPP_INLINE_VISIBILITY long long abs(long long __x) _NOEXCEPT {return llabs(__x);}
+inline _LIBCPP_INLINE_VISIBILITY long long abs(long long __x) _NOEXCEPT {return llabs(__x);}
 #endif // _LIBCPP_HAS_NO_LONG_LONG
 
-    inline _LIBCPP_INLINE_VISIBILITY  ldiv_t div(     long __x,      long __y) _NOEXCEPT {return  ldiv(__x, __y);}
+inline _LIBCPP_INLINE_VISIBILITY  ldiv_t div(     long __x,      long __y) _NOEXCEPT {return  ldiv(__x, __y);}
 #ifndef _LIBCPP_HAS_NO_LONG_LONG
-    inline _LIBCPP_INLINE_VISIBILITY lldiv_t div(long long __x, long long __y) _NOEXCEPT {return lldiv(__x, __y);}
+inline _LIBCPP_INLINE_VISIBILITY lldiv_t div(long long __x, long long __y) _NOEXCEPT {return lldiv(__x, __y);}
 #endif // _LIBCPP_HAS_NO_LONG_LONG
 #endif // _LIBCPP_MSVCRT / __sun__ / _AIX
 

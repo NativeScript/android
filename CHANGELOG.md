@@ -1,3 +1,28 @@
+5.3.1
+==
+## Bug Fixes
+ - [5.3 build failing (Android) (#1329)](https://github.com/NativeScript/android-runtime/issues/1329)
+ - [fix(build): Correct dependencies of `cleanupAllJars` gradle task (#1338)](https://github.com/NativeScript/android-runtime/pull/1338)
+
+5.3.0
+==
+
+## What's New
+ - [Upgrade v8 to 7.3.492.25(#1301)](https://github.com/NativeScript/android-runtime/issues/1301)
+ - [Upgrade the android gradle plugin to the latest 3.3.2 version(#1304)](https://github.com/NativeScript/android-runtime/issues/1304)
+ - [Fail SBG when there's no sbg-bindings.txt file generated(#1286)](https://github.com/NativeScript/android-runtime/issues/1286)
+ - [Enable arm64-v8 in app.gradle(#1284)](https://github.com/NativeScript/android-runtime/issues/1284)
+ - [Support external buildscript configurations(#1279)](https://github.com/NativeScript/android-runtime/issues/1279)
+ - [Refactor SBG to support generics and proper handling of overridable methods(#1322)](https://github.com/NativeScript/android-runtime/issues/1322)
+
+## Bug Fixes
+ - [The minSdk version should not be declared in the android manifest file(#1316)](https://github.com/NativeScript/android-runtime/issues/1316)
+ - ["Unable to resolve dependency" error when runtime is not build (#1309)](https://github.com/NativeScript/android-runtime/issues/1309)
+ - [App crashes after tns debug android --debug-brk and trying to debug with "Step into/over"(#892)](https://github.com/NativeScript/android-runtime/issues/892)
+ - [Unable to call plugin's native code if application has been build before adding the plugin(#1293)](https://github.com/NativeScript/android-runtime/issues/1293)
+ - [Android build fails when tns-core-modules is updated(#1257)](https://github.com/NativeScript/android-runtime/issues/1257)
+ - [Generate better code(#689)](https://github.com/NativeScript/android-runtime/issues/689)
+
 5.2.1
 ==
 

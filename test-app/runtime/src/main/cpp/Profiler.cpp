@@ -15,11 +15,12 @@ void Profiler::Init(Isolate* isolate, const Local<Object>& globalObj, const stri
     m_appName = appName;
     m_outputDir = outputDir;
     auto extData = External::New(isolate, this);
-    globalObj->Set(ArgConverter::ConvertToV8String(isolate, "__startCPUProfiler"), FunctionTemplate::New(isolate, Profiler::StartCPUProfilerCallback, extData)->GetFunction());
-    globalObj->Set(ArgConverter::ConvertToV8String(isolate, "__stopCPUProfiler"), FunctionTemplate::New(isolate, Profiler::StopCPUProfilerCallback, extData)->GetFunction());
-    globalObj->Set(ArgConverter::ConvertToV8String(isolate, "__heapSnapshot"), FunctionTemplate::New(isolate, Profiler::HeapSnapshotMethodCallback, extData)->GetFunction());
-    globalObj->Set(ArgConverter::ConvertToV8String(isolate, "__startNDKProfiler"), FunctionTemplate::New(isolate, Profiler::StartNDKProfilerCallback, extData)->GetFunction());
-    globalObj->Set(ArgConverter::ConvertToV8String(isolate, "__stopNDKProfiler"), FunctionTemplate::New(isolate, Profiler::StopNDKProfilerCallback, extData)->GetFunction());
+    Local<Context> context = isolate->GetCurrentContext();
+    globalObj->Set(ArgConverter::ConvertToV8String(isolate, "__startCPUProfiler"), FunctionTemplate::New(isolate, Profiler::StartCPUProfilerCallback, extData)->GetFunction(context).ToLocalChecked());
+    globalObj->Set(ArgConverter::ConvertToV8String(isolate, "__stopCPUProfiler"), FunctionTemplate::New(isolate, Profiler::StopCPUProfilerCallback, extData)->GetFunction(context).ToLocalChecked());
+    globalObj->Set(ArgConverter::ConvertToV8String(isolate, "__heapSnapshot"), FunctionTemplate::New(isolate, Profiler::HeapSnapshotMethodCallback, extData)->GetFunction(context).ToLocalChecked());
+    globalObj->Set(ArgConverter::ConvertToV8String(isolate, "__startNDKProfiler"), FunctionTemplate::New(isolate, Profiler::StartNDKProfilerCallback, extData)->GetFunction(context).ToLocalChecked());
+    globalObj->Set(ArgConverter::ConvertToV8String(isolate, "__stopNDKProfiler"), FunctionTemplate::New(isolate, Profiler::StopNDKProfilerCallback, extData)->GetFunction(context).ToLocalChecked());
 }
 
 void Profiler::StartCPUProfilerCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {

@@ -155,7 +155,7 @@ class ObjectManager {
 
         void MakeRegularObjectsWeak(const std::set<int>& instances, DirectBuffer& inputBuff);
 
-        void MakeImplObjectsWeak(const std::map<int, v8::Persistent<v8::Object>*>& instances, DirectBuffer& inputBuff);
+        void MakeImplObjectsWeak(const std::unordered_map<int, v8::Persistent<v8::Object>*>& instances, DirectBuffer& inputBuff);
 
         void CheckWeakObjectsAreAlive(const std::vector<PersistentObjectIdPair>& instances, DirectBuffer& inputBuff, DirectBuffer& outputBuff);
 
@@ -201,7 +201,7 @@ class ObjectManager {
 
         std::stack<GarbageCollectionInfo> m_markedForGC;
 
-        std::map<int, v8::Persistent<v8::Object>*> m_idToObject;
+        std::unordered_map<int, v8::Persistent<v8::Object>*> m_idToObject;
 
         PersistentObjectIdSet m_released;
 
@@ -211,7 +211,7 @@ class ObjectManager {
 
         std::set<v8::Persistent<v8::Object>*> m_visitedPOs;
         std::vector<PersistentObjectIdPair> m_implObjWeak;
-        std::map<int, v8::Persistent<v8::Object>*> m_implObjStrong;
+        std::unordered_map<int, v8::Persistent<v8::Object>*> m_implObjStrong;
 
         volatile int m_currentObjectId;
 

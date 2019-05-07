@@ -97,7 +97,7 @@ String16 PageResource::getContent(protocol::String* errorString) {
 }
 
 const char* PageResource::resourceTypeByMimeType(std::string mimeType) {
-    auto result = protocol::Page::ResourceTypeEnum::Document;
+    auto result = protocol::Network::ResourceTypeEnum::Document;
 
     if (!mimeType.empty()) {
         auto it = s_mimeTypeMap.find(mimeType);
@@ -110,18 +110,18 @@ const char* PageResource::resourceTypeByMimeType(std::string mimeType) {
 }
 
 std::map<std::string, const char*> PageResource::s_mimeTypeMap = {
-    { "text/xml", v8_inspector::protocol::Page::ResourceTypeEnum::Document },
-    { "text/plain", v8_inspector::protocol::Page::ResourceTypeEnum::Document },
-    { "application/xml", v8_inspector::protocol::Page::ResourceTypeEnum::Document },
+    { "text/xml", v8_inspector::protocol::Network::ResourceTypeEnum::Document },
+    { "text/plain", v8_inspector::protocol::Network::ResourceTypeEnum::Document },
+    { "application/xml", v8_inspector::protocol::Network::ResourceTypeEnum::Document },
     // text/css mime type is regarded as document so as to display in the Sources tab
-    { "text/css", v8_inspector::protocol::Page::ResourceTypeEnum::Document },
-    { "text/javascript", v8_inspector::protocol::Page::ResourceTypeEnum::Script },
-    { "application/javascript", v8_inspector::protocol::Page::ResourceTypeEnum::Script },
-    { "application/json", v8_inspector::protocol::Page::ResourceTypeEnum::Document },
-    { "text/typescript", v8_inspector::protocol::Page::ResourceTypeEnum::Script },
-    { "image/jpeg", v8_inspector::protocol::Page::ResourceTypeEnum::Image },
-    { "image/png", v8_inspector::protocol::Page::ResourceTypeEnum::Image },
-    { "application/binary", v8_inspector::protocol::Page::ResourceTypeEnum::Other }
+    { "text/css", v8_inspector::protocol::Network::ResourceTypeEnum::Document },
+    { "text/javascript", v8_inspector::protocol::Network::ResourceTypeEnum::Script },
+    { "application/javascript", v8_inspector::protocol::Network::ResourceTypeEnum::Script },
+    { "application/json", v8_inspector::protocol::Network::ResourceTypeEnum::Document },
+    { "text/typescript", v8_inspector::protocol::Network::ResourceTypeEnum::Script },
+    { "image/jpeg", v8_inspector::protocol::Network::ResourceTypeEnum::Image },
+    { "image/png", v8_inspector::protocol::Network::ResourceTypeEnum::Image },
+    { "application/binary", v8_inspector::protocol::Network::ResourceTypeEnum::Other }
 };
 
 std::map<std::string, v8_inspector::utils::PageResource> PageResource::s_cachedPageResources;

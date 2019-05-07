@@ -558,8 +558,9 @@ CallbackHandlers::GetImplementedInterfaces(JEnv& env, const Local<Object>& imple
     }
 
     vector<jstring> interfacesToImplement;
-    auto propNames = implementationObject->GetOwnPropertyNames();
     auto isolate = implementationObject->GetIsolate();
+    auto context = isolate->GetCurrentContext();
+    auto propNames = implementationObject->GetOwnPropertyNames(context).ToLocalChecked();
     for (int i = 0; i < propNames->Length(); i++) {
         auto name = propNames->Get(i).As<String>();
         auto prop = implementationObject->Get(name);
@@ -616,8 +617,9 @@ CallbackHandlers::GetMethodOverrides(JEnv& env, const Local<Object>& implementat
     }
 
     vector<jstring> methodNames;
-    auto propNames = implementationObject->GetOwnPropertyNames();
     auto isolate = implementationObject->GetIsolate();
+    auto context = isolate->GetCurrentContext();
+    auto propNames = implementationObject->GetOwnPropertyNames(context).ToLocalChecked();
     for (int i = 0; i < propNames->Length(); i++) {
         auto name = propNames->Get(i).As<String>();
         auto method = implementationObject->Get(name);
@@ -842,11 +844,13 @@ Local<Value> CallbackHandlers::CallJSMethod(Isolate* isolate, JNIEnv* _env,
             arguments[i] = jsArgs->Get(i);
         }
 
+        auto context = isolate->GetCurrentContext();
+
         TryCatch tc(isolate);
         Local<Value> jsResult;
         {
             SET_PROFILER_FRAME();
-            jsResult = jsMethod->Call(jsObject, argc, argc == 0 ? nullptr : arguments.data());
+            jsMethod->Call(context, jsObject, argc, argc == 0 ? nullptr : arguments.data()).ToLocal(&jsResult);
         }
 
         //TODO: if javaResult is a pure js object create a java object that represents this object in java land
@@ -1043,7 +1047,7 @@ void CallbackHandlers::WorkerGlobalOnMessageCallback(Isolate* isolate, jstring m
 
             auto func = callback.As<Function>();
 
-            func->Call(Undefined(isolate), 1, args1);
+            func->Call(context, Undefined(isolate), 1, args1);
         } else {
             DEBUG_WRITE(
                 "WORKER: WorkerGlobalOnMessageCallback couldn't fire a worker's `onmessage` callback because it isn't implemented!");
@@ -1154,7 +1158,7 @@ CallbackHandlers::WorkerObjectOnMessageCallback(Isolate* isolate, jint workerId,
 
             auto func = callback.As<Function>();
 
-            func->Call(Undefined(isolate), 1, args1);
+            func->Call(context, Undefined(isolate), 1, args1);
         } else {
             DEBUG_WRITE(
                 "MAIN: WorkerObjectOnMessageCallback couldn't fire a worker(id=%d) object's `onmessage` callback because it isn't implemented.",
@@ -1264,7 +1268,7 @@ void CallbackHandlers::WorkerGlobalCloseCallback(const v8::FunctionCallbackInfo<
             auto func = callback.As<Function>();
 
             DEBUG_WRITE("WORKER: WorketThreadCloseCallback onclose handle is being called.");
-            func->Call(Undefined(isolate), 0, args1);
+            func->Call(context, Undefined(isolate), 0, args1);
             DEBUG_WRITE("WORKER: WorketThreadCloseCallback onclose handle was called.");
         }
 
@@ -1309,7 +1313,8 @@ void CallbackHandlers::CallWorkerScopeOnErrorHandle(Isolate* isolate, TryCatch& 
 
             auto func = callback.As<Function>();
 
-            auto result = func->Call(Undefined(isolate), 1, args1);
+            Local<Value> result;
+            func->Call(context, Undefined(isolate), 1, args1).ToLocal(&result);
 
             // return 'true'-like value, don't bubble up to main Worker.onerror
             if (!result.IsEmpty() && result->BooleanValue(context).ToChecked()) {
@@ -1404,9 +1409,11 @@ CallbackHandlers::CallWorkerObjectOnErrorHandle(Isolate* isolate, jint workerId,
 
             auto func = callback.As<Function>();
 
-            // Handle exceptions thrown in onmessage with the worker.onerror handler, if present
-            auto result = func->Call(Undefined(isolate), 1, args1);
             auto context = isolate->GetCurrentContext();
+
+            // Handle exceptions thrown in onmessage with the worker.onerror handler, if present
+            Local<Value> result;
+            func->Call(context, Undefined(isolate), 1, args1).ToLocal(&result);
             if (!result.IsEmpty() && result->BooleanValue(context).ToChecked()) {
                 // Do nothing, exception is handled and does not need to be raised to application level
                 return;

@@ -25,6 +25,21 @@ void MetadataNode::Init(Isolate* isolate) {
     cache->MetadataKey = new Persistent<String>(isolate, key);
 }
 
+Local<ObjectTemplate> MetadataNode::GetOrCreateArrayObjectTemplate(Isolate* isolate) {
+    auto it = s_arrayObjectTemplates.find(isolate);
+    if (it != s_arrayObjectTemplates.end()) {
+        return it->second->Get(isolate);
+    }
+
+    auto arrayObjectTemplate = ObjectTemplate::New(isolate);
+    arrayObjectTemplate->SetInternalFieldCount(static_cast<int>(ObjectManager::MetadataNodeKeys::END));
+    arrayObjectTemplate->SetIndexedPropertyHandler(ArrayIndexedPropertyGetterCallback, ArrayIndexedPropertySetterCallback);
+
+    s_arrayObjectTemplates.emplace(std::make_pair(isolate, new Persistent<ObjectTemplate>(isolate, arrayObjectTemplate)));
+
+    return arrayObjectTemplate;
+}
+
 MetadataNode::MetadataNode(MetadataTreeNode* treeNode) :
     m_treeNode(treeNode) {
     uint8_t nodeType = s_metadataReader.GetNodeType(treeNode);
@@ -195,12 +210,10 @@ Local<Object> MetadataNode::CreateArrayWrapper(Isolate* isolate) {
     auto node = GetOrCreate("java/lang/Object");
     auto ctorFunc = node->GetConstructorFunction(isolate);
 
-    auto arrayObjectTemplate = ObjectTemplate::New(isolate);
-    arrayObjectTemplate->SetInternalFieldCount(static_cast<int>(ObjectManager::MetadataNodeKeys::END));
-    arrayObjectTemplate->SetIndexedPropertyHandler(ArrayIndexedPropertyGetterCallback, ArrayIndexedPropertySetterCallback);
+    auto arrayObjectTemplate = GetOrCreateArrayObjectTemplate(isolate);
 
-    auto arr = arrayObjectTemplate->NewInstance();
     auto context = isolate->GetCurrentContext();
+    auto arr = arrayObjectTemplate->NewInstance(context).ToLocalChecked();
     arr->SetPrototype(context, ctorFunc->Get(V8StringConstants::GetPrototype(isolate)));
     arr->SetAccessor(context, ArgConverter::ConvertToV8String(isolate, "length"), ArrayLengthGetterCallack, nullptr, Local<Value>(), AccessControl::ALL_CAN_READ, PropertyAttribute::DontDelete);
 
@@ -269,7 +282,7 @@ void MetadataNode::NullObjectAccessorGetterCallback(Local<Name> property,const P
             auto funcTemplate = FunctionTemplate::New(isolate, MetadataNode::NullValueOfCallback);
             auto context = isolate->GetCurrentContext();
             thiz->Delete(context, V8StringConstants::GetValueOf(isolate));
-            thiz->Set(V8StringConstants::GetValueOf(isolate), funcTemplate->GetFunction());
+            thiz->Set(V8StringConstants::GetValueOf(isolate), funcTemplate->GetFunction(context).ToLocalChecked());
         }
 
         info.GetReturnValue().Set(thiz);
@@ -441,6 +454,8 @@ vector<MetadataNode::MethodCallbackData*> MetadataNode::SetInstanceMethodsFromSt
     string lastMethodName;
     MethodCallbackData* callbackData = nullptr;
 
+    auto context = isolate->GetCurrentContext();
+
     auto origin = Constants::APP_ROOT_FOLDER_PATH + GetOrCreateInternal(treeNode)->m_name;
     for (auto i = 0; i < instanceMethodCount; i++) {
         auto entry = s_metadataReader.ReadInstanceMethodEntry(&curPtr);
@@ -466,9 +481,9 @@ vector<MetadataNode::MethodCallbackData*> MetadataNode::SetInstanceMethodsFromSt
             auto funcName = ArgConverter::ConvertToV8String(isolate, entry.name);
 
             if (s_profilerEnabled) {
-                auto func = funcTemplate->GetFunction();
+                auto func = funcTemplate->GetFunction(context).ToLocalChecked();
                 Local<Function> wrapperFunc = Wrap(isolate, func, entry.name, origin, false /* isCtorFunc */);
-                Local<Function> ctorFunc = ctorFuncTemplate->GetFunction();
+                Local<Function> ctorFunc = ctorFuncTemplate->GetFunction(context).ToLocalChecked();
                 Local<Object> protoObject = ctorFunc->Get(ArgConverter::ConvertToV8String(isolate, "prototype")).As<Object>();
                 if (!protoObject.IsEmpty() && !protoObject->IsUndefined() && !protoObject->IsNull()) {
                     protoObject->Set(funcName, wrapperFunc);
@@ -632,7 +647,7 @@ void MetadataNode::SetStaticMembers(Isolate* isolate, Local<Function>& ctorFunct
                 callbackData = new MethodCallbackData(this);
                 auto funcData = External::New(isolate, callbackData);
                 auto funcTemplate = FunctionTemplate::New(isolate, MethodCallback, funcData);
-                auto func = funcTemplate->GetFunction();
+                auto func = funcTemplate->GetFunction(context).ToLocalChecked();
                 auto funcName = ArgConverter::ConvertToV8String(isolate, entry.name);
                 ctorFunction->Set(funcName, Wrap(isolate, func, entry.name, origin, false /* isCtorFunc */));
                 lastMethodName = entry.name;
@@ -643,7 +658,7 @@ void MetadataNode::SetStaticMembers(Isolate* isolate, Local<Function>& ctorFunct
         //attach .extend function
         auto extendFuncName = V8StringConstants::GetExtend(isolate);
         auto extendFuncTemplate = FunctionTemplate::New(isolate, ExtendMethodCallback, External::New(isolate, this));
-        ctorFunction->Set(extendFuncName, extendFuncTemplate->GetFunction());
+        ctorFunction->Set(extendFuncName, extendFuncTemplate->GetFunction(context).ToLocalChecked());
 
         //get candidates from static fields metadata
         auto staticFieldCout = *reinterpret_cast<uint16_t*>(curPtr);
@@ -742,7 +757,8 @@ Local<FunctionTemplate> MetadataNode::GetConstructorFunctionTemplate(Isolate* is
         node->SetMissingBaseMethods(isolate, skippedBaseTypes, instanceMethodData, prototypeTemplate);
     }
 
-    auto ctorFunc = ctorFuncTemplate->GetFunction();
+    auto context = isolate->GetCurrentContext();
+    auto ctorFunc = ctorFuncTemplate->GetFunction(context).ToLocalChecked();
 
     auto origin = Constants::APP_ROOT_FOLDER_PATH + node->m_name;
 
@@ -1403,9 +1419,9 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
         auto extendFuncTemplate = FunctionTemplate::New(isolate, ExtendedClassConstructorCallback, extendData);
         extendFuncTemplate->InstanceTemplate()->SetInternalFieldCount(static_cast<int>(ObjectManager::MetadataNodeKeys::END));
 
-        auto extendFunc = extendFuncTemplate->GetFunction();
-        auto prototypeName = V8StringConstants::GetPrototype(isolate);
         auto context = isolate->GetCurrentContext();
+        auto extendFunc = extendFuncTemplate->GetFunction(context).ToLocalChecked();
+        auto prototypeName = V8StringConstants::GetPrototype(isolate);
         implementationObject->SetPrototype(context, baseClassCtorFunc->Get(prototypeName));
         implementationObject->SetAccessor(context, V8StringConstants::GetSuper(isolate), SuperAccessorGetterCallback, nullptr, implementationObject);
 
@@ -1841,7 +1857,8 @@ void MetadataNode::RegisterSymbolHasInstanceCallback(Isolate* isolate, MetadataE
 
     auto extData = External::New(isolate, clazz);
     auto hasInstanceTemplate = FunctionTemplate::New(isolate, MetadataNode::SymbolHasInstanceCallback, extData);
-    auto hasInstanceFunc = hasInstanceTemplate->GetFunction();
+    auto context = isolate->GetCurrentContext();
+    auto hasInstanceFunc = hasInstanceTemplate->GetFunction(context).ToLocalChecked();
     PropertyDescriptor descriptor(hasInstanceFunc, false);
     auto hasInstanceSymbol = Symbol::GetHasInstance(isolate);
     interface->ToObject(isolate)->DefineProperty(isolate->GetCurrentContext(), hasInstanceSymbol, descriptor);
@@ -1904,4 +1921,5 @@ std::map<std::string, MetadataTreeNode*> MetadataNode::s_name2TreeNodeCache;
 std::map<MetadataTreeNode*, MetadataNode*> MetadataNode::s_treeNode2NodeCache;
 map<Isolate*, MetadataNode::MetadataNodeCache*> MetadataNode::s_metadata_node_cache;
 bool MetadataNode::s_profilerEnabled = false;
+std::map<Isolate*, Persistent<ObjectTemplate>*> MetadataNode::s_arrayObjectTemplates;
 

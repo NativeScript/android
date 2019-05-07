@@ -5,10 +5,9 @@
 #ifndef V8_CONVERSIONS_H_
 #define V8_CONVERSIONS_H_
 
-#include <limits>
-
 #include "src/base/logging.h"
-#include "src/utils.h"
+#include "src/globals.h"
+#include "src/vector.h"
 
 namespace v8 {
 namespace internal {
@@ -26,13 +25,9 @@ const int kMaxFractionDigits = 100;
 // If x is NaN, the result is INT_MIN.  Otherwise the result is the argument x,
 // clamped to [INT_MIN, INT_MAX] and then rounded to an integer.
 inline int FastD2IChecked(double x) {
-    if (!(x >= INT_MIN)) {
-        return INT_MIN;    // Negation to catch NaNs.
-    }
-    if (x > INT_MAX) {
-        return INT_MAX;
-    }
-    return static_cast<int>(x);
+  if (!(x >= INT_MIN)) return INT_MIN;  // Negation to catch NaNs.
+  if (x > INT_MAX) return INT_MAX;
+  return static_cast<int>(x);
 }
 
 // The fast double-to-(unsigned-)int conversion routine does not guarantee
@@ -40,27 +35,27 @@ inline int FastD2IChecked(double x) {
 // The result is undefined if x is infinite or NaN, or if the rounded
 // integer value is outside the range of type int.
 inline int FastD2I(double x) {
-    DCHECK(x <= INT_MAX);
-    DCHECK(x >= INT_MIN);
-    return static_cast<int32_t>(x);
+  DCHECK(x <= INT_MAX);
+  DCHECK(x >= INT_MIN);
+  return static_cast<int32_t>(x);
 }
 
 inline unsigned int FastD2UI(double x);
 
 
 inline double FastI2D(int x) {
-    // There is no rounding involved in converting an integer to a
-    // double, so this code should compile to a few instructions without
-    // any FPU pipeline stalls.
-    return static_cast<double>(x);
+  // There is no rounding involved in converting an integer to a
+  // double, so this code should compile to a few instructions without
+  // any FPU pipeline stalls.
+  return static_cast<double>(x);
 }
 
 
 inline double FastUI2D(unsigned x) {
-    // There is no rounding involved in converting an unsigned integer to a
-    // double, so this code should compile to a few instructions without
-    // any FPU pipeline stalls.
-    return static_cast<double>(x);
+  // There is no rounding involved in converting an unsigned integer to a
+  // double, so this code should compile to a few instructions without
+  // any FPU pipeline stalls.
+  return static_cast<double>(x);
 }
 
 
@@ -83,12 +78,12 @@ inline uint32_t DoubleToUint32(double x);
 // Enumeration for allowing octals and ignoring junk when converting
 // strings to numbers.
 enum ConversionFlags {
-    NO_FLAGS = 0,
-    ALLOW_HEX = 1,
-    ALLOW_OCTAL = 2,
-    ALLOW_IMPLICIT_OCTAL = 4,
-    ALLOW_BINARY = 8,
-    ALLOW_TRAILING_JUNK = 16
+  NO_FLAGS = 0,
+  ALLOW_HEX = 1,
+  ALLOW_OCTAL = 2,
+  ALLOW_IMPLICIT_OCTAL = 4,
+  ALLOW_BINARY = 8,
+  ALLOW_TRAILING_JUNK = 16
 };
 
 
@@ -112,7 +107,7 @@ MaybeHandle<BigInt> StringToBigInt(Isolate* isolate, Handle<String> string);
 //   0o -> octal
 //   0b -> binary
 V8_EXPORT_PRIVATE MaybeHandle<BigInt> BigIntLiteral(Isolate* isolate,
-        const char* string);
+                                                    const char* string);
 
 const int kDoubleToCStringMinBufferSize = 100;
 
@@ -120,7 +115,7 @@ const int kDoubleToCStringMinBufferSize = 100;
 // The buffer should be large enough for any floating point number.
 // 100 characters is enough.
 V8_EXPORT_PRIVATE const char* DoubleToCString(double value,
-        Vector<char> buffer);
+                                              Vector<char> buffer);
 
 // Convert an int to a null-terminated string. The returned string is
 // located inside the buffer, but not necessarily at the start.
@@ -134,7 +129,7 @@ char* DoubleToPrecisionCString(double value, int f);
 char* DoubleToRadixCString(double value, int radix);
 
 static inline bool IsMinusZero(double value) {
-    return bit_cast<int64_t>(value) == bit_cast<int64_t>(-0.0);
+  return bit_cast<int64_t>(value) == bit_cast<int64_t>(-0.0);
 }
 
 // Returns true if value can be converted to a SMI, and returns the resulting

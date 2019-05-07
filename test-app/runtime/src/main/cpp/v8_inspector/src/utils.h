@@ -37,138 +37,122 @@ namespace internal {
 // Returns the value (0 .. 15) of a hexadecimal character c.
 // If c is not a legal hexadecimal character, returns a value < 0.
 inline int HexValue(uc32 c) {
-    c -= '0';
-    if (static_cast<unsigned>(c) <= 9) {
-        return c;
-    }
-    c = (c | 0x20) - ('a' - '0');  // detect 0x11..0x16 and 0x31..0x36.
-    if (static_cast<unsigned>(c) <= 5) {
-        return c + 10;
-    }
-    return -1;
+  c -= '0';
+  if (static_cast<unsigned>(c) <= 9) return c;
+  c = (c | 0x20) - ('a' - '0');  // detect 0x11..0x16 and 0x31..0x36.
+  if (static_cast<unsigned>(c) <= 5) return c + 10;
+  return -1;
 }
 
 inline char HexCharOfValue(int value) {
-    DCHECK(0 <= value && value <= 16);
-    if (value < 10) {
-        return value + '0';
-    }
-    return value - 10 + 'A';
+  DCHECK(0 <= value && value <= 16);
+  if (value < 10) return value + '0';
+  return value - 10 + 'A';
 }
 
-inline int BoolToInt(bool b) {
-    return b ? 1 : 0;
-}
-
-// Same as strcmp, but can handle NULL arguments.
-inline bool CStringEquals(const char* s1, const char* s2) {
-    return (s1 == s2) || (s1 != nullptr && s2 != nullptr && strcmp(s1, s2) == 0);
-}
+inline int BoolToInt(bool b) { return b ? 1 : 0; }
 
 // Checks if value is in range [lower_limit, higher_limit] using a single
 // branch.
 template <typename T, typename U>
 inline constexpr bool IsInRange(T value, U lower_limit, U higher_limit) {
 #if V8_CAN_HAVE_DCHECK_IN_CONSTEXPR
-    DCHECK(lower_limit <= higher_limit);
+  DCHECK(lower_limit <= higher_limit);
 #endif
-    STATIC_ASSERT(sizeof(U) <= sizeof(T));
-    typedef typename std::make_unsigned<T>::type unsigned_T;
-    // Use static_cast to support enum classes.
-    return static_cast<unsigned_T>(static_cast<unsigned_T>(value) -
-                                   static_cast<unsigned_T>(lower_limit)) <=
-           static_cast<unsigned_T>(static_cast<unsigned_T>(higher_limit) -
-                                   static_cast<unsigned_T>(lower_limit));
+  STATIC_ASSERT(sizeof(U) <= sizeof(T));
+  typedef typename std::make_unsigned<T>::type unsigned_T;
+  // Use static_cast to support enum classes.
+  return static_cast<unsigned_T>(static_cast<unsigned_T>(value) -
+                                 static_cast<unsigned_T>(lower_limit)) <=
+         static_cast<unsigned_T>(static_cast<unsigned_T>(higher_limit) -
+                                 static_cast<unsigned_T>(lower_limit));
 }
 
 // Checks if [index, index+length) is in range [0, max). Note that this check
 // works even if {index+length} would wrap around.
 inline constexpr bool IsInBounds(size_t index, size_t length, size_t max) {
-    return length <= max && index <= (max - length);
+  return length <= max && index <= (max - length);
 }
 
 // X must be a power of 2.  Returns the number of trailing zeros.
 template <typename T,
           typename = typename std::enable_if<std::is_integral<T>::value>::type>
 inline int WhichPowerOf2(T x) {
-    DCHECK(base::bits::IsPowerOfTwo(x));
-    int bits = 0;
+  DCHECK(base::bits::IsPowerOfTwo(x));
+  int bits = 0;
 #ifdef DEBUG
-    const T original_x = x;
+  const T original_x = x;
 #endif
-    constexpr int max_bits = sizeof(T) * 8;
-    static_assert(max_bits <= 64, "integral types are not bigger than 64 bits");
+  constexpr int max_bits = sizeof(T) * 8;
+  static_assert(max_bits <= 64, "integral types are not bigger than 64 bits");
 // Avoid shifting by more than the bit width of x to avoid compiler warnings.
 #define CHECK_BIGGER(s)                                      \
   if (max_bits > s && x >= T{1} << (max_bits > s ? s : 0)) { \
     bits += s;                                               \
     x >>= max_bits > s ? s : 0;                              \
   }
-    CHECK_BIGGER(32)
-    CHECK_BIGGER(16)
-    CHECK_BIGGER(8)
-    CHECK_BIGGER(4)
+  CHECK_BIGGER(32)
+  CHECK_BIGGER(16)
+  CHECK_BIGGER(8)
+  CHECK_BIGGER(4)
 #undef CHECK_BIGGER
-    switch (x) {
-    default:
-        UNREACHABLE();
+  switch (x) {
+    default: UNREACHABLE();
     case 8:
-        bits++;
-        V8_FALLTHROUGH;
+      bits++;
+      V8_FALLTHROUGH;
     case 4:
-        bits++;
-        V8_FALLTHROUGH;
+      bits++;
+      V8_FALLTHROUGH;
     case 2:
-        bits++;
-        V8_FALLTHROUGH;
-    case 1:
-        break;
-    }
-    DCHECK_EQ(T{1} << bits, original_x);
-    return bits;
+      bits++;
+      V8_FALLTHROUGH;
+    case 1: break;
+  }
+  DCHECK_EQ(T{1} << bits, original_x);
+  return bits;
 }
 
 inline int MostSignificantBit(uint32_t x) {
-    static const int msb4[] = {0, 1, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4};
-    int nibble = 0;
-    if (x & 0xffff0000) {
-        nibble += 16;
-        x >>= 16;
-    }
-    if (x & 0xff00) {
-        nibble += 8;
-        x >>= 8;
-    }
-    if (x & 0xf0) {
-        nibble += 4;
-        x >>= 4;
-    }
-    return nibble + msb4[x];
+  static const int msb4[] = {0, 1, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4};
+  int nibble = 0;
+  if (x & 0xffff0000) {
+    nibble += 16;
+    x >>= 16;
+  }
+  if (x & 0xff00) {
+    nibble += 8;
+    x >>= 8;
+  }
+  if (x & 0xf0) {
+    nibble += 4;
+    x >>= 4;
+  }
+  return nibble + msb4[x];
 }
 
 template <typename T>
 static T ArithmeticShiftRight(T x, int shift) {
-    DCHECK_LE(0, shift);
-    if (x < 0) {
-        // Right shift of signed values is implementation defined. Simulate a
-        // true arithmetic right shift by adding leading sign bits.
-        using UnsignedT = typename std::make_unsigned<T>::type;
-        UnsignedT mask = ~(static_cast<UnsignedT>(~0) >> shift);
-        return (static_cast<UnsignedT>(x) >> shift) | mask;
-    } else {
-        return x >> shift;
-    }
+  DCHECK_LE(0, shift);
+  if (x < 0) {
+    // Right shift of signed values is implementation defined. Simulate a
+    // true arithmetic right shift by adding leading sign bits.
+    using UnsignedT = typename std::make_unsigned<T>::type;
+    UnsignedT mask = ~(static_cast<UnsignedT>(~0) >> shift);
+    return (static_cast<UnsignedT>(x) >> shift) | mask;
+  } else {
+    return x >> shift;
+  }
 }
 
 template <typename T>
 int Compare(const T& a, const T& b) {
-    if (a == b) {
-        return 0;
-    } else if (a < b) {
-        return -1;
-    } else {
-        return 1;
-    }
+  if (a == b)
+    return 0;
+  else if (a < b)
+    return -1;
+  else
+    return 1;
 }
 
 // Compare function to compare the object pointer value of two
@@ -177,180 +161,125 @@ int Compare(const T& a, const T& b) {
 template<typename T> class Handle;  // Forward declaration.
 template <typename T>
 int HandleObjectPointerCompare(const Handle<T>* a, const Handle<T>* b) {
-    return Compare<T*>(*(*a), *(*b));
+  return Compare<T*>(*(*a), *(*b));
 }
 
 // Returns the maximum of the two parameters.
 template <typename T>
 constexpr T Max(T a, T b) {
-    return a < b ? b : a;
+  return a < b ? b : a;
 }
 
 
 // Returns the minimum of the two parameters.
 template <typename T>
 constexpr T Min(T a, T b) {
-    return a < b ? a : b;
+  return a < b ? a : b;
 }
 
 // Returns the maximum of the two parameters according to JavaScript semantics.
 template <typename T>
 T JSMax(T x, T y) {
-    if (std::isnan(x)) {
-        return x;
-    }
-    if (std::isnan(y)) {
-        return y;
-    }
-    if (std::signbit(x) < std::signbit(y)) {
-        return x;
-    }
-    return x > y ? x : y;
+  if (std::isnan(x)) return x;
+  if (std::isnan(y)) return y;
+  if (std::signbit(x) < std::signbit(y)) return x;
+  return x > y ? x : y;
 }
 
 // Returns the maximum of the two parameters according to JavaScript semantics.
 template <typename T>
 T JSMin(T x, T y) {
-    if (std::isnan(x)) {
-        return x;
-    }
-    if (std::isnan(y)) {
-        return y;
-    }
-    if (std::signbit(x) < std::signbit(y)) {
-        return y;
-    }
-    return x > y ? y : x;
+  if (std::isnan(x)) return x;
+  if (std::isnan(y)) return y;
+  if (std::signbit(x) < std::signbit(y)) return y;
+  return x > y ? y : x;
 }
 
 // Returns the absolute value of its argument.
 template <typename T,
           typename = typename std::enable_if<std::is_signed<T>::value>::type>
 typename std::make_unsigned<T>::type Abs(T a) {
-    // This is a branch-free implementation of the absolute value function and is
-    // described in Warren's "Hacker's Delight", chapter 2. It avoids undefined
-    // behavior with the arithmetic negation operation on signed values as well.
-    typedef typename std::make_unsigned<T>::type unsignedT;
-    unsignedT x = static_cast<unsignedT>(a);
-    unsignedT y = static_cast<unsignedT>(a >> (sizeof(T) * 8 - 1));
-    return (x ^ y) - y;
+  // This is a branch-free implementation of the absolute value function and is
+  // described in Warren's "Hacker's Delight", chapter 2. It avoids undefined
+  // behavior with the arithmetic negation operation on signed values as well.
+  typedef typename std::make_unsigned<T>::type unsignedT;
+  unsignedT x = static_cast<unsignedT>(a);
+  unsignedT y = static_cast<unsignedT>(a >> (sizeof(T) * 8 - 1));
+  return (x ^ y) - y;
 }
 
 // Returns the negative absolute value of its argument.
 template <typename T,
           typename = typename std::enable_if<std::is_signed<T>::value>::type>
 T Nabs(T a) {
-    return a < 0 ? a : -a;
-}
-
-// Floor(-0.0) == 0.0
-inline double Floor(double x) {
-#if V8_CC_MSVC
-    if (x == 0) {
-        return x;    // Fix for issue 3477.
-    }
-#endif
-    return std::floor(x);
+  return a < 0 ? a : -a;
 }
 
 inline double Modulo(double x, double y) {
 #if defined(V8_OS_WIN)
-    // Workaround MS fmod bugs. ECMA-262 says:
-    // dividend is finite and divisor is an infinity => result equals dividend
-    // dividend is a zero and divisor is nonzero finite => result equals dividend
-    if (!(std::isfinite(x) && (!std::isfinite(y) && !std::isnan(y))) &&
-            !(x == 0 && (y != 0 && std::isfinite(y)))) {
-        double result = fmod(x, y);
-        // Workaround MS bug in VS CRT in some OS versions, https://crbug.com/915045
-        // fmod(-17, +/-1) should equal -0.0 but now returns 0.0.
-        if (x < 0 && result == 0) {
-            result = -0.0;
-        }
-        x = result;
-    }
-    return x;
+  // Workaround MS fmod bugs. ECMA-262 says:
+  // dividend is finite and divisor is an infinity => result equals dividend
+  // dividend is a zero and divisor is nonzero finite => result equals dividend
+  if (!(std::isfinite(x) && (!std::isfinite(y) && !std::isnan(y))) &&
+      !(x == 0 && (y != 0 && std::isfinite(y)))) {
+    double result = fmod(x, y);
+    // Workaround MS bug in VS CRT in some OS versions, https://crbug.com/915045
+    // fmod(-17, +/-1) should equal -0.0 but now returns 0.0.
+    if (x < 0 && result == 0) result = -0.0;
+    x = result;
+  }
+  return x;
 #elif defined(V8_OS_AIX)
-    // AIX raises an underflow exception for (Number.MIN_VALUE % Number.MAX_VALUE)
-    feclearexcept(FE_ALL_EXCEPT);
-    double result = std::fmod(x, y);
-    int exception = fetestexcept(FE_UNDERFLOW);
-    return (exception ? x : result);
+  // AIX raises an underflow exception for (Number.MIN_VALUE % Number.MAX_VALUE)
+  feclearexcept(FE_ALL_EXCEPT);
+  double result = std::fmod(x, y);
+  int exception = fetestexcept(FE_UNDERFLOW);
+  return (exception ? x : result);
 #else
-    return std::fmod(x, y);
+  return std::fmod(x, y);
 #endif
-}
-
-inline double Pow(double x, double y) {
-    if (y == 0.0) {
-        return 1.0;
-    }
-    if (std::isnan(y) || ((x == 1 || x == -1) && std::isinf(y))) {
-        return std::numeric_limits<double>::quiet_NaN();
-    }
-#if (defined(__MINGW64_VERSION_MAJOR) &&                              \
-     (!defined(__MINGW64_VERSION_RC) || __MINGW64_VERSION_RC < 1)) || \
-    defined(V8_OS_AIX)
-    // MinGW64 and AIX have a custom implementation for pow.  This handles certain
-    // special cases that are different.
-    if ((x == 0.0 || std::isinf(x)) && y != 0.0 && std::isfinite(y)) {
-        double f;
-        double result = ((x == 0.0) ^ (y > 0)) ? V8_INFINITY : 0;
-        /* retain sign if odd integer exponent */
-        return ((std::modf(y, &f) == 0.0) && (static_cast<int64_t>(y) & 1))
-               ? copysign(result, x)
-               : result;
-    }
-
-    if (x == 2.0) {
-        int y_int = static_cast<int>(y);
-        if (y == y_int) {
-            return std::ldexp(1.0, y_int);
-        }
-    }
-#endif
-    return std::pow(x, y);
 }
 
 template <typename T>
 T SaturateAdd(T a, T b) {
-    if (std::is_signed<T>::value) {
-        if (a > 0 && b > 0) {
-            if (a > std::numeric_limits<T>::max() - b) {
-                return std::numeric_limits<T>::max();
-            }
-        } else if (a < 0 && b < 0) {
-            if (a < std::numeric_limits<T>::min() - b) {
-                return std::numeric_limits<T>::min();
-            }
-        }
-    } else {
-        CHECK(std::is_unsigned<T>::value);
-        if (a > std::numeric_limits<T>::max() - b) {
-            return std::numeric_limits<T>::max();
-        }
+  if (std::is_signed<T>::value) {
+    if (a > 0 && b > 0) {
+      if (a > std::numeric_limits<T>::max() - b) {
+        return std::numeric_limits<T>::max();
+      }
+    } else if (a < 0 && b < 0) {
+      if (a < std::numeric_limits<T>::min() - b) {
+        return std::numeric_limits<T>::min();
+      }
     }
-    return a + b;
+  } else {
+    CHECK(std::is_unsigned<T>::value);
+    if (a > std::numeric_limits<T>::max() - b) {
+      return std::numeric_limits<T>::max();
+    }
+  }
+  return a + b;
 }
 
 template <typename T>
 T SaturateSub(T a, T b) {
-    if (std::is_signed<T>::value) {
-        if (a >= 0 && b < 0) {
-            if (a > std::numeric_limits<T>::max() + b) {
-                return std::numeric_limits<T>::max();
-            }
-        } else if (a < 0 && b > 0) {
-            if (a < std::numeric_limits<T>::min() + b) {
-                return std::numeric_limits<T>::min();
-            }
-        }
-    } else {
-        CHECK(std::is_unsigned<T>::value);
-        if (a < b) {
-            return static_cast<T>(0);
-        }
+  if (std::is_signed<T>::value) {
+    if (a >= 0 && b < 0) {
+      if (a > std::numeric_limits<T>::max() + b) {
+        return std::numeric_limits<T>::max();
+      }
+    } else if (a < 0 && b > 0) {
+      if (a < std::numeric_limits<T>::min() + b) {
+        return std::numeric_limits<T>::min();
+      }
     }
-    return a - b;
+  } else {
+    CHECK(std::is_unsigned<T>::value);
+    if (a < b) {
+      return static_cast<T>(0);
+    }
+  }
+  return a - b;
 }
 
 // ----------------------------------------------------------------------------
@@ -359,46 +288,46 @@ T SaturateSub(T a, T b) {
 
 template<class T, int shift, int size, class U>
 class BitFieldBase {
-    public:
-        typedef T FieldType;
+ public:
+  typedef T FieldType;
 
-        // A type U mask of bit field.  To use all bits of a type U of x bits
-        // in a bitfield without compiler warnings we have to compute 2^x
-        // without using a shift count of x in the computation.
-        static const U kOne = static_cast<U>(1U);
-        static const U kMask = ((kOne << shift) << size) - (kOne << shift);
-        static const U kShift = shift;
-        static const U kSize = size;
-        static const U kNext = kShift + kSize;
-        static const U kNumValues = kOne << size;
+  // A type U mask of bit field.  To use all bits of a type U of x bits
+  // in a bitfield without compiler warnings we have to compute 2^x
+  // without using a shift count of x in the computation.
+  static const U kOne = static_cast<U>(1U);
+  static const U kMask = ((kOne << shift) << size) - (kOne << shift);
+  static const U kShift = shift;
+  static const U kSize = size;
+  static const U kNext = kShift + kSize;
+  static const U kNumValues = kOne << size;
 
-        // Value for the field with all bits set.
-        static const T kMax = static_cast<T>(kNumValues - 1);
+  // Value for the field with all bits set.
+  static const T kMax = static_cast<T>(kNumValues - 1);
 
-        // Tells whether the provided value fits into the bit field.
-        static constexpr bool is_valid(T value) {
-            return (static_cast<U>(value) & ~static_cast<U>(kMax)) == 0;
-        }
+  // Tells whether the provided value fits into the bit field.
+  static constexpr bool is_valid(T value) {
+    return (static_cast<U>(value) & ~static_cast<U>(kMax)) == 0;
+  }
 
-        // Returns a type U with the bit field value encoded.
-        static constexpr U encode(T value) {
+  // Returns a type U with the bit field value encoded.
+  static constexpr U encode(T value) {
 #if V8_CAN_HAVE_DCHECK_IN_CONSTEXPR
-            DCHECK(is_valid(value));
+    DCHECK(is_valid(value));
 #endif
-            return static_cast<U>(value) << shift;
-        }
+    return static_cast<U>(value) << shift;
+  }
 
-        // Returns a type U with the bit field value updated.
-        static constexpr U update(U previous, T value) {
-            return (previous & ~kMask) | encode(value);
-        }
+  // Returns a type U with the bit field value updated.
+  static constexpr U update(U previous, T value) {
+    return (previous & ~kMask) | encode(value);
+  }
 
-        // Extracts the bit field from the value.
-        static constexpr T decode(U value) {
-            return static_cast<T>((value & kMask) >> shift);
-        }
+  // Extracts the bit field from the value.
+  static constexpr T decode(U value) {
+    return static_cast<T>((value & kMask) >> shift);
+  }
 
-        STATIC_ASSERT((kNext - 1) / 8 < sizeof(U));
+  STATIC_ASSERT((kNext - 1) / 8 < sizeof(U));
 };
 
 template <class T, int shift, int size>
@@ -461,38 +390,34 @@ class BitField64 : public BitFieldBase<T, shift, size, uint64_t> { };
 //
 template <class T, int kBitsPerItem, int kBitsPerWord, class U>
 class BitSetComputer {
-    public:
-        static const int kItemsPerWord = kBitsPerWord / kBitsPerItem;
-        static const int kMask = (1 << kBitsPerItem) - 1;
+ public:
+  static const int kItemsPerWord = kBitsPerWord / kBitsPerItem;
+  static const int kMask = (1 << kBitsPerItem) - 1;
 
-        // The number of array elements required to embed T information for each item.
-        static int word_count(int items) {
-            if (items == 0) {
-                return 0;
-            }
-            return (items - 1) / kItemsPerWord + 1;
-        }
+  // The number of array elements required to embed T information for each item.
+  static int word_count(int items) {
+    if (items == 0) return 0;
+    return (items - 1) / kItemsPerWord + 1;
+  }
 
-        // The array index to look at for item.
-        static int index(int base_index, int item) {
-            return base_index + item / kItemsPerWord;
-        }
+  // The array index to look at for item.
+  static int index(int base_index, int item) {
+    return base_index + item / kItemsPerWord;
+  }
 
-        // Extract T data for a given item from data.
-        static T decode(U data, int item) {
-            return static_cast<T>((data >> shift(item)) & kMask);
-        }
+  // Extract T data for a given item from data.
+  static T decode(U data, int item) {
+    return static_cast<T>((data >> shift(item)) & kMask);
+  }
 
-        // Return the encoding for a store of value for item in previous.
-        static U encode(U previous, int item, T value) {
-            int shift_value = shift(item);
-            int set_bits = (static_cast<int>(value) << shift_value);
-            return (previous & ~(kMask << shift_value)) | set_bits;
-        }
+  // Return the encoding for a store of value for item in previous.
+  static U encode(U previous, int item, T value) {
+    int shift_value = shift(item);
+    int set_bits = (static_cast<int>(value) << shift_value);
+    return (previous & ~(kMask << shift_value)) | set_bits;
+  }
 
-        static int shift(int item) {
-            return (item % kItemsPerWord) * kBitsPerItem;
-        }
+  static int shift(int item) { return (item % kItemsPerWord) * kBitsPerItem; }
 };
 
 // Helper macros for defining a contiguous sequence of field offset constants.
@@ -527,42 +452,42 @@ static const uint64_t kZeroHashSeed = 0;
 // Thomas Wang, Integer Hash Functions.
 // http://www.concentric.net/~Ttwang/tech/inthash.htm`
 inline uint32_t ComputeUnseededHash(uint32_t key) {
-    uint32_t hash = key;
-    hash = ~hash + (hash << 15);  // hash = (hash << 15) - hash - 1;
-    hash = hash ^ (hash >> 12);
-    hash = hash + (hash << 2);
-    hash = hash ^ (hash >> 4);
-    hash = hash * 2057;  // hash = (hash + (hash << 3)) + (hash << 11);
-    hash = hash ^ (hash >> 16);
-    return hash & 0x3fffffff;
+  uint32_t hash = key;
+  hash = ~hash + (hash << 15);  // hash = (hash << 15) - hash - 1;
+  hash = hash ^ (hash >> 12);
+  hash = hash + (hash << 2);
+  hash = hash ^ (hash >> 4);
+  hash = hash * 2057;  // hash = (hash + (hash << 3)) + (hash << 11);
+  hash = hash ^ (hash >> 16);
+  return hash & 0x3fffffff;
 }
 
 inline uint32_t ComputeLongHash(uint64_t key) {
-    uint64_t hash = key;
-    hash = ~hash + (hash << 18);  // hash = (hash << 18) - hash - 1;
-    hash = hash ^ (hash >> 31);
-    hash = hash * 21;  // hash = (hash + (hash << 2)) + (hash << 4);
-    hash = hash ^ (hash >> 11);
-    hash = hash + (hash << 6);
-    hash = hash ^ (hash >> 22);
-    return static_cast<uint32_t>(hash & 0x3fffffff);
+  uint64_t hash = key;
+  hash = ~hash + (hash << 18);  // hash = (hash << 18) - hash - 1;
+  hash = hash ^ (hash >> 31);
+  hash = hash * 21;  // hash = (hash + (hash << 2)) + (hash << 4);
+  hash = hash ^ (hash >> 11);
+  hash = hash + (hash << 6);
+  hash = hash ^ (hash >> 22);
+  return static_cast<uint32_t>(hash & 0x3fffffff);
 }
 
 inline uint32_t ComputeSeededHash(uint32_t key, uint64_t seed) {
 #ifdef V8_USE_SIPHASH
-    return halfsiphash(key, seed);
+  return halfsiphash(key, seed);
 #else
-    return ComputeLongHash(static_cast<uint64_t>(key) ^ seed);
+  return ComputeLongHash(static_cast<uint64_t>(key) ^ seed);
 #endif  // V8_USE_SIPHASH
 }
 
 inline uint32_t ComputePointerHash(void* ptr) {
-    return ComputeUnseededHash(
-               static_cast<uint32_t>(reinterpret_cast<intptr_t>(ptr)));
+  return ComputeUnseededHash(
+      static_cast<uint32_t>(reinterpret_cast<intptr_t>(ptr)));
 }
 
 inline uint32_t ComputeAddressHash(Address address) {
-    return ComputeUnseededHash(static_cast<uint32_t>(address & 0xFFFFFFFFul));
+  return ComputeUnseededHash(static_cast<uint32_t>(address & 0xFFFFFFFFul));
 }
 
 // ----------------------------------------------------------------------------
@@ -582,213 +507,162 @@ static const int kInt64UpperHalfMemoryOffset = 0;
 // the instance will cause an error.
 template <typename T>
 class StaticResource {
-    public:
-        StaticResource() : is_reserved_(false)  {}
+ public:
+  StaticResource() : is_reserved_(false)  {}
 
-    private:
-        template <typename S> friend class Access;
-        T instance_;
-        bool is_reserved_;
+ private:
+  template <typename S> friend class Access;
+  T instance_;
+  bool is_reserved_;
 };
 
 
 // Locally scoped access to a static resource.
 template <typename T>
 class Access {
-    public:
-        explicit Access(StaticResource<T>* resource)
-            : resource_(resource)
-            , instance_(&resource->instance_) {
-            DCHECK(!resource->is_reserved_);
-            resource->is_reserved_ = true;
-        }
+ public:
+  explicit Access(StaticResource<T>* resource)
+    : resource_(resource)
+    , instance_(&resource->instance_) {
+    DCHECK(!resource->is_reserved_);
+    resource->is_reserved_ = true;
+  }
 
-        ~Access() {
-            resource_->is_reserved_ = false;
-            resource_ = nullptr;
-            instance_ = nullptr;
-        }
+  ~Access() {
+    resource_->is_reserved_ = false;
+    resource_ = nullptr;
+    instance_ = nullptr;
+  }
 
-        T* value()  {
-            return instance_;
-        }
-        T* operator -> ()  {
-            return instance_;
-        }
+  T* value()  { return instance_; }
+  T* operator -> ()  { return instance_; }
 
-    private:
-        StaticResource<T>* resource_;
-        T* instance_;
+ private:
+  StaticResource<T>* resource_;
+  T* instance_;
 };
 
 // A pointer that can only be set once and doesn't allow NULL values.
 template<typename T>
 class SetOncePointer {
-    public:
-        SetOncePointer() = default;
+ public:
+  SetOncePointer() = default;
 
-        bool is_set() const {
-            return pointer_ != nullptr;
-        }
+  bool is_set() const { return pointer_ != nullptr; }
 
-        T* get() const {
-            DCHECK_NOT_NULL(pointer_);
-            return pointer_;
-        }
+  T* get() const {
+    DCHECK_NOT_NULL(pointer_);
+    return pointer_;
+  }
 
-        void set(T* value) {
-            DCHECK(pointer_ == nullptr && value != nullptr);
-            pointer_ = value;
-        }
+  void set(T* value) {
+    DCHECK(pointer_ == nullptr && value != nullptr);
+    pointer_ = value;
+  }
 
-        T* operator=(T* value) {
-            set(value);
-            return value;
-        }
+  T* operator=(T* value) {
+    set(value);
+    return value;
+  }
 
-        bool operator==(std::nullptr_t) const {
-            return pointer_ == nullptr;
-        }
-        bool operator!=(std::nullptr_t) const {
-            return pointer_ != nullptr;
-        }
+  bool operator==(std::nullptr_t) const { return pointer_ == nullptr; }
+  bool operator!=(std::nullptr_t) const { return pointer_ != nullptr; }
 
-    private:
-        T* pointer_ = nullptr;
-};
-
-
-template <typename T, int kSize>
-class EmbeddedVector : public Vector<T> {
-    public:
-        EmbeddedVector() : Vector<T>(buffer_, kSize) { }
-
-        explicit EmbeddedVector(T initial_value) : Vector<T>(buffer_, kSize) {
-            for (int i = 0; i < kSize; ++i) {
-                buffer_[i] = initial_value;
-            }
-        }
-
-        // When copying, make underlying Vector to reference our buffer.
-    EmbeddedVector(const EmbeddedVector& rhs) V8_NOEXCEPT :
-        Vector<T>(rhs) {
-            MemCopy(buffer_, rhs.buffer_, sizeof(T) * kSize);
-            this->set_start(buffer_);
-        }
-
-        EmbeddedVector& operator=(const EmbeddedVector& rhs) V8_NOEXCEPT {
-            if (this == &rhs) {
-                return *this;
-            }
-            Vector<T>::operator=(rhs);
-            MemCopy(buffer_, rhs.buffer_, sizeof(T) * kSize);
-            this->set_start(buffer_);
-            return *this;
-        }
-
-    private:
-        T buffer_[kSize];
+ private:
+  T* pointer_ = nullptr;
 };
 
 // Compare 8bit/16bit chars to 8bit/16bit chars.
 template <typename lchar, typename rchar>
 inline int CompareCharsUnsigned(const lchar* lhs, const rchar* rhs,
                                 size_t chars) {
-    const lchar* limit = lhs + chars;
-    if (sizeof(*lhs) == sizeof(char) && sizeof(*rhs) == sizeof(char)) {
-        // memcmp compares byte-by-byte, yielding wrong results for two-byte
-        // strings on little-endian systems.
-        return memcmp(lhs, rhs, chars);
-    }
-    while (lhs < limit) {
-        int r = static_cast<int>(*lhs) - static_cast<int>(*rhs);
-        if (r != 0) {
-            return r;
-        }
-        ++lhs;
-        ++rhs;
-    }
-    return 0;
+  const lchar* limit = lhs + chars;
+  if (sizeof(*lhs) == sizeof(char) && sizeof(*rhs) == sizeof(char)) {
+    // memcmp compares byte-by-byte, yielding wrong results for two-byte
+    // strings on little-endian systems.
+    return memcmp(lhs, rhs, chars);
+  }
+  while (lhs < limit) {
+    int r = static_cast<int>(*lhs) - static_cast<int>(*rhs);
+    if (r != 0) return r;
+    ++lhs;
+    ++rhs;
+  }
+  return 0;
 }
 
 template <typename lchar, typename rchar>
 inline int CompareChars(const lchar* lhs, const rchar* rhs, size_t chars) {
-    DCHECK_LE(sizeof(lchar), 2);
-    DCHECK_LE(sizeof(rchar), 2);
-    if (sizeof(lchar) == 1) {
-        if (sizeof(rchar) == 1) {
-            return CompareCharsUnsigned(reinterpret_cast<const uint8_t*>(lhs),
-                                        reinterpret_cast<const uint8_t*>(rhs),
-                                        chars);
-        } else {
-            return CompareCharsUnsigned(reinterpret_cast<const uint8_t*>(lhs),
-                                        reinterpret_cast<const uint16_t*>(rhs),
-                                        chars);
-        }
+  DCHECK_LE(sizeof(lchar), 2);
+  DCHECK_LE(sizeof(rchar), 2);
+  if (sizeof(lchar) == 1) {
+    if (sizeof(rchar) == 1) {
+      return CompareCharsUnsigned(reinterpret_cast<const uint8_t*>(lhs),
+                                  reinterpret_cast<const uint8_t*>(rhs),
+                                  chars);
     } else {
-        if (sizeof(rchar) == 1) {
-            return CompareCharsUnsigned(reinterpret_cast<const uint16_t*>(lhs),
-                                        reinterpret_cast<const uint8_t*>(rhs),
-                                        chars);
-        } else {
-            return CompareCharsUnsigned(reinterpret_cast<const uint16_t*>(lhs),
-                                        reinterpret_cast<const uint16_t*>(rhs),
-                                        chars);
-        }
+      return CompareCharsUnsigned(reinterpret_cast<const uint8_t*>(lhs),
+                                  reinterpret_cast<const uint16_t*>(rhs),
+                                  chars);
     }
+  } else {
+    if (sizeof(rchar) == 1) {
+      return CompareCharsUnsigned(reinterpret_cast<const uint16_t*>(lhs),
+                                  reinterpret_cast<const uint8_t*>(rhs),
+                                  chars);
+    } else {
+      return CompareCharsUnsigned(reinterpret_cast<const uint16_t*>(lhs),
+                                  reinterpret_cast<const uint16_t*>(rhs),
+                                  chars);
+    }
+  }
 }
 
 
 // Calculate 10^exponent.
 inline int TenToThe(int exponent) {
-    DCHECK_LE(exponent, 9);
-    DCHECK_GE(exponent, 1);
-    int answer = 10;
-    for (int i = 1; i < exponent; i++) {
-        answer *= 10;
-    }
-    return answer;
+  DCHECK_LE(exponent, 9);
+  DCHECK_GE(exponent, 1);
+  int answer = 10;
+  for (int i = 1; i < exponent; i++) answer *= 10;
+  return answer;
 }
 
 
 template<typename ElementType, int NumElements>
 class EmbeddedContainer {
-    public:
-        EmbeddedContainer() : elems_() { }
+ public:
+  EmbeddedContainer() : elems_() { }
 
-        int length() const {
-            return NumElements;
-        }
-        const ElementType& operator[](int i) const {
-            DCHECK(i < length());
-            return elems_[i];
-        }
-        ElementType& operator[](int i) {
-            DCHECK(i < length());
-            return elems_[i];
-        }
+  int length() const { return NumElements; }
+  const ElementType& operator[](int i) const {
+    DCHECK(i < length());
+    return elems_[i];
+  }
+  ElementType& operator[](int i) {
+    DCHECK(i < length());
+    return elems_[i];
+  }
 
-    private:
-        ElementType elems_[NumElements];
+ private:
+  ElementType elems_[NumElements];
 };
 
 
 template<typename ElementType>
 class EmbeddedContainer<ElementType, 0> {
-    public:
-        int length() const {
-            return 0;
-        }
-        const ElementType& operator[](int i) const {
-            UNREACHABLE();
-            static ElementType t = 0;
-            return t;
-        }
-        ElementType& operator[](int i) {
-            UNREACHABLE();
-            static ElementType t = 0;
-            return t;
-        }
+ public:
+  int length() const { return 0; }
+  const ElementType& operator[](int i) const {
+    UNREACHABLE();
+    static ElementType t = 0;
+    return t;
+  }
+  ElementType& operator[](int i) {
+    UNREACHABLE();
+    static ElementType t = 0;
+    return t;
+  }
 };
 
 
@@ -797,109 +671,99 @@ class EmbeddedContainer<ElementType, 0> {
 // buffer bounds on all operations in debug mode.
 // This simple base class does not allow formatted output.
 class SimpleStringBuilder {
-    public:
-        // Create a string builder with a buffer of the given size. The
-        // buffer is allocated through NewArray<char> and must be
-        // deallocated by the caller of Finalize().
-        explicit SimpleStringBuilder(int size);
+ public:
+  // Create a string builder with a buffer of the given size. The
+  // buffer is allocated through NewArray<char> and must be
+  // deallocated by the caller of Finalize().
+  explicit SimpleStringBuilder(int size);
 
-        SimpleStringBuilder(char* buffer, int size)
-            : buffer_(buffer, size), position_(0) { }
+  SimpleStringBuilder(char* buffer, int size)
+      : buffer_(buffer, size), position_(0) { }
 
-        ~SimpleStringBuilder() {
-            if (!is_finalized()) {
-                Finalize();
-            }
-        }
+  ~SimpleStringBuilder() { if (!is_finalized()) Finalize(); }
 
-        int size() const {
-            return buffer_.length();
-        }
+  int size() const { return buffer_.length(); }
 
-        // Get the current position in the builder.
-        int position() const {
-            DCHECK(!is_finalized());
-            return position_;
-        }
+  // Get the current position in the builder.
+  int position() const {
+    DCHECK(!is_finalized());
+    return position_;
+  }
 
-        // Reset the position.
-        void Reset() {
-            position_ = 0;
-        }
+  // Reset the position.
+  void Reset() { position_ = 0; }
 
-        // Add a single character to the builder. It is not allowed to add
-        // 0-characters; use the Finalize() method to terminate the string
-        // instead.
-        void AddCharacter(char c) {
-            DCHECK_NE(c, '\0');
-            DCHECK(!is_finalized() && position_ < buffer_.length());
-            buffer_[position_++] = c;
-        }
+  // Add a single character to the builder. It is not allowed to add
+  // 0-characters; use the Finalize() method to terminate the string
+  // instead.
+  void AddCharacter(char c) {
+    DCHECK_NE(c, '\0');
+    DCHECK(!is_finalized() && position_ < buffer_.length());
+    buffer_[position_++] = c;
+  }
 
-        // Add an entire string to the builder. Uses strlen() internally to
-        // compute the length of the input string.
-        void AddString(const char* s);
+  // Add an entire string to the builder. Uses strlen() internally to
+  // compute the length of the input string.
+  void AddString(const char* s);
 
-        // Add the first 'n' characters of the given 0-terminated string 's' to the
-        // builder. The input string must have enough characters.
-        void AddSubstring(const char* s, int n);
+  // Add the first 'n' characters of the given 0-terminated string 's' to the
+  // builder. The input string must have enough characters.
+  void AddSubstring(const char* s, int n);
 
-        // Add character padding to the builder. If count is non-positive,
-        // nothing is added to the builder.
-        void AddPadding(char c, int count);
+  // Add character padding to the builder. If count is non-positive,
+  // nothing is added to the builder.
+  void AddPadding(char c, int count);
 
-        // Add the decimal representation of the value.
-        void AddDecimalInteger(int value);
+  // Add the decimal representation of the value.
+  void AddDecimalInteger(int value);
 
-        // Finalize the string by 0-terminating it and returning the buffer.
-        char* Finalize();
+  // Finalize the string by 0-terminating it and returning the buffer.
+  char* Finalize();
 
-    protected:
-        Vector<char> buffer_;
-        int position_;
+ protected:
+  Vector<char> buffer_;
+  int position_;
 
-        bool is_finalized() const {
-            return position_ < 0;
-        }
+  bool is_finalized() const { return position_ < 0; }
 
-    private:
-        DISALLOW_IMPLICIT_CONSTRUCTORS(SimpleStringBuilder);
+ private:
+  DISALLOW_IMPLICIT_CONSTRUCTORS(SimpleStringBuilder);
 };
 
 // Bit field extraction.
 inline uint32_t unsigned_bitextract_32(int msb, int lsb, uint32_t x) {
-    return (x >> lsb) & ((1 << (1 + msb - lsb)) - 1);
+  return (x >> lsb) & ((1 << (1 + msb - lsb)) - 1);
 }
 
 inline uint64_t unsigned_bitextract_64(int msb, int lsb, uint64_t x) {
-    return (x >> lsb) & ((static_cast<uint64_t>(1) << (1 + msb - lsb)) - 1);
+  return (x >> lsb) & ((static_cast<uint64_t>(1) << (1 + msb - lsb)) - 1);
 }
 
 inline int32_t signed_bitextract_32(int msb, int lsb, int32_t x) {
-    return (x << (31 - msb)) >> (lsb + 31 - msb);
+  return (x << (31 - msb)) >> (lsb + 31 - msb);
 }
 
 inline int signed_bitextract_64(int msb, int lsb, int x) {
-    // TODO(jbramley): This is broken for big bitfields.
-    return (x << (63 - msb)) >> (lsb + 63 - msb);
+  // TODO(jbramley): This is broken for big bitfields.
+  return (x << (63 - msb)) >> (lsb + 63 - msb);
 }
 
 // Check number width.
 inline bool is_intn(int64_t x, unsigned n) {
-    DCHECK((0 < n) && (n < 64));
-    int64_t limit = static_cast<int64_t>(1) << (n - 1);
-    return (-limit <= x) && (x < limit);
+  DCHECK((0 < n) && (n < 64));
+  int64_t limit = static_cast<int64_t>(1) << (n - 1);
+  return (-limit <= x) && (x < limit);
 }
 
 inline bool is_uintn(int64_t x, unsigned n) {
-    DCHECK((0 < n) && (n < (sizeof(x) * kBitsPerByte)));
-    return !(x >> n);
+  DCHECK((0 < n) && (n < (sizeof(x) * kBitsPerByte)));
+  return !(x >> n);
 }
 
 template <class T>
 inline T truncate_to_intn(T x, unsigned n) {
-    DCHECK((0 < n) && (n < (sizeof(x) * kBitsPerByte)));
-    return (x & ((static_cast<T>(1) << n) - 1));
+  DCHECK((0 < n) && (n < (sizeof(x) * kBitsPerByte)));
+  return (x & ((static_cast<T>(1) << n) - 1));
 }
 
 #define INT_1_TO_63_LIST(V)                                                    \
@@ -945,123 +809,85 @@ V(120) V(121) V(122) V(123) V(124) V(125) V(126) V(127)
 // clang-format on
 
 class FeedbackSlot {
-    public:
-        FeedbackSlot() : id_(kInvalidSlot) {}
-        explicit FeedbackSlot(int id) : id_(id) {}
+ public:
+  FeedbackSlot() : id_(kInvalidSlot) {}
+  explicit FeedbackSlot(int id) : id_(id) {}
 
-        int ToInt() const {
-            return id_;
-        }
+  int ToInt() const { return id_; }
 
-        static FeedbackSlot Invalid() {
-            return FeedbackSlot();
-        }
-        bool IsInvalid() const {
-            return id_ == kInvalidSlot;
-        }
+  static FeedbackSlot Invalid() { return FeedbackSlot(); }
+  bool IsInvalid() const { return id_ == kInvalidSlot; }
 
-        bool operator==(FeedbackSlot that) const {
-            return this->id_ == that.id_;
-        }
-        bool operator!=(FeedbackSlot that) const {
-            return !(*this == that);
-        }
+  bool operator==(FeedbackSlot that) const { return this->id_ == that.id_; }
+  bool operator!=(FeedbackSlot that) const { return !(*this == that); }
 
-        friend size_t hash_value(FeedbackSlot slot) {
-            return slot.ToInt();
-        }
-        friend std::ostream& operator<<(std::ostream& os, FeedbackSlot);
+  friend size_t hash_value(FeedbackSlot slot) { return slot.ToInt(); }
+  friend std::ostream& operator<<(std::ostream& os, FeedbackSlot);
 
-    private:
-        static const int kInvalidSlot = -1;
+ private:
+  static const int kInvalidSlot = -1;
 
-        int id_;
+  int id_;
 };
 
 
 class BailoutId {
-    public:
-        explicit BailoutId(int id) : id_(id) { }
-        int ToInt() const {
-            return id_;
-        }
+ public:
+  explicit BailoutId(int id) : id_(id) { }
+  int ToInt() const { return id_; }
 
-        static BailoutId None() {
-            return BailoutId(kNoneId);
-        }
-        static BailoutId ScriptContext() {
-            return BailoutId(kScriptContextId);
-        }
-        static BailoutId FunctionContext() {
-            return BailoutId(kFunctionContextId);
-        }
-        static BailoutId FunctionEntry() {
-            return BailoutId(kFunctionEntryId);
-        }
-        static BailoutId Declarations() {
-            return BailoutId(kDeclarationsId);
-        }
-        static BailoutId FirstUsable() {
-            return BailoutId(kFirstUsableId);
-        }
-        static BailoutId StubEntry() {
-            return BailoutId(kStubEntryId);
-        }
+  static BailoutId None() { return BailoutId(kNoneId); }
+  static BailoutId ScriptContext() { return BailoutId(kScriptContextId); }
+  static BailoutId FunctionContext() { return BailoutId(kFunctionContextId); }
+  static BailoutId FunctionEntry() { return BailoutId(kFunctionEntryId); }
+  static BailoutId Declarations() { return BailoutId(kDeclarationsId); }
+  static BailoutId FirstUsable() { return BailoutId(kFirstUsableId); }
+  static BailoutId StubEntry() { return BailoutId(kStubEntryId); }
 
-        // Special bailout id support for deopting into the {JSConstructStub} stub.
-        // The following hard-coded deoptimization points are supported by the stub:
-        //  - {ConstructStubCreate} maps to {construct_stub_create_deopt_pc_offset}.
-        //  - {ConstructStubInvoke} maps to {construct_stub_invoke_deopt_pc_offset}.
-        static BailoutId ConstructStubCreate() {
-            return BailoutId(1);
-        }
-        static BailoutId ConstructStubInvoke() {
-            return BailoutId(2);
-        }
-        bool IsValidForConstructStub() const {
-            return id_ == ConstructStubCreate().ToInt() ||
-                   id_ == ConstructStubInvoke().ToInt();
-        }
+  // Special bailout id support for deopting into the {JSConstructStub} stub.
+  // The following hard-coded deoptimization points are supported by the stub:
+  //  - {ConstructStubCreate} maps to {construct_stub_create_deopt_pc_offset}.
+  //  - {ConstructStubInvoke} maps to {construct_stub_invoke_deopt_pc_offset}.
+  static BailoutId ConstructStubCreate() { return BailoutId(1); }
+  static BailoutId ConstructStubInvoke() { return BailoutId(2); }
+  bool IsValidForConstructStub() const {
+    return id_ == ConstructStubCreate().ToInt() ||
+           id_ == ConstructStubInvoke().ToInt();
+  }
 
-        bool IsNone() const {
-            return id_ == kNoneId;
-        }
-        bool operator==(const BailoutId& other) const {
-            return id_ == other.id_;
-        }
-        bool operator!=(const BailoutId& other) const {
-            return id_ != other.id_;
-        }
-        friend size_t hash_value(BailoutId);
-        V8_EXPORT_PRIVATE friend std::ostream& operator<<(std::ostream&, BailoutId);
+  bool IsNone() const { return id_ == kNoneId; }
+  bool operator==(const BailoutId& other) const { return id_ == other.id_; }
+  bool operator!=(const BailoutId& other) const { return id_ != other.id_; }
+  friend size_t hash_value(BailoutId);
+  V8_EXPORT_PRIVATE friend std::ostream& operator<<(std::ostream&, BailoutId);
 
-    private:
-        friend class Builtins;
+ private:
+  friend class Builtins;
 
-        static const int kNoneId = -1;
+  static const int kNoneId = -1;
 
-        // Using 0 could disguise errors.
-        static const int kScriptContextId = 1;
-        static const int kFunctionContextId = 2;
-        static const int kFunctionEntryId = 3;
+  // Using 0 could disguise errors.
+  static const int kScriptContextId = 1;
+  static const int kFunctionContextId = 2;
+  static const int kFunctionEntryId = 3;
 
-        // This AST id identifies the point after the declarations have been visited.
-        // We need it to capture the environment effects of declarations that emit
-        // code (function declarations).
-        static const int kDeclarationsId = 4;
+  // This AST id identifies the point after the declarations have been visited.
+  // We need it to capture the environment effects of declarations that emit
+  // code (function declarations).
+  static const int kDeclarationsId = 4;
 
-        // Every FunctionState starts with this id.
-        static const int kFirstUsableId = 5;
+  // Every FunctionState starts with this id.
+  static const int kFirstUsableId = 5;
 
-        // Every compiled stub starts with this id.
-        static const int kStubEntryId = 6;
+  // Every compiled stub starts with this id.
+  static const int kStubEntryId = 6;
 
-        // Builtin continuations bailout ids start here. If you need to add a
-        // non-builtin BailoutId, add it before this id so that this Id has the
-        // highest number.
-        static const int kFirstBuiltinContinuationId = 7;
+  // Builtin continuations bailout ids start here. If you need to add a
+  // non-builtin BailoutId, add it before this id so that this Id has the
+  // highest number.
+  static const int kFirstBuiltinContinuationId = 7;
 
-        int id_;
+  int id_;
 };
 
 
@@ -1082,7 +908,7 @@ void PRINTF_FORMAT(2, 3) PrintIsolate(void* isolate, const char* format, ...);
 // Returns the number of chars written, or -1 if output was truncated.
 int PRINTF_FORMAT(2, 3) SNPrintF(Vector<char> str, const char* format, ...);
 V8_EXPORT_PRIVATE int PRINTF_FORMAT(2, 0)
-VSNPrintF(Vector<char> str, const char* format, va_list args);
+    VSNPrintF(Vector<char> str, const char* format, va_list args);
 
 void StrNCpy(Vector<char> dest, const char* src, size_t n);
 
@@ -1090,7 +916,7 @@ void StrNCpy(Vector<char> dest, const char* src, size_t n);
 void Flush(FILE* out);
 
 inline void Flush() {
-    Flush(stdout);
+  Flush(stdout);
 }
 
 
@@ -1138,18 +964,18 @@ V8_EXPORT_PRIVATE std::string ReadFile(const char* filename, bool* exists,
 std::string ReadFile(FILE* file, bool* exists, bool verbose = true);
 
 class StringBuilder : public SimpleStringBuilder {
-    public:
-        explicit StringBuilder(int size) : SimpleStringBuilder(size) { }
-        StringBuilder(char* buffer, int size) : SimpleStringBuilder(buffer, size) { }
+ public:
+  explicit StringBuilder(int size) : SimpleStringBuilder(size) { }
+  StringBuilder(char* buffer, int size) : SimpleStringBuilder(buffer, size) { }
 
-        // Add formatted contents to the builder just like printf().
-        void PRINTF_FORMAT(2, 3) AddFormatted(const char* format, ...);
+  // Add formatted contents to the builder just like printf().
+  void PRINTF_FORMAT(2, 3) AddFormatted(const char* format, ...);
 
-        // Add formatted contents like printf based on a va_list.
-        void PRINTF_FORMAT(2, 0) AddFormattedList(const char* format, va_list list);
+  // Add formatted contents like printf based on a va_list.
+  void PRINTF_FORMAT(2, 0) AddFormattedList(const char* format, va_list list);
 
-    private:
-        DISALLOW_IMPLICIT_CONSTRUCTORS(StringBuilder);
+ private:
+  DISALLOW_IMPLICIT_CONSTRUCTORS(StringBuilder);
 };
 
 
@@ -1167,47 +993,56 @@ bool StringToArrayIndex(Stream* stream, uint32_t* index);
 // return an address significantly above the actual current stack position.
 V8_NOINLINE uintptr_t GetCurrentStackPosition();
 
+static inline uint16_t ByteReverse16(uint16_t value) {
+#if V8_HAS_BUILTIN_BSWAP16
+      return __builtin_bswap16(value);
+#else
+      return value << 8 | (value >> 8 & 0x00FF);
+#endif
+}
+
+static inline uint32_t ByteReverse32(uint32_t value) {
+#if V8_HAS_BUILTIN_BSWAP32
+      return __builtin_bswap32(value);
+#else
+      return value << 24 |
+             ((value << 8) & 0x00FF0000) |
+             ((value >> 8) & 0x0000FF00) |
+             ((value >> 24) & 0x00000FF);
+#endif
+}
+
+static inline uint64_t ByteReverse64(uint64_t value) {
+#if V8_HAS_BUILTIN_BSWAP64
+      return __builtin_bswap64(value);
+#else
+      size_t bits_of_v = sizeof(value) * kBitsPerByte;
+      return value << (bits_of_v - 8) |
+             ((value << (bits_of_v - 24)) & 0x00FF000000000000) |
+             ((value << (bits_of_v - 40)) & 0x0000FF0000000000) |
+             ((value << (bits_of_v - 56)) & 0x000000FF00000000) |
+             ((value >> (bits_of_v - 56)) & 0x00000000FF000000) |
+             ((value >> (bits_of_v - 40)) & 0x0000000000FF0000) |
+             ((value >> (bits_of_v - 24)) & 0x000000000000FF00) |
+             ((value >> (bits_of_v - 8)) & 0x00000000000000FF);
+#endif
+}
+
 template <typename V>
 static inline V ByteReverse(V value) {
-    size_t size_of_v = sizeof(value);
-    switch (size_of_v) {
+  size_t size_of_v = sizeof(value);
+  switch (size_of_v) {
+    case 1:
+      return value;
     case 2:
-#if V8_HAS_BUILTIN_BSWAP16
-        return static_cast<V>(__builtin_bswap16(static_cast<uint16_t>(value)));
-#else
-        return value << 8 | (value >> 8 & 0x00FF);
-#endif
+      return static_cast<V>(ByteReverse16(static_cast<uint16_t>(value)));
     case 4:
-#if V8_HAS_BUILTIN_BSWAP32
-        return static_cast<V>(__builtin_bswap32(static_cast<uint32_t>(value)));
-#else
-        {
-            size_t bits_of_v = size_of_v * kBitsPerByte;
-            return value << (bits_of_v - 8) |
-                   ((value << (bits_of_v - 24)) & 0x00FF0000) |
-                   ((value >> (bits_of_v - 24)) & 0x0000FF00) |
-                   ((value >> (bits_of_v - 8)) & 0x00000FF);
-        }
-#endif
+      return static_cast<V>(ByteReverse32(static_cast<uint32_t>(value)));
     case 8:
-#if V8_HAS_BUILTIN_BSWAP64
-        return static_cast<V>(__builtin_bswap64(static_cast<uint64_t>(value)));
-#else
-        {
-            size_t bits_of_v = size_of_v * kBitsPerByte;
-            return value << (bits_of_v - 8) |
-                   ((value << (bits_of_v - 24)) & 0x00FF000000000000) |
-                   ((value << (bits_of_v - 40)) & 0x0000FF0000000000) |
-                   ((value << (bits_of_v - 56)) & 0x000000FF00000000) |
-                   ((value >> (bits_of_v - 56)) & 0x00000000FF000000) |
-                   ((value >> (bits_of_v - 40)) & 0x0000000000FF0000) |
-                   ((value >> (bits_of_v - 24)) & 0x000000000000FF00) |
-                   ((value >> (bits_of_v - 8)) & 0x00000000000000FF);
-        }
-#endif
+      return static_cast<V>(ByteReverse64(static_cast<uint64_t>(value)));
     default:
-        UNREACHABLE();
-    }
+      UNREACHABLE();
+  }
 }
 
 V8_EXPORT_PRIVATE bool PassesFilter(Vector<const char> name,
@@ -1218,8 +1053,8 @@ V8_EXPORT_PRIVATE bool PassesFilter(Vector<const char> name,
 // instruction sequences.
 // TODO(jgruber): Better support for other architectures.
 V8_INLINE void ZapCode(Address addr, size_t size_in_bytes) {
-    static constexpr int kZapByte = 0xCC;
-    std::memset(reinterpret_cast<void*>(addr), kZapByte, size_in_bytes);
+  static constexpr int kZapByte = 0xCC;
+  std::memset(reinterpret_cast<void*>(addr), kZapByte, size_in_bytes);
 }
 
 }  // namespace internal

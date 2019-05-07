@@ -53,6 +53,10 @@ DispatchResponse V8DOMAgentImpl::disable() {
     return DispatchResponse::OK();
 }
 
+DispatchResponse V8DOMAgentImpl::getContentQuads(Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectId, std::unique_ptr<protocol::Array<protocol::Array<double>>>* out_quads) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
 DispatchResponse V8DOMAgentImpl::getDocument(Maybe<int> in_depth, Maybe<bool> in_pierce, std::unique_ptr<protocol::DOM::Node>* out_root) {
     std::unique_ptr<protocol::DOM::Node> defaultNode = protocol::DOM::Node::create()
             .setNodeId(0)
@@ -214,7 +218,7 @@ DispatchResponse V8DOMAgentImpl::discardSearchResults(const String& in_searchId)
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::resolveNode(Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectGroup, std::unique_ptr<protocol::Runtime::RemoteObject>* out_object) {
+DispatchResponse V8DOMAgentImpl::resolveNode(Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectGroup, Maybe<int> in_executionContextId, std::unique_ptr<protocol::Runtime::RemoteObject>* out_object) {
     auto resolvedNode = protocol::Runtime::RemoteObject::create()
                         .setType("View")
                         .build();
@@ -252,7 +256,7 @@ DispatchResponse V8DOMAgentImpl::getFlattenedDocument(Maybe<int> in_depth, Maybe
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::getNodeForLocation(int in_x, int in_y, Maybe<bool> in_includeUserAgentShadowDOM, int* out_nodeId) {
+DispatchResponse V8DOMAgentImpl::getNodeForLocation(int in_x, int in_y, Maybe<bool> in_includeUserAgentShadowDOM, int* out_backendNodeId, Maybe<int>* out_nodeId) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
@@ -304,6 +308,10 @@ DispatchResponse V8DOMAgentImpl::setFileInputFiles(std::unique_ptr<protocol::Arr
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
+DispatchResponse V8DOMAgentImpl::getFileInfo(const String& in_objectId, String* out_path) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
 DispatchResponse V8DOMAgentImpl::setInspectedNode(int in_nodeId) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
@@ -324,7 +332,7 @@ DispatchResponse V8DOMAgentImpl::undo() {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8DOMAgentImpl::getFrameOwner(const String& in_frameId, int* out_nodeId) {
+DispatchResponse V8DOMAgentImpl::getFrameOwner(const String& in_frameId, int* out_backendNodeId, Maybe<int>* out_nodeId) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 

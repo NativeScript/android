@@ -80,7 +80,8 @@ void ObjectManager::Init(Isolate *isolate) {
     auto jsWrapperFuncTemplate = FunctionTemplate::New(isolate, JSWrapperConstructorCallback);
     jsWrapperFuncTemplate->InstanceTemplate()->SetInternalFieldCount(
             static_cast<int>(MetadataNodeKeys::END));
-    auto jsWrapperFunc = jsWrapperFuncTemplate->GetFunction();
+    auto context = isolate->GetCurrentContext();
+    auto jsWrapperFunc = jsWrapperFuncTemplate->GetFunction(context).ToLocalChecked();
     m_poJsWrapperFunc = new Persistent<Function>(isolate, jsWrapperFunc);
 
     if (m_markingMode != JavaScriptMarkingMode::None) {
@@ -569,7 +570,7 @@ void ObjectManager::MarkReachableObjects(Isolate *isolate, const Local<Object> &
             if (propName->IsString()) {
                 auto name = propName.As<String>();
 
-                bool isPropDescriptor = o->HasRealNamedCallbackProperty(name);
+                bool isPropDescriptor = o->HasRealNamedCallbackProperty(context, name).ToChecked();
                 if (isPropDescriptor) {
                     Local<Value> getter;
                     Local<Value> setter;
@@ -750,7 +751,7 @@ void ObjectManager::MakeRegularObjectsWeak(const set<int> &instances, DirectBuff
  * so we tell java to take the JAVA objects out of strong, BUT KEEP THEM AS WEEK REFERENCES,
  * so that if java needs to release them, it can, on a later stage.
  * */
-void ObjectManager::MakeImplObjectsWeak(const map<int, Persistent<Object> *> &instances,
+void ObjectManager::MakeImplObjectsWeak(const unordered_map<int, Persistent<Object> *> &instances,
                                         DirectBuffer &inputBuff) {
     jboolean keepAsWeak = JNI_TRUE;
 

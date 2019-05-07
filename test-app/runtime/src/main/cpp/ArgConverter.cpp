@@ -6,6 +6,7 @@
 #include "NumericCasts.h"
 #include "Runtime.h"
 #include "V8GlobalHelpers.h"
+#include "NativeScriptAssert.h"
 #include <sstream>
 
 using namespace v8;
@@ -14,12 +15,13 @@ using namespace tns;
 
 void ArgConverter::Init(Isolate* isolate) {
     auto cache = GetTypeLongCache(isolate);
+    auto context = isolate->GetCurrentContext();
 
     auto ft = FunctionTemplate::New(isolate, ArgConverter::NativeScriptLongFunctionCallback);
     ft->SetClassName(V8StringConstants::GetLongNumber(isolate));
     ft->InstanceTemplate()->Set(V8StringConstants::GetValueOf(isolate), FunctionTemplate::New(isolate, ArgConverter::NativeScriptLongValueOfFunctionCallback));
     ft->InstanceTemplate()->Set(V8StringConstants::GetToString(isolate), FunctionTemplate::New(isolate, ArgConverter::NativeScriptLongToStringFunctionCallback));
-    cache->LongNumberCtorFunc = new Persistent<Function>(isolate, ft->GetFunction());
+    cache->LongNumberCtorFunc = new Persistent<Function>(isolate, ft->GetFunction(context).ToLocalChecked());
 
     auto nanObject = Number::New(isolate, numeric_limits<double>::quiet_NaN()).As<NumberObject>();
     cache->NanNumberObject = new Persistent<NumberObject>(isolate, nanObject);

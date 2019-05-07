@@ -36,8 +36,8 @@ inline bool IsIdentifierStart(uc32 c);
 V8_EXPORT_PRIVATE bool IsIdentifierStartSlow(uc32 c);
 #else
 inline bool IsIdentifierStartSlow(uc32 c) {
-    // Non-BMP characters are not supported without I18N.
-    return (c <= 0xFFFF) ? unibrow::ID_Start::Is(c) : false;
+  // Non-BMP characters are not supported without I18N.
+  return (c <= 0xFFFF) ? unibrow::ID_Start::Is(c) : false;
 }
 #endif
 
@@ -51,11 +51,11 @@ inline bool IsIdentifierPart(uc32 c);
 V8_EXPORT_PRIVATE bool IsIdentifierPartSlow(uc32 c);
 #else
 inline bool IsIdentifierPartSlow(uc32 c) {
-    // Non-BMP charaacters are not supported without I18N.
-    if (c <= 0xFFFF) {
-        return unibrow::ID_Start::Is(c) || unibrow::ID_Continue::Is(c);
-    }
-    return false;
+  // Non-BMP charaacters are not supported without I18N.
+  if (c <= 0xFFFF) {
+    return unibrow::ID_Start::Is(c) || unibrow::ID_Continue::Is(c);
+  }
+  return false;
 }
 #endif
 
@@ -66,9 +66,7 @@ inline bool IsWhiteSpace(uc32 c);
 #ifdef V8_INTL_SUPPORT
 V8_EXPORT_PRIVATE bool IsWhiteSpaceSlow(uc32 c);
 #else
-inline bool IsWhiteSpaceSlow(uc32 c) {
-    return unibrow::WhiteSpace::Is(c);
-}
+inline bool IsWhiteSpaceSlow(uc32 c) { return unibrow::WhiteSpace::Is(c); }
 #endif
 
 // WhiteSpace and LineTerminator according to ES6 draft section 11.2 and 11.3
@@ -76,7 +74,7 @@ inline bool IsWhiteSpaceSlow(uc32 c) {
 // as well as \u0009 - \u000d and \ufeff.
 inline bool IsWhiteSpaceOrLineTerminator(uc32 c);
 inline bool IsWhiteSpaceOrLineTerminatorSlow(uc32 c) {
-    return IsWhiteSpaceSlow(c) || unibrow::IsLineTerminator(c);
+  return IsWhiteSpaceSlow(c) || unibrow::IsLineTerminator(c);
 }
 
 inline bool IsLineTerminatorSequence(uc32 c, uc32 next);

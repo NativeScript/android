@@ -31,32 +31,32 @@ exports.run = function(cntxt)
 			expect(isConstructor).toEqual(true);
 		});
 
-		it("TestConstructorOverrideForBuiltinTypeWithInitMethod", function () {
-
-			__log("TEST: TestConstructorOverrideForBuiltinTypeWithInitMethod");
-
-			var initInvocationCount = 0;
-
-			var MyDatePicker = android.widget.DatePicker.extend({
-				init: function() {
-					++initInvocationCount;
-				}
-			});
-
-			var datePicker = new MyDatePicker(context);
-
-			__log("datePicker=" + datePicker);
-
-			var count1 = initInvocationCount;
-
-			expect(count1).toBeGreaterThan(0);
-
-			datePicker.init(2014, 3, 25, null);
-
-			var count2 = initInvocationCount;
-
-			expect(count2).toBeGreaterThan(count1);
-		});
+//		it("TestConstructorOverrideForBuiltinTypeWithInitMethod", function () {
+//
+//			__log("TEST: TestConstructorOverrideForBuiltinTypeWithInitMethod");
+//
+//			var initInvocationCount = 0;
+//
+//			var MyDatePicker = android.widget.DatePicker.extend({
+//				init: function() {
+//					++initInvocationCount;
+//				}
+//			});
+//
+//			var datePicker = new MyDatePicker(context);
+//
+//			__log("datePicker=" + datePicker);
+//
+//			var count1 = initInvocationCount;
+//
+//			expect(count1).toBeGreaterThan(0);
+//
+//			datePicker.init(2014, 3, 25, null);
+//
+//			var count2 = initInvocationCount;
+//
+//			expect(count2).toBeGreaterThan(count1);
+//		});
 
 		it("TestBuiltinNestedClassCreation", function () {
 
