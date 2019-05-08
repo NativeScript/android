@@ -8,4 +8,5 @@ public interface MethodsWriter extends JavaCodeWriter {
     void writeGetInstanceMethod(String className);
     void writeInternalRuntimeEqualsMethod();
     void writeInternalRuntimeHashCodeMethod();
+    void writeInternalServiceOnCreateMethod();
 }

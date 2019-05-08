@@ -463,8 +463,16 @@ public class Generator {
             methodsWriter.writeGetInstanceMethod(normalizedClassName);
         }
 
+        if (!hasOverriddenOnCreateMethod(userImplementedMethods) && isServiceClass) {
+            methodsWriter.writeInternalServiceOnCreateMethod();
+        }
+
         methodsWriter.writeInternalRuntimeHashCodeMethod();
         methodsWriter.writeInternalRuntimeEqualsMethod();
+    }
+
+    private boolean hasOverriddenOnCreateMethod(List<String> overriddenMethods) {
+        return overriddenMethods.contains("onCreate");
     }
 
     private boolean areAllArgumentsAndReturnTypePublic(ReifiedJavaMethod method) {

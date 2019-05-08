@@ -35,14 +35,15 @@ public class MethodsWriterImpl implements MethodsWriter {
     private static final String INTERNAL_RUNTIME_EQUALS_METHOD_RETURN_STATEMENT = "return super.equals(other);";
     private static final String INTERNAL_RUNTIME_HASHCODE_METHOD_RETURN_STATEMENT = "return super.hashCode();";
     private static final String ANDROID_LOG_METHOD_CALL_STATEMENT = "android.util.Log.w(\"Warning\", \"NativeScript discarding uncaught JS exception!\");";
-    private static final String RUNTIME_INIT_METHOD_CALL_STATEMENT = "com.tns.Runtime " + RUNTIME_VARIABLE_NAME + " = RuntimeHelper.initRuntime(this);";
+    private static final String RUNTIME_INIT_METHOD_CALL_STATEMENT = "com.tns.Runtime " + RUNTIME_VARIABLE_NAME + " = com.tns.RuntimeHelper.initRuntime(this);";
     private static final String RUNTIME_RUN_METHOD_CALL_STATEMENT = RUNTIME_VARIABLE_NAME + ".run();";
     private static final String RUNTIME_INIT_INSTANCE_METHOD_CALL_STATEMENT = "com.tns.Runtime.initInstance(this);";
 
-    private static final String RUNTIME_IS_INITIALIZED_METHOD_CALL = "Runtime.isInitialized()";
+    private static final String RUNTIME_IS_INITIALIZED_METHOD_CALL = "com.tns.Runtime.isInitialized()";
 
     private static final String INTERNAL_RUNTIME_EQUALS_METHOD_SIGNATURE = "public boolean equals__super(java.lang.Object other)";
     private static final String INTERNAL_RUNTIME_HASHCODE_METHOD_SIGNATURE = "public int hashCode__super()";
+    private static final String INTERNAL_SERVICES_ONCREATE_METHOD_SIGNATURE = "public void " + ON_CREATE_METHOD_NAME + "()";
 
     private static final String RETURN_KEYWORD = "return";
     private static final String IF_STATEMENT_BEGINNING = "if";
@@ -73,8 +74,8 @@ public class MethodsWriterImpl implements MethodsWriter {
         if (isForApplicationClass) {
             writeRuntimeInitCallForApplication(method);
             writeRuntimeInitializationCheckForApplication(method);
-        } else if (isForServiceClass) {
-            writeRuntimeInitializationForService(method);
+        } else if (isForServiceClass && method.getName().equals(ON_CREATE_METHOD_NAME)) {
+            writeRuntimeInitializationForService();
         }
 
         writeMethodBody(method);
@@ -157,22 +158,20 @@ public class MethodsWriterImpl implements MethodsWriter {
         }
     }
 
-    private void writeRuntimeInitializationForService(ReifiedJavaMethod method) {
-        if (method.getName().equals(ON_CREATE_METHOD_NAME)) {
-            writer.write(IF_STATEMENT_BEGINNING);
-            writer.write(OPENING_ROUND_BRACKET_LITERAL);
-            writer.write(NEGATE_LITERAL);
-            writer.write(RUNTIME_IS_INITIALIZED_METHOD_CALL);
-            writer.write(CLOSING_ROUND_BRACKET_LITERAL);
-            writer.write(OPENING_CURLY_BRACKET_LITERAL);
+    private void writeRuntimeInitializationForService() {
+        writer.write(IF_STATEMENT_BEGINNING);
+        writer.write(OPENING_ROUND_BRACKET_LITERAL);
+        writer.write(NEGATE_LITERAL);
+        writer.write(RUNTIME_IS_INITIALIZED_METHOD_CALL);
+        writer.write(CLOSING_ROUND_BRACKET_LITERAL);
+        writer.write(OPENING_CURLY_BRACKET_LITERAL);
 
-            writer.write(RUNTIME_INIT_METHOD_CALL_STATEMENT);
-            writer.write(RUNTIME_RUN_METHOD_CALL_STATEMENT);
-            
-            writer.write(CLOSING_CURLY_BRACKET_LITERAL);
+        writer.write(RUNTIME_INIT_METHOD_CALL_STATEMENT);
+        writer.write(RUNTIME_RUN_METHOD_CALL_STATEMENT);
 
-            writer.write(RUNTIME_INIT_INSTANCE_METHOD_CALL_STATEMENT);
-        }
+        writer.write(CLOSING_CURLY_BRACKET_LITERAL);
+
+        writer.write(RUNTIME_INIT_INSTANCE_METHOD_CALL_STATEMENT);
     }
 
     private void writeRuntimeInitializationCheckForApplication(ReifiedJavaMethod method) {
@@ -364,6 +363,16 @@ public class MethodsWriterImpl implements MethodsWriter {
         writer.write(signature);
         writer.write(OPENING_CURLY_BRACKET_LITERAL);
         writer.write(returnStatement);
+        writer.write(CLOSING_CURLY_BRACKET_LITERAL);
+    }
+
+    @Override
+    public void writeInternalServiceOnCreateMethod() {
+        writer.write(INTERNAL_SERVICES_ONCREATE_METHOD_SIGNATURE);
+        writer.write(OPENING_CURLY_BRACKET_LITERAL);
+
+        writeRuntimeInitializationForService();
+
         writer.write(CLOSING_CURLY_BRACKET_LITERAL);
     }
 }
