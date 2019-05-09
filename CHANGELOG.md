@@ -1,3 +1,22 @@
+5.4.0
+==
+
+## What's New
+
+- [Upgrade v8 to 7.4.288.25(#1356)](https://github.com/NativeScript/android-runtime/issues/1356)
+- [Upgrade the android gradle plugin to the latest 3.4.0 version(#1360)](https://github.com/NativeScript/android-runtime/issues/1360)
+- [Enable V8 symbols using from application's package.json file(#1368)](https://github.com/NativeScript/android-runtime/issues/1368)
+
+## Bug Fixes
+
+- [HashMaps improvements - fix for "Attempt to use cleared object reference"(#1345)](https://github.com/NativeScript/android-runtime/issues/1345)
+- [Unable to start Service when the application process is killed by the OS(#1347)](https://github.com/NativeScript/android-runtime/pull/1347)
+- [gradlew not compatible with sh(#1349)](https://github.com/NativeScript/android-runtime/issues/1349)
+- [Memory leak in global.postMessage(#1358)](https://github.com/NativeScript/android-runtime/issues/1358)
+- [memory leak java <-> javascript when java returns [] array(#1363)](https://github.com/NativeScript/android-runtime/issues/1363)
+- [Bug when reifying some generic classes in the SBG(#1372)](https://github.com/NativeScript/android-runtime/issues/1372)
+- [Extending an Android service fails if `onCreate` hasn't been overridden()](https://github.com/NativeScript/android-runtime/issues/1373)
+
 5.3.1
 ==
 ## Bug Fixes
