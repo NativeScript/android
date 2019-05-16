@@ -132,6 +132,7 @@ function getFileAst(tsHelpersFilePath) {
                 plugins: ["decorators"]
             });
 
+
             return resolve(ast);
         });
     });
@@ -219,7 +220,7 @@ var astFromFileContent = function (path, data, err) {
 
         var ast = babelParser.parse(data.data, {
             minify: false,
-            plugins: ["decorators"]
+            plugins: ["decorators", "objectRestSpread"]
         });
         data.ast = ast;
         return resolve(data);
