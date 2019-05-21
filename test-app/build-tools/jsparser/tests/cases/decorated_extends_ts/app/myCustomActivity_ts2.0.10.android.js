@@ -33,9 +33,9 @@ var Activity = (function (_super) {
         this._callbacks.onActivityResult(this, requestCode, resultCode, data, _super.prototype.onActivityResult);
     };
     Activity = __decorate([
-        JavaProxy("org.nativescript.a.MyCustomActivity"), 
+        JavaProxy("org.nativescript.a.MyCustomActivity"),
         __metadata('design:paramtypes', [])
     ], Activity);
     return Activity;
-}(android.support.v7.app.AppCompatActivity));
+}(androidx.appcompat.app.AppCompatActivity));
 //# sourceMappingURL=myCustomActivity.android.js.map

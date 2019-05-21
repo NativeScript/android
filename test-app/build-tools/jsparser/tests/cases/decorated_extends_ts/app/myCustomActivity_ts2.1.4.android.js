@@ -33,7 +33,7 @@ var Activity = (function (_super) {
         this._callbacks.onActivityResult(this, requestCode, resultCode, data, _super.prototype.onActivityResult);
     };
     return Activity;
-}(android.support.v7.app.AppCompatActivity));
+}(androidx.appcompat.app.AppCompatActivity));
 Activity = __decorate([
     JavaProxy("org.nativescript.b.MyCustomActivity"),
     __metadata("design:paramtypes", [])
