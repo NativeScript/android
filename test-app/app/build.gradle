@@ -483,7 +483,7 @@ def explodeAar(File compileDependency, File outputDir) {
                 def targetFile = new File(outputDir, file.name)
                 InputStream inputStream = jar.getInputStream(file)
                 new File(targetFile.parent).mkdirs()
-                Files.copy(inputStream, targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                Files.copy(inputStream, targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
             }
             if (file.isDirectory()) {
                 continue
@@ -499,9 +499,9 @@ def explodeAar(File compileDependency, File outputDir) {
 }
 
 def md5(String string) {
-    MessageDigest digest = MessageDigest.getInstance("MD5") ;
-    digest.update(string.bytes);
-    return new BigInteger(1, digest.digest()).toString(16).padLeft(32, '0');
+    MessageDigest digest = MessageDigest.getInstance("MD5")
+    digest.update(string.bytes)
+    return new BigInteger(1, digest.digest()).toString(16).padLeft(32, '0')
 }
 
 class WorkerTask extends DefaultTask {
@@ -597,7 +597,7 @@ task cleanupAllJars {
     outputs.files cleanupAllJarsTimestamp
 
     doLast {
-        def allDests = project.ext.allJars*.outputDir*.name;
+        def allDests = project.ext.allJars*.outputDir*.name
         def dir = new File(extractedDependenciesDir)
         if (dir.exists()) {
             dir.eachDir {
