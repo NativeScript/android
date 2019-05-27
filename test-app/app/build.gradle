@@ -20,8 +20,7 @@ import groovy.json.JsonSlurper
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
-import java.util.regex.Matcher
-import java.util.regex.Pattern
+import groovy.io.FileType
 import java.security.MessageDigest
 import javax.inject.Inject
 apply plugin: "com.android.application"
@@ -518,60 +517,61 @@ class EmptyRunnable implements Runnable {
 }
 
 // Discover all jars and dynamically create tasks for the extraction of each of them
-def allJars = []
+project.ext.allJars = []
 afterEvaluate { project ->
     def buildType = project.selectedBuildType == "release" ? "Release" : "Debug"
     def jars = []
-    Pattern pattern = Pattern.compile("^(.+)${buildType}CompileClasspath\$")
     def artifactType = Attribute.of('artifactType', String)
     configurations.all { config ->
-        Matcher matcher = pattern.matcher(config.name)
-        if (matcher.find() || config.name == "${buildType.toLowerCase()}CompileClasspath") {
+        if (config.name == "${buildType.toLowerCase()}RuntimeClasspath") {
             config.incoming.artifactView {
                 attributes {
                     it.attribute(artifactType, 'jar')
                 }
             }.artifacts.each {
-                def jar = it.file;
-                if (!jars.contains(jar)) {
-                    jars.add(jar)
-                    def destDir = md5(jar.path);
-                    def outputDir = new File(Paths.get(extractedDependenciesDir, destDir).normalize().toString())
-
-                    def taskName = "extract_${jar.name}_to_${destDir}"
-                    logger.debug("Creating dynamic task ${taskName}")
-
-                    // Add discovered jars as dependencies of cleanupAllJars.
-                    // This is cruicial for cloud builds because they are different
-                    // on each incremental build (as each time the gradle user home
-                    // directory is a randomly generated string)
-                    cleanupAllJars.inputs.files jar
-
-                    task "${taskName}" (type: WorkerTask) {
-                        dependsOn cleanupAllJars
-                        extractAllJars.dependsOn it
-
-                        // This dependency seems redundant but probably due to some Gradle issue with workers,
-                        // without it `runSbg` sporadically starts before all extraction tasks have finished and
-                        // fails due to missing JARs
-                        runSbg.dependsOn it
-
-                        inputs.files jar
-                        outputs.dir outputDir
-
-                        doLast {
-                            // Runing in parallel no longer seems to bring any benefit.
-                            // It mattered only when we were extracting JARs from AARs.
-                            // To try it simply remove the following comments.
-                            // workerExecutor.submit(EmptyRunnable.class) {
-                            explodeAar(jar, outputDir)
-                            // }
-                        }
-                    }
-                    allJars.add([file: jar, outputDir: outputDir])
-                }
+                processJar(it.file, jars)
             }
         }
+    }
+}
+
+def processJar(File jar, jars) {
+    if (!jars.contains(jar)) {
+        jars.add(jar)
+        def destDir = md5(jar.path)
+        def outputDir = new File(Paths.get(extractedDependenciesDir, destDir).normalize().toString())
+
+        def taskName = "extract_${jar.name}_to_${destDir}"
+        logger.debug("Creating dynamic task ${taskName}")
+
+        // Add discovered jars as dependencies of cleanupAllJars.
+        // This is cruicial for cloud builds because they are different
+        // on each incremental build (as each time the gradle user home
+        // directory is a randomly generated string)
+        cleanupAllJars.inputs.files jar
+
+        task "${taskName}" (type: WorkerTask) {
+            dependsOn cleanupAllJars
+            extractAllJars.dependsOn it
+
+            // This dependency seems redundant but probably due to some Gradle issue with workers,
+            // without it `runSbg` sporadically starts before all extraction tasks have finished and
+            // fails due to missing JARs
+            runSbg.dependsOn it
+
+            inputs.files jar
+            outputs.dir outputDir
+
+            doLast {
+                // Runing in parallel no longer seems to bring any benefit.
+                // It mattered only when we were extracting JARs from AARs.
+                // To try it simply remove the following comments.
+                // workerExecutor.submit(EmptyRunnable.class) {
+                explodeAar(jar, outputDir)
+                // }
+            }
+        }
+        project.ext.allJars.add([file: jar, outputDir: outputDir])
     }
 }
 
@@ -583,7 +583,7 @@ task cleanupAllJars {
     outputs.files cleanupAllJarsTimestamp
 
     doLast {
-        def allDests = allJars*.outputDir*.name;
+        def allDests = project.ext.allJars*.outputDir*.name;
         def dir = new File(extractedDependenciesDir)
         if (dir.exists()) {
             dir.eachDir {
