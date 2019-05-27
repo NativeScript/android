@@ -531,6 +531,20 @@ afterEvaluate { project ->
             }.artifacts.each {
                 processJar(it.file, jars)
             }
+
+            def projectDependencies = config.getAllDependencies().withType(ProjectDependency)
+            def dependentProjects = projectDependencies*.dependencyProject
+            dependentProjects.findAll {
+                // if there's a project dependency search for its result jar file in the build/intermediates/runtime_library_classes folder
+                def jarDir = new File("${it.getBuildDir()}/intermediates/runtime_library_classes/${buildType.toLowerCase()}")
+                if(jarDir.exists()) {
+                    jarDir.eachFileRecurse(FileType.FILES) { file ->
+                        if (file.path.endsWith(".jar")) {
+                            processJar(file, jars)
+                        }
+                    }
+                }
+            }
         }
     }
 }
