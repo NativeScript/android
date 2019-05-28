@@ -536,6 +536,7 @@ afterEvaluate { project ->
             def dependentProjects = projectDependencies*.dependencyProject
             dependentProjects.findAll {
                 // if there's a project dependency search for its result jar file in the build/intermediates/runtime_library_classes folder
+                // this is the output folder in gradle 5.1.1, but it can be changed in the future versions of gradle
                 def jarDir = new File("${it.getBuildDir()}/intermediates/runtime_library_classes/${buildType.toLowerCase()}")
                 if(jarDir.exists()) {
                     jarDir.eachFileRecurse(FileType.FILES) { file ->
@@ -543,6 +544,8 @@ afterEvaluate { project ->
                             processJar(file, jars)
                         }
                     }
+                } else {
+                    println "WARNING: Folder ${jarDir.path} does not exists, the dependent project's classess won't be included in the metadata"
                 }
             }
         }
