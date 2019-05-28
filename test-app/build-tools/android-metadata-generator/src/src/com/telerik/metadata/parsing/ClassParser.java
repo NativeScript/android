@@ -29,6 +29,11 @@ public final class ClassParser {
         for (String implementedInterfaceName : implementedInterfacesNames) {
             ClassDescriptor interfaceClass = ClassRepo.findClass(implementedInterfaceName);
 
+            if (interfaceClass == null) {
+                System.out.println(String.format("WARNING: Skipping interface %s implemented in %s as it cannot be resolved", implementedInterfaceName, clazz.getClassName()));
+                continue;
+            }
+
             for (MethodDescriptor md : interfaceClass.getMethods()) {
                 if (!md.isStatic() && !md.isAbstract()) {
                     collectedDefaultMethods.add(md);
