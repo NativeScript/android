@@ -523,7 +523,7 @@ afterEvaluate { project ->
     def jars = []
     def artifactType = Attribute.of('artifactType', String)
     configurations.all { config ->
-        if (config.name == "${buildType.toLowerCase()}RuntimeClasspath") {
+        if (config.name.toLowerCase().endsWith("${buildType}RuntimeClasspath".toLowerCase())) {
             config.incoming.artifactView {
                 attributes {
                     it.attribute(artifactType, 'jar')
