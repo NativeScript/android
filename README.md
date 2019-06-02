@@ -1,6 +1,5 @@
 # Android Runtime for NativeScript
 [![Build Status](https://travis-ci.org/NativeScript/android-runtime.svg?branch=master)](https://travis-ci.org/NativeScript/android-runtime)
-[![Waffle.io - NativeScript Android Runtime](https://badge.waffle.io/NativeScript/android-runtime.svg?columns=In%20Progress)](https://waffle.io/NativeScript/android-runtime)
 
 Contains the source code for the NativeScript's Android Runtime. [NativeScript](https://www.nativescript.org/) is a framework which enables developers to write truly native mobile applications for Android and iOS using JavaScript and CSS. Each mobile platform has its own ecosystem and offers completely different development tools and language(s) - Java for Android and Objective C (Swift) for iOS. In order to translate JavaScript code to the corresponding native APIs some kind of proxy mechanism is needed. This is exactly what the "Runtime" parts of NativeScript are responsible for. The Android Runtime may be thought of as "The Bridge" between the JavaScript and Android worlds. A NativeScript application for Android is a standard native package (apk) which besides the JavaScript files embed the runtime as well.
 
