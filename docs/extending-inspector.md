@@ -70,7 +70,7 @@ This step involves fetching and building the V8 projectory, explanation for whic
  - [create a unique pointer wrapper for your new agent impl instance](https://github.com/NativeScript/android-runtime/blob/5a04e09439e2bc6a201577895b9ac6538441e758/test-app/runtime/src/main/cpp/v8_inspector/src/inspector/v8-inspector-session-impl.cc#L141), and call the static domain dispatcher's [wire](https://github.com/NativeScript/android-runtime/blob/5a04e09439e2bc6a201577895b9ac6538441e758/test-app/runtime/src/main/cpp/v8_inspector/src/inspector/v8-inspector-session-impl.cc#L143) method
  - make sure to call [agent.disable](https://github.com/NativeScript/android-runtime/blob/5a04e09439e2bc6a201577895b9ac6538441e758/test-app/runtime/src/main/cpp/v8_inspector/src/inspector/v8-inspector-session-impl.cc#L167) in V8InspectorSessionImpl's destructor.
  - register the newly implemented domain as a supported one inside [ V8InspectorSessionImpl::supportedDomainsImpl()](https://github.com/NativeScript/android-runtime/blob/5a04e09439e2bc6a201577895b9ac6538441e758/test-app/runtime/src/main/cpp/v8_inspector/src/inspector/v8-inspector-session-impl.cc#L389)
- - `#include "src/inspector/ns-v8-debugger-agent-impl.h"`
+ - `#include "NSV8DebuggerAgentImpl.h"`
  - replace **V8DebuggerAgentImpl** with **NSV8DebuggerAgentImpl**
 
 9. Don't forget to add the new classes to the CMakeLists!
