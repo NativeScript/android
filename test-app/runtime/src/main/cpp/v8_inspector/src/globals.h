@@ -87,6 +87,10 @@ constexpr int kStackSpaceRequiredForCompilation = 40;
 #define V8_SFI_HAS_UNIQUE_ID true
 #endif
 
+#if defined(V8_OS_WIN) && defined(V8_TARGET_ARCH_X64)
+#define V8_OS_WIN_X64 true
+#endif
+
 // Superclass for classes only using static method functions.
 // The subclass of AllStatic cannot be instantiated at all.
 class AllStatic {
@@ -200,28 +204,51 @@ constexpr size_t kReservedCodeRangePages = 0;
 
 STATIC_ASSERT(kSystemPointerSize == (1 << kSystemPointerSizeLog2));
 
+#ifdef V8_COMPRESS_POINTERS
+static_assert(
+    kSystemPointerSize == kInt64Size,
+    "Pointer compression can be enabled only for 64-bit architectures");
+
+constexpr int kTaggedSize = kInt32Size;
+constexpr int kTaggedSizeLog2 = 2;
+
+// These types define raw and atomic storage types for tagged values stored
+// on V8 heap.
+using Tagged_t = int32_t;
+using AtomicTagged_t = base::Atomic32;
+
+#else
+
 constexpr int kTaggedSize = kSystemPointerSize;
 constexpr int kTaggedSizeLog2 = kSystemPointerSizeLog2;
-STATIC_ASSERT(kTaggedSize == (1 << kTaggedSizeLog2));
 
 // These types define raw and atomic storage types for tagged values stored
 // on V8 heap.
 using Tagged_t = Address;
 using AtomicTagged_t = base::AtomicWord;
+
+#endif  // V8_COMPRESS_POINTERS
+
+// Defines whether the branchless or branchful implementation of pointer
+// decompression should be used.
+constexpr bool kUseBranchlessPtrDecompression = true;
+
+STATIC_ASSERT(kTaggedSize == (1 << kTaggedSizeLog2));
+
 using AsAtomicTagged = base::AsAtomicPointerImpl<AtomicTagged_t>;
 STATIC_ASSERT(sizeof(Tagged_t) == kTaggedSize);
 STATIC_ASSERT(sizeof(AtomicTagged_t) == kTaggedSize);
 
+STATIC_ASSERT(kTaggedSize == kApiTaggedSize);
+
 // TODO(ishell): use kTaggedSize or kSystemPointerSize instead.
+#ifndef V8_COMPRESS_POINTERS
 constexpr int kPointerSize = kSystemPointerSize;
 constexpr int kPointerSizeLog2 = kSystemPointerSizeLog2;
 STATIC_ASSERT(kPointerSize == (1 << kPointerSizeLog2));
-
-constexpr int kEmbedderDataSlotSize =
-#ifdef V8_COMPRESS_POINTERS
-    kTaggedSize +
 #endif
-    kTaggedSize;
+
+constexpr int kEmbedderDataSlotSize = kSystemPointerSize;
 
 constexpr int kEmbedderDataSlotSizeInTaggedSlots =
     kEmbedderDataSlotSize / kTaggedSize;
@@ -289,7 +316,8 @@ F FUNCTION_CAST(Address addr) {
 // which provide a level of indirection between the function pointer
 // and the function entrypoint.
 #if V8_HOST_ARCH_PPC && \
-    (V8_OS_AIX || (V8_TARGET_ARCH_PPC64 && V8_TARGET_BIG_ENDIAN))
+    (V8_OS_AIX || (V8_TARGET_ARCH_PPC64 && V8_TARGET_BIG_ENDIAN && \
+    (!defined(_CALL_ELF) || _CALL_ELF == 1)))
 #define USES_FUNCTION_DESCRIPTORS 1
 #define FUNCTION_ENTRYPOINT_ADDRESS(f)       \
   (reinterpret_cast<v8::internal::Address*>( \
@@ -311,14 +339,18 @@ inline size_t hash_value(LanguageMode mode) {
   return static_cast<size_t>(mode);
 }
 
-inline std::ostream& operator<<(std::ostream& os, const LanguageMode& mode) {
+inline const char* LanguageMode2String(LanguageMode mode) {
   switch (mode) {
     case LanguageMode::kSloppy:
-      return os << "sloppy";
+      return "sloppy";
     case LanguageMode::kStrict:
-      return os << "strict";
+      return "strict";
   }
   UNREACHABLE();
+}
+
+inline std::ostream& operator<<(std::ostream& os, LanguageMode mode) {
+  return os << LanguageMode2String(mode);
 }
 
 inline bool is_sloppy(LanguageMode language_mode) {
@@ -520,6 +552,7 @@ constexpr uint32_t kQuietNaNHighBitsMask = 0xfff << (51 - 32);
 class AccessorInfo;
 class Arguments;
 class Assembler;
+class ClassScope;
 class Code;
 class CodeSpace;
 class Context;
@@ -666,13 +699,33 @@ enum AllocationSpace {
 constexpr int kSpaceTagSize = 4;
 STATIC_ASSERT(FIRST_SPACE == 0);
 
-enum class AllocationType {
+enum class AllocationType : uint8_t {
   kYoung,    // Regular object allocated in NEW_SPACE or NEW_LO_SPACE
   kOld,      // Regular object allocated in OLD_SPACE or LO_SPACE
   kCode,     // Code object allocated in CODE_SPACE or CODE_LO_SPACE
   kMap,      // Map object allocated in MAP_SPACE
   kReadOnly  // Object allocated in RO_SPACE
 };
+
+inline size_t hash_value(AllocationType kind) {
+  return static_cast<uint8_t>(kind);
+}
+
+inline std::ostream& operator<<(std::ostream& os, AllocationType kind) {
+  switch (kind) {
+    case AllocationType::kYoung:
+      return os << "Young";
+    case AllocationType::kOld:
+      return os << "Old";
+    case AllocationType::kCode:
+      return os << "Code";
+    case AllocationType::kMap:
+      return os << "Map";
+    case AllocationType::kReadOnly:
+      return os << "ReadOnly";
+  }
+  UNREACHABLE();
+}
 
 // TODO(ishell): review and rename kWordAligned to kTaggedAligned.
 enum AllocationAlignment { kWordAligned, kDoubleAligned, kDoubleUnaligned };
@@ -684,6 +737,7 @@ enum WriteBarrierKind : uint8_t {
   kNoWriteBarrier,
   kMapWriteBarrier,
   kPointerWriteBarrier,
+  kEphemeronKeyWriteBarrier,
   kFullWriteBarrier
 };
 
@@ -699,26 +753,10 @@ inline std::ostream& operator<<(std::ostream& os, WriteBarrierKind kind) {
       return os << "MapWriteBarrier";
     case kPointerWriteBarrier:
       return os << "PointerWriteBarrier";
+    case kEphemeronKeyWriteBarrier:
+      return os << "EphemeronKeyWriteBarrier";
     case kFullWriteBarrier:
       return os << "FullWriteBarrier";
-  }
-  UNREACHABLE();
-}
-
-// A flag that indicates whether objects should be pretenured when
-// allocated (allocated directly into either the old generation or read-only
-// space), or not (allocated in the young generation if the object size and type
-// allows).
-enum PretenureFlag { NOT_TENURED, TENURED, TENURED_READ_ONLY };
-
-inline std::ostream& operator<<(std::ostream& os, const PretenureFlag& flag) {
-  switch (flag) {
-    case NOT_TENURED:
-      return os << "NotTenured";
-    case TENURED:
-      return os << "Tenured";
-    case TENURED_READ_ONLY:
-      return os << "TenuredReadOnly";
   }
   UNREACHABLE();
 }
@@ -744,11 +782,16 @@ enum VisitMode {
   VISIT_FOR_SERIALIZATION,
 };
 
+enum class BytecodeFlushMode {
+  kDoNotFlushBytecode,
+  kFlushBytecode,
+  kStressFlushBytecode,
+};
+
 // Flag indicating whether code is built into the VM (one of the natives files).
 enum NativesFlag {
   NOT_NATIVES_CODE,
   EXTENSION_CODE,
-  NATIVES_CODE,
   INSPECTOR_CODE
 };
 
@@ -870,24 +913,24 @@ constexpr int kIeeeDoubleExponentWordOffset = 0;
     ::i::kHeapObjectTag))
 
 // OBJECT_POINTER_ALIGN returns the value aligned as a HeapObject pointer
-#define OBJECT_POINTER_ALIGN(value)                             \
-  (((value) + kObjectAlignmentMask) & ~kObjectAlignmentMask)
+#define OBJECT_POINTER_ALIGN(value) \
+  (((value) + ::i::kObjectAlignmentMask) & ~::i::kObjectAlignmentMask)
 
 // OBJECT_POINTER_PADDING returns the padding size required to align value
 // as a HeapObject pointer
 #define OBJECT_POINTER_PADDING(value) (OBJECT_POINTER_ALIGN(value) - (value))
 
 // POINTER_SIZE_ALIGN returns the value aligned as a system pointer.
-#define POINTER_SIZE_ALIGN(value)                               \
-  (((value) + kPointerAlignmentMask) & ~kPointerAlignmentMask)
+#define POINTER_SIZE_ALIGN(value) \
+  (((value) + ::i::kPointerAlignmentMask) & ~::i::kPointerAlignmentMask)
 
 // POINTER_SIZE_PADDING returns the padding size required to align value
 // as a system pointer.
 #define POINTER_SIZE_PADDING(value) (POINTER_SIZE_ALIGN(value) - (value))
 
 // CODE_POINTER_ALIGN returns the value aligned as a generated code segment.
-#define CODE_POINTER_ALIGN(value)                               \
-  (((value) + kCodeAlignmentMask) & ~kCodeAlignmentMask)
+#define CODE_POINTER_ALIGN(value) \
+  (((value) + ::i::kCodeAlignmentMask) & ~::i::kCodeAlignmentMask)
 
 // CODE_POINTER_PADDING returns the padding size required to align value
 // as a generated code segment.
@@ -895,8 +938,7 @@ constexpr int kIeeeDoubleExponentWordOffset = 0;
 
 // DOUBLE_POINTER_ALIGN returns the value algined for double pointers.
 #define DOUBLE_POINTER_ALIGN(value) \
-  (((value) + kDoubleAlignmentMask) & ~kDoubleAlignmentMask)
-
+  (((value) + ::i::kDoubleAlignmentMask) & ~::i::kDoubleAlignmentMask)
 
 // Defines hints about receiver values based on structural knowledge.
 enum class ConvertReceiverMode : unsigned {
@@ -953,6 +995,7 @@ inline std::ostream& operator<<(std::ostream& os, CreateArgumentsType type) {
 }
 
 enum ScopeType : uint8_t {
+  CLASS_SCOPE,     // The scope introduced by a class.
   EVAL_SCOPE,      // The top-level scope for an eval source.
   FUNCTION_SCOPE,  // The top-level scope for a function.
   MODULE_SCOPE,    // The scope introduced by a module literal
@@ -976,6 +1019,8 @@ inline std::ostream& operator<<(std::ostream& os, ScopeType type) {
       return os << "CATCH_SCOPE";
     case ScopeType::BLOCK_SCOPE:
       return os << "BLOCK_SCOPE";
+    case ScopeType::CLASS_SCOPE:
+      return os << "CLASS_SCOPE";
     case ScopeType::WITH_SCOPE:
       return os << "WITH_SCOPE";
   }
@@ -1547,6 +1592,9 @@ enum class StubCallMode {
 
 constexpr int kFunctionLiteralIdInvalid = -1;
 constexpr int kFunctionLiteralIdTopLevel = 0;
+
+constexpr int kSmallOrderedHashSetMinCapacity = 4;
+constexpr int kSmallOrderedHashMapMinCapacity = 4;
 
 }  // namespace internal
 }  // namespace v8

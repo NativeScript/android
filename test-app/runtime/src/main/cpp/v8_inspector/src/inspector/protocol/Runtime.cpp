@@ -534,6 +534,42 @@ std::unique_ptr<InternalPropertyDescriptor> InternalPropertyDescriptor::clone() 
     return fromValue(toValue().get(), &errors);
 }
 
+std::unique_ptr<PrivatePropertyDescriptor> PrivatePropertyDescriptor::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->addError("object expected");
+        return nullptr;
+    }
+
+    std::unique_ptr<PrivatePropertyDescriptor> result(new PrivatePropertyDescriptor());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->push();
+    protocol::Value* nameValue = object->get("name");
+    errors->setName("name");
+    result->m_name = ValueConversions<String>::fromValue(nameValue, errors);
+    protocol::Value* valueValue = object->get("value");
+    errors->setName("value");
+    result->m_value = ValueConversions<protocol::Runtime::RemoteObject>::fromValue(valueValue, errors);
+    errors->pop();
+    if (errors->hasErrors())
+        return nullptr;
+    return result;
+}
+
+std::unique_ptr<protocol::DictionaryValue> PrivatePropertyDescriptor::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("name", ValueConversions<String>::toValue(m_name));
+    result->setValue("value", ValueConversions<protocol::Runtime::RemoteObject>::toValue(m_value.get()));
+    return result;
+}
+
+std::unique_ptr<PrivatePropertyDescriptor> PrivatePropertyDescriptor::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
+
 std::unique_ptr<CallArgument> CallArgument::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
@@ -1842,10 +1878,11 @@ void DispatcherImpl::getProperties(int callId, const String& method, const Proto
     // Declare output parameters.
     std::unique_ptr<protocol::Array<protocol::Runtime::PropertyDescriptor>> out_result;
     Maybe<protocol::Array<protocol::Runtime::InternalPropertyDescriptor>> out_internalProperties;
+    Maybe<protocol::Array<protocol::Runtime::PrivatePropertyDescriptor>> out_privateProperties;
     Maybe<protocol::Runtime::ExceptionDetails> out_exceptionDetails;
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->getProperties(in_objectId, std::move(in_ownProperties), std::move(in_accessorPropertiesOnly), std::move(in_generatePreview), &out_result, &out_internalProperties, &out_exceptionDetails);
+    DispatchResponse response = m_backend->getProperties(in_objectId, std::move(in_ownProperties), std::move(in_accessorPropertiesOnly), std::move(in_generatePreview), &out_result, &out_internalProperties, &out_privateProperties, &out_exceptionDetails);
     if (response.status() == DispatchResponse::kFallThrough) {
         channel()->fallThrough(callId, method, message);
         return;
@@ -1855,6 +1892,8 @@ void DispatcherImpl::getProperties(int callId, const String& method, const Proto
         result->setValue("result", ValueConversions<protocol::Array<protocol::Runtime::PropertyDescriptor>>::toValue(out_result.get()));
         if (out_internalProperties.isJust())
             result->setValue("internalProperties", ValueConversions<protocol::Array<protocol::Runtime::InternalPropertyDescriptor>>::toValue(out_internalProperties.fromJust()));
+        if (out_privateProperties.isJust())
+            result->setValue("privateProperties", ValueConversions<protocol::Array<protocol::Runtime::PrivatePropertyDescriptor>>::toValue(out_privateProperties.fromJust()));
         if (out_exceptionDetails.isJust())
             result->setValue("exceptionDetails", ValueConversions<protocol::Runtime::ExceptionDetails>::toValue(out_exceptionDetails.fromJust()));
     }

@@ -152,21 +152,21 @@ static constexpr int kStackLimitValues = 1000;
 
 // Below are three parsing routines for CBOR, which cover enough
 // to roundtrip JSON messages.
-std::unique_ptr<DictionaryValue> parseMap(int32_t stack_depth, CBORTokenizer* tokenizer);
-std::unique_ptr<ListValue> parseArray(int32_t stack_depth, CBORTokenizer* tokenizer);
-std::unique_ptr<Value> parseValue(int32_t stack_depth, CBORTokenizer* tokenizer);
+std::unique_ptr<DictionaryValue> parseMap(int32_t stack_depth, cbor::CBORTokenizer* tokenizer);
+std::unique_ptr<ListValue> parseArray(int32_t stack_depth, cbor::CBORTokenizer* tokenizer);
+std::unique_ptr<Value> parseValue(int32_t stack_depth, cbor::CBORTokenizer* tokenizer);
 
 // |bytes| must start with the indefinite length array byte, so basically,
 // ParseArray may only be called after an indefinite length array has been
 // detected.
-std::unique_ptr<ListValue> parseArray(int32_t stack_depth, CBORTokenizer* tokenizer) {
-  DCHECK(tokenizer->TokenTag() == CBORTokenTag::ARRAY_START);
+std::unique_ptr<ListValue> parseArray(int32_t stack_depth, cbor::CBORTokenizer* tokenizer) {
+  DCHECK(tokenizer->TokenTag() == cbor::CBORTokenTag::ARRAY_START);
   tokenizer->Next();
   auto list = ListValue::create();
-  while (tokenizer->TokenTag() != CBORTokenTag::STOP) {
+  while (tokenizer->TokenTag() != cbor::CBORTokenTag::STOP) {
     // Error::CBOR_UNEXPECTED_EOF_IN_ARRAY
-    if (tokenizer->TokenTag() == CBORTokenTag::DONE) return nullptr;
-    if (tokenizer->TokenTag() == CBORTokenTag::ERROR_VALUE) return nullptr;
+    if (tokenizer->TokenTag() == cbor::CBORTokenTag::DONE) return nullptr;
+    if (tokenizer->TokenTag() == cbor::CBORTokenTag::ERROR_VALUE) return nullptr;
     // Parse value.
     auto value = parseValue(stack_depth, tokenizer);
     if (!value) return nullptr;
@@ -177,51 +177,51 @@ std::unique_ptr<ListValue> parseArray(int32_t stack_depth, CBORTokenizer* tokeni
 }
 
 std::unique_ptr<Value> parseValue(
-    int32_t stack_depth, CBORTokenizer* tokenizer) {
+    int32_t stack_depth, cbor::CBORTokenizer* tokenizer) {
   // Error::CBOR_STACK_LIMIT_EXCEEDED
   if (stack_depth > kStackLimitValues) return nullptr;
   // Skip past the envelope to get to what's inside.
-  if (tokenizer->TokenTag() == CBORTokenTag::ENVELOPE)
+  if (tokenizer->TokenTag() == cbor::CBORTokenTag::ENVELOPE)
     tokenizer->EnterEnvelope();
   switch (tokenizer->TokenTag()) {
-    case CBORTokenTag::ERROR_VALUE:
+    case cbor::CBORTokenTag::ERROR_VALUE:
       return nullptr;
-    case CBORTokenTag::DONE:
+    case cbor::CBORTokenTag::DONE:
       // Error::CBOR_UNEXPECTED_EOF_EXPECTED_VALUE
       return nullptr;
-    case CBORTokenTag::TRUE_VALUE: {
+    case cbor::CBORTokenTag::TRUE_VALUE: {
       std::unique_ptr<Value> value = FundamentalValue::create(true);
       tokenizer->Next();
       return value;
     }
-    case CBORTokenTag::FALSE_VALUE: {
+    case cbor::CBORTokenTag::FALSE_VALUE: {
       std::unique_ptr<Value> value = FundamentalValue::create(false);
       tokenizer->Next();
       return value;
     }
-    case CBORTokenTag::NULL_VALUE: {
+    case cbor::CBORTokenTag::NULL_VALUE: {
       std::unique_ptr<Value> value = FundamentalValue::null();
       tokenizer->Next();
       return value;
     }
-    case CBORTokenTag::INT32: {
+    case cbor::CBORTokenTag::INT32: {
       std::unique_ptr<Value> value = FundamentalValue::create(tokenizer->GetInt32());
       tokenizer->Next();
       return value;
     }
-    case CBORTokenTag::DOUBLE: {
+    case cbor::CBORTokenTag::DOUBLE: {
       std::unique_ptr<Value> value = FundamentalValue::create(tokenizer->GetDouble());
       tokenizer->Next();
       return value;
     }
-    case CBORTokenTag::STRING8: {
+    case cbor::CBORTokenTag::STRING8: {
       span<uint8_t> str = tokenizer->GetString8();
       std::unique_ptr<Value> value =
           StringValue::create(StringUtil::fromUTF8(str.data(), str.size()));
       tokenizer->Next();
       return value;
     }
-    case CBORTokenTag::STRING16: {
+    case cbor::CBORTokenTag::STRING16: {
       span<uint8_t> wire = tokenizer->GetString16WireRep();
       DCHECK_EQ(wire.size() & 1, 0);
       std::unique_ptr<Value> value = StringValue::create(StringUtil::fromUTF16(
@@ -229,14 +229,14 @@ std::unique_ptr<Value> parseValue(
       tokenizer->Next();
       return value;
     }
-    case CBORTokenTag::BINARY: {
+    case cbor::CBORTokenTag::BINARY: {
       span<uint8_t> payload = tokenizer->GetBinary();
       tokenizer->Next();
       return BinaryValue::create(Binary::fromSpan(payload.data(), payload.size()));
     }
-    case CBORTokenTag::MAP_START:
+    case cbor::CBORTokenTag::MAP_START:
       return parseMap(stack_depth + 1, tokenizer);
-    case CBORTokenTag::ARRAY_START:
+    case cbor::CBORTokenTag::ARRAY_START:
       return parseArray(stack_depth + 1, tokenizer);
     default:
       // Error::CBOR_UNSUPPORTED_VALUE
@@ -248,22 +248,22 @@ std::unique_ptr<Value> parseValue(
 // ParseArray may only be called after an indefinite length array has been
 // detected.
 std::unique_ptr<DictionaryValue> parseMap(
-    int32_t stack_depth, CBORTokenizer* tokenizer) {
+    int32_t stack_depth, cbor::CBORTokenizer* tokenizer) {
   auto dict = DictionaryValue::create();
   tokenizer->Next();
-  while (tokenizer->TokenTag() != CBORTokenTag::STOP) {
-    if (tokenizer->TokenTag() == CBORTokenTag::DONE) {
+  while (tokenizer->TokenTag() != cbor::CBORTokenTag::STOP) {
+    if (tokenizer->TokenTag() == cbor::CBORTokenTag::DONE) {
       // Error::CBOR_UNEXPECTED_EOF_IN_MAP
       return nullptr;
     }
-    if (tokenizer->TokenTag() == CBORTokenTag::ERROR_VALUE) return nullptr;
+    if (tokenizer->TokenTag() == cbor::CBORTokenTag::ERROR_VALUE) return nullptr;
     // Parse key.
     String key;
-    if (tokenizer->TokenTag() == CBORTokenTag::STRING8) {
+    if (tokenizer->TokenTag() == cbor::CBORTokenTag::STRING8) {
       span<uint8_t> key_span = tokenizer->GetString8();
       key = StringUtil::fromUTF8(key_span.data(), key_span.size());
       tokenizer->Next();
-    } else if (tokenizer->TokenTag() == CBORTokenTag::STRING16) {
+    } else if (tokenizer->TokenTag() == cbor::CBORTokenTag::STRING16) {
       return nullptr;  // STRING16 not supported yet.
     } else {
       // Error::CBOR_INVALID_MAP_KEY
@@ -288,22 +288,21 @@ std::unique_ptr<Value> Value::parseBinary(const uint8_t* data, size_t size) {
   if (bytes.empty()) return nullptr;
 
   // Error::CBOR_INVALID_START_BYTE
-  // TODO(johannes): EncodeInitialByteForEnvelope() method.
-  if (bytes[0] != 0xd8) return nullptr;
+  if (bytes[0] != cbor::InitialByteForEnvelope()) return nullptr;
 
-  CBORTokenizer tokenizer(bytes);
-  if (tokenizer.TokenTag() == CBORTokenTag::ERROR_VALUE) return nullptr;
+  cbor::CBORTokenizer tokenizer(bytes);
+  if (tokenizer.TokenTag() == cbor::CBORTokenTag::ERROR_VALUE) return nullptr;
 
   // We checked for the envelope start byte above, so the tokenizer
   // must agree here, since it's not an error.
-  DCHECK(tokenizer.TokenTag() == CBORTokenTag::ENVELOPE);
+  DCHECK(tokenizer.TokenTag() == cbor::CBORTokenTag::ENVELOPE);
   tokenizer.EnterEnvelope();
   // Error::MAP_START_EXPECTED
-  if (tokenizer.TokenTag() != CBORTokenTag::MAP_START) return nullptr;
+  if (tokenizer.TokenTag() != cbor::CBORTokenTag::MAP_START) return nullptr;
   std::unique_ptr<Value> result = parseMap(/*stack_depth=*/1, &tokenizer);
   if (!result) return nullptr;
-  if (tokenizer.TokenTag() == CBORTokenTag::DONE) return result;
-  if (tokenizer.TokenTag() == CBORTokenTag::ERROR_VALUE) return nullptr;
+  if (tokenizer.TokenTag() == cbor::CBORTokenTag::DONE) return result;
+  if (tokenizer.TokenTag() == cbor::CBORTokenTag::ERROR_VALUE) return nullptr;
   // Error::CBOR_TRAILING_JUNK
   return nullptr;
 }
@@ -341,7 +340,7 @@ void Value::writeJSON(StringBuilder* output) const
 
 void Value::writeBinary(std::vector<uint8_t>* bytes) const {
     DCHECK(m_type == TypeNull);
-    bytes->push_back(EncodeNull());
+    bytes->push_back(cbor::EncodeNull());
 }
 
 std::unique_ptr<Value> Value::clone() const
@@ -418,13 +417,13 @@ void FundamentalValue::writeJSON(StringBuilder* output) const
 void FundamentalValue::writeBinary(std::vector<uint8_t>* bytes) const {
     switch (type()) {
     case TypeDouble:
-        EncodeDouble(m_doubleValue, bytes);
+        cbor::EncodeDouble(m_doubleValue, bytes);
         return;
     case TypeInteger:
-        EncodeInt32(m_integerValue, bytes);
+        cbor::EncodeInt32(m_integerValue, bytes);
         return;
     case TypeBoolean:
-        bytes->push_back(m_boolValue ? EncodeTrue() : EncodeFalse());
+        bytes->push_back(m_boolValue ? cbor::EncodeTrue() : cbor::EncodeFalse());
         return;
     default:
         DCHECK(false);
@@ -466,20 +465,20 @@ namespace {
 //   have LATIN1 on the wire, so we call EncodeFromLatin1 which
 //   transcodes to UTF8 if needed.
 void EncodeString(const String& s, std::vector<uint8_t>* out) {
-  if (StringUtil::CharactersLatin1(s)) {
-    EncodeFromLatin1(span<uint8_t>(StringUtil::CharactersLatin1(s),
-                                   StringUtil::CharacterCount(s)),
-                     out);
+  if (StringUtil::CharacterCount(s) == 0) {
+    cbor::EncodeString8(span<uint8_t>(nullptr, 0), out);  // Empty string.
+  } else if (StringUtil::CharactersLatin1(s)) {
+    cbor::EncodeFromLatin1(span<uint8_t>(StringUtil::CharactersLatin1(s),
+		                         StringUtil::CharacterCount(s)),
+                           out);
   } else if (StringUtil::CharactersUTF16(s)) {
-    EncodeFromUTF16(span<uint16_t>(StringUtil::CharactersUTF16(s),
-                                   StringUtil::CharacterCount(s)),
-                    out);
+    cbor::EncodeFromUTF16(span<uint16_t>(StringUtil::CharactersUTF16(s),
+                                         StringUtil::CharacterCount(s)),
+                          out);
   } else if (StringUtil::CharactersUTF8(s)) {
-    EncodeString8(span<uint8_t>(StringUtil::CharactersUTF8(s),
-                                StringUtil::CharacterCount(s)),
-                  out);
-  } else {
-    EncodeString8(span<uint8_t>(nullptr, 0), out);  // Empty string.
+    cbor::EncodeString8(span<uint8_t>(StringUtil::CharactersUTF8(s),
+                                      StringUtil::CharacterCount(s)),
+                        out);
   }
 }
 }  // namespace
@@ -506,7 +505,8 @@ void BinaryValue::writeJSON(StringBuilder* output) const
 }
 
 void BinaryValue::writeBinary(std::vector<uint8_t>* bytes) const {
-    EncodeBinary(span<uint8_t>(m_binaryValue.data(), m_binaryValue.size()), bytes);
+    cbor::EncodeBinary(span<uint8_t>(m_binaryValue.data(),
+                                     m_binaryValue.size()), bytes);
 }
 
 std::unique_ptr<Value> BinaryValue::clone() const
@@ -669,9 +669,9 @@ void DictionaryValue::writeJSON(StringBuilder* output) const
 }
 
 void DictionaryValue::writeBinary(std::vector<uint8_t>* bytes) const {
-    EnvelopeEncoder encoder;
+    cbor::EnvelopeEncoder encoder;
     encoder.EncodeStart(bytes);
-    bytes->push_back(EncodeIndefiniteLengthMapStart());
+    bytes->push_back(cbor::EncodeIndefiniteLengthMapStart());
     for (size_t i = 0; i < m_order.size(); ++i) {
         const String& key = m_order[i];
         Dictionary::const_iterator value = m_data.find(key);
@@ -679,7 +679,7 @@ void DictionaryValue::writeBinary(std::vector<uint8_t>* bytes) const {
         EncodeString(key, bytes);
         value->second->writeBinary(bytes);
     }
-    bytes->push_back(EncodeStop());
+    bytes->push_back(cbor::EncodeStop());
     encoder.EncodeStop(bytes);
 }
 
@@ -718,13 +718,13 @@ void ListValue::writeJSON(StringBuilder* output) const
 }
 
 void ListValue::writeBinary(std::vector<uint8_t>* bytes) const {
-    EnvelopeEncoder encoder;
+    cbor::EnvelopeEncoder encoder;
     encoder.EncodeStart(bytes);
-    bytes->push_back(EncodeIndefiniteLengthArrayStart());
+    bytes->push_back(cbor::EncodeIndefiniteLengthArrayStart());
     for (size_t i = 0; i < m_data.size(); ++i) {
         m_data[i]->writeBinary(bytes);
     }
-    bytes->push_back(EncodeStop());
+    bytes->push_back(cbor::EncodeStop());
     encoder.EncodeStop(bytes);
 }
 
@@ -1708,7 +1708,7 @@ std::unique_ptr<Value> parseJSONCharacters(const uint8_t* characters, unsigned l
 } // namespace protocol
 
 
-// Generated by lib/CBOR_cpp.template.
+// Generated by lib/encoding_cpp.template.
 
 // Copyright 2019 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
@@ -1716,16 +1716,67 @@ std::unique_ptr<Value> parseJSONCharacters(const uint8_t* characters, unsigned l
 
 
 #include <cassert>
+#include <cmath>
+#include <cstring>
 #include <limits>
+#include <stack>
 
 namespace v8_inspector {
 namespace protocol {
 
-// ===== encoding/cbor.cc =====
+// ===== encoding/encoding.cc =====
 
-using namespace cbor;
-
+namespace cbor {
 namespace {
+// Indicates the number of bits the "initial byte" needs to be shifted to the
+// right after applying |kMajorTypeMask| to produce the major type in the
+// lowermost bits.
+static constexpr uint8_t kMajorTypeBitShift = 5u;
+// Mask selecting the low-order 5 bits of the "initial byte", which is where
+// the additional information is encoded.
+static constexpr uint8_t kAdditionalInformationMask = 0x1f;
+// Mask selecting the high-order 3 bits of the "initial byte", which indicates
+// the major type of the encoded value.
+static constexpr uint8_t kMajorTypeMask = 0xe0;
+// Indicates the integer is in the following byte.
+static constexpr uint8_t kAdditionalInformation1Byte = 24u;
+// Indicates the integer is in the next 2 bytes.
+static constexpr uint8_t kAdditionalInformation2Bytes = 25u;
+// Indicates the integer is in the next 4 bytes.
+static constexpr uint8_t kAdditionalInformation4Bytes = 26u;
+// Indicates the integer is in the next 8 bytes.
+static constexpr uint8_t kAdditionalInformation8Bytes = 27u;
+
+// Encodes the initial byte, consisting of the |type| in the first 3 bits
+// followed by 5 bits of |additional_info|.
+constexpr uint8_t EncodeInitialByte(MajorType type, uint8_t additional_info) {
+  return (static_cast<uint8_t>(type) << kMajorTypeBitShift) |
+         (additional_info & kAdditionalInformationMask);
+}
+
+// TAG 24 indicates that what follows is a byte string which is
+// encoded in CBOR format. We use this as a wrapper for
+// maps and arrays, allowing us to skip them, because the
+// byte string carries its size (byte length).
+// https://tools.ietf.org/html/rfc7049#section-2.4.4.1
+static constexpr uint8_t kInitialByteForEnvelope =
+    EncodeInitialByte(MajorType::TAG, 24);
+// The initial byte for a byte string with at most 2^32 bytes
+// of payload. This is used for envelope encoding, even if
+// the byte string is shorter.
+static constexpr uint8_t kInitialByteFor32BitLengthByteString =
+    EncodeInitialByte(MajorType::BYTE_STRING, 26);
+
+// See RFC 7049 Section 2.2.1, indefinite length arrays / maps have additional
+// info = 31.
+static constexpr uint8_t kInitialByteIndefiniteLengthArray =
+    EncodeInitialByte(MajorType::ARRAY, 31);
+static constexpr uint8_t kInitialByteIndefiniteLengthMap =
+    EncodeInitialByte(MajorType::MAP, 31);
+// See RFC 7049 Section 2.3, Table 1; this is used for finishing indefinite
+// length maps / arrays.
+static constexpr uint8_t kStopByte =
+    EncodeInitialByte(MajorType::SIMPLE_VALUE, 31);
 
 // See RFC 7049 Section 2.3, Table 2.
 static constexpr uint8_t kEncodedTrue =
@@ -1737,46 +1788,86 @@ static constexpr uint8_t kEncodedNull =
 static constexpr uint8_t kInitialByteForDouble =
     EncodeInitialByte(MajorType::SIMPLE_VALUE, 27);
 
-}  // namespace
-
-uint8_t EncodeTrue() { return kEncodedTrue; }
-uint8_t EncodeFalse() { return kEncodedFalse; }
-uint8_t EncodeNull() { return kEncodedNull; }
-
-uint8_t EncodeIndefiniteLengthArrayStart() {
-  return kInitialByteIndefiniteLengthArray;
-}
-
-uint8_t EncodeIndefiniteLengthMapStart() {
-  return kInitialByteIndefiniteLengthMap;
-}
-
-uint8_t EncodeStop() { return kStopByte; }
-
-namespace {
 // See RFC 7049 Table 3 and Section 2.4.4.2. This is used as a prefix for
 // arbitrary binary data encoded as BYTE_STRING.
 static constexpr uint8_t kExpectedConversionToBase64Tag =
     EncodeInitialByte(MajorType::TAG, 22);
 
-// When parsing CBOR, we limit recursion depth for objects and arrays
-// to this constant.
-static constexpr int kStackLimit = 1000;
-
 // Writes the bytes for |v| to |out|, starting with the most significant byte.
 // See also: https://commandcenter.blogspot.com/2012/04/byte-order-fallacy.html
-template <typename T>
-void WriteBytesMostSignificantByteFirst(T v, std::vector<uint8_t>* out) {
+template <typename T, class C>
+void WriteBytesMostSignificantByteFirst(T v, C* out) {
   for (int shift_bytes = sizeof(T) - 1; shift_bytes >= 0; --shift_bytes)
     out->push_back(0xff & (v >> (shift_bytes * 8)));
 }
+
+// Extracts sizeof(T) bytes from |in| to extract a value of type T
+// (e.g. uint64_t, uint32_t, ...), most significant byte first.
+// See also: https://commandcenter.blogspot.com/2012/04/byte-order-fallacy.html
+template <typename T>
+T ReadBytesMostSignificantByteFirst(span<uint8_t> in) {
+  assert(static_cast<std::size_t>(in.size()) >= sizeof(T));
+  T result = 0;
+  for (std::size_t shift_bytes = 0; shift_bytes < sizeof(T); ++shift_bytes)
+    result |= T(in[sizeof(T) - 1 - shift_bytes]) << (shift_bytes * 8);
+  return result;
+}
 }  // namespace
 
-namespace cbor_internals {
+namespace internals {
+// Reads the start of a token with definitive size from |bytes|.
+// |type| is the major type as specified in RFC 7049 Section 2.1.
+// |value| is the payload (e.g. for MajorType::UNSIGNED) or is the size
+// (e.g. for BYTE_STRING).
+// If successful, returns the number of bytes read. Otherwise returns -1.
+int8_t ReadTokenStart(span<uint8_t> bytes, MajorType* type, uint64_t* value) {
+  if (bytes.empty())
+    return -1;
+  uint8_t initial_byte = bytes[0];
+  *type = MajorType((initial_byte & kMajorTypeMask) >> kMajorTypeBitShift);
+
+  uint8_t additional_information = initial_byte & kAdditionalInformationMask;
+  if (additional_information < 24) {
+    // Values 0-23 are encoded directly into the additional info of the
+    // initial byte.
+    *value = additional_information;
+    return 1;
+  }
+  if (additional_information == kAdditionalInformation1Byte) {
+    // Values 24-255 are encoded with one initial byte, followed by the value.
+    if (bytes.size() < 2)
+      return -1;
+    *value = ReadBytesMostSignificantByteFirst<uint8_t>(bytes.subspan(1));
+    return 2;
+  }
+  if (additional_information == kAdditionalInformation2Bytes) {
+    // Values 256-65535: 1 initial byte + 2 bytes payload.
+    if (static_cast<std::size_t>(bytes.size()) < 1 + sizeof(uint16_t))
+      return -1;
+    *value = ReadBytesMostSignificantByteFirst<uint16_t>(bytes.subspan(1));
+    return 3;
+  }
+  if (additional_information == kAdditionalInformation4Bytes) {
+    // 32 bit uint: 1 initial byte + 4 bytes payload.
+    if (static_cast<std::size_t>(bytes.size()) < 1 + sizeof(uint32_t))
+      return -1;
+    *value = ReadBytesMostSignificantByteFirst<uint32_t>(bytes.subspan(1));
+    return 5;
+  }
+  if (additional_information == kAdditionalInformation8Bytes) {
+    // 64 bit uint: 1 initial byte + 8 bytes payload.
+    if (static_cast<std::size_t>(bytes.size()) < 1 + sizeof(uint64_t))
+      return -1;
+    *value = ReadBytesMostSignificantByteFirst<uint64_t>(bytes.subspan(1));
+    return 9;
+  }
+  return -1;
+}
+
 // Writes the start of a token with |type|. The |value| may indicate the size,
 // or it may be the payload if the value is an unsigned integer.
-void WriteTokenStart(MajorType type, uint64_t value,
-                     std::vector<uint8_t>* encoded) {
+template <typename C>
+void WriteTokenStartTmpl(MajorType type, uint64_t value, C* encoded) {
   if (value < 24) {
     // Values 0-23 are encoded directly into the additional info of the
     // initial byte.
@@ -1806,81 +1897,77 @@ void WriteTokenStart(MajorType type, uint64_t value,
   encoded->push_back(EncodeInitialByte(type, kAdditionalInformation8Bytes));
   WriteBytesMostSignificantByteFirst<uint64_t>(value, encoded);
 }
-}  // namespace cbor_internals
-
-namespace {
-// Extracts sizeof(T) bytes from |in| to extract a value of type T
-// (e.g. uint64_t, uint32_t, ...), most significant byte first.
-// See also: https://commandcenter.blogspot.com/2012/04/byte-order-fallacy.html
-template <typename T>
-T ReadBytesMostSignificantByteFirst(span<uint8_t> in) {
-  assert(static_cast<std::size_t>(in.size()) >= sizeof(T));
-  T result = 0;
-  for (std::size_t shift_bytes = 0; shift_bytes < sizeof(T); ++shift_bytes)
-    result |= T(in[sizeof(T) - 1 - shift_bytes]) << (shift_bytes * 8);
-  return result;
+void WriteTokenStart(MajorType type,
+                     uint64_t value,
+                     std::vector<uint8_t>* encoded) {
+  WriteTokenStartTmpl(type, value, encoded);
 }
-}  // namespace
-
-namespace cbor_internals {
-int8_t ReadTokenStart(span<uint8_t> bytes, MajorType* type, uint64_t* value) {
-  if (bytes.empty()) return -1;
-  uint8_t initial_byte = bytes[0];
-  *type = MajorType((initial_byte & kMajorTypeMask) >> kMajorTypeBitShift);
-
-  uint8_t additional_information = initial_byte & kAdditionalInformationMask;
-  if (additional_information < 24) {
-    // Values 0-23 are encoded directly into the additional info of the
-    // initial byte.
-    *value = additional_information;
-    return 1;
-  }
-  if (additional_information == kAdditionalInformation1Byte) {
-    // Values 24-255 are encoded with one initial byte, followed by the value.
-    if (bytes.size() < 2) return -1;
-    *value = ReadBytesMostSignificantByteFirst<uint8_t>(bytes.subspan(1));
-    return 2;
-  }
-  if (additional_information == kAdditionalInformation2Bytes) {
-    // Values 256-65535: 1 initial byte + 2 bytes payload.
-    if (static_cast<std::size_t>(bytes.size()) < 1 + sizeof(uint16_t))
-      return -1;
-    *value = ReadBytesMostSignificantByteFirst<uint16_t>(bytes.subspan(1));
-    return 3;
-  }
-  if (additional_information == kAdditionalInformation4Bytes) {
-    // 32 bit uint: 1 initial byte + 4 bytes payload.
-    if (static_cast<std::size_t>(bytes.size()) < 1 + sizeof(uint32_t))
-      return -1;
-    *value = ReadBytesMostSignificantByteFirst<uint32_t>(bytes.subspan(1));
-    return 5;
-  }
-  if (additional_information == kAdditionalInformation8Bytes) {
-    // 64 bit uint: 1 initial byte + 8 bytes payload.
-    if (static_cast<std::size_t>(bytes.size()) < 1 + sizeof(uint64_t))
-      return -1;
-    *value = ReadBytesMostSignificantByteFirst<uint64_t>(bytes.subspan(1));
-    return 9;
-  }
-  return -1;
+void WriteTokenStart(MajorType type, uint64_t value, std::string* encoded) {
+  WriteTokenStartTmpl(type, value, encoded);
 }
-}  // namespace cbor_internals
+}  // namespace internals
 
-using cbor_internals::WriteTokenStart;
-using cbor_internals::ReadTokenStart;
+// =============================================================================
+// Detecting CBOR content
+// =============================================================================
 
-void EncodeInt32(int32_t value, std::vector<uint8_t>* out) {
+uint8_t InitialByteForEnvelope() {
+  return kInitialByteForEnvelope;
+}
+uint8_t InitialByteFor32BitLengthByteString() {
+  return kInitialByteFor32BitLengthByteString;
+}
+bool IsCBORMessage(span<uint8_t> msg) {
+  return msg.size() >= 6 && msg[0] == InitialByteForEnvelope() &&
+         msg[1] == InitialByteFor32BitLengthByteString();
+}
+
+// =============================================================================
+// Encoding invidiual CBOR items
+// =============================================================================
+
+uint8_t EncodeTrue() {
+  return kEncodedTrue;
+}
+uint8_t EncodeFalse() {
+  return kEncodedFalse;
+}
+uint8_t EncodeNull() {
+  return kEncodedNull;
+}
+
+uint8_t EncodeIndefiniteLengthArrayStart() {
+  return kInitialByteIndefiniteLengthArray;
+}
+
+uint8_t EncodeIndefiniteLengthMapStart() {
+  return kInitialByteIndefiniteLengthMap;
+}
+
+uint8_t EncodeStop() {
+  return kStopByte;
+}
+
+template <typename C>
+void EncodeInt32Tmpl(int32_t value, C* out) {
   if (value >= 0) {
-    WriteTokenStart(MajorType::UNSIGNED, value, out);
+    internals::WriteTokenStart(MajorType::UNSIGNED, value, out);
   } else {
     uint64_t representation = static_cast<uint64_t>(-(value + 1));
-    WriteTokenStart(MajorType::NEGATIVE, representation, out);
+    internals::WriteTokenStart(MajorType::NEGATIVE, representation, out);
   }
 }
+void EncodeInt32(int32_t value, std::vector<uint8_t>* out) {
+  EncodeInt32Tmpl(value, out);
+}
+void EncodeInt32(int32_t value, std::string* out) {
+  EncodeInt32Tmpl(value, out);
+}
 
-void EncodeString16(span<uint16_t> in, std::vector<uint8_t>* out) {
+template <typename C>
+void EncodeString16Tmpl(span<uint16_t> in, C* out) {
   uint64_t byte_length = static_cast<uint64_t>(in.size_bytes());
-  WriteTokenStart(MajorType::BYTE_STRING, byte_length, out);
+  internals::WriteTokenStart(MajorType::BYTE_STRING, byte_length, out);
   // When emitting UTF16 characters, we always write the least significant byte
   // first; this is because it's the native representation for X86.
   // TODO(johannes): Implement a more efficient thing here later, e.g.
@@ -1895,16 +1982,31 @@ void EncodeString16(span<uint16_t> in, std::vector<uint8_t>* out) {
     out->push_back(two_bytes >> 8);
   }
 }
-
-void EncodeString8(span<uint8_t> in, std::vector<uint8_t>* out) {
-  WriteTokenStart(MajorType::STRING, static_cast<uint64_t>(in.size_bytes()),
-                  out);
-  out->insert(out->end(), in.begin(), in.end());
+void EncodeString16(span<uint16_t> in, std::vector<uint8_t>* out) {
+  EncodeString16Tmpl(in, out);
+}
+void EncodeString16(span<uint16_t> in, std::string* out) {
+  EncodeString16Tmpl(in, out);
 }
 
-void EncodeFromLatin1(span<uint8_t> latin1, std::vector<uint8_t>* out) {
+template <typename C>
+void EncodeString8Tmpl(span<uint8_t> in, C* out) {
+  internals::WriteTokenStart(MajorType::STRING,
+                             static_cast<uint64_t>(in.size_bytes()), out);
+  out->insert(out->end(), in.begin(), in.end());
+}
+void EncodeString8(span<uint8_t> in, std::vector<uint8_t>* out) {
+  EncodeString8Tmpl(in, out);
+}
+void EncodeString8(span<uint8_t> in, std::string* out) {
+  EncodeString8Tmpl(in, out);
+}
+
+template <typename C>
+void EncodeFromLatin1Tmpl(span<uint8_t> latin1, C* out) {
   for (std::ptrdiff_t ii = 0; ii < latin1.size(); ++ii) {
-    if (latin1[ii] <= 127) continue;
+    if (latin1[ii] <= 127)
+      continue;
     // If there's at least one non-ASCII char, convert to UTF8.
     std::vector<uint8_t> utf8(latin1.begin(), latin1.begin() + ii);
     for (; ii < latin1.size(); ++ii) {
@@ -1916,29 +2018,51 @@ void EncodeFromLatin1(span<uint8_t> latin1, std::vector<uint8_t>* out) {
         utf8.push_back((latin1[ii] | 0x80) & 0xbf);
       }
     }
-    EncodeString8(span<uint8_t>(utf8.data(), utf8.size()), out);
+    EncodeString8(SpanFromVector(utf8), out);
     return;
   }
   EncodeString8(latin1, out);
 }
+void EncodeFromLatin1(span<uint8_t> latin1, std::vector<uint8_t>* out) {
+  EncodeFromLatin1Tmpl(latin1, out);
+}
+void EncodeFromLatin1(span<uint8_t> latin1, std::string* out) {
+  EncodeFromLatin1Tmpl(latin1, out);
+}
 
-void EncodeFromUTF16(span<uint16_t> utf16, std::vector<uint8_t>* out) {
+template <typename C>
+void EncodeFromUTF16Tmpl(span<uint16_t> utf16, C* out) {
   // If there's at least one non-ASCII char, encode as STRING16 (UTF16).
   for (uint16_t ch : utf16) {
-    if (ch <= 127) continue;
+    if (ch <= 127)
+      continue;
     EncodeString16(utf16, out);
     return;
   }
   // It's all US-ASCII, strip out every second byte and encode as UTF8.
-  WriteTokenStart(MajorType::STRING, static_cast<uint64_t>(utf16.size()), out);
+  internals::WriteTokenStart(MajorType::STRING,
+                             static_cast<uint64_t>(utf16.size()), out);
   out->insert(out->end(), utf16.begin(), utf16.end());
 }
+void EncodeFromUTF16(span<uint16_t> utf16, std::vector<uint8_t>* out) {
+  EncodeFromUTF16Tmpl(utf16, out);
+}
+void EncodeFromUTF16(span<uint16_t> utf16, std::string* out) {
+  EncodeFromUTF16Tmpl(utf16, out);
+}
 
-void EncodeBinary(span<uint8_t> in, std::vector<uint8_t>* out) {
+template <typename C>
+void EncodeBinaryTmpl(span<uint8_t> in, C* out) {
   out->push_back(kExpectedConversionToBase64Tag);
   uint64_t byte_length = static_cast<uint64_t>(in.size_bytes());
-  WriteTokenStart(MajorType::BYTE_STRING, byte_length, out);
+  internals::WriteTokenStart(MajorType::BYTE_STRING, byte_length, out);
   out->insert(out->end(), in.begin(), in.end());
+}
+void EncodeBinary(span<uint8_t> in, std::vector<uint8_t>* out) {
+  EncodeBinaryTmpl(in, out);
+}
+void EncodeBinary(span<uint8_t> in, std::string* out) {
+  EncodeBinaryTmpl(in, out);
 }
 
 // A double is encoded with a specific initial byte
@@ -1950,7 +2074,8 @@ constexpr std::ptrdiff_t kEncodedDoubleSize = 1 + sizeof(uint64_t);
 // bit wide length, plus a 32 bit length for that string.
 constexpr std::ptrdiff_t kEncodedEnvelopeHeaderSize = 1 + 1 + sizeof(uint32_t);
 
-void EncodeDouble(double value, std::vector<uint8_t>* out) {
+template <typename C>
+void EncodeDoubleTmpl(double value, C* out) {
   // The additional_info=27 indicates 64 bits for the double follow.
   // See RFC 7049 Section 2.3, Table 1.
   out->push_back(kInitialByteForDouble);
@@ -1961,45 +2086,78 @@ void EncodeDouble(double value, std::vector<uint8_t>* out) {
   reinterpret.from_double = value;
   WriteBytesMostSignificantByteFirst<uint64_t>(reinterpret.to_uint64, out);
 }
+void EncodeDouble(double value, std::vector<uint8_t>* out) {
+  EncodeDoubleTmpl(value, out);
+}
+void EncodeDouble(double value, std::string* out) {
+  EncodeDoubleTmpl(value, out);
+}
 
-void EnvelopeEncoder::EncodeStart(std::vector<uint8_t>* out) {
-  assert(byte_size_pos_ == 0);
+// =============================================================================
+// cbor::EnvelopeEncoder - for wrapping submessages
+// =============================================================================
+
+template <typename C>
+void EncodeStartTmpl(C* out, std::size_t& byte_size_pos) {
+  assert(byte_size_pos == 0);
   out->push_back(kInitialByteForEnvelope);
   out->push_back(kInitialByteFor32BitLengthByteString);
-  byte_size_pos_ = out->size();
+  byte_size_pos = out->size();
   out->resize(out->size() + sizeof(uint32_t));
 }
 
-bool EnvelopeEncoder::EncodeStop(std::vector<uint8_t>* out) {
-  assert(byte_size_pos_ != 0);
+void EnvelopeEncoder::EncodeStart(std::vector<uint8_t>* out) {
+  EncodeStartTmpl<std::vector<uint8_t>>(out, byte_size_pos_);
+}
+
+void EnvelopeEncoder::EncodeStart(std::string* out) {
+  EncodeStartTmpl<std::string>(out, byte_size_pos_);
+}
+
+template <typename C>
+bool EncodeStopTmpl(C* out, std::size_t& byte_size_pos) {
+  assert(byte_size_pos != 0);
   // The byte size is the size of the payload, that is, all the
   // bytes that were written past the byte size position itself.
-  uint64_t byte_size = out->size() - (byte_size_pos_ + sizeof(uint32_t));
+  uint64_t byte_size = out->size() - (byte_size_pos + sizeof(uint32_t));
   // We store exactly 4 bytes, so at most INT32MAX, with most significant
   // byte first.
-  if (byte_size > std::numeric_limits<uint32_t>::max()) return false;
+  if (byte_size > std::numeric_limits<uint32_t>::max())
+    return false;
   for (int shift_bytes = sizeof(uint32_t) - 1; shift_bytes >= 0;
        --shift_bytes) {
-    (*out)[byte_size_pos_++] = 0xff & (byte_size >> (shift_bytes * 8));
+    (*out)[byte_size_pos++] = 0xff & (byte_size >> (shift_bytes * 8));
   }
   return true;
 }
 
+bool EnvelopeEncoder::EncodeStop(std::vector<uint8_t>* out) {
+  return EncodeStopTmpl(out, byte_size_pos_);
+}
+
+bool EnvelopeEncoder::EncodeStop(std::string* out) {
+  return EncodeStopTmpl(out, byte_size_pos_);
+}
+
+// =============================================================================
+// cbor::NewCBOREncoder - for encoding from a streaming parser
+// =============================================================================
+
 namespace {
-class JSONToCBOREncoder : public JSONParserHandler {
+template <typename C>
+class CBOREncoder : public StreamingParserHandler {
  public:
-  JSONToCBOREncoder(std::vector<uint8_t>* out, Status* status)
-      : out_(out), status_(status) {
+  CBOREncoder(C* out, Status* status) : out_(out), status_(status) {
     *status_ = Status();
   }
 
-  void HandleObjectBegin() override {
+  void HandleMapBegin() override {
     envelopes_.emplace_back();
     envelopes_.back().EncodeStart(out_);
     out_->push_back(kInitialByteIndefiniteLengthMap);
   }
 
-  void HandleObjectEnd() override {
+  void HandleMapEnd() override {
     out_->push_back(kStopByte);
     assert(!envelopes_.empty());
     envelopes_.back().EncodeStop(out_);
@@ -2024,21 +2182,10 @@ class JSONToCBOREncoder : public JSONParserHandler {
   }
 
   void HandleString16(span<uint16_t> chars) override {
-    for (uint16_t ch : chars) {
-      if (ch >= 0x7f) {
-        // If there's at least one non-7bit character, we encode as UTF16.
-        EncodeString16(chars, out_);
-        return;
-      }
-    }
-    std::vector<uint8_t> sevenbit_chars(chars.begin(), chars.end());
-    EncodeString8(span<uint8_t>(sevenbit_chars.data(), sevenbit_chars.size()),
-                  out_);
+    EncodeFromUTF16(chars, out_);
   }
 
-  void HandleBinary(std::vector<uint8_t> bytes) override {
-    EncodeBinary(span<uint8_t>(bytes.data(), bytes.size()), out_);
-  }
+  void HandleBinary(span<uint8_t> bytes) override { EncodeBinary(bytes, out_); }
 
   void HandleDouble(double value) override { EncodeDouble(value, out_); }
 
@@ -2061,28 +2208,268 @@ class JSONToCBOREncoder : public JSONParserHandler {
   }
 
  private:
-  std::vector<uint8_t>* out_;
+  C* out_;
   std::vector<EnvelopeEncoder> envelopes_;
   Status* status_;
 };
 }  // namespace
 
-std::unique_ptr<JSONParserHandler> NewJSONToCBOREncoder(
-    std::vector<uint8_t>* out, Status* status) {
-  return std::unique_ptr<JSONParserHandler>(new JSONToCBOREncoder(out, status));
+std::unique_ptr<StreamingParserHandler> NewCBOREncoder(
+    std::vector<uint8_t>* out,
+    Status* status) {
+  return std::unique_ptr<StreamingParserHandler>(
+      new CBOREncoder<std::vector<uint8_t>>(out, status));
+}
+std::unique_ptr<StreamingParserHandler> NewCBOREncoder(std::string* out,
+                                                       Status* status) {
+  return std::unique_ptr<StreamingParserHandler>(
+      new CBOREncoder<std::string>(out, status));
 }
 
+// =============================================================================
+// cbor::CBORTokenizer - for parsing individual CBOR items
+// =============================================================================
+
+CBORTokenizer::CBORTokenizer(span<uint8_t> bytes) : bytes_(bytes) {
+  ReadNextToken(/*enter_envelope=*/false);
+}
+CBORTokenizer::~CBORTokenizer() {}
+
+CBORTokenTag CBORTokenizer::TokenTag() const {
+  return token_tag_;
+}
+
+void CBORTokenizer::Next() {
+  if (token_tag_ == CBORTokenTag::ERROR_VALUE ||
+      token_tag_ == CBORTokenTag::DONE)
+    return;
+  ReadNextToken(/*enter_envelope=*/false);
+}
+
+void CBORTokenizer::EnterEnvelope() {
+  assert(token_tag_ == CBORTokenTag::ENVELOPE);
+  ReadNextToken(/*enter_envelope=*/true);
+}
+
+Status CBORTokenizer::Status() const {
+  return status_;
+}
+
+int32_t CBORTokenizer::GetInt32() const {
+  assert(token_tag_ == CBORTokenTag::INT32);
+  // The range checks happen in ::ReadNextToken().
+  return static_cast<uint32_t>(
+      token_start_type_ == MajorType::UNSIGNED
+          ? token_start_internal_value_
+          : -static_cast<int64_t>(token_start_internal_value_) - 1);
+}
+
+double CBORTokenizer::GetDouble() const {
+  assert(token_tag_ == CBORTokenTag::DOUBLE);
+  union {
+    uint64_t from_uint64;
+    double to_double;
+  } reinterpret;
+  reinterpret.from_uint64 = ReadBytesMostSignificantByteFirst<uint64_t>(
+      bytes_.subspan(status_.pos + 1));
+  return reinterpret.to_double;
+}
+
+span<uint8_t> CBORTokenizer::GetString8() const {
+  assert(token_tag_ == CBORTokenTag::STRING8);
+  auto length = static_cast<std::ptrdiff_t>(token_start_internal_value_);
+  return bytes_.subspan(status_.pos + (token_byte_length_ - length), length);
+}
+
+span<uint8_t> CBORTokenizer::GetString16WireRep() const {
+  assert(token_tag_ == CBORTokenTag::STRING16);
+  auto length = static_cast<std::ptrdiff_t>(token_start_internal_value_);
+  return bytes_.subspan(status_.pos + (token_byte_length_ - length), length);
+}
+
+span<uint8_t> CBORTokenizer::GetBinary() const {
+  assert(token_tag_ == CBORTokenTag::BINARY);
+  auto length = static_cast<std::ptrdiff_t>(token_start_internal_value_);
+  return bytes_.subspan(status_.pos + (token_byte_length_ - length), length);
+}
+
+span<uint8_t> CBORTokenizer::GetEnvelopeContents() const {
+  assert(token_tag_ == CBORTokenTag::ENVELOPE);
+  auto length = static_cast<std::ptrdiff_t>(token_start_internal_value_);
+  return bytes_.subspan(status_.pos + kEncodedEnvelopeHeaderSize, length);
+}
+
+void CBORTokenizer::ReadNextToken(bool enter_envelope) {
+  if (enter_envelope) {
+    status_.pos += kEncodedEnvelopeHeaderSize;
+  } else {
+    status_.pos =
+        status_.pos == Status::npos() ? 0 : status_.pos + token_byte_length_;
+  }
+  status_.error = Error::OK;
+  if (status_.pos >= bytes_.size()) {
+    token_tag_ = CBORTokenTag::DONE;
+    return;
+  }
+  switch (bytes_[status_.pos]) {
+    case kStopByte:
+      SetToken(CBORTokenTag::STOP, 1);
+      return;
+    case kInitialByteIndefiniteLengthMap:
+      SetToken(CBORTokenTag::MAP_START, 1);
+      return;
+    case kInitialByteIndefiniteLengthArray:
+      SetToken(CBORTokenTag::ARRAY_START, 1);
+      return;
+    case kEncodedTrue:
+      SetToken(CBORTokenTag::TRUE_VALUE, 1);
+      return;
+    case kEncodedFalse:
+      SetToken(CBORTokenTag::FALSE_VALUE, 1);
+      return;
+    case kEncodedNull:
+      SetToken(CBORTokenTag::NULL_VALUE, 1);
+      return;
+    case kExpectedConversionToBase64Tag: {  // BINARY
+      int8_t bytes_read = internals::ReadTokenStart(
+          bytes_.subspan(status_.pos + 1), &token_start_type_,
+          &token_start_internal_value_);
+      int64_t token_byte_length = 1 + bytes_read + token_start_internal_value_;
+      if (-1 == bytes_read || token_start_type_ != MajorType::BYTE_STRING ||
+          status_.pos + token_byte_length > bytes_.size()) {
+        SetError(Error::CBOR_INVALID_BINARY);
+        return;
+      }
+      SetToken(CBORTokenTag::BINARY,
+               static_cast<std::ptrdiff_t>(token_byte_length));
+      return;
+    }
+    case kInitialByteForDouble: {  // DOUBLE
+      if (status_.pos + kEncodedDoubleSize > bytes_.size()) {
+        SetError(Error::CBOR_INVALID_DOUBLE);
+        return;
+      }
+      SetToken(CBORTokenTag::DOUBLE, kEncodedDoubleSize);
+      return;
+    }
+    case kInitialByteForEnvelope: {  // ENVELOPE
+      if (status_.pos + kEncodedEnvelopeHeaderSize > bytes_.size()) {
+        SetError(Error::CBOR_INVALID_ENVELOPE);
+        return;
+      }
+      // The envelope must be a byte string with 32 bit length.
+      if (bytes_[status_.pos + 1] != kInitialByteFor32BitLengthByteString) {
+        SetError(Error::CBOR_INVALID_ENVELOPE);
+        return;
+      }
+      // Read the length of the byte string.
+      token_start_internal_value_ = ReadBytesMostSignificantByteFirst<uint32_t>(
+          bytes_.subspan(status_.pos + 2));
+      // Make sure the payload is contained within the message.
+      if (token_start_internal_value_ + kEncodedEnvelopeHeaderSize +
+              status_.pos >
+          static_cast<std::size_t>(bytes_.size())) {
+        SetError(Error::CBOR_INVALID_ENVELOPE);
+        return;
+      }
+      auto length = static_cast<std::ptrdiff_t>(token_start_internal_value_);
+      SetToken(CBORTokenTag::ENVELOPE, kEncodedEnvelopeHeaderSize + length);
+      return;
+    }
+    default: {
+      span<uint8_t> remainder =
+          bytes_.subspan(status_.pos, bytes_.size() - status_.pos);
+      assert(!remainder.empty());
+      int8_t token_start_length = internals::ReadTokenStart(
+          remainder, &token_start_type_, &token_start_internal_value_);
+      bool success = token_start_length != -1;
+      switch (token_start_type_) {
+        case MajorType::UNSIGNED:  // INT32.
+          if (!success || std::numeric_limits<int32_t>::max() <
+                              token_start_internal_value_) {
+            SetError(Error::CBOR_INVALID_INT32);
+            return;
+          }
+          SetToken(CBORTokenTag::INT32, token_start_length);
+          return;
+        case MajorType::NEGATIVE:  // INT32.
+          if (!success ||
+              std::numeric_limits<int32_t>::min() >
+                  -static_cast<int64_t>(token_start_internal_value_) - 1) {
+            SetError(Error::CBOR_INVALID_INT32);
+            return;
+          }
+          SetToken(CBORTokenTag::INT32, token_start_length);
+          return;
+        case MajorType::STRING: {  // STRING8.
+          if (!success || remainder.size() < static_cast<int64_t>(
+                                                 token_start_internal_value_)) {
+            SetError(Error::CBOR_INVALID_STRING8);
+            return;
+          }
+          auto length =
+              static_cast<std::ptrdiff_t>(token_start_internal_value_);
+          SetToken(CBORTokenTag::STRING8, token_start_length + length);
+          return;
+        }
+        case MajorType::BYTE_STRING: {  // STRING16.
+          if (!success ||
+              remainder.size() <
+                  static_cast<int64_t>(token_start_internal_value_) ||
+              // Must be divisible by 2 since UTF16 is 2 bytes per character.
+              token_start_internal_value_ & 1) {
+            SetError(Error::CBOR_INVALID_STRING16);
+            return;
+          }
+          auto length =
+              static_cast<std::ptrdiff_t>(token_start_internal_value_);
+          SetToken(CBORTokenTag::STRING16, token_start_length + length);
+          return;
+        }
+        case MajorType::ARRAY:
+        case MajorType::MAP:
+        case MajorType::TAG:
+        case MajorType::SIMPLE_VALUE:
+          SetError(Error::CBOR_UNSUPPORTED_VALUE);
+          return;
+      }
+    }
+  }
+}
+
+void CBORTokenizer::SetToken(CBORTokenTag token_tag,
+                             std::ptrdiff_t token_byte_length) {
+  token_tag_ = token_tag;
+  token_byte_length_ = token_byte_length;
+}
+
+void CBORTokenizer::SetError(Error error) {
+  token_tag_ = CBORTokenTag::ERROR_VALUE;
+  status_.error = error;
+}
+
+// =============================================================================
+// cbor::ParseCBOR - for receiving streaming parser events for CBOR messages
+// =============================================================================
+
 namespace {
+// When parsing CBOR, we limit recursion depth for objects and arrays
+// to this constant.
+static constexpr int kStackLimit = 300;
+
 // Below are three parsing routines for CBOR, which cover enough
 // to roundtrip JSON messages.
-bool ParseMap(int32_t stack_depth, CBORTokenizer* tokenizer,
-              JSONParserHandler* out);
-bool ParseArray(int32_t stack_depth, CBORTokenizer* tokenizer,
-                JSONParserHandler* out);
-bool ParseValue(int32_t stack_depth, CBORTokenizer* tokenizer,
-                JSONParserHandler* out);
+bool ParseMap(int32_t stack_depth,
+              CBORTokenizer* tokenizer,
+              StreamingParserHandler* out);
+bool ParseArray(int32_t stack_depth,
+                CBORTokenizer* tokenizer,
+                StreamingParserHandler* out);
+bool ParseValue(int32_t stack_depth,
+                CBORTokenizer* tokenizer,
+                StreamingParserHandler* out);
 
-void ParseUTF16String(CBORTokenizer* tokenizer, JSONParserHandler* out) {
+void ParseUTF16String(CBORTokenizer* tokenizer, StreamingParserHandler* out) {
   std::vector<uint16_t> value;
   span<uint8_t> rep = tokenizer->GetString16WireRep();
   for (std::ptrdiff_t ii = 0; ii < rep.size(); ii += 2)
@@ -2091,15 +2478,16 @@ void ParseUTF16String(CBORTokenizer* tokenizer, JSONParserHandler* out) {
   tokenizer->Next();
 }
 
-bool ParseUTF8String(CBORTokenizer* tokenizer, JSONParserHandler* out) {
+bool ParseUTF8String(CBORTokenizer* tokenizer, StreamingParserHandler* out) {
   assert(tokenizer->TokenTag() == CBORTokenTag::STRING8);
   out->HandleString8(tokenizer->GetString8());
   tokenizer->Next();
   return true;
 }
 
-bool ParseValue(int32_t stack_depth, CBORTokenizer* tokenizer,
-                JSONParserHandler* out) {
+bool ParseValue(int32_t stack_depth,
+                CBORTokenizer* tokenizer,
+                StreamingParserHandler* out) {
   if (stack_depth > kStackLimit) {
     out->HandleError(
         Status{Error::CBOR_STACK_LIMIT_EXCEEDED, tokenizer->Status().pos});
@@ -2142,8 +2530,7 @@ bool ParseValue(int32_t stack_depth, CBORTokenizer* tokenizer,
       ParseUTF16String(tokenizer, out);
       return true;
     case CBORTokenTag::BINARY: {
-      span<uint8_t> binary = tokenizer->GetBinary();
-      out->HandleBinary(std::vector<uint8_t>(binary.begin(), binary.end()));
+      out->HandleBinary(tokenizer->GetBinary());
       tokenizer->Next();
       return true;
     }
@@ -2161,8 +2548,9 @@ bool ParseValue(int32_t stack_depth, CBORTokenizer* tokenizer,
 // |bytes| must start with the indefinite length array byte, so basically,
 // ParseArray may only be called after an indefinite length array has been
 // detected.
-bool ParseArray(int32_t stack_depth, CBORTokenizer* tokenizer,
-                JSONParserHandler* out) {
+bool ParseArray(int32_t stack_depth,
+                CBORTokenizer* tokenizer,
+                StreamingParserHandler* out) {
   assert(tokenizer->TokenTag() == CBORTokenTag::ARRAY_START);
   tokenizer->Next();
   out->HandleArrayBegin();
@@ -2177,7 +2565,8 @@ bool ParseArray(int32_t stack_depth, CBORTokenizer* tokenizer,
       return false;
     }
     // Parse value.
-    if (!ParseValue(stack_depth, tokenizer, out)) return false;
+    if (!ParseValue(stack_depth, tokenizer, out))
+      return false;
   }
   out->HandleArrayEnd();
   tokenizer->Next();
@@ -2187,10 +2576,11 @@ bool ParseArray(int32_t stack_depth, CBORTokenizer* tokenizer,
 // |bytes| must start with the indefinite length array byte, so basically,
 // ParseArray may only be called after an indefinite length array has been
 // detected.
-bool ParseMap(int32_t stack_depth, CBORTokenizer* tokenizer,
-              JSONParserHandler* out) {
+bool ParseMap(int32_t stack_depth,
+              CBORTokenizer* tokenizer,
+              StreamingParserHandler* out) {
   assert(tokenizer->TokenTag() == CBORTokenTag::MAP_START);
-  out->HandleObjectBegin();
+  out->HandleMapBegin();
   tokenizer->Next();
   while (tokenizer->TokenTag() != CBORTokenTag::STOP) {
     if (tokenizer->TokenTag() == CBORTokenTag::DONE) {
@@ -2204,7 +2594,8 @@ bool ParseMap(int32_t stack_depth, CBORTokenizer* tokenizer,
     }
     // Parse key.
     if (tokenizer->TokenTag() == CBORTokenTag::STRING8) {
-      if (!ParseUTF8String(tokenizer, out)) return false;
+      if (!ParseUTF8String(tokenizer, out))
+        return false;
     } else if (tokenizer->TokenTag() == CBORTokenTag::STRING16) {
       ParseUTF16String(tokenizer, out);
     } else {
@@ -2213,26 +2604,27 @@ bool ParseMap(int32_t stack_depth, CBORTokenizer* tokenizer,
       return false;
     }
     // Parse value.
-    if (!ParseValue(stack_depth, tokenizer, out)) return false;
+    if (!ParseValue(stack_depth, tokenizer, out))
+      return false;
   }
-  out->HandleObjectEnd();
+  out->HandleMapEnd();
   tokenizer->Next();
   return true;
 }
 }  // namespace
 
-void ParseCBOR(span<uint8_t> bytes, JSONParserHandler* json_out) {
+void ParseCBOR(span<uint8_t> bytes, StreamingParserHandler* out) {
   if (bytes.empty()) {
-    json_out->HandleError(Status{Error::CBOR_NO_INPUT, 0});
+    out->HandleError(Status{Error::CBOR_NO_INPUT, 0});
     return;
   }
   if (bytes[0] != kInitialByteForEnvelope) {
-    json_out->HandleError(Status{Error::CBOR_INVALID_START_BYTE, 0});
+    out->HandleError(Status{Error::CBOR_INVALID_START_BYTE, 0});
     return;
   }
   CBORTokenizer tokenizer(bytes);
   if (tokenizer.TokenTag() == CBORTokenTag::ERROR_VALUE) {
-    json_out->HandleError(tokenizer.Status());
+    out->HandleError(tokenizer.Status());
     return;
   }
   // We checked for the envelope start byte above, so the tokenizer
@@ -2240,295 +2632,1086 @@ void ParseCBOR(span<uint8_t> bytes, JSONParserHandler* json_out) {
   assert(tokenizer.TokenTag() == CBORTokenTag::ENVELOPE);
   tokenizer.EnterEnvelope();
   if (tokenizer.TokenTag() != CBORTokenTag::MAP_START) {
-    json_out->HandleError(
+    out->HandleError(
         Status{Error::CBOR_MAP_START_EXPECTED, tokenizer.Status().pos});
     return;
   }
-  if (!ParseMap(/*stack_depth=*/1, &tokenizer, json_out)) return;
-  if (tokenizer.TokenTag() == CBORTokenTag::DONE) return;
+  if (!ParseMap(/*stack_depth=*/1, &tokenizer, out))
+    return;
+  if (tokenizer.TokenTag() == CBORTokenTag::DONE)
+    return;
   if (tokenizer.TokenTag() == CBORTokenTag::ERROR_VALUE) {
-    json_out->HandleError(tokenizer.Status());
+    out->HandleError(tokenizer.Status());
     return;
   }
-  json_out->HandleError(
-      Status{Error::CBOR_TRAILING_JUNK, tokenizer.Status().pos});
+  out->HandleError(Status{Error::CBOR_TRAILING_JUNK, tokenizer.Status().pos});
 }
 
-CBORTokenizer::CBORTokenizer(span<uint8_t> bytes) : bytes_(bytes) {
-  ReadNextToken(/*enter_envelope=*/false);
+// =============================================================================
+// cbor::AppendString8EntryToMap - for limited in-place editing of messages
+// =============================================================================
+
+template <typename C>
+Status AppendString8EntryToCBORMapTmpl(span<uint8_t> string8_key,
+                                       span<uint8_t> string8_value,
+                                       C* cbor) {
+  span<uint8_t> bytes(reinterpret_cast<const uint8_t*>(cbor->data()),
+                      cbor->size());
+  CBORTokenizer tokenizer(bytes);
+  if (tokenizer.TokenTag() == CBORTokenTag::ERROR_VALUE)
+    return tokenizer.Status();
+  if (tokenizer.TokenTag() != CBORTokenTag::ENVELOPE)
+    return Status(Error::CBOR_INVALID_ENVELOPE, 0);
+  std::ptrdiff_t envelope_size = tokenizer.GetEnvelopeContents().size();
+  std::size_t old_size = cbor->size();
+  if (old_size != std::size_t(envelope_size) + kEncodedEnvelopeHeaderSize)
+    return Status(Error::CBOR_INVALID_ENVELOPE, 0);
+  if (envelope_size == 0 ||
+      (tokenizer.GetEnvelopeContents()[0] != EncodeIndefiniteLengthMapStart()))
+    return Status(Error::CBOR_MAP_START_EXPECTED, kEncodedEnvelopeHeaderSize);
+  if (cbor->back() != EncodeStop())
+    return Status(Error::CBOR_MAP_STOP_EXPECTED, cbor->size() - 1);
+  cbor->pop_back();
+  EncodeString8(string8_key, cbor);
+  EncodeString8(string8_value, cbor);
+  cbor->push_back(EncodeStop());
+  std::size_t new_envelope_size = envelope_size + (cbor->size() - old_size);
+  if (new_envelope_size > std::numeric_limits<uint32_t>::max())
+    return Status(Error::CBOR_ENVELOPE_SIZE_LIMIT_EXCEEDED, 0);
+  std::size_t size_pos = cbor->size() - new_envelope_size - sizeof(uint32_t);
+  uint8_t* out = reinterpret_cast<uint8_t*>(&cbor->at(size_pos));
+  *(out++) = (new_envelope_size >> 24) & 0xff;
+  *(out++) = (new_envelope_size >> 16) & 0xff;
+  *(out++) = (new_envelope_size >> 8) & 0xff;
+  *(out) = new_envelope_size & 0xff;
+  return Status();
 }
-CBORTokenizer::~CBORTokenizer() {}
-
-CBORTokenTag CBORTokenizer::TokenTag() const { return token_tag_; }
-
-void CBORTokenizer::Next() {
-  if (token_tag_ == CBORTokenTag::ERROR_VALUE || token_tag_ == CBORTokenTag::DONE)
-    return;
-  ReadNextToken(/*enter_envelope=*/false);
+Status AppendString8EntryToCBORMap(span<uint8_t> string8_key,
+                                   span<uint8_t> string8_value,
+                                   std::vector<uint8_t>* cbor) {
+  return AppendString8EntryToCBORMapTmpl(string8_key, string8_value, cbor);
 }
-
-void CBORTokenizer::EnterEnvelope() {
-  assert(token_tag_ == CBORTokenTag::ENVELOPE);
-  ReadNextToken(/*enter_envelope=*/true);
+Status AppendString8EntryToCBORMap(span<uint8_t> string8_key,
+                                   span<uint8_t> string8_value,
+                                   std::string* cbor) {
+  return AppendString8EntryToCBORMapTmpl(string8_key, string8_value, cbor);
 }
+}  // namespace cbor
 
-Status CBORTokenizer::Status() const { return status_; }
+namespace json {
 
-int32_t CBORTokenizer::GetInt32() const {
-  assert(token_tag_ == CBORTokenTag::INT32);
-  // The range checks happen in ::ReadNextToken().
-  return static_cast<uint32_t>(
-      token_start_type_ == MajorType::UNSIGNED
-          ? token_start_internal_value_
-          : -static_cast<int64_t>(token_start_internal_value_) - 1);
-}
+// =============================================================================
+// json::NewJSONEncoder - for encoding streaming parser events as JSON
+// =============================================================================
 
-double CBORTokenizer::GetDouble() const {
-  assert(token_tag_ == CBORTokenTag::DOUBLE);
-  union {
-    uint64_t from_uint64;
-    double to_double;
-  } reinterpret;
-  reinterpret.from_uint64 = ReadBytesMostSignificantByteFirst<uint64_t>(
-      bytes_.subspan(status_.pos + 1));
-  return reinterpret.to_double;
-}
-
-span<uint8_t> CBORTokenizer::GetString8() const {
-  assert(token_tag_ == CBORTokenTag::STRING8);
-  auto length = static_cast<std::ptrdiff_t>(token_start_internal_value_);
-  return bytes_.subspan(status_.pos + (token_byte_length_ - length), length);
-}
-
-span<uint8_t> CBORTokenizer::GetString16WireRep() const {
-  assert(token_tag_ == CBORTokenTag::STRING16);
-  auto length = static_cast<std::ptrdiff_t>(token_start_internal_value_);
-  return bytes_.subspan(status_.pos + (token_byte_length_ - length), length);
-}
-
-span<uint8_t> CBORTokenizer::GetBinary() const {
-  assert(token_tag_ == CBORTokenTag::BINARY);
-  auto length = static_cast<std::ptrdiff_t>(token_start_internal_value_);
-  return bytes_.subspan(status_.pos + (token_byte_length_ - length), length);
-}
-
-void CBORTokenizer::ReadNextToken(bool enter_envelope) {
-  if (enter_envelope) {
-    status_.pos += kEncodedEnvelopeHeaderSize;
-  } else {
-    status_.pos =
-        status_.pos == Status::npos() ? 0 : status_.pos + token_byte_length_;
+namespace {
+// Prints |value| to |out| with 4 hex digits, most significant chunk first.
+template <typename C>
+void PrintHex(uint16_t value, C* out) {
+  for (int ii = 3; ii >= 0; --ii) {
+    int four_bits = 0xf & (value >> (4 * ii));
+    out->push_back(four_bits + ((four_bits <= 9) ? '0' : ('a' - 10)));
   }
-  status_.error = Error::OK;
-  if (status_.pos >= bytes_.size()) {
-    token_tag_ = CBORTokenTag::DONE;
+}
+
+// In the writer below, we maintain a stack of State instances.
+// It is just enough to emit the appropriate delimiters and brackets
+// in JSON.
+enum class Container {
+  // Used for the top-level, initial state.
+  NONE,
+  // Inside a JSON object.
+  MAP,
+  // Inside a JSON array.
+  ARRAY
+};
+class State {
+ public:
+  explicit State(Container container) : container_(container) {}
+  void StartElement(std::vector<uint8_t>* out) {
+    // FIXME!!!
+  }
+  void StartElement(std::string* out) {
+    assert(container_ != Container::NONE || size_ == 0);
+    if (size_ != 0) {
+      char delim = (!(size_ & 1) || container_ == Container::ARRAY) ? ',' : ':';
+      out->append(1, delim);
+    }
+    ++size_;
+  }
+  Container container() const { return container_; }
+
+ private:
+  Container container_ = Container::NONE;
+  int size_ = 0;
+};
+
+constexpr char kBase64Table[] =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    "abcdefghijklmnopqrstuvwxyz0123456789+/";
+
+template <typename C>
+void Base64Encode(const span<uint8_t>& in, C* out) {
+  // The following three cases are based on the tables in the example
+  // section in https://en.wikipedia.org/wiki/Base64. We process three
+  // input bytes at a time, emitting 4 output bytes at a time.
+  std::ptrdiff_t ii = 0;
+
+  // While possible, process three input bytes.
+  for (; ii + 3 <= in.size(); ii += 3) {
+    uint32_t twentyfour_bits = (in[ii] << 16) | (in[ii + 1] << 8) | in[ii + 2];
+    out->push_back(kBase64Table[(twentyfour_bits >> 18)]);
+    out->push_back(kBase64Table[(twentyfour_bits >> 12) & 0x3f]);
+    out->push_back(kBase64Table[(twentyfour_bits >> 6) & 0x3f]);
+    out->push_back(kBase64Table[twentyfour_bits & 0x3f]);
+  }
+  if (ii + 2 <= in.size()) {  // Process two input bytes.
+    uint32_t twentyfour_bits = (in[ii] << 16) | (in[ii + 1] << 8);
+    out->push_back(kBase64Table[(twentyfour_bits >> 18)]);
+    out->push_back(kBase64Table[(twentyfour_bits >> 12) & 0x3f]);
+    out->push_back(kBase64Table[(twentyfour_bits >> 6) & 0x3f]);
+    out->push_back('=');  // Emit padding.
     return;
   }
-  switch (bytes_[status_.pos]) {
-    case kStopByte:
-      SetToken(CBORTokenTag::STOP, 1);
+  if (ii + 1 <= in.size()) {  // Process a single input byte.
+    uint32_t twentyfour_bits = (in[ii] << 16);
+    out->push_back(kBase64Table[(twentyfour_bits >> 18)]);
+    out->push_back(kBase64Table[(twentyfour_bits >> 12) & 0x3f]);
+    out->push_back('=');  // Emit padding.
+    out->push_back('=');  // Emit padding.
+  }
+}
+
+// Implements a handler for JSON parser events to emit a JSON string.
+template <typename C>
+class JSONEncoder : public StreamingParserHandler {
+ public:
+  JSONEncoder(const Platform* platform, C* out, Status* status)
+      : platform_(platform), out_(out), status_(status) {
+    *status_ = Status();
+    state_.emplace(Container::NONE);
+  }
+
+  void HandleMapBegin() override {
+    if (!status_->ok())
       return;
-    case kInitialByteIndefiniteLengthMap:
-      SetToken(CBORTokenTag::MAP_START, 1);
+    assert(!state_.empty());
+    state_.top().StartElement(out_);
+    state_.emplace(Container::MAP);
+    Emit('{');
+  }
+
+  void HandleMapEnd() override {
+    if (!status_->ok())
       return;
-    case kInitialByteIndefiniteLengthArray:
-      SetToken(CBORTokenTag::ARRAY_START, 1);
+    assert(state_.size() >= 2 && state_.top().container() == Container::MAP);
+    state_.pop();
+    Emit('}');
+  }
+
+  void HandleArrayBegin() override {
+    if (!status_->ok())
       return;
-    case kEncodedTrue:
-      SetToken(CBORTokenTag::TRUE_VALUE, 1);
+    state_.top().StartElement(out_);
+    state_.emplace(Container::ARRAY);
+    Emit('[');
+  }
+
+  void HandleArrayEnd() override {
+    if (!status_->ok())
       return;
-    case kEncodedFalse:
-      SetToken(CBORTokenTag::FALSE_VALUE, 1);
+    assert(state_.size() >= 2 && state_.top().container() == Container::ARRAY);
+    state_.pop();
+    Emit(']');
+  }
+
+  void HandleString16(span<uint16_t> chars) override {
+    if (!status_->ok())
       return;
-    case kEncodedNull:
-      SetToken(CBORTokenTag::NULL_VALUE, 1);
-      return;
-    case kExpectedConversionToBase64Tag: {  // BINARY
-      int8_t bytes_read =
-          ReadTokenStart(bytes_.subspan(status_.pos + 1), &token_start_type_,
-                         &token_start_internal_value_);
-      int64_t token_byte_length = 1 + bytes_read + token_start_internal_value_;
-      if (-1 == bytes_read || token_start_type_ != MajorType::BYTE_STRING ||
-          status_.pos + token_byte_length > bytes_.size()) {
-        SetError(Error::CBOR_INVALID_BINARY);
-        return;
+    state_.top().StartElement(out_);
+    Emit('"');
+    for (const uint16_t ch : chars) {
+      if (ch == '"') {
+        Emit("\\\"");
+      } else if (ch == '\\') {
+        Emit("\\\\");
+      } else if (ch == '\b') {
+        Emit("\\b");
+      } else if (ch == '\f') {
+        Emit("\\f");
+      } else if (ch == '\n') {
+        Emit("\\n");
+      } else if (ch == '\r') {
+        Emit("\\r");
+      } else if (ch == '\t') {
+        Emit("\\t");
+      } else if (ch >= 32 && ch <= 126) {
+        Emit(ch);
+      } else {
+        Emit("\\u");
+        PrintHex(ch, out_);
       }
-      SetToken(CBORTokenTag::BINARY,
-               static_cast<std::ptrdiff_t>(token_byte_length));
-      return;
     }
-    case kInitialByteForDouble: {  // DOUBLE
-      if (status_.pos + kEncodedDoubleSize > bytes_.size()) {
-        SetError(Error::CBOR_INVALID_DOUBLE);
-        return;
-      }
-      SetToken(CBORTokenTag::DOUBLE, kEncodedDoubleSize);
+    Emit('"');
+  }
+
+  void HandleString8(span<uint8_t> chars) override {
+    if (!status_->ok())
       return;
-    }
-    case kInitialByteForEnvelope: {  // ENVELOPE
-      if (status_.pos + kEncodedEnvelopeHeaderSize > bytes_.size()) {
-        SetError(Error::CBOR_INVALID_ENVELOPE);
-        return;
-      }
-      // The envelope must be a byte string with 32 bit length.
-      if (bytes_[status_.pos + 1] != kInitialByteFor32BitLengthByteString) {
-        SetError(Error::CBOR_INVALID_ENVELOPE);
-        return;
-      }
-      // Read the length of the byte string.
-      token_start_internal_value_ = ReadBytesMostSignificantByteFirst<uint32_t>(
-          bytes_.subspan(status_.pos + 2));
-      // Make sure the payload is contained within the message.
-      if (token_start_internal_value_ + kEncodedEnvelopeHeaderSize +
-              status_.pos >
-          static_cast<std::size_t>(bytes_.size())) {
-        SetError(Error::CBOR_INVALID_ENVELOPE);
-        return;
-      }
-      auto length = static_cast<std::ptrdiff_t>(token_start_internal_value_);
-      SetToken(CBORTokenTag::ENVELOPE,
-               kEncodedEnvelopeHeaderSize + length);
-      return;
-    }
-    default: {
-      span<uint8_t> remainder =
-          bytes_.subspan(status_.pos, bytes_.size() - status_.pos);
-      assert(!remainder.empty());
-      int8_t token_start_length = ReadTokenStart(remainder, &token_start_type_,
-                                                 &token_start_internal_value_);
-      bool success = token_start_length != -1;
-      switch (token_start_type_) {
-        case MajorType::UNSIGNED:  // INT32.
-          if (!success || std::numeric_limits<int32_t>::max() <
-                              token_start_internal_value_) {
-            SetError(Error::CBOR_INVALID_INT32);
-            return;
-          }
-          SetToken(CBORTokenTag::INT32, token_start_length);
-          return;
-        case MajorType::NEGATIVE:  // INT32.
-          if (!success ||
-              std::numeric_limits<int32_t>::min() >
-                  -static_cast<int64_t>(token_start_internal_value_) - 1) {
-            SetError(Error::CBOR_INVALID_INT32);
-            return;
-          }
-          SetToken(CBORTokenTag::INT32, token_start_length);
-          return;
-        case MajorType::STRING: {  // STRING8.
-          if (!success || remainder.size() < static_cast<int64_t>(
-                                                 token_start_internal_value_)) {
-            SetError(Error::CBOR_INVALID_STRING8);
-            return;
-          }
-          auto length = static_cast<std::ptrdiff_t>(token_start_internal_value_);
-          SetToken(CBORTokenTag::STRING8, token_start_length + length);
-          return;
+    state_.top().StartElement(out_);
+    Emit('"');
+    for (std::ptrdiff_t ii = 0; ii < chars.size(); ++ii) {
+      uint8_t c = chars[ii];
+      if (c == '"') {
+        Emit("\\\"");
+      } else if (c == '\\') {
+        Emit("\\\\");
+      } else if (c == '\b') {
+        Emit("\\b");
+      } else if (c == '\f') {
+        Emit("\\f");
+      } else if (c == '\n') {
+        Emit("\\n");
+      } else if (c == '\r') {
+        Emit("\\r");
+      } else if (c == '\t') {
+        Emit("\\t");
+      } else if (c >= 32 && c <= 126) {
+        Emit(c);
+      } else if (c < 32) {
+        Emit("\\u");
+        PrintHex(static_cast<uint16_t>(c), out_);
+      } else {
+        // Inspect the leading byte to figure out how long the utf8
+        // byte sequence is; while doing this initialize |codepoint|
+        // with the first few bits.
+        // See table in: https://en.wikipedia.org/wiki/UTF-8
+        // byte one is 110x xxxx -> 2 byte utf8 sequence
+        // byte one is 1110 xxxx -> 3 byte utf8 sequence
+        // byte one is 1111 0xxx -> 4 byte utf8 sequence
+        uint32_t codepoint;
+        int num_bytes_left;
+        if ((c & 0xe0) == 0xc0) {  // 2 byte utf8 sequence
+          num_bytes_left = 1;
+          codepoint = c & 0x1f;
+        } else if ((c & 0xf0) == 0xe0) {  // 3 byte utf8 sequence
+          num_bytes_left = 2;
+          codepoint = c & 0x0f;
+        } else if ((c & 0xf8) == 0xf0) {  // 4 byte utf8 sequence
+          codepoint = c & 0x07;
+          num_bytes_left = 3;
+        } else {
+          continue;  // invalid leading byte
         }
-        case MajorType::BYTE_STRING: {  // STRING16.
-          if (!success ||
-              remainder.size() <
-                  static_cast<int64_t>(token_start_internal_value_) ||
-              // Must be divisible by 2 since UTF16 is 2 bytes per character.
-              token_start_internal_value_ & 1) {
-            SetError(Error::CBOR_INVALID_STRING16);
-            return;
-          }
-          auto length = static_cast<std::ptrdiff_t>(token_start_internal_value_);
-          SetToken(CBORTokenTag::STRING16, token_start_length + length);
-          return;
+
+        // If we have enough bytes in our input, decode the remaining ones
+        // belonging to this Unicode character into |codepoint|.
+        if (ii + num_bytes_left > chars.size())
+          continue;
+        while (num_bytes_left > 0) {
+          c = chars[++ii];
+          --num_bytes_left;
+          // Check the next byte is a continuation byte, that is 10xx xxxx.
+          if ((c & 0xc0) != 0x80)
+            continue;
+          codepoint = (codepoint << 6) | (c & 0x3f);
         }
-        case MajorType::ARRAY:
-        case MajorType::MAP:
-        case MajorType::TAG:
-        case MajorType::SIMPLE_VALUE:
-          SetError(Error::CBOR_UNSUPPORTED_VALUE);
-          return;
+
+        // Disallow overlong encodings for ascii characters, as these
+        // would include " and other characters significant to JSON
+        // string termination / control.
+        if (codepoint < 0x7f)
+          continue;
+        // Invalid in UTF8, and can't be represented in UTF16 anyway.
+        if (codepoint > 0x10ffff)
+          continue;
+
+        // So, now we transcode to UTF16,
+        // using the math described at https://en.wikipedia.org/wiki/UTF-16,
+        // for either one or two 16 bit characters.
+        if (codepoint < 0xffff) {
+          Emit("\\u");
+          PrintHex(static_cast<uint16_t>(codepoint), out_);
+          continue;
+        }
+        codepoint -= 0x10000;
+        // high surrogate
+        Emit("\\u");
+        PrintHex(static_cast<uint16_t>((codepoint >> 10) + 0xd800), out_);
+        // low surrogate
+        Emit("\\u");
+        PrintHex(static_cast<uint16_t>((codepoint & 0x3ff) + 0xdc00), out_);
       }
     }
+    Emit('"');
   }
+
+  void HandleBinary(span<uint8_t> bytes) override {
+    if (!status_->ok())
+      return;
+    state_.top().StartElement(out_);
+    Emit('"');
+    Base64Encode(bytes, out_);
+    Emit('"');
+  }
+
+  void HandleDouble(double value) override {
+    if (!status_->ok())
+      return;
+    state_.top().StartElement(out_);
+    // JSON cannot represent NaN or Infinity. So, for compatibility,
+    // we behave like the JSON object in web browsers: emit 'null'.
+    if (!std::isfinite(value)) {
+      Emit("null");
+      return;
+    }
+    std::unique_ptr<char[]> str_value = platform_->DToStr(value);
+
+    // DToStr may fail to emit a 0 before the decimal dot. E.g. this is
+    // the case in base::NumberToString in Chromium (which is based on
+    // dmg_fp). So, much like
+    // https://cs.chromium.org/chromium/src/base/json/json_writer.cc
+    // we probe for this and emit the leading 0 anyway if necessary.
+    const char* chars = str_value.get();
+    if (chars[0] == '.') {
+      Emit('0');
+    } else if (chars[0] == '-' && chars[1] == '.') {
+      Emit("-0");
+      ++chars;
+    }
+    Emit(chars);
+  }
+
+  void HandleInt32(int32_t value) override {
+    if (!status_->ok())
+      return;
+    state_.top().StartElement(out_);
+    Emit(std::to_string(value));
+  }
+
+  void HandleBool(bool value) override {
+    if (!status_->ok())
+      return;
+    state_.top().StartElement(out_);
+    Emit(value ? "true" : "false");
+  }
+
+  void HandleNull() override {
+    if (!status_->ok())
+      return;
+    state_.top().StartElement(out_);
+    Emit("null");
+  }
+
+  void HandleError(Status error) override {
+    assert(!error.ok());
+    *status_ = error;
+    out_->clear();
+  }
+
+ private:
+  void Emit(char c) { out_->push_back(c); }
+  void Emit(const char* str) {
+    out_->insert(out_->end(), str, str + strlen(str));
+  }
+  void Emit(const std::string& str) {
+    out_->insert(out_->end(), str.begin(), str.end());
+  }
+
+  const Platform* platform_;
+  C* out_;
+  Status* status_;
+  std::stack<State> state_;
+};
+}  // namespace
+
+std::unique_ptr<StreamingParserHandler> NewJSONEncoder(
+    const Platform* platform,
+    std::vector<uint8_t>* out,
+    Status* status) {
+  return std::unique_ptr<StreamingParserHandler>(
+      new JSONEncoder<std::vector<uint8_t>>(platform, out, status));
+}
+std::unique_ptr<StreamingParserHandler> NewJSONEncoder(const Platform* platform,
+                                                       std::string* out,
+                                                       Status* status) {
+  return std::unique_ptr<StreamingParserHandler>(
+      new JSONEncoder<std::string>(platform, out, status));
 }
 
-void CBORTokenizer::SetToken(CBORTokenTag token_tag,
-                             std::ptrdiff_t token_byte_length) {
-  token_tag_ = token_tag;
-  token_byte_length_ = token_byte_length;
-}
+// =============================================================================
+// json::ParseJSON - for receiving streaming parser events for JSON.
+// =============================================================================
 
-void CBORTokenizer::SetError(Error error) {
-  token_tag_ = CBORTokenTag::ERROR_VALUE;
-  status_.error = error;
-}
+namespace {
+const int kStackLimit = 300;
 
-#if 0
-void DumpCBOR(span<uint8_t> cbor) {
-  std::string indent;
-  CBORTokenizer tokenizer(cbor);
-  while (true) {
-    fprintf(stderr, "%s", indent.c_str());
-    switch (tokenizer.TokenTag()) {
-      case CBORTokenTag::ERROR_VALUE:
-        fprintf(stderr, "ERROR {status.error=%d, status.pos=%ld}\n",
-               tokenizer.Status().error, tokenizer.Status().pos);
-        return;
-      case CBORTokenTag::DONE:
-        fprintf(stderr, "DONE\n");
-        return;
-      case CBORTokenTag::TRUE_VALUE:
-        fprintf(stderr, "TRUE_VALUE\n");
-        break;
-      case CBORTokenTag::FALSE_VALUE:
-        fprintf(stderr, "FALSE_VALUE\n");
-        break;
-      case CBORTokenTag::NULL_VALUE:
-        fprintf(stderr, "NULL_VALUE\n");
-        break;
-      case CBORTokenTag::INT32:
-        fprintf(stderr, "INT32 [%d]\n", tokenizer.GetInt32());
-        break;
-      case CBORTokenTag::DOUBLE:
-        fprintf(stderr, "DOUBLE [%lf]\n", tokenizer.GetDouble());
-        break;
-      case CBORTokenTag::STRING8: {
-        span<uint8_t> v = tokenizer.GetString8();
-        std::string t(v.begin(), v.end());
-        fprintf(stderr, "STRING8 [%s]\n", t.c_str());
+enum Token {
+  ObjectBegin,
+  ObjectEnd,
+  ArrayBegin,
+  ArrayEnd,
+  StringLiteral,
+  Number,
+  BoolTrue,
+  BoolFalse,
+  NullToken,
+  ListSeparator,
+  ObjectPairSeparator,
+  InvalidToken,
+  NoInput
+};
+
+const char* const kNullString = "null";
+const char* const kTrueString = "true";
+const char* const kFalseString = "false";
+
+template <typename Char>
+class JsonParser {
+ public:
+  JsonParser(const Platform* platform, StreamingParserHandler* handler)
+      : platform_(platform), handler_(handler) {}
+
+  void Parse(const Char* start, std::size_t length) {
+    start_pos_ = start;
+    const Char* end = start + length;
+    const Char* tokenEnd;
+    ParseValue(start, end, &tokenEnd, 0);
+    if (tokenEnd != end) {
+      HandleError(Error::JSON_PARSER_UNPROCESSED_INPUT_REMAINS, tokenEnd);
+    }
+  }
+
+ private:
+  bool CharsToDouble(const uint16_t* chars,
+                     std::size_t length,
+                     double* result) {
+    std::string buffer;
+    buffer.reserve(length + 1);
+    for (std::size_t ii = 0; ii < length; ++ii) {
+      bool is_ascii = !(chars[ii] & ~0x7F);
+      if (!is_ascii)
+        return false;
+      buffer.push_back(static_cast<char>(chars[ii]));
+    }
+    return platform_->StrToD(buffer.c_str(), result);
+  }
+
+  bool CharsToDouble(const uint8_t* chars, std::size_t length, double* result) {
+    std::string buffer(reinterpret_cast<const char*>(chars), length);
+    return platform_->StrToD(buffer.c_str(), result);
+  }
+
+  static bool ParseConstToken(const Char* start,
+                              const Char* end,
+                              const Char** token_end,
+                              const char* token) {
+    // |token| is \0 terminated, it's one of the constants at top of the file.
+    while (start < end && *token != '\0' && *start++ == *token++) {
+    }
+    if (*token != '\0')
+      return false;
+    *token_end = start;
+    return true;
+  }
+
+  static bool ReadInt(const Char* start,
+                      const Char* end,
+                      const Char** token_end,
+                      bool allow_leading_zeros) {
+    if (start == end)
+      return false;
+    bool has_leading_zero = '0' == *start;
+    int length = 0;
+    while (start < end && '0' <= *start && *start <= '9') {
+      ++start;
+      ++length;
+    }
+    if (!length)
+      return false;
+    if (!allow_leading_zeros && length > 1 && has_leading_zero)
+      return false;
+    *token_end = start;
+    return true;
+  }
+
+  static bool ParseNumberToken(const Char* start,
+                               const Char* end,
+                               const Char** token_end) {
+    // We just grab the number here. We validate the size in DecodeNumber.
+    // According to RFC4627, a valid number is: [minus] int [frac] [exp]
+    if (start == end)
+      return false;
+    Char c = *start;
+    if ('-' == c)
+      ++start;
+
+    if (!ReadInt(start, end, &start, /*allow_leading_zeros=*/false))
+      return false;
+    if (start == end) {
+      *token_end = start;
+      return true;
+    }
+
+    // Optional fraction part
+    c = *start;
+    if ('.' == c) {
+      ++start;
+      if (!ReadInt(start, end, &start, /*allow_leading_zeros=*/true))
+        return false;
+      if (start == end) {
+        *token_end = start;
+        return true;
+      }
+      c = *start;
+    }
+
+    // Optional exponent part
+    if ('e' == c || 'E' == c) {
+      ++start;
+      if (start == end)
+        return false;
+      c = *start;
+      if ('-' == c || '+' == c) {
+        ++start;
+        if (start == end)
+          return false;
+      }
+      if (!ReadInt(start, end, &start, /*allow_leading_zeros=*/true))
+        return false;
+    }
+
+    *token_end = start;
+    return true;
+  }
+
+  static bool ReadHexDigits(const Char* start,
+                            const Char* end,
+                            const Char** token_end,
+                            int digits) {
+    if (end - start < digits)
+      return false;
+    for (int i = 0; i < digits; ++i) {
+      Char c = *start++;
+      if (!(('0' <= c && c <= '9') || ('a' <= c && c <= 'f') ||
+            ('A' <= c && c <= 'F')))
+        return false;
+    }
+    *token_end = start;
+    return true;
+  }
+
+  static bool ParseStringToken(const Char* start,
+                               const Char* end,
+                               const Char** token_end) {
+    while (start < end) {
+      Char c = *start++;
+      if ('\\' == c) {
+        if (start == end)
+          return false;
+        c = *start++;
+        // Make sure the escaped char is valid.
+        switch (c) {
+          case 'x':
+            if (!ReadHexDigits(start, end, &start, 2))
+              return false;
+            break;
+          case 'u':
+            if (!ReadHexDigits(start, end, &start, 4))
+              return false;
+            break;
+          case '\\':
+          case '/':
+          case 'b':
+          case 'f':
+          case 'n':
+          case 'r':
+          case 't':
+          case 'v':
+          case '"':
+            break;
+          default:
+            return false;
+        }
+      } else if ('"' == c) {
+        *token_end = start;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  static bool SkipComment(const Char* start,
+                          const Char* end,
+                          const Char** comment_end) {
+    if (start == end)
+      return false;
+
+    if (*start != '/' || start + 1 >= end)
+      return false;
+    ++start;
+
+    if (*start == '/') {
+      // Single line comment, read to newline.
+      for (++start; start < end; ++start) {
+        if (*start == '\n' || *start == '\r') {
+          *comment_end = start + 1;
+          return true;
+        }
+      }
+      *comment_end = end;
+      // Comment reaches end-of-input, which is fine.
+      return true;
+    }
+
+    if (*start == '*') {
+      Char previous = '\0';
+      // Block comment, read until end marker.
+      for (++start; start < end; previous = *start++) {
+        if (previous == '*' && *start == '/') {
+          *comment_end = start + 1;
+          return true;
+        }
+      }
+      // Block comment must close before end-of-input.
+      return false;
+    }
+
+    return false;
+  }
+
+  static bool IsSpaceOrNewLine(Char c) {
+    // \v = vertial tab; \f = form feed page break.
+    return c == ' ' || c == '\n' || c == '\v' || c == '\f' || c == '\r' ||
+           c == '\t';
+  }
+
+  static void SkipWhitespaceAndComments(const Char* start,
+                                        const Char* end,
+                                        const Char** whitespace_end) {
+    while (start < end) {
+      if (IsSpaceOrNewLine(*start)) {
+        ++start;
+      } else if (*start == '/') {
+        const Char* comment_end;
+        if (!SkipComment(start, end, &comment_end))
+          break;
+        start = comment_end;
+      } else {
         break;
       }
-      case CBORTokenTag::STRING16: {
-        span<uint8_t> v = tokenizer.GetString16WireRep();
-        std::string t(v.begin(), v.end());
-        fprintf(stderr, "STRING16 [%s]\n", t.c_str());
+    }
+    *whitespace_end = start;
+  }
+
+  static Token ParseToken(const Char* start,
+                          const Char* end,
+                          const Char** tokenStart,
+                          const Char** token_end) {
+    SkipWhitespaceAndComments(start, end, tokenStart);
+    start = *tokenStart;
+
+    if (start == end)
+      return NoInput;
+
+    switch (*start) {
+      case 'n':
+        if (ParseConstToken(start, end, token_end, kNullString))
+          return NullToken;
         break;
-      }
-      case CBORTokenTag::BINARY: {
-        span<uint8_t> v = tokenizer.GetBinary();
-        std::string t(v.begin(), v.end());
-        fprintf(stderr, "BINARY [%s]\n", t.c_str());
+      case 't':
+        if (ParseConstToken(start, end, token_end, kTrueString))
+          return BoolTrue;
         break;
-      }
-      case CBORTokenTag::MAP_START:
-        fprintf(stderr, "MAP_START\n");
-        indent += "  ";
+      case 'f':
+        if (ParseConstToken(start, end, token_end, kFalseString))
+          return BoolFalse;
         break;
-      case CBORTokenTag::ARRAY_START:
-        fprintf(stderr, "ARRAY_START\n");
-        indent += "  ";
+      case '[':
+        *token_end = start + 1;
+        return ArrayBegin;
+      case ']':
+        *token_end = start + 1;
+        return ArrayEnd;
+      case ',':
+        *token_end = start + 1;
+        return ListSeparator;
+      case '{':
+        *token_end = start + 1;
+        return ObjectBegin;
+      case '}':
+        *token_end = start + 1;
+        return ObjectEnd;
+      case ':':
+        *token_end = start + 1;
+        return ObjectPairSeparator;
+      case '0':
+      case '1':
+      case '2':
+      case '3':
+      case '4':
+      case '5':
+      case '6':
+      case '7':
+      case '8':
+      case '9':
+      case '-':
+        if (ParseNumberToken(start, end, token_end))
+          return Number;
         break;
-      case CBORTokenTag::STOP:
-        fprintf(stderr, "STOP\n");
-        indent.erase(0, 2);
+      case '"':
+        if (ParseStringToken(start + 1, end, token_end))
+          return StringLiteral;
         break;
-      case CBORTokenTag::ENVELOPE:
-        fprintf(stderr, "ENVELOPE\n");
-        tokenizer.EnterEnvelope();
+    }
+    return InvalidToken;
+  }
+
+  static int HexToInt(Char c) {
+    if ('0' <= c && c <= '9')
+      return c - '0';
+    if ('A' <= c && c <= 'F')
+      return c - 'A' + 10;
+    if ('a' <= c && c <= 'f')
+      return c - 'a' + 10;
+    assert(false);  // Unreachable.
+    return 0;
+  }
+
+  static bool DecodeString(const Char* start,
+                           const Char* end,
+                           std::vector<uint16_t>* output) {
+    if (start == end)
+      return true;
+    if (start > end)
+      return false;
+    output->reserve(end - start);
+    while (start < end) {
+      uint16_t c = *start++;
+      // If the |Char| we're dealing with is really a byte, then
+      // we have utf8 here, and we need to check for multibyte characters
+      // and transcode them to utf16 (either one or two utf16 chars).
+      if (sizeof(Char) == sizeof(uint8_t) && c >= 0x7f) {
+        // Inspect the leading byte to figure out how long the utf8
+        // byte sequence is; while doing this initialize |codepoint|
+        // with the first few bits.
+        // See table in: https://en.wikipedia.org/wiki/UTF-8
+        // byte one is 110x xxxx -> 2 byte utf8 sequence
+        // byte one is 1110 xxxx -> 3 byte utf8 sequence
+        // byte one is 1111 0xxx -> 4 byte utf8 sequence
+        uint32_t codepoint;
+        int num_bytes_left;
+        if ((c & 0xe0) == 0xc0) {  // 2 byte utf8 sequence
+          num_bytes_left = 1;
+          codepoint = c & 0x1f;
+        } else if ((c & 0xf0) == 0xe0) {  // 3 byte utf8 sequence
+          num_bytes_left = 2;
+          codepoint = c & 0x0f;
+        } else if ((c & 0xf8) == 0xf0) {  // 4 byte utf8 sequence
+          codepoint = c & 0x07;
+          num_bytes_left = 3;
+        } else {
+          return false;  // invalid leading byte
+        }
+
+        // If we have enough bytes in our inpput, decode the remaining ones
+        // belonging to this Unicode character into |codepoint|.
+        if (start + num_bytes_left > end)
+          return false;
+        while (num_bytes_left > 0) {
+          c = *start++;
+          --num_bytes_left;
+          // Check the next byte is a continuation byte, that is 10xx xxxx.
+          if ((c & 0xc0) != 0x80)
+            return false;
+          codepoint = (codepoint << 6) | (c & 0x3f);
+        }
+
+        // Disallow overlong encodings for ascii characters, as these
+        // would include " and other characters significant to JSON
+        // string termination / control.
+        if (codepoint < 0x7f)
+          return false;
+        // Invalid in UTF8, and can't be represented in UTF16 anyway.
+        if (codepoint > 0x10ffff)
+          return false;
+
+        // So, now we transcode to UTF16,
+        // using the math described at https://en.wikipedia.org/wiki/UTF-16,
+        // for either one or two 16 bit characters.
+        if (codepoint < 0xffff) {
+          output->push_back(codepoint);
+          continue;
+        }
+        codepoint -= 0x10000;
+        output->push_back((codepoint >> 10) + 0xd800);    // high surrogate
+        output->push_back((codepoint & 0x3ff) + 0xdc00);  // low surrogate
         continue;
-    }
-    tokenizer.Next();
-  }
-}
-#endif
+      }
+      if ('\\' != c) {
+        output->push_back(c);
+        continue;
+      }
+      if (start == end)
+        return false;
+      c = *start++;
 
+      if (c == 'x') {
+        // \x is not supported.
+        return false;
+      }
+
+      switch (c) {
+        case '"':
+        case '/':
+        case '\\':
+          break;
+        case 'b':
+          c = '\b';
+          break;
+        case 'f':
+          c = '\f';
+          break;
+        case 'n':
+          c = '\n';
+          break;
+        case 'r':
+          c = '\r';
+          break;
+        case 't':
+          c = '\t';
+          break;
+        case 'v':
+          c = '\v';
+          break;
+        case 'u':
+          c = (HexToInt(*start) << 12) + (HexToInt(*(start + 1)) << 8) +
+              (HexToInt(*(start + 2)) << 4) + HexToInt(*(start + 3));
+          start += 4;
+          break;
+        default:
+          return false;
+      }
+      output->push_back(c);
+    }
+    return true;
+  }
+
+  void ParseValue(const Char* start,
+                  const Char* end,
+                  const Char** value_token_end,
+                  int depth) {
+    if (depth > kStackLimit) {
+      HandleError(Error::JSON_PARSER_STACK_LIMIT_EXCEEDED, start);
+      return;
+    }
+    const Char* token_start;
+    const Char* token_end;
+    Token token = ParseToken(start, end, &token_start, &token_end);
+    switch (token) {
+      case NoInput:
+        HandleError(Error::JSON_PARSER_NO_INPUT, token_start);
+        return;
+      case InvalidToken:
+        HandleError(Error::JSON_PARSER_INVALID_TOKEN, token_start);
+        return;
+      case NullToken:
+        handler_->HandleNull();
+        break;
+      case BoolTrue:
+        handler_->HandleBool(true);
+        break;
+      case BoolFalse:
+        handler_->HandleBool(false);
+        break;
+      case Number: {
+        double value;
+        if (!CharsToDouble(token_start, token_end - token_start, &value)) {
+          HandleError(Error::JSON_PARSER_INVALID_NUMBER, token_start);
+          return;
+        }
+        if (value >= std::numeric_limits<int32_t>::min() &&
+            value <= std::numeric_limits<int32_t>::max() &&
+            static_cast<int32_t>(value) == value)
+          handler_->HandleInt32(static_cast<int32_t>(value));
+        else
+          handler_->HandleDouble(value);
+        break;
+      }
+      case StringLiteral: {
+        std::vector<uint16_t> value;
+        bool ok = DecodeString(token_start + 1, token_end - 1, &value);
+        if (!ok) {
+          HandleError(Error::JSON_PARSER_INVALID_STRING, token_start);
+          return;
+        }
+        handler_->HandleString16(span<uint16_t>(value.data(), value.size()));
+        break;
+      }
+      case ArrayBegin: {
+        handler_->HandleArrayBegin();
+        start = token_end;
+        token = ParseToken(start, end, &token_start, &token_end);
+        while (token != ArrayEnd) {
+          ParseValue(start, end, &token_end, depth + 1);
+          if (error_)
+            return;
+
+          // After a list value, we expect a comma or the end of the list.
+          start = token_end;
+          token = ParseToken(start, end, &token_start, &token_end);
+          if (token == ListSeparator) {
+            start = token_end;
+            token = ParseToken(start, end, &token_start, &token_end);
+            if (token == ArrayEnd) {
+              HandleError(Error::JSON_PARSER_UNEXPECTED_ARRAY_END, token_start);
+              return;
+            }
+          } else if (token != ArrayEnd) {
+            // Unexpected value after list value. Bail out.
+            HandleError(Error::JSON_PARSER_COMMA_OR_ARRAY_END_EXPECTED,
+                        token_start);
+            return;
+          }
+        }
+        handler_->HandleArrayEnd();
+        break;
+      }
+      case ObjectBegin: {
+        handler_->HandleMapBegin();
+        start = token_end;
+        token = ParseToken(start, end, &token_start, &token_end);
+        while (token != ObjectEnd) {
+          if (token != StringLiteral) {
+            HandleError(Error::JSON_PARSER_STRING_LITERAL_EXPECTED,
+                        token_start);
+            return;
+          }
+          std::vector<uint16_t> key;
+          if (!DecodeString(token_start + 1, token_end - 1, &key)) {
+            HandleError(Error::JSON_PARSER_INVALID_STRING, token_start);
+            return;
+          }
+          handler_->HandleString16(span<uint16_t>(key.data(), key.size()));
+          start = token_end;
+
+          token = ParseToken(start, end, &token_start, &token_end);
+          if (token != ObjectPairSeparator) {
+            HandleError(Error::JSON_PARSER_COLON_EXPECTED, token_start);
+            return;
+          }
+          start = token_end;
+
+          ParseValue(start, end, &token_end, depth + 1);
+          if (error_)
+            return;
+          start = token_end;
+
+          // After a key/value pair, we expect a comma or the end of the
+          // object.
+          token = ParseToken(start, end, &token_start, &token_end);
+          if (token == ListSeparator) {
+            start = token_end;
+            token = ParseToken(start, end, &token_start, &token_end);
+            if (token == ObjectEnd) {
+              HandleError(Error::JSON_PARSER_UNEXPECTED_MAP_END, token_start);
+              return;
+            }
+          } else if (token != ObjectEnd) {
+            // Unexpected value after last object value. Bail out.
+            HandleError(Error::JSON_PARSER_COMMA_OR_MAP_END_EXPECTED,
+                        token_start);
+            return;
+          }
+        }
+        handler_->HandleMapEnd();
+        break;
+      }
+
+      default:
+        // We got a token that's not a value.
+        HandleError(Error::JSON_PARSER_VALUE_EXPECTED, token_start);
+        return;
+    }
+
+    SkipWhitespaceAndComments(token_end, end, value_token_end);
+  }
+
+  void HandleError(Error error, const Char* pos) {
+    assert(error != Error::OK);
+    if (!error_) {
+      handler_->HandleError(Status{error, pos - start_pos_});
+      error_ = true;
+    }
+  }
+
+  const Char* start_pos_ = nullptr;
+  bool error_ = false;
+  const Platform* platform_;
+  StreamingParserHandler* handler_;
+};
+}  // namespace
+
+void ParseJSON(const Platform& platform,
+               span<uint8_t> chars,
+               StreamingParserHandler* handler) {
+  JsonParser<uint8_t> parser(&platform, handler);
+  parser.Parse(chars.data(), chars.size());
+}
+
+void ParseJSON(const Platform& platform,
+               span<uint16_t> chars,
+               StreamingParserHandler* handler) {
+  JsonParser<uint16_t> parser(&platform, handler);
+  parser.Parse(chars.data(), chars.size());
+}
+
+// =============================================================================
+// json::ConvertCBORToJSON, json::ConvertJSONToCBOR - for transcoding
+// =============================================================================
+template <typename C>
+Status ConvertCBORToJSONTmpl(const Platform& platform,
+                             span<uint8_t> cbor,
+                             C* json) {
+  Status status;
+  std::unique_ptr<StreamingParserHandler> json_writer =
+      NewJSONEncoder(&platform, json, &status);
+  cbor::ParseCBOR(cbor, json_writer.get());
+  return status;
+}
+
+Status ConvertCBORToJSON(const Platform& platform,
+                         span<uint8_t> cbor,
+                         std::vector<uint8_t>* json) {
+  return ConvertCBORToJSONTmpl(platform, cbor, json);
+}
+Status ConvertCBORToJSON(const Platform& platform,
+                         span<uint8_t> cbor,
+                         std::string* json) {
+  return ConvertCBORToJSONTmpl(platform, cbor, json);
+}
+
+template <typename C>
+Status ConvertJSONToCBORTmpl(const Platform& platform,
+                             span<uint8_t> json,
+                             C* cbor) {
+  Status status;
+  std::unique_ptr<StreamingParserHandler> encoder =
+      cbor::NewCBOREncoder(cbor, &status);
+  ParseJSON(platform, json, encoder.get());
+  return status;
+}
+Status ConvertJSONToCBOR(const Platform& platform,
+                         span<uint8_t> json,
+                         std::string* cbor) {
+  return ConvertJSONToCBORTmpl(platform, json, cbor);
+}
+Status ConvertJSONToCBOR(const Platform& platform,
+                         span<uint8_t> json,
+                         std::vector<uint8_t>* cbor) {
+  return ConvertJSONToCBORTmpl(platform, json, cbor);
+}
+}  // namespace json
 
 } // namespace v8_inspector
 } // namespace protocol
