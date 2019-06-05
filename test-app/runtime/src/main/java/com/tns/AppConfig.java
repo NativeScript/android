@@ -20,7 +20,8 @@ class AppConfig {
         HandleTimeZoneChanges("handleTimeZoneChanges", false),
         MaxLogcatObjectSize("maxLogcatObjectSize", 1024),
         ForceLog("forceLog", false),
-        DiscardUncaughtJsExceptions("discardUncaughtJsExceptions", false);
+        DiscardUncaughtJsExceptions("discardUncaughtJsExceptions", false),
+        EnableLineBreakpoins("enableLineBreakpoints", false);
 
         private final String name;
         private final Object defaultValue;
@@ -116,6 +117,9 @@ class AppConfig {
                     if (androidObject.has(KnownKeys.ForceLog.getName())) {
                         values[KnownKeys.ForceLog.ordinal()] = androidObject.getBoolean(KnownKeys.ForceLog.getName());
                     }
+                    if (androidObject.has(KnownKeys.EnableLineBreakpoins.getName())) {
+                        values[KnownKeys.EnableLineBreakpoins.ordinal()] = androidObject.getBoolean(KnownKeys.EnableLineBreakpoins.getName());
+                    }
                 }
             }
         } catch (Exception e) {
@@ -165,6 +169,10 @@ class AppConfig {
 
     public boolean getForceLog() {
         return (boolean)values[KnownKeys.ForceLog.ordinal()];
+    }
+
+    public boolean getLineBreakpointsEnabled() {
+        return (boolean)values[KnownKeys.EnableLineBreakpoins.ordinal()];
     }
 
     public boolean getDiscardUncaughtJsExceptions() {

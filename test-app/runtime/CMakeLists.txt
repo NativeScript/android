@@ -63,6 +63,7 @@ if (NOT OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
         src/main/cpp/JsV8InspectorClient.cpp
         src/main/cpp/DOMDomainCallbackHandlers.cpp
         src/main/cpp/NetworkDomainCallbackHandlers.cpp
+        src/main/cpp/NSV8DebuggerAgentImpl.cpp
 
         src/main/cpp/v8_inspector/src/inspector/protocol/CSS.cpp
         src/main/cpp/v8_inspector/src/inspector/protocol/Console.cpp

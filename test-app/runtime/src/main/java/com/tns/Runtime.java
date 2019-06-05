@@ -273,6 +273,15 @@ public class Runtime {
     }
 
     @RuntimeCallable
+    public static boolean getLineBreakpointsEnabled() {
+        if (staticConfiguration != null && staticConfiguration.appConfig != null) {
+            return staticConfiguration.appConfig.getLineBreakpointsEnabled();
+        } else {
+            return ((boolean) AppConfig.KnownKeys.EnableLineBreakpoins.getDefaultValue());
+        }
+    }
+
+    @RuntimeCallable
     public int getMarkingModeOrdinal() {
         if (staticConfiguration != null && staticConfiguration.appConfig != null) {
             return staticConfiguration.appConfig.getMarkingMode().ordinal();

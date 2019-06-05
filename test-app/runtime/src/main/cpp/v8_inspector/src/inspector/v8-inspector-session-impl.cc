@@ -24,6 +24,7 @@
 #include "src/inspector/v8-css-agent-impl.h"
 #include "src/inspector/v8-overlay-agent-impl.h"
 #include "src/inspector/v8-log-agent-impl.h"
+#include "NSV8DebuggerAgentImpl.h"
 
 namespace v8_inspector {
 
@@ -106,7 +107,7 @@ V8InspectorSessionImpl::V8InspectorSessionImpl(V8InspectorImpl* inspector,
       this, this, agentState(protocol::Runtime::Metainfo::domainName)));
   protocol::Runtime::Dispatcher::wire(&m_dispatcher, m_runtimeAgent.get());
 
-  m_debuggerAgent.reset(new V8DebuggerAgentImpl(
+  m_debuggerAgent.reset(new NSV8DebuggerAgentImpl(
       this, this, agentState(protocol::Debugger::Metainfo::domainName)));
   protocol::Debugger::Dispatcher::wire(&m_dispatcher, m_debuggerAgent.get());
 
