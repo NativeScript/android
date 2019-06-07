@@ -56,7 +56,7 @@ function getCredentials() {
 function listMilestones() {
 
     console.log("Request open milestones.");
-    milestoneRequest.headers.Authorization = "Basic " + new Buffer(username + ":" + password).toString("base64");
+    milestoneRequest.headers.Authorization = "Basic " + Buffer.from(username + ":" + password).toString("base64");
 
     var req = https.request(milestoneRequest, gitHubResponse(function (data) {
 
@@ -106,11 +106,11 @@ function selectMilestone() {
 }
 
 function createReleaseNotes(milestone) {
-        
+
     console.log("Request closed issues in the milestone.");
-    issuesRequest.headers.Authorization = "Basic " + new Buffer(username + ":" + password).toString("base64");
+    issuesRequest.headers.Authorization = "Basic " + Buffer.from(username + ":" + password).toString("base64");
     issuesRequest.path = '/repos/NativeScript/android-runtime/issues?milestone=' + milestone.number + '&state=closed';
-    
+
     var req = https.request(issuesRequest, gitHubResponse(function (data) {
 
         if (!(data instanceof Array)) {
@@ -131,7 +131,7 @@ function createReleaseNotes(milestone) {
                     return l.name == "feature";
                 }).length > 0;
             });
-            
+
              var performance = issues.filter(function (i) {
                 return i.labels.filter(function (l) {
                     return l.name == "T:Performance";
