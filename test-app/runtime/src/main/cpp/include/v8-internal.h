@@ -7,6 +7,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 #include <type_traits>
 
 #include "v8-version.h"  // NOLINT(build/include)
@@ -29,7 +30,6 @@ static const Address kNullAddress = 0;
  * Configuration of tagging scheme.
  */
 const int kApiSystemPointerSize = sizeof(void*);
-const int kApiTaggedSize = kApiSystemPointerSize;
 const int kApiDoubleSize = sizeof(double);
 const int kApiInt32Size = sizeof(int32_t);
 const int kApiInt64Size = sizeof(int64_t);
@@ -92,6 +92,9 @@ struct SmiTagging<8> {
 static_assert(
     kApiSystemPointerSize == kApiInt64Size,
     "Pointer compression can be enabled only for 64-bit architectures");
+const int kApiTaggedSize = kApiInt32Size;
+#else
+const int kApiTaggedSize = kApiSystemPointerSize;
 #endif
 
 #ifdef V8_31BIT_SMIS_ON_64BIT_ARCH
@@ -131,11 +134,7 @@ class Internals {
   static const int kJSObjectHeaderSize = 3 * kApiTaggedSize;
   static const int kFixedArrayHeaderSize = 2 * kApiTaggedSize;
   static const int kEmbedderDataArrayHeaderSize = 2 * kApiTaggedSize;
-  static const int kEmbedderDataSlotSize =
-#ifdef V8_COMPRESS_POINTERS
-      2 *
-#endif
-      kApiSystemPointerSize;
+  static const int kEmbedderDataSlotSize = kApiSystemPointerSize;
   static const int kNativeContextEmbedderDataOffset = 7 * kApiTaggedSize;
   static const int kFullStringRepresentationMask = 0x0f;
   static const int kStringEncodingMask = 0x8;
@@ -166,7 +165,6 @@ class Internals {
   static const int kNodeStateMask = 0x7;
   static const int kNodeStateIsWeakValue = 2;
   static const int kNodeStateIsPendingValue = 3;
-  static const int kNodeStateIsNearDeathValue = 4;
   static const int kNodeIsIndependentShift = 3;
   static const int kNodeIsActiveShift = 4;
 
@@ -277,6 +275,17 @@ class Internals {
   V8_INLINE static T ReadRawField(internal::Address heap_object_ptr,
                                   int offset) {
     internal::Address addr = heap_object_ptr + offset - kHeapObjectTag;
+#ifdef V8_COMPRESS_POINTERS
+    if (sizeof(T) > kApiTaggedSize) {
+      // TODO(ishell, v8:8875): When pointer compression is enabled 8-byte size
+      // fields (external pointers, doubles and BigInt data) are only
+      // kTaggedSize aligned so we have to use unaligned pointer friendly way of
+      // accessing them in order to avoid undefined behavior in C++ code.
+      T r;
+      memcpy(&r, reinterpret_cast<void*>(addr), sizeof(T));
+      return r;
+    }
+#endif
     return *reinterpret_cast<const T*>(addr);
   }
 
@@ -301,22 +310,8 @@ class Internals {
 #endif
   }
 
-  V8_INLINE static internal::Address ReadTaggedAnyField(
-      internal::Address heap_object_ptr, int offset) {
 #ifdef V8_COMPRESS_POINTERS
-    int32_t value = ReadRawField<int32_t>(heap_object_ptr, offset);
-    internal::Address root_mask = static_cast<internal::Address>(
-        -static_cast<intptr_t>(value & kSmiTagMask));
-    internal::Address root_or_zero =
-        root_mask & GetRootFromOnHeapAddress(heap_object_ptr);
-    return root_or_zero +
-           static_cast<internal::Address>(static_cast<intptr_t>(value));
-#else
-    return ReadRawField<internal::Address>(heap_object_ptr, offset);
-#endif
-  }
-
-#ifdef V8_COMPRESS_POINTERS
+  // See v8:7703 or src/ptr-compr.* for details about pointer compression.
   static constexpr size_t kPtrComprHeapReservationSize = size_t{1} << 32;
   static constexpr size_t kPtrComprIsolateRootBias =
       kPtrComprHeapReservationSize / 2;
@@ -328,18 +323,14 @@ class Internals {
            -static_cast<intptr_t>(kPtrComprIsolateRootAlignment);
   }
 
-#else
-
-  template <typename T>
-  V8_INLINE static T ReadEmbedderData(const v8::Context* context, int index) {
-    typedef internal::Address A;
-    typedef internal::Internals I;
-    A ctx = *reinterpret_cast<const A*>(context);
-    A embedder_data =
-        I::ReadTaggedPointerField(ctx, I::kNativeContextEmbedderDataOffset);
-    int value_offset =
-        I::kEmbedderDataArrayHeaderSize + (I::kEmbedderDataSlotSize * index);
-    return I::ReadRawField<T>(embedder_data, value_offset);
+  V8_INLINE static internal::Address DecompressTaggedAnyField(
+      internal::Address heap_object_ptr, int32_t value) {
+    internal::Address root_mask = static_cast<internal::Address>(
+        -static_cast<intptr_t>(value & kSmiTagMask));
+    internal::Address root_or_zero =
+        root_mask & GetRootFromOnHeapAddress(heap_object_ptr);
+    return root_or_zero +
+           static_cast<internal::Address>(static_cast<intptr_t>(value));
   }
 #endif  // V8_COMPRESS_POINTERS
 };

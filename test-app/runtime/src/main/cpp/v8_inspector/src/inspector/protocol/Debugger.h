@@ -1358,7 +1358,7 @@ public:
 
     virtual DispatchResponse continueToLocation(std::unique_ptr<protocol::Debugger::Location> in_location, Maybe<String> in_targetCallFrames) = 0;
     virtual DispatchResponse disable() = 0;
-    virtual DispatchResponse enable(String* out_debuggerId) = 0;
+    virtual DispatchResponse enable(Maybe<double> in_maxScriptsCacheSize, String* out_debuggerId) = 0;
     virtual DispatchResponse evaluateOnCallFrame(const String& in_callFrameId, const String& in_expression, Maybe<String> in_objectGroup, Maybe<bool> in_includeCommandLineAPI, Maybe<bool> in_silent, Maybe<bool> in_returnByValue, Maybe<bool> in_generatePreview, Maybe<bool> in_throwOnSideEffect, Maybe<double> in_timeout, std::unique_ptr<protocol::Runtime::RemoteObject>* out_result, Maybe<protocol::Runtime::ExceptionDetails>* out_exceptionDetails) = 0;
     virtual DispatchResponse getPossibleBreakpoints(std::unique_ptr<protocol::Debugger::Location> in_start, Maybe<protocol::Debugger::Location> in_end, Maybe<bool> in_restrictToFunction, std::unique_ptr<protocol::Array<protocol::Debugger::BreakLocation>>* out_locations) = 0;
     virtual DispatchResponse getScriptSource(const String& in_scriptId, String* out_scriptSource) = 0;

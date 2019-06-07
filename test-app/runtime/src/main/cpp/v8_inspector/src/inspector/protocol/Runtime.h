@@ -27,6 +27,7 @@ class PropertyPreview;
 class EntryPreview;
 class PropertyDescriptor;
 class InternalPropertyDescriptor;
+class PrivatePropertyDescriptor;
 class CallArgument;
 using ExecutionContextId = int;
 class ExecutionContextDescription;
@@ -929,6 +930,82 @@ private:
 
     String m_name;
     Maybe<protocol::Runtime::RemoteObject> m_value;
+};
+
+
+class  PrivatePropertyDescriptor : public Serializable{
+    PROTOCOL_DISALLOW_COPY(PrivatePropertyDescriptor);
+public:
+    static std::unique_ptr<PrivatePropertyDescriptor> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~PrivatePropertyDescriptor() override { }
+
+    String getName() { return m_name; }
+    void setName(const String& value) { m_name = value; }
+
+    protocol::Runtime::RemoteObject* getValue() { return m_value.get(); }
+    void setValue(std::unique_ptr<protocol::Runtime::RemoteObject> value) { m_value = std::move(value); }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    String serializeToJSON() override { return toValue()->serializeToJSON(); }
+    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    String toJSON() const { return toValue()->toJSONString(); }
+    std::unique_ptr<PrivatePropertyDescriptor> clone() const;
+
+    template<int STATE>
+    class PrivatePropertyDescriptorBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            NameSet = 1 << 1,
+            ValueSet = 1 << 2,
+            AllFieldsSet = (NameSet | ValueSet | 0)};
+
+
+        PrivatePropertyDescriptorBuilder<STATE | NameSet>& setName(const String& value)
+        {
+            static_assert(!(STATE & NameSet), "property name should not be set yet");
+            m_result->setName(value);
+            return castState<NameSet>();
+        }
+
+        PrivatePropertyDescriptorBuilder<STATE | ValueSet>& setValue(std::unique_ptr<protocol::Runtime::RemoteObject> value)
+        {
+            static_assert(!(STATE & ValueSet), "property value should not be set yet");
+            m_result->setValue(std::move(value));
+            return castState<ValueSet>();
+        }
+
+        std::unique_ptr<PrivatePropertyDescriptor> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class PrivatePropertyDescriptor;
+        PrivatePropertyDescriptorBuilder() : m_result(new PrivatePropertyDescriptor()) { }
+
+        template<int STEP> PrivatePropertyDescriptorBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<PrivatePropertyDescriptorBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Runtime::PrivatePropertyDescriptor> m_result;
+    };
+
+    static PrivatePropertyDescriptorBuilder<0> create()
+    {
+        return PrivatePropertyDescriptorBuilder<0>();
+    }
+
+private:
+    PrivatePropertyDescriptor()
+    {
+    }
+
+    String m_name;
+    std::unique_ptr<protocol::Runtime::RemoteObject> m_value;
 };
 
 
@@ -2194,7 +2271,7 @@ public:
     virtual void evaluate(const String& in_expression, Maybe<String> in_objectGroup, Maybe<bool> in_includeCommandLineAPI, Maybe<bool> in_silent, Maybe<int> in_contextId, Maybe<bool> in_returnByValue, Maybe<bool> in_generatePreview, Maybe<bool> in_userGesture, Maybe<bool> in_awaitPromise, Maybe<bool> in_throwOnSideEffect, Maybe<double> in_timeout, std::unique_ptr<EvaluateCallback> callback) = 0;
     virtual DispatchResponse getIsolateId(String* out_id) = 0;
     virtual DispatchResponse getHeapUsage(double* out_usedSize, double* out_totalSize) = 0;
-    virtual DispatchResponse getProperties(const String& in_objectId, Maybe<bool> in_ownProperties, Maybe<bool> in_accessorPropertiesOnly, Maybe<bool> in_generatePreview, std::unique_ptr<protocol::Array<protocol::Runtime::PropertyDescriptor>>* out_result, Maybe<protocol::Array<protocol::Runtime::InternalPropertyDescriptor>>* out_internalProperties, Maybe<protocol::Runtime::ExceptionDetails>* out_exceptionDetails) = 0;
+    virtual DispatchResponse getProperties(const String& in_objectId, Maybe<bool> in_ownProperties, Maybe<bool> in_accessorPropertiesOnly, Maybe<bool> in_generatePreview, std::unique_ptr<protocol::Array<protocol::Runtime::PropertyDescriptor>>* out_result, Maybe<protocol::Array<protocol::Runtime::InternalPropertyDescriptor>>* out_internalProperties, Maybe<protocol::Array<protocol::Runtime::PrivatePropertyDescriptor>>* out_privateProperties, Maybe<protocol::Runtime::ExceptionDetails>* out_exceptionDetails) = 0;
     virtual DispatchResponse globalLexicalScopeNames(Maybe<int> in_executionContextId, std::unique_ptr<protocol::Array<String>>* out_names) = 0;
     virtual DispatchResponse queryObjects(const String& in_prototypeObjectId, Maybe<String> in_objectGroup, std::unique_ptr<protocol::Runtime::RemoteObject>* out_objects) = 0;
     virtual DispatchResponse releaseObject(const String& in_objectId) = 0;

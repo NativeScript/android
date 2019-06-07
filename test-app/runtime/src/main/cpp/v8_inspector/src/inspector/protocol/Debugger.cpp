@@ -986,11 +986,25 @@ void DispatcherImpl::disable(int callId, const String& method, const ProtocolMes
 
 void DispatcherImpl::enable(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
 {
+    // Prepare input parameters.
+    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
+    errors->push();
+    protocol::Value* maxScriptsCacheSizeValue = object ? object->get("maxScriptsCacheSize") : nullptr;
+    Maybe<double> in_maxScriptsCacheSize;
+    if (maxScriptsCacheSizeValue) {
+        errors->setName("maxScriptsCacheSize");
+        in_maxScriptsCacheSize = ValueConversions<double>::fromValue(maxScriptsCacheSizeValue, errors);
+    }
+    errors->pop();
+    if (errors->hasErrors()) {
+        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
+        return;
+    }
     // Declare output parameters.
     String out_debuggerId;
 
     std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->enable(&out_debuggerId);
+    DispatchResponse response = m_backend->enable(std::move(in_maxScriptsCacheSize), &out_debuggerId);
     if (response.status() == DispatchResponse::kFallThrough) {
         channel()->fallThrough(callId, method, message);
         return;
