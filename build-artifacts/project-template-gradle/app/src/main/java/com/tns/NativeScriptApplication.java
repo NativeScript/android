@@ -2,7 +2,7 @@ package com.tns;
 
 import android.app.Application;
 import android.os.Build;
-import android.support.multidex.MultiDex;
+import androidx.multidex.MultiDex;
 
 public class NativeScriptApplication extends Application {
 

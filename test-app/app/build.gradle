@@ -12,8 +12,10 @@
 *
 *            -PtargetSdk=[target_sdk]
 *            -PbuildToolsVersion=[build_tools_version]
-*            -PsupportVersion=[support_version]
 *            -PcompileSdk=[compile_sdk_version]
+*            -PandroidXLegacy=[androidx_legacy_version]
+*            -PandroidXAppCompat=[androidx_appcompat_version]
+*            -PandroidXMaterial=[androidx_material_version]
 */
 
 import groovy.json.JsonSlurper
@@ -303,40 +305,27 @@ repositories {
 }
 
 dependencies {
-    def supportVer = "28.0.0"
-    if (project.hasProperty("supportVersion")) {
-        supportVer = supportVersion
+    def androidXLegacyVersion = "1.0.0"
+    if (project.hasProperty("androidXLegacy")) {
+        androidXLegacyVersion = androidXLegacy
     }
-    if (project.hasProperty("useAndroidX") && (useAndroidX || useAndroidX.toBoolean())) {
-        def androidXLegacyVersion = "1.0.0"
-        if (project.hasProperty("androidXLegacy")) {
-            androidXLegacyVersion = androidXLegacy
-        }
 
-        def androidXAppCompatVersion = "1.1.0-alpha01"
-        if (project.hasProperty("androidXAppCompat")) {
-            androidXAppCompatVersion = androidXAppCompat
-        }
-
-        def androidXMaterialVersion = "1.1.0-alpha01"
-        if (project.hasProperty("androidXMaterial")) {
-            androidXMaterialVersion = androidXMaterial
-        }
-
-        println "\t + using andorid X library androidx.legacy:legacy-support-v4:$androidXLegacyVersion"
-
-        implementation "androidx.multidex:multidex:2.0.0"
-        implementation "androidx.legacy:legacy-support-v4:$androidXLegacyVersion"
-        implementation "androidx.appcompat:appcompat:$androidXAppCompatVersion"
-        implementation "com.google.android.material:material:$androidXMaterialVersion"
-    } else {
-        println "\t + using support library version $supportVer"
-
-        implementation "com.android.support:multidex:1.0.2"
-        implementation "com.android.support:support-v4:$supportVer"
-        implementation "com.android.support:appcompat-v7:$supportVer"
-        implementation "com.android.support:design:$supportVer"
+    def androidXAppCompatVersion = "1.1.0-alpha01"
+    if (project.hasProperty("androidXAppCompat")) {
+        androidXAppCompatVersion = androidXAppCompat
     }
+
+    def androidXMaterialVersion = "1.1.0-alpha01"
+    if (project.hasProperty("androidXMaterial")) {
+        androidXMaterialVersion = androidXMaterial
+    }
+
+    println "\t + using andorid X library androidx.legacy:legacy-support-v4:$androidXLegacyVersion"
+
+    implementation "androidx.multidex:multidex:2.0.0"
+    implementation "androidx.legacy:legacy-support-v4:$androidXLegacyVersion"
+    implementation "androidx.appcompat:appcompat:$androidXAppCompatVersion"
+    implementation "com.google.android.material:material:$androidXMaterialVersion"
 
     def useV8Symbols = false
 
@@ -428,7 +417,6 @@ tasks.whenTaskAdded({ org.gradle.api.DefaultTask currentTask ->
         extractAllJars.finalizedBy(collectAllJars)
     }
     if (currentTask =~ /compile.+JavaWithJavac/) {
-        currentTask.dependsOn(makeAndroidXChanges)
         currentTask.dependsOn(runSbg)
         currentTask.finalizedBy(ensureMetadataOutDir)
         ensureMetadataOutDir.finalizedBy(buildMetadata)
@@ -705,43 +693,6 @@ task buildMetadata(type: JavaExec) {
         main "-jar"
 
         args "android-metadata-generator.jar"
-    }
-}
-
-task makeAndroidXChanges {
-    if (project.hasProperty("useAndroidX") && (useAndroidX || useAndroidX.toBoolean())) {
-        // code changes
-        def codeTuples = new ArrayList<Tuple2<String, String>>()
-        codeTuples.add(new Tuple2<String, String>('android\\.support\\.annotation\\.NonNull', 'androidx.annotation.NonNull'))
-        codeTuples.add(new Tuple2<String, String>('android\\.support\\.v7\\.app\\.AppCompatActivity', 'androidx.appcompat.app.AppCompatActivity'))
-        codeTuples.add(new Tuple2<String, String>('android\\.support\\.v7\\.appcompat\\.R', 'androidx.appcompat.R'))
-        codeTuples.add(new Tuple2<String, String>('android\\.support\\.design\\.widget\\.TabLayout', 'com.google.android.material.tabs.TabLayout'))
-        codeTuples.add(new Tuple2<String, String>('android\\.support\\.v4\\.app\\.ActivityCompat', 'androidx.core.app.ActivityCompat'))
-        codeTuples.add(new Tuple2<String, String>('android\\.support\\.v4\\.app\\.Fragment', 'androidx.fragment.app.Fragment'))
-        codeTuples.add(new Tuple2<String, String>('android\\.support\\.v4\\.view\\.ViewPager', 'androidx.viewpager.widget.ViewPager'))
-        codeTuples.add(new Tuple2<String, String>('android\\.support\\.v7\\.widget\\.Toolbar', 'androidx.appcompat.widget.Toolbar'))
-        codeTuples.add(new Tuple2<String, String>('android\\.support\\.multidex\\.MultiDex', 'androidx.multidex.MultiDex'))
-
-        codeTuples.each { tuple ->
-            ant.replaceregexp(match: tuple.first, replace: tuple.second, flags: 'g', byline: true) {
-                fileset(dir: "$projectDir/src/debug/java/com/tns/", includes: '*.java')
-            }
-            ant.replaceregexp(match: tuple.first, replace: tuple.second, flags: 'g', byline: true) {
-                fileset(dir: "$projectDir/src/main/java/com/tns/", includes: '*.java')
-            }
-        }
-
-        // resource changes
-        def resourceTuples = new ArrayList<Tuple2<String, String>>()
-        resourceTuples.add(new Tuple2<String, String>('android\\.support\\.v7\\.widget\\.Toolbar', 'androidx.appcompat.widget.Toolbar'))
-        resourceTuples.add(new Tuple2<String, String>('android\\.support\\.v4\\.view\\.ViewPager', 'androidx.viewpager.widget.ViewPager'))
-        resourceTuples.add(new Tuple2<String, String>('android\\.support\\.design\\.widget\\.TabLayout', 'com.google.android.material.tabs.TabLayout'))
-
-        resourceTuples.each { tuple ->
-            ant.replaceregexp(match: tuple.first, replace: tuple.second, flags: 'g', byline: true) {
-                fileset(dir: "$projectDir/src/debug/res/layout/", includes: 'error_activity.xml')
-            }
-        }
     }
 }
 
