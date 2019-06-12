@@ -1,5 +1,5 @@
 {
-  "name": "ast-parser",
+  "name": "js-parser",
   "version": "1.0.0",
   "description": "javascript static analysis tool",
   "main": "js_parser.js",
@@ -13,7 +13,7 @@
     "babel-traverse": "6.26.0",
     "babel-types": "6.26.0",
     "babylon": "6.18.0",
-    "lazy": "1.0.11"
+    "split": "1.0.1"
   },
   "repository": "https://github.com/NativeScript/android-runtime",
   "devDependencies": {
