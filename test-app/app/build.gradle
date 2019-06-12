@@ -310,12 +310,12 @@ dependencies {
         androidXLegacyVersion = androidXLegacy
     }
 
-    def androidXAppCompatVersion = "1.1.0-alpha01"
+    def androidXAppCompatVersion = "1.0.2"
     if (project.hasProperty("androidXAppCompat")) {
         androidXAppCompatVersion = androidXAppCompat
     }
 
-    def androidXMaterialVersion = "1.1.0-alpha01"
+    def androidXMaterialVersion = "1.0.0"
     if (project.hasProperty("androidXMaterial")) {
         androidXMaterialVersion = androidXMaterial
     }
