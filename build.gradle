@@ -127,6 +127,17 @@ task generateDtsgJar(type: Exec) {
     }
 }
 
+task jsParserNPMInstall(type: Exec) {
+    doFirst {
+        workingDir "$TEST_APP_PATH/build-tools/jsparser"
+        if (isWinOs) {
+            commandLine "cmd", "/c", "npm", "install"
+        } else {
+            commandLine "npm", "install"
+        }
+    }
+}
+
 task generateSbgJar(type: Exec) {
     doFirst {
         workingDir "$TEST_APP_PATH"
@@ -328,6 +339,7 @@ task createNpmPackage(type: Exec) {
 }
 
 generateSbgJar.dependsOn(generateDtsgJar)
+generateSbgJar.dependsOn(jsParserNPMInstall)
 generateMdgJar.dependsOn(generateSbgJar)
 createDistDir.dependsOn(generateMdgJar)
 
