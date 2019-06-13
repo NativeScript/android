@@ -411,6 +411,12 @@ task addDependenciesFromAppResourcesLibraries {
     }
 }
 
+// Uncomment the code bellow to get detailed deprecation warnings
+//tasks.withType(JavaCompile) {
+//    options.compilerArgs << '-Xlint:unchecked'
+//    options.deprecation = true
+//}
+
 tasks.whenTaskAdded({ org.gradle.api.DefaultTask currentTask ->
     if (currentTask =~ /generate.+BuildConfig/) {
         currentTask.finalizedBy(extractAllJars)

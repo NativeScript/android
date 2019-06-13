@@ -318,6 +318,7 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
 
         int tabCount;
 
+        @SuppressWarnings("deprecation")
         public Pager(FragmentManager fm, int tabCount) {
             super(fm);
             this.tabCount = tabCount;

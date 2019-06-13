@@ -2,11 +2,13 @@ package org.nativescript.staticbindinggenerator.generating.writing.impl;
 
 import org.apache.bcel.generic.Type;
 import org.nativescript.staticbindinggenerator.DefaultValues;
+import org.nativescript.staticbindinggenerator.Generator;
 import org.nativescript.staticbindinggenerator.Writer;
 import org.nativescript.staticbindinggenerator.generating.parsing.methods.ReifiedJavaMethod;
 import org.nativescript.staticbindinggenerator.generating.writing.MethodsWriter;
 import org.nativescript.staticbindinggenerator.naming.BcelNamingUtil;
 
+import java.util.Arrays;
 import java.util.List;
 
 public class MethodsWriterImpl implements MethodsWriter {
@@ -228,7 +230,25 @@ public class MethodsWriterImpl implements MethodsWriter {
         writer.write(CLOSING_ROUND_BRACKET_LITERAL);
     }
 
+    private boolean isMethodDeprecated(ReifiedJavaMethod method) {
+        return Arrays.stream(
+                method
+                    .getMethod()
+                    .getAttributes())
+                    .anyMatch(x ->
+                            x.getClass()
+                                    .isAssignableFrom(org.apache.bcel.classfile.Deprecated.class));
+    }
+
+    private void writeSuppressDeprecationsToWriter() {
+        writer.writeln("@SuppressWarnings( \"deprecation\" )");
+    }
+
     private void writeMethodSignature(ReifiedJavaMethod method) {
+        if(isMethodDeprecated(method)) {
+            writeSuppressDeprecationsToWriter();
+        }
+
         writer.write(getMethodVisibilityModifier(method));
         writer.write(SPACE_LITERAL);
         writer.write(method.getOwnGenericArgumentsDeclaration());
