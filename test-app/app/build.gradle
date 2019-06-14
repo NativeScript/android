@@ -411,11 +411,12 @@ task addDependenciesFromAppResourcesLibraries {
     }
 }
 
-// Uncomment the code bellow to get detailed deprecation warnings
-//tasks.withType(JavaCompile) {
-//    options.compilerArgs << '-Xlint:unchecked'
-//    options.deprecation = true
-//}
+if (failOnCompilationWarningsEnabled()) {
+    tasks.withType(JavaCompile) {
+        options.compilerArgs << '-Xlint:all' << "-Werror"
+        options.deprecation = true
+    }
+}
 
 tasks.whenTaskAdded({ org.gradle.api.DefaultTask currentTask ->
     if (currentTask =~ /generate.+BuildConfig/) {
@@ -451,7 +452,15 @@ task runSbg(type: JavaExec) {
 
     workingDir "$BUILD_TOOLS_PATH"
     main "-jar"
-    args "static-binding-generator.jar"
+
+    def paramz = new ArrayList<String>()
+    paramz.add("static-binding-generator.jar")
+
+    if (failOnCompilationWarningsEnabled()) {
+        paramz.add("-show-deprecation-warnings")
+    }
+
+    args paramz
 
     doFirst {
         new File("$OUTPUT_JAVA_DIR/com/tns/gen").deleteDir()
@@ -463,6 +472,10 @@ task ensureMetadataOutDir {
         def outputDir = file("$METADATA_OUT_PATH")
         outputDir.mkdirs()
     }
+}
+
+def failOnCompilationWarningsEnabled() {
+    return project.hasProperty("failOnCompilationWarnings") && (failOnCompilationWarnings || failOnCompilationWarnings.toBoolean())
 }
 
 def explodeAar(File compileDependency, File outputDir) {

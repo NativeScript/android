@@ -33,6 +33,8 @@ public class Main {
     }
 
     public static void main(String[] args) throws IOException, ClassNotFoundException {
+        InputParameters.parseCommand(args);
+
         validateInput();
 
         getWorkerExcludeFile();
@@ -44,7 +46,7 @@ public class Main {
 
         // generate java bindings
         String inputBindingFilename = Paths.get(System.getProperty("user.dir"), SBG_BINDINGS_NAME).toString();
-        Generator generator = new Generator(outputDir, rows, isSuppressCallJSMethodExceptionsEnabled(), false);
+        Generator generator = new Generator(outputDir, rows, isSuppressCallJSMethodExceptionsEnabled());
         generator.writeBindings(inputBindingFilename);
     }
 

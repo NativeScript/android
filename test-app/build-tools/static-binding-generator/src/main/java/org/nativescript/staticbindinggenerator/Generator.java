@@ -78,13 +78,13 @@ public class Generator {
     private Set<String> nonPublicNestedClasses;
 
     public Generator(File outputDir, List<DataRow> libs) throws IOException {
-        this(outputDir, libs, false, false);
+        this(outputDir, libs, false);
     }
 
-    public Generator(File outputDir, List<DataRow> libs, boolean suppressCallJSMethodExceptions, boolean throwOnError) throws IOException {
+    public Generator(File outputDir, List<DataRow> libs, boolean suppressCallJSMethodExceptions) throws IOException {
         this.outputDir = outputDir;
         this.libs = libs;
-        this.fileSystemHelper = new FileSystemHelperImpl(throwOnError);
+        this.fileSystemHelper = new FileSystemHelperImpl(InputParameters.getCurrent().getThrowOnError());
         ClassesCollection classesCollection = readClasses(libs);
         this.classes = classesCollection.getRegularClasses();
         this.nonPublicNestedClasses = classesCollection.getNonPublicNestedClasses();
@@ -443,16 +443,19 @@ public class Generator {
         for (ReifiedJavaMethod abstractMethod : inheritedMethodsView.getNonImplementedMethods()) {
             writer.writeln();
             writer.writeln();
-            methodsWriter.writeMethod(abstractMethod);
+            methodsWriter.writeMethod(abstractMethod, false);
         }
 
-        for (ReifiedJavaMethod overridableMethod : inheritedMethodsView.getOverridableImplementedMethods()) {
+        List<ReifiedJavaMethod> overridableImplementedMethods = inheritedMethodsView.getOverridableImplementedMethods();
+
+        for (ReifiedJavaMethod overridableMethod : overridableImplementedMethods) {
             for (String userImplementedMethodName : userImplementedMethods) {
                 if (overridableMethod.getName().equals(userImplementedMethodName)) {
                     if (areAllArgumentsAndReturnTypePublic(overridableMethod)) {
                         writer.writeln();
                         writer.writeln();
-                        methodsWriter.writeMethod(overridableMethod);
+                        boolean isUserImplemented = !overridableMethod.isDeprecated() || !hasNonDeprecatedImplementation(overridableMethod, overridableImplementedMethods);
+                        methodsWriter.writeMethod(overridableMethod, isUserImplemented);
                     }
                 }
             }
@@ -469,6 +472,22 @@ public class Generator {
 
         methodsWriter.writeInternalRuntimeHashCodeMethod();
         methodsWriter.writeInternalRuntimeEqualsMethod();
+    }
+
+    /**
+     * Checks whether in the list of implemented methods there's another method with the same name which is not deprecated.
+     * In that case we'll consider that method as user implemented, but not the current one
+     *
+     * @private
+     * @param {ReifiedJavaMethod} currentMethod The method to check.
+     * @param {List<ReifiedJavaMethod>} allOverridableMethods The list will all the overridable methods to check in.
+     * @returns {boolean} Returns true or false.
+     */
+    private boolean hasNonDeprecatedImplementation(ReifiedJavaMethod currentMethod, List<ReifiedJavaMethod> allOverridableMethods) {
+        return allOverridableMethods.stream().anyMatch(method ->
+                method != currentMethod
+                        && method.getName().equals(currentMethod.getName())
+                        && !method.isDeprecated());
     }
 
     private boolean hasOverriddenOnCreateMethod(List<String> overriddenMethods) {

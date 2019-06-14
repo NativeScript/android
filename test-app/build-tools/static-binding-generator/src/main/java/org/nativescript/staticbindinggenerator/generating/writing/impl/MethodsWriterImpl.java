@@ -3,6 +3,7 @@ package org.nativescript.staticbindinggenerator.generating.writing.impl;
 import org.apache.bcel.generic.Type;
 import org.nativescript.staticbindinggenerator.DefaultValues;
 import org.nativescript.staticbindinggenerator.Generator;
+import org.nativescript.staticbindinggenerator.InputParameters;
 import org.nativescript.staticbindinggenerator.Writer;
 import org.nativescript.staticbindinggenerator.generating.parsing.methods.ReifiedJavaMethod;
 import org.nativescript.staticbindinggenerator.generating.writing.MethodsWriter;
@@ -69,8 +70,8 @@ public class MethodsWriterImpl implements MethodsWriter {
     }
 
     @Override
-    public void writeMethod(ReifiedJavaMethod method) {
-        writeMethodSignature(method);
+    public void writeMethod(ReifiedJavaMethod method, boolean isUserImplemented) {
+        writeMethodSignature(method, isUserImplemented);
         writer.write(OPENING_CURLY_BRACKET_LITERAL);
 
         if (isForApplicationClass) {
@@ -230,22 +231,14 @@ public class MethodsWriterImpl implements MethodsWriter {
         writer.write(CLOSING_ROUND_BRACKET_LITERAL);
     }
 
-    private boolean isMethodDeprecated(ReifiedJavaMethod method) {
-        return Arrays.stream(
-                method
-                    .getMethod()
-                    .getAttributes())
-                    .anyMatch(x ->
-                            x.getClass()
-                                    .isAssignableFrom(org.apache.bcel.classfile.Deprecated.class));
-    }
-
     private void writeSuppressDeprecationsToWriter() {
         writer.writeln("@SuppressWarnings( \"deprecation\" )");
     }
 
-    private void writeMethodSignature(ReifiedJavaMethod method) {
-        if(isMethodDeprecated(method)) {
+    private void writeMethodSignature(ReifiedJavaMethod method, boolean isUserImplemented) {
+        if(method.isDeprecated() &&
+                (!isUserImplemented // we want to show warnings only for methods implemented by the user, but not for the SBG auto implemented abstract methods
+                || InputParameters.getCurrent().getSuppressDeprecationWarnings())) {
             writeSuppressDeprecationsToWriter();
         }
 
@@ -325,6 +318,11 @@ public class MethodsWriterImpl implements MethodsWriter {
     }
 
     private void writeReturnStatementWithCast(String typeForCasting, String value) {
+        if (typeForCasting.equals("java.lang.Object")) {
+            // we don't need to cast when the return time is java.lang.object
+            writeReturnStatement(value);
+            return;
+        }
         writer.write(RETURN_KEYWORD);
         writer.write(OPENING_ROUND_BRACKET_LITERAL);
         writer.write(BcelNamingUtil.resolveBcelTypeName(typeForCasting));
