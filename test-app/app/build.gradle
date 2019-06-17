@@ -533,7 +533,7 @@ afterEvaluate { project ->
                         }
                     }
                 } else {
-                    println "WARNING: Folder ${jarDir.path} does not exists, the dependent project's classess won't be included in the metadata"
+                    println "WARNING: Folder ${jarDir.path} does not exists, the dependent project's classes won't be included in the metadata"
                 }
             }
         }
