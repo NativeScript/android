@@ -11,15 +11,17 @@ import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.os.Bundle;
 
+import androidx.core.content.pm.PackageInfoCompat;
+
 public final class Util {
     private Util() {
     }
 
     public static String getDexThumb(Context context) throws NameNotFoundException {
         PackageInfo packageInfo = context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
-        int code = packageInfo.versionCode;
+        long code = PackageInfoCompat.getLongVersionCode(packageInfo);
         long updateTime = packageInfo.lastUpdateTime;
-        return String.valueOf(updateTime) + "-" + String.valueOf(code);
+        return updateTime + "-" + code;
     }
 
     public static boolean isDebuggableApp(Context context) {

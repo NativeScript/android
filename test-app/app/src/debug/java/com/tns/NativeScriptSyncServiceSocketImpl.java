@@ -25,7 +25,7 @@ public class NativeScriptSyncServiceSocketImpl {
 
     public NativeScriptSyncServiceSocketImpl(Runtime runtime, Logger logger, Context context) {
         this.runtime = runtime;
-        this.logger = logger;
+        NativeScriptSyncServiceSocketImpl.logger = logger;
         this.context = context;
         DEVICE_APP_DIR = this.context.getFilesDir().getAbsolutePath() + "/app";
     }

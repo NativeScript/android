@@ -77,6 +77,17 @@ public class JavaMethodImpl implements JavaMethod {
     }
 
     @Override
+    public boolean isDeprecated() {
+        return Arrays.stream(
+            this
+                .getMethod()
+                .getAttributes())
+                .anyMatch(x ->
+                x.getClass()
+                        .isAssignableFrom(org.apache.bcel.classfile.Deprecated.class));
+    }
+
+    @Override
     public String getSignature() {
         return method.getSignature();
     }

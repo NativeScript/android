@@ -40,7 +40,7 @@ public class NativeScriptSyncService {
 
     public NativeScriptSyncService(Runtime runtime, Logger logger, Context context) {
         this.runtime = runtime;
-        this.logger = logger;
+        NativeScriptSyncService.logger = logger;
         this.context = context;
 
         syncPath = SYNC_ROOT_SOURCE_DIR + context.getPackageName() + SYNC_SOURCE_DIR;

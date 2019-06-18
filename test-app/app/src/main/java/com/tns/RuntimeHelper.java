@@ -34,10 +34,10 @@ public final class RuntimeHelper {
             // empty file just to check if there was a raised uncaught error by
             // ErrorReport
             if (Util.isDebuggableApp(context)) {
-                String fileName = "";
+                String fileName;
 
                 try {
-                    Class ErrReport = Class.forName("com.tns.ErrorReport");
+                    Class<?> ErrReport = Class.forName("com.tns.ErrorReport");
                     Field field = ErrReport.getDeclaredField("ERROR_FILE_NAME");
                     fileName = (String) field.get(null);
                 } catch (Exception e) {
@@ -310,10 +310,10 @@ public final class RuntimeHelper {
         // runtime needs to be initialized before the NativeScriptSyncService is enabled because it uses runtime.runScript(...)
         try {
             @SuppressWarnings("unchecked")
-            Class NativeScriptSyncService = Class.forName("com.tns.NativeScriptSyncServiceSocketImpl");
+            Class<?> NativeScriptSyncService = Class.forName("com.tns.NativeScriptSyncServiceSocketImpl");
 
             @SuppressWarnings("unchecked")
-            Constructor cons = NativeScriptSyncService.getConstructor(new Class[]{Runtime.class, Logger.class, Context.class});
+            Constructor<?> cons = NativeScriptSyncService.getConstructor(new Class<?>[]{Runtime.class, Logger.class, Context.class});
             Object syncService = cons.newInstance(runtime, logger, context);
 
             @SuppressWarnings("unchecked")

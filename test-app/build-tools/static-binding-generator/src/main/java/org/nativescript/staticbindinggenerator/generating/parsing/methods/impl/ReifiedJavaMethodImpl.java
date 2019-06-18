@@ -97,6 +97,9 @@ public class ReifiedJavaMethodImpl implements ReifiedJavaMethod {
     }
 
     @Override
+    public boolean isDeprecated() { return javaMethod.isDeprecated(); }
+
+    @Override
     public String getSignature() {
         return javaMethod.getSignature();
     }
