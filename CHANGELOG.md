@@ -1,3 +1,18 @@
+6.0.0
+==
+
+## What's New
+
+- [Enable AndroidX and Jetifier(#1370)](https://github.com/NativeScript/android-runtime/issues/1370)
+- [Upgrade v8 to 7.5.288.22(#1387)](https://github.com/NativeScript/android-runtime/issues/1387)
+- [Upgrade android gradle plugin to the latest 3.4.1 version(#1390)](https://github.com/NativeScript/android-runtime/issues/1390)
+
+## Bug Fixes
+
+- [java.lang.NullPointerException in Metadata generator(#13795)](https://github.com/NativeScript/android-runtime/issues/1379)
+- [Buffer() is deprecated(#1392)](https://github.com/NativeScript/android-runtime/pull/1392)
+- [Warnings when building android(#1396)](https://github.com/NativeScript/android-runtime/issues/1396)
+
 5.4.0
 ==
 
