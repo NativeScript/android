@@ -234,6 +234,15 @@ public class Runtime {
         return runtime;
     }
 
+    public static boolean isDebuggable() {
+        Runtime runtime = com.tns.Runtime.getCurrentRuntime();
+        if(runtime != null) {
+            return runtime.config.isDebuggable;
+        } else {
+            return false;
+        }
+    }
+
     private static Runtime getObjectRuntime(Object object) {
         Runtime runtime = null;
 

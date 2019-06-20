@@ -480,7 +480,9 @@ public class CodeItem {
                         try {
                             throw new Exception("Unknown Index type.");
                         } catch (Exception e) {
-                            e.printStackTrace();
+                            if (com.tns.Runtime.isDebuggable()) {
+                                e.printStackTrace();
+                            }
                         }
                     }
 

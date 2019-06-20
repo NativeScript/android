@@ -904,7 +904,9 @@ public class MethodWriter extends MethodVisitor {
                         try {
                             throw new Exception("Opcode error : 0x" + Integer.toHexString(opcode));
                         } catch (Exception e) {
-                            e.printStackTrace();
+                            if (com.tns.Runtime.isDebuggable()) {
+                                e.printStackTrace();
+                            }
                         }
                     }
 
@@ -939,7 +941,9 @@ public class MethodWriter extends MethodVisitor {
                             try {
                                 throw new IllegalArgumentException("Instruction Range extension unhandled. Opcode : 0x" + Integer.toHexString(opcode));
                             } catch (Exception e) {
-                                e.printStackTrace();
+                                if (com.tns.Runtime.isDebuggable()) {
+                                    e.printStackTrace();
+                                }
                             }
                         }
                     }

@@ -41,7 +41,9 @@ public class ErrorReportActivity extends AppCompatActivity {
 
             resetCheckingForPermissions();
         } catch (Exception e) {
-            e.printStackTrace();
+            if (Util.isDebuggableApp(this)) {
+                e.printStackTrace();
+            }
             Toast.makeText(this, "Couldn't resolve permissions", Toast.LENGTH_LONG).show();
             resetCheckingForPermissions();
         }

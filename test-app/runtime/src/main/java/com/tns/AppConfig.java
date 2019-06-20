@@ -104,8 +104,10 @@ class AppConfig {
                             MarkingMode markingMode = MarkingMode.valueOf(markingModeString);
                             values[KnownKeys.MarkingMode.ordinal()] = markingMode;
                         } catch (Exception e) {
-                            e.printStackTrace();
-                            Log.v("JS", "Failed to parse marking mode. The default " + ((MarkingMode)KnownKeys.MarkingMode.getDefaultValue()).name() + " will be used.");
+                            Log.e("JS", String.format("Failed to parse marking mode: %s. The default %s will be used!", e.getMessage(), ((MarkingMode)KnownKeys.MarkingMode.getDefaultValue()).name()));
+                            if (com.tns.Runtime.isDebuggable()) {
+                                e.printStackTrace();
+                            }
                         }
                     }
                     if (androidObject.has(KnownKeys.HandleTimeZoneChanges.getName())) {
@@ -123,7 +125,9 @@ class AppConfig {
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            if (com.tns.Runtime.isDebuggable()) {
+                e.printStackTrace();
+            }
         }
     }
 

@@ -317,7 +317,9 @@ public class AsmDexPrinter {
             try {
                 throw new Exception ("Unhandled constant type.");
             } catch (Exception e) {
-                e.printStackTrace();
+                if (com.tns.Runtime.isDebuggable()) {
+                    e.printStackTrace();
+                }
             }
         }
 

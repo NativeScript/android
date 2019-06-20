@@ -48,7 +48,9 @@ public class NativeScriptSyncServiceSocketImpl {
             try {
                 deviceSystemSocket.close();
             } catch (IOException e) {
-                e.printStackTrace();
+                if (com.tns.Runtime.isDebuggable()) {
+                    e.printStackTrace();
+                }
             }
         }
 
@@ -63,10 +65,14 @@ public class NativeScriptSyncServiceSocketImpl {
                     liveSyncThread.start();
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                if (com.tns.Runtime.isDebuggable()) {
+                    e.printStackTrace();
+                }
             }
             catch (java.security.NoSuchAlgorithmException e) {
-                e.printStackTrace();
+                if (com.tns.Runtime.isDebuggable()) {
+                    e.printStackTrace();
+                }
             }
         }
 
@@ -136,7 +142,9 @@ public class NativeScriptSyncServiceSocketImpl {
 
             } catch (IOException e) {
                 logger.write(String.format("Error while LiveSyncing: Client socket might be closed!", e.toString()));
-                e.printStackTrace();
+                if (com.tns.Runtime.isDebuggable()) {
+                    e.printStackTrace();
+                }
             }
             try {
                 do {
@@ -426,7 +434,9 @@ public class NativeScriptSyncServiceSocketImpl {
                 logger.write(message);
                 this.livesyncSocket.close();
             } catch (IOException e) {
-                e.printStackTrace();
+                if (com.tns.Runtime.isDebuggable()) {
+                    e.printStackTrace();
+                }
             }
         }
 

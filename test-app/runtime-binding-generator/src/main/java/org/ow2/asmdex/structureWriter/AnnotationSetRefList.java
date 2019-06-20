@@ -101,7 +101,9 @@ public class AnnotationSetRefList {
             try {
                 throw new Exception("Annotation Parameter index >= Parameter count of this method.");
             } catch (Exception e) {
-                e.printStackTrace();
+                if (com.tns.Runtime.isDebuggable()) {
+                    e.printStackTrace();
+                }
             }
         }
 

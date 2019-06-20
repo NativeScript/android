@@ -6,6 +6,7 @@
 - [Enable AndroidX and Jetifier(#1370)](https://github.com/NativeScript/android-runtime/issues/1370)
 - [Upgrade v8 to 7.5.288.22(#1387)](https://github.com/NativeScript/android-runtime/issues/1387)
 - [Upgrade android gradle plugin to the latest 3.4.1 version(#1390)](https://github.com/NativeScript/android-runtime/issues/1390)
+- [Remove printStackTrace method calls from the source code(#1359)](https://github.com/NativeScript/android-runtime/issues/1359)
 
 ## Bug Fixes
 

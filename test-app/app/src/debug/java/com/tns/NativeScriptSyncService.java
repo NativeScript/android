@@ -90,7 +90,9 @@ public class NativeScriptSyncService {
             try {
                 serverSocket.close();
             } catch (IOException e) {
-                e.printStackTrace();
+                if (com.tns.Runtime.isDebuggable()) {
+                    e.printStackTrace();
+                }
             }
         }
 
@@ -104,7 +106,9 @@ public class NativeScriptSyncService {
                     new Thread(commThread).start();
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                if (com.tns.Runtime.isDebuggable()) {
+                    e.printStackTrace();
+                }
             }
         }
     }
@@ -131,11 +135,15 @@ public class NativeScriptSyncService {
                 try {
                     output.write(1);
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    if (com.tns.Runtime.isDebuggable()) {
+                        e.printStackTrace();
+                    }
                 }
                 socket.close();
             } catch (IOException e) {
-                e.printStackTrace();
+                if (com.tns.Runtime.isDebuggable()) {
+                    e.printStackTrace();
+                }
             }
         }
     }
@@ -153,7 +161,9 @@ public class NativeScriptSyncService {
             flags = context.getPackageManager().getPackageInfo(context.getPackageName(), 0).applicationInfo.flags;
             shouldExecuteSync = ((flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0);
         } catch (NameNotFoundException e) {
-            e.printStackTrace();
+            if (com.tns.Runtime.isDebuggable()) {
+                e.printStackTrace();
+            }
             return false;
         }
 
@@ -309,11 +319,15 @@ public class NativeScriptSyncService {
             }
         } catch (FileNotFoundException e) {
             logger.write("Error copying file " + sourceFile);
-            e.printStackTrace();
+            if (com.tns.Runtime.isDebuggable()) {
+                e.printStackTrace();
+            }
             return false;
         } catch (IOException e) {
             logger.write("Error copying file " + sourceFile);
-            e.printStackTrace();
+            if (com.tns.Runtime.isDebuggable()) {
+                e.printStackTrace();
+            }
             return false;
         } finally {
             try {

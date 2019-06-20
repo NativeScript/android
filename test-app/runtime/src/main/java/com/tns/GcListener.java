@@ -38,7 +38,9 @@ public class GcListener {
                         lastUpdateTime = currentUpdateTime;
                     }
                 } catch (InterruptedException e) {
-                    e.printStackTrace();
+                    if (com.tns.Runtime.isDebuggable()) {
+                        e.printStackTrace();
+                    }
                 }
             }
         }
@@ -72,7 +74,9 @@ public class GcListener {
                     }
                     Thread.sleep(timeInterval);
                 } catch (InterruptedException e) {
-                    e.printStackTrace();
+                    if (com.tns.Runtime.isDebuggable()) {
+                        e.printStackTrace();
+                    }
                 }
             }
         }

@@ -94,7 +94,9 @@ class AndroidJsV8Inspector {
             AndroidJsV8Inspector.send(connection, sendingText);
 
         } catch (JSONException | IOException e) {
-            e.printStackTrace();
+            if (com.tns.Runtime.isDebuggable()) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -190,7 +192,9 @@ class AndroidJsV8Inspector {
                 try {
                     this.debugBrkLock.wait(1000 * 30);
                 } catch (InterruptedException e) {
-                    e.printStackTrace();
+                    if (com.tns.Runtime.isDebuggable()) {
+                        e.printStackTrace();
+                    }
                 } finally {
                     AndroidJsV8Inspector.ReadyToProcessMessages.set(true);
                     this.processDebugBreak();
@@ -331,7 +335,9 @@ class AndroidJsV8Inspector {
             try {
                 return inspectorMessages.take();
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                if (com.tns.Runtime.isDebuggable()) {
+                    e.printStackTrace();
+                }
             }
 
             return null;
@@ -345,7 +351,9 @@ class AndroidJsV8Inspector {
         protected void onException(IOException exception) {
             // when the chrome inspector is disconnected by closing the tab a "Broken pipe" exception is thrown which we don't need to log, only in verbose logging mode
             if(!exception.getMessage().equals("Broken pipe") || currentRuntimeLogger.isEnabled()) {
-                exception.printStackTrace();
+                if (com.tns.Runtime.isDebuggable()) {
+                    exception.printStackTrace();
+                }
             }
             disconnect();
         }
