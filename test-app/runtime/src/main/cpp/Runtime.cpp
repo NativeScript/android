@@ -370,12 +370,10 @@ bool Runtime::TryCallGC() {
     return success;
 }
 
-void Runtime::PassExceptionToJsNative(JNIEnv* env, jobject obj, jthrowable exception, jstring stackTrace, jboolean isDiscarded) {
+void Runtime::PassExceptionToJsNative(JNIEnv* env, jobject obj, jthrowable exception, jstring message, jstring stackTrace, jboolean isDiscarded) {
     auto isolate = m_isolate;
 
-    //create error message
-    string errMsg = isDiscarded ? "An exception was caught and discarded. You can look at \"stackTrace\" or \"nativeException\" for more detailed information about the exception.":
-                    "The application crashed because of an uncaught exception. You can look at \"stackTrace\" or \"nativeException\" for more detailed information about the exception.";
+    string errMsg = ArgConverter::jstringToString(message);
 
     auto errObj = Exception::Error(ArgConverter::ConvertToV8String(isolate, errMsg)).As<Object>();
 
@@ -391,9 +389,6 @@ void Runtime::PassExceptionToJsNative(JNIEnv* env, jobject obj, jthrowable excep
             nativeExceptionObject = Object::New(isolate);
         }
     }
-
-    string stackTraceText = ArgConverter::jstringToString(stackTrace);
-    errMsg += "\n" + stackTraceText;
 
     //create a JS error object
     errObj->Set(V8StringConstants::GetNativeException(isolate), nativeExceptionObject);

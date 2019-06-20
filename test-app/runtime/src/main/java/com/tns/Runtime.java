@@ -53,7 +53,7 @@ public class Runtime {
 
     private native void unlock(int runtimeId);
 
-    private native void passExceptionToJsNative(int runtimeId, Throwable ex, String stackTrace, boolean isDiscarded);
+    private native void passExceptionToJsNative(int runtimeId, Throwable ex, String message, String stackTrace, boolean isDiscarded);
 
     private native void clearStartupData(int runtimeId);
 
@@ -73,20 +73,22 @@ public class Runtime {
 
     private static native void ResetDateTimeConfigurationCache(int runtimeId);
 
-    void passUncaughtExceptionToJs(Throwable ex, String stackTrace) {
-        passExceptionToJsNative(getRuntimeId(), ex, stackTrace, false);
+    void passUncaughtExceptionToJs(Throwable ex, String message, String stackTrace) {
+        passExceptionToJsNative(getRuntimeId(), ex, message, stackTrace, false);
     }
 
-    void passDiscardedExceptionToJs(Throwable ex, String message) {
-        String stackTrace = message + Runtime.getStackTraceErrorMessage(ex);
-        passExceptionToJsNative(getRuntimeId(), ex, stackTrace, true);
+    void passDiscardedExceptionToJs(Throwable ex, String prefix) {
+        //String message = prefix + ex.getMessage();
+        // we'd better not prefix the error with something like - Error on "main" thread for reportSupressedException
+        // as it doesn't seem very useful for the users
+        passExceptionToJsNative(getRuntimeId(), ex, ex.getMessage(), Runtime.getStackTraceErrorMessage(ex), true);
     }
 
     public static void passSuppressedExceptionToJs(Throwable ex, String methodName) {
         com.tns.Runtime runtime = com.tns.Runtime.getCurrentRuntime();
         if (runtime != null) {
             String errorMessage = "Error on \"" + Thread.currentThread().getName() + "\" thread for " + methodName + "\n";
-            runtime.passDiscardedExceptionToJs(ex, errorMessage);
+            runtime.passDiscardedExceptionToJs(ex, "");
         }
     }
 
@@ -245,6 +247,21 @@ public class Runtime {
         return runtime;
     }
 
+    /*
+        Removes the error message lines to leave just the stack trace
+     */
+    private static String getStackTraceOnly(String content) {
+        String[] lines = content.split("\n");
+        while (lines.length > 0 && !lines[0].trim().startsWith("at")) {
+            lines = Arrays.copyOfRange(lines, 1, lines.length);
+        }
+        String result = "";
+        for (String line: lines) {
+            result += line + "\n";
+        }
+        return result;
+    }
+
     public static String getStackTraceErrorMessage(Throwable ex) {
         String content;
         java.io.PrintStream ps = null;
@@ -256,6 +273,10 @@ public class Runtime {
 
             try {
                 content = baos.toString("US-ASCII");
+                if (ex instanceof NativeScriptException) {
+                    content = getStackTraceOnly(content);
+                    content = ((NativeScriptException)ex).getIncomingStackTrace() + content;
+                }
             } catch (java.io.UnsupportedEncodingException e) {
                 content = e.getMessage();
             }

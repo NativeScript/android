@@ -4,26 +4,37 @@ package com.tns;
 public class NativeScriptException extends RuntimeException {
     @SuppressWarnings("unused")
     private long jsValueAddress = 0;
+    private String incomingStackTrace;
 
     public NativeScriptException() {
         super();
     }
 
-    public NativeScriptException(String detailMessage) {
-        super(detailMessage);
+    public NativeScriptException(String message) {
+        super(message);
     }
 
     public NativeScriptException(Throwable throwable) {
         super(throwable);
     }
 
-    public NativeScriptException(String detailMessage, Throwable throwable) {
-        super(detailMessage, throwable);
+    public NativeScriptException(String message, Throwable throwable) {
+        super(message, throwable);
     }
 
-    public NativeScriptException(String detailMessage, long jsValueAddress) {
-        super(detailMessage);
+    public NativeScriptException(String message, String stackTrace, Throwable throwable) {
+        super(message, throwable);
+        this.incomingStackTrace = stackTrace;
+    }
+
+    public NativeScriptException(String message, String stackTrace, long jsValueAddress) {
+        super(message);
+        this.incomingStackTrace = stackTrace;
         this.jsValueAddress = jsValueAddress;
+    }
+
+    public String getIncomingStackTrace() {
+        return incomingStackTrace;
     }
 
     @RuntimeCallable

@@ -18,7 +18,8 @@ describe("Tests discarded exception ", function () {
         expect(reportedException).not.toBe(null);
         expect(reportedException.nativeException).not.toBe(null);
         expect(reportedException.nativeException.getMessage()).toBe('Exception to suppress');
-        expect(reportedException.stackTrace).toContain('Error on "main" thread for reportSupressedException');
+        expect(reportedException.message).toBe('Exception to suppress');
+        expect(reportedException.stackTrace).toContain('com.tns.tests.DiscardedExceptionTest.reportSupressedException');
     });
 
     afterEach(function() {
