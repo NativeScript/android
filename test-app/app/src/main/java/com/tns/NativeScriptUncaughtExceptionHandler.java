@@ -1,7 +1,6 @@
 package com.tns;
 
 import java.lang.Thread.UncaughtExceptionHandler;
-
 import android.content.Context;
 
 public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHandler {
@@ -19,18 +18,19 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
 
     @Override
     public void uncaughtException(Thread thread, Throwable ex) {
-        String currentThreadMessage = "An uncaught Exception occurred on \"" + thread.getName() + "\" thread.\n";
-
-        String errorMessage = currentThreadMessage + Runtime.getStackTraceErrorMessage(ex);
+        String currentThreadMessage = String.format("An uncaught Exception occurred on \"%s\" thread.\n%s\n", thread.getName(), ex.getMessage());
+        String stackTraceErrorMessage = Runtime.getStackTraceErrorMessage(ex);
+        String errorMessage = currentThreadMessage + stackTraceErrorMessage;
 
         if (Runtime.isInitialized()) {
             try {
-                ex.printStackTrace();
+                // print this only in debug
+                System.err.println(errorMessage);
 
                 Runtime runtime = Runtime.getCurrentRuntime();
 
                 if (runtime != null) {
-                    runtime.passUncaughtExceptionToJs(ex, errorMessage);
+                    runtime.passUncaughtExceptionToJs(ex, ex.getMessage(), stackTraceErrorMessage);
                 }
             } catch (Throwable t) {
                 t.printStackTrace();

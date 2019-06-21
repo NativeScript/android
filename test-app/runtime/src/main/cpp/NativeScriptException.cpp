@@ -23,14 +23,20 @@ NativeScriptException::NativeScriptException(const string& message)
     m_javascriptException(nullptr), m_javaException(JniLocalRef()), m_message(message) {
 }
 
+NativeScriptException::NativeScriptException(const string& message, const string& stackTrace)
+    :
+    m_javascriptException(nullptr), m_javaException(JniLocalRef()), m_message(message), m_stackTrace(stackTrace) {
+}
+
 NativeScriptException::NativeScriptException(TryCatch& tc, const string& message)
     :
     m_javaException(JniLocalRef()) {
     auto isolate = Isolate::GetCurrent();
     m_javascriptException = new Persistent<Value>(isolate, tc.Exception());
-    bool isMessageEmpty = tc.Message().IsEmpty();
-    bool isExceptionEmpty = tc.Exception().IsEmpty();
-    m_message = GetFullMessage(tc, isExceptionEmpty, isMessageEmpty, message);
+    auto ex = tc.Exception();
+    m_message = GetErrorMessage(tc.Message(), ex, message);
+    m_stackTrace = GetErrorStackTrace(tc.Message()->GetStackTrace());
+    m_fullMessage = GetFullMessage(tc, m_message);
     tc.Reset();
 }
 
@@ -40,9 +46,15 @@ void NativeScriptException::ReThrowToV8() {
 
     if (m_javascriptException != nullptr) {
         errObj = Local<Value>::New(isolate, *m_javascriptException);
-        if (errObj->IsObject() && !m_message.empty()) {
-            errObj.As<Object>()->Set(ArgConverter::ConvertToV8String(isolate, "fullMessage"), ArgConverter::ConvertToV8String(isolate, m_message));
+        if (errObj->IsObject()) {
+            if (!m_fullMessage.empty()) {
+                errObj.As<Object>()->Set(ArgConverter::ConvertToV8String(isolate, "fullMessage"), ArgConverter::ConvertToV8String(isolate, m_fullMessage));
+            } else if (!m_message.empty()) {
+                errObj.As<Object>()->Set(ArgConverter::ConvertToV8String(isolate, "fullMessage"), ArgConverter::ConvertToV8String(isolate, m_message));
+            }
         }
+    } else if (!m_fullMessage.empty()) {
+        errObj = Exception::Error(ArgConverter::ConvertToV8String(isolate, m_fullMessage));
     } else if (!m_message.empty()) {
         errObj = Exception::Error(ArgConverter::ConvertToV8String(isolate, m_message));
     } else if (!m_javaException.IsNull()) {
@@ -83,22 +95,24 @@ void NativeScriptException::ReThrowToJava() {
             ex = (jthrowable) exObj.Move();
         }
 
+        JniLocalRef msg(env.NewStringUTF(m_message.c_str()));
+        JniLocalRef stackTrace(env.NewStringUTF(m_stackTrace.c_str()));
+
         if (ex == nullptr) {
-            JniLocalRef msg(env.NewStringUTF(m_message.c_str()));
-            ex = static_cast<jthrowable>(env.NewObject(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_JSVALUE_CTOR_ID, (jstring) msg, reinterpret_cast<jlong>(m_javascriptException)));
+            ex = static_cast<jthrowable>(env.NewObject(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_JSVALUE_CTOR_ID, (jstring) msg, (jstring)stackTrace, reinterpret_cast<jlong>(m_javascriptException)));
         } else {
             auto excClassName = objectManager->GetClassName(ex);
             if (excClassName != "com/tns/NativeScriptException") {
-                JniLocalRef msg(env.NewStringUTF(m_message.c_str()));
-                ex = static_cast<jthrowable>(env.NewObject(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_THROWABLE_CTOR_ID, (jstring) msg, ex));
+                ex = static_cast<jthrowable>(env.NewObject(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_THROWABLE_CTOR_ID, (jstring) msg, (jstring)stackTrace, ex));
             }
         }
     } else if (!m_message.empty()) {
         JniLocalRef msg(env.NewStringUTF(m_message.c_str()));
-        ex = static_cast<jthrowable>(env.NewObject(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_JSVALUE_CTOR_ID, (jstring) msg, (jlong) 0));
+        JniLocalRef stackTrace(env.NewStringUTF(m_stackTrace.c_str()));
+        ex = static_cast<jthrowable>(env.NewObject(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_JSVALUE_CTOR_ID, (jstring) msg, (jstring)stackTrace, (jlong) 0));
     } else {
         JniLocalRef msg(env.NewStringUTF("No java exception or message provided."));
-        ex = static_cast<jthrowable>(env.NewObject(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_JSVALUE_CTOR_ID, (jstring) msg, (jlong) 0));
+        ex = static_cast<jthrowable>(env.NewObject(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_JSVALUE_CTOR_ID, (jstring) msg, (jstring) nullptr, (jlong) 0));
     }
     env.Throw(ex);
 }
@@ -115,10 +129,10 @@ void NativeScriptException::Init() {
     NATIVESCRIPTEXCEPTION_CLASS = env.FindClass("com/tns/NativeScriptException");
     assert(NATIVESCRIPTEXCEPTION_CLASS != nullptr);
 
-    NATIVESCRIPTEXCEPTION_JSVALUE_CTOR_ID = env.GetMethodID(NATIVESCRIPTEXCEPTION_CLASS, "<init>", "(Ljava/lang/String;J)V");
+    NATIVESCRIPTEXCEPTION_JSVALUE_CTOR_ID = env.GetMethodID(NATIVESCRIPTEXCEPTION_CLASS, "<init>", "(Ljava/lang/String;Ljava/lang/String;J)V");
     assert(NATIVESCRIPTEXCEPTION_JSVALUE_CTOR_ID != nullptr);
 
-    NATIVESCRIPTEXCEPTION_THROWABLE_CTOR_ID = env.GetMethodID(NATIVESCRIPTEXCEPTION_CLASS, "<init>", "(Ljava/lang/String;Ljava/lang/Throwable;)V");
+    NATIVESCRIPTEXCEPTION_THROWABLE_CTOR_ID = env.GetMethodID(NATIVESCRIPTEXCEPTION_CLASS, "<init>", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)V");
     assert(NATIVESCRIPTEXCEPTION_THROWABLE_CTOR_ID != nullptr);
 
     NATIVESCRIPTEXCEPTION_GET_STACK_TRACE_AS_STRING_METHOD_ID = env.GetStaticMethodID(NATIVESCRIPTEXCEPTION_CLASS, "getStackTraceAsString", "(Ljava/lang/Throwable;)Ljava/lang/String;");
@@ -128,8 +142,9 @@ void NativeScriptException::Init() {
 // ON V8 UNCAUGHT EXCEPTION
 void NativeScriptException::OnUncaughtError(Local<Message> message, Local<Value> error) {
     string errorMessage = GetErrorMessage(message, error);
+    string stackTrace = GetErrorStackTrace(message->GetStackTrace());
 
-    NativeScriptException e(errorMessage);
+    NativeScriptException e(errorMessage, stackTrace);
     e.ReThrowToJava();
 }
 
@@ -203,17 +218,31 @@ Local<Value> NativeScriptException::GetJavaExceptionFromEnv(const JniLocalRef& e
     return errObj;
 }
 
-string NativeScriptException::GetFullMessage(const TryCatch& tc, bool isExceptionEmpty, bool isMessageEmpty, const string& prependMessage) {
+string NativeScriptException::GetFullMessage(const TryCatch& tc, const string& jsExceptionMessage) {
     auto ex = tc.Exception();
 
-    string jsExeptionMessage;
+    v8::Isolate* isolate = v8::Isolate::GetCurrent();
+    v8::Local<v8::Context> context = isolate->GetEnteredContext();
 
-    if (!isExceptionEmpty && !isMessageEmpty) {
-        jsExeptionMessage = GetErrorMessage(tc.Message(), ex);
-    }
+    auto message = tc.Message();
 
     stringstream ss;
-    ss << endl << prependMessage << jsExeptionMessage;
+    ss << jsExceptionMessage;
+
+    //get script name
+    auto scriptResName = message->GetScriptResourceName();
+
+    //get stack trace
+    string stackTraceMessage = GetErrorStackTrace(message->GetStackTrace());
+
+    if (!scriptResName.IsEmpty() && scriptResName->IsString()) {
+        ss << endl <<"File: \"" << ArgConverter::ConvertToString(scriptResName.As<String>());
+    } else {
+        ss << endl <<"File: \"<unknown>";
+    }
+    ss << ", line: " << message->GetLineNumber(context).ToChecked() << ", column: " << message->GetStartColumn() << endl << endl;
+    ss << "StackTrace: " << endl << stackTraceMessage << endl;
+
     string loggedMessage = ss.str();
 
     PrintErrorMessage(loggedMessage);
@@ -266,46 +295,38 @@ void NativeScriptException::PrintErrorMessage(const string& errorMessage) {
     }
 }
 
-string NativeScriptException::GetErrorMessage(const Local<Message>& message, Local<Value>& error) {
+string NativeScriptException::GetErrorMessage(const Local<Message>& message, Local<Value>& error, const string& prependMessage) {
 
     Local<String> message_text_string = message->Get();
     auto mes = ArgConverter::ConvertToString(message_text_string);
 
     v8::Isolate* isolate = v8::Isolate::GetCurrent();
     v8::Local<v8::Context> context = isolate->GetEnteredContext();
-    int line_number = message->GetLineNumber(context).FromMaybe(0);
 
     //get whole error message from previous stack
+    stringstream ss;
+
+    if (prependMessage != "") {
+        ss << prependMessage << endl;
+    }
+
     string errMessage;
+    bool hasFullErrorMessage = false;
     auto v8FullMessage = ArgConverter::ConvertToV8String(isolate, "fullMessage");
     if (error->IsObject() && error.As<Object>()->Has(context, v8FullMessage).ToChecked()) {
+        hasFullErrorMessage = true;
         errMessage = ArgConverter::ConvertToString(error.As<Object>()->Get(v8FullMessage).As<String>());
+        ss << errMessage;
     }
 
-
-    //get current message
     auto str = error->ToDetailString(context);
-    if (str.IsEmpty()) {
-        str = String::NewFromUtf8(isolate, "");
+    if (!str.IsEmpty()) {
+        String::Utf8Value utfError(isolate, str.FromMaybe(Local<String>()));
+        if(hasFullErrorMessage) {
+            ss << endl;
+        }
+        ss << *utfError;
     }
-    String::Utf8Value utfError(isolate, str.FromMaybe(Local<String>()));
-
-    //get script name
-    auto scriptResName = message->GetScriptResourceName();
-
-    //get stack trace
-    string stackTraceMessage = GetErrorStackTrace(message->GetStackTrace());
-
-    stringstream ss;
-    ss << endl << errMessage;
-    ss << endl << *utfError << endl;
-    if (!scriptResName.IsEmpty() && scriptResName->IsString()) {
-        ss << "File: \"" << ArgConverter::ConvertToString(scriptResName.As<String>());
-    } else {
-        ss << "File: \"<unknown>";
-    }
-    ss << ", line: " << message->GetLineNumber(context).ToChecked() << ", column: " << message->GetStartColumn() << endl << endl;
-    ss << "StackTrace: " << endl << stackTraceMessage << endl;
 
     return ss.str();
 }
