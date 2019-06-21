@@ -88,7 +88,9 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
                     checkSelfPermissionMethod = ActivityCompat.class.getMethod("checkSelfPermission", Context.class, String.class);
                 } catch (NoSuchMethodException e) {
                     // method wasn't found, so there is no need to handle permissions explicitly
-                    e.printStackTrace();
+                    if (Util.isDebuggableApp(activity)) {
+                        e.printStackTrace();
+                    }
                     return;
                 }
 
@@ -104,7 +106,9 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
                 }
             } catch (Exception e) {
                 Toast.makeText(activity, "Couldn't resolve permissions", Toast.LENGTH_LONG).show();
-                e.printStackTrace();
+                if (Util.isDebuggableApp(activity)) {
+                    e.printStackTrace();
+                }
                 return;
             }
         }
@@ -410,7 +414,9 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
                         } catch (Exception e) {
                             String err = "Could not write logcat report to sdcard. Make sure you have allowed access to external storage!";
                             Toast.makeText(activity, err, Toast.LENGTH_LONG).show();
-                            e.printStackTrace();
+                            if (Util.isDebuggableApp(container.getContext())) {
+                                e.printStackTrace();
+                            }
                         }
                     }
                 }

@@ -222,9 +222,13 @@ public class ApplicationReader {
         try {
             dexFile.parse(this.byteCode);
         } catch (IllegalArgumentException e) {
-            e.printStackTrace();
+            if (com.tns.Runtime.isDebuggable()) {
+                e.printStackTrace();
+            }
         } catch (IOException e) {
-            e.printStackTrace();
+            if (com.tns.Runtime.isDebuggable()) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -295,7 +299,9 @@ public class ApplicationReader {
                 buffer.flush();
                 result = buffer.toByteArray();
             } catch (IOException e) {
-                e.printStackTrace();
+                if (com.tns.Runtime.isDebuggable()) {
+                    e.printStackTrace();
+                }
             } finally {
                 if (buffer != null) {
                     buffer.close();
@@ -986,7 +992,9 @@ public class ApplicationReader {
             try {
                 throw new Exception("Unknown value format : 0x" + Integer.toHexString(valueType));
             } catch (Exception e) {
-                e.printStackTrace();
+                if (com.tns.Runtime.isDebuggable()) {
+                    e.printStackTrace();
+                }
             }
         }
 
@@ -1136,7 +1144,9 @@ public class ApplicationReader {
             try {
                 throw new Exception("Unhandled value format : " + Integer.toHexString(valueType));
             } catch (Exception e) {
-                e.printStackTrace();
+                if (com.tns.Runtime.isDebuggable()) {
+                    e.printStackTrace();
+                }
             }
             return null;
         }

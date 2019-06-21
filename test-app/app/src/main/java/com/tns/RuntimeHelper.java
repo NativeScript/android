@@ -142,14 +142,18 @@ public final class RuntimeHelper {
                     if (logger.isEnabled()) {
                         logger.write("Error while getting current proxy thumb");
                     }
-                    e.printStackTrace();
+                    if (Util.isDebuggableApp(context)) {
+                        e.printStackTrace();
+                    }
                 }
 
                 String nativeLibDir = null;
                 try {
                     nativeLibDir = context.getPackageManager().getApplicationInfo(appName, 0).nativeLibraryDir;
                 } catch (NameNotFoundException e) {
-                    e.printStackTrace();
+                    if (Util.isDebuggableApp(context)) {
+                        e.printStackTrace();
+                    }
                 }
 
                 boolean isDebuggable = Util.isDebuggableApp(context);
@@ -186,7 +190,9 @@ public final class RuntimeHelper {
 
                         v8Inspector.waitForDebugger(shouldBreak);
                     } catch (IOException e) {
-                        e.printStackTrace();
+                        if (Util.isDebuggableApp(context)) {
+                            e.printStackTrace();
+                        }
                     }
 
                     // if app is in debuggable mode run livesync service
@@ -213,7 +219,9 @@ public final class RuntimeHelper {
                     if (logger.isEnabled()) {
                         logger.write("Cannot initialize application instance.");
                     }
-                    e.printStackTrace();
+                    if (Util.isDebuggableApp(context)) {
+                        e.printStackTrace();
+                    }
                 }
 
                 if (appConfig.handleTimeZoneChanges()) {
@@ -320,15 +328,25 @@ public final class RuntimeHelper {
             Method startServerMethod = NativeScriptSyncService.getMethod("startServer");
             startServerMethod.invoke(syncService);
         } catch (ClassNotFoundException e) {
-            e.printStackTrace();
+            if (Util.isDebuggableApp(context)) {
+                e.printStackTrace();
+            }
         } catch (NoSuchMethodException e) {
-            e.printStackTrace();
+            if (Util.isDebuggableApp(context)) {
+                e.printStackTrace();
+            }
         } catch (IllegalAccessException e) {
-            e.printStackTrace();
+            if (Util.isDebuggableApp(context)) {
+                e.printStackTrace();
+            }
         } catch (InvocationTargetException e) {
-            e.printStackTrace();
+            if (Util.isDebuggableApp(context)) {
+                e.printStackTrace();
+            }
         } catch (InstantiationException e) {
-            e.printStackTrace();
+            if (Util.isDebuggableApp(context)) {
+                e.printStackTrace();
+            }
         }
     }
 

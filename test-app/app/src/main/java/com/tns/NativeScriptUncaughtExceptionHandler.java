@@ -24,8 +24,9 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
 
         if (Runtime.isInitialized()) {
             try {
-                // print this only in debug
-                System.err.println(errorMessage);
+                if (Util.isDebuggableApp(context)) {
+                    ex.printStackTrace();
+                }
 
                 Runtime runtime = Runtime.getCurrentRuntime();
 
@@ -33,7 +34,9 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
                     runtime.passUncaughtExceptionToJs(ex, ex.getMessage(), stackTraceErrorMessage);
                 }
             } catch (Throwable t) {
-                t.printStackTrace();
+                if (Util.isDebuggableApp(context)) {
+                    t.printStackTrace();
+                }
             }
         }
 
@@ -55,7 +58,9 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
                 res = (Boolean) startActivity.invoke(null, context, errorMessage);
             } catch (Exception e) {
                 android.util.Log.v("Error", errorMessage);
-                e.printStackTrace();
+                if (Util.isDebuggableApp(context)) {
+                    e.printStackTrace();
+                };
                 android.util.Log.v("Application Error", "ErrorActivity default implementation not found. Reinstall android platform to fix.");
             }
         }

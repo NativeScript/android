@@ -116,7 +116,9 @@ public class EncodedValueFactory {
             try {
                 throw new Exception("Unknown type for this value.");
             } catch (Exception e) {
-                e.printStackTrace();
+                if (com.tns.Runtime.isDebuggable()) {
+                    e.printStackTrace();
+                }
             }
         }
 
@@ -250,7 +252,9 @@ public class EncodedValueFactory {
             try {
                 throw new Exception("Unable to find the type of this Value.");
             } catch (Exception e) {
-                e.printStackTrace();
+                if (com.tns.Runtime.isDebuggable()) {
+                    e.printStackTrace();
+                }
             }
 
             return null;

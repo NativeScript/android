@@ -1,5 +1,7 @@
 package com.tns;
 
+import android.util.Log;
+
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -173,7 +175,10 @@ public class DexFactory {
                 result = df.loadClass(desiredDexClassName, classLoader);
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.w("JS", String.format("Error resolving class %s: %s. Fall back to DexClassLoader."));
+            if (com.tns.Runtime.isDebuggable()) {
+                e.printStackTrace();
+            }
             // fall back to DexClassLoader
             DexClassLoader dexClassLoader = new DexClassLoader(jarFilePath, this.odexDir.getAbsolutePath(), null, classLoader);
             result = dexClassLoader.loadClass(fullClassName);
@@ -317,11 +322,15 @@ public class DexFactory {
                 out.close();
             }
         } catch (FileNotFoundException e) {
-            logger.write("Error while writting current proxy thumb");
-            e.printStackTrace();
+            Log.w("JS", String.format("Error while writing current proxy thumb: %s", e.getMessage()));
+            if (com.tns.Runtime.isDebuggable()) {
+                e.printStackTrace();
+            }
         } catch (IOException e) {
-            logger.write("Error while writting current proxy thumb");
-            e.printStackTrace();
+            Log.w("JS", String.format("Error while writing current proxy thumb: %s", e.getMessage()));
+            if (com.tns.Runtime.isDebuggable()) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -366,11 +375,15 @@ public class DexFactory {
                 return cachedThumb;
             }
         } catch (FileNotFoundException e) {
-            logger.write("Error while getting current proxy thumb");
-            e.printStackTrace();
+            Log.w("JS", String.format("Error while writing current proxy thumb: %s", e.getMessage()));
+            if (com.tns.Runtime.isDebuggable()) {
+                e.printStackTrace();
+            }
         } catch (IOException e) {
-            logger.write("Error while getting current proxy thumb");
-            e.printStackTrace();
+            Log.w("JS", String.format("Error while writing current proxy thumb: %s", e.getMessage()));
+            if (com.tns.Runtime.isDebuggable()) {
+                e.printStackTrace();
+            }
         }
 
         return null;

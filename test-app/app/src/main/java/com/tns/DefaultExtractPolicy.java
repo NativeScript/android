@@ -74,7 +74,9 @@ public class DefaultExtractPolicy implements ExtractPolicy {
             return updateTime + "-" + code;
         } catch (NameNotFoundException e) {
             logger.write("Error while getting current assets thumb");
-            e.printStackTrace();
+            if (com.tns.Runtime.isDebuggable()) {
+                e.printStackTrace();
+            }
         }
 
         return null;
@@ -93,10 +95,14 @@ public class DefaultExtractPolicy implements ExtractPolicy {
             }
         } catch (FileNotFoundException e) {
             logger.write("Error while getting current assets thumb");
-            e.printStackTrace();
+            if (com.tns.Runtime.isDebuggable()) {
+                e.printStackTrace();
+            }
         } catch (IOException e) {
             logger.write("Error while getting current asstes thumb");
-            e.printStackTrace();
+            if (com.tns.Runtime.isDebuggable()) {
+                e.printStackTrace();
+            }
         }
 
         return null;
@@ -117,10 +123,14 @@ public class DefaultExtractPolicy implements ExtractPolicy {
             }
         } catch (FileNotFoundException e) {
             logger.write("Error while writing current assets thumb");
-            e.printStackTrace();
+            if (com.tns.Runtime.isDebuggable()) {
+                e.printStackTrace();
+            }
         } catch (IOException e) {
             logger.write("Error while writing current assets thumb");
-            e.printStackTrace();
+            if (com.tns.Runtime.isDebuggable()) {
+                e.printStackTrace();
+            }
         }
     }
 

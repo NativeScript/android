@@ -412,7 +412,9 @@ public class Dump {
                 generateCtor(cv, classTo, defaultCtor, classSignature, tnsClassSignature, false);
             } catch (Exception e) {
                 // TODO Auto-generated catch block
-                e.printStackTrace();
+                if (com.tns.Runtime.isDebuggable()) {
+                    e.printStackTrace();
+                }
             }
         } else {
             for (MethodDescriptor ctor : ctors) {

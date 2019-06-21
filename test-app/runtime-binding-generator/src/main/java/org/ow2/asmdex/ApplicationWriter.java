@@ -503,7 +503,9 @@ public class ApplicationWriter extends ApplicationVisitor {
             try {
                 throw new Exception("Data Size isn't a multiple of (uint).");
             } catch (Exception e) {
-                e.printStackTrace();
+                if (com.tns.Runtime.isDebuggable()) {
+                    e.printStackTrace();
+                }
             }
         }
         out.putInt(dataSize, dataSizeOffset);
@@ -534,7 +536,9 @@ public class ApplicationWriter extends ApplicationVisitor {
         try {
             sha = MessageDigest.getInstance("SHA-1");
         } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
+            if (com.tns.Runtime.isDebuggable()) {
+                e.printStackTrace();
+            }
         }
 
         if (sha != null) {
@@ -547,7 +551,9 @@ public class ApplicationWriter extends ApplicationVisitor {
                 try {
                     throw new Exception("SHA-1 digest has an unexpected size : " + digest.length);
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    if (com.tns.Runtime.isDebuggable()) {
+                        e.printStackTrace();
+                    }
                 }
             }
         }

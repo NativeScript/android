@@ -228,7 +228,9 @@ public class EncodedValueUtil {
             try {
                 throw new Exception("Unknown descriptor to convert: " + desc);
             } catch (Exception e) {
-                e.printStackTrace();
+                if (com.tns.Runtime.isDebuggable()) {
+                    e.printStackTrace();
+                }
             }
         }
 

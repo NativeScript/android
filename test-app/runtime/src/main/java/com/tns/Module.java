@@ -1,6 +1,7 @@
 package com.tns;
 
 import android.text.TextUtils;
+import android.util.Log;
 
 import java.io.File;
 import java.io.IOException;
@@ -55,7 +56,9 @@ class Module {
             file = resolvePathHelper(path, baseDir);
         } catch (IOException e) {
             //probably cache failed because of getCanonicalPath
-            e.printStackTrace();
+            if (com.tns.Runtime.isDebuggable()) {
+                e.printStackTrace();
+            }
         }
 
         String resolvedPath;
@@ -63,7 +66,9 @@ class Module {
         try {
             resolvedPath = file.getCanonicalPath();
         } catch (IOException e) {
-            e.printStackTrace();
+            if (com.tns.Runtime.isDebuggable()) {
+                e.printStackTrace();
+            }
             resolvedPath = file.getAbsolutePath();
         }
 
@@ -310,7 +315,9 @@ class Module {
         } catch (NativeScriptException ex) {
             throw new NativeScriptException(notFoundMessage, ex);
         } catch (IOException e) {
-            e.printStackTrace();
+            if (com.tns.Runtime.isDebuggable()) {
+                e.printStackTrace();
+            }
         }
 
         if (bootstrapFile == null) {
@@ -320,7 +327,9 @@ class Module {
             } catch (NativeScriptException ex) {
                 throw new NativeScriptException(notFoundMessage, ex);
             } catch (IOException e) {
-                e.printStackTrace();
+                if (com.tns.Runtime.isDebuggable()) {
+                    e.printStackTrace();
+                }
             }
         }
 

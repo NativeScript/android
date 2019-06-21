@@ -88,7 +88,9 @@ public class TryCatch {
                 try {
                     throw new Exception("A Try/Catch can't support more than one CatchAll.");
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    if (com.tns.Runtime.isDebuggable()) {
+                        e.printStackTrace();
+                    }
                 }
             } else {
                 catchAllHandler = exceptionHandler.getHandler();
