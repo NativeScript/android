@@ -317,7 +317,7 @@ public class GenericsAwareClassHierarchyParserImpl implements GenericsAwareClass
         JavaClass javaClass = classesCache.get(BcelNamingUtil.resolveClassName(className));
 
         if (javaClass == null) {
-            throw new RuntimeException("Class not found!");
+            throw new RuntimeException("Class \"" + className + "\" not found!");
         }
 
         return javaClass;
