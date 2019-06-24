@@ -25,7 +25,7 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
         if (Runtime.isInitialized()) {
             try {
                 if (Util.isDebuggableApp(context)) {
-                    ex.printStackTrace();
+                    System.err.println(errorMessage);
                 }
 
                 Runtime runtime = Runtime.getCurrentRuntime();
