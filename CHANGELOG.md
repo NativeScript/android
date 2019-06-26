@@ -10,6 +10,8 @@
 
 ## Bug Fixes
 
+- [Improve package.json parsing in SBG (#1407)](https://github.com/NativeScript/android-runtime/pull/1407)
+- [Improve error message in SBG class parsing (#1401)](https://github.com/NativeScript/android-runtime/pull/1401)
 - [java.lang.NullPointerException in Metadata generator(#13795)](https://github.com/NativeScript/android-runtime/issues/1379)
 - [Buffer() is deprecated(#1392)](https://github.com/NativeScript/android-runtime/pull/1392)
 - [Warnings when building android(#1396)](https://github.com/NativeScript/android-runtime/issues/1396)
