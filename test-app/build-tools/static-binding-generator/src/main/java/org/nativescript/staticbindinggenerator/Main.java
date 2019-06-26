@@ -51,8 +51,8 @@ public class Main {
     }
 
     /*
-    * Method should traverse all js files from input folder and put the ones that need traversing in another file
-    * */
+     * Method should traverse all js files from input folder and put the ones that need traversing in another file
+     * */
     private static void generateJsInputFile() throws IOException {
         try {
             traverseDirectory(inputDir, false/*traverse explicitly*/);
@@ -69,7 +69,7 @@ public class Main {
         pw.close();
     }
 
-    private static boolean isSuppressCallJSMethodExceptionsEnabled() throws IOException{
+    private static boolean isSuppressCallJSMethodExceptionsEnabled() throws IOException {
         File jsonFile = new File(inputDir, "package.json");
         if (!jsonFile.exists()) {
             return false;
@@ -79,9 +79,13 @@ public class Main {
         try {
             pjson = new JSONObject(jsonContent);
             if (pjson.has("android")) {
-                JSONObject androidSettings = (JSONObject) pjson.get("android");
-                if(androidSettings.has("suppressCallJSMethodExceptions") && androidSettings.get("suppressCallJSMethodExceptions").toString().equals("true")) {
-                    return true;
+                Object androidJsonProperty = pjson.get("android");
+
+                if (androidJsonProperty instanceof JSONObject) {
+                    JSONObject androidSettings = (JSONObject) androidJsonProperty;
+                    if (androidSettings.has("suppressCallJSMethodExceptions") && androidSettings.get("suppressCallJSMethodExceptions").toString().equals("true")) {
+                        return true;
+                    }
                 }
             }
         } catch (JSONException e) {
@@ -116,7 +120,7 @@ public class Main {
     /*
      * Run the javascript static analysis [js_parser] and generate an output file.
      * This output file should contain all the information needed to generate java counterparts to the traversed js classes.
-    * */
+     * */
     private static void runJsParser() throws IOException {
         String parserPath = Paths.get(System.getProperty("user.dir"), "jsparser", "js_parser.js").toString();
 
@@ -134,7 +138,7 @@ public class Main {
             e.printStackTrace();
             throw new InterruptedIOException("A problem occured while waiting for the jsparser to finish.");
         }
-        if(p.exitValue() != 0) {
+        if (p.exitValue() != 0) {
             System.exit(p.exitValue());
         }
     }
@@ -167,10 +171,14 @@ public class Main {
                     if (!pjson.has("nativescript")) {
                         return;
                     } else {
-                        JSONObject nsValue = (JSONObject) pjson.get("nativescript");
-                        if (nsValue.has("recursive-static-bindings")) {
-                            System.out.println(String.format("Task: traverseDirectory: Folder will be traversed completely: %s", currentDir));
-                            traverseExplicitly = true;
+                        Object nativeScriptJsonProperty = pjson.get("nativescript");
+                        if (nativeScriptJsonProperty instanceof JSONObject) {
+                            JSONObject nsValue = (JSONObject) nativeScriptJsonProperty;
+                            if (nsValue.has("recursive-static-bindings")) {
+                                traverseExplicitly = true;
+                            }
+                        } else {
+                            return;
                         }
                     }
                 }
@@ -192,8 +200,8 @@ public class Main {
     private static List<String> webpackWorkersExcludesList;
 
     /*
-    * Should provide the webpack specific files that need to be excluded from the js analysis
-    * */
+     * Should provide the webpack specific files that need to be excluded from the js analysis
+     * */
     private static void getWorkerExcludeFile() {
         webpackWorkersExcludesList = new ArrayList<String>();
 
