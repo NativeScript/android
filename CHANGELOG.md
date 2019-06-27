@@ -25,6 +25,8 @@
     The application crashed because of an uncaught exception. You can look at "stackTrace" or "nativeException" for more detailed information about the exception.
     ```
 
+- [The built-in `JSON.stringify` method is used for cross workers communication](https://github.com/NativeScript/android-runtime/issues/1408). Circular object references are no longer supported and attempting to send such object will throw an exception.
+
 5.4.0
 ==
 
