@@ -992,7 +992,7 @@ CallbackHandlers::WorkerObjectPostMessageCallback(const v8::FunctionCallbackInfo
                                            ArgConverter::ConvertToV8String(isolate, "workerId"),
                                            jsId);
 
-        Local<String> msg = tns::JsonStringifyObject(isolate, args[0])->ToString(isolate);
+        Local<String> msg = tns::JsonStringifyObject(isolate, args[0], false);
         auto context = isolate->GetCurrentContext();
         // get worker's ID that is associated on the other side - in Java
         auto id = jsId->Int32Value(context).ToChecked();
@@ -1090,7 +1090,7 @@ CallbackHandlers::WorkerGlobalPostMessageCallback(const v8::FunctionCallbackInfo
             return;
         }
 
-        Local<String> msg = tns::JsonStringifyObject(isolate, args[0])->ToString(isolate);
+        Local<String> msg = tns::JsonStringifyObject(isolate, args[0], false);
 
         JEnv env;
         auto mId = env.GetStaticMethodID(RUNTIME_CLASS, "sendMessageFromWorkerToMain",

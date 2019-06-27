@@ -66,34 +66,35 @@ Local<Function> GetSmartJSONStringifyFunction(Isolate* isolate) {
     return smartStringifyPersistentFunction->Get(isolate);
 }
 
-Local<String> tns::JsonStringifyObject(Isolate* isolate, Handle<v8::Value> value) {
+Local<String> tns::JsonStringifyObject(Isolate* isolate, Handle<v8::Value> value, bool handleCircularReferences) {
     if (value.IsEmpty()) {
         return String::Empty(isolate);
     }
 
-    Local<Function> smartJSONStringifyFunction = GetSmartJSONStringifyFunction(isolate);
+    if (handleCircularReferences) {
+        Local<Function> smartJSONStringifyFunction = GetSmartJSONStringifyFunction(isolate);
 
-    if (!smartJSONStringifyFunction.IsEmpty()) {
-        if (value->IsObject()) {
-            v8::Local<v8::Value> resultValue;
-            v8::TryCatch tc(isolate);
+        if (!smartJSONStringifyFunction.IsEmpty()) {
+            if (value->IsObject()) {
+                v8::Local<v8::Value> resultValue;
+                v8::TryCatch tc(isolate);
 
-            Local<Value> args[] = { value->ToObject(isolate) };
-            auto success = smartJSONStringifyFunction->Call(isolate->GetCurrentContext(), Undefined(isolate), 1, args).ToLocal(&resultValue);
+                Local<Value> args[] = { value->ToObject(isolate) };
+                auto success = smartJSONStringifyFunction->Call(isolate->GetCurrentContext(), Undefined(isolate), 1, args).ToLocal(&resultValue);
 
-            if (success && !tc.HasCaught()) {
-                return resultValue->ToString(isolate);
+                if (success && !tc.HasCaught()) {
+                    return resultValue->ToString(isolate);
+                }
             }
         }
     }
 
     v8::Local<v8::String> resultString;
     v8::TryCatch tc(isolate);
-    auto success = v8::JSON::Stringify(isolate->GetCurrentContext(), value->ToObject(isolate), ArgConverter::ConvertToV8String(isolate, "2")).ToLocal(&resultString);
+    auto success = v8::JSON::Stringify(isolate->GetCurrentContext(), value->ToObject(isolate)).ToLocal(&resultString);
 
     if (!success && tc.HasCaught()) {
-        auto message = tc.Message()->Get();
-        resultString = v8::String::Concat(isolate, ArgConverter::ConvertToV8String(isolate, "Couldn't convert object to a JSON string: "), message);
+        throw NativeScriptException(tc);
     }
 
     return resultString;
