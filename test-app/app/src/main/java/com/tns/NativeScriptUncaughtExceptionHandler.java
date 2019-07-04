@@ -20,7 +20,7 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
     public void uncaughtException(Thread thread, Throwable ex) {
         String currentThreadMessage = String.format("An uncaught Exception occurred on \"%s\" thread.\n%s\n", thread.getName(), ex.getMessage());
         String stackTraceErrorMessage = Runtime.getStackTraceErrorMessage(ex);
-        String errorMessage = currentThreadMessage + stackTraceErrorMessage;
+        String errorMessage = String.format("%s\nStackTrace:\n%s", currentThreadMessage, stackTraceErrorMessage);
 
         if (Runtime.isInitialized()) {
             try {
