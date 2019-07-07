@@ -4,13 +4,16 @@
 # This file is used by the CI only and it's not meant for regular development.
 ###############################################################################################
 
+#Peice of code to ensure that the ADB is in PATH.
 echo "Ensure adb is in PATH"
 export PATH="$ANDROID_HOME/platform-tools:$PATH"
 adb version
 
+#Peice of code to Update submodule.
 echo "Update submodule"
 git submodule update --init
 
+#Peice of code to cleanup old build and test artefacts.
 echo "Cleanup old build and test artefacts"
 rm -rf consoleLog.txt
 rm -rf test-app/dist/*.xml
