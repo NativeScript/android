@@ -3,6 +3,8 @@
 //
 
 #include <v8_inspector/src/inspector/utils/v8-inspector-common.h>
+#include <codecvt>
+#include <locale>
 #include <ArgConverter.h>
 #include <NativeScriptAssert.h>
 
@@ -37,6 +39,16 @@ std::string Common::getJSCallErrorMessage(const std::string& functionName, v8::L
 
 protocol::DispatchResponse Common::protocolCommandNotSupportedDispatchResponse() {
     return protocol::DispatchResponse::Error(s_notImplemented);
+}
+
+std::vector<uint16_t> Common::toVector(const std::string &value) {
+    std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> convert;
+    std::u16string valueu16 = convert.from_bytes(value);
+
+    const uint16_t *begin = reinterpret_cast<uint16_t const *>(valueu16.data());
+    const uint16_t *end = reinterpret_cast<uint16_t const *>(valueu16.data() + valueu16.size());
+    std::vector<uint16_t> vector(begin, end);
+    return vector;
 }
 
 const String16 Common::s_notImplemented = "Protocol command not supported.";
