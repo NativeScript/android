@@ -3,6 +3,8 @@
 
 ## What's New
 
+- [Support UTF-16 characters in inspector Log domain (#1418)](https://github.com/NativeScript/android-runtime/pull/1418)
+- [Use the built-in JSON.stringify for cross workers communication (#1411)](https://github.com/NativeScript/android-runtime/pull/1411)
 - [Enable AndroidX and Jetifier(#1370)](https://github.com/NativeScript/android-runtime/issues/1370)
 - [Upgrade v8 to 7.5.288.22(#1387)](https://github.com/NativeScript/android-runtime/issues/1387)
 - [Upgrade android gradle plugin to the latest 3.4.1 version(#1390)](https://github.com/NativeScript/android-runtime/issues/1390)
