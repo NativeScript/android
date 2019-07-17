@@ -1,6 +1,17 @@
 6.0.0
 ==
 
+## Breaking Changes
+
+- Exception information in onDiscarderError and onUnhandledError is changed so that `message` contains the exception message and `stackTrace` contains only the stackTrace. In the previous implementation `stackTrace` contained some additional details (including the exception message) and the `message` was something like:
+
+    ```
+    The application crashed because of an uncaught exception. You can look at "stackTrace" or "nativeException" for more detailed information about the exception.
+    ```
+
+- [The built-in `JSON.stringify` method is used for cross workers communication](https://github.com/NativeScript/android-runtime/issues/1408). Circular object references are no longer supported and attempting to send such object will throw an exception.
+
+
 ## What's New
 
 - [Support UTF-16 characters in inspector Log domain (#1418)](https://github.com/NativeScript/android-runtime/pull/1418)
@@ -19,15 +30,6 @@
 - [Warnings when building android(#1396)](https://github.com/NativeScript/android-runtime/issues/1396)
 - [No JS stack on discardedError and unhandledError(#1354)](https://github.com/NativeScript/android-runtime/issues/1354)
 
-## Breaking Changes
-
-- Exception information in onDiscarderError and onUnhandledError is changed so that `message` contains the exception message and `stackTrace` contains only the stackTrace. In the previous implementation `stackTrace` contained some additional details (including the exception message) and the `message` was something like:
-
-    ```
-    The application crashed because of an uncaught exception. You can look at "stackTrace" or "nativeException" for more detailed information about the exception.
-    ```
-
-- [The built-in `JSON.stringify` method is used for cross workers communication](https://github.com/NativeScript/android-runtime/issues/1408). Circular object references are no longer supported and attempting to send such object will throw an exception.
 
 5.4.0
 ==
