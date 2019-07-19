@@ -389,6 +389,12 @@ public class MethodsWriterImpl implements MethodsWriter {
         writer.write(INTERNAL_SERVICES_ONCREATE_METHOD_SIGNATURE);
         writer.write(OPENING_CURLY_BRACKET_LITERAL);
 
+        writer.write(SUPER_METHOD_CALL_PREFIX);
+        writer.write(ON_CREATE_METHOD_NAME);
+        writer.write(OPENING_ROUND_BRACKET_LITERAL);
+        writer.write(CLOSING_ROUND_BRACKET_LITERAL);
+        writer.write(END_OF_STATEMENT_LITERAL);
+
         writeRuntimeInitializationForService();
 
         writer.write(CLOSING_CURLY_BRACKET_LITERAL);
