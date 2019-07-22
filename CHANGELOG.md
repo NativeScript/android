@@ -1,8 +1,20 @@
 6.0.0
 ==
 
+## Breaking Changes
+
+- Exception information in onDiscarderError and onUnhandledError is changed so that `message` contains the exception message and `stackTrace` contains only the stackTrace. In the previous implementation `stackTrace` contained some additional details (including the exception message) and the `message` was something like:
+
+    ```
+    The application crashed because of an uncaught exception. You can look at "stackTrace" or "nativeException" for more detailed information about the exception.
+    ```
+
+- [The built-in `JSON.stringify` method is used for cross workers communication](https://github.com/NativeScript/android-runtime/issues/1408). Circular object references are no longer supported and attempting to send such object will throw an exception.
+
+
 ## What's New
 
+- [Use the built-in JSON.stringify for cross workers communication (#1411)](https://github.com/NativeScript/android-runtime/pull/1411)
 - [Enable AndroidX and Jetifier(#1370)](https://github.com/NativeScript/android-runtime/issues/1370)
 - [Upgrade v8 to 7.5.288.22(#1387)](https://github.com/NativeScript/android-runtime/issues/1387)
 - [Upgrade android gradle plugin to the latest 3.4.1 version(#1390)](https://github.com/NativeScript/android-runtime/issues/1390)
@@ -17,15 +29,6 @@
 - [Warnings when building android(#1396)](https://github.com/NativeScript/android-runtime/issues/1396)
 - [No JS stack on discardedError and unhandledError(#1354)](https://github.com/NativeScript/android-runtime/issues/1354)
 
-## Breaking Changes
-
-- Exception information in onDiscarderError and onUnhandledError is changed so that `message` contains the exception message and `stackTrace` contains only the stackTrace. In the previous implementation `stackTrace` contained some additional details (including the exception message) and the `message` was something like:
-
-    ```
-    The application crashed because of an uncaught exception. You can look at "stackTrace" or "nativeException" for more detailed information about the exception.
-    ```
-
-- [The built-in `JSON.stringify` method is used for cross workers communication](https://github.com/NativeScript/android-runtime/issues/1408). Circular object references are no longer supported and attempting to send such object will throw an exception.
 
 5.4.0
 ==
