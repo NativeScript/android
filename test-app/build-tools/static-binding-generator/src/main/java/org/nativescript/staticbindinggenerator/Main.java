@@ -4,10 +4,13 @@ import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.nativescript.staticbindinggenerator.nodejs.NodeJSProcess;
+import org.nativescript.staticbindinggenerator.nodejs.impl.NodeJSProcessImpl;
+import org.nativescript.staticbindinggenerator.system.environment.impl.EnvironmentVariablesReaderImpl;
+import org.nativescript.staticbindinggenerator.system.process.impl.ProcessExecutorImpl;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InterruptedIOException;
 import java.io.PrintWriter;
 import java.nio.charset.Charset;
 import java.nio.file.Paths;
@@ -121,25 +124,13 @@ public class Main {
      * Run the javascript static analysis [js_parser] and generate an output file.
      * This output file should contain all the information needed to generate java counterparts to the traversed js classes.
      * */
-    private static void runJsParser() throws IOException {
+    private static void runJsParser() {
         String parserPath = Paths.get(System.getProperty("user.dir"), "jsparser", "js_parser.js").toString();
+        NodeJSProcess nodeJSProcess = new NodeJSProcessImpl(new ProcessExecutorImpl(), new EnvironmentVariablesReaderImpl());
+        int exitCode = nodeJSProcess.runScript(parserPath);
 
-        List<String> l = new ArrayList<String>();
-        l.add("node");
-        l.add(parserPath);
-
-        ProcessBuilder pb = new ProcessBuilder(l);
-        pb.redirectOutput(ProcessBuilder.Redirect.INHERIT);
-        pb.redirectError(ProcessBuilder.Redirect.INHERIT);
-        Process p = pb.start();
-        try {
-            p.waitFor();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-            throw new InterruptedIOException("A problem occured while waiting for the jsparser to finish.");
-        }
-        if (p.exitValue() != 0) {
-            System.exit(p.exitValue());
+        if (exitCode != 0) {
+            System.exit(exitCode);
         }
     }
 
