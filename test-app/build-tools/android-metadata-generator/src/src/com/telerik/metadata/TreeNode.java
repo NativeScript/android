@@ -174,6 +174,16 @@ public class TreeNode {
         _name = value;
     }
 
+    private boolean wentThroughSettingMembers = false;
+
+    public boolean hasWentThroughSettingMembers() {
+        return wentThroughSettingMembers;
+    }
+
+    public void setWentThroughSettingMembers(boolean wentThroughSettingMembers) {
+        this.wentThroughSettingMembers = wentThroughSettingMembers;
+    }
+
     private String _name;
     //
     public short id;
