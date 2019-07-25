@@ -239,9 +239,9 @@ void FieldAccessor::SetJavaField(Isolate* isolate, const Local<Object>& target, 
         case 'Z': { //bool
             //TODO: validate value is a boolean before calling
             if (isStatic) {
-                env.SetStaticBooleanField(clazz, fieldId, value->BooleanValue(context).ToChecked());
+                env.SetStaticBooleanField(clazz, fieldId, value->BooleanValue(isolate));
             } else {
-                env.SetBooleanField(targetJavaObject, fieldId, value->BooleanValue(context).ToChecked());
+                env.SetBooleanField(targetJavaObject, fieldId, value->BooleanValue(isolate));
             }
             break;
         }
@@ -256,7 +256,7 @@ void FieldAccessor::SetJavaField(Isolate* isolate, const Local<Object>& target, 
         }
         case 'C': { //char
             //TODO: validate value is a single char
-            String::Utf8Value stringValue(isolate, value->ToString(isolate));
+            String::Utf8Value stringValue(isolate, value->ToString(context).ToLocalChecked());
             JniLocalRef strValue(env.NewStringUTF(*stringValue));
             const char* chars = env.GetStringUTFChars(strValue, 0);
 
@@ -327,7 +327,8 @@ void FieldAccessor::SetJavaField(Isolate* isolate, const Local<Object>& target, 
                 //TODO: validate valie is a string;
                 result = ArgConverter::ConvertToJavaString(value);
             } else {
-                auto objectWithHiddenID = value->ToObject(isolate);
+                auto context = isolate->GetCurrentContext();
+                auto objectWithHiddenID = value->ToObject(context).ToLocalChecked();
                 result = objectManager->GetJavaObjectByJsObject(objectWithHiddenID);
             }
         }

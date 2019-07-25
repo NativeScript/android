@@ -388,16 +388,17 @@ std::unique_ptr<BreakpointResolvedNotification> BreakpointResolvedNotification::
     return fromValue(toValue().get(), &errors);
 }
 
-const char* PausedNotification::ReasonEnum::XHR = "XHR";
+const char* PausedNotification::ReasonEnum::Ambiguous = "ambiguous";
+const char* PausedNotification::ReasonEnum::Assert = "assert";
+const char* PausedNotification::ReasonEnum::DebugCommand = "debugCommand";
 const char* PausedNotification::ReasonEnum::DOM = "DOM";
 const char* PausedNotification::ReasonEnum::EventListener = "EventListener";
 const char* PausedNotification::ReasonEnum::Exception = "exception";
-const char* PausedNotification::ReasonEnum::Assert = "assert";
-const char* PausedNotification::ReasonEnum::DebugCommand = "debugCommand";
-const char* PausedNotification::ReasonEnum::PromiseRejection = "promiseRejection";
+const char* PausedNotification::ReasonEnum::Instrumentation = "instrumentation";
 const char* PausedNotification::ReasonEnum::OOM = "OOM";
 const char* PausedNotification::ReasonEnum::Other = "other";
-const char* PausedNotification::ReasonEnum::Ambiguous = "ambiguous";
+const char* PausedNotification::ReasonEnum::PromiseRejection = "promiseRejection";
+const char* PausedNotification::ReasonEnum::XHR = "XHR";
 
 std::unique_ptr<PausedNotification> PausedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
@@ -691,6 +692,13 @@ const char* Current = "current";
 } // namespace TargetCallFramesEnum
 } // namespace ContinueToLocation
 
+namespace SetInstrumentationBreakpoint {
+namespace InstrumentationEnum {
+const char* BeforeScriptExecution = "beforeScriptExecution";
+const char* BeforeScriptWithSourceMapExecution = "beforeScriptWithSourceMapExecution";
+} // namespace InstrumentationEnum
+} // namespace SetInstrumentationBreakpoint
+
 namespace SetPauseOnExceptions {
 namespace StateEnum {
 const char* None = "none";
@@ -701,32 +709,34 @@ const char* All = "all";
 
 namespace Paused {
 namespace ReasonEnum {
-const char* XHR = "XHR";
+const char* Ambiguous = "ambiguous";
+const char* Assert = "assert";
+const char* DebugCommand = "debugCommand";
 const char* DOM = "DOM";
 const char* EventListener = "EventListener";
 const char* Exception = "exception";
-const char* Assert = "assert";
-const char* DebugCommand = "debugCommand";
-const char* PromiseRejection = "promiseRejection";
+const char* Instrumentation = "instrumentation";
 const char* OOM = "OOM";
 const char* Other = "other";
-const char* Ambiguous = "ambiguous";
+const char* PromiseRejection = "promiseRejection";
+const char* XHR = "XHR";
 } // namespace ReasonEnum
 } // namespace Paused
 
 namespace API {
 namespace Paused {
 namespace ReasonEnum {
-const char* XHR = "XHR";
+const char* Ambiguous = "ambiguous";
+const char* Assert = "assert";
+const char* DebugCommand = "debugCommand";
 const char* DOM = "DOM";
 const char* EventListener = "EventListener";
 const char* Exception = "exception";
-const char* Assert = "assert";
-const char* DebugCommand = "debugCommand";
-const char* PromiseRejection = "promiseRejection";
+const char* Instrumentation = "instrumentation";
 const char* OOM = "OOM";
 const char* Other = "other";
-const char* Ambiguous = "ambiguous";
+const char* PromiseRejection = "promiseRejection";
+const char* XHR = "XHR";
 } // namespace ReasonEnum
 } // namespace Paused
 } // namespace API
@@ -837,12 +847,12 @@ void Frontend::flush()
     m_frontendChannel->flushProtocolNotifications();
 }
 
-void Frontend::sendRawNotification(String notification)
+void Frontend::sendRawJSONNotification(String notification)
 {
     m_frontendChannel->sendProtocolNotification(InternalRawNotification::fromJSON(std::move(notification)));
 }
 
-void Frontend::sendRawNotification(std::vector<uint8_t> notification)
+void Frontend::sendRawCBORNotification(std::vector<uint8_t> notification)
 {
     m_frontendChannel->sendProtocolNotification(InternalRawNotification::fromBinary(std::move(notification)));
 }
@@ -871,6 +881,7 @@ public:
         m_dispatchMap["Debugger.setBlackboxPatterns"] = &DispatcherImpl::setBlackboxPatterns;
         m_dispatchMap["Debugger.setBlackboxedRanges"] = &DispatcherImpl::setBlackboxedRanges;
         m_dispatchMap["Debugger.setBreakpoint"] = &DispatcherImpl::setBreakpoint;
+        m_dispatchMap["Debugger.setInstrumentationBreakpoint"] = &DispatcherImpl::setInstrumentationBreakpoint;
         m_dispatchMap["Debugger.setBreakpointByUrl"] = &DispatcherImpl::setBreakpointByUrl;
         m_dispatchMap["Debugger.setBreakpointOnFunctionCall"] = &DispatcherImpl::setBreakpointOnFunctionCall;
         m_dispatchMap["Debugger.setBreakpointsActive"] = &DispatcherImpl::setBreakpointsActive;
@@ -911,6 +922,7 @@ protected:
     void setBlackboxPatterns(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
     void setBlackboxedRanges(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
     void setBreakpoint(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    void setInstrumentationBreakpoint(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
     void setBreakpointByUrl(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
     void setBreakpointOnFunctionCall(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
     void setBreakpointsActive(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
@@ -1474,6 +1486,37 @@ void DispatcherImpl::setBreakpoint(int callId, const String& method, const Proto
     if (response.status() == DispatchResponse::kSuccess) {
         result->setValue("breakpointId", ValueConversions<String>::toValue(out_breakpointId));
         result->setValue("actualLocation", ValueConversions<protocol::Debugger::Location>::toValue(out_actualLocation.get()));
+    }
+    if (weak->get())
+        weak->get()->sendResponse(callId, response, std::move(result));
+    return;
+}
+
+void DispatcherImpl::setInstrumentationBreakpoint(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
+    // Prepare input parameters.
+    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
+    errors->push();
+    protocol::Value* instrumentationValue = object ? object->get("instrumentation") : nullptr;
+    errors->setName("instrumentation");
+    String in_instrumentation = ValueConversions<String>::fromValue(instrumentationValue, errors);
+    errors->pop();
+    if (errors->hasErrors()) {
+        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
+        return;
+    }
+    // Declare output parameters.
+    String out_breakpointId;
+
+    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    DispatchResponse response = m_backend->setInstrumentationBreakpoint(in_instrumentation, &out_breakpointId);
+    if (response.status() == DispatchResponse::kFallThrough) {
+        channel()->fallThrough(callId, method, message);
+        return;
+    }
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    if (response.status() == DispatchResponse::kSuccess) {
+        result->setValue("breakpointId", ValueConversions<String>::toValue(out_breakpointId));
     }
     if (weak->get())
         weak->get()->sendResponse(callId, response, std::move(result));

@@ -173,10 +173,11 @@ void NumericCasts::MarkAsLongCallback(const v8::FunctionCallbackInfo<Value>& arg
         }
 
         Local<Value> value;
+        auto context = isolate->GetCurrentContext();
         if (args[0]->IsInt32()) {
-            value = args[0]->ToInt32(isolate);
+            value = args[0]->ToInt32(context).ToLocalChecked();
         } else {
-            value = args[0]->ToString(isolate);
+            value = args[0]->ToString(context).ToLocalChecked();
         }
 
         auto cast = Object::New(isolate);
@@ -207,10 +208,11 @@ void NumericCasts::MarkAsByteCallback(const v8::FunctionCallbackInfo<Value>& arg
         }
 
         Local<Value> value;
+        auto context = isolate->GetCurrentContext();
         if (args[0]->IsInt32()) {
-            value = args[0]->ToInt32(isolate);
+            value = args[0]->ToInt32(context).ToLocalChecked();
         } else {
-            value = args[0]->ToString(isolate);
+            value = args[0]->ToString(context).ToLocalChecked();
         }
 
         auto cast = Object::New(isolate);
@@ -242,10 +244,11 @@ void NumericCasts::MarkAsShortCallback(const v8::FunctionCallbackInfo<Value>& ar
         }
 
         Local<Value> value;
+        auto context = isolate->GetCurrentContext();
         if (args[0]->IsInt32()) {
-            value = args[0]->ToInt32(isolate);
+            value = args[0]->ToInt32(context).ToLocalChecked();
         } else {
-            value = args[0]->ToString(isolate);
+            value = args[0]->ToString(context).ToLocalChecked();
         }
 
         auto cast = Object::New(isolate);
@@ -275,7 +278,8 @@ void NumericCasts::MarkAsCharCallback(const v8::FunctionCallbackInfo<Value>& arg
             throw NativeScriptException(string("char(x) should be called with single parameter containing a char representation"));
         }
 
-        auto value = args[0]->ToString(isolate);
+        auto context = isolate->GetCurrentContext();
+        auto value = args[0]->ToString(context).ToLocalChecked();
         if (value->Length() != 1) {
             throw NativeScriptException(string("char(x) should be called with single parameter containing a single char"));
         }
@@ -307,7 +311,8 @@ void NumericCasts::MarkAsFloatCallback(const v8::FunctionCallbackInfo<Value>& ar
             throw NativeScriptException(string("float(x) should be called with single parameter containing a float number representation"));
         }
 
-        auto value = args[0]->ToNumber(isolate);
+        auto context = isolate->GetCurrentContext();
+        auto value = args[0]->ToNumber(context).ToLocalChecked();
         auto cast = Object::New(isolate);
         MarkJsObject(isolate, cast, CastType::Float, value);
         args.GetReturnValue().Set(cast);
@@ -335,7 +340,8 @@ void NumericCasts::MarkAsDoubleCallback(const v8::FunctionCallbackInfo<Value>& a
             throw NativeScriptException(string("double(x) should be called with single parameter containing a double number representation"));
         }
 
-        auto value = args[0]->ToNumber(isolate);
+        auto context = isolate->GetCurrentContext();
+        auto value = args[0]->ToNumber(context).ToLocalChecked();
         auto cast = Object::New(isolate);
         MarkJsObject(isolate, cast, CastType::Double, value);
         args.GetReturnValue().Set(cast);

@@ -120,8 +120,8 @@ public:
     explicit Frontend(FrontendChannel* frontendChannel) : m_frontendChannel(frontendChannel) { }
 
     void flush();
-    void sendRawNotification(String);
-    void sendRawNotification(std::vector<uint8_t>);
+    void sendRawJSONNotification(String);
+    void sendRawCBORNotification(std::vector<uint8_t>);
 private:
     FrontendChannel* m_frontendChannel;
 };

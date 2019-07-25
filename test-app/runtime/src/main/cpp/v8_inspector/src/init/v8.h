@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef V8_V8_H_
-#define V8_V8_H_
+#ifndef V8_INIT_V8_H_
+#define V8_INIT_V8_H_
 
-#include "src/globals.h"
+#include "src/common/globals.h"
 
 namespace v8 {
 
@@ -50,4 +50,4 @@ class V8 : public AllStatic {
 }  // namespace internal
 }  // namespace v8
 
-#endif  // V8_V8_H_
+#endif  // V8_INIT_V8_H_

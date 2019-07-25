@@ -35,9 +35,10 @@ void DOMDomainCallbackHandlers::ChildNodeInsertedCallback(const v8::FunctionCall
             throw NativeScriptException("Calling ChildNodeInserted with invalid arguments. Required params: parentId: number, lastId: number, node: JSON String");
         }
 
-        auto parentId = args[0]->ToNumber(isolate);
-        auto lastId = args[1]->ToNumber(isolate);
-        auto node = args[2]->ToString(isolate);
+        auto context = isolate->GetCurrentContext();
+        auto parentId = args[0]->ToNumber(context).ToLocalChecked();
+        auto lastId = args[1]->ToNumber(context).ToLocalChecked();
+        auto node = args[2]->ToString(context).ToLocalChecked();
 
         auto resultString = V8DOMAgentImpl::AddBackendNodeIdProperty(isolate, node);
         auto resultUtf16Data = resultString.data();
@@ -54,7 +55,6 @@ void DOMDomainCallbackHandlers::ChildNodeInsertedCallback(const v8::FunctionCall
             return;
         }
 
-        auto context = isolate->GetCurrentContext();
         domAgentInstance->m_frontend.childNodeInserted(parentId->Int32Value(context).ToChecked(), lastId->Int32Value(context).ToChecked(), std::move(domNode));
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
@@ -85,10 +85,10 @@ void DOMDomainCallbackHandlers::ChildNodeRemovedCallback(const v8::FunctionCallb
             throw NativeScriptException("Calling ChildNodeRemoved with invalid arguments. Required params: parentId: number, nodeId: number");
         }
 
-        auto parentId = args[0]->ToNumber(isolate);
-        auto nodeId = args[1]->ToNumber(isolate);
-
         auto context = isolate->GetCurrentContext();
+        auto parentId = args[0]->ToNumber(context).ToLocalChecked();
+        auto nodeId = args[1]->ToNumber(context).ToLocalChecked();
+
         domAgentInstance->m_frontend.childNodeRemoved(parentId->Int32Value(context).ToChecked(), nodeId->Int32Value(context).ToChecked());
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
@@ -119,11 +119,11 @@ void DOMDomainCallbackHandlers::AttributeModifiedCallback(const v8::FunctionCall
             throw NativeScriptException("Calling AttributeModified with invalid arguments. Required params: nodeId: number, name: string, value: string");
         }
 
-        auto nodeId = args[0]->ToNumber(isolate);
-        auto attributeName = args[1]->ToString(isolate);
-        auto attributeValue = args[2]->ToString(isolate);
-
         auto context = isolate->GetCurrentContext();
+        auto nodeId = args[0]->ToNumber(context).ToLocalChecked();
+        auto attributeName = args[1]->ToString(context).ToLocalChecked();
+        auto attributeValue = args[2]->ToString(context).ToLocalChecked();
+
         domAgentInstance->m_frontend.attributeModified(nodeId->Int32Value(context).ToChecked(),
                 v8_inspector::toProtocolString(isolate, attributeName),
                 v8_inspector::toProtocolString(isolate, attributeValue));
@@ -155,10 +155,10 @@ void DOMDomainCallbackHandlers::AttributeRemovedCallback(const v8::FunctionCallb
             throw NativeScriptException("Calling AttributeRemoved with invalid arguments. Required params: nodeId: number, name: string");
         }
 
-        auto nodeId = args[0]->ToNumber(isolate);
-        auto attributeName = args[1]->ToString(isolate);
-
         auto context = isolate->GetCurrentContext();
+        auto nodeId = args[0]->ToNumber(context).ToLocalChecked();
+        auto attributeName = args[1]->ToString(context).ToLocalChecked();
+
         domAgentInstance->m_frontend.attributeRemoved(nodeId->Int32Value(context).ToChecked(),
                 v8_inspector::toProtocolString(isolate, attributeName));
     } catch (NativeScriptException& e) {

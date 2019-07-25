@@ -11,12 +11,6 @@
 #include "src/inspector/protocol/Forward.h"
 #include "src/inspector/protocol/Runtime.h"
 #include "src/inspector/protocol/Schema.h"
-#include "src/inspector/protocol/Page.h"
-#include "src/inspector/protocol/Network.h"
-#include "src/inspector/protocol/DOM.h"
-#include "src/inspector/protocol/CSS.h"
-#include "src/inspector/protocol/Overlay.h"
-#include "src/inspector/protocol/Log.h"
 
 #include "include/v8-inspector.h"
 
@@ -46,7 +40,7 @@ class V8InspectorSessionImpl : public V8InspectorSession,
   static std::unique_ptr<V8InspectorSessionImpl> create(
       V8InspectorImpl*, int contextGroupId, int sessionId,
       V8Inspector::Channel*, const StringView& state);
-  ~V8InspectorSessionImpl() override;
+      ~V8InspectorSessionImpl() override;
 
         V8InspectorImpl* inspector() const {
             return m_inspector;
@@ -112,6 +106,7 @@ class V8InspectorSessionImpl : public V8InspectorSession,
   // V8InspectorSession implementation.
   void dispatchProtocolMessage(const StringView& message) override;
   std::unique_ptr<StringBuffer> stateJSON() override;
+  std::vector<uint8_t> state() override;
   std::vector<std::unique_ptr<protocol::Schema::API::Domain>> supportedDomains()
       override;
   void addInspectedObject(
