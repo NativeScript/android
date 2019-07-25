@@ -16,9 +16,11 @@ dependencies {
     compile group: 'org.json', name: 'json', version: '20090211'
     compile 'commons-io:commons-io:2.5'
     compile 'com.google.code.gson:gson:2.8.5'
-    testCompile 'com.google.code.gson:gson:2.8.5'
-    testCompile 'junit:junit:4.+'
     compile 'com.google.googlejavaformat:google-java-format:1.6'
+
+    testCompile 'com.google.code.gson:gson:2.8.5'
+    testCompile 'junit:junit:4.12'
+    testCompile 'org.mockito:mockito-core:3.0.0'
 }
 
 compileJava {
