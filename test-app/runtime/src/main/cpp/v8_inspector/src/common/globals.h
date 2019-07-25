@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef V8_GLOBALS_H_
-#define V8_GLOBALS_H_
+#ifndef V8_COMMON_GLOBALS_H_
+#define V8_COMMON_GLOBALS_H_
 
 #include <stddef.h>
 #include <stdint.h>
@@ -25,7 +25,7 @@ namespace v8 {
 namespace base {
 class Mutex;
 class RecursiveMutex;
-}
+}  // namespace base
 
 namespace internal {
 
@@ -82,9 +82,19 @@ constexpr int kStackSpaceRequiredForCompilation = 40;
 #define V8_DOUBLE_FIELDS_UNBOXING false
 #endif
 
+// Determine whether tagged pointers are 8 bytes (used in Torque layouts for
+// choosing where to insert padding).
+#if V8_TARGET_ARCH_64_BIT && !defined(V8_COMPRESS_POINTERS)
+#define TAGGED_SIZE_8_BYTES true
+#else
+#define TAGGED_SIZE_8_BYTES false
+#endif
+
 // Some types of tracing require the SFI to store a unique ID.
 #if defined(V8_TRACE_MAPS) || defined(V8_TRACE_IGNITION)
 #define V8_SFI_HAS_UNIQUE_ID true
+#else
+#define V8_SFI_HAS_UNIQUE_ID false
 #endif
 
 #if defined(V8_OS_WIN) && defined(V8_TARGET_ARCH_X64)
@@ -100,7 +110,7 @@ class AllStatic {
 #endif
 };
 
-typedef uint8_t byte;
+using byte = uint8_t;
 
 // -----------------------------------------------------------------------------
 // Constants
@@ -160,7 +170,6 @@ constexpr size_t kMaxWasmCodeMemory = kMaxWasmCodeMB * MB;
 constexpr int kSystemPointerSizeLog2 = 3;
 constexpr intptr_t kIntptrSignBit =
     static_cast<intptr_t>(uintptr_t{0x8000000000000000});
-constexpr uintptr_t kUintptrAllBitsSet = uintptr_t{0xFFFFFFFFFFFFFFFF};
 constexpr bool kRequiresCodeRange = true;
 #if V8_HOST_ARCH_PPC && V8_TARGET_ARCH_PPC && V8_OS_LINUX
 constexpr size_t kMaximalCodeRangeSize = 512 * MB;
@@ -182,7 +191,6 @@ constexpr size_t kReservedCodeRangePages = 0;
 #else
 constexpr int kSystemPointerSizeLog2 = 2;
 constexpr intptr_t kIntptrSignBit = 0x80000000;
-constexpr uintptr_t kUintptrAllBitsSet = 0xFFFFFFFFu;
 #if V8_HOST_ARCH_PPC && V8_TARGET_ARCH_PPC && V8_OS_LINUX
 constexpr bool kRequiresCodeRange = false;
 constexpr size_t kMaximalCodeRangeSize = 0 * MB;
@@ -204,6 +212,15 @@ constexpr size_t kReservedCodeRangePages = 0;
 
 STATIC_ASSERT(kSystemPointerSize == (1 << kSystemPointerSizeLog2));
 
+// This macro is used for declaring and defining HeapObject getter methods that
+// are a bit more efficient for the pointer compression case than the default
+// parameterless getters because isolate root doesn't have to be computed from
+// arbitrary field address but it comes "for free" instead.
+// These alternatives are always defined (in order to avoid #ifdef mess but
+// are not supposed to be used when pointer compression is not enabled.
+#define ROOT_VALUE isolate_for_root
+#define ROOT_PARAM Isolate* const ROOT_VALUE
+
 #ifdef V8_COMPRESS_POINTERS
 static_assert(
     kSystemPointerSize == kInt64Size,
@@ -217,6 +234,11 @@ constexpr int kTaggedSizeLog2 = 2;
 using Tagged_t = int32_t;
 using AtomicTagged_t = base::Atomic32;
 
+#define DEFINE_ROOT_VALUE(isolate) ROOT_PARAM = isolate
+#define WITH_ROOT_PARAM(...) ROOT_PARAM, ##__VA_ARGS__
+#define WITH_ROOT_VALUE(...) ROOT_VALUE, ##__VA_ARGS__
+#define WITH_ROOT(isolate_for_root, ...) isolate_for_root, ##__VA_ARGS__
+
 #else
 
 constexpr int kTaggedSize = kSystemPointerSize;
@@ -227,6 +249,11 @@ constexpr int kTaggedSizeLog2 = kSystemPointerSizeLog2;
 using Tagged_t = Address;
 using AtomicTagged_t = base::AtomicWord;
 
+#define DEFINE_ROOT_VALUE(isolate)
+#define WITH_ROOT_PARAM(...) __VA_ARGS__
+#define WITH_ROOT_VALUE(...) __VA_ARGS__
+#define WITH_ROOT(isolate_for_root, ...) __VA_ARGS__
+
 #endif  // V8_COMPRESS_POINTERS
 
 // Defines whether the branchless or branchful implementation of pointer
@@ -234,6 +261,7 @@ using AtomicTagged_t = base::AtomicWord;
 constexpr bool kUseBranchlessPtrDecompression = true;
 
 STATIC_ASSERT(kTaggedSize == (1 << kTaggedSizeLog2));
+STATIC_ASSERT((kTaggedSize == 8) == TAGGED_SIZE_8_BYTES);
 
 using AsAtomicTagged = base::AsAtomicPointerImpl<AtomicTagged_t>;
 STATIC_ASSERT(sizeof(Tagged_t) == kTaggedSize);
@@ -288,8 +316,8 @@ constexpr uint64_t kQuietNaNMask = static_cast<uint64_t>(0xfff) << 51;
 // Latin1/UTF-16 constants
 // Code-point values in Unicode 4.0 are 21 bits wide.
 // Code units in UTF-16 are 16 bits wide.
-typedef uint16_t uc16;
-typedef int32_t uc32;
+using uc16 = uint16_t;
+using uc32 = int32_t;
 constexpr int kOneByteSize = kCharSize;
 constexpr int kUC16Size = sizeof(uc16);  // NOLINT
 
@@ -311,13 +339,12 @@ F FUNCTION_CAST(Address addr) {
   return reinterpret_cast<F>(addr);
 }
 
-
 // Determine whether the architecture uses function descriptors
 // which provide a level of indirection between the function pointer
 // and the function entrypoint.
-#if V8_HOST_ARCH_PPC && \
+#if V8_HOST_ARCH_PPC &&                                            \
     (V8_OS_AIX || (V8_TARGET_ARCH_PPC64 && V8_TARGET_BIG_ENDIAN && \
-    (!defined(_CALL_ELF) || _CALL_ELF == 1)))
+                   (!defined(_CALL_ELF) || _CALL_ELF == 1)))
 #define USES_FUNCTION_DESCRIPTORS 1
 #define FUNCTION_ENTRYPOINT_ADDRESS(f)       \
   (reinterpret_cast<v8::internal::Address*>( \
@@ -325,7 +352,6 @@ F FUNCTION_CAST(Address addr) {
 #else
 #define USES_FUNCTION_DESCRIPTORS 0
 #endif
-
 
 // -----------------------------------------------------------------------------
 // Declarations for use in both the preparser and the rest of V8.
@@ -546,6 +572,11 @@ static const intptr_t kPageAlignmentMask = (intptr_t{1} << kPageSizeBits) - 1;
 // If looking only at the top 32 bits, the QNaN mask is bits 19 to 30.
 constexpr uint32_t kQuietNaNHighBitsMask = 0xfff << (51 - 32);
 
+enum class HeapObjectReferenceType {
+  WEAK,
+  STRONG,
+};
+
 // -----------------------------------------------------------------------------
 // Forward declarations for frequently used classes
 
@@ -569,7 +600,8 @@ class Foreign;
 class FreeStoreAllocationPolicy;
 class FunctionTemplateInfo;
 class GlobalDictionary;
-template <typename T> class Handle;
+template <typename T>
+class Handle;
 class Heap;
 class HeapObject;
 class HeapObjectReference;
@@ -598,6 +630,10 @@ class NewSpace;
 class NewLargeObjectSpace;
 class NumberDictionary;
 class Object;
+template <HeapObjectReferenceType kRefType, typename StorageType>
+class TaggedImpl;
+class StrongTaggedValue;
+class TaggedValue;
 class CompressedObjectSlot;
 class CompressedMaybeObjectSlot;
 class CompressedMapWordSlot;
@@ -617,6 +653,7 @@ class Smi;
 template <typename Config, class Allocator = FreeStoreAllocationPolicy>
 class SplayTree;
 class String;
+class StringStream;
 class Struct;
 class Symbol;
 class Variable;
@@ -669,9 +706,9 @@ using MaybeObjectSlot = SlotTraits<SlotLocation::kOnHeap>::TMaybeObjectSlot;
 // HeapObjectReference).
 using HeapObjectSlot = SlotTraits<SlotLocation::kOnHeap>::THeapObjectSlot;
 
-typedef bool (*WeakSlotCallback)(FullObjectSlot pointer);
+using WeakSlotCallback = bool (*)(FullObjectSlot pointer);
 
-typedef bool (*WeakSlotCallbackWithHeap)(Heap* heap, FullObjectSlot pointer);
+using WeakSlotCallbackWithHeap = bool (*)(Heap* heap, FullObjectSlot pointer);
 
 // -----------------------------------------------------------------------------
 // Miscellaneous
@@ -732,34 +769,7 @@ enum AllocationAlignment { kWordAligned, kDoubleAligned, kDoubleUnaligned };
 
 enum class AccessMode { ATOMIC, NON_ATOMIC };
 
-// Supported write barrier modes.
-enum WriteBarrierKind : uint8_t {
-  kNoWriteBarrier,
-  kMapWriteBarrier,
-  kPointerWriteBarrier,
-  kEphemeronKeyWriteBarrier,
-  kFullWriteBarrier
-};
-
-inline size_t hash_value(WriteBarrierKind kind) {
-  return static_cast<uint8_t>(kind);
-}
-
-inline std::ostream& operator<<(std::ostream& os, WriteBarrierKind kind) {
-  switch (kind) {
-    case kNoWriteBarrier:
-      return os << "NoWriteBarrier";
-    case kMapWriteBarrier:
-      return os << "MapWriteBarrier";
-    case kPointerWriteBarrier:
-      return os << "PointerWriteBarrier";
-    case kEphemeronKeyWriteBarrier:
-      return os << "EphemeronKeyWriteBarrier";
-    case kFullWriteBarrier:
-      return os << "FullWriteBarrier";
-  }
-  UNREACHABLE();
-}
+enum class AllowLargeObjects { kFalse, kTrue };
 
 enum MinimumCapacity {
   USE_DEFAULT_MINIMUM_CAPACITY,
@@ -769,8 +779,6 @@ enum MinimumCapacity {
 enum GarbageCollector { SCAVENGER, MARK_COMPACTOR, MINOR_MARK_COMPACTOR };
 
 enum Executability { NOT_EXECUTABLE, EXECUTABLE };
-
-enum Movability { kMovable, kImmovable };
 
 enum VisitMode {
   VISIT_ALL,
@@ -789,11 +797,7 @@ enum class BytecodeFlushMode {
 };
 
 // Flag indicating whether code is built into the VM (one of the natives files).
-enum NativesFlag {
-  NOT_NATIVES_CODE,
-  EXTENSION_CODE,
-  INSPECTOR_CODE
-};
+enum NativesFlag { NOT_NATIVES_CODE, EXTENSION_CODE, INSPECTOR_CODE };
 
 // ParseRestriction is used to restrict the set of valid statements in a
 // unit of compilation.  Restriction violations cause a syntax error.
@@ -855,16 +859,14 @@ enum ShouldThrow {
 };
 
 // The Store Buffer (GC).
-typedef enum {
+enum StoreBufferEvent {
   kStoreBufferFullEvent,
   kStoreBufferStartScanningPagesEvent,
   kStoreBufferScanningPageEvent
-} StoreBufferEvent;
+};
 
-
-typedef void (*StoreBufferCallback)(Heap* heap,
-                                    MemoryChunk* page,
-                                    StoreBufferEvent event);
+using StoreBufferCallback = void (*)(Heap* heap, MemoryChunk* page,
+                                     StoreBufferEvent event);
 
 // Union used for customized checking of the IEEE double types
 // inlined within v8 runtime, rather than going to the underlying
@@ -872,30 +874,29 @@ typedef void (*StoreBufferCallback)(Heap* heap,
 union IeeeDoubleLittleEndianArchType {
   double d;
   struct {
-    unsigned int man_low  :32;
-    unsigned int man_high :20;
-    unsigned int exp      :11;
-    unsigned int sign     :1;
+    unsigned int man_low : 32;
+    unsigned int man_high : 20;
+    unsigned int exp : 11;
+    unsigned int sign : 1;
   } bits;
 };
-
 
 union IeeeDoubleBigEndianArchType {
   double d;
   struct {
-    unsigned int sign     :1;
-    unsigned int exp      :11;
-    unsigned int man_high :20;
-    unsigned int man_low  :32;
+    unsigned int sign : 1;
+    unsigned int exp : 11;
+    unsigned int man_high : 20;
+    unsigned int man_low : 32;
   } bits;
 };
 
 #if V8_TARGET_LITTLE_ENDIAN
-typedef IeeeDoubleLittleEndianArchType IeeeDoubleArchType;
+using IeeeDoubleArchType = IeeeDoubleLittleEndianArchType;
 constexpr int kIeeeDoubleMantissaWordOffset = 0;
 constexpr int kIeeeDoubleExponentWordOffset = 4;
 #else
-typedef IeeeDoubleBigEndianArchType IeeeDoubleArchType;
+using IeeeDoubleArchType = IeeeDoubleBigEndianArchType;
 constexpr int kIeeeDoubleMantissaWordOffset = 4;
 constexpr int kIeeeDoubleExponentWordOffset = 0;
 #endif
@@ -908,9 +909,13 @@ constexpr int kIeeeDoubleExponentWordOffset = 0;
 #define HAS_SMI_TAG(value) \
   ((static_cast<intptr_t>(value) & ::i::kSmiTagMask) == ::i::kSmiTag)
 
-#define HAS_HEAP_OBJECT_TAG(value)                              \
+#define HAS_STRONG_HEAP_OBJECT_TAG(value)                       \
   (((static_cast<intptr_t>(value) & ::i::kHeapObjectTagMask) == \
     ::i::kHeapObjectTag))
+
+#define HAS_WEAK_HEAP_OBJECT_TAG(value)                         \
+  (((static_cast<intptr_t>(value) & ::i::kHeapObjectTagMask) == \
+    ::i::kWeakHeapObjectTag))
 
 // OBJECT_POINTER_ALIGN returns the value aligned as a HeapObject pointer
 #define OBJECT_POINTER_ALIGN(value) \
@@ -1190,7 +1195,6 @@ enum MaybeAssignedFlag : uint8_t { kNotAssigned, kMaybeAssigned };
 
 enum ParseErrorType { kSyntaxError = 0, kReferenceError = 1 };
 
-
 enum class InterpreterPushArgsMode : unsigned {
   kArrayFunction,
   kWithFinalSpread,
@@ -1380,7 +1384,7 @@ enum class DataPropertyInLiteralFlag {
   kDontEnum = 1 << 0,
   kSetFunctionName = 1 << 1
 };
-typedef base::Flags<DataPropertyInLiteralFlag> DataPropertyInLiteralFlags;
+using DataPropertyInLiteralFlags = base::Flags<DataPropertyInLiteralFlag>;
 DEFINE_OPERATORS_FOR_FLAGS(DataPropertyInLiteralFlags)
 
 enum ExternalArrayType {
@@ -1476,17 +1480,6 @@ enum IsolateAddressId {
       kIsolateAddressCount
 };
 
-V8_INLINE static bool HasWeakHeapObjectTag(Address value) {
-  // TODO(jkummerow): Consolidate integer types here.
-  return ((static_cast<intptr_t>(value) & kHeapObjectTagMask) ==
-          kWeakHeapObjectTag);
-}
-
-enum class HeapObjectReferenceType {
-  WEAK,
-  STRONG,
-};
-
 enum class PoisoningMitigationLevel {
   kPoisonAll,
   kDontPoison,
@@ -1523,55 +1516,20 @@ enum KeyedAccessLoadMode {
 
 enum KeyedAccessStoreMode {
   STANDARD_STORE,
-  STORE_TRANSITION_TO_OBJECT,
-  STORE_TRANSITION_TO_DOUBLE,
-  STORE_AND_GROW_NO_TRANSITION_HANDLE_COW,
-  STORE_AND_GROW_TRANSITION_TO_OBJECT,
-  STORE_AND_GROW_TRANSITION_TO_DOUBLE,
-  STORE_NO_TRANSITION_IGNORE_OUT_OF_BOUNDS,
-  STORE_NO_TRANSITION_HANDLE_COW
+  STORE_AND_GROW_HANDLE_COW,
+  STORE_IGNORE_OUT_OF_BOUNDS,
+  STORE_HANDLE_COW
 };
 
 enum MutableMode { MUTABLE, IMMUTABLE };
 
-static inline bool IsTransitionStoreMode(KeyedAccessStoreMode store_mode) {
-  return store_mode == STORE_TRANSITION_TO_OBJECT ||
-         store_mode == STORE_TRANSITION_TO_DOUBLE ||
-         store_mode == STORE_AND_GROW_TRANSITION_TO_OBJECT ||
-         store_mode == STORE_AND_GROW_TRANSITION_TO_DOUBLE;
-}
-
 static inline bool IsCOWHandlingStoreMode(KeyedAccessStoreMode store_mode) {
-  return store_mode == STORE_NO_TRANSITION_HANDLE_COW ||
-         store_mode == STORE_AND_GROW_NO_TRANSITION_HANDLE_COW;
-}
-
-static inline KeyedAccessStoreMode GetNonTransitioningStoreMode(
-    KeyedAccessStoreMode store_mode, bool receiver_was_cow) {
-  switch (store_mode) {
-    case STORE_AND_GROW_NO_TRANSITION_HANDLE_COW:
-    case STORE_AND_GROW_TRANSITION_TO_OBJECT:
-    case STORE_AND_GROW_TRANSITION_TO_DOUBLE:
-      store_mode = STORE_AND_GROW_NO_TRANSITION_HANDLE_COW;
-      break;
-    case STANDARD_STORE:
-    case STORE_TRANSITION_TO_OBJECT:
-    case STORE_TRANSITION_TO_DOUBLE:
-      store_mode =
-          receiver_was_cow ? STORE_NO_TRANSITION_HANDLE_COW : STANDARD_STORE;
-      break;
-    case STORE_NO_TRANSITION_IGNORE_OUT_OF_BOUNDS:
-    case STORE_NO_TRANSITION_HANDLE_COW:
-      break;
-  }
-  DCHECK(!IsTransitionStoreMode(store_mode));
-  DCHECK_IMPLIES(receiver_was_cow, IsCOWHandlingStoreMode(store_mode));
-  return store_mode;
+  return store_mode == STORE_HANDLE_COW ||
+         store_mode == STORE_AND_GROW_HANDLE_COW;
 }
 
 static inline bool IsGrowStoreMode(KeyedAccessStoreMode store_mode) {
-  return store_mode >= STORE_AND_GROW_NO_TRANSITION_HANDLE_COW &&
-         store_mode <= STORE_AND_GROW_TRANSITION_TO_DOUBLE;
+  return store_mode == STORE_AND_GROW_HANDLE_COW;
 }
 
 enum IcCheckType { ELEMENT, PROPERTY };
@@ -1601,4 +1559,4 @@ constexpr int kSmallOrderedHashMapMinCapacity = 4;
 
 namespace i = v8::internal;
 
-#endif  // V8_GLOBALS_H_
+#endif  // V8_COMMON_GLOBALS_H_

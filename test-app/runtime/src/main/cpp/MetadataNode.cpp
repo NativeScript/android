@@ -809,14 +809,14 @@ Persistent<Function>* MetadataNode::GetPersistentConstructorFunction(Isolate* is
 
 MetadataNode::TypeMetadata* MetadataNode::GetTypeMetadata(Isolate* isolate, const Local<Function>& value) {
     Local<Value> hiddenVal;
-    V8GetPrivateValue(isolate, value, String::NewFromUtf8(isolate, "typemetadata"), hiddenVal);
+    V8GetPrivateValue(isolate, value, String::NewFromUtf8(isolate, "typemetadata").ToLocalChecked(), hiddenVal);
 
     auto data = reinterpret_cast<TypeMetadata*>(hiddenVal.As<External>()->Value());
     return data;
 }
 
 void MetadataNode::SetTypeMetadata(Isolate* isolate, Local<Function> value, TypeMetadata* data) {
-    V8SetPrivateValue(isolate, value, String::NewFromUtf8(isolate, "typemetadata"),  External::New(isolate, data));
+    V8SetPrivateValue(isolate, value, String::NewFromUtf8(isolate, "typemetadata").ToLocalChecked(),  External::New(isolate, data));
 }
 
 MetadataNode* MetadataNode::GetInstanceMetadata(Isolate* isolate, const Local<Object>& value) {
@@ -895,12 +895,13 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
 
         Local<Object> implementationObject;
         Local<String> v8ExtendName;
+        auto context = isolate->GetCurrentContext();
 
         if (info.Length() == 1) {
             if (!info[0]->IsObject()) {
                 throw NativeScriptException(string("First argument must be implementation object"));
             }
-            implementationObject = info[0]->ToObject(isolate);
+            implementationObject = info[0]->ToObject(context).ToLocalChecked();
         } else if (info.Length() == 2) {
             if (!info[0]->IsString()) {
                 throw NativeScriptException(string("First argument must be string"));
@@ -909,8 +910,8 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
                 throw NativeScriptException(string("Second argument must be implementation object"));
             }
 
-            v8ExtendName = info[0]->ToString(isolate);
-            implementationObject = info[1]->ToObject(isolate);
+            v8ExtendName = info[0]->ToString(context).ToLocalChecked();
+            implementationObject = info[1]->ToObject(context).ToLocalChecked();
         } else {
             throw NativeScriptException(string("Invalid number of arguments"));
         }
@@ -921,7 +922,6 @@ void MetadataNode::InterfaceConstructorCallback(const v8::FunctionCallbackInfo<v
         //@@@ Refactor
         thiz->SetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::CallSuper), True(isolate));
 
-        auto context = isolate->GetCurrentContext();
         implementationObject->SetPrototype(context, thiz->GetPrototype());
         thiz->SetPrototype(context, implementationObject);
         V8SetPrivateValue(isolate, thiz, V8StringConstants::GetImplementationObject(isolate), implementationObject);
@@ -1108,7 +1108,7 @@ Local<Object> MetadataNode::GetImplementationObject(Isolate* isolate, const Loca
         return implementationObject;
     }
 
-    auto context = isolate->GetCurrentContext();
+    auto context = object->CreationContext();
     if (object->HasOwnProperty(context, V8StringConstants::GetIsPrototypeImplementationObject(isolate)).ToChecked()) {
         auto v8Prototype = V8StringConstants::GetPrototype(isolate);
         auto maybeHasOwnProperty = object->HasOwnProperty(context, v8Prototype);
@@ -1121,7 +1121,7 @@ Local<Object> MetadataNode::GetImplementationObject(Isolate* isolate, const Loca
     }
 
     Local<Value> hiddenValue;
-    V8GetPrivateValue(isolate, object,  String::NewFromUtf8(isolate, "t::ActivityImplementationObject"), hiddenValue);
+    V8GetPrivateValue(isolate, object,  String::NewFromUtf8(isolate, "t::ActivityImplementationObject").ToLocalChecked(), hiddenValue);
     auto obj = hiddenValue.As<Object>();
     if (!obj.IsEmpty()) {
         DEBUG_WRITE("GetImplementationObject returning ActivityImplementationObject property on object: %d", object->GetIdentityHash());
@@ -1255,7 +1255,8 @@ bool MetadataNode::ValidateExtendArguments(const FunctionCallbackInfo<Value>& in
             throw NativeScriptException(exceptionMessage);
         }
 
-        implementationObject = info[0]->ToObject(isolate);
+        auto context = isolate->GetCurrentContext();
+        implementationObject = info[0]->ToObject(context).ToLocalChecked();
     } else if (info.Length() == 2 || isTypeScriptExtend) {
         if (!info[0]->IsString()) {
             stringstream ss;
@@ -1274,7 +1275,8 @@ bool MetadataNode::ValidateExtendArguments(const FunctionCallbackInfo<Value>& in
         }
 
         DEBUG_WRITE("ExtendsCallMethodHandler: getting extend name");
-        extendName = info[0]->ToString(isolate);
+        auto context = isolate->GetCurrentContext();
+        extendName = info[0]->ToString(context).ToLocalChecked();
         bool isValidExtendName = IsValidExtendName(extendName);
         if (!isValidExtendName) {
             stringstream ss;
@@ -1283,7 +1285,7 @@ bool MetadataNode::ValidateExtendArguments(const FunctionCallbackInfo<Value>& in
 
             throw NativeScriptException(exceptionMessage);
         }
-        implementationObject = info[1]->ToObject(isolate);
+        implementationObject = info[1]->ToObject(context).ToLocalChecked();
     } else {
         stringstream ss;
         ss << "Invalid extend() call at location: " << extendLocation.c_str();
@@ -1355,7 +1357,7 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
             hasDot = strName.find('.') != string::npos;
         } else if (info.Length() == 3) {
             auto context = isolate->GetCurrentContext();
-            if (info[2]->IsBoolean() && info[2]->BooleanValue(context).ToChecked()) {
+            if (info[2]->IsBoolean() && info[2]->BooleanValue(isolate)) {
                 isTypeScriptExtend = true;
             }
         }
@@ -1406,7 +1408,7 @@ void MetadataNode::ExtendMethodCallback(const v8::FunctionCallbackInfo<v8::Value
         auto implementationObjectProperty = hiddenVal.As<String>();
         if (implementationObjectProperty.IsEmpty()) {
             //mark the implementationObject as such and set a pointer to it's class node inside it for reuse validation later
-            V8SetPrivateValue(isolate, implementationObject, implementationObjectPropertyName, String::NewFromUtf8(isolate, fullExtendedName.c_str()));
+            V8SetPrivateValue(isolate, implementationObject, implementationObjectPropertyName, String::NewFromUtf8(isolate, fullExtendedName.c_str()).ToLocalChecked());
         } else {
             string usedClassName = ArgConverter::ConvertToString(implementationObjectProperty);
             stringstream s;
@@ -1861,7 +1863,7 @@ void MetadataNode::RegisterSymbolHasInstanceCallback(Isolate* isolate, MetadataE
     auto hasInstanceFunc = hasInstanceTemplate->GetFunction(context).ToLocalChecked();
     PropertyDescriptor descriptor(hasInstanceFunc, false);
     auto hasInstanceSymbol = Symbol::GetHasInstance(isolate);
-    interface->ToObject(isolate)->DefineProperty(isolate->GetCurrentContext(), hasInstanceSymbol, descriptor);
+    interface->ToObject(context).ToLocalChecked()->DefineProperty(context, hasInstanceSymbol, descriptor);
 }
 
 void MetadataNode::SymbolHasInstanceCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -1879,9 +1881,10 @@ void MetadataNode::SymbolHasInstanceCallback(const v8::FunctionCallbackInfo<v8::
     auto clazz = reinterpret_cast<jclass>(info.Data().As<External>()->Value());
 
     auto isolate = info.GetIsolate();
+    auto context = isolate->GetCurrentContext();
     auto runtime = Runtime::GetRuntime(isolate);
     auto objectManager = runtime->GetObjectManager();
-    auto obj = objectManager->GetJavaObjectByJsObject(arg->ToObject(isolate));
+    auto obj = objectManager->GetJavaObjectByJsObject(arg->ToObject(context).ToLocalChecked());
 
     if (obj.IsNull()) {
         // Couldn't find a corresponding java instance counterpart. This could happen

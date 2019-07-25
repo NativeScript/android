@@ -207,11 +207,12 @@ void JsV8InspectorClient::sendToFrontEndCallback(const v8::FunctionCallbackInfo<
     try {
         auto isolate = args.GetIsolate();
         if ((args.Length() > 0) && args[0]->IsString()) {
-            std::string message = ArgConverter::ConvertToString(args[0]->ToString(isolate));
+            auto context = isolate->GetCurrentContext();
+            std::string message = ArgConverter::ConvertToString(args[0]->ToString(context).ToLocalChecked());
 
             std::string level = "log";
             if (args.Length() > 1  && args[1]->IsString()) {
-                level = ArgConverter::ConvertToString(args[1]->ToString(isolate));
+                level = ArgConverter::ConvertToString(args[1]->ToString(context).ToLocalChecked());
             }
 
             JEnv env;

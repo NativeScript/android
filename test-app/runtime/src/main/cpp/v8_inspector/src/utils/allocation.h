@@ -2,15 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef V8_ALLOCATION_H_
-#define V8_ALLOCATION_H_
+#ifndef V8_UTILS_ALLOCATION_H_
+#define V8_UTILS_ALLOCATION_H_
 
 #include "include/v8-platform.h"
 #include "src/base/address-region.h"
 #include "src/base/compiler-specific.h"
 #include "src/base/platform/platform.h"
-#include "src/globals.h"
-#include "src/v8.h"
+#include "src/common/globals.h"
+#include "src/init/v8.h"
 
 namespace v8 {
 namespace internal {
@@ -30,7 +30,7 @@ class Isolate;
 class V8_EXPORT_PRIVATE Malloced {
  public:
   void* operator new(size_t size) { return New(size); }
-  void  operator delete(void* p) { Delete(p); }
+  void operator delete(void* p) { Delete(p); }
 
   static void* New(size_t size);
   static void Delete(void* p);
@@ -60,13 +60,11 @@ void DeleteArray(T* array) {
   delete[] array;
 }
 
-
 // The normal strdup functions use malloc.  These versions of StrDup
 // and StrNDup uses new and calls the FatalProcessOutOfMemory handler
 // if allocation fails.
 V8_EXPORT_PRIVATE char* StrDup(const char* str);
 char* StrNDup(const char* str, int n);
-
 
 // Allocation policy for allocating in the C free store using malloc
 // and free. Used as the default policy for lists.
@@ -81,7 +79,7 @@ class FreeStoreAllocationPolicy {
 void* AllocWithRetry(size_t size);
 
 V8_EXPORT_PRIVATE void* AlignedAlloc(size_t size, size_t alignment);
-void AlignedFree(void *ptr);
+void AlignedFree(void* ptr);
 
 // Returns platfrom page allocator instance. Guaranteed to be a valid pointer.
 V8_EXPORT_PRIVATE v8::PageAllocator* GetPlatformPageAllocator();
@@ -186,11 +184,14 @@ class V8_EXPORT_PRIVATE VirtualMemory final {
   ~VirtualMemory();
 
   // Move constructor.
-  VirtualMemory(VirtualMemory&& other) V8_NOEXCEPT { TakeControl(&other); }
+  VirtualMemory(VirtualMemory&& other) V8_NOEXCEPT { *this = std::move(other); }
 
   // Move assignment operator.
   VirtualMemory& operator=(VirtualMemory&& other) V8_NOEXCEPT {
-    TakeControl(&other);
+    DCHECK(!IsReserved());
+    page_allocator_ = other.page_allocator_;
+    region_ = other.region_;
+    other.Reset();
     return *this;
   }
 
@@ -202,7 +203,7 @@ class V8_EXPORT_PRIVATE VirtualMemory final {
 
   v8::PageAllocator* page_allocator() { return page_allocator_; }
 
-  const base::AddressRegion& region() const { return region_; }
+  base::AddressRegion region() const { return region_; }
 
   // Returns the start address of the reserved memory.
   // If the memory was reserved with an alignment, this address is not
@@ -235,10 +236,6 @@ class V8_EXPORT_PRIVATE VirtualMemory final {
   // Frees all memory.
   void Free();
 
-  // Assign control of the reserved region to a different VirtualMemory object.
-  // The old object is no longer functional (IsReserved() returns false).
-  void TakeControl(VirtualMemory* from);
-
   bool InVM(Address address, size_t size) {
     return region_.contains(address, size);
   }
@@ -254,4 +251,4 @@ class V8_EXPORT_PRIVATE VirtualMemory final {
 }  // namespace internal
 }  // namespace v8
 
-#endif  // V8_ALLOCATION_H_
+#endif  // V8_UTILS_ALLOCATION_H_

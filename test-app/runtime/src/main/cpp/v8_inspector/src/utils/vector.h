@@ -2,34 +2,32 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef V8_VECTOR_H_
-#define V8_VECTOR_H_
+#ifndef V8_UTILS_VECTOR_H_
+#define V8_UTILS_VECTOR_H_
 
 #include <algorithm>
 #include <cstring>
 #include <iterator>
 
-#include "src/allocation.h"
-#include "src/checks.h"
-#include "src/globals.h"
+#include "src/common/checks.h"
+#include "src/common/globals.h"
+#include "src/utils/allocation.h"
 
 namespace v8 {
 namespace internal {
-
 
 template <typename T>
 class Vector {
  public:
   constexpr Vector() : start_(nullptr), length_(0) {}
 
-  Vector(T* data, size_t length) : start_(data), length_(length) {
+  constexpr Vector(T* data, size_t length) : start_(data), length_(length) {
+#ifdef V8_CAN_HAVE_DCHECK_IN_CONSTEXPR
     DCHECK(length == 0 || data != nullptr);
+#endif
   }
 
-  template <int N>
-  explicit constexpr Vector(T (&arr)[N]) : start_(arr), length_(N) {}
-
-  static Vector<T> New(int length) {
+  static Vector<T> New(size_t length) {
     return Vector<T>(NewArray<T>(length), length);
   }
 
@@ -38,12 +36,13 @@ class Vector {
   Vector<T> SubVector(size_t from, size_t to) const {
     DCHECK_LE(from, to);
     DCHECK_LE(to, length_);
-    return Vector<T>(start() + from, to - from);
+    return Vector<T>(begin() + from, to - from);
   }
 
-  // Returns the length of the vector.
+  // Returns the length of the vector. Only use this if you really need an
+  // integer return value. Use {size()} otherwise.
   int length() const {
-    DCHECK(length_ <= static_cast<size_t>(std::numeric_limits<int>::max()));
+    DCHECK_GE(std::numeric_limits<int>::max(), length_);
     return static_cast<int>(length_);
   }
 
@@ -52,9 +51,6 @@ class Vector {
 
   // Returns whether or not the vector is empty.
   constexpr bool empty() const { return length_ == 0; }
-
-  // Returns the pointer to the start of the data in the vector.
-  constexpr T* start() const { return start_; }
 
   // Access individual vector elements - checks bounds in debug mode.
   T& operator[](size_t index) const {
@@ -71,9 +67,11 @@ class Vector {
     return start_[length_ - 1];
   }
 
-  typedef T* iterator;
-  constexpr iterator begin() const { return start_; }
-  constexpr iterator end() const { return start_ + length_; }
+  // Returns a pointer to the start of the data in the vector.
+  constexpr T* begin() const { return start_; }
+
+  // Returns a pointer past the end of the data in the vector.
+  constexpr T* end() const { return start_ + length_; }
 
   // Returns a clone of this vector with a new backing store.
   Vector<T> Clone() const {
@@ -81,34 +79,6 @@ class Vector {
     for (size_t i = 0; i < length_; i++) result[i] = start_[i];
     return Vector<T>(result, length_);
   }
-
-  template <typename CompareFunction>
-  void Sort(CompareFunction cmp, size_t s, size_t l) {
-    std::sort(start() + s, start() + s + l, RawComparer<CompareFunction>(cmp));
-  }
-
-  template <typename CompareFunction>
-  void Sort(CompareFunction cmp) {
-    std::sort(start(), start() + length(), RawComparer<CompareFunction>(cmp));
-  }
-
-  void Sort() {
-    std::sort(start(), start() + length());
-  }
-
-  template <typename CompareFunction>
-  void StableSort(CompareFunction cmp, size_t s, size_t l) {
-    std::stable_sort(start() + s, start() + s + l,
-                     RawComparer<CompareFunction>(cmp));
-  }
-
-  template <typename CompareFunction>
-  void StableSort(CompareFunction cmp) {
-    std::stable_sort(start(), start() + length(),
-                     RawComparer<CompareFunction>(cmp));
-  }
-
-  void StableSort() { std::stable_sort(start(), start() + length()); }
 
   void Truncate(size_t length) {
     DCHECK(length <= length_);
@@ -142,7 +112,7 @@ class Vector {
 
   template <typename S>
   static constexpr Vector<T> cast(Vector<S> input) {
-    return Vector<T>(reinterpret_cast<T*>(input.start()),
+    return Vector<T>(reinterpret_cast<T*>(input.begin()),
                      input.length() * sizeof(S) / sizeof(T));
   }
 
@@ -160,28 +130,14 @@ class Vector {
  private:
   T* start_;
   size_t length_;
-
-  template <typename CookedComparer>
-  class RawComparer {
-   public:
-    explicit RawComparer(CookedComparer cmp) : cmp_(cmp) {}
-    bool operator()(const T& a, const T& b) {
-      return cmp_(&a, &b) < 0;
-    }
-
-   private:
-    CookedComparer cmp_;
-  };
 };
-
 
 template <typename T>
 class ScopedVector : public Vector<T> {
  public:
-  explicit ScopedVector(int length) : Vector<T>(NewArray<T>(length), length) { }
-  ~ScopedVector() {
-    DeleteArray(this->start());
-  }
+  explicit ScopedVector(size_t length)
+      : Vector<T>(NewArray<T>(length), length) {}
+  ~ScopedVector() { DeleteArray(this->begin()); }
 
  private:
   DISALLOW_IMPLICIT_CONSTRUCTORS(ScopedVector);
@@ -217,6 +173,15 @@ class OwnedVector {
   T* start() const {
     DCHECK_IMPLIES(length_ > 0, data_ != nullptr);
     return data_.get();
+  }
+
+  constexpr T* begin() const { return start(); }
+  constexpr T* end() const { return start() + size(); }
+
+  // Access individual vector elements - checks bounds in debug mode.
+  T& operator[](size_t index) const {
+    DCHECK_LT(index, length_);
+    return data_[index];
   }
 
   // Returns a {Vector<T>} view of the data in this vector.
@@ -260,41 +225,34 @@ class OwnedVector {
   size_t length_ = 0;
 };
 
-inline int StrLength(const char* string) {
-  size_t length = strlen(string);
-  DCHECK(length == static_cast<size_t>(static_cast<int>(length)));
-  return static_cast<int>(length);
-}
-
 template <size_t N>
 constexpr Vector<const uint8_t> StaticCharVector(const char (&array)[N]) {
   return Vector<const uint8_t>::cast(Vector<const char>(array, N - 1));
 }
 
 inline Vector<const char> CStrVector(const char* data) {
-  return Vector<const char>(data, StrLength(data));
+  return Vector<const char>(data, strlen(data));
 }
 
-inline Vector<const uint8_t> OneByteVector(const char* data, int length) {
+inline Vector<const uint8_t> OneByteVector(const char* data, size_t length) {
   return Vector<const uint8_t>(reinterpret_cast<const uint8_t*>(data), length);
 }
 
 inline Vector<const uint8_t> OneByteVector(const char* data) {
-  return OneByteVector(data, StrLength(data));
+  return OneByteVector(data, strlen(data));
 }
 
 inline Vector<char> MutableCStrVector(char* data) {
-  return Vector<char>(data, StrLength(data));
+  return Vector<char>(data, strlen(data));
 }
 
-inline Vector<char> MutableCStrVector(char* data, int max) {
-  int length = StrLength(data);
-  return Vector<char>(data, (length < max) ? length : max);
+inline Vector<char> MutableCStrVector(char* data, size_t max) {
+  return Vector<char>(data, strnlen(data, max));
 }
 
-template <typename T, int N>
+template <typename T, size_t N>
 inline constexpr Vector<T> ArrayVector(T (&arr)[N]) {
-  return Vector<T>(arr);
+  return Vector<T>{arr, N};
 }
 
 // Construct a Vector from a start pointer and a size.
@@ -310,36 +268,22 @@ inline constexpr auto VectorOf(Container&& c)
   return VectorOf(c.data(), c.size());
 }
 
-template <typename T, int kSize>
+template <typename T, size_t kSize>
 class EmbeddedVector : public Vector<T> {
  public:
   EmbeddedVector() : Vector<T>(buffer_, kSize) {}
 
-  explicit EmbeddedVector(T initial_value) : Vector<T>(buffer_, kSize) {
-    for (int i = 0; i < kSize; ++i) {
-      buffer_[i] = initial_value;
-    }
-  }
-
-  // When copying, make underlying Vector to reference our buffer.
-  EmbeddedVector(const EmbeddedVector& rhs) V8_NOEXCEPT : Vector<T>(rhs) {
-    MemCopy(buffer_, rhs.buffer_, sizeof(T) * kSize);
-    this->set_start(buffer_);
-  }
-
-  EmbeddedVector& operator=(const EmbeddedVector& rhs) V8_NOEXCEPT {
-    if (this == &rhs) return *this;
-    Vector<T>::operator=(rhs);
-    MemCopy(buffer_, rhs.buffer_, sizeof(T) * kSize);
-    this->set_start(buffer_);
-    return *this;
+  explicit EmbeddedVector(const T& initial_value) : Vector<T>(buffer_, kSize) {
+    std::fill_n(buffer_, kSize, initial_value);
   }
 
  private:
   T buffer_[kSize];
+
+  DISALLOW_COPY_AND_ASSIGN(EmbeddedVector);
 };
 
 }  // namespace internal
 }  // namespace v8
 
-#endif  // V8_VECTOR_H_
+#endif  // V8_UTILS_VECTOR_H_

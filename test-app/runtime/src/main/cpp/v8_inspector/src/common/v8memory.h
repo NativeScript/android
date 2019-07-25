@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef V8_V8MEMORY_H_
-#define V8_V8MEMORY_H_
+#ifndef V8_COMMON_V8MEMORY_H_
+#define V8_COMMON_V8MEMORY_H_
 
-#include "src/globals.h"
+#include "src/base/macros.h"
+#include "src/common/globals.h"
 
 namespace v8 {
 namespace internal {
@@ -15,13 +16,12 @@ namespace internal {
 // Note that this class currently relies on undefined behaviour. There is a
 // proposal (http://wg21.link/p0593r2) to make it defined behaviour though.
 template <class T>
-T& Memory(Address addr) {
-  // {addr} must be aligned.
-  DCHECK_EQ(0, addr & (alignof(T) - 1));
+inline T& Memory(Address addr) {
+  DCHECK(IsAligned(addr, alignof(T)));
   return *reinterpret_cast<T*>(addr);
 }
 template <class T>
-T& Memory(byte* addr) {
+inline T& Memory(byte* addr) {
   return Memory<T>(reinterpret_cast<Address>(addr));
 }
 
@@ -37,18 +37,6 @@ template <typename V>
 static inline void WriteUnalignedValue(Address p, V value) {
   ASSERT_TRIVIALLY_COPYABLE(V);
   memcpy(reinterpret_cast<void*>(p), &value, sizeof(V));
-}
-
-static inline double ReadFloatValue(Address p) {
-  return ReadUnalignedValue<float>(p);
-}
-
-static inline double ReadDoubleValue(Address p) {
-  return ReadUnalignedValue<double>(p);
-}
-
-static inline void WriteDoubleValue(Address p, double value) {
-  WriteUnalignedValue(p, value);
 }
 
 static inline uint16_t ReadUnalignedUInt16(Address p) {
@@ -108,4 +96,4 @@ static inline void WriteLittleEndianValue(V* p, V value) {
 }  // namespace internal
 }  // namespace v8
 
-#endif  // V8_V8MEMORY_H_
+#endif  // V8_COMMON_V8MEMORY_H_

@@ -449,9 +449,8 @@ void ObjectManager::ReleaseRegularObjects() {
 
         bool isReachableFromImplementationObject = false;
 
-        if (!gcNum.IsEmpty()) {
-            auto context = m_isolate->GetCurrentContext();
-            int objGcNum = gcNum->Int32Value(context).ToChecked();
+        if (!gcNum.IsEmpty() && gcNum->IsNumber()) {
+            double objGcNum = gcNum.As<Number>()->Value();
 
             // done so we can release only java objects from this GC stack and pass all objects that will be released in parent GC stacks
             isReachableFromImplementationObject = objGcNum >= numberOfGC;
@@ -490,7 +489,7 @@ void ObjectManager::MarkReachableObjects(Isolate *isolate, const Local<Object> &
 
     s.push(obj);
 
-    auto propName = String::NewFromUtf8(isolate, "t::gcNum");
+    auto propName = String::NewFromUtf8(isolate, "t::gcNum").ToLocalChecked();
 
     assert(!m_markedForGC.empty());
     auto &topGCInfo = m_markedForGC.top();
@@ -560,15 +559,14 @@ void ObjectManager::MarkReachableObjects(Isolate *isolate, const Local<Object> &
             s.push(proto);
         }
 
-        auto context = isolate->GetCurrentContext();
-        bool success = false;
-        auto propNames = NativeScriptExtension::GetPropertyKeys(isolate, context, o, success);
-        assert(success);
-        int len = propNames->Length();
+        auto context = o->CreationContext();
+        auto propNames = NativeScriptExtension::GetPropertyKeys(isolate, o);
+        uint64_t len = propNames.size();
+
         for (int i = 0; i < len; i++) {
-            auto propName = propNames->Get(i);
-            if (propName->IsString()) {
-                auto name = propName.As<String>();
+            auto propertyName = propNames[i];
+            if (!propertyName.IsEmpty() && propertyName->IsString()) {
+                auto name = propertyName.As<String>();
 
                 bool isPropDescriptor = o->HasRealNamedCallbackProperty(context, name).ToChecked();
                 if (isPropDescriptor) {
@@ -580,8 +578,8 @@ void ObjectManager::MarkReachableObjects(Isolate *isolate, const Local<Object> &
                         int getterClosureObjectLength = 0;
                         auto getterClosureObjects = NativeScriptExtension::GetClosureObjects(
                                 isolate, getter.As<Function>(), &getterClosureObjectLength);
-                        for (int i = 0; i < getterClosureObjectLength; i++) {
-                            auto &curV = *(getterClosureObjects + i);
+                        for (int j = 0; j < getterClosureObjectLength; j++) {
+                            auto &curV = *(getterClosureObjects + j);
                             if (!curV.IsEmpty() && curV->IsObject()) {
                                 s.push(curV);
                             }
@@ -593,8 +591,8 @@ void ObjectManager::MarkReachableObjects(Isolate *isolate, const Local<Object> &
                         int setterClosureObjectLength = 0;
                         auto setterClosureObjects = NativeScriptExtension::GetClosureObjects(
                                 isolate, setter.As<Function>(), &setterClosureObjectLength);
-                        for (int i = 0; i < setterClosureObjectLength; i++) {
-                            auto &curV = *(setterClosureObjects + i);
+                        for (int j = 0; j < setterClosureObjectLength; j++) {
+                            auto &curV = *(setterClosureObjects + j);
                             if (!curV.IsEmpty() && curV->IsObject()) {
                                 s.push(curV);
                             }
@@ -603,7 +601,7 @@ void ObjectManager::MarkReachableObjects(Isolate *isolate, const Local<Object> &
                         NativeScriptExtension::ReleaseClosureObjects(setterClosureObjects);
                     }
                 } else {
-                    auto prop = o->Get(propName);
+                    auto prop = o->Get(propertyName);
 
                     if (!prop.IsEmpty() && prop->IsObject()) {
                         s.push(prop);
