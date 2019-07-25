@@ -1,3 +1,14 @@
+6.0.1
+==
+
+## Bug Fixes
+
+- [Arabic and Kurdish characters show as gibberish in console.log() (#1302)](https://github.com/NativeScript/android-runtime/issues/1302)
+- [IntentService extending fails at runtime when service is started (#1426)](https://github.com/NativeScript/android-runtime/issues/1426)
+- [SBG may fail when parsing big JS files (#1430)](https://github.com/NativeScript/android-runtime/issues/1430)
+
+
+
 6.0.0
 ==
 
