@@ -1,4 +1,5 @@
 #include "JType.h"
+#include "NativeScriptAssert.h"
 
 namespace tns {
 Type JType::getClassType(int retType) {
@@ -48,42 +49,42 @@ jobject JType::NewDouble(JEnv env, jdouble value) {
 
 jbyte JType::ByteValue(JEnv env, jobject value) {
     EnsureInstance(env, &Byte, Type::Byte);
-    return env.GetByteField(value, Byte->valueField);
+    return env.CallByteMethod(value, Byte->valueMethodId);
 }
 
 jchar JType::CharValue(JEnv env, jobject value) {
     EnsureInstance(env, &Char, Type::Char);
-    return env.GetCharField(value, Char->valueField);
+    return env.CallCharMethod(value, Char->valueMethodId);
 }
 
 jboolean JType::BooleanValue(JEnv env, jobject value) {
     EnsureInstance(env, &Boolean, Type::Boolean);
-    return env.GetBooleanField(value, Boolean->valueField);
+    return env.CallBooleanMethod(value, Boolean->valueMethodId);
 }
 
 jshort JType::ShortValue(JEnv env, jobject value) {
     EnsureInstance(env, &Short, Type::Short);
-    return env.GetShortField(value, Short->valueField);
+    return env.CallShortMethod(value, Short->valueMethodId);
 }
 
 jint JType::IntValue(JEnv env, jobject value) {
     EnsureInstance(env, &Int, Type::Int);
-    return env.GetIntField(value, Int->valueField);
+    return env.CallIntMethod(value, Int->valueMethodId);
 }
 
 jlong JType::LongValue(JEnv env, jobject value) {
     EnsureInstance(env, &Long, Type::Long);
-    return env.GetLongField(value, Long->valueField);
+    return env.CallLongMethod(value, Long->valueMethodId);
 }
 
 jfloat JType::FloatValue(JEnv env, jobject value) {
     EnsureInstance(env, &Float, Type::Float);
-    return env.GetFloatField(value, Float->valueField);
+    return env.CallFloatMethod(value, Float->valueMethodId);
 }
 
 jdouble JType::DoubleValue(JEnv env, jobject value) {
     EnsureInstance(env, &Double, Type::Double);
-    return env.GetDoubleField(value, Double->valueField);
+    return env.CallDoubleMethod(value, Double->valueMethodId);
 }
 
 void JType::EnsureInstance(JEnv env, JType** instance, Type type) {
@@ -92,51 +93,51 @@ void JType::EnsureInstance(JEnv env, JType** instance, Type type) {
     }
 
     *instance = new JType();
+
     (*instance)->Init(env, type);
 }
 
 void JType::Init(JEnv env, Type type) {
-    // TODO: Provide a fallback mechanism to prevent possible field name changes
     switch (type) {
     case Type::Byte:
         this->clazz = env.FindClass("java/lang/Byte");
         this->ctor = env.GetMethodID(this->clazz, "<init>", "(B)V");
-        this->valueField = env.GetFieldID(this->clazz, "value", "B");
+        this->valueMethodId = env.GetMethodID(this->clazz, "byteValue", "()B");
         break;
     case Type::Char:
         this->clazz = env.FindClass("java/lang/Character");
         this->ctor = env.GetMethodID(this->clazz, "<init>", "(C)V");
-        this->valueField = env.GetFieldID(this->clazz, "value", "C");
+        this->valueMethodId = env.GetMethodID(this->clazz, "charValue", "()C");
         break;
     case Type::Boolean:
         this->clazz = env.FindClass("java/lang/Boolean");
         this->ctor = env.GetMethodID(this->clazz, "<init>", "(Z)V");
-        this->valueField = env.GetFieldID(this->clazz, "value", "Z");
+        this->valueMethodId = env.GetMethodID(this->clazz, "booleanValue", "()Z");
         break;
     case Type::Short:
         this->clazz = env.FindClass("java/lang/Short");
         this->ctor = env.GetMethodID(this->clazz, "<init>", "(S)V");
-        this->valueField = env.GetFieldID(this->clazz, "value", "S");
+        this->valueMethodId = env.GetMethodID(this->clazz, "shortValue", "()S");
         break;
     case Type::Int:
         this->clazz = env.FindClass("java/lang/Integer");
         this->ctor = env.GetMethodID(this->clazz, "<init>", "(I)V");
-        this->valueField = env.GetFieldID(this->clazz, "value", "I");
+        this->valueMethodId = env.GetMethodID(this->clazz, "intValue", "()I");
         break;
     case Type::Long:
         this->clazz = env.FindClass("java/lang/Long");
         this->ctor = env.GetMethodID(this->clazz, "<init>", "(J)V");
-        this->valueField = env.GetFieldID(this->clazz, "value", "J");
+        this->valueMethodId = env.GetMethodID(this->clazz, "longValue", "()J");
         break;
     case Type::Float:
         this->clazz = env.FindClass("java/lang/Float");
         this->ctor = env.GetMethodID(this->clazz, "<init>", "(F)V");
-        this->valueField = env.GetFieldID(this->clazz, "value", "F");
+        this->valueMethodId = env.GetMethodID(this->clazz, "floatValue", "()F");
         break;
     case Type::Double:
         this->clazz = env.FindClass("java/lang/Double");
         this->ctor = env.GetMethodID(this->clazz, "<init>", "(D)V");
-        this->valueField = env.GetFieldID(this->clazz, "value", "D");
+        this->valueMethodId = env.GetMethodID(this->clazz, "doubleValue", "()D");
         break;
     default:
         break;
