@@ -50,7 +50,7 @@ class JType {
 
         jclass clazz;
         jmethodID ctor;
-        jfieldID valueField;
+        jmethodID valueMethodId;
 
         static JType* Byte;
         static JType* Char;
