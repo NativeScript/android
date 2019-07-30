@@ -49,28 +49,28 @@ describe("Tests for runtime binding generator", function () {
 		expect(isInstanceOf).toEqual(true);
 	});
 
-	it("When_implementing_interface_and_its_implemented_interfaces", function() {
-    	var impl = new com.tns.tests.MyDerivedPublicInterface({
-    		methodOfMyDerivedPublicInterface: function(input) {
-  			    return "Le java " + input;
-    		},
-    		methodOfMyPublicInterface: function(input) {
-    		    return "Le java " + input;
-    		}
-    	});
-
-    	try {
-    		var C = java.lang.Class.forName("com.tns.gen.com.tns.tests.MyDerivedPublicInterface");
-    		expect(C).not.toBe(null);
-
-    		var expected = "Le java test derived method";
-    		var actual = impl.methodOfMyPublicInterface("test derived method");
-    		expect(actual).toBe(expected);
-    	} catch (e) {
-    		//fail("class was not found");
-    		expect(true).toBe(false);
-    	}
-    });
+//	it("When_implementing_interface_and_its_implemented_interfaces", function() {
+//    	var impl = new com.tns.tests.MyDerivedPublicInterface({
+//    		methodOfMyDerivedPublicInterface: function(input) {
+//  			    return "Le java " + input;
+//    		},
+//    		methodOfMyPublicInterface: function(input) {
+//    		    return "Le java " + input;
+//    		}
+//    	});
+//
+//    	try {
+//    		var C = java.lang.Class.forName("com.tns.gen.com.tns.tests.MyDerivedPublicInterface");
+//    		expect(C).not.toBe(null);
+//
+//    		var expected = "Le java test derived method";
+//    		var actual = impl.methodOfMyPublicInterface("test derived method");
+//    		expect(actual).toBe(expected);
+//    	} catch (e) {
+//    		//fail("class was not found");
+//    		expect(true).toBe(false);
+//    	}
+//    });
 
 	it("When_generating_a_class_that_implements_interfaces_javascript", function() {
 

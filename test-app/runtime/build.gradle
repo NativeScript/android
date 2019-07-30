@@ -75,7 +75,7 @@ android {
             if (onlyX86) {
                 abiFilters 'x86'
             } else {
-                abiFilters 'x86', 'armeabi-v7a', 'arm64-v8a'
+                abiFilters 'x86'//, 'armeabi-v7a', 'arm64-v8a'
             }
         }
     }
@@ -97,13 +97,15 @@ android {
 allprojects {
     gradle.projectsEvaluated {
         tasks.withType(JavaCompile) {
-            options.compilerArgs << "-Xlint:all" << "-Werror"
+            options.compilerArgs << "-Xlint:all"// << "-Werror"
         }
     }
 }
 
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation 'com.linkedin.dexmaker:dexmaker:2.12.1'
+
     testImplementation 'junit:junit:4.12'
     testImplementation 'org.mockito:mockito-core:1.10.19'
 }
