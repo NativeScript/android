@@ -2,6 +2,7 @@ package com.tns.system.classes.loading.impl;
 
 import com.tns.system.classes.caching.ClassCache;
 import com.tns.system.classes.loading.ClassStorageService;
+import com.tns.system.classes.loading.LookedUpClassNotFound;
 import com.tns.system.classloaders.ClassLoadersCollection;
 
 import org.junit.Before;
@@ -95,8 +96,7 @@ public class ClassStorageServiceImplTest {
         try {
             classStorageService.retrieveClass(TEST_CLASS_LOOKUP_NAME);
             fail();
-        } catch (RuntimeException e) {
-            assertEquals("Unexpected exception type", RuntimeException.class.getName(), e.getClass().getName());
+        } catch (LookedUpClassNotFound e) {
             assertEquals("Unexpected exception message", "Class \"" + TEST_CLASS_LOOKUP_NAME + "\" not found.", e.getMessage());
         }
     }

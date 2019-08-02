@@ -49,6 +49,21 @@ describe("Tests for runtime binding generator", function () {
 		expect(isInstanceOf).toEqual(true);
 	});
 
+    it("When_implementing_interface_and_its_implemented_interfaces", function() {
+	    var impl = new com.tns.tests.MyDerivedPublicInterface({
+        		methodOfMyDerivedPublicInterface: function(input) {
+      			    return "Le java " + input;
+        		},
+        		methodOfMyPublicInterface: function(input) {
+        		    return "Le java " + input;
+        		}
+        	});
+
+         	var expected = "Le java test derived method";
+        	var actual = impl.methodOfMyPublicInterface("test derived method");
+        	expect(actual).toBe(expected);
+        });
+
 	it("When_generating_a_class_that_implements_interfaces_javascript", function() {
 
 	    __log("TEST: When_generating_a_class_that_implements_interfaces_javascript");

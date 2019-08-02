@@ -157,12 +157,11 @@ public class DexFactory {
         }
 
         Class<?> result;
+        DexClassLoader dexClassLoader = new DexClassLoader(jarFilePath, this.odexDir.getAbsolutePath(), null, classLoader);
 
         if (isInterface) {
-            DexClassLoader dexClassLoader = new DexClassLoader(jarFilePath, this.odexDir.getAbsolutePath(), null, classLoader);
             result = dexClassLoader.loadClass(fullClassName);
         } else {
-            DexClassLoader dexClassLoader = new DexClassLoader(jarFilePath, this.odexDir.getAbsolutePath(), null, classLoader);
             result = dexClassLoader.loadClass(desiredDexClassName);
         }
 

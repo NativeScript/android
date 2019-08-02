@@ -2,6 +2,7 @@ package com.tns.system.classes.loading.impl;
 
 import com.tns.system.classes.caching.ClassCache;
 import com.tns.system.classes.loading.ClassStorageService;
+import com.tns.system.classes.loading.LookedUpClassNotFound;
 import com.tns.system.classloaders.ClassLoadersCollection;
 
 public class ClassStorageServiceImpl implements ClassStorageService {
@@ -42,7 +43,7 @@ public class ClassStorageServiceImpl implements ClassStorageService {
             }
         }
 
-        throw new RuntimeException("Class \"" + lookupKey + "\" not found.");
+        throw new LookedUpClassNotFound("Class \"" + lookupKey + "\" not found.");
     }
 
     @Override

@@ -18,13 +18,16 @@
 *            -PandroidXMaterial=[androidx_material_version]
 */
 
+
+import groovy.io.FileType
 import groovy.json.JsonSlurper
+
+import javax.inject.Inject
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
-import groovy.io.FileType
 import java.security.MessageDigest
-import javax.inject.Inject
+
 apply plugin: "com.android.application"
 
 def onlyX86 = project.hasProperty("onlyX86")
@@ -545,7 +548,7 @@ afterEvaluate { project ->
                 // if there's a project dependency search for its result jar file in the build/intermediates/runtime_library_classes folder
                 // this is the output folder in gradle 5.1.1, but it can be changed in the future versions of gradle
                 def jarDir = new File("${it.getBuildDir()}/intermediates/runtime_library_classes/${buildType.toLowerCase()}")
-                if(jarDir.exists()) {
+                if (jarDir.exists()) {
                     jarDir.eachFileRecurse(FileType.FILES) { file ->
                         if (file.path.endsWith(".jar")) {
                             processJar(file, jars)
@@ -574,7 +577,7 @@ def processJar(File jar, jars) {
         // directory is a randomly generated string)
         cleanupAllJars.inputs.files jar
 
-        task "${taskName}" (type: WorkerTask) {
+        task "${taskName}"(type: WorkerTask) {
             dependsOn cleanupAllJars
             extractAllJars.dependsOn it
 

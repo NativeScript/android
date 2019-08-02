@@ -24,23 +24,10 @@ public class ClassLoadersCollectionImplTest {
         }
     }
 
-    @Test(expected = UnsupportedOperationException.class)
+    @Test
     public void testGetClassLoadersCollectionIsImmutable() {
         Collection<ClassLoader> classLoaders = classLoadersCollection.getClassLoadersCollection();
 
-        classLoaders.add(null);
-        fail();
-        classLoaders.addAll(null);
-        fail();
-        classLoaders.clear();
-        fail();
-        classLoaders.remove(null);
-        fail();
-        classLoaders.removeAll(null);
-        fail();
-        classLoaders.retainAll(null);
-        fail();
-        classLoaders.iterator().remove();
-        fail();
+        assertEquals("Unexpected collection type", "UnmodifiableCollection", classLoaders.getClass().getSimpleName());
     }
 }
