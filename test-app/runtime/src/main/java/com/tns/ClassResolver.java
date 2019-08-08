@@ -1,15 +1,17 @@
 package com.tns;
 
+import com.tns.system.classes.loading.ClassStorageService;
+
 import java.io.IOException;
 
 class ClassResolver {
-    private final Runtime runtime;
+    private final ClassStorageService classStorageService;
 
-    public ClassResolver(Runtime runtime) {
-        this.runtime = runtime;
+    ClassResolver(ClassStorageService classStorageService) {
+        this.classStorageService = classStorageService;
     }
 
-    public Class<?> resolveClass(String baseClassName, String fullClassName, DexFactory dexFactory, String[] methodOverrides, String[] implementedInterfaces, boolean isInterface) throws ClassNotFoundException, IOException {
+    Class<?> resolveClass(String baseClassName, String fullClassName, DexFactory dexFactory, String[] methodOverrides, String[] implementedInterfaces, boolean isInterface) throws ClassNotFoundException, IOException {
         String canonicalClassName = fullClassName.replace('/', '.');
         String canonicalBaseClassName = baseClassName.replace('/', '.');
         String name = "";
@@ -24,7 +26,7 @@ class ClassResolver {
         }
 
         if (clazz == null) {
-            clazz = Runtime.getClassForName(className);
+            clazz = classStorageService.retrieveClass(className);
         }
 
         return clazz;
