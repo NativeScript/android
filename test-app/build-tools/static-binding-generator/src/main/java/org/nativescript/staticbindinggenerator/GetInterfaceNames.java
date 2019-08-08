@@ -71,7 +71,7 @@ public class GetInterfaceNames {
                 }
             }
         } catch (IOException ioe) {
-            throw new RuntimeException("Error while reading JAR entry!", ioe);
+            //throw new RuntimeException("Error while reading JAR entry!", ioe);
         } finally {
             if (jis != null) {
                 try {

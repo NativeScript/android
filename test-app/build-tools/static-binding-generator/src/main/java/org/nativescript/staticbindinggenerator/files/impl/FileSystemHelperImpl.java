@@ -65,7 +65,7 @@ public class FileSystemHelperImpl implements FileSystemHelper {
             }
         } catch (IOException ioe) {
             if (shouldThrowOnError) {
-                throw new RuntimeException("Error while reading JAR entry!", ioe);
+                //throw new RuntimeException("Error while reading JAR entry!", ioe);
             } else {
                 ioe.printStackTrace();
             }
@@ -116,12 +116,13 @@ public class FileSystemHelperImpl implements FileSystemHelper {
         Map<String, JavaClass> classes = new HashMap<String, JavaClass>();
         Set<String> nonPublicNestedClasses = new HashSet<>();
 
-        ArrayDeque<File> d = new ArrayDeque<File>();
+        ArrayDeque<File> d = new ArrayDeque<>();
         d.add(new File(directoryPath));
 
         while (!d.isEmpty()) {
             File cur = d.pollFirst();
             File[] files = cur.listFiles();
+            System.out.println("!!!! VM: dir is: " + cur.getAbsolutePath());
             for (File f : files) {
                 if (f.isFile() && f.getName().endsWith(CLASS_EXT)) {
                     ClassParser cp = new ClassParser(f.getAbsolutePath());

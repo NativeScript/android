@@ -256,12 +256,25 @@ public class Generator {
         Map<String, JavaClass> map = new HashMap<String, JavaClass>();
         Set<String> nonPublicNestedClasses = new HashSet<>();
         if (libs != null) {
+
             for (DataRow dr : libs) {
                 String lib = dr.getRow();
                 File f = new File(lib);
-                ClassesCollection classes = f.isFile() ? fileSystemHelper.readClassesFromJar(lib) : fileSystemHelper.readClassesFromDirectory(lib);
-                map.putAll(classes.getRegularClasses());
-                nonPublicNestedClasses.addAll(classes.getNonPublicNestedClasses());
+                System.out.println("!!!!! VM: lib: " + lib);
+                System.out.println("!!!! VM isfile: " + f.isFile());
+            }
+
+
+
+            for (DataRow dr : libs) {
+                String lib = dr.getRow();
+                File f = new File(lib);
+                if(f.exists()){
+                    ClassesCollection classes = f.isFile() ? fileSystemHelper.readClassesFromJar(lib) : fileSystemHelper.readClassesFromDirectory(lib);
+                    map.putAll(classes.getRegularClasses());
+                    nonPublicNestedClasses.addAll(classes.getNonPublicNestedClasses());
+                }
+
             }
         }
         return new ClassesCollection(map, nonPublicNestedClasses);

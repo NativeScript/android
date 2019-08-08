@@ -19,12 +19,7 @@
 */
 
 import groovy.json.JsonSlurper
-import java.nio.file.Files
-import java.nio.file.Paths
-import java.nio.file.StandardCopyOption
-import groovy.io.FileType
-import java.security.MessageDigest
-import javax.inject.Inject
+
 apply plugin: "com.android.application"
 
 def onlyX86 = project.hasProperty("onlyX86")
@@ -83,9 +78,6 @@ version of the {N} CLI install a previous version of the runtime package - 'tns 
 """)
         }
 
-        project.ext.extractedDependenciesDir = "${project.buildDir}/exploded-dependencies"
-        project.ext.cleanupAllJarsTimestamp = "${project.buildDir}/cleanupAllJars.timestamp"
-        project.ext.extractAllJarsTimestamp = "${project.buildDir}/extractAllJars.timestamp"
         project.ext.nativescriptDependencies = new JsonSlurper().parseText(dependenciesJson.text)
         project.ext.PLATFORMS_ANDROID = "platforms/android"
         project.ext.USER_PROJECT_ROOT = "$rootDir/../.."
@@ -420,10 +412,13 @@ if (failOnCompilationWarningsEnabled()) {
 
 tasks.whenTaskAdded({ org.gradle.api.DefaultTask currentTask ->
     if (currentTask =~ /generate.+BuildConfig/) {
-        currentTask.finalizedBy(extractAllJars)
-        extractAllJars.finalizedBy(collectAllJars)
+        currentTask.finalizedBy(collectAllJars)
     }
     if (currentTask =~ /compile.+JavaWithJavac/) {
+
+        buildMetadata.dependsOn collectAllJars
+        runSbg.dependsOn collectAllJars
+
         currentTask.dependsOn(runSbg)
         currentTask.finalizedBy(ensureMetadataOutDir)
         ensureMetadataOutDir.finalizedBy(buildMetadata)
@@ -441,14 +436,12 @@ tasks.whenTaskAdded({ org.gradle.api.DefaultTask currentTask ->
 ////////////////////////////////////////////////////////////////////////////////////
 
 task runSbg(type: JavaExec) {
-    dependsOn "collectAllJars"
     if (!findProject(':static-binding-generator').is(null)) {
         dependsOn ':static-binding-generator:jar'
     }
 
     outputs.dir("$OUTPUT_JAVA_DIR/com/tns/gen")
     inputs.dir(INPUT_JS_DIR)
-    inputs.dir(extractedDependenciesDir)
 
     workingDir "$BUILD_TOOLS_PATH"
     main "-jar"
@@ -478,56 +471,12 @@ def failOnCompilationWarningsEnabled() {
     return project.hasProperty("failOnCompilationWarnings") && (failOnCompilationWarnings || failOnCompilationWarnings.toBoolean())
 }
 
-def explodeAar(File compileDependency, File outputDir) {
-    logger.info("explodeAar: Extracting ${compileDependency.path} -> ${outputDir.path}")
-
-    if (compileDependency.name.endsWith(".aar")) {
-        java.util.jar.JarFile jar = new java.util.jar.JarFile(compileDependency)
-        Enumeration enumEntries = jar.entries()
-        while (enumEntries.hasMoreElements()) {
-            java.util.jar.JarEntry file = (java.util.jar.JarEntry) enumEntries.nextElement()
-            if (file.name.endsWith(".jar")) {
-                def targetFile = new File(outputDir, file.name)
-                InputStream inputStream = jar.getInputStream(file)
-                new File(targetFile.parent).mkdirs()
-                Files.copy(inputStream, targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
-            }
-            if (file.isDirectory()) {
-                continue
-            }
-        }
-        jar.close()
-    } else if (compileDependency.name.endsWith(".jar")) {
-        copy {
-            from compileDependency.absolutePath
-            into outputDir
-        }
-    }
-}
-
-def md5(String string) {
-    MessageDigest digest = MessageDigest.getInstance("MD5")
-    digest.update(string.bytes)
-    return new BigInteger(1, digest.digest()).toString(16).padLeft(32, '0')
-}
-
-class WorkerTask extends DefaultTask {
-    @Inject
-    WorkerExecutor getWorkerExecutor() {
-        throw new UnsupportedOperationException()
-    }
-}
-
-class EmptyRunnable implements Runnable {
-    void run() {
-    }
-}
-
 // Discover all jars and dynamically create tasks for the extraction of each of them
 project.ext.allJars = []
+project.ext.dependentProjectsJarDirs = []
+
 afterEvaluate { project ->
     def buildType = project.selectedBuildType == "release" ? "Release" : "Debug"
-    def jars = []
     def artifactType = Attribute.of('artifactType', String)
     configurations.all { config ->
         if (config.name.toLowerCase().endsWith("${buildType}RuntimeClasspath".toLowerCase())) {
@@ -536,7 +485,9 @@ afterEvaluate { project ->
                     it.attribute(artifactType, 'jar')
                 }
             }.artifacts.each {
-                processJar(it.file, jars)
+                project.ext.allJars.add(it.file)
+                System.out.println("!!!!! VM: " + it.file.getAbsolutePath())
+                collectAllJars.inputs.files it.file
             }
 
             def projectDependencies = config.getAllDependencies().withType(ProjectDependency)
@@ -545,96 +496,20 @@ afterEvaluate { project ->
                 // if there's a project dependency search for its result jar file in the build/intermediates/runtime_library_classes folder
                 // this is the output folder in gradle 5.1.1, but it can be changed in the future versions of gradle
                 def jarDir = new File("${it.getBuildDir()}/intermediates/runtime_library_classes/${buildType.toLowerCase()}")
-                if(jarDir.exists()) {
-                    jarDir.eachFileRecurse(FileType.FILES) { file ->
-                        if (file.path.endsWith(".jar")) {
-                            processJar(file, jars)
-                        }
-                    }
-                } else {
-                    println "WARNING: Folder ${jarDir.path} does not exists, the dependent project's classes won't be included in the metadata"
+                //jarDir.mkdirs()
+
+                System.out.println("!!!!! VM: " + jarDir.getAbsolutePath())
+                project.ext.dependentProjectsJarDirs.add(jarDir)
+
+                if (jarDir.exists()) {
+                    collectAllJars.inputs.dir(jarDir)
                 }
             }
         }
-    }
-}
-
-def processJar(File jar, jars) {
-    if (!jars.contains(jar)) {
-        jars.add(jar)
-        def destDir = md5(jar.path)
-        def outputDir = new File(Paths.get(extractedDependenciesDir, destDir).normalize().toString())
-
-        def taskName = "extract_${jar.name}_to_${destDir}"
-        logger.debug("Creating dynamic task ${taskName}")
-
-        // Add discovered jars as dependencies of cleanupAllJars.
-        // This is cruicial for cloud builds because they are different
-        // on each incremental build (as each time the gradle user home
-        // directory is a randomly generated string)
-        cleanupAllJars.inputs.files jar
-
-        task "${taskName}" (type: WorkerTask) {
-            dependsOn cleanupAllJars
-            extractAllJars.dependsOn it
-
-            // This dependency seems redundant but probably due to some Gradle issue with workers,
-            // without it `runSbg` sporadically starts before all extraction tasks have finished and
-            // fails due to missing JARs
-            runSbg.dependsOn it
-
-            inputs.files jar
-            outputs.dir outputDir
-
-            doLast {
-                // Runing in parallel no longer seems to bring any benefit.
-                // It mattered only when we were extracting JARs from AARs.
-                // To try it simply remove the following comments.
-                // workerExecutor.submit(EmptyRunnable.class) {
-                explodeAar(jar, outputDir)
-                // }
-            }
-        }
-        project.ext.allJars.add([file: jar, outputDir: outputDir])
-    }
-}
-
-task cleanupAllJars {
-    // We depend on the list of libs directories that might contain aar or jar files
-    // and on the list of all discovered jars
-    inputs.files(pluginDependencies)
-
-    outputs.files cleanupAllJarsTimestamp
-
-    doLast {
-        def allDests = project.ext.allJars*.outputDir*.name
-        def dir = new File(extractedDependenciesDir)
-        if (dir.exists()) {
-            dir.eachDir {
-                // An old directory which is no longer a dependency (e.g. orphaned by a deleted plugin)
-                if (!allDests.contains(it.name)) {
-                    logger.info("Task cleanupAllJars: Deleting orphaned ${it.path}")
-                    org.apache.commons.io.FileUtils.deleteDirectory(it)
-                }
-            }
-        }
-        new File(cleanupAllJarsTimestamp).write ""
-    }
-}
-
-
-// Placeholder task which depends on all dynamically generated extraction tasks
-task extractAllJars {
-    dependsOn cleanupAllJars
-    outputs.files extractAllJarsTimestamp
-
-    doLast {
-        new File(cleanupAllJarsTimestamp).write ""
     }
 }
 
 task collectAllJars {
-    dependsOn extractAllJars
     description "gathers all paths to jar dependencies before building metadata with them"
 
     def sdkPath = android.sdkDirectory.getAbsolutePath()
@@ -642,21 +517,30 @@ task collectAllJars {
 
     doFirst {
         def allJarPaths = new LinkedList<String>()
+
         allJarPaths.add(androidJar)
         allJarPaths.addAll(pluginsJarLibraries)
-        def ft = fileTree(dir: extractedDependenciesDir, include: "**/*.jar")
-        ft.each { currentJarFile ->
-            allJarPaths.add(currentJarFile.getAbsolutePath())
+
+        for (File dir : project.ext.dependentProjectsJarDirs) {
+            def ft = fileTree(dir: dir, include: "**/*.jar")
+            ft.each { currentJarFile ->
+                allJarPaths.add(currentJarFile.getAbsolutePath())
+            }
+        }
+
+        for (File jar : project.ext.allJars) {
+            allJarPaths.add(jar.getAbsolutePath())
         }
 
         new File("$BUILD_TOOLS_PATH/$SBG_JAVA_DEPENDENCIES").withWriter { out ->
-            allJarPaths.each { out.println it }
+            allJarPaths.each {
+                out.println it
+            }
         }
         new File("$BUILD_TOOLS_PATH/$MDG_JAVA_DEPENDENCIES").withWriter { out ->
             allJarPaths.each {
-                if (it.endsWith(".jar")) {
-                    out.println it
-                }
+                out.println it
+                System.out.println("!!!!! VM: mdg dep: " + it)
             }
         }
 
