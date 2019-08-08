@@ -193,6 +193,16 @@ public class TreeNode {
     public TreeNode baseClassNode;
     //
 
+    private boolean wentThroughSettingMembers = false;
+
+    public boolean hasWentThroughSettingMembers() {
+        return wentThroughSettingMembers;
+    }
+
+    public void setWentThroughSettingMembers(boolean wentThroughSettingMembers) {
+        this.wentThroughSettingMembers = wentThroughSettingMembers;
+    }
+
     public ArrayList<TreeNode> children;
 
     public TreeNode getChild(String childName) {
