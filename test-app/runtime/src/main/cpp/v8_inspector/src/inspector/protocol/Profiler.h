@@ -1056,8 +1056,8 @@ public:
     void consoleProfileStarted(const String& id, std::unique_ptr<protocol::Debugger::Location> location, Maybe<String> title = Maybe<String>());
 
     void flush();
-    void sendRawNotification(String);
-    void sendRawNotification(std::vector<uint8_t>);
+    void sendRawJSONNotification(String);
+    void sendRawCBORNotification(std::vector<uint8_t>);
 private:
     FrontendChannel* m_frontendChannel;
 };

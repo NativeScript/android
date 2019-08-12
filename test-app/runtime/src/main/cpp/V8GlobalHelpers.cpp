@@ -71,6 +71,7 @@ Local<String> tns::JsonStringifyObject(Isolate* isolate, Handle<v8::Value> value
         return String::Empty(isolate);
     }
 
+    auto context = isolate->GetCurrentContext();
     if (handleCircularReferences) {
         Local<Function> smartJSONStringifyFunction = GetSmartJSONStringifyFunction(isolate);
 
@@ -79,11 +80,11 @@ Local<String> tns::JsonStringifyObject(Isolate* isolate, Handle<v8::Value> value
                 v8::Local<v8::Value> resultValue;
                 v8::TryCatch tc(isolate);
 
-                Local<Value> args[] = { value->ToObject(isolate) };
-                auto success = smartJSONStringifyFunction->Call(isolate->GetCurrentContext(), Undefined(isolate), 1, args).ToLocal(&resultValue);
+                Local<Value> args[] = { value->ToObject(context).ToLocalChecked() };
+                auto success = smartJSONStringifyFunction->Call(context, Undefined(isolate), 1, args).ToLocal(&resultValue);
 
                 if (success && !tc.HasCaught()) {
-                    return resultValue->ToString(isolate);
+                    return resultValue->ToString(context).ToLocalChecked();
                 }
             }
         }
@@ -91,7 +92,7 @@ Local<String> tns::JsonStringifyObject(Isolate* isolate, Handle<v8::Value> value
 
     v8::Local<v8::String> resultString;
     v8::TryCatch tc(isolate);
-    auto success = v8::JSON::Stringify(isolate->GetCurrentContext(), value->ToObject(isolate)).ToLocal(&resultString);
+    auto success = v8::JSON::Stringify(context, value->ToObject(context).ToLocalChecked()).ToLocal(&resultString);
 
     if (!success && tc.HasCaught()) {
         throw NativeScriptException(tc);
@@ -103,7 +104,8 @@ Local<String> tns::JsonStringifyObject(Isolate* isolate, Handle<v8::Value> value
 bool tns::V8GetPrivateValue(Isolate* isolate, const Local<Object>& obj, const Local<String>& propName, Local<Value>& out) {
     auto privateKey = Private::ForApi(isolate, propName);
 
-    auto hasPrivate = obj->HasPrivate(isolate->GetCurrentContext(), privateKey);
+    auto context = obj->CreationContext();
+    auto hasPrivate = obj->HasPrivate(context, privateKey);
 
     if (hasPrivate.IsNothing()) {
         stringstream ss;
@@ -115,7 +117,7 @@ bool tns::V8GetPrivateValue(Isolate* isolate, const Local<Object>& obj, const Lo
         return false;
     }
 
-    auto res = obj->GetPrivate(isolate->GetCurrentContext(), privateKey);
+    auto res = obj->GetPrivate(context, privateKey);
 
     if (res.IsEmpty()) {
         stringstream ss;
@@ -128,7 +130,8 @@ bool tns::V8GetPrivateValue(Isolate* isolate, const Local<Object>& obj, const Lo
 
 bool tns::V8SetPrivateValue(Isolate* isolate, const Local<Object>& obj, const Local<String>& propName, const Local<Value>& value) {
     auto privateKey = Private::ForApi(isolate, propName);
-    auto res = obj->SetPrivate(isolate->GetCurrentContext(), privateKey, value);
+    auto context = obj->CreationContext();
+    auto res = obj->SetPrivate(context, privateKey, value);
 
     if (res.IsNothing()) {
         stringstream ss;

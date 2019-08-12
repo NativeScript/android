@@ -46,7 +46,8 @@ void Profiler::StartCPUProfilerCallbackImpl(const v8::FunctionCallbackInfo<v8::V
     auto isolate = args.GetIsolate();
     auto started = false;
     if ((args.Length() == 1) && (args[0]->IsString())) {
-        auto name = args[0]->ToString(isolate);
+        auto context = isolate->GetCurrentContext();
+        auto name = args[0]->ToString(context).ToLocalChecked();
         StartCPUProfiler(isolate, name);
         started = true;
     }
@@ -76,7 +77,8 @@ void Profiler::StopCPUProfilerCallbackImpl(const v8::FunctionCallbackInfo<v8::Va
     auto isolate = args.GetIsolate();
     auto stopped = false;
     if ((args.Length() == 1) && (args[0]->IsString())) {
-        auto name = args[0]->ToString(isolate);
+        auto context = isolate->GetCurrentContext();
+        auto name = args[0]->ToString(context).ToLocalChecked();
         stopped = StopCPUProfiler(isolate, name);
     }
     args.GetReturnValue().Set(stopped);

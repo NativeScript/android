@@ -39,6 +39,13 @@ namespace TargetCallFramesEnum {
 } // TargetCallFramesEnum
 } // ContinueToLocation
 
+namespace SetInstrumentationBreakpoint {
+namespace InstrumentationEnum {
+ extern const char* BeforeScriptExecution;
+ extern const char* BeforeScriptWithSourceMapExecution;
+} // InstrumentationEnum
+} // SetInstrumentationBreakpoint
+
 namespace SetPauseOnExceptions {
 namespace StateEnum {
  extern const char* None;
@@ -49,16 +56,17 @@ namespace StateEnum {
 
 namespace Paused {
 namespace ReasonEnum {
- extern const char* XHR;
+ extern const char* Ambiguous;
+ extern const char* Assert;
+ extern const char* DebugCommand;
  extern const char* DOM;
  extern const char* EventListener;
  extern const char* Exception;
- extern const char* Assert;
- extern const char* DebugCommand;
- extern const char* PromiseRejection;
+ extern const char* Instrumentation;
  extern const char* OOM;
  extern const char* Other;
- extern const char* Ambiguous;
+ extern const char* PromiseRejection;
+ extern const char* XHR;
 } // ReasonEnum
 } // Paused
 
@@ -768,16 +776,17 @@ public:
     void setCallFrames(std::unique_ptr<protocol::Array<protocol::Debugger::CallFrame>> value) { m_callFrames = std::move(value); }
 
     struct  ReasonEnum {
-        static const char* XHR;
+        static const char* Ambiguous;
+        static const char* Assert;
+        static const char* DebugCommand;
         static const char* DOM;
         static const char* EventListener;
         static const char* Exception;
-        static const char* Assert;
-        static const char* DebugCommand;
-        static const char* PromiseRejection;
+        static const char* Instrumentation;
         static const char* OOM;
         static const char* Other;
-        static const char* Ambiguous;
+        static const char* PromiseRejection;
+        static const char* XHR;
     }; // ReasonEnum
 
     String getReason() { return m_reason; }
@@ -1373,6 +1382,7 @@ public:
     virtual DispatchResponse setBlackboxPatterns(std::unique_ptr<protocol::Array<String>> in_patterns) = 0;
     virtual DispatchResponse setBlackboxedRanges(const String& in_scriptId, std::unique_ptr<protocol::Array<protocol::Debugger::ScriptPosition>> in_positions) = 0;
     virtual DispatchResponse setBreakpoint(std::unique_ptr<protocol::Debugger::Location> in_location, Maybe<String> in_condition, String* out_breakpointId, std::unique_ptr<protocol::Debugger::Location>* out_actualLocation) = 0;
+    virtual DispatchResponse setInstrumentationBreakpoint(const String& in_instrumentation, String* out_breakpointId) = 0;
     virtual DispatchResponse setBreakpointByUrl(int in_lineNumber, Maybe<String> in_url, Maybe<String> in_urlRegex, Maybe<String> in_scriptHash, Maybe<int> in_columnNumber, Maybe<String> in_condition, String* out_breakpointId, std::unique_ptr<protocol::Array<protocol::Debugger::Location>>* out_locations) = 0;
     virtual DispatchResponse setBreakpointOnFunctionCall(const String& in_objectId, Maybe<String> in_condition, String* out_breakpointId) = 0;
     virtual DispatchResponse setBreakpointsActive(bool in_active) = 0;
@@ -1399,8 +1409,8 @@ public:
     void scriptParsed(const String& scriptId, const String& url, int startLine, int startColumn, int endLine, int endColumn, int executionContextId, const String& hash, Maybe<protocol::DictionaryValue> executionContextAuxData = Maybe<protocol::DictionaryValue>(), Maybe<bool> isLiveEdit = Maybe<bool>(), Maybe<String> sourceMapURL = Maybe<String>(), Maybe<bool> hasSourceURL = Maybe<bool>(), Maybe<bool> isModule = Maybe<bool>(), Maybe<int> length = Maybe<int>(), Maybe<protocol::Runtime::StackTrace> stackTrace = Maybe<protocol::Runtime::StackTrace>());
 
     void flush();
-    void sendRawNotification(String);
-    void sendRawNotification(std::vector<uint8_t>);
+    void sendRawJSONNotification(String);
+    void sendRawCBORNotification(std::vector<uint8_t>);
 private:
     FrontendChannel* m_frontendChannel;
 };

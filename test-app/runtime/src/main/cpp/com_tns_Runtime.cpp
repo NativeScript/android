@@ -370,5 +370,5 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_ResetDateTimeConfigurationCache(J
     }
 
     auto isolate = runtime->GetIsolate();
-    Date::DateTimeConfigurationChangeNotification(isolate);
+    isolate->DateTimeConfigurationChangeNotification(Isolate::TimeZoneDetection::kRedetect);
 }

@@ -27,7 +27,7 @@ void NetworkDomainCallbackHandlers::ResponseReceivedCallback(const v8::FunctionC
 
         auto context = isolate->GetCurrentContext();
 
-        v8::Local<v8::Object> argsObj = args[0]->ToObject(isolate);
+        v8::Local<v8::Object> argsObj = args[0]->ToObject(context).ToLocalChecked();
 
         if ((!argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "requestId")).FromMaybe(false) ||
                 !argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "timestamp")).FromMaybe(false) ||
@@ -36,12 +36,12 @@ void NetworkDomainCallbackHandlers::ResponseReceivedCallback(const v8::FunctionC
             throw NativeScriptException(wrongParametersError);
         }
 
-        auto requestId = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "requestId")).ToLocalChecked()->ToString(isolate);
-        auto type = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "type")).ToLocalChecked()->ToString(isolate);
+        auto requestId = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "requestId")).ToLocalChecked()->ToString(context).ToLocalChecked();
+        auto type = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "type")).ToLocalChecked()->ToString(context).ToLocalChecked();
         auto response = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "response")).ToLocalChecked();
-        auto timeStamp = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "timestamp")).ToLocalChecked()->ToNumber(isolate)->IntegerValue(context).ToChecked();
+        auto timeStamp = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "timestamp")).ToLocalChecked()->ToNumber(context).ToLocalChecked()->IntegerValue(context).ToChecked();
 
-        auto responseAsObj = response->ToObject(isolate);
+        auto responseAsObj = response->ToObject(context).ToLocalChecked();
         auto connectionReusedProp = ArgConverter::ConvertToV8String(isolate, "connectionReused");
         if (!responseAsObj->Has(context, connectionReusedProp).FromMaybe(false)) {
             responseAsObj->Set(connectionReusedProp, v8::Boolean::New(isolate, true));
@@ -129,7 +129,7 @@ void NetworkDomainCallbackHandlers::RequestWillBeSentCallback(const v8::Function
 
         auto context = isolate->GetCurrentContext();
 
-        v8::Local<v8::Object> argsObj = args[0]->ToObject(isolate);
+        v8::Local<v8::Object> argsObj = args[0]->ToObject(context).ToLocalChecked();
 
         if ((!(argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "requestId")).FromMaybe(false)) ||
                 !(argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "url")).FromMaybe(false)) ||
@@ -139,17 +139,17 @@ void NetworkDomainCallbackHandlers::RequestWillBeSentCallback(const v8::Function
             throw NativeScriptException(wrongParametersError);
         }
 
-        auto requestId = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "requestId")).ToLocalChecked()->ToString(isolate);
-        auto url = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "url")).ToLocalChecked()->ToString(isolate);
+        auto requestId = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "requestId")).ToLocalChecked()->ToString(context).ToLocalChecked();
+        auto url = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "url")).ToLocalChecked()->ToString(context).ToLocalChecked();
         auto request = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "request")).ToLocalChecked();
-        auto timeStamp = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "timestamp")).ToLocalChecked()->ToNumber(isolate)->IntegerValue(context).ToChecked();
-        auto typeArg = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "type")).ToLocalChecked()->ToString(isolate);
+        auto timeStamp = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "timestamp")).ToLocalChecked()->ToNumber(context).ToLocalChecked()->IntegerValue(context).ToChecked();
+        auto typeArg = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "type")).ToLocalChecked()->ToString(context).ToLocalChecked();
         long long int wallTime = 0;
         if (argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "wallTime")).FromMaybe(true)) {
-            wallTime = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "wallTime")).ToLocalChecked()->ToNumber(isolate)->IntegerValue(context).ToChecked();
+            wallTime = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "wallTime")).ToLocalChecked()->ToNumber(context).ToLocalChecked()->IntegerValue(context).ToChecked();
         }
 
-        auto requestAsObj = request->ToObject(isolate);
+        auto requestAsObj = request->ToObject(context).ToLocalChecked();
         auto initialPriorityProp = ArgConverter::ConvertToV8String(isolate, "initialPriority");
         auto referrerPolicyProp = ArgConverter::ConvertToV8String(isolate, "referrerPolicy");
         if (!argsObj->Has(context, initialPriorityProp).FromMaybe(false)) {
@@ -230,7 +230,7 @@ void NetworkDomainCallbackHandlers::DataForRequestIdCallback(const v8::FunctionC
 
         auto context = isolate->GetCurrentContext();
 
-        v8::Local<v8::Object> argsObj = args[0]->ToObject(isolate);
+        v8::Local<v8::Object> argsObj = args[0]->ToObject(context).ToLocalChecked();
 
         if (!argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "requestId")).FromMaybe(false) ||
                 !argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "data")).FromMaybe(false) ||
@@ -238,13 +238,13 @@ void NetworkDomainCallbackHandlers::DataForRequestIdCallback(const v8::FunctionC
             throw NativeScriptException(wrongParametersError);
         }
 
-        auto requestId = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "requestId")).ToLocalChecked()->ToString(isolate);
+        auto requestId = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "requestId")).ToLocalChecked()->ToString(context).ToLocalChecked();
         auto data = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "data")).ToLocalChecked()->ToString(context).ToLocalChecked();
-        auto hasTextContent = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "hasTextContent")).ToLocalChecked()->ToBoolean(context).ToLocalChecked();
+        auto hasTextContent = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "hasTextContent")).ToLocalChecked()->ToBoolean(isolate);
 
         auto requestIdString = ArgConverter::ConvertToString(requestId);
         auto dataString = ArgConverter::ConvertToUtf16String(data);
-        auto hasTextContentBool = hasTextContent->BooleanValue(context).ToChecked();
+        auto hasTextContentBool = hasTextContent->BooleanValue(isolate);
 
         auto responses = networkAgentInstance->m_responses;
         auto it = responses.find(requestIdString);
@@ -290,19 +290,19 @@ void NetworkDomainCallbackHandlers::LoadingFinishedCallback(const v8::FunctionCa
 
         auto context = isolate->GetCurrentContext();
 
-        v8::Local<v8::Object> argsObj = args[0]->ToObject(isolate);
+        v8::Local<v8::Object> argsObj = args[0]->ToObject(context).ToLocalChecked();
 
         if (!argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "requestId")).FromMaybe(false) ||
                 !argsObj->Has(context, ArgConverter::ConvertToV8String(isolate, "timestamp")).FromMaybe(false)) {
             throw NativeScriptException(wrongParametersError);
         }
 
-        auto requestId = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "requestId")).ToLocalChecked()->ToString(isolate);
-        auto timeStamp = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "timestamp")).ToLocalChecked()->ToNumber(isolate)->IntegerValue(context).ToChecked();
+        auto requestId = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "requestId")).ToLocalChecked()->ToString(context).ToLocalChecked();
+        auto timeStamp = argsObj->Get(context, ArgConverter::ConvertToV8String(isolate, "timestamp")).ToLocalChecked()->ToNumber(context).ToLocalChecked()->IntegerValue(context).ToChecked();
         long long int encodedDataLength = 0;
         auto encodedDataLengthProp = ArgConverter::ConvertToV8String(isolate, "encodedDataLength");
         if (argsObj->Has(context, encodedDataLengthProp).FromMaybe(true)) {
-            encodedDataLength = argsObj->Get(context, encodedDataLengthProp).ToLocalChecked()->ToNumber(isolate)->IntegerValue(context).ToChecked();
+            encodedDataLength = argsObj->Get(context, encodedDataLengthProp).ToLocalChecked()->ToNumber(context).ToLocalChecked()->IntegerValue(context).ToChecked();
         }
 
         networkAgentInstance->m_frontend.loadingFinished(ArgConverter::ConvertToString(requestId).c_str(), timeStamp, encodedDataLength);
