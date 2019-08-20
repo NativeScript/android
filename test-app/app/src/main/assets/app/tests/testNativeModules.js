@@ -10,9 +10,11 @@ describe("Tests native modules)", function () {
 		if (lcArch.indexOf("arm") > -1) {
 			arch = "arm";
 		} else if (lcArch.indexOf("aarch64") > -1) {
-		    arch = (com.tns.Runtime.getPointerSize() == 4) ? "arm" : "arm64";
+			arch = (com.tns.Runtime.getPointerSize() == 4) ? "arm" : "arm64";
 		} else if (lcArch.indexOf("i686") > -1) {
 			arch = "x86";
+		}	else if (lcArch.indexOf("x86_64") > -1) {
+			arch = "x86_64";
 		} else {
 			throw new Error("Unsupported architecture=" + sysArch);
 		}
