@@ -323,7 +323,7 @@ dependencies {
         androidXMaterialVersion = androidXMaterial
     }
 
-    println "\t + using andorid X library androidx.legacy:legacy-support-v4:$androidXLegacyVersion"
+    println "\t + using android X library androidx.legacy:legacy-support-v4:$androidXLegacyVersion"
 
     implementation "androidx.multidex:multidex:2.0.0"
     implementation "androidx.legacy:legacy-support-v4:$androidXLegacyVersion"
