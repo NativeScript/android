@@ -64,10 +64,10 @@ def METADATA_OUT_PATH = "$projectDir/src/main/assets/metadata"
 def pluginsJarLibraries = new LinkedList<String>()
 def allJarLibraries = new LinkedList<String>()
 
-def computeCompileSdkVersion = { -> project.hasProperty("compileSdk") ? compileSdk : 28 }
-def computeTargetSdkVersion = { -> project.hasProperty("targetSdk") ? targetSdk : 28 }
+def computeCompileSdkVersion = { -> project.hasProperty("compileSdk") ? compileSdk : 29 }
+def computeTargetSdkVersion = { -> project.hasProperty("targetSdk") ? targetSdk : 29 }
 def computeBuildToolsVersion = { ->
-    project.hasProperty("buildToolsVersion") ? buildToolsVersion : "28.0.3"
+    project.hasProperty("buildToolsVersion") ? buildToolsVersion : "29.0.2"
 }
 
 project.ext.selectedBuildType = project.hasProperty("release") ? "release" : "debug"
