@@ -1,6 +1,4 @@
 apply plugin: 'com.android.library'
-//apply plugin: 'kotlin-android-extensions'
-//apply plugin: 'kotlin-android'
 
 def optimized = project.hasProperty("optimized")
 if (optimized) {
@@ -25,9 +23,6 @@ if (useCCache) {
 project.ext._buildToolsVersion = "29.0.2"
 
 android {
-//    kotlinOptions {
-//        jvmTarget = '1.8'
-//    }
     sourceSets {
         main {
             def defaultSrcPath = "src/main/java"
@@ -111,7 +106,6 @@ dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     testImplementation 'junit:junit:4.12'
     testImplementation 'org.mockito:mockito-core:1.10.19'
-//    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
 }
 
 tasks.whenTaskAdded { task ->

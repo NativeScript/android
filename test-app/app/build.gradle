@@ -27,12 +27,14 @@ import java.nio.file.Files
 import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
-import java.util.regex.Matcher
-import java.util.regex.Pattern
 
 apply plugin: "com.android.application"
-apply plugin: 'kotlin-android'
-apply plugin: 'kotlin-android-extensions'
+
+def useKotlin = project.hasProperty("useKotlin") && project.ext.useKotlin=="true"
+if (useKotlin) {
+    apply plugin: 'kotlin-android'
+    apply plugin: 'kotlin-android-extensions'
+}
 
 def onlyX86 = project.hasProperty("onlyX86")
 if (onlyX86) {
@@ -68,6 +70,7 @@ def METADATA_OUT_PATH = "$projectDir/src/main/assets/metadata"
 def pluginsJarLibraries = new LinkedList<String>()
 def allJarLibraries = new LinkedList<String>()
 
+def computeKotlinVersion = { -> project.hasProperty("kotlinVersion") ? kotlinVersion : "1.3.41" }
 def computeCompileSdkVersion = { -> project.hasProperty("compileSdk") ? compileSdk : 29 }
 def computeTargetSdkVersion = { -> project.hasProperty("targetSdk") ? targetSdk : 29 }
 def computeBuildToolsVersion = { ->
@@ -224,8 +227,11 @@ def setAppIdentifier = { ->
 }
 
 android {
-    kotlinOptions {
-        jvmTarget = '1.8'
+
+    if (useKotlin) {
+        kotlinOptions {
+            jvmTarget = '1.8'
+        }
     }
 
     compileSdkVersion computeCompileSdkVersion()
@@ -334,7 +340,7 @@ dependencies {
 
     println "\t + using android X library androidx.legacy:legacy-support-v4:$androidXLegacyVersion"
 
-    implementation "androidx.multidex:multidex:2.0.0"
+    implementation "androidx.multidex:multidex:2.0.1"
     implementation "androidx.legacy:legacy-support-v4:$androidXLegacyVersion"
     implementation "androidx.appcompat:appcompat:$androidXAppCompatVersion"
     implementation "com.google.android.material:material:$androidXMaterialVersion"
@@ -373,7 +379,10 @@ dependencies {
         implementation project(':runtime')
     }
 
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.3.41"
+    def kotlinVersion = computeKotlinVersion()
+    if (useKotlin) {
+        implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
+    }
 
 }
 

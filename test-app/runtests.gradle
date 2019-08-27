@@ -37,14 +37,17 @@ def getBuildArguments = { ->
     if (useCCache) {
         arguments.add("-PuseCCache")
     }
+
+    arguments.add("-PuseKotlin=true")
+
     return arguments
 }
 
 task installApk(type: Exec) {
-        doFirst {
-            println "Attempting to install buit apk"
-            commandLine getBuildArguments()
-        }
+    doFirst {
+        println "Attempting to install buit apk"
+        commandLine getBuildArguments()
+    }
 }
 
 task runAdbAsRoot(type: Exec) {
@@ -52,9 +55,9 @@ task runAdbAsRoot(type: Exec) {
         println "Removing previous android_unit_test_results.xml"
 
         if (isWinOs) {
-            commandLine "cmd", "/c", "adb", "-e" , "root"
+            commandLine "cmd", "/c", "adb", "-e", "root"
         } else {
-            commandLine "adb", "-e" , "root"
+            commandLine "adb", "-e", "root"
         }
     }
 }
@@ -64,7 +67,7 @@ task deletePreviousResultXml(type: Exec) {
         println "Removing previous android_unit_test_results.xml"
 
         if (isWinOs) {
-            commandLine "cmd", "/c", "adb", runOnDeviceOrEmulator, "-e" , "shell", "rm", "-rf", "/data/data/com.tns.testapplication/android_unit_test_results.xml"
+            commandLine "cmd", "/c", "adb", runOnDeviceOrEmulator, "-e", "shell", "rm", "-rf", "/data/data/com.tns.testapplication/android_unit_test_results.xml"
         } else {
             commandLine "adb", runOnDeviceOrEmulator, "-e", "shell", "rm", "-rf", "/data/data/com.tns.testapplication/android_unit_test_results.xml"
         }
@@ -78,7 +81,7 @@ task startInstalledApk(type: Exec) {
         if (isWinOs) {
             commandLine "cmd", "/c", "adb", runOnDeviceOrEmulator, "-e", "shell", "am", "start", "-n", "com.tns.testapplication/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
         } else {
-            commandLine "adb", runOnDeviceOrEmulator, "-e" , "shell", "am", "start", "-n", "com.tns.testapplication/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
+            commandLine "adb", runOnDeviceOrEmulator, "-e", "shell", "am", "start", "-n", "com.tns.testapplication/com.tns.NativeScriptActivity", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"
         }
     }
 }
