@@ -18,6 +18,8 @@ class Common {
 
         static protocol::DispatchResponse protocolCommandNotSupportedDispatchResponse();
 
+        static std::vector<uint16_t> toVector(const std::string& value);
+
     private:
         static const String16 s_notImplemented;
 };

@@ -15,11 +15,10 @@
 namespace v8_inspector {
 
 using protocol::Response;
-using protocol::Runtime::RemoteObject;
+using protocol::Runtime::EntryPreview;
 using protocol::Runtime::ObjectPreview;
 using protocol::Runtime::PropertyPreview;
-using protocol::Runtime::EntryPreview;
-using protocol::Runtime::InternalPropertyDescriptor;
+using protocol::Runtime::RemoteObject;
 
 namespace {
 V8InspectorClient* clientFor(v8::Local<v8::Context> context) {
@@ -56,10 +55,14 @@ Response toProtocolValue(v8::Local<v8::Context> context,
   }
   if (value->IsNumber()) {
     double doubleValue = value.As<v8::Number>()->Value();
-    int intValue = static_cast<int>(doubleValue);
-    if (intValue == doubleValue) {
-      *result = protocol::FundamentalValue::create(intValue);
-      return Response::OK();
+    if (doubleValue >= std::numeric_limits<int>::min() &&
+        doubleValue <= std::numeric_limits<int>::max() &&
+        bit_cast<int64_t>(doubleValue) != bit_cast<int64_t>(-0.0)) {
+      int intValue = static_cast<int>(doubleValue);
+      if (intValue == doubleValue) {
+        *result = protocol::FundamentalValue::create(intValue);
+        return Response::OK();
+      }
     }
     *result = protocol::FundamentalValue::create(doubleValue);
     return Response::OK();
@@ -805,6 +808,26 @@ void getInternalPropertiesForPreview(
   }
 }
 
+void getPrivatePropertiesForPreview(
+    v8::Local<v8::Context> context, v8::Local<v8::Object> object,
+    int* nameLimit, bool* overflow,
+    protocol::Array<PropertyPreview>* privateProperties) {
+  std::vector<PrivatePropertyMirror> mirrors =
+      ValueMirror::getPrivateProperties(context, object);
+  std::vector<String16> whitelist;
+  for (auto& mirror : mirrors) {
+    std::unique_ptr<PropertyPreview> propertyPreview;
+    mirror.value->buildPropertyPreview(context, mirror.name, &propertyPreview);
+    if (!propertyPreview) continue;
+    if (!*nameLimit) {
+      *overflow = true;
+      return;
+    }
+    --*nameLimit;
+    privateProperties->addItem(std::move(propertyPreview));
+  }
+}
+
 class ObjectMirror final : public ValueMirror {
  public:
   ObjectMirror(v8::Local<v8::Value> value, const String16& description)
@@ -895,6 +918,7 @@ class ObjectMirror final : public ValueMirror {
 
     v8::Local<v8::Value> value = m_value;
     while (value->IsProxy()) value = value.As<v8::Proxy>()->GetTarget();
+
     if (value->IsObject() && !value->IsProxy()) {
       v8::Local<v8::Object> objectForPreview = value.As<v8::Object>();
       std::vector<InternalPropertyMirror> internalProperties;
@@ -908,6 +932,9 @@ class ObjectMirror final : public ValueMirror {
           properties->addItem(std::move(propertyPreview));
         }
       }
+
+      getPrivatePropertiesForPreview(context, objectForPreview, nameLimit,
+                                     &overflow, properties.get());
 
       std::vector<PropertyMirror> mirrors;
       if (getPropertiesForPreview(context, objectForPreview, nameLimit,
@@ -1344,6 +1371,53 @@ void ValueMirror::getInternalProperties(
       }
     }
   }
+}
+
+// static
+std::vector<PrivatePropertyMirror> ValueMirror::getPrivateProperties(
+    v8::Local<v8::Context> context, v8::Local<v8::Object> object) {
+  std::vector<PrivatePropertyMirror> mirrors;
+  v8::Isolate* isolate = context->GetIsolate();
+  v8::MicrotasksScope microtasksScope(isolate,
+                                      v8::MicrotasksScope::kDoNotRunMicrotasks);
+  v8::TryCatch tryCatch(isolate);
+  v8::Local<v8::Array> privateProperties;
+
+  if (!v8::debug::GetPrivateFields(context, object).ToLocal(&privateProperties))
+    return mirrors;
+
+  for (uint32_t i = 0; i < privateProperties->Length(); i += 2) {
+    v8::Local<v8::Value> name;
+    if (!privateProperties->Get(context, i).ToLocal(&name)) {
+      tryCatch.Reset();
+      continue;
+    }
+
+    // Weirdly, v8::Private is set to be a subclass of v8::Data and
+    // not v8::Value, meaning, we first need to upcast to v8::Data
+    // and then downcast to v8::Private. Changing the hierarchy is a
+    // breaking change now. Not sure if that's possible.
+    //
+    // TODO(gsathya): Add an IsPrivate method to the v8::Private and
+    // assert here.
+    v8::Local<v8::Private> private_field = v8::Local<v8::Private>::Cast(name);
+    v8::Local<v8::Value> private_name = private_field->Name();
+    DCHECK(!private_name->IsUndefined());
+
+    v8::Local<v8::Value> value;
+    if (!privateProperties->Get(context, i + 1).ToLocal(&value)) {
+      tryCatch.Reset();
+      continue;
+    }
+    auto wrapper = ValueMirror::create(context, value);
+    if (wrapper) {
+      mirrors.emplace_back(PrivatePropertyMirror{
+          toProtocolStringWithTypeCheck(context->GetIsolate(), private_name),
+          std::move(wrapper)});
+    }
+  }
+
+  return mirrors;
 }
 
 String16 descriptionForNode(v8::Local<v8::Context> context,

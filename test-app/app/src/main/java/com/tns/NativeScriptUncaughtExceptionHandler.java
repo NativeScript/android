@@ -1,7 +1,6 @@
 package com.tns;
 
 import java.lang.Thread.UncaughtExceptionHandler;
-
 import android.content.Context;
 
 public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHandler {
@@ -19,21 +18,25 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
 
     @Override
     public void uncaughtException(Thread thread, Throwable ex) {
-        String currentThreadMessage = "An uncaught Exception occurred on \"" + thread.getName() + "\" thread.\n";
-
-        String errorMessage = currentThreadMessage + Runtime.getStackTraceErrorMessage(ex);
+        String currentThreadMessage = String.format("An uncaught Exception occurred on \"%s\" thread.\n%s\n", thread.getName(), ex.getMessage());
+        String stackTraceErrorMessage = Runtime.getStackTraceErrorMessage(ex);
+        String errorMessage = String.format("%s\nStackTrace:\n%s", currentThreadMessage, stackTraceErrorMessage);
 
         if (Runtime.isInitialized()) {
             try {
-                ex.printStackTrace();
+                if (Util.isDebuggableApp(context)) {
+                    System.err.println(errorMessage);
+                }
 
                 Runtime runtime = Runtime.getCurrentRuntime();
 
                 if (runtime != null) {
-                    runtime.passUncaughtExceptionToJs(ex, errorMessage);
+                    runtime.passUncaughtExceptionToJs(ex, ex.getMessage(), stackTraceErrorMessage);
                 }
             } catch (Throwable t) {
-                t.printStackTrace();
+                if (Util.isDebuggableApp(context)) {
+                    t.printStackTrace();
+                }
             }
         }
 
@@ -55,7 +58,9 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
                 res = (Boolean) startActivity.invoke(null, context, errorMessage);
             } catch (Exception e) {
                 android.util.Log.v("Error", errorMessage);
-                e.printStackTrace();
+                if (Util.isDebuggableApp(context)) {
+                    e.printStackTrace();
+                };
                 android.util.Log.v("Application Error", "ErrorActivity default implementation not found. Reinstall android platform to fix.");
             }
         }

@@ -558,8 +558,9 @@ CallbackHandlers::GetImplementedInterfaces(JEnv& env, const Local<Object>& imple
     }
 
     vector<jstring> interfacesToImplement;
-    auto propNames = implementationObject->GetOwnPropertyNames();
     auto isolate = implementationObject->GetIsolate();
+    auto context = isolate->GetCurrentContext();
+    auto propNames = implementationObject->GetOwnPropertyNames(context).ToLocalChecked();
     for (int i = 0; i < propNames->Length(); i++) {
         auto name = propNames->Get(i).As<String>();
         auto prop = implementationObject->Get(name);
@@ -570,11 +571,11 @@ CallbackHandlers::GetImplementedInterfaces(JEnv& env, const Local<Object>& imple
             v8::String::Utf8Value propName(isolate, name);
             std::string arrNameC = std::string(*propName);
             if (arrNameC == "interfaces") {
-                auto interfacesArr = prop->ToObject(isolate);
+                auto interfacesArr = prop->ToObject(context).ToLocalChecked();
 
                 auto context = isolate->GetCurrentContext();
                 int length = interfacesArr->Get(
-                                 v8::String::NewFromUtf8(isolate, "length"))->ToObject(isolate)->Uint32Value(
+                                 v8::String::NewFromUtf8(isolate, "length").ToLocalChecked())->ToObject(context).ToLocalChecked()->Uint32Value(
                                  context).ToChecked();
 
                 if (length > 0) {
@@ -616,8 +617,9 @@ CallbackHandlers::GetMethodOverrides(JEnv& env, const Local<Object>& implementat
     }
 
     vector<jstring> methodNames;
-    auto propNames = implementationObject->GetOwnPropertyNames();
     auto isolate = implementationObject->GetIsolate();
+    auto context = isolate->GetCurrentContext();
+    auto propNames = implementationObject->GetOwnPropertyNames(context).ToLocalChecked();
     for (int i = 0; i < propNames->Length(); i++) {
         auto name = propNames->Get(i).As<String>();
         auto method = implementationObject->Get(name);
@@ -649,7 +651,8 @@ void CallbackHandlers::LogMethodCallback(const v8::FunctionCallbackInfo<v8::Valu
     try {
         if ((args.Length() > 0) && args[0]->IsString()) {
             auto isolate = args.GetIsolate();
-            String::Utf8Value message(isolate, args[0]->ToString(isolate));
+            auto context = isolate->GetCurrentContext();
+            String::Utf8Value message(isolate, args[0]->ToString(context).ToLocalChecked());
             DEBUG_WRITE("%s", *message);
         }
     } catch (NativeScriptException& e) {
@@ -842,11 +845,13 @@ Local<Value> CallbackHandlers::CallJSMethod(Isolate* isolate, JNIEnv* _env,
             arguments[i] = jsArgs->Get(i);
         }
 
+        auto context = isolate->GetCurrentContext();
+
         TryCatch tc(isolate);
         Local<Value> jsResult;
         {
             SET_PROFILER_FRAME();
-            jsResult = jsMethod->Call(jsObject, argc, argc == 0 ? nullptr : arguments.data());
+            jsMethod->Call(context, jsObject, argc, argc == 0 ? nullptr : arguments.data()).ToLocal(&jsResult);
         }
 
         //TODO: if javaResult is a pure js object create a java object that represents this object in java land
@@ -933,7 +938,8 @@ void CallbackHandlers::NewThreadCallback(const v8::FunctionCallbackInfo<v8::Valu
             currentDir = currentDir.substr(fileSchema.length());
         }
 
-        auto workerPath = ArgConverter::ConvertToString(args[0]->ToString(isolate));
+        auto context = isolate->GetCurrentContext();
+        auto workerPath = ArgConverter::ConvertToString(args[0]->ToString(context).ToLocalChecked());
 
         // Will throw if path is invalid or doesn't exist
         ModuleInternal::CheckFileExists(isolate, workerPath, currentDir);
@@ -988,7 +994,7 @@ CallbackHandlers::WorkerObjectPostMessageCallback(const v8::FunctionCallbackInfo
                                            ArgConverter::ConvertToV8String(isolate, "workerId"),
                                            jsId);
 
-        Local<String> msg = tns::JsonStringifyObject(isolate, args[0])->ToString(isolate);
+        Local<String> msg = tns::JsonStringifyObject(isolate, args[0], false);
         auto context = isolate->GetCurrentContext();
         // get worker's ID that is associated on the other side - in Java
         auto id = jsId->Int32Value(context).ToChecked();
@@ -1043,7 +1049,7 @@ void CallbackHandlers::WorkerGlobalOnMessageCallback(Isolate* isolate, jstring m
 
             auto func = callback.As<Function>();
 
-            func->Call(Undefined(isolate), 1, args1);
+            func->Call(context, Undefined(isolate), 1, args1);
         } else {
             DEBUG_WRITE(
                 "WORKER: WorkerGlobalOnMessageCallback couldn't fire a worker's `onmessage` callback because it isn't implemented!");
@@ -1086,7 +1092,7 @@ CallbackHandlers::WorkerGlobalPostMessageCallback(const v8::FunctionCallbackInfo
             return;
         }
 
-        Local<String> msg = tns::JsonStringifyObject(isolate, args[0])->ToString(isolate);
+        Local<String> msg = tns::JsonStringifyObject(isolate, args[0], false);
 
         JEnv env;
         auto mId = env.GetStaticMethodID(RUNTIME_CLASS, "sendMessageFromWorkerToMain",
@@ -1154,7 +1160,7 @@ CallbackHandlers::WorkerObjectOnMessageCallback(Isolate* isolate, jint workerId,
 
             auto func = callback.As<Function>();
 
-            func->Call(Undefined(isolate), 1, args1);
+            func->Call(context, Undefined(isolate), 1, args1);
         } else {
             DEBUG_WRITE(
                 "MAIN: WorkerObjectOnMessageCallback couldn't fire a worker(id=%d) object's `onmessage` callback because it isn't implemented.",
@@ -1198,7 +1204,7 @@ CallbackHandlers::WorkerObjectTerminateCallback(const v8::FunctionCallbackInfo<v
         V8GetPrivateValue(isolate, thiz, ArgConverter::ConvertToV8String(isolate, "isTerminated"),
                           isTerminated);
 
-        if (!isTerminated.IsEmpty() && isTerminated->BooleanValue(context).ToChecked()) {
+        if (!isTerminated.IsEmpty() && isTerminated->BooleanValue(isolate)) {
             DEBUG_WRITE(
                 "Main: WorkerObjectTerminateCallback - Worker(id=%d)'s terminate has already been called.",
                 id);
@@ -1243,7 +1249,7 @@ void CallbackHandlers::WorkerGlobalCloseCallback(const v8::FunctionCallbackInfo<
         auto isTerminating = globalObject->Get(
                                  ArgConverter::ConvertToV8String(isolate, "isTerminating"));
 
-        if (!isTerminating.IsEmpty() && isTerminating->BooleanValue(context).ToChecked()) {
+        if (!isTerminating.IsEmpty() && isTerminating->BooleanValue(isolate)) {
             DEBUG_WRITE("WORKER: WorkerThreadCloseCallback - Worker is currently terminating...");
             return;
         }
@@ -1264,7 +1270,7 @@ void CallbackHandlers::WorkerGlobalCloseCallback(const v8::FunctionCallbackInfo<
             auto func = callback.As<Function>();
 
             DEBUG_WRITE("WORKER: WorketThreadCloseCallback onclose handle is being called.");
-            func->Call(Undefined(isolate), 0, args1);
+            func->Call(context, Undefined(isolate), 0, args1);
             DEBUG_WRITE("WORKER: WorketThreadCloseCallback onclose handle was called.");
         }
 
@@ -1309,10 +1315,11 @@ void CallbackHandlers::CallWorkerScopeOnErrorHandle(Isolate* isolate, TryCatch& 
 
             auto func = callback.As<Function>();
 
-            auto result = func->Call(Undefined(isolate), 1, args1);
+            Local<Value> result;
+            func->Call(context, Undefined(isolate), 1, args1).ToLocal(&result);
 
             // return 'true'-like value, don't bubble up to main Worker.onerror
-            if (!result.IsEmpty() && result->BooleanValue(context).ToChecked()) {
+            if (!result.IsEmpty() && result->BooleanValue(isolate)) {
                 // Do nothing, exception has been handled
                 return;
             }
@@ -1327,7 +1334,7 @@ void CallbackHandlers::CallWorkerScopeOnErrorHandle(Isolate* isolate, TryCatch& 
             if (!outStackTrace.IsEmpty()) {
                 stackTrace = outStackTrace->ToDetailString(context).FromMaybe(Local<String>());
             }
-            auto source = innerTc.Message()->GetScriptResourceName()->ToString(isolate);
+            auto source = innerTc.Message()->GetScriptResourceName()->ToString(context).ToLocalChecked();
 
             auto runtime = Runtime::GetRuntime(isolate);
             runtime->PassUncaughtExceptionFromWorkerToMainHandler(msg, stackTrace, source, lno);
@@ -1336,7 +1343,7 @@ void CallbackHandlers::CallWorkerScopeOnErrorHandle(Isolate* isolate, TryCatch& 
         // throw so that it may bubble up to main
         auto lno = tc.Message()->GetLineNumber(context).ToChecked();
         auto msg = tc.Message()->Get();
-        auto source = tc.Message()->GetScriptResourceName()->ToString(isolate);
+        auto source = tc.Message()->GetScriptResourceName()->ToString(context).ToLocalChecked();
         Local<Value> outStackTrace = tc.StackTrace(context).FromMaybe(Local<Value>());
         Local<String> stackTrace;
         if (!outStackTrace.IsEmpty()) {
@@ -1404,10 +1411,12 @@ CallbackHandlers::CallWorkerObjectOnErrorHandle(Isolate* isolate, jint workerId,
 
             auto func = callback.As<Function>();
 
-            // Handle exceptions thrown in onmessage with the worker.onerror handler, if present
-            auto result = func->Call(Undefined(isolate), 1, args1);
             auto context = isolate->GetCurrentContext();
-            if (!result.IsEmpty() && result->BooleanValue(context).ToChecked()) {
+
+            // Handle exceptions thrown in onmessage with the worker.onerror handler, if present
+            Local<Value> result;
+            func->Call(context, Undefined(isolate), 1, args1).ToLocal(&result);
+            if (!result.IsEmpty() && result->BooleanValue(isolate)) {
                 // Do nothing, exception is handled and does not need to be raised to application level
                 return;
             }

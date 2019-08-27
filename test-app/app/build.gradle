@@ -12,11 +12,14 @@
 *
 *            -PtargetSdk=[target_sdk]
 *            -PbuildToolsVersion=[build_tools_version]
-*            -PsupportVersion=[support_version]
 *            -PcompileSdk=[compile_sdk_version]
+*            -PandroidXLegacy=[androidx_legacy_version]
+*            -PandroidXAppCompat=[androidx_appcompat_version]
+*            -PandroidXMaterial=[androidx_material_version]
 */
 
 
+import groovy.io.FileType
 import groovy.json.JsonSlurper
 
 import javax.inject.Inject
@@ -28,8 +31,8 @@ import java.util.regex.Matcher
 import java.util.regex.Pattern
 
 apply plugin: "com.android.application"
-apply plugin: 'kotlin-android-extensions'
 apply plugin: 'kotlin-android'
+apply plugin: 'kotlin-android-extensions'
 
 def onlyX86 = project.hasProperty("onlyX86")
 if (onlyX86) {
@@ -65,10 +68,10 @@ def METADATA_OUT_PATH = "$projectDir/src/main/assets/metadata"
 def pluginsJarLibraries = new LinkedList<String>()
 def allJarLibraries = new LinkedList<String>()
 
-def computeCompileSdkVersion = { -> project.hasProperty("compileSdk") ? compileSdk : 28 }
-def computeTargetSdkVersion = { -> project.hasProperty("targetSdk") ? targetSdk : 28 }
+def computeCompileSdkVersion = { -> project.hasProperty("compileSdk") ? compileSdk : 29 }
+def computeTargetSdkVersion = { -> project.hasProperty("targetSdk") ? targetSdk : 29 }
 def computeBuildToolsVersion = { ->
-    project.hasProperty("buildToolsVersion") ? buildToolsVersion : "28.0.3"
+    project.hasProperty("buildToolsVersion") ? buildToolsVersion : "29.0.2"
 }
 
 project.ext.selectedBuildType = project.hasProperty("release") ? "release" : "debug"
@@ -94,10 +97,8 @@ version of the {N} CLI install a previous version of the runtime package - 'tns 
         project.ext.PLATFORMS_ANDROID = "platforms/android"
         project.ext.USER_PROJECT_ROOT = "$rootDir/../.."
 
-        project.ext.getAppResourcesPath = { ->
+        project.ext.getAppPath = { ->
             def relativePathToApp = "app"
-            def relativePathToAppResources
-            def absolutePathToAppResources
             def nsConfigFile = file("$USER_PROJECT_ROOT/nsconfig.json")
             def nsConfig
 
@@ -109,13 +110,27 @@ version of the {N} CLI install a previous version of the runtime package - 'tns 
                 relativePathToApp = nsConfig.appPath
             }
 
-            if (nsConfig != null && nsConfig.appResourcesPath != null) {
-                relativePathToAppResources = nsConfig.appResourcesPath
-            } else {
-                relativePathToAppResources = "$relativePathToApp/App_Resources"
+            project.ext.appPath = java.nio.file.Paths.get(USER_PROJECT_ROOT).resolve(relativePathToApp).toAbsolutePath()
+
+            return project.ext.appPath
+        }
+
+        project.ext.getAppResourcesPath = { ->
+            def relativePathToAppResources
+            def absolutePathToAppResources
+            def nsConfigFile = file("$USER_PROJECT_ROOT/nsconfig.json")
+            def nsConfig
+
+            if (nsConfigFile.exists()) {
+                nsConfig = new JsonSlurper().parseText(nsConfigFile.getText("UTF-8"))
             }
 
-            absolutePathToAppResources = java.nio.file.Paths.get(USER_PROJECT_ROOT).resolve(relativePathToAppResources).toAbsolutePath()
+            if (nsConfig != null && nsConfig.appResourcesPath != null) {
+                relativePathToAppResources = nsConfig.appResourcesPath
+                absolutePathToAppResources = java.nio.file.Paths.get(USER_PROJECT_ROOT).resolve(relativePathToAppResources).toAbsolutePath()
+            } else {
+                absolutePathToAppResources = "${getAppPath()}/App_Resources"
+            }
 
             project.ext.appResourcesPath = absolutePathToAppResources
 
@@ -193,7 +208,7 @@ def getAppIdentifier = { packageJsonMap ->
 
 def setAppIdentifier = { ->
     println "\t + setting applicationId"
-    File packageJsonFile = new File("$rootDir/../../package.json")
+    File packageJsonFile = new File("$USER_PROJECT_ROOT/$PACKAGE_JSON")
 
     if (packageJsonFile.exists()) {
         def content = packageJsonFile.getText("UTF-8")
@@ -225,7 +240,7 @@ android {
             if (onlyX86) {
                 abiFilters 'x86'
             } else {
-                abiFilters 'x86'//, 'armeabi-v7a', 'arm64-v8a'
+                abiFilters 'x86', 'x86_64', 'armeabi-v7a', 'arm64-v8a'
             }
         }
         dexOptions {
@@ -302,45 +317,45 @@ repositories {
 }
 
 dependencies {
-    def supportVer = "28.0.0"
-    if (project.hasProperty("supportVersion")) {
-        supportVer = supportVersion
+    def androidXLegacyVersion = "1.0.0"
+    if (project.hasProperty("androidXLegacy")) {
+        androidXLegacyVersion = androidXLegacy
     }
-    if (project.hasProperty("useAndroidX") && (useAndroidX || useAndroidX.toBoolean())) {
-        def androidXLegacyVersion = "1.0.0"
-        if (project.hasProperty("androidXLegacy")) {
-            androidXLegacyVersion = androidXLegacy
-        }
 
-        def androidXAppCompatVersion = "1.1.0-alpha01"
-        if (project.hasProperty("androidXAppCompat")) {
-            androidXAppCompatVersion = androidXAppCompat
-        }
-
-        def androidXMaterialVersion = "1.1.0-alpha01"
-        if (project.hasProperty("androidXMaterial")) {
-            androidXMaterialVersion = androidXMaterial
-        }
-
-        println "\t + using andorid X library androidx.legacy:legacy-support-v4:$androidXLegacyVersion"
-
-        implementation "androidx.multidex:multidex:2.0.0"
-        implementation "androidx.legacy:legacy-support-v4:$androidXLegacyVersion"
-        implementation "androidx.appcompat:appcompat:$androidXAppCompatVersion"
-        implementation "com.google.android.material:material:$androidXMaterialVersion"
-    } else {
-        println "\t + using support library version $supportVer"
-
-        implementation "com.android.support:multidex:1.0.2"
-        implementation "com.android.support:support-v4:$supportVer"
-        implementation "com.android.support:appcompat-v7:$supportVer"
-        implementation "com.android.support:design:$supportVer"
+    def androidXAppCompatVersion = "1.0.2"
+    if (project.hasProperty("androidXAppCompat")) {
+        androidXAppCompatVersion = androidXAppCompat
     }
-    def useV8Symbols = nativescriptDependencies.any {
-        def packageJsonPath = file("$rootDir/${it.directory}/$PACKAGE_JSON")
-        def packageJson = new JsonSlurper().parseText(packageJsonPath.text)
-        return packageJson.nativescript.useV8Symbols
+
+    def androidXMaterialVersion = "1.0.0"
+    if (project.hasProperty("androidXMaterial")) {
+        androidXMaterialVersion = androidXMaterial
     }
+
+    println "\t + using android X library androidx.legacy:legacy-support-v4:$androidXLegacyVersion"
+
+    implementation "androidx.multidex:multidex:2.0.0"
+    implementation "androidx.legacy:legacy-support-v4:$androidXLegacyVersion"
+    implementation "androidx.appcompat:appcompat:$androidXAppCompatVersion"
+    implementation "com.google.android.material:material:$androidXMaterialVersion"
+
+    def useV8Symbols = false
+
+    def appPackageJsonFile = file("${getAppPath()}/$PACKAGE_JSON")
+    if (appPackageJsonFile.exists()) {
+        def appPackageJson = new JsonSlurper().parseText(appPackageJsonFile.text)
+        useV8Symbols = appPackageJson.android && appPackageJson.android.useV8Symbols
+    }
+
+    if (!useV8Symbols) {
+        // check whether any of the dependencies require v8 symbols
+        useV8Symbols = nativescriptDependencies.any {
+            def packageJsonFile = file("$rootDir/${it.directory}/$PACKAGE_JSON")
+            def packageJson = new JsonSlurper().parseText(packageJsonFile.text)
+            return packageJson.nativescript && packageJson.nativescript.useV8Symbols
+        }
+    }
+
     if (!externalRuntimeExists) {
         def runtime = "nativescript-optimized-with-inspector"
 
@@ -410,13 +425,19 @@ task addDependenciesFromAppResourcesLibraries {
     }
 }
 
+if (failOnCompilationWarningsEnabled()) {
+    tasks.withType(JavaCompile) {
+        options.compilerArgs << '-Xlint:all' << "-Werror"
+        options.deprecation = true
+    }
+}
+
 tasks.whenTaskAdded({ org.gradle.api.DefaultTask currentTask ->
     if (currentTask =~ /generate.+BuildConfig/) {
         currentTask.finalizedBy(extractAllJars)
         extractAllJars.finalizedBy(collectAllJars)
     }
     if (currentTask =~ /compile.+JavaWithJavac/) {
-        currentTask.dependsOn(makeAndroidXChanges)
         currentTask.dependsOn(runSbg)
         currentTask.finalizedBy(ensureMetadataOutDir)
         ensureMetadataOutDir.finalizedBy(buildMetadata)
@@ -445,7 +466,15 @@ task runSbg(type: JavaExec) {
 
     workingDir "$BUILD_TOOLS_PATH"
     main "-jar"
-    args "static-binding-generator.jar"
+
+    def paramz = new ArrayList<String>()
+    paramz.add("static-binding-generator.jar")
+
+    if (failOnCompilationWarningsEnabled()) {
+        paramz.add("-show-deprecation-warnings")
+    }
+
+    args paramz
 
     doFirst {
         new File("$OUTPUT_JAVA_DIR/com/tns/gen").deleteDir()
@@ -457,6 +486,10 @@ task ensureMetadataOutDir {
         def outputDir = file("$METADATA_OUT_PATH")
         outputDir.mkdirs()
     }
+}
+
+def failOnCompilationWarningsEnabled() {
+    return project.hasProperty("failOnCompilationWarnings") && (failOnCompilationWarnings || failOnCompilationWarnings.toBoolean())
 }
 
 def explodeAar(File compileDependency, File outputDir) {
@@ -471,7 +504,7 @@ def explodeAar(File compileDependency, File outputDir) {
                 def targetFile = new File(outputDir, file.name)
                 InputStream inputStream = jar.getInputStream(file)
                 new File(targetFile.parent).mkdirs()
-                Files.copy(inputStream, targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                Files.copy(inputStream, targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
             }
             if (file.isDirectory()) {
                 continue
@@ -487,9 +520,9 @@ def explodeAar(File compileDependency, File outputDir) {
 }
 
 def md5(String string) {
-    MessageDigest digest = MessageDigest.getInstance("MD5");
-    digest.update(string.bytes);
-    return new BigInteger(1, digest.digest()).toString(16).padLeft(32, '0');
+    MessageDigest digest = MessageDigest.getInstance("MD5")
+    digest.update(string.bytes)
+    return new BigInteger(1, digest.digest()).toString(16).padLeft(32, '0')
 }
 
 class WorkerTask extends DefaultTask {
@@ -505,60 +538,78 @@ class EmptyRunnable implements Runnable {
 }
 
 // Discover all jars and dynamically create tasks for the extraction of each of them
-def allJars = []
+project.ext.allJars = []
 afterEvaluate { project ->
     def buildType = project.selectedBuildType == "release" ? "Release" : "Debug"
     def jars = []
-    Pattern pattern = Pattern.compile("^(.+)${buildType}CompileClasspath\$")
     def artifactType = Attribute.of('artifactType', String)
     configurations.all { config ->
-        Matcher matcher = pattern.matcher(config.name)
-        if (matcher.find() || config.name == "${buildType.toLowerCase()}CompileClasspath") {
+        if (config.name.toLowerCase().endsWith("${buildType}RuntimeClasspath".toLowerCase())) {
             config.incoming.artifactView {
                 attributes {
                     it.attribute(artifactType, 'jar')
                 }
             }.artifacts.each {
-                def jar = it.file;
-                if (!jars.contains(jar)) {
-                    jars.push(jar)
-                    def destDir = md5(jar.path);
-                    def outputDir = new File(Paths.get(extractedDependenciesDir, destDir).normalize().toString())
+                processJar(it.file, jars)
+            }
 
-                    def taskName = "extract_${jar.name}_to_${destDir}"
-                    logger.debug("Creating dynamic task ${taskName}")
-
-                    // Add discovered jars as dependencies of cleanupAllJars.
-                    // This is cruicial for cloud builds because they are different
-                    // on each incremental build (as each time the gradle user home
-                    // directory is a randomly generated string)
-                    cleanupAllJars.inputs.files jar
-
-                    task "${taskName}"(type: WorkerTask) {
-                        dependsOn cleanupAllJars
-                        extractAllJars.dependsOn it
-
-                        // This dependency seems redundant but probably due to some Gradle issue with workers,
-                        // without it `runSbg` sporadically starts before all extraction tasks have finished and
-                        // fails due to missing JARs
-                        runSbg.dependsOn it
-
-                        inputs.files jar
-                        outputs.dir outputDir
-
-                        doLast {
-                            // Runing in parallel no longer seems to bring any benefit.
-                            // It mattered only when we were extracting JARs from AARs.
-                            // To try it simply remove the following comments.
-                            // workerExecutor.submit(EmptyRunnable.class) {
-                            explodeAar(jar, outputDir)
-                            // }
+            def projectDependencies = config.getAllDependencies().withType(ProjectDependency)
+            def dependentProjects = projectDependencies*.dependencyProject
+            dependentProjects.findAll {
+                // if there's a project dependency search for its result jar file in the build/intermediates/runtime_library_classes folder
+                // this is the output folder in gradle 5.1.1, but it can be changed in the future versions of gradle
+                def jarDir = new File("${it.getBuildDir()}/intermediates/runtime_library_classes/${buildType.toLowerCase()}")
+                if (jarDir.exists()) {
+                    jarDir.eachFileRecurse(FileType.FILES) { file ->
+                        if (file.path.endsWith(".jar")) {
+                            processJar(file, jars)
                         }
                     }
-                    allJars.push([file: jar, outputDir: outputDir])
+                } else {
+                    println "WARNING: Folder ${jarDir.path} does not exists, the dependent project's classes won't be included in the metadata"
                 }
             }
         }
+    }
+}
+
+def processJar(File jar, jars) {
+    if (!jars.contains(jar)) {
+        jars.add(jar)
+        def destDir = md5(jar.path)
+        def outputDir = new File(Paths.get(extractedDependenciesDir, destDir).normalize().toString())
+
+        def taskName = "extract_${jar.name}_to_${destDir}"
+        logger.debug("Creating dynamic task ${taskName}")
+
+        // Add discovered jars as dependencies of cleanupAllJars.
+        // This is cruicial for cloud builds because they are different
+        // on each incremental build (as each time the gradle user home
+        // directory is a randomly generated string)
+        cleanupAllJars.inputs.files jar
+
+        task "${taskName}"(type: WorkerTask) {
+            dependsOn cleanupAllJars
+            extractAllJars.dependsOn it
+
+            // This dependency seems redundant but probably due to some Gradle issue with workers,
+            // without it `runSbg` sporadically starts before all extraction tasks have finished and
+            // fails due to missing JARs
+            runSbg.dependsOn it
+
+            inputs.files jar
+            outputs.dir outputDir
+
+            doLast {
+                // Runing in parallel no longer seems to bring any benefit.
+                // It mattered only when we were extracting JARs from AARs.
+                // To try it simply remove the following comments.
+                // workerExecutor.submit(EmptyRunnable.class) {
+                explodeAar(jar, outputDir)
+                // }
+            }
+        }
+        project.ext.allJars.add([file: jar, outputDir: outputDir])
     }
 }
 
@@ -570,7 +621,7 @@ task cleanupAllJars {
     outputs.files cleanupAllJarsTimestamp
 
     doLast {
-        def allDests = allJars*.outputDir*.name;
+        def allDests = project.ext.allJars*.outputDir*.name
         def dir = new File(extractedDependenciesDir)
         if (dir.exists()) {
             dir.eachDir {
@@ -689,43 +740,6 @@ task buildMetadata(type: JavaExec) {
         main "-jar"
 
         args "android-metadata-generator.jar"
-    }
-}
-
-task makeAndroidXChanges {
-    if (project.hasProperty("useAndroidX") && (useAndroidX || useAndroidX.toBoolean())) {
-        // code changes
-        def codeTuples = new ArrayList<Tuple2<String, String>>()
-        codeTuples.add(new Tuple2<String, String>('android\\.support\\.annotation\\.NonNull', 'androidx.annotation.NonNull'))
-        codeTuples.add(new Tuple2<String, String>('android\\.support\\.v7\\.app\\.AppCompatActivity', 'androidx.appcompat.app.AppCompatActivity'))
-        codeTuples.add(new Tuple2<String, String>('android\\.support\\.v7\\.appcompat\\.R', 'androidx.appcompat.R'))
-        codeTuples.add(new Tuple2<String, String>('android\\.support\\.design\\.widget\\.TabLayout', 'com.google.android.material.tabs.TabLayout'))
-        codeTuples.add(new Tuple2<String, String>('android\\.support\\.v4\\.app\\.ActivityCompat', 'androidx.core.app.ActivityCompat'))
-        codeTuples.add(new Tuple2<String, String>('android\\.support\\.v4\\.app\\.Fragment', 'androidx.fragment.app.Fragment'))
-        codeTuples.add(new Tuple2<String, String>('android\\.support\\.v4\\.view\\.ViewPager', 'androidx.viewpager.widget.ViewPager'))
-        codeTuples.add(new Tuple2<String, String>('android\\.support\\.v7\\.widget\\.Toolbar', 'androidx.appcompat.widget.Toolbar'))
-        codeTuples.add(new Tuple2<String, String>('android\\.support\\.multidex\\.MultiDex', 'androidx.multidex.MultiDex'))
-
-        codeTuples.each { tuple ->
-            ant.replaceregexp(match: tuple.first, replace: tuple.second, flags: 'g', byline: true) {
-                fileset(dir: "$projectDir/src/debug/java/com/tns/", includes: '*.java')
-            }
-            ant.replaceregexp(match: tuple.first, replace: tuple.second, flags: 'g', byline: true) {
-                fileset(dir: "$projectDir/src/main/java/com/tns/", includes: '*.java')
-            }
-        }
-
-        // resource changes
-        def resourceTuples = new ArrayList<Tuple2<String, String>>()
-        resourceTuples.add(new Tuple2<String, String>('android\\.support\\.v7\\.widget\\.Toolbar', 'androidx.appcompat.widget.Toolbar'))
-        resourceTuples.add(new Tuple2<String, String>('android\\.support\\.v4\\.view\\.ViewPager', 'androidx.viewpager.widget.ViewPager'))
-        resourceTuples.add(new Tuple2<String, String>('android\\.support\\.design\\.widget\\.TabLayout', 'com.google.android.material.tabs.TabLayout'))
-
-        resourceTuples.each { tuple ->
-            ant.replaceregexp(match: tuple.first, replace: tuple.second, flags: 'g', byline: true) {
-                fileset(dir: "$projectDir/src/debug/res/layout/", includes: 'error_activity.xml')
-            }
-        }
     }
 }
 

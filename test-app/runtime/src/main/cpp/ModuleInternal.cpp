@@ -80,7 +80,7 @@ void ModuleInternal::Init(Isolate* isolate, const string& baseDir) {
     m_requireFactoryFunction = new Persistent<Function>(isolate, requireFactoryFunction);
 
     auto requireFuncTemplate = FunctionTemplate::New(isolate, RequireCallback, External::New(isolate, this));
-    auto requireFunc = requireFuncTemplate->GetFunction();
+    auto requireFunc = requireFuncTemplate->GetFunction(context).ToLocalChecked();
     global->Set(ArgConverter::ConvertToV8String(isolate, "__nativeRequire"), requireFunc);
     m_requireFunction = new Persistent<Function>(isolate, requireFunc);
 
@@ -339,7 +339,8 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& moduleP
     auto thiz = Object::New(isolate);
     auto extendsName = ArgConverter::ConvertToV8String(isolate, "__extends");
     thiz->Set(extendsName, isolate->GetCurrentContext()->Global()->Get(extendsName));
-    moduleFunc->Call(thiz, sizeof(requireArgs) / sizeof(Local<Value> ), requireArgs);
+    auto context = isolate->GetCurrentContext();
+    moduleFunc->Call(context, thiz, sizeof(requireArgs) / sizeof(Local<Value> ), requireArgs);
 
     if (tc.HasCaught()) {
         throw NativeScriptException(tc, "Error calling module function ");

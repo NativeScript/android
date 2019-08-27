@@ -25,14 +25,14 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
-import android.support.design.widget.TabLayout;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.app.Fragment;
-import android.support.v4.app.FragmentManager;
-import android.support.v4.app.FragmentStatePagerAdapter;
-import android.support.v4.view.ViewPager;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.Toolbar;
+import com.google.android.material.tabs.TabLayout;
+import androidx.core.app.ActivityCompat;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
+import androidx.fragment.app.FragmentStatePagerAdapter;
+import androidx.viewpager.widget.ViewPager;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
 import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -88,7 +88,9 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
                     checkSelfPermissionMethod = ActivityCompat.class.getMethod("checkSelfPermission", Context.class, String.class);
                 } catch (NoSuchMethodException e) {
                     // method wasn't found, so there is no need to handle permissions explicitly
-                    e.printStackTrace();
+                    if (Util.isDebuggableApp(activity)) {
+                        e.printStackTrace();
+                    }
                     return;
                 }
 
@@ -104,7 +106,9 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
                 }
             } catch (Exception e) {
                 Toast.makeText(activity, "Couldn't resolve permissions", Toast.LENGTH_LONG).show();
-                e.printStackTrace();
+                if (Util.isDebuggableApp(activity)) {
+                    e.printStackTrace();
+                }
                 return;
             }
         }
@@ -318,6 +322,7 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
 
         int tabCount;
 
+        @SuppressWarnings("deprecation")
         public Pager(FragmentManager fm, int tabCount) {
             super(fm);
             this.tabCount = tabCount;
@@ -409,7 +414,9 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
                         } catch (Exception e) {
                             String err = "Could not write logcat report to sdcard. Make sure you have allowed access to external storage!";
                             Toast.makeText(activity, err, Toast.LENGTH_LONG).show();
-                            e.printStackTrace();
+                            if (Util.isDebuggableApp(container.getContext())) {
+                                e.printStackTrace();
+                            }
                         }
                     }
                 }

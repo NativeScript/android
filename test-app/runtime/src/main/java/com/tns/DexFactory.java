@@ -1,5 +1,13 @@
 package com.tns;
 
+import android.util.Log;
+
+import com.tns.bindings.AnnotationDescriptor;
+import com.tns.bindings.ProxyGenerator;
+import com.tns.bindings.desc.ClassDescriptor;
+import com.tns.bindings.desc.reflection.ClassInfo;
+import com.tns.system.classes.loading.ClassStorageService;
+
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -10,17 +18,10 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.InvalidClassException;
 import java.io.OutputStreamWriter;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
-
-import com.tns.bindings.AnnotationDescriptor;
-import com.tns.bindings.ProxyGenerator;
-import com.tns.bindings.desc.ClassDescriptor;
-import com.tns.bindings.desc.reflection.ClassInfo;
 
 import dalvik.system.DexClassLoader;
 
@@ -32,11 +33,12 @@ public class DexFactory {
     private final File odexDir;
     private final String dexThumb;
     private final ClassLoader classLoader;
+    private final ClassStorageService classStorageService;
 
     private ProxyGenerator proxyGenerator;
     private HashMap<String, Class<?>> injectedDexClasses = new HashMap<String, Class<?>>();
 
-    public DexFactory(Logger logger, ClassLoader classLoader, File dexBaseDir, String dexThumb) {
+    DexFactory(Logger logger, ClassLoader classLoader, File dexBaseDir, String dexThumb, ClassStorageService classStorageService) {
         this.logger = logger;
         this.classLoader = classLoader;
         this.dexDir = dexBaseDir;
@@ -56,6 +58,7 @@ public class DexFactory {
 
         this.updateDexThumbAndPurgeCache();
         this.proxyGenerator.setProxyThumb(this.dexThumb);
+        this.classStorageService = classStorageService;
     }
 
     static long totalGenTime = 0;
@@ -152,33 +155,17 @@ public class DexFactory {
             out.closeEntry();
             out.close();
         }
-        //
 
-        Class<?> result = null;
-        try {
-            // use DexFile instead of DexClassLoader to allow class loading
-            // within the default class loader
-            // Note: According to the official documentation, DexFile should not
-            // be directly used.
-            // However, this is the only viable way to get our dynamic classes
-            // loaded within the system class loader
+        Class<?> result;
+        DexClassLoader dexClassLoader = new DexClassLoader(jarFilePath, this.odexDir.getAbsolutePath(), null, classLoader);
 
-            if (isInterface) {
-                @SuppressWarnings("deprecation")
-                dalvik.system.DexFile df = dalvik.system.DexFile.loadDex(jarFilePath, new File(this.odexDir, fullClassName).getAbsolutePath(), 0);
-                result = df.loadClass(fullClassName, classLoader);
-            } else {
-                @SuppressWarnings("deprecation")
-                dalvik.system.DexFile df = dalvik.system.DexFile.loadDex(jarFilePath, new File(this.odexDir, desiredDexClassName).getAbsolutePath(), 0);
-                result = df.loadClass(desiredDexClassName, classLoader);
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-            // fall back to DexClassLoader
-            DexClassLoader dexClassLoader = new DexClassLoader(jarFilePath, this.odexDir.getAbsolutePath(), null, classLoader);
+        if (isInterface) {
             result = dexClassLoader.loadClass(fullClassName);
+        } else {
+            result = dexClassLoader.loadClass(desiredDexClassName);
         }
 
+        classStorageService.storeClass(result.getName(), result);
         this.injectedDexClasses.put(originalFullClassName, result);
 
         return result;
@@ -317,11 +304,15 @@ public class DexFactory {
                 out.close();
             }
         } catch (FileNotFoundException e) {
-            logger.write("Error while writting current proxy thumb");
-            e.printStackTrace();
+            Log.w("JS", String.format("Error while writing current proxy thumb: %s", e.getMessage()));
+            if (com.tns.Runtime.isDebuggable()) {
+                e.printStackTrace();
+            }
         } catch (IOException e) {
-            logger.write("Error while writting current proxy thumb");
-            e.printStackTrace();
+            Log.w("JS", String.format("Error while writing current proxy thumb: %s", e.getMessage()));
+            if (com.tns.Runtime.isDebuggable()) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -366,11 +357,15 @@ public class DexFactory {
                 return cachedThumb;
             }
         } catch (FileNotFoundException e) {
-            logger.write("Error while getting current proxy thumb");
-            e.printStackTrace();
+            Log.w("JS", String.format("Error while writing current proxy thumb: %s", e.getMessage()));
+            if (com.tns.Runtime.isDebuggable()) {
+                e.printStackTrace();
+            }
         } catch (IOException e) {
-            logger.write("Error while getting current proxy thumb");
-            e.printStackTrace();
+            Log.w("JS", String.format("Error while writing current proxy thumb: %s", e.getMessage()));
+            if (com.tns.Runtime.isDebuggable()) {
+                e.printStackTrace();
+            }
         }
 
         return null;

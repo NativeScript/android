@@ -1,4 +1,4 @@
 {
-    "v8Version": "7.3.492.25",
-    "mksnapshotParams": "--profile_deserialization --turbo_instruction_scheduling"
+    "v8Version": "7.6.303.28",
+    "mksnapshotParams": "--profile_deserialization --turbo_instruction_scheduling --target_os=android --no-native-code-counters"
 }

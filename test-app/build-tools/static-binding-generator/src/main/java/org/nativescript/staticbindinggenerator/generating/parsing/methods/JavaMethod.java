@@ -18,6 +18,7 @@ public interface JavaMethod {
     boolean isStatic();
     boolean isFinal();
     boolean isSynthetic();
+    boolean isDeprecated();
     String getSignature();
     String getGenericSignature();
     boolean hasGenericSignature();

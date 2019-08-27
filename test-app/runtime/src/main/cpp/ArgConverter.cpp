@@ -15,12 +15,13 @@ using namespace tns;
 
 void ArgConverter::Init(Isolate* isolate) {
     auto cache = GetTypeLongCache(isolate);
+    auto context = isolate->GetCurrentContext();
 
     auto ft = FunctionTemplate::New(isolate, ArgConverter::NativeScriptLongFunctionCallback);
     ft->SetClassName(V8StringConstants::GetLongNumber(isolate));
     ft->InstanceTemplate()->Set(V8StringConstants::GetValueOf(isolate), FunctionTemplate::New(isolate, ArgConverter::NativeScriptLongValueOfFunctionCallback));
     ft->InstanceTemplate()->Set(V8StringConstants::GetToString(isolate), FunctionTemplate::New(isolate, ArgConverter::NativeScriptLongToStringFunctionCallback));
-    cache->LongNumberCtorFunc = new Persistent<Function>(isolate, ft->GetFunction());
+    cache->LongNumberCtorFunc = new Persistent<Function>(isolate, ft->GetFunction(context).ToLocalChecked());
 
     auto nanObject = Number::New(isolate, numeric_limits<double>::quiet_NaN()).As<NumberObject>();
     cache->NanNumberObject = new Persistent<NumberObject>(isolate, nanObject);
@@ -217,7 +218,8 @@ int64_t ArgConverter::ConvertToJavaLong(Isolate* isolate, const Local<Value>& va
 
     assert(!valueProp.IsEmpty());
 
-    string num = ConvertToString(valueProp->ToString(isolate));
+    Local<Context> context = isolate->GetCurrentContext();
+    string num = ConvertToString(valueProp->ToString(context).ToLocalChecked());
 
     int64_t longValue = atoll(num.c_str());
 
@@ -267,7 +269,7 @@ jstring ArgConverter::ConvertToJavaString(const Local<Value>& value) {
 }
 
 Local<String> ArgConverter::ConvertToV8String(Isolate* isolate, const jchar* data, int length) {
-    return String::NewFromTwoByte(isolate, (const uint16_t*) data, String::kNormalString, length);
+    return String::NewFromTwoByte(isolate, (const uint16_t*) data, NewStringType::kNormal, length).ToLocalChecked();
 }
 
 Local<String> ArgConverter::ConvertToV8String(Isolate* isolate, const string& s) {
@@ -276,11 +278,11 @@ Local<String> ArgConverter::ConvertToV8String(Isolate* isolate, const string& s)
 }
 
 Local<String> ArgConverter::ConvertToV8String(Isolate* isolate, const char* data, int length) {
-    return String::NewFromUtf8(isolate, (const char*) data, String::kNormalString, length);
+    return String::NewFromUtf8(isolate, (const char*) data, NewStringType::kNormal, length).ToLocalChecked();
 }
 
 Local<String> ArgConverter::ConvertToV8UTF16String(Isolate* isolate, const u16string& utf16string) {
-    return String::NewFromTwoByte(isolate, ((const uint16_t*) utf16string.data()));
+    return String::NewFromTwoByte(isolate, ((const uint16_t*) utf16string.data())).ToLocalChecked();
 }
 
 std::map<Isolate*, ArgConverter::TypeLongOperationsCache*> ArgConverter::s_type_long_operations_cache;

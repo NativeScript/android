@@ -20,7 +20,8 @@ class AppConfig {
         HandleTimeZoneChanges("handleTimeZoneChanges", false),
         MaxLogcatObjectSize("maxLogcatObjectSize", 1024),
         ForceLog("forceLog", false),
-        DiscardUncaughtJsExceptions("discardUncaughtJsExceptions", false);
+        DiscardUncaughtJsExceptions("discardUncaughtJsExceptions", false),
+        EnableLineBreakpoins("enableLineBreakpoints", false);
 
         private final String name;
         private final Object defaultValue;
@@ -103,8 +104,10 @@ class AppConfig {
                             MarkingMode markingMode = MarkingMode.valueOf(markingModeString);
                             values[KnownKeys.MarkingMode.ordinal()] = markingMode;
                         } catch (Exception e) {
-                            e.printStackTrace();
-                            Log.v("JS", "Failed to parse marking mode. The default " + ((MarkingMode)KnownKeys.MarkingMode.getDefaultValue()).name() + " will be used.");
+                            Log.e("JS", String.format("Failed to parse marking mode: %s. The default %s will be used!", e.getMessage(), ((MarkingMode)KnownKeys.MarkingMode.getDefaultValue()).name()));
+                            if (com.tns.Runtime.isDebuggable()) {
+                                e.printStackTrace();
+                            }
                         }
                     }
                     if (androidObject.has(KnownKeys.HandleTimeZoneChanges.getName())) {
@@ -116,10 +119,15 @@ class AppConfig {
                     if (androidObject.has(KnownKeys.ForceLog.getName())) {
                         values[KnownKeys.ForceLog.ordinal()] = androidObject.getBoolean(KnownKeys.ForceLog.getName());
                     }
+                    if (androidObject.has(KnownKeys.EnableLineBreakpoins.getName())) {
+                        values[KnownKeys.EnableLineBreakpoins.ordinal()] = androidObject.getBoolean(KnownKeys.EnableLineBreakpoins.getName());
+                    }
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            if (com.tns.Runtime.isDebuggable()) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -165,6 +173,10 @@ class AppConfig {
 
     public boolean getForceLog() {
         return (boolean)values[KnownKeys.ForceLog.ordinal()];
+    }
+
+    public boolean getLineBreakpointsEnabled() {
+        return (boolean)values[KnownKeys.EnableLineBreakpoins.ordinal()];
     }
 
     public boolean getDiscardUncaughtJsExceptions() {

@@ -9,7 +9,8 @@
 		"markingMode": "full",
 		"maxLogcatObjectSize": 1024,
 		"forceLog": false,
-		"suppressCallJSMethodExceptions": false
+		"suppressCallJSMethodExceptions": false,
+		"enableLineBreakpoints": false
 	},
 	"discardUncaughtJsExceptions": false
 }

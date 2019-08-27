@@ -301,7 +301,9 @@ public class DebugInfoItem {
                     try {
                         throw new IllegalArgumentException("Unknown Local Variable type.");
                     } catch (Exception e) {
-                        e.printStackTrace();
+                        if (com.tns.Runtime.isDebuggable()) {
+                            e.printStackTrace();
+                        }
                     }
                 }
             }

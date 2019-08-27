@@ -113,7 +113,9 @@ public class InstructionFormat35C extends Instruction
                 try {
                     throw new Exception("Abnormal arguments number : " + nbRegisters);
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    if (com.tns.Runtime.isDebuggable()) {
+                        e.printStackTrace();
+                    }
                 }
             }
         }
@@ -183,7 +185,9 @@ public class InstructionFormat35C extends Instruction
             try {
                 throw new Exception("Abnormal arguments number : " + nbRegisters);
             } catch (Exception e) {
-                e.printStackTrace();
+                if (com.tns.Runtime.isDebuggable()) {
+                    e.printStackTrace();
+                }
             }
         }
         int mask=0;

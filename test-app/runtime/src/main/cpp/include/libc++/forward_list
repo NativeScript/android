@@ -1,10 +1,9 @@
 // -*- C++ -*-
 //===----------------------- forward_list ---------------------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is dual licensed under the MIT and the University of Illinois Open
-// Source Licenses. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -166,6 +165,11 @@ template <class T, class Allocator>
 template <class T, class Allocator>
     void swap(forward_list<T, Allocator>& x, forward_list<T, Allocator>& y)
          noexcept(noexcept(x.swap(y)));
+
+template <class T, class Allocator, class U>
+    void erase(forward_list<T, Allocator>& c, const U& value);       // C++20
+template <class T, class Allocator, class Predicate>
+    void erase_if(forward_list<T, Allocator>& c, Predicate pred);    // C++20
 
 }  // std
 
@@ -1501,7 +1505,7 @@ template <class _Tp, class _Alloc>
 void
 forward_list<_Tp, _Alloc>::remove(const value_type& __v)
 {
-    forward_list<_Tp, _Alloc> __deleted_nodes; // collect the nodes we're removing
+    forward_list<_Tp, _Alloc> __deleted_nodes(get_allocator()); // collect the nodes we're removing
     iterator __e = end();
     for (iterator __i = before_begin(); __i.__get_begin()->__next_ != nullptr;)
     {
@@ -1525,6 +1529,7 @@ template <class _Predicate>
 void
 forward_list<_Tp, _Alloc>::remove_if(_Predicate __pred)
 {
+    forward_list<_Tp, _Alloc> __deleted_nodes(get_allocator()); // collect the nodes we're removing
     iterator __e = end();
     for (iterator __i = before_begin(); __i.__get_begin()->__next_ != nullptr;)
     {
@@ -1533,7 +1538,7 @@ forward_list<_Tp, _Alloc>::remove_if(_Predicate __pred)
             iterator __j = _VSTD::next(__i, 2);
             for (; __j != __e && __pred(*__j); ++__j)
                 ;
-            erase_after(__i, __j);
+            __deleted_nodes.splice_after(__deleted_nodes.before_begin(), *this, __i, __j);
             if (__j == __e)
                 break;
             __i = __j;
@@ -1548,13 +1553,14 @@ template <class _BinaryPredicate>
 void
 forward_list<_Tp, _Alloc>::unique(_BinaryPredicate __binary_pred)
 {
+    forward_list<_Tp, _Alloc> __deleted_nodes(get_allocator()); // collect the nodes we're removing
     for (iterator __i = begin(), __e = end(); __i != __e;)
     {
         iterator __j = _VSTD::next(__i);
         for (; __j != __e && __binary_pred(*__i, *__j); ++__j)
             ;
         if (__i.__get_begin()->__next_ != __j.__get_unsafe_node_pointer())
-            erase_after(__i, __j);
+            __deleted_nodes.splice_after(__deleted_nodes.before_begin(), *this, __i, __j);
         __i = __j;
     }
 }
@@ -1743,6 +1749,18 @@ swap(forward_list<_Tp, _Alloc>& __x, forward_list<_Tp, _Alloc>& __y)
 {
     __x.swap(__y);
 }
+
+#if _LIBCPP_STD_VER > 17
+template <class _Tp, class _Allocator, class _Predicate>
+inline _LIBCPP_INLINE_VISIBILITY
+void erase_if(forward_list<_Tp, _Allocator>& __c, _Predicate __pred)
+{ __c.remove_if(__pred); }
+
+template <class _Tp, class _Allocator, class _Up>
+inline _LIBCPP_INLINE_VISIBILITY
+void erase(forward_list<_Tp, _Allocator>& __c, const _Up& __v)
+{ _VSTD::erase_if(__c, [&](auto& __elem) { return __elem == __v; }); }
+#endif
 
 _LIBCPP_END_NAMESPACE_STD
 

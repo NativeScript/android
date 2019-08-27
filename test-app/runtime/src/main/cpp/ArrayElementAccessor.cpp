@@ -95,7 +95,7 @@ void ArrayElementAccessor::SetArrayElement(Isolate* isolate, const Local<Object>
     jboolean isCopy = false;
 
     if (elementSignature == "Z") { //bool
-        jboolean boolElementValue = (jboolean) value->BooleanValue(context).ToChecked();
+        jboolean boolElementValue = (jboolean) value->BooleanValue(isolate);
         jbooleanArray boolArr = static_cast<jbooleanArray>(arr);
         env.SetBooleanArrayRegion(boolArr, index, 1, &boolElementValue);
     } else if (elementSignature == "B") { //byte
@@ -103,7 +103,7 @@ void ArrayElementAccessor::SetArrayElement(Isolate* isolate, const Local<Object>
         jbyteArray byteArr = static_cast<jbyteArray>(arr);
         env.SetByteArrayRegion(byteArr, index, 1, &byteElementValue);
     } else if (elementSignature == "C") { //char
-        String::Utf8Value utf8(isolate, value->ToString(isolate));
+        String::Utf8Value utf8(isolate, value->ToString(context).ToLocalChecked());
         JniLocalRef s(env.NewString((jchar*) *utf8, 1));
         const char* singleChar = env.GetStringUTFChars(s, &isCopy);
         jchar charElementValue = *singleChar;

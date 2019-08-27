@@ -27,15 +27,16 @@ V8CSSAgentImpl::V8CSSAgentImpl(V8InspectorSessionImpl* session,
 
 V8CSSAgentImpl::~V8CSSAgentImpl() { }
 
-DispatchResponse V8CSSAgentImpl::enable() {
+void V8CSSAgentImpl::enable(std::unique_ptr<EnableCallback> callback) {
     if (m_enabled) {
-        return DispatchResponse::OK();
+        callback->sendSuccess();
+        return;
     }
 
     m_state->setBoolean(CSSAgentState::cssEnabled, true);
     m_enabled = true;
 
-    return DispatchResponse::OK();
+    callback->sendSuccess();
 }
 
 DispatchResponse V8CSSAgentImpl::disable() {
@@ -227,7 +228,7 @@ DispatchResponse V8CSSAgentImpl::forcePseudoState(int in_nodeId, std::unique_ptr
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
-DispatchResponse V8CSSAgentImpl::getBackgroundColors(int in_nodeId, Maybe<protocol::Array<String>>* out_backgroundColors, Maybe<String>* out_computedFontSize, Maybe<String>* out_computedFontWeight, Maybe<String>* out_computedBodyFontSize) {
+DispatchResponse V8CSSAgentImpl::getBackgroundColors(int in_nodeId, Maybe<protocol::Array<String>>* out_backgroundColors, Maybe<String>* out_computedFontSize, Maybe<String>* out_computedFontWeight) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 

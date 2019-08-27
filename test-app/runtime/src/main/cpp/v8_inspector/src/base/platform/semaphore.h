@@ -33,41 +33,41 @@ class TimeDelta;
 // count becomes non-zero.
 
 class V8_BASE_EXPORT Semaphore final {
-    public:
-        explicit Semaphore(int count);
-        ~Semaphore();
+ public:
+  explicit Semaphore(int count);
+  ~Semaphore();
 
-        // Increments the semaphore counter.
-        void Signal();
+  // Increments the semaphore counter.
+  void Signal();
 
-        // Decrements the semaphore counter if it is positive, or blocks until it
-        // becomes positive and then decrements the counter.
-        void Wait();
+  // Decrements the semaphore counter if it is positive, or blocks until it
+  // becomes positive and then decrements the counter.
+  void Wait();
 
-        // Like Wait() but returns after rel_time time has passed. If the timeout
-        // happens the return value is false and the counter is unchanged. Otherwise
-        // the semaphore counter is decremented and true is returned.
-        bool WaitFor(const TimeDelta& rel_time) V8_WARN_UNUSED_RESULT;
+  // Like Wait() but returns after rel_time time has passed. If the timeout
+  // happens the return value is false and the counter is unchanged. Otherwise
+  // the semaphore counter is decremented and true is returned.
+  bool WaitFor(const TimeDelta& rel_time) V8_WARN_UNUSED_RESULT;
 
 #if V8_OS_MACOSX
-        typedef semaphore_t NativeHandle;
+  using NativeHandle = semaphore_t;
 #elif V8_OS_POSIX
-        typedef sem_t NativeHandle;
+  using NativeHandle = sem_t;
 #elif V8_OS_WIN
-        typedef HANDLE NativeHandle;
+  using NativeHandle = HANDLE;
 #endif
 
-        NativeHandle& native_handle() {
-            return native_handle_;
-        }
-        const NativeHandle& native_handle() const {
-            return native_handle_;
-        }
+  NativeHandle& native_handle() {
+    return native_handle_;
+  }
+  const NativeHandle& native_handle() const {
+    return native_handle_;
+  }
 
-    private:
-        NativeHandle native_handle_;
+ private:
+  NativeHandle native_handle_;
 
-        DISALLOW_COPY_AND_ASSIGN(Semaphore);
+  DISALLOW_COPY_AND_ASSIGN(Semaphore);
 };
 
 
@@ -83,15 +83,15 @@ class V8_BASE_EXPORT Semaphore final {
 
 template <int N>
 struct CreateSemaphoreTrait {
-    static Semaphore* Create() {
-        return new Semaphore(N);
-    }
+  static Semaphore* Create() {
+    return new Semaphore(N);
+  }
 };
 
 template <int N>
 struct LazySemaphore {
-    typedef typename LazyDynamicInstance<Semaphore, CreateSemaphoreTrait<N>,
-            ThreadSafeInitOnceTrait>::type type;
+  using typename LazyDynamicInstance<Semaphore, CreateSemaphoreTrait<N>,
+                                     ThreadSafeInitOnceTrait>::type;
 };
 
 #define LAZY_SEMAPHORE_INITIALIZER LAZY_DYNAMIC_INSTANCE_INITIALIZER

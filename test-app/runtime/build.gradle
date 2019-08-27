@@ -22,7 +22,7 @@ if (useCCache) {
     println "Use CCache build triggered."
 }
 
-project.ext._buildToolsVersion = "28.0.3"
+project.ext._buildToolsVersion = "29.0.2"
 
 android {
 //    kotlinOptions {
@@ -37,12 +37,12 @@ android {
             java.srcDirs = [bindingGeneratorSourcePath, defaultSrcPath]
         }
     }
-    compileSdkVersion 28
+    compileSdkVersion 29
     buildToolsVersion project.ext._buildToolsVersion
 
     defaultConfig {
         minSdkVersion 17
-        targetSdkVersion 28
+        targetSdkVersion 29
         versionCode 1
         versionName "1.0"
 
@@ -59,15 +59,15 @@ android {
         externalNativeBuild {
             cmake {
                 if (optimized) {
-                    arguments.push("-DOPTIMIZED_BUILD=true")
+                    arguments.add("-DOPTIMIZED_BUILD=true")
                 }
 
                 if (optimizedWithInspector) {
-                    arguments.push("-DOPTIMIZED_WITH_INSPECTOR_BUILD=true")
+                    arguments.add("-DOPTIMIZED_WITH_INSPECTOR_BUILD=true")
                 }
 
                 if (useCCache) {
-                    arguments.push("-DUSE_CCACHE=true")
+                    arguments.add("-DUSE_CCACHE=true")
                 }
 
                 //https://developer.android.com/ndk/guides/cmake.html
@@ -80,7 +80,7 @@ android {
             if (onlyX86) {
                 abiFilters 'x86'
             } else {
-                abiFilters 'x86'//, 'armeabi-v7a', 'arm64-v8a'
+                abiFilters 'x86', 'x86_64', 'armeabi-v7a', 'arm64-v8a'
             }
         }
     }

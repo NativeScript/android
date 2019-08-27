@@ -1,3 +1,66 @@
+6.0.1
+==
+
+## Bug Fixes
+
+- [Arabic and Kurdish characters show as gibberish in console.log() (#1302)](https://github.com/NativeScript/android-runtime/issues/1302)
+- [IntentService extending fails at runtime when service is started (#1426)](https://github.com/NativeScript/android-runtime/issues/1426)
+- [SBG may fail when parsing big JS files (#1430)](https://github.com/NativeScript/android-runtime/issues/1430)
+- [Upgrade android gradle plugin to the latest 3.4.2 version (#1425)](https://github.com/NativeScript/android-runtime/issues/1425)
+
+
+
+6.0.0
+==
+
+## Breaking Changes
+
+- Exception information in onDiscarderError and onUnhandledError is changed so that `message` contains the exception message and `stackTrace` contains only the stackTrace. In the previous implementation `stackTrace` contained some additional details (including the exception message) and the `message` was something like:
+
+    ```
+    The application crashed because of an uncaught exception. You can look at "stackTrace" or "nativeException" for more detailed information about the exception.
+    ```
+
+- [The built-in `JSON.stringify` method is used for cross workers communication](https://github.com/NativeScript/android-runtime/issues/1408). Circular object references are no longer supported and attempting to send such object will throw an exception.
+
+
+## What's New
+
+- [Use the built-in JSON.stringify for cross workers communication (#1411)](https://github.com/NativeScript/android-runtime/pull/1411)
+- [Enable AndroidX and Jetifier(#1370)](https://github.com/NativeScript/android-runtime/issues/1370)
+- [Upgrade v8 to 7.5.288.22(#1387)](https://github.com/NativeScript/android-runtime/issues/1387)
+- [Upgrade android gradle plugin to the latest 3.4.1 version(#1390)](https://github.com/NativeScript/android-runtime/issues/1390)
+- [Remove printStackTrace method calls from the source code(#1359)](https://github.com/NativeScript/android-runtime/issues/1359)
+
+## Bug Fixes
+
+- [Improve package.json parsing in SBG (#1407)](https://github.com/NativeScript/android-runtime/pull/1407)
+- [Improve error message in SBG class parsing (#1401)](https://github.com/NativeScript/android-runtime/pull/1401)
+- [java.lang.NullPointerException in Metadata generator(#13795)](https://github.com/NativeScript/android-runtime/issues/1379)
+- [Buffer() is deprecated(#1392)](https://github.com/NativeScript/android-runtime/pull/1392)
+- [Warnings when building android(#1396)](https://github.com/NativeScript/android-runtime/issues/1396)
+- [No JS stack on discardedError and unhandledError(#1354)](https://github.com/NativeScript/android-runtime/issues/1354)
+
+
+5.4.0
+==
+
+## What's New
+
+- [Upgrade v8 to 7.4.288.25(#1356)](https://github.com/NativeScript/android-runtime/issues/1356)
+- [Upgrade the android gradle plugin to the latest 3.4.0 version(#1360)](https://github.com/NativeScript/android-runtime/issues/1360)
+- [Enable V8 symbols using from application's package.json file(#1368)](https://github.com/NativeScript/android-runtime/issues/1368)
+
+## Bug Fixes
+
+- [HashMaps improvements - fix for "Attempt to use cleared object reference"(#1345)](https://github.com/NativeScript/android-runtime/issues/1345)
+- [Unable to start Service when the application process is killed by the OS(#1347)](https://github.com/NativeScript/android-runtime/pull/1347)
+- [gradlew not compatible with sh(#1349)](https://github.com/NativeScript/android-runtime/issues/1349)
+- [Memory leak in global.postMessage(#1358)](https://github.com/NativeScript/android-runtime/issues/1358)
+- [memory leak java <-> javascript when java returns [] array(#1363)](https://github.com/NativeScript/android-runtime/issues/1363)
+- [Bug when reifying some generic classes in the SBG(#1372)](https://github.com/NativeScript/android-runtime/issues/1372)
+- [Extending an Android service fails if `onCreate` hasn't been overridden()](https://github.com/NativeScript/android-runtime/issues/1373)
+
 5.3.1
 ==
 ## Bug Fixes

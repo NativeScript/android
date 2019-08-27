@@ -85,7 +85,7 @@ namespace base {
 
 template <typename T>
 struct LeakyInstanceTrait {
-    static void Destroy(T* /* instance */) {}
+  static void Destroy(T* /* instance */) {}
 };
 
 
@@ -94,69 +94,67 @@ struct LeakyInstanceTrait {
 
 template <typename T>
 struct StaticallyAllocatedInstanceTrait {
-    using StorageType =
-        typename std::aligned_storage<sizeof(T), alignof(T)>::type;
+  using StorageType =
+      typename std::aligned_storage<sizeof(T), alignof(T)>::type;
 
-    static T* MutableInstance(StorageType* storage) {
-        return reinterpret_cast<T*>(storage);
-    }
+  static T* MutableInstance(StorageType* storage) {
+    return reinterpret_cast<T*>(storage);
+  }
 
-    template <typename ConstructTrait>
-    static void InitStorageUsingTrait(StorageType* storage) {
-        ConstructTrait::Construct(storage);
-    }
+  template <typename ConstructTrait>
+  static void InitStorageUsingTrait(StorageType* storage) {
+    ConstructTrait::Construct(storage);
+  }
 };
 
 
 template <typename T>
 struct DynamicallyAllocatedInstanceTrait {
-    using StorageType = T*;
+  using StorageType = T*;
 
-    static T* MutableInstance(StorageType* storage) {
-        return *storage;
-    }
+  static T* MutableInstance(StorageType* storage) {
+    return *storage;
+  }
 
-    template <typename CreateTrait>
-    static void InitStorageUsingTrait(StorageType* storage) {
-        *storage = CreateTrait::Create();
-    }
+  template <typename CreateTrait>
+  static void InitStorageUsingTrait(StorageType* storage) {
+    *storage = CreateTrait::Create();
+  }
 };
 
 
 template <typename T>
 struct DefaultConstructTrait {
-    // Constructs the provided object which was already allocated.
-    static void Construct(void* allocated_ptr) {
-        new (allocated_ptr) T();
-    }
+  // Constructs the provided object which was already allocated.
+  static void Construct(void* allocated_ptr) { new (allocated_ptr) T(); }
 };
 
 
 template <typename T>
 struct DefaultCreateTrait {
-    static T* Create() {
-        return new T();
-    }
+  static T* Create() {
+    return new T();
+  }
 };
 
 
 struct ThreadSafeInitOnceTrait {
-    template <typename Function, typename Storage>
-    static void Init(OnceType* once, Function function, Storage storage) {
-        CallOnce(once, function, storage);
-    }
+  template <typename Function, typename Storage>
+  static void Init(OnceType* once, Function function, Storage storage) {
+    CallOnce(once, function, storage);
+  }
 };
 
 
 // Initialization trait for users who don't care about thread-safety.
 struct SingleThreadInitOnceTrait {
-    template <typename Function, typename Storage>
-    static void Init(OnceType* once, Function function, Storage storage) {
-        if (*once == ONCE_STATE_UNINITIALIZED) {
-            function(storage);
-            *once = ONCE_STATE_DONE;
-        }
+  template <typename Function, typename Storage>
+  static void Init(OnceType* once, Function function, Storage storage) {
+    if (*once == ONCE_STATE_UNINITIALIZED) {
+      function(storage);
+      *once = ONCE_STATE_DONE;
     }
+  }
 };
 
 
@@ -164,35 +162,35 @@ struct SingleThreadInitOnceTrait {
 template <typename T, typename AllocationTrait, typename CreateTrait,
           typename InitOnceTrait, typename DestroyTrait  /* not used yet. */>
 struct LazyInstanceImpl {
-    public:
-        using StorageType = typename AllocationTrait::StorageType;
+ public:
+  using StorageType = typename AllocationTrait::StorageType;
 
-    private:
-        static void InitInstance(void* storage) {
-            AllocationTrait::template InitStorageUsingTrait<CreateTrait>(
-                static_cast<StorageType*>(storage));
-        }
+ private:
+  static void InitInstance(void* storage) {
+    AllocationTrait::template InitStorageUsingTrait<CreateTrait>(
+        static_cast<StorageType*>(storage));
+  }
 
-        void Init() const {
-            InitOnceTrait::Init(&once_, &InitInstance, static_cast<void*>(&storage_));
-        }
+  void Init() const {
+    InitOnceTrait::Init(&once_, &InitInstance, static_cast<void*>(&storage_));
+  }
 
-    public:
-        T* Pointer() {
-            Init();
-            return AllocationTrait::MutableInstance(&storage_);
-        }
+ public:
+  T* Pointer() {
+    Init();
+    return AllocationTrait::MutableInstance(&storage_);
+  }
 
-        const T& Get() const {
-            Init();
-            return *AllocationTrait::MutableInstance(&storage_);
-        }
+  const T& Get() const {
+    Init();
+    return *AllocationTrait::MutableInstance(&storage_);
+  }
 
-        mutable OnceType once_;
-        // Note that the previous field, OnceType, is an AtomicWord which guarantees
-        // 4-byte alignment of the storage field below. If compiling with GCC (>4.2),
-        // the LAZY_ALIGN macro above will guarantee correctness for any alignment.
-        mutable StorageType storage_;
+  mutable OnceType once_;
+  // Note that the previous field, OnceType, is an AtomicWord which guarantees
+  // 4-byte alignment of the storage field below. If compiling with GCC (>4.2),
+  // the LAZY_ALIGN macro above will guarantee correctness for any alignment.
+  mutable StorageType storage_;
 };
 
 
@@ -201,8 +199,8 @@ template <typename T,
           typename InitOnceTrait = ThreadSafeInitOnceTrait,
           typename DestroyTrait = LeakyInstanceTrait<T> >
 struct LazyStaticInstance {
-    typedef LazyInstanceImpl<T, StaticallyAllocatedInstanceTrait<T>,
-            CreateTrait, InitOnceTrait, DestroyTrait> type;
+  using type = LazyInstanceImpl<T, StaticallyAllocatedInstanceTrait<T>,
+                                CreateTrait, InitOnceTrait, DestroyTrait>;
 };
 
 
@@ -211,9 +209,9 @@ template <typename T,
           typename InitOnceTrait = ThreadSafeInitOnceTrait,
           typename DestroyTrait = LeakyInstanceTrait<T> >
 struct LazyInstance {
-    // A LazyInstance is a LazyStaticInstance.
-    typedef typename LazyStaticInstance<T, CreateTrait, InitOnceTrait,
-            DestroyTrait>::type type;
+  // A LazyInstance is a LazyStaticInstance.
+  using type = typename LazyStaticInstance<T, CreateTrait, InitOnceTrait,
+                                           DestroyTrait>::type;
 };
 
 
@@ -222,8 +220,8 @@ template <typename T,
           typename InitOnceTrait = ThreadSafeInitOnceTrait,
           typename DestroyTrait = LeakyInstanceTrait<T> >
 struct LazyDynamicInstance {
-    typedef LazyInstanceImpl<T, DynamicallyAllocatedInstanceTrait<T>,
-            CreateTrait, InitOnceTrait, DestroyTrait> type;
+  using type = LazyInstanceImpl<T, DynamicallyAllocatedInstanceTrait<T>,
+                                CreateTrait, InitOnceTrait, DestroyTrait>;
 };
 
 // LeakyObject<T> wraps an object of type T, which is initialized in the
@@ -231,20 +229,18 @@ struct LazyDynamicInstance {
 // destructible and can be used in static (lazily initialized) variables.
 template <typename T>
 class LeakyObject {
-    public:
-        template <typename... Args>
-        explicit LeakyObject(Args&& ... args) {
-            new (&storage_) T(std::forward<Args>(args)...);
-        }
+ public:
+  template <typename... Args>
+  explicit LeakyObject(Args&&... args) {
+    new (&storage_) T(std::forward<Args>(args)...);
+  }
 
-        T* get() {
-            return reinterpret_cast<T*>(&storage_);
-        }
+  T* get() { return reinterpret_cast<T*>(&storage_); }
 
-    private:
-        typename std::aligned_storage<sizeof(T), alignof(T)>::type storage_;
+ private:
+  typename std::aligned_storage<sizeof(T), alignof(T)>::type storage_;
 
-        DISALLOW_COPY_AND_ASSIGN(LeakyObject);
+  DISALLOW_COPY_AND_ASSIGN(LeakyObject);
 };
 
 // Define a function which returns a pointer to a lazily initialized and never

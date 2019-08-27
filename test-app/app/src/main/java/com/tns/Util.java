@@ -10,6 +10,9 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.os.Bundle;
+import android.util.Log;
+
+import androidx.core.content.pm.PackageInfoCompat;
 
 public final class Util {
     private Util() {
@@ -17,9 +20,9 @@ public final class Util {
 
     public static String getDexThumb(Context context) throws NameNotFoundException {
         PackageInfo packageInfo = context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
-        int code = packageInfo.versionCode;
+        long code = PackageInfoCompat.getLongVersionCode(packageInfo);
         long updateTime = packageInfo.lastUpdateTime;
-        return String.valueOf(updateTime) + "-" + String.valueOf(code);
+        return updateTime + "-" + code;
     }
 
     public static boolean isDebuggableApp(Context context) {
@@ -28,7 +31,9 @@ public final class Util {
             flags = context.getPackageManager().getPackageInfo(context.getPackageName(), 0).applicationInfo.flags;
         } catch (NameNotFoundException e) {
             flags = 0;
-            e.printStackTrace();
+            if (Util.isDebuggableApp(context)) {
+                e.printStackTrace();
+            }
         }
 
         boolean isDebuggableApp = ((flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0);
@@ -45,7 +50,7 @@ public final class Util {
                 pluginClassName = metadataBundle.getString("com.tns.internal.Plugin");
             }
         } catch (Exception e) {
-            if (logger.isEnabled()) {
+            if (Util.isDebuggableApp(context) && logger.isEnabled()) {
                 e.printStackTrace();
             }
         }
@@ -55,7 +60,7 @@ public final class Util {
             Plugin p = (Plugin) liveSyncPluginClass.newInstance();
             success = p.execute(context);
         } catch (Exception e) {
-            if (logger.isEnabled()) {
+            if (Util.isDebuggableApp(context) && logger.isEnabled()) {
                 e.printStackTrace();
             }
         }

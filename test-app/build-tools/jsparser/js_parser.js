@@ -22,10 +22,10 @@ loggingSettings = {
 var fs = require("fs"),
     babelParser = require("babylon"),
     traverse = require("babel-traverse"),
+    split = require('split'),
     logger = require('./helpers/logger')(loggingSettings),
     path = require("path"),
     es5_visitors = require("./visitors/es5-visitors"),
-    lazy = require("lazy"),
     eol = require('os').EOL,
 
     BUILD_TOOLS_DIR = `${__dirname}/../`,
@@ -99,17 +99,20 @@ readLinesFromFile(inputFilesPath, inputFiles, tsHelpersFilePath)
 */
 function readLinesFromFile(filePath, outArr, resolveParameter) {
     return new Promise(function (resolve, reject) {
-        new lazy(fs.createReadStream(filePath))
-            .lines
-            .forEach(function (line) {
+        fs.createReadStream(filePath)
+        .pipe(split())
+        .on('data', function (line) {
+            // skip empty lines
+            if(/\S/.test(line)) {
                 outArr.push(line.toString().trim());
-            }).on('pipe', function (err) {
-                if (err) {
-                    return reject(err);
-                }
-
-                return resolve(resolveParameter)
-            });
+            }
+        })
+        .on('error', function(err) {
+            return reject(err);
+        })
+        .on('close', function(e) {
+            return resolve(resolveParameter)
+        });
     });
 }
 
@@ -132,6 +135,7 @@ function getFileAst(tsHelpersFilePath) {
                 plugins: ["decorators"]
             });
 
+
             return resolve(ast);
         });
     });
@@ -143,19 +147,21 @@ function getFileAst(tsHelpersFilePath) {
 */
 function readInterfaceNames(data, err) {
     return new Promise(function (resolve, reject) {
-        new lazy(fs.createReadStream(interfacesNamesFilePath))
-            .lines
-            .forEach(function (line) {
-                interfaceNames.push(line.toString());
-            }).on('pipe', function (err) {
-                if (err) {
-                    return reject(false);
-                }
-
-                inputDir = path.normalize(inputDir);
-
-                return resolve(inputDir);
-            });
+        fs.createReadStream(interfacesNamesFilePath)
+        .pipe(split())
+        .on('data', function (line) {
+            // skip empty lines
+            if(/\S/.test(line)) {
+                interfaceNames.push(line.toString().trim());
+            }
+        })
+        .on('error', function(e) {
+            return reject(false);
+        })
+        .on('close', function(e) {
+            inputDir = path.normalize(inputDir);
+            return resolve(inputDir);
+        });
     })
 }
 
@@ -219,7 +225,7 @@ var astFromFileContent = function (path, data, err) {
 
         var ast = babelParser.parse(data.data, {
             minify: false,
-            plugins: ["decorators"]
+            plugins: ["decorators", "objectRestSpread"]
         });
         data.ast = ast;
         return resolve(data);

@@ -1,10 +1,9 @@
 // -*- C++ -*-
 //===---------------------------- ios -------------------------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is dual licensed under the MIT and the University of Illinois Open
-// Source Licenses. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 
@@ -331,6 +330,15 @@ public:
     void __set_badbit_and_consider_rethrow();
     void __set_failbit_and_consider_rethrow();
 
+    _LIBCPP_INLINE_VISIBILITY
+    void __setstate_nothrow(iostate __state)
+    {
+        if (__rdbuf_)
+            __rdstate_ |= __state;
+        else
+            __rdstate_ |= __state | ios_base::badbit;
+    }
+
 protected:
     _LIBCPP_INLINE_VISIBILITY
     ios_base() {// purposefully does no initialization
@@ -425,6 +433,16 @@ public:
     explicit failure(const char* __msg, const error_code& __ec = io_errc::stream);
     virtual ~failure() throw();
 };
+
+_LIBCPP_NORETURN inline _LIBCPP_INLINE_VISIBILITY
+void __throw_failure(char const* __msg) {
+#ifndef _LIBCPP_NO_EXCEPTIONS
+    throw ios_base::failure(__msg);
+#else
+    ((void)__msg);
+    _VSTD::abort();
+#endif
+}
 
 class _LIBCPP_TYPE_VIS ios_base::Init
 {

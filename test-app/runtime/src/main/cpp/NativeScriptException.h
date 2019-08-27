@@ -21,6 +21,11 @@ class NativeScriptException {
         NativeScriptException(const std::string& message);
 
         /*
+         * Generates a NativeScriptException with given message and stackTrace
+         */
+        NativeScriptException(const std::string& message, const std::string& stackTrace);
+
+        /*
          * Generates a NativeScriptException with javascript error from TryCatch and a prepend message if any
          */
         NativeScriptException(v8::TryCatch& tc, const std::string& message = "");
@@ -64,7 +69,7 @@ class NativeScriptException {
         /*
          * Gets all the information from a js message and an js error object and puts it in a string
          */
-        static std::string GetErrorMessage(const v8::Local<v8::Message>& message, v8::Local<v8::Value>& error);
+        static std::string GetErrorMessage(const v8::Local<v8::Message>& message, v8::Local<v8::Value>& error, const std::string& prependMessage = "");
 
         /*
          * Generates string stack trace from js StackTrace
@@ -74,11 +79,13 @@ class NativeScriptException {
         /*
          *	Adds a prepend message to the normal message process
          */
-        std::string GetFullMessage(const v8::TryCatch& tc, bool isExceptionEmpty, bool isMessageEmpty, const std::string& prependMessage = "");
+        std::string GetFullMessage(const v8::TryCatch& tc, const std::string& jsExceptionMessage);
 
         v8::Persistent<v8::Value>* m_javascriptException;
         JniLocalRef m_javaException;
         std::string m_message;
+        std::string m_stackTrace;
+        std::string m_fullMessage;
 
         static jclass RUNTIME_CLASS;
         static jclass THROWABLE_CLASS;

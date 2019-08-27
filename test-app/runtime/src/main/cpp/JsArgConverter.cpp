@@ -98,7 +98,8 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index) {
             sprintf(buff, "Cannot convert string to %s at index %d", typeSignature.c_str(), index);
         }
     } else if (arg->IsObject()) {
-        auto jsObject = arg->ToObject(m_isolate);
+        auto context = m_isolate->GetCurrentContext();
+        auto jsObject = arg->ToObject(context).ToLocalChecked();
 
         auto castType = NumericCasts::GetCastType(m_isolate, jsObject);
 
@@ -107,13 +108,12 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index) {
 
         auto runtime = Runtime::GetRuntime(m_isolate);
         auto objectManager = runtime->GetObjectManager();
-        auto context = m_isolate->GetCurrentContext();
 
         switch (castType) {
         case CastType::Char:
             castValue = NumericCasts::GetCastValue(jsObject);
             if (castValue->IsString()) {
-                string value = ArgConverter::ConvertToString(castValue->ToString(m_isolate));
+                string value = ArgConverter::ConvertToString(castValue->ToString(context).ToLocalChecked());
                 m_args[index].c = (jchar) value[0];
                 success = true;
             }
@@ -122,12 +122,12 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index) {
         case CastType::Byte:
             castValue = NumericCasts::GetCastValue(jsObject);
             if (castValue->IsString()) {
-                string strValue = ArgConverter::ConvertToString(castValue->ToString(m_isolate));
+                string strValue = ArgConverter::ConvertToString(castValue->ToString(context).ToLocalChecked());
                 int byteArg = atoi(strValue.c_str());
                 jbyte value = (jbyte) byteArg;
                 success = ConvertFromCastFunctionObject(value, index);
             } else if (castValue->IsInt32()) {
-                jbyte value = (jbyte) castValue->ToInt32(m_isolate)->Int32Value(context).ToChecked();
+                jbyte value = (jbyte) castValue->ToInt32(context).ToLocalChecked()->Int32Value(context).ToChecked();
                 success = ConvertFromCastFunctionObject(value, index);
             }
             break;
@@ -135,12 +135,12 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index) {
         case CastType::Short:
             castValue = NumericCasts::GetCastValue(jsObject);
             if (castValue->IsString()) {
-                string strValue = ArgConverter::ConvertToString(castValue->ToString(m_isolate));
+                string strValue = ArgConverter::ConvertToString(castValue->ToString(context).ToLocalChecked());
                 int shortArg = atoi(strValue.c_str());
                 jshort value = (jshort) shortArg;
                 success = ConvertFromCastFunctionObject(value, index);
             } else if (castValue->IsInt32()) {
-                jshort value = (jshort) castValue->ToInt32(m_isolate)->Int32Value(context).ToChecked();
+                jshort value = (jshort) castValue->ToInt32(context).ToLocalChecked()->Int32Value(context).ToChecked();
                 success = ConvertFromCastFunctionObject(value, index);
             }
             break;
@@ -148,12 +148,12 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index) {
         case CastType::Long:
             castValue = NumericCasts::GetCastValue(jsObject);
             if (castValue->IsString()) {
-                string strValue = ArgConverter::ConvertToString(castValue->ToString(m_isolate));
+                string strValue = ArgConverter::ConvertToString(castValue->ToString(context).ToLocalChecked());
                 int64_t longArg = atoll(strValue.c_str());
                 jlong value = (jlong) longArg;
                 success = ConvertFromCastFunctionObject(value, index);
             } else if (castValue->IsInt32()) {
-                jlong value = (jlong) castValue->ToInt32(m_isolate)->IntegerValue(context).ToChecked();
+                jlong value = (jlong) castValue->ToInt32(context).ToLocalChecked()->IntegerValue(context).ToChecked();
                 success = ConvertFromCastFunctionObject(value, index);
             }
             break;
@@ -161,7 +161,7 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index) {
         case CastType::Float:
             castValue = NumericCasts::GetCastValue(jsObject);
             if (castValue->IsNumber()) {
-                double floatArg = castValue->ToNumber(m_isolate)->NumberValue(context).ToChecked();
+                double floatArg = castValue->ToNumber(context).ToLocalChecked()->NumberValue(context).ToChecked();
                 jfloat value = (jfloat) floatArg;
                 success = ConvertFromCastFunctionObject(value, index);
             }
@@ -170,7 +170,7 @@ bool JsArgConverter::ConvertArg(const Local<Value>& arg, int index) {
         case CastType::Double:
             castValue = NumericCasts::GetCastValue(jsObject);
             if (castValue->IsNumber()) {
-                double doubleArg = castValue->ToNumber(m_isolate)->NumberValue(context).ToChecked();
+                double doubleArg = castValue->ToNumber(context).ToLocalChecked()->NumberValue(context).ToChecked();
                 jdouble value = (jdouble) doubleArg;
                 success = ConvertFromCastFunctionObject(value, index);
             }
@@ -287,12 +287,12 @@ bool JsArgConverter::ConvertJavaScriptBoolean(const Local<Value>& jsValue, int i
     if (typeSignature == "Z") {
         bool argValue;
         if (jsValue->IsBoolean()) {
-            argValue = jsValue->BooleanValue(context).ToChecked();
+            argValue = jsValue->BooleanValue(m_isolate);
         } else {
             auto boolObj = Local<BooleanObject>::Cast(jsValue);
             auto val = boolObj->Get(V8StringConstants::GetValueOf(m_isolate));
             if (!val.IsEmpty() && val->IsFunction()) {
-                argValue = val.As<Function>()->Call(boolObj, 0, nullptr)->BooleanValue(context).ToChecked();
+                argValue = val.As<Function>()->Call(context, boolObj, 0, nullptr).ToLocalChecked()->BooleanValue(m_isolate);
             } else {
                 argValue = false;
             }
@@ -336,7 +336,7 @@ bool JsArgConverter::ConvertJavaScriptArray(const Local<Array>& jsArr, int index
     case 'Z':
         arr = m_env.NewBooleanArray(arrLength);
         for (jsize i = 0; i < arrLength; i++) {
-            jboolean value = jsArr->Get(i)->BooleanValue(context).ToChecked();
+            jboolean value = jsArr->Get(i)->BooleanValue(m_isolate);
             m_env.SetBooleanArrayRegion((jbooleanArray) arr, i, 1, &value);
         }
         break;
@@ -350,7 +350,7 @@ bool JsArgConverter::ConvertJavaScriptArray(const Local<Array>& jsArr, int index
     case 'C':
         arr = m_env.NewCharArray(arrLength);
         for (jsize i = 0; i < arrLength; i++) {
-            String::Utf8Value utf8(m_isolate, jsArr->Get(i)->ToString(m_isolate));
+            String::Utf8Value utf8(m_isolate, jsArr->Get(i)->ToString(context).ToLocalChecked());
             JniLocalRef s(m_env.NewString((jchar*) *utf8, 1));
             const char* singleChar = m_env.GetStringUTFChars(s, nullptr);
             jchar value = *singleChar;

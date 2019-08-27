@@ -43,7 +43,7 @@ SimpleProfiler::~SimpleProfiler() {
 
 void SimpleProfiler::Init(Isolate* isolate, Local<ObjectTemplate>& globalTemplate) {
     s_frames.reserve(10000);
-    auto funcName = String::NewFromUtf8(isolate, "__printProfilerData");
+    auto funcName = String::NewFromUtf8(isolate, "__printProfilerData").ToLocalChecked();
     globalTemplate->Set(funcName, FunctionTemplate::New(isolate, PrintProfilerDataCallback));
 }
 

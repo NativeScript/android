@@ -2,8 +2,8 @@ package com.tns;
 
 import android.app.Application;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.v7.app.AppCompatActivity;
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
 import android.widget.Toast;
 
 import java.lang.reflect.Method;
@@ -13,7 +13,7 @@ import static com.tns.ErrorReport.resetCheckingForPermissions;
 
 public class ErrorReportActivity extends AppCompatActivity {
     public void onCreate(Bundle savedInstanceState) {
-        setTheme(android.support.v7.appcompat.R.style.Theme_AppCompat_NoActionBar);
+        setTheme(androidx.appcompat.R.style.Theme_AppCompat_NoActionBar);
 
         super.onCreate(savedInstanceState);
         Application app = this.getApplication();
@@ -41,7 +41,9 @@ public class ErrorReportActivity extends AppCompatActivity {
 
             resetCheckingForPermissions();
         } catch (Exception e) {
-            e.printStackTrace();
+            if (Util.isDebuggableApp(this)) {
+                e.printStackTrace();
+            }
             Toast.makeText(this, "Couldn't resolve permissions", Toast.LENGTH_LONG).show();
             resetCheckingForPermissions();
         }

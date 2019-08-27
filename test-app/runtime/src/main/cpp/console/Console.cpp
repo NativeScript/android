@@ -74,7 +74,8 @@ void Console::sendToDevToolsFrontEnd(v8::Isolate* isolate, const std::string& me
 }
 
 const v8::Local<v8::String> transformJSObject(v8::Isolate* isolate, v8::Local<v8::Object> object) {
-    auto objToString = object->ToString(isolate);
+    auto context = isolate->GetCurrentContext();
+    auto objToString = object->ToString(context).ToLocalChecked();
     v8::Local<v8::String> resultString;
 
     auto hasCustomToStringImplementation = ArgConverter::ConvertToString(objToString).find("[object Object]") == std::string::npos;
@@ -94,10 +95,10 @@ const v8::Local<v8::String> buildStringFromArg(v8::Isolate* isolate, const v8::L
     if (val->IsFunction()) {
         val->ToDetailString(isolate->GetCurrentContext()).ToLocal(&argString);
     } else if (val->IsArray()) {
-        auto cachedSelf = val;
-        auto array = val->ToObject(isolate);
-        auto arrayEntryKeys = array->GetPropertyNames(isolate->GetCurrentContext()).ToLocalChecked();
         auto context = isolate->GetCurrentContext();
+        auto cachedSelf = val;
+        auto array = val->ToObject(context).ToLocalChecked();
+        auto arrayEntryKeys = array->GetPropertyNames(isolate->GetCurrentContext()).ToLocalChecked();
 
         auto arrayLength = arrayEntryKeys->Length();
 
@@ -174,7 +175,7 @@ void Console::assertCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 
         auto argLen = info.Length();
         auto context = isolate->GetCurrentContext();
-        auto expressionPasses = argLen && info[0]->BooleanValue(context).ToChecked();
+        auto expressionPasses = argLen && info[0]->BooleanValue(isolate);
 
         if (!expressionPasses) {
             std::stringstream assertionError;
@@ -320,7 +321,7 @@ void Console::dirCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
 
                     auto propIsFunction = propertyValue->IsFunction();
 
-                    ss << ArgConverter::ConvertToString(propertyName->ToString(isolate));
+                    ss << ArgConverter::ConvertToString(propertyName->ToString(context).ToLocalChecked());
 
                     if (propIsFunction) {
                         ss << "()";
@@ -329,7 +330,7 @@ void Console::dirCallback(const v8::FunctionCallbackInfo<v8::Value>& info) {
                         std::string jsonStringifiedArray = ArgConverter::ConvertToString(stringResult);
                         ss << ": " << jsonStringifiedArray;
                     } else if (propertyValue->IsObject()) {
-                        auto obj = propertyValue->ToObject(isolate);
+                        auto obj = propertyValue->ToObject(context).ToLocalChecked();
                         auto objString = transformJSObject(isolate, obj);
                         std::string jsonStringifiedObject = ArgConverter::ConvertToString(objString);
                         // if object prints out as the error string for circular references, replace with #CR instead for brevity

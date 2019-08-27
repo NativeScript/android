@@ -1,6 +1,6 @@
 {
     "protocol": {
-        "path": "js_protocol.json",
+        "path": "js_protocol.pdl",
         "package": "src/inspector/protocol",
         "output": "protocol",
         "namespace": ["v8_inspector", "protocol"],
@@ -28,16 +28,22 @@
                 "domain": "HeapProfiler"
             },
             {
-                "domain": "Page"
+                "domain": "Page",
+                "exclude": ["getNavigationHistory", "navigateToHistoryEntry", "resetNavigationHistory", "captureScreenshot", "screencastFrameAck", "handleJavaScriptDialog", "setColorPickerEnabled", "getAppManifest", "setControlNavigations", "processNavigation", "printToPDF", "bringToFront", "setDownloadBehavior", "navigate", "crash", "close", "setWebLifecycleState", "captureSnapshot"],
+                "async": ["getResourceContent", "searchInResource"],
+                "exclude_events": ["screencastFrame", "screencastVisibilityChanged", "colorPicked", "interstitialShown", "interstitialHidden", "javascriptDialogOpening", "javascriptDialogClosed", "navigationRequested"]
             },
             {
-                "domain": "Network"
+                "domain": "Network",
+                "exclude": ["clearBrowserCache", "clearBrowserCookies", "getCookies", "getAllCookies", "deleteCookies", "setCookie", "setCookies", "canEmulateNetworkConditions", "setRequestInterception", "continueInterceptedRequest", "getResponseBodyForInterception", "takeResponseBodyForInterceptionAsStream"],
+                "async": ["getResponseBody", "getRequestPostData"]
             },
             {
                 "domain": "DOM"
             },
             {
-                "domain": "CSS"
+                "domain": "CSS",
+                "async": ["enable"]
             },
             {
                 "domain": "Overlay"
@@ -46,7 +52,8 @@
                 "domain": "Log"
             },
             {
-                "domain": "Security"
+                "domain": "Security",
+                "include": []
             }
         ]
     },

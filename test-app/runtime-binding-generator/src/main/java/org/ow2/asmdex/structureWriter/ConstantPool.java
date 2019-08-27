@@ -1082,7 +1082,9 @@ public class ConstantPool {
             try {
                 throw new Exception("Sorted Classes list doesn't match the original list !");
             } catch (Exception e) {
-                e.printStackTrace();
+                if (com.tns.Runtime.isDebuggable()) {
+                    e.printStackTrace();
+                }
             }
         }
     }

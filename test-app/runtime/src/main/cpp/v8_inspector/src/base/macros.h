@@ -8,7 +8,6 @@
 #include <limits>
 
 #include "src/base/compiler-specific.h"
-#include "src/base/format-macros.h"
 #include "src/base/logging.h"
 
 // No-op macro which is used to work around MSVC's funky VA_ARGS support.
@@ -101,11 +100,11 @@ char (&ArraySizeHelper(const T (&array)[N]))[N];
 // is likely to surprise you.
 template <class Dest, class Source>
 V8_INLINE Dest bit_cast(Source const& source) {
-    static_assert(sizeof(Dest) == sizeof(Source),
-                  "source and dest must be same size");
-    Dest dest;
-    memcpy(&dest, &source, sizeof(dest));
-    return dest;
+  static_assert(sizeof(Dest) == sizeof(Source),
+                "source and dest must be same size");
+  Dest dest;
+  memcpy(&dest, &source, sizeof(dest));
+  return dest;
 }
 
 // Explicitly declare the assignment operator as deleted.
@@ -146,7 +145,7 @@ V8_INLINE Dest bit_cast(Source const& source) {
 //  odr-used by the definition of the destructor of that class, [...]
 #define DISALLOW_NEW_AND_DELETE()                            \
   void* operator new(size_t) { base::OS::Abort(); }          \
-  void* operator new[](size_t) { base::OS::Abort(); };       \
+  void* operator new[](size_t) { base::OS::Abort(); }        \
   void operator delete(void*, size_t) { base::OS::Abort(); } \
   void operator delete[](void*, size_t) { base::OS::Abort(); }
 
@@ -209,44 +208,44 @@ namespace base {
 template <typename T>
 struct is_trivially_copyable {
 #if V8_CC_MSVC
-    // Unfortunately, MSVC 2015 is broken in that std::is_trivially_copyable can
-    // be false even though it should be true according to the standard.
-    // (status at 2018-02-26, observed on the msvc waterfall bot).
-    // Interestingly, the lower-level primitives used below are working as
-    // intended, so we reimplement this according to the standard.
-    // See also https://developercommunity.visualstudio.com/content/problem/
-    //          170883/msvc-type-traits-stdis-trivial-is-bugged.html.
-    static constexpr bool value =
-        // Copy constructor is trivial or deleted.
-        (std::is_trivially_copy_constructible<T>::value ||
-         !std::is_copy_constructible<T>::value) &&
-        // Copy assignment operator is trivial or deleted.
-        (std::is_trivially_copy_assignable<T>::value ||
-         !std::is_copy_assignable<T>::value) &&
-        // Move constructor is trivial or deleted.
-        (std::is_trivially_move_constructible<T>::value ||
-         !std::is_move_constructible<T>::value) &&
-        // Move assignment operator is trivial or deleted.
-        (std::is_trivially_move_assignable<T>::value ||
-         !std::is_move_assignable<T>::value) &&
-        // (Some implementations mandate that one of the above is non-deleted, but
-        // the standard does not, so let's skip this check.)
-        // Trivial non-deleted destructor.
-        std::is_trivially_destructible<T>::value;
+  // Unfortunately, MSVC 2015 is broken in that std::is_trivially_copyable can
+  // be false even though it should be true according to the standard.
+  // (status at 2018-02-26, observed on the msvc waterfall bot).
+  // Interestingly, the lower-level primitives used below are working as
+  // intended, so we reimplement this according to the standard.
+  // See also https://developercommunity.visualstudio.com/content/problem/
+  //          170883/msvc-type-traits-stdis-trivial-is-bugged.html.
+  static constexpr bool value =
+      // Copy constructor is trivial or deleted.
+      (std::is_trivially_copy_constructible<T>::value ||
+       !std::is_copy_constructible<T>::value) &&
+      // Copy assignment operator is trivial or deleted.
+      (std::is_trivially_copy_assignable<T>::value ||
+       !std::is_copy_assignable<T>::value) &&
+      // Move constructor is trivial or deleted.
+      (std::is_trivially_move_constructible<T>::value ||
+       !std::is_move_constructible<T>::value) &&
+      // Move assignment operator is trivial or deleted.
+      (std::is_trivially_move_assignable<T>::value ||
+       !std::is_move_assignable<T>::value) &&
+      // (Some implementations mandate that one of the above is non-deleted, but
+      // the standard does not, so let's skip this check.)
+      // Trivial non-deleted destructor.
+      std::is_trivially_destructible<T>::value;
 
 #elif defined(__GNUC__) && __GNUC__ < 5
-    // WARNING:
-    // On older libstdc++ versions, there is no way to correctly implement
-    // is_trivially_copyable. The workaround below is an approximation (neither
-    // over- nor underapproximation). E.g. it wrongly returns true if the move
-    // constructor is non-trivial, and it wrongly returns false if the copy
-    // constructor is deleted, but copy assignment is trivial.
-    // TODO(rongjie) Remove this workaround once we require gcc >= 5.0
-    static constexpr bool value =
-        __has_trivial_copy(T) && __has_trivial_destructor(T);
+  // WARNING:
+  // On older libstdc++ versions, there is no way to correctly implement
+  // is_trivially_copyable. The workaround below is an approximation (neither
+  // over- nor underapproximation). E.g. it wrongly returns true if the move
+  // constructor is non-trivial, and it wrongly returns false if the copy
+  // constructor is deleted, but copy assignment is trivial.
+  // TODO(rongjie) Remove this workaround once we require gcc >= 5.0
+  static constexpr bool value =
+      __has_trivial_copy(T) && __has_trivial_destructor(T);
 
 #else
-    static constexpr bool value = std::is_trivially_copyable<T>::value;
+  static constexpr bool value = std::is_trivially_copyable<T>::value;
 #endif
 };
 #if defined(__GNUC__) && __GNUC__ < 5
@@ -267,8 +266,8 @@ struct is_trivially_copyable {
 // issued for (yet) unused variables (typically parameters).
 // The arguments are guaranteed to be evaluated from left to right.
 struct Use {
-    template <typename T>
-    Use(T&&) {}  // NOLINT(runtime/explicit)
+  template <typename T>
+  Use(T&&) {}  // NOLINT(runtime/explicit)
 };
 #define USE(...)                                                   \
   do {                                                             \
@@ -290,7 +289,7 @@ struct Use {
 // Only use this for cheap-to-copy types, or use move semantics explicitly.
 template <class A>
 V8_INLINE A implicit_cast(A x) {
-    return x;
+  return x;
 }
 
 // Define our own macros for writing 64-bit constants.  This is less fragile
@@ -318,7 +317,7 @@ V8_INLINE A implicit_cast(A x) {
 #define V8PRIdPTR V8_PTR_PREFIX "d"
 #define V8PRIuPTR V8_PTR_PREFIX "u"
 
-#ifdef V8_TARGET_ARCH_64_BIT
+#if V8_TARGET_ARCH_64_BIT
 #define V8_PTR_HEX_DIGITS 12
 #define V8PRIxPTR_FMT "0x%012" V8PRIxPTR
 #else
@@ -355,61 +354,61 @@ V8_INLINE A implicit_cast(A x) {
 // Return the largest multiple of m which is <= x.
 template <typename T>
 inline T RoundDown(T x, intptr_t m) {
-    STATIC_ASSERT(std::is_integral<T>::value);
-    // m must be a power of two.
-    DCHECK(m != 0 && ((m & (m - 1)) == 0));
-    return x & -m;
+  STATIC_ASSERT(std::is_integral<T>::value);
+  // m must be a power of two.
+  DCHECK(m != 0 && ((m & (m - 1)) == 0));
+  return x & -m;
 }
 template <intptr_t m, typename T>
 constexpr inline T RoundDown(T x) {
-    STATIC_ASSERT(std::is_integral<T>::value);
-    // m must be a power of two.
-    STATIC_ASSERT(m != 0 && ((m & (m - 1)) == 0));
-    return x & -m;
+  STATIC_ASSERT(std::is_integral<T>::value);
+  // m must be a power of two.
+  STATIC_ASSERT(m != 0 && ((m & (m - 1)) == 0));
+  return x & -m;
 }
 
 // Return the smallest multiple of m which is >= x.
 template <typename T>
 inline T RoundUp(T x, intptr_t m) {
-    STATIC_ASSERT(std::is_integral<T>::value);
-    return RoundDown<T>(static_cast<T>(x + m - 1), m);
+  STATIC_ASSERT(std::is_integral<T>::value);
+  return RoundDown<T>(static_cast<T>(x + m - 1), m);
 }
 template <intptr_t m, typename T>
 constexpr inline T RoundUp(T x) {
-    STATIC_ASSERT(std::is_integral<T>::value);
-    return RoundDown<m, T>(static_cast<T>(x + (m - 1)));
+  STATIC_ASSERT(std::is_integral<T>::value);
+  return RoundDown<m, T>(static_cast<T>(x + (m - 1)));
 }
 
 template <typename T, typename U>
 constexpr inline bool IsAligned(T value, U alignment) {
-    return (value & (alignment - 1)) == 0;
+  return (value & (alignment - 1)) == 0;
 }
 
 inline void* AlignedAddress(void* address, size_t alignment) {
-    // The alignment must be a power of two.
-    DCHECK_EQ(alignment & (alignment - 1), 0u);
-    return reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(address) &
-                                   ~static_cast<uintptr_t>(alignment - 1));
+  // The alignment must be a power of two.
+  DCHECK_EQ(alignment & (alignment - 1), 0u);
+  return reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(address) &
+                                 ~static_cast<uintptr_t>(alignment - 1));
 }
 
 // Bounds checks for float to integer conversions, which does truncation. Hence,
 // the range of legal values is (min - 1, max + 1).
 template <typename int_t, typename float_t, typename biggest_int_t = int64_t>
 bool is_inbounds(float_t v) {
-    static_assert(sizeof(int_t) < sizeof(biggest_int_t),
-                  "int_t can't be bounds checked by the compiler");
-    constexpr float_t kLowerBound =
-        static_cast<float_t>(std::numeric_limits<int_t>::min()) - 1;
-    constexpr float_t kUpperBound =
-        static_cast<float_t>(std::numeric_limits<int_t>::max()) + 1;
-    constexpr bool kLowerBoundIsMin =
-        static_cast<biggest_int_t>(kLowerBound) ==
-        static_cast<biggest_int_t>(std::numeric_limits<int_t>::min());
-    constexpr bool kUpperBoundIsMax =
-        static_cast<biggest_int_t>(kUpperBound) ==
-        static_cast<biggest_int_t>(std::numeric_limits<int_t>::max());
-    return (kLowerBoundIsMin ? (kLowerBound <= v) : (kLowerBound < v)) &&
-           (kUpperBoundIsMax ? (v <= kUpperBound) : (v < kUpperBound));
+  static_assert(sizeof(int_t) < sizeof(biggest_int_t),
+                "int_t can't be bounds checked by the compiler");
+  constexpr float_t kLowerBound =
+      static_cast<float_t>(std::numeric_limits<int_t>::min()) - 1;
+  constexpr float_t kUpperBound =
+      static_cast<float_t>(std::numeric_limits<int_t>::max()) + 1;
+  constexpr bool kLowerBoundIsMin =
+      static_cast<biggest_int_t>(kLowerBound) ==
+      static_cast<biggest_int_t>(std::numeric_limits<int_t>::min());
+  constexpr bool kUpperBoundIsMax =
+      static_cast<biggest_int_t>(kUpperBound) ==
+      static_cast<biggest_int_t>(std::numeric_limits<int_t>::max());
+  return (kLowerBoundIsMin ? (kLowerBound <= v) : (kLowerBound < v)) &&
+         (kUpperBoundIsMax ? (v <= kUpperBound) : (v < kUpperBound));
 }
 
 #ifdef V8_OS_WIN

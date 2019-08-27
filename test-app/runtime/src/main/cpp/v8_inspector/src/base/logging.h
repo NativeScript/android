@@ -14,17 +14,39 @@
 #include "src/base/compiler-specific.h"
 #include "src/base/template-utils.h"
 
-[[noreturn]] PRINTF_FORMAT(3, 4) V8_BASE_EXPORT V8_NOINLINE
-void V8_Fatal(const char* file, int line, const char* format, ...);
-
 V8_BASE_EXPORT V8_NOINLINE void V8_Dcheck(const char* file, int line,
-        const char* message);
+                                          const char* message);
 
 #ifdef DEBUG
+// In debug, include file, line, and full error message for all
+// FATAL() calls.
+[[noreturn]] PRINTF_FORMAT(3, 4) V8_BASE_EXPORT V8_NOINLINE
+    void V8_Fatal(const char* file, int line, const char* format, ...);
 #define FATAL(...) V8_Fatal(__FILE__, __LINE__, __VA_ARGS__)
+
+#elif !defined(OFFICIAL_BUILD)
+// In non-official release, include full error message, but drop file & line
+// numbers. It saves binary size to drop the |file| & |line| as opposed to just
+// passing in "", 0 for them.
+[[noreturn]] PRINTF_FORMAT(1, 2) V8_BASE_EXPORT V8_NOINLINE
+    void V8_Fatal(const char* format, ...);
+#define FATAL(...) V8_Fatal(__VA_ARGS__)
 #else
-#define FATAL(...) V8_Fatal("", 0, __VA_ARGS__)
+// In official builds, include only messages that contain parameters because
+// single-message errors can always be derived from stack traces.
+[[noreturn]] V8_BASE_EXPORT V8_NOINLINE void V8_FatalNoContext();
+[[noreturn]] PRINTF_FORMAT(1, 2) V8_BASE_EXPORT V8_NOINLINE
+    void V8_Fatal(const char* format, ...);
+// FATAL(msg) -> V8_FatalNoContext()
+// FATAL(msg, ...) -> V8_Fatal()
+#define FATAL_HELPER(_7, _6, _5, _4, _3, _2, _1, _0, ...) _0
+#define FATAL_DISCARD_ARG(arg) V8_FatalNoContext()
+#define FATAL(...)                                                            \
+  FATAL_HELPER(__VA_ARGS__, V8_Fatal, V8_Fatal, V8_Fatal, V8_Fatal, V8_Fatal, \
+               V8_Fatal, V8_Fatal, FATAL_DISCARD_ARG)                         \
+  (__VA_ARGS__)
 #endif
+
 #define UNIMPLEMENTED() FATAL("unimplemented code")
 #define UNREACHABLE() FATAL("unreachable code")
 
@@ -36,7 +58,15 @@ V8_BASE_EXPORT void SetPrintStackTrace(void (*print_stack_trace_)());
 
 // Override the default function that handles DCHECKs.
 V8_BASE_EXPORT void SetDcheckFunction(void (*dcheck_Function)(const char*, int,
-                                      const char*));
+                                                              const char*));
+
+// In official builds, assume all check failures can be debugged given just the
+// stack trace.
+#if !defined(DEBUG) && defined(OFFICIAL_BUILD)
+#define CHECK_FAILED_HANDLER(message) FATAL("ignored")
+#else
+#define CHECK_FAILED_HANDLER(message) FATAL("Check failed: %s.", message)
+#endif
 
 // CHECK dies with a fatal error if condition is not true.  It is *not*
 // controlled by DEBUG, so the check will be executed regardless of
@@ -47,7 +77,7 @@ V8_BASE_EXPORT void SetDcheckFunction(void (*dcheck_Function)(const char*, int,
 #define CHECK_WITH_MSG(condition, message) \
   do {                                     \
     if (V8_UNLIKELY(!(condition))) {       \
-      FATAL("Check failed: %s.", message); \
+      CHECK_FAILED_HANDLER(message);       \
     }                                      \
   } while (false)
 #define CHECK(condition) CHECK_WITH_MSG(condition, #condition)
@@ -107,10 +137,10 @@ V8_BASE_EXPORT void SetDcheckFunction(void (*dcheck_Function)(const char*, int,
 // Define PrintCheckOperand<T> for each T which defines operator<< for ostream.
 template <typename T>
 typename std::enable_if<
-!std::is_function<typename std::remove_pointer<T>::type>::value&&
-has_output_operator<T>::value>::type
+    !std::is_function<typename std::remove_pointer<T>::type>::value &&
+    has_output_operator<T>::value>::type
 PrintCheckOperand(std::ostream& os, T val) {
-    os << std::forward<T>(val);
+  os << std::forward<T>(val);
 }
 
 // Provide an overload for functions and function pointers. Function pointers
@@ -120,31 +150,31 @@ PrintCheckOperand(std::ostream& os, T val) {
 // pointers, so this is a no-op for MSVC.)
 template <typename T>
 typename std::enable_if<
-std::is_function<typename std::remove_pointer<T>::type>::value>::type
+    std::is_function<typename std::remove_pointer<T>::type>::value>::type
 PrintCheckOperand(std::ostream& os, T val) {
-    os << reinterpret_cast<const void*>(val);
+  os << reinterpret_cast<const void*>(val);
 }
 
 // Define PrintCheckOperand<T> for enums which have no operator<<.
 template <typename T>
-typename std::enable_if<std::is_enum<T>::value&&
-!has_output_operator<T>::value>::type
+typename std::enable_if<std::is_enum<T>::value &&
+                        !has_output_operator<T>::value>::type
 PrintCheckOperand(std::ostream& os, T val) {
-    using underlying_t = typename std::underlying_type<T>::type;
-    // 8-bit types are not printed as number, so extend them to 16 bit.
-    using int_t = typename std::conditional<
-                  std::is_same<underlying_t, uint8_t>::value, uint16_t,
-                  typename std::conditional<std::is_same<underlying_t, int8_t>::value,
-                  int16_t, underlying_t>::type>::type;
-    PrintCheckOperand(os, static_cast<int_t>(static_cast<underlying_t>(val)));
+  using underlying_t = typename std::underlying_type<T>::type;
+  // 8-bit types are not printed as number, so extend them to 16 bit.
+  using int_t = typename std::conditional<
+      std::is_same<underlying_t, uint8_t>::value, uint16_t,
+      typename std::conditional<std::is_same<underlying_t, int8_t>::value,
+                                int16_t, underlying_t>::type>::type;
+  PrintCheckOperand(os, static_cast<int_t>(static_cast<underlying_t>(val)));
 }
 
 // Define default PrintCheckOperand<T> for non-printable types.
 template <typename T>
-typename std::enable_if<!has_output_operator<T>::value&&
-!std::is_enum<T>::value>::type
+typename std::enable_if<!has_output_operator<T>::value &&
+                        !std::is_enum<T>::value>::type
 PrintCheckOperand(std::ostream& os, T val) {
-    os << "<unprintable>";
+  os << "<unprintable>";
 }
 
 // Define specializations for character types, defined in logging.cc.
@@ -169,13 +199,13 @@ DEFINE_PRINT_CHECK_OPERAND_CHAR(unsigned char)
 // takes ownership of the returned string.
 template <typename Lhs, typename Rhs>
 std::string* MakeCheckOpString(Lhs lhs, Rhs rhs, char const* msg) {
-    std::ostringstream ss;
-    ss << msg << " (";
-    PrintCheckOperand<Lhs>(ss, lhs);
-    ss << " vs. ";
-    PrintCheckOperand<Rhs>(ss, rhs);
-    ss << ")";
-    return new std::string(ss.str());
+  std::ostringstream ss;
+  ss << msg << " (";
+  PrintCheckOperand<Lhs>(ss, lhs);
+  ss << " vs. ";
+  PrintCheckOperand<Rhs>(ss, rhs);
+  ss << ")";
+  return new std::string(ss.str());
 }
 
 // Commonly used instantiations of MakeCheckOpString<>. Explicitly instantiated
@@ -200,18 +230,18 @@ EXPLICIT_CHECK_OP_INSTANTIATION(void const*)
 // "unsigned int", to allow "unsigned int == bool" comparisons.
 template <typename T>
 struct comparison_underlying_type {
-    // std::underlying_type must only be used with enum types, thus use this
-    // {Dummy} type if the given type is not an enum.
-    enum Dummy {};
-    using decay = typename std::decay<T>::type;
-    static constexpr bool is_enum = std::is_enum<decay>::value;
-    using underlying = typename std::underlying_type<
-                       typename std::conditional<is_enum, decay, Dummy>::type>::type;
-    using type_or_bool =
-        typename std::conditional<is_enum, underlying, decay>::type;
-    using type =
-        typename std::conditional<std::is_same<type_or_bool, bool>::value,
-        unsigned int, type_or_bool>::type;
+  // std::underlying_type must only be used with enum types, thus use this
+  // {Dummy} type if the given type is not an enum.
+  enum Dummy {};
+  using decay = typename std::decay<T>::type;
+  static constexpr bool is_enum = std::is_enum<decay>::value;
+  using underlying = typename std::underlying_type<
+      typename std::conditional<is_enum, decay, Dummy>::type>::type;
+  using type_or_bool =
+      typename std::conditional<is_enum, underlying, decay>::type;
+  using type =
+      typename std::conditional<std::is_same<type_or_bool, bool>::value,
+                                unsigned int, type_or_bool>::type;
 };
 // Cast a value to its underlying type
 #define MAKE_UNDERLYING(Type, value) \
@@ -221,12 +251,12 @@ struct comparison_underlying_type {
 // signed, and Rhs is unsigned. False in all other cases.
 template <typename Lhs, typename Rhs>
 struct is_signed_vs_unsigned {
-    using lhs_underlying = typename comparison_underlying_type<Lhs>::type;
-    using rhs_underlying = typename comparison_underlying_type<Rhs>::type;
-    static constexpr bool value = std::is_integral<lhs_underlying>::value &&
-                                  std::is_integral<rhs_underlying>::value &&
-                                  std::is_signed<lhs_underlying>::value &&
-                                  std::is_unsigned<rhs_underlying>::value;
+  using lhs_underlying = typename comparison_underlying_type<Lhs>::type;
+  using rhs_underlying = typename comparison_underlying_type<Rhs>::type;
+  static constexpr bool value = std::is_integral<lhs_underlying>::value &&
+                                std::is_integral<rhs_underlying>::value &&
+                                std::is_signed<lhs_underlying>::value &&
+                                std::is_unsigned<rhs_underlying>::value;
 };
 // Same thing, other way around: Lhs is unsigned, Rhs signed.
 template <typename Lhs, typename Rhs>
@@ -246,13 +276,13 @@ struct is_unsigned_vs_signed : public is_signed_vs_unsigned<Rhs, Lhs> {};
   }
 DEFINE_SIGNED_MISMATCH_COMP(is_signed_vs_unsigned, EQ,
                             lhs >= 0 && MAKE_UNSIGNED(Lhs, lhs) ==
-                            MAKE_UNDERLYING(Rhs, rhs))
+                                            MAKE_UNDERLYING(Rhs, rhs))
 DEFINE_SIGNED_MISMATCH_COMP(is_signed_vs_unsigned, LT,
                             lhs < 0 || MAKE_UNSIGNED(Lhs, lhs) <
-                            MAKE_UNDERLYING(Rhs, rhs))
+                                           MAKE_UNDERLYING(Rhs, rhs))
 DEFINE_SIGNED_MISMATCH_COMP(is_signed_vs_unsigned, LE,
                             lhs <= 0 || MAKE_UNSIGNED(Lhs, lhs) <=
-                            MAKE_UNDERLYING(Rhs, rhs))
+                                            MAKE_UNDERLYING(Rhs, rhs))
 DEFINE_SIGNED_MISMATCH_COMP(is_signed_vs_unsigned, NE, !CmpEQImpl(lhs, rhs))
 DEFINE_SIGNED_MISMATCH_COMP(is_signed_vs_unsigned, GT, !CmpLEImpl(lhs, rhs))
 DEFINE_SIGNED_MISMATCH_COMP(is_signed_vs_unsigned, GE, !CmpLTImpl(lhs, rhs))

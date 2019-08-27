@@ -4,6 +4,8 @@
 
 #include "src/inspector/v8-inspector-session-impl.h"
 
+#include "src/base/logging.h"
+#include "src/base/macros.h"
 #include "src/inspector/injected-script.h"
 #include "src/inspector/inspected-context.h"
 #include "src/inspector/protocol/Protocol.h"
@@ -15,6 +17,7 @@
 #include "src/inspector/v8-debugger.h"
 #include "src/inspector/v8-heap-profiler-agent-impl.h"
 #include "src/inspector/v8-inspector-impl.h"
+#include "src/inspector/v8-inspector-protocol-encoding.h"
 #include "src/inspector/v8-profiler-agent-impl.h"
 #include "src/inspector/v8-runtime-agent-impl.h"
 #include "src/inspector/v8-schema-agent-impl.h"
@@ -24,8 +27,42 @@
 #include "src/inspector/v8-css-agent-impl.h"
 #include "src/inspector/v8-overlay-agent-impl.h"
 #include "src/inspector/v8-log-agent-impl.h"
+#include "NSV8DebuggerAgentImpl.h"
 
 namespace v8_inspector {
+namespace {
+using ::v8_inspector_protocol_encoding::span;
+using ::v8_inspector_protocol_encoding::SpanFrom;
+using IPEStatus = ::v8_inspector_protocol_encoding::Status;
+
+bool IsCBORMessage(const StringView& msg) {
+  return msg.is8Bit() && msg.length() >= 2 && msg.characters8()[0] == 0xd8 &&
+         msg.characters8()[1] == 0x5a;
+}
+
+IPEStatus ConvertToCBOR(const StringView& state, std::vector<uint8_t>* cbor) {
+  return state.is8Bit()
+             ? ConvertJSONToCBOR(
+                   span<uint8_t>(state.characters8(), state.length()), cbor)
+             : ConvertJSONToCBOR(
+                   span<uint16_t>(state.characters16(), state.length()), cbor);
+}
+
+std::unique_ptr<protocol::DictionaryValue> ParseState(const StringView& state) {
+  std::vector<uint8_t> converted;
+  span<uint8_t> cbor;
+  if (IsCBORMessage(state))
+    cbor = span<uint8_t>(state.characters8(), state.length());
+  else if (ConvertToCBOR(state, &converted).ok())
+    cbor = SpanFrom(converted);
+  if (!cbor.empty()) {
+    std::unique_ptr<protocol::Value> value =
+        protocol::Value::parseBinary(cbor.data(), cbor.size());
+    if (value) return protocol::DictionaryValue::cast(std::move(value));
+  }
+  return protocol::DictionaryValue::create();
+}
+}  // namespace
 
 // static
 bool V8InspectorSession::canDispatchMethod(const StringView& method) {
@@ -78,33 +115,26 @@ V8InspectorSessionImpl::V8InspectorSessionImpl(V8InspectorImpl* inspector,
       m_channel(channel),
       m_customObjectFormatterEnabled(false),
       m_dispatcher(this),
-      m_state(nullptr),
+      m_state(ParseState(savedState)),
       m_runtimeAgent(nullptr),
       m_debuggerAgent(nullptr),
       m_heapProfilerAgent(nullptr),
       m_profilerAgent(nullptr),
       m_consoleAgent(nullptr),
       m_schemaAgent(nullptr),
-      m_pageAgent(nullptr),
-      m_networkAgent(nullptr),
-      m_domAgent(nullptr),
-      m_cssAgent(nullptr),
-      m_overlayAgent(nullptr),
-      m_logAgent(nullptr) {
-  if (savedState.length()) {
-    std::unique_ptr<protocol::Value> state =
-        protocol::StringUtil::parseJSON(toString16(savedState));
-    if (state) m_state = protocol::DictionaryValue::cast(std::move(state));
-    if (!m_state) m_state = protocol::DictionaryValue::create();
-  } else {
-    m_state = protocol::DictionaryValue::create();
-  }
+       m_pageAgent(nullptr),
+       m_networkAgent(nullptr),
+       m_domAgent(nullptr),
+       m_cssAgent(nullptr),
+       m_overlayAgent(nullptr),
+       m_logAgent(nullptr) {
+  m_state->getBoolean("use_binary_protocol", &use_binary_protocol_);
 
   m_runtimeAgent.reset(new V8RuntimeAgentImpl(
       this, this, agentState(protocol::Runtime::Metainfo::domainName)));
   protocol::Runtime::Dispatcher::wire(&m_dispatcher, m_runtimeAgent.get());
 
-  m_debuggerAgent.reset(new V8DebuggerAgentImpl(
+  m_debuggerAgent.reset(new NSV8DebuggerAgentImpl(
       this, this, agentState(protocol::Debugger::Metainfo::domainName)));
   protocol::Debugger::Dispatcher::wire(&m_dispatcher, m_debuggerAgent.get());
 
@@ -125,29 +155,29 @@ V8InspectorSessionImpl::V8InspectorSessionImpl(V8InspectorImpl* inspector,
       this, this, agentState(protocol::Schema::Metainfo::domainName)));
   protocol::Schema::Dispatcher::wire(&m_dispatcher, m_schemaAgent.get());
 
-    m_pageAgent.reset(new V8PageAgentImpl(
-                          this, this, agentState(protocol::Page::Metainfo::domainName)));
-    protocol::Page::Dispatcher::wire(&m_dispatcher, m_pageAgent.get());
+  m_pageAgent.reset(new V8PageAgentImpl(
+      this, this, agentState(protocol::Page::Metainfo::domainName)));
+  protocol::Page::Dispatcher::wire(&m_dispatcher, m_pageAgent.get());
 
-    m_networkAgent.reset(new V8NetworkAgentImpl(
-                             this, this, agentState(protocol::Network::Metainfo::domainName)));
-    protocol::Network::Dispatcher::wire(&m_dispatcher, m_networkAgent.get());
+  m_networkAgent.reset(new V8NetworkAgentImpl(
+      this, this, agentState(protocol::Network::Metainfo::domainName)));
+  protocol::Network::Dispatcher::wire(&m_dispatcher, m_networkAgent.get());
 
-    m_domAgent.reset(new V8DOMAgentImpl(
-                         this, this, agentState(protocol::DOM::Metainfo::domainName)));
-    protocol::DOM::Dispatcher::wire(&m_dispatcher, m_domAgent.get());
+  m_domAgent.reset(new V8DOMAgentImpl(
+      this, this, agentState(protocol::DOM::Metainfo::domainName)));
+  protocol::DOM::Dispatcher::wire(&m_dispatcher, m_domAgent.get());
 
-    m_cssAgent.reset(new V8CSSAgentImpl(
-                         this, this, agentState(protocol::CSS::Metainfo::domainName)));
-    protocol::CSS::Dispatcher::wire(&m_dispatcher, m_cssAgent.get());
+  m_cssAgent.reset(new V8CSSAgentImpl(
+      this, this, agentState(protocol::CSS::Metainfo::domainName)));
+  protocol::CSS::Dispatcher::wire(&m_dispatcher, m_cssAgent.get());
 
-    m_overlayAgent.reset(new V8OverlayAgentImpl(
-                             this, this, agentState(protocol::Overlay::Metainfo::domainName)));
-    protocol::Overlay::Dispatcher::wire(&m_dispatcher, m_overlayAgent.get());
+  m_overlayAgent.reset(new V8OverlayAgentImpl(
+      this, this, agentState(protocol::Overlay::Metainfo::domainName)));
+  protocol::Overlay::Dispatcher::wire(&m_dispatcher, m_overlayAgent.get());
 
-    m_logAgent.reset(new V8LogAgentImpl(
-                         this, this, agentState(protocol::Log::Metainfo::domainName)));
-    protocol::Log::Dispatcher::wire(&m_dispatcher, m_logAgent.get());
+  m_logAgent.reset(new V8LogAgentImpl(
+      this, this, agentState(protocol::Log::Metainfo::domainName)));
+  protocol::Log::Dispatcher::wire(&m_dispatcher, m_logAgent.get());
 
   if (savedState.length()) {
     m_runtimeAgent->restore();
@@ -192,41 +222,53 @@ namespace {
 class MessageBuffer : public StringBuffer {
  public:
   static std::unique_ptr<MessageBuffer> create(
-      std::unique_ptr<protocol::Serializable> message) {
+      std::unique_ptr<protocol::Serializable> message, bool binary) {
     return std::unique_ptr<MessageBuffer>(
-        new MessageBuffer(std::move(message)));
+        new MessageBuffer(std::move(message), binary));
   }
 
   const StringView& string() override {
     if (!m_serialized) {
-      m_serialized = StringBuffer::create(toStringView(m_message->serialize()));
+      if (m_binary) {
+        // Encode binary response as an 8bit string buffer.
+        m_serialized.reset(
+            new BinaryStringBuffer(m_message->serializeToBinary()));
+      } else {
+        m_serialized =
+            StringBuffer::create(toStringView(m_message->serializeToJSON()));
+      }
       m_message.reset(nullptr);
     }
     return m_serialized->string();
   }
 
  private:
-  explicit MessageBuffer(std::unique_ptr<protocol::Serializable> message)
-      : m_message(std::move(message)) {}
+  explicit MessageBuffer(std::unique_ptr<protocol::Serializable> message,
+                         bool binary)
+      : m_message(std::move(message)), m_binary(binary) {}
 
   std::unique_ptr<protocol::Serializable> m_message;
   std::unique_ptr<StringBuffer> m_serialized;
+  bool m_binary;
 };
 
 }  // namespace
 
 void V8InspectorSessionImpl::sendProtocolResponse(
     int callId, std::unique_ptr<protocol::Serializable> message) {
-  m_channel->sendResponse(callId, MessageBuffer::create(std::move(message)));
+  m_channel->sendResponse(
+      callId, MessageBuffer::create(std::move(message), use_binary_protocol_));
 }
 
 void V8InspectorSessionImpl::sendProtocolNotification(
     std::unique_ptr<protocol::Serializable> message) {
-  m_channel->sendNotification(MessageBuffer::create(std::move(message)));
+  m_channel->sendNotification(
+      MessageBuffer::create(std::move(message), use_binary_protocol_));
 }
 
-void V8InspectorSessionImpl::fallThrough(int callId, const String16& method,
-                                         const String16& message) {
+void V8InspectorSessionImpl::fallThrough(
+    int callId, const String16& method,
+    const protocol::ProtocolMessage& message) {
   // There's no other layer to handle the command.
   UNREACHABLE();
 }
@@ -371,20 +413,41 @@ void V8InspectorSessionImpl::reportAllContexts(V8RuntimeAgentImpl* agent) {
 
 void V8InspectorSessionImpl::dispatchProtocolMessage(
     const StringView& message) {
+  bool binary_protocol = IsCBORMessage(message);
+  if (binary_protocol) {
+    use_binary_protocol_ = true;
+    m_state->setBoolean("use_binary_protocol", true);
+  }
+
   int callId;
+  std::unique_ptr<protocol::Value> parsed_message;
+  if (binary_protocol) {
+    parsed_message = protocol::Value::parseBinary(
+        message.characters8(), static_cast<unsigned>(message.length()));
+  } else {
+    parsed_message = protocol::StringUtil::parseJSON(message);
+  }
   String16 method;
-  std::unique_ptr<protocol::Value> parsedMessage =
-      protocol::StringUtil::parseJSON(message);
-  if (m_dispatcher.parseCommand(parsedMessage.get(), &callId, &method)) {
+  if (m_dispatcher.parseCommand(parsed_message.get(), &callId, &method)) {
     // Pass empty string instead of the actual message to save on a conversion.
     // We're allowed to do so because fall-through is not implemented.
-    m_dispatcher.dispatch(callId, method, std::move(parsedMessage), "");
+    m_dispatcher.dispatch(callId, method, std::move(parsed_message),
+                          protocol::ProtocolMessage());
   }
 }
 
 std::unique_ptr<StringBuffer> V8InspectorSessionImpl::stateJSON() {
-  String16 json = m_state->serialize();
-  return StringBufferImpl::adopt(json);
+  std::vector<uint8_t> json;
+  IPEStatus status = ConvertCBORToJSON(SpanFrom(state()), &json);
+  DCHECK(status.ok());
+  USE(status);
+  return v8::base::make_unique<BinaryStringBuffer>(std::move(json));
+}
+
+std::vector<uint8_t> V8InspectorSessionImpl::state() {
+  std::vector<uint8_t> out;
+  m_state->writeBinary(&out);
+  return out;
 }
 
 std::vector<std::unique_ptr<protocol::Schema::API::Domain>>
@@ -420,23 +483,23 @@ V8InspectorSessionImpl::supportedDomainsImpl() {
                        .setName(protocol::Schema::Metainfo::domainName)
                        .setVersion(protocol::Schema::Metainfo::version)
                        .build());
-  result.push_back(protocol::Schema::Domain::create()
+   result.push_back(protocol::Schema::Domain::create()
                        .setName(protocol::Page::Metainfo::domainName)
                        .setVersion(protocol::Page::Metainfo::version)
                        .build());
-  result.push_back(protocol::Schema::Domain::create()
+   result.push_back(protocol::Schema::Domain::create()
                        .setName(protocol::Network::Metainfo::domainName)
                        .setVersion(protocol::Network::Metainfo::version)
                        .build());
-  result.push_back(protocol::Schema::Domain::create()
+   result.push_back(protocol::Schema::Domain::create()
                        .setName(protocol::DOM::Metainfo::domainName)
                        .setVersion(protocol::DOM::Metainfo::version)
                        .build());
-  result.push_back(protocol::Schema::Domain::create()
+   result.push_back(protocol::Schema::Domain::create()
                        .setName(protocol::CSS::Metainfo::domainName)
                        .setVersion(protocol::CSS::Metainfo::version)
                        .build());
-  result.push_back(protocol::Schema::Domain::create()
+   result.push_back(protocol::Schema::Domain::create()
                        .setName(protocol::Overlay::Metainfo::domainName)
                        .setVersion(protocol::Overlay::Metainfo::version)
                        .build());

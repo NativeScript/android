@@ -15,6 +15,8 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 
+import androidx.core.content.pm.PackageInfoCompat;
+
 import com.tns.Logger;
 import com.tns.ExtractPolicy;
 import com.tns.FileExtractor;
@@ -67,12 +69,14 @@ public class DefaultExtractPolicy implements ExtractPolicy {
     private String generateAssetsThumb(Context context) {
         try {
             PackageInfo packageInfo = context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
-            int code = packageInfo.versionCode;
+            long code = PackageInfoCompat.getLongVersionCode(packageInfo);
             long updateTime = packageInfo.lastUpdateTime;
-            return String.valueOf(updateTime) + "-" + String.valueOf(code);
+            return updateTime + "-" + code;
         } catch (NameNotFoundException e) {
             logger.write("Error while getting current assets thumb");
-            e.printStackTrace();
+            if (com.tns.Runtime.isDebuggable()) {
+                e.printStackTrace();
+            }
         }
 
         return null;
@@ -91,10 +95,14 @@ public class DefaultExtractPolicy implements ExtractPolicy {
             }
         } catch (FileNotFoundException e) {
             logger.write("Error while getting current assets thumb");
-            e.printStackTrace();
+            if (com.tns.Runtime.isDebuggable()) {
+                e.printStackTrace();
+            }
         } catch (IOException e) {
             logger.write("Error while getting current asstes thumb");
-            e.printStackTrace();
+            if (com.tns.Runtime.isDebuggable()) {
+                e.printStackTrace();
+            }
         }
 
         return null;
@@ -115,10 +123,14 @@ public class DefaultExtractPolicy implements ExtractPolicy {
             }
         } catch (FileNotFoundException e) {
             logger.write("Error while writing current assets thumb");
-            e.printStackTrace();
+            if (com.tns.Runtime.isDebuggable()) {
+                e.printStackTrace();
+            }
         } catch (IOException e) {
             logger.write("Error while writing current assets thumb");
-            e.printStackTrace();
+            if (com.tns.Runtime.isDebuggable()) {
+                e.printStackTrace();
+            }
         }
     }
 

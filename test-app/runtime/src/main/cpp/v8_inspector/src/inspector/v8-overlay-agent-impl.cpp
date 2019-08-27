@@ -54,10 +54,15 @@ DispatchResponse V8OverlayAgentImpl::setPausedInDebuggerMessage(const Maybe<Stri
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
+DispatchResponse V8OverlayAgentImpl::setShowAdHighlights(bool in_show) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
 DispatchResponse V8OverlayAgentImpl::highlightNode(std::unique_ptr<protocol::Overlay::HighlightConfig> in_highlightConfig,
-        const Maybe<int> in_nodeId,
-        const Maybe<int> in_backendNodeId,
-        const Maybe<String> in_objectId) {
+        Maybe<int> in_nodeId,
+        Maybe<int> in_backendNodeId,
+        Maybe<String> in_objectId,
+        Maybe<String> in_selector) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 
@@ -97,6 +102,10 @@ DispatchResponse V8OverlayAgentImpl::setShowPaintRects(bool in_result) {
 }
 
 DispatchResponse V8OverlayAgentImpl::setShowScrollBottleneckRects(bool in_show) {
+    return utils::Common::protocolCommandNotSupportedDispatchResponse();
+}
+
+DispatchResponse V8OverlayAgentImpl::setShowHitTestBorders(bool in_show) {
     return utils::Common::protocolCommandNotSupportedDispatchResponse();
 }
 

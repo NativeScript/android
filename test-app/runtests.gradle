@@ -28,14 +28,14 @@ def getBuildArguments = { ->
     if (isWinOs) {
         arguments += ["cmd", "/c", "gradlew"]
     } else {
-        arguments.push("./gradlew")
+        arguments.add("./gradlew")
     }
-    arguments.push(":app:installDebug")
+    arguments.add(":app:installDebug")
     if (onlyX86) {
-        arguments.push("-PonlyX86")
+        arguments.add("-PonlyX86")
     }
     if (useCCache) {
-        arguments.push("-PuseCCache")
+        arguments.add("-PuseCCache")
     }
     return arguments
 }

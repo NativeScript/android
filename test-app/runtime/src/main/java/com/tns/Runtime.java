@@ -1,35 +1,36 @@
 package com.tns;
 
+import android.os.Handler;
+import android.os.HandlerThread;
+import android.os.Looper;
+import android.os.Message;
+import android.os.Process;
+
+import com.tns.bindings.ProxyGenerator;
+import com.tns.system.classes.caching.impl.ClassCacheImpl;
+import com.tns.system.classes.loading.ClassStorageService;
+import com.tns.system.classes.loading.impl.ClassStorageServiceImpl;
+import com.tns.system.classloaders.impl.ClassLoadersCollectionImpl;
+
 import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import android.os.Handler;
-import android.os.HandlerThread;
-import android.os.Looper;
-import android.os.Message;
-import android.os.Process;
-import android.util.Log;
-import android.util.SparseArray;
-
-import com.tns.bindings.ProxyGenerator;
 
 public class Runtime {
     private native void initNativeScript(int runtimeId, String filesPath, String nativeLibDir, boolean verboseLoggingEnabled, boolean isDebuggable, String packageName,
@@ -53,7 +54,7 @@ public class Runtime {
 
     private native void unlock(int runtimeId);
 
-    private native void passExceptionToJsNative(int runtimeId, Throwable ex, String stackTrace, boolean isDiscarded);
+    private native void passExceptionToJsNative(int runtimeId, Throwable ex, String message, String stackTrace, boolean isDiscarded);
 
     private native void clearStartupData(int runtimeId);
 
@@ -73,28 +74,26 @@ public class Runtime {
 
     private static native void ResetDateTimeConfigurationCache(int runtimeId);
 
-    void passUncaughtExceptionToJs(Throwable ex, String stackTrace) {
-        passExceptionToJsNative(getRuntimeId(), ex, stackTrace, false);
+    void passUncaughtExceptionToJs(Throwable ex, String message, String stackTrace) {
+        passExceptionToJsNative(getRuntimeId(), ex, message, stackTrace, false);
     }
 
-    void passDiscardedExceptionToJs(Throwable ex, String message) {
-        String stackTrace = message + Runtime.getStackTraceErrorMessage(ex);
-        passExceptionToJsNative(getRuntimeId(), ex, stackTrace, true);
+    void passDiscardedExceptionToJs(Throwable ex, String prefix) {
+        //String message = prefix + ex.getMessage();
+        // we'd better not prefix the error with something like - Error on "main" thread for reportSupressedException
+        // as it doesn't seem very useful for the users
+        passExceptionToJsNative(getRuntimeId(), ex, ex.getMessage(), Runtime.getStackTraceErrorMessage(ex), true);
     }
 
     public static void passSuppressedExceptionToJs(Throwable ex, String methodName) {
         com.tns.Runtime runtime = com.tns.Runtime.getCurrentRuntime();
         if (runtime != null) {
             String errorMessage = "Error on \"" + Thread.currentThread().getName() + "\" thread for " + methodName + "\n";
-            runtime.passDiscardedExceptionToJs(ex, errorMessage);
+            runtime.passDiscardedExceptionToJs(ex, "");
         }
     }
 
     private boolean initialized;
-
-    private final static HashMap<String, Class<?>> classCache = new HashMap<String, Class<?>>();
-
-    private final static HashSet<ClassLoader> classLoaderCache = new HashSet<ClassLoader>();
 
     private final static String FAILED_CTOR_RESOLUTION_MSG = "Check the number and type of arguments.\n" +
             "Primitive types need to be manually wrapped in their respective Object wrappers.\n" +
@@ -179,6 +178,8 @@ public class Runtime {
      */
     private Map<Integer, Handler> workerIdToHandler = new HashMap<>();
 
+    private static final ClassStorageService classStorageService = new ClassStorageServiceImpl(ClassCacheImpl.INSTANCE, ClassLoadersCollectionImpl.INSTANCE);
+
     public Runtime(ClassResolver classResolver, GcListener gcListener, StaticConfiguration config, DynamicConfiguration dynamicConfig, int runtimeId, int workerId, HashMap<Integer, Object> strongInstances, HashMap<Integer, WeakReference<Object>> weakInstances, NativeScriptHashMap<Object, Integer> strongJavaObjectToId, NativeScriptWeakHashMap<Object, Integer> weakJavaObjectToId) {
         this.classResolver = classResolver;
         this.gcListener = gcListener;
@@ -210,7 +211,7 @@ public class Runtime {
                     this.mainThreadHandler = dynamicConfiguration.mainThreadScheduler.getHandler();
                 }
 
-                classResolver = new ClassResolver(this);
+                classResolver = new ClassResolver(classStorageService);
                 currentRuntime.set(this);
 
                 runtimeCache.put(this.runtimeId, this);
@@ -232,6 +233,15 @@ public class Runtime {
         return runtime;
     }
 
+    public static boolean isDebuggable() {
+        Runtime runtime = com.tns.Runtime.getCurrentRuntime();
+        if (runtime != null) {
+            return runtime.config.isDebuggable;
+        } else {
+            return false;
+        }
+    }
+
     private static Runtime getObjectRuntime(Object object) {
         Runtime runtime = null;
 
@@ -245,6 +255,21 @@ public class Runtime {
         return runtime;
     }
 
+    /*
+        Removes the error message lines to leave just the stack trace
+     */
+    private static String getStackTraceOnly(String content) {
+        String[] lines = content.split("\n");
+        while (lines.length > 0 && !lines[0].trim().startsWith("at")) {
+            lines = Arrays.copyOfRange(lines, 1, lines.length);
+        }
+        String result = "";
+        for (String line : lines) {
+            result += line + "\n";
+        }
+        return result;
+    }
+
     public static String getStackTraceErrorMessage(Throwable ex) {
         String content;
         java.io.PrintStream ps = null;
@@ -256,6 +281,10 @@ public class Runtime {
 
             try {
                 content = baos.toString("US-ASCII");
+                if (ex instanceof NativeScriptException) {
+                    content = getStackTraceOnly(content);
+                    content = ((NativeScriptException) ex).getIncomingStackTrace() + content;
+                }
             } catch (java.io.UnsupportedEncodingException e) {
                 content = e.getMessage();
             }
@@ -270,6 +299,15 @@ public class Runtime {
 
     public DynamicConfiguration getDynamicConfig() {
         return dynamicConfig;
+    }
+
+    @RuntimeCallable
+    public static boolean getLineBreakpointsEnabled() {
+        if (staticConfiguration != null && staticConfiguration.appConfig != null) {
+            return staticConfiguration.appConfig.getLineBreakpointsEnabled();
+        } else {
+            return ((boolean) AppConfig.KnownKeys.EnableLineBreakpoins.getDefaultValue());
+        }
     }
 
     @RuntimeCallable
@@ -560,7 +598,7 @@ public class Runtime {
         try {
             this.logger = logger;
 
-            this.dexFactory = new DexFactory(logger, classLoader, dexDir, dexThumb);
+            this.dexFactory = new DexFactory(logger, classLoader, dexDir, dexThumb, classStorageService);
 
             if (logger.isEnabled()) {
                 logger.write("Initializing NativeScript JAVA");
@@ -745,25 +783,7 @@ public class Runtime {
 
     @RuntimeCallable
     private static String[] getTypeMetadata(String className, int index) throws ClassNotFoundException {
-        Class<?> clazz = classCache.get(className);
-
-        if (clazz == null) {
-            for (ClassLoader classLoader : classLoaderCache) {
-                try {
-                    clazz = classLoader.loadClass(className);
-                    if (clazz != null) {
-                        classCache.put(className, clazz);
-                        break;
-                    }
-                } catch (ClassNotFoundException e1) {
-                    Log.w("JS", "Dynamically loading class " + className + " was unsuccessful. Will attempt to load class from alternative ClassLoader.");
-                }
-            }
-            if (clazz == null) {
-                clazz = Class.forName(className);
-                classCache.put(className, clazz);
-            }
-        }
+        Class<?> clazz = classStorageService.retrieveClass(className);
 
         String[] result = getTypeMetadata(clazz, index);
 
@@ -885,14 +905,7 @@ public class Runtime {
         strongJavaObjectToID.put(instance, key);
 
         Class<?> clazz = instance.getClass();
-        String className = clazz.getName();
-        if (!classCache.containsKey(className)) {
-            classCache.put(className, clazz);
-            ClassLoader clazzloader = clazz.getClassLoader();
-            if (!classLoaderCache.contains(clazzloader)) {
-                classLoaderCache.add(clazzloader);
-            }
-        }
+        classStorageService.storeClass(clazz.getName(), clazz);
 
         if (logger != null && logger.isEnabled()) {
             logger.write("MakeInstanceStrong (" + key + ", " + instance.getClass().toString() + ")");
@@ -1117,16 +1130,8 @@ public class Runtime {
         return packagedArgs;
     }
 
-    static Class<?> getClassForName(String className) throws ClassNotFoundException {
-        Class<?> clazz = classCache.get(className);
-        if (clazz == null) {
-            clazz = Class.forName(className);
-            if (clazz != null) {
-                classCache.put(className, clazz);
-            }
-        }
-
-        return clazz;
+    static Class<?> getClassForName(String className) {
+        return classStorageService.retrieveClass(className);
     }
 
     @RuntimeCallable
@@ -1152,7 +1157,8 @@ public class Runtime {
             logger.write("resolveMethodOverload: Resolving method " + methodName + " on class " + className);
         }
 
-        Class<?> clazz = getClassForName(className);
+        Class<?> clazz = classStorageService.retrieveClass(className);
+
 
         String res = MethodResolver.resolveMethodOverload(clazz, methodName, args);
         if (logger.isEnabled()) {
@@ -1267,8 +1273,14 @@ public class Runtime {
 
     @RuntimeCallable
     private static Class<?> getCachedClass(String className) {
-        Class<?> clazz = classCache.get(className);
-        return clazz;
+        Class<?> clazz;
+
+        try {
+            clazz = classStorageService.retrieveClass(className);
+            return clazz;
+        } catch (RuntimeException e){
+            return null;
+        }
     }
 
     @RuntimeCallable
