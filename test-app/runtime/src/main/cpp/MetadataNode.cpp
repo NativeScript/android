@@ -364,6 +364,61 @@ void MetadataNode::FieldAccessorSetterCallback(Local<Name> property, Local<Value
     }
 }
 
+void MetadataNode::PropertyAccessorGetterCallback(Local<Name> property, const PropertyCallbackInfo<Value>& info) {
+    try {
+        auto isolate = info.GetIsolate();
+        auto context = isolate->GetCurrentContext();
+        auto thiz = info.This();
+        auto propertyCallbackData = reinterpret_cast<PropertyCallbackData*>(info.Data().As<External>()->Value());
+
+        std::string getterMethodName = propertyCallbackData->getterMethodName;
+        if(getterMethodName == ""){
+            throw NativeScriptException("Missing getter method for property: " + propertyCallbackData->propertyName);
+        }
+
+        auto getter = thiz->Get(context, v8::String::NewFromUtf8(isolate, getterMethodName.c_str())).ToLocalChecked();
+        auto value = getter.As<Function>()->Call(thiz, 0, nullptr);
+        info.GetReturnValue().Set(value);
+    } catch (NativeScriptException& e) {
+        e.ReThrowToV8();
+    } catch (std::exception e) {
+        stringstream ss;
+        ss << "Error: c++ exception: " << e.what() << endl;
+        NativeScriptException nsEx(ss.str());
+        nsEx.ReThrowToV8();
+    } catch (...) {
+        NativeScriptException nsEx(std::string("Error: c++ exception!"));
+        nsEx.ReThrowToV8();
+    }
+}
+void MetadataNode::PropertyAccessorSetterCallback(Local<Name> property, Local<Value> value, const PropertyCallbackInfo<void>& info) {
+    try {
+        auto isolate = info.GetIsolate();
+        auto context = isolate->GetCurrentContext();
+        auto thiz = info.This();
+        auto propertyCallbackData = reinterpret_cast<PropertyCallbackData*>(info.Data().As<External>()->Value());
+
+        std::string setterMethodName = propertyCallbackData->setterMethodName;
+        if(setterMethodName == ""){
+            throw NativeScriptException("Missing setter method for property: " + propertyCallbackData->propertyName);
+        }
+
+        auto setter = thiz->Get(context, v8::String::NewFromUtf8(isolate, setterMethodName.c_str())).ToLocalChecked();
+        setter.As<Function>()->Call(thiz, 1, &value);
+        info.GetReturnValue().Set(value);
+    } catch (NativeScriptException& e) {
+        e.ReThrowToV8();
+    } catch (std::exception e) {
+        stringstream ss;
+        ss << "Error: c++ exception: " << e.what() << endl;
+        NativeScriptException nsEx(ss.str());
+        nsEx.ReThrowToV8();
+    } catch (...) {
+        NativeScriptException nsEx(std::string("Error: c++ exception!"));
+        nsEx.ReThrowToV8();
+    }
+}
+
 void MetadataNode::SuperAccessorGetterCallback(Local<Name> property, const PropertyCallbackInfo<Value>& info) {
     try {
         auto thiz = info.This();
@@ -523,6 +578,36 @@ void MetadataNode::SetInstanceFieldsFromStaticMetadata(Isolate* isolate, Local<F
         auto fieldData = External::New(isolate, fieldInfo);
         prototypeTemplate->SetAccessor(fieldName, FieldAccessorGetterCallback, FieldAccessorSetterCallback, fieldData, AccessControl::DEFAULT, PropertyAttribute::DontDelete);
     }
+
+    auto kotlinPropertiesCount = *reinterpret_cast<uint16_t*>(curPtr);
+    curPtr += sizeof(uint16_t);
+    for (int i = 0; i < kotlinPropertiesCount; ++i) {
+        uint32_t nameOfffset = *reinterpret_cast<uint32_t*>(curPtr);
+        string propertyName = s_metadataReader.ReadName(nameOfffset);
+        curPtr += sizeof(uint32_t);
+
+        auto hasGetter = *reinterpret_cast<uint16_t*>(curPtr);
+        curPtr += sizeof(uint16_t);
+
+        std::string getterMethodName = "";
+        if(hasGetter>=1){
+            auto entry = s_metadataReader.ReadInstanceMethodEntry(&curPtr);
+            getterMethodName = entry.name;
+        }
+
+        auto hasSetter = *reinterpret_cast<uint16_t*>(curPtr);
+        curPtr += sizeof(uint16_t);
+
+        std::string setterMethodName = "";
+        if(hasSetter >= 1){
+            auto entry = s_metadataReader.ReadInstanceMethodEntry(&curPtr);
+            setterMethodName = entry.name;
+        }
+
+        auto propertyInfo = new PropertyCallbackData(propertyName, getterMethodName, setterMethodName);
+        auto propertyData = External::New(isolate, propertyInfo);
+        prototypeTemplate->SetAccessor(ArgConverter::ConvertToV8String(isolate, propertyName), PropertyAccessorGetterCallback, PropertyAccessorSetterCallback, propertyData, AccessControl::DEFAULT, PropertyAttribute::DontDelete);
+    }
 }
 
 vector<MetadataNode::MethodCallbackData*> MetadataNode::SetInstanceMembersFromRuntimeMetadata(Isolate* isolate, Local<FunctionTemplate>& ctorFuncTemplate, Local<ObjectTemplate>& prototypeTemplate, vector<MethodCallbackData*>& instanceMethodsCallbackData, const vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode* treeNode) {
@@ -616,6 +701,28 @@ void MetadataNode::SetStaticMembers(Isolate* isolate, Local<Function>& ctorFunct
         curPtr += sizeof(uint16_t);
         for (auto i = 0; i < instanceFieldCout; i++) {
             auto entry = s_metadataReader.ReadInstanceFieldEntry(&curPtr);
+        }
+
+        auto kotlinPropertiesCount = *reinterpret_cast<uint16_t*>(curPtr);
+        curPtr += sizeof(uint16_t);
+        for (int i = 0; i < kotlinPropertiesCount; ++i) {
+            uint32_t nameOfffset = *reinterpret_cast<uint32_t*>(curPtr);
+            string propertyName = s_metadataReader.ReadName(nameOfffset);
+            curPtr += sizeof(uint32_t);
+
+            auto hasGetter = *reinterpret_cast<uint16_t*>(curPtr);
+            curPtr += sizeof(uint16_t);
+
+            if(hasGetter>=1){
+                auto entry = s_metadataReader.ReadInstanceMethodEntry(&curPtr);
+            }
+
+            auto hasSetter = *reinterpret_cast<uint16_t*>(curPtr);
+            curPtr += sizeof(uint16_t);
+
+            if(hasSetter >= 1){
+                auto entry = s_metadataReader.ReadInstanceMethodEntry(&curPtr);
+            }
         }
 
         string lastMethodName;

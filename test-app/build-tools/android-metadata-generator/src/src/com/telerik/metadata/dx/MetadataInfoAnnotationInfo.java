@@ -20,7 +20,7 @@ public class MetadataInfoAnnotationInfo implements MetadataInfoAnnotationDescrip
         List<String> strings = dexFile.getDex().strings();
         EncodedValueReader reader = annotation.getReader();
         int count = reader.readAnnotation();
-        for (int i=0; i<count; i++) {
+        for (int i = 0; i < count; i++) {
             String annName = strings.get(reader.readAnnotationName());
             if (annName.equals("skip")) {
                 return reader.readBoolean();
@@ -34,7 +34,7 @@ public class MetadataInfoAnnotationInfo implements MetadataInfoAnnotationDescrip
         List<String> strings = dexFile.getDex().strings();
         EncodedValueReader reader = annotation.getReader();
         int count = reader.readAnnotation();
-        for (int i=0; i<count; i++) {
+        for (int i = 0; i < count; i++) {
             String annName = strings.get(reader.readAnnotationName());
             if (annName.equals("superClassname")) {
                 return strings.get(reader.readString());

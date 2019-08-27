@@ -5,6 +5,8 @@ import com.telerik.metadata.desc.MethodDescriptor;
 import com.telerik.metadata.desc.TypeDescriptor;
 
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 
 public class TreeNode {
     public static class MethodInfo {
@@ -48,6 +50,31 @@ public class TreeNode {
         public boolean isFinalType;
     }
 
+    public static class PropertyInfo {
+
+        private final String propertyName;
+        private final MethodInfo getterMethod;
+        private final MethodInfo setterMethod;
+
+        public PropertyInfo(String propertyName, MethodInfo getterMethod, MethodInfo setterMethod) {
+            this.propertyName = propertyName;
+            this.getterMethod = getterMethod;
+            this.setterMethod = setterMethod;
+        }
+
+        public String getPropertyName() {
+            return propertyName;
+        }
+
+        public Optional<MethodInfo> getGetterMethod() {
+            return getterMethod == null ? Optional.<MethodInfo>empty() : Optional.of(getterMethod);
+        }
+
+        public Optional<MethodInfo> getSetterMethod() {
+            return setterMethod == null ? Optional.<MethodInfo>empty() : Optional.of(setterMethod);
+        }
+    }
+
     public static final byte Package = 0;
     public static final byte Class = 1 << 0;
     public static final byte Interface = 1 << 1;
@@ -64,6 +91,7 @@ public class TreeNode {
         staticMethods = new ArrayList<TreeNode.MethodInfo>();
         instanceFields = new ArrayList<TreeNode.FieldInfo>();
         staticFields = new ArrayList<TreeNode.FieldInfo>();
+        properties = new ArrayList<PropertyInfo>();
     }
 
     public static final TreeNode BYTE = getPrimitive("B", (byte) 1);
@@ -134,7 +162,7 @@ public class TreeNode {
     }
 
     public static TreeNode getPrimitive(String name)
-    throws IllegalArgumentException {
+            throws IllegalArgumentException {
         if (name.equals("B")) {
             return TreeNode.BYTE;
         } else if (name.equals("S")) {
@@ -190,8 +218,18 @@ public class TreeNode {
     public ArrayList<MethodInfo> staticMethods;
     public ArrayList<FieldInfo> instanceFields;
     public ArrayList<FieldInfo> staticFields;
+    ArrayList<PropertyInfo> properties;
     public TreeNode baseClassNode;
+    TreeNode parentNode;
     //
+
+    void addProperty(PropertyInfo propertyInfo){
+        properties.add(propertyInfo);
+    }
+
+    List<PropertyInfo> getProperties(){
+        return properties;
+    }
 
     private boolean wentThroughSettingMembers = false;
 
@@ -222,15 +260,18 @@ public class TreeNode {
 
     public TreeNode createChild(String childName) {
         TreeNode child = new TreeNode();
+        child.parentNode = this;
         child.setName(childName);
         children.add(child);
         return child;
     }
 
-    public TreeNode attachChild(ClassDescriptor clazz) throws Exception {
-        TreeNode child = getPrimitive(clazz);
-        children.add(child);
-        return child;
+    TreeNode createCompanionNode(String companionNode) {
+        TreeNode companion = new TreeNode();
+        companion.parentNode = this.parentNode;
+        companion.setName(this.getName() + "$" + companionNode);
+        this.parentNode.children.add(companion);
+        return companion;
     }
 
 }

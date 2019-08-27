@@ -1,4 +1,6 @@
 apply plugin: 'com.android.library'
+//apply plugin: 'kotlin-android-extensions'
+//apply plugin: 'kotlin-android'
 
 def optimized = project.hasProperty("optimized")
 if (optimized) {
@@ -23,6 +25,9 @@ if (useCCache) {
 project.ext._buildToolsVersion = "28.0.3"
 
 android {
+//    kotlinOptions {
+//        jvmTarget = '1.8'
+//    }
     sourceSets {
         main {
             def defaultSrcPath = "src/main/java"
@@ -75,7 +80,7 @@ android {
             if (onlyX86) {
                 abiFilters 'x86'
             } else {
-                abiFilters 'x86', 'armeabi-v7a', 'arm64-v8a'
+                abiFilters 'x86'//, 'armeabi-v7a', 'arm64-v8a'
             }
         }
     }
@@ -106,6 +111,7 @@ dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     testImplementation 'junit:junit:4.12'
     testImplementation 'org.mockito:mockito-core:1.10.19'
+//    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
 }
 
 tasks.whenTaskAdded { task ->
@@ -174,6 +180,9 @@ task revertVersionFile(type: Exec) {
             commandLine "git", "checkout", "--", versionFilePath
         }
     }
+}
+repositories {
+    mavenCentral()
 }
 
 def createPackageConfigFileTask(taskName) {

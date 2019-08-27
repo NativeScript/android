@@ -7,8 +7,11 @@ import com.telerik.metadata.desc.ClassDescriptor;
 import com.telerik.metadata.desc.FieldDescriptor;
 import com.telerik.metadata.desc.MetadataInfoAnnotationDescriptor;
 import com.telerik.metadata.desc.MethodDescriptor;
+import com.telerik.metadata.desc.PropertyDescriptor;
 import com.telerik.metadata.desc.TypeDescriptor;
 import com.telerik.metadata.dx.DexFile;
+import com.telerik.metadata.kotlin.classes.KotlinClassMetadataParser;
+import com.telerik.metadata.kotlin.classes.impl.KotlinClassMetadataParserImpl;
 import com.telerik.metadata.parsing.ClassParser;
 
 import java.io.File;
@@ -63,6 +66,7 @@ public class Builder {
                 // e.g. we are processing jars with API 21 while we have in
                 // our class path API 17
                 // Class<?> clazz = Class.forName(className, false, loader);
+
                 ClassDescriptor clazz = ClassRepo.findClass(className);
                 if (clazz == null) {
                     throw new ClassNotFoundException("Class " + className + " not found in the input android libraries.");
@@ -191,8 +195,38 @@ public class Builder {
 
         setFieldInfo(clazz, node, root, fields, null);
 
+        setPropertiesInfo(root, node, clazz.getProperties());
+
         // adds static fields from interface to implementing class because java can call them from implementing class... no problem.
         getFieldsFromImplementedInterfaces(clazz, node, root, fields);
+    }
+
+    private static void setPropertiesInfo(TreeNode root, TreeNode node, PropertyDescriptor[] propertyDescriptors) throws Exception {
+        for (PropertyDescriptor propertyDescriptor : propertyDescriptors) {
+            String propertyName = propertyDescriptor.getName();
+
+            MethodDescriptor getterMethod = propertyDescriptor.getGetterMethod();
+            MethodDescriptor setterMethod = propertyDescriptor.getSetterMethod();
+
+            MethodInfo getterMethodInfo = null;
+            if (getterMethod != null) {
+                getterMethodInfo = new MethodInfo(getterMethod);
+                getterMethodInfo.isResolved = true;
+                getterMethodInfo.signature = getMethodSignature(root, getterMethod.getReturnType(), getterMethod.getArgumentTypes());
+            }
+
+
+            MethodInfo setterMethodInfo = null;
+            if (setterMethod != null) {
+                setterMethodInfo = new MethodInfo(setterMethod);
+                setterMethodInfo.isResolved = true;
+                setterMethodInfo.signature = getMethodSignature(root, setterMethod.getReturnType(), setterMethod.getArgumentTypes());
+            }
+
+            TreeNode.PropertyInfo propertyInfo = new TreeNode.PropertyInfo(propertyName, getterMethodInfo, setterMethodInfo);
+            node.addProperty(propertyInfo);
+        }
+
     }
 
     private static void setFieldInfo(ClassDescriptor clazz, TreeNode node, TreeNode root, FieldDescriptor[] fields, ClassDescriptor interfaceClass) throws Exception {
@@ -285,6 +319,7 @@ public class Builder {
     }
 
     private static TreeNode getOrCreateNode(TreeNode root, ClassDescriptor clazz, String predefinedSuperClassname) throws Exception {
+
         if (ClassUtil.isPrimitive(clazz)) {
             return TreeNode.getPrimitive(clazz);
         }
@@ -309,6 +344,8 @@ public class Builder {
         }
 
         ClassDescriptor outer = ClassUtil.getEnclosingClass(clazz);
+
+
         ArrayList<ClassDescriptor> outerClasses = new ArrayList<ClassDescriptor>();
         while (outer != null) {
             if (!outer.isPublic()) {
@@ -337,7 +374,12 @@ public class Builder {
 
         TreeNode child = node.getChild(name);
         if (child == null) {
-            child = node.createChild(name);
+            if (isNestedClassKotlinCompanionObject(outer, clazz)) {
+                child = node.createCompanionNode(name);
+            } else {
+                child = node.createChild(name);
+            }
+
             if (ClassUtil.isPrimitive(clazz)) {
                 TreeNode tmp = TreeNode.getPrimitive(clazz);
                 child.nodeType = tmp.nodeType;
@@ -370,6 +412,15 @@ public class Builder {
         }
 
         return node;
+    }
+
+    private static boolean isNestedClassKotlinCompanionObject(ClassDescriptor outerClass, ClassDescriptor nestedClass) {
+        if (outerClass == null || nestedClass == null) {
+            return false;
+        }
+
+        KotlinClassMetadataParser kotlinClassMetadataParser = new KotlinClassMetadataParserImpl();
+        return kotlinClassMetadataParser.wasKotlinCompanionObject(outerClass, nestedClass);
     }
 
     private static TreeNode createArrayNode(TreeNode root, String className)

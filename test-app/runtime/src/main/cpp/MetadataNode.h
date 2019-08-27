@@ -117,6 +117,9 @@ class MetadataNode {
 
         static void FieldAccessorGetterCallback(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info);
         static void FieldAccessorSetterCallback(v8::Local<v8::Name> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info);
+        static void PropertyAccessorGetterCallback(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info);
+        static void PropertyAccessorSetterCallback(v8::Local<v8::Name> property, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info);
+
         static void ClassAccessorGetterCallback(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info);
         static void SetClassAccessor(v8::Local<v8::Function>& ctorFunction);
         static void SuperAccessorGetterCallback(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info);
@@ -169,6 +172,17 @@ class MetadataNode {
             MetadataNode* node;
             MethodCallbackData* parent;
             bool isSuper;
+        };
+
+        struct PropertyCallbackData {
+            PropertyCallbackData(std::string _propertyName, std::string _getterMethodName, std::string _setterMethodName)
+                :
+                    propertyName(_propertyName), getterMethodName(_getterMethodName), setterMethodName(_setterMethodName) {
+
+            }
+            std::string propertyName;
+            std::string getterMethodName;
+            std::string setterMethodName;
         };
 
         struct ExtendedClassCallbackData {

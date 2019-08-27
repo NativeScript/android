@@ -5,9 +5,13 @@ import java.nio.ByteOrder;
 import java.nio.IntBuffer;
 import java.util.ArrayDeque;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Optional;
 
 import com.telerik.metadata.TreeNode.FieldInfo;
 import com.telerik.metadata.TreeNode.MethodInfo;
+
+import javax.swing.text.html.Option;
 
 public class Writer {
 
@@ -129,6 +133,34 @@ public class Writer {
             writeFinalModifier(fi, writer);
         }
 
+        List<TreeNode.PropertyInfo> propertyInfos = n.getProperties();
+        len = writeLength(propertyInfos.size(), writer);
+        for(TreeNode.PropertyInfo propertyInfo: propertyInfos){
+            int pos = stringsMap.get(propertyInfo.getPropertyName()); // get start position
+            // of the name
+            writeInt(pos, writer); // write start position of the name of the
+            // variable
+
+            Optional<MethodInfo> propertyGetter = propertyInfo.getGetterMethod();
+            Optional<MethodInfo> propertySetter = propertyInfo.getSetterMethod();
+
+            if(propertyGetter.isPresent()){
+                writeLength(1, writer);
+                MethodInfo getterMethod = propertyGetter.get();
+                writeMethodInfo(getterMethod, stringsMap, writer);
+            } else {
+                writeLength(0, writer);
+            }
+
+            if(propertySetter.isPresent()){
+                writeLength(1, writer);
+                MethodInfo setterMethod = propertySetter.get();
+                writeMethodInfo(setterMethod, stringsMap, writer);
+            } else {
+                writeLength(0, writer);
+            }
+        }
+
         len = writeLength(n.staticMethods.size(), writer);
         for (int i = 0; i < len; i++) {
             MethodInfo mi = n.staticMethods.get(i);
@@ -145,6 +177,8 @@ public class Writer {
             writeFinalModifier(fi, writer);
             writeTreeNodeId(fi.declaringType, writer);
         }
+
+
     }
 
     public void writeTree(TreeNode root) throws Exception {
@@ -203,6 +237,27 @@ public class Writer {
                     name = n.staticFields.get(i).name;
                     if (!uniqueStrings.containsKey(name)) {
                         writeUniqueName(name, uniqueStrings, outStringsStream);
+                    }
+                }
+
+                for(TreeNode.PropertyInfo propertyInfo: n.getProperties()){
+                    name = propertyInfo.getPropertyName();
+                    if (!uniqueStrings.containsKey(name)) {
+                        writeUniqueName(name, uniqueStrings, outStringsStream);
+                    }
+                    Optional<MethodInfo> getterMethodOptional = propertyInfo.getGetterMethod();
+                    if(getterMethodOptional.isPresent()){
+                        name = getterMethodOptional.get().name;
+                        if (!uniqueStrings.containsKey(name)) {
+                            writeUniqueName(name, uniqueStrings, outStringsStream);
+                        }
+                    }
+                    Optional<MethodInfo> setterMethodOptional = propertyInfo.getSetterMethod();
+                    if(setterMethodOptional.isPresent()){
+                        name = setterMethodOptional.get().name;
+                        if (!uniqueStrings.containsKey(name)) {
+                            writeUniqueName(name, uniqueStrings, outStringsStream);
+                        }
                     }
                 }
             }
@@ -285,9 +340,7 @@ public class Writer {
             intBuffer.put(nodeData);
             outNodeStream.write(byteBuffer.array());
 
-            for (TreeNode child : n.children) {
-                d.add(child);
-            }
+            d.addAll(n.children);
         }
 
         outNodeStream.flush();
