@@ -175,6 +175,9 @@ task revertVersionFile(type: Exec) {
         }
     }
 }
+repositories {
+    mavenCentral()
+}
 
 def createPackageConfigFileTask(taskName) {
     def mode = (taskName == "bundleDebug") ? "debug" : "release"

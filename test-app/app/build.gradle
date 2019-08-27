@@ -30,6 +30,12 @@ import java.security.MessageDigest
 
 apply plugin: "com.android.application"
 
+def useKotlin = project.hasProperty("useKotlin") && project.ext.useKotlin=="true"
+if (useKotlin) {
+    apply plugin: 'kotlin-android'
+    apply plugin: 'kotlin-android-extensions'
+}
+
 def onlyX86 = project.hasProperty("onlyX86")
 if (onlyX86) {
     println "OnlyX86 build triggered."
@@ -64,6 +70,7 @@ def METADATA_OUT_PATH = "$projectDir/src/main/assets/metadata"
 def pluginsJarLibraries = new LinkedList<String>()
 def allJarLibraries = new LinkedList<String>()
 
+def computeKotlinVersion = { -> project.hasProperty("kotlinVersion") ? kotlinVersion : "1.3.41" }
 def computeCompileSdkVersion = { -> project.hasProperty("compileSdk") ? compileSdk : 29 }
 def computeTargetSdkVersion = { -> project.hasProperty("targetSdk") ? targetSdk : 29 }
 def computeBuildToolsVersion = { ->
@@ -220,6 +227,13 @@ def setAppIdentifier = { ->
 }
 
 android {
+
+    if (useKotlin) {
+        kotlinOptions {
+            jvmTarget = '1.8'
+        }
+    }
+
     compileSdkVersion computeCompileSdkVersion()
     buildToolsVersion computeBuildToolsVersion()
 
@@ -305,6 +319,7 @@ repositories {
             dirs pluginDependencies
         }
     }
+    mavenCentral()
 }
 
 dependencies {
@@ -325,7 +340,7 @@ dependencies {
 
     println "\t + using android X library androidx.legacy:legacy-support-v4:$androidXLegacyVersion"
 
-    implementation "androidx.multidex:multidex:2.0.0"
+    implementation "androidx.multidex:multidex:2.0.1"
     implementation "androidx.legacy:legacy-support-v4:$androidXLegacyVersion"
     implementation "androidx.appcompat:appcompat:$androidXAppCompatVersion"
     implementation "com.google.android.material:material:$androidXMaterialVersion"
@@ -362,6 +377,11 @@ dependencies {
         project.dependencies.add("implementation", [name: runtime, ext: "aar"])
     } else {
         implementation project(':runtime')
+    }
+
+    def kotlinVersion = computeKotlinVersion()
+    if (useKotlin) {
+        implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
     }
 
 }
@@ -686,6 +706,11 @@ task buildMetadata(type: JavaExec) {
     def classesDir = "$buildDir/intermediates/javac"
     inputs.dir(classesDir)
 
+    def kotlinClassesDir = "$buildDir/tmp/kotlin-classes"
+    if (file(kotlinClassesDir).exists()) {
+        inputs.dir(kotlinClassesDir)
+    }
+
     outputs.files("$METADATA_OUT_PATH/treeNodeStream.dat", "$METADATA_OUT_PATH/treeStringsStream.dat", "$METADATA_OUT_PATH/treeValueStream.dat")
 
     doFirst {
@@ -700,6 +725,15 @@ task buildMetadata(type: JavaExec) {
         for (File subDir : classesSubDirs) {
             if (subDir.getName().equals(selectedBuildType)) {
                 generatedClasses.add(subDir.getAbsolutePath())
+            }
+        }
+
+        if (file(kotlinClassesDir).exists()) {
+            def kotlinClassesSubDirs = new File(kotlinClassesDir).listFiles()
+            for (File subDir : kotlinClassesSubDirs) {
+                if (subDir.getName() == selectedBuildType) {
+                    generatedClasses.add(subDir.getAbsolutePath())
+                }
             }
         }
 
