@@ -9,6 +9,7 @@
  - [Update androidSdk, targetSdk and build tools to 29 (#1452)](https://github.com/NativeScript/android-runtime/issues/1452)
  - [Upgrade android gradle plugin to the latest 3.5.0 version (#1456)](https://github.com/NativeScript/android-runtime/issues/1456)
  - [Add initial Kotlin support (#1459)](https://github.com/NativeScript/android-runtime/issues/1459)
+ - [Add support for user defined gradle.properties (#1463)](https://github.com/NativeScript/android-runtime/issues/1463)
 
 
 ## Bug Fixes
