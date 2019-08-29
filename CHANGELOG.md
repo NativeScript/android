@@ -14,7 +14,7 @@
 ## Bug Fixes
 
  - [SIGSEGV in libNativeScript.so on callback from java with console.log when displaying an object. #1366](https://github.com/NativeScript/android-runtime/issues/1366)
- 
+
 6.0.2
 ==
 
