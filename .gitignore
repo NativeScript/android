@@ -3,6 +3,7 @@ node_modules/
 dist/
 .gradle
 .idea
+.cxx/
 
 local.properties
 

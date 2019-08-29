@@ -236,11 +236,11 @@ string NativeScriptException::GetFullMessage(const TryCatch& tc, const string& j
     string stackTraceMessage = GetErrorStackTrace(message->GetStackTrace());
 
     if (!scriptResName.IsEmpty() && scriptResName->IsString()) {
-        ss << endl <<"File: \"" << ArgConverter::ConvertToString(scriptResName.As<String>());
+        ss << endl <<"File: (" << ArgConverter::ConvertToString(scriptResName.As<String>());
     } else {
-        ss << endl <<"File: \"<unknown>";
+        ss << endl <<"File: (<unknown>";
     }
-    ss << ", line: " << message->GetLineNumber(context).ToChecked() << ", column: " << message->GetStartColumn() << endl << endl;
+    ss << ":" << message->GetLineNumber(context).ToChecked() << ":" << message->GetStartColumn() << ")" << endl << endl;
     ss << "StackTrace: " << endl << stackTraceMessage << endl;
 
     string loggedMessage = ss.str();
