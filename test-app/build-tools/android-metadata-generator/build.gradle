@@ -7,8 +7,8 @@
 */
 apply plugin: "java"
 
-sourceCompatibility = JavaVersion.VERSION_1_6
-targetCompatibility = JavaVersion.VERSION_1_6
+sourceCompatibility = JavaVersion.VERSION_1_8
+targetCompatibility = JavaVersion.VERSION_1_8
 
 buildscript {
     repositories {
@@ -17,7 +17,7 @@ buildscript {
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle:3.4.2'
+        classpath 'com.android.tools.build:gradle:3.5.0'
     }
 }
 
@@ -43,6 +43,7 @@ repositories {
 
 dependencies {
     compile 'org.apache.bcel:bcel:6.2'
+    compile group: 'org.jetbrains.kotlinx', name: 'kotlinx-metadata-jvm', version: '0.1.0'
     compile files("./src/libs/dx.jar")
 }
 

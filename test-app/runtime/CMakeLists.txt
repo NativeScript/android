@@ -16,7 +16,7 @@ endif (CCACHE_FOUND AND (USE_CCACHE))
 # "-DANDROID_STL=c++_static" is just not enough for clang++ to find some libraries in the ndk
 MESSAGE(STATUS "## ANDROID_NDK_ROOT: " ${ANDROID_NDK_ROOT})
 
-set(COMMON_CMAKE_ARGUMENTS "-std=c++11 -Werror -Wno-unused-result -mstackrealign -fexceptions -fno-builtin-stpcpy -fno-rtti -D_LIBCPP_ABI_VERSION=Cr -D_LIBCPP_ENABLE_NODISCARD -D_LIBCPP_ABI_UNSTABLE")
+set(COMMON_CMAKE_ARGUMENTS "-nostdinc++ -std=c++14 -Werror -Wno-unused-result -mstackrealign -fexceptions -fno-builtin-stpcpy -fno-rtti -D_LIBCPP_ABI_VERSION=Cr -D_LIBCPP_ENABLE_NODISCARD -D_LIBCPP_ABI_UNSTABLE")
 
 # AOSP has switched to using LLD by default and the NDK will use it by default in the next release.
 # BFD and Gold will be removed once LLD has been through a release cycle with no major unresolved issues (estimated r21)
@@ -89,6 +89,7 @@ if (NOT OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
         src/main/cpp/v8_inspector/src/inspector/v8-overlay-agent-impl.cpp
         src/main/cpp/v8_inspector/src/inspector/v8-page-agent-impl.cpp
 
+        src/main/cpp/v8_inspector/third_party/inspector_protocol/encoding/encoding.cc
         src/main/cpp/v8_inspector/src/inspector/custom-preview.cc
         src/main/cpp/v8_inspector/src/inspector/injected-script.cc
         src/main/cpp/v8_inspector/src/inspector/inspected-context.cc
@@ -104,12 +105,14 @@ if (NOT OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
         src/main/cpp/v8_inspector/src/inspector/v8-debugger-script.cc
         src/main/cpp/v8_inspector/src/inspector/v8-heap-profiler-agent-impl.cc
         src/main/cpp/v8_inspector/src/inspector/v8-inspector-impl.cc
+        src/main/cpp/v8_inspector/src/inspector/v8-inspector-protocol-encoding.cc
         src/main/cpp/v8_inspector/src/inspector/v8-inspector-session-impl.cc
         src/main/cpp/v8_inspector/src/inspector/v8-profiler-agent-impl.cc
         src/main/cpp/v8_inspector/src/inspector/v8-regex.cc
         src/main/cpp/v8_inspector/src/inspector/v8-runtime-agent-impl.cc
         src/main/cpp/v8_inspector/src/inspector/v8-schema-agent-impl.cc
         src/main/cpp/v8_inspector/src/inspector/v8-stack-trace-impl.cc
+        src/main/cpp/v8_inspector/src/inspector/v8-string-conversions.cc
         src/main/cpp/v8_inspector/src/inspector/v8-value-utils.cc
         src/main/cpp/v8_inspector/src/inspector/value-mirror.cc
         src/main/cpp/v8_inspector/src/inspector/wasm-translation.cc

@@ -18,14 +18,24 @@
 *            -PandroidXMaterial=[androidx_material_version]
 */
 
+
+import groovy.io.FileType
 import groovy.json.JsonSlurper
+
+import javax.inject.Inject
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
-import groovy.io.FileType
 import java.security.MessageDigest
-import javax.inject.Inject
+
 apply plugin: "com.android.application"
+
+def enableKotlin = (project.hasProperty("useKotlin") && project.useKotlin == "true")
+
+if (enableKotlin) {
+    apply plugin: 'kotlin-android'
+    apply plugin: 'kotlin-android-extensions'
+}
 
 def onlyX86 = project.hasProperty("onlyX86")
 if (onlyX86) {
@@ -61,10 +71,11 @@ def METADATA_OUT_PATH = "$projectDir/src/main/assets/metadata"
 def pluginsJarLibraries = new LinkedList<String>()
 def allJarLibraries = new LinkedList<String>()
 
-def computeCompileSdkVersion = { -> project.hasProperty("compileSdk") ? compileSdk : 28 }
-def computeTargetSdkVersion = { -> project.hasProperty("targetSdk") ? targetSdk : 28 }
+def computeKotlinVersion = { -> project.hasProperty("kotlinVersion") ? kotlinVersion : "1.3.41" }
+def computeCompileSdkVersion = { -> project.hasProperty("compileSdk") ? compileSdk : 29 }
+def computeTargetSdkVersion = { -> project.hasProperty("targetSdk") ? targetSdk : 29 }
 def computeBuildToolsVersion = { ->
-    project.hasProperty("buildToolsVersion") ? buildToolsVersion : "28.0.3"
+    project.hasProperty("buildToolsVersion") ? buildToolsVersion : "29.0.2"
 }
 
 project.ext.selectedBuildType = project.hasProperty("release") ? "release" : "debug"
@@ -217,6 +228,13 @@ def setAppIdentifier = { ->
 }
 
 android {
+
+    if (enableKotlin) {
+        kotlinOptions {
+            jvmTarget = '1.8'
+        }
+    }
+
     compileSdkVersion computeCompileSdkVersion()
     buildToolsVersion computeBuildToolsVersion()
 
@@ -302,6 +320,7 @@ repositories {
             dirs pluginDependencies
         }
     }
+    mavenCentral()
 }
 
 dependencies {
@@ -320,9 +339,9 @@ dependencies {
         androidXMaterialVersion = androidXMaterial
     }
 
-    println "\t + using andorid X library androidx.legacy:legacy-support-v4:$androidXLegacyVersion"
+    println "\t + using android X library androidx.legacy:legacy-support-v4:$androidXLegacyVersion"
 
-    implementation "androidx.multidex:multidex:2.0.0"
+    implementation "androidx.multidex:multidex:2.0.1"
     implementation "androidx.legacy:legacy-support-v4:$androidXLegacyVersion"
     implementation "androidx.appcompat:appcompat:$androidXAppCompatVersion"
     implementation "com.google.android.material:material:$androidXMaterialVersion"
@@ -359,6 +378,11 @@ dependencies {
         project.dependencies.add("implementation", [name: runtime, ext: "aar"])
     } else {
         implementation project(':runtime')
+    }
+
+    def kotlinVersion = computeKotlinVersion()
+    if (enableKotlin) {
+        implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
     }
 
 }
@@ -545,7 +569,7 @@ afterEvaluate { project ->
                 // if there's a project dependency search for its result jar file in the build/intermediates/runtime_library_classes folder
                 // this is the output folder in gradle 5.1.1, but it can be changed in the future versions of gradle
                 def jarDir = new File("${it.getBuildDir()}/intermediates/runtime_library_classes/${buildType.toLowerCase()}")
-                if(jarDir.exists()) {
+                if (jarDir.exists()) {
                     jarDir.eachFileRecurse(FileType.FILES) { file ->
                         if (file.path.endsWith(".jar")) {
                             processJar(file, jars)
@@ -574,7 +598,7 @@ def processJar(File jar, jars) {
         // directory is a randomly generated string)
         cleanupAllJars.inputs.files jar
 
-        task "${taskName}" (type: WorkerTask) {
+        task "${taskName}"(type: WorkerTask) {
             dependsOn cleanupAllJars
             extractAllJars.dependsOn it
 
@@ -683,6 +707,11 @@ task buildMetadata(type: JavaExec) {
     def classesDir = "$buildDir/intermediates/javac"
     inputs.dir(classesDir)
 
+    def kotlinClassesDir = "$buildDir/tmp/kotlin-classes"
+    if (file(kotlinClassesDir).exists()) {
+        inputs.dir(kotlinClassesDir)
+    }
+
     outputs.files("$METADATA_OUT_PATH/treeNodeStream.dat", "$METADATA_OUT_PATH/treeStringsStream.dat", "$METADATA_OUT_PATH/treeValueStream.dat")
 
     doFirst {
@@ -697,6 +726,15 @@ task buildMetadata(type: JavaExec) {
         for (File subDir : classesSubDirs) {
             if (subDir.getName().equals(selectedBuildType)) {
                 generatedClasses.add(subDir.getAbsolutePath())
+            }
+        }
+
+        if (file(kotlinClassesDir).exists()) {
+            def kotlinClassesSubDirs = new File(kotlinClassesDir).listFiles()
+            for (File subDir : kotlinClassesSubDirs) {
+                if (subDir.getName() == selectedBuildType) {
+                    generatedClasses.add(subDir.getAbsolutePath())
+                }
             }
         }
 

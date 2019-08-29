@@ -287,6 +287,14 @@ task copyFilesToProjectTemeplate {
             into "$DIST_FRAMEWORK_PATH"
         }
         copy {
+            from "$TEST_APP_PATH/paths.gradle"
+            into "$DIST_FRAMEWORK_PATH"
+        }
+        copy {
+            from "$TEST_APP_PATH/user_properties_reader.gradle"
+            into "$DIST_FRAMEWORK_PATH"
+        }
+        copy {
             from "$TEST_APP_PATH/gradle"
             into "$DIST_FRAMEWORK_PATH/gradle"
         }

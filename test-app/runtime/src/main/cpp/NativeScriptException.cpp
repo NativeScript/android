@@ -346,7 +346,7 @@ string NativeScriptException::GetErrorStackTrace(const Local<StackTrace>& stackT
         auto lineNumber = frame->GetLineNumber();
         auto column = frame->GetColumn();
 
-        ss << "\tFrame: function:'" << funcName.c_str() << "', file:'" << srcName.c_str() << "', line: " << lineNumber << ", column: " << column << endl;
+        ss << "\t" << (i > 0 ? "at " : "") << funcName.c_str() << "(" << srcName.c_str() << ":" << lineNumber << ":" << column << ")" << endl;
     }
 
     return ss.str();

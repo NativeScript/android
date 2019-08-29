@@ -1,0 +1,22 @@
+def GRADLE_PROPERTIES_FILENAME = "gradle.properties"
+
+def getFile = { dir, filename ->
+    File file = new File("$dir$File.separator$filename")
+    file?.exists() ? file : null
+}
+
+def getPropertyFile = { dir ->
+    return getFile(dir, GRADLE_PROPERTIES_FILENAME)
+}
+
+ext.getUserProperties = { dir ->
+    def file = getPropertyFile(dir)
+    if (!file) {
+        return null
+    }
+
+    Properties properties = new Properties()
+    properties.load(file.newInputStream())
+
+    return properties
+}

@@ -1,9 +1,27 @@
+6.1.0
+==
+
+## What's New
+ - [Runtime Binding Generator depends on deprecated APIs #1441)](https://github.com/NativeScript/android-runtime/issues/1441)
+ - [The runtime depends on accessing a hidden value field (#1458)](https://github.com/NativeScript/android-runtime/issues/1458)
+ - [Upgrade v8 to 7.6.303.28 (#1439)](https://github.com/NativeScript/android-runtime/issues/1439)
+ - [Unify JS stack trace when exception is thrown #1443](https://github.com/NativeScript/android-runtime/issues/1443)
+ - [Update androidSdk, targetSdk and build tools to 29 (#1452)](https://github.com/NativeScript/android-runtime/issues/1452)
+ - [Upgrade android gradle plugin to the latest 3.5.0 version (#1456)](https://github.com/NativeScript/android-runtime/issues/1456)
+ - [Add initial Kotlin support (#1459)](https://github.com/NativeScript/android-runtime/issues/1459)
+ - [Add support for user defined gradle.properties (#1463)](https://github.com/NativeScript/android-runtime/issues/1463)
+
+
+## Bug Fixes
+
+ - [SIGSEGV in libNativeScript.so on callback from java with console.log when displaying an object. #1366](https://github.com/NativeScript/android-runtime/issues/1366)
+
 6.0.2
 ==
 
 ## What's New
 
-- [Include x86_64 architecture](https://github.com/NativeScript/android-runtime/issues/1419)
+ - [Include x86_64 architecture](https://github.com/NativeScript/android-runtime/issues/1419)
 
 6.0.1
 ==
@@ -14,7 +32,6 @@
 - [IntentService extending fails at runtime when service is started (#1426)](https://github.com/NativeScript/android-runtime/issues/1426)
 - [SBG may fail when parsing big JS files (#1430)](https://github.com/NativeScript/android-runtime/issues/1430)
 - [Upgrade android gradle plugin to the latest 3.4.2 version (#1425)](https://github.com/NativeScript/android-runtime/issues/1425)
-
 
 
 6.0.0
