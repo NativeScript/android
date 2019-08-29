@@ -312,12 +312,12 @@ describe("Tests exception handling ", function () {
 	        require("./syntaxErrors.js");
 	    } catch (e) {
 	        exceptionCaught = true;
-	        errMsg = e.fullMessage
+	        errMsg = e.fullMessage;
 	    }
 	    expect(exceptionCaught).toBe(true);
 	    expect(errMsg).toContain("Cannot compile /data/data/com.tns.testapplication/files/app/tests/syntaxErrors.js");
 	    expect(errMsg).toContain("SyntaxError: Unexpected token class");
-	    expect(errMsg).toContain("File: \"file:///data/data/com.tns.testapplication/files/app/tests/syntaxErrors.js, line: 3, column: 4");
+	    expect(errMsg).toContain("File: (file:///data/data/com.tns.testapplication/files/app/tests/syntaxErrors.js:3:4)");
 	});
 
     // run this test only for API level bigger than 25 as we have handling there
