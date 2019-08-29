@@ -30,8 +30,9 @@ import java.security.MessageDigest
 
 apply plugin: "com.android.application"
 
-def useKotlin = project.hasProperty("useKotlin") && project.ext.useKotlin=="true"
-if (useKotlin) {
+def enableKotlin = (project.hasProperty("useKotlin") && project.useKotlin == "true")
+
+if (enableKotlin) {
     apply plugin: 'kotlin-android'
     apply plugin: 'kotlin-android-extensions'
 }
@@ -228,7 +229,7 @@ def setAppIdentifier = { ->
 
 android {
 
-    if (useKotlin) {
+    if (enableKotlin) {
         kotlinOptions {
             jvmTarget = '1.8'
         }
@@ -380,7 +381,7 @@ dependencies {
     }
 
     def kotlinVersion = computeKotlinVersion()
-    if (useKotlin) {
+    if (enableKotlin) {
         implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
     }
 
