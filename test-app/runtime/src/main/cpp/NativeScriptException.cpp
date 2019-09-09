@@ -71,9 +71,10 @@ void NativeScriptException::ReThrowToJava() {
     JEnv env;
 
     auto isolate = Isolate::GetCurrent();
-    auto objectManager = Runtime::GetObjectManager(isolate);
+
 
     if (!m_javaException.IsNull()) {
+        auto objectManager = Runtime::GetObjectManager(isolate);
         auto excClassName = objectManager->GetClassName((jobject) m_javaException);
         if (excClassName == "com/tns/NativeScriptException") {
             ex = m_javaException;
@@ -101,6 +102,7 @@ void NativeScriptException::ReThrowToJava() {
         if (ex == nullptr) {
             ex = static_cast<jthrowable>(env.NewObject(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_JSVALUE_CTOR_ID, (jstring) msg, (jstring)stackTrace, reinterpret_cast<jlong>(m_javascriptException)));
         } else {
+            auto objectManager = Runtime::GetObjectManager(isolate);
             auto excClassName = objectManager->GetClassName(ex);
             if (excClassName != "com/tns/NativeScriptException") {
                 ex = static_cast<jthrowable>(env.NewObject(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_THROWABLE_CTOR_ID, (jstring) msg, (jstring)stackTrace, ex));

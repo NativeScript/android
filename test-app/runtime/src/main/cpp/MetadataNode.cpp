@@ -11,6 +11,7 @@
 #include "Runtime.h"
 #include <sstream>
 #include <cctype>
+#include <dirent.h>
 #include "ManualInstrumentation.h"
 
 #include "v8.h"
@@ -1698,6 +1699,12 @@ void MetadataNode::BuildMetadata(const string& filesPath) {
 
     string baseDir = filesPath;
     baseDir.append("/metadata");
+
+    DIR* dir = opendir(baseDir.c_str());
+    if(dir == nullptr){
+        throw NativeScriptException(string("metadata folder couldn't be opened!"));
+    }
+
     string nodesFile = baseDir + "/treeNodeStream.dat";
     string namesFile = baseDir + "/treeStringsStream.dat";
     string valuesFile = baseDir + "/treeValueStream.dat";
