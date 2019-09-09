@@ -27,8 +27,12 @@ import java.nio.file.Files
 import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
+import org.gradle.internal.logging.text.StyledTextOutputFactory
 
 apply plugin: "com.android.application"
+apply from: "gradle-helpers/BuildToolTask.gradle"
+def outLogger = services.get(StyledTextOutputFactory).create("colouredOutputLogger")
+gradle.useLogger(new BuildAdapter())
 
 def enableKotlin = (project.hasProperty("useKotlin") && project.useKotlin == "true")
 
@@ -464,7 +468,7 @@ tasks.whenTaskAdded({ org.gradle.api.DefaultTask currentTask ->
 ///////////////////////////// EXECUTUION PHASE /////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
 
-task runSbg(type: JavaExec) {
+task runSbg(type: BuildToolTask) {
     dependsOn "collectAllJars"
     if (!findProject(':static-binding-generator').is(null)) {
         dependsOn ':static-binding-generator:jar'
@@ -483,6 +487,8 @@ task runSbg(type: JavaExec) {
     if (failOnCompilationWarningsEnabled()) {
         paramz.add("-show-deprecation-warnings")
     }
+
+    setOutputs outLogger
 
     args paramz
 
@@ -695,7 +701,7 @@ task collectAllJars {
     }
 }
 
-task buildMetadata(type: JavaExec) {
+task buildMetadata(type: BuildToolTask) {
     if (!findProject(':android-metadata-generator').is(null)) {
         dependsOn ':android-metadata-generator:jar'
     }
@@ -749,11 +755,13 @@ task buildMetadata(type: JavaExec) {
         workingDir "$BUILD_TOOLS_PATH"
         main "-jar"
 
+        setOutputs outLogger
+
         args "android-metadata-generator.jar"
     }
 }
 
-task generateTypescriptDefinitions(type: JavaExec) {
+task generateTypescriptDefinitions(type: BuildToolTask) {
     if (!findProject(':dts-generator').is(null)) {
         dependsOn ':dts-generator:jar'
     }
@@ -785,6 +793,9 @@ task generateTypescriptDefinitions(type: JavaExec) {
 
         logger.info("Task generateTypescriptDefinitions: Call dts-generator.jar with arguments: " + paramz.toString().replaceAll(',', ''))
         println "Task generateTypescriptDefinitions: Call dts-generator.jar with arguments: " + paramz.toString().replaceAll(',', '')
+
+        setOutputs outLogger
+
         args paramz.toArray()
     }
 }

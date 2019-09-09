@@ -35,22 +35,29 @@ public class Main {
         inputJsFiles = new ArrayList<>();
     }
 
-    public static void main(String[] args) throws IOException, ClassNotFoundException {
-        InputParameters.parseCommand(args);
+    public static void main(String[] args) {
+        try {
+            InputParameters.parseCommand(args);
 
-        validateInput();
+            validateInput();
 
-        getWorkerExcludeFile();
+            getWorkerExcludeFile();
 
-        List<DataRow> rows = Generator.getRows(dependenciesFile);
-        GetInterfaceNames.generateInterfaceFile(rows);
-        generateJsInputFile();
-        runJsParser();
+            List<DataRow> rows = Generator.getRows(dependenciesFile);
+            GetInterfaceNames.generateInterfaceFile(rows);
+            generateJsInputFile();
+            runJsParser();
 
-        // generate java bindings
-        String inputBindingFilename = Paths.get(System.getProperty("user.dir"), SBG_BINDINGS_NAME).toString();
-        Generator generator = new Generator(outputDir, rows, isSuppressCallJSMethodExceptionsEnabled());
-        generator.writeBindings(inputBindingFilename);
+            // generate java bindings
+            String inputBindingFilename = Paths.get(System.getProperty("user.dir"), SBG_BINDINGS_NAME).toString();
+            Generator generator = new Generator(outputDir, rows, isSuppressCallJSMethodExceptionsEnabled());
+
+            generator.writeBindings(inputBindingFilename);
+        } catch (Exception ex) {
+            System.err.println(String.format("Error executing Static Binding Generator: %s", ex.getMessage()));
+            ex.printStackTrace(System.out);
+            System.exit(1);
+        }
     }
 
     /*
