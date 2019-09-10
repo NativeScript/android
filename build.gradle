@@ -279,10 +279,6 @@ task copyFilesToProjectTemeplate {
             rename "runtime-optimized-with-inspector-release.aar", "nativescript-optimized-with-inspector.aar"
         }
         copy {
-            from "$TEST_APP_PATH/app/gradle-helpers/BuildToolTask.gradle"
-            into "$DIST_FRAMEWORK_PATH/app/gradle-helpers"
-        }
-        copy {
             from "$TEST_APP_PATH/app/build.gradle"
             into "$DIST_FRAMEWORK_PATH/app"
         }
@@ -297,6 +293,14 @@ task copyFilesToProjectTemeplate {
         copy {
             from "$TEST_APP_PATH/gradle-helpers/user_properties_reader.gradle"
             into "$DIST_FRAMEWORK_PATH/gradle-helpers"
+        }
+        copy {
+            from "$TEST_APP_PATH/app/gradle-helpers/CustomExecutionLogger.gradle"
+            into "$DIST_FRAMEWORK_PATH/app/gradle-helpers"
+        }
+        copy {
+            from "$TEST_APP_PATH/app/gradle-helpers/BuildToolTask.gradle"
+            into "$DIST_FRAMEWORK_PATH/app/gradle-helpers"
         }
         copy {
             from "$TEST_APP_PATH/gradle"
