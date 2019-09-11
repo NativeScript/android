@@ -19,33 +19,39 @@ public class Generator {
     /**
      * @param args
      */
-    public static void main(String[] args) throws Exception {
-        String metadataOutputDir = "bin";
-        List<String> params = null;
-
+    public static void main(String[] args) {
         try {
-            metadataOutputDir = getFileRows(MDG_OUTPUT_DIR).get(0);
-        } catch (Exception e) {
-            throw new InvalidParameterException(String.format("You need to pass a file containing a single line: the output dir for the metadata generator1\n", e.getMessage()));
+            String metadataOutputDir;
+            List<String> params;
+
+            try {
+                metadataOutputDir = getFileRows(MDG_OUTPUT_DIR).get(0);
+            } catch (Exception e) {
+                throw new InvalidParameterException(String.format("You need to pass a file containing a single line: the output dir for the metadata generator1\n", e.getMessage()));
+            }
+            try {
+                params = getFileRows(MDG_JAVA_DEPENDENCIES);
+            } catch (Exception e) {
+                throw new InvalidParameterException(String.format("You need to pass a file containing a list of jar/class paths, so metadata can be generated for them!\n", e.getMessage()));
+            }
+
+            TreeNode root = Builder.build(params);
+
+            FileOutputStream ovs = new FileOutputStream(new File(metadataOutputDir, "treeValueStream.dat"));
+            FileStreamWriter outValueStream = new FileStreamWriter(ovs);
+
+            FileOutputStream ons = new FileOutputStream(new File(metadataOutputDir, "treeNodeStream.dat"));
+            FileStreamWriter outNodeStream = new FileStreamWriter(ons);
+
+            FileOutputStream oss = new FileOutputStream(new File(metadataOutputDir, "treeStringsStream.dat"));
+            FileStreamWriter outStringsStream = new FileStreamWriter(oss);
+
+            new Writer(outNodeStream, outValueStream, outStringsStream).writeTree(root);
+        } catch (Throwable ex) {
+            System.err.println(String.format("Error executing Metadata Generator: %s", ex.getMessage()));
+            ex.printStackTrace(System.out);
+            System.exit(1);
         }
-        try {
-            params = getFileRows(MDG_JAVA_DEPENDENCIES);
-        } catch (Exception e) {
-            throw new InvalidParameterException(String.format("You need to pass a file containing a list of jar/class paths, so metadata can be generated for them!\n", e.getMessage()));
-        }
-
-        TreeNode root = Builder.build(params);
-
-        FileOutputStream ovs = new FileOutputStream(new File(metadataOutputDir, "treeValueStream.dat"));
-        FileStreamWriter outValueStream = new FileStreamWriter(ovs);
-
-        FileOutputStream ons = new FileOutputStream(new File(metadataOutputDir, "treeNodeStream.dat"));
-        FileStreamWriter outNodeStream = new FileStreamWriter(ons);
-
-        FileOutputStream oss = new FileOutputStream(new File(metadataOutputDir, "treeStringsStream.dat"));
-        FileStreamWriter outStringsStream = new FileStreamWriter(oss);
-
-        new Writer(outNodeStream, outValueStream, outStringsStream).writeTree(root);
     }
 
     public static List<String> getFileRows(String filename) throws IOException {

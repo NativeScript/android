@@ -27,8 +27,13 @@ import java.nio.file.Files
 import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
+import org.gradle.internal.logging.text.StyledTextOutputFactory
+import static org.gradle.internal.logging.text.StyledTextOutput.Style
 
 apply plugin: "com.android.application"
+apply from: "gradle-helpers/BuildToolTask.gradle"
+apply from: "gradle-helpers/CustomExecutionLogger.gradle"
+def outLogger = services.get(StyledTextOutputFactory).create("colouredOutputLogger")
 
 def enableKotlin = (project.hasProperty("useKotlin") && project.useKotlin == "true")
 
@@ -39,7 +44,7 @@ if (enableKotlin) {
 
 def onlyX86 = project.hasProperty("onlyX86")
 if (onlyX86) {
-    println "OnlyX86 build triggered."
+    outLogger.withStyle(Style.Info).println "OnlyX86 build triggered."
 }
 
 //common
@@ -146,7 +151,7 @@ version of the {N} CLI install a previous version of the runtime package - 'tns 
         def pathToBuildScriptGradle = "$absolutePathToAppResources/Android/buildscript.gradle"
         def buildScriptGradle = file(pathToBuildScriptGradle)
         if (buildScriptGradle.exists()) {
-            println "\t + applying user-defined buildscript from ${buildScriptGradle}"
+            outLogger.withStyle(Style.SuccessHeader).println "\t + applying user-defined buildscript from ${buildScriptGradle}"
             apply from: pathToBuildScriptGradle, to: buildscript
         }
 
@@ -154,7 +159,7 @@ version of the {N} CLI install a previous version of the runtime package - 'tns 
             def pathToPluginBuildScriptGradle = "$rootDir/${dep.directory}/$PLATFORMS_ANDROID/buildscript.gradle"
             def pluginBuildScriptGradle = file(pathToPluginBuildScriptGradle)
             if (pluginBuildScriptGradle.exists()) {
-                println "\t + applying user-defined buildscript from dependency ${pluginBuildScriptGradle}"
+                outLogger.withStyle(Style.SuccessHeader).println "\t + applying user-defined buildscript from dependency ${pluginBuildScriptGradle}"
                 apply from: pathToPluginBuildScriptGradle, to: buildscript
             }
         }
@@ -172,7 +177,7 @@ def applyBeforePluginGradleConfiguration = { ->
     def pathToBeforePluginGradle = "$appResourcesPath/Android/before-plugins.gradle"
     def beforePluginGradle = file(pathToBeforePluginGradle)
     if (beforePluginGradle.exists()) {
-        println "\t + applying user-defined configuration from ${beforePluginGradle}"
+        outLogger.withStyle(Style.SuccessHeader).println "\t + applying user-defined configuration from ${beforePluginGradle}"
         apply from: pathToBeforePluginGradle
     }
 }
@@ -182,10 +187,10 @@ def applyAppGradleConfiguration = { ->
     def pathToAppGradle = "$appResourcesPath/Android/app.gradle"
     def appGradle = file(pathToAppGradle)
     if (appGradle.exists()) {
-        println "\t + applying user-defined configuration from ${appGradle}"
+        outLogger.withStyle(Style.SuccessHeader).println "\t + applying user-defined configuration from ${appGradle}"
         apply from: pathToAppGradle
     } else {
-        println "\t + couldn't load user-defined configuration from ${appGradle}. File doesn't exist."
+        outLogger.withStyle(Style.Info).println "\t + couldn't load user-defined configuration from ${appGradle}. File doesn't exist."
     }
 }
 
@@ -211,7 +216,7 @@ def getAppIdentifier = { packageJsonMap ->
 }
 
 def setAppIdentifier = { ->
-    println "\t + setting applicationId"
+    outLogger.withStyle(Style.SuccessHeader).println "\t + setting applicationId"
     File packageJsonFile = new File("$USER_PROJECT_ROOT/$PACKAGE_JSON")
 
     if (packageJsonFile.exists()) {
@@ -339,7 +344,7 @@ dependencies {
         androidXMaterialVersion = androidXMaterial
     }
 
-    println "\t + using android X library androidx.legacy:legacy-support-v4:$androidXLegacyVersion"
+    outLogger.withStyle(Style.SuccessHeader).println "\t + using android X library androidx.legacy:legacy-support-v4:$androidXLegacyVersion"
 
     implementation "androidx.multidex:multidex:2.0.1"
     implementation "androidx.legacy:legacy-support-v4:$androidXLegacyVersion"
@@ -374,7 +379,7 @@ dependencies {
             runtime = "nativescript-regular"
         }
 
-        println "\t + adding nativescript runtime package dependency: $runtime"
+        outLogger.withStyle(Style.SuccessHeader).println "\t + adding nativescript runtime package dependency: $runtime"
         project.dependencies.add("implementation", [name: runtime, ext: "aar"])
     } else {
         implementation project(':runtime')
@@ -397,14 +402,14 @@ task addDependenciesFromNativeScriptPlugins {
         aarFiles.each { aarFile ->
             def length = aarFile.name.length() - 4
             def fileName = aarFile.name[0..<length]
-            println "\t + adding aar plugin dependency: " + aarFile.getAbsolutePath()
+            outLogger.withStyle(Style.SuccessHeader).println "\t + adding aar plugin dependency: " + aarFile.getAbsolutePath()
             project.dependencies.add("implementation", [name: fileName, ext: "aar"])
         }
 
         def jarFiles = fileTree(dir: file("$rootDir/${dep.directory}/$PLATFORMS_ANDROID"), include: ["**/*.jar"])
         jarFiles.each { jarFile ->
             def jarFileAbsolutePath = jarFile.getAbsolutePath()
-            println "\t + adding jar plugin dependency: $jarFileAbsolutePath"
+            outLogger.withStyle(Style.SuccessHeader).println "\t + adding jar plugin dependency: $jarFileAbsolutePath"
             pluginsJarLibraries.add(jarFile.getAbsolutePath())
         }
 
@@ -420,14 +425,14 @@ task addDependenciesFromAppResourcesLibraries {
         aarFiles.each { aarFile ->
             def length = aarFile.name.length() - 4
             def fileName = aarFile.name[0..<length]
-            println "\t + adding aar library dependency: " + aarFile.getAbsolutePath()
+            outLogger.withStyle(Style.SuccessHeader).println "\t + adding aar library dependency: " + aarFile.getAbsolutePath()
             project.dependencies.add("implementation", [name: fileName, ext: "aar"])
         }
 
         def jarFiles = fileTree(dir: appResourcesLibraries, include: ["**/*.jar"])
         jarFiles.each { jarFile ->
             def jarFileAbsolutePath = jarFile.getAbsolutePath()
-            println "\t + adding jar plugin dependency: $jarFileAbsolutePath"
+            outLogger.withStyle(Style.SuccessHeader).println "\t + adding jar plugin dependency: $jarFileAbsolutePath"
             pluginsJarLibraries.add(jarFile.getAbsolutePath())
         }
 
@@ -464,7 +469,7 @@ tasks.whenTaskAdded({ org.gradle.api.DefaultTask currentTask ->
 ///////////////////////////// EXECUTUION PHASE /////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////
 
-task runSbg(type: JavaExec) {
+task runSbg(type: BuildToolTask) {
     dependsOn "collectAllJars"
     if (!findProject(':static-binding-generator').is(null)) {
         dependsOn ':static-binding-generator:jar'
@@ -483,6 +488,8 @@ task runSbg(type: JavaExec) {
     if (failOnCompilationWarningsEnabled()) {
         paramz.add("-show-deprecation-warnings")
     }
+
+    setOutputs outLogger
 
     args paramz
 
@@ -576,7 +583,7 @@ afterEvaluate { project ->
                         }
                     }
                 } else {
-                    println "WARNING: Folder ${jarDir.path} does not exists, the dependent project's classes won't be included in the metadata"
+                    outLogger.withStyle(Style.Info).println "WARNING: Folder ${jarDir.path} does not exists, the dependent project's classes won't be included in the metadata"
                 }
             }
         }
@@ -695,7 +702,7 @@ task collectAllJars {
     }
 }
 
-task buildMetadata(type: JavaExec) {
+task buildMetadata(type: BuildToolTask) {
     if (!findProject(':android-metadata-generator').is(null)) {
         dependsOn ':android-metadata-generator:jar'
     }
@@ -749,11 +756,13 @@ task buildMetadata(type: JavaExec) {
         workingDir "$BUILD_TOOLS_PATH"
         main "-jar"
 
+        setOutputs outLogger
+
         args "android-metadata-generator.jar"
     }
 }
 
-task generateTypescriptDefinitions(type: JavaExec) {
+task generateTypescriptDefinitions(type: BuildToolTask) {
     if (!findProject(':dts-generator').is(null)) {
         dependsOn ':dts-generator:jar'
     }
@@ -784,7 +793,10 @@ task generateTypescriptDefinitions(type: JavaExec) {
         new File("$TYPINGS_PATH").mkdirs()
 
         logger.info("Task generateTypescriptDefinitions: Call dts-generator.jar with arguments: " + paramz.toString().replaceAll(',', ''))
-        println "Task generateTypescriptDefinitions: Call dts-generator.jar with arguments: " + paramz.toString().replaceAll(',', '')
+        outLogger.withStyle(Style.SuccessHeader).println "Task generateTypescriptDefinitions: Call dts-generator.jar with arguments: " + paramz.toString().replaceAll(',', '')
+
+        setOutputs outLogger
+
         args paramz.toArray()
     }
 }
@@ -807,7 +819,7 @@ static def shouldIncludeDirForTypings(path, includeDirs) {
 
 task copyTypings {
     doLast {
-        println "Copied generated typings to application root level. Make sure to import android.d.ts in reference.d.ts"
+        outLogger.withStyle(Style.Info).println "Copied generated typings to application root level. Make sure to import android.d.ts in reference.d.ts"
 
         copy {
             from "$TYPINGS_PATH"
