@@ -33,7 +33,6 @@ import static org.gradle.internal.logging.text.StyledTextOutput.Style
 apply plugin: "com.android.application"
 apply from: "gradle-helpers/BuildToolTask.gradle"
 apply from: "gradle-helpers/CustomExecutionLogger.gradle"
-def outLogger = services.get(StyledTextOutputFactory).create("colouredOutputLogger")
 
 def enableKotlin = (project.hasProperty("useKotlin") && project.useKotlin == "true")
 
@@ -105,6 +104,7 @@ version of the {N} CLI install a previous version of the runtime package - 'tns 
         project.ext.nativescriptDependencies = new JsonSlurper().parseText(dependenciesJson.text)
         project.ext.PLATFORMS_ANDROID = "platforms/android"
         project.ext.USER_PROJECT_ROOT = "$rootDir/../.."
+        project.ext.outLogger = services.get(StyledTextOutputFactory).create("colouredOutputLogger")
 
         project.ext.getAppPath = { ->
             def relativePathToApp = "app"
