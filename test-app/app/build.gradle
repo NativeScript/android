@@ -295,6 +295,29 @@ android {
     applyBeforePluginGradleConfiguration()
     applyPluginGradleConfigurations()
     applyAppGradleConfiguration()
+
+    def initializeMergedAssetsOutputPath = { ->
+      android.applicationVariants.all { variant ->
+          if (variant.buildType.name == project.selectedBuildType) {
+              def task
+              if (variant.metaClass.respondsTo(variant, "getMergeAssetsProvider")) {
+                  def provider = variant.getMergeAssetsProvider()
+                  task = provider.get();
+              } else {
+                  // fallback for older android gradle plugin versions
+                  task = variant.getMergeAssets()
+              }
+              for (File file : task.getOutputs().getFiles()) {
+                  if (!file.getPath().contains("/incremental/")) {
+                      project.ext.mergedAssetsOutputPath = file.getPath()
+                      break;
+                  }
+              }
+          }
+      }
+    }
+
+    initializeMergedAssetsOutputPath()
 }
 
 def externalRuntimeExists = !findProject(':runtime').is(null)
@@ -454,8 +477,7 @@ tasks.whenTaskAdded({ org.gradle.api.DefaultTask currentTask ->
     }
     if (currentTask =~ /compile.+JavaWithJavac/) {
         currentTask.dependsOn(runSbg)
-        currentTask.finalizedBy(ensureMetadataOutDir)
-        ensureMetadataOutDir.finalizedBy(buildMetadata)
+        currentTask.finalizedBy(buildMetadata)
     }
     if (currentTask =~ /merge.*Assets/) {
         currentTask.shouldRunAfter(buildMetadata)
@@ -495,13 +517,6 @@ task runSbg(type: BuildToolTask) {
 
     doFirst {
         new File("$OUTPUT_JAVA_DIR/com/tns/gen").deleteDir()
-    }
-}
-
-task ensureMetadataOutDir {
-    doLast {
-        def outputDir = file("$METADATA_OUT_PATH")
-        outputDir.mkdirs()
     }
 }
 
@@ -552,6 +567,14 @@ class WorkerTask extends DefaultTask {
 class EmptyRunnable implements Runnable {
     void run() {
     }
+}
+
+def getMergedAssetsOutputPath() {
+    if (!project.hasProperty("mergedAssetsOutputPath")) {
+        // mergedAssetsOutputPath not found fallback to the default value for android gradle plugin 3.4.0
+        project.ext.mergedAssetsOutputPath = "$projectDir/build/intermediates/assets/" + project.selectedBuildType + "/out"
+    }
+    return project.ext.mergedAssetsOutputPath
 }
 
 // Discover all jars and dynamically create tasks for the extraction of each of them
@@ -702,10 +725,27 @@ task collectAllJars {
     }
 }
 
+task copyMetadata {
+    doLast {
+        copy {
+          from "$projectDir/src/main/assets/metadata"
+          into getMergedAssetsOutputPath() + "/metadata"
+        }
+    }
+}
+
 task buildMetadata(type: BuildToolTask) {
     if (!findProject(':android-metadata-generator').is(null)) {
         dependsOn ':android-metadata-generator:jar'
     }
+
+    // As some external gradle plugins can reorder the execution order of the tasks it may happen that buildMetadata is executed after merge{Debug/Release}Assets
+    // in that case the metadata won't be included in the result apk and it will crash, so to avoid this we are adding the copyMetadata task which will manually copy
+    // the metadata files in the merge assets folder and they will be added to the result apk
+
+    // The next line is added to avoid adding another copyData implementation from the firebase plugin - https://github.com/EddyVerbruggen/nativescript-plugin-firebase/blob/3943bb9147f43c41599e801d026378eba93d3f3a/publish/scripts/installer.js#L1105
+    //buildMetadata.finalizedBy(copyMetadata)
+    finalizedBy copyMetadata
 
     description "builds metadata with provided jar dependencies"
 
@@ -725,6 +765,8 @@ task buildMetadata(type: BuildToolTask) {
         // get compiled classes to pass to metadata generator
         // these need to be called after the classes have compiled
         assert file(classesDir).exists()
+
+        new File(getMergedAssetsOutputPath() + "/metadata").deleteDir()
 
         def classesSubDirs = new File(classesDir).listFiles()
         def selectedBuildType = project.ext.selectedBuildType
