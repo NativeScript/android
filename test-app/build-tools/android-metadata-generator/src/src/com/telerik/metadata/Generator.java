@@ -47,7 +47,7 @@ public class Generator {
             FileStreamWriter outStringsStream = new FileStreamWriter(oss);
 
             new Writer(outNodeStream, outValueStream, outStringsStream).writeTree(root);
-        } catch (Exception ex) {
+        } catch (Throwable ex) {
             System.err.println(String.format("Error executing Metadata Generator: %s", ex.getMessage()));
             ex.printStackTrace(System.out);
             System.exit(1);

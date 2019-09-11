@@ -53,7 +53,7 @@ public class Main {
             Generator generator = new Generator(outputDir, rows, isSuppressCallJSMethodExceptionsEnabled());
 
             generator.writeBindings(inputBindingFilename);
-        } catch (Exception ex) {
+        } catch (Throwable ex) {
             System.err.println(String.format("Error executing Static Binding Generator: %s", ex.getMessage()));
             ex.printStackTrace(System.out);
             System.exit(1);
