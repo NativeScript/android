@@ -81,7 +81,7 @@ void ModuleInternal::Init(Isolate* isolate, const string& baseDir) {
 
     auto requireFuncTemplate = FunctionTemplate::New(isolate, RequireCallback, External::New(isolate, this));
     auto requireFunc = requireFuncTemplate->GetFunction(context).ToLocalChecked();
-    global->Set(ArgConverter::ConvertToV8String(isolate, "__nativeRequire"), requireFunc);
+    global->Set(context, ArgConverter::ConvertToV8String(isolate, "__nativeRequire"), requireFunc);
     m_requireFunction = new Persistent<Function>(isolate, requireFunc);
 
     Local<Function> globalRequire;
@@ -91,7 +91,7 @@ void ModuleInternal::Init(Isolate* isolate, const string& baseDir) {
     } else {
         globalRequire = GetRequireFunction(isolate, Constants::APP_ROOT_FOLDER_PATH);
     }
-    global->Set(ArgConverter::ConvertToV8String(isolate, "require"), globalRequire);
+    global->Set(context, ArgConverter::ConvertToV8String(isolate, "require"), globalRequire);
 }
 
 Local<Function> ModuleInternal::GetRequireFunction(Isolate* isolate, const string& dirName) {
@@ -170,10 +170,13 @@ void ModuleInternal::RequireCallbackImpl(const v8::FunctionCallbackInfo<v8::Valu
 
         args.GetReturnValue().Set(moduleObj);
     } else {
-        auto exportsObj = moduleObj->Get(ArgConverter::ConvertToV8String(isolate, "exports"));
+        auto context = isolate->GetCurrentContext();
+        Local<Value> exportsVal;
+        moduleObj->Get(context, ArgConverter::ConvertToV8String(isolate, "exports")).ToLocal(&exportsVal);
 
-        assert(!exportsObj.IsEmpty());
+        assert(!exportsVal.IsEmpty());
 
+        auto exportsObj = exportsVal.As<Object>();
         args.GetReturnValue().Set(exportsObj);
     }
 }
@@ -269,12 +272,13 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& moduleP
     tns::instrumentation::Frame frame(frameName.c_str());
     Local<Object> result;
 
+    auto context = isolate->GetCurrentContext();
     auto moduleObj = Object::New(isolate);
     auto exportsObj = Object::New(isolate);
     auto exportsPropName = ArgConverter::ConvertToV8String(isolate, "exports");
-    moduleObj->Set(exportsPropName, exportsObj);
+    moduleObj->Set(context, exportsPropName, exportsObj);
     auto fullRequiredModulePath = ArgConverter::ConvertToV8String(isolate, modulePath);
-    moduleObj->Set(ArgConverter::ConvertToV8String(isolate, "filename"), fullRequiredModulePath);
+    moduleObj->Set(context, ArgConverter::ConvertToV8String(isolate, "filename"), fullRequiredModulePath);
 
     auto poModuleObj = new Persistent<Object>(isolate, moduleObj);
     TempModule tempModule(this, modulePath, moduleCacheKey, poModuleObj);
@@ -286,7 +290,6 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& moduleP
     if (Util::EndsWith(modulePath, ".js")) {
         auto script = LoadScript(isolate, modulePath, fullRequiredModulePath);
 
-        auto context = isolate->GetCurrentContext();
         moduleFunc = script->Run(context).ToLocalChecked().As<Function>();
         if (tc.HasCaught()) {
             throw NativeScriptException(tc, "Error running script " + modulePath);
@@ -305,7 +308,7 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& moduleP
         }
         auto extFunc = External::New(isolate, func);
         auto ft = FunctionTemplate::New(isolate, RequireNativeCallback, extFunc);
-        auto maybeFunc = ft->GetFunction(isolate->GetCurrentContext());
+        auto maybeFunc = ft->GetFunction(context);
         if (maybeFunc.IsEmpty() || tc.HasCaught()) {
             throw NativeScriptException(tc, "Cannot create native module function callback");
         }
@@ -327,7 +330,7 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& moduleP
         moduleObj, exportsObj, require, fileName, dirName
     };
 
-    moduleObj->Set(ArgConverter::ConvertToV8String(isolate, "require"), require);
+    moduleObj->Set(context, ArgConverter::ConvertToV8String(isolate, "require"), require);
 
     auto moduleIdProp = ArgConverter::ConvertToV8String(isolate, "id");
     const auto readOnlyFlags = static_cast<PropertyAttribute>(PropertyAttribute::DontDelete | PropertyAttribute::ReadOnly);
@@ -338,8 +341,7 @@ Local<Object> ModuleInternal::LoadModule(Isolate* isolate, const string& moduleP
 
     auto thiz = Object::New(isolate);
     auto extendsName = ArgConverter::ConvertToV8String(isolate, "__extends");
-    thiz->Set(extendsName, isolate->GetCurrentContext()->Global()->Get(extendsName));
-    auto context = isolate->GetCurrentContext();
+    thiz->Set(context, extendsName, context->Global()->Get(context, extendsName).ToLocalChecked());
     moduleFunc->Call(context, thiz, sizeof(requireArgs) / sizeof(Local<Value> ), requireArgs);
 
     if (tc.HasCaught()) {

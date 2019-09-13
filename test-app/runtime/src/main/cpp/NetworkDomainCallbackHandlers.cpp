@@ -44,19 +44,19 @@ void NetworkDomainCallbackHandlers::ResponseReceivedCallback(const v8::FunctionC
         auto responseAsObj = response->ToObject(context).ToLocalChecked();
         auto connectionReusedProp = ArgConverter::ConvertToV8String(isolate, "connectionReused");
         if (!responseAsObj->Has(context, connectionReusedProp).FromMaybe(false)) {
-            responseAsObj->Set(connectionReusedProp, v8::Boolean::New(isolate, true));
+            responseAsObj->Set(context, connectionReusedProp, v8::Boolean::New(isolate, true));
         }
         auto connectionIdProp = ArgConverter::ConvertToV8String(isolate, "connectionId");
         if (!responseAsObj->Has(context, connectionIdProp).FromMaybe(false)) {
-            responseAsObj->Set(connectionIdProp, v8::Number::New(isolate, 0));
+            responseAsObj->Set(context, connectionIdProp, v8::Number::New(isolate, 0));
         }
         auto encodedDataLengthProp = ArgConverter::ConvertToV8String(isolate, "encodedDataLength");
         if (!responseAsObj->Has(context, encodedDataLengthProp).FromMaybe(false)) {
-            responseAsObj->Set(encodedDataLengthProp, v8::Number::New(isolate, 0));
+            responseAsObj->Set(context, encodedDataLengthProp, v8::Number::New(isolate, 0));
         }
         auto securityStateProp = ArgConverter::ConvertToV8String(isolate, "securityState");
         if (!responseAsObj->Has(context, securityStateProp).FromMaybe(false)) {
-            responseAsObj->Set(securityStateProp, ArgConverter::ConvertToV8String(isolate, "info"));
+            responseAsObj->Set(context, securityStateProp, ArgConverter::ConvertToV8String(isolate, "info"));
         }
         v8::Local<v8::String> responseJson;
         auto maybeResponseJson = v8::JSON::Stringify(context, responseAsObj);
@@ -153,10 +153,10 @@ void NetworkDomainCallbackHandlers::RequestWillBeSentCallback(const v8::Function
         auto initialPriorityProp = ArgConverter::ConvertToV8String(isolate, "initialPriority");
         auto referrerPolicyProp = ArgConverter::ConvertToV8String(isolate, "referrerPolicy");
         if (!argsObj->Has(context, initialPriorityProp).FromMaybe(false)) {
-            requestAsObj->Set(initialPriorityProp, ArgConverter::ConvertToV8String(isolate, "Medium"));
+            requestAsObj->Set(context, initialPriorityProp, ArgConverter::ConvertToV8String(isolate, "Medium"));
         }
         if (!argsObj->Has(context, referrerPolicyProp).FromMaybe(false)) {
-            requestAsObj->Set(referrerPolicyProp, ArgConverter::ConvertToV8String(isolate, "no-referrer-when-downgrade"));
+            requestAsObj->Set(context, referrerPolicyProp, ArgConverter::ConvertToV8String(isolate, "no-referrer-when-downgrade"));
         }
 
         v8::Local<v8::String> requestJson;

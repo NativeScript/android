@@ -316,7 +316,7 @@ describe("Tests exception handling ", function () {
 	    }
 	    expect(exceptionCaught).toBe(true);
 	    expect(errMsg).toContain("Cannot compile /data/data/com.tns.testapplication/files/app/tests/syntaxErrors.js");
-	    expect(errMsg).toContain("SyntaxError: Unexpected token class");
+	    expect(errMsg).toContain("SyntaxError: Unexpected token 'class'");
 	    expect(errMsg).toContain("File: (file:///data/data/com.tns.testapplication/files/app/tests/syntaxErrors.js:3:4)");
 	});
 

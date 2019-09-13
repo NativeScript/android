@@ -18,7 +18,7 @@ void ArrayBufferHelper::CreateConvertFunctions(Isolate* isolate, const Local<Obj
     auto context = isolate->GetCurrentContext();
     auto fromFunc = FunctionTemplate::New(isolate, CreateFromCallbackStatic, extData)->GetFunction(context).ToLocalChecked();
     auto ctx = isolate->GetCurrentContext();
-    auto arrBufferCtorFunc = global->Get(ArgConverter::ConvertToV8String(isolate, "ArrayBuffer")).As<Function>();
+    auto arrBufferCtorFunc = global->Get(context, ArgConverter::ConvertToV8String(isolate, "ArrayBuffer")).ToLocalChecked().As<Function>();
     arrBufferCtorFunc->Set(ctx, ArgConverter::ConvertToV8String(isolate, "from"), fromFunc);
 }
 

@@ -562,8 +562,8 @@ CallbackHandlers::GetImplementedInterfaces(JEnv& env, const Local<Object>& imple
     auto context = isolate->GetCurrentContext();
     auto propNames = implementationObject->GetOwnPropertyNames(context).ToLocalChecked();
     for (int i = 0; i < propNames->Length(); i++) {
-        auto name = propNames->Get(i).As<String>();
-        auto prop = implementationObject->Get(name);
+        auto name = propNames->Get(context, i).ToLocalChecked().As<String>();
+        auto prop = implementationObject->Get(context, name).ToLocalChecked();
 
         bool arrFound = !prop.IsEmpty() && prop->IsArray();
 
@@ -575,12 +575,13 @@ CallbackHandlers::GetImplementedInterfaces(JEnv& env, const Local<Object>& imple
 
                 auto context = isolate->GetCurrentContext();
                 int length = interfacesArr->Get(
-                                 v8::String::NewFromUtf8(isolate, "length").ToLocalChecked())->ToObject(context).ToLocalChecked()->Uint32Value(
+                                 context,
+                                 v8::String::NewFromUtf8(isolate, "length").ToLocalChecked()).ToLocalChecked()->ToObject(context).ToLocalChecked()->Uint32Value(
                                  context).ToChecked();
 
                 if (length > 0) {
                     for (int i = 0; i < length; i++) {
-                        auto element = interfacesArr->Get(i);
+                        auto element = interfacesArr->Get(context, i).ToLocalChecked();
 
                         if (element->IsFunction()) {
                             auto node = MetadataNode::GetTypeMetadataName(isolate, element);
@@ -621,8 +622,8 @@ CallbackHandlers::GetMethodOverrides(JEnv& env, const Local<Object>& implementat
     auto context = isolate->GetCurrentContext();
     auto propNames = implementationObject->GetOwnPropertyNames(context).ToLocalChecked();
     for (int i = 0; i < propNames->Length(); i++) {
-        auto name = propNames->Get(i).As<String>();
-        auto method = implementationObject->Get(name);
+        auto name = propNames->Get(context, i).ToLocalChecked().As<String>();
+        auto method = implementationObject->Get(context, name).ToLocalChecked();
 
         bool methodFound = !method.IsEmpty() && method->IsFunction();
 
@@ -823,7 +824,8 @@ Local<Value> CallbackHandlers::CallJSMethod(Isolate* isolate, JNIEnv* _env,
     JEnv env(_env);
     Local<Value> result;
 
-    auto method = jsObject->Get(ArgConverter::ConvertToV8String(isolate, methodName));
+    auto context = isolate->GetCurrentContext();
+    auto method = jsObject->Get(context, ArgConverter::ConvertToV8String(isolate, methodName)).ToLocalChecked();
 
     if (method.IsEmpty() || method->IsUndefined()) {
         stringstream ss;
@@ -842,7 +844,7 @@ Local<Value> CallbackHandlers::CallJSMethod(Isolate* isolate, JNIEnv* _env,
 
         std::vector<Local<Value>> arguments(argc);
         for (int i = 0; i < argc; i++) {
-            arguments[i] = jsArgs->Get(i);
+            arguments[i] = jsArgs->Get(context, i).ToLocalChecked();
         }
 
         auto context = isolate->GetCurrentContext();
@@ -1032,7 +1034,7 @@ void CallbackHandlers::WorkerGlobalOnMessageCallback(Isolate* isolate, jstring m
 
         TryCatch tc(isolate);
 
-        auto callback = globalObject->Get(ArgConverter::ConvertToV8String(isolate, "onmessage"));
+        auto callback = globalObject->Get(context, ArgConverter::ConvertToV8String(isolate, "onmessage")).ToLocalChecked();
         auto isEmpty = callback.IsEmpty();
         auto isFunction = callback->IsFunction();
 
@@ -1142,7 +1144,8 @@ CallbackHandlers::WorkerObjectOnMessageCallback(Isolate* isolate, jint workerId,
 
         auto worker = Local<Object>::New(isolate, *workerPersistent);
 
-        auto callback = worker->Get(ArgConverter::ConvertToV8String(isolate, "onmessage"));
+        auto context = isolate->GetCurrentContext();
+        auto callback = worker->Get(context, ArgConverter::ConvertToV8String(isolate, "onmessage")).ToLocalChecked();
         auto isEmpty = callback.IsEmpty();
         auto isFunction = callback->IsFunction();
 
@@ -1247,18 +1250,20 @@ void CallbackHandlers::WorkerGlobalCloseCallback(const v8::FunctionCallbackInfo<
         auto globalObject = context->Global();
 
         auto isTerminating = globalObject->Get(
-                                 ArgConverter::ConvertToV8String(isolate, "isTerminating"));
+                                 context,
+                                 ArgConverter::ConvertToV8String(isolate, "isTerminating")).ToLocalChecked();
 
         if (!isTerminating.IsEmpty() && isTerminating->BooleanValue(isolate)) {
             DEBUG_WRITE("WORKER: WorkerThreadCloseCallback - Worker is currently terminating...");
             return;
         }
 
-        globalObject->Set(ArgConverter::ConvertToV8String(isolate, "isTerminating"),
+        globalObject->Set(context,
+                          ArgConverter::ConvertToV8String(isolate, "isTerminating"),
                           Boolean::New(isolate, true));
 
         // execute onclose handler if one is implemented
-        auto callback = globalObject->Get(ArgConverter::ConvertToV8String(isolate, "onclose"));
+        auto callback = globalObject->Get(context, ArgConverter::ConvertToV8String(isolate, "onclose")).ToLocalChecked();
         auto isEmpty = callback.IsEmpty();
         auto isFunction = callback->IsFunction();
 
@@ -1305,7 +1310,7 @@ void CallbackHandlers::CallWorkerScopeOnErrorHandle(Isolate* isolate, TryCatch& 
         auto globalObject = context->Global();
 
         // execute onerror handle if one is implemented
-        auto callback = globalObject->Get(ArgConverter::ConvertToV8String(isolate, "onerror"));
+        auto callback = globalObject->Get(context, ArgConverter::ConvertToV8String(isolate, "onerror")).ToLocalChecked();
         auto isEmpty = callback.IsEmpty();
         auto isFunction = callback->IsFunction();
 
@@ -1392,19 +1397,24 @@ CallbackHandlers::CallWorkerObjectOnErrorHandle(Isolate* isolate, jint workerId,
 
         auto worker = Local<Object>::New(isolate, *workerPersistent);
 
-        auto callback = worker->Get(ArgConverter::ConvertToV8String(isolate, "onerror"));
+        auto context = isolate->GetCurrentContext();
+        auto callback = worker->Get(context, ArgConverter::ConvertToV8String(isolate, "onerror")).ToLocalChecked();
         auto isEmpty = callback.IsEmpty();
         auto isFunction = callback->IsFunction();
 
         if (!isEmpty && isFunction) {
             auto errEvent = Object::New(isolate);
-            errEvent->Set(ArgConverter::ConvertToV8String(isolate, "message"),
+            errEvent->Set(context,
+                          ArgConverter::ConvertToV8String(isolate, "message"),
                           ArgConverter::jstringToV8String(isolate, message));
-            errEvent->Set(ArgConverter::ConvertToV8String(isolate, "stackTrace"),
+            errEvent->Set(context,
+                          ArgConverter::ConvertToV8String(isolate, "stackTrace"),
                           ArgConverter::jstringToV8String(isolate, stackTrace));
-            errEvent->Set(ArgConverter::ConvertToV8String(isolate, "filename"),
+            errEvent->Set(context,
+                          ArgConverter::ConvertToV8String(isolate, "filename"),
                           ArgConverter::jstringToV8String(isolate, filename));
-            errEvent->Set(ArgConverter::ConvertToV8String(isolate, "lineno"),
+            errEvent->Set(context,
+                          ArgConverter::ConvertToV8String(isolate, "lineno"),
                           Number::New(isolate, lineno));
 
             Local<Value> args1[] = {errEvent};

@@ -56,8 +56,9 @@ void WeakRef::ConstructorCallbackImpl(const FunctionCallbackInfo<Value>& args) {
                 poTarget->SetWeak(callbackState, WeakTargetCallback, WeakCallbackType::kFinalizer);
                 poHolder->SetWeak(callbackState, WeakHolderCallback, WeakCallbackType::kFinalizer);
 
-                weakRef->Set(ArgConverter::ConvertToV8String(isolate, "get"), GetGetterFunction(isolate));
-                weakRef->Set(ArgConverter::ConvertToV8String(isolate, "clear"), GetClearFunction(isolate));
+                auto context = isolate->GetCurrentContext();
+                weakRef->Set(context, ArgConverter::ConvertToV8String(isolate, "get"), GetGetterFunction(isolate));
+                weakRef->Set(context, ArgConverter::ConvertToV8String(isolate, "clear"), GetClearFunction(isolate));
                 V8SetPrivateValue(isolate, weakRef, V8StringConstants::GetTarget(isolate), External::New(isolate, poTarget));
 
                 args.GetReturnValue().Set(weakRef);
