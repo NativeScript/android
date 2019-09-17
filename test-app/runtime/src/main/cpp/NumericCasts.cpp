@@ -37,7 +37,9 @@ CastType NumericCasts::GetCastType(Isolate* isolate, const Local<Object>& object
 
 Local<Value> NumericCasts::GetCastValue(const Local<Object>& object) {
     auto isolate = object->GetIsolate();
-    auto value = object->Get(V8StringConstants::GetValue(isolate));
+    auto context = object->CreationContext();
+    Local<Value> value;
+    object->Get(context, V8StringConstants::GetValue(isolate)).ToLocal(&value);
     return value;
 }
 
@@ -362,7 +364,8 @@ void NumericCasts::MarkJsObject(Isolate* isolate, const Local<Object>& object, C
     auto key = ArgConverter::ConvertToV8String(isolate, s_castMarker);
     auto type = Integer::New(isolate, static_cast<int>(castType));
     V8SetPrivateValue(isolate, object, key, type);
-    object->Set(V8StringConstants::GetValue(isolate), value);
+    auto context = object->CreationContext();
+    object->Set(context, V8StringConstants::GetValue(isolate), value);
 
     DEBUG_WRITE("MarkJsObject: Marking js object: %d with cast type: %d", object->GetIdentityHash(), castType);
 }

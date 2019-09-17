@@ -95,13 +95,14 @@ void ArrayHelper::CreateJavaArray(const v8::FunctionCallbackInfo<v8::Value>& inf
 
         auto func = type.As<Function>();
 
-        auto clazz = func->Get(ArgConverter::ConvertToV8String(isolate, "class"));
-
-        if (clazz.IsEmpty()) {
+        Local<Value> classVal;
+        func->Get(context, ArgConverter::ConvertToV8String(isolate, "class")).ToLocal(&classVal);
+        if (classVal.IsEmpty()) {
             Throw(isolate, "Expect known class as a second argument.");
             return;
         }
 
+        auto clazz = classVal.As<Object>();
         auto c = objectManager->GetJavaObjectByJsObject(clazz.As<Object>());
 
         JEnv env;

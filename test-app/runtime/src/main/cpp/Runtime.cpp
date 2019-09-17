@@ -185,8 +185,6 @@ void Runtime::Init(jstring filesPath, jstring nativeLibDir, bool verboseLoggingE
 
     NativeScriptException::Init();
     m_isolate = PrepareV8Runtime(filesRoot, nativeLibDirStr, packageNameStr, isDebuggable, callingDirStr, profilerOutputDirStr, maxLogcatObjectSize, forceLog);
-
-    s_isolate2RuntimesCache.insert(make_pair(m_isolate, this));
 }
 
 std::string Runtime::ReadFileText(const std::string& filePath) {
@@ -391,8 +389,9 @@ void Runtime::PassExceptionToJsNative(JNIEnv* env, jobject obj, jthrowable excep
     }
 
     //create a JS error object
-    errObj->Set(V8StringConstants::GetNativeException(isolate), nativeExceptionObject);
-    errObj->Set(V8StringConstants::GetStackTrace(isolate), ArgConverter::jstringToV8String(isolate, stackTrace));
+    auto context = isolate->GetCurrentContext();
+    errObj->Set(context, V8StringConstants::GetNativeException(isolate), nativeExceptionObject);
+    errObj->Set(context, V8StringConstants::GetStackTrace(isolate), ArgConverter::jstringToV8String(isolate, stackTrace));
 
     //pass err to JS
     NativeScriptException::CallJsFuncWithErr(errObj, isDiscarded);
@@ -558,6 +557,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     auto isolate = Isolate::New(create_params);
     isolateFrame.log("Isolate.New");
 
+    s_isolate2RuntimesCache.insert(make_pair(isolate, this));
     Isolate::Scope isolate_scope(isolate);
     HandleScope handleScope(isolate);
 
@@ -644,7 +644,8 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     auto global = context->Global();
 
-    auto gcFunc = global->Get(ArgConverter::ConvertToV8String(isolate, "gc"));
+    Local<Value> gcFunc;
+    global->Get(context, ArgConverter::ConvertToV8String(isolate, "gc")).ToLocal(&gcFunc);
     if (!gcFunc.IsEmpty() && gcFunc->IsFunction()) {
         m_gcFunc = new Persistent<Function>(isolate, gcFunc.As<Function>());
     }

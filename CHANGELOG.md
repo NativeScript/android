@@ -1,3 +1,9 @@
+6.2.0
+==
+
+## What's New
+ - [Upgrade v8 to 7.7.299.11 (#1478)](https://github.com/NativeScript/android-runtime/issues/1478)
+
 6.1.0
 ==
 

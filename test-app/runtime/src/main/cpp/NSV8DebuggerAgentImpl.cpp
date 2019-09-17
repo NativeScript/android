@@ -30,7 +30,7 @@ Response NSV8DebuggerAgentImpl::getPossibleBreakpoints(
     if(m_lineBreakpointsEnabled) {
         return V8DebuggerAgentImpl::getPossibleBreakpoints(std::move(start), std::move(end), std::move(restrictToFunction), locations);
     } else {
-        *locations = protocol::Array<protocol::Debugger::BreakLocation>::create();
+        *locations = std::make_unique<protocol::Array<protocol::Debugger::BreakLocation>>();
         return Response::OK();
     }
 }
