@@ -1,3 +1,10 @@
+6.1.1
+==
+
+## Bug Fixes
+
+- [When using kotlin sometimes the metadata is not existing in the result apk (#1476)](https://github.com/NativeScript/android-runtime/issues/1476)
+
 6.1.0
 ==
 
