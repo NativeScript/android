@@ -77,6 +77,7 @@ class ObjectManager {
             None
         };
 
+
     private:
 
         struct JSInstanceInfo {
@@ -164,6 +165,8 @@ class ObjectManager {
         static void JSObjectWeakCallbackStatic(const v8::WeakCallbackInfo<ObjectWeakCallbackState>& data);
 
         static void JSObjectFinalizerStatic(const v8::WeakCallbackInfo<ObjectWeakCallbackState>& data);
+
+
 
         void JSObjectWeakCallback(v8::Isolate* isolate, ObjectWeakCallbackState* callbackState);
 

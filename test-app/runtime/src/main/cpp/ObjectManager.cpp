@@ -85,8 +85,8 @@ void ObjectManager::Init(Isolate *isolate) {
     m_poJsWrapperFunc = new Persistent<Function>(isolate, jsWrapperFunc);
 
     if (m_markingMode != JavaScriptMarkingMode::None) {
-        isolate->AddGCPrologueCallback(ObjectManager::OnGcStartedStatic, kGCTypeAll);
-        isolate->AddGCEpilogueCallback(ObjectManager::OnGcFinishedStatic, kGCTypeAll);
+        isolate->AddGCPrologueCallback(ObjectManager::OnGcStartedStatic, kGCTypeMarkSweepCompact);
+        isolate->AddGCEpilogueCallback(ObjectManager::OnGcFinishedStatic, kGCTypeMarkSweepCompact);
     }
 }
 
@@ -380,9 +380,20 @@ void ObjectManager::JSObjectWeakCallback(Isolate *isolate, ObjectWeakCallbackSta
                     jsInstanceInfo->IsJavaObjectWeak = true;
                 }
             } else {
-                assert(!m_markedForGC.empty());
-                auto &topGCInfo = m_markedForGC.top();
-                topGCInfo.markedForGC.push_back(po);
+//                assert(!m_markedForGC.empty());
+
+                if(m_markedForGC.empty()){
+                    // Emulates the behavior in the InGcStarted callback. Тhis is necessary as the hooking
+                    // to the V8 GC is done only on the markSweepCompact phase. The JSObjectWeakCallback
+                    // however is still triggered in other V8 GC phases (scavenger for example). This
+                    // creates a problem that there is no 'top' on the m_markedForGC stack.
+                    GarbageCollectionInfo gcInfo(++m_numberOfGC);
+                    gcInfo.markedForGC.push_back(po);
+                    m_markedForGC.push(gcInfo);
+                } else {
+                    auto &topGCInfo = m_markedForGC.top();
+                    topGCInfo.markedForGC.push_back(po);
+                }
             }
         }
     }
@@ -634,9 +645,15 @@ void ObjectManager::MarkReachableArrayElements(Local<Object> &o, stack<Local<Val
 
 void ObjectManager::OnGcStartedStatic(Isolate *isolate, GCType type, GCCallbackFlags flags) {
     try {
+        tns::instrumentation::Frame frame;
+
         auto runtime = Runtime::GetRuntime(isolate);
         auto objectManager = runtime->GetObjectManager();
         objectManager->OnGcStarted(type, flags);
+
+        if(frame.check()){
+            frame.log("OnGcStartedStatic");
+        }
     } catch (NativeScriptException &e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -652,9 +669,15 @@ void ObjectManager::OnGcStartedStatic(Isolate *isolate, GCType type, GCCallbackF
 
 void ObjectManager::OnGcFinishedStatic(Isolate *isolate, GCType type, GCCallbackFlags flags) {
     try {
+        tns::instrumentation::Frame frame;
+
         auto runtime = Runtime::GetRuntime(isolate);
         auto objectManager = runtime->GetObjectManager();
         objectManager->OnGcFinished(type, flags);
+
+        if(frame.check()){
+            frame.log("OnGcFinishedStatic");
+        }
     } catch (NativeScriptException &e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
