@@ -380,10 +380,8 @@ void ObjectManager::JSObjectWeakCallback(Isolate *isolate, ObjectWeakCallbackSta
                     jsInstanceInfo->IsJavaObjectWeak = true;
                 }
             } else {
-//                assert(!m_markedForGC.empty());
-
                 if(m_markedForGC.empty()){
-                    // Emulates the behavior in the InGcStarted callback. Тhis is necessary as the hooking
+                    // Emulates the behavior in the OnGcStarted callback. Тhis is necessary as the hooking
                     // to the V8 GC is done only on the markSweepCompact phase. The JSObjectWeakCallback
                     // however is still triggered in other V8 GC phases (scavenger for example). This
                     // creates a problem that there is no 'top' on the m_markedForGC stack.
