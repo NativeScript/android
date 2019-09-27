@@ -1,3 +1,10 @@
+6.1.2
+==
+
+## Bug Fixes
+
+- [UI freezes with tns-android 6.1.0 (Android only) (#1479)](https://github.com/NativeScript/android-runtime/issues/1479)
+
 6.1.1
 ==
 
