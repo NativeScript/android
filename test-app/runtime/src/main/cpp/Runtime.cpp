@@ -454,6 +454,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     void* snapshotPtr = nullptr;
     string snapshotPath;
+    bool snapshotPathExists = false;
 
     // If device isn't running on Sdk 17
     if (m_androidVersion != 17) {
@@ -488,12 +489,20 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
         // we have a precompiled snapshot blob provided - try to load it directly
         if (!Constants::V8_HEAP_SNAPSHOT_BLOB.empty()) {
             snapshotPath = Constants::V8_HEAP_SNAPSHOT_BLOB;
+            snapshotPathExists = File::Exists(snapshotPath);
             saveSnapshot = false;
         } else {
-            snapshotPath = filesPath + "/internal/snapshot.blob";
+            std::string oldSnapshotBlobPath = filesPath + "/internal/snapshot.blob";
+            std::string snapshotBlobPath = filesPath + "/internal/TNSSnapshot.blob";
+
+            bool oldSnapshotExists = File::Exists(oldSnapshotBlobPath);
+            bool snapshotExists = File::Exists(snapshotBlobPath);
+
+            snapshotPathExists = oldSnapshotExists || snapshotExists;
+            snapshotPath = oldSnapshotExists ? oldSnapshotBlobPath : snapshotBlobPath;
         }
 
-        if (File::Exists(snapshotPath)) {
+        if (snapshotPathExists) {
             m_heapSnapshotBlob = new MemoryMappedFile(MemoryMappedFile::Open(snapshotPath.c_str()));
             m_startupData->data = static_cast<const char*>(m_heapSnapshotBlob->memory);
             m_startupData->raw_size = m_heapSnapshotBlob->size;
@@ -501,7 +510,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
             isCustomSnapshotFound = true;
             DEBUG_WRITE_FORCE("Snapshot read %s (%zuB).", snapshotPath.c_str(), m_heapSnapshotBlob->size);
         } else if (!saveSnapshot) {
-            DEBUG_WRITE_FORCE("No snapshot file found at %s", snapshotPath.c_str());
+            throw NativeScriptException("No snapshot file found at: " + snapshotPath);
         } else {
             // This should be executed before V8::Initialize, which calls it with false.
             NativeScriptExtension::CpuFeaturesProbe(true);
