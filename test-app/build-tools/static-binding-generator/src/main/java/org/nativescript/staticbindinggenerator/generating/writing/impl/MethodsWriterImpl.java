@@ -2,14 +2,12 @@ package org.nativescript.staticbindinggenerator.generating.writing.impl;
 
 import org.apache.bcel.generic.Type;
 import org.nativescript.staticbindinggenerator.DefaultValues;
-import org.nativescript.staticbindinggenerator.Generator;
 import org.nativescript.staticbindinggenerator.InputParameters;
 import org.nativescript.staticbindinggenerator.Writer;
 import org.nativescript.staticbindinggenerator.generating.parsing.methods.ReifiedJavaMethod;
 import org.nativescript.staticbindinggenerator.generating.writing.MethodsWriter;
 import org.nativescript.staticbindinggenerator.naming.BcelNamingUtil;
 
-import java.util.Arrays;
 import java.util.List;
 
 public class MethodsWriterImpl implements MethodsWriter {
@@ -24,6 +22,8 @@ public class MethodsWriterImpl implements MethodsWriter {
     private static final String GET_INSTANCE_METHOD_SIGNATURE_PATTERN = "public static %s getInstance()";
     private static final String RUNTIME_CALL_JS_METHOD_CALL_PATTERN = "com.tns.Runtime.callJSMethod(this, \"%s\", %s.class, " + ARGS_VARIABLE_NAME + ")";
     private static final String RUNTIME_CALL_JS_CONSTRUCTOR_METHOD_CALL_PATTERN = "com.tns.Runtime.callJSMethod(this, \"%s\", %s.class, true," + ARGS_VARIABLE_NAME + ")";
+    private static final String RUNTIME_CALL_JS_METHOD_FROM_POSSIBLE_NON_MAIN_THREAD_CALL_PATTERN = "com.tns.Runtime.callJSMethodFromPossibleNonMainThread(this, \"%s\", %s.class, " + ARGS_VARIABLE_NAME + ")";
+    private static final String RUNTIME_CALL_JS_CONSTRUCTOR_METHOD_FROM_POSSIBLE_NON_MAIN_THREAD_CALL_PATTERN = "com.tns.Runtime.callJSMethodFromPossibleNonMainThread(this, \"%s\", %s.class, true," + ARGS_VARIABLE_NAME + ")";
     private static final String ARGS_VARIABLE_PATTERN = "java.lang.Object[] " + ARGS_VARIABLE_NAME + " = new java.lang.Object[%d];";
 
     private static final String THROWS_DECLARATION_BEGINNING = " throws ";
@@ -41,6 +41,7 @@ public class MethodsWriterImpl implements MethodsWriter {
     private static final String RUNTIME_INIT_METHOD_CALL_STATEMENT = "com.tns.Runtime " + RUNTIME_VARIABLE_NAME + " = com.tns.RuntimeHelper.initRuntime(this);";
     private static final String RUNTIME_RUN_METHOD_CALL_STATEMENT = RUNTIME_VARIABLE_NAME + ".run();";
     private static final String RUNTIME_INIT_INSTANCE_METHOD_CALL_STATEMENT = "com.tns.Runtime.initInstance(this);";
+    private static final String RUNTIME_INIT_INSTANCE_FROM_POSSIBLE_NON_MAIN_THREAD_METHOD_CALL_STATEMENT = "com.tns.Runtime.initInstanceFromPossibleNonMainThread(this);";
 
     private static final String RUNTIME_IS_INITIALIZED_METHOD_CALL = "com.tns.Runtime.isInitialized()";
 
@@ -60,13 +61,15 @@ public class MethodsWriterImpl implements MethodsWriter {
     private final boolean shouldSuppressCallJsMethodExceptions;
     private final boolean isForApplicationClass;
     private final boolean isForServiceClass;
+    private final boolean isForAndroidWorkerClass;
 
 
-    public MethodsWriterImpl(final Writer writer, boolean shouldSuppressCallJsMethodExceptions, boolean isForApplicationClass, boolean isForServiceClass) {
+    public MethodsWriterImpl(final Writer writer, boolean shouldSuppressCallJsMethodExceptions, boolean isForApplicationClass, boolean isForServiceClass, boolean isForAndroidWorkerClass) {
         this.writer = writer;
         this.shouldSuppressCallJsMethodExceptions = shouldSuppressCallJsMethodExceptions;
         this.isForApplicationClass = isForApplicationClass;
         this.isForServiceClass = isForServiceClass;
+        this.isForAndroidWorkerClass = isForAndroidWorkerClass;
     }
 
     @Override
@@ -106,8 +109,10 @@ public class MethodsWriterImpl implements MethodsWriter {
         writer.write(CLOSING_ROUND_BRACKET_LITERAL);
         writer.write(END_OF_STATEMENT_LITERAL);
 
-        if (!isForApplicationClass && !isForServiceClass) {
+        if (!isForApplicationClass && !isForServiceClass && !isForAndroidWorkerClass) {
             writer.write(RUNTIME_INIT_INSTANCE_METHOD_CALL_STATEMENT);
+        } else if (isForAndroidWorkerClass) {
+            writer.write(RUNTIME_INIT_INSTANCE_FROM_POSSIBLE_NON_MAIN_THREAD_METHOD_CALL_STATEMENT);
         }
 
         if (hasUserImplementedInitMethod) {
@@ -236,9 +241,9 @@ public class MethodsWriterImpl implements MethodsWriter {
     }
 
     private void writeMethodSignature(ReifiedJavaMethod method, boolean isUserImplemented) {
-        if(method.isDeprecated() &&
+        if (method.isDeprecated() &&
                 (!isUserImplemented // we want to show warnings only for methods implemented by the user, but not for the SBG auto implemented abstract methods
-                || InputParameters.getCurrent().getSuppressDeprecationWarnings())) {
+                        || InputParameters.getCurrent().getSuppressDeprecationWarnings())) {
             writeSuppressDeprecationsToWriter();
         }
 
@@ -279,7 +284,7 @@ public class MethodsWriterImpl implements MethodsWriter {
         writeArgumentsVariableForMethodCall(method);
         writeCallJsMethodExceptionsSuppressBlockBeginningIfNecessary();
 
-        String methodCallPattern = method.isConstructor() ? RUNTIME_CALL_JS_CONSTRUCTOR_METHOD_CALL_PATTERN : RUNTIME_CALL_JS_METHOD_CALL_PATTERN;
+        String methodCallPattern = getMethodCallPattern(method);
         String runtimeCallJsMethodCall = String.format(methodCallPattern, getMethodName(method), BcelNamingUtil.resolveBcelTypeName(returnType));
 
         if (!returnType.equals(Type.VOID)) {
@@ -290,6 +295,22 @@ public class MethodsWriterImpl implements MethodsWriter {
         }
 
         writeCallJsMethodExceptionsSuppressBlockClosingIfNecessary(returnType, getMethodName(method));
+    }
+
+    private String getMethodCallPattern(ReifiedJavaMethod method) {
+        if (method.isConstructor()) {
+            if (!isForAndroidWorkerClass) {
+                return RUNTIME_CALL_JS_CONSTRUCTOR_METHOD_CALL_PATTERN;
+            } else {
+                return RUNTIME_CALL_JS_CONSTRUCTOR_METHOD_FROM_POSSIBLE_NON_MAIN_THREAD_CALL_PATTERN;
+            }
+        } else {
+            if (!isForAndroidWorkerClass) {
+                return RUNTIME_CALL_JS_METHOD_CALL_PATTERN;
+            } else {
+                return RUNTIME_CALL_JS_METHOD_FROM_POSSIBLE_NON_MAIN_THREAD_CALL_PATTERN;
+            }
+        }
     }
 
     private String getMethodName(ReifiedJavaMethod method) {
