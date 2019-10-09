@@ -7,6 +7,7 @@ import java.util.List;
 import kotlinx.metadata.KmProperty;
 
 public interface KotlinClassMetadataParser {
+    boolean wasKotlinClass(ClassDescriptor clazz);
     boolean wasKotlinCompanionObject(ClassDescriptor clazz, ClassDescriptor possibleCompanion);
     List<KmProperty> getKotlinProperties(ClassDescriptor clazz);
 }

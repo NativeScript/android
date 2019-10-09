@@ -1,6 +1,12 @@
 package com.telerik.metadata;
 
+import com.telerik.metadata.analytics.AnalyticsCollector;
+import com.telerik.metadata.analytics.AnalyticsCollectorProvider;
 import com.telerik.metadata.desc.ClassDescriptor;
+import com.telerik.metadata.kotlin.classes.KotlinClassMetadataParser;
+import com.telerik.metadata.kotlin.classes.impl.KotlinClassMetadataParserImpl;
+
+import org.apache.bcel.classfile.ClassParser;
 
 import java.io.File;
 import java.io.IOException;
@@ -9,11 +15,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.bcel.classfile.ClassParser;
-
 public class ClassDirectory implements ClassMapProvider {
     private final String path;
     private final Map<String, ClassDescriptor> classMap;
+    private static final KotlinClassMetadataParser kotlinClassMetadataParser = new KotlinClassMetadataParserImpl();
+    private static final AnalyticsCollector analyticsCollector = AnalyticsCollectorProvider.getInstance().provideAnalyticsCollector();
     private static final String CLASS_EXT = ".class";
     private static final String DEX_EXT = ".dex";
 
@@ -37,7 +43,7 @@ public class ClassDirectory implements ClassMapProvider {
     }
 
     private static void readDirectory(ClassDirectory dir, String path)
-    throws IOException {
+            throws IOException {
         List<File> subDirs = new ArrayList<File>();
         File currentDir = new File(path);
         for (File file : currentDir.listFiles()) {
@@ -51,7 +57,7 @@ public class ClassDirectory implements ClassMapProvider {
                 subDirs.add(file);
             }
         }
-        for (File sd: subDirs) {
+        for (File sd : subDirs) {
             readDirectory(dir, sd.getAbsolutePath());
         }
     }
@@ -61,10 +67,17 @@ public class ClassDirectory implements ClassMapProvider {
         if (name.endsWith(CLASS_EXT)) {
             ClassParser cp = new ClassParser(file.getAbsolutePath());
             clazz = new com.telerik.metadata.bcl.ClassInfo(cp.parse());
+            markIfKotlinClass(clazz);
         } else if (name.endsWith(DEX_EXT)) {
             // TODO:
         }
 
         return clazz;
+    }
+
+    private static void markIfKotlinClass(ClassDescriptor classDescriptor) {
+        if (kotlinClassMetadataParser.wasKotlinClass(classDescriptor)) {
+            analyticsCollector.markHasKotlinRuntimeClassesIfNotMarkedAlready();
+        }
     }
 }
