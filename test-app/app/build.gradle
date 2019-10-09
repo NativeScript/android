@@ -571,7 +571,7 @@ class EmptyRunnable implements Runnable {
 
 def getMergedAssetsOutputPath() {
     if (!project.hasProperty("mergedAssetsOutputPath")) {
-        // mergedAssetsOutputPath not found fallback to the default value for android gradle plugin 3.5.0
+        // mergedAssetsOutputPath not found fallback to the default value for android gradle plugin 3.5.1
         project.ext.mergedAssetsOutputPath = "$projectDir/build/intermediates/merged_assets/" + project.selectedBuildType + "/out"
     }
     return project.ext.mergedAssetsOutputPath
