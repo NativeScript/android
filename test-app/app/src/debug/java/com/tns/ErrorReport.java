@@ -286,14 +286,12 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
             }
         });
 
-        this.setOnTabSelectedListener(tabLayout);
+        this.addOnTabSelectedListener(tabLayout);
     }
 
-    @SuppressWarnings("deprecation")
-    private void setOnTabSelectedListener(TabLayout tabLayout) {
-        tabLayout.setOnTabSelectedListener(this);
+    private void addOnTabSelectedListener(TabLayout tabLayout) {
+        tabLayout.addOnTabSelectedListener(this);
     }
-
     private static void createErrorFile(final Context context) {
         try {
             File errFile = new File(context.getFilesDir(), ERROR_FILE_NAME);
