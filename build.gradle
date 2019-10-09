@@ -299,6 +299,10 @@ task copyFilesToProjectTemeplate {
             into "$DIST_FRAMEWORK_PATH/app/gradle-helpers"
         }
         copy {
+            from "$TEST_APP_PATH/app/gradle-helpers/AnalyticsCollector.gradle"
+            into "$DIST_FRAMEWORK_PATH/app/gradle-helpers"
+        }
+        copy {
             from "$TEST_APP_PATH/app/gradle-helpers/BuildToolTask.gradle"
             into "$DIST_FRAMEWORK_PATH/app/gradle-helpers"
         }
