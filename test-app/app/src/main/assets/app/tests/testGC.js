@@ -1,31 +1,33 @@
-describe("Tests garbage collection", function () {
-	
+// Run GC tests only in Full marking mode
+let describeFunc = __markingMode == 0 ? describe : xdescribe;
+
+describeFunc("Tests garbage collection", function () {
 	var myCustomEquality = function(first, second) {
 		return first == second;
 	};
-	
+
 	beforeEach(function() {
 		jasmine.addCustomEqualityTester(myCustomEquality);
 	});
 
 	xit("TestGarbageCollection", function (done) {
-		var normalTest = function () { 
+		var normalTest = function () {
 
 			__log("TEST: TestGarbageCollection");
-			
+
 			var obj = new com.tns.tests.ClassX();
-			
+
 			obj.dummy();
-			
+
 			obj = null;
-			
+
 			gc();
 			java.lang.System.gc();
 			gc();
 			java.lang.System.gc();
 			gc();
 			java.lang.System.gc();
-			
+
 			new java.lang.Thread(new java.lang.Runnable("ThreadFunc", {
 				run: function() {
 					var isCollected = com.tns.tests.ClassX.IsCollected;
@@ -37,62 +39,62 @@ describe("Tests garbage collection", function () {
 		};
 		normalTest();
 	});
-	
+
 	// this test has implicit assert in com.tns.Runtime.getJavaObjectByID method
 	it("test1", function () {
-		
+
 	  	function createObjects(name) {
 		  	var c1 = new com.tns.tests.Class1();
-			
+
 			var cb1 = new com.tns.tests.Class1.Callback1(name, {
 				getMessage: function() {
 					var msg = c1.getMessage();
 					return msg;
 				}
 			});
-			
+
 			return com.tns.tests.Class1.Class2.printMessageWithDelay(cb1, 5 * 1000);
 		}
-		
+
 		expect(createObjects("Callback5")).toBe(true);
 		expect(createObjects("Callback26")).toBe(true);
-		
+
 		gc();
 		java.lang.System.gc();
 	});
-	
+
 	// this test has implicit assert in com.tns.Runtime.getJavaObjectByID method
 	it("test2", function () {
-		
+
 		function indref1() {
 			this.class1 = new com.tns.tests.Class1();
 		}
 		indref1.prototype.getMessage = function() {
 			return "~~~" + this.class1.getMessage();
 		}
-	  
+
 	  	function createObjects(name) {
 			var c1 = new indref1();
-			
+
 			var cb1 = new com.tns.tests.Class1.Callback1(name, {
 				getMessage: function() {
 					var msg = c1.getMessage();
 					return msg;
 				}
 			});
-			
+
 			return com.tns.tests.Class1.Class2.printMessageWithDelay(cb1, 5 * 1000);
 		}
-		
+
 		expect(createObjects("Callback55")).toBe(true);
 		expect(createObjects("Callback56")).toBe(true);
 		gc();
 		java.lang.System.gc();
 	});
-	
+
 	// this test has implicit assert in com.tns.Runtime.getJavaObjectByID method
 	it("test3", function () {
-		
+
 		function indref2() {
 			this.helper = new indref2helper();
 		}
@@ -105,29 +107,29 @@ describe("Tests garbage collection", function () {
 		indref2helper.prototype.getMessage = function() {
 			return "***" + this.class1.getMessage();
 		}
-	  
+
 	  	function createObjects(name) {
 			var c1 = new indref2();
-			
+
 			var cb1 = new com.tns.tests.Class1.Callback1(name, {
 				getMessage: function() {
 					var msg = c1.getMessage();
 					return msg;
 				}
 			});
-			
+
 			return com.tns.tests.Class1.Class2.printMessageWithDelay(cb1, 5 * 1000);
 		}
-		
+
 		expect(createObjects("Callback91")).toBe(true);
 		expect(createObjects("Callback92")).toBe(true);
 		gc();
 		java.lang.System.gc();
 	});
-	
+
 	// this test has implicit assert in com.tns.Runtime.getJavaObjectByID method
 	it("test4", function () {
-		
+
 		function indref3() {
 			this.helper = new indref3helper();
 		}
@@ -136,54 +138,54 @@ describe("Tests garbage collection", function () {
 		}
 		function indref3helper() {
 			this._class1 = new com.tns.tests.Class1();
-		
+
 			Object.defineProperty(this, "class1", {
 				get: function() {
-			  		return this._class1 
-				} 
+			  		return this._class1
+				}
 			});
 		}
 		indref3helper.prototype.getMessage = function() {
 			return "^^^" + this.class1.getMessage();
-		}  
-	  	
+		}
+
 	  	function createObjects(name) {
 			var c1 = new indref3();
-			
+
 			var cb1 = new com.tns.tests.Class1.Callback1(name, {
 				getMessage: function() {
 					var msg = c1.getMessage();
 					return msg;
 				}
 			});
-			
+
 			return com.tns.tests.Class1.Class2.printMessageWithDelay(cb1, 5 * 1000);
 		}
-		
+
 		expect(createObjects("Callback1133")).toBe(true);
 		expect(createObjects("Callback1134")).toBe(true);
 		gc();
 		java.lang.System.gc();
 	});
-	
+
 	// this test has implicit assert in com.tns.Runtime.getJavaObjectByID method
 	//originally test was commented out
 	xit("test5", function () {
-		
+
 		function indref4() {
 			this.helper = new indref4helper();
 		}
 		indref4.prototype.getMessage = function() {
 			return "&&&" + this.helper.getMessageZZZ();
 		}
-		function indref4helper() {	
+		function indref4helper() {
 			var _class1 = new com.tns.tests.Class1();
-			
+
 			__log("indref4helper _class1=" + _class1);
-		
+
 			Object.defineProperty(this, "class1", {
 				get: function() {
-			  		return _class1 
+			  		return _class1
 				}
 				,enumerable: false
 			});
@@ -191,42 +193,42 @@ describe("Tests garbage collection", function () {
 		indref4helper.prototype.getMessageZZZ = function() {
 			return "```" + this.class1.getMessage();
 		}
-	  	
+
 	  	function createObjects(name) {
 			var c1 = new indref4();
-			
+
 			var cb1 = new com.tns.tests.Class1.Callback1(name, {
 				getMessage: function() {
 					var msg = c1.getMessage();
 					return msg;
 				}
 			});
-			
+
 			return com.tns.tests.Class1.Class2.printMessageWithDelay(cb1, 5 * 1000);
 		}
-		
+
 		expect(createObjects("Callback1178")).toBe(true);
 		expect(createObjects("Callback1179")).toBe(true);
 		gc();
 		java.lang.System.gc();
 	});
-	
+
 	it("testAccessingStringFieldWontLeak", function () {
-		
+
 		__log("TEST: testAccessingStringFieldWontLeak");
 
 		var dummy = new com.tns.tests.DummyClass();
-		
+
 		for (var i=0; i<10000; i++)
 		{
 			var name = dummy.nameField;
-			
+
 			expect(name).toBe("dummy");
 		}
 	});
 
 	xit("should persist JavaScript object when it reappears after GC", function () {
-		
+
 		function getObject() {
 			var o = new java.lang.Object();
 			o.x = 123;
@@ -287,7 +289,7 @@ describe("Tests garbage collection", function () {
         gc();
         java.lang.System.gc();
     })
-	
+
 	it("should properly reintroduce Java object back in a callback", function () {
 		function getTestObject() {
 			return new com.tns.tests.BadEqualsTest(
@@ -300,19 +302,19 @@ describe("Tests garbage collection", function () {
 		}
 
 		var test = getTestObject();
-	
+
 		// flush LRU cache
 		for (var i=0; i<65536; i++) {
 			new java.lang.Object().hashCode();
 		}
-	
+
 		gc();
 		java.lang.Runtime.getRuntime().gc();
 		gc();
 		java.lang.Runtime.getRuntime().gc();
 		gc();
 		java.lang.Runtime.getRuntime().gc();
-	
+
 		test.postCallback();
 	});
 });

@@ -7,6 +7,7 @@
 #include "SimpleAllocator.h"
 #include "WeakRef.h"
 #include "ArrayBufferHelper.h"
+#include "JSONObjectHelper.h"
 #include "Profiler.h"
 #include "ModuleInternal.h"
 #include "File.h"
@@ -77,6 +78,7 @@ class Runtime {
         ModuleInternal m_module;
 
         ArrayBufferHelper m_arrayBufferHelper;
+        JSONObjectHelper m_jsonObjectHelper;
 
         WeakRef m_weakRef;
 
