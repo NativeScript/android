@@ -697,6 +697,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     ArrayHelper::Init(context);
 
     m_arrayBufferHelper.CreateConvertFunctions(isolate, global, m_objectManager);
+    m_jsonObjectHelper.CreateConvertFunctions(isolate, global, m_objectManager);
 
     s_mainThreadInitialized = true;
 

@@ -149,6 +149,7 @@ add_library(
     src/main/cpp/JniSignatureParser.cpp
     src/main/cpp/JsArgConverter.cpp
     src/main/cpp/JsArgToArrayConverter.cpp
+    src/main/cpp/JSONObjectHelper.cpp
     src/main/cpp/Logger.cpp
     src/main/cpp/ManualInstrumentation.cpp
     src/main/cpp/MetadataMethodInfo.cpp
