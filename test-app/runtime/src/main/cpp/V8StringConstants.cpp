@@ -51,6 +51,12 @@ Local<String> V8StringConstants::GetNativeException(Isolate* isolate) {
     return Local<String>::New(isolate, *consts->NATIVE_EXCEPTION_PERSISTENT);
 }
 
+Local<String> V8StringConstants::GetStack(Isolate* isolate) {
+    auto consts = GetConstantsForIsolate(isolate);
+
+    return Local<String>::New(isolate, *consts->STACK_PERSISTENT);
+}
+
 Local<String> V8StringConstants::GetStackTrace(Isolate* isolate) {
     auto consts = GetConstantsForIsolate(isolate);
 
@@ -130,6 +136,7 @@ const string V8StringConstants::NULL_NODE_NAME = "nullNode";
 const string V8StringConstants::IS_PROTOTYPE_IMPLEMENTATION_OBJECT = "__isPrototypeImplementationObject";
 const string V8StringConstants::NATIVE_EXCEPTION = "nativeException";
 const string V8StringConstants::STACK_TRACE = "stackTrace";
+const string V8StringConstants::STACK = "stack";
 const string V8StringConstants::LONG_NUMBER = "NativeScriptLongNumber";
 const string V8StringConstants::PROTOTYPE = "prototype";
 const string V8StringConstants::SUPER = "super";
