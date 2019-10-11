@@ -368,7 +368,7 @@ bool Runtime::TryCallGC() {
     return success;
 }
 
-void Runtime::PassExceptionToJsNative(JNIEnv* env, jobject obj, jthrowable exception, jstring message, jstring stackTrace, jboolean isDiscarded) {
+void Runtime::PassExceptionToJsNative(JNIEnv* env, jobject obj, jthrowable exception, jstring message, jstring fullStackTrace, jstring jsStackTrace, jboolean isDiscarded) {
     auto isolate = m_isolate;
 
     string errMsg = ArgConverter::jstringToString(message);
@@ -391,7 +391,10 @@ void Runtime::PassExceptionToJsNative(JNIEnv* env, jobject obj, jthrowable excep
     //create a JS error object
     auto context = isolate->GetCurrentContext();
     errObj->Set(context, V8StringConstants::GetNativeException(isolate), nativeExceptionObject);
-    errObj->Set(context, V8StringConstants::GetStackTrace(isolate), ArgConverter::jstringToV8String(isolate, stackTrace));
+    errObj->Set(context, V8StringConstants::GetStackTrace(isolate), ArgConverter::jstringToV8String(isolate, fullStackTrace));
+    if (jsStackTrace != NULL) {
+        errObj->Set(context, V8StringConstants::GetStack(isolate), ArgConverter::jstringToV8String(isolate, jsStackTrace));
+    }
 
     //pass err to JS
     NativeScriptException::CallJsFuncWithErr(errObj, isDiscarded);
