@@ -42,8 +42,9 @@ describe("Test JSONObject conversions", () => {
         };
         let actual = org.json.JSONObject.from(param);
         expect(actual instanceof org.json.JSONObject).toBe(true);
-        let actualStr = com.tns.tests.JSONObjectMethods.testWithObject(actual);
-        expect(actualStr).toBe(`{"prop1":"prop1 value","prop2":123,"prop3":{"prop4":"prop 4 value"}}`);
+        expect(actual.getString("prop1")).toEqual(param.prop1);
+        expect(actual.getInt("prop2")).toEqual(param.prop2);
+        expect(actual.getJSONObject("prop3").getString("prop4")).toEqual(param.prop3.prop4);
     });
 
     it("JSONObject.from with array", () => {
@@ -56,7 +57,10 @@ describe("Test JSONObject conversions", () => {
         }];
         let actual = org.json.JSONObject.from(param);
         expect(actual instanceof org.json.JSONArray).toBe(true);
-        let actualStr = com.tns.tests.JSONObjectMethods.testWithArray(actual);
-        expect(actualStr).toBe(`[{"prop1":"item 1, prop1 value","prop2":123},{"prop1":"item 2, prop1 value","prop2":456}]`);
+        expect(actual.length()).toEqual(2);
+        for (var i = 0; i < actual.length(); i++) {
+            expect(actual.get(i).getString("prop1")).toEqual(param[i].prop1);
+            expect(actual.get(i).getInt("prop2")).toEqual(param[i].prop2);
+        }
     });
 });
