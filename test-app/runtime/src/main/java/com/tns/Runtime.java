@@ -284,7 +284,7 @@ public class Runtime {
             ex.printStackTrace(ps);
 
             try {
-                content = baos.toString("US-ASCII");
+                content = baos.toString("UTF-8");
                 if (ex instanceof NativeScriptException) {
                     content = getStackTraceOnly(content);
                     content = ((NativeScriptException) ex).getIncomingStackTrace() + content;
