@@ -169,7 +169,7 @@ class ErrorReport implements TabLayout.OnTabSelectedListener {
             ex.printStackTrace(ps);
 
             try {
-                content = baos.toString("US-ASCII");
+                content = baos.toString("UTF-8");
             } catch (UnsupportedEncodingException e) {
                 content = e.getMessage();
             }
