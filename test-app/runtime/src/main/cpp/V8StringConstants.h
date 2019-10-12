@@ -21,6 +21,8 @@ class V8StringConstants {
 
         static v8::Local<v8::String> GetNativeException(v8::Isolate* isolate);
 
+        static v8::Local<v8::String> GetStack(v8::Isolate* isolate);
+
         static v8::Local<v8::String> GetStackTrace(v8::Isolate* isolate);
 
         static v8::Local<v8::String> GetLongNumber(v8::Isolate* isolate);
@@ -52,6 +54,7 @@ class V8StringConstants {
         static const std::string NULL_NODE_NAME;
         static const std::string IS_PROTOTYPE_IMPLEMENTATION_OBJECT;
         static const std::string NATIVE_EXCEPTION;
+        static const std::string STACK;
         static const std::string STACK_TRACE;
         static const std::string LONG_NUMBER;
         static const std::string PROTOTYPE;
@@ -96,6 +99,8 @@ class V8StringConstants {
                 str = String::NewFromUtf8(isolate, NATIVE_EXCEPTION.c_str()).ToLocalChecked();
                 NATIVE_EXCEPTION_PERSISTENT = new Persistent<String>(isolate, str);
 
+                str = String::NewFromUtf8(isolate, STACK.c_str()).ToLocalChecked();
+                STACK_PERSISTENT = new Persistent<String>(isolate, str);
 
                 str = String::NewFromUtf8(isolate, STACK_TRACE.c_str()).ToLocalChecked();
                 STACK_TRACE_PERSISTENT = new Persistent<String>(isolate, str);
@@ -151,6 +156,7 @@ class V8StringConstants {
                 NULL_NODE_NAME_PERSISTENT->Reset();
                 IS_PROTOTYPE_IMPLEMENTATION_OBJECT_PERSISTENT->Reset();
                 NATIVE_EXCEPTION_PERSISTENT->Reset();
+                STACK_PERSISTENT->Reset();
                 STACK_TRACE_PERSISTENT->Reset();
                 LONG_NUMBER_PERSISTENT->Reset();
                 PROTOTYPE_PERSISTENT->Reset();
@@ -171,6 +177,7 @@ class V8StringConstants {
             v8::Persistent<v8::String>* NULL_NODE_NAME_PERSISTENT;
             v8::Persistent<v8::String>* IS_PROTOTYPE_IMPLEMENTATION_OBJECT_PERSISTENT;
             v8::Persistent<v8::String>* NATIVE_EXCEPTION_PERSISTENT;
+            v8::Persistent<v8::String>* STACK_PERSISTENT;
             v8::Persistent<v8::String>* STACK_TRACE_PERSISTENT;
             v8::Persistent<v8::String>* LONG_NUMBER_PERSISTENT;
             v8::Persistent<v8::String>* PROTOTYPE_PERSISTENT;

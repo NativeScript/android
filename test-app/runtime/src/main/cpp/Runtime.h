@@ -53,7 +53,7 @@ class Runtime {
         void AdjustAmountOfExternalAllocatedMemory();
         bool NotifyGC(JNIEnv* env, jobject obj);
         bool TryCallGC();
-        void PassExceptionToJsNative(JNIEnv* env, jobject obj, jthrowable exception, jstring message, jstring stackTrace, jboolean isDiscarded);
+        void PassExceptionToJsNative(JNIEnv* env, jobject obj, jthrowable exception, jstring message, jstring fullStackTrace, jstring jsStackTrace, jboolean isDiscarded);
         void PassUncaughtExceptionFromWorkerToMainHandler(v8::Local<v8::String> message, v8::Local<v8::String> stackTrace, v8::Local<v8::String> filename, int lineno);
         void ClearStartupData(JNIEnv* env, jobject obj);
         void DestroyRuntime();
