@@ -233,9 +233,6 @@ public class Builder {
                             mi.declaringType = getOrCreateNode(root, clazz, null);
                             node.staticMethods.add(mi);
                         } else {
-                            if(mi.name.contains("testIntExtension") || mi.name.contains("testArrayExtension")){
-                                System.out.println("asd");
-                            }
                             mi.declaringType = getOrCreateNode(root, m.getDeclaringClass(), null);
                             node.addExtensionFunction(mi);
                         }

@@ -10,7 +10,6 @@
 namespace tns {
 class JsArgConverter {
     public:
-//        JsArgConverter();
 
         JsArgConverter(const v8::Local<v8::Object>& caller, const v8::FunctionCallbackInfo<v8::Value>& args, const std::string& methodSignature, MetadataEntry* entry);
 

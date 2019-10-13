@@ -33,6 +33,7 @@ import static org.gradle.internal.logging.text.StyledTextOutput.Style
 apply plugin: "com.android.application"
 apply from: "gradle-helpers/BuildToolTask.gradle"
 apply from: "gradle-helpers/CustomExecutionLogger.gradle"
+apply from: "gradle-helpers/AnalyticsCollector.gradle"
 
 def enableKotlin = (project.hasProperty("useKotlin") && project.useKotlin == "true")
 
@@ -80,6 +81,14 @@ def computeCompileSdkVersion = { -> project.hasProperty("compileSdk") ? compileS
 def computeTargetSdkVersion = { -> project.hasProperty("targetSdk") ? targetSdk : 29 }
 def computeBuildToolsVersion = { ->
     project.hasProperty("buildToolsVersion") ? buildToolsVersion : "29.0.2"
+}
+
+def enableAnalytics = (project.hasProperty("gatherAnalyticsData") && project.gatherAnalyticsData == "true")
+def analyticsFilePath = "$rootDir/analytics/build-statistics.json"
+def analyticsCollector = project.ext.AnalyticsCollector.withOutputPath(analyticsFilePath)
+if (enableKotlin && enableAnalytics) {
+    analyticsCollector.markHasUseKotlinPropertyInApp()
+    analyticsCollector.writeAnalyticsFile()
 }
 
 project.ext.selectedBuildType = project.hasProperty("release") ? "release" : "debug"
@@ -308,7 +317,7 @@ android {
                   task = variant.getMergeAssets()
               }
               for (File file : task.getOutputs().getFiles()) {
-                  if (!file.getPath().contains("/incremental/")) {
+                  if (!file.getPath().contains("${File.separator}incremental${File.separator}")) {
                       project.ext.mergedAssetsOutputPath = file.getPath()
                       break;
                   }
@@ -800,7 +809,14 @@ task buildMetadata(type: BuildToolTask) {
 
         setOutputs outLogger
 
-        args "android-metadata-generator.jar"
+        def paramz = new ArrayList<String>()
+        paramz.add("android-metadata-generator.jar")
+
+        if(enableAnalytics){
+            paramz.add("analyticsFilePath=$analyticsFilePath")
+        }
+
+        args paramz.toArray()
     }
 }
 

@@ -883,3 +883,7 @@ void ObjectManager::ReleaseNativeCounterpart(v8::Local<v8::Object> &object) {
     auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
     object->SetInternalField(jsInfoIdx, Undefined(m_isolate));
 }
+
+ObjectManager::JavaScriptMarkingMode ObjectManager::GetMarkingMode() {
+    return this->m_markingMode;
+}

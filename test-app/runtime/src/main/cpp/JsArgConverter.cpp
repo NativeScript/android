@@ -14,8 +14,6 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
-//JsArgConverter::JsArgConverter(){}
-
 JsArgConverter::JsArgConverter(const Local<Object>& caller, const v8::FunctionCallbackInfo<Value>& args, const string& methodSignature, MetadataEntry* entry)
         : m_isolate(args.GetIsolate()), m_env(JEnv()), m_methodSignature(methodSignature), m_isValid(true), m_error(Error()) {
     int v8ProvidedArgumentsLength = args.Length();

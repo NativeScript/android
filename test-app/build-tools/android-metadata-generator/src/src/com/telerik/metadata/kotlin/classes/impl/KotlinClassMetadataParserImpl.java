@@ -27,6 +27,11 @@ import kotlinx.metadata.jvm.KotlinClassMetadata;
 public class KotlinClassMetadataParserImpl implements KotlinClassMetadataParser {
 
     @Override
+    public boolean wasKotlinClass(ClassDescriptor clazz) {
+        return clazz.getKotlinClassMetadataAnnotation().isPresent();
+    }
+
+    @Override
     public boolean wasKotlinCompanionObject(ClassDescriptor clazz, ClassDescriptor possibleCompanion) {
         Optional<KotlinClassMetadataAnnotation> kotlinClassMetadataAnnotationOptional = clazz.getKotlinClassMetadataAnnotation();
         if (!kotlinClassMetadataAnnotationOptional.isPresent()) {

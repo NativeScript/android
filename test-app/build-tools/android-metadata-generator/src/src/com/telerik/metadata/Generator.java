@@ -1,5 +1,7 @@
 package com.telerik.metadata;
 
+import com.telerik.metadata.analytics.AnalyticsConfiguration;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -8,18 +10,20 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.security.InvalidParameterException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 public class Generator {
 
-    public static final String MDG_OUTPUT_DIR = "mdg-output-dir.txt";
-    public static final String MDG_JAVA_DEPENDENCIES = "mdg-java-dependencies.txt";
+    private static final String ANALYTICS_ARGUMENT_BEGINNING = "analyticsFilePath=";
+    private static final String MDG_OUTPUT_DIR = "mdg-output-dir.txt";
+    private static final String MDG_JAVA_DEPENDENCIES = "mdg-java-dependencies.txt";
 
     /**
      * @param args
      */
     public static void main(String[] args) {
+        enableAnalyticsBasedOnArgs(args);
+
         try {
             String metadataOutputDir;
             List<String> params;
@@ -51,6 +55,15 @@ public class Generator {
             System.err.println(String.format("Error executing Metadata Generator: %s", ex.getMessage()));
             ex.printStackTrace(System.out);
             System.exit(1);
+        }
+    }
+
+    private static void enableAnalyticsBasedOnArgs(String[] args){
+        for (String arg : args) {
+            if (arg.startsWith(ANALYTICS_ARGUMENT_BEGINNING)) {
+                String filePath = arg.replace(ANALYTICS_ARGUMENT_BEGINNING, "");
+                AnalyticsConfiguration.enableAnalytics(filePath);
+            }
         }
     }
 

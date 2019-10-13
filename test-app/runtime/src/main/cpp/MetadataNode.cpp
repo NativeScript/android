@@ -87,10 +87,6 @@ MetadataNode* MetadataNode::GetOrCreate(const string& className) {
     auto it = s_name2NodeCache.find(className);
 
     if (it == s_name2NodeCache.end()) {
-        //"[Ljava/lang/String;"
-        if(className == "[Ljava/lang/String;"){
-            int a = 5;
-        }
         MetadataTreeNode* treeNode = GetOrCreateTreeNodeByName(className);
 
         node = GetOrCreateInternal(treeNode);

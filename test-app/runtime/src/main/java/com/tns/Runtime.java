@@ -58,7 +58,7 @@ public class Runtime {
 
     private native void unlock(int runtimeId);
 
-    private native void passExceptionToJsNative(int runtimeId, Throwable ex, String message, String stackTrace, boolean isDiscarded);
+    private native void passExceptionToJsNative(int runtimeId, Throwable ex, String message, String fullStackTrace, String jsStackTrace, boolean isDiscarded);
 
     private native void clearStartupData(int runtimeId);
 
@@ -78,15 +78,15 @@ public class Runtime {
 
     private static native void ResetDateTimeConfigurationCache(int runtimeId);
 
-    void passUncaughtExceptionToJs(Throwable ex, String message, String stackTrace) {
-        passExceptionToJsNative(getRuntimeId(), ex, message, stackTrace, false);
+    void passUncaughtExceptionToJs(Throwable ex, String message, String fullStackTrace, String jsStackTrace) {
+        passExceptionToJsNative(getRuntimeId(), ex, message, fullStackTrace, jsStackTrace, false);
     }
 
     void passDiscardedExceptionToJs(Throwable ex, String prefix) {
         //String message = prefix + ex.getMessage();
         // we'd better not prefix the error with something like - Error on "main" thread for reportSupressedException
         // as it doesn't seem very useful for the users
-        passExceptionToJsNative(getRuntimeId(), ex, ex.getMessage(), Runtime.getStackTraceErrorMessage(ex), true);
+        passExceptionToJsNative(getRuntimeId(), ex, ex.getMessage(), Runtime.getStackTraceErrorMessage(ex), Runtime.getJSStackTrace(ex), true);
     }
 
     public static void passSuppressedExceptionToJs(Throwable ex, String methodName) {
@@ -274,6 +274,14 @@ public class Runtime {
         return result;
     }
 
+    public static String getJSStackTrace(Throwable ex) {
+        if (ex instanceof NativeScriptException) {
+            return ((NativeScriptException) ex).getIncomingStackTrace();
+        } else {
+            return null;
+        }
+    }
+
     public static String getStackTraceErrorMessage(Throwable ex) {
         String content;
         java.io.PrintStream ps = null;
@@ -285,9 +293,10 @@ public class Runtime {
 
             try {
                 content = baos.toString("US-ASCII");
-                if (ex instanceof NativeScriptException) {
+                String jsStackTrace = Runtime.getJSStackTrace(ex);
+                if (jsStackTrace != null) {
                     content = getStackTraceOnly(content);
-                    content = ((NativeScriptException) ex).getIncomingStackTrace() + content;
+                    content = jsStackTrace + content;
                 }
             } catch (java.io.UnsupportedEncodingException e) {
                 content = e.getMessage();
