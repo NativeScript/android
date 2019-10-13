@@ -81,7 +81,7 @@ public class ClassUtil {
             }
             currentClass = getSuperclass(currentClass);
         }
-        return methods.toArray(new MethodDescriptor[methods.size()]);
+        return methods.toArray(new MethodDescriptor[0]);
     }
 
     public static String getCanonicalName(String className) {

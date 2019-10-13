@@ -1,6 +1,7 @@
 package com.telerik.metadata;
 
 import com.telerik.metadata.desc.ClassDescriptor;
+import com.telerik.metadata.desc.ExtensionFunctionDescriptor;
 import com.telerik.metadata.desc.MethodDescriptor;
 import com.telerik.metadata.desc.TypeDescriptor;
 
@@ -14,9 +15,12 @@ public class TreeNode {
             this.name = m.getName();
             this.sig = m.getSignature();
             this.isResolved = false;
-            signature = new ArrayList<TreeNode>();
+            this.isExtensionFunction = m instanceof ExtensionFunctionDescriptor;
+
+            signature = new ArrayList<>();
         }
 
+        public boolean isExtensionFunction;
         public String name;
         public String sig;
         public ArrayList<TreeNode> signature;
@@ -85,13 +89,15 @@ public class TreeNode {
     public static final byte Final = 1;
 
     public TreeNode() {
-        children = new ArrayList<TreeNode>();
+        children = new ArrayList<>();
 
-        instanceMethods = new ArrayList<TreeNode.MethodInfo>();
-        staticMethods = new ArrayList<TreeNode.MethodInfo>();
-        instanceFields = new ArrayList<TreeNode.FieldInfo>();
-        staticFields = new ArrayList<TreeNode.FieldInfo>();
-        properties = new ArrayList<PropertyInfo>();
+        instanceMethods = new ArrayList<>();
+        staticMethods = new ArrayList<>();
+        instanceFields = new ArrayList<>();
+        staticFields = new ArrayList<>();
+        properties = new ArrayList<>();
+        extensionFunctions = new ArrayList<>();
+        resolvedMethods = new ArrayList<>();
     }
 
     public static final TreeNode BYTE = getPrimitive("B", (byte) 1);
@@ -219,16 +225,34 @@ public class TreeNode {
     public ArrayList<FieldInfo> instanceFields;
     public ArrayList<FieldInfo> staticFields;
     ArrayList<PropertyInfo> properties;
+    ArrayList<MethodInfo> extensionFunctions;
+    ArrayList<MethodInfo> resolvedMethods;
     public TreeNode baseClassNode;
     TreeNode parentNode;
     //
 
-    void addProperty(PropertyInfo propertyInfo){
+    void addProperty(PropertyInfo propertyInfo) {
         properties.add(propertyInfo);
     }
 
-    List<PropertyInfo> getProperties(){
+    void addExtensionFunction(MethodInfo methodInfo) {
+        extensionFunctions.add(methodInfo);
+    }
+
+    List<PropertyInfo> getProperties() {
         return properties;
+    }
+
+    List<MethodInfo> getExtensionFunctions() {
+        return extensionFunctions;
+    }
+
+    void addResolvedMethod(MethodInfo resolvedMethod) {
+        resolvedMethods.add(resolvedMethod);
+    }
+
+    List<MethodInfo> getResolvedMethods() {
+        return resolvedMethods;
     }
 
     private boolean wentThroughSettingMembers = false;

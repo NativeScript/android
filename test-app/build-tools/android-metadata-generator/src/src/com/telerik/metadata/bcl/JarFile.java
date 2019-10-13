@@ -20,7 +20,7 @@ public class JarFile implements ClassMapProvider {
 
     private JarFile(String path) {
         this.path = path;
-        this.classMap = new HashMap<String, ClassDescriptor>();
+        this.classMap = new HashMap<>();
     }
 
     public String getPath() {

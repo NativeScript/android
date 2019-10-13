@@ -21,6 +21,8 @@ class MetadataReader {
 
         MetadataEntry ReadStaticMethodEntry(uint8_t** data);
 
+        MetadataEntry ReadExtensionFunctionEntry(uint8_t** data);
+
         MetadataEntry ReadInstanceFieldEntry(uint8_t** data);
 
         MetadataEntry ReadStaticFieldEntry(uint8_t** data);

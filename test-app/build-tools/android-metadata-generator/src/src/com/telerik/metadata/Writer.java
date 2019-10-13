@@ -1,5 +1,8 @@
 package com.telerik.metadata;
 
+import com.telerik.metadata.TreeNode.FieldInfo;
+import com.telerik.metadata.TreeNode.MethodInfo;
+
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.IntBuffer;
@@ -7,11 +10,6 @@ import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
-
-import com.telerik.metadata.TreeNode.FieldInfo;
-import com.telerik.metadata.TreeNode.MethodInfo;
-
-import javax.swing.text.html.Option;
 
 public class Writer {
 
@@ -62,7 +60,7 @@ public class Writer {
 
     private static void writeMethodInfo(MethodInfo mi,
                                         HashMap<String, Integer> uniqueStrings, StreamWriter outValueStream)
-    throws Exception {
+            throws Exception {
         int pos = uniqueStrings.get(mi.name).intValue();
         writeInt(pos, outValueStream);
 
@@ -78,7 +76,7 @@ public class Writer {
     }
 
     private static void writeTreeNodeId(TreeNode node, StreamWriter out)
-    throws Exception {
+            throws Exception {
         if (node == null) {
             writeTreeNodeId_buff[0] = writeTreeNodeId_buff[1] = 0;
         } else {
@@ -89,13 +87,13 @@ public class Writer {
     }
 
     private static void writeFinalModifier(FieldInfo fi, StreamWriter out)
-    throws Exception {
+            throws Exception {
         writeModifierFinal_buff[0] = fi.isFinalType ? TreeNode.Final : 0;
         out.write(writeModifierFinal_buff);
     }
 
     private static int writeLength(int length, StreamWriter out)
-    throws Exception {
+            throws Exception {
         writeLength_lenBuff[0] = (byte) (length & 0xFF);
         writeLength_lenBuff[1] = (byte) ((length >> 8) & 0xFF);
         out.write(writeLength_lenBuff);
@@ -121,6 +119,14 @@ public class Writer {
             writeMethodInfo(n.instanceMethods.get(i), stringsMap, writer);
         }
 
+        List<MethodInfo> extensionFunctions = n.getExtensionFunctions();
+
+        writeLength(extensionFunctions.size(), writer);
+        for (MethodInfo extensionFunction : extensionFunctions) {
+            writeMethodInfo(extensionFunction, stringsMap, writer);
+            writeTreeNodeId(extensionFunction.declaringType, writer);
+        }
+
         len = writeLength(n.instanceFields.size(), writer);
         for (int i = 0; i < len; i++) {
             FieldInfo fi = n.instanceFields.get(i);
@@ -134,8 +140,8 @@ public class Writer {
         }
 
         List<TreeNode.PropertyInfo> propertyInfos = n.getProperties();
-        len = writeLength(propertyInfos.size(), writer);
-        for(TreeNode.PropertyInfo propertyInfo: propertyInfos){
+        writeLength(propertyInfos.size(), writer);
+        for (TreeNode.PropertyInfo propertyInfo : propertyInfos) {
             int pos = stringsMap.get(propertyInfo.getPropertyName()); // get start position
             // of the name
             writeInt(pos, writer); // write start position of the name of the
@@ -144,7 +150,7 @@ public class Writer {
             Optional<MethodInfo> propertyGetter = propertyInfo.getGetterMethod();
             Optional<MethodInfo> propertySetter = propertyInfo.getSetterMethod();
 
-            if(propertyGetter.isPresent()){
+            if (propertyGetter.isPresent()) {
                 writeLength(1, writer);
                 MethodInfo getterMethod = propertyGetter.get();
                 writeMethodInfo(getterMethod, stringsMap, writer);
@@ -152,7 +158,7 @@ public class Writer {
                 writeLength(0, writer);
             }
 
-            if(propertySetter.isPresent()){
+            if (propertySetter.isPresent()) {
                 writeLength(1, writer);
                 MethodInfo setterMethod = propertySetter.get();
                 writeMethodInfo(setterMethod, stringsMap, writer);
@@ -189,7 +195,7 @@ public class Writer {
         HashMap<String, Integer> uniqueStrings = new HashMap<String, Integer>();
 
         commonInterfacePrefixPosition = writeUniqueName("com/tns/gen/",
-                                        uniqueStrings, outStringsStream);
+                uniqueStrings, outStringsStream);
 
         // this while loop fils the treeStringsStream.dat file with a sequence
         // of the
@@ -210,7 +216,7 @@ public class Writer {
                 n.offsetName = uniqueStrings.get(name).intValue();
             } else {
                 n.offsetName = writeUniqueName(name, uniqueStrings,
-                                               outStringsStream);
+                        outStringsStream);
             }
 
             if (((n.nodeType & TreeNode.Interface) == TreeNode.Interface)
@@ -240,20 +246,27 @@ public class Writer {
                     }
                 }
 
-                for(TreeNode.PropertyInfo propertyInfo: n.getProperties()){
+                for (MethodInfo extensionFunction : n.getExtensionFunctions()) {
+                    name = extensionFunction.name;
+                    if (!uniqueStrings.containsKey(name)) {
+                        writeUniqueName(name, uniqueStrings, outStringsStream);
+                    }
+                }
+
+                for (TreeNode.PropertyInfo propertyInfo : n.getProperties()) {
                     name = propertyInfo.getPropertyName();
                     if (!uniqueStrings.containsKey(name)) {
                         writeUniqueName(name, uniqueStrings, outStringsStream);
                     }
                     Optional<MethodInfo> getterMethodOptional = propertyInfo.getGetterMethod();
-                    if(getterMethodOptional.isPresent()){
+                    if (getterMethodOptional.isPresent()) {
                         name = getterMethodOptional.get().name;
                         if (!uniqueStrings.containsKey(name)) {
                             writeUniqueName(name, uniqueStrings, outStringsStream);
                         }
                     }
                     Optional<MethodInfo> setterMethodOptional = propertyInfo.getSetterMethod();
-                    if(setterMethodOptional.isPresent()){
+                    if (setterMethodOptional.isPresent()) {
                         name = setterMethodOptional.get().name;
                         if (!uniqueStrings.containsKey(name)) {
                             writeUniqueName(name, uniqueStrings, outStringsStream);
@@ -284,7 +297,7 @@ public class Writer {
 
                 outValueStream.write(n.nodeType);
             } else if (((n.nodeType & TreeNode.Class) == TreeNode.Class)
-                       || ((n.nodeType & TreeNode.Interface) == TreeNode.Interface)) {
+                    || ((n.nodeType & TreeNode.Interface) == TreeNode.Interface)) {
                 n.offsetValue = outValueStream.getPosition();
 
                 writeClassValue(outValueStream, uniqueStrings, n);

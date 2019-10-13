@@ -9,6 +9,10 @@ import com.telerik.metadata.desc.MethodDescriptor;
 import com.telerik.metadata.desc.PropertyDescriptor;
 import com.telerik.metadata.kotlin.classes.KotlinClassMetadataParser;
 import com.telerik.metadata.kotlin.classes.impl.KotlinClassMetadataParserImpl;
+import com.telerik.metadata.kotlin.functions.ExtensionFunctionsCollector;
+import com.telerik.metadata.kotlin.functions.ExtensionFunctionsStorage;
+import com.telerik.metadata.kotlin.functions.impl.ExtensionFunctionsCollectorImpl;
+import com.telerik.metadata.kotlin.functions.impl.ExtensionFunctionsStorageImpl;
 
 import org.apache.bcel.classfile.AnnotationEntry;
 import org.apache.bcel.classfile.Attribute;
@@ -22,19 +26,22 @@ import org.apache.bcel.classfile.JavaClass;
 import org.apache.bcel.classfile.Method;
 
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
+import kotlinx.metadata.KmFunction;
 import kotlinx.metadata.KmProperty;
 import kotlinx.metadata.jvm.JvmExtensionsKt;
 import kotlinx.metadata.jvm.JvmMethodSignature;
 
 public class ClassInfo implements ClassDescriptor {
     private final JavaClass clazz;
+    private final ExtensionFunctionsStorage extensionFunctionsStorage;
 
     public ClassInfo(JavaClass clazz) {
         this.clazz = clazz;
+        this.extensionFunctionsStorage = ExtensionFunctionsStorageImpl.getInstance();
         init();
     }
 
@@ -126,7 +133,7 @@ public class ClassInfo implements ClassDescriptor {
         Method[] ms = clazz.getMethods();
         MethodDescriptor[] methods = new MethodDescriptor[ms.length];
         for (int i = 0; i < methods.length; i++) {
-            methods[i] = new MethodInfo(ms[i]);
+            methods[i] = new MethodInfo(ms[i], this);
         }
         return methods;
     }
@@ -164,7 +171,7 @@ public class ClassInfo implements ClassDescriptor {
             String methodName = method.getName();
 
             if (methodSignature.equals(signature) && methodName.equals(name)) {
-                return new MethodInfo(method);
+                return new MethodInfo(method, this);
             }
         }
 

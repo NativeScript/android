@@ -1,20 +1,16 @@
 package com.telerik.metadata.bcl;
 
 import com.telerik.metadata.desc.ClassDescriptor;
+import com.telerik.metadata.desc.ExtensionFunctionDescriptor;
 import com.telerik.metadata.desc.MetadataInfoAnnotationDescriptor;
 import com.telerik.metadata.desc.MethodDescriptor;
 import com.telerik.metadata.desc.TypeDescriptor;
-import org.apache.bcel.classfile.Method;
-import org.apache.bcel.generic.Type;
 
-public class MethodInfo implements MethodDescriptor {
+public class ExtensionFunctionInfo implements ExtensionFunctionDescriptor {
+    private final MethodDescriptor m;
 
-    private final Method m;
-    private final ClassDescriptor classDescriptor;
-
-    public MethodInfo(Method m, ClassDescriptor classDescriptor) {
+    public ExtensionFunctionInfo(MethodDescriptor m) {
         this.m = m;
-        this.classDescriptor = classDescriptor;
     }
 
     @Override
@@ -44,7 +40,7 @@ public class MethodInfo implements MethodDescriptor {
 
     @Override
     public ClassDescriptor getDeclaringClass() {
-        return classDescriptor;
+        return m.getDeclaringClass();
     }
 
     @Override
@@ -59,17 +55,12 @@ public class MethodInfo implements MethodDescriptor {
 
     @Override
     public TypeDescriptor[] getArgumentTypes() {
-        Type[] ts = m.getArgumentTypes();
-        TypeDescriptor[] argTypes = new TypeDescriptor[ts.length];
-        for (int i=0; i<argTypes.length; i++) {
-            argTypes[i] = new TypeInfo(ts[i]);
-        }
-        return argTypes;
+        return m.getArgumentTypes();
     }
 
     @Override
     public TypeDescriptor getReturnType() {
-        return new TypeInfo(m.getReturnType());
+        return m.getReturnType();
     }
 
     @Override
@@ -82,7 +73,7 @@ public class MethodInfo implements MethodDescriptor {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
 
-        MethodInfo that = (MethodInfo) o;
+        ExtensionFunctionInfo that = (ExtensionFunctionInfo) o;
 
         return m.equals(that.m);
     }
