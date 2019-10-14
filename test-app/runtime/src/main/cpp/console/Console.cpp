@@ -69,7 +69,7 @@ void Console::sendToADBLogcat(const std::string& message, android_LogPriority lo
 
 void Console::sendToDevToolsFrontEnd(v8::Isolate* isolate, const std::string& message, const std::string& logLevel) {
     if (m_callback != nullptr) {
-        m_callback(message, logLevel);
+        m_callback(isolate, message, logLevel);
     }
 }
 

@@ -11,7 +11,7 @@
 
 namespace tns {
 
-typedef void (*ConsoleCallback)(const std::string& message, const std::string& logLevel);
+typedef void (*ConsoleCallback)(v8::Isolate* isolate, const std::string& message, const std::string& logLevel);
 
 class Console {
     public:
