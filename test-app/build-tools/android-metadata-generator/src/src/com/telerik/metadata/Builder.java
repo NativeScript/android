@@ -12,12 +12,19 @@ import com.telerik.metadata.desc.TypeDescriptor;
 import com.telerik.metadata.dx.DexFile;
 import com.telerik.metadata.kotlin.classes.KotlinClassMetadataParser;
 import com.telerik.metadata.kotlin.classes.impl.KotlinClassMetadataParserImpl;
+import com.telerik.metadata.kotlin.functions.ClassNameAndExtensionFunctionPair;
+import com.telerik.metadata.kotlin.functions.ExtensionFunctionsCollector;
+import com.telerik.metadata.kotlin.functions.ExtensionFunctionsStorage;
+import com.telerik.metadata.kotlin.functions.impl.ExtensionFunctionsCollectorImpl;
+import com.telerik.metadata.kotlin.functions.impl.ExtensionFunctionsStorageImpl;
+import com.telerik.metadata.nodes.cache.NodesCacheImpl;
 import com.telerik.metadata.parsing.ClassParser;
 
 import java.io.File;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -57,6 +64,22 @@ public class Builder {
         TreeNode root = TreeNode.getRoot();
 
         String[] classNames = ClassRepo.getClassNames();
+
+        for (String className : classNames) {
+            try {
+                ClassDescriptor clazz = ClassRepo.findClass(className);
+                if (clazz == null) {
+                    throw new ClassNotFoundException("Class " + className + " not found in the input android libraries.");
+                } else {
+                    tryCollectKotlinExtensionFunctions(clazz);
+                }
+            } catch (Throwable e) {
+                System.out.println("Skip " + className);
+                System.out.println("\tError: " + e.toString());
+                //e.printStackTrace();
+            }
+        }
+
         for (String className : classNames) {
             try {
                 // possible exceptions here are:
@@ -80,7 +103,18 @@ public class Builder {
             }
         }
 
+
         return root;
+    }
+
+    private static void tryCollectKotlinExtensionFunctions(ClassDescriptor classDescriptor) {
+        ExtensionFunctionsCollector extensionFunctionsCollector = new ExtensionFunctionsCollectorImpl(new KotlinClassMetadataParserImpl());
+        Collection<ClassNameAndExtensionFunctionPair> extensionFunctions = extensionFunctionsCollector.collectExtensionFunctions(classDescriptor);
+
+        if (!extensionFunctions.isEmpty()) {
+            ExtensionFunctionsStorage extensionFunctionsStorage = ExtensionFunctionsStorageImpl.getInstance();
+            extensionFunctionsStorage.storeExtensionFunctions(extensionFunctions);
+        }
     }
 
     private static Boolean isClassPublic(ClassDescriptor clazz) {
@@ -128,19 +162,35 @@ public class Builder {
     private static void setNodeMembers(ClassDescriptor clazz, TreeNode node, TreeNode root, boolean hasClassMetadataInfo) throws Exception {
         node.setWentThroughSettingMembers(true);
 
-        Map<String, MethodInfo> existingMethods = new HashMap<String, MethodInfo>();
+        Map<String, MethodInfo> existingMethods = new HashMap<>();
         for (MethodInfo mi : node.instanceMethods) {
             existingMethods.put(mi.name + mi.sig, mi);
         }
+        MethodDescriptor[] extensionFunctions = ExtensionFunctionsStorageImpl.getInstance().retrieveExtensionFunctions(clazz.getClassName()).toArray(new MethodDescriptor[0]);
+        MethodDescriptor[] nonExtensionFunctionMethods = ClassUtil.getAllMethods(clazz);
+        MethodDescriptor[] allMethods = concatenate(extensionFunctions, nonExtensionFunctionMethods);
 
-        MethodDescriptor[] allMethods = ClassUtil.getAllMethods(clazz);
         MethodDescriptor[] classImplementedMethods = clazz.getMethods();
         MethodDescriptor[] interfaceImplementedMethods = clazz.isClass() ? getDefaultMethodsFromImplementedInterfaces(clazz, classImplementedMethods) : new MethodDescriptor[0];
-        MethodDescriptor[] methods = concatenate(classImplementedMethods, interfaceImplementedMethods);
-
+        MethodDescriptor[] methods = concatenate(classImplementedMethods, interfaceImplementedMethods, extensionFunctions);
         Arrays.sort(methods, methodNameComparator);
 
-        for (MethodDescriptor m : methods) {
+        setMethodsInfo(root, node, clazz, methods, allMethods, existingMethods, hasClassMetadataInfo);
+
+        FieldDescriptor[] fields = clazz.getFields();
+
+        setFieldInfo(clazz, node, root, fields, null);
+
+        setPropertiesInfo(root, node, clazz.getProperties());
+
+        // adds static fields from interface to implementing class because java can call them from implementing class... no problem.
+        getFieldsFromImplementedInterfaces(clazz, node, root, fields);
+    }
+
+    private static void setMethodsInfo(TreeNode root, TreeNode node, ClassDescriptor clazz, MethodDescriptor[] ownMethodDescriptors, MethodDescriptor[] ownAndParentMethodDescriptors, Map<String, MethodInfo> existingNodeMethods, boolean hasClassMetadataInfo) throws Exception {
+
+
+        for (MethodDescriptor m : ownMethodDescriptors) {
             if (m.isSynthetic()) {
                 continue;
             }
@@ -157,7 +207,7 @@ public class Builder {
 
                 MethodInfo mi = new MethodInfo(m);
                 int countUnique = 0;
-                for (MethodDescriptor m1 : allMethods) {
+                for (MethodDescriptor m1 : ownAndParentMethodDescriptors) {
                     boolean m1IsStatic = m1.isStatic();
                     if (!m1.isSynthetic()
                             && (m1.isPublic() || m1.isProtected())
@@ -172,33 +222,35 @@ public class Builder {
                 }
                 mi.isResolved = countUnique == 1;
 
+
                 TypeDescriptor[] params = m.getArgumentTypes();
                 mi.signature = getMethodSignature(root, m.getReturnType(),
                         params);
 
                 if (mi.signature != null) {
                     if (isStatic) {
-                        mi.declaringType = getOrCreateNode(root, clazz, null);
-                        node.staticMethods.add(mi);
+                        if (!mi.isExtensionFunction) {
+                            mi.declaringType = getOrCreateNode(root, clazz, null);
+                            node.staticMethods.add(mi);
+                        } else {
+                            mi.declaringType = getOrCreateNode(root, m.getDeclaringClass(), null);
+                            node.addExtensionFunction(mi);
+                        }
                     } else {
                         String sig = m.getName() + m.getSignature();
-                        if (existingMethods.containsKey(sig)) {
+                        if (existingNodeMethods.containsKey(sig)) {
                             continue;
                         }
                         node.instanceMethods.add(mi);
                     }
                 }
+
+                if (mi.isResolved) {
+                    node.resolvedMethods.add(mi);
+                }
             }
         }
 
-        FieldDescriptor[] fields = clazz.getFields();
-
-        setFieldInfo(clazz, node, root, fields, null);
-
-        setPropertiesInfo(root, node, clazz.getProperties());
-
-        // adds static fields from interface to implementing class because java can call them from implementing class... no problem.
-        getFieldsFromImplementedInterfaces(clazz, node, root, fields);
     }
 
     private static void setPropertiesInfo(TreeNode root, TreeNode node, PropertyDescriptor[] propertyDescriptors) throws Exception {
@@ -411,6 +463,7 @@ public class Builder {
             }
         }
 
+        NodesCacheImpl.getInstance().addNode(clazz.getClassName(), node);
         return node;
     }
 
@@ -493,10 +546,25 @@ public class Builder {
         int bLen = b.length;
 
         @SuppressWarnings("unchecked")
-        T[] c = (T[]) Array.newInstance(a.getClass().getComponentType(), aLen + bLen);
-        System.arraycopy(a, 0, c, 0, aLen);
-        System.arraycopy(b, 0, c, aLen, bLen);
+        T[] d = (T[]) Array.newInstance(a.getClass().getComponentType(), aLen + bLen);
+        System.arraycopy(a, 0, d, 0, aLen);
+        System.arraycopy(b, 0, d, aLen, bLen);
 
-        return c;
+        return d;
+    }
+
+    private static <T> T[] concatenate(T[] a, T[] b, T[] c) {
+        int aLen = a.length;
+        int bLen = b.length;
+        int cLen = c.length;
+        int abLen = aLen + bLen;
+
+        @SuppressWarnings("unchecked")
+        T[] d = (T[]) Array.newInstance(a.getClass().getComponentType(), abLen + cLen);
+        System.arraycopy(a, 0, d, 0, aLen);
+        System.arraycopy(b, 0, d, aLen, bLen);
+        System.arraycopy(c, 0, d, abLen, cLen);
+
+        return d;
     }
 }

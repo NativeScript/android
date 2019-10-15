@@ -60,3 +60,4 @@ require("./tests/kotlin/properties/testPropertiesSupport");
 require("./tests/kotlin/delegation/testDelegationSupport");
 require("./tests/kotlin/objects/testObjectsSupport");
 require("./tests/kotlin/functions/testTopLevelFunctionsSupport");
+require("./tests/kotlin/extensions/testExtensionFunctionsSupport")

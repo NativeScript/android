@@ -554,6 +554,23 @@ vector<MetadataNode::MethodCallbackData*> MetadataNode::SetInstanceMethodsFromSt
 
         callbackData->candidates.push_back(entry);
     }
+
+    auto extensionFunctionsCount = *reinterpret_cast<uint16_t*>(curPtr);
+    curPtr += sizeof(uint16_t);
+    for (auto i = 0; i < extensionFunctionsCount; i++) {
+        auto entry = s_metadataReader.ReadExtensionFunctionEntry(&curPtr);
+        if (entry.name != lastMethodName) {
+            callbackData = new MethodCallbackData(this);
+            auto funcData = External::New(isolate, callbackData);
+            auto funcTemplate = FunctionTemplate::New(isolate, MethodCallback, funcData);
+            auto funcName = ArgConverter::ConvertToV8String(isolate, entry.name);
+            prototypeTemplate->Set(funcName, funcTemplate);
+
+            lastMethodName = entry.name;
+        }
+        callbackData->candidates.push_back(entry);
+    }
+
     return instanceMethodData;
 }
 
@@ -581,6 +598,12 @@ void MetadataNode::SetInstanceFieldsFromStaticMetadata(Isolate* isolate, Local<F
     //skip metadata methods -- advance the pointer only
     for (auto i = 0; i < instanceMethodCout; i++) {
         auto entry = s_metadataReader.ReadInstanceMethodEntry(&curPtr);
+    }
+
+    auto extensionFunctionsCount = *reinterpret_cast<uint16_t*>(curPtr);
+    curPtr += sizeof(uint16_t);
+    for (auto i = 0; i < extensionFunctionsCount; i++) {
+        auto entry = s_metadataReader.ReadExtensionFunctionEntry(&curPtr);
     }
 
     //get candidates from instance fields metadata
@@ -714,6 +737,13 @@ void MetadataNode::SetStaticMembers(Isolate* isolate, Local<Function>& ctorFunct
         for (auto i = 0; i < instanceMethodCout; i++) {
             auto entry = s_metadataReader.ReadInstanceMethodEntry(&curPtr);
         }
+
+        auto extensionFunctionsCount = *reinterpret_cast<uint16_t*>(curPtr);
+        curPtr += sizeof(uint16_t);
+        for (auto i = 0; i < extensionFunctionsCount; i++) {
+            auto entry = s_metadataReader.ReadExtensionFunctionEntry(&curPtr);
+        }
+
         auto instanceFieldCout = *reinterpret_cast<uint16_t*>(curPtr);
         curPtr += sizeof(uint16_t);
         for (auto i = 0; i < instanceFieldCout; i++) {
@@ -1114,8 +1144,12 @@ void MetadataNode::MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& inf
             // Iterates through all methods and finds the best match based on the number of arguments
             auto found = false;
             for (auto& c : candidates) {
-                found = c.paramCount == argLength;
+                found = (!c.isExtensionFunction && c.paramCount == argLength) || (
+                        c.isExtensionFunction && c.paramCount == argLength + 1);
                 if (found) {
+                    if(c.isExtensionFunction){
+                        className = &c.declaringType;
+                    }
                     entry = &c;
                     DEBUG_WRITE("MetaDataEntry Method %s's signature is: %s", entry->name.c_str(), entry->sig.c_str());
                     break;

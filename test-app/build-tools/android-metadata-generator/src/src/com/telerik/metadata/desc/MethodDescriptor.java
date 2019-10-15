@@ -7,6 +7,8 @@ public interface MethodDescriptor {
     boolean isStatic();
     boolean isAbstract();
 
+    ClassDescriptor getDeclaringClass();
+
     String getName();
     String getSignature();
 

@@ -14,6 +14,7 @@
 #include <map>
 
 namespace tns {
+
 class ArgConverter {
     public:
         static void Init(v8::Isolate* isolate);

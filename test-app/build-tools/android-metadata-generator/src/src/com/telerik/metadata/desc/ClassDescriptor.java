@@ -4,11 +4,15 @@ import java.util.Optional;
 
 public interface ClassDescriptor {
     boolean isClass();
+
     boolean isInterface();
+
     boolean isEnum();
 
     boolean isStatic();
+
     boolean isPublic();
+
     boolean isProtected();
 
     MethodDescriptor[] getMethods();
@@ -24,6 +28,8 @@ public interface ClassDescriptor {
     String[] getInterfaceNames();
 
     String getPackageName();
+
     String getClassName();
+
     String getSuperclassName();
 }

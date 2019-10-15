@@ -14,6 +14,39 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
+JsArgConverter::JsArgConverter(const Local<Object>& caller, const v8::FunctionCallbackInfo<Value>& args, const string& methodSignature, MetadataEntry* entry)
+        : m_isolate(args.GetIsolate()), m_env(JEnv()), m_methodSignature(methodSignature), m_isValid(true), m_error(Error()) {
+    int v8ProvidedArgumentsLength = args.Length();
+    m_argsLen = 1 + v8ProvidedArgumentsLength;
+
+    if (m_argsLen > 0) {
+        if ((entry != nullptr) && (entry->isResolved)) {
+            if (entry->parsedSig.empty()) {
+                JniSignatureParser parser(m_methodSignature);
+                entry->parsedSig = parser.Parse();
+            }
+            m_tokens = entry->parsedSig;
+        } else {
+            JniSignatureParser parser(m_methodSignature);
+            m_tokens = parser.Parse();
+        }
+
+        m_isValid = ConvertArg(caller, 0);
+
+        if (!m_isValid) {
+            throw NativeScriptException("Error while converting argument!");
+        }
+
+        for (int i = 0; i < v8ProvidedArgumentsLength; i++) {
+            m_isValid = ConvertArg(args[i], i + 1);
+
+            if (!m_isValid) {
+                break;
+            }
+        }
+    }
+}
+
 JsArgConverter::JsArgConverter(const v8::FunctionCallbackInfo<Value>& args, bool hasImplementationObject, const string& methodSignature, MetadataEntry* entry)
     : m_isolate(args.GetIsolate()), m_env(JEnv()), m_methodSignature(methodSignature), m_isValid(true), m_error(Error()) {
     m_argsLen = !hasImplementationObject ? args.Length() : args.Length() - 1;

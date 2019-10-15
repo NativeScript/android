@@ -319,10 +319,16 @@ void CallbackHandlers::CallJavaMethod(const Local<Object>& caller, const string&
                     methodName.c_str());
     }
 
-    JsArgConverter argConverter(args, false, *sig, entry);
+    JsArgConverter* argConverter;
 
-    if (!argConverter.IsValid()) {
-        JsArgConverter::Error err = argConverter.GetError();
+    if(entry != nullptr && entry->isExtensionFunction){
+        argConverter = new JsArgConverter(caller, args, *sig, entry);
+    } else {
+        argConverter = new JsArgConverter(args, false, *sig, entry);
+    }
+
+    if (!argConverter->IsValid()) {
+        JsArgConverter::Error err = argConverter->GetError();
         throw NativeScriptException(err.msg);
     }
 
@@ -330,7 +336,8 @@ void CallbackHandlers::CallJavaMethod(const Local<Object>& caller, const string&
 
     JniLocalRef callerJavaObject;
 
-    jvalue* javaArgs = argConverter.ToArgs();
+    jvalue* javaArgs = argConverter->ToArgs();
+
 
     auto runtime = Runtime::GetRuntime(isolate);
     auto objectManager = runtime->GetObjectManager();
@@ -534,6 +541,8 @@ void CallbackHandlers::CallJavaMethod(const Local<Object>& caller, const string&
     if ((++adjustMemCount % 2) == 0) {
         AdjustAmountOfExternalAllocatedMemory(env, isolate);
     }
+
+    delete argConverter;
 }
 
 void CallbackHandlers::AdjustAmountOfExternalAllocatedMemory(JEnv& env, Isolate* isolate) {
