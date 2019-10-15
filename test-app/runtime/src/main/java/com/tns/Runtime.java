@@ -292,7 +292,7 @@ public class Runtime {
             ex.printStackTrace(ps);
 
             try {
-                content = baos.toString("US-ASCII");
+                content = baos.toString("UTF-8");
                 String jsStackTrace = Runtime.getJSStackTrace(ex);
                 if (jsStackTrace != null) {
                     content = getStackTraceOnly(content);
