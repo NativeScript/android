@@ -21,3 +21,4 @@ bin/
 
 .classpath
 android-runtime.iml
+test-app/build-tools/*.log

@@ -20,6 +20,30 @@ class Common {
 
         static std::vector<uint16_t> toVector(const std::string& value);
 
+        template<typename T>
+        static std::unique_ptr<protocol::Array<T>> fromValue(protocol::Value* value, protocol::ErrorSupport* errors) {
+            protocol::ListValue* array = protocol::ListValue::cast(value);
+            if (!array) {
+                errors->addError("array expected");
+                return nullptr;
+            }
+
+            std::unique_ptr<protocol::Array<T>> result(new protocol::Array<T>());
+            errors->push();
+            for (size_t i = 0; i < array->size(); ++i) {
+                errors->setName(protocol::StringUtil::fromInteger(i));
+                std::unique_ptr<T> item = protocol::ValueConversions<T>::fromValue(array->at(i), errors);
+                result->push_back(std::move(item));
+            }
+
+            errors->pop();
+            if (errors->hasErrors()) {
+                return nullptr;
+            }
+
+            return result;
+        }
+
     private:
         static const String16 s_notImplemented;
 };

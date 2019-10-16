@@ -42,15 +42,16 @@ NativeScriptException::NativeScriptException(TryCatch& tc, const string& message
 
 void NativeScriptException::ReThrowToV8() {
     auto isolate = Isolate::GetCurrent();
+    auto context = isolate->GetCurrentContext();
     Local<Value> errObj;
 
     if (m_javascriptException != nullptr) {
         errObj = Local<Value>::New(isolate, *m_javascriptException);
         if (errObj->IsObject()) {
             if (!m_fullMessage.empty()) {
-                errObj.As<Object>()->Set(ArgConverter::ConvertToV8String(isolate, "fullMessage"), ArgConverter::ConvertToV8String(isolate, m_fullMessage));
+                errObj.As<Object>()->Set(context, ArgConverter::ConvertToV8String(isolate, "fullMessage"), ArgConverter::ConvertToV8String(isolate, m_fullMessage));
             } else if (!m_message.empty()) {
-                errObj.As<Object>()->Set(ArgConverter::ConvertToV8String(isolate, "fullMessage"), ArgConverter::ConvertToV8String(isolate, m_message));
+                errObj.As<Object>()->Set(context, ArgConverter::ConvertToV8String(isolate, "fullMessage"), ArgConverter::ConvertToV8String(isolate, m_message));
             }
         }
     } else if (!m_fullMessage.empty()) {
@@ -71,9 +72,10 @@ void NativeScriptException::ReThrowToJava() {
     JEnv env;
 
     auto isolate = Isolate::GetCurrent();
-    auto objectManager = Runtime::GetObjectManager(isolate);
+
 
     if (!m_javaException.IsNull()) {
+        auto objectManager = Runtime::GetObjectManager(isolate);
         auto excClassName = objectManager->GetClassName((jobject) m_javaException);
         if (excClassName == "com/tns/NativeScriptException") {
             ex = m_javaException;
@@ -101,6 +103,7 @@ void NativeScriptException::ReThrowToJava() {
         if (ex == nullptr) {
             ex = static_cast<jthrowable>(env.NewObject(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_JSVALUE_CTOR_ID, (jstring) msg, (jstring)stackTrace, reinterpret_cast<jlong>(m_javascriptException)));
         } else {
+            auto objectManager = Runtime::GetObjectManager(isolate);
             auto excClassName = objectManager->GetClassName(ex);
             if (excClassName != "com/tns/NativeScriptException") {
                 ex = static_cast<jthrowable>(env.NewObject(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_THROWABLE_CTOR_ID, (jstring) msg, (jstring)stackTrace, ex));
@@ -155,8 +158,12 @@ void NativeScriptException::CallJsFuncWithErr(Local<Value> errObj, jboolean isDi
     auto context = isolate->GetCurrentContext();
     auto globalHandle = context->Global();
 
-    auto handler = isDiscarded ?
-                   globalHandle->Get(V8StringConstants::GetDiscardedError(isolate)) : globalHandle->Get(V8StringConstants::GetUncaughtError(isolate));
+    Local<Value> handler;
+    if (isDiscarded) {
+        globalHandle->Get(context, V8StringConstants::GetDiscardedError(isolate)).ToLocal(&handler);
+    } else {
+        globalHandle->Get(context, V8StringConstants::GetUncaughtError(isolate)).ToLocal(&handler);
+    }
     auto isEmpty = handler.IsEmpty();
     auto isFunction = handler->IsFunction();
 
@@ -213,7 +220,8 @@ Local<Value> NativeScriptException::GetJavaExceptionFromEnv(const JniLocalRef& e
         nativeExceptionObject = objectManager->CreateJSWrapper(javaObjectID, className);
     }
 
-    errObj->Set(V8StringConstants::GetNativeException(isolate), nativeExceptionObject);
+    auto context = isolate->GetCurrentContext();
+    errObj->Set(context, V8StringConstants::GetNativeException(isolate), nativeExceptionObject);
 
     return errObj;
 }
@@ -269,7 +277,9 @@ JniLocalRef NativeScriptException::TryGetJavaThrowableObject(JEnv& env, const Lo
         objClass = JniLocalRef(env.GetObjectClass(javaObj));
     } else {
         auto isolate = jsObj->GetIsolate();
-        auto nativeEx = jsObj->Get(V8StringConstants::GetNativeException(isolate));
+        auto context = isolate->GetCurrentContext();
+        Local<Value> nativeEx;
+        jsObj->Get(context, V8StringConstants::GetNativeException(isolate)).ToLocal(&nativeEx);
         if (!nativeEx.IsEmpty() && nativeEx->IsObject()) {
             javaObj = objectManager->GetJavaObjectByJsObject(nativeEx.As<Object>());
             objClass = JniLocalRef(env.GetObjectClass(javaObj));
@@ -315,7 +325,13 @@ string NativeScriptException::GetErrorMessage(const Local<Message>& message, Loc
     auto v8FullMessage = ArgConverter::ConvertToV8String(isolate, "fullMessage");
     if (error->IsObject() && error.As<Object>()->Has(context, v8FullMessage).ToChecked()) {
         hasFullErrorMessage = true;
-        errMessage = ArgConverter::ConvertToString(error.As<Object>()->Get(v8FullMessage).As<String>());
+        Local<Value> errMsgVal;
+        error.As<Object>()->Get(context, v8FullMessage).ToLocal(&errMsgVal);
+        if (!errMsgVal.IsEmpty()) {
+            errMessage = ArgConverter::ConvertToString(errMsgVal.As<String>());
+        } else {
+            errMessage = "";
+        }
         ss << errMessage;
     }
 

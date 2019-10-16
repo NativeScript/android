@@ -233,12 +233,11 @@ void JsV8InspectorClient::sendToFrontEndCallback(const v8::FunctionCallbackInfo<
     }
 }
 
-void JsV8InspectorClient::consoleLogCallback(const string& message, const string& logLevel) {
+void JsV8InspectorClient::consoleLogCallback(Isolate* isolate, const string& message, const string& logLevel) {
     if (!inspectorIsConnected()) {
         return;
     }
 
-    auto isolate = Runtime::GetRuntime(0)->GetIsolate();
     auto stack = v8::StackTrace::CurrentStackTrace(isolate, 1, v8::StackTrace::StackTraceOptions::kDetailed);
 
     auto frame = stack->GetFrame(isolate, 0);

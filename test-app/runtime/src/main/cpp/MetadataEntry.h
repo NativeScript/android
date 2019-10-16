@@ -35,7 +35,7 @@ struct MetadataEntry {
         :
         isTypeMember(false), name(std::string()), treeNode(nullptr), sig(std::string()), returnType(std::string()), retType(MethodReturnType::Unknown), paramCount(0),
         isStatic(false), isFinal(false), declaringType(std::string()),
-        isResolved(false), memberId(nullptr), clazz(nullptr) {
+        isResolved(false), isExtensionFunction(false), memberId(nullptr), clazz(nullptr) {
     }
     MetadataTreeNode* treeNode;
     NodeType type;
@@ -49,6 +49,7 @@ struct MetadataEntry {
     bool isFinal;
     bool isTypeMember;
     bool isResolved;
+    bool isExtensionFunction;
     void* memberId;
     jclass clazz;
     std::vector<std::string> parsedSig;

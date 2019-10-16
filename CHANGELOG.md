@@ -1,3 +1,23 @@
+6.2.0
+==
+
+## What's New
+ - [Add Kotlin extension functions support (#1515)](https://github.com/NativeScript/android-runtime/issues/1515)
+ - [update dts generator to the latest version (#1506)](https://github.com/NativeScript/android-runtime/pull/1506)
+ - [Unify exceptions information in try/catch and __onUncaughtError (#1445)](https://github.com/NativeScript/android-runtime/issues/1445)
+ - [Interop between JS Objects and JSONObjects (#1500)](https://github.com/NativeScript/android-runtime/issues/1500)
+ - [Collect build analytics (#1501)](https://github.com/NativeScript/android-runtime/issues/1501)
+ - [expose the NDK revision used to build the V8 and the Runtime (#1498)](https://github.com/NativeScript/android-runtime/pull/1498)
+ - [Upgrade android gradle plugin to the latest 3.5.1 version (#1502)](https://github.com/NativeScript/android-runtime/issues/1502)
+ - [support snapshot libs out of the box (#1496)](https://github.com/NativeScript/android-runtime/pull/1496)
+ - [Upgrade v8 to 7.7.299.11 (#1478)](https://github.com/NativeScript/android-runtime/issues/1478)
+ 
+## Bug Fixes
+ - [Console.log in worker makes chrome debugging crash (#1511)](https://github.com/NativeScript/android-runtime/issues/1511)
+ - [fix searching for merge assets folder on windows (#1503)](https://github.com/NativeScript/android-runtime/pull/1503)
+ - [Background job with WorkManager (#1488)](https://github.com/NativeScript/android-runtime/issues/1488)
+ - [Deprecated API used in the ErrorActivity is crashing the app (when latest support library is used) (#1494)](https://github.com/NativeScript/android-runtime/issues/1494)
+
 6.1.2
 ==
 
@@ -11,6 +31,7 @@
 ## Bug Fixes
 
 - [When using kotlin sometimes the metadata is not existing in the result apk (#1476)](https://github.com/NativeScript/android-runtime/issues/1476)
+
 
 6.1.0
 ==

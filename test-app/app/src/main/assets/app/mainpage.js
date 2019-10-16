@@ -54,8 +54,10 @@ require("./tests/testInterfaceImplementation");
 require("./tests/testRuntimeImplementedAPIs");
 require("./tests/testsInstanceOfOperator");
 require("./tests/testReleaseNativeCounterpart");
+require("./tests/testJSONObjects");
 require("./tests/kotlin/companions/testCompanionObjectsSupport");
 require("./tests/kotlin/properties/testPropertiesSupport");
 require("./tests/kotlin/delegation/testDelegationSupport");
 require("./tests/kotlin/objects/testObjectsSupport");
 require("./tests/kotlin/functions/testTopLevelFunctionsSupport");
+require("./tests/kotlin/extensions/testExtensionFunctionsSupport")

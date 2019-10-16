@@ -76,7 +76,8 @@ DispatchResponse V8DOMAgentImpl::getDocument(Maybe<int> in_depth, Maybe<bool> in
     auto globalInspectorObject = utils::Common::getGlobalInspectorObject(isolate);
 
     if (!globalInspectorObject.IsEmpty()) {
-        auto getDocument = globalInspectorObject->Get(ArgConverter::ConvertToV8String(isolate, getDocumentFunctionString));
+        v8::Local<v8::Value> getDocument;
+        globalInspectorObject->Get(context, ArgConverter::ConvertToV8String(isolate, getDocumentFunctionString)).ToLocal(&getDocument);
 
         if (!getDocument.IsEmpty() && getDocument->IsFunction()) {
             auto getDocumentFunc = getDocument.As<v8::Function>();
@@ -140,7 +141,8 @@ DispatchResponse V8DOMAgentImpl::removeNode(int in_nodeId) {
     auto globalInspectorObject = utils::Common::getGlobalInspectorObject(isolate);
 
     if (!globalInspectorObject.IsEmpty()) {
-        auto removeNode = globalInspectorObject->Get(ArgConverter::ConvertToV8String(isolate, removeNodeFunctionString));
+        v8::Local<v8::Value> removeNode;
+        globalInspectorObject->Get(context, ArgConverter::ConvertToV8String(isolate, removeNodeFunctionString)).ToLocal(&removeNode);
 
         if (!removeNode.IsEmpty() && removeNode->IsFunction()) {
             auto removeNodeFunc = removeNode.As<v8::Function>();
@@ -176,7 +178,8 @@ DispatchResponse V8DOMAgentImpl::setAttributesAsText(int in_nodeId, const String
     auto globalInspectorObject = utils::Common::getGlobalInspectorObject(isolate);
 
     if (!globalInspectorObject.IsEmpty()) {
-        auto setAttributeAsText = globalInspectorObject->Get(ArgConverter::ConvertToV8String(isolate, setAttributeAsTextFunctionString));
+        v8::Local<v8::Value> setAttributeAsText;
+        globalInspectorObject->Get(context, ArgConverter::ConvertToV8String(isolate, setAttributeAsTextFunctionString)).ToLocal(&setAttributeAsText);
 
         if (!setAttributeAsText.IsEmpty() && setAttributeAsText->IsFunction()) {
             auto setAttributeAsTextFunc = setAttributeAsText.As<v8::Function>();

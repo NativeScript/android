@@ -4,8 +4,8 @@ buildscript {
 
     def initialize = { ->
         def userDir = "${rootProject.projectDir}/../.."
-        apply from: "$rootDir/user_properties_reader.gradle"
-        apply from: "$rootDir/paths.gradle"
+        apply from: "$rootDir/gradle-helpers/user_properties_reader.gradle"
+        apply from: "$rootDir/gradle-helpers/paths.gradle"
         rootProject.ext.userDefinedGradleProperties = getUserProperties("${getAppResourcesPath(userDir)}/Android")
     }
     initialize()
@@ -19,7 +19,7 @@ buildscript {
         jcenter()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:3.5.0'
+        classpath 'com.android.tools.build:gradle:3.5.1'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
     }
 }

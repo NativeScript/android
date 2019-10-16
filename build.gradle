@@ -287,12 +287,24 @@ task copyFilesToProjectTemeplate {
             into "$DIST_FRAMEWORK_PATH"
         }
         copy {
-            from "$TEST_APP_PATH/paths.gradle"
-            into "$DIST_FRAMEWORK_PATH"
+            from "$TEST_APP_PATH/gradle-helpers/paths.gradle"
+            into "$DIST_FRAMEWORK_PATH/gradle-helpers"
         }
         copy {
-            from "$TEST_APP_PATH/user_properties_reader.gradle"
-            into "$DIST_FRAMEWORK_PATH"
+            from "$TEST_APP_PATH/gradle-helpers/user_properties_reader.gradle"
+            into "$DIST_FRAMEWORK_PATH/gradle-helpers"
+        }
+        copy {
+            from "$TEST_APP_PATH/app/gradle-helpers/CustomExecutionLogger.gradle"
+            into "$DIST_FRAMEWORK_PATH/app/gradle-helpers"
+        }
+        copy {
+            from "$TEST_APP_PATH/app/gradle-helpers/AnalyticsCollector.gradle"
+            into "$DIST_FRAMEWORK_PATH/app/gradle-helpers"
+        }
+        copy {
+            from "$TEST_APP_PATH/app/gradle-helpers/BuildToolTask.gradle"
+            into "$DIST_FRAMEWORK_PATH/app/gradle-helpers"
         }
         copy {
             from "$TEST_APP_PATH/gradle"

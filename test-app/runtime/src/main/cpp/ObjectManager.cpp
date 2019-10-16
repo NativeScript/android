@@ -610,7 +610,8 @@ void ObjectManager::MarkReachableObjects(Isolate *isolate, const Local<Object> &
                         NativeScriptExtension::ReleaseClosureObjects(setterClosureObjects);
                     }
                 } else {
-                    auto prop = o->Get(propertyName);
+                    Local<Value> prop;
+                    o->Get(context, propertyName).ToLocal(&prop);
 
                     if (!prop.IsEmpty() && prop->IsObject()) {
                         s.push(prop);
@@ -632,8 +633,10 @@ void ObjectManager::MarkReachableArrayElements(Local<Object> &o, stack<Local<Val
     auto arr = o.As<Array>();
 
     int arrEnclosedObjectsLength = arr->Length();
+    auto context = o->CreationContext();
     for (int i = 0; i < arrEnclosedObjectsLength; i++) {
-        auto enclosedElement = arr->Get(i);
+        Local<Value> enclosedElement;
+        arr->Get(context, i).ToLocal(&enclosedElement);
 
         if (!enclosedElement.IsEmpty() && enclosedElement->IsObject()) {
             s.push(enclosedElement);
@@ -900,4 +903,8 @@ void ObjectManager::ReleaseNativeCounterpart(v8::Local<v8::Object> &object) {
     delete jsInstanceInfo;
     auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
     object->SetInternalField(jsInfoIdx, Undefined(m_isolate));
+}
+
+ObjectManager::JavaScriptMarkingMode ObjectManager::GetMarkingMode() {
+    return this->m_markingMode;
 }

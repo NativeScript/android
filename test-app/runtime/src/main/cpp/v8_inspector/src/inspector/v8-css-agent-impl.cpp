@@ -137,7 +137,7 @@ DispatchResponse V8CSSAgentImpl::getInlineStylesForNode(int in_nodeId, Maybe<pro
 }
 
 DispatchResponse V8CSSAgentImpl::getComputedStyleForNode(int in_nodeId, std::unique_ptr<protocol::Array<protocol::CSS::CSSComputedStyleProperty>>* out_computedStyle) {
-    auto computedStylePropertyArr = protocol::Array<protocol::CSS::CSSComputedStyleProperty>::create();
+    auto computedStylePropertyArr = std::make_unique<protocol::Array<protocol::CSS::CSSComputedStyleProperty>>();
 
     std::string getComputedStylesForNodeString = "getComputedStylesForNode";
     // TODO: Pete: Find a better way to get a hold of the isolate
@@ -148,7 +148,8 @@ DispatchResponse V8CSSAgentImpl::getComputedStyleForNode(int in_nodeId, std::uni
     auto globalInspectorObject = utils::Common::getGlobalInspectorObject(isolate);
 
     if (!globalInspectorObject.IsEmpty()) {
-        auto getComputedStylesForNode = globalInspectorObject->Get(ArgConverter::ConvertToV8String(isolate, getComputedStylesForNodeString));
+        v8::Local<v8::Value> getComputedStylesForNode;
+        globalInspectorObject->Get(context, ArgConverter::ConvertToV8String(isolate, getComputedStylesForNodeString)).ToLocal(&getComputedStylesForNode);
 
         if (!getComputedStylesForNode.IsEmpty() && getComputedStylesForNode->IsFunction()) {
             auto getComputedStylesForNodeFunc = getComputedStylesForNode.As<v8::Function>();
@@ -171,7 +172,7 @@ DispatchResponse V8CSSAgentImpl::getComputedStyleForNode(int in_nodeId, std::uni
                 auto resultJson = protocol::StringUtil::parseJSON(resultCStr);
 
                 protocol::ErrorSupport errorSupport;
-                auto computedStyles = protocol::Array<protocol::CSS::CSSComputedStyleProperty>::fromValue(
+                auto computedStyles = utils::Common::fromValue<protocol::CSS::CSSComputedStyleProperty>(
                                           resultJson.get(), &errorSupport);
 
                 auto errorSupportString = errorSupport.errors().utf8();
@@ -194,9 +195,9 @@ DispatchResponse V8CSSAgentImpl::getComputedStyleForNode(int in_nodeId, std::uni
 }
 
 DispatchResponse V8CSSAgentImpl::getPlatformFontsForNode(int in_nodeId, std::unique_ptr<protocol::Array<protocol::CSS::PlatformFontUsage>>* out_fonts) {
-    auto fontsArr = protocol::Array<protocol::CSS::PlatformFontUsage>::create();
+    auto fontsArr = std::make_unique<protocol::Array<protocol::CSS::PlatformFontUsage>>();
     auto defaultFont = "System Font";
-    fontsArr->addItem(std::move(protocol::CSS::PlatformFontUsage::create()
+    fontsArr->emplace_back(std::move(protocol::CSS::PlatformFontUsage::create()
                                 .setFamilyName(defaultFont)
                                 .setGlyphCount(1)
                                 .setIsCustomFont(false)

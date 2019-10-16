@@ -7,6 +7,7 @@ import com.android.dex.Dex;
 import com.android.dex.MethodId;
 import com.android.dex.ProtoId;
 import com.android.dx.rop.code.AccessFlags;
+import com.telerik.metadata.desc.ClassDescriptor;
 import com.telerik.metadata.desc.MetadataInfoAnnotationDescriptor;
 import com.telerik.metadata.desc.MethodDescriptor;
 import com.telerik.metadata.desc.TypeDescriptor;
@@ -46,6 +47,11 @@ public class MethodInfo implements MethodDescriptor {
     @Override
     public boolean isAbstract() {
         return AccessFlags.isAbstract(method.getAccessFlags());
+    }
+
+    @Override
+    public ClassDescriptor getDeclaringClass() {
+        return null;
     }
 
     @Override

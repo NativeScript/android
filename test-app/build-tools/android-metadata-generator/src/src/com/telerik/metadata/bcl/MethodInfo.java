@@ -1,5 +1,6 @@
 package com.telerik.metadata.bcl;
 
+import com.telerik.metadata.desc.ClassDescriptor;
 import com.telerik.metadata.desc.MetadataInfoAnnotationDescriptor;
 import com.telerik.metadata.desc.MethodDescriptor;
 import com.telerik.metadata.desc.TypeDescriptor;
@@ -7,10 +8,13 @@ import org.apache.bcel.classfile.Method;
 import org.apache.bcel.generic.Type;
 
 public class MethodInfo implements MethodDescriptor {
-    private final Method m;
 
-    public MethodInfo(Method m) {
+    private final Method m;
+    private final ClassDescriptor classDescriptor;
+
+    public MethodInfo(Method m, ClassDescriptor classDescriptor) {
         this.m = m;
+        this.classDescriptor = classDescriptor;
     }
 
     @Override
@@ -36,6 +40,11 @@ public class MethodInfo implements MethodDescriptor {
     @Override
     public boolean isAbstract() {
         return m.isAbstract();
+    }
+
+    @Override
+    public ClassDescriptor getDeclaringClass() {
+        return classDescriptor;
     }
 
     @Override

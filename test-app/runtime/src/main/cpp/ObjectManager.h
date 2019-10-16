@@ -77,6 +77,7 @@ class ObjectManager {
             None
         };
 
+        JavaScriptMarkingMode GetMarkingMode();
 
     private:
 

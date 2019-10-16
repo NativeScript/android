@@ -72,7 +72,7 @@ DispatchResponse V8PageAgentImpl::getResourceTree(std::unique_ptr<protocol::Page
             .setUrl(m_frameUrl.c_str())
             .build();
 
-    auto subresources = protocol::Array<protocol::Page::FrameResource>::create();
+    auto subresources = std::make_unique<protocol::Array<protocol::Page::FrameResource>>();
 
     auto resources = v8_inspector::utils::PageResource::getPageResources();
 
@@ -84,7 +84,7 @@ DispatchResponse V8PageAgentImpl::getResourceTree(std::unique_ptr<protocol::Page
                 .setMimeType(pageResource.getMimeType())
                 .build();
 
-        subresources->addItem(std::move(frameResource));
+        subresources->emplace_back(std::move(frameResource));
     }
 
     *out_frameTree = protocol::Page::FrameResourceTree::create()
@@ -140,7 +140,7 @@ void V8PageAgentImpl::searchInResource(const String& in_frameId, const String& i
         cachedPageResources = utils::PageResource::getPageResources();
     }
 
-    auto result = protocol::Array<protocol::Debugger::SearchMatch>::create();
+    auto result = std::make_unique<protocol::Array<protocol::Debugger::SearchMatch>>();
 
     auto it = cachedPageResources.find(in_url.utf8());
     if (it == cachedPageResources.end()) {
@@ -154,7 +154,7 @@ void V8PageAgentImpl::searchInResource(const String& in_frameId, const String& i
     if (errorString->isEmpty()) {
         auto matches = v8_inspector::utils::ResourceContentSearchUtils::searchInTextByLinesImpl(m_session, content, in_query, isCaseSensitive, isRegex);
         for (auto& match : matches) {
-            result->addItem(std::move(match));
+            result->emplace_back(std::move(match));
         }
 
         callback->sendSuccess(std::move(result));

@@ -404,9 +404,10 @@ public class Generator {
     private void writeConstructorsToWriter(Writer writer, JavaClass clazz, DataRow dataRow, String generatedClassName, GenericHierarchyView genericHierarchyView) {
         boolean isApplicationClass = androidClassChecker.isApplicationClass(clazz);
         boolean isServiceClass = androidClassChecker.isServiceClass(clazz);
+        boolean isAndroidWorkerClass = androidClassChecker.isAndroidWorkerClass(clazz);
 
         MethodSignatureReifier methodSignatureReifier = new MethodSignatureReifier(genericHierarchyView);
-        MethodsWriter methodsWriter = new MethodsWriterImpl(writer, suppressCallJSMethodExceptions, isApplicationClass, isServiceClass);
+        MethodsWriter methodsWriter = new MethodsWriterImpl(writer, suppressCallJSMethodExceptions, isApplicationClass, isServiceClass, isAndroidWorkerClass);
         ImplementationObjectChecker implementationObjectChecker = new ImplementationObjectCheckerImpl();
 
         List<String> implObjectMethods = Arrays.asList(dataRow.getMethods());
@@ -425,8 +426,9 @@ public class Generator {
     private void writeMethodsToWriter(Writer writer, GenericHierarchyView genericHierarchyView, Map<JavaClass, GenericHierarchyView> interfaceGenericHierarchyViews, JavaClass clazz, List<String> userImplementedMethods, List<JavaClass> userImplementedInterfaces, String packageName) {
         boolean isApplicationClass = androidClassChecker.isApplicationClass(clazz);
         boolean isServiceClass = androidClassChecker.isServiceClass(clazz);
+        boolean isAndroidWorkerClass = androidClassChecker.isAndroidWorkerClass(clazz);
 
-        MethodsWriter methodsWriter = new MethodsWriterImpl(writer, suppressCallJSMethodExceptions, isApplicationClass, isServiceClass);
+        MethodsWriter methodsWriter = new MethodsWriterImpl(writer, suppressCallJSMethodExceptions, isApplicationClass, isServiceClass, isAndroidWorkerClass);
 
         InheritedMethodsCollector inheritedMethodsCollector = new InheritedMethodsCollectorImpl.Builder()
                 .forJavaClass(clazz)

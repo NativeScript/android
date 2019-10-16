@@ -199,6 +199,20 @@ MetadataEntry MetadataReader::ReadStaticMethodEntry(uint8_t** data) {
     return entry;
 }
 
+MetadataEntry MetadataReader::ReadExtensionFunctionEntry(uint8_t** data) {
+    MetadataEntry entry;
+    MethodInfo smip(*data, this); //static method info pointer
+
+    FillEntryWithMethodInfo(smip, entry);
+    entry.isStatic = true;
+    entry.declaringType = smip.GetDeclaringType();
+    entry.isExtensionFunction = true;
+
+    *data += smip.GetSizeOfReadMethodInfo();
+
+    return entry;
+}
+
 string MetadataReader::ReadInterfaceImplementationTypeName(MetadataTreeNode* treeNode, bool& isPrefix) {
     uint8_t* data = m_valueData + treeNode->offsetValue + sizeof(uint8_t) + sizeof(uint16_t);
 

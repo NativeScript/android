@@ -17,7 +17,7 @@ buildscript {
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle:3.5.0'
+        classpath 'com.android.tools.build:gradle:3.5.1'
     }
 }
 
@@ -43,6 +43,7 @@ repositories {
 
 dependencies {
     compile 'org.apache.bcel:bcel:6.2'
+    compile 'com.google.code.gson:gson:2.8.5'
     compile group: 'org.jetbrains.kotlinx', name: 'kotlinx-metadata-jvm', version: '0.1.0'
     compile files("./src/libs/dx.jar")
 }

@@ -28,8 +28,12 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Queue;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class Runtime {
@@ -54,7 +58,7 @@ public class Runtime {
 
     private native void unlock(int runtimeId);
 
-    private native void passExceptionToJsNative(int runtimeId, Throwable ex, String message, String stackTrace, boolean isDiscarded);
+    private native void passExceptionToJsNative(int runtimeId, Throwable ex, String message, String fullStackTrace, String jsStackTrace, boolean isDiscarded);
 
     private native void clearStartupData(int runtimeId);
 
@@ -74,15 +78,15 @@ public class Runtime {
 
     private static native void ResetDateTimeConfigurationCache(int runtimeId);
 
-    void passUncaughtExceptionToJs(Throwable ex, String message, String stackTrace) {
-        passExceptionToJsNative(getRuntimeId(), ex, message, stackTrace, false);
+    void passUncaughtExceptionToJs(Throwable ex, String message, String fullStackTrace, String jsStackTrace) {
+        passExceptionToJsNative(getRuntimeId(), ex, message, fullStackTrace, jsStackTrace, false);
     }
 
     void passDiscardedExceptionToJs(Throwable ex, String prefix) {
         //String message = prefix + ex.getMessage();
         // we'd better not prefix the error with something like - Error on "main" thread for reportSupressedException
         // as it doesn't seem very useful for the users
-        passExceptionToJsNative(getRuntimeId(), ex, ex.getMessage(), Runtime.getStackTraceErrorMessage(ex), true);
+        passExceptionToJsNative(getRuntimeId(), ex, ex.getMessage(), Runtime.getStackTraceErrorMessage(ex), Runtime.getJSStackTrace(ex), true);
     }
 
     public static void passSuppressedExceptionToJs(Throwable ex, String methodName) {
@@ -270,6 +274,14 @@ public class Runtime {
         return result;
     }
 
+    public static String getJSStackTrace(Throwable ex) {
+        if (ex instanceof NativeScriptException) {
+            return ((NativeScriptException) ex).getIncomingStackTrace();
+        } else {
+            return null;
+        }
+    }
+
     public static String getStackTraceErrorMessage(Throwable ex) {
         String content;
         java.io.PrintStream ps = null;
@@ -280,10 +292,11 @@ public class Runtime {
             ex.printStackTrace(ps);
 
             try {
-                content = baos.toString("US-ASCII");
-                if (ex instanceof NativeScriptException) {
+                content = baos.toString("UTF-8");
+                String jsStackTrace = Runtime.getJSStackTrace(ex);
+                if (jsStackTrace != null) {
                     content = getStackTraceOnly(content);
-                    content = ((NativeScriptException) ex).getIncomingStackTrace() + content;
+                    content = jsStackTrace + content;
                 }
             } catch (java.io.UnsupportedEncodingException e) {
                 content = e.getMessage();
@@ -551,7 +564,6 @@ public class Runtime {
         WorkThreadScheduler mainThreadScheduler = new WorkThreadScheduler(new MainThreadHandler(Looper.myLooper()));
         DynamicConfiguration dynamicConfiguration = new DynamicConfiguration(0, mainThreadScheduler, null);
         Runtime runtime = initRuntime(dynamicConfiguration);
-
         return runtime;
     }
 
@@ -735,6 +747,37 @@ public class Runtime {
 
     public void unlock() {
         unlock(runtimeId);
+    }
+
+    public static void initInstanceFromPossibleNonMainThread(final Object instance) {
+        if (isNotOnMainThread()) {
+            Runnable runnable = new Runnable() {
+                @Override
+                public void run() {
+                    initInstance(instance);
+                }
+            };
+
+            RunnableFuture<Void> task = new FutureTask<>(runnable, null);
+            getMainThreadHandler().post(task);
+
+            try {
+                task.get(); // this will block until Runnable completes
+            } catch (InterruptedException | ExecutionException e) {
+                throw new RuntimeException(e);
+            }
+
+        } else {
+            initInstance(instance);
+        }
+    }
+
+    private static Handler getMainThreadHandler() {
+        return new Handler(Looper.getMainLooper());
+    }
+
+    private static boolean isNotOnMainThread() {
+        return Looper.myLooper() != Looper.getMainLooper();
     }
 
     public static void initInstance(Object instance) {
@@ -1049,24 +1092,58 @@ public class Runtime {
         return result;
     }
 
+    public static Object callJSMethodFromPossibleNonMainThread(Object javaObject, String methodName, Class<?> retType, Object... args) throws NativeScriptException {
+        return callJSMethodFromPossibleNonMainThread(javaObject, methodName, retType, false /* isConstructor */, args);
+    }
+
+    public static Object callJSMethodFromPossibleNonMainThread(Object javaObject, String methodName, Class<?> retType, boolean isConstructor, Object... args) throws NativeScriptException {
+        return callJSMethodFromPossibleNonMainThread(javaObject, methodName, retType, isConstructor, 0, args);
+    }
+
+    public static Object callJSMethodFromPossibleNonMainThread(Object javaObject, String methodName, boolean isConstructor, Object... args) throws NativeScriptException {
+        return callJSMethodFromPossibleNonMainThread(javaObject, methodName, void.class, isConstructor, 0, args);
+    }
+
+    public static Object callJSMethodFromPossibleNonMainThread(final Object javaObject, final String methodName, final Class<?> retType, final boolean isConstructor, final long delay, final Object... args) throws NativeScriptException {
+        if (isNotOnMainThread()) {
+            Callable<Object> callable = new Callable<Object>() {
+                @Override
+                public Object call() {
+                    return callJSMethod(javaObject, methodName, retType, isConstructor, delay, args);
+                }
+            };
+
+            RunnableFuture<Object> task = new FutureTask<>(callable);
+            getMainThreadHandler().post(task);
+
+            try {
+                return task.get(); // this will block until Runnable completes
+            } catch (InterruptedException | ExecutionException e) {
+                throw new RuntimeException(e);
+            }
+
+        } else {
+            return callJSMethod(javaObject, methodName, retType, isConstructor, delay, args);
+        }
+    }
+
+
     // sends args in pairs (typeID, value, null) except for objects where its
     // (typeid, javaObjectID, javaJNIClassPath)
     public static Object callJSMethod(Object javaObject, String methodName, Class<?> retType, Object... args) throws NativeScriptException {
         return callJSMethod(javaObject, methodName, retType, false /* isConstructor */, args);
     }
 
-    public static Object callJSMethodWithDelay(Object javaObject, String methodName, Class<?> retType, long delay, Object... args) throws NativeScriptException {
-        return callJSMethod(javaObject, methodName, retType, false /* isConstructor */, delay, args);
-    }
-
     public static Object callJSMethod(Object javaObject, String methodName, Class<?> retType, boolean isConstructor, Object... args) throws NativeScriptException {
-        Object ret = callJSMethod(javaObject, methodName, retType, isConstructor, 0, args);
-
-        return ret;
+        return callJSMethod(javaObject, methodName, retType, isConstructor, 0, args);
     }
 
     public static Object callJSMethod(Object javaObject, String methodName, boolean isConstructor, Object... args) throws NativeScriptException {
         return callJSMethod(javaObject, methodName, void.class, isConstructor, 0, args);
+    }
+
+    public static Object callJSMethodWithDelay(Object javaObject, String methodName, Class<?> retType, long delay, Object... args) throws NativeScriptException {
+        return callJSMethod(javaObject, methodName, retType, false /* isConstructor */, delay, args);
     }
 
     public static Object callJSMethod(Object javaObject, String methodName, Class<?> retType, boolean isConstructor, long delay, Object... args) throws NativeScriptException {
@@ -1278,7 +1355,7 @@ public class Runtime {
         try {
             clazz = classStorageService.retrieveClass(className);
             return clazz;
-        } catch (RuntimeException e){
+        } catch (RuntimeException e) {
             return null;
         }
     }

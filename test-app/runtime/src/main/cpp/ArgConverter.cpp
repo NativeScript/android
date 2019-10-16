@@ -47,7 +47,13 @@ void ArgConverter::NativeScriptLongValueOfFunctionCallback(const v8::FunctionCal
 void ArgConverter::NativeScriptLongToStringFunctionCallback(const v8::FunctionCallbackInfo<Value>& args) {
     try {
         auto isolate = args.GetIsolate();
-        args.GetReturnValue().Set(args.This()->Get(V8StringConstants::GetValue(isolate)));
+        auto context = isolate->GetCurrentContext();
+        Local<Value> result;
+        if (args.This()->Get(context, V8StringConstants::GetValue(isolate)).ToLocal(&result)) {
+            args.GetReturnValue().Set(result);
+        } else {
+            args.GetReturnValue().Set(v8::Undefined(isolate));
+        }
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -149,7 +155,8 @@ Local<Array> ArgConverter::ConvertJavaArgsToJsArgs(Isolate* isolate, jobjectArra
             break;
         }
 
-        arr->Set(i, jsArg);
+        auto context = isolate->GetCurrentContext();
+        arr->Set(context, i, jsArg);
     }
 
     return arr;
@@ -214,11 +221,12 @@ int64_t ArgConverter::ConvertToJavaLong(Isolate* isolate, const Local<Value>& va
 
     assert(!obj.IsEmpty());
 
-    auto valueProp = obj->Get(V8StringConstants::GetValue(isolate));
+    auto context = isolate->GetCurrentContext();
+    Local<Value> temp;
+    bool success = obj->Get(context, V8StringConstants::GetValue(isolate)).ToLocal(&temp);
+    assert(success && !temp.IsEmpty());
+    auto valueProp = temp.As<Object>();
 
-    assert(!valueProp.IsEmpty());
-
-    Local<Context> context = isolate->GetCurrentContext();
     string num = ConvertToString(valueProp->ToString(context).ToLocalChecked());
 
     int64_t longValue = atoll(num.c_str());
