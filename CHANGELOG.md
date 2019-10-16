@@ -4,6 +4,21 @@
 ## What's New
  - [Upgrade v8 to 7.7.299.11 (#1478)](https://github.com/NativeScript/android-runtime/issues/1478)
 
+6.1.2
+==
+
+## Bug Fixes
+
+- [UI freezes with tns-android 6.1.0 (Android only) (#1479)](https://github.com/NativeScript/android-runtime/issues/1479)
+
+6.1.1
+==
+
+## Bug Fixes
+
+- [When using kotlin sometimes the metadata is not existing in the result apk (#1476)](https://github.com/NativeScript/android-runtime/issues/1476)
+
+
 6.1.0
 ==
 
