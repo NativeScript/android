@@ -1,46 +1,46 @@
 package com.telerik.metadata.parsing;
 
 import com.telerik.metadata.ClassRepo;
-import com.telerik.metadata.desc.ClassDescriptor;
-import com.telerik.metadata.desc.MethodDescriptor;
+import com.telerik.metadata.parsing.classes.NativeClassDescriptor;
+import com.telerik.metadata.parsing.classes.NativeMethodDescriptor;
 
 import java.util.HashSet;
 import java.util.Set;
 
 public final class ClassParser {
 
-    private final ClassDescriptor clazz;
+    private final NativeClassDescriptor clazz;
 
-    private ClassParser(ClassDescriptor clazz) {
+    private ClassParser(NativeClassDescriptor clazz) {
         this.clazz = clazz;
     }
 
-    public static ClassParser forClassDescriptor(ClassDescriptor clazz) {
+    public static ClassParser forClassDescriptor(NativeClassDescriptor clazz) {
         return new ClassParser(clazz);
     }
 
-    public Set<MethodDescriptor> getAllDefaultMethodsFromImplementedInterfaces() {
-        return getAllDefaultMethodsFromImplementedInterfacesRecursively(clazz, new HashSet<MethodDescriptor>());
+    public Set<NativeMethodDescriptor> getAllDefaultMethodsFromImplementedInterfaces() {
+        return getAllDefaultMethodsFromImplementedInterfacesRecursively(clazz, new HashSet<NativeMethodDescriptor>());
     }
 
-    private HashSet<MethodDescriptor> getAllDefaultMethodsFromImplementedInterfacesRecursively(ClassDescriptor clazz, HashSet<MethodDescriptor> collectedDefaultMethods) {
+    private HashSet<NativeMethodDescriptor> getAllDefaultMethodsFromImplementedInterfacesRecursively(NativeClassDescriptor clazz, HashSet<NativeMethodDescriptor> collectedDefaultMethods) {
         String[] implementedInterfacesNames = clazz.getInterfaceNames();
 
         for (String implementedInterfaceName : implementedInterfacesNames) {
-            ClassDescriptor interfaceClass = ClassRepo.findClass(implementedInterfaceName);
+            NativeClassDescriptor interfaceClass = ClassRepo.findClass(implementedInterfaceName);
 
             if (interfaceClass == null) {
                 System.out.println(String.format("WARNING: Skipping interface %s implemented in %s as it cannot be resolved", implementedInterfaceName, clazz.getClassName()));
                 continue;
             }
 
-            for (MethodDescriptor md : interfaceClass.getMethods()) {
+            for (NativeMethodDescriptor md : interfaceClass.getMethods()) {
                 if (!md.isStatic() && !md.isAbstract()) {
                     collectedDefaultMethods.add(md);
                 }
             }
 
-            collectedDefaultMethods.addAll(getAllDefaultMethodsFromImplementedInterfacesRecursively(interfaceClass, new HashSet<MethodDescriptor>()));
+            collectedDefaultMethods.addAll(getAllDefaultMethodsFromImplementedInterfacesRecursively(interfaceClass, new HashSet<NativeMethodDescriptor>()));
         }
 
         return collectedDefaultMethods;

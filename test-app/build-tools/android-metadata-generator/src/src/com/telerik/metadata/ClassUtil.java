@@ -1,29 +1,27 @@
 package com.telerik.metadata;
 
-import com.telerik.metadata.desc.ClassDescriptor;
-import com.telerik.metadata.desc.MethodDescriptor;
-import com.telerik.metadata.desc.TypeDescriptor;
+import com.telerik.metadata.parsing.classes.NativeClassDescriptor;
+import com.telerik.metadata.parsing.classes.NativeMethodDescriptor;
+import com.telerik.metadata.parsing.classes.NativeTypeDescriptor;
 
 import java.util.ArrayList;
-
-import org.apache.bcel.generic.Type;
 
 public class ClassUtil {
     private ClassUtil() {
     }
 
-    public static boolean isPrimitive(ClassDescriptor clazz) {
+    public static boolean isPrimitive(NativeClassDescriptor clazz) {
         boolean isPrimitive = !clazz.isClass() && !clazz.isEnum()
                               && !clazz.isInterface();
         return isPrimitive;
     }
 
-    public static boolean isPrimitive(TypeDescriptor type) {
-        boolean isPrimitive = type.equals(TypeDescriptor.BOOLEAN)
-                              || type.equals(TypeDescriptor.CHAR) || type.equals(TypeDescriptor.BYTE)
-                              || type.equals(TypeDescriptor.SHORT) || type.equals(TypeDescriptor.INT)
-                              || type.equals(TypeDescriptor.LONG) || type.equals(TypeDescriptor.FLOAT)
-                              || type.equals(TypeDescriptor.DOUBLE) || type.equals(TypeDescriptor.VOID);
+    public static boolean isPrimitive(NativeTypeDescriptor type) {
+        boolean isPrimitive = type.equals(NativeTypeDescriptor.Companion.getBOOLEAN())
+                              || type.equals(NativeTypeDescriptor.Companion.getCHAR()) || type.equals(NativeTypeDescriptor.Companion.getBYTE())
+                              || type.equals(NativeTypeDescriptor.Companion.getSHORT()) || type.equals(NativeTypeDescriptor.Companion.getINT())
+                              || type.equals(NativeTypeDescriptor.Companion.getLONG()) || type.equals(NativeTypeDescriptor.Companion.getFLOAT())
+                              || type.equals(NativeTypeDescriptor.Companion.getDOUBLE()) || type.equals(NativeTypeDescriptor.Companion.getVOID());
 
         return isPrimitive;
     }
@@ -36,7 +34,7 @@ public class ClassUtil {
         return isPrimitive;
     }
 
-    public static boolean isArray(ClassDescriptor clazz) {
+    public static boolean isArray(NativeClassDescriptor clazz) {
         boolean isArray = isArray(clazz.getClassName());
         return isArray;
     }
@@ -46,8 +44,8 @@ public class ClassUtil {
         return isArray;
     }
 
-    public static ClassDescriptor getEnclosingClass(ClassDescriptor clazz) {
-        ClassDescriptor enclosingClass = null;
+    public static NativeClassDescriptor getEnclosingClass(NativeClassDescriptor clazz) {
+        NativeClassDescriptor enclosingClass = null;
 
         String className = clazz.getClassName();
         int idx = className.lastIndexOf("$");
@@ -59,7 +57,7 @@ public class ClassUtil {
         return enclosingClass;
     }
 
-    public static String getSimpleName(ClassDescriptor clazz) {
+    public static String getSimpleName(NativeClassDescriptor clazz) {
         String className = clazz.getClassName();
         int idx = className.lastIndexOf("$");
         if (idx < 0) {
@@ -69,19 +67,19 @@ public class ClassUtil {
         return simpleName;
     }
 
-    public static MethodDescriptor[] getAllMethods(ClassDescriptor clazz) {
-        ArrayList<MethodDescriptor> methods = new ArrayList<MethodDescriptor>();
-        ClassDescriptor currentClass = clazz;
+    public static NativeMethodDescriptor[] getAllMethods(NativeClassDescriptor clazz) {
+        ArrayList<NativeMethodDescriptor> methods = new ArrayList<NativeMethodDescriptor>();
+        NativeClassDescriptor currentClass = clazz;
         while (currentClass != null) {
-            MethodDescriptor[] currentClassMethods = currentClass.getMethods();
-            for (MethodDescriptor m : currentClassMethods) {
+            NativeMethodDescriptor[] currentClassMethods = currentClass.getMethods();
+            for (NativeMethodDescriptor m : currentClassMethods) {
                 if ((m.isPublic() || m.isProtected()) && !m.isSynthetic()) {
                     methods.add(m);
                 }
             }
             currentClass = getSuperclass(currentClass);
         }
-        return methods.toArray(new MethodDescriptor[0]);
+        return methods.toArray(new NativeMethodDescriptor[0]);
     }
 
     public static String getCanonicalName(String className) {
@@ -95,8 +93,8 @@ public class ClassUtil {
         return canonicalName;
     }
 
-    public static ClassDescriptor getSuperclass(ClassDescriptor clazz) {
-        ClassDescriptor superClass = null;
+    public static NativeClassDescriptor getSuperclass(NativeClassDescriptor clazz) {
+        NativeClassDescriptor superClass = null;
         if (!clazz.getClassName().equals("java.lang.Object")) {
             String superClassName = clazz.getSuperclassName();
             superClass = ClassRepo.findClass(superClassName);
@@ -104,8 +102,8 @@ public class ClassUtil {
         return superClass;
     }
 
-    public static ClassDescriptor getClassByName(String className) {
-        ClassDescriptor clazz = ClassRepo.findClass(className);
+    public static NativeClassDescriptor getClassByName(String className) {
+        NativeClassDescriptor clazz = ClassRepo.findClass(className);
         return clazz;
     }
 

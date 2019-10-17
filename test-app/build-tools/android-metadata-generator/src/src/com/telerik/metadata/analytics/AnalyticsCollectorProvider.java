@@ -1,7 +1,7 @@
 package com.telerik.metadata.analytics;
 
-import com.telerik.metadata.analytics.impl.EnabledAnalyticsCollectorImpl;
-import com.telerik.metadata.analytics.impl.NoOpAnalyticsCollector;
+import com.telerik.metadata.analytics.enabled.DefaultAnalyticsCollector;
+import com.telerik.metadata.analytics.disabled.NoOpAnalyticsCollector;
 
 public class AnalyticsCollectorProvider {
     private static final AnalyticsCollectorProvider ourInstance = new AnalyticsCollectorProvider();
@@ -16,7 +16,7 @@ public class AnalyticsCollectorProvider {
     public AnalyticsCollector provideAnalyticsCollector() {
         if (AnalyticsConfiguration.areAnalyticsEnabled()) {
             String analyticsFilePath = AnalyticsConfiguration.getAnalyticsFilePath();
-            return new EnabledAnalyticsCollectorImpl(analyticsFilePath);
+            return new DefaultAnalyticsCollector(analyticsFilePath);
         } else {
             return new NoOpAnalyticsCollector();
         }

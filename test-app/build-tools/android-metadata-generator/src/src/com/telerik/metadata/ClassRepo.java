@@ -1,6 +1,6 @@
 package com.telerik.metadata;
 
-import com.telerik.metadata.desc.ClassDescriptor;
+import com.telerik.metadata.parsing.classes.NativeClassDescriptor;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -15,8 +15,8 @@ public class ClassRepo {
         cachedProviders.add(classMapProvider);
     }
 
-    public static ClassDescriptor findClass(String className) {
-        ClassDescriptor clazz = null;
+    public static NativeClassDescriptor findClass(String className) {
+        NativeClassDescriptor clazz = null;
         for (ClassMapProvider classMapProvider : cachedProviders) {
             clazz = classMapProvider.getClassMap().get(className);
             if (clazz != null) {

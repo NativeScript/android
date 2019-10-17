@@ -2,22 +2,21 @@ package com.telerik.metadata;
 
 import com.telerik.metadata.TreeNode.FieldInfo;
 import com.telerik.metadata.TreeNode.MethodInfo;
-import com.telerik.metadata.bcl.JarFile;
-import com.telerik.metadata.desc.ClassDescriptor;
-import com.telerik.metadata.desc.FieldDescriptor;
-import com.telerik.metadata.desc.MetadataInfoAnnotationDescriptor;
-import com.telerik.metadata.desc.MethodDescriptor;
-import com.telerik.metadata.desc.PropertyDescriptor;
-import com.telerik.metadata.desc.TypeDescriptor;
-import com.telerik.metadata.dx.DexFile;
-import com.telerik.metadata.kotlin.classes.KotlinClassMetadataParser;
-import com.telerik.metadata.kotlin.classes.impl.KotlinClassMetadataParserImpl;
-import com.telerik.metadata.kotlin.functions.ClassNameAndExtensionFunctionPair;
-import com.telerik.metadata.kotlin.functions.ExtensionFunctionsCollector;
-import com.telerik.metadata.kotlin.functions.ExtensionFunctionsStorage;
-import com.telerik.metadata.kotlin.functions.impl.ExtensionFunctionsCollectorImpl;
-import com.telerik.metadata.kotlin.functions.impl.ExtensionFunctionsStorageImpl;
-import com.telerik.metadata.nodes.cache.NodesCacheImpl;
+import com.telerik.metadata.parsing.classes.bytecode.JarFile;
+import com.telerik.metadata.parsing.classes.NativeClassDescriptor;
+import com.telerik.metadata.parsing.classes.NativeFieldDescriptor;
+import com.telerik.metadata.parsing.classes.MetadataInfoAnnotationDescriptor;
+import com.telerik.metadata.parsing.classes.NativeMethodDescriptor;
+import com.telerik.metadata.parsing.classes.kotlin.extensions.KotlinExtensionFunctionDescriptor;
+import com.telerik.metadata.parsing.classes.kotlin.properties.KotlinPropertyDescriptor;
+import com.telerik.metadata.parsing.classes.NativeTypeDescriptor;
+import com.telerik.metadata.parsing.classes.kotlin.metadata.ClassMetadataParser;
+import com.telerik.metadata.parsing.classes.kotlin.metadata.bytecode.BytecodeClassMetadataParser;
+import com.telerik.metadata.parsing.classes.kotlin.extensions.ClassNameAndFunctionPair;
+import com.telerik.metadata.parsing.classes.kotlin.extensions.ExtensionFunctionsCollector;
+import com.telerik.metadata.storage.functions.FunctionsStorage;
+import com.telerik.metadata.parsing.classes.kotlin.extensions.bytecode.BytecodeExtensionFunctionsCollector;
+import com.telerik.metadata.storage.functions.extensions.ExtensionFunctionsStorage;
 import com.telerik.metadata.parsing.ClassParser;
 
 import java.io.File;
@@ -33,16 +32,16 @@ import java.util.Map;
 import java.util.Set;
 
 public class Builder {
-    private static class MethodNameComparator implements Comparator<MethodDescriptor> {
+    private static class MethodNameComparator implements Comparator<NativeMethodDescriptor> {
         @Override
-        public int compare(MethodDescriptor o1, MethodDescriptor o2) {
+        public int compare(NativeMethodDescriptor o1, NativeMethodDescriptor o2) {
             return o1.getName().compareTo(o2.getName());
         }
     }
 
     private static MethodNameComparator methodNameComparator = new MethodNameComparator();
 
-    public static TreeNode build(List<String> paths) throws Exception {
+    static TreeNode build(List<String> paths) throws Exception {
         for (String path : paths) {
             File file = new File(path);
             if (file.exists()) {
@@ -50,9 +49,6 @@ public class Builder {
                     if (path.endsWith(".jar")) {
                         JarFile jar = JarFile.readJar(path);
                         ClassRepo.addToCache(jar);
-                    } else if (path.endsWith(".dex")) {
-                        DexFile dex = DexFile.readDex(path);
-                        ClassRepo.addToCache(dex);
                     }
                 } else if (file.isDirectory()) {
                     ClassDirectory dir = ClassDirectory.readDirectory(path);
@@ -67,7 +63,7 @@ public class Builder {
 
         for (String className : classNames) {
             try {
-                ClassDescriptor clazz = ClassRepo.findClass(className);
+                NativeClassDescriptor clazz = ClassRepo.findClass(className);
                 if (clazz == null) {
                     throw new ClassNotFoundException("Class " + className + " not found in the input android libraries.");
                 } else {
@@ -90,10 +86,13 @@ public class Builder {
                 // our class path API 17
                 // Class<?> clazz = Class.forName(className, false, loader);
 
-                ClassDescriptor clazz = ClassRepo.findClass(className);
+                NativeClassDescriptor clazz = ClassRepo.findClass(className);
                 if (clazz == null) {
                     throw new ClassNotFoundException("Class " + className + " not found in the input android libraries.");
                 } else {
+                    if(clazz.getClassName().contains("SomePublicClass")){
+                        System.out.println("asd");
+                    }
                     generate(clazz, root);
                 }
             } catch (Throwable e) {
@@ -107,21 +106,21 @@ public class Builder {
         return root;
     }
 
-    private static void tryCollectKotlinExtensionFunctions(ClassDescriptor classDescriptor) {
-        ExtensionFunctionsCollector extensionFunctionsCollector = new ExtensionFunctionsCollectorImpl(new KotlinClassMetadataParserImpl());
-        Collection<ClassNameAndExtensionFunctionPair> extensionFunctions = extensionFunctionsCollector.collectExtensionFunctions(classDescriptor);
+    private static void tryCollectKotlinExtensionFunctions(NativeClassDescriptor classDescriptor) {
+        ExtensionFunctionsCollector extensionFunctionsCollector = new BytecodeExtensionFunctionsCollector(new BytecodeClassMetadataParser());
+        Collection<ClassNameAndFunctionPair<KotlinExtensionFunctionDescriptor>> extensionFunctions = extensionFunctionsCollector.collectExtensionFunctions(classDescriptor);
 
         if (!extensionFunctions.isEmpty()) {
-            ExtensionFunctionsStorage extensionFunctionsStorage = ExtensionFunctionsStorageImpl.getInstance();
-            extensionFunctionsStorage.storeExtensionFunctions(extensionFunctions);
+            FunctionsStorage<KotlinExtensionFunctionDescriptor> extensionFunctionsStorage = ExtensionFunctionsStorage.getInstance();
+            extensionFunctionsStorage.storeFunctions(extensionFunctions);
         }
     }
 
-    private static Boolean isClassPublic(ClassDescriptor clazz) {
-        Boolean isPublic = true;
+    private static Boolean isClassPublic(NativeClassDescriptor clazz) {
+        boolean isPublic = true;
 
         try {
-            ClassDescriptor currClass = clazz;
+            NativeClassDescriptor currClass = clazz;
             while (currClass != null) {
                 if (!currClass.isPublic() && !currClass.isProtected()) {
                     isPublic = false;
@@ -137,7 +136,7 @@ public class Builder {
         return isPublic;
     }
 
-    private static void generate(ClassDescriptor clazz, TreeNode root) throws Exception {
+    private static void generate(NativeClassDescriptor clazz, TreeNode root) throws Exception {
         if (!isClassPublic(clazz)) {
             return;
         }
@@ -159,25 +158,25 @@ public class Builder {
         }
     }
 
-    private static void setNodeMembers(ClassDescriptor clazz, TreeNode node, TreeNode root, boolean hasClassMetadataInfo) throws Exception {
+    private static void setNodeMembers(NativeClassDescriptor clazz, TreeNode node, TreeNode root, boolean hasClassMetadataInfo) throws Exception {
         node.setWentThroughSettingMembers(true);
 
         Map<String, MethodInfo> existingMethods = new HashMap<>();
         for (MethodInfo mi : node.instanceMethods) {
             existingMethods.put(mi.name + mi.sig, mi);
         }
-        MethodDescriptor[] extensionFunctions = ExtensionFunctionsStorageImpl.getInstance().retrieveExtensionFunctions(clazz.getClassName()).toArray(new MethodDescriptor[0]);
-        MethodDescriptor[] nonExtensionFunctionMethods = ClassUtil.getAllMethods(clazz);
-        MethodDescriptor[] allMethods = concatenate(extensionFunctions, nonExtensionFunctionMethods);
+        NativeMethodDescriptor[] extensionFunctions = ExtensionFunctionsStorage.getInstance().retrieveFunctions(clazz.getClassName()).toArray(new NativeMethodDescriptor[0]);
+        NativeMethodDescriptor[] nonExtensionFunctionMethods = ClassUtil.getAllMethods(clazz);
+        NativeMethodDescriptor[] allMethods = concatenate(extensionFunctions, nonExtensionFunctionMethods);
 
-        MethodDescriptor[] classImplementedMethods = clazz.getMethods();
-        MethodDescriptor[] interfaceImplementedMethods = clazz.isClass() ? getDefaultMethodsFromImplementedInterfaces(clazz, classImplementedMethods) : new MethodDescriptor[0];
-        MethodDescriptor[] methods = concatenate(classImplementedMethods, interfaceImplementedMethods, extensionFunctions);
+        NativeMethodDescriptor[] classImplementedMethods = clazz.getMethods();
+        NativeMethodDescriptor[] interfaceImplementedMethods = clazz.isClass() ? getDefaultMethodsFromImplementedInterfaces(clazz, classImplementedMethods) : new NativeMethodDescriptor[0];
+        NativeMethodDescriptor[] methods = concatenate(classImplementedMethods, interfaceImplementedMethods, extensionFunctions);
         Arrays.sort(methods, methodNameComparator);
 
         setMethodsInfo(root, node, clazz, methods, allMethods, existingMethods, hasClassMetadataInfo);
 
-        FieldDescriptor[] fields = clazz.getFields();
+        NativeFieldDescriptor[] fields = clazz.getFields();
 
         setFieldInfo(clazz, node, root, fields, null);
 
@@ -187,10 +186,10 @@ public class Builder {
         getFieldsFromImplementedInterfaces(clazz, node, root, fields);
     }
 
-    private static void setMethodsInfo(TreeNode root, TreeNode node, ClassDescriptor clazz, MethodDescriptor[] ownMethodDescriptors, MethodDescriptor[] ownAndParentMethodDescriptors, Map<String, MethodInfo> existingNodeMethods, boolean hasClassMetadataInfo) throws Exception {
+    private static void setMethodsInfo(TreeNode root, TreeNode node, NativeClassDescriptor clazz, NativeMethodDescriptor[] ownMethodDescriptors, NativeMethodDescriptor[] ownAndParentMethodDescriptors, Map<String, MethodInfo> existingNodeMethods, boolean hasClassMetadataInfo) throws Exception {
 
 
-        for (MethodDescriptor m : ownMethodDescriptors) {
+        for (NativeMethodDescriptor m : ownMethodDescriptors) {
             if (m.isSynthetic()) {
                 continue;
             }
@@ -207,7 +206,7 @@ public class Builder {
 
                 MethodInfo mi = new MethodInfo(m);
                 int countUnique = 0;
-                for (MethodDescriptor m1 : ownAndParentMethodDescriptors) {
+                for (NativeMethodDescriptor m1 : ownAndParentMethodDescriptors) {
                     boolean m1IsStatic = m1.isStatic();
                     if (!m1.isSynthetic()
                             && (m1.isPublic() || m1.isProtected())
@@ -223,7 +222,7 @@ public class Builder {
                 mi.isResolved = countUnique == 1;
 
 
-                TypeDescriptor[] params = m.getArgumentTypes();
+                NativeTypeDescriptor[] params = m.getArgumentTypes();
                 mi.signature = getMethodSignature(root, m.getReturnType(),
                         params);
 
@@ -253,12 +252,12 @@ public class Builder {
 
     }
 
-    private static void setPropertiesInfo(TreeNode root, TreeNode node, PropertyDescriptor[] propertyDescriptors) throws Exception {
-        for (PropertyDescriptor propertyDescriptor : propertyDescriptors) {
+    private static void setPropertiesInfo(TreeNode root, TreeNode node, KotlinPropertyDescriptor[] propertyDescriptors) throws Exception {
+        for (KotlinPropertyDescriptor propertyDescriptor : propertyDescriptors) {
             String propertyName = propertyDescriptor.getName();
 
-            MethodDescriptor getterMethod = propertyDescriptor.getGetterMethod();
-            MethodDescriptor setterMethod = propertyDescriptor.getSetterMethod();
+            NativeMethodDescriptor getterMethod = propertyDescriptor.getGetterMethod();
+            NativeMethodDescriptor setterMethod = propertyDescriptor.getSetterMethod();
 
             MethodInfo getterMethodInfo = null;
             if (getterMethod != null) {
@@ -281,12 +280,12 @@ public class Builder {
 
     }
 
-    private static void setFieldInfo(ClassDescriptor clazz, TreeNode node, TreeNode root, FieldDescriptor[] fields, ClassDescriptor interfaceClass) throws Exception {
-        for (FieldDescriptor f : fields) {
+    private static void setFieldInfo(NativeClassDescriptor clazz, TreeNode node, TreeNode root, NativeFieldDescriptor[] fields, NativeClassDescriptor interfaceClass) throws Exception {
+        for (NativeFieldDescriptor f : fields) {
             if (f.isPublic() || f.isProtected()) {
                 FieldInfo fi = new FieldInfo(f.getName());
 
-                TypeDescriptor t = f.getType();
+                NativeTypeDescriptor t = f.getType();
                 boolean isPrimitive = ClassUtil.isPrimitive(t);
 
                 fi.valueType = isPrimitive ? TreeNode.getPrimitive(t) : getOrCreateNode(root, t);
@@ -307,11 +306,11 @@ public class Builder {
         }
     }
 
-    private static void getFieldsFromImplementedInterfaces(ClassDescriptor clazz, TreeNode node, TreeNode root, FieldDescriptor[] classFields) throws Exception {
-        FieldDescriptor[] fields = null;
-        List<FieldDescriptor> originalClassFields = Arrays.asList(classFields);
+    private static void getFieldsFromImplementedInterfaces(NativeClassDescriptor clazz, TreeNode node, TreeNode root, NativeFieldDescriptor[] classFields) throws Exception {
+        NativeFieldDescriptor[] fields;
+        List<NativeFieldDescriptor> originalClassFields = Arrays.asList(classFields);
 
-        ClassDescriptor interfaceClass = null;
+        NativeClassDescriptor interfaceClass;
         String[] implementedInterfacesNames = clazz.getInterfaceNames();
         if (implementedInterfacesNames.length > 0) {
             for (String currInterface : implementedInterfacesNames) {
@@ -324,7 +323,7 @@ public class Builder {
 
                     //if interface and implementing class declare the same static field name the class take precedence
                     if (originalClassFields.size() > 0) {
-                        for (FieldDescriptor f : fields) {
+                        for (NativeFieldDescriptor f : fields) {
                             if (originalClassFields.contains(f)) {
                                 return;
                             }
@@ -336,18 +335,18 @@ public class Builder {
         }
     }
 
-    private static MethodDescriptor[] getDefaultMethodsFromImplementedInterfaces(ClassDescriptor clazz, MethodDescriptor[] originalClassMethodDescriptors) {
+    private static NativeMethodDescriptor[] getDefaultMethodsFromImplementedInterfaces(NativeClassDescriptor clazz, NativeMethodDescriptor[] originalClassMethodDescriptors) {
         ClassParser parser = ClassParser.forClassDescriptor(clazz);
 
-        Set<MethodDescriptor> defaultMethods = parser.getAllDefaultMethodsFromImplementedInterfaces();
-        Set<MethodDescriptor> classMethods = new HashSet<MethodDescriptor>(Arrays.asList(originalClassMethodDescriptors));
+        Set<NativeMethodDescriptor> defaultMethods = parser.getAllDefaultMethodsFromImplementedInterfaces();
+        Set<NativeMethodDescriptor> classMethods = new HashSet<>(Arrays.asList(originalClassMethodDescriptors));
 
         defaultMethods.removeAll(classMethods);
 
-        return defaultMethods.toArray(new MethodDescriptor[0]);
+        return defaultMethods.toArray(new NativeMethodDescriptor[0]);
     }
 
-    private static TreeNode getOrCreateNode(TreeNode root, TypeDescriptor type)
+    private static TreeNode getOrCreateNode(TreeNode root, NativeTypeDescriptor type)
             throws Exception {
         TreeNode node;
 
@@ -357,7 +356,7 @@ public class Builder {
             node = createArrayNode(root, typeName);
         } else {
             String name = ClassUtil.getCanonicalName(type.getSignature());
-            ClassDescriptor clazz = ClassRepo.findClass(name);
+            NativeClassDescriptor clazz = ClassRepo.findClass(name);
 
             // if clazz is not found in the ClassRepo, the method/field being analyzed will be skipped
             if (clazz == null) {
@@ -370,7 +369,7 @@ public class Builder {
         return node;
     }
 
-    private static TreeNode getOrCreateNode(TreeNode root, ClassDescriptor clazz, String predefinedSuperClassname) throws Exception {
+    private static TreeNode getOrCreateNode(TreeNode root, NativeClassDescriptor clazz, String predefinedSuperClassname) throws Exception {
 
         if (ClassUtil.isPrimitive(clazz)) {
             return TreeNode.getPrimitive(clazz);
@@ -395,10 +394,10 @@ public class Builder {
             node = child;
         }
 
-        ClassDescriptor outer = ClassUtil.getEnclosingClass(clazz);
+        NativeClassDescriptor outer = ClassUtil.getEnclosingClass(clazz);
 
 
-        ArrayList<ClassDescriptor> outerClasses = new ArrayList<ClassDescriptor>();
+        ArrayList<NativeClassDescriptor> outerClasses = new ArrayList<>();
         while (outer != null) {
             if (!outer.isPublic()) {
                 return null;
@@ -445,7 +444,7 @@ public class Builder {
         }
         node = child;
         if (node.baseClassNode == null) {
-            ClassDescriptor baseClass = null;
+            NativeClassDescriptor baseClass = null;
             if (predefinedSuperClassname != null) {
                 baseClass = ClassUtil.getClassByName(predefinedSuperClassname);
             } else {
@@ -463,16 +462,15 @@ public class Builder {
             }
         }
 
-        NodesCacheImpl.getInstance().addNode(clazz.getClassName(), node);
         return node;
     }
 
-    private static boolean isNestedClassKotlinCompanionObject(ClassDescriptor outerClass, ClassDescriptor nestedClass) {
+    private static boolean isNestedClassKotlinCompanionObject(NativeClassDescriptor outerClass, NativeClassDescriptor nestedClass) {
         if (outerClass == null || nestedClass == null) {
             return false;
         }
 
-        KotlinClassMetadataParser kotlinClassMetadataParser = new KotlinClassMetadataParserImpl();
+        ClassMetadataParser kotlinClassMetadataParser = new BytecodeClassMetadataParser();
         return kotlinClassMetadataParser.wasKotlinCompanionObject(outerClass, nestedClass);
     }
 
@@ -502,7 +500,7 @@ public class Builder {
                 child.nodeType = node.nodeType;
                 child.arrayElement = node;
             } else {
-                ClassDescriptor clazz = ClassRepo.findClass(name);
+                NativeClassDescriptor clazz = ClassRepo.findClass(name);
                 child.nodeType = clazz.isInterface() ? TreeNode.Interface
                         : TreeNode.Class;
                 if (clazz.isStatic()) {
@@ -516,9 +514,9 @@ public class Builder {
     }
 
     private static ArrayList<TreeNode> getMethodSignature(TreeNode root,
-                                                          TypeDescriptor retType, TypeDescriptor[] params) throws Exception {
-        ArrayList<TreeNode> sig = new ArrayList<TreeNode>();
-        boolean isVoid = retType.equals(TypeDescriptor.VOID);
+                                                          NativeTypeDescriptor retType, NativeTypeDescriptor[] params) throws Exception {
+        ArrayList<TreeNode> sig = new ArrayList<>();
+        boolean isVoid = retType.equals(NativeTypeDescriptor.Companion.getVOID());
 
         TreeNode node = null;
         if (!isVoid) {
@@ -528,7 +526,7 @@ public class Builder {
         }
         sig.add(node);
 
-        for (TypeDescriptor param : params) {
+        for (NativeTypeDescriptor param : params) {
             boolean isPrimitive = ClassUtil.isPrimitive(param);
             node = isPrimitive ? TreeNode.getPrimitive(param)
                     : getOrCreateNode(root, param);
