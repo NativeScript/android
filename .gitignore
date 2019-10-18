@@ -18,6 +18,7 @@ bin/
 .project
 .DS_Store
 .settings
+thumbs.db
 
 .classpath
 android-runtime.iml
