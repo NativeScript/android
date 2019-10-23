@@ -39,12 +39,11 @@ public class NativeScriptException extends RuntimeException {
 
     @RuntimeCallable
     public static String getStackTraceAsString(Throwable ex) {
-        String errMessage;
+        String errMessage = "";
         try {
-            errMessage = ex.toString();
             for (StackTraceElement frame: ex.getStackTrace()) {
-                errMessage += "\n    ";
-                errMessage += frame;
+                errMessage += "\t";
+                errMessage += frame + "\n";
             }
 
             Throwable cause = ex.getCause();
@@ -56,5 +55,10 @@ public class NativeScriptException extends RuntimeException {
             errMessage = "Unknown error. Cannot get error message.";
         }
         return errMessage;
+    }
+
+    @RuntimeCallable
+    public static String getMessage(Throwable ex) {
+        return ex.toString();
     }
 }

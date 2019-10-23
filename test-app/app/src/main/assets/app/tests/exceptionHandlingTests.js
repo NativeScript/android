@@ -302,7 +302,7 @@ describe("Tests exception handling ", function () {
 	        errMsg = e.toString();
 	    }
 	    expect(exceptionCaught).toBe(true);
-	    expect(errMsg).toBe("Error: Unknown error. Cannot get error message.");
+	    expect(errMsg).toBe("Error: com.tns.tests.ExceptionHandlingTest$BadException");
 	});
 
 	it("should successfully catch syntax errors", function () {
@@ -320,18 +320,18 @@ describe("Tests exception handling ", function () {
 	    expect(errMsg).toContain("File: (file:///data/data/com.tns.testapplication/files/app/tests/syntaxErrors.js:3:4)");
 	});
 
-    // run this test only for API level bigger than 25 as we have handling there
-    if(android.os.Build.VERSION.SDK_INT > 25 && android.os.Build.CPU_ABI != "x86" && android.os.Build.CPU_ABI != "x86_64") {
-        it("Should handle SIGABRT and throw a NativeScript exception when incorrectly calling JNI methods", function () {
-            let myClassInstance = new com.tns.tests.MyTestBaseClass3();
-            // public void callMeWithAString(java.lang.String[] stringArr, Runnable arbitraryInterface)
-            try {
-                myClassInstance.callMeWithAString("stringVal", new java.lang.Runnable({ run: () => {} }))
-            } catch (e) {
-                android.util.Log.d("~~~~~", "~~~~~~~~ " + e.toString());
+   // run this test only for API level bigger than 25 as we have handling there
+   if(android.os.Build.VERSION.SDK_INT > 25 && android.os.Build.CPU_ABI != "x86" && android.os.Build.CPU_ABI != "x86_64") {
+       it("Should handle SIGABRT and throw a NativeScript exception when incorrectly calling JNI methods", function () {
+           let myClassInstance = new com.tns.tests.MyTestBaseClass3();
+           // public void callMeWithAString(java.lang.String[] stringArr, Runnable arbitraryInterface)
+           try {
+               myClassInstance.callMeWithAString("stringVal", new java.lang.Runnable({ run: () => {} }))
+           } catch (e) {
+               android.util.Log.d("~~~~~", "~~~~~~~~ " + e.toString());
 
-                expect(e.toString()).toContain("SIGABRT");
-            }
-        });
-    }
+               expect(e.toString()).toContain("SIGABRT");
+           }
+       });
+   }
 });

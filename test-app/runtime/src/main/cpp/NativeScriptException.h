@@ -52,9 +52,14 @@ class NativeScriptException {
         JniLocalRef TryGetJavaThrowableObject(JEnv& env, const v8::Local<v8::Object>& jsObj);
 
         /*
-         * Gets java exception stack message from jthrowable
+         * Gets java exception message from jthrowable
          */
         std::string GetExceptionMessage(JEnv& env, jthrowable exception);
+
+        /*
+         * Gets java exception stack trace from jthrowable
+         */
+        std::string GetExceptionStackTrace(JEnv& env, jthrowable exception);
 
         /*
          * Gets the member m_javaException, wraps it and creates a javascript error object from it
@@ -92,6 +97,7 @@ class NativeScriptException {
         static jclass NATIVESCRIPTEXCEPTION_CLASS;
         static jmethodID NATIVESCRIPTEXCEPTION_JSVALUE_CTOR_ID;
         static jmethodID NATIVESCRIPTEXCEPTION_THROWABLE_CTOR_ID;
+        static jmethodID NATIVESCRIPTEXCEPTION_GET_MESSAGE_METHOD_ID;
         static jmethodID NATIVESCRIPTEXCEPTION_GET_STACK_TRACE_AS_STRING_METHOD_ID;
 
         static void PrintErrorMessage(const std::string& errorMessage);
