@@ -1,1 +1,1 @@
-// empty file to avoid using settings.gradle file from test-app
+rootProject.name = "bindings-generator"

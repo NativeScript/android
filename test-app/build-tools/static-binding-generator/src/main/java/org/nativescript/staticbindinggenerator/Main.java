@@ -1,5 +1,9 @@
 package org.nativescript.staticbindinggenerator;
 
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.DefaultParser;
+import org.apache.commons.cli.Options;
 import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -18,11 +22,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Main {
-    public static final String SBG_INPUT_FILE = "sbg-input-file.txt";
-    public static final String SBG_OUTPUT_FILE = "sbg-output-file.txt";
-    public static final String SBG_BINDINGS_NAME = "sbg-bindings.txt";
-    public static final String SBG_JS_PARSED_FILES = "sbg-js-parsed-files.txt";
-    public static final String SBG_INTERFACE_NAMES = "sbg-interfaces-names.txt";
+    private static String SBG_INPUT_FILE = "sbg-input-file.txt";
+    private static String SBG_OUTPUT_FILE = "sbg-output-file.txt";
+    private static String SBG_BINDINGS_NAME = "sbg-bindings.txt";
+    private static String SBG_JS_PARSED_FILES = "sbg-js-parsed-files.txt";
+    static String SBG_INTERFACE_NAMES = "sbg-interfaces-names.txt";
+
+    private static boolean areFilePathsConfigured = false;
+
+    static String WORKING_DIRECTORY = null;
+
 
     private static String jsCodeAbsolutePath;
     private static List<String> inputJsFiles;
@@ -37,6 +46,16 @@ public class Main {
 
     public static void main(String[] args) {
         try {
+
+            Options options = new Options();
+            options.addOption("workDir", true, "The directory where the SBG input and output files are.");
+
+            CommandLineParser parser = new DefaultParser();
+            CommandLine cmd = parser.parse(options, args);
+
+            WORKING_DIRECTORY = cmd.getOptionValue("workDir");
+            configureFilePaths();
+
             InputParameters.parseCommand(args);
 
             validateInput();
@@ -49,7 +68,7 @@ public class Main {
             runJsParser();
 
             // generate java bindings
-            String inputBindingFilename = Paths.get(System.getProperty("user.dir"), SBG_BINDINGS_NAME).toString();
+            String inputBindingFilename = Paths.get(SBG_BINDINGS_NAME).toString();
             Generator generator = new Generator(outputDir, rows, isSuppressCallJSMethodExceptionsEnabled());
 
             generator.writeBindings(inputBindingFilename);
@@ -57,6 +76,20 @@ public class Main {
             System.err.println(String.format("Error executing Static Binding Generator: %s", ex.getMessage()));
             ex.printStackTrace(System.out);
             System.exit(1);
+        }
+    }
+
+    private static void configureFilePaths() {
+        if (!areFilePathsConfigured) {
+
+            SBG_INPUT_FILE = Paths.get(WORKING_DIRECTORY, SBG_INPUT_FILE).toString();
+            SBG_OUTPUT_FILE = Paths.get(WORKING_DIRECTORY, SBG_OUTPUT_FILE).toString();
+            SBG_BINDINGS_NAME = Paths.get(WORKING_DIRECTORY, SBG_BINDINGS_NAME).toString();
+            SBG_JS_PARSED_FILES = Paths.get(WORKING_DIRECTORY, SBG_JS_PARSED_FILES).toString();
+            SBG_INTERFACE_NAMES = Paths.get(WORKING_DIRECTORY, SBG_INTERFACE_NAMES).toString();
+            dependenciesFile = Paths.get(WORKING_DIRECTORY, "sbg-java-dependencies.txt").toString();
+
+            areFilePathsConfigured = true;
         }
     }
 
@@ -105,7 +138,6 @@ public class Main {
     }
 
     private static void validateInput() throws IOException {
-        dependenciesFile = "sbg-java-dependencies.txt";
         if (!(new File(dependenciesFile).exists())) {
             throw new IllegalArgumentException(String.format("Couldn't find input dependenciesFile file. Make sure the file %s is present.", dependenciesFile));
         }
@@ -132,7 +164,7 @@ public class Main {
      * This output file should contain all the information needed to generate java counterparts to the traversed js classes.
      * */
     private static void runJsParser() {
-        String parserPath = Paths.get(System.getProperty("user.dir"), "jsparser", "js_parser.js").toString();
+        String parserPath = Paths.get(WORKING_DIRECTORY, "jsparser", "js_parser.js").toString();
         NodeJSProcess nodeJSProcess = new NodeJSProcessImpl(new ProcessExecutorImpl(), new EnvironmentVariablesReaderImpl());
         int exitCode = nodeJSProcess.runScript(parserPath);
 

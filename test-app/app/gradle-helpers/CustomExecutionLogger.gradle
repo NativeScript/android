@@ -49,4 +49,4 @@ class CustomExecutionLogger extends BuildAdapter implements TaskExecutionListene
     }
 }
 
-gradle.useLogger(new CustomExecutionLogger(outLogger))
+//gradle.useLogger(new CustomExecutionLogger(outLogger))

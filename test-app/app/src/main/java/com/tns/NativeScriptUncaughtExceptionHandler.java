@@ -60,7 +60,7 @@ public class NativeScriptUncaughtExceptionHandler implements UncaughtExceptionHa
                 android.util.Log.v("Error", errorMessage);
                 if (Util.isDebuggableApp(context)) {
                     e.printStackTrace();
-                };
+                }
                 android.util.Log.v("Application Error", "ErrorActivity default implementation not found. Reinstall android platform to fix.");
             }
         }

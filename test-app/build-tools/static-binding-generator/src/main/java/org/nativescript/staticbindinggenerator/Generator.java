@@ -122,7 +122,7 @@ public class Generator {
 
             return generatedFiles;
         } catch (FileNotFoundException exception) {
-            String jsParserPath = Paths.get(System.getProperty("user.dir"), "jsparser", "js_parser.js").toString();
+            String jsParserPath = Paths.get(Main.WORKING_DIRECTORY, "jsparser", "js_parser.js").toString();
             throw new IOException(String.format("Couldn't find '%s' bindings input file. Most probably there's an error in the JS Parser execution. You can run JS Parser with verbose logging by executing \"node '%s' enableErrorLogging\".", filename, jsParserPath));
         }
     }
@@ -206,7 +206,7 @@ public class Generator {
     }
 
     public static List<DataRow> getRows(String filename) throws IOException {
-        List<DataRow> rows = new ArrayList<DataRow>();
+        List<DataRow> rows = new ArrayList<>();
         BufferedReader br = null;
         try {
             br = new BufferedReader(new InputStreamReader(new FileInputStream(filename)));
@@ -224,8 +224,8 @@ public class Generator {
     }
 
     private Binding[] processRows(List<DataRow> rows) throws ClassNotFoundException {
-        ArrayList<Binding> bindings = new ArrayList<Binding>();
-        HashSet<String> interfaceNames = new HashSet<String>();
+        ArrayList<Binding> bindings = new ArrayList<>();
+        HashSet<String> interfaceNames = new HashSet<>();
 
         for (DataRow dataRow : rows) {
             String classname = dataRow.getBaseClassname();

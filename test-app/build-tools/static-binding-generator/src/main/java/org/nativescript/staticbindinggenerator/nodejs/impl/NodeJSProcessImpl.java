@@ -38,7 +38,10 @@ public class NodeJSProcessImpl implements NodeJSProcess {
             parameters.add(MAX_OLD_SPACE_SIZE_DEFAULT_PROPERTY_UNDERSCORED);
         }
 
+//        parameters.add("--inspect-brk");
+
         parameters.add(scriptPath);
+
 
         return parameters;
     }

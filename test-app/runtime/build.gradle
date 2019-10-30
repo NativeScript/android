@@ -75,7 +75,7 @@ android {
             if (onlyX86) {
                 abiFilters 'x86'
             } else {
-                abiFilters 'x86', 'x86_64', 'armeabi-v7a', 'arm64-v8a'
+                abiFilters 'x86'//, 'x86_64', 'armeabi-v7a', 'arm64-v8a'
             }
         }
     }
@@ -210,3 +210,11 @@ def createPackageConfigFileTask(taskName) {
         }
     }
 }
+
+task disableNativeBuildWhenCleaning {
+    doFirst{
+        gradle.taskGraph.allTasks.findAll { it.name ==~ /externalNativeBuild.*/ }*.enabled = false
+    }
+}
+
+clean.dependsOn(disableNativeBuildWhenCleaning)

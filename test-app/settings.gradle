@@ -1,10 +1,14 @@
 include ':app',
         ':runtime',
         ':runtime-binding-generator',
-        ':static-binding-generator',
+//        ':static-binding-generator',
         ':android-metadata-generator',
         ':dts-generator'
 
-project(':static-binding-generator').projectDir = new File('build-tools/static-binding-generator')
+
+//project(':static-binding-generator').projectDir = new File('build-tools/static-binding-generator')
 project(':android-metadata-generator').projectDir = new File('build-tools/android-metadata-generator')
 project(':dts-generator').projectDir = new File('build-tools/android-dts-generator/dts-generator')
+////project(':gradle-plugins').projectDir = new File('gradle-plugins')
+
+includeBuild('./gradle-plugins')

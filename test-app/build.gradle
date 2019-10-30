@@ -10,7 +10,7 @@ buildscript {
     }
     initialize()
 
-    def computeKotlinVersion = { -> project.hasProperty("kotlinVersion") ? kotlinVersion : "1.3.41"
+    def computeKotlinVersion = { -> project.hasProperty("kotlinVersion") ? kotlinVersion : "1.3.50"
     }
     def kotlinVersion = computeKotlinVersion()
 
@@ -19,9 +19,18 @@ buildscript {
         jcenter()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:3.5.1'
+        classpath 'com.android.tools.build:gradle:3.5.2'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
+        classpath "com.nativescript:nativescript-android-plugin:0.1.0"
+
+//        def gradlePlugins = project(':gradle-plugins')
+//        if(gradlePlugins != null){
+//            classpath gradlePlugins
+//        } else {
+//            classpath files("$rootDir/gradle-plugins/build/libs/nativescript-android-plugin-0.1.0.jar")
+//        }
     }
+
 }
 
 allprojects {

@@ -24,7 +24,7 @@ public class GetInterfaceNames {
      * */
     public static void generateInterfaceFile(List<DataRow> rows)
             throws IOException {
-        currentDir = System.getProperty("user.dir");
+        currentDir = Main.WORKING_DIRECTORY;
         String outputFileName = Main.SBG_INTERFACE_NAMES;
 
         PrintWriter out = ensureOutputFile(outputFileName);
@@ -84,7 +84,7 @@ public class GetInterfaceNames {
     }
 
     public static PrintWriter ensureOutputFile(String outputFileName) throws IOException {
-        File checkFile = new File(currentDir, outputFileName);
+        File checkFile = new File(outputFileName);
         if (checkFile.exists()) {
             checkFile.delete();
         } else {
