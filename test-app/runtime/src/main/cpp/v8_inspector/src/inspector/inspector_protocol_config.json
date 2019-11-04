@@ -54,6 +54,18 @@
             {
                 "domain": "Security",
                 "include": []
+            },
+            {
+                "domain": "IO",
+                "include": ["resolveBlob"]
+            },
+            {
+                "domain": "Tracing",
+                "include": ["start", "end"],
+                "async": ["start", "end"]
+            },
+            {
+                "domain": "Performance"
             }
         ]
     },
