@@ -19,8 +19,8 @@ class AnalyticsCollector{
         return new AnalyticsCollector(analyticsFilePath)
     }
 
-    void markHasUseKotlinPropertyInApp() {
-        hasUseKotlinPropertyInApp = true
+    void markUseKotlinPropertyInApp(boolean useKotlin) {
+        hasUseKotlinPropertyInApp = useKotlin
     }
 
     void writeAnalyticsFile() {

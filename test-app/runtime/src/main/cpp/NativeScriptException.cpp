@@ -140,6 +140,9 @@ void NativeScriptException::Init() {
 
     NATIVESCRIPTEXCEPTION_GET_STACK_TRACE_AS_STRING_METHOD_ID = env.GetStaticMethodID(NATIVESCRIPTEXCEPTION_CLASS, "getStackTraceAsString", "(Ljava/lang/Throwable;)Ljava/lang/String;");
     assert(NATIVESCRIPTEXCEPTION_GET_STACK_TRACE_AS_STRING_METHOD_ID != nullptr);
+
+    NATIVESCRIPTEXCEPTION_GET_MESSAGE_METHOD_ID = env.GetStaticMethodID(NATIVESCRIPTEXCEPTION_CLASS, "getMessage", "(Ljava/lang/Throwable;)Ljava/lang/String;");
+    assert(NATIVESCRIPTEXCEPTION_GET_MESSAGE_METHOD_ID != nullptr);
 }
 
 // ON V8 UNCAUGHT EXCEPTION
@@ -204,7 +207,8 @@ Local<Value> NativeScriptException::WrapJavaToJsException() {
 
 Local<Value> NativeScriptException::GetJavaExceptionFromEnv(const JniLocalRef& exc, JEnv& env) {
     auto errMsg = GetExceptionMessage(env, exc);
-    DEBUG_WRITE("Error during java interop errorMessage %s", errMsg.c_str());
+    auto stackTrace = GetExceptionStackTrace(env, exc);
+    DEBUG_WRITE("Error during java interop errorMessage: %s\n stackTrace:\n %s", errMsg.c_str(), stackTrace.c_str());
 
     auto isolate = Isolate::GetCurrent();
     auto objectManager = Runtime::GetObjectManager(isolate);
@@ -222,6 +226,10 @@ Local<Value> NativeScriptException::GetJavaExceptionFromEnv(const JniLocalRef& e
 
     auto context = isolate->GetCurrentContext();
     errObj->Set(context, V8StringConstants::GetNativeException(isolate), nativeExceptionObject);
+
+    string jsStackTraceMessage = GetErrorStackTrace(Exception::GetStackTrace(errObj));
+    errObj->Set(context, V8StringConstants::GetStack(isolate), ArgConverter::ConvertToV8String(isolate, jsStackTraceMessage));
+    errObj->Set(context, V8StringConstants::GetStackTrace(isolate), ArgConverter::ConvertToV8String(isolate, jsStackTraceMessage + stackTrace));
 
     return errObj;
 }
@@ -362,7 +370,9 @@ string NativeScriptException::GetErrorStackTrace(const Local<StackTrace>& stackT
         auto lineNumber = frame->GetLineNumber();
         auto column = frame->GetColumn();
 
-        ss << "\t" << (i > 0 ? "at " : "") << funcName.c_str() << "(" << srcName.c_str() << ":" << lineNumber << ":" << column << ")" << endl;
+        auto startString = i == 0 ? "" : "\t";
+
+        ss << startString << (i > 0 ? "at " : "") << funcName.c_str() << "(" << srcName.c_str() << ":" << lineNumber << ":" << column << ")" << endl;
     }
 
     return ss.str();
@@ -370,7 +380,7 @@ string NativeScriptException::GetErrorStackTrace(const Local<StackTrace>& stackT
 
 string NativeScriptException::GetExceptionMessage(JEnv& env, jthrowable exception) {
     string errMsg;
-    JniLocalRef msg(env.CallStaticObjectMethod(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_GET_STACK_TRACE_AS_STRING_METHOD_ID, exception));
+    JniLocalRef msg(env.CallStaticObjectMethod(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_GET_MESSAGE_METHOD_ID, exception));
 
     const char* msgStr = env.GetStringUTFChars(msg, nullptr);
 
@@ -381,9 +391,23 @@ string NativeScriptException::GetExceptionMessage(JEnv& env, jthrowable exceptio
     return errMsg;
 }
 
+string NativeScriptException::GetExceptionStackTrace(JEnv& env, jthrowable exception) {
+    string errStackTrace;
+    JniLocalRef msg(env.CallStaticObjectMethod(NATIVESCRIPTEXCEPTION_CLASS, NATIVESCRIPTEXCEPTION_GET_STACK_TRACE_AS_STRING_METHOD_ID, exception));
+
+    const char* msgStr = env.GetStringUTFChars(msg, nullptr);
+
+    errStackTrace.append(msgStr);
+
+    env.ReleaseStringUTFChars(msg, msgStr);
+
+    return errStackTrace;
+}
+
 jclass NativeScriptException::RUNTIME_CLASS = nullptr;
 jclass NativeScriptException::THROWABLE_CLASS = nullptr;
 jclass NativeScriptException::NATIVESCRIPTEXCEPTION_CLASS = nullptr;
 jmethodID NativeScriptException::NATIVESCRIPTEXCEPTION_JSVALUE_CTOR_ID = nullptr;
 jmethodID NativeScriptException::NATIVESCRIPTEXCEPTION_THROWABLE_CTOR_ID = nullptr;
+jmethodID NativeScriptException::NATIVESCRIPTEXCEPTION_GET_MESSAGE_METHOD_ID = nullptr;
 jmethodID NativeScriptException::NATIVESCRIPTEXCEPTION_GET_STACK_TRACE_AS_STRING_METHOD_ID = nullptr;

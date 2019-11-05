@@ -23,3 +23,4 @@ thumbs.db
 .classpath
 android-runtime.iml
 test-app/build-tools/*.log
+test-app/analytics/build-statistics.json
