@@ -173,3 +173,66 @@ void DOMDomainCallbackHandlers::AttributeRemovedCallback(const v8::FunctionCallb
         nsEx.ReThrowToV8();
     }
 }
+
+void DOMDomainCallbackHandlers::NodeHighlightRequestedCallback(const v8::FunctionCallbackInfo<v8::Value>& args) {
+   try {
+       auto overlayAgentInstance = V8OverlayAgentImpl::Instance;
+
+       if (!overlayAgentInstance) {
+           return;
+       }
+       auto isolate = args.GetIsolate();
+
+       v8::HandleScope scope(isolate);
+
+       if (args.Length() != 1 || !args[0]->IsNumber()) {
+           throw NativeScriptException("Calling NodeHighlightRequested with invalid arguments. Required params: nodeId: number");
+       }
+
+       auto context = isolate->GetCurrentContext();
+       auto nodeId = args[0]->ToNumber(context).ToLocalChecked();
+
+       overlayAgentInstance->m_frontend.nodeHighlightRequested(nodeId->Int32Value(context).ToChecked());
+
+   } catch (NativeScriptException& e) {
+       e.ReThrowToV8();
+   } catch (std::exception e) {
+       std::stringstream ss;
+       ss << "Error: c exception: " << e.what() << std::endl;
+       NativeScriptException nsEx(ss.str());
+       nsEx.ReThrowToV8();
+   } catch (...) {
+       NativeScriptException nsEx(std::string("Error: c exception!"));
+       nsEx.ReThrowToV8();
+   }
+}
+
+void DOMDomainCallbackHandlers::InspectModeCanceled(const v8::FunctionCallbackInfo<v8::Value>& args) {
+   try {
+       auto overlayAgentInstance = V8OverlayAgentImpl::Instance;
+
+       if (!overlayAgentInstance) {
+           return;
+       }
+       auto isolate = args.GetIsolate();
+
+       v8::HandleScope scope(isolate);
+
+       if (args.Length() != 0) {
+           throw NativeScriptException("Calling InspectModeCanceled with invalid arguments. Required params: none");
+       }
+
+       overlayAgentInstance->m_frontend.inspectModeCanceled();
+
+   } catch (NativeScriptException& e) {
+       e.ReThrowToV8();
+   } catch (std::exception e) {
+       std::stringstream ss;
+       ss << "Error: c exception: " << e.what() << std::endl;
+       NativeScriptException nsEx(ss.str());
+       nsEx.ReThrowToV8();
+   } catch (...) {
+       NativeScriptException nsEx(std::string("Error: c exception!"));
+       nsEx.ReThrowToV8();
+   }
+}

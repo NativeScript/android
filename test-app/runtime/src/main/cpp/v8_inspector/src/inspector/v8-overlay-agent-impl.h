@@ -63,6 +63,8 @@ namespace v8_inspector {
 
         protocol::Overlay::Frontend m_frontend;
 
+        static V8OverlayAgentImpl* Instance;
+
     private:
         V8InspectorSessionImpl *m_session;
         protocol::DictionaryValue *m_state;

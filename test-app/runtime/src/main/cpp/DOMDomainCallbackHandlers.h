@@ -7,11 +7,13 @@
 
 #include <include/v8.h>
 #include <v8_inspector/src/inspector/v8-dom-agent-impl.h>
+#include <v8_inspector/src/inspector/v8-overlay-agent-impl.h>
+
 #include "JsV8InspectorClient.h"
 #include "NativeScriptException.h"
 
 namespace tns {
-class DOMDomainCallbackHandlers {
+    class DOMDomainCallbackHandlers {
 
     public:
         static void DocumentUpdatedCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
@@ -19,7 +21,11 @@ class DOMDomainCallbackHandlers {
         static void ChildNodeRemovedCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
         static void AttributeModifiedCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
         static void AttributeRemovedCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
-};
+
+        // TODO: extract handlers into separate OverlayDomainCallbackHandlers class
+        static void NodeHighlightRequestedCallback(const v8::FunctionCallbackInfo<v8::Value>& args);
+        static void InspectModeCanceled(const v8::FunctionCallbackInfo<v8::Value>& args);
+    };
 }
 
 

@@ -299,6 +299,10 @@ void JsV8InspectorClient::attachInspectorCallbacks(Isolate* isolate,
     inspectorJSObject->Set(ArgConverter::ConvertToV8String(isolate, "attributeModified"), FunctionTemplate::New(isolate, DOMDomainCallbackHandlers::AttributeModifiedCallback));
     inspectorJSObject->Set(ArgConverter::ConvertToV8String(isolate, "attributeRemoved"), FunctionTemplate::New(isolate, DOMDomainCallbackHandlers::AttributeRemovedCallback));
 
+    // TODO: extract handlers into separate OverlayDomainCallbackHandlers class
+    inspectorJSObject->Set(ArgConverter::ConvertToV8String(isolate, "nodeHighlightRequested"), FunctionTemplate::New(isolate, DOMDomainCallbackHandlers::NodeHighlightRequestedCallback));
+    inspectorJSObject->Set(ArgConverter::ConvertToV8String(isolate, "inspectModeCanceled"), FunctionTemplate::New(isolate, DOMDomainCallbackHandlers::InspectModeCanceled));
+
     globalObjectTemplate->Set(ArgConverter::ConvertToV8String(isolate, "__inspector"), inspectorJSObject);
 }
 
