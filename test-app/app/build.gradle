@@ -86,8 +86,8 @@ def computeBuildToolsVersion = { ->
 def enableAnalytics = (project.hasProperty("gatherAnalyticsData") && project.gatherAnalyticsData == "true")
 def analyticsFilePath = "$rootDir/analytics/build-statistics.json"
 def analyticsCollector = project.ext.AnalyticsCollector.withOutputPath(analyticsFilePath)
-if (enableKotlin && enableAnalytics) {
-    analyticsCollector.markHasUseKotlinPropertyInApp()
+if (enableAnalytics) {
+    analyticsCollector.markUseKotlinPropertyInApp(enableKotlin)
     analyticsCollector.writeAnalyticsFile()
 }
 
