@@ -16,6 +16,9 @@ Contains the source code for the NativeScript's Android Runtime. [NativeScript](
 
 <!-- /TOC -->
 
+## Additional docs
+Several Wiki pages describe some internal topics about the runtime [here](https://github.com/NativeScript/android-runtime/wiki)
+
 ## Main Projects
 The repo is structured in the following projects (ordered by dependencies):
 
