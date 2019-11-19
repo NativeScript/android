@@ -1,11 +1,5 @@
-/*
-*	Packs metadata generator in a .tgz file in ~/dist folder
-*	To build .tgz
-*			gradlew packmg
-*	To build jar
-*			gradlew jarmg
-*/
-apply plugin: "java"
+apply plugin: 'java'
+apply plugin: 'kotlin'
 
 sourceCompatibility = JavaVersion.VERSION_1_8
 targetCompatibility = JavaVersion.VERSION_1_8
@@ -26,6 +20,9 @@ sourceSets {
         java {
             srcDir 'src/src'
         }
+        kotlin {
+            srcDirs += 'src/src'
+        }
     }
 }
 
@@ -34,6 +31,10 @@ compileJava {
 }
 
 compileJava.outputs.dir("$rootDir/dist/classes")
+
+compileKotlin {
+    kotlinOptions.allWarningsAsErrors = true
+}
 
 repositories {
     google()

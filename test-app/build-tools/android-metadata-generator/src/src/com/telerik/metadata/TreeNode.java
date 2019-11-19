@@ -1,9 +1,9 @@
 package com.telerik.metadata;
 
-import com.telerik.metadata.desc.ClassDescriptor;
-import com.telerik.metadata.desc.ExtensionFunctionDescriptor;
-import com.telerik.metadata.desc.MethodDescriptor;
-import com.telerik.metadata.desc.TypeDescriptor;
+import com.telerik.metadata.parsing.classes.NativeClassDescriptor;
+import com.telerik.metadata.parsing.classes.kotlin.extensions.KotlinExtensionFunctionDescriptor;
+import com.telerik.metadata.parsing.classes.NativeMethodDescriptor;
+import com.telerik.metadata.parsing.classes.NativeTypeDescriptor;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -11,11 +11,11 @@ import java.util.Optional;
 
 public class TreeNode {
     public static class MethodInfo {
-        public MethodInfo(MethodDescriptor m) {
+        public MethodInfo(NativeMethodDescriptor m) {
             this.name = m.getName();
             this.sig = m.getSignature();
             this.isResolved = false;
-            this.isExtensionFunction = m instanceof ExtensionFunctionDescriptor;
+            this.isExtensionFunction = m instanceof KotlinExtensionFunctionDescriptor;
 
             signature = new ArrayList<>();
         }
@@ -109,35 +109,35 @@ public class TreeNode {
     public static final TreeNode BOOLEAN = getPrimitive("Z", (byte) 7);
     public static final TreeNode CHAR = getPrimitive("C", (byte) 8);
 
-    public static TreeNode getPrimitive(TypeDescriptor type) throws Exception {
+    public static TreeNode getPrimitive(NativeTypeDescriptor type) throws Exception {
         if (!ClassUtil.isPrimitive(type)) {
             throw new Exception("type must be primitive");
         }
 
-        if (type.equals(TypeDescriptor.BYTE)) {
+        if (type.equals(NativeTypeDescriptor.Companion.getBYTE())) {
             return TreeNode.BYTE;
-        } else if (type.equals(TypeDescriptor.SHORT)) {
+        } else if (type.equals(NativeTypeDescriptor.Companion.getSHORT())) {
             return TreeNode.SHORT;
-        } else if (type.equals(TypeDescriptor.INT)) {
+        } else if (type.equals(NativeTypeDescriptor.Companion.getINT())) {
             return TreeNode.INTEGER;
-        } else if (type.equals(TypeDescriptor.LONG)) {
+        } else if (type.equals(NativeTypeDescriptor.Companion.getLONG())) {
             return TreeNode.LONG;
-        } else if (type.equals(TypeDescriptor.FLOAT)) {
+        } else if (type.equals(NativeTypeDescriptor.Companion.getFLOAT())) {
             return TreeNode.FLOAT;
-        } else if (type.equals(TypeDescriptor.DOUBLE)) {
+        } else if (type.equals(NativeTypeDescriptor.Companion.getDOUBLE())) {
             return TreeNode.DOUBLE;
-        } else if (type.equals(TypeDescriptor.BOOLEAN)) {
+        } else if (type.equals(NativeTypeDescriptor.Companion.getBOOLEAN())) {
             return TreeNode.BOOLEAN;
-        } else if (type.equals(TypeDescriptor.CHAR)) {
+        } else if (type.equals(NativeTypeDescriptor.Companion.getCHAR())) {
             return TreeNode.CHAR;
-        } else if (type.equals(TypeDescriptor.VOID)) {
+        } else if (type.equals(NativeTypeDescriptor.Companion.getVOID())) {
             return null;
         } else {
             throw new Exception("unknown type=" + type.toString());
         }
     }
 
-    public static TreeNode getPrimitive(ClassDescriptor clazz) throws Exception {
+    public static TreeNode getPrimitive(NativeClassDescriptor clazz) throws Exception {
         if (!ClassUtil.isPrimitive(clazz)) {
             throw new Exception("clazz must be primitive");
         }

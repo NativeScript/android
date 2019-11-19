@@ -2,9 +2,10 @@ package com.telerik.metadata;
 
 import com.telerik.metadata.analytics.AnalyticsCollector;
 import com.telerik.metadata.analytics.AnalyticsCollectorProvider;
-import com.telerik.metadata.desc.ClassDescriptor;
-import com.telerik.metadata.kotlin.classes.KotlinClassMetadataParser;
-import com.telerik.metadata.kotlin.classes.impl.KotlinClassMetadataParserImpl;
+import com.telerik.metadata.parsing.classes.bytecode.NativeClassBytecodeDescriptor;
+import com.telerik.metadata.parsing.classes.NativeClassDescriptor;
+import com.telerik.metadata.parsing.classes.kotlin.metadata.ClassMetadataParser;
+import com.telerik.metadata.parsing.classes.kotlin.metadata.bytecode.BytecodeClassMetadataParser;
 
 import org.apache.bcel.classfile.ClassParser;
 
@@ -17,18 +18,18 @@ import java.util.Map;
 
 public class ClassDirectory implements ClassMapProvider {
     private final String path;
-    private final Map<String, ClassDescriptor> classMap;
-    private static final KotlinClassMetadataParser kotlinClassMetadataParser = new KotlinClassMetadataParserImpl();
+    private final Map<String, NativeClassDescriptor> classMap;
+    private static final ClassMetadataParser kotlinClassMetadataParser = new BytecodeClassMetadataParser();
     private static final AnalyticsCollector analyticsCollector = AnalyticsCollectorProvider.getInstance().provideAnalyticsCollector();
     private static final String CLASS_EXT = ".class";
     private static final String DEX_EXT = ".dex";
 
     private ClassDirectory(String path) {
         this.path = path;
-        this.classMap = new HashMap<String, ClassDescriptor>();
+        this.classMap = new HashMap<String, NativeClassDescriptor>();
     }
 
-    public Map<String, ClassDescriptor> getClassMap() {
+    public Map<String, NativeClassDescriptor> getClassMap() {
         return classMap;
     }
 
@@ -50,7 +51,7 @@ public class ClassDirectory implements ClassMapProvider {
             if (file.isFile()) {
                 String name = file.getName();
                 if (name.endsWith(CLASS_EXT)) {
-                    ClassDescriptor clazz = getClassDescriptor(name, file);
+                    NativeClassDescriptor clazz = getClassDescriptor(name, file);
                     dir.classMap.put(clazz.getClassName(), clazz);
                 }
             } else if (file.isDirectory()) {
@@ -62,11 +63,11 @@ public class ClassDirectory implements ClassMapProvider {
         }
     }
 
-    private static ClassDescriptor getClassDescriptor(String name, File file) throws IOException {
-        ClassDescriptor clazz = null;
+    private static NativeClassDescriptor getClassDescriptor(String name, File file) throws IOException {
+        NativeClassDescriptor clazz = null;
         if (name.endsWith(CLASS_EXT)) {
             ClassParser cp = new ClassParser(file.getAbsolutePath());
-            clazz = new com.telerik.metadata.bcl.ClassInfo(cp.parse());
+            clazz = new NativeClassBytecodeDescriptor(cp.parse());
             markIfKotlinClass(clazz);
         } else if (name.endsWith(DEX_EXT)) {
             // TODO:
@@ -75,7 +76,7 @@ public class ClassDirectory implements ClassMapProvider {
         return clazz;
     }
 
-    private static void markIfKotlinClass(ClassDescriptor classDescriptor) {
+    private static void markIfKotlinClass(NativeClassDescriptor classDescriptor) {
         if (kotlinClassMetadataParser.wasKotlinClass(classDescriptor)) {
             analyticsCollector.markHasKotlinRuntimeClassesIfNotMarkedAlready();
         }
