@@ -2,22 +2,22 @@ package com.telerik.metadata;
 
 import com.telerik.metadata.TreeNode.FieldInfo;
 import com.telerik.metadata.TreeNode.MethodInfo;
-import com.telerik.metadata.parsing.classes.bytecode.JarFile;
+import com.telerik.metadata.parsing.ClassParser;
+import com.telerik.metadata.parsing.classes.MetadataInfoAnnotationDescriptor;
 import com.telerik.metadata.parsing.classes.NativeClassDescriptor;
 import com.telerik.metadata.parsing.classes.NativeFieldDescriptor;
-import com.telerik.metadata.parsing.classes.MetadataInfoAnnotationDescriptor;
 import com.telerik.metadata.parsing.classes.NativeMethodDescriptor;
-import com.telerik.metadata.parsing.classes.kotlin.extensions.KotlinExtensionFunctionDescriptor;
-import com.telerik.metadata.parsing.classes.kotlin.properties.KotlinPropertyDescriptor;
 import com.telerik.metadata.parsing.classes.NativeTypeDescriptor;
-import com.telerik.metadata.parsing.classes.kotlin.metadata.ClassMetadataParser;
-import com.telerik.metadata.parsing.classes.kotlin.metadata.bytecode.BytecodeClassMetadataParser;
+import com.telerik.metadata.parsing.classes.bytecode.JarFile;
 import com.telerik.metadata.parsing.classes.kotlin.extensions.ClassNameAndFunctionPair;
 import com.telerik.metadata.parsing.classes.kotlin.extensions.ExtensionFunctionsCollector;
-import com.telerik.metadata.storage.functions.FunctionsStorage;
+import com.telerik.metadata.parsing.classes.kotlin.extensions.KotlinExtensionFunctionDescriptor;
 import com.telerik.metadata.parsing.classes.kotlin.extensions.bytecode.BytecodeExtensionFunctionsCollector;
+import com.telerik.metadata.parsing.classes.kotlin.metadata.ClassMetadataParser;
+import com.telerik.metadata.parsing.classes.kotlin.metadata.bytecode.BytecodeClassMetadataParser;
+import com.telerik.metadata.parsing.classes.kotlin.properties.KotlinPropertyDescriptor;
+import com.telerik.metadata.storage.functions.FunctionsStorage;
 import com.telerik.metadata.storage.functions.extensions.ExtensionFunctionsStorage;
-import com.telerik.metadata.parsing.ClassParser;
 
 import java.io.File;
 import java.lang.reflect.Array;
@@ -90,7 +90,7 @@ public class Builder {
                 if (clazz == null) {
                     throw new ClassNotFoundException("Class " + className + " not found in the input android libraries.");
                 } else {
-                    if(clazz.getClassName().contains("SomePublicClass")){
+                    if (clazz.getClassName().contains("SomePublicClass")) {
                         System.out.println("asd");
                     }
                     generate(clazz, root);
@@ -258,12 +258,14 @@ public class Builder {
 
             NativeMethodDescriptor getterMethod = propertyDescriptor.getGetterMethod();
             NativeMethodDescriptor setterMethod = propertyDescriptor.getSetterMethod();
+            boolean shouldAddProperty = true;
 
             MethodInfo getterMethodInfo = null;
             if (getterMethod != null) {
                 getterMethodInfo = new MethodInfo(getterMethod);
                 getterMethodInfo.isResolved = true;
                 getterMethodInfo.signature = getMethodSignature(root, getterMethod.getReturnType(), getterMethod.getArgumentTypes());
+                shouldAddProperty = getterMethodInfo.signature != null;
             }
 
 
@@ -272,10 +274,13 @@ public class Builder {
                 setterMethodInfo = new MethodInfo(setterMethod);
                 setterMethodInfo.isResolved = true;
                 setterMethodInfo.signature = getMethodSignature(root, setterMethod.getReturnType(), setterMethod.getArgumentTypes());
+                shouldAddProperty = setterMethodInfo.signature != null;
             }
 
-            TreeNode.PropertyInfo propertyInfo = new TreeNode.PropertyInfo(propertyName, getterMethodInfo, setterMethodInfo);
-            node.addProperty(propertyInfo);
+            if (shouldAddProperty) {
+                TreeNode.PropertyInfo propertyInfo = new TreeNode.PropertyInfo(propertyName, getterMethodInfo, setterMethodInfo);
+                node.addProperty(propertyInfo);
+            }
         }
 
     }
