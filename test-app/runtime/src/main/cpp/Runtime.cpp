@@ -43,8 +43,23 @@ using namespace tns;
 bool tns::LogEnabled = true;
 SimpleAllocator g_allocator;
 
-void SIGABRT_handler(int sigNumber) {
-    throw NativeScriptException("JNI Exception occurred (SIGABRT).\n=======\nCheck the 'adb logcat' for additional information about the error.\n=======\n");
+void SIG_handler(int sigNumber) {
+    stringstream msg;
+    msg << "JNI Exception occurred (";
+    switch (sigNumber) {
+        case SIGABRT:
+            msg << "SIGABRT";
+            break;
+        case SIGSEGV:
+            msg << "SIGSEGV";
+            break;
+        default:
+            // Shouldn't happen, but for completeness
+            msg << "Signal #" << sigNumber;
+            break;
+    }
+    msg << ").\n=======\nCheck the 'adb logcat' for additional information about the error.\n=======\n";
+    throw NativeScriptException(msg.str());
 }
 
 void Runtime::Init(JavaVM* vm, void* reserved) {
@@ -56,11 +71,12 @@ void Runtime::Init(JavaVM* vm, void* reserved) {
         JEnv::Init(s_jvm);
     }
 
-    if (m_androidVersion > 25) {
-        // handle SIGABRT only on API level > 25 as the handling is not so efficient in older versions
+    // handle SIGABRT/SIGSEGV only on API level > 20 as the handling is not so efficient in older versions
+    if (m_androidVersion > 20) {
         struct sigaction action;
-        action.sa_handler = SIGABRT_handler;
+        action.sa_handler = SIG_handler;
         sigaction(SIGABRT, &action, NULL);
+        sigaction(SIGSEGV, &action, NULL);
     }
 }
 
