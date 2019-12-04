@@ -1,6 +1,6 @@
 package com.telerik.metadata;
 
-import com.telerik.metadata.parsing.classes.NativeClassDescriptor;
+import com.telerik.metadata.parsing.NativeClassDescriptor;
 
 import java.util.Map;
 

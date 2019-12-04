@@ -34,6 +34,7 @@ compileJava.outputs.dir("$rootDir/dist/classes")
 
 compileKotlin {
     kotlinOptions.allWarningsAsErrors = true
+    kotlinOptions.jvmTarget = "1.8"
 }
 
 repositories {
