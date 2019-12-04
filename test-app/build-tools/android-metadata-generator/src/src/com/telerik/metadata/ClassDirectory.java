@@ -2,12 +2,17 @@ package com.telerik.metadata;
 
 import com.telerik.metadata.analytics.AnalyticsCollector;
 import com.telerik.metadata.analytics.AnalyticsCollectorProvider;
-import com.telerik.metadata.parsing.classes.bytecode.NativeClassBytecodeDescriptor;
-import com.telerik.metadata.parsing.classes.NativeClassDescriptor;
-import com.telerik.metadata.parsing.classes.kotlin.metadata.ClassMetadataParser;
-import com.telerik.metadata.parsing.classes.kotlin.metadata.bytecode.BytecodeClassMetadataParser;
+import com.telerik.metadata.parsing.NativeClassDescriptor;
+import com.telerik.metadata.parsing.java.classes.JavaClassDescriptor;
+import com.telerik.metadata.parsing.kotlin.classes.KotlinClassDescriptor;
+import com.telerik.metadata.parsing.kotlin.metadata.ClassMetadataParser;
+import com.telerik.metadata.parsing.kotlin.metadata.MetadataAnnotation;
+import com.telerik.metadata.parsing.kotlin.metadata.bytecode.BytecodeClassMetadataParser;
+import com.telerik.metadata.parsing.kotlin.metadata.bytecode.BytecodeMetadataAnnotation;
 
+import org.apache.bcel.classfile.AnnotationEntry;
 import org.apache.bcel.classfile.ClassParser;
+import org.apache.bcel.classfile.JavaClass;
 
 import java.io.File;
 import java.io.IOException;
@@ -67,18 +72,28 @@ public class ClassDirectory implements ClassMapProvider {
         NativeClassDescriptor clazz = null;
         if (name.endsWith(CLASS_EXT)) {
             ClassParser cp = new ClassParser(file.getAbsolutePath());
-            clazz = new NativeClassBytecodeDescriptor(cp.parse());
-            markIfKotlinClass(clazz);
-        } else if (name.endsWith(DEX_EXT)) {
-            // TODO:
+            JavaClass javaClass = cp.parse();
+            boolean isKotlinClass = false;
+
+            AnnotationEntry[] annotationEntries = javaClass.getAnnotationEntries();
+            if (annotationEntries != null) {
+                for (AnnotationEntry annotationEntry : annotationEntries) {
+                    String annotationType = annotationEntry.getAnnotationType();
+                    if ("Lkotlin/Metadata;".equals(annotationType)) {
+                        MetadataAnnotation kotlinClassMetadataAnnotation = new BytecodeMetadataAnnotation(annotationEntry);
+                        NativeClassDescriptor kotlinClassDescriptor = new KotlinClassDescriptor(javaClass, kotlinClassMetadataAnnotation);
+                        isKotlinClass = true;
+                        analyticsCollector.markHasKotlinRuntimeClassesIfNotMarkedAlready();
+                        return kotlinClassDescriptor;
+                    }
+                }
+            }
+
+            if (!isKotlinClass) {
+                return new JavaClassDescriptor(javaClass);
+            }
         }
 
         return clazz;
-    }
-
-    private static void markIfKotlinClass(NativeClassDescriptor classDescriptor) {
-        if (kotlinClassMetadataParser.wasKotlinClass(classDescriptor)) {
-            analyticsCollector.markHasKotlinRuntimeClassesIfNotMarkedAlready();
-        }
     }
 }

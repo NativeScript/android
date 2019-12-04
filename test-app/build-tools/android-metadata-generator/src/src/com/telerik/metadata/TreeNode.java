@@ -1,9 +1,9 @@
 package com.telerik.metadata;
 
-import com.telerik.metadata.parsing.classes.NativeClassDescriptor;
-import com.telerik.metadata.parsing.classes.kotlin.extensions.KotlinExtensionFunctionDescriptor;
-import com.telerik.metadata.parsing.classes.NativeMethodDescriptor;
-import com.telerik.metadata.parsing.classes.NativeTypeDescriptor;
+import com.telerik.metadata.parsing.NativeClassDescriptor;
+import com.telerik.metadata.parsing.kotlin.extensions.KotlinExtensionFunctionDescriptor;
+import com.telerik.metadata.parsing.NativeMethodDescriptor;
+import com.telerik.metadata.parsing.NativeTypeDescriptor;
 
 import java.util.ArrayList;
 import java.util.List;

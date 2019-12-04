@@ -1,8 +1,6 @@
 package com.telerik.metadata.parsing;
 
 import com.telerik.metadata.ClassRepo;
-import com.telerik.metadata.parsing.classes.NativeClassDescriptor;
-import com.telerik.metadata.parsing.classes.NativeMethodDescriptor;
 
 import java.util.HashSet;
 import java.util.Set;

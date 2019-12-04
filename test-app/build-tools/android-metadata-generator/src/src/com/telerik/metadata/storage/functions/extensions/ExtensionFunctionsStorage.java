@@ -1,7 +1,7 @@
 package com.telerik.metadata.storage.functions.extensions;
 
-import com.telerik.metadata.parsing.classes.kotlin.extensions.KotlinExtensionFunctionDescriptor;
-import com.telerik.metadata.parsing.classes.kotlin.extensions.ClassNameAndFunctionPair;
+import com.telerik.metadata.parsing.kotlin.extensions.KotlinExtensionFunctionDescriptor;
+import com.telerik.metadata.parsing.kotlin.extensions.ClassNameAndFunctionPair;
 import com.telerik.metadata.storage.functions.FunctionsStorage;
 
 import org.jetbrains.annotations.NotNull;

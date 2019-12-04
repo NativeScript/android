@@ -3,24 +3,24 @@ package com.telerik.metadata;
 import com.telerik.metadata.TreeNode.FieldInfo;
 import com.telerik.metadata.TreeNode.MethodInfo;
 import com.telerik.metadata.parsing.ClassParser;
-import com.telerik.metadata.parsing.classes.MetadataInfoAnnotationDescriptor;
-import com.telerik.metadata.parsing.classes.NativeClassDescriptor;
-import com.telerik.metadata.parsing.classes.NativeFieldDescriptor;
-import com.telerik.metadata.parsing.classes.NativeMethodDescriptor;
-import com.telerik.metadata.parsing.classes.NativeTypeDescriptor;
-import com.telerik.metadata.parsing.classes.bytecode.JarFile;
-import com.telerik.metadata.parsing.classes.kotlin.extensions.ClassNameAndFunctionPair;
-import com.telerik.metadata.parsing.classes.kotlin.extensions.ExtensionFunctionsCollector;
-import com.telerik.metadata.parsing.classes.kotlin.extensions.KotlinExtensionFunctionDescriptor;
-import com.telerik.metadata.parsing.classes.kotlin.extensions.bytecode.BytecodeExtensionFunctionsCollector;
-import com.telerik.metadata.parsing.classes.kotlin.metadata.ClassMetadataParser;
-import com.telerik.metadata.parsing.classes.kotlin.metadata.bytecode.BytecodeClassMetadataParser;
-import com.telerik.metadata.parsing.classes.kotlin.properties.KotlinPropertyDescriptor;
+import com.telerik.metadata.parsing.MetadataInfoAnnotationDescriptor;
+import com.telerik.metadata.parsing.NativeClassDescriptor;
+import com.telerik.metadata.parsing.NativeFieldDescriptor;
+import com.telerik.metadata.parsing.NativeMethodDescriptor;
+import com.telerik.metadata.parsing.NativePropertyDescriptor;
+import com.telerik.metadata.parsing.NativeTypeDescriptor;
+import com.telerik.metadata.parsing.bytecode.JarFile;
+import com.telerik.metadata.parsing.kotlin.classes.KotlinClassDescriptor;
+import com.telerik.metadata.parsing.kotlin.extensions.ClassNameAndFunctionPair;
+import com.telerik.metadata.parsing.kotlin.extensions.ExtensionFunctionsCollector;
+import com.telerik.metadata.parsing.kotlin.extensions.KotlinExtensionFunctionDescriptor;
+import com.telerik.metadata.parsing.kotlin.extensions.bytecode.BytecodeExtensionFunctionsCollector;
+import com.telerik.metadata.parsing.kotlin.metadata.ClassMetadataParser;
+import com.telerik.metadata.parsing.kotlin.metadata.bytecode.BytecodeClassMetadataParser;
 import com.telerik.metadata.storage.functions.FunctionsStorage;
 import com.telerik.metadata.storage.functions.extensions.ExtensionFunctionsStorage;
 
 import java.io.File;
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -90,9 +90,6 @@ public class Builder {
                 if (clazz == null) {
                     throw new ClassNotFoundException("Class " + className + " not found in the input android libraries.");
                 } else {
-                    if (clazz.getClassName().contains("SomePublicClass")) {
-                        System.out.println("asd");
-                    }
                     generate(clazz, root);
                 }
             } catch (Throwable e) {
@@ -107,13 +104,16 @@ public class Builder {
     }
 
     private static void tryCollectKotlinExtensionFunctions(NativeClassDescriptor classDescriptor) {
-        ExtensionFunctionsCollector extensionFunctionsCollector = new BytecodeExtensionFunctionsCollector(new BytecodeClassMetadataParser());
-        Collection<ClassNameAndFunctionPair<KotlinExtensionFunctionDescriptor>> extensionFunctions = extensionFunctionsCollector.collectExtensionFunctions(classDescriptor);
+        if (classDescriptor instanceof KotlinClassDescriptor) {
+            ExtensionFunctionsCollector extensionFunctionsCollector = new BytecodeExtensionFunctionsCollector(new BytecodeClassMetadataParser());
+            Collection<ClassNameAndFunctionPair<KotlinExtensionFunctionDescriptor>> extensionFunctions = extensionFunctionsCollector.collectExtensionFunctions((KotlinClassDescriptor) classDescriptor);
 
-        if (!extensionFunctions.isEmpty()) {
-            FunctionsStorage<KotlinExtensionFunctionDescriptor> extensionFunctionsStorage = ExtensionFunctionsStorage.getInstance();
-            extensionFunctionsStorage.storeFunctions(extensionFunctions);
+            if (!extensionFunctions.isEmpty()) {
+                FunctionsStorage<KotlinExtensionFunctionDescriptor> extensionFunctionsStorage = ExtensionFunctionsStorage.getInstance();
+                extensionFunctionsStorage.storeFunctions(extensionFunctions);
+            }
         }
+
     }
 
     private static Boolean isClassPublic(NativeClassDescriptor clazz) {
@@ -167,11 +167,11 @@ public class Builder {
         }
         NativeMethodDescriptor[] extensionFunctions = ExtensionFunctionsStorage.getInstance().retrieveFunctions(clazz.getClassName()).toArray(new NativeMethodDescriptor[0]);
         NativeMethodDescriptor[] nonExtensionFunctionMethods = ClassUtil.getAllMethods(clazz);
-        NativeMethodDescriptor[] allMethods = concatenate(extensionFunctions, nonExtensionFunctionMethods);
+        NativeMethodDescriptor[] allMethods = concatenateNativeMethodArrays(extensionFunctions, nonExtensionFunctionMethods);
 
         NativeMethodDescriptor[] classImplementedMethods = clazz.getMethods();
         NativeMethodDescriptor[] interfaceImplementedMethods = clazz.isClass() ? getDefaultMethodsFromImplementedInterfaces(clazz, classImplementedMethods) : new NativeMethodDescriptor[0];
-        NativeMethodDescriptor[] methods = concatenate(classImplementedMethods, interfaceImplementedMethods, extensionFunctions);
+        NativeMethodDescriptor[] methods = concatenateNativeMethodArrays(classImplementedMethods, interfaceImplementedMethods, extensionFunctions);
         Arrays.sort(methods, methodNameComparator);
 
         setMethodsInfo(root, node, clazz, methods, allMethods, existingMethods, hasClassMetadataInfo);
@@ -252,8 +252,8 @@ public class Builder {
 
     }
 
-    private static void setPropertiesInfo(TreeNode root, TreeNode node, KotlinPropertyDescriptor[] propertyDescriptors) throws Exception {
-        for (KotlinPropertyDescriptor propertyDescriptor : propertyDescriptors) {
+    private static void setPropertiesInfo(TreeNode root, TreeNode node, NativePropertyDescriptor[] propertyDescriptors) throws Exception {
+        for (NativePropertyDescriptor propertyDescriptor : propertyDescriptors) {
             String propertyName = propertyDescriptor.getName();
 
             NativeMethodDescriptor getterMethod = propertyDescriptor.getGetterMethod();
@@ -544,26 +544,24 @@ public class Builder {
         return sig;
     }
 
-    private static <T> T[] concatenate(T[] a, T[] b) {
+    private static NativeMethodDescriptor[] concatenateNativeMethodArrays(NativeMethodDescriptor[] a, NativeMethodDescriptor[] b) {
         int aLen = a.length;
         int bLen = b.length;
 
-        @SuppressWarnings("unchecked")
-        T[] d = (T[]) Array.newInstance(a.getClass().getComponentType(), aLen + bLen);
+        NativeMethodDescriptor[] d = new NativeMethodDescriptor[aLen + bLen];
         System.arraycopy(a, 0, d, 0, aLen);
         System.arraycopy(b, 0, d, aLen, bLen);
 
         return d;
     }
 
-    private static <T> T[] concatenate(T[] a, T[] b, T[] c) {
+    private static NativeMethodDescriptor[] concatenateNativeMethodArrays(NativeMethodDescriptor[] a, NativeMethodDescriptor[] b, NativeMethodDescriptor[] c) {
         int aLen = a.length;
         int bLen = b.length;
         int cLen = c.length;
         int abLen = aLen + bLen;
 
-        @SuppressWarnings("unchecked")
-        T[] d = (T[]) Array.newInstance(a.getClass().getComponentType(), abLen + cLen);
+        NativeMethodDescriptor[] d = new NativeMethodDescriptor[abLen + cLen];
         System.arraycopy(a, 0, d, 0, aLen);
         System.arraycopy(b, 0, d, aLen, bLen);
         System.arraycopy(c, 0, d, abLen, cLen);
