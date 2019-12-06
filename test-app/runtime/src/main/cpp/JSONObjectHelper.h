@@ -2,20 +2,14 @@
 #define JSONOBJECTHELPER_H_
 
 #include "v8.h"
-#include "ObjectManager.h"
 
 namespace tns {
 
 class JSONObjectHelper {
 public:
-    JSONObjectHelper();
-    void CreateConvertFunctions(v8::Isolate* isolate, const v8::Local<v8::Object>& global, ObjectManager* objectManager);
+    static void RegisterFromFunction(v8::Isolate *isolate, v8::Local<v8::Value>& jsonObject);
 private:
-    ObjectManager* m_objectManager;
-    v8::Persistent<v8::Function>* m_serializeFunc;
-
-    v8::Local<v8::Function> CreateSerializeFunc(v8::Isolate* isolate);
-    void ConvertCallback(const v8::FunctionCallbackInfo<v8::Value>& info);
+    static v8::Local<v8::Function> CreateSerializeFunc(v8::Local<v8::Context> context);
     static void ConvertCallbackStatic(const v8::FunctionCallbackInfo<v8::Value>& info);
 };
 
