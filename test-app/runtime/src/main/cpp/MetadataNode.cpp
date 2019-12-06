@@ -13,6 +13,7 @@
 #include <cctype>
 #include <dirent.h>
 #include "ManualInstrumentation.h"
+#include "JSONObjectHelper.h"
 
 #include "v8.h"
 
@@ -1367,6 +1368,10 @@ void MetadataNode::PackageGetterCallback(Local<Name> property, const PropertyCal
                 }
 
                 V8SetPrivateValue(isolate, thiz, strProperty, cachedItem);
+
+                if (node->m_name == "org/json" && child.name == "JSONObject") {
+                    JSONObjectHelper::RegisterFromFunction(isolate, cachedItem);
+                }
             }
         }
 

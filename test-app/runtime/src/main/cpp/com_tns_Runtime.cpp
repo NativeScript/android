@@ -322,12 +322,18 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_TerminateWorkerCallback(JNIEnv* e
 
     auto isolate = runtime->GetIsolate();
 
-    v8::Isolate::Scope isolate_scope(isolate);
-    v8::HandleScope handleScope(isolate);
+    {
+        v8::Isolate::Scope isolate_scope(isolate);
+        v8::HandleScope handleScope(isolate);
 
-    CallbackHandlers::TerminateWorkerThread(isolate);
+        CallbackHandlers::TerminateWorkerThread(isolate);
 
-    runtime->DestroyRuntime();
+        runtime->DestroyRuntime();
+    }
+
+    isolate->Dispose();
+
+    delete runtime;
 }
 
 extern "C" JNIEXPORT void Java_com_tns_Runtime_ClearWorkerPersistent(JNIEnv* env, jobject obj, jint runtimeId, jint workerId) {

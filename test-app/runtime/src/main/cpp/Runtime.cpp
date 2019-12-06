@@ -203,6 +203,12 @@ void Runtime::Init(jstring filesPath, jstring nativeLibDir, bool verboseLoggingE
     m_isolate = PrepareV8Runtime(filesRoot, nativeLibDirStr, packageNameStr, isDebuggable, callingDirStr, profilerOutputDirStr, maxLogcatObjectSize, forceLog);
 }
 
+Runtime::~Runtime() {
+    delete this->m_objectManager;
+    delete this->m_heapSnapshotBlob;
+    delete this->m_startupData;
+}
+
 std::string Runtime::ReadFileText(const std::string& filePath) {
 #ifdef APPLICATION_IN_DEBUG
     std::lock_guard<std::mutex> lock(m_fileWriteMutex);
@@ -717,7 +723,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     ArrayHelper::Init(context);
 
     m_arrayBufferHelper.CreateConvertFunctions(isolate, global, m_objectManager);
-    m_jsonObjectHelper.CreateConvertFunctions(isolate, global, m_objectManager);
 
     s_mainThreadInitialized = true;
 

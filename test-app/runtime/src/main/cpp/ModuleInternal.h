@@ -19,6 +19,8 @@ class ModuleInternal {
     public:
         ModuleInternal();
 
+        ~ModuleInternal();
+
         void Init(v8::Isolate* isolate, const std::string& baseDir = "");
 
         void Load(const std::string& path);
