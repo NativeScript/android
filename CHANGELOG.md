@@ -1,3 +1,16 @@
+6.3.0
+==
+
+## What's New
+
+- [Upgrade v8 to 7.8.279.19 (#1526)](https://github.com/NativeScript/android-runtime/issues/1526)
+- [Restrict Kotlin internal modifier from metadata (#1551)](https://github.com/NativeScript/android-runtime/pull/1551)
+- [Restrict Kotlin properties with non-public type (#1552)](https://github.com/NativeScript/android-runtime/issues/1552)
+
+## Bug Fixes
+
+- [Android 9: signal 11 (SIGSEGV), code 1 (SEGV_MAPERR) in libNativeScript.so (#1413)](https://github.com/NativeScript/android-runtime/issues/1413)
+
 6.2.0
 ==
 
