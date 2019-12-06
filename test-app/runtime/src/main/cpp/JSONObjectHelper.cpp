@@ -7,33 +7,54 @@
 using namespace v8;
 using namespace tns;
 
-JSONObjectHelper::JSONObjectHelper()
-    : m_objectManager(nullptr), m_serializeFunc(nullptr) {
-}
+void JSONObjectHelper::RegisterFromFunction(Isolate *isolate, Local<Value>& jsonObject) {
+    if (!jsonObject->IsFunction()) {
+        return;
+    }
 
-void JSONObjectHelper::CreateConvertFunctions(Isolate *isolate, const Local<Object> &global, ObjectManager* objectManager) {
-    m_objectManager = objectManager;
-
-    m_serializeFunc = new Persistent<Function>(isolate, CreateSerializeFunc(isolate));
+    Isolate::Scope isolate_scope(isolate);
+    HandleScope handle_scope(isolate);
 
     Local<Context> context = isolate->GetCurrentContext();
+    Context::Scope context_scope(context);
 
-    Local<External> extData = External::New(isolate, this);
-    Local<Function> fromFunc = FunctionTemplate::New(isolate, ConvertCallbackStatic, extData)->GetFunction(context).ToLocalChecked();
+    Local<Function> jsonObjectFunc =  jsonObject.As<Function>();
+    auto fromKey = ArgConverter::ConvertToV8String(isolate, "from");
+    if (jsonObjectFunc->Has(context, fromKey).FromMaybe(false)) {
+        return;
+    }
 
-    Local<Function> jsonObjectFunc = global->Get(context, ArgConverter::ConvertToV8String(isolate, "org"))
-            .ToLocalChecked().As<Object>()->Get(context, ArgConverter::ConvertToV8String(isolate, "json"))
-            .ToLocalChecked().As<Object>()->Get(context, ArgConverter::ConvertToV8String(isolate, "JSONObject"))
-            .ToLocalChecked().As<Function>();
-
-    jsonObjectFunc->Set(context, ArgConverter::ConvertToV8String(isolate, "from"), fromFunc);
+    Persistent<Function>* serializeFunc = new Persistent<Function>(isolate, CreateSerializeFunc(context));
+    Local<External> extData = External::New(isolate, serializeFunc);
+    Local<Function> fromFunc;
+    bool ok = FunctionTemplate::New(isolate, ConvertCallbackStatic, extData)->GetFunction(context).ToLocal(&fromFunc);
+    assert(ok);
+    jsonObjectFunc->Set(context, fromKey, fromFunc);
 }
 
 void JSONObjectHelper::ConvertCallbackStatic(const FunctionCallbackInfo<Value>& info) {
     try {
         Local<External> extData = info.Data().As<External>();
-        auto thiz = reinterpret_cast<JSONObjectHelper*>(extData->Value());
-        thiz->ConvertCallback(info);
+        auto poSerializeFunc = reinterpret_cast<Persistent<Function>*>(extData->Value());
+        Isolate* isolate = info.GetIsolate();
+        Local<Function> serializeFunc = poSerializeFunc->Get(isolate);
+
+        if (info.Length() < 1) {
+            NativeScriptException nsEx(std::string("The \"from\" function expects one parameter"));
+            nsEx.ReThrowToV8();
+            return;
+        }
+
+        Local<Context> context = isolate->GetCurrentContext();
+
+        Local<Value> args[] = { info[0] };
+        Local<Value> result;
+        TryCatch tc(isolate);
+        if (!serializeFunc->Call(context, Undefined(isolate), 1, args).ToLocal(&result)) {
+            throw NativeScriptException(tc, "Error serializing to JSONObject");
+        }
+
+        info.GetReturnValue().Set(result);
     } catch (NativeScriptException& e) {
         e.ReThrowToV8();
     } catch (std::exception e) {
@@ -47,28 +68,7 @@ void JSONObjectHelper::ConvertCallbackStatic(const FunctionCallbackInfo<Value>& 
     }
 }
 
-void JSONObjectHelper::ConvertCallback(const FunctionCallbackInfo<Value>& info) {
-    if (info.Length() < 1) {
-        NativeScriptException nsEx(std::string("The \"from\" function expects one parameter"));
-        nsEx.ReThrowToV8();
-        return;
-    }
-
-    Isolate* isolate = info.GetIsolate();
-    Local<Context> context = isolate->GetCurrentContext();
-
-    Local<Function> serializeFunc = m_serializeFunc->Get(isolate);
-    Local<Value> args[] = { info[0] };
-    Local<Value> result;
-    TryCatch tc(isolate);
-    if (!serializeFunc->Call(context, Undefined(isolate), 1, args).ToLocal(&result)) {
-        throw NativeScriptException(tc, "Error serializing to JSONObject");
-    }
-
-    info.GetReturnValue().Set(result);
-}
-
-Local<Function> JSONObjectHelper::CreateSerializeFunc(Isolate* isolate) {
+Local<Function> JSONObjectHelper::CreateSerializeFunc(Local<Context> context) {
     std::string source =
         "(() => function serialize(data) {"
         "    let store;"
@@ -102,7 +102,7 @@ Local<Function> JSONObjectHelper::CreateSerializeFunc(Isolate* isolate) {
         "    }"
         "})()";
 
-    Local<Context> context = isolate->GetCurrentContext();
+    Isolate* isolate = context->GetIsolate();
 
     Local<Script> script = Script::Compile(context, ArgConverter::ConvertToV8String(isolate, source)).ToLocalChecked();
 

@@ -31,6 +31,15 @@ ModuleInternal::ModuleInternal()
     : m_isolate(nullptr), m_requireFunction(nullptr), m_requireFactoryFunction(nullptr) {
 }
 
+ModuleInternal::~ModuleInternal() {
+    delete this->m_requireFunction;
+    delete this->m_requireFactoryFunction;
+    for (const auto pair: this->m_requireCache) {
+        delete pair.second;
+    }
+    this->m_requireCache.clear();
+}
+
 void ModuleInternal::Init(Isolate* isolate, const string& baseDir) {
     JEnv env;
 
