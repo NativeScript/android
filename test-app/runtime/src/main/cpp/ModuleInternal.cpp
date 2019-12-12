@@ -22,6 +22,7 @@
 #include <mutex>
 #include <libgen.h>
 #include <dlfcn.h>
+#include <sys/stat.h>
 
 using namespace v8;
 using namespace std;
@@ -460,6 +461,19 @@ ScriptCompiler::CachedData* ModuleInternal::TryLoadScriptCache(const std::string
     }
 
     auto cachePath = path + ".cache";
+
+    struct stat result;
+    if (stat(cachePath.c_str(), &result) == 0) {
+        auto cacheLastModifiedTime = result.st_mtime;
+        if (stat(path.c_str(), &result) == 0) {
+            auto jsLastModifiedTime = result.st_mtime;
+            if (jsLastModifiedTime > 0 && cacheLastModifiedTime > 0 && jsLastModifiedTime > cacheLastModifiedTime) {
+                // The javascript file is more recent than the cache file => ignore the cache
+                return nullptr;
+            }
+        }
+    }
+
     int length = 0;
     auto data = File::ReadBinary(cachePath, length);
     if (!data) {
