@@ -1456,7 +1456,6 @@ public:
 void DispatcherImpl::enable(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
 {
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     std::unique_ptr<EnableCallbackImpl> callback(new EnableCallbackImpl(weakPtr(), callId, method, message));
     m_backend->enable(std::move(callback));
     return;

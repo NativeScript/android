@@ -2448,7 +2448,6 @@ void DispatcherImpl::getResponseBody(int callId, const String& method, const Pro
         return;
     }
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     std::unique_ptr<GetResponseBodyCallbackImpl> callback(new GetResponseBodyCallbackImpl(weakPtr(), callId, method, message));
     m_backend->getResponseBody(in_requestId, std::move(callback));
     return;
@@ -2492,7 +2491,6 @@ void DispatcherImpl::getRequestPostData(int callId, const String& method, const 
         return;
     }
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     std::unique_ptr<GetRequestPostDataCallbackImpl> callback(new GetRequestPostDataCallbackImpl(weakPtr(), callId, method, message));
     m_backend->getRequestPostData(in_requestId, std::move(callback));
     return;

@@ -1501,7 +1501,6 @@ void DispatcherImpl::awaitPromise(int callId, const String& method, const Protoc
         return;
     }
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     std::unique_ptr<AwaitPromiseCallbackImpl> callback(new AwaitPromiseCallbackImpl(weakPtr(), callId, method, message));
     m_backend->awaitPromise(in_promiseObjectId, std::move(in_returnByValue), std::move(in_generatePreview), std::move(callback));
     return;
@@ -1601,7 +1600,6 @@ void DispatcherImpl::callFunctionOn(int callId, const String& method, const Prot
         return;
     }
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     std::unique_ptr<CallFunctionOnCallbackImpl> callback(new CallFunctionOnCallbackImpl(weakPtr(), callId, method, message));
     m_backend->callFunctionOn(in_functionDeclaration, std::move(in_objectId), std::move(in_arguments), std::move(in_silent), std::move(in_returnByValue), std::move(in_generatePreview), std::move(in_userGesture), std::move(in_awaitPromise), std::move(in_executionContextId), std::move(in_objectGroup), std::move(callback));
     return;
@@ -1790,15 +1788,20 @@ void DispatcherImpl::evaluate(int callId, const String& method, const ProtocolMe
         errors->setName("timeout");
         in_timeout = ValueConversions<double>::fromValue(timeoutValue, errors);
     }
+    protocol::Value* disableBreaksValue = object ? object->get("disableBreaks") : nullptr;
+    Maybe<bool> in_disableBreaks;
+    if (disableBreaksValue) {
+        errors->setName("disableBreaks");
+        in_disableBreaks = ValueConversions<bool>::fromValue(disableBreaksValue, errors);
+    }
     errors->pop();
     if (errors->hasErrors()) {
         reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
         return;
     }
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     std::unique_ptr<EvaluateCallbackImpl> callback(new EvaluateCallbackImpl(weakPtr(), callId, method, message));
-    m_backend->evaluate(in_expression, std::move(in_objectGroup), std::move(in_includeCommandLineAPI), std::move(in_silent), std::move(in_contextId), std::move(in_returnByValue), std::move(in_generatePreview), std::move(in_userGesture), std::move(in_awaitPromise), std::move(in_throwOnSideEffect), std::move(in_timeout), std::move(callback));
+    m_backend->evaluate(in_expression, std::move(in_objectGroup), std::move(in_includeCommandLineAPI), std::move(in_silent), std::move(in_contextId), std::move(in_returnByValue), std::move(in_generatePreview), std::move(in_userGesture), std::move(in_awaitPromise), std::move(in_throwOnSideEffect), std::move(in_timeout), std::move(in_disableBreaks), std::move(callback));
     return;
 }
 
@@ -2119,7 +2122,6 @@ void DispatcherImpl::runScript(int callId, const String& method, const ProtocolM
         return;
     }
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     std::unique_ptr<RunScriptCallbackImpl> callback(new RunScriptCallbackImpl(weakPtr(), callId, method, message));
     m_backend->runScript(in_scriptId, std::move(in_executionContextId), std::move(in_objectGroup), std::move(in_silent), std::move(in_includeCommandLineAPI), std::move(in_returnByValue), std::move(in_generatePreview), std::move(in_awaitPromise), std::move(callback));
     return;
@@ -2201,7 +2203,6 @@ public:
 void DispatcherImpl::terminateExecution(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
 {
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     std::unique_ptr<TerminateExecutionCallbackImpl> callback(new TerminateExecutionCallbackImpl(weakPtr(), callId, method, message));
     m_backend->terminateExecution(std::move(callback));
     return;

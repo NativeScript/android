@@ -1,3 +1,10 @@
+6.4.0
+==
+
+## What's New
+
+- [Upgrade v8 to 7.9.317.31 (#1526)](https://github.com/NativeScript/android-runtime/issues/1555)
+
 6.3.0
 ==
 
@@ -24,7 +31,7 @@
  - [Upgrade android gradle plugin to the latest 3.5.1 version (#1502)](https://github.com/NativeScript/android-runtime/issues/1502)
  - [support snapshot libs out of the box (#1496)](https://github.com/NativeScript/android-runtime/pull/1496)
  - [Upgrade v8 to 7.7.299.11 (#1478)](https://github.com/NativeScript/android-runtime/issues/1478)
- 
+
 ## Bug Fixes
  - [Console.log in worker makes chrome debugging crash (#1511)](https://github.com/NativeScript/android-runtime/issues/1511)
  - [fix searching for merge assets folder on windows (#1503)](https://github.com/NativeScript/android-runtime/pull/1503)
