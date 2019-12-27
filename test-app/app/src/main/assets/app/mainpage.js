@@ -61,4 +61,5 @@ require("./tests/kotlin/delegation/testDelegationSupport");
 require("./tests/kotlin/objects/testObjectsSupport");
 require("./tests/kotlin/functions/testTopLevelFunctionsSupport");
 require("./tests/kotlin/extensions/testExtensionFunctionsSupport");
+require("./tests/kotlin/enums/testEnumsSupport");
 require("./tests/kotlin/access/testInternalLanguageFeaturesSupport");

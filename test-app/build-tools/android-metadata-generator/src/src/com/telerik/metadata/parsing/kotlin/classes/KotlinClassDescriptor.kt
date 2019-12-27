@@ -7,6 +7,7 @@ import com.telerik.metadata.parsing.NativeMethodDescriptor
 import com.telerik.metadata.parsing.NativePropertyDescriptor
 import com.telerik.metadata.parsing.bytecode.classes.NativeClassBytecodeDescriptor
 import com.telerik.metadata.parsing.kotlin.fields.KotlinCompanionFieldDescriptor
+import com.telerik.metadata.parsing.kotlin.fields.KotlinEnumFieldDescriptor
 import com.telerik.metadata.parsing.kotlin.fields.KotlinJvmFieldDescriptor
 import com.telerik.metadata.parsing.kotlin.metadata.MetadataAnnotation
 import com.telerik.metadata.parsing.kotlin.metadata.bytecode.BytecodeClassMetadataParser
@@ -36,7 +37,6 @@ class KotlinClassDescriptor(nativeClass: JavaClass, private val metadataAnnotati
 
     override val fields: Array<NativeFieldDescriptor> by lazy {
         val fields = ArrayList<NativeFieldDescriptor>()
-
         val meta = kotlinMetadata
         var kotlinMetadataProperties: Collection<KmProperty> = emptyList()
 
@@ -48,6 +48,12 @@ class KotlinClassDescriptor(nativeClass: JavaClass, private val metadataAnnotati
             if (possibleCompanionField.isPresent) {
                 fields.add(possibleCompanionField.get())
             }
+
+            if(metaClass.enumEntries.isNotEmpty()){
+                val enumFields = getEnumEntriesAsFields(nativeClass, metaClass.enumEntries)
+                fields.addAll(enumFields)
+            }
+
         } else if (meta is KotlinClassMetadata.FileFacade) {
             kotlinMetadataProperties = meta.toKmPackage().properties
         } else if (meta is KotlinClassMetadata.MultiFileClassPart) {
@@ -105,6 +111,20 @@ class KotlinClassDescriptor(nativeClass: JavaClass, private val metadataAnnotati
         }
 
         return Optional.empty()
+    }
+
+    private fun getEnumEntriesAsFields(nativeClass: JavaClass, metadataEnumEntries: Collection<String>): Collection<KotlinEnumFieldDescriptor> {
+        val bytecodeFields = nativeClass.fields
+
+        val matchingEnumFields = bytecodeFields
+                .filter {
+                    metadataEnumEntries.contains(it.name)
+                }
+                .map {
+                    KotlinEnumFieldDescriptor(it, isPublic, isInternal, isProtected)
+                }
+
+        return matchingEnumFields
     }
 
     override val properties: Array<out NativePropertyDescriptor> by lazy {
