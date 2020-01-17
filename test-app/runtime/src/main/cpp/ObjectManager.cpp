@@ -343,6 +343,8 @@ void ObjectManager::JSObjectFinalizer(Isolate *isolate, ObjectWeakCallbackState 
         po->Reset();
         auto it = m_idToObject.find(javaObjectID);
         m_idToObject.erase(it);
+        delete po;
+        delete callbackState;
     }
 }
 
