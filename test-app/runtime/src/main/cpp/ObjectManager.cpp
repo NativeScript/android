@@ -325,6 +325,8 @@ void ObjectManager::JSObjectFinalizer(Isolate *isolate, ObjectWeakCallbackState 
 
     if (jsInstanceInfo == nullptr) {
         po->Reset();
+        delete po;
+        delete callbackState;
         return;
     }
 
