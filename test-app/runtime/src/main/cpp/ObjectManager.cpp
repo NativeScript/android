@@ -341,8 +341,7 @@ void ObjectManager::JSObjectFinalizer(Isolate *isolate, ObjectWeakCallbackState 
         auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
         po->Get(m_isolate)->SetInternalField(jsInfoIdx, Undefined(m_isolate));
         po->Reset();
-        auto it = m_idToObject.find(javaObjectID);
-        m_idToObject.erase(it);
+        m_idToObject.erase(javaObjectID);
         delete po;
         delete callbackState;
     }
