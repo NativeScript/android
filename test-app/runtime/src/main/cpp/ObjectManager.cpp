@@ -325,6 +325,8 @@ void ObjectManager::JSObjectFinalizer(Isolate *isolate, ObjectWeakCallbackState 
 
     if (jsInstanceInfo == nullptr) {
         po->Reset();
+        delete po;
+        delete callbackState;
         return;
     }
 
@@ -341,6 +343,9 @@ void ObjectManager::JSObjectFinalizer(Isolate *isolate, ObjectWeakCallbackState 
         auto jsInfoIdx = static_cast<int>(MetadataNodeKeys::JsInfo);
         po->Get(m_isolate)->SetInternalField(jsInfoIdx, Undefined(m_isolate));
         po->Reset();
+        m_idToObject.erase(javaObjectID);
+        delete po;
+        delete callbackState;
     }
 }
 
