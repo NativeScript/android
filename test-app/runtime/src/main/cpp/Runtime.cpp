@@ -96,6 +96,7 @@ Runtime::Runtime(JNIEnv* env, jobject runtime, int id)
     : m_env(env), m_id(id), m_isolate(nullptr), m_lastUsedMemory(0), m_gcFunc(nullptr), m_runGC(false) {
     m_runtime = m_env.NewGlobalRef(runtime);
     m_objectManager = new ObjectManager(m_runtime);
+    m_loopTimer = new MessageLoopTimer();
     s_id2RuntimeCache.insert(make_pair(id, this));
 
     if (GET_USED_MEMORY_METHOD_ID == nullptr) {
@@ -204,6 +205,7 @@ void Runtime::Init(jstring filesPath, jstring nativeLibDir, bool verboseLoggingE
 
 Runtime::~Runtime() {
     delete this->m_objectManager;
+    delete this->m_loopTimer;
     delete this->m_heapSnapshotBlob;
     delete this->m_startupData;
 }
@@ -717,6 +719,8 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     ArrayHelper::Init(context);
 
     m_arrayBufferHelper.CreateConvertFunctions(isolate, global, m_objectManager);
+
+    m_loopTimer->Init(context);
 
     s_mainThreadInitialized = true;
 

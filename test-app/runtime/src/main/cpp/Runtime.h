@@ -9,6 +9,7 @@
 #include "ArrayBufferHelper.h"
 #include "Profiler.h"
 #include "ModuleInternal.h"
+#include "MessageLoopTimer.h"
 #include "File.h"
 #include <mutex>
 
@@ -83,6 +84,8 @@ class Runtime {
         WeakRef m_weakRef;
 
         Profiler m_profiler;
+
+        MessageLoopTimer* m_loopTimer;
 
         v8::StartupData* m_startupData = nullptr;
         MemoryMappedFile* m_heapSnapshotBlob = nullptr;
