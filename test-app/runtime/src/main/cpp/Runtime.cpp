@@ -28,7 +28,6 @@
 #include "NetworkDomainCallbackHandlers.h"
 #include "sys/system_properties.h"
 #include "ManualInstrumentation.h"
-#include <natives_blob.h>
 #include <snapshot_blob.h>
 
 #ifdef APPLICATION_IN_DEBUG
@@ -471,11 +470,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     create_params.array_buffer_allocator = &g_allocator;
 
     m_startupData = new StartupData();
-
-    auto* nativesBlobStartupData = new StartupData();
-    nativesBlobStartupData->data = reinterpret_cast<const char*>(&natives_blob_bin[0]);
-    nativesBlobStartupData->raw_size = natives_blob_bin_len;
-    V8::SetNativesDataBlob(nativesBlobStartupData);
 
     void* snapshotPtr = nullptr;
     string snapshotPath;

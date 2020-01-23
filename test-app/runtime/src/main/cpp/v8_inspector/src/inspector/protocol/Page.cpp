@@ -1539,7 +1539,6 @@ void DispatcherImpl::getResourceContent(int callId, const String& method, const 
         return;
     }
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     std::unique_ptr<GetResourceContentCallbackImpl> callback(new GetResourceContentCallbackImpl(weakPtr(), callId, method, message));
     m_backend->getResourceContent(in_frameId, in_url, std::move(callback));
     return;
@@ -1705,7 +1704,6 @@ void DispatcherImpl::searchInResource(int callId, const String& method, const Pr
         return;
     }
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
     std::unique_ptr<SearchInResourceCallbackImpl> callback(new SearchInResourceCallbackImpl(weakPtr(), callId, method, message));
     m_backend->searchInResource(in_frameId, in_url, in_query, std::move(in_caseSensitive), std::move(in_isRegex), std::move(callback));
     return;
