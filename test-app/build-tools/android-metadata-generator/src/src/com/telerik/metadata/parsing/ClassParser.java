@@ -1,6 +1,7 @@
 package com.telerik.metadata.parsing;
 
-import com.telerik.metadata.ClassRepo;
+import com.telerik.metadata.security.classes.SecuredClassRepository;
+import com.telerik.metadata.security.classes.SecuredNativeClassDescriptor;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -25,12 +26,14 @@ public final class ClassParser {
         String[] implementedInterfacesNames = clazz.getInterfaceNames();
 
         for (String implementedInterfaceName : implementedInterfacesNames) {
-            NativeClassDescriptor interfaceClass = ClassRepo.findClass(implementedInterfaceName);
+            SecuredNativeClassDescriptor securedNativeClassDescriptor = SecuredClassRepository.INSTANCE.findClass(implementedInterfaceName);
 
-            if (interfaceClass == null) {
+            if (!securedNativeClassDescriptor.isUsageAllowed()) {
                 System.out.println(String.format("WARNING: Skipping interface %s implemented in %s as it cannot be resolved", implementedInterfaceName, clazz.getClassName()));
                 continue;
             }
+
+            NativeClassDescriptor interfaceClass = securedNativeClassDescriptor.getNativeDescriptor();
 
             for (NativeMethodDescriptor md : interfaceClass.getMethods()) {
                 if (!md.isStatic() && !md.isAbstract()) {

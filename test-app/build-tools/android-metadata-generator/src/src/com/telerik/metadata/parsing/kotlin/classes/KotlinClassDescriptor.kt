@@ -1,6 +1,5 @@
 package com.telerik.metadata.parsing.kotlin.classes
 
-import com.telerik.metadata.ClassRepo
 import com.telerik.metadata.ClassUtil
 import com.telerik.metadata.ClassUtil.getCanonicalName
 import com.telerik.metadata.parsing.NativeFieldDescriptor
@@ -15,6 +14,7 @@ import com.telerik.metadata.parsing.kotlin.metadata.MetadataAnnotation
 import com.telerik.metadata.parsing.kotlin.metadata.bytecode.BytecodeClassMetadataParser
 import com.telerik.metadata.parsing.kotlin.methods.KotlinMethodDescriptor
 import com.telerik.metadata.parsing.kotlin.properties.KotlinPropertyDescriptor
+import com.telerik.metadata.security.classes.SecuredClassRepository
 import kotlinx.metadata.Flag
 import kotlinx.metadata.KmClass
 import kotlinx.metadata.KmProperty
@@ -52,7 +52,7 @@ class KotlinClassDescriptor(nativeClass: JavaClass, private val metadataAnnotati
             }
 
             val possibleObjectInstanceField = getObjectFieldIfAny(nativeClass)
-            if(possibleObjectInstanceField.isPresent){
+            if (possibleObjectInstanceField.isPresent) {
                 fields.add(possibleObjectInstanceField.get())
             }
 
@@ -107,13 +107,16 @@ class KotlinClassDescriptor(nativeClass: JavaClass, private val metadataAnnotati
         if (!companionName.isNullOrEmpty()) {
             val fullCompanionName = "$className$$companionName"
             val canonicalName = ClassUtil.getCanonicalName(fullCompanionName)
-            val companionClass = ClassRepo.findClass(canonicalName)
-            if (companionClass is KotlinClassDescriptor) {
-                val companionField = nativeClass
-                        .fields
-                        .single { it.name == companionName }
-                val companionFieldDescriptor = KotlinCompanionFieldDescriptor(companionField, companionClass)
-                return Optional.of(companionFieldDescriptor)
+            val possibleCompanionClass = SecuredClassRepository.findClass(canonicalName)
+            if (possibleCompanionClass.isUsageAllowed) {
+                val companionClass = possibleCompanionClass.nativeDescriptor
+                if (companionClass is KotlinClassDescriptor) {
+                    val companionField = nativeClass
+                            .fields
+                            .single { it.name == companionName }
+                    val companionFieldDescriptor = KotlinCompanionFieldDescriptor(companionField, companionClass)
+                    return Optional.of(companionFieldDescriptor)
+                }
             }
         }
 
