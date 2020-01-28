@@ -26,8 +26,7 @@ object UserPatternsCollection : PatternsCollection {
     }
 
     private fun parseFile(filePath: String): Collection<PatternEntry> {
-        val uri = URI(filePath)
-        val path = Paths.get(uri)
+        val path = Paths.get(filePath)
 
         if (!Files.exists(path)) {
             return emptyList()
