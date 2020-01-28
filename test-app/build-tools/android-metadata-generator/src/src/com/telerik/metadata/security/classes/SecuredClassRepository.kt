@@ -3,7 +3,7 @@ package com.telerik.metadata.security.classes
 import com.telerik.metadata.ClassMapProvider
 import com.telerik.metadata.parsing.NativeClassDescriptor
 import com.telerik.metadata.security.filtering.blacklisting.MetadataBlacklist
-import com.telerik.metadata.security.filtering.input.PatternEntry
+import com.telerik.metadata.security.filtering.input.user.UserPatternsCollection
 import com.telerik.metadata.security.filtering.matching.impl.PatternMatcherImpl
 import com.telerik.metadata.security.filtering.whitelisting.MetadataWhitelist
 import java.util.*
@@ -11,8 +11,8 @@ import java.util.*
 object SecuredClassRepository {
     private val cachedProviders = ArrayList<ClassMapProvider>()
     private val patternMatcher = PatternMatcherImpl()
-    private val whitelist = MetadataWhitelist(listOf(PatternEntry("*", "*")), patternMatcher)
-    private val blacklist = MetadataBlacklist(emptyList(), patternMatcher)
+    private val whitelist = MetadataWhitelist(UserPatternsCollection.whitelistEntries, patternMatcher)
+    private val blacklist = MetadataBlacklist(UserPatternsCollection.blacklistEntries, patternMatcher)
 
     fun addToCache(classMapProvider: ClassMapProvider) {
         cachedProviders.add(classMapProvider)
@@ -58,7 +58,7 @@ object SecuredClassRepository {
         return SecuredNativeClassDescriptor(false, NativeClassDescriptor.Missing)
     }
 
-    private fun findClassFromProviders(className: String): NativeClassDescriptor?{
+    private fun findClassFromProviders(className: String): NativeClassDescriptor? {
         var clazz: NativeClassDescriptor? = null
         for (classMapProvider in cachedProviders) {
             clazz = classMapProvider.classMap[className]
