@@ -16,15 +16,24 @@ object UserPatternsCollection : PatternsCollection {
 
 
     override fun populateWhitelistEntriesFromFile(filePath: String) {
-        whitelistEntries = parseFile(filePath) + PatternEntry("java.lang", "Object")
+        whitelistEntries = parseFile(filePath) +
+                PatternEntry("java.lang", "Object") +
+                PatternEntry("com.tns.gen*", "*")
     }
 
     override fun populateBlacklistEntriesFromFile(filePath: String) {
         blacklistEntries = parseFile(filePath)
     }
 
-    private fun parseFile(path: String): Collection<PatternEntry> {
-        val fileLines = Files.readAllLines(Paths.get(URI(path)))
+    private fun parseFile(filePath: String): Collection<PatternEntry> {
+        val uri = URI(filePath)
+        val path = Paths.get(uri)
+
+        if (!Files.exists(path)) {
+            return emptyList()
+        }
+
+        val fileLines = Files.readAllLines(path)
         val lineSplitter = UserLineSplitter()
         val commentFilter = UserLineCommentFilter()
 
