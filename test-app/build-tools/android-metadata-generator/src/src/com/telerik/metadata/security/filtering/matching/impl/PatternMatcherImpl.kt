@@ -9,6 +9,12 @@ class PatternMatcherImpl : PatternMatcher {
         Algorithm is borrowed from: https://www.geeksforgeeks.org/wildcard-character-matching/
          */
 
+
+        // Short circuit if pattern is '*'
+        if (pattern == "*" && input.isNotEmpty()) {
+            return true
+        }
+
         // If we reach at the end of both strings,
         // we are done
         if (pattern.isEmpty() && input.isEmpty())
