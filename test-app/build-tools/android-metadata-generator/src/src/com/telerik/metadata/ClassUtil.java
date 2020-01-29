@@ -3,6 +3,8 @@ package com.telerik.metadata;
 import com.telerik.metadata.parsing.NativeClassDescriptor;
 import com.telerik.metadata.parsing.NativeMethodDescriptor;
 import com.telerik.metadata.parsing.NativeTypeDescriptor;
+import com.telerik.metadata.security.classes.SecuredClassRepository;
+import com.telerik.metadata.security.classes.SecuredNativeClassDescriptor;
 
 import java.util.ArrayList;
 
@@ -10,48 +12,44 @@ public class ClassUtil {
     private ClassUtil() {
     }
 
-    public static boolean isPrimitive(NativeClassDescriptor clazz) {
-        boolean isPrimitive = !clazz.isClass() && !clazz.isEnum()
-                              && !clazz.isInterface();
-        return isPrimitive;
+    static boolean isPrimitive(NativeClassDescriptor clazz) {
+        return !clazz.isClass() && !clazz.isEnum()
+                && !clazz.isInterface();
     }
 
-    public static boolean isPrimitive(NativeTypeDescriptor type) {
-        boolean isPrimitive = type.equals(NativeTypeDescriptor.Companion.getBOOLEAN())
-                              || type.equals(NativeTypeDescriptor.Companion.getCHAR()) || type.equals(NativeTypeDescriptor.Companion.getBYTE())
-                              || type.equals(NativeTypeDescriptor.Companion.getSHORT()) || type.equals(NativeTypeDescriptor.Companion.getINT())
-                              || type.equals(NativeTypeDescriptor.Companion.getLONG()) || type.equals(NativeTypeDescriptor.Companion.getFLOAT())
-                              || type.equals(NativeTypeDescriptor.Companion.getDOUBLE()) || type.equals(NativeTypeDescriptor.Companion.getVOID());
+    static boolean isPrimitive(NativeTypeDescriptor type) {
 
-        return isPrimitive;
+        return type.equals(NativeTypeDescriptor.Companion.getBOOLEAN())
+                || type.equals(NativeTypeDescriptor.Companion.getCHAR()) || type.equals(NativeTypeDescriptor.Companion.getBYTE())
+                || type.equals(NativeTypeDescriptor.Companion.getSHORT()) || type.equals(NativeTypeDescriptor.Companion.getINT())
+                || type.equals(NativeTypeDescriptor.Companion.getLONG()) || type.equals(NativeTypeDescriptor.Companion.getFLOAT())
+                || type.equals(NativeTypeDescriptor.Companion.getDOUBLE()) || type.equals(NativeTypeDescriptor.Companion.getVOID());
     }
 
-    public static boolean isPrimitive(String name) {
-        boolean isPrimitive = name.equals("C") || name.equals("Z")
-                              || name.equals("B") || name.equals("S") || name.equals("I")
-                              || name.equals("J") || name.equals("F") || name.equals("D")
-                              || name.equals("V");
-        return isPrimitive;
+    static boolean isPrimitive(String name) {
+        return name.equals("C") || name.equals("Z")
+                || name.equals("B") || name.equals("S") || name.equals("I")
+                || name.equals("J") || name.equals("F") || name.equals("D")
+                || name.equals("V");
     }
 
-    public static boolean isArray(NativeClassDescriptor clazz) {
-        boolean isArray = isArray(clazz.getClassName());
-        return isArray;
+    static boolean isArray(NativeClassDescriptor clazz) {
+        return isArray(clazz.getClassName());
     }
 
-    public static boolean isArray(String className) {
-        boolean isArray = className.startsWith("[");
-        return isArray;
+    static boolean isArray(String className) {
+        return className.startsWith("[");
     }
 
-    public static NativeClassDescriptor getEnclosingClass(NativeClassDescriptor clazz) {
+    static NativeClassDescriptor getEnclosingClass(NativeClassDescriptor clazz) {
         NativeClassDescriptor enclosingClass = null;
 
         String className = clazz.getClassName();
         int idx = className.lastIndexOf("$");
         if (idx > 0) {
             String name = className.substring(0, idx);
-            enclosingClass = ClassRepo.findClass(name);
+            SecuredNativeClassDescriptor securedNativeClassDescriptor = SecuredClassRepository.INSTANCE.findClass(name);
+            enclosingClass = securedNativeClassDescriptor.isUsageAllowed() ? securedNativeClassDescriptor.getNativeDescriptor() : null;
         }
 
         return enclosingClass;
@@ -67,7 +65,7 @@ public class ClassUtil {
         return simpleName;
     }
 
-    public static NativeMethodDescriptor[] getAllMethods(NativeClassDescriptor clazz) {
+    static NativeMethodDescriptor[] getAllMethods(NativeClassDescriptor clazz) {
         ArrayList<NativeMethodDescriptor> methods = new ArrayList<NativeMethodDescriptor>();
         NativeClassDescriptor currentClass = clazz;
         while (currentClass != null) {
@@ -86,25 +84,21 @@ public class ClassUtil {
         String canonicalName;
         if (className.startsWith("L") && className.endsWith(";")) {
             canonicalName = className.substring(1, className.length() - 1)
-                            .replace('/', '.');
+                    .replace('/', '.');
         } else {
             canonicalName = className;
         }
         return canonicalName;
     }
 
-    public static NativeClassDescriptor getSuperclass(NativeClassDescriptor clazz) {
+    static NativeClassDescriptor getSuperclass(NativeClassDescriptor clazz) {
         NativeClassDescriptor superClass = null;
         if (!clazz.getClassName().equals("java.lang.Object")) {
             String superClassName = clazz.getSuperclassName();
-            superClass = ClassRepo.findClass(superClassName);
+            SecuredNativeClassDescriptor securedNativeClassDescriptor = SecuredClassRepository.INSTANCE.findNearestAllowedClass(superClassName);
+            superClass = securedNativeClassDescriptor.isUsageAllowed() ? securedNativeClassDescriptor.getNativeDescriptor() : null;
         }
         return superClass;
-    }
-
-    public static NativeClassDescriptor getClassByName(String className) {
-        NativeClassDescriptor clazz = ClassRepo.findClass(className);
-        return clazz;
     }
 
 }
