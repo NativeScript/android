@@ -1,7 +1,7 @@
 package com.telerik.metadata.parsing.kotlin.classes
 
-import com.telerik.metadata.ClassRepo
 import com.telerik.metadata.ClassUtil
+import com.telerik.metadata.ClassUtil.getCanonicalName
 import com.telerik.metadata.parsing.NativeFieldDescriptor
 import com.telerik.metadata.parsing.NativeMethodDescriptor
 import com.telerik.metadata.parsing.NativePropertyDescriptor
@@ -9,10 +9,12 @@ import com.telerik.metadata.parsing.bytecode.classes.NativeClassBytecodeDescript
 import com.telerik.metadata.parsing.kotlin.fields.KotlinCompanionFieldDescriptor
 import com.telerik.metadata.parsing.kotlin.fields.KotlinEnumFieldDescriptor
 import com.telerik.metadata.parsing.kotlin.fields.KotlinJvmFieldDescriptor
+import com.telerik.metadata.parsing.kotlin.fields.KotlinObjectInstanceFieldDescriptor
 import com.telerik.metadata.parsing.kotlin.metadata.MetadataAnnotation
 import com.telerik.metadata.parsing.kotlin.metadata.bytecode.BytecodeClassMetadataParser
 import com.telerik.metadata.parsing.kotlin.methods.KotlinMethodDescriptor
 import com.telerik.metadata.parsing.kotlin.properties.KotlinPropertyDescriptor
+import com.telerik.metadata.security.classes.SecuredClassRepository
 import kotlinx.metadata.Flag
 import kotlinx.metadata.KmClass
 import kotlinx.metadata.KmProperty
@@ -49,7 +51,13 @@ class KotlinClassDescriptor(nativeClass: JavaClass, private val metadataAnnotati
                 fields.add(possibleCompanionField.get())
             }
 
-            if(metaClass.enumEntries.isNotEmpty()){
+            val possibleObjectInstanceField = getObjectFieldIfAny(nativeClass)
+            if (possibleObjectInstanceField.isPresent) {
+                fields.add(possibleObjectInstanceField.get())
+            }
+
+            if (metaClass.enumEntries.isNotEmpty()) {
+
                 val enumFields = getEnumEntriesAsFields(nativeClass, metaClass.enumEntries)
                 fields.addAll(enumFields)
             }
@@ -100,17 +108,35 @@ class KotlinClassDescriptor(nativeClass: JavaClass, private val metadataAnnotati
         if (!companionName.isNullOrEmpty()) {
             val fullCompanionName = "$className$$companionName"
             val canonicalName = ClassUtil.getCanonicalName(fullCompanionName)
-            val companionClass = ClassRepo.findClass(canonicalName)
-            if (companionClass is KotlinClassDescriptor) {
-                val companionField = nativeClass
-                        .fields
-                        .single { it.name == companionName }
-                val companionFieldDescriptor = KotlinCompanionFieldDescriptor(companionField, companionClass)
-                return Optional.of(companionFieldDescriptor)
+            val possibleCompanionClass = SecuredClassRepository.findClass(canonicalName)
+            if (possibleCompanionClass.isUsageAllowed) {
+                val companionClass = possibleCompanionClass.nativeDescriptor
+                if (companionClass is KotlinClassDescriptor) {
+                    val companionField = nativeClass
+                            .fields
+                            .single { it.name == companionName }
+                    val companionFieldDescriptor = KotlinCompanionFieldDescriptor(companionField, companionClass)
+                    return Optional.of(companionFieldDescriptor)
+                }
             }
         }
 
         return Optional.empty()
+    }
+
+    private fun getObjectFieldIfAny(nativeClass: JavaClass): Optional<KotlinObjectInstanceFieldDescriptor> {
+        return nativeClass
+                .fields
+                .singleOrNull { field ->
+                    field.name == "INSTANCE" && getCanonicalName(field.type.signature) == nativeClass.className
+                }.run {
+                    if (this != null) {
+                        val objectInstanceField = KotlinObjectInstanceFieldDescriptor(this@run, this@KotlinClassDescriptor)
+                        Optional.of(objectInstanceField)
+                    } else {
+                        Optional.empty()
+                    }
+                }
     }
 
     private fun getEnumEntriesAsFields(nativeClass: JavaClass, metadataEnumEntries: Collection<String>): Collection<KotlinEnumFieldDescriptor> {

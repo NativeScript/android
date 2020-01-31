@@ -3,7 +3,7 @@ package com.telerik.metadata.parsing
 /**
  * Describes the properties of a native field
  */
-interface NativeFieldDescriptor : AccessModifiable {
+interface NativeFieldDescriptor : AccessModifiable, NativeDescriptor {
     val isFinal: Boolean
     val isStatic: Boolean
     val name: String

@@ -17,6 +17,9 @@ import com.telerik.metadata.parsing.kotlin.extensions.KotlinExtensionFunctionDes
 import com.telerik.metadata.parsing.kotlin.extensions.bytecode.BytecodeExtensionFunctionsCollector;
 import com.telerik.metadata.parsing.kotlin.metadata.ClassMetadataParser;
 import com.telerik.metadata.parsing.kotlin.metadata.bytecode.BytecodeClassMetadataParser;
+import com.telerik.metadata.security.MetadataSecurityViolationException;
+import com.telerik.metadata.security.classes.SecuredClassRepository;
+import com.telerik.metadata.security.classes.SecuredNativeClassDescriptor;
 import com.telerik.metadata.storage.functions.FunctionsStorage;
 import com.telerik.metadata.storage.functions.extensions.ExtensionFunctionsStorage;
 
@@ -48,26 +51,26 @@ public class Builder {
                 if (file.isFile()) {
                     if (path.endsWith(".jar")) {
                         JarFile jar = JarFile.readJar(path);
-                        ClassRepo.addToCache(jar);
+                        SecuredClassRepository.INSTANCE.addToCache(jar);
                     }
                 } else if (file.isDirectory()) {
                     ClassDirectory dir = ClassDirectory.readDirectory(path);
-                    ClassRepo.addToCache(dir);
+                    SecuredClassRepository.INSTANCE.addToCache(dir);
                 }
             }
         }
 
         TreeNode root = TreeNode.getRoot();
 
-        String[] classNames = ClassRepo.getClassNames();
+        String[] classNames = SecuredClassRepository.INSTANCE.getClassNames();
 
         for (String className : classNames) {
             try {
-                NativeClassDescriptor clazz = ClassRepo.findClass(className);
-                if (clazz == null) {
-                    throw new ClassNotFoundException("Class " + className + " not found in the input android libraries.");
+                SecuredNativeClassDescriptor clazz = SecuredClassRepository.INSTANCE.findClass(className);
+                if (!clazz.isUsageAllowed()) {
+                    throwMetadataSecurityViolationException(className);
                 } else {
-                    tryCollectKotlinExtensionFunctions(clazz);
+                    tryCollectKotlinExtensionFunctions(clazz.getNativeDescriptor());
                 }
             } catch (Throwable e) {
                 System.out.println("Skip " + className);
@@ -86,11 +89,11 @@ public class Builder {
                 // our class path API 17
                 // Class<?> clazz = Class.forName(className, false, loader);
 
-                NativeClassDescriptor clazz = ClassRepo.findClass(className);
-                if (clazz == null) {
-                    throw new ClassNotFoundException("Class " + className + " not found in the input android libraries.");
+                SecuredNativeClassDescriptor clazz = SecuredClassRepository.INSTANCE.findClass(className);
+                if (!clazz.isUsageAllowed()) {
+                    throwMetadataSecurityViolationException(className);
                 } else {
-                    generate(clazz, root);
+                    generate(clazz.getNativeDescriptor(), root);
                 }
             } catch (Throwable e) {
                 System.out.println("Skip " + className);
@@ -101,6 +104,10 @@ public class Builder {
 
 
         return root;
+    }
+
+    private static void throwMetadataSecurityViolationException(String className){
+        throw new MetadataSecurityViolationException("Class " + className + " could not be used!");
     }
 
     private static void tryCollectKotlinExtensionFunctions(NativeClassDescriptor classDescriptor) {
@@ -319,8 +326,10 @@ public class Builder {
         String[] implementedInterfacesNames = clazz.getInterfaceNames();
         if (implementedInterfacesNames.length > 0) {
             for (String currInterface : implementedInterfacesNames) {
-                interfaceClass = ClassRepo.findClass(currInterface);
-                if (interfaceClass != null) {
+                SecuredNativeClassDescriptor securedNativeClassDescriptor = SecuredClassRepository.INSTANCE.findClass(currInterface);
+
+                if (securedNativeClassDescriptor.isUsageAllowed()) {
+                    interfaceClass = securedNativeClassDescriptor.getNativeDescriptor();
                     fields = interfaceClass.getFields();
 
                     // If the interface iteself extends other interfaces - add their fields too
@@ -361,14 +370,14 @@ public class Builder {
             node = createArrayNode(root, typeName);
         } else {
             String name = ClassUtil.getCanonicalName(type.getSignature());
-            NativeClassDescriptor clazz = ClassRepo.findClass(name);
+            SecuredNativeClassDescriptor clazz = SecuredClassRepository.INSTANCE.findNearestAllowedClass(name);
 
             // if clazz is not found in the ClassRepo, the method/field being analyzed will be skipped
-            if (clazz == null) {
+            if (!clazz.isUsageAllowed()) {
                 return null;
             }
 
-            node = getOrCreateNode(root, clazz, null);
+            node = getOrCreateNode(root, clazz.getNativeDescriptor(), null);
         }
 
         return node;
@@ -451,10 +460,11 @@ public class Builder {
         if (node.baseClassNode == null) {
             NativeClassDescriptor baseClass = null;
             if (predefinedSuperClassname != null) {
-                baseClass = ClassUtil.getClassByName(predefinedSuperClassname);
+                SecuredNativeClassDescriptor securedNativeClassDescriptor = SecuredClassRepository.INSTANCE.findNearestAllowedClass(predefinedSuperClassname);
+                baseClass = securedNativeClassDescriptor.isUsageAllowed() ? securedNativeClassDescriptor.getNativeDescriptor() : null;
             } else {
                 baseClass = clazz.isInterface()
-                        ? ClassUtil.getClassByName("java.lang.Object")
+                        ? SecuredClassRepository.INSTANCE.findClass("java.lang.Object").getNativeDescriptor() // java.lang.Object should always be available
                         : ClassUtil.getSuperclass(clazz);
             }
             if (baseClass != null) {
@@ -505,13 +515,17 @@ public class Builder {
                 child.nodeType = node.nodeType;
                 child.arrayElement = node;
             } else {
-                NativeClassDescriptor clazz = ClassRepo.findClass(name);
-                child.nodeType = clazz.isInterface() ? TreeNode.Interface
-                        : TreeNode.Class;
-                if (clazz.isStatic()) {
-                    child.nodeType |= TreeNode.Static;
+                SecuredNativeClassDescriptor securedNativeClassDescriptor = SecuredClassRepository.INSTANCE.findNearestAllowedClass(name);
+                if (securedNativeClassDescriptor.isUsageAllowed()) {
+                    NativeClassDescriptor nativeClassDescriptor = securedNativeClassDescriptor.getNativeDescriptor();
+                    child.nodeType = nativeClassDescriptor.isInterface() ? TreeNode.Interface
+                            : TreeNode.Class;
+                    if (nativeClassDescriptor.isStatic()) {
+                        child.nodeType |= TreeNode.Static;
+                    }
+                    child.arrayElement = getOrCreateNode(root, nativeClassDescriptor, null);
                 }
-                child.arrayElement = getOrCreateNode(root, clazz, null);
+
             }
         }
 

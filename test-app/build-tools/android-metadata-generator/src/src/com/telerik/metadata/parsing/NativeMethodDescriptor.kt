@@ -3,7 +3,7 @@ package com.telerik.metadata.parsing
 /**
  * Describes the properties of a native method
  */
-interface NativeMethodDescriptor : AccessModifiable {
+interface NativeMethodDescriptor : AccessModifiable, NativeDescriptor {
     val isSynthetic: Boolean
     val isStatic: Boolean
     val isAbstract: Boolean

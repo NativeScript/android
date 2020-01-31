@@ -152,6 +152,7 @@ add_library(
     src/main/cpp/JSONObjectHelper.cpp
     src/main/cpp/Logger.cpp
     src/main/cpp/ManualInstrumentation.cpp
+    src/main/cpp/MessageLoopTimer.cpp
     src/main/cpp/MetadataMethodInfo.cpp
     src/main/cpp/MetadataNode.cpp
     src/main/cpp/MetadataReader.cpp
@@ -222,7 +223,8 @@ endif()
 # completing its build.
 find_library(system-log log)
 find_library(system-z z)
+find_library(system-android android)
 
 # Command info: https://cmake.org/cmake/help/v3.4/command/target_link_libraries.html
 # Specifies libraries CMake should link to your target library.
-target_link_libraries(NativeScript ${system-log} ${system-z})
+target_link_libraries(NativeScript ${system-log} ${system-z} ${system-android})

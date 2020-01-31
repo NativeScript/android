@@ -1,7 +1,7 @@
 {
   "name": "tns-android",
   "description": "NativeScript Runtime for Android",
-  "version": "6.3.1",
+  "version": "6.4.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/NativeScript/android-runtime.git"
@@ -11,7 +11,7 @@
   ],
   "gradle": {
     "version": "5.4.1",
-    "android": "3.5.1"
+    "android": "3.5.3"
   },
   "android_ndk_version": "20"
 }

@@ -1,5 +1,5 @@
 {
-    "v8Version": "7.8.279.19",
+    "v8Version": "7.9.317.31",
     "ndkRevision": "20.0.5594570",
     "mksnapshotParams": "--profile_deserialization --turbo_instruction_scheduling --target_os=android --no-native-code-counters"
 }
