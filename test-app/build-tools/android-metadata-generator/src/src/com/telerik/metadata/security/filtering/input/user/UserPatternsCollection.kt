@@ -40,10 +40,13 @@ object UserPatternsCollection : PatternsCollection {
     private fun parseFile(path: Path): Collection<PatternEntry> {
         val fileLines = Files.readAllLines(path)
         val lineSplitter = UserLineSplitter()
-        val commentFilter = UserLineCommentFilter()
+        val lineFilter = UserLineFilter()
 
         return fileLines
-                .filter { !commentFilter.isCommentLine(it) }
+                .asSequence()
+                .filter { !lineFilter.isCommentLine(it) }
+                .filter { !lineFilter.isEmptyLine(it) }
                 .map { lineSplitter.splitLine(it) }
+                .toList()
     }
 }

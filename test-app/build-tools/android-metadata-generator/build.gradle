@@ -51,7 +51,7 @@ dependencies {
 
     testCompile 'junit:junit:4.13'
     testCompile 'org.mockito:mockito-core:3.0.0'
-    implementation 'junit:junit:4.12'
+    testImplementation 'junit:junit:4.12'
 }
 
 task copyNecessaryFiles {

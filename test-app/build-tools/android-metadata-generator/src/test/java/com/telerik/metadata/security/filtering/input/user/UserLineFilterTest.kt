@@ -4,13 +4,13 @@ import org.junit.Test
 
 import org.junit.Assert.*
 
-class UserLineCommentFilterTest {
+class UserLineFilterTest {
 
     companion object {
         private const val UNEXPECTED_LINE_FILTERING_RESULT_MESSAGE = "Unexpected line filtering result"
     }
 
-    private val filter = UserLineCommentFilter()
+    private val filter = UserLineFilter()
 
     @Test
     fun `Is regular commented line`() {
@@ -37,5 +37,23 @@ class UserLineCommentFilterTest {
         val isComment = filter.isCommentLine(line)
 
         assertFalse(UNEXPECTED_LINE_FILTERING_RESULT_MESSAGE, isComment)
+    }
+
+    @Test
+    fun `Is empty line`(){
+        val line = System.lineSeparator()
+
+        val isEmptyLine = filter.isEmptyLine(line)
+
+        assertTrue(UNEXPECTED_LINE_FILTERING_RESULT_MESSAGE, isEmptyLine)
+    }
+
+    @Test
+    fun `Is whitespace line`(){
+        val line = "   "
+
+        val isEmptyLine = filter.isEmptyLine(line)
+
+        assertTrue(UNEXPECTED_LINE_FILTERING_RESULT_MESSAGE, isEmptyLine)
     }
 }
