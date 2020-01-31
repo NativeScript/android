@@ -28,7 +28,6 @@
 #include "NetworkDomainCallbackHandlers.h"
 #include "sys/system_properties.h"
 #include "ManualInstrumentation.h"
-#include <natives_blob.h>
 #include <snapshot_blob.h>
 
 #ifdef APPLICATION_IN_DEBUG
@@ -97,6 +96,7 @@ Runtime::Runtime(JNIEnv* env, jobject runtime, int id)
     : m_env(env), m_id(id), m_isolate(nullptr), m_lastUsedMemory(0), m_gcFunc(nullptr), m_runGC(false) {
     m_runtime = m_env.NewGlobalRef(runtime);
     m_objectManager = new ObjectManager(m_runtime);
+    m_loopTimer = new MessageLoopTimer();
     s_id2RuntimeCache.insert(make_pair(id, this));
 
     if (GET_USED_MEMORY_METHOD_ID == nullptr) {
@@ -205,6 +205,7 @@ void Runtime::Init(jstring filesPath, jstring nativeLibDir, bool verboseLoggingE
 
 Runtime::~Runtime() {
     delete this->m_objectManager;
+    delete this->m_loopTimer;
     delete this->m_heapSnapshotBlob;
     delete this->m_startupData;
 }
@@ -472,11 +473,6 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     m_startupData = new StartupData();
 
-    auto* nativesBlobStartupData = new StartupData();
-    nativesBlobStartupData->data = reinterpret_cast<const char*>(&natives_blob_bin[0]);
-    nativesBlobStartupData->raw_size = natives_blob_bin_len;
-    V8::SetNativesDataBlob(nativesBlobStartupData);
-
     void* snapshotPtr = nullptr;
     string snapshotPath;
     bool snapshotPathExists = false;
@@ -723,6 +719,8 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     ArrayHelper::Init(context);
 
     m_arrayBufferHelper.CreateConvertFunctions(isolate, global, m_objectManager);
+
+    m_loopTimer->Init(context);
 
     s_mainThreadInitialized = true;
 

@@ -3,7 +3,7 @@ package com.telerik.metadata.parsing
 /**
  * Describes the signature of a native type
  */
-interface NativeTypeDescriptor {
+interface NativeTypeDescriptor : NativeDescriptor {
     val signature: String
 
     class PrimitiveType constructor(override val signature: String) : NativeTypeDescriptor

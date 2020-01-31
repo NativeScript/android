@@ -1,6 +1,7 @@
 package com.telerik.metadata;
 
 import com.telerik.metadata.analytics.AnalyticsConfiguration;
+import com.telerik.metadata.security.filtering.input.user.UserPatternsCollection;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -17,12 +18,16 @@ public class Generator {
     private static final String ANALYTICS_ARGUMENT_BEGINNING = "analyticsFilePath=";
     private static final String MDG_OUTPUT_DIR = "mdg-output-dir.txt";
     private static final String MDG_JAVA_DEPENDENCIES = "mdg-java-dependencies.txt";
+    private static final String MDG_WHITELIST = "whitelist.mdg";
+    private static final String MDG_BLACKLIST = "blacklist.mdg";
 
     /**
      * @param args
      */
     public static void main(String[] args) {
         enableAnalyticsBasedOnArgs(args);
+        UserPatternsCollection.INSTANCE.populateWhitelistEntriesFromFile(MDG_WHITELIST);
+        UserPatternsCollection.INSTANCE.populateBlacklistEntriesFromFile(MDG_BLACKLIST);
 
         try {
             String metadataOutputDir;

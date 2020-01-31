@@ -1,3 +1,18 @@
+6.4.0
+==
+
+## What's New
+
+- [[FR] Customize metadata generation to avoid adding unnecessary unused JS wrappers (#1485)](https://github.com/NativeScript/android-runtime/issues/1485)
+- [Upgrade v8 to 7.9.317.31 (#1526)](https://github.com/NativeScript/android-runtime/issues/1555)
+- [Upgrade android gradle plugin to the latest 3.5.3 version (#1564)](https://github.com/NativeScript/android-runtime/issues/1564)
+
+## Bug Fixes
+
+- [WebAssembly won't initialize without the debugger (#1558)](https://github.com/NativeScript/android-runtime/issues/1558)
+- [Clean up allocations from finalized object links (#1566)](https://github.com/NativeScript/android-runtime/pull/1566)
+- [Fix Kotlin Object issue (#1562)](https://github.com/NativeScript/android-runtime/pull/1562)
+
 6.3.1
 ==
 
@@ -33,7 +48,7 @@
  - [Upgrade android gradle plugin to the latest 3.5.1 version (#1502)](https://github.com/NativeScript/android-runtime/issues/1502)
  - [support snapshot libs out of the box (#1496)](https://github.com/NativeScript/android-runtime/pull/1496)
  - [Upgrade v8 to 7.7.299.11 (#1478)](https://github.com/NativeScript/android-runtime/issues/1478)
- 
+
 ## Bug Fixes
  - [Console.log in worker makes chrome debugging crash (#1511)](https://github.com/NativeScript/android-runtime/issues/1511)
  - [fix searching for merge assets folder on windows (#1503)](https://github.com/NativeScript/android-runtime/pull/1503)
