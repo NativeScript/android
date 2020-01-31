@@ -400,6 +400,42 @@ std::unique_ptr<ScriptTypeProfile> ScriptTypeProfile::clone() const
     return fromValue(toValue().get(), &errors);
 }
 
+std::unique_ptr<CounterInfo> CounterInfo::fromValue(protocol::Value* value, ErrorSupport* errors)
+{
+    if (!value || value->type() != protocol::Value::TypeObject) {
+        errors->addError("object expected");
+        return nullptr;
+    }
+
+    std::unique_ptr<CounterInfo> result(new CounterInfo());
+    protocol::DictionaryValue* object = DictionaryValue::cast(value);
+    errors->push();
+    protocol::Value* nameValue = object->get("name");
+    errors->setName("name");
+    result->m_name = ValueConversions<String>::fromValue(nameValue, errors);
+    protocol::Value* valueValue = object->get("value");
+    errors->setName("value");
+    result->m_value = ValueConversions<int>::fromValue(valueValue, errors);
+    errors->pop();
+    if (errors->hasErrors())
+        return nullptr;
+    return result;
+}
+
+std::unique_ptr<protocol::DictionaryValue> CounterInfo::toValue() const
+{
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    result->setValue("name", ValueConversions<String>::toValue(m_name));
+    result->setValue("value", ValueConversions<int>::toValue(m_value));
+    return result;
+}
+
+std::unique_ptr<CounterInfo> CounterInfo::clone() const
+{
+    ErrorSupport errors;
+    return fromValue(toValue().get(), &errors);
+}
+
 std::unique_ptr<ConsoleProfileFinishedNotification> ConsoleProfileFinishedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
@@ -527,11 +563,6 @@ void Frontend::flush()
     m_frontendChannel->flushProtocolNotifications();
 }
 
-void Frontend::sendRawJSONNotification(String notification)
-{
-    m_frontendChannel->sendProtocolNotification(InternalRawNotification::fromJSON(std::move(notification)));
-}
-
 void Frontend::sendRawCBORNotification(std::vector<uint8_t> notification)
 {
     m_frontendChannel->sendProtocolNotification(InternalRawNotification::fromBinary(std::move(notification)));
@@ -556,6 +587,9 @@ public:
         m_dispatchMap["Profiler.stopTypeProfile"] = &DispatcherImpl::stopTypeProfile;
         m_dispatchMap["Profiler.takePreciseCoverage"] = &DispatcherImpl::takePreciseCoverage;
         m_dispatchMap["Profiler.takeTypeProfile"] = &DispatcherImpl::takeTypeProfile;
+        m_dispatchMap["Profiler.enableRuntimeCallStats"] = &DispatcherImpl::enableRuntimeCallStats;
+        m_dispatchMap["Profiler.disableRuntimeCallStats"] = &DispatcherImpl::disableRuntimeCallStats;
+        m_dispatchMap["Profiler.getRuntimeCallStats"] = &DispatcherImpl::getRuntimeCallStats;
     }
     ~DispatcherImpl() override { }
     bool canDispatch(const String& method) override;
@@ -580,6 +614,9 @@ protected:
     void stopTypeProfile(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
     void takePreciseCoverage(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
     void takeTypeProfile(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    void enableRuntimeCallStats(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    void disableRuntimeCallStats(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    void getRuntimeCallStats(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
 
     Backend* m_backend;
 };
@@ -814,6 +851,54 @@ void DispatcherImpl::takeTypeProfile(int callId, const String& method, const Pro
     std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
     if (response.status() == DispatchResponse::kSuccess) {
         result->setValue("result", ValueConversions<protocol::Array<protocol::Profiler::ScriptTypeProfile>>::toValue(out_result.get()));
+    }
+    if (weak->get())
+        weak->get()->sendResponse(callId, response, std::move(result));
+    return;
+}
+
+void DispatcherImpl::enableRuntimeCallStats(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
+
+    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    DispatchResponse response = m_backend->enableRuntimeCallStats();
+    if (response.status() == DispatchResponse::kFallThrough) {
+        channel()->fallThrough(callId, method, message);
+        return;
+    }
+    if (weak->get())
+        weak->get()->sendResponse(callId, response);
+    return;
+}
+
+void DispatcherImpl::disableRuntimeCallStats(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
+
+    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    DispatchResponse response = m_backend->disableRuntimeCallStats();
+    if (response.status() == DispatchResponse::kFallThrough) {
+        channel()->fallThrough(callId, method, message);
+        return;
+    }
+    if (weak->get())
+        weak->get()->sendResponse(callId, response);
+    return;
+}
+
+void DispatcherImpl::getRuntimeCallStats(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+{
+    // Declare output parameters.
+    std::unique_ptr<protocol::Array<protocol::Profiler::CounterInfo>> out_result;
+
+    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    DispatchResponse response = m_backend->getRuntimeCallStats(&out_result);
+    if (response.status() == DispatchResponse::kFallThrough) {
+        channel()->fallThrough(callId, method, message);
+        return;
+    }
+    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
+    if (response.status() == DispatchResponse::kSuccess) {
+        result->setValue("result", ValueConversions<protocol::Array<protocol::Profiler::CounterInfo>>::toValue(out_result.get()));
     }
     if (weak->get())
         weak->get()->sendResponse(callId, response, std::move(result));

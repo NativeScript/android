@@ -1,3 +1,10 @@
+6.5.0
+==
+
+## What's New
+
+- [Upgrade v8 to 8.0.426.16 (#1579)](https://github.com/NativeScript/android-runtime/issues/1579)
+
 6.4.0
 ==
 

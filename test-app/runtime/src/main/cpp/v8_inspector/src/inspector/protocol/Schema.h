@@ -35,8 +35,9 @@ public:
     void setVersion(const String& value) { m_version = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<Domain> clone() const;
     std::unique_ptr<StringBuffer> toJSONString() const override;
@@ -120,7 +121,6 @@ public:
     explicit Frontend(FrontendChannel* frontendChannel) : m_frontendChannel(frontendChannel) { }
 
     void flush();
-    void sendRawJSONNotification(String);
     void sendRawCBORNotification(std::vector<uint8_t>);
 private:
     FrontendChannel* m_frontendChannel;
