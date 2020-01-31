@@ -5,6 +5,15 @@
 
 - [Upgrade v8 to 7.9.317.31 (#1526)](https://github.com/NativeScript/android-runtime/issues/1555)
 
+6.3.1
+==
+
+## Bug Fixes
+
+- [Kotlin enum values not visible at runtime (#1560)](https://github.com/NativeScript/android-runtime/issues/1560)
+- [Code cache breaks HMR (#1554)](https://github.com/NativeScript/android-runtime/issues/1554)
+- [Worker memory leak in android (#1550)](https://github.com/NativeScript/android-runtime/issues/1550)
+
 6.3.0
 ==
 

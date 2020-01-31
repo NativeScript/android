@@ -57,6 +57,7 @@ class KotlinClassDescriptor(nativeClass: JavaClass, private val metadataAnnotati
             }
 
             if (metaClass.enumEntries.isNotEmpty()) {
+
                 val enumFields = getEnumEntriesAsFields(nativeClass, metaClass.enumEntries)
                 fields.addAll(enumFields)
             }
