@@ -27,7 +27,7 @@ public class Generator {
      * @param args
      */
     public static void main(String[] args) {
-        enableAnalyticsBasedOnArgs(args);
+        enableFlaggedFeatures(args);
         UserPatternsCollection.INSTANCE.populateWhitelistEntriesFromFile(MDG_WHITELIST);
         UserPatternsCollection.INSTANCE.populateBlacklistEntriesFromFile(MDG_BLACKLIST);
 
@@ -65,7 +65,7 @@ public class Generator {
         }
     }
 
-    private static void enableAnalyticsBasedOnArgs(String[] args) {
+    private static void enableFlaggedFeatures(String[] args) {
         for (String arg : args) {
             if (arg.startsWith(ANALYTICS_ARGUMENT_BEGINNING)) {
                 String filePath = arg.replace(ANALYTICS_ARGUMENT_BEGINNING, "");
