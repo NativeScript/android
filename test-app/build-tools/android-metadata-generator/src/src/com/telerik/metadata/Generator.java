@@ -2,6 +2,7 @@ package com.telerik.metadata;
 
 import com.telerik.metadata.analytics.AnalyticsConfiguration;
 import com.telerik.metadata.security.filtering.input.user.UserPatternsCollection;
+import com.telerik.metadata.security.logging.console.MetadataFilterConsoleLogger;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -15,6 +16,7 @@ import java.util.List;
 
 public class Generator {
 
+    private static final String VERBOSE_FLAG_NAME = "verbose";
     private static final String ANALYTICS_ARGUMENT_BEGINNING = "analyticsFilePath=";
     private static final String MDG_OUTPUT_DIR = "mdg-output-dir.txt";
     private static final String MDG_JAVA_DEPENDENCIES = "mdg-java-dependencies.txt";
@@ -63,17 +65,19 @@ public class Generator {
         }
     }
 
-    private static void enableAnalyticsBasedOnArgs(String[] args){
+    private static void enableAnalyticsBasedOnArgs(String[] args) {
         for (String arg : args) {
             if (arg.startsWith(ANALYTICS_ARGUMENT_BEGINNING)) {
                 String filePath = arg.replace(ANALYTICS_ARGUMENT_BEGINNING, "");
                 AnalyticsConfiguration.enableAnalytics(filePath);
+            } else if (VERBOSE_FLAG_NAME.equals(arg)) {
+                MetadataFilterConsoleLogger.INSTANCE.setEnabled(true);
             }
         }
     }
 
     public static List<String> getFileRows(String filename) throws IOException {
-        List<String> rows = new ArrayList<String>();
+        List<String> rows = new ArrayList<>();
         BufferedReader br = null;
         try {
             br = new BufferedReader(new InputStreamReader(new FileInputStream(filename)));

@@ -67,9 +67,7 @@ public class Builder {
         for (String className : classNames) {
             try {
                 SecuredNativeClassDescriptor clazz = SecuredClassRepository.INSTANCE.findClass(className);
-                if (!clazz.isUsageAllowed()) {
-                    throwMetadataSecurityViolationException(className);
-                } else {
+                if (clazz.isUsageAllowed()) {
                     tryCollectKotlinExtensionFunctions(clazz.getNativeDescriptor());
                 }
             } catch (Throwable e) {
@@ -90,9 +88,7 @@ public class Builder {
                 // Class<?> clazz = Class.forName(className, false, loader);
 
                 SecuredNativeClassDescriptor clazz = SecuredClassRepository.INSTANCE.findClass(className);
-                if (!clazz.isUsageAllowed()) {
-                    throwMetadataSecurityViolationException(className);
-                } else {
+                if (clazz.isUsageAllowed()) {
                     generate(clazz.getNativeDescriptor(), root);
                 }
             } catch (Throwable e) {
@@ -104,10 +100,6 @@ public class Builder {
 
 
         return root;
-    }
-
-    private static void throwMetadataSecurityViolationException(String className){
-        throw new MetadataSecurityViolationException("Class " + className + " could not be used!");
     }
 
     private static void tryCollectKotlinExtensionFunctions(NativeClassDescriptor classDescriptor) {
