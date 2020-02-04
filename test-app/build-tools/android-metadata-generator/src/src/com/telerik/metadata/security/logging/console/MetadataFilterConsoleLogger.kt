@@ -15,7 +15,9 @@ object MetadataFilterConsoleLogger : MetadataFilterLogger {
         if (isEnabled) {
             val logBuilder = StringBuilder()
 
-            logBuilder.append(action)
+            logBuilder
+                    .append("verbose: ")
+                    .append(action)
                     .append(" ")
                     .append(className)
                     .append(" from ")
