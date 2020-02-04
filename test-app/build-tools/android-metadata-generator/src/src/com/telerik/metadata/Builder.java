@@ -17,7 +17,6 @@ import com.telerik.metadata.parsing.kotlin.extensions.KotlinExtensionFunctionDes
 import com.telerik.metadata.parsing.kotlin.extensions.bytecode.BytecodeExtensionFunctionsCollector;
 import com.telerik.metadata.parsing.kotlin.metadata.ClassMetadataParser;
 import com.telerik.metadata.parsing.kotlin.metadata.bytecode.BytecodeClassMetadataParser;
-import com.telerik.metadata.security.MetadataSecurityViolationException;
 import com.telerik.metadata.security.classes.SecuredClassRepository;
 import com.telerik.metadata.security.classes.SecuredNativeClassDescriptor;
 import com.telerik.metadata.storage.functions.FunctionsStorage;
@@ -196,31 +195,30 @@ public class Builder {
     private static void setMethodsInfo(TreeNode root, TreeNode node, NativeClassDescriptor clazz, NativeMethodDescriptor[] ownMethodDescriptors, NativeMethodDescriptor[] ownAndParentMethodDescriptors, Map<String, MethodInfo> existingNodeMethods, boolean hasClassMetadataInfo) throws Exception {
 
 
-        for (NativeMethodDescriptor m : ownMethodDescriptors) {
-            if (m.isSynthetic()) {
+        for (NativeMethodDescriptor ownMethod : ownMethodDescriptors) {
+            if (ownMethod.isSynthetic()) {
                 continue;
             }
 
-            if (hasClassMetadataInfo && !m.getName().equals("<init>")) {
-                MetadataInfoAnnotationDescriptor metadataInfo = m.getMetadataInfoAnnotation();
+            if (hasClassMetadataInfo && !ownMethod.getName().equals("<init>")) {
+                MetadataInfoAnnotationDescriptor metadataInfo = ownMethod.getMetadataInfoAnnotation();
                 if ((metadataInfo != null) && metadataInfo.skip()) {
                     continue;
                 }
             }
 
-            if (m.isPublic() || m.isProtected()) {
-                boolean isStatic = m.isStatic();
+            if (ownMethod.isPublic() || ownMethod.isProtected()) {
+                boolean isStatic = ownMethod.isStatic();
 
-                MethodInfo mi = new MethodInfo(m);
+                MethodInfo mi = new MethodInfo(ownMethod);
+
                 int countUnique = 0;
-                for (NativeMethodDescriptor m1 : ownAndParentMethodDescriptors) {
-                    boolean m1IsStatic = m1.isStatic();
-                    if (!m1.isSynthetic()
-                            && (m1.isPublic() || m1.isProtected())
+                for (NativeMethodDescriptor ownOrParentMethod : ownAndParentMethodDescriptors) {
+                    boolean m1IsStatic = ownOrParentMethod.isStatic();
+                    if (!ownOrParentMethod.isSynthetic()
+                            && (ownOrParentMethod.isPublic() || ownOrParentMethod.isProtected())
                             && (isStatic == m1IsStatic)
-                            && (m1.getName().equals(mi.name) && (m1
-                            .getArgumentTypes().length == m
-                            .getArgumentTypes().length))) {
+                            && (ownOrParentMethod.getName().equals(mi.name) && (ownOrParentMethod.getArgumentTypes().length == ownMethod.getArgumentTypes().length))) {
                         if (++countUnique > 1) {
                             break;
                         }
@@ -229,8 +227,8 @@ public class Builder {
                 mi.isResolved = countUnique == 1;
 
 
-                NativeTypeDescriptor[] params = m.getArgumentTypes();
-                mi.signature = getMethodSignature(root, m.getReturnType(),
+                NativeTypeDescriptor[] params = ownMethod.getArgumentTypes();
+                mi.signature = getMethodSignature(root, ownMethod.getReturnType(),
                         params);
 
                 if (mi.signature != null) {
@@ -239,11 +237,11 @@ public class Builder {
                             mi.declaringType = getOrCreateNode(root, clazz, null);
                             node.staticMethods.add(mi);
                         } else {
-                            mi.declaringType = getOrCreateNode(root, m.getDeclaringClass(), null);
+                            mi.declaringType = getOrCreateNode(root, ownMethod.getDeclaringClass(), null);
                             node.addExtensionFunction(mi);
                         }
                     } else {
-                        String sig = m.getName() + m.getSignature();
+                        String sig = ownMethod.getName() + ownMethod.getSignature();
                         if (existingNodeMethods.containsKey(sig)) {
                             continue;
                         }

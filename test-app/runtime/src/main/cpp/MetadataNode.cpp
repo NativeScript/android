@@ -488,12 +488,17 @@ std::vector<MetadataNode::MethodCallbackData*> MetadataNode::SetInstanceMembers(
     }
 }
 
-vector<MetadataNode::MethodCallbackData*> MetadataNode::SetInstanceMethodsFromStaticMetadata(Isolate* isolate, Local<FunctionTemplate>& ctorFuncTemplate, Local<ObjectTemplate>& prototypeTemplate, vector<MethodCallbackData*>& instanceMethodsCallbackData, const vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode* treeNode) {
+vector<MetadataNode::MethodCallbackData *> MetadataNode::SetInstanceMethodsFromStaticMetadata(Isolate *isolate,
+                                                   Local<FunctionTemplate> &ctorFuncTemplate,
+                                                   Local<ObjectTemplate> &prototypeTemplate,
+                                                   vector<MethodCallbackData *> &instanceMethodsCallbackData,
+                                                   const vector<MethodCallbackData *> &baseInstanceMethodsCallbackData,
+                                                   MetadataTreeNode *treeNode) {
     SET_PROFILER_FRAME();
 
-    std::vector<MethodCallbackData*> instanceMethodData;
+    std::vector<MethodCallbackData *> instanceMethodData;
 
-    uint8_t* curPtr = s_metadataReader.GetValueData() + treeNode->offsetValue + 1;
+    uint8_t *curPtr = s_metadataReader.GetValueData() + treeNode->offsetValue + 1;
 
     auto nodeType = s_metadataReader.GetNodeType(treeNode);
 
@@ -505,27 +510,55 @@ vector<MetadataNode::MethodCallbackData*> MetadataNode::SetInstanceMethodsFromSt
         curPtr += sizeof(uint8_t) + sizeof(uint32_t);
     }
 
-    //get candidates from instance methods metadata
-    auto instanceMethodCount = *reinterpret_cast<uint16_t*>(curPtr);
-    curPtr += sizeof(uint16_t);
     string lastMethodName;
-    MethodCallbackData* callbackData = nullptr;
+    MethodCallbackData *callbackData = nullptr;
 
     auto context = isolate->GetCurrentContext();
-
     auto origin = Constants::APP_ROOT_FOLDER_PATH + GetOrCreateInternal(treeNode)->m_name;
+
+    std::unordered_map<std::string, MethodCallbackData *> collectedExtensionMethodDatas;
+
+    auto extensionFunctionsCount = *reinterpret_cast<uint16_t *>(curPtr);
+    curPtr += sizeof(uint16_t);
+    for (auto i = 0; i < extensionFunctionsCount; i++) {
+        auto entry = s_metadataReader.ReadExtensionFunctionEntry(&curPtr);
+
+        if (entry.name != lastMethodName) {
+            callbackData = new MethodCallbackData(this);
+            auto funcData = External::New(isolate, callbackData);
+            auto funcTemplate = FunctionTemplate::New(isolate, MethodCallback, funcData);
+            auto funcName = ArgConverter::ConvertToV8String(isolate, entry.name);
+            prototypeTemplate->Set(funcName, funcTemplate);
+
+            lastMethodName = entry.name;
+            std::pair<std::string, MethodCallbackData *> p(entry.name, callbackData);
+            collectedExtensionMethodDatas.insert(p);
+        }
+        callbackData->candidates.push_back(entry);
+    }
+
+
+    //get candidates from instance methods metadata
+    auto instanceMethodCount = *reinterpret_cast<uint16_t *>(curPtr);
+    curPtr += sizeof(uint16_t);
+
     for (auto i = 0; i < instanceMethodCount; i++) {
         auto entry = s_metadataReader.ReadInstanceMethodEntry(&curPtr);
 
         // attach a function to the prototype of a javascript Object
         if (entry.name != lastMethodName) {
-            callbackData = new MethodCallbackData(this);
+            callbackData = tryGetExtensionMethodCallbackData(collectedExtensionMethodDatas,
+                                                             entry.name);
+            if (callbackData == nullptr) {
+                callbackData = new MethodCallbackData(this);
+            }
+
             instanceMethodData.push_back(callbackData);
 
             instanceMethodsCallbackData.push_back(callbackData);
             auto itBegin = baseInstanceMethodsCallbackData.begin();
             auto itEnd = baseInstanceMethodsCallbackData.end();
-            auto itFound = find_if(itBegin, itEnd, [&entry] (MethodCallbackData *x) {
+            auto itFound = find_if(itBegin, itEnd, [&entry](MethodCallbackData *x) {
                 return x->candidates.front().name == entry.name;
             });
             if (itFound != itEnd) {
@@ -539,10 +572,13 @@ vector<MetadataNode::MethodCallbackData*> MetadataNode::SetInstanceMethodsFromSt
 
             if (s_profilerEnabled) {
                 auto func = funcTemplate->GetFunction(context).ToLocalChecked();
-                Local<Function> wrapperFunc = Wrap(isolate, func, entry.name, origin, false /* isCtorFunc */);
+                Local<Function> wrapperFunc = Wrap(isolate, func, entry.name, origin,
+                                                   false /* isCtorFunc */);
                 Local<Function> ctorFunc = ctorFuncTemplate->GetFunction(context).ToLocalChecked();
                 Local<Value> protoVal;
-                ctorFunc->Get(context, ArgConverter::ConvertToV8String(isolate, "prototype")).ToLocal(&protoVal);
+                ctorFunc->Get(context,
+                              ArgConverter::ConvertToV8String(isolate, "prototype")).ToLocal(
+                        &protoVal);
                 if (!protoVal.IsEmpty() && !protoVal->IsUndefined() && !protoVal->IsNull()) {
                     protoVal.As<Object>()->Set(context, funcName, wrapperFunc);
                 }
@@ -556,23 +592,24 @@ vector<MetadataNode::MethodCallbackData*> MetadataNode::SetInstanceMethodsFromSt
         callbackData->candidates.push_back(entry);
     }
 
-    auto extensionFunctionsCount = *reinterpret_cast<uint16_t*>(curPtr);
-    curPtr += sizeof(uint16_t);
-    for (auto i = 0; i < extensionFunctionsCount; i++) {
-        auto entry = s_metadataReader.ReadExtensionFunctionEntry(&curPtr);
-        if (entry.name != lastMethodName) {
-            callbackData = new MethodCallbackData(this);
-            auto funcData = External::New(isolate, callbackData);
-            auto funcTemplate = FunctionTemplate::New(isolate, MethodCallback, funcData);
-            auto funcName = ArgConverter::ConvertToV8String(isolate, entry.name);
-            prototypeTemplate->Set(funcName, funcTemplate);
+    return instanceMethodData;
+}
 
-            lastMethodName = entry.name;
-        }
-        callbackData->candidates.push_back(entry);
+MetadataNode::MethodCallbackData *MetadataNode::tryGetExtensionMethodCallbackData(
+        std::unordered_map<std::string, MethodCallbackData *> collectedMethodCallbackDatas,
+        std::string lookupName) {
+
+    if (collectedMethodCallbackDatas.size() < 1) {
+        return nullptr;
     }
 
-    return instanceMethodData;
+    auto iter = collectedMethodCallbackDatas.find(lookupName);
+
+    if (iter != collectedMethodCallbackDatas.end()) {
+        return iter->second;
+    }
+
+    return nullptr;
 }
 
 void MetadataNode::SetInstanceFieldsFromStaticMetadata(Isolate* isolate, Local<FunctionTemplate>& ctorFuncTemplate, Local<ObjectTemplate>& prototypeTemplate, vector<MethodCallbackData*>& instanceMethodsCallbackData, const vector<MethodCallbackData*>& baseInstanceMethodsCallbackData, MetadataTreeNode* treeNode) {
@@ -592,6 +629,12 @@ void MetadataNode::SetInstanceFieldsFromStaticMetadata(Isolate* isolate, Local<F
         curPtr += sizeof(uint8_t) + sizeof(uint32_t);
     }
 
+    auto extensionFunctionsCount = *reinterpret_cast<uint16_t*>(curPtr);
+    curPtr += sizeof(uint16_t);
+    for (auto i = 0; i < extensionFunctionsCount; i++) {
+        auto entry = s_metadataReader.ReadExtensionFunctionEntry(&curPtr);
+    }
+
     //get candidates from instance methods metadata
     auto instanceMethodCout = *reinterpret_cast<uint16_t*>(curPtr);
     curPtr += sizeof(uint16_t);
@@ -599,12 +642,6 @@ void MetadataNode::SetInstanceFieldsFromStaticMetadata(Isolate* isolate, Local<F
     //skip metadata methods -- advance the pointer only
     for (auto i = 0; i < instanceMethodCout; i++) {
         auto entry = s_metadataReader.ReadInstanceMethodEntry(&curPtr);
-    }
-
-    auto extensionFunctionsCount = *reinterpret_cast<uint16_t*>(curPtr);
-    curPtr += sizeof(uint16_t);
-    for (auto i = 0; i < extensionFunctionsCount; i++) {
-        auto entry = s_metadataReader.ReadExtensionFunctionEntry(&curPtr);
     }
 
     //get candidates from instance fields metadata
@@ -733,16 +770,17 @@ void MetadataNode::SetStaticMembers(Isolate* isolate, Local<Function>& ctorFunct
         if (s_metadataReader.IsNodeTypeInterface(nodeType)) {
             curPtr += sizeof(uint8_t) + sizeof(uint32_t);
         }
-        auto instanceMethodCout = *reinterpret_cast<uint16_t*>(curPtr);
-        curPtr += sizeof(uint16_t);
-        for (auto i = 0; i < instanceMethodCout; i++) {
-            auto entry = s_metadataReader.ReadInstanceMethodEntry(&curPtr);
-        }
 
         auto extensionFunctionsCount = *reinterpret_cast<uint16_t*>(curPtr);
         curPtr += sizeof(uint16_t);
         for (auto i = 0; i < extensionFunctionsCount; i++) {
             auto entry = s_metadataReader.ReadExtensionFunctionEntry(&curPtr);
+        }
+
+        auto instanceMethodCout = *reinterpret_cast<uint16_t*>(curPtr);
+        curPtr += sizeof(uint16_t);
+        for (auto i = 0; i < instanceMethodCout; i++) {
+            auto entry = s_metadataReader.ReadInstanceMethodEntry(&curPtr);
         }
 
         auto instanceFieldCout = *reinterpret_cast<uint16_t*>(curPtr);

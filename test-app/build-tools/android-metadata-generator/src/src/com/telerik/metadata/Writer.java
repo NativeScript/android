@@ -114,17 +114,17 @@ public class Writer {
             writeInt(commonInterfacePrefixPosition, writer);
         }
 
-        int len = writeLength(n.instanceMethods.size(), writer);
-        for (int i = 0; i < len; i++) {
-            writeMethodInfo(n.instanceMethods.get(i), stringsMap, writer);
-        }
-
         List<MethodInfo> extensionFunctions = n.getExtensionFunctions();
 
         writeLength(extensionFunctions.size(), writer);
         for (MethodInfo extensionFunction : extensionFunctions) {
             writeMethodInfo(extensionFunction, stringsMap, writer);
             writeTreeNodeId(extensionFunction.declaringType, writer);
+        }
+
+        int len = writeLength(n.instanceMethods.size(), writer);
+        for (int i = 0; i < len; i++) {
+            writeMethodInfo(n.instanceMethods.get(i), stringsMap, writer);
         }
 
         len = writeLength(n.instanceFields.size(), writer);
