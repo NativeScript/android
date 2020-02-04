@@ -21,6 +21,7 @@ import com.telerik.metadata.security.classes.SecuredClassRepository;
 import com.telerik.metadata.security.classes.SecuredNativeClassDescriptor;
 import com.telerik.metadata.storage.functions.FunctionsStorage;
 import com.telerik.metadata.storage.functions.extensions.ExtensionFunctionsStorage;
+import com.telerik.metadata.security.MetadataSecurityViolationException;
 
 import java.io.File;
 import java.util.ArrayList;
