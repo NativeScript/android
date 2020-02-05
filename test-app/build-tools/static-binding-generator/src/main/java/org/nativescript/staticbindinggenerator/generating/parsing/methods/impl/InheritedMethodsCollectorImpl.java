@@ -103,7 +103,7 @@ public class InheritedMethodsCollectorImpl implements InheritedMethodsCollector 
     private ReifiedJavaMethod findMethodBinding(ReifiedJavaMethod method, List<ReifiedJavaMethod> allMethods) {
         for (int i = 0; i < allMethods.size(); i++) {
             ReifiedJavaMethod curr = allMethods.get(i);
-            if (javaMethodUtils.isSubSignature(method, curr)) {
+            if (javaMethodUtils.isSubSignature(method, curr) || javaMethodUtils.isSubSignature(curr, method)) {
                 return curr;
             }
         }
