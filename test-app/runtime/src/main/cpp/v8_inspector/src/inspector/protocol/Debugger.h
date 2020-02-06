@@ -90,8 +90,9 @@ public:
     void setColumnNumber(int value) { m_columnNumber = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<Location> clone() const;
 
@@ -174,8 +175,9 @@ public:
     void setColumnNumber(int value) { m_columnNumber = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ScriptPosition> clone() const;
 
@@ -272,8 +274,9 @@ public:
     void setReturnValue(std::unique_ptr<protocol::Runtime::RemoteObject> value) { m_returnValue = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<CallFrame> clone() const;
 
@@ -422,8 +425,9 @@ public:
     void setEndLocation(std::unique_ptr<protocol::Debugger::Location> value) { m_endLocation = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<Scope> clone() const;
 
@@ -519,8 +523,9 @@ public:
     void setLineContent(const String& value) { m_lineContent = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<SearchMatch> clone() const;
     std::unique_ptr<StringBuffer> toJSONString() const override;
@@ -612,8 +617,9 @@ public:
     void setType(const String& value) { m_type = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<BreakLocation> clone() const;
 
@@ -703,8 +709,9 @@ public:
     void setLocation(std::unique_ptr<protocol::Debugger::Location> value) { m_location = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<BreakpointResolvedNotification> clone() const;
 
@@ -813,8 +820,9 @@ public:
     void setAsyncCallStackTraceId(std::unique_ptr<protocol::Runtime::StackTraceId> value) { m_asyncCallStackTraceId = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<PausedNotification> clone() const;
 
@@ -966,8 +974,9 @@ public:
     void setStackTrace(std::unique_ptr<protocol::Runtime::StackTrace> value) { m_stackTrace = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ScriptFailedToParseNotification> clone() const;
 
@@ -1189,8 +1198,9 @@ public:
     void setStackTrace(std::unique_ptr<protocol::Runtime::StackTrace> value) { m_stackTrace = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ScriptParsedNotification> clone() const;
 
@@ -1370,7 +1380,7 @@ public:
     virtual DispatchResponse enable(Maybe<double> in_maxScriptsCacheSize, String* out_debuggerId) = 0;
     virtual DispatchResponse evaluateOnCallFrame(const String& in_callFrameId, const String& in_expression, Maybe<String> in_objectGroup, Maybe<bool> in_includeCommandLineAPI, Maybe<bool> in_silent, Maybe<bool> in_returnByValue, Maybe<bool> in_generatePreview, Maybe<bool> in_throwOnSideEffect, Maybe<double> in_timeout, std::unique_ptr<protocol::Runtime::RemoteObject>* out_result, Maybe<protocol::Runtime::ExceptionDetails>* out_exceptionDetails) = 0;
     virtual DispatchResponse getPossibleBreakpoints(std::unique_ptr<protocol::Debugger::Location> in_start, Maybe<protocol::Debugger::Location> in_end, Maybe<bool> in_restrictToFunction, std::unique_ptr<protocol::Array<protocol::Debugger::BreakLocation>>* out_locations) = 0;
-    virtual DispatchResponse getScriptSource(const String& in_scriptId, String* out_scriptSource) = 0;
+    virtual DispatchResponse getScriptSource(const String& in_scriptId, String* out_scriptSource, Maybe<Binary>* out_bytecode) = 0;
     virtual DispatchResponse getWasmBytecode(const String& in_scriptId, Binary* out_bytecode) = 0;
     virtual DispatchResponse getStackTrace(std::unique_ptr<protocol::Runtime::StackTraceId> in_stackTraceId, std::unique_ptr<protocol::Runtime::StackTrace>* out_stackTrace) = 0;
     virtual DispatchResponse pause() = 0;
@@ -1410,7 +1420,6 @@ public:
     void scriptParsed(const String& scriptId, const String& url, int startLine, int startColumn, int endLine, int endColumn, int executionContextId, const String& hash, Maybe<protocol::DictionaryValue> executionContextAuxData = Maybe<protocol::DictionaryValue>(), Maybe<bool> isLiveEdit = Maybe<bool>(), Maybe<String> sourceMapURL = Maybe<String>(), Maybe<bool> hasSourceURL = Maybe<bool>(), Maybe<bool> isModule = Maybe<bool>(), Maybe<int> length = Maybe<int>(), Maybe<protocol::Runtime::StackTrace> stackTrace = Maybe<protocol::Runtime::StackTrace>());
 
     void flush();
-    void sendRawJSONNotification(String);
     void sendRawCBORNotification(std::vector<uint8_t>);
 private:
     FrontendChannel* m_frontendChannel;

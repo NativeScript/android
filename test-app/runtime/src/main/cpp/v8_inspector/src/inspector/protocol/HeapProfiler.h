@@ -49,8 +49,9 @@ public:
     void setChildren(std::unique_ptr<protocol::Array<protocol::HeapProfiler::SamplingHeapProfileNode>> value) { m_children = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<SamplingHeapProfileNode> clone() const;
 
@@ -148,8 +149,9 @@ public:
     void setOrdinal(double value) { m_ordinal = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<SamplingHeapProfileSample> clone() const;
 
@@ -236,8 +238,9 @@ public:
     void setSamples(std::unique_ptr<protocol::Array<protocol::HeapProfiler::SamplingHeapProfileSample>> value) { m_samples = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<SamplingHeapProfile> clone() const;
 
@@ -309,8 +312,9 @@ public:
     void setChunk(const String& value) { m_chunk = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<AddHeapSnapshotChunkNotification> clone() const;
 
@@ -373,8 +377,9 @@ public:
     void setStatsUpdate(std::unique_ptr<protocol::Array<int>> value) { m_statsUpdate = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<HeapStatsUpdateNotification> clone() const;
 
@@ -440,8 +445,9 @@ public:
     void setTimestamp(double value) { m_timestamp = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<LastSeenObjectIdNotification> clone() const;
 
@@ -522,8 +528,9 @@ public:
     void setFinished(bool value) { m_finished = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    String serializeToJSON() override { return toValue()->serializeToJSON(); }
-    std::vector<uint8_t> serializeToBinary() override { return toValue()->serializeToBinary(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override {
+        toValue()->AppendSerialized(out);
+    }
     String toJSON() const { return toValue()->toJSONString(); }
     std::unique_ptr<ReportHeapSnapshotProgressNotification> clone() const;
 
@@ -626,7 +633,6 @@ public:
     void resetProfiles();
 
     void flush();
-    void sendRawJSONNotification(String);
     void sendRawCBORNotification(std::vector<uint8_t>);
 private:
     FrontendChannel* m_frontendChannel;
