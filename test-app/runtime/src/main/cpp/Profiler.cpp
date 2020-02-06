@@ -147,14 +147,13 @@ bool Profiler::Write(CpuProfile* cpuProfile) {
                 ss << "RegExp_" << scriptName << "_" << lineNumber << "_" << columnNumber;
                 funcName = ss.str();
             }
-            snprintf(buff, sizeof(buff), "{\"functionName\":\"%s\",\"scriptId\":%d,\"url\":\"%s\",\"lineNumber\":%d,\"columnNumber\":%d,\"hitCount\":%u,\"callUID\":%u,\"deoptReason\":\"%s\",\"id\":%u,\"children\":[",
+            snprintf(buff, sizeof(buff), "{\"functionName\":\"%s\",\"scriptId\":%d,\"url\":\"%s\",\"lineNumber\":%d,\"columnNumber\":%d,\"hitCount\":%u,\"deoptReason\":\"%s\",\"id\":%u,\"children\":[",
                      funcName.c_str(),
                      node->GetScriptId(),
                      scriptName.c_str(),
                      lineNumber,
                      columnNumber,
                      node->GetHitCount(),
-                     node->GetCallUid(),
                      node->GetBailoutReason(),
                      node->GetNodeId());
             fwrite(buff, sizeof(char), strlen(buff), fp);

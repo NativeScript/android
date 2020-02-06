@@ -15,7 +15,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include "third_party/inspector_protocol/bindings/bindings.h"
+#include "third_party/inspector_protocol/crdtp/glue.h"
 
 namespace v8_inspector {
 namespace protocol {
@@ -53,8 +53,8 @@ template <typename T>
 using Array = typename detail::ArrayTypedef<T>::type;
 
 namespace detail {
-using v8_inspector_protocol_bindings::glue::detail::PtrMaybe;
-using v8_inspector_protocol_bindings::glue::detail::ValueMaybe;
+using v8_crdtp::glue::detail::PtrMaybe;
+using v8_crdtp::glue::detail::ValueMaybe;
 
 template <typename T>
 struct MaybeTypedef { typedef PtrMaybe<T> type; };
@@ -98,14 +98,12 @@ namespace protocol {
 
 class  Serializable {
 public:
-    ProtocolMessage serialize(bool binary) {
-      if (binary)
-        return StringUtil::binaryToMessage(serializeToBinary());
-      else
-        return StringUtil::jsonToMessage(serializeToJSON());
+    virtual std::vector<uint8_t> TakeSerialized() && {
+      std::vector<uint8_t> out;
+      AppendSerialized(&out);
+      return out;
     }
-    virtual String serializeToJSON() = 0;
-    virtual std::vector<uint8_t> serializeToBinary() = 0;
+    virtual void AppendSerialized(std::vector<uint8_t>* out) const = 0;
     virtual ~Serializable() = default;
 };
 

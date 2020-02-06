@@ -93,7 +93,7 @@ String ErrorSupport::errors()
 
 //#include "Values.h"
 
-#include "third_party/inspector_protocol/encoding/encoding.h"
+#include "third_party/inspector_protocol/crdtp/cbor.h"
 
 namespace v8_inspector {
 namespace protocol {
@@ -152,26 +152,26 @@ void escapeStringForJSONInternal(const Char* str, unsigned len,
 // to this constant.
 static constexpr int kStackLimitValues = 1000;
 
-using v8_inspector_protocol_encoding::Error;
-using v8_inspector_protocol_encoding::Status;
-using v8_inspector_protocol_encoding::span;
+using v8_crdtp::Error;
+using v8_crdtp::Status;
+using v8_crdtp::span;
 namespace cbor {
-using v8_inspector_protocol_encoding::cbor::CBORTokenTag;
-using v8_inspector_protocol_encoding::cbor::CBORTokenizer;
-using v8_inspector_protocol_encoding::cbor::EncodeBinary;
-using v8_inspector_protocol_encoding::cbor::EncodeDouble;
-using v8_inspector_protocol_encoding::cbor::EncodeFalse;
-using v8_inspector_protocol_encoding::cbor::EncodeFromLatin1;
-using v8_inspector_protocol_encoding::cbor::EncodeFromUTF16;
-using v8_inspector_protocol_encoding::cbor::EncodeIndefiniteLengthArrayStart;
-using v8_inspector_protocol_encoding::cbor::EncodeIndefiniteLengthMapStart;
-using v8_inspector_protocol_encoding::cbor::EncodeInt32;
-using v8_inspector_protocol_encoding::cbor::EncodeNull;
-using v8_inspector_protocol_encoding::cbor::EncodeStop;
-using v8_inspector_protocol_encoding::cbor::EncodeString8;
-using v8_inspector_protocol_encoding::cbor::EncodeTrue;
-using v8_inspector_protocol_encoding::cbor::EnvelopeEncoder;
-using v8_inspector_protocol_encoding::cbor::InitialByteForEnvelope;
+using v8_crdtp::cbor::CBORTokenTag;
+using v8_crdtp::cbor::CBORTokenizer;
+using v8_crdtp::cbor::EncodeBinary;
+using v8_crdtp::cbor::EncodeDouble;
+using v8_crdtp::cbor::EncodeFalse;
+using v8_crdtp::cbor::EncodeFromLatin1;
+using v8_crdtp::cbor::EncodeFromUTF16;
+using v8_crdtp::cbor::EncodeIndefiniteLengthArrayStart;
+using v8_crdtp::cbor::EncodeIndefiniteLengthMapStart;
+using v8_crdtp::cbor::EncodeInt32;
+using v8_crdtp::cbor::EncodeNull;
+using v8_crdtp::cbor::EncodeStop;
+using v8_crdtp::cbor::EncodeString8;
+using v8_crdtp::cbor::EncodeTrue;
+using v8_crdtp::cbor::EnvelopeEncoder;
+using v8_crdtp::cbor::InitialByteForEnvelope;
 }  // namespace cbor
 
 // Below are three parsing routines for CBOR, which cover enough
@@ -367,7 +367,7 @@ void Value::writeJSON(StringBuilder* output) const
     StringUtil::builderAppend(*output, nullValueString, 4);
 }
 
-void Value::writeBinary(std::vector<uint8_t>* bytes) const {
+void Value::AppendSerialized(std::vector<uint8_t>* bytes) const {
     DCHECK(m_type == TypeNull);
     bytes->push_back(cbor::EncodeNull());
 }
@@ -383,16 +383,6 @@ String Value::toJSONString() const
     StringUtil::builderReserve(result, 512);
     writeJSON(&result);
     return StringUtil::builderToString(result);
-}
-
-String Value::serializeToJSON() {
-    return toJSONString();
-}
-
-std::vector<uint8_t> Value::serializeToBinary() {
-    std::vector<uint8_t> bytes;
-    writeBinary(&bytes);
-    return bytes;
 }
 
 bool FundamentalValue::asBoolean(bool* output) const
@@ -443,7 +433,7 @@ void FundamentalValue::writeJSON(StringBuilder* output) const
     }
 }
 
-void FundamentalValue::writeBinary(std::vector<uint8_t>* bytes) const {
+void FundamentalValue::AppendSerialized(std::vector<uint8_t>* bytes) const {
     switch (type()) {
     case TypeDouble:
         cbor::EncodeDouble(m_doubleValue, bytes);
@@ -512,7 +502,7 @@ void EncodeString(const String& s, std::vector<uint8_t>* out) {
 }
 }  // namespace
 
-void StringValue::writeBinary(std::vector<uint8_t>* bytes) const {
+void StringValue::AppendSerialized(std::vector<uint8_t>* bytes) const {
   EncodeString(m_stringValue, bytes);
 }
 
@@ -533,7 +523,7 @@ void BinaryValue::writeJSON(StringBuilder* output) const
     StringUtil::builderAppendQuotedString(*output, m_binaryValue.toBase64());
 }
 
-void BinaryValue::writeBinary(std::vector<uint8_t>* bytes) const {
+void BinaryValue::AppendSerialized(std::vector<uint8_t>* bytes) const {
     cbor::EncodeBinary(span<uint8_t>(m_binaryValue.data(),
                                      m_binaryValue.size()), bytes);
 }
@@ -549,7 +539,11 @@ void SerializedValue::writeJSON(StringBuilder* output) const
     StringUtil::builderAppend(*output, m_serializedJSON);
 }
 
-void SerializedValue::writeBinary(std::vector<uint8_t>* output) const
+std::vector<uint8_t> SerializedValue::TakeSerialized() && {
+    return std::move(m_serializedBinary);
+}
+
+void SerializedValue::AppendSerialized(std::vector<uint8_t>* output) const
 {
     DCHECK(type() == TypeSerialized);
     output->insert(output->end(), m_serializedBinary.begin(), m_serializedBinary.end());
@@ -697,7 +691,7 @@ void DictionaryValue::writeJSON(StringBuilder* output) const
     StringUtil::builderAppend(*output, '}');
 }
 
-void DictionaryValue::writeBinary(std::vector<uint8_t>* bytes) const {
+void DictionaryValue::AppendSerialized(std::vector<uint8_t>* bytes) const {
     cbor::EnvelopeEncoder encoder;
     encoder.EncodeStart(bytes);
     bytes->push_back(cbor::EncodeIndefiniteLengthMapStart());
@@ -706,7 +700,7 @@ void DictionaryValue::writeBinary(std::vector<uint8_t>* bytes) const {
         Dictionary::const_iterator value = m_data.find(key);
         DCHECK(value != m_data.cend() && value->second);
         EncodeString(key, bytes);
-        value->second->writeBinary(bytes);
+        value->second->AppendSerialized(bytes);
     }
     bytes->push_back(cbor::EncodeStop());
     encoder.EncodeStop(bytes);
@@ -746,12 +740,12 @@ void ListValue::writeJSON(StringBuilder* output) const
     StringUtil::builderAppend(*output, ']');
 }
 
-void ListValue::writeBinary(std::vector<uint8_t>* bytes) const {
+void ListValue::AppendSerialized(std::vector<uint8_t>* bytes) const {
     cbor::EnvelopeEncoder encoder;
     encoder.EncodeStart(bytes);
     bytes->push_back(cbor::EncodeIndefiniteLengthArrayStart());
     for (size_t i = 0; i < m_data.size(); ++i) {
-        m_data[i]->writeBinary(bytes);
+        m_data[i]->AppendSerialized(bytes);
     }
     bytes->push_back(cbor::EncodeStop());
     encoder.EncodeStop(bytes);
@@ -979,14 +973,9 @@ public:
         return std::unique_ptr<ProtocolError>(new ProtocolError(code, errorMessage));
     }
 
-    String serializeToJSON() override
+    void AppendSerialized(std::vector<uint8_t>* out) const override
     {
-        return serialize()->serializeToJSON();
-    }
-
-    std::vector<uint8_t> serializeToBinary() override
-    {
-        return serialize()->serializeToBinary();
+        toDictionary()->AppendSerialized(out);
     }
 
     ~ProtocolError() override {}
@@ -998,7 +987,7 @@ private:
     {
     }
 
-    std::unique_ptr<DictionaryValue> serialize() {
+    std::unique_ptr<DictionaryValue> toDictionary() const {
         std::unique_ptr<protocol::DictionaryValue> error = DictionaryValue::create();
         error->setInteger("code", m_code);
         error->setString("message", m_errorMessage);
@@ -1141,13 +1130,13 @@ UberDispatcher::~UberDispatcher() = default;
 // static
 std::unique_ptr<Serializable> InternalResponse::createResponse(int callId, std::unique_ptr<Serializable> params)
 {
-    return std::unique_ptr<Serializable>(new InternalResponse(callId, String(), std::move(params)));
+    return std::unique_ptr<Serializable>(new InternalResponse(callId, nullptr, std::move(params)));
 }
 
 // static
-std::unique_ptr<Serializable> InternalResponse::createNotification(const String& notification, std::unique_ptr<Serializable> params)
+std::unique_ptr<Serializable> InternalResponse::createNotification(const char* method, std::unique_ptr<Serializable> params)
 {
-    return std::unique_ptr<Serializable>(new InternalResponse(0, notification, std::move(params)));
+    return std::unique_ptr<Serializable>(new InternalResponse(0, method, std::move(params)));
 }
 
 // static
@@ -1156,37 +1145,38 @@ std::unique_ptr<Serializable> InternalResponse::createErrorResponse(int callId, 
     return ProtocolError::createErrorResponse(callId, code, message, nullptr);
 }
 
-String InternalResponse::serializeToJSON()
+void InternalResponse::AppendSerialized(std::vector<uint8_t>* out) const
 {
-    std::unique_ptr<DictionaryValue> result = DictionaryValue::create();
-    std::unique_ptr<Serializable> params(m_params ? std::move(m_params) : DictionaryValue::create());
-    if (m_notification.length()) {
-        result->setString("method", m_notification);
-        result->setValue("params", SerializedValue::fromJSON(params->serializeToJSON()));
+    using v8_crdtp::cbor::NewCBOREncoder;
+    using v8_crdtp::ParserHandler;
+    using v8_crdtp::Status;
+    using v8_crdtp::SpanFrom;
+
+    Status status;
+    std::unique_ptr<ParserHandler> encoder = NewCBOREncoder(out, &status);
+    encoder->HandleMapBegin();
+    if (m_method) {
+        encoder->HandleString8(SpanFrom("method"));
+        encoder->HandleString8(SpanFrom(m_method));
+        encoder->HandleString8(SpanFrom("params"));
     } else {
-        result->setInteger("id", m_callId);
-        result->setValue("result", SerializedValue::fromJSON(params->serializeToJSON()));
+        encoder->HandleString8(SpanFrom("id"));
+        encoder->HandleInt32(m_callId);
+        encoder->HandleString8(SpanFrom("result"));
     }
-    return result->serializeToJSON();
+    if (m_params) {
+        m_params->AppendSerialized(out);
+    } else {
+        encoder->HandleMapBegin();
+        encoder->HandleMapEnd();
+    }
+    encoder->HandleMapEnd();
+    DCHECK(status.ok());
 }
 
-std::vector<uint8_t> InternalResponse::serializeToBinary()
-{
-    std::unique_ptr<DictionaryValue> result = DictionaryValue::create();
-    std::unique_ptr<Serializable> params(m_params ? std::move(m_params) : DictionaryValue::create());
-    if (m_notification.length()) {
-        result->setString("method", m_notification);
-        result->setValue("params", SerializedValue::fromBinary(params->serializeToBinary()));
-    } else {
-        result->setInteger("id", m_callId);
-        result->setValue("result", SerializedValue::fromBinary(params->serializeToBinary()));
-    }
-    return result->serializeToBinary();
-}
-
-InternalResponse::InternalResponse(int callId, const String& notification, std::unique_ptr<Serializable> params)
+InternalResponse::InternalResponse(int callId, const char* method, std::unique_ptr<Serializable> params)
     : m_callId(callId)
-    , m_notification(notification)
+    , m_method(method)
     , m_params(params ? std::move(params) : nullptr)
 {
 }
