@@ -84,6 +84,7 @@ def computeBuildToolsVersion = { ->
 }
 
 def enableAnalytics = (project.hasProperty("gatherAnalyticsData") && project.gatherAnalyticsData == "true")
+def enableVerboseMDG = project.gradle.startParameter.logLevel.name() == 'DEBUG'
 def analyticsFilePath = "$rootDir/analytics/build-statistics.json"
 def analyticsCollector = project.ext.AnalyticsCollector.withOutputPath(analyticsFilePath)
 if (enableAnalytics) {
@@ -821,6 +822,10 @@ task buildMetadata(type: BuildToolTask) {
 
         if(enableAnalytics){
             paramz.add("analyticsFilePath=$analyticsFilePath")
+        }
+
+        if(enableVerboseMDG){
+            paramz.add("verbose")
         }
 
         args paramz.toArray()
