@@ -1,17 +1,10 @@
-6.5.0
-==
-
-## What's New
-
-- [Upgrade v8 to 8.0.426.16 (#1579)](https://github.com/NativeScript/android-runtime/issues/1579)
-
-6.4.0
+6.4.1
 ==
 
 ## What's New
 
 - [[FR] Customize metadata generation to avoid adding unnecessary unused JS wrappers (#1485)](https://github.com/NativeScript/android-runtime/issues/1485)
-- [Upgrade v8 to 7.9.317.31 (#1526)](https://github.com/NativeScript/android-runtime/issues/1555)
+- [Upgrade v8 to 8.0.426.16 (#1579)](https://github.com/NativeScript/android-runtime/issues/1579)
 - [Upgrade android gradle plugin to the latest 3.5.3 version (#1564)](https://github.com/NativeScript/android-runtime/issues/1564)
 
 ## Bug Fixes
