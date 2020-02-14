@@ -74,6 +74,7 @@ public final class RuntimeHelper {
 
             Logger logger = new LogcatLogger(context);
 
+            Runtime.nativeLibraryLoaded = true;
             Runtime runtime = null;
             boolean showErrorIntent = hasErrorIntent(context);
             if (!showErrorIntent) {

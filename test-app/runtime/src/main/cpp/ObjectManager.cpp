@@ -19,56 +19,56 @@ using namespace tns;
 
 ObjectManager::ObjectManager(jobject javaRuntimeObject) :
         m_javaRuntimeObject(javaRuntimeObject),
-        m_env(JEnv()),
         m_numberOfGC(0),
         m_currentObjectId(0),
         m_cache(NewWeakGlobalRefCallback, DeleteWeakGlobalRefCallback, 1000, this) {
 
-    auto runtimeClass = m_env.FindClass("com/tns/Runtime");
+    JEnv env;
+    auto runtimeClass = env.FindClass("com/tns/Runtime");
     assert(runtimeClass != nullptr);
 
-    GET_JAVAOBJECT_BY_ID_METHOD_ID = m_env.GetMethodID(runtimeClass, "getJavaObjectByID",
+    GET_JAVAOBJECT_BY_ID_METHOD_ID = env.GetMethodID(runtimeClass, "getJavaObjectByID",
                                                        "(I)Ljava/lang/Object;");
     assert(GET_JAVAOBJECT_BY_ID_METHOD_ID != nullptr);
 
-    GET_OR_CREATE_JAVA_OBJECT_ID_METHOD_ID = m_env.GetMethodID(runtimeClass,
+    GET_OR_CREATE_JAVA_OBJECT_ID_METHOD_ID = env.GetMethodID(runtimeClass,
                                                                "getOrCreateJavaObjectID",
                                                                "(Ljava/lang/Object;)I");
     assert(GET_OR_CREATE_JAVA_OBJECT_ID_METHOD_ID != nullptr);
 
-    MAKE_INSTANCE_WEAK_BATCH_METHOD_ID = m_env.GetMethodID(runtimeClass, "makeInstanceWeak",
+    MAKE_INSTANCE_WEAK_BATCH_METHOD_ID = env.GetMethodID(runtimeClass, "makeInstanceWeak",
                                                            "(Ljava/nio/ByteBuffer;IZ)V");
     assert(MAKE_INSTANCE_WEAK_BATCH_METHOD_ID != nullptr);
 
-    MAKE_INSTANCE_WEAK_AND_CHECK_IF_ALIVE_METHOD_ID = m_env.GetMethodID(runtimeClass,
+    MAKE_INSTANCE_WEAK_AND_CHECK_IF_ALIVE_METHOD_ID = env.GetMethodID(runtimeClass,
                                                                         "makeInstanceWeakAndCheckIfAlive",
                                                                         "(I)Z");
     assert(MAKE_INSTANCE_WEAK_AND_CHECK_IF_ALIVE_METHOD_ID != nullptr);
 
-    RELEASE_NATIVE_INSTANCE_METHOD_ID = m_env.GetMethodID(runtimeClass, "releaseNativeCounterpart",
+    RELEASE_NATIVE_INSTANCE_METHOD_ID = env.GetMethodID(runtimeClass, "releaseNativeCounterpart",
                                                           "(I)V");
     assert(RELEASE_NATIVE_INSTANCE_METHOD_ID != nullptr);
 
-    CHECK_WEAK_OBJECTS_ARE_ALIVE_METHOD_ID = m_env.GetMethodID(runtimeClass,
+    CHECK_WEAK_OBJECTS_ARE_ALIVE_METHOD_ID = env.GetMethodID(runtimeClass,
                                                                "checkWeakObjectAreAlive",
                                                                "(Ljava/nio/ByteBuffer;Ljava/nio/ByteBuffer;I)V");
     assert(CHECK_WEAK_OBJECTS_ARE_ALIVE_METHOD_ID != nullptr);
 
-    JAVA_LANG_CLASS = m_env.FindClass("java/lang/Class");
+    JAVA_LANG_CLASS = env.FindClass("java/lang/Class");
     assert(JAVA_LANG_CLASS != nullptr);
 
-    GET_NAME_METHOD_ID = m_env.GetMethodID(JAVA_LANG_CLASS, "getName", "()Ljava/lang/String;");
+    GET_NAME_METHOD_ID = env.GetMethodID(JAVA_LANG_CLASS, "getName", "()Ljava/lang/String;");
     assert(GET_NAME_METHOD_ID != nullptr);
 
-    auto useGlobalRefsMethodID = m_env.GetStaticMethodID(runtimeClass, "useGlobalRefs", "()Z");
+    auto useGlobalRefsMethodID = env.GetStaticMethodID(runtimeClass, "useGlobalRefs", "()Z");
     assert(useGlobalRefsMethodID != nullptr);
 
-    auto useGlobalRefs = m_env.CallStaticBooleanMethod(runtimeClass, useGlobalRefsMethodID);
+    auto useGlobalRefs = env.CallStaticBooleanMethod(runtimeClass, useGlobalRefsMethodID);
     m_useGlobalRefs = useGlobalRefs == JNI_TRUE;
 
-    auto getMarkingModeOrdinalMethodID = m_env.GetMethodID(runtimeClass, "getMarkingModeOrdinal",
+    auto getMarkingModeOrdinalMethodID = env.GetMethodID(runtimeClass, "getMarkingModeOrdinal",
                                                            "()I");
-    jint markingMode = m_env.CallIntMethod(m_javaRuntimeObject, getMarkingModeOrdinalMethodID);
+    jint markingMode = env.CallIntMethod(m_javaRuntimeObject, getMarkingModeOrdinalMethodID);
     m_markingMode = static_cast<JavaScriptMarkingMode>(markingMode);
 }
 
@@ -99,8 +99,9 @@ JniLocalRef ObjectManager::GetJavaObjectByJsObject(const Local<Object> &object) 
             JniLocalRef javaObject(GetJavaObjectByID(jsInstanceInfo->JavaObjectID), true);
             return javaObject;
         } else {
+            JEnv env;
             JniLocalRef javaObject(
-                    m_env.NewLocalRef(GetJavaObjectByID(jsInstanceInfo->JavaObjectID)));
+                    env.NewLocalRef(GetJavaObjectByID(jsInstanceInfo->JavaObjectID)));
             return javaObject;
         }
     }
@@ -156,7 +157,8 @@ jweak ObjectManager::GetJavaObjectByID(uint32_t javaObjectID) {
 }
 
 jobject ObjectManager::GetJavaObjectByIDImpl(uint32_t javaObjectID) {
-    jobject object = m_env.CallObjectMethod(m_javaRuntimeObject, GET_JAVAOBJECT_BY_ID_METHOD_ID,
+    JEnv env;
+    jobject object = env.CallObjectMethod(m_javaRuntimeObject, GET_JAVAOBJECT_BY_ID_METHOD_ID,
                                             javaObjectID);
     return object;
 }
@@ -180,7 +182,8 @@ void ObjectManager::SetJavaClass(const Local<Object> &instance, jclass clazz) {
 }
 
 int ObjectManager::GetOrCreateObjectId(jobject object) {
-    jint javaObjectID = m_env.CallIntMethod(m_javaRuntimeObject,
+    JEnv env;
+    jint javaObjectID = env.CallIntMethod(m_javaRuntimeObject,
                                             GET_OR_CREATE_JAVA_OBJECT_ID_METHOD_ID, object);
 
     return javaObjectID;
@@ -208,7 +211,8 @@ Local<Object> ObjectManager::CreateJSWrapper(jint javaObjectID, const string &ty
 
 Local<Object>
 ObjectManager::CreateJSWrapper(jint javaObjectID, const string &typeName, jobject instance) {
-    JniLocalRef clazz(m_env.GetObjectClass(instance));
+    JEnv env;
+    JniLocalRef clazz(env.GetObjectClass(instance));
 
     return CreateJSWrapperHelper(javaObjectID, typeName, clazz);
 }
@@ -224,7 +228,8 @@ ObjectManager::CreateJSWrapperHelper(jint javaObjectID, const string &typeName, 
     auto jsWrapper = node->CreateJSWrapper(isolate, this);
 
     if (!jsWrapper.IsEmpty()) {
-        auto claz = m_env.FindClass(className);
+        JEnv env;
+        auto claz = env.FindClass(className);
         Link(jsWrapper, javaObjectID, claz);
     }
     return jsWrapper;
@@ -282,13 +287,15 @@ bool ObjectManager::CloneLink(const Local<Object> &src, const Local<Object> &des
 }
 
 string ObjectManager::GetClassName(jobject javaObject) {
-    JniLocalRef objectClass(m_env.GetObjectClass(javaObject));
+    JEnv env;
+    JniLocalRef objectClass(env.GetObjectClass(javaObject));
 
     return GetClassName((jclass) objectClass);
 }
 
 string ObjectManager::GetClassName(jclass clazz) {
-    JniLocalRef javaCanonicalName(m_env.CallObjectMethod(clazz, GET_NAME_METHOD_ID));
+    JEnv env;
+    JniLocalRef javaCanonicalName(env.CallObjectMethod(clazz, GET_NAME_METHOD_ID));
 
     string className = ArgConverter::jstringToString(javaCanonicalName);
 
@@ -331,7 +338,8 @@ void ObjectManager::JSObjectFinalizer(Isolate *isolate, ObjectWeakCallbackState 
     }
 
     auto javaObjectID = jsInstanceInfo->JavaObjectID;
-    jboolean isJavaInstanceAlive = m_env.CallBooleanMethod(m_javaRuntimeObject,
+    JEnv env;
+    jboolean isJavaInstanceAlive = env.CallBooleanMethod(m_javaRuntimeObject,
                                                            MAKE_INSTANCE_WEAK_AND_CHECK_IF_ALIVE_METHOD_ID,
                                                            javaObjectID);
     if (isJavaInstanceAlive) {
@@ -629,7 +637,8 @@ void ObjectManager::MarkReachableObjects(Isolate *isolate, const Local<Object> &
 
     if (frame.check()) {
         auto cls = fromJsInfo->ObjectClazz;
-        JniLocalRef className(m_env.CallObjectMethod(cls, GET_NAME_METHOD_ID));
+        JEnv env;
+        JniLocalRef className(env.CallObjectMethod(cls, GET_NAME_METHOD_ID));
         frame.log("MarkReachableObjects: " + ArgConverter::jstringToString(className));
     }
 }
@@ -751,13 +760,14 @@ void ObjectManager::OnGcFinished(GCType type, GCCallbackFlags flags) {
  * */
 void ObjectManager::MakeRegularObjectsWeak(const set<int> &instances, DirectBuffer &inputBuff) {
     jboolean keepAsWeak = JNI_FALSE;
+    JEnv env;
 
     for (auto javaObjectId : instances) {
         bool success = inputBuff.Write(javaObjectId);
 
         if (!success) {
             int length = inputBuff.Length();
-            m_env.CallVoidMethod(m_javaRuntimeObject, MAKE_INSTANCE_WEAK_BATCH_METHOD_ID,
+            env.CallVoidMethod(m_javaRuntimeObject, MAKE_INSTANCE_WEAK_BATCH_METHOD_ID,
                                  (jobject) inputBuff, length, keepAsWeak);
             inputBuff.Reset();
             success = inputBuff.Write(javaObjectId);
@@ -766,7 +776,7 @@ void ObjectManager::MakeRegularObjectsWeak(const set<int> &instances, DirectBuff
     }
     int size = inputBuff.Size();
     if (size > 0) {
-        m_env.CallVoidMethod(m_javaRuntimeObject, MAKE_INSTANCE_WEAK_BATCH_METHOD_ID,
+        env.CallVoidMethod(m_javaRuntimeObject, MAKE_INSTANCE_WEAK_BATCH_METHOD_ID,
                              (jobject) inputBuff, size, keepAsWeak);
     }
 
@@ -781,6 +791,7 @@ void ObjectManager::MakeRegularObjectsWeak(const set<int> &instances, DirectBuff
 void ObjectManager::MakeImplObjectsWeak(const unordered_map<int, Persistent<Object> *> &instances,
                                         DirectBuffer &inputBuff) {
     jboolean keepAsWeak = JNI_TRUE;
+    JEnv env;
 
     for (const auto &kv : instances) {
         if (kv.second != nullptr) {
@@ -791,7 +802,7 @@ void ObjectManager::MakeImplObjectsWeak(const unordered_map<int, Persistent<Obje
             if (!success) {
                 int length = inputBuff.Length();
                 jboolean keepAsWeak = JNI_TRUE;
-                m_env.CallVoidMethod(m_javaRuntimeObject, MAKE_INSTANCE_WEAK_BATCH_METHOD_ID,
+                env.CallVoidMethod(m_javaRuntimeObject, MAKE_INSTANCE_WEAK_BATCH_METHOD_ID,
                                      (jobject) inputBuff, length, keepAsWeak);
                 inputBuff.Reset();
                 success = inputBuff.Write(javaObjectId);
@@ -802,7 +813,7 @@ void ObjectManager::MakeImplObjectsWeak(const unordered_map<int, Persistent<Obje
     int size = inputBuff.Size();
     if (size > 0) {
         jboolean keepAsWeak = JNI_TRUE;
-        m_env.CallVoidMethod(m_javaRuntimeObject, MAKE_INSTANCE_WEAK_BATCH_METHOD_ID,
+        env.CallVoidMethod(m_javaRuntimeObject, MAKE_INSTANCE_WEAK_BATCH_METHOD_ID,
                              (jobject) inputBuff, size, keepAsWeak);
     }
 
@@ -816,6 +827,7 @@ void ObjectManager::MakeImplObjectsWeak(const unordered_map<int, Persistent<Obje
 void ObjectManager::CheckWeakObjectsAreAlive(const vector<PersistentObjectIdPair> &instances,
                                              DirectBuffer &inputBuff, DirectBuffer &outputBuff) {
     TNSPERF();
+    JEnv env;
 
     for (const auto &poIdPair : instances) {
         int javaObjectId = poIdPair.javaObjectId;
@@ -824,7 +836,7 @@ void ObjectManager::CheckWeakObjectsAreAlive(const vector<PersistentObjectIdPair
 
         if (!success) {
             int length = inputBuff.Length();
-            m_env.CallVoidMethod(m_javaRuntimeObject, CHECK_WEAK_OBJECTS_ARE_ALIVE_METHOD_ID,
+            env.CallVoidMethod(m_javaRuntimeObject, CHECK_WEAK_OBJECTS_ARE_ALIVE_METHOD_ID,
                                  (jobject) inputBuff, (jobject) outputBuff, length);
             //
             int *released = outputBuff.GetData();
@@ -844,7 +856,7 @@ void ObjectManager::CheckWeakObjectsAreAlive(const vector<PersistentObjectIdPair
     }
     int size = inputBuff.Size();
     if (size > 0) {
-        m_env.CallVoidMethod(m_javaRuntimeObject, CHECK_WEAK_OBJECTS_ARE_ALIVE_METHOD_ID,
+        env.CallVoidMethod(m_javaRuntimeObject, CHECK_WEAK_OBJECTS_ARE_ALIVE_METHOD_ID,
                              (jobject) inputBuff, (jobject) outputBuff, size);
         int *released = outputBuff.GetData();
         for (int i = 0; i < size; i++) {
@@ -863,7 +875,8 @@ jweak ObjectManager::NewWeakGlobalRefCallback(const int &javaObjectID, void *sta
 
     JniLocalRef obj(objManager->GetJavaObjectByIDImpl(javaObjectID));
 
-    jweak weakRef = objManager->m_env.NewWeakGlobalRef(obj);
+    JEnv env;
+    jweak weakRef = env.NewWeakGlobalRef(obj);
 
     return weakRef;
 }
@@ -871,7 +884,8 @@ jweak ObjectManager::NewWeakGlobalRefCallback(const int &javaObjectID, void *sta
 void ObjectManager::DeleteWeakGlobalRefCallback(const jweak &object, void *state) {
     auto objManager = reinterpret_cast<ObjectManager *>(state);
 
-    objManager->m_env.DeleteWeakGlobalRef(object);
+    JEnv env;
+    env.DeleteWeakGlobalRef(object);
 }
 
 Local<Object> ObjectManager::GetEmptyObject(Isolate *isolate) {
@@ -903,7 +917,8 @@ void ObjectManager::ReleaseNativeCounterpart(v8::Local<v8::Object> &object) {
         throw NativeScriptException("Trying to release a non native object!");
     }
 
-    m_env.CallVoidMethod(m_javaRuntimeObject, RELEASE_NATIVE_INSTANCE_METHOD_ID,
+    JEnv env;
+    env.CallVoidMethod(m_javaRuntimeObject, RELEASE_NATIVE_INSTANCE_METHOD_ID,
                          jsInstanceInfo->JavaObjectID);
 
     delete jsInstanceInfo;

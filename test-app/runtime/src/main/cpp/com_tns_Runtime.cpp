@@ -301,6 +301,17 @@ extern "C" JNIEXPORT jint Java_com_tns_Runtime_getPointerSize(JNIEnv* env, jobje
     return sizeof(void*);
 }
 
+extern "C" JNIEXPORT jint Java_com_tns_Runtime_getCurrentRuntimeId(JNIEnv* _env, jobject obj) {
+    Isolate* isolate = Isolate::GetCurrent();
+    if (isolate == nullptr) {
+        return -1;
+    }
+
+    Runtime* runtime = Runtime::GetRuntime(isolate);
+    int id = runtime->GetId();
+    return id;
+}
+
 extern "C" JNIEXPORT void Java_com_tns_Runtime_WorkerGlobalOnMessageCallback(JNIEnv* env, jobject obj, jint runtimeId, jstring msg) {
     // Worker Thread runtime
     auto runtime = TryGetRuntime(runtimeId);

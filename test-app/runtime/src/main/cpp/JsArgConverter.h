@@ -55,8 +55,6 @@ class JsArgConverter {
         template<typename T>
         bool ConvertFromCastFunctionObject(T value, int index);
 
-        JEnv m_env;
-
         v8::Isolate* m_isolate;
 
         int m_argsLen;

@@ -93,17 +93,17 @@ int Runtime::GetAndroidVersion() {
 }
 
 Runtime::Runtime(JNIEnv* env, jobject runtime, int id)
-    : m_env(env), m_id(id), m_isolate(nullptr), m_lastUsedMemory(0), m_gcFunc(nullptr), m_runGC(false) {
-    m_runtime = m_env.NewGlobalRef(runtime);
+    : m_id(id), m_isolate(nullptr), m_lastUsedMemory(0), m_gcFunc(nullptr), m_runGC(false) {
+    m_runtime = env->NewGlobalRef(runtime);
     m_objectManager = new ObjectManager(m_runtime);
     m_loopTimer = new MessageLoopTimer();
     s_id2RuntimeCache.insert(make_pair(id, this));
 
     if (GET_USED_MEMORY_METHOD_ID == nullptr) {
-        auto RUNTIME_CLASS = m_env.FindClass("com/tns/Runtime");
+        auto RUNTIME_CLASS = env->FindClass("com/tns/Runtime");
         assert(RUNTIME_CLASS != nullptr);
 
-        GET_USED_MEMORY_METHOD_ID = m_env.GetMethodID(RUNTIME_CLASS, "getUsedMemory", "()J");
+        GET_USED_MEMORY_METHOD_ID = env->GetMethodID(RUNTIME_CLASS, "getUsedMemory", "()J");
         assert(GET_USED_MEMORY_METHOD_ID != nullptr);
     }
 }
@@ -172,10 +172,10 @@ void Runtime::Init(JNIEnv* _env, jobject obj, int runtimeId, jstring filesPath, 
 
     auto enableLog = verboseLoggingEnabled == JNI_TRUE;
 
-    runtime->Init(filesPath, nativeLibDir, enableLog, isDebuggable, packageName, args, callingDir, maxLogcatObjectSize, forceLog);
+    runtime->Init(env, filesPath, nativeLibDir, enableLog, isDebuggable, packageName, args, callingDir, maxLogcatObjectSize, forceLog);
 }
 
-void Runtime::Init(jstring filesPath, jstring nativeLibDir, bool verboseLoggingEnabled, bool isDebuggable, jstring packageName, jobjectArray args, jstring callingDir, int maxLogcatObjectSize, bool forceLog) {
+void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir, bool verboseLoggingEnabled, bool isDebuggable, jstring packageName, jobjectArray args, jstring callingDir, int maxLogcatObjectSize, bool forceLog) {
     LogEnabled = verboseLoggingEnabled;
 
     auto filesRoot = ArgConverter::jstringToString(filesPath);
@@ -185,15 +185,15 @@ void Runtime::Init(jstring filesPath, jstring nativeLibDir, bool verboseLoggingE
 
     Constants::APP_ROOT_FOLDER_PATH = filesRoot + "/app/";
     // read config options passed from Java
-    JniLocalRef v8Flags(m_env.GetObjectArrayElement(args, 0));
+    JniLocalRef v8Flags(env->GetObjectArrayElement(args, 0));
     Constants::V8_STARTUP_FLAGS = ArgConverter::jstringToString(v8Flags);
-    JniLocalRef cacheCode(m_env.GetObjectArrayElement(args, 1));
+    JniLocalRef cacheCode(env->GetObjectArrayElement(args, 1));
     Constants::V8_CACHE_COMPILED_CODE = (bool) cacheCode;
-    JniLocalRef snapshotScript(m_env.GetObjectArrayElement(args, 2));
+    JniLocalRef snapshotScript(env->GetObjectArrayElement(args, 2));
     Constants::V8_HEAP_SNAPSHOT_SCRIPT = ArgConverter::jstringToString(snapshotScript);
-    JniLocalRef snapshotBlob(m_env.GetObjectArrayElement(args, 3));
+    JniLocalRef snapshotBlob(env->GetObjectArrayElement(args, 3));
     Constants::V8_HEAP_SNAPSHOT_BLOB = ArgConverter::jstringToString(snapshotBlob);
-    JniLocalRef profilerOutputDir(m_env.GetObjectArrayElement(args, 4));
+    JniLocalRef profilerOutputDir(env->GetObjectArrayElement(args, 4));
 
     DEBUG_WRITE("Initializing Telerik NativeScript");
 
@@ -360,7 +360,8 @@ jint Runtime::GenerateNewObjectId(JNIEnv* env, jobject obj) {
 }
 
 void Runtime::AdjustAmountOfExternalAllocatedMemory() {
-    int64_t usedMemory = m_env.CallLongMethod(m_runtime, GET_USED_MEMORY_METHOD_ID);
+    JEnv env;
+    int64_t usedMemory = env.CallLongMethod(m_runtime, GET_USED_MEMORY_METHOD_ID);
     int64_t changeInBytes = usedMemory - m_lastUsedMemory;
     int64_t externalMemory = 0;
 
@@ -812,6 +813,10 @@ void Runtime::DestroyRuntime() {
 
 Local<Context> Runtime::GetContext() {
     return this->m_context->Get(this->m_isolate);
+}
+
+int Runtime::GetId() {
+    return this->m_id;
 }
 
 JavaVM* Runtime::s_jvm = nullptr;
