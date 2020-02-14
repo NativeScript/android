@@ -876,7 +876,8 @@ void ObjectManager::DeleteWeakGlobalRefCallback(const jweak &object, void *state
 
 Local<Object> ObjectManager::GetEmptyObject(Isolate *isolate) {
     auto emptyObjCtorFunc = Local<Function>::New(isolate, *m_poJsWrapperFunc);
-    auto val = emptyObjCtorFunc->CallAsConstructor(isolate->GetCurrentContext(), 0, nullptr);
+    auto context = Runtime::GetRuntime(isolate)->GetContext();
+    auto val = emptyObjCtorFunc->CallAsConstructor(context, 0, nullptr);
     if (val.IsEmpty()) {
         return Local<Object>();
     }

@@ -433,7 +433,7 @@ bool JsArgConverter::ConvertJavaScriptArray(const Local<Array>& jsArr, int index
         arr = m_env.NewObjectArray(arrLength, elementClass, nullptr);
         for (int i = 0; i < arrLength; i++) {
             auto v = jsArr->Get(context, i).ToLocalChecked();
-            JsArgToArrayConverter c(m_isolate, v, false, (int) Type::Null);
+            JsArgToArrayConverter c(context, v, false, (int) Type::Null);
             jobject o = c.GetConvertedArg();
             m_env.SetObjectArrayElement((jobjectArray) arr, i, o);
         }

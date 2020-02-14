@@ -47,11 +47,11 @@ namespace tns {
         static std::string ResolveClassName(v8::Isolate *isolate, jclass &clazz);
 
         static v8::Local<v8::Value>
-        GetArrayElement(v8::Isolate *isolate, const v8::Local<v8::Object> &array, uint32_t index,
+        GetArrayElement(v8::Local<v8::Context> context, const v8::Local<v8::Object> &array, uint32_t index,
                         const std::string &arraySignature);
 
         static void
-        SetArrayElement(v8::Isolate *isolate, const v8::Local<v8::Object> &array, uint32_t index,
+        SetArrayElement(v8::Local<v8::Context> context, const v8::Local<v8::Object> &array, uint32_t index,
                         const std::string &arraySignature, v8::Local<v8::Value> &value);
 
         static int GetArrayLength(v8::Isolate *isolate, const v8::Local<v8::Object> &arr);

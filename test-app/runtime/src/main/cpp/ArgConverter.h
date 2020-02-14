@@ -17,9 +17,9 @@ namespace tns {
 
 class ArgConverter {
     public:
-        static void Init(v8::Isolate* isolate);
+        static void Init(v8::Local<v8::Context> context);
 
-        static v8::Local<v8::Array> ConvertJavaArgsToJsArgs(v8::Isolate* isolate, jobjectArray args);
+        static v8::Local<v8::Array> ConvertJavaArgsToJsArgs(v8::Local<v8::Context> context, jobjectArray args);
 
         static v8::Local<v8::Value> ConvertFromJavaLong(v8::Isolate* isolate, jlong value);
 

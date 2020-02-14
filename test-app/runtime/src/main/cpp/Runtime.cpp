@@ -234,13 +234,15 @@ void Runtime::RunModule(JNIEnv* _env, jobject obj, jstring scriptFile) {
     JEnv env(_env);
 
     string filePath = ArgConverter::jstringToString(scriptFile);
-    m_module.Load(filePath);
+    auto context = this->GetContext();
+    m_module.Load(context, filePath);
 }
 
 void Runtime::RunWorker(jstring scriptFile) {
     // TODO: Pete: Why do I crash here with a JNI error (accessing bad jni)
     string filePath = ArgConverter::jstringToString(scriptFile);
-    m_module.LoadWorker(filePath);
+    auto context = this->GetContext();
+    m_module.LoadWorker(context, filePath);
 }
 
 jobject Runtime::RunScript(JNIEnv* _env, jobject obj, jstring scriptFile) {
@@ -248,7 +250,7 @@ jobject Runtime::RunScript(JNIEnv* _env, jobject obj, jstring scriptFile) {
     jobject res = nullptr;
 
     auto isolate = m_isolate;
-    auto context = isolate->GetCurrentContext();
+    auto context = this->GetContext();
 
     auto filename = ArgConverter::jstringToString(scriptFile);
     auto src = ReadFileText(filename);
@@ -588,6 +590,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     isolateFrame.log("Isolate.New");
 
     s_isolate2RuntimesCache.insert(make_pair(isolate, this));
+    v8::Locker locker(isolate);
     Isolate::Scope isolate_scope(isolate);
     HandleScope handleScope(isolate);
 
@@ -700,7 +703,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
      */
     global->DefineOwnProperty(context, ArgConverter::ConvertToV8String(isolate, "console"), console, readOnlyFlags);
 
-    ArgConverter::Init(isolate);
+    ArgConverter::Init(context);
 
     CallbackHandlers::Init(isolate);
 
@@ -718,9 +721,11 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     ArrayHelper::Init(context);
 
-    m_arrayBufferHelper.CreateConvertFunctions(isolate, global, m_objectManager);
+    m_arrayBufferHelper.CreateConvertFunctions(context, global, m_objectManager);
 
     m_loopTimer->Init(context);
+
+    this->m_context = new Persistent<Context>(isolate, context);
 
     s_mainThreadInitialized = true;
 
@@ -728,7 +733,8 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 }
 
 jobject Runtime::ConvertJsValueToJavaObject(JEnv& env, const Local<Value>& value, int classReturnType) {
-    JsArgToArrayConverter argConverter(m_isolate, value, false/*is implementation object*/, classReturnType);
+    auto context = this->GetContext();
+    JsArgToArrayConverter argConverter(context, value, false/*is implementation object*/, classReturnType);
     jobject jr = argConverter.GetConvertedArg();
     jobject javaResult = nullptr;
     if (jr != nullptr) {
@@ -802,6 +808,10 @@ bool Runtime::RunExtraCode(Isolate* isolate, Local<Context> context, const char*
 void Runtime::DestroyRuntime() {
     s_id2RuntimeCache.erase(m_id);
     s_isolate2RuntimesCache.erase(m_isolate);
+}
+
+Local<Context> Runtime::GetContext() {
+    return this->m_context->Get(this->m_isolate);
 }
 
 JavaVM* Runtime::s_jvm = nullptr;

@@ -9,9 +9,10 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
-Local<Value> ArrayElementAccessor::GetArrayElement(Isolate* isolate, const Local<Object>& array, uint32_t index, const string& arraySignature) {
+Local<Value> ArrayElementAccessor::GetArrayElement(Local<Context> context, const Local<Object>& array, uint32_t index, const string& arraySignature) {
     JEnv env;
 
+    Isolate* isolate = context->GetIsolate();
     EscapableHandleScope handleScope(isolate);
     auto runtime = Runtime::GetRuntime(isolate);
     auto objectManager = runtime->GetObjectManager();
@@ -79,13 +80,13 @@ Local<Value> ArrayElementAccessor::GetArrayElement(Isolate* isolate, const Local
     return handleScope.Escape(value);
 }
 
-void ArrayElementAccessor::SetArrayElement(Isolate* isolate, const Local<Object>& array, uint32_t index, const string& arraySignature, Local<Value>& value) {
+void ArrayElementAccessor::SetArrayElement(Local<Context> context, const Local<Object>& array, uint32_t index, const string& arraySignature, Local<Value>& value) {
     JEnv env;
 
+    Isolate* isolate = context->GetIsolate();
     HandleScope handleScope(isolate);
     auto runtime = Runtime::GetRuntime(isolate);
     auto objectManager = runtime->GetObjectManager();
-    auto context = isolate->GetCurrentContext();
 
     tns::JniLocalRef arr = objectManager->GetJavaObjectByJsObject(array);
 
@@ -140,7 +141,7 @@ void ArrayElementAccessor::SetArrayElement(Isolate* isolate, const Local<Object>
         if (isReferenceType) {
             auto object = value.As<Object>();
 
-            JsArgToArrayConverter argConverter(isolate, value, false, (int) Type::Null);
+            JsArgToArrayConverter argConverter(context, value, false, (int) Type::Null);
             if (argConverter.IsValid()) {
                 jobjectArray objArr = static_cast<jobjectArray>(arr);
                 jobject objectElementValue = argConverter.GetConvertedArg();

@@ -198,22 +198,21 @@ void ModuleInternal::RequireNativeCallback(const v8::FunctionCallbackInfo<v8::Va
     funcPtr(args);
 }
 
-void ModuleInternal::Load(const string& path) {
+void ModuleInternal::Load(Local<Context> context, const string& path) {
     TNSPERF();
     auto isolate = m_isolate;
-    auto context = isolate->GetCurrentContext();
     auto globalObject = context->Global();
     auto require = globalObject->Get(context, ArgConverter::ConvertToV8String(isolate, "require")).ToLocalChecked().As<Function>();
     Local<Value> args[] = { ArgConverter::ConvertToV8String(isolate, path) };
     require->Call(context, globalObject, 1, args);
 }
 
-void ModuleInternal::LoadWorker(const string& path) {
+void ModuleInternal::LoadWorker(Local<Context> context, const string& path) {
     TNSPERF();
     auto isolate = m_isolate;
     TryCatch tc(isolate);
 
-    Load(path);
+    Load(context, path);
 
     if (tc.HasCaught()) {
         // This will handle any errors that occur when first loading a script (new worker)

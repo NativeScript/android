@@ -23,13 +23,13 @@ class ModuleInternal {
 
         void Init(v8::Isolate* isolate, const std::string& baseDir = "");
 
-        void Load(const std::string& path);
+        void Load(v8::Local<v8::Context> context, const std::string& path);
 
         /*
          * Reuses `Load` logic and adds TryCatch exception handling to push any unhandled exceptions
          * during script's initial load through the worker scope's `onerror` handler (if implemented before the exception was thrown)
          */
-        void LoadWorker(const std::string& path);
+        void LoadWorker(v8::Local<v8::Context> context, const std::string& path);
 
         /*
          * Checks if target script exists, will throw if negative

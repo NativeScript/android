@@ -63,6 +63,8 @@ class Runtime {
         void Lock();
         void Unlock();
 
+        v8::Local<v8::Context> GetContext();
+
         static v8::Platform* platform;
 
         std::string ReadFileText(const std::string& filePath);
@@ -94,6 +96,8 @@ class Runtime {
 
         v8::Persistent<v8::Function>* m_gcFunc;
         volatile bool m_runGC;
+
+        v8::Persistent<v8::Context>* m_context;
 
         v8::Isolate* PrepareV8Runtime(const std::string& filesPath, const std::string& nativeLibsDir, const std::string& packageName, bool isDebuggable, const std::string& callingDir, const std::string& profilerOutputDir, const int maxLogcatObjectSize, const bool forceLog);
         jobject ConvertJsValueToJavaObject(JEnv& env, const v8::Local<v8::Value>& value, int classReturnType);

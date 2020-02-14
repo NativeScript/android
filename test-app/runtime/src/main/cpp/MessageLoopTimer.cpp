@@ -124,6 +124,7 @@ int MessageLoopTimer::PumpMessageLoopCallback(int fd, int events, void* data) {
     read(fd, &msg, sizeof(uint8_t));
 
     auto isolate = static_cast<Isolate*>(data);
+    v8::Locker locker(isolate);
     v8::Isolate::Scope isolate_scope(isolate);
     v8::HandleScope handleScope(isolate);
 

@@ -1279,8 +1279,9 @@ public class Runtime {
 
         final Object[] tmpArgs = extendConstructorArgs(methodName, isConstructor, args);
         final boolean discardUncaughtJsExceptions = this.config.appConfig.getDiscardUncaughtJsExceptions();
+        boolean enableMultithreadedJavascript = this.config.appConfig.getEnableMultithreadedJavascript();
 
-        if (isWorkThread) {
+        if (enableMultithreadedJavascript || isWorkThread) {
             Object[] packagedArgs = packageArgs(tmpArgs);
             try {
                 ret = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, isConstructor, packagedArgs);

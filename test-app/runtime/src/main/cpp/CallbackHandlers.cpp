@@ -171,15 +171,15 @@ string CallbackHandlers::ResolveClassName(Isolate* isolate, jclass& clazz) {
     return className;
 }
 
-Local<Value> CallbackHandlers::GetArrayElement(Isolate* isolate, const Local<Object>& array,
+Local<Value> CallbackHandlers::GetArrayElement(Local<Context> context, const Local<Object>& array,
         uint32_t index, const string& arraySignature) {
-    return arrayElementAccessor.GetArrayElement(isolate, array, index, arraySignature);
+    return arrayElementAccessor.GetArrayElement(context, array, index, arraySignature);
 }
 
-void CallbackHandlers::SetArrayElement(Isolate* isolate, const Local<Object>& array, uint32_t index,
+void CallbackHandlers::SetArrayElement(Local<Context> context, const Local<Object>& array, uint32_t index,
                                        const string& arraySignature, Local<Value>& value) {
 
-    arrayElementAccessor.SetArrayElement(isolate, array, index, arraySignature, value);
+    arrayElementAccessor.SetArrayElement(context, array, index, arraySignature, value);
 }
 
 Local<Value> CallbackHandlers::GetJavaField(Isolate* isolate, const Local<Object>& caller,
@@ -568,7 +568,7 @@ CallbackHandlers::GetImplementedInterfaces(JEnv& env, const Local<Object>& imple
 
     vector<jstring> interfacesToImplement;
     auto isolate = implementationObject->GetIsolate();
-    auto context = isolate->GetCurrentContext();
+    auto context = implementationObject->CreationContext();
     auto propNames = implementationObject->GetOwnPropertyNames(context).ToLocalChecked();
     for (int i = 0; i < propNames->Length(); i++) {
         auto name = propNames->Get(context, i).ToLocalChecked().As<String>();
@@ -582,7 +582,6 @@ CallbackHandlers::GetImplementedInterfaces(JEnv& env, const Local<Object>& imple
             if (arrNameC == "interfaces") {
                 auto interfacesArr = prop->ToObject(context).ToLocalChecked();
 
-                auto context = isolate->GetCurrentContext();
                 int length = interfacesArr->Get(
                                  context,
                                  v8::String::NewFromUtf8(isolate, "length").ToLocalChecked()).ToLocalChecked()->ToObject(context).ToLocalChecked()->Uint32Value(
@@ -628,7 +627,7 @@ CallbackHandlers::GetMethodOverrides(JEnv& env, const Local<Object>& implementat
 
     vector<jstring> methodNames;
     auto isolate = implementationObject->GetIsolate();
-    auto context = isolate->GetCurrentContext();
+    auto context = implementationObject->CreationContext();
     auto propNames = implementationObject->GetOwnPropertyNames(context).ToLocalChecked();
     for (int i = 0; i < propNames->Length(); i++) {
         auto name = propNames->Get(context, i).ToLocalChecked().As<String>();
@@ -833,7 +832,7 @@ Local<Value> CallbackHandlers::CallJSMethod(Isolate* isolate, JNIEnv* _env,
     JEnv env(_env);
     Local<Value> result;
 
-    auto context = isolate->GetCurrentContext();
+    auto context = Runtime::GetRuntime(isolate)->GetContext();
     auto method = jsObject->Get(context, ArgConverter::ConvertToV8String(isolate, methodName)).ToLocalChecked();
 
     if (method.IsEmpty() || method->IsUndefined()) {
@@ -848,15 +847,13 @@ Local<Value> CallbackHandlers::CallJSMethod(Isolate* isolate, JNIEnv* _env,
         EscapableHandleScope handleScope(isolate);
 
         auto jsMethod = method.As<Function>();
-        auto jsArgs = ArgConverter::ConvertJavaArgsToJsArgs(isolate, args);
+        auto jsArgs = ArgConverter::ConvertJavaArgsToJsArgs(context, args);
         int argc = jsArgs->Length();
 
         std::vector<Local<Value>> arguments(argc);
         for (int i = 0; i < argc; i++) {
             arguments[i] = jsArgs->Get(context, i).ToLocalChecked();
         }
-
-        auto context = isolate->GetCurrentContext();
 
         TryCatch tc(isolate);
         Local<Value> jsResult;
@@ -1160,12 +1157,11 @@ CallbackHandlers::WorkerObjectOnMessageCallback(Isolate* isolate, jint workerId,
 
         if (!isEmpty && isFunction) {
             auto msgString = ArgConverter::jstringToV8String(isolate, message).As<String>();
-            auto context = isolate->GetCurrentContext();
             Local<Value> msg;
             JSON::Parse(context, msgString).ToLocal(&msg);
 
             auto obj = Object::New(isolate);
-            obj->DefineOwnProperty(isolate->GetCurrentContext(),
+            obj->DefineOwnProperty(context,
                                    ArgConverter::ConvertToV8String(isolate, "data"), msg,
                                    PropertyAttribute::ReadOnly);
             Local<Value> args1[] = {obj};
@@ -1430,8 +1426,6 @@ CallbackHandlers::CallWorkerObjectOnErrorHandle(Isolate* isolate, jint workerId,
 
             auto func = callback.As<Function>();
 
-            auto context = isolate->GetCurrentContext();
-
             // Handle exceptions thrown in onmessage with the worker.onerror handler, if present
             Local<Value> result;
             func->Call(context, Undefined(isolate), 1, args1).ToLocal(&result);
@@ -1490,9 +1484,6 @@ void CallbackHandlers::ClearWorkerPersistent(int workerId) {
 }
 
 void CallbackHandlers::TerminateWorkerThread(Isolate* isolate) {
-    auto context = isolate->GetCurrentContext();
-    context->Exit();
-
     isolate->TerminateExecution();
 }
 
