@@ -767,6 +767,9 @@ task buildMetadata(type: BuildToolTask) {
     description "builds metadata with provided jar dependencies"
 
     inputs.files("$MDG_JAVA_DEPENDENCIES")
+    
+    // make MDG aware of whitelist.mdg and blacklist.mdg files
+    inputs.files(project.fileTree(dir: "$rootDir", include: "**/*.mdg"))
 
     def classesDir = "$buildDir/intermediates/javac"
     inputs.dir(classesDir)
