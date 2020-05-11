@@ -16,10 +16,7 @@ import org.apache.bcel.classfile.JavaClass;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class ClassDirectory implements ClassMapProvider {
     private final String path;
@@ -31,7 +28,7 @@ public class ClassDirectory implements ClassMapProvider {
 
     private ClassDirectory(String path) {
         this.path = path;
-        this.classMap = new HashMap<String, NativeClassDescriptor>();
+        this.classMap = new HashMap<>();
     }
 
     public Map<String, NativeClassDescriptor> getClassMap() {
@@ -50,9 +47,9 @@ public class ClassDirectory implements ClassMapProvider {
 
     private static void readDirectory(ClassDirectory dir, String path)
             throws IOException {
-        List<File> subDirs = new ArrayList<File>();
+        List<File> subDirs = new ArrayList<>();
         File currentDir = new File(path);
-        for (File file : currentDir.listFiles()) {
+        for (File file : Objects.requireNonNull(currentDir.listFiles())) {
             if (file.isFile()) {
                 String name = file.getName();
                 if (name.endsWith(CLASS_EXT)) {
@@ -73,7 +70,6 @@ public class ClassDirectory implements ClassMapProvider {
         if (name.endsWith(CLASS_EXT)) {
             ClassParser cp = new ClassParser(file.getAbsolutePath());
             JavaClass javaClass = cp.parse();
-            boolean isKotlinClass = false;
 
             AnnotationEntry[] annotationEntries = javaClass.getAnnotationEntries();
             if (annotationEntries != null) {
@@ -82,16 +78,13 @@ public class ClassDirectory implements ClassMapProvider {
                     if ("Lkotlin/Metadata;".equals(annotationType)) {
                         MetadataAnnotation kotlinClassMetadataAnnotation = new BytecodeMetadataAnnotation(annotationEntry);
                         NativeClassDescriptor kotlinClassDescriptor = new KotlinClassDescriptor(javaClass, kotlinClassMetadataAnnotation);
-                        isKotlinClass = true;
                         analyticsCollector.markHasKotlinRuntimeClassesIfNotMarkedAlready();
                         return kotlinClassDescriptor;
                     }
                 }
             }
 
-            if (!isKotlinClass) {
-                return new JavaClassDescriptor(javaClass);
-            }
+            return new JavaClassDescriptor(javaClass);
         }
 
         return clazz;

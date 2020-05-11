@@ -438,6 +438,8 @@ public class Builder {
 
             if (ClassUtil.isPrimitive(clazz)) {
                 TreeNode tmp = TreeNode.getPrimitive(clazz);
+                if(tmp == null)
+                    throw new UnsupportedOperationException("tmp == null" + clazz.getClassName());
                 child.nodeType = tmp.nodeType;
             } else {
                 child.nodeType = clazz.isInterface() ? TreeNode.Interface
@@ -449,7 +451,7 @@ public class Builder {
         }
         node = child;
         if (node.baseClassNode == null) {
-            NativeClassDescriptor baseClass = null;
+            NativeClassDescriptor baseClass;
             if (predefinedSuperClassname != null) {
                 SecuredNativeClassDescriptor securedNativeClassDescriptor = SecuredClassRepository.INSTANCE.findNearestAllowedClass(predefinedSuperClassname);
                 baseClass = securedNativeClassDescriptor.isUsageAllowed() ? securedNativeClassDescriptor.getNativeDescriptor() : null;
@@ -503,6 +505,8 @@ public class Builder {
             child = currentNode.createChild(name);
             if (ClassUtil.isPrimitive(name)) {
                 TreeNode node = TreeNode.getPrimitive(name);
+                if(node == null)
+                    throw new UnsupportedOperationException("node == null: " + name);
                 child.nodeType = node.nodeType;
                 child.arrayElement = node;
             } else {
