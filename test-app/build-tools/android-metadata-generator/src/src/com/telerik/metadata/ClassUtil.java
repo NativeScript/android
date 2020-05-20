@@ -61,12 +61,11 @@ public class ClassUtil {
         if (idx < 0) {
             idx = className.lastIndexOf(".");
         }
-        String simpleName = className.substring(idx + 1);
-        return simpleName;
+        return className.substring(idx + 1);
     }
 
     static NativeMethodDescriptor[] getAllMethods(NativeClassDescriptor clazz) {
-        ArrayList<NativeMethodDescriptor> methods = new ArrayList<NativeMethodDescriptor>();
+        ArrayList<NativeMethodDescriptor> methods = new ArrayList<>();
         NativeClassDescriptor currentClass = clazz;
         while (currentClass != null) {
             NativeMethodDescriptor[] currentClassMethods = currentClass.getMethods();

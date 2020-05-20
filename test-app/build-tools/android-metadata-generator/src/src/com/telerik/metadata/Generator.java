@@ -24,7 +24,7 @@ public class Generator {
     private static final String MDG_BLACKLIST = "blacklist.mdg";
 
     /**
-     * @param args
+     * @param args arguments
      */
     public static void main(String[] args) {
         enableFlaggedFeatures(args);
@@ -38,12 +38,12 @@ public class Generator {
             try {
                 metadataOutputDir = getFileRows(MDG_OUTPUT_DIR).get(0);
             } catch (Exception e) {
-                throw new InvalidParameterException(String.format("You need to pass a file containing a single line: the output dir for the metadata generator1\n", e.getMessage()));
+                throw new InvalidParameterException(String.format("You need to pass a file containing a single line: the output dir for the metadata generator %s\n", e.getMessage()));
             }
             try {
                 params = getFileRows(MDG_JAVA_DEPENDENCIES);
             } catch (Exception e) {
-                throw new InvalidParameterException(String.format("You need to pass a file containing a list of jar/class paths, so metadata can be generated for them!\n", e.getMessage()));
+                throw new InvalidParameterException(String.format("You need to pass a file containing a list of jar/class paths, so metadata can be generated for them! %s\n", e.getMessage()));
             }
 
             TreeNode root = Builder.build(params);
