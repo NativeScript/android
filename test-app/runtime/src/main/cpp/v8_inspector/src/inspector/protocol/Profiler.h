@@ -30,6 +30,7 @@ class ScriptTypeProfile;
 class CounterInfo;
 class ConsoleProfileFinishedNotification;
 class ConsoleProfileStartedNotification;
+class PreciseCoverageDeltaUpdateNotification;
 
 // ------------- Type and builder declarations.
 
@@ -63,10 +64,7 @@ public:
     void setPositionTicks(std::unique_ptr<protocol::Array<protocol::Profiler::PositionTickInfo>> value) { m_positionTicks = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<ProfileNode> clone() const;
 
     template<int STATE>
@@ -180,10 +178,7 @@ public:
     void setTimeDeltas(std::unique_ptr<protocol::Array<int>> value) { m_timeDeltas = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<Profile> clone() const;
 
     template<int STATE>
@@ -282,10 +277,7 @@ public:
     void setTicks(int value) { m_ticks = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<PositionTickInfo> clone() const;
 
     template<int STATE>
@@ -364,10 +356,7 @@ public:
     void setCount(int value) { m_count = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<CoverageRange> clone() const;
 
     template<int STATE>
@@ -456,10 +445,7 @@ public:
     void setIsBlockCoverage(bool value) { m_isBlockCoverage = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<FunctionCoverage> clone() const;
 
     template<int STATE>
@@ -546,10 +532,7 @@ public:
     void setFunctions(std::unique_ptr<protocol::Array<protocol::Profiler::FunctionCoverage>> value) { m_functions = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<ScriptCoverage> clone() const;
 
     template<int STATE>
@@ -629,10 +612,7 @@ public:
     void setName(const String& value) { m_name = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<TypeObject> clone() const;
 
     template<int STATE>
@@ -697,10 +677,7 @@ public:
     void setTypes(std::unique_ptr<protocol::Array<protocol::Profiler::TypeObject>> value) { m_types = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<TypeProfileEntry> clone() const;
 
     template<int STATE>
@@ -778,10 +755,7 @@ public:
     void setEntries(std::unique_ptr<protocol::Array<protocol::Profiler::TypeProfileEntry>> value) { m_entries = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<ScriptTypeProfile> clone() const;
 
     template<int STATE>
@@ -864,10 +838,7 @@ public:
     void setValue(int value) { m_value = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<CounterInfo> clone() const;
 
     template<int STATE>
@@ -949,10 +920,7 @@ public:
     void setTitle(const String& value) { m_title = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<ConsoleProfileFinishedNotification> clone() const;
 
     template<int STATE>
@@ -1046,10 +1014,7 @@ public:
     void setTitle(const String& value) { m_title = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<ConsoleProfileStartedNotification> clone() const;
 
     template<int STATE>
@@ -1116,6 +1081,93 @@ private:
 };
 
 
+class  PreciseCoverageDeltaUpdateNotification : public Serializable{
+    PROTOCOL_DISALLOW_COPY(PreciseCoverageDeltaUpdateNotification);
+public:
+    static std::unique_ptr<PreciseCoverageDeltaUpdateNotification> fromValue(protocol::Value* value, ErrorSupport* errors);
+
+    ~PreciseCoverageDeltaUpdateNotification() override { }
+
+    double getTimestamp() { return m_timestamp; }
+    void setTimestamp(double value) { m_timestamp = value; }
+
+    String getOccassion() { return m_occassion; }
+    void setOccassion(const String& value) { m_occassion = value; }
+
+    protocol::Array<protocol::Profiler::ScriptCoverage>* getResult() { return m_result.get(); }
+    void setResult(std::unique_ptr<protocol::Array<protocol::Profiler::ScriptCoverage>> value) { m_result = std::move(value); }
+
+    std::unique_ptr<protocol::DictionaryValue> toValue() const;
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
+    std::unique_ptr<PreciseCoverageDeltaUpdateNotification> clone() const;
+
+    template<int STATE>
+    class PreciseCoverageDeltaUpdateNotificationBuilder {
+    public:
+        enum {
+            NoFieldsSet = 0,
+            TimestampSet = 1 << 1,
+            OccassionSet = 1 << 2,
+            ResultSet = 1 << 3,
+            AllFieldsSet = (TimestampSet | OccassionSet | ResultSet | 0)};
+
+
+        PreciseCoverageDeltaUpdateNotificationBuilder<STATE | TimestampSet>& setTimestamp(double value)
+        {
+            static_assert(!(STATE & TimestampSet), "property timestamp should not be set yet");
+            m_result->setTimestamp(value);
+            return castState<TimestampSet>();
+        }
+
+        PreciseCoverageDeltaUpdateNotificationBuilder<STATE | OccassionSet>& setOccassion(const String& value)
+        {
+            static_assert(!(STATE & OccassionSet), "property occassion should not be set yet");
+            m_result->setOccassion(value);
+            return castState<OccassionSet>();
+        }
+
+        PreciseCoverageDeltaUpdateNotificationBuilder<STATE | ResultSet>& setResult(std::unique_ptr<protocol::Array<protocol::Profiler::ScriptCoverage>> value)
+        {
+            static_assert(!(STATE & ResultSet), "property result should not be set yet");
+            m_result->setResult(std::move(value));
+            return castState<ResultSet>();
+        }
+
+        std::unique_ptr<PreciseCoverageDeltaUpdateNotification> build()
+        {
+            static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
+            return std::move(m_result);
+        }
+
+    private:
+        friend class PreciseCoverageDeltaUpdateNotification;
+        PreciseCoverageDeltaUpdateNotificationBuilder() : m_result(new PreciseCoverageDeltaUpdateNotification()) { }
+
+        template<int STEP> PreciseCoverageDeltaUpdateNotificationBuilder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<PreciseCoverageDeltaUpdateNotificationBuilder<STATE | STEP>*>(this);
+        }
+
+        std::unique_ptr<protocol::Profiler::PreciseCoverageDeltaUpdateNotification> m_result;
+    };
+
+    static PreciseCoverageDeltaUpdateNotificationBuilder<0> create()
+    {
+        return PreciseCoverageDeltaUpdateNotificationBuilder<0>();
+    }
+
+private:
+    PreciseCoverageDeltaUpdateNotification()
+    {
+          m_timestamp = 0;
+    }
+
+    double m_timestamp;
+    String m_occassion;
+    std::unique_ptr<protocol::Array<protocol::Profiler::ScriptCoverage>> m_result;
+};
+
+
 // ------------- Backend interface.
 
 class  Backend {
@@ -1127,12 +1179,12 @@ public:
     virtual DispatchResponse getBestEffortCoverage(std::unique_ptr<protocol::Array<protocol::Profiler::ScriptCoverage>>* out_result) = 0;
     virtual DispatchResponse setSamplingInterval(int in_interval) = 0;
     virtual DispatchResponse start() = 0;
-    virtual DispatchResponse startPreciseCoverage(Maybe<bool> in_callCount, Maybe<bool> in_detailed) = 0;
+    virtual DispatchResponse startPreciseCoverage(Maybe<bool> in_callCount, Maybe<bool> in_detailed, Maybe<bool> in_allowTriggeredUpdates, double* out_timestamp) = 0;
     virtual DispatchResponse startTypeProfile() = 0;
     virtual DispatchResponse stop(std::unique_ptr<protocol::Profiler::Profile>* out_profile) = 0;
     virtual DispatchResponse stopPreciseCoverage() = 0;
     virtual DispatchResponse stopTypeProfile() = 0;
-    virtual DispatchResponse takePreciseCoverage(std::unique_ptr<protocol::Array<protocol::Profiler::ScriptCoverage>>* out_result) = 0;
+    virtual DispatchResponse takePreciseCoverage(std::unique_ptr<protocol::Array<protocol::Profiler::ScriptCoverage>>* out_result, double* out_timestamp) = 0;
     virtual DispatchResponse takeTypeProfile(std::unique_ptr<protocol::Array<protocol::Profiler::ScriptTypeProfile>>* out_result) = 0;
     virtual DispatchResponse enableRuntimeCallStats() = 0;
     virtual DispatchResponse disableRuntimeCallStats() = 0;
@@ -1144,14 +1196,15 @@ public:
 
 class  Frontend {
 public:
-    explicit Frontend(FrontendChannel* frontendChannel) : m_frontendChannel(frontendChannel) { }
+  explicit Frontend(FrontendChannel* frontend_channel) : frontend_channel_(frontend_channel) {}
     void consoleProfileFinished(const String& id, std::unique_ptr<protocol::Debugger::Location> location, std::unique_ptr<protocol::Profiler::Profile> profile, Maybe<String> title = Maybe<String>());
     void consoleProfileStarted(const String& id, std::unique_ptr<protocol::Debugger::Location> location, Maybe<String> title = Maybe<String>());
+    void preciseCoverageDeltaUpdate(double timestamp, const String& occassion, std::unique_ptr<protocol::Array<protocol::Profiler::ScriptCoverage>> result);
 
-    void flush();
-    void sendRawCBORNotification(std::vector<uint8_t>);
-private:
-    FrontendChannel* m_frontendChannel;
+  void flush();
+  void sendRawNotification(std::unique_ptr<Serializable>);
+ private:
+  FrontendChannel* frontend_channel_;
 };
 
 // ------------- Dispatcher.

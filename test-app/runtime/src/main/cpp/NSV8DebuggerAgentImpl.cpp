@@ -31,7 +31,7 @@ Response NSV8DebuggerAgentImpl::getPossibleBreakpoints(
         return V8DebuggerAgentImpl::getPossibleBreakpoints(std::move(start), std::move(end), std::move(restrictToFunction), locations);
     } else {
         *locations = std::make_unique<protocol::Array<protocol::Debugger::BreakLocation>>();
-        return Response::OK();
+        return Response::Success();
     }
 }
 

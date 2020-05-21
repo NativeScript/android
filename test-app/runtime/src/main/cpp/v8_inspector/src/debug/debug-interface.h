@@ -52,12 +52,20 @@ V8_EXPORT_PRIVATE void ClearBreakOnNextFunctionCall(Isolate* isolate);
 MaybeLocal<Array> GetInternalProperties(Isolate* isolate, Local<Value> value);
 
 /**
- * Returns array of private fields specific to the value type. Result has
- * the following format: [<name>, <value>,...,<name>, <value>]. Result array
- * will be allocated in the current context.
+ * Returns through the out parameters names_out a vector of names
+ * in v8::String for private members, including fields, methods,
+ * accessors specific to the value type.
+ * The values are returned through the out parameter values_out in the
+ * corresponding indices. Private fields and methods are returned directly
+ * while accessors are returned as v8::debug::AccessorPair. Missing components
+ * in the accessor pairs are null.
+ * If an exception occurs, false is returned. Otherwise true is returned.
+ * Results will be allocated in the current context and handle scope.
  */
-V8_EXPORT_PRIVATE MaybeLocal<Array> GetPrivateFields(Local<Context> context,
-                                                     Local<Object> value);
+V8_EXPORT_PRIVATE bool GetPrivateMembers(Local<Context> context,
+                                         Local<Object> value,
+                                         std::vector<Local<Value>>* names_out,
+                                         std::vector<Local<Value>>* values_out);
 
 /**
  * Forwards to v8::Object::CreationContext, but with special handling for
@@ -92,6 +100,13 @@ enum StepAction {
 void PrepareStep(Isolate* isolate, StepAction action);
 void ClearStepping(Isolate* isolate);
 V8_EXPORT_PRIVATE void BreakRightNow(Isolate* isolate);
+
+// Use `SetTerminateOnResume` to indicate that an TerminateExecution interrupt
+// should be set shortly before resuming, i.e. shortly before returning into
+// the JavaScript stack frames on the stack. In contrast to setting the
+// interrupt with `RequestTerminateExecution` directly, this flag allows
+// the isolate to be entered for further JavaScript execution.
+V8_EXPORT_PRIVATE void SetTerminateOnResume(Isolate* isolate);
 
 bool AllFramesOnStackAreBlackboxed(Isolate* isolate);
 
@@ -149,6 +164,7 @@ class V8_EXPORT_PRIVATE Script {
                        LiveEditResult* result) const;
   bool SetBreakpoint(v8::Local<v8::String> condition, debug::Location* location,
                      BreakpointId* id) const;
+  void RemoveWasmBreakpoint(BreakpointId id);
   bool SetBreakpointOnScriptEntry(BreakpointId* id) const;
 };
 
@@ -164,8 +180,10 @@ class WasmScript : public Script {
   std::pair<int, int> GetFunctionRange(int function_index) const;
   int GetContainingFunction(int byte_offset) const;
 
-  debug::WasmDisassembly DisassembleFunction(int function_index) const;
   uint32_t GetFunctionHash(int function_index);
+
+  int CodeOffset() const;
+  int CodeLength() const;
 };
 
 V8_EXPORT_PRIVATE void GetLoadedScripts(
@@ -200,6 +218,9 @@ class DebugDelegate {
 
 V8_EXPORT_PRIVATE void SetDebugDelegate(Isolate* isolate,
                                         DebugDelegate* listener);
+
+V8_EXPORT_PRIVATE void TierDownAllModulesPerIsolate(Isolate* isolate);
+V8_EXPORT_PRIVATE void TierUpAllModulesPerIsolate(Isolate* isolate);
 
 class AsyncEventDelegate {
  public:
@@ -402,7 +423,8 @@ class V8_EXPORT_PRIVATE ScopeIterator {
     ScopeTypeBlock,
     ScopeTypeScript,
     ScopeTypeEval,
-    ScopeTypeModule
+    ScopeTypeModule,
+    ScopeTypeWasmExpressionStack
   };
 
   virtual bool Done() = 0;
@@ -513,6 +535,25 @@ class WeakMap : public v8::Object {
   WeakMap();
 };
 
+/**
+ * Pairs of accessors.
+ *
+ * In the case of private accessors, getters and setters are either null or
+ * Functions.
+ */
+class V8_EXPORT_PRIVATE AccessorPair : public v8::Value {
+ public:
+  v8::Local<v8::Value> getter();
+  v8::Local<v8::Value> setter();
+
+  static bool IsAccessorPair(v8::Local<v8::Value> obj);
+  V8_INLINE static AccessorPair* Cast(v8::Value* obj);
+
+ private:
+  AccessorPair();
+  static void CheckCast(v8::Value* obj);
+};
+
 struct PropertyDescriptor {
   bool enumerable : 1;
   bool has_enumerable : 1;
@@ -545,6 +586,16 @@ class PropertyIterator {
   virtual bool is_own() = 0;
   virtual bool is_array_index() = 0;
 };
+
+AccessorPair* AccessorPair::Cast(v8::Value* value) {
+#ifdef V8_ENABLE_CHECKS
+  CheckCast(value);
+#endif
+  return static_cast<AccessorPair*>(value);
+}
+
+MaybeLocal<Message> GetMessageFromPromise(Local<Promise> promise);
+
 }  // namespace debug
 }  // namespace v8
 

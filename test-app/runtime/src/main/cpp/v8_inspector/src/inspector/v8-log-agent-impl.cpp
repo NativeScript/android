@@ -28,25 +28,25 @@ V8LogAgentImpl::~V8LogAgentImpl() { }
 
 DispatchResponse V8LogAgentImpl::enable() {
     if (m_enabled) {
-        return DispatchResponse::Error("Log Agent already enabled!");
+        return DispatchResponse::ServerError("Log Agent already enabled!");
     }
 
     m_state->setBoolean(LogAgentState::logEnabled, true);
     m_enabled = true;
 
-    return DispatchResponse::OK();
+    return DispatchResponse::Success();
 }
 
 DispatchResponse V8LogAgentImpl::disable() {
     if (!m_enabled) {
-        return DispatchResponse::OK();
+        return DispatchResponse::Success();
     }
 
     m_state->setBoolean(LogAgentState::logEnabled, false);
 
     m_enabled = false;
 
-    return DispatchResponse::OK();
+    return DispatchResponse::Success();
 }
 
 DispatchResponse V8LogAgentImpl::startViolationsReport(std::unique_ptr<protocol::Array<protocol::Log::ViolationSetting>> in_config) {

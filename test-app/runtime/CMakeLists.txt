@@ -118,7 +118,6 @@ if (NOT OPTIMIZED_BUILD OR OPTIMIZED_WITH_INSPECTOR_BUILD)
         src/main/cpp/v8_inspector/src/inspector/v8-string-conversions.cc
         src/main/cpp/v8_inspector/src/inspector/v8-value-utils.cc
         src/main/cpp/v8_inspector/src/inspector/value-mirror.cc
-        src/main/cpp/v8_inspector/src/inspector/wasm-translation.cc
     )
 else ()
     # Debug builds will include the V8 inspector sources

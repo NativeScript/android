@@ -17,7 +17,6 @@
 #include "src/inspector/protocol/Forward.h"
 #include "src/inspector/protocol/Runtime.h"
 #include "src/inspector/v8-debugger-script.h"
-#include "src/inspector/wasm-translation.h"
 
 #include "include/v8-inspector.h"
 
@@ -78,7 +77,8 @@ class V8Debugger : public v8::debug::DebugDelegate,
   bool canBreakProgram();
   void breakProgram(int targetContextGroupId);
   void interruptAndBreak(int targetContextGroupId);
-  void continueProgram(int targetContextGroupId);
+  void continueProgram(int targetContextGroupId,
+                       bool terminateOnResume = false);
   void breakProgramOnAssert(int targetContextGroupId);
 
   void setPauseOnNextCall(bool, int targetContextGroupId);
@@ -139,8 +139,6 @@ class V8Debugger : public v8::debug::DebugDelegate,
   void unmuteScriptParsedEvents();
 
   V8InspectorImpl* inspector() { return m_inspector; }
-
-  WasmTranslation* wasmTranslation() { return &m_wasmTranslation; }
 
   void setMaxAsyncTaskStacksForTest(int limit);
   void dumpAsyncTaskStacksStateForTest();
@@ -249,7 +247,6 @@ class V8Debugger : public v8::debug::DebugDelegate,
   // V8Debugger owns all the async stacks, while most of the other references
   // are weak, which allows to collect some stacks when there are too many.
   std::list<std::shared_ptr<AsyncStackTrace>> m_allAsyncStacks;
-  std::unordered_map<int, std::weak_ptr<StackFrame>> m_framesCache;
 
   std::unordered_map<V8DebuggerAgentImpl*, int> m_maxAsyncCallStackDepthMap;
   void* m_taskWithScheduledBreak = nullptr;
@@ -273,8 +270,6 @@ class V8Debugger : public v8::debug::DebugDelegate,
   std::unordered_map<int, V8DebuggerId> m_contextGroupIdToDebuggerId;
 
   std::unique_ptr<TerminateExecutionCallback> m_terminateExecutionCallback;
-
-  WasmTranslation m_wasmTranslation;
 
   DISALLOW_COPY_AND_ASSIGN(V8Debugger);
 };

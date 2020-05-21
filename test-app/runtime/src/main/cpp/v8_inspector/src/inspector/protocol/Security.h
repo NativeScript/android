@@ -70,10 +70,7 @@ public:
     void setRecommendations(std::unique_ptr<protocol::Array<String>> value) { m_recommendations = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<SecurityStateExplanation> clone() const;
 
     template<int STATE>
@@ -205,10 +202,7 @@ public:
     void setDisplayedInsecureContentStyle(const String& value) { m_displayedInsecureContentStyle = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<InsecureContentStatus> clone() const;
 
     template<int STATE>
@@ -335,10 +329,7 @@ public:
     void setRequestURL(const String& value) { m_requestURL = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<CertificateErrorNotification> clone() const;
 
     template<int STATE>
@@ -432,10 +423,7 @@ public:
     void setSummary(const String& value) { m_summary = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<SecurityStateChangedNotification> clone() const;
 
     template<int STATE>
@@ -530,7 +518,7 @@ public:
 
     virtual DispatchResponse disable()
     {
-        return DispatchResponse::OK();
+        return DispatchResponse::Success();
     }
 };
 
@@ -538,14 +526,14 @@ public:
 
 class  Frontend {
 public:
-    explicit Frontend(FrontendChannel* frontendChannel) : m_frontendChannel(frontendChannel) { }
+  explicit Frontend(FrontendChannel* frontend_channel) : frontend_channel_(frontend_channel) {}
     void certificateError(int eventId, const String& errorType, const String& requestURL);
     void securityStateChanged(const String& securityState, bool schemeIsCryptographic, std::unique_ptr<protocol::Array<protocol::Security::SecurityStateExplanation>> explanations, std::unique_ptr<protocol::Security::InsecureContentStatus> insecureContentStatus, Maybe<String> summary = Maybe<String>());
 
-    void flush();
-    void sendRawCBORNotification(std::vector<uint8_t>);
-private:
-    FrontendChannel* m_frontendChannel;
+  void flush();
+  void sendRawNotification(std::unique_ptr<Serializable>);
+ private:
+  FrontendChannel* frontend_channel_;
 };
 
 // ------------- Dispatcher.

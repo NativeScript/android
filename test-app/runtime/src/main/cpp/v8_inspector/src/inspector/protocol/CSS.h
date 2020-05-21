@@ -69,10 +69,7 @@ public:
     void setMatches(std::unique_ptr<protocol::Array<protocol::CSS::RuleMatch>> value) { m_matches = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<PseudoElementMatches> clone() const;
 
     template<int STATE>
@@ -147,10 +144,7 @@ public:
     void setMatchedCSSRules(std::unique_ptr<protocol::Array<protocol::CSS::RuleMatch>> value) { m_matchedCSSRules = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<InheritedStyleEntry> clone() const;
 
     template<int STATE>
@@ -222,10 +216,7 @@ public:
     void setMatchingSelectors(std::unique_ptr<protocol::Array<int>> value) { m_matchingSelectors = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<RuleMatch> clone() const;
 
     template<int STATE>
@@ -300,10 +291,7 @@ public:
     void setRange(std::unique_ptr<protocol::CSS::SourceRange> value) { m_range = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<Value> clone() const;
 
     template<int STATE>
@@ -375,10 +363,7 @@ public:
     void setText(const String& value) { m_text = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<SelectorList> clone() const;
 
     template<int STATE>
@@ -488,10 +473,7 @@ public:
     void setLength(double value) { m_length = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<CSSStyleSheetHeader> clone() const;
 
     template<int STATE>
@@ -674,10 +656,7 @@ public:
     void setMedia(std::unique_ptr<protocol::Array<protocol::CSS::CSSMedia>> value) { m_media = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<CSSRule> clone() const;
 
     template<int STATE>
@@ -780,10 +759,7 @@ public:
     void setUsed(bool value) { m_used = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<RuleUsage> clone() const;
 
     template<int STATE>
@@ -884,10 +860,7 @@ public:
     void setEndColumn(int value) { m_endColumn = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<SourceRange> clone() const;
 
     template<int STATE>
@@ -987,10 +960,7 @@ public:
     void setImportant(bool value) { m_important = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<ShorthandEntry> clone() const;
 
     template<int STATE>
@@ -1071,10 +1041,7 @@ public:
     void setValue(const String& value) { m_value = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<CSSComputedStyleProperty> clone() const;
 
     template<int STATE>
@@ -1160,10 +1127,7 @@ public:
     void setRange(std::unique_ptr<protocol::CSS::SourceRange> value) { m_range = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<CSSStyle> clone() const;
 
     template<int STATE>
@@ -1282,10 +1246,7 @@ public:
     void setRange(std::unique_ptr<protocol::CSS::SourceRange> value) { m_range = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<CSSProperty> clone() const;
 
     template<int STATE>
@@ -1424,10 +1385,7 @@ public:
     void setMediaList(std::unique_ptr<protocol::Array<protocol::CSS::MediaQuery>> value) { m_mediaList = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<CSSMedia> clone() const;
 
     template<int STATE>
@@ -1529,10 +1487,7 @@ public:
     void setActive(bool value) { m_active = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<MediaQuery> clone() const;
 
     template<int STATE>
@@ -1618,10 +1573,7 @@ public:
     void setComputedLength(double value) { m_computedLength = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<MediaQueryExpression> clone() const;
 
     template<int STATE>
@@ -1722,10 +1674,7 @@ public:
     void setGlyphCount(double value) { m_glyphCount = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<PlatformFontUsage> clone() const;
 
     template<int STATE>
@@ -1828,10 +1777,7 @@ public:
     void setPlatformFontFamily(const String& value) { m_platformFontFamily = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<FontFace> clone() const;
 
     template<int STATE>
@@ -1959,10 +1905,7 @@ public:
     void setKeyframes(std::unique_ptr<protocol::Array<protocol::CSS::CSSKeyframeRule>> value) { m_keyframes = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<CSSKeyframesRule> clone() const;
 
     template<int STATE>
@@ -2043,10 +1986,7 @@ public:
     void setStyle(std::unique_ptr<protocol::CSS::CSSStyle> value) { m_style = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<CSSKeyframeRule> clone() const;
 
     template<int STATE>
@@ -2139,10 +2079,7 @@ public:
     void setText(const String& value) { m_text = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<StyleDeclarationEdit> clone() const;
 
     template<int STATE>
@@ -2223,10 +2160,7 @@ public:
     void setFont(std::unique_ptr<protocol::CSS::FontFace> value) { m_font = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<FontsUpdatedNotification> clone() const;
 
     template<int STATE>
@@ -2286,10 +2220,7 @@ public:
     void setHeader(std::unique_ptr<protocol::CSS::CSSStyleSheetHeader> value) { m_header = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<StyleSheetAddedNotification> clone() const;
 
     template<int STATE>
@@ -2351,10 +2282,7 @@ public:
     void setStyleSheetId(const String& value) { m_styleSheetId = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<StyleSheetChangedNotification> clone() const;
 
     template<int STATE>
@@ -2416,10 +2344,7 @@ public:
     void setStyleSheetId(const String& value) { m_styleSheetId = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<StyleSheetRemovedNotification> clone() const;
 
     template<int STATE>
@@ -2512,17 +2437,17 @@ public:
 
 class  Frontend {
 public:
-    explicit Frontend(FrontendChannel* frontendChannel) : m_frontendChannel(frontendChannel) { }
+  explicit Frontend(FrontendChannel* frontend_channel) : frontend_channel_(frontend_channel) {}
     void fontsUpdated(Maybe<protocol::CSS::FontFace> font = Maybe<protocol::CSS::FontFace>());
     void mediaQueryResultChanged();
     void styleSheetAdded(std::unique_ptr<protocol::CSS::CSSStyleSheetHeader> header);
     void styleSheetChanged(const String& styleSheetId);
     void styleSheetRemoved(const String& styleSheetId);
 
-    void flush();
-    void sendRawCBORNotification(std::vector<uint8_t>);
-private:
-    FrontendChannel* m_frontendChannel;
+  void flush();
+  void sendRawNotification(std::unique_ptr<Serializable>);
+ private:
+  FrontendChannel* frontend_channel_;
 };
 
 // ------------- Dispatcher.

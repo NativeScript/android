@@ -24,20 +24,21 @@ class Common {
         static std::unique_ptr<protocol::Array<T>> fromValue(protocol::Value* value, protocol::ErrorSupport* errors) {
             protocol::ListValue* array = protocol::ListValue::cast(value);
             if (!array) {
-                errors->addError("array expected");
+                errors->AddError("array expected");
                 return nullptr;
             }
 
             std::unique_ptr<protocol::Array<T>> result(new protocol::Array<T>());
-            errors->push();
+            errors->Push();
             for (size_t i = 0; i < array->size(); ++i) {
-                errors->setName(protocol::StringUtil::fromInteger(i));
+                const char* name = std::to_string(i).c_str();
+                errors->SetName(name);
                 std::unique_ptr<T> item = protocol::ValueConversions<T>::fromValue(array->at(i), errors);
                 result->push_back(std::move(item));
             }
 
-            errors->pop();
-            if (errors->hasErrors()) {
+            errors->Pop();
+            if (!errors->Errors().empty()) {
                 return nullptr;
             }
 
@@ -45,7 +46,7 @@ class Common {
         }
 
     private:
-        static const String16 s_notImplemented;
+        static const std::string s_notImplemented;
 };
 
 }

@@ -351,7 +351,8 @@ void MetadataNode::FieldAccessorSetterCallback(Local<Name> property, Local<Value
         auto fieldCallbackData = reinterpret_cast<FieldCallbackData*>(info.Data().As<External>()->Value());
 
         if (!fieldCallbackData->isStatic && thiz->StrictEquals(info.Holder())) {
-            info.GetReturnValue().SetUndefined();
+            auto isolate = info.GetIsolate();
+            info.GetReturnValue().Set(v8::Undefined(isolate));
             return;
         }
 

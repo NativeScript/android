@@ -35,13 +35,8 @@ public:
     void setVersion(const String& value) { m_version = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<Domain> clone() const;
-    std::unique_ptr<StringBuffer> toJSONString() const override;
-    void writeBinary(std::vector<uint8_t>* out) const override;
 
     template<int STATE>
     class DomainBuilder {
@@ -110,7 +105,7 @@ public:
 
     virtual DispatchResponse disable()
     {
-        return DispatchResponse::OK();
+        return DispatchResponse::Success();
     }
 };
 
@@ -118,12 +113,12 @@ public:
 
 class  Frontend {
 public:
-    explicit Frontend(FrontendChannel* frontendChannel) : m_frontendChannel(frontendChannel) { }
+  explicit Frontend(FrontendChannel* frontend_channel) : frontend_channel_(frontend_channel) {}
 
-    void flush();
-    void sendRawCBORNotification(std::vector<uint8_t>);
-private:
-    FrontendChannel* m_frontendChannel;
+  void flush();
+  void sendRawNotification(std::unique_ptr<Serializable>);
+ private:
+  FrontendChannel* frontend_channel_;
 };
 
 // ------------- Dispatcher.

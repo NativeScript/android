@@ -3,6 +3,7 @@
 //
 
 #include <sstream>
+#include <v8_inspector/third_party/inspector_protocol/crdtp/json.h>
 #include "NetworkDomainCallbackHandlers.h"
 #include "NativeScriptAssert.h"
 
@@ -65,16 +66,17 @@ void NetworkDomainCallbackHandlers::ResponseReceivedCallback(const v8::FunctionC
             throw NativeScriptException("`response` parameter not in the correct format.");
         }
 
-        auto responseJsonString = ArgConverter::ConvertToUtf16String(responseJson);
-        auto responseUtf16Data = responseJsonString.data();
-        auto protocolResponseJson = protocol::StringUtil::parseJSON(String16((const uint16_t*) responseUtf16Data));
+        const String16 responseJsonString = toProtocolString(isolate, responseJson);
+        std::vector<uint8_t> cbor;
+        v8_crdtp::json::ConvertJSONToCBOR(v8_crdtp::span<uint16_t>(responseJsonString.characters16(), responseJsonString.length()), &cbor);
+        std::unique_ptr<protocol::Value> protocolResponseJson = protocol::Value::parseBinary(cbor.data(), cbor.size());
 
         protocol::ErrorSupport errorSupport;
+        auto protocolResponseObj = protocol::Network::Response::fromValue(protocolResponseJson.get(), &errorSupport);
 
-        auto protocolResponseObj = protocol::Network::Response::fromValue(protocolResponseJson.get(),
-                                   &errorSupport);
-
-        auto errorString = errorSupport.errors().utf8();
+        std::vector<uint8_t> json;
+        v8_crdtp::json::ConvertCBORToJSON(errorSupport.Errors(), &json);
+        auto errorString = String16(reinterpret_cast<const char*>(json.data()), json.size()).utf8();
 
         if (!errorString.empty()) {
             auto errorMessage = "Error while parsing debug `response` object. ";
@@ -166,16 +168,18 @@ void NetworkDomainCallbackHandlers::RequestWillBeSentCallback(const v8::Function
             throw NativeScriptException("`request` parameter not in the correct format.");
         }
 
-        auto requestJsonString = ArgConverter::ConvertToUtf16String(requestJson);
-        auto requestUtf16Data = requestJsonString.data();
-        auto protocolRequestJson = protocol::StringUtil::parseJSON(String16((const uint16_t*)  requestUtf16Data));
+        const String16& requestJsonString16 = toProtocolString(isolate, requestJson);
+        std::vector<uint8_t> cbor;
+        v8_crdtp::json::ConvertJSONToCBOR(v8_crdtp::span<uint16_t>(requestJsonString16.characters16(), requestJsonString16.length()), &cbor);
+        std::unique_ptr<protocol::Value> protocolRequestJson = protocol::Value::parseBinary(cbor.data(), cbor.size());
 
         protocol::ErrorSupport errorSupport;
-
         auto protocolRequestObj = protocol::Network::Request::fromValue(protocolRequestJson.get(), &errorSupport);
         auto initiator = protocol::Network::Initiator::create().setType(protocol::Network::Initiator::TypeEnum::Script).build();
 
-        auto errorString = errorSupport.errors().utf8();
+        std::vector<uint8_t> json;
+        v8_crdtp::json::ConvertCBORToJSON(errorSupport.Errors(), &json);
+        auto errorString = String16(reinterpret_cast<const char*>(json.data()), json.size()).utf8();
 
         if (!errorString.empty()) {
             auto errorMessage = "Error while parsing debug `request` object. ";

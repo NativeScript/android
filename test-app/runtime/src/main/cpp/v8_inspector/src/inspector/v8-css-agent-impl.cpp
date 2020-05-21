@@ -3,8 +3,9 @@
 //
 
 #include <NativeScriptAssert.h>
-#include <ArgConverter.h>
+#include <v8_inspector/third_party/inspector_protocol/crdtp/json.h>
 #include <v8_inspector/src/inspector/utils/v8-inspector-common.h>
+#include <ArgConverter.h>
 #include "v8-css-agent-impl.h"
 
 namespace v8_inspector {
@@ -41,14 +42,14 @@ void V8CSSAgentImpl::enable(std::unique_ptr<EnableCallback> callback) {
 
 DispatchResponse V8CSSAgentImpl::disable() {
     if (!m_enabled) {
-        return DispatchResponse::OK();
+        return DispatchResponse::Success();
     }
 
     m_state->setBoolean(CSSAgentState::cssEnabled, false);
 
     m_enabled = false;
 
-    return DispatchResponse::OK();
+    return DispatchResponse::Success();
 }
 
 // Not supported
@@ -110,7 +111,7 @@ DispatchResponse V8CSSAgentImpl::getMatchedStylesForNode(int in_nodeId, Maybe<pr
 //        *out_inherited = std::move(Maybe<protocol::Array<protocol::CSS::InheritedStyleEntry>>(std::move(inheritedElementsArr)));
 //        *out_pseudoElements = std::move(Maybe<protocol::Array<protocol::CSS::PseudoElementMatches>>(std::move(pseudoElementsArr)));
 
-    return DispatchResponse::OK();
+    return DispatchResponse::Success();
 }
 
 DispatchResponse V8CSSAgentImpl::getInlineStylesForNode(int in_nodeId, Maybe<protocol::CSS::CSSStyle>* out_inlineStyle, Maybe<protocol::CSS::CSSStyle>* out_attributesStyle) {
@@ -133,7 +134,7 @@ DispatchResponse V8CSSAgentImpl::getInlineStylesForNode(int in_nodeId, Maybe<pro
 //        *out_inlineStyle = std::move(Maybe<protocol::CSS::CSSStyle>(std::move(inlineStyle)));
 //        *out_attributesStyle = std::move(Maybe<protocol::CSS::CSSStyle>(std::move(attributeStyle)));
 
-    return DispatchResponse::OK();
+    return DispatchResponse::Success();
 }
 
 DispatchResponse V8CSSAgentImpl::getComputedStyleForNode(int in_nodeId, std::unique_ptr<protocol::Array<protocol::CSS::CSSComputedStyleProperty>>* out_computedStyle) {
@@ -161,29 +162,31 @@ DispatchResponse V8CSSAgentImpl::getComputedStyleForNode(int in_nodeId, std::uni
             if (tc.HasCaught()) {
 
                 *out_computedStyle = std::move(computedStylePropertyArr);
-                return DispatchResponse::Error(utils::Common::getJSCallErrorMessage(getComputedStylesForNodeString, tc.Message()->Get()).c_str());
+                return DispatchResponse::ServerError(utils::Common::getJSCallErrorMessage(getComputedStylesForNodeString, tc.Message()->Get()).c_str());
             }
 
             v8::Local<v8::Value> outResult;
 
             if (maybeResult.ToLocal(&outResult)) {
-                auto resultString = ArgConverter::ConvertToString(outResult->ToString(context).ToLocalChecked());
-                auto resultCStr = resultString.c_str();
-                auto resultJson = protocol::StringUtil::parseJSON(resultCStr);
-
+                auto resultString = outResult->ToString(context).ToLocalChecked();
+                String16 resultProtocolString = toProtocolString(isolate, resultString);
+                std::vector<uint8_t> cbor;
+                v8_crdtp::json::ConvertJSONToCBOR(v8_crdtp::span<uint16_t>(resultProtocolString.characters16(), resultProtocolString.length()), &cbor);
+                std::unique_ptr<protocol::Value> resultJson = protocol::Value::parseBinary(cbor.data(), cbor.size());
                 protocol::ErrorSupport errorSupport;
-                auto computedStyles = utils::Common::fromValue<protocol::CSS::CSSComputedStyleProperty>(
-                                          resultJson.get(), &errorSupport);
+                std::unique_ptr<protocol::Array<protocol::CSS::CSSComputedStyleProperty>> computedStyles = utils::Common::fromValue<protocol::CSS::CSSComputedStyleProperty>(resultJson.get(), &errorSupport);
 
-                auto errorSupportString = errorSupport.errors().utf8();
+                std::vector<uint8_t> json;
+                v8_crdtp::json::ConvertCBORToJSON(errorSupport.Errors(), &json);
+                auto errorSupportString = String16(reinterpret_cast<const char*>(json.data()), json.size()).utf8();
                 if (!errorSupportString.empty()) {
                     auto errorMessage = "Error while parsing CSSComputedStyleProperty object. ";
                     DEBUG_WRITE_FORCE("%s Error: %s", errorMessage, errorSupportString.c_str());
-                    return DispatchResponse::Error(errorMessage);
+                    return DispatchResponse::ServerError(errorMessage);
                 } else {
                     *out_computedStyle = std::move(computedStyles);
 
-                    return DispatchResponse::OK();
+                    return DispatchResponse::Success();
                 }
             }
         }
@@ -191,7 +194,7 @@ DispatchResponse V8CSSAgentImpl::getComputedStyleForNode(int in_nodeId, std::uni
 
     *out_computedStyle = std::move(computedStylePropertyArr);
 
-    return DispatchResponse::OK();
+    return DispatchResponse::Success();
 }
 
 DispatchResponse V8CSSAgentImpl::getPlatformFontsForNode(int in_nodeId, std::unique_ptr<protocol::Array<protocol::CSS::PlatformFontUsage>>* out_fonts) {
@@ -204,7 +207,7 @@ DispatchResponse V8CSSAgentImpl::getPlatformFontsForNode(int in_nodeId, std::uni
                                 .build()));
     *out_fonts = std::move(fontsArr);
 
-    return DispatchResponse::OK();
+    return DispatchResponse::Success();
 }
 
 DispatchResponse V8CSSAgentImpl::getStyleSheetText(const String& in_styleSheetId, String* out_text) {

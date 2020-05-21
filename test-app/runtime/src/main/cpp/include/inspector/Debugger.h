@@ -16,8 +16,8 @@ namespace protocol {
 #define v8_inspector_protocol_exported_api_h
 class V8_EXPORT Exported {
 public:
-    virtual std::unique_ptr<StringBuffer> toJSONString() const = 0;
-    virtual void writeBinary(std::vector<uint8_t>* out) const = 0;
+    virtual void AppendSerialized(std::vector<uint8_t>* out) const = 0;
+
     virtual ~Exported() { }
 };
 #endif // !defined(v8_inspector_protocol_exported_api_h)
@@ -47,7 +47,6 @@ V8_EXPORT extern const char* XHR;
 
 class V8_EXPORT SearchMatch : public Exported {
 public:
-    static std::unique_ptr<protocol::Debugger::API::SearchMatch> fromJSONString(const StringView& json);
     static std::unique_ptr<protocol::Debugger::API::SearchMatch> fromBinary(const uint8_t* data, size_t length);
 };
 

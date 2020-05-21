@@ -25,25 +25,25 @@ V8OverlayAgentImpl::~V8OverlayAgentImpl() { }
 
 DispatchResponse V8OverlayAgentImpl::enable() {
     if (m_enabled) {
-        return DispatchResponse::Error("Overlay Agent already enabled!");
+        return DispatchResponse::ServerError("Overlay Agent already enabled!");
     }
 
     m_state->setBoolean(OverlayAgentState::overlayEnabled, true);
     m_enabled = true;
 
-    return DispatchResponse::OK();
+    return DispatchResponse::Success();
 }
 
 DispatchResponse V8OverlayAgentImpl::disable() {
     if (!m_enabled) {
-        return DispatchResponse::OK();
+        return DispatchResponse::Success();
     }
 
     m_state->setBoolean(OverlayAgentState::overlayEnabled, false);
 
     m_enabled = false;
 
-    return DispatchResponse::OK();
+    return DispatchResponse::Success();
 }
 
 DispatchResponse V8OverlayAgentImpl::setShowFPSCounter(bool in_show) {

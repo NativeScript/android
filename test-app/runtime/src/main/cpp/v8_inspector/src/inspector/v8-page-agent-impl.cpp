@@ -29,26 +29,26 @@ V8PageAgentImpl::~V8PageAgentImpl() {}
 
 DispatchResponse V8PageAgentImpl::enable() {
     if (m_enabled) {
-        return DispatchResponse::OK();
+        return DispatchResponse::Success();
     }
 
     m_state->setBoolean(PageAgentState::pageEnabled, true);
 
     m_enabled = true;
 
-    return DispatchResponse::OK();
+    return DispatchResponse::Success();
 }
 
 DispatchResponse V8PageAgentImpl::disable() {
     if (!m_enabled) {
-        return DispatchResponse::OK();
+        return DispatchResponse::Success();
     }
 
     m_state->setBoolean(PageAgentState::pageEnabled, false);
 
     m_enabled = false;
 
-    return DispatchResponse::OK();
+    return DispatchResponse::Success();
 }
 
 DispatchResponse V8PageAgentImpl::addScriptToEvaluateOnLoad(const String& in_scriptSource, String* out_identifier) {
@@ -92,7 +92,7 @@ DispatchResponse V8PageAgentImpl::getResourceTree(std::unique_ptr<protocol::Page
                      .setResources(std::move(subresources))
                      .build();
 
-    return DispatchResponse::OK();
+    return DispatchResponse::Success();
 }
 
 void V8PageAgentImpl::getResourceContent(const String& in_frameId, const String& in_url, std::unique_ptr<GetResourceContentCallback> callback) {
@@ -111,7 +111,7 @@ void V8PageAgentImpl::getResourceContent(const String& in_frameId, const String&
 
     auto it = cachedPageResources.find(in_url.utf8());
     if (it == cachedPageResources.end()) {
-        callback->sendFailure(DispatchResponse::Error("Resource not found."));
+        callback->sendFailure(DispatchResponse::ServerError("Resource not found."));
         return;
     }
 
@@ -124,7 +124,7 @@ void V8PageAgentImpl::getResourceContent(const String& in_frameId, const String&
     auto content = resource.getContent(errorString);
 
     if (!errorString->isEmpty()) {
-        callback->sendFailure(DispatchResponse::Error(*errorString));
+        callback->sendFailure(DispatchResponse::ServerError(errorString->utf8()));
         return;
     }
 
@@ -161,7 +161,7 @@ void V8PageAgentImpl::searchInResource(const String& in_frameId, const String& i
         return;
     }
 
-    callback->sendFailure(DispatchResponse::Error(*errorString));
+    callback->sendFailure(DispatchResponse::ServerError(errorString->utf8()));
 }
 
 void V8PageAgentImpl::restore() {

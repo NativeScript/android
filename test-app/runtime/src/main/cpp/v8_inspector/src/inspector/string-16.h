@@ -12,6 +12,7 @@
 #include <string>
 #include <vector>
 
+#include "../../third_party/inspector_protocol/crdtp/serializer_traits.h"
 #include "src/base/compiler-specific.h"
 
 namespace v8_inspector {
@@ -69,11 +70,7 @@ class String16 {
   // Convenience methods.
   V8_EXPORT std::string utf8() const;
   V8_EXPORT static String16 fromUTF8(const char* stringStart, size_t length);
-
-  // Instantiates a String16 in native endianness from UTF16 LE.
-  // On Big endian architectures, byte order needs to be flipped.
-  V8_EXPORT static String16 fromUTF16LE(const UChar* stringStart,
-                                        size_t length);
+  V8_EXPORT static String16 fromUTF16(const UChar* stringStart, size_t length);
 
   std::size_t hash() const {
     if (!hash_code) {
@@ -163,5 +160,14 @@ struct hash<v8_inspector::String16> {
 }  // namespace std
 
 #endif  // !defined(__APPLE__) || defined(_LIBCPP_VERSION)
+
+// See third_party/inspector_protocol/crdtp/serializer_traits.h.
+namespace v8_crdtp {
+template <>
+struct SerializerTraits<v8_inspector::String16> {
+  static void Serialize(const v8_inspector::String16& str,
+                        std::vector<uint8_t>* out);
+};
+}  // namespace v8_crdtp
 
 #endif  // V8_INSPECTOR_STRING_16_H_
