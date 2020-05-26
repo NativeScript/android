@@ -7,6 +7,7 @@
 
 - [[metadata] not rebuilding on json api usage change (#1589)](https://github.com/NativeScript/android-runtime/issues/1589)
 
+
 6.5.0
 ==
 
