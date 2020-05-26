@@ -51,14 +51,14 @@ fi
 
 for emulator in $listOfEmulators; do
     echo "Start emulator $emulator"
-    $ANDROID_HOME/emulator/emulator -avd ${emulator} -verbose -wipe-data -gpu on&
+    $ANDROID_HOME/emulator/emulator -avd ${emulator} -verbose -wipe-data -gpu on &
     find ~/.android/avd/${emulator}.avd -type f -name 'config.ini' -exec cat {} +
 
     echo "Run Android Runtime unit tests for $emulator"
-    $ANDROID_HOME/platform-tools/adb devices
-    $ANDROID_HOME/platform-tools/adb -e logcat -c
-    $ANDROID_HOME/platform-tools/adb -e logcat > consoleLog.txt&
-    $ANDROID_HOME/platform-tools/adb -e logcat > consoleLog$emulator.txt&
+    $ANDROID_HOME/platform-tools/adb wait-for-device
+    $ANDROID_HOME/platform-tools/adb -s emulator-5554 logcat -c
+    $ANDROID_HOME/platform-tools/adb -s emulator-5554 logcat > consoleLog.txt &
+    $ANDROID_HOME/platform-tools/adb -s emulator-5554 logcat > consoleLog$emulator.txt &
 
     if [ "$1" != 'unit_tests_only' ]; then
         ./gradlew runtests
