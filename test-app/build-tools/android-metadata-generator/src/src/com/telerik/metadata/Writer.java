@@ -6,6 +6,7 @@ import com.telerik.metadata.TreeNode.MethodInfo;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.IntBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.List;
@@ -42,7 +43,7 @@ public class Writer {
         writeUniqueName_lenBuff[1] = (byte) ((len >> 8) & 0xFF);
 
         outStringsStream.write(writeUniqueName_lenBuff);
-        outStringsStream.write(name.getBytes("UTF-8"));
+        outStringsStream.write(name.getBytes(StandardCharsets.UTF_8));
 
         uniqueStrings.put(name, position);
 
@@ -61,7 +62,7 @@ public class Writer {
     private static void writeMethodInfo(MethodInfo mi,
                                         HashMap<String, Integer> uniqueStrings, StreamWriter outValueStream)
             throws Exception {
-        int pos = uniqueStrings.get(mi.name).intValue();
+        int pos = uniqueStrings.get(mi.name);
         writeInt(pos, outValueStream);
 
         byte isResolved = (byte) (mi.isResolved ? 1 : 0);
@@ -190,9 +191,9 @@ public class Writer {
     public void writeTree(TreeNode root) throws Exception {
         short curId = 0;
 
-        ArrayDeque<TreeNode> d = new ArrayDeque<TreeNode>();
+        ArrayDeque<TreeNode> d = new ArrayDeque<>();
 
-        HashMap<String, Integer> uniqueStrings = new HashMap<String, Integer>();
+        HashMap<String, Integer> uniqueStrings = new HashMap<>();
 
         commonInterfacePrefixPosition = writeUniqueName("com/tns/gen/",
                 uniqueStrings, outStringsStream);
@@ -275,9 +276,7 @@ public class Writer {
                 }
             }
 
-            for (TreeNode child : n.children) {
-                d.add(child);
-            }
+            d.addAll(n.children);
         }
 
         outStringsStream.flush();
@@ -307,9 +306,7 @@ public class Writer {
                 throw new Exception("should not happen");
             }
 
-            for (TreeNode child : n.children) {
-                d.add(child);
-            }
+            d.addAll(n.children);
         }
 
         outValueStream.flush();

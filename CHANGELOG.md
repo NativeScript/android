@@ -1,3 +1,17 @@
+6.5.1
+==
+
+## Bug Fixes
+
+- [Cleanup of warnings / possible not checked nullpointers (#1610)](https://github.com/NativeScript/android-runtime/pull/1610)
+
+- [[metadata] not rebuilding on json api usage change (#1589)](https://github.com/NativeScript/android-runtime/issues/1589)
+
+6.5.0
+==
+
+### No changes
+
 6.4.1
 ==
 

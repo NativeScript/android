@@ -71,11 +71,11 @@ public class TreeNode {
         }
 
         public Optional<MethodInfo> getGetterMethod() {
-            return getterMethod == null ? Optional.<MethodInfo>empty() : Optional.of(getterMethod);
+            return getterMethod == null ? Optional.empty() : Optional.of(getterMethod);
         }
 
         public Optional<MethodInfo> getSetterMethod() {
-            return setterMethod == null ? Optional.<MethodInfo>empty() : Optional.of(setterMethod);
+            return setterMethod == null ? Optional.empty() : Optional.of(setterMethod);
         }
     }
 
@@ -144,51 +144,53 @@ public class TreeNode {
 
         String name = clazz.getClassName();
 
-        if (name.equals("byte")) {
-            return TreeNode.BYTE;
-        } else if (name.equals("short")) {
-            return TreeNode.SHORT;
-        } else if (name.equals("int")) {
-            return TreeNode.INTEGER;
-        } else if (name.equals("long")) {
-            return TreeNode.LONG;
-        } else if (name.equals("float")) {
-            return TreeNode.FLOAT;
-        } else if (name.equals("double")) {
-            return TreeNode.DOUBLE;
-        } else if (name.equals("boolean")) {
-            return TreeNode.BOOLEAN;
-        } else if (name.equals("char")) {
-            return TreeNode.CHAR;
-        } else if (name.equals("void")) {
-            return null;
-        } else {
-            throw new Exception("unknown type=" + name);
+        switch (name) {
+            case "byte":
+                return TreeNode.BYTE;
+            case "short":
+                return TreeNode.SHORT;
+            case "int":
+                return TreeNode.INTEGER;
+            case "long":
+                return TreeNode.LONG;
+            case "float":
+                return TreeNode.FLOAT;
+            case "double":
+                return TreeNode.DOUBLE;
+            case "boolean":
+                return TreeNode.BOOLEAN;
+            case "char":
+                return TreeNode.CHAR;
+            case "void":
+                return null;
+            default:
+                throw new Exception("unknown type=" + name);
         }
     }
 
     public static TreeNode getPrimitive(String name)
             throws IllegalArgumentException {
-        if (name.equals("B")) {
-            return TreeNode.BYTE;
-        } else if (name.equals("S")) {
-            return TreeNode.SHORT;
-        } else if (name.equals("I")) {
-            return TreeNode.INTEGER;
-        } else if (name.equals("J")) {
-            return TreeNode.LONG;
-        } else if (name.equals("F")) {
-            return TreeNode.FLOAT;
-        } else if (name.equals("D")) {
-            return TreeNode.DOUBLE;
-        } else if (name.equals("Z")) {
-            return TreeNode.BOOLEAN;
-        } else if (name.equals("C")) {
-            return TreeNode.CHAR;
-        } else if (name.equals("V")) {
-            return null;
-        } else {
-            throw new IllegalArgumentException("unknown type=" + name);
+        switch (name) {
+            case "B":
+                return TreeNode.BYTE;
+            case "S":
+                return TreeNode.SHORT;
+            case "I":
+                return TreeNode.INTEGER;
+            case "J":
+                return TreeNode.LONG;
+            case "F":
+                return TreeNode.FLOAT;
+            case "D":
+                return TreeNode.DOUBLE;
+            case "Z":
+                return TreeNode.BOOLEAN;
+            case "C":
+                return TreeNode.CHAR;
+            case "V":
+                return null;
+            default:
+                throw new IllegalArgumentException("unknown type=" + name);
         }
     }
 
