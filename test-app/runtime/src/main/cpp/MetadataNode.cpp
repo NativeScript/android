@@ -12,8 +12,13 @@
 #include <sstream>
 #include <cctype>
 #include <dirent.h>
+#include <errno.h>
+#include <android/log.h>
+#include <unistd.h>
 #include "ManualInstrumentation.h"
 #include "JSONObjectHelper.h"
+
+
 
 #include "v8.h"
 
@@ -1785,8 +1790,37 @@ void MetadataNode::BuildMetadata(const string& filesPath) {
     baseDir.append("/metadata");
 
     DIR* dir = opendir(baseDir.c_str());
+
     if(dir == nullptr){
-        throw NativeScriptException(string("metadata folder couldn't be opened!"));
+        stringstream ss;
+        ss << "metadata folder couldn't be opened! (Error: ";
+        ss << errno;
+        ss << ") ";
+
+        // TODO: Is there a way to detect if the screen is locked as verification
+        // We assume based on the error that this is the only way to get this specific error here at this point
+        if (errno == 2) {
+            // Log the error with error code
+            __android_log_print(ANDROID_LOG_ERROR, "TNS.error", "%s", ss.str().c_str());
+
+            // While the screen is locked after boot; we cannot access our own apps directory on Android 9+
+            // So the only thing to do at this point is just exit normally w/o crashing!
+
+            // The only reason we should be in this specific path; is if:
+            // 1) android:directBootAware="true" flag is set on receiver
+            // 2) android.intent.action.LOCKED_BOOT_COMPLETED intent is set in manifest on above receiver
+            // See:  https://developer.android.com/guide/topics/manifest/receiver-element
+            //  and: https://developer.android.com/training/articles/direct-boot
+            // This specific path occurs if you using the NativeScript-Local-Notification plugin, the
+            // receiver code runs fine, but the app actually doesn't need to startup.  The Native code tries to
+            // startup because the receiver is triggered.  So even though we are exiting, the receiver will have
+            // done its job
+
+            exit(0);
+        }
+        else {
+          throw NativeScriptException(ss.str());
+        }
     }
 
     string nodesFile = baseDir + "/treeNodeStream.dat";
