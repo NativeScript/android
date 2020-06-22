@@ -1799,7 +1799,7 @@ void MetadataNode::BuildMetadata(const string& filesPath) {
 
         // TODO: Is there a way to detect if the screen is locked as verification
         // We assume based on the error that this is the only way to get this specific error here at this point
-        if (errno == 2) {
+        if (errno == ENOENT) {
             // Log the error with error code
             __android_log_print(ANDROID_LOG_ERROR, "TNS.error", "%s", ss.str().c_str());
 
@@ -1829,7 +1829,12 @@ void MetadataNode::BuildMetadata(const string& filesPath) {
 
     FILE* f = fopen(nodesFile.c_str(), "rb");
     if (f == nullptr) {
-        throw NativeScriptException(string("metadata file (treeNodeStream.dat) couldn't be opened!"));
+        stringstream ss;
+        ss << "metadata file (treeNodeStream.dat) couldn't be opened! (Error: ";
+        ss << errno;
+        ss << ") ";
+
+        throw NativeScriptException(ss.str());
     }
     fseek(f, 0, SEEK_END);
     int lenNodes = ftell(f);
@@ -1843,7 +1848,11 @@ void MetadataNode::BuildMetadata(const string& filesPath) {
 
     f = fopen(namesFile.c_str(), "rb");
     if (f == nullptr) {
-        throw NativeScriptException(string("metadata file (treeStringsStream.dat) couldn't be opened!"));
+        stringstream ss;
+        ss << "metadata file (treeStringsStream.dat) couldn't be opened! (Error: ";
+        ss << errno;
+        ss << ") ";
+        throw NativeScriptException(ss.str());
     }
     fseek(f, 0, SEEK_END);
     int lenNames = ftell(f);
@@ -1854,7 +1863,11 @@ void MetadataNode::BuildMetadata(const string& filesPath) {
 
     f = fopen(valuesFile.c_str(), "rb");
     if (f == nullptr) {
-        throw NativeScriptException(string("metadata file (treeValueStream.dat) couldn't be opened!"));
+        stringstream ss;
+        ss << "metadata file (treeValueStream.dat) couldn't be opened! (Error: ";
+        ss << errno;
+        ss << ") ";
+        throw NativeScriptException(ss.str());
     }
     fseek(f, 0, SEEK_END);
     int lenValues = ftell(f);
