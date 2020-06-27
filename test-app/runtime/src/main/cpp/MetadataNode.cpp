@@ -12,8 +12,13 @@
 #include <sstream>
 #include <cctype>
 #include <dirent.h>
+#include <errno.h>
+#include <android/log.h>
+#include <unistd.h>
 #include "ManualInstrumentation.h"
 #include "JSONObjectHelper.h"
+
+
 
 #include "v8.h"
 
@@ -1785,8 +1790,37 @@ void MetadataNode::BuildMetadata(const string& filesPath) {
     baseDir.append("/metadata");
 
     DIR* dir = opendir(baseDir.c_str());
+
     if(dir == nullptr){
-        throw NativeScriptException(string("metadata folder couldn't be opened!"));
+        stringstream ss;
+        ss << "metadata folder couldn't be opened! (Error: ";
+        ss << errno;
+        ss << ") ";
+
+        // TODO: Is there a way to detect if the screen is locked as verification
+        // We assume based on the error that this is the only way to get this specific error here at this point
+        if (errno == ENOENT) {
+            // Log the error with error code
+            __android_log_print(ANDROID_LOG_ERROR, "TNS.error", "%s", ss.str().c_str());
+
+            // While the screen is locked after boot; we cannot access our own apps directory on Android 9+
+            // So the only thing to do at this point is just exit normally w/o crashing!
+
+            // The only reason we should be in this specific path; is if:
+            // 1) android:directBootAware="true" flag is set on receiver
+            // 2) android.intent.action.LOCKED_BOOT_COMPLETED intent is set in manifest on above receiver
+            // See:  https://developer.android.com/guide/topics/manifest/receiver-element
+            //  and: https://developer.android.com/training/articles/direct-boot
+            // This specific path occurs if you using the NativeScript-Local-Notification plugin, the
+            // receiver code runs fine, but the app actually doesn't need to startup.  The Native code tries to
+            // startup because the receiver is triggered.  So even though we are exiting, the receiver will have
+            // done its job
+
+            exit(0);
+        }
+        else {
+          throw NativeScriptException(ss.str());
+        }
     }
 
     string nodesFile = baseDir + "/treeNodeStream.dat";
@@ -1795,7 +1829,12 @@ void MetadataNode::BuildMetadata(const string& filesPath) {
 
     FILE* f = fopen(nodesFile.c_str(), "rb");
     if (f == nullptr) {
-        throw NativeScriptException(string("metadata file (treeNodeStream.dat) couldn't be opened!"));
+        stringstream ss;
+        ss << "metadata file (treeNodeStream.dat) couldn't be opened! (Error: ";
+        ss << errno;
+        ss << ") ";
+
+        throw NativeScriptException(ss.str());
     }
     fseek(f, 0, SEEK_END);
     int lenNodes = ftell(f);
@@ -1809,7 +1848,11 @@ void MetadataNode::BuildMetadata(const string& filesPath) {
 
     f = fopen(namesFile.c_str(), "rb");
     if (f == nullptr) {
-        throw NativeScriptException(string("metadata file (treeStringsStream.dat) couldn't be opened!"));
+        stringstream ss;
+        ss << "metadata file (treeStringsStream.dat) couldn't be opened! (Error: ";
+        ss << errno;
+        ss << ") ";
+        throw NativeScriptException(ss.str());
     }
     fseek(f, 0, SEEK_END);
     int lenNames = ftell(f);
@@ -1820,7 +1863,11 @@ void MetadataNode::BuildMetadata(const string& filesPath) {
 
     f = fopen(valuesFile.c_str(), "rb");
     if (f == nullptr) {
-        throw NativeScriptException(string("metadata file (treeValueStream.dat) couldn't be opened!"));
+        stringstream ss;
+        ss << "metadata file (treeValueStream.dat) couldn't be opened! (Error: ";
+        ss << errno;
+        ss << ") ";
+        throw NativeScriptException(ss.str());
     }
     fseek(f, 0, SEEK_END);
     int lenValues = ftell(f);
