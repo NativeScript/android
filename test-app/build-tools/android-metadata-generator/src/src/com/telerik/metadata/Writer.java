@@ -4,6 +4,7 @@ import com.telerik.metadata.TreeNode.FieldInfo;
 import com.telerik.metadata.TreeNode.MethodInfo;
 
 import java.nio.ByteBuffer;
+import java.nio.Buffer;
 import java.nio.ByteOrder;
 import java.nio.IntBuffer;
 import java.nio.charset.StandardCharsets;
@@ -346,7 +347,7 @@ public class Writer {
             nodeData[1] = n.offsetName;
             nodeData[2] = n.offsetValue;
 
-            intBuffer.clear();
+            ((Buffer)intBuffer).clear();
             intBuffer.put(nodeData);
             outNodeStream.write(byteBuffer.array());
 
