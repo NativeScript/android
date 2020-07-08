@@ -781,6 +781,9 @@ task buildMetadata(type: BuildToolTask) {
 
     outputs.files("$METADATA_OUT_PATH/treeNodeStream.dat", "$METADATA_OUT_PATH/treeStringsStream.dat", "$METADATA_OUT_PATH/treeValueStream.dat")
 
+    workingDir "$BUILD_TOOLS_PATH"
+    main "-jar"
+
     doFirst {
         // get compiled classes to pass to metadata generator
         // these need to be called after the classes have compiled
@@ -815,9 +818,6 @@ task buildMetadata(type: BuildToolTask) {
             generatedClasses.each { out.println it }
         }
 
-        workingDir "$BUILD_TOOLS_PATH"
-        main "-jar"
-
         setOutputs outLogger
 
         def paramz = new ArrayList<String>()
@@ -843,12 +843,11 @@ task generateTypescriptDefinitions(type: BuildToolTask) {
     def paramz = new ArrayList<String>()
     def includeDirs = ["com.android.support", "/platforms/" + android.compileSdkVersion]
 
+    workingDir "$BUILD_TOOLS_PATH"
+    main "-jar"
+
     doFirst {
         delete "$TYPINGS_PATH"
-
-        workingDir "$BUILD_TOOLS_PATH"
-
-        main "-jar"
 
         paramz.add("dts-generator.jar")
         paramz.add("-input")

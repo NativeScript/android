@@ -10,8 +10,8 @@
     "**/*"
   ],
   "gradle": {
-    "version": "5.4.1",
-    "android": "3.5.3"
+    "version": "6.4",
+    "android": "3.6.3"
   },
   "android_ndk_version": "21b"
 }
