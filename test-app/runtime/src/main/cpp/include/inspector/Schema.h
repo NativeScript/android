@@ -16,8 +16,8 @@ namespace protocol {
 #define v8_inspector_protocol_exported_api_h
 class V8_EXPORT Exported {
 public:
-    virtual std::unique_ptr<StringBuffer> toJSONString() const = 0;
-    virtual void writeBinary(std::vector<uint8_t>* out) const = 0;
+    virtual void AppendSerialized(std::vector<uint8_t>* out) const = 0;
+
     virtual ~Exported() { }
 };
 #endif // !defined(v8_inspector_protocol_exported_api_h)
@@ -31,7 +31,6 @@ namespace API {
 
 class V8_EXPORT Domain : public Exported {
 public:
-    static std::unique_ptr<protocol::Schema::API::Domain> fromJSONString(const StringView& json);
     static std::unique_ptr<protocol::Schema::API::Domain> fromBinary(const uint8_t* data, size_t length);
 };
 

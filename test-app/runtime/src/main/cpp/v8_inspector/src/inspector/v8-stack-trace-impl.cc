@@ -6,9 +6,13 @@
 
 #include <algorithm>
 
+#include "../../third_party/inspector_protocol/crdtp/json.h"
 #include "src/inspector/v8-debugger.h"
 #include "src/inspector/v8-inspector-impl.h"
-#include "src/inspector/wasm-translation.h"
+
+using v8_crdtp::SpanFrom;
+using v8_crdtp::json::ConvertCBORToJSON;
+using v8_crdtp::json::ConvertJSONToCBOR;
 
 namespace v8_inspector {
 
@@ -124,10 +128,19 @@ V8StackTraceId::V8StackTraceId(uintptr_t id,
                                bool should_pause)
     : id(id), debugger_id(debugger_id), should_pause(should_pause) {}
 
-V8StackTraceId::V8StackTraceId(const StringView& json)
+V8StackTraceId::V8StackTraceId(StringView json)
     : id(0), debugger_id(V8DebuggerId().pair()) {
-  auto dict =
-      protocol::DictionaryValue::cast(protocol::StringUtil::parseJSON(json));
+  if (json.length() == 0) return;
+  std::vector<uint8_t> cbor;
+  if (json.is8Bit()) {
+    ConvertJSONToCBOR(
+        v8_crdtp::span<uint8_t>(json.characters8(), json.length()), &cbor);
+  } else {
+    ConvertJSONToCBOR(
+        v8_crdtp::span<uint16_t>(json.characters16(), json.length()), &cbor);
+  }
+  auto dict = protocol::DictionaryValue::cast(
+      protocol::Value::parseBinary(cbor.data(), cbor.size()));
   if (!dict) return;
   String16 s;
   if (!dict->getString(kId, &s)) return;
@@ -150,8 +163,10 @@ std::unique_ptr<StringBuffer> V8StackTraceId::ToString() {
   dict->setString(kId, String16::fromInteger64(id));
   dict->setString(kDebuggerId, V8DebuggerId(debugger_id).toString());
   dict->setBoolean(kShouldPause, should_pause);
-  String16 json = dict->toJSONString();
-  return StringBufferImpl::adopt(json);
+  std::vector<uint8_t> json;
+  v8_crdtp::json::ConvertCBORToJSON(v8_crdtp::SpanFrom(dict->Serialize()),
+                                    &json);
+  return StringBufferFrom(std::move(json));
 }
 
 StackFrame::StackFrame(v8::Isolate* isolate, v8::Local<v8::StackFrame> v8Frame)
@@ -165,11 +180,6 @@ StackFrame::StackFrame(v8::Isolate* isolate, v8::Local<v8::StackFrame> v8Frame)
                             v8Frame->GetScriptNameOrSourceURL()) {
   DCHECK_NE(v8::Message::kNoLineNumberInfo, m_lineNumber + 1);
   DCHECK_NE(v8::Message::kNoColumnInfo, m_columnNumber + 1);
-}
-
-void StackFrame::translate(WasmTranslation* wasmTranslation) {
-  wasmTranslation->TranslateWasmScriptLocationToProtocolLocation(
-      &m_scriptId, &m_lineNumber, &m_columnNumber);
 }
 
 const String16& StackFrame::functionName() const { return m_functionName; }
@@ -342,8 +352,7 @@ std::unique_ptr<StringBuffer> V8StackTraceImpl::toString() const {
     stackTrace.append(String16::fromInteger(frame.columnNumber() + 1));
     stackTrace.append(')');
   }
-  String16 string = stackTrace.toString();
-  return StringBufferImpl::adopt(string);
+  return StringBufferFrom(stackTrace.toString());
 }
 
 bool V8StackTraceImpl::isEqualIgnoringTopFrame(

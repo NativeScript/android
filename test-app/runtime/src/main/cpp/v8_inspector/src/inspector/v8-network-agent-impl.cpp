@@ -28,26 +28,26 @@ V8NetworkAgentImpl::~V8NetworkAgentImpl() {}
 
 DispatchResponse V8NetworkAgentImpl::enable(Maybe<int> in_maxTotalBufferSize, Maybe<int> in_maxResourceBufferSize, Maybe<int> in_maxPostDataSize) {
     if (m_enabled) {
-        return DispatchResponse::OK();
+        return DispatchResponse::Success();
     }
 
     m_state->setBoolean(NetworkAgentState::networkEnabled, true);
 
     m_enabled = true;
 
-    return DispatchResponse::OK();
+    return DispatchResponse::Success();
 }
 
 DispatchResponse V8NetworkAgentImpl::disable() {
     if (!m_enabled) {
-        return DispatchResponse::OK();
+        return DispatchResponse::Success();
     }
 
     m_state->setBoolean(NetworkAgentState::networkEnabled, false);
 
     m_enabled = false;
 
-    return DispatchResponse::OK();
+    return DispatchResponse::Success();
 }
 
 DispatchResponse V8NetworkAgentImpl::setExtraHTTPHeaders(std::unique_ptr<protocol::Network::Headers> in_headers) {
@@ -59,7 +59,7 @@ void V8NetworkAgentImpl::getResponseBody(const String& in_requestId, std::unique
 
     if (it == m_responses.end()) {
         auto error = "Response not found for requestId = " + in_requestId;
-        callback->sendFailure(DispatchResponse::Error(error));
+        callback->sendFailure(DispatchResponse::ServerError(error.utf8()));
         return;
     }
 

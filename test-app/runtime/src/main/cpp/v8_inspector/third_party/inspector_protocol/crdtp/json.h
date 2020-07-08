@@ -6,6 +6,7 @@
 #define V8_CRDTP_JSON_H_
 
 #include <memory>
+#include <vector>
 #include "export.h"
 #include "parser_handler.h"
 
@@ -45,10 +46,6 @@ Status ConvertCBORToJSON(span<uint8_t> cbor, std::vector<uint8_t>* json);
 Status ConvertJSONToCBOR(span<uint8_t> json, std::vector<uint8_t>* cbor);
 
 Status ConvertJSONToCBOR(span<uint16_t> json, std::vector<uint8_t>* cbor);
-
-Status ConvertJSONToCBOR(span<uint8_t> json, std::string* cbor);
-
-Status ConvertJSONToCBOR(span<uint16_t> json, std::string* cbor);
 }  // namespace json
 }  // namespace v8_crdtp
 

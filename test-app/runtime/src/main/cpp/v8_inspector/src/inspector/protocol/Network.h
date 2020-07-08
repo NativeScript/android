@@ -211,10 +211,7 @@ public:
     void setReceiveHeadersEnd(double value) { m_receiveHeadersEnd = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<ResourceTiming> clone() const;
 
     template<int STATE>
@@ -470,10 +467,7 @@ public:
     void setIsLinkPreload(bool value) { m_isLinkPreload = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<Request> clone() const;
 
     template<int STATE>
@@ -627,10 +621,7 @@ public:
     void setSignatureData(const String& value) { m_signatureData = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<SignedCertificateTimestamp> clone() const;
 
     template<int STATE>
@@ -794,10 +785,7 @@ public:
     void setCertificateTransparencyCompliance(const String& value) { m_certificateTransparencyCompliance = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<SecurityDetails> clone() const;
 
     template<int STATE>
@@ -1030,10 +1018,7 @@ public:
     void setSecurityDetails(std::unique_ptr<protocol::Network::SecurityDetails> value) { m_securityDetails = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<Response> clone() const;
 
     template<int STATE>
@@ -1241,10 +1226,7 @@ public:
     void setHeaders(std::unique_ptr<protocol::Network::Headers> value) { m_headers = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<WebSocketRequest> clone() const;
 
     template<int STATE>
@@ -1324,10 +1306,7 @@ public:
     void setRequestHeadersText(const String& value) { m_requestHeadersText = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<WebSocketResponse> clone() const;
 
     template<int STATE>
@@ -1435,10 +1414,7 @@ public:
     void setPayloadData(const String& value) { m_payloadData = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<WebSocketFrame> clone() const;
 
     template<int STATE>
@@ -1540,10 +1516,7 @@ public:
     void setLineNumber(double value) { m_lineNumber = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<Initiator> clone() const;
 
     template<int STATE>
@@ -1654,10 +1627,7 @@ public:
     void setSameSite(const String& value) { m_sameSite = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<Cookie> clone() const;
 
     template<int STATE>
@@ -1818,10 +1788,7 @@ public:
     void setRealm(const String& value) { m_realm = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<AuthChallenge> clone() const;
 
     template<int STATE>
@@ -1935,10 +1902,7 @@ public:
     void setCertificates(std::unique_ptr<protocol::Array<String>> value) { m_certificates = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<SignedExchangeSignature> clone() const;
 
     template<int STATE>
@@ -2077,10 +2041,7 @@ public:
     void setSignatures(std::unique_ptr<protocol::Array<protocol::Network::SignedExchangeSignature>> value) { m_signatures = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<SignedExchangeHeader> clone() const;
 
     template<int STATE>
@@ -2178,10 +2139,7 @@ public:
     void setErrorField(const String& value) { m_errorField = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<SignedExchangeError> clone() const;
 
     template<int STATE>
@@ -2269,10 +2227,7 @@ public:
     void setErrors(std::unique_ptr<protocol::Array<protocol::Network::SignedExchangeError>> value) { m_errors = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<SignedExchangeInfo> clone() const;
 
     template<int STATE>
@@ -2364,10 +2319,7 @@ public:
     void setEncodedDataLength(int value) { m_encodedDataLength = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<DataReceivedNotification> clone() const;
 
     template<int STATE>
@@ -2471,10 +2423,7 @@ public:
     void setData(const String& value) { m_data = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<EventSourceMessageReceivedNotification> clone() const;
 
     template<int STATE>
@@ -2590,10 +2539,7 @@ public:
     void setBlockedReason(const String& value) { m_blockedReason = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<LoadingFailedNotification> clone() const;
 
     template<int STATE>
@@ -2707,10 +2653,7 @@ public:
     void setShouldReportCorbBlocking(bool value) { m_shouldReportCorbBlocking = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<LoadingFinishedNotification> clone() const;
 
     template<int STATE>
@@ -2835,10 +2778,7 @@ public:
     void setResponseHeaders(std::unique_ptr<protocol::Network::Headers> value) { m_responseHeaders = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<RequestInterceptedNotification> clone() const;
 
     template<int STATE>
@@ -2979,10 +2919,7 @@ public:
     void setRequestId(const String& value) { m_requestId = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<RequestServedFromCacheNotification> clone() const;
 
     template<int STATE>
@@ -3078,10 +3015,7 @@ public:
     void setHasUserGesture(bool value) { m_hasUserGesture = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<RequestWillBeSentNotification> clone() const;
 
     template<int STATE>
@@ -3233,10 +3167,7 @@ public:
     void setTimestamp(double value) { m_timestamp = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<ResourceChangedPriorityNotification> clone() const;
 
     template<int STATE>
@@ -3320,10 +3251,7 @@ public:
     void setInfo(std::unique_ptr<protocol::Network::SignedExchangeInfo> value) { m_info = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<SignedExchangeReceivedNotification> clone() const;
 
     template<int STATE>
@@ -3410,10 +3338,7 @@ public:
     void setFrameId(const String& value) { m_frameId = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<ResponseReceivedNotification> clone() const;
 
     template<int STATE>
@@ -3522,10 +3447,7 @@ public:
     void setTimestamp(double value) { m_timestamp = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<WebSocketClosedNotification> clone() const;
 
     template<int STATE>
@@ -3604,10 +3526,7 @@ public:
     void setInitiator(std::unique_ptr<protocol::Network::Initiator> value) { m_initiator = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<WebSocketCreatedNotification> clone() const;
 
     template<int STATE>
@@ -3691,10 +3610,7 @@ public:
     void setErrorMessage(const String& value) { m_errorMessage = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<WebSocketFrameErrorNotification> clone() const;
 
     template<int STATE>
@@ -3781,10 +3697,7 @@ public:
     void setResponse(std::unique_ptr<protocol::Network::WebSocketFrame> value) { m_response = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<WebSocketFrameReceivedNotification> clone() const;
 
     template<int STATE>
@@ -3871,10 +3784,7 @@ public:
     void setResponse(std::unique_ptr<protocol::Network::WebSocketFrame> value) { m_response = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<WebSocketFrameSentNotification> clone() const;
 
     template<int STATE>
@@ -3961,10 +3871,7 @@ public:
     void setResponse(std::unique_ptr<protocol::Network::WebSocketResponse> value) { m_response = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<WebSocketHandshakeResponseReceivedNotification> clone() const;
 
     template<int STATE>
@@ -4054,10 +3961,7 @@ public:
     void setRequest(std::unique_ptr<protocol::Network::WebSocketRequest> value) { m_request = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<WebSocketWillSendHandshakeRequestNotification> clone() const;
 
     template<int STATE>
@@ -4179,7 +4083,7 @@ public:
 
 class  Frontend {
 public:
-    explicit Frontend(FrontendChannel* frontendChannel) : m_frontendChannel(frontendChannel) { }
+  explicit Frontend(FrontendChannel* frontend_channel) : frontend_channel_(frontend_channel) {}
     void dataReceived(const String& requestId, double timestamp, int dataLength, int encodedDataLength);
     void eventSourceMessageReceived(const String& requestId, double timestamp, const String& eventName, const String& eventId, const String& data);
     void loadingFailed(const String& requestId, double timestamp, const String& type, const String& errorText, Maybe<bool> canceled = Maybe<bool>(), Maybe<String> blockedReason = Maybe<String>());
@@ -4198,10 +4102,10 @@ public:
     void webSocketHandshakeResponseReceived(const String& requestId, double timestamp, std::unique_ptr<protocol::Network::WebSocketResponse> response);
     void webSocketWillSendHandshakeRequest(const String& requestId, double timestamp, double wallTime, std::unique_ptr<protocol::Network::WebSocketRequest> request);
 
-    void flush();
-    void sendRawCBORNotification(std::vector<uint8_t>);
-private:
-    FrontendChannel* m_frontendChannel;
+  void flush();
+  void sendRawNotification(std::unique_ptr<Serializable>);
+ private:
+  FrontendChannel* frontend_channel_;
 };
 
 // ------------- Dispatcher.

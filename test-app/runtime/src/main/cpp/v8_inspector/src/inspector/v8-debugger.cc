@@ -108,8 +108,7 @@ V8Debugger::V8Debugger(v8::Isolate* isolate, V8InspectorImpl* inspector)
       m_continueToLocationBreakpointId(kNoBreakpointId),
       m_maxAsyncCallStacks(kMaxAsyncTaskStacks),
       m_maxAsyncCallStackDepth(0),
-      m_pauseOnExceptionsState(v8::debug::NoBreakOnException),
-      m_wasmTranslation(isolate) {}
+      m_pauseOnExceptionsState(v8::debug::NoBreakOnException) {}
 
 V8Debugger::~V8Debugger() {
   m_isolate->RemoveCallCompletedCallback(
@@ -125,6 +124,7 @@ void V8Debugger::enable() {
   m_isolate->AddNearHeapLimitCallback(&V8Debugger::nearHeapLimitCallback, this);
   v8::debug::ChangeBreakOnException(m_isolate, v8::debug::NoBreakOnException);
   m_pauseOnExceptionsState = v8::debug::NoBreakOnException;
+  v8::debug::TierDownAllModulesPerIsolate(m_isolate);
 }
 
 void V8Debugger::disable() {
@@ -147,7 +147,7 @@ void V8Debugger::disable() {
   m_taskWithScheduledBreakPauseRequested = false;
   m_pauseOnNextCallRequested = false;
   m_pauseOnAsyncCall = false;
-  m_wasmTranslation.Clear();
+  v8::debug::TierUpAllModulesPerIsolate(m_isolate);
   v8::debug::SetDebugDelegate(m_isolate, nullptr);
   m_isolate->RemoveNearHeapLimitCallback(&V8Debugger::nearHeapLimitCallback,
                                          m_originalHeapLimit);
@@ -247,9 +247,15 @@ void V8Debugger::interruptAndBreak(int targetContextGroupId) {
       nullptr);
 }
 
-void V8Debugger::continueProgram(int targetContextGroupId) {
+void V8Debugger::continueProgram(int targetContextGroupId,
+                                 bool terminateOnResume) {
   if (m_pausedContextGroupId != targetContextGroupId) return;
-  if (isPaused()) m_inspector->client()->quitMessageLoopOnPause();
+  if (isPaused()) {
+    if (terminateOnResume) {
+      v8::debug::SetTerminateOnResume(m_isolate);
+    }
+    m_inspector->client()->quitMessageLoopOnPause();
+  }
 }
 
 void V8Debugger::breakProgramOnAssert(int targetContextGroupId) {
@@ -297,7 +303,10 @@ bool V8Debugger::asyncStepOutOfFunction(int targetContextGroupId,
                                         bool onlyAtReturn) {
   v8::HandleScope handleScope(m_isolate);
   auto iterator = v8::debug::StackTraceIterator::Create(m_isolate);
-  CHECK(!iterator->Done());
+  // When stepping through extensions code, it is possible that the
+  // iterator doesn't have any frames, since we exclude all frames
+  // that correspond to extension scripts.
+  if (iterator->Done()) return false;
   bool atReturn = !iterator->GetReturnValue().IsEmpty();
   iterator->Advance();
   // Synchronous stack has more then one frame.
@@ -330,8 +339,8 @@ void V8Debugger::terminateExecution(
     std::unique_ptr<TerminateExecutionCallback> callback) {
   if (m_terminateExecutionCallback) {
     if (callback) {
-      callback->sendFailure(
-          Response::Error("There is current termination request in progress"));
+      callback->sendFailure(Response::ServerError(
+          "There is current termination request in progress"));
     }
     return;
   }
@@ -385,9 +394,9 @@ Response V8Debugger::continueToLocation(
     }
     continueProgram(targetContextGroupId);
     // TODO(kozyatinskiy): Return actual line and column number.
-    return Response::OK();
+    return Response::Success();
   } else {
-    return Response::Error("Cannot continue to specified location");
+    return Response::ServerError("Cannot continue to specified location");
   }
 }
 
@@ -514,24 +523,17 @@ void V8Debugger::ScriptCompiled(v8::Local<v8::debug::Script> script,
 
   v8::Isolate* isolate = m_isolate;
   V8InspectorClient* client = m_inspector->client();
-  WasmTranslation& wasmTranslation = m_wasmTranslation;
 
   m_inspector->forEachSession(
       m_inspector->contextGroupId(contextId),
-      [isolate, &script, has_compile_error, is_live_edited, client,
-       &wasmTranslation](V8InspectorSessionImpl* session) {
+      [isolate, &script, has_compile_error, is_live_edited,
+       client](V8InspectorSessionImpl* session) {
         auto agent = session->debuggerAgent();
         if (!agent->enabled()) return;
         agent->didParseSource(
             V8DebuggerScript::Create(isolate, script, is_live_edited, agent,
                                      client),
             !has_compile_error);
-        if (script->IsWasm() && script->SourceMappingURL().IsEmpty()) {
-          // In this case we also create fake scripts corresponding to each
-          // function.
-          // TODO(leese): Get rid of this once frontend no longer uses these.
-          wasmTranslation.AddScript(script.As<v8::debug::WasmScript>(), agent);
-        }
       });
 }
 
@@ -682,6 +684,9 @@ v8::MaybeLocal<v8::Value> V8Debugger::getTargetScopes(
         break;
       case v8::debug::ScopeIterator::ScopeTypeModule:
         description = "Module" + nameSuffix;
+        break;
+      case v8::debug::ScopeIterator::ScopeTypeWasmExpressionStack:
+        description = "Wasm Expression Stack" + nameSuffix;
         break;
     }
     v8::Local<v8::Object> object = iterator->GetObject();
@@ -1010,7 +1015,6 @@ void V8Debugger::allAsyncTasksCanceled() {
   m_currentExternalParent.clear();
   m_currentTasks.clear();
 
-  m_framesCache.clear();
   m_allAsyncStacks.clear();
   m_asyncStacksCount = 0;
 }
@@ -1068,28 +1072,12 @@ void V8Debugger::collectOldAsyncStacksIfNeeded() {
       ++it;
     }
   }
-  cleanupExpiredWeakPointers(m_framesCache);
 }
 
 std::shared_ptr<StackFrame> V8Debugger::symbolize(
     v8::Local<v8::StackFrame> v8Frame) {
-  auto it = m_framesCache.end();
-  int frameId = 0;
-  if (m_maxAsyncCallStackDepth) {
-    frameId = v8::debug::GetStackFrameId(v8Frame);
-    it = m_framesCache.find(frameId);
-  }
-  if (it != m_framesCache.end() && !it->second.expired()) {
-    return std::shared_ptr<StackFrame>(it->second);
-  }
-  std::shared_ptr<StackFrame> frame(new StackFrame(isolate(), v8Frame));
-  // TODO(clemensb): Figure out a way to do this translation only right before
-  // sending the stack trace over wire.
-  if (v8Frame->IsWasm()) frame->translate(&m_wasmTranslation);
-  if (m_maxAsyncCallStackDepth) {
-    m_framesCache[frameId] = frame;
-  }
-  return frame;
+  CHECK(!v8Frame.IsEmpty());
+  return std::make_shared<StackFrame>(isolate(), v8Frame);
 }
 
 void V8Debugger::setMaxAsyncTaskStacksForTest(int limit) {

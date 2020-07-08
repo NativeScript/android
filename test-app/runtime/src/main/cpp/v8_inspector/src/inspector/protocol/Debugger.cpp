@@ -8,6 +8,11 @@
 
 #include "src/inspector/protocol/Protocol.h"
 
+#include "third_party/inspector_protocol/crdtp/cbor.h"
+#include "third_party/inspector_protocol/crdtp/find_by_first.h"
+#include "third_party/inspector_protocol/crdtp/serializer_traits.h"
+#include "third_party/inspector_protocol/crdtp/span.h"
+
 namespace v8_inspector {
 namespace protocol {
 namespace Debugger {
@@ -21,26 +26,26 @@ const char Metainfo::version[] = "1.3";
 std::unique_ptr<Location> Location::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<Location> result(new Location());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* scriptIdValue = object->get("scriptId");
-    errors->setName("scriptId");
+    errors->SetName("scriptId");
     result->m_scriptId = ValueConversions<String>::fromValue(scriptIdValue, errors);
     protocol::Value* lineNumberValue = object->get("lineNumber");
-    errors->setName("lineNumber");
+    errors->SetName("lineNumber");
     result->m_lineNumber = ValueConversions<int>::fromValue(lineNumberValue, errors);
     protocol::Value* columnNumberValue = object->get("columnNumber");
     if (columnNumberValue) {
-        errors->setName("columnNumber");
+        errors->SetName("columnNumber");
         result->m_columnNumber = ValueConversions<int>::fromValue(columnNumberValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -55,6 +60,17 @@ std::unique_ptr<protocol::DictionaryValue> Location::toValue() const
     return result;
 }
 
+void Location::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("scriptId"), m_scriptId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("lineNumber"), m_lineNumber, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("columnNumber"), m_columnNumber, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<Location> Location::clone() const
 {
     ErrorSupport errors;
@@ -64,21 +80,21 @@ std::unique_ptr<Location> Location::clone() const
 std::unique_ptr<ScriptPosition> ScriptPosition::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<ScriptPosition> result(new ScriptPosition());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* lineNumberValue = object->get("lineNumber");
-    errors->setName("lineNumber");
+    errors->SetName("lineNumber");
     result->m_lineNumber = ValueConversions<int>::fromValue(lineNumberValue, errors);
     protocol::Value* columnNumberValue = object->get("columnNumber");
-    errors->setName("columnNumber");
+    errors->SetName("columnNumber");
     result->m_columnNumber = ValueConversions<int>::fromValue(columnNumberValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -91,6 +107,16 @@ std::unique_ptr<protocol::DictionaryValue> ScriptPosition::toValue() const
     return result;
 }
 
+void ScriptPosition::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("lineNumber"), m_lineNumber, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("columnNumber"), m_columnNumber, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<ScriptPosition> ScriptPosition::clone() const
 {
     ErrorSupport errors;
@@ -100,43 +126,43 @@ std::unique_ptr<ScriptPosition> ScriptPosition::clone() const
 std::unique_ptr<CallFrame> CallFrame::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<CallFrame> result(new CallFrame());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* callFrameIdValue = object->get("callFrameId");
-    errors->setName("callFrameId");
+    errors->SetName("callFrameId");
     result->m_callFrameId = ValueConversions<String>::fromValue(callFrameIdValue, errors);
     protocol::Value* functionNameValue = object->get("functionName");
-    errors->setName("functionName");
+    errors->SetName("functionName");
     result->m_functionName = ValueConversions<String>::fromValue(functionNameValue, errors);
     protocol::Value* functionLocationValue = object->get("functionLocation");
     if (functionLocationValue) {
-        errors->setName("functionLocation");
+        errors->SetName("functionLocation");
         result->m_functionLocation = ValueConversions<protocol::Debugger::Location>::fromValue(functionLocationValue, errors);
     }
     protocol::Value* locationValue = object->get("location");
-    errors->setName("location");
+    errors->SetName("location");
     result->m_location = ValueConversions<protocol::Debugger::Location>::fromValue(locationValue, errors);
     protocol::Value* urlValue = object->get("url");
-    errors->setName("url");
+    errors->SetName("url");
     result->m_url = ValueConversions<String>::fromValue(urlValue, errors);
     protocol::Value* scopeChainValue = object->get("scopeChain");
-    errors->setName("scopeChain");
+    errors->SetName("scopeChain");
     result->m_scopeChain = ValueConversions<protocol::Array<protocol::Debugger::Scope>>::fromValue(scopeChainValue, errors);
     protocol::Value* thisValue = object->get("this");
-    errors->setName("this");
+    errors->SetName("this");
     result->m_this = ValueConversions<protocol::Runtime::RemoteObject>::fromValue(thisValue, errors);
     protocol::Value* returnValueValue = object->get("returnValue");
     if (returnValueValue) {
-        errors->setName("returnValue");
+        errors->SetName("returnValue");
         result->m_returnValue = ValueConversions<protocol::Runtime::RemoteObject>::fromValue(returnValueValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -157,6 +183,22 @@ std::unique_ptr<protocol::DictionaryValue> CallFrame::toValue() const
     return result;
 }
 
+void CallFrame::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("callFrameId"), m_callFrameId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("functionName"), m_functionName, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("functionLocation"), m_functionLocation, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("location"), m_location, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("url"), m_url, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("scopeChain"), m_scopeChain, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("this"), m_this, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("returnValue"), m_returnValue, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<CallFrame> CallFrame::clone() const
 {
     ErrorSupport errors;
@@ -172,40 +214,41 @@ const char* Scope::TypeEnum::Block = "block";
 const char* Scope::TypeEnum::Script = "script";
 const char* Scope::TypeEnum::Eval = "eval";
 const char* Scope::TypeEnum::Module = "module";
+const char* Scope::TypeEnum::WasmExpressionStack = "wasm-expression-stack";
 
 std::unique_ptr<Scope> Scope::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<Scope> result(new Scope());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* typeValue = object->get("type");
-    errors->setName("type");
+    errors->SetName("type");
     result->m_type = ValueConversions<String>::fromValue(typeValue, errors);
     protocol::Value* objectValue = object->get("object");
-    errors->setName("object");
+    errors->SetName("object");
     result->m_object = ValueConversions<protocol::Runtime::RemoteObject>::fromValue(objectValue, errors);
     protocol::Value* nameValue = object->get("name");
     if (nameValue) {
-        errors->setName("name");
+        errors->SetName("name");
         result->m_name = ValueConversions<String>::fromValue(nameValue, errors);
     }
     protocol::Value* startLocationValue = object->get("startLocation");
     if (startLocationValue) {
-        errors->setName("startLocation");
+        errors->SetName("startLocation");
         result->m_startLocation = ValueConversions<protocol::Debugger::Location>::fromValue(startLocationValue, errors);
     }
     protocol::Value* endLocationValue = object->get("endLocation");
     if (endLocationValue) {
-        errors->setName("endLocation");
+        errors->SetName("endLocation");
         result->m_endLocation = ValueConversions<protocol::Debugger::Location>::fromValue(endLocationValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -224,6 +267,19 @@ std::unique_ptr<protocol::DictionaryValue> Scope::toValue() const
     return result;
 }
 
+void Scope::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("type"), m_type, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("object"), m_object, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("name"), m_name, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("startLocation"), m_startLocation, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("endLocation"), m_endLocation, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<Scope> Scope::clone() const
 {
     ErrorSupport errors;
@@ -233,21 +289,21 @@ std::unique_ptr<Scope> Scope::clone() const
 std::unique_ptr<SearchMatch> SearchMatch::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<SearchMatch> result(new SearchMatch());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* lineNumberValue = object->get("lineNumber");
-    errors->setName("lineNumber");
+    errors->SetName("lineNumber");
     result->m_lineNumber = ValueConversions<double>::fromValue(lineNumberValue, errors);
     protocol::Value* lineContentValue = object->get("lineContent");
-    errors->setName("lineContent");
+    errors->SetName("lineContent");
     result->m_lineContent = ValueConversions<String>::fromValue(lineContentValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -260,31 +316,20 @@ std::unique_ptr<protocol::DictionaryValue> SearchMatch::toValue() const
     return result;
 }
 
+void SearchMatch::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("lineNumber"), m_lineNumber, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("lineContent"), m_lineContent, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<SearchMatch> SearchMatch::clone() const
 {
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
-}
-
-std::unique_ptr<StringBuffer> SearchMatch::toJSONString() const
-{
-    String json = toValue()->toJSONString();
-    return StringBufferImpl::adopt(json);
-}
-
-void SearchMatch::writeBinary(std::vector<uint8_t>* out) const
-{
-    toValue()->AppendSerialized(out);
-}
-
-// static
-std::unique_ptr<API::SearchMatch> API::SearchMatch::fromJSONString(const StringView& json)
-{
-    ErrorSupport errors;
-    std::unique_ptr<Value> value = StringUtil::parseJSON(json);
-    if (!value)
-        return nullptr;
-    return protocol::Debugger::SearchMatch::fromValue(value.get(), &errors);
 }
 
 // static
@@ -305,31 +350,31 @@ const char* BreakLocation::TypeEnum::Return = "return";
 std::unique_ptr<BreakLocation> BreakLocation::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<BreakLocation> result(new BreakLocation());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* scriptIdValue = object->get("scriptId");
-    errors->setName("scriptId");
+    errors->SetName("scriptId");
     result->m_scriptId = ValueConversions<String>::fromValue(scriptIdValue, errors);
     protocol::Value* lineNumberValue = object->get("lineNumber");
-    errors->setName("lineNumber");
+    errors->SetName("lineNumber");
     result->m_lineNumber = ValueConversions<int>::fromValue(lineNumberValue, errors);
     protocol::Value* columnNumberValue = object->get("columnNumber");
     if (columnNumberValue) {
-        errors->setName("columnNumber");
+        errors->SetName("columnNumber");
         result->m_columnNumber = ValueConversions<int>::fromValue(columnNumberValue, errors);
     }
     protocol::Value* typeValue = object->get("type");
     if (typeValue) {
-        errors->setName("type");
+        errors->SetName("type");
         result->m_type = ValueConversions<String>::fromValue(typeValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -346,30 +391,47 @@ std::unique_ptr<protocol::DictionaryValue> BreakLocation::toValue() const
     return result;
 }
 
+void BreakLocation::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("scriptId"), m_scriptId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("lineNumber"), m_lineNumber, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("columnNumber"), m_columnNumber, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("type"), m_type, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<BreakLocation> BreakLocation::clone() const
 {
     ErrorSupport errors;
     return fromValue(toValue().get(), &errors);
 }
 
+namespace ScriptLanguageEnum {
+const char JavaScript[] = "JavaScript";
+const char WebAssembly[] = "WebAssembly";
+} // namespace ScriptLanguageEnum
+
 std::unique_ptr<BreakpointResolvedNotification> BreakpointResolvedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<BreakpointResolvedNotification> result(new BreakpointResolvedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* breakpointIdValue = object->get("breakpointId");
-    errors->setName("breakpointId");
+    errors->SetName("breakpointId");
     result->m_breakpointId = ValueConversions<String>::fromValue(breakpointIdValue, errors);
     protocol::Value* locationValue = object->get("location");
-    errors->setName("location");
+    errors->SetName("location");
     result->m_location = ValueConversions<protocol::Debugger::Location>::fromValue(locationValue, errors);
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -380,6 +442,16 @@ std::unique_ptr<protocol::DictionaryValue> BreakpointResolvedNotification::toVal
     result->setValue("breakpointId", ValueConversions<String>::toValue(m_breakpointId));
     result->setValue("location", ValueConversions<protocol::Debugger::Location>::toValue(m_location.get()));
     return result;
+}
+
+void BreakpointResolvedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("breakpointId"), m_breakpointId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("location"), m_location, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<BreakpointResolvedNotification> BreakpointResolvedNotification::clone() const
@@ -403,46 +475,46 @@ const char* PausedNotification::ReasonEnum::XHR = "XHR";
 std::unique_ptr<PausedNotification> PausedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<PausedNotification> result(new PausedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* callFramesValue = object->get("callFrames");
-    errors->setName("callFrames");
+    errors->SetName("callFrames");
     result->m_callFrames = ValueConversions<protocol::Array<protocol::Debugger::CallFrame>>::fromValue(callFramesValue, errors);
     protocol::Value* reasonValue = object->get("reason");
-    errors->setName("reason");
+    errors->SetName("reason");
     result->m_reason = ValueConversions<String>::fromValue(reasonValue, errors);
     protocol::Value* dataValue = object->get("data");
     if (dataValue) {
-        errors->setName("data");
+        errors->SetName("data");
         result->m_data = ValueConversions<protocol::DictionaryValue>::fromValue(dataValue, errors);
     }
     protocol::Value* hitBreakpointsValue = object->get("hitBreakpoints");
     if (hitBreakpointsValue) {
-        errors->setName("hitBreakpoints");
+        errors->SetName("hitBreakpoints");
         result->m_hitBreakpoints = ValueConversions<protocol::Array<String>>::fromValue(hitBreakpointsValue, errors);
     }
     protocol::Value* asyncStackTraceValue = object->get("asyncStackTrace");
     if (asyncStackTraceValue) {
-        errors->setName("asyncStackTrace");
+        errors->SetName("asyncStackTrace");
         result->m_asyncStackTrace = ValueConversions<protocol::Runtime::StackTrace>::fromValue(asyncStackTraceValue, errors);
     }
     protocol::Value* asyncStackTraceIdValue = object->get("asyncStackTraceId");
     if (asyncStackTraceIdValue) {
-        errors->setName("asyncStackTraceId");
+        errors->SetName("asyncStackTraceId");
         result->m_asyncStackTraceId = ValueConversions<protocol::Runtime::StackTraceId>::fromValue(asyncStackTraceIdValue, errors);
     }
     protocol::Value* asyncCallStackTraceIdValue = object->get("asyncCallStackTraceId");
     if (asyncCallStackTraceIdValue) {
-        errors->setName("asyncCallStackTraceId");
+        errors->SetName("asyncCallStackTraceId");
         result->m_asyncCallStackTraceId = ValueConversions<protocol::Runtime::StackTraceId>::fromValue(asyncCallStackTraceIdValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -465,6 +537,21 @@ std::unique_ptr<protocol::DictionaryValue> PausedNotification::toValue() const
     return result;
 }
 
+void PausedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("callFrames"), m_callFrames, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("reason"), m_reason, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("data"), m_data, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("hitBreakpoints"), m_hitBreakpoints, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("asyncStackTrace"), m_asyncStackTrace, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("asyncStackTraceId"), m_asyncStackTraceId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("asyncCallStackTraceId"), m_asyncCallStackTraceId, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
+}
+
 std::unique_ptr<PausedNotification> PausedNotification::clone() const
 {
     ErrorSupport errors;
@@ -474,69 +561,79 @@ std::unique_ptr<PausedNotification> PausedNotification::clone() const
 std::unique_ptr<ScriptFailedToParseNotification> ScriptFailedToParseNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<ScriptFailedToParseNotification> result(new ScriptFailedToParseNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* scriptIdValue = object->get("scriptId");
-    errors->setName("scriptId");
+    errors->SetName("scriptId");
     result->m_scriptId = ValueConversions<String>::fromValue(scriptIdValue, errors);
     protocol::Value* urlValue = object->get("url");
-    errors->setName("url");
+    errors->SetName("url");
     result->m_url = ValueConversions<String>::fromValue(urlValue, errors);
     protocol::Value* startLineValue = object->get("startLine");
-    errors->setName("startLine");
+    errors->SetName("startLine");
     result->m_startLine = ValueConversions<int>::fromValue(startLineValue, errors);
     protocol::Value* startColumnValue = object->get("startColumn");
-    errors->setName("startColumn");
+    errors->SetName("startColumn");
     result->m_startColumn = ValueConversions<int>::fromValue(startColumnValue, errors);
     protocol::Value* endLineValue = object->get("endLine");
-    errors->setName("endLine");
+    errors->SetName("endLine");
     result->m_endLine = ValueConversions<int>::fromValue(endLineValue, errors);
     protocol::Value* endColumnValue = object->get("endColumn");
-    errors->setName("endColumn");
+    errors->SetName("endColumn");
     result->m_endColumn = ValueConversions<int>::fromValue(endColumnValue, errors);
     protocol::Value* executionContextIdValue = object->get("executionContextId");
-    errors->setName("executionContextId");
+    errors->SetName("executionContextId");
     result->m_executionContextId = ValueConversions<int>::fromValue(executionContextIdValue, errors);
     protocol::Value* hashValue = object->get("hash");
-    errors->setName("hash");
+    errors->SetName("hash");
     result->m_hash = ValueConversions<String>::fromValue(hashValue, errors);
     protocol::Value* executionContextAuxDataValue = object->get("executionContextAuxData");
     if (executionContextAuxDataValue) {
-        errors->setName("executionContextAuxData");
+        errors->SetName("executionContextAuxData");
         result->m_executionContextAuxData = ValueConversions<protocol::DictionaryValue>::fromValue(executionContextAuxDataValue, errors);
     }
     protocol::Value* sourceMapURLValue = object->get("sourceMapURL");
     if (sourceMapURLValue) {
-        errors->setName("sourceMapURL");
+        errors->SetName("sourceMapURL");
         result->m_sourceMapURL = ValueConversions<String>::fromValue(sourceMapURLValue, errors);
     }
     protocol::Value* hasSourceURLValue = object->get("hasSourceURL");
     if (hasSourceURLValue) {
-        errors->setName("hasSourceURL");
+        errors->SetName("hasSourceURL");
         result->m_hasSourceURL = ValueConversions<bool>::fromValue(hasSourceURLValue, errors);
     }
     protocol::Value* isModuleValue = object->get("isModule");
     if (isModuleValue) {
-        errors->setName("isModule");
+        errors->SetName("isModule");
         result->m_isModule = ValueConversions<bool>::fromValue(isModuleValue, errors);
     }
     protocol::Value* lengthValue = object->get("length");
     if (lengthValue) {
-        errors->setName("length");
+        errors->SetName("length");
         result->m_length = ValueConversions<int>::fromValue(lengthValue, errors);
     }
     protocol::Value* stackTraceValue = object->get("stackTrace");
     if (stackTraceValue) {
-        errors->setName("stackTrace");
+        errors->SetName("stackTrace");
         result->m_stackTrace = ValueConversions<protocol::Runtime::StackTrace>::fromValue(stackTraceValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    protocol::Value* codeOffsetValue = object->get("codeOffset");
+    if (codeOffsetValue) {
+        errors->SetName("codeOffset");
+        result->m_codeOffset = ValueConversions<int>::fromValue(codeOffsetValue, errors);
+    }
+    protocol::Value* scriptLanguageValue = object->get("scriptLanguage");
+    if (scriptLanguageValue) {
+        errors->SetName("scriptLanguage");
+        result->m_scriptLanguage = ValueConversions<String>::fromValue(scriptLanguageValue, errors);
+    }
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -564,7 +661,35 @@ std::unique_ptr<protocol::DictionaryValue> ScriptFailedToParseNotification::toVa
         result->setValue("length", ValueConversions<int>::toValue(m_length.fromJust()));
     if (m_stackTrace.isJust())
         result->setValue("stackTrace", ValueConversions<protocol::Runtime::StackTrace>::toValue(m_stackTrace.fromJust()));
+    if (m_codeOffset.isJust())
+        result->setValue("codeOffset", ValueConversions<int>::toValue(m_codeOffset.fromJust()));
+    if (m_scriptLanguage.isJust())
+        result->setValue("scriptLanguage", ValueConversions<String>::toValue(m_scriptLanguage.fromJust()));
     return result;
+}
+
+void ScriptFailedToParseNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("scriptId"), m_scriptId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("url"), m_url, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("startLine"), m_startLine, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("startColumn"), m_startColumn, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("endLine"), m_endLine, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("endColumn"), m_endColumn, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("executionContextId"), m_executionContextId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("hash"), m_hash, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("executionContextAuxData"), m_executionContextAuxData, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("sourceMapURL"), m_sourceMapURL, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("hasSourceURL"), m_hasSourceURL, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("isModule"), m_isModule, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("length"), m_length, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("stackTrace"), m_stackTrace, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("codeOffset"), m_codeOffset, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("scriptLanguage"), m_scriptLanguage, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<ScriptFailedToParseNotification> ScriptFailedToParseNotification::clone() const
@@ -576,74 +701,84 @@ std::unique_ptr<ScriptFailedToParseNotification> ScriptFailedToParseNotification
 std::unique_ptr<ScriptParsedNotification> ScriptParsedNotification::fromValue(protocol::Value* value, ErrorSupport* errors)
 {
     if (!value || value->type() != protocol::Value::TypeObject) {
-        errors->addError("object expected");
+        errors->AddError("object expected");
         return nullptr;
     }
 
     std::unique_ptr<ScriptParsedNotification> result(new ScriptParsedNotification());
     protocol::DictionaryValue* object = DictionaryValue::cast(value);
-    errors->push();
+    errors->Push();
     protocol::Value* scriptIdValue = object->get("scriptId");
-    errors->setName("scriptId");
+    errors->SetName("scriptId");
     result->m_scriptId = ValueConversions<String>::fromValue(scriptIdValue, errors);
     protocol::Value* urlValue = object->get("url");
-    errors->setName("url");
+    errors->SetName("url");
     result->m_url = ValueConversions<String>::fromValue(urlValue, errors);
     protocol::Value* startLineValue = object->get("startLine");
-    errors->setName("startLine");
+    errors->SetName("startLine");
     result->m_startLine = ValueConversions<int>::fromValue(startLineValue, errors);
     protocol::Value* startColumnValue = object->get("startColumn");
-    errors->setName("startColumn");
+    errors->SetName("startColumn");
     result->m_startColumn = ValueConversions<int>::fromValue(startColumnValue, errors);
     protocol::Value* endLineValue = object->get("endLine");
-    errors->setName("endLine");
+    errors->SetName("endLine");
     result->m_endLine = ValueConversions<int>::fromValue(endLineValue, errors);
     protocol::Value* endColumnValue = object->get("endColumn");
-    errors->setName("endColumn");
+    errors->SetName("endColumn");
     result->m_endColumn = ValueConversions<int>::fromValue(endColumnValue, errors);
     protocol::Value* executionContextIdValue = object->get("executionContextId");
-    errors->setName("executionContextId");
+    errors->SetName("executionContextId");
     result->m_executionContextId = ValueConversions<int>::fromValue(executionContextIdValue, errors);
     protocol::Value* hashValue = object->get("hash");
-    errors->setName("hash");
+    errors->SetName("hash");
     result->m_hash = ValueConversions<String>::fromValue(hashValue, errors);
     protocol::Value* executionContextAuxDataValue = object->get("executionContextAuxData");
     if (executionContextAuxDataValue) {
-        errors->setName("executionContextAuxData");
+        errors->SetName("executionContextAuxData");
         result->m_executionContextAuxData = ValueConversions<protocol::DictionaryValue>::fromValue(executionContextAuxDataValue, errors);
     }
     protocol::Value* isLiveEditValue = object->get("isLiveEdit");
     if (isLiveEditValue) {
-        errors->setName("isLiveEdit");
+        errors->SetName("isLiveEdit");
         result->m_isLiveEdit = ValueConversions<bool>::fromValue(isLiveEditValue, errors);
     }
     protocol::Value* sourceMapURLValue = object->get("sourceMapURL");
     if (sourceMapURLValue) {
-        errors->setName("sourceMapURL");
+        errors->SetName("sourceMapURL");
         result->m_sourceMapURL = ValueConversions<String>::fromValue(sourceMapURLValue, errors);
     }
     protocol::Value* hasSourceURLValue = object->get("hasSourceURL");
     if (hasSourceURLValue) {
-        errors->setName("hasSourceURL");
+        errors->SetName("hasSourceURL");
         result->m_hasSourceURL = ValueConversions<bool>::fromValue(hasSourceURLValue, errors);
     }
     protocol::Value* isModuleValue = object->get("isModule");
     if (isModuleValue) {
-        errors->setName("isModule");
+        errors->SetName("isModule");
         result->m_isModule = ValueConversions<bool>::fromValue(isModuleValue, errors);
     }
     protocol::Value* lengthValue = object->get("length");
     if (lengthValue) {
-        errors->setName("length");
+        errors->SetName("length");
         result->m_length = ValueConversions<int>::fromValue(lengthValue, errors);
     }
     protocol::Value* stackTraceValue = object->get("stackTrace");
     if (stackTraceValue) {
-        errors->setName("stackTrace");
+        errors->SetName("stackTrace");
         result->m_stackTrace = ValueConversions<protocol::Runtime::StackTrace>::fromValue(stackTraceValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors())
+    protocol::Value* codeOffsetValue = object->get("codeOffset");
+    if (codeOffsetValue) {
+        errors->SetName("codeOffset");
+        result->m_codeOffset = ValueConversions<int>::fromValue(codeOffsetValue, errors);
+    }
+    protocol::Value* scriptLanguageValue = object->get("scriptLanguage");
+    if (scriptLanguageValue) {
+        errors->SetName("scriptLanguage");
+        result->m_scriptLanguage = ValueConversions<String>::fromValue(scriptLanguageValue, errors);
+    }
+    errors->Pop();
+    if (!errors->Errors().empty())
         return nullptr;
     return result;
 }
@@ -673,7 +808,36 @@ std::unique_ptr<protocol::DictionaryValue> ScriptParsedNotification::toValue() c
         result->setValue("length", ValueConversions<int>::toValue(m_length.fromJust()));
     if (m_stackTrace.isJust())
         result->setValue("stackTrace", ValueConversions<protocol::Runtime::StackTrace>::toValue(m_stackTrace.fromJust()));
+    if (m_codeOffset.isJust())
+        result->setValue("codeOffset", ValueConversions<int>::toValue(m_codeOffset.fromJust()));
+    if (m_scriptLanguage.isJust())
+        result->setValue("scriptLanguage", ValueConversions<String>::toValue(m_scriptLanguage.fromJust()));
     return result;
+}
+
+void ScriptParsedNotification::AppendSerialized(std::vector<uint8_t>* out) const {
+    v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+    envelope_encoder.EncodeStart(out);
+    out->push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("scriptId"), m_scriptId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("url"), m_url, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("startLine"), m_startLine, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("startColumn"), m_startColumn, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("endLine"), m_endLine, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("endColumn"), m_endColumn, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("executionContextId"), m_executionContextId, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("hash"), m_hash, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("executionContextAuxData"), m_executionContextAuxData, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("isLiveEdit"), m_isLiveEdit, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("sourceMapURL"), m_sourceMapURL, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("hasSourceURL"), m_hasSourceURL, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("isModule"), m_isModule, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("length"), m_length, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("stackTrace"), m_stackTrace, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("codeOffset"), m_codeOffset, out);
+      v8_crdtp::SerializeField(v8_crdtp::SpanFrom("scriptLanguage"), m_scriptLanguage, out);
+    out->push_back(v8_crdtp::cbor::EncodeStop());
+    envelope_encoder.EncodeStop(out);
 }
 
 std::unique_ptr<ScriptParsedNotification> ScriptParsedNotification::clone() const
@@ -745,18 +909,18 @@ const char* XHR = "XHR";
 
 void Frontend::breakpointResolved(const String& breakpointId, std::unique_ptr<protocol::Debugger::Location> location)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<BreakpointResolvedNotification> messageData = BreakpointResolvedNotification::create()
         .setBreakpointId(breakpointId)
         .setLocation(std::move(location))
         .build();
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Debugger.breakpointResolved", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Debugger.breakpointResolved", std::move(messageData)));
 }
 
 void Frontend::paused(std::unique_ptr<protocol::Array<protocol::Debugger::CallFrame>> callFrames, const String& reason, Maybe<protocol::DictionaryValue> data, Maybe<protocol::Array<String>> hitBreakpoints, Maybe<protocol::Runtime::StackTrace> asyncStackTrace, Maybe<protocol::Runtime::StackTraceId> asyncStackTraceId, Maybe<protocol::Runtime::StackTraceId> asyncCallStackTraceId)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<PausedNotification> messageData = PausedNotification::create()
         .setCallFrames(std::move(callFrames))
@@ -772,19 +936,19 @@ void Frontend::paused(std::unique_ptr<protocol::Array<protocol::Debugger::CallFr
         messageData->setAsyncStackTraceId(std::move(asyncStackTraceId).takeJust());
     if (asyncCallStackTraceId.isJust())
         messageData->setAsyncCallStackTraceId(std::move(asyncCallStackTraceId).takeJust());
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Debugger.paused", std::move(messageData)));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Debugger.paused", std::move(messageData)));
 }
 
 void Frontend::resumed()
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Debugger.resumed"));
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Debugger.resumed"));
 }
 
-void Frontend::scriptFailedToParse(const String& scriptId, const String& url, int startLine, int startColumn, int endLine, int endColumn, int executionContextId, const String& hash, Maybe<protocol::DictionaryValue> executionContextAuxData, Maybe<String> sourceMapURL, Maybe<bool> hasSourceURL, Maybe<bool> isModule, Maybe<int> length, Maybe<protocol::Runtime::StackTrace> stackTrace)
+void Frontend::scriptFailedToParse(const String& scriptId, const String& url, int startLine, int startColumn, int endLine, int endColumn, int executionContextId, const String& hash, Maybe<protocol::DictionaryValue> executionContextAuxData, Maybe<String> sourceMapURL, Maybe<bool> hasSourceURL, Maybe<bool> isModule, Maybe<int> length, Maybe<protocol::Runtime::StackTrace> stackTrace, Maybe<int> codeOffset, Maybe<String> scriptLanguage)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<ScriptFailedToParseNotification> messageData = ScriptFailedToParseNotification::create()
         .setScriptId(scriptId)
@@ -808,12 +972,16 @@ void Frontend::scriptFailedToParse(const String& scriptId, const String& url, in
         messageData->setLength(std::move(length).takeJust());
     if (stackTrace.isJust())
         messageData->setStackTrace(std::move(stackTrace).takeJust());
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Debugger.scriptFailedToParse", std::move(messageData)));
+    if (codeOffset.isJust())
+        messageData->setCodeOffset(std::move(codeOffset).takeJust());
+    if (scriptLanguage.isJust())
+        messageData->setScriptLanguage(std::move(scriptLanguage).takeJust());
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Debugger.scriptFailedToParse", std::move(messageData)));
 }
 
-void Frontend::scriptParsed(const String& scriptId, const String& url, int startLine, int startColumn, int endLine, int endColumn, int executionContextId, const String& hash, Maybe<protocol::DictionaryValue> executionContextAuxData, Maybe<bool> isLiveEdit, Maybe<String> sourceMapURL, Maybe<bool> hasSourceURL, Maybe<bool> isModule, Maybe<int> length, Maybe<protocol::Runtime::StackTrace> stackTrace)
+void Frontend::scriptParsed(const String& scriptId, const String& url, int startLine, int startColumn, int endLine, int endColumn, int executionContextId, const String& hash, Maybe<protocol::DictionaryValue> executionContextAuxData, Maybe<bool> isLiveEdit, Maybe<String> sourceMapURL, Maybe<bool> hasSourceURL, Maybe<bool> isModule, Maybe<int> length, Maybe<protocol::Runtime::StackTrace> stackTrace, Maybe<int> codeOffset, Maybe<String> scriptLanguage)
 {
-    if (!m_frontendChannel)
+    if (!frontend_channel_)
         return;
     std::unique_ptr<ScriptParsedNotification> messageData = ScriptParsedNotification::create()
         .setScriptId(scriptId)
@@ -839,918 +1007,966 @@ void Frontend::scriptParsed(const String& scriptId, const String& url, int start
         messageData->setLength(std::move(length).takeJust());
     if (stackTrace.isJust())
         messageData->setStackTrace(std::move(stackTrace).takeJust());
-    m_frontendChannel->sendProtocolNotification(InternalResponse::createNotification("Debugger.scriptParsed", std::move(messageData)));
+    if (codeOffset.isJust())
+        messageData->setCodeOffset(std::move(codeOffset).takeJust());
+    if (scriptLanguage.isJust())
+        messageData->setScriptLanguage(std::move(scriptLanguage).takeJust());
+    frontend_channel_->SendProtocolNotification(v8_crdtp::CreateNotification("Debugger.scriptParsed", std::move(messageData)));
 }
 
 void Frontend::flush()
 {
-    m_frontendChannel->flushProtocolNotifications();
+    frontend_channel_->FlushProtocolNotifications();
 }
 
-void Frontend::sendRawCBORNotification(std::vector<uint8_t> notification)
+void Frontend::sendRawNotification(std::unique_ptr<Serializable> notification)
 {
-    m_frontendChannel->sendProtocolNotification(InternalRawNotification::fromBinary(std::move(notification)));
+    frontend_channel_->SendProtocolNotification(std::move(notification));
 }
 
 // --------------------- Dispatcher.
 
-class DispatcherImpl : public protocol::DispatcherBase {
+class DomainDispatcherImpl : public protocol::DomainDispatcher {
 public:
-    DispatcherImpl(FrontendChannel* frontendChannel, Backend* backend)
-        : DispatcherBase(frontendChannel)
-        , m_backend(backend) {
-        m_dispatchMap["Debugger.continueToLocation"] = &DispatcherImpl::continueToLocation;
-        m_dispatchMap["Debugger.disable"] = &DispatcherImpl::disable;
-        m_dispatchMap["Debugger.enable"] = &DispatcherImpl::enable;
-        m_dispatchMap["Debugger.evaluateOnCallFrame"] = &DispatcherImpl::evaluateOnCallFrame;
-        m_dispatchMap["Debugger.getPossibleBreakpoints"] = &DispatcherImpl::getPossibleBreakpoints;
-        m_dispatchMap["Debugger.getScriptSource"] = &DispatcherImpl::getScriptSource;
-        m_dispatchMap["Debugger.getWasmBytecode"] = &DispatcherImpl::getWasmBytecode;
-        m_dispatchMap["Debugger.getStackTrace"] = &DispatcherImpl::getStackTrace;
-        m_dispatchMap["Debugger.pause"] = &DispatcherImpl::pause;
-        m_dispatchMap["Debugger.pauseOnAsyncCall"] = &DispatcherImpl::pauseOnAsyncCall;
-        m_dispatchMap["Debugger.removeBreakpoint"] = &DispatcherImpl::removeBreakpoint;
-        m_dispatchMap["Debugger.restartFrame"] = &DispatcherImpl::restartFrame;
-        m_dispatchMap["Debugger.resume"] = &DispatcherImpl::resume;
-        m_dispatchMap["Debugger.searchInContent"] = &DispatcherImpl::searchInContent;
-        m_dispatchMap["Debugger.setAsyncCallStackDepth"] = &DispatcherImpl::setAsyncCallStackDepth;
-        m_dispatchMap["Debugger.setBlackboxPatterns"] = &DispatcherImpl::setBlackboxPatterns;
-        m_dispatchMap["Debugger.setBlackboxedRanges"] = &DispatcherImpl::setBlackboxedRanges;
-        m_dispatchMap["Debugger.setBreakpoint"] = &DispatcherImpl::setBreakpoint;
-        m_dispatchMap["Debugger.setInstrumentationBreakpoint"] = &DispatcherImpl::setInstrumentationBreakpoint;
-        m_dispatchMap["Debugger.setBreakpointByUrl"] = &DispatcherImpl::setBreakpointByUrl;
-        m_dispatchMap["Debugger.setBreakpointOnFunctionCall"] = &DispatcherImpl::setBreakpointOnFunctionCall;
-        m_dispatchMap["Debugger.setBreakpointsActive"] = &DispatcherImpl::setBreakpointsActive;
-        m_dispatchMap["Debugger.setPauseOnExceptions"] = &DispatcherImpl::setPauseOnExceptions;
-        m_dispatchMap["Debugger.setReturnValue"] = &DispatcherImpl::setReturnValue;
-        m_dispatchMap["Debugger.setScriptSource"] = &DispatcherImpl::setScriptSource;
-        m_dispatchMap["Debugger.setSkipAllPauses"] = &DispatcherImpl::setSkipAllPauses;
-        m_dispatchMap["Debugger.setVariableValue"] = &DispatcherImpl::setVariableValue;
-        m_dispatchMap["Debugger.stepInto"] = &DispatcherImpl::stepInto;
-        m_dispatchMap["Debugger.stepOut"] = &DispatcherImpl::stepOut;
-        m_dispatchMap["Debugger.stepOver"] = &DispatcherImpl::stepOver;
-    }
-    ~DispatcherImpl() override { }
-    bool canDispatch(const String& method) override;
-    void dispatch(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<protocol::DictionaryValue> messageObject) override;
-    std::unordered_map<String, String>& redirects() { return m_redirects; }
+    DomainDispatcherImpl(FrontendChannel* frontendChannel, Backend* backend)
+        : DomainDispatcher(frontendChannel)
+        , m_backend(backend) {}
+    ~DomainDispatcherImpl() override { }
 
-protected:
-    using CallHandler = void (DispatcherImpl::*)(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> messageObject, ErrorSupport* errors);
-    using DispatchMap = std::unordered_map<String, CallHandler>;
-    DispatchMap m_dispatchMap;
-    std::unordered_map<String, String> m_redirects;
+    using CallHandler = void (DomainDispatcherImpl::*)(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
 
-    void continueToLocation(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void disable(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void enable(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void evaluateOnCallFrame(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getPossibleBreakpoints(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getScriptSource(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getWasmBytecode(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void getStackTrace(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void pause(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void pauseOnAsyncCall(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void removeBreakpoint(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void restartFrame(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void resume(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void searchInContent(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setAsyncCallStackDepth(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setBlackboxPatterns(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setBlackboxedRanges(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setBreakpoint(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setInstrumentationBreakpoint(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setBreakpointByUrl(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setBreakpointOnFunctionCall(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setBreakpointsActive(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setPauseOnExceptions(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setReturnValue(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setScriptSource(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setSkipAllPauses(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void setVariableValue(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void stepInto(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void stepOut(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
-    void stepOver(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport*);
+    std::function<void(const v8_crdtp::Dispatchable&)> Dispatch(v8_crdtp::span<uint8_t> command_name) override;
 
+    void continueToLocation(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void disable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void enable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void evaluateOnCallFrame(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void getPossibleBreakpoints(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void getScriptSource(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void getWasmBytecode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void getStackTrace(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void pause(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void pauseOnAsyncCall(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void removeBreakpoint(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void restartFrame(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void resume(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void searchInContent(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setAsyncCallStackDepth(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setBlackboxPatterns(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setBlackboxedRanges(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setBreakpoint(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setInstrumentationBreakpoint(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setBreakpointByUrl(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setBreakpointOnFunctionCall(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setBreakpointsActive(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setPauseOnExceptions(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setReturnValue(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setScriptSource(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setSkipAllPauses(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void setVariableValue(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void stepInto(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void stepOut(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+    void stepOver(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors);
+ protected:
     Backend* m_backend;
 };
 
-bool DispatcherImpl::canDispatch(const String& method) {
-    return m_dispatchMap.find(method) != m_dispatchMap.end();
+namespace {
+// This helper method with a static map of command methods (instance methods
+// of DomainDispatcherImpl declared just above) by their name is used immediately below,
+// in the DomainDispatcherImpl::Dispatch method.
+DomainDispatcherImpl::CallHandler CommandByName(v8_crdtp::span<uint8_t> command_name) {
+  static auto* commands = [](){
+    auto* commands = new std::vector<std::pair<v8_crdtp::span<uint8_t>,
+                              DomainDispatcherImpl::CallHandler>>{
+    {
+          v8_crdtp::SpanFrom("continueToLocation"),
+          &DomainDispatcherImpl::continueToLocation
+    },
+    {
+          v8_crdtp::SpanFrom("disable"),
+          &DomainDispatcherImpl::disable
+    },
+    {
+          v8_crdtp::SpanFrom("enable"),
+          &DomainDispatcherImpl::enable
+    },
+    {
+          v8_crdtp::SpanFrom("evaluateOnCallFrame"),
+          &DomainDispatcherImpl::evaluateOnCallFrame
+    },
+    {
+          v8_crdtp::SpanFrom("getPossibleBreakpoints"),
+          &DomainDispatcherImpl::getPossibleBreakpoints
+    },
+    {
+          v8_crdtp::SpanFrom("getScriptSource"),
+          &DomainDispatcherImpl::getScriptSource
+    },
+    {
+          v8_crdtp::SpanFrom("getStackTrace"),
+          &DomainDispatcherImpl::getStackTrace
+    },
+    {
+          v8_crdtp::SpanFrom("getWasmBytecode"),
+          &DomainDispatcherImpl::getWasmBytecode
+    },
+    {
+          v8_crdtp::SpanFrom("pause"),
+          &DomainDispatcherImpl::pause
+    },
+    {
+          v8_crdtp::SpanFrom("pauseOnAsyncCall"),
+          &DomainDispatcherImpl::pauseOnAsyncCall
+    },
+    {
+          v8_crdtp::SpanFrom("removeBreakpoint"),
+          &DomainDispatcherImpl::removeBreakpoint
+    },
+    {
+          v8_crdtp::SpanFrom("restartFrame"),
+          &DomainDispatcherImpl::restartFrame
+    },
+    {
+          v8_crdtp::SpanFrom("resume"),
+          &DomainDispatcherImpl::resume
+    },
+    {
+          v8_crdtp::SpanFrom("searchInContent"),
+          &DomainDispatcherImpl::searchInContent
+    },
+    {
+          v8_crdtp::SpanFrom("setAsyncCallStackDepth"),
+          &DomainDispatcherImpl::setAsyncCallStackDepth
+    },
+    {
+          v8_crdtp::SpanFrom("setBlackboxPatterns"),
+          &DomainDispatcherImpl::setBlackboxPatterns
+    },
+    {
+          v8_crdtp::SpanFrom("setBlackboxedRanges"),
+          &DomainDispatcherImpl::setBlackboxedRanges
+    },
+    {
+          v8_crdtp::SpanFrom("setBreakpoint"),
+          &DomainDispatcherImpl::setBreakpoint
+    },
+    {
+          v8_crdtp::SpanFrom("setBreakpointByUrl"),
+          &DomainDispatcherImpl::setBreakpointByUrl
+    },
+    {
+          v8_crdtp::SpanFrom("setBreakpointOnFunctionCall"),
+          &DomainDispatcherImpl::setBreakpointOnFunctionCall
+    },
+    {
+          v8_crdtp::SpanFrom("setBreakpointsActive"),
+          &DomainDispatcherImpl::setBreakpointsActive
+    },
+    {
+          v8_crdtp::SpanFrom("setInstrumentationBreakpoint"),
+          &DomainDispatcherImpl::setInstrumentationBreakpoint
+    },
+    {
+          v8_crdtp::SpanFrom("setPauseOnExceptions"),
+          &DomainDispatcherImpl::setPauseOnExceptions
+    },
+    {
+          v8_crdtp::SpanFrom("setReturnValue"),
+          &DomainDispatcherImpl::setReturnValue
+    },
+    {
+          v8_crdtp::SpanFrom("setScriptSource"),
+          &DomainDispatcherImpl::setScriptSource
+    },
+    {
+          v8_crdtp::SpanFrom("setSkipAllPauses"),
+          &DomainDispatcherImpl::setSkipAllPauses
+    },
+    {
+          v8_crdtp::SpanFrom("setVariableValue"),
+          &DomainDispatcherImpl::setVariableValue
+    },
+    {
+          v8_crdtp::SpanFrom("stepInto"),
+          &DomainDispatcherImpl::stepInto
+    },
+    {
+          v8_crdtp::SpanFrom("stepOut"),
+          &DomainDispatcherImpl::stepOut
+    },
+    {
+          v8_crdtp::SpanFrom("stepOver"),
+          &DomainDispatcherImpl::stepOver
+    },
+    };
+    return commands;
+  }();
+  return v8_crdtp::FindByFirst<DomainDispatcherImpl::CallHandler>(*commands, command_name, nullptr);
+}
+}  // namespace
+
+std::function<void(const v8_crdtp::Dispatchable&)> DomainDispatcherImpl::Dispatch(v8_crdtp::span<uint8_t> command_name) {
+  CallHandler handler = CommandByName(command_name);
+  if (!handler) return nullptr;
+  return [this, handler](const v8_crdtp::Dispatchable& dispatchable){
+    std::unique_ptr<DictionaryValue> params =
+        DictionaryValue::cast(protocol::Value::parseBinary(dispatchable.Params().data(),
+        dispatchable.Params().size()));
+    ErrorSupport errors;
+    errors.Push();
+    (this->*handler)(dispatchable, params.get(), &errors);
+  };
 }
 
-void DispatcherImpl::dispatch(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<protocol::DictionaryValue> messageObject)
-{
-    std::unordered_map<String, CallHandler>::iterator it = m_dispatchMap.find(method);
-    DCHECK(it != m_dispatchMap.end());
-    protocol::ErrorSupport errors;
-    (this->*(it->second))(callId, method, message, std::move(messageObject), &errors);
-}
 
-
-void DispatcherImpl::continueToLocation(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::continueToLocation(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* locationValue = object ? object->get("location") : nullptr;
-    errors->setName("location");
+    protocol::Value* locationValue = params ? params->get("location") : nullptr;
+    errors->SetName("location");
     std::unique_ptr<protocol::Debugger::Location> in_location = ValueConversions<protocol::Debugger::Location>::fromValue(locationValue, errors);
-    protocol::Value* targetCallFramesValue = object ? object->get("targetCallFrames") : nullptr;
+    protocol::Value* targetCallFramesValue = params ? params->get("targetCallFrames") : nullptr;
     Maybe<String> in_targetCallFrames;
     if (targetCallFramesValue) {
-        errors->setName("targetCallFrames");
+        errors->SetName("targetCallFrames");
         in_targetCallFrames = ValueConversions<String>::fromValue(targetCallFramesValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->continueToLocation(std::move(in_location), std::move(in_targetCallFrames));
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Debugger.continueToLocation"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::disable(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::disable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->disable();
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Debugger.disable"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::enable(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::enable(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* maxScriptsCacheSizeValue = object ? object->get("maxScriptsCacheSize") : nullptr;
+    protocol::Value* maxScriptsCacheSizeValue = params ? params->get("maxScriptsCacheSize") : nullptr;
     Maybe<double> in_maxScriptsCacheSize;
     if (maxScriptsCacheSizeValue) {
-        errors->setName("maxScriptsCacheSize");
+        errors->SetName("maxScriptsCacheSize");
         in_maxScriptsCacheSize = ValueConversions<double>::fromValue(maxScriptsCacheSizeValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     String out_debuggerId;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->enable(std::move(in_maxScriptsCacheSize), &out_debuggerId);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Debugger.enable"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("debuggerId", ValueConversions<String>::toValue(out_debuggerId));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("debuggerId"), out_debuggerId, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::evaluateOnCallFrame(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::evaluateOnCallFrame(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* callFrameIdValue = object ? object->get("callFrameId") : nullptr;
-    errors->setName("callFrameId");
+    protocol::Value* callFrameIdValue = params ? params->get("callFrameId") : nullptr;
+    errors->SetName("callFrameId");
     String in_callFrameId = ValueConversions<String>::fromValue(callFrameIdValue, errors);
-    protocol::Value* expressionValue = object ? object->get("expression") : nullptr;
-    errors->setName("expression");
+    protocol::Value* expressionValue = params ? params->get("expression") : nullptr;
+    errors->SetName("expression");
     String in_expression = ValueConversions<String>::fromValue(expressionValue, errors);
-    protocol::Value* objectGroupValue = object ? object->get("objectGroup") : nullptr;
+    protocol::Value* objectGroupValue = params ? params->get("objectGroup") : nullptr;
     Maybe<String> in_objectGroup;
     if (objectGroupValue) {
-        errors->setName("objectGroup");
+        errors->SetName("objectGroup");
         in_objectGroup = ValueConversions<String>::fromValue(objectGroupValue, errors);
     }
-    protocol::Value* includeCommandLineAPIValue = object ? object->get("includeCommandLineAPI") : nullptr;
+    protocol::Value* includeCommandLineAPIValue = params ? params->get("includeCommandLineAPI") : nullptr;
     Maybe<bool> in_includeCommandLineAPI;
     if (includeCommandLineAPIValue) {
-        errors->setName("includeCommandLineAPI");
+        errors->SetName("includeCommandLineAPI");
         in_includeCommandLineAPI = ValueConversions<bool>::fromValue(includeCommandLineAPIValue, errors);
     }
-    protocol::Value* silentValue = object ? object->get("silent") : nullptr;
+    protocol::Value* silentValue = params ? params->get("silent") : nullptr;
     Maybe<bool> in_silent;
     if (silentValue) {
-        errors->setName("silent");
+        errors->SetName("silent");
         in_silent = ValueConversions<bool>::fromValue(silentValue, errors);
     }
-    protocol::Value* returnByValueValue = object ? object->get("returnByValue") : nullptr;
+    protocol::Value* returnByValueValue = params ? params->get("returnByValue") : nullptr;
     Maybe<bool> in_returnByValue;
     if (returnByValueValue) {
-        errors->setName("returnByValue");
+        errors->SetName("returnByValue");
         in_returnByValue = ValueConversions<bool>::fromValue(returnByValueValue, errors);
     }
-    protocol::Value* generatePreviewValue = object ? object->get("generatePreview") : nullptr;
+    protocol::Value* generatePreviewValue = params ? params->get("generatePreview") : nullptr;
     Maybe<bool> in_generatePreview;
     if (generatePreviewValue) {
-        errors->setName("generatePreview");
+        errors->SetName("generatePreview");
         in_generatePreview = ValueConversions<bool>::fromValue(generatePreviewValue, errors);
     }
-    protocol::Value* throwOnSideEffectValue = object ? object->get("throwOnSideEffect") : nullptr;
+    protocol::Value* throwOnSideEffectValue = params ? params->get("throwOnSideEffect") : nullptr;
     Maybe<bool> in_throwOnSideEffect;
     if (throwOnSideEffectValue) {
-        errors->setName("throwOnSideEffect");
+        errors->SetName("throwOnSideEffect");
         in_throwOnSideEffect = ValueConversions<bool>::fromValue(throwOnSideEffectValue, errors);
     }
-    protocol::Value* timeoutValue = object ? object->get("timeout") : nullptr;
+    protocol::Value* timeoutValue = params ? params->get("timeout") : nullptr;
     Maybe<double> in_timeout;
     if (timeoutValue) {
-        errors->setName("timeout");
+        errors->SetName("timeout");
         in_timeout = ValueConversions<double>::fromValue(timeoutValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::Runtime::RemoteObject> out_result;
     Maybe<protocol::Runtime::ExceptionDetails> out_exceptionDetails;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->evaluateOnCallFrame(in_callFrameId, in_expression, std::move(in_objectGroup), std::move(in_includeCommandLineAPI), std::move(in_silent), std::move(in_returnByValue), std::move(in_generatePreview), std::move(in_throwOnSideEffect), std::move(in_timeout), &out_result, &out_exceptionDetails);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Debugger.evaluateOnCallFrame"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("result", ValueConversions<protocol::Runtime::RemoteObject>::toValue(out_result.get()));
-        if (out_exceptionDetails.isJust())
-            result->setValue("exceptionDetails", ValueConversions<protocol::Runtime::ExceptionDetails>::toValue(out_exceptionDetails.fromJust()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("result"), out_result, &result);
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("exceptionDetails"), out_exceptionDetails, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::getPossibleBreakpoints(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::getPossibleBreakpoints(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* startValue = object ? object->get("start") : nullptr;
-    errors->setName("start");
+    protocol::Value* startValue = params ? params->get("start") : nullptr;
+    errors->SetName("start");
     std::unique_ptr<protocol::Debugger::Location> in_start = ValueConversions<protocol::Debugger::Location>::fromValue(startValue, errors);
-    protocol::Value* endValue = object ? object->get("end") : nullptr;
+    protocol::Value* endValue = params ? params->get("end") : nullptr;
     Maybe<protocol::Debugger::Location> in_end;
     if (endValue) {
-        errors->setName("end");
+        errors->SetName("end");
         in_end = ValueConversions<protocol::Debugger::Location>::fromValue(endValue, errors);
     }
-    protocol::Value* restrictToFunctionValue = object ? object->get("restrictToFunction") : nullptr;
+    protocol::Value* restrictToFunctionValue = params ? params->get("restrictToFunction") : nullptr;
     Maybe<bool> in_restrictToFunction;
     if (restrictToFunctionValue) {
-        errors->setName("restrictToFunction");
+        errors->SetName("restrictToFunction");
         in_restrictToFunction = ValueConversions<bool>::fromValue(restrictToFunctionValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::Array<protocol::Debugger::BreakLocation>> out_locations;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getPossibleBreakpoints(std::move(in_start), std::move(in_end), std::move(in_restrictToFunction), &out_locations);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Debugger.getPossibleBreakpoints"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("locations", ValueConversions<protocol::Array<protocol::Debugger::BreakLocation>>::toValue(out_locations.get()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("locations"), out_locations, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::getScriptSource(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::getScriptSource(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* scriptIdValue = object ? object->get("scriptId") : nullptr;
-    errors->setName("scriptId");
+    protocol::Value* scriptIdValue = params ? params->get("scriptId") : nullptr;
+    errors->SetName("scriptId");
     String in_scriptId = ValueConversions<String>::fromValue(scriptIdValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     String out_scriptSource;
     Maybe<Binary> out_bytecode;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getScriptSource(in_scriptId, &out_scriptSource, &out_bytecode);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Debugger.getScriptSource"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("scriptSource", ValueConversions<String>::toValue(out_scriptSource));
-        if (out_bytecode.isJust())
-            result->setValue("bytecode", ValueConversions<Binary>::toValue(out_bytecode.fromJust()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("scriptSource"), out_scriptSource, &result);
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("bytecode"), out_bytecode, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::getWasmBytecode(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::getWasmBytecode(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* scriptIdValue = object ? object->get("scriptId") : nullptr;
-    errors->setName("scriptId");
+    protocol::Value* scriptIdValue = params ? params->get("scriptId") : nullptr;
+    errors->SetName("scriptId");
     String in_scriptId = ValueConversions<String>::fromValue(scriptIdValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     Binary out_bytecode;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getWasmBytecode(in_scriptId, &out_bytecode);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Debugger.getWasmBytecode"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("bytecode", ValueConversions<Binary>::toValue(out_bytecode));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("bytecode"), out_bytecode, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::getStackTrace(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::getStackTrace(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* stackTraceIdValue = object ? object->get("stackTraceId") : nullptr;
-    errors->setName("stackTraceId");
+    protocol::Value* stackTraceIdValue = params ? params->get("stackTraceId") : nullptr;
+    errors->SetName("stackTraceId");
     std::unique_ptr<protocol::Runtime::StackTraceId> in_stackTraceId = ValueConversions<protocol::Runtime::StackTraceId>::fromValue(stackTraceIdValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::Runtime::StackTrace> out_stackTrace;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->getStackTrace(std::move(in_stackTraceId), &out_stackTrace);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Debugger.getStackTrace"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("stackTrace", ValueConversions<protocol::Runtime::StackTrace>::toValue(out_stackTrace.get()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("stackTrace"), out_stackTrace, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::pause(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::pause(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->pause();
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Debugger.pause"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::pauseOnAsyncCall(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::pauseOnAsyncCall(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* parentStackTraceIdValue = object ? object->get("parentStackTraceId") : nullptr;
-    errors->setName("parentStackTraceId");
+    protocol::Value* parentStackTraceIdValue = params ? params->get("parentStackTraceId") : nullptr;
+    errors->SetName("parentStackTraceId");
     std::unique_ptr<protocol::Runtime::StackTraceId> in_parentStackTraceId = ValueConversions<protocol::Runtime::StackTraceId>::fromValue(parentStackTraceIdValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->pauseOnAsyncCall(std::move(in_parentStackTraceId));
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Debugger.pauseOnAsyncCall"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::removeBreakpoint(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::removeBreakpoint(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* breakpointIdValue = object ? object->get("breakpointId") : nullptr;
-    errors->setName("breakpointId");
+    protocol::Value* breakpointIdValue = params ? params->get("breakpointId") : nullptr;
+    errors->SetName("breakpointId");
     String in_breakpointId = ValueConversions<String>::fromValue(breakpointIdValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->removeBreakpoint(in_breakpointId);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Debugger.removeBreakpoint"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::restartFrame(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::restartFrame(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* callFrameIdValue = object ? object->get("callFrameId") : nullptr;
-    errors->setName("callFrameId");
+    protocol::Value* callFrameIdValue = params ? params->get("callFrameId") : nullptr;
+    errors->SetName("callFrameId");
     String in_callFrameId = ValueConversions<String>::fromValue(callFrameIdValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::Array<protocol::Debugger::CallFrame>> out_callFrames;
     Maybe<protocol::Runtime::StackTrace> out_asyncStackTrace;
     Maybe<protocol::Runtime::StackTraceId> out_asyncStackTraceId;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->restartFrame(in_callFrameId, &out_callFrames, &out_asyncStackTrace, &out_asyncStackTraceId);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Debugger.restartFrame"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("callFrames", ValueConversions<protocol::Array<protocol::Debugger::CallFrame>>::toValue(out_callFrames.get()));
-        if (out_asyncStackTrace.isJust())
-            result->setValue("asyncStackTrace", ValueConversions<protocol::Runtime::StackTrace>::toValue(out_asyncStackTrace.fromJust()));
-        if (out_asyncStackTraceId.isJust())
-            result->setValue("asyncStackTraceId", ValueConversions<protocol::Runtime::StackTraceId>::toValue(out_asyncStackTraceId.fromJust()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("callFrames"), out_callFrames, &result);
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("asyncStackTrace"), out_asyncStackTrace, &result);
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("asyncStackTraceId"), out_asyncStackTraceId, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::resume(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
-{
-
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->resume();
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
-        return;
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response);
-    return;
-}
-
-void DispatcherImpl::searchInContent(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::resume(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* scriptIdValue = object ? object->get("scriptId") : nullptr;
-    errors->setName("scriptId");
-    String in_scriptId = ValueConversions<String>::fromValue(scriptIdValue, errors);
-    protocol::Value* queryValue = object ? object->get("query") : nullptr;
-    errors->setName("query");
-    String in_query = ValueConversions<String>::fromValue(queryValue, errors);
-    protocol::Value* caseSensitiveValue = object ? object->get("caseSensitive") : nullptr;
-    Maybe<bool> in_caseSensitive;
-    if (caseSensitiveValue) {
-        errors->setName("caseSensitive");
-        in_caseSensitive = ValueConversions<bool>::fromValue(caseSensitiveValue, errors);
+    protocol::Value* terminateOnResumeValue = params ? params->get("terminateOnResume") : nullptr;
+    Maybe<bool> in_terminateOnResume;
+    if (terminateOnResumeValue) {
+        errors->SetName("terminateOnResume");
+        in_terminateOnResume = ValueConversions<bool>::fromValue(terminateOnResumeValue, errors);
     }
-    protocol::Value* isRegexValue = object ? object->get("isRegex") : nullptr;
-    Maybe<bool> in_isRegex;
-    if (isRegexValue) {
-        errors->setName("isRegex");
-        in_isRegex = ValueConversions<bool>::fromValue(isRegexValue, errors);
-    }
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
+
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
+    DispatchResponse response = m_backend->resume(std::move(in_terminateOnResume));
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Debugger.resume"), dispatchable.Serialized());
         return;
     }
+    if (weak->get())
+        weak->get()->sendResponse(dispatchable.CallId(), response);
+    return;
+}
+
+void DomainDispatcherImpl::searchInContent(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
+{
+    // Prepare input parameters.
+    protocol::Value* scriptIdValue = params ? params->get("scriptId") : nullptr;
+    errors->SetName("scriptId");
+    String in_scriptId = ValueConversions<String>::fromValue(scriptIdValue, errors);
+    protocol::Value* queryValue = params ? params->get("query") : nullptr;
+    errors->SetName("query");
+    String in_query = ValueConversions<String>::fromValue(queryValue, errors);
+    protocol::Value* caseSensitiveValue = params ? params->get("caseSensitive") : nullptr;
+    Maybe<bool> in_caseSensitive;
+    if (caseSensitiveValue) {
+        errors->SetName("caseSensitive");
+        in_caseSensitive = ValueConversions<bool>::fromValue(caseSensitiveValue, errors);
+    }
+    protocol::Value* isRegexValue = params ? params->get("isRegex") : nullptr;
+    Maybe<bool> in_isRegex;
+    if (isRegexValue) {
+        errors->SetName("isRegex");
+        in_isRegex = ValueConversions<bool>::fromValue(isRegexValue, errors);
+    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::Array<protocol::Debugger::SearchMatch>> out_result;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->searchInContent(in_scriptId, in_query, std::move(in_caseSensitive), std::move(in_isRegex), &out_result);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Debugger.searchInContent"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("result", ValueConversions<protocol::Array<protocol::Debugger::SearchMatch>>::toValue(out_result.get()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("result"), out_result, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::setAsyncCallStackDepth(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::setAsyncCallStackDepth(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* maxDepthValue = object ? object->get("maxDepth") : nullptr;
-    errors->setName("maxDepth");
+    protocol::Value* maxDepthValue = params ? params->get("maxDepth") : nullptr;
+    errors->SetName("maxDepth");
     int in_maxDepth = ValueConversions<int>::fromValue(maxDepthValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setAsyncCallStackDepth(in_maxDepth);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Debugger.setAsyncCallStackDepth"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::setBlackboxPatterns(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::setBlackboxPatterns(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* patternsValue = object ? object->get("patterns") : nullptr;
-    errors->setName("patterns");
+    protocol::Value* patternsValue = params ? params->get("patterns") : nullptr;
+    errors->SetName("patterns");
     std::unique_ptr<protocol::Array<String>> in_patterns = ValueConversions<protocol::Array<String>>::fromValue(patternsValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setBlackboxPatterns(std::move(in_patterns));
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Debugger.setBlackboxPatterns"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::setBlackboxedRanges(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::setBlackboxedRanges(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* scriptIdValue = object ? object->get("scriptId") : nullptr;
-    errors->setName("scriptId");
+    protocol::Value* scriptIdValue = params ? params->get("scriptId") : nullptr;
+    errors->SetName("scriptId");
     String in_scriptId = ValueConversions<String>::fromValue(scriptIdValue, errors);
-    protocol::Value* positionsValue = object ? object->get("positions") : nullptr;
-    errors->setName("positions");
+    protocol::Value* positionsValue = params ? params->get("positions") : nullptr;
+    errors->SetName("positions");
     std::unique_ptr<protocol::Array<protocol::Debugger::ScriptPosition>> in_positions = ValueConversions<protocol::Array<protocol::Debugger::ScriptPosition>>::fromValue(positionsValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setBlackboxedRanges(in_scriptId, std::move(in_positions));
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Debugger.setBlackboxedRanges"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::setBreakpoint(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::setBreakpoint(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* locationValue = object ? object->get("location") : nullptr;
-    errors->setName("location");
+    protocol::Value* locationValue = params ? params->get("location") : nullptr;
+    errors->SetName("location");
     std::unique_ptr<protocol::Debugger::Location> in_location = ValueConversions<protocol::Debugger::Location>::fromValue(locationValue, errors);
-    protocol::Value* conditionValue = object ? object->get("condition") : nullptr;
+    protocol::Value* conditionValue = params ? params->get("condition") : nullptr;
     Maybe<String> in_condition;
     if (conditionValue) {
-        errors->setName("condition");
+        errors->SetName("condition");
         in_condition = ValueConversions<String>::fromValue(conditionValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     String out_breakpointId;
     std::unique_ptr<protocol::Debugger::Location> out_actualLocation;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setBreakpoint(std::move(in_location), std::move(in_condition), &out_breakpointId, &out_actualLocation);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Debugger.setBreakpoint"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("breakpointId", ValueConversions<String>::toValue(out_breakpointId));
-        result->setValue("actualLocation", ValueConversions<protocol::Debugger::Location>::toValue(out_actualLocation.get()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("breakpointId"), out_breakpointId, &result);
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("actualLocation"), out_actualLocation, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::setInstrumentationBreakpoint(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::setInstrumentationBreakpoint(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* instrumentationValue = object ? object->get("instrumentation") : nullptr;
-    errors->setName("instrumentation");
+    protocol::Value* instrumentationValue = params ? params->get("instrumentation") : nullptr;
+    errors->SetName("instrumentation");
     String in_instrumentation = ValueConversions<String>::fromValue(instrumentationValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     String out_breakpointId;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setInstrumentationBreakpoint(in_instrumentation, &out_breakpointId);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Debugger.setInstrumentationBreakpoint"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("breakpointId", ValueConversions<String>::toValue(out_breakpointId));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("breakpointId"), out_breakpointId, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::setBreakpointByUrl(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::setBreakpointByUrl(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* lineNumberValue = object ? object->get("lineNumber") : nullptr;
-    errors->setName("lineNumber");
+    protocol::Value* lineNumberValue = params ? params->get("lineNumber") : nullptr;
+    errors->SetName("lineNumber");
     int in_lineNumber = ValueConversions<int>::fromValue(lineNumberValue, errors);
-    protocol::Value* urlValue = object ? object->get("url") : nullptr;
+    protocol::Value* urlValue = params ? params->get("url") : nullptr;
     Maybe<String> in_url;
     if (urlValue) {
-        errors->setName("url");
+        errors->SetName("url");
         in_url = ValueConversions<String>::fromValue(urlValue, errors);
     }
-    protocol::Value* urlRegexValue = object ? object->get("urlRegex") : nullptr;
+    protocol::Value* urlRegexValue = params ? params->get("urlRegex") : nullptr;
     Maybe<String> in_urlRegex;
     if (urlRegexValue) {
-        errors->setName("urlRegex");
+        errors->SetName("urlRegex");
         in_urlRegex = ValueConversions<String>::fromValue(urlRegexValue, errors);
     }
-    protocol::Value* scriptHashValue = object ? object->get("scriptHash") : nullptr;
+    protocol::Value* scriptHashValue = params ? params->get("scriptHash") : nullptr;
     Maybe<String> in_scriptHash;
     if (scriptHashValue) {
-        errors->setName("scriptHash");
+        errors->SetName("scriptHash");
         in_scriptHash = ValueConversions<String>::fromValue(scriptHashValue, errors);
     }
-    protocol::Value* columnNumberValue = object ? object->get("columnNumber") : nullptr;
+    protocol::Value* columnNumberValue = params ? params->get("columnNumber") : nullptr;
     Maybe<int> in_columnNumber;
     if (columnNumberValue) {
-        errors->setName("columnNumber");
+        errors->SetName("columnNumber");
         in_columnNumber = ValueConversions<int>::fromValue(columnNumberValue, errors);
     }
-    protocol::Value* conditionValue = object ? object->get("condition") : nullptr;
+    protocol::Value* conditionValue = params ? params->get("condition") : nullptr;
     Maybe<String> in_condition;
     if (conditionValue) {
-        errors->setName("condition");
+        errors->SetName("condition");
         in_condition = ValueConversions<String>::fromValue(conditionValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     String out_breakpointId;
     std::unique_ptr<protocol::Array<protocol::Debugger::Location>> out_locations;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setBreakpointByUrl(in_lineNumber, std::move(in_url), std::move(in_urlRegex), std::move(in_scriptHash), std::move(in_columnNumber), std::move(in_condition), &out_breakpointId, &out_locations);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Debugger.setBreakpointByUrl"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("breakpointId", ValueConversions<String>::toValue(out_breakpointId));
-        result->setValue("locations", ValueConversions<protocol::Array<protocol::Debugger::Location>>::toValue(out_locations.get()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("breakpointId"), out_breakpointId, &result);
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("locations"), out_locations, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::setBreakpointOnFunctionCall(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::setBreakpointOnFunctionCall(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* objectIdValue = object ? object->get("objectId") : nullptr;
-    errors->setName("objectId");
+    protocol::Value* objectIdValue = params ? params->get("objectId") : nullptr;
+    errors->SetName("objectId");
     String in_objectId = ValueConversions<String>::fromValue(objectIdValue, errors);
-    protocol::Value* conditionValue = object ? object->get("condition") : nullptr;
+    protocol::Value* conditionValue = params ? params->get("condition") : nullptr;
     Maybe<String> in_condition;
     if (conditionValue) {
-        errors->setName("condition");
+        errors->SetName("condition");
         in_condition = ValueConversions<String>::fromValue(conditionValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     String out_breakpointId;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setBreakpointOnFunctionCall(in_objectId, std::move(in_condition), &out_breakpointId);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Debugger.setBreakpointOnFunctionCall"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        result->setValue("breakpointId", ValueConversions<String>::toValue(out_breakpointId));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("breakpointId"), out_breakpointId, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::setBreakpointsActive(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::setBreakpointsActive(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* activeValue = object ? object->get("active") : nullptr;
-    errors->setName("active");
+    protocol::Value* activeValue = params ? params->get("active") : nullptr;
+    errors->SetName("active");
     bool in_active = ValueConversions<bool>::fromValue(activeValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setBreakpointsActive(in_active);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Debugger.setBreakpointsActive"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::setPauseOnExceptions(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::setPauseOnExceptions(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* stateValue = object ? object->get("state") : nullptr;
-    errors->setName("state");
+    protocol::Value* stateValue = params ? params->get("state") : nullptr;
+    errors->SetName("state");
     String in_state = ValueConversions<String>::fromValue(stateValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setPauseOnExceptions(in_state);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Debugger.setPauseOnExceptions"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::setReturnValue(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::setReturnValue(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* newValueValue = object ? object->get("newValue") : nullptr;
-    errors->setName("newValue");
+    protocol::Value* newValueValue = params ? params->get("newValue") : nullptr;
+    errors->SetName("newValue");
     std::unique_ptr<protocol::Runtime::CallArgument> in_newValue = ValueConversions<protocol::Runtime::CallArgument>::fromValue(newValueValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setReturnValue(std::move(in_newValue));
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Debugger.setReturnValue"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::setScriptSource(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::setScriptSource(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* scriptIdValue = object ? object->get("scriptId") : nullptr;
-    errors->setName("scriptId");
+    protocol::Value* scriptIdValue = params ? params->get("scriptId") : nullptr;
+    errors->SetName("scriptId");
     String in_scriptId = ValueConversions<String>::fromValue(scriptIdValue, errors);
-    protocol::Value* scriptSourceValue = object ? object->get("scriptSource") : nullptr;
-    errors->setName("scriptSource");
+    protocol::Value* scriptSourceValue = params ? params->get("scriptSource") : nullptr;
+    errors->SetName("scriptSource");
     String in_scriptSource = ValueConversions<String>::fromValue(scriptSourceValue, errors);
-    protocol::Value* dryRunValue = object ? object->get("dryRun") : nullptr;
+    protocol::Value* dryRunValue = params ? params->get("dryRun") : nullptr;
     Maybe<bool> in_dryRun;
     if (dryRunValue) {
-        errors->setName("dryRun");
+        errors->SetName("dryRun");
         in_dryRun = ValueConversions<bool>::fromValue(dryRunValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     Maybe<protocol::Array<protocol::Debugger::CallFrame>> out_callFrames;
     Maybe<bool> out_stackChanged;
@@ -1758,151 +1974,146 @@ void DispatcherImpl::setScriptSource(int callId, const String& method, const Pro
     Maybe<protocol::Runtime::StackTraceId> out_asyncStackTraceId;
     Maybe<protocol::Runtime::ExceptionDetails> out_exceptionDetails;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setScriptSource(in_scriptId, in_scriptSource, std::move(in_dryRun), &out_callFrames, &out_stackChanged, &out_asyncStackTrace, &out_asyncStackTraceId, &out_exceptionDetails);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Debugger.setScriptSource"), dispatchable.Serialized());
         return;
     }
-    std::unique_ptr<protocol::DictionaryValue> result = DictionaryValue::create();
-    if (response.status() == DispatchResponse::kSuccess) {
-        if (out_callFrames.isJust())
-            result->setValue("callFrames", ValueConversions<protocol::Array<protocol::Debugger::CallFrame>>::toValue(out_callFrames.fromJust()));
-        if (out_stackChanged.isJust())
-            result->setValue("stackChanged", ValueConversions<bool>::toValue(out_stackChanged.fromJust()));
-        if (out_asyncStackTrace.isJust())
-            result->setValue("asyncStackTrace", ValueConversions<protocol::Runtime::StackTrace>::toValue(out_asyncStackTrace.fromJust()));
-        if (out_asyncStackTraceId.isJust())
-            result->setValue("asyncStackTraceId", ValueConversions<protocol::Runtime::StackTraceId>::toValue(out_asyncStackTraceId.fromJust()));
-        if (out_exceptionDetails.isJust())
-            result->setValue("exceptionDetails", ValueConversions<protocol::Runtime::ExceptionDetails>::toValue(out_exceptionDetails.fromJust()));
-    }
-    if (weak->get())
-        weak->get()->sendResponse(callId, response, std::move(result));
+      if (weak->get()) {
+        std::vector<uint8_t> result;
+        if (response.IsSuccess()) {
+          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+          envelope_encoder.EncodeStart(&result);
+          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("callFrames"), out_callFrames, &result);
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("stackChanged"), out_stackChanged, &result);
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("asyncStackTrace"), out_asyncStackTrace, &result);
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("asyncStackTraceId"), out_asyncStackTraceId, &result);
+            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("exceptionDetails"), out_exceptionDetails, &result);
+          result.push_back(v8_crdtp::cbor::EncodeStop());
+          envelope_encoder.EncodeStop(&result);
+        }
+        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
+      }
     return;
 }
 
-void DispatcherImpl::setSkipAllPauses(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::setSkipAllPauses(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* skipValue = object ? object->get("skip") : nullptr;
-    errors->setName("skip");
+    protocol::Value* skipValue = params ? params->get("skip") : nullptr;
+    errors->SetName("skip");
     bool in_skip = ValueConversions<bool>::fromValue(skipValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setSkipAllPauses(in_skip);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Debugger.setSkipAllPauses"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::setVariableValue(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::setVariableValue(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* scopeNumberValue = object ? object->get("scopeNumber") : nullptr;
-    errors->setName("scopeNumber");
+    protocol::Value* scopeNumberValue = params ? params->get("scopeNumber") : nullptr;
+    errors->SetName("scopeNumber");
     int in_scopeNumber = ValueConversions<int>::fromValue(scopeNumberValue, errors);
-    protocol::Value* variableNameValue = object ? object->get("variableName") : nullptr;
-    errors->setName("variableName");
+    protocol::Value* variableNameValue = params ? params->get("variableName") : nullptr;
+    errors->SetName("variableName");
     String in_variableName = ValueConversions<String>::fromValue(variableNameValue, errors);
-    protocol::Value* newValueValue = object ? object->get("newValue") : nullptr;
-    errors->setName("newValue");
+    protocol::Value* newValueValue = params ? params->get("newValue") : nullptr;
+    errors->SetName("newValue");
     std::unique_ptr<protocol::Runtime::CallArgument> in_newValue = ValueConversions<protocol::Runtime::CallArgument>::fromValue(newValueValue, errors);
-    protocol::Value* callFrameIdValue = object ? object->get("callFrameId") : nullptr;
-    errors->setName("callFrameId");
+    protocol::Value* callFrameIdValue = params ? params->get("callFrameId") : nullptr;
+    errors->SetName("callFrameId");
     String in_callFrameId = ValueConversions<String>::fromValue(callFrameIdValue, errors);
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->setVariableValue(in_scopeNumber, in_variableName, std::move(in_newValue), in_callFrameId);
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Debugger.setVariableValue"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::stepInto(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::stepInto(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
-    protocol::DictionaryValue* object = DictionaryValue::cast(requestMessageObject->get("params"));
-    errors->push();
-    protocol::Value* breakOnAsyncCallValue = object ? object->get("breakOnAsyncCall") : nullptr;
+    protocol::Value* breakOnAsyncCallValue = params ? params->get("breakOnAsyncCall") : nullptr;
     Maybe<bool> in_breakOnAsyncCall;
     if (breakOnAsyncCallValue) {
-        errors->setName("breakOnAsyncCall");
+        errors->SetName("breakOnAsyncCall");
         in_breakOnAsyncCall = ValueConversions<bool>::fromValue(breakOnAsyncCallValue, errors);
     }
-    errors->pop();
-    if (errors->hasErrors()) {
-        reportProtocolError(callId, DispatchResponse::kInvalidParams, kInvalidParamsString, errors);
-        return;
-    }
+    if (MaybeReportInvalidParams(dispatchable, *errors)) return;
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->stepInto(std::move(in_breakOnAsyncCall));
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Debugger.stepInto"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::stepOut(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::stepOut(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->stepOut();
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Debugger.stepOut"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
 
-void DispatcherImpl::stepOver(int callId, const String& method, const ProtocolMessage& message, std::unique_ptr<DictionaryValue> requestMessageObject, ErrorSupport* errors)
+void DomainDispatcherImpl::stepOver(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
 
-    std::unique_ptr<DispatcherBase::WeakPtr> weak = weakPtr();
+    std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
     DispatchResponse response = m_backend->stepOver();
-    if (response.status() == DispatchResponse::kFallThrough) {
-        channel()->fallThrough(callId, method, message);
+    if (response.IsFallThrough()) {
+        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("Debugger.stepOver"), dispatchable.Serialized());
         return;
     }
     if (weak->get())
-        weak->get()->sendResponse(callId, response);
+        weak->get()->sendResponse(dispatchable.CallId(), response);
     return;
 }
+
+namespace {
+// This helper method (with a static map of redirects) is used from Dispatcher::wire
+// immediately below.
+const std::vector<std::pair<v8_crdtp::span<uint8_t>, v8_crdtp::span<uint8_t>>>& SortedRedirects() {
+  static auto* redirects = [](){
+    auto* redirects = new std::vector<std::pair<v8_crdtp::span<uint8_t>, v8_crdtp::span<uint8_t>>>{
+    };
+    return redirects;
+  }();
+  return *redirects;
+}
+}  // namespace
 
 // static
 void Dispatcher::wire(UberDispatcher* uber, Backend* backend)
 {
-    std::unique_ptr<DispatcherImpl> dispatcher(new DispatcherImpl(uber->channel(), backend));
-    uber->setupRedirects(dispatcher->redirects());
-    uber->registerBackend("Debugger", std::move(dispatcher));
+    auto dispatcher = std::make_unique<DomainDispatcherImpl>(uber->channel(), backend);
+    uber->WireBackend(v8_crdtp::SpanFrom("Debugger"), SortedRedirects(), std::move(dispatcher));
 }
 
 } // Debugger

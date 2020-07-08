@@ -26,11 +26,17 @@ class CallFrame;
 class Scope;
 class SearchMatch;
 class BreakLocation;
+using ScriptLanguage = String;
 class BreakpointResolvedNotification;
 class PausedNotification;
 using ResumedNotification = Object;
 class ScriptFailedToParseNotification;
 class ScriptParsedNotification;
+
+namespace ScriptLanguageEnum {
+ extern const char JavaScript[];
+ extern const char WebAssembly[];
+} // namespace ScriptLanguageEnum
 
 namespace ContinueToLocation {
 namespace TargetCallFramesEnum {
@@ -90,10 +96,7 @@ public:
     void setColumnNumber(int value) { m_columnNumber = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<Location> clone() const;
 
     template<int STATE>
@@ -175,10 +178,7 @@ public:
     void setColumnNumber(int value) { m_columnNumber = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<ScriptPosition> clone() const;
 
     template<int STATE>
@@ -274,10 +274,7 @@ public:
     void setReturnValue(std::unique_ptr<protocol::Runtime::RemoteObject> value) { m_returnValue = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<CallFrame> clone() const;
 
     template<int STATE>
@@ -404,6 +401,7 @@ public:
         static const char* Script;
         static const char* Eval;
         static const char* Module;
+        static const char* WasmExpressionStack;
     }; // TypeEnum
 
     String getType() { return m_type; }
@@ -425,10 +423,7 @@ public:
     void setEndLocation(std::unique_ptr<protocol::Debugger::Location> value) { m_endLocation = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<Scope> clone() const;
 
     template<int STATE>
@@ -523,13 +518,8 @@ public:
     void setLineContent(const String& value) { m_lineContent = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<SearchMatch> clone() const;
-    std::unique_ptr<StringBuffer> toJSONString() const override;
-    void writeBinary(std::vector<uint8_t>* out) const override;
 
     template<int STATE>
     class SearchMatchBuilder {
@@ -617,10 +607,7 @@ public:
     void setType(const String& value) { m_type = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<BreakLocation> clone() const;
 
     template<int STATE>
@@ -709,10 +696,7 @@ public:
     void setLocation(std::unique_ptr<protocol::Debugger::Location> value) { m_location = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<BreakpointResolvedNotification> clone() const;
 
     template<int STATE>
@@ -820,10 +804,7 @@ public:
     void setAsyncCallStackTraceId(std::unique_ptr<protocol::Runtime::StackTraceId> value) { m_asyncCallStackTraceId = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<PausedNotification> clone() const;
 
     template<int STATE>
@@ -973,11 +954,16 @@ public:
     protocol::Runtime::StackTrace* getStackTrace(protocol::Runtime::StackTrace* defaultValue) { return m_stackTrace.isJust() ? m_stackTrace.fromJust() : defaultValue; }
     void setStackTrace(std::unique_ptr<protocol::Runtime::StackTrace> value) { m_stackTrace = std::move(value); }
 
+    bool hasCodeOffset() { return m_codeOffset.isJust(); }
+    int getCodeOffset(int defaultValue) { return m_codeOffset.isJust() ? m_codeOffset.fromJust() : defaultValue; }
+    void setCodeOffset(int value) { m_codeOffset = value; }
+
+    bool hasScriptLanguage() { return m_scriptLanguage.isJust(); }
+    String getScriptLanguage(const String& defaultValue) { return m_scriptLanguage.isJust() ? m_scriptLanguage.fromJust() : defaultValue; }
+    void setScriptLanguage(const String& value) { m_scriptLanguage = value; }
+
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<ScriptFailedToParseNotification> clone() const;
 
     template<int STATE>
@@ -1088,6 +1074,18 @@ public:
             return *this;
         }
 
+        ScriptFailedToParseNotificationBuilder<STATE>& setCodeOffset(int value)
+        {
+            m_result->setCodeOffset(value);
+            return *this;
+        }
+
+        ScriptFailedToParseNotificationBuilder<STATE>& setScriptLanguage(const String& value)
+        {
+            m_result->setScriptLanguage(value);
+            return *this;
+        }
+
         std::unique_ptr<ScriptFailedToParseNotification> build()
         {
             static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
@@ -1135,6 +1133,8 @@ private:
     Maybe<bool> m_isModule;
     Maybe<int> m_length;
     Maybe<protocol::Runtime::StackTrace> m_stackTrace;
+    Maybe<int> m_codeOffset;
+    Maybe<String> m_scriptLanguage;
 };
 
 
@@ -1197,11 +1197,16 @@ public:
     protocol::Runtime::StackTrace* getStackTrace(protocol::Runtime::StackTrace* defaultValue) { return m_stackTrace.isJust() ? m_stackTrace.fromJust() : defaultValue; }
     void setStackTrace(std::unique_ptr<protocol::Runtime::StackTrace> value) { m_stackTrace = std::move(value); }
 
+    bool hasCodeOffset() { return m_codeOffset.isJust(); }
+    int getCodeOffset(int defaultValue) { return m_codeOffset.isJust() ? m_codeOffset.fromJust() : defaultValue; }
+    void setCodeOffset(int value) { m_codeOffset = value; }
+
+    bool hasScriptLanguage() { return m_scriptLanguage.isJust(); }
+    String getScriptLanguage(const String& defaultValue) { return m_scriptLanguage.isJust() ? m_scriptLanguage.fromJust() : defaultValue; }
+    void setScriptLanguage(const String& value) { m_scriptLanguage = value; }
+
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<ScriptParsedNotification> clone() const;
 
     template<int STATE>
@@ -1318,6 +1323,18 @@ public:
             return *this;
         }
 
+        ScriptParsedNotificationBuilder<STATE>& setCodeOffset(int value)
+        {
+            m_result->setCodeOffset(value);
+            return *this;
+        }
+
+        ScriptParsedNotificationBuilder<STATE>& setScriptLanguage(const String& value)
+        {
+            m_result->setScriptLanguage(value);
+            return *this;
+        }
+
         std::unique_ptr<ScriptParsedNotification> build()
         {
             static_assert(STATE == AllFieldsSet, "state should be AllFieldsSet");
@@ -1366,6 +1383,8 @@ private:
     Maybe<bool> m_isModule;
     Maybe<int> m_length;
     Maybe<protocol::Runtime::StackTrace> m_stackTrace;
+    Maybe<int> m_codeOffset;
+    Maybe<String> m_scriptLanguage;
 };
 
 
@@ -1387,7 +1406,7 @@ public:
     virtual DispatchResponse pauseOnAsyncCall(std::unique_ptr<protocol::Runtime::StackTraceId> in_parentStackTraceId) = 0;
     virtual DispatchResponse removeBreakpoint(const String& in_breakpointId) = 0;
     virtual DispatchResponse restartFrame(const String& in_callFrameId, std::unique_ptr<protocol::Array<protocol::Debugger::CallFrame>>* out_callFrames, Maybe<protocol::Runtime::StackTrace>* out_asyncStackTrace, Maybe<protocol::Runtime::StackTraceId>* out_asyncStackTraceId) = 0;
-    virtual DispatchResponse resume() = 0;
+    virtual DispatchResponse resume(Maybe<bool> in_terminateOnResume) = 0;
     virtual DispatchResponse searchInContent(const String& in_scriptId, const String& in_query, Maybe<bool> in_caseSensitive, Maybe<bool> in_isRegex, std::unique_ptr<protocol::Array<protocol::Debugger::SearchMatch>>* out_result) = 0;
     virtual DispatchResponse setAsyncCallStackDepth(int in_maxDepth) = 0;
     virtual DispatchResponse setBlackboxPatterns(std::unique_ptr<protocol::Array<String>> in_patterns) = 0;
@@ -1412,17 +1431,17 @@ public:
 
 class  Frontend {
 public:
-    explicit Frontend(FrontendChannel* frontendChannel) : m_frontendChannel(frontendChannel) { }
+  explicit Frontend(FrontendChannel* frontend_channel) : frontend_channel_(frontend_channel) {}
     void breakpointResolved(const String& breakpointId, std::unique_ptr<protocol::Debugger::Location> location);
     void paused(std::unique_ptr<protocol::Array<protocol::Debugger::CallFrame>> callFrames, const String& reason, Maybe<protocol::DictionaryValue> data = Maybe<protocol::DictionaryValue>(), Maybe<protocol::Array<String>> hitBreakpoints = Maybe<protocol::Array<String>>(), Maybe<protocol::Runtime::StackTrace> asyncStackTrace = Maybe<protocol::Runtime::StackTrace>(), Maybe<protocol::Runtime::StackTraceId> asyncStackTraceId = Maybe<protocol::Runtime::StackTraceId>(), Maybe<protocol::Runtime::StackTraceId> asyncCallStackTraceId = Maybe<protocol::Runtime::StackTraceId>());
     void resumed();
-    void scriptFailedToParse(const String& scriptId, const String& url, int startLine, int startColumn, int endLine, int endColumn, int executionContextId, const String& hash, Maybe<protocol::DictionaryValue> executionContextAuxData = Maybe<protocol::DictionaryValue>(), Maybe<String> sourceMapURL = Maybe<String>(), Maybe<bool> hasSourceURL = Maybe<bool>(), Maybe<bool> isModule = Maybe<bool>(), Maybe<int> length = Maybe<int>(), Maybe<protocol::Runtime::StackTrace> stackTrace = Maybe<protocol::Runtime::StackTrace>());
-    void scriptParsed(const String& scriptId, const String& url, int startLine, int startColumn, int endLine, int endColumn, int executionContextId, const String& hash, Maybe<protocol::DictionaryValue> executionContextAuxData = Maybe<protocol::DictionaryValue>(), Maybe<bool> isLiveEdit = Maybe<bool>(), Maybe<String> sourceMapURL = Maybe<String>(), Maybe<bool> hasSourceURL = Maybe<bool>(), Maybe<bool> isModule = Maybe<bool>(), Maybe<int> length = Maybe<int>(), Maybe<protocol::Runtime::StackTrace> stackTrace = Maybe<protocol::Runtime::StackTrace>());
+    void scriptFailedToParse(const String& scriptId, const String& url, int startLine, int startColumn, int endLine, int endColumn, int executionContextId, const String& hash, Maybe<protocol::DictionaryValue> executionContextAuxData = Maybe<protocol::DictionaryValue>(), Maybe<String> sourceMapURL = Maybe<String>(), Maybe<bool> hasSourceURL = Maybe<bool>(), Maybe<bool> isModule = Maybe<bool>(), Maybe<int> length = Maybe<int>(), Maybe<protocol::Runtime::StackTrace> stackTrace = Maybe<protocol::Runtime::StackTrace>(), Maybe<int> codeOffset = Maybe<int>(), Maybe<String> scriptLanguage = Maybe<String>());
+    void scriptParsed(const String& scriptId, const String& url, int startLine, int startColumn, int endLine, int endColumn, int executionContextId, const String& hash, Maybe<protocol::DictionaryValue> executionContextAuxData = Maybe<protocol::DictionaryValue>(), Maybe<bool> isLiveEdit = Maybe<bool>(), Maybe<String> sourceMapURL = Maybe<String>(), Maybe<bool> hasSourceURL = Maybe<bool>(), Maybe<bool> isModule = Maybe<bool>(), Maybe<int> length = Maybe<int>(), Maybe<protocol::Runtime::StackTrace> stackTrace = Maybe<protocol::Runtime::StackTrace>(), Maybe<int> codeOffset = Maybe<int>(), Maybe<String> scriptLanguage = Maybe<String>());
 
-    void flush();
-    void sendRawCBORNotification(std::vector<uint8_t>);
-private:
-    FrontendChannel* m_frontendChannel;
+  void flush();
+  void sendRawNotification(std::unique_ptr<Serializable>);
+ private:
+  FrontendChannel* frontend_channel_;
 };
 
 // ------------- Dispatcher.

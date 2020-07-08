@@ -38,7 +38,7 @@ std::string Common::getJSCallErrorMessage(const std::string& functionName, v8::L
 }
 
 protocol::DispatchResponse Common::protocolCommandNotSupportedDispatchResponse() {
-    return protocol::DispatchResponse::Error(s_notImplemented);
+    return protocol::DispatchResponse::ServerError(s_notImplemented);
 }
 
 std::vector<uint16_t> Common::toVector(const std::string &value) {
@@ -51,6 +51,6 @@ std::vector<uint16_t> Common::toVector(const std::string &value) {
     return vector;
 }
 
-const String16 Common::s_notImplemented = "Protocol command not supported.";
+const std::string Common::s_notImplemented = "Protocol command not supported.";
 }
 }

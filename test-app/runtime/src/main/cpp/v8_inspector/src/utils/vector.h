@@ -9,6 +9,7 @@
 #include <cstring>
 #include <iterator>
 #include <memory>
+#include <type_traits>
 
 #include "src/common/checks.h"
 #include "src/common/globals.h"
@@ -71,6 +72,9 @@ class Vector {
   // Returns a pointer to the start of the data in the vector.
   constexpr T* begin() const { return start_; }
 
+  // For consistency with other containers, do also provide a {data} accessor.
+  constexpr T* data() const { return start_; }
+
   // Returns a pointer past the end of the data in the vector.
   constexpr T* end() const { return start_ + length_; }
 
@@ -113,6 +117,14 @@ class Vector {
 
   template <typename S>
   static constexpr Vector<T> cast(Vector<S> input) {
+    // Casting is potentially dangerous, so be really restrictive here. This
+    // might be lifted once we have use cases for that.
+    STATIC_ASSERT(std::is_pod<S>::value);
+    STATIC_ASSERT(std::is_pod<T>::value);
+#if V8_HAS_CXX14_CONSTEXPR
+    DCHECK_EQ(0, (input.length() * sizeof(S)) % sizeof(T));
+    DCHECK_EQ(0, reinterpret_cast<uintptr_t>(input.begin()) % alignof(T));
+#endif
     return Vector<T>(reinterpret_cast<T*>(input.begin()),
                      input.length() * sizeof(S) / sizeof(T));
   }
@@ -195,7 +207,7 @@ class OwnedVector {
   // Allocates a new vector of the specified size via the default allocator.
   static OwnedVector<T> New(size_t size) {
     if (size == 0) return {};
-    return OwnedVector<T>(std::unique_ptr<T[]>(new T[size]), size);
+    return OwnedVector<T>(std::make_unique<T[]>(size), size);
   }
 
   // Allocates a new vector containing the specified collection of values.
@@ -207,7 +219,8 @@ class OwnedVector {
   static OwnedVector<T> Of(const U& collection) {
     Iterator begin = std::begin(collection);
     Iterator end = std::end(collection);
-    OwnedVector<T> vec = New(std::distance(begin, end));
+    using non_const_t = typename std::remove_const<T>::type;
+    auto vec = OwnedVector<non_const_t>::New(std::distance(begin, end));
     std::copy(begin, end, vec.start());
     return vec;
   }

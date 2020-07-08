@@ -13,5 +13,5 @@
     "version": "5.4.1",
     "android": "3.5.3"
   },
-  "android_ndk_version": "21"
+  "android_ndk_version": "21b"
 }

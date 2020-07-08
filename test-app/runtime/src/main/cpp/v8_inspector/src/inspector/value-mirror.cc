@@ -42,17 +42,18 @@ V8InternalValueType v8InternalValueTypeFrom(v8::Local<v8::Context> context,
 Response toProtocolValue(v8::Local<v8::Context> context,
                          v8::Local<v8::Value> value, int maxDepth,
                          std::unique_ptr<protocol::Value>* result) {
-  if (!maxDepth) return Response::Error("Object reference chain is too long");
+  if (!maxDepth)
+    return Response::ServerError("Object reference chain is too long");
   maxDepth--;
 
   if (value->IsNull() || value->IsUndefined()) {
     *result = protocol::Value::null();
-    return Response::OK();
+    return Response::Success();
   }
   if (value->IsBoolean()) {
     *result =
         protocol::FundamentalValue::create(value.As<v8::Boolean>()->Value());
-    return Response::OK();
+    return Response::Success();
   }
   if (value->IsNumber()) {
     double doubleValue = value.As<v8::Number>()->Value();
@@ -62,16 +63,16 @@ Response toProtocolValue(v8::Local<v8::Context> context,
       int intValue = static_cast<int>(doubleValue);
       if (intValue == doubleValue) {
         *result = protocol::FundamentalValue::create(intValue);
-        return Response::OK();
+        return Response::Success();
       }
     }
     *result = protocol::FundamentalValue::create(doubleValue);
-    return Response::OK();
+    return Response::Success();
   }
   if (value->IsString()) {
     *result = protocol::StringValue::create(
         toProtocolString(context->GetIsolate(), value.As<v8::String>()));
-    return Response::OK();
+    return Response::Success();
   }
   if (value->IsArray()) {
     v8::Local<v8::Array> array = value.As<v8::Array>();
@@ -84,11 +85,11 @@ Response toProtocolValue(v8::Local<v8::Context> context,
         return Response::InternalError();
       std::unique_ptr<protocol::Value> element;
       Response response = toProtocolValue(context, value, maxDepth, &element);
-      if (!response.isSuccess()) return response;
+      if (!response.IsSuccess()) return response;
       inspectorArray->pushValue(std::move(element));
     }
     *result = std::move(inspectorArray);
-    return Response::OK();
+    return Response::Success();
   }
   if (value->IsObject()) {
     std::unique_ptr<protocol::DictionaryValue> jsonObject =
@@ -119,21 +120,21 @@ Response toProtocolValue(v8::Local<v8::Context> context,
       std::unique_ptr<protocol::Value> propertyValue;
       Response response =
           toProtocolValue(context, property, maxDepth, &propertyValue);
-      if (!response.isSuccess()) return response;
+      if (!response.IsSuccess()) return response;
       jsonObject->setValue(
           toProtocolString(context->GetIsolate(), propertyName),
           std::move(propertyValue));
     }
     *result = std::move(jsonObject);
-    return Response::OK();
+    return Response::Success();
   }
-  return Response::Error("Object couldn't be returned by value");
+  return Response::ServerError("Object couldn't be returned by value");
 }
 
 Response toProtocolValue(v8::Local<v8::Context> context,
                          v8::Local<v8::Value> value,
                          std::unique_ptr<protocol::Value>* result) {
-  if (value->IsUndefined()) return Response::OK();
+  if (value->IsUndefined()) return Response::Success();
   return toProtocolValue(context, value, 1000, result);
 }
 
@@ -361,7 +362,7 @@ class PrimitiveValueMirror final : public ValueMirror {
                   .build();
     if (m_value->IsNull())
       (*result)->setSubtype(RemoteObject::SubtypeEnum::Null);
-    return Response::OK();
+    return Response::Success();
   }
 
   void buildEntryPreview(
@@ -416,7 +417,7 @@ class NumberMirror final : public ValueMirror {
     } else {
       (*result)->setValue(protocol::FundamentalValue::create(m_value->Value()));
     }
-    return Response::OK();
+    return Response::Success();
   }
   void buildPropertyPreview(
       v8::Local<v8::Context> context, const String16& name,
@@ -470,7 +471,7 @@ class BigIntMirror final : public ValueMirror {
                   .setUnserializableValue(description)
                   .setDescription(description)
                   .build();
-    return Response::OK();
+    return Response::Success();
   }
 
   void buildPropertyPreview(v8::Local<v8::Context> context,
@@ -513,13 +514,13 @@ class SymbolMirror final : public ValueMirror {
       v8::Local<v8::Context> context, WrapMode mode,
       std::unique_ptr<RemoteObject>* result) const override {
     if (mode == WrapMode::kForceValue) {
-      return Response::Error("Object couldn't be returned by value");
+      return Response::ServerError("Object couldn't be returned by value");
     }
     *result = RemoteObject::create()
                   .setType(RemoteObject::TypeEnum::Symbol)
                   .setDescription(descriptionForSymbol(context, m_symbol))
                   .build();
-    return Response::OK();
+    return Response::Success();
   }
 
   void buildPropertyPreview(v8::Local<v8::Context> context,
@@ -576,7 +577,7 @@ class LocationMirror final : public ValueMirror {
                   .setDescription("Object")
                   .setValue(std::move(location))
                   .build();
-    return Response::OK();
+    return Response::Success();
   }
   v8::Local<v8::Value> v8Value() const override { return m_value; }
 
@@ -620,7 +621,7 @@ class FunctionMirror final : public ValueMirror {
     if (mode == WrapMode::kForceValue) {
       std::unique_ptr<protocol::Value> protocolValue;
       Response response = toProtocolValue(context, m_value, &protocolValue);
-      if (!response.isSuccess()) return response;
+      if (!response.IsSuccess()) return response;
       *result = RemoteObject::create()
                     .setType(RemoteObject::TypeEnum::Function)
                     .setValue(std::move(protocolValue))
@@ -633,7 +634,7 @@ class FunctionMirror final : public ValueMirror {
                     .setDescription(descriptionForFunction(context, m_value))
                     .build();
     }
-    return Response::OK();
+    return Response::Success();
   }
 
   void buildPropertyPreview(
@@ -841,7 +842,15 @@ void getPrivatePropertiesForPreview(
   std::vector<String16> whitelist;
   for (auto& mirror : mirrors) {
     std::unique_ptr<PropertyPreview> propertyPreview;
-    mirror.value->buildPropertyPreview(context, mirror.name, &propertyPreview);
+    if (mirror.value) {
+      mirror.value->buildPropertyPreview(context, mirror.name,
+                                         &propertyPreview);
+    } else {
+      propertyPreview = PropertyPreview::create()
+                            .setName(mirror.name)
+                            .setType(PropertyPreview::TypeEnum::Accessor)
+                            .build();
+    }
     if (!propertyPreview) continue;
     if (!*nameLimit) {
       *overflow = true;
@@ -873,7 +882,7 @@ class ObjectMirror final : public ValueMirror {
     if (mode == WrapMode::kForceValue) {
       std::unique_ptr<protocol::Value> protocolValue;
       Response response = toProtocolValue(context, m_value, &protocolValue);
-      if (!response.isSuccess()) return response;
+      if (!response.IsSuccess()) return response;
       *result = RemoteObject::create()
                     .setType(RemoteObject::TypeEnum::Object)
                     .setValue(std::move(protocolValue))
@@ -896,7 +905,7 @@ class ObjectMirror final : public ValueMirror {
         (*result)->setPreview(std::move(previewValue));
       }
     }
-    return Response::OK();
+    return Response::Success();
   }
 
   void buildObjectPreview(
@@ -1415,40 +1424,41 @@ std::vector<PrivatePropertyMirror> ValueMirror::getPrivateProperties(
   v8::TryCatch tryCatch(isolate);
   v8::Local<v8::Array> privateProperties;
 
-  if (!v8::debug::GetPrivateFields(context, object).ToLocal(&privateProperties))
+  std::vector<v8::Local<v8::Value>> names;
+  std::vector<v8::Local<v8::Value>> values;
+  if (!v8::debug::GetPrivateMembers(context, object, &names, &values))
     return mirrors;
 
-  for (uint32_t i = 0; i < privateProperties->Length(); i += 2) {
-    v8::Local<v8::Value> name;
-    if (!privateProperties->Get(context, i).ToLocal(&name)) {
-      tryCatch.Reset();
-      continue;
+  size_t len = values.size();
+  for (size_t i = 0; i < len; i++) {
+    v8::Local<v8::Value> name = names[i];
+    DCHECK(name->IsString());
+    v8::Local<v8::Value> value = values[i];
+
+    std::unique_ptr<ValueMirror> valueMirror;
+    std::unique_ptr<ValueMirror> getterMirror;
+    std::unique_ptr<ValueMirror> setterMirror;
+    if (v8::debug::AccessorPair::IsAccessorPair(value)) {
+      v8::Local<v8::debug::AccessorPair> accessors =
+          value.As<v8::debug::AccessorPair>();
+      v8::Local<v8::Value> getter = accessors->getter();
+
+      v8::Local<v8::Value> setter = accessors->setter();
+      if (!getter->IsNull()) {
+        getterMirror = ValueMirror::create(context, getter);
+      }
+      if (!setter->IsNull()) {
+        setterMirror = ValueMirror::create(context, setter);
+      }
+    } else {
+      valueMirror = ValueMirror::create(context, value);
     }
 
-    // Weirdly, v8::Private is set to be a subclass of v8::Data and
-    // not v8::Value, meaning, we first need to upcast to v8::Data
-    // and then downcast to v8::Private. Changing the hierarchy is a
-    // breaking change now. Not sure if that's possible.
-    //
-    // TODO(gsathya): Add an IsPrivate method to the v8::Private and
-    // assert here.
-    v8::Local<v8::Private> private_field = v8::Local<v8::Private>::Cast(name);
-    v8::Local<v8::Value> private_name = private_field->Name();
-    DCHECK(!private_name->IsUndefined());
-
-    v8::Local<v8::Value> value;
-    if (!privateProperties->Get(context, i + 1).ToLocal(&value)) {
-      tryCatch.Reset();
-      continue;
-    }
-    auto wrapper = ValueMirror::create(context, value);
-    if (wrapper) {
-      mirrors.emplace_back(PrivatePropertyMirror{
-          toProtocolStringWithTypeCheck(context->GetIsolate(), private_name),
-          std::move(wrapper)});
-    }
+    mirrors.emplace_back(PrivatePropertyMirror{
+        toProtocolStringWithTypeCheck(context->GetIsolate(), name),
+        std::move(valueMirror), std::move(getterMirror),
+        std::move(setterMirror)});
   }
-
   return mirrors;
 }
 

@@ -98,7 +98,7 @@ class V8DebuggerAgentImpl : public protocol::Debugger::Backend {
   Response getWasmBytecode(const String16& scriptId,
                            protocol::Binary* bytecode) override;
   Response pause() override;
-  Response resume() override;
+  Response resume(Maybe<bool> terminateOnResume) override;
   Response stepOver() override;
   Response stepInto(Maybe<bool> inBreakOnAsyncCall) override;
   Response stepOut() override;
@@ -177,7 +177,8 @@ class V8DebuggerAgentImpl : public protocol::Debugger::Backend {
   void setBreakpointImpl(const String16& breakpointId,
                          v8::Local<v8::Function> function,
                          v8::Local<v8::String> condition);
-  void removeBreakpointImpl(const String16& breakpointId);
+  void removeBreakpointImpl(const String16& breakpointId,
+                            const std::vector<V8DebuggerScript*>& scripts);
   void clearBreakDetails();
 
   void internalSetAsyncCallStackDepth(int);

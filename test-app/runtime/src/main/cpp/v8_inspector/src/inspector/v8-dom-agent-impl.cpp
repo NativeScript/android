@@ -6,6 +6,7 @@
 #include "v8-dom-agent-impl.h"
 #include <ArgConverter.h>
 #include <Runtime.h>
+#include <v8_inspector/third_party/inspector_protocol/crdtp/json.h>
 #include <v8_inspector/src/inspector/utils/v8-inspector-common.h>
 
 namespace v8_inspector {
@@ -31,26 +32,26 @@ V8DOMAgentImpl::~V8DOMAgentImpl() { }
 
 DispatchResponse V8DOMAgentImpl::enable() {
     if (m_enabled) {
-        return DispatchResponse::OK();
+        return DispatchResponse::Success();
     }
 
     m_state->setBoolean(DOMAgentState::domEnabled, true);
 
     m_enabled = true;
 
-    return DispatchResponse::OK();
+    return DispatchResponse::Success();
 }
 
 DispatchResponse V8DOMAgentImpl::disable() {
     if (!m_enabled) {
-        return DispatchResponse::OK();
+        return DispatchResponse::Success();
     }
 
     m_state->setBoolean(DOMAgentState::domEnabled, false);
 
     m_enabled = false;
 
-    return DispatchResponse::OK();
+    return DispatchResponse::Success();
 }
 
 DispatchResponse V8DOMAgentImpl::getContentQuads(Maybe<int> in_nodeId, Maybe<int> in_backendNodeId, Maybe<String> in_objectId, std::unique_ptr<protocol::Array<protocol::Array<double>>>* out_quads) {
@@ -90,7 +91,7 @@ DispatchResponse V8DOMAgentImpl::getDocument(Maybe<int> in_depth, Maybe<bool> in
                 auto error = utils::Common::getJSCallErrorMessage(getDocumentFunctionString, tc.Message()->Get()).c_str();
 
                 *out_root = std::move(defaultNode);
-                return DispatchResponse::Error(error);
+                return DispatchResponse::ServerError(error);
             }
 
             v8::Local<v8::Value> outResult;
@@ -104,30 +105,33 @@ DispatchResponse V8DOMAgentImpl::getDocument(Maybe<int> in_depth, Maybe<bool> in
                 }
 
                 auto resultUtf16Data = resultString.data();
-
-                auto resultJson = protocol::StringUtil::parseJSON(String16((const uint16_t*) resultUtf16Data));
-
+                String16 resultProtocolString = String16((const uint16_t*) resultUtf16Data);
+                std::vector<uint8_t> cbor;
+                v8_crdtp::json::ConvertJSONToCBOR(v8_crdtp::span<uint16_t>(resultProtocolString.characters16(), resultProtocolString.length()), &cbor);
+                std::unique_ptr<protocol::Value> resultJson = protocol::Value::parseBinary(cbor.data(), cbor.size());
                 protocol::ErrorSupport errorSupport;
-                auto domNode = protocol::DOM::Node::fromValue(resultJson.get(), &errorSupport);
+                std::unique_ptr<protocol::DOM::Node> domNode = protocol::DOM::Node::fromValue(resultJson.get(), &errorSupport);
 
-                auto errorSupportString = errorSupport.errors().utf8();
+                std::vector<uint8_t> json;
+                v8_crdtp::json::ConvertCBORToJSON(errorSupport.Errors(), &json);
+                auto errorSupportString = String16(reinterpret_cast<const char*>(json.data()), json.size()).utf8();
                 if (!errorSupportString.empty()) {
                     auto errorMessage = "Error while parsing debug `DOM Node` object. ";
                     DEBUG_WRITE_FORCE("JS Error: %s, Error support: %s", errorMessage, errorSupportString.c_str());
-                    return DispatchResponse::Error(errorMessage);
+                    return DispatchResponse::ServerError(errorMessage);
                 } else {
                     *out_root = std::move(domNode);
 
-                    return DispatchResponse::OK();
+                    return DispatchResponse::Success();
                 }
             } else {
-                return DispatchResponse::Error("Didn't get a proper result from __getDocument call. Returning empty visual tree.");
+                return DispatchResponse::ServerError("Didn't get a proper result from __getDocument call. Returning empty visual tree.");
             }
         }
     }
 
     *out_root = std::move(defaultNode);
-    return DispatchResponse::Error("Error getting DOM tree.");
+    return DispatchResponse::ServerError("Error getting DOM tree.");
 }
 
 DispatchResponse V8DOMAgentImpl::removeNode(int in_nodeId) {
@@ -153,14 +157,14 @@ DispatchResponse V8DOMAgentImpl::removeNode(int in_nodeId) {
 
             if (tc.HasCaught()) {
                 auto error = utils::Common::getJSCallErrorMessage(removeNodeFunctionString, tc.Message()->Get()).c_str();
-                return DispatchResponse::Error(error);
+                return DispatchResponse::ServerError(error);
             }
 
-            return DispatchResponse::OK();
+            return DispatchResponse::Success();
         }
     }
 
-    return DispatchResponse::Error("Couldn't remove the selected DOMNode from the visual tree. Global Inspector object not found.");
+    return DispatchResponse::ServerError("Couldn't remove the selected DOMNode from the visual tree. Global Inspector object not found.");
 }
 
 DispatchResponse V8DOMAgentImpl::setAttributeValue(int in_nodeId, const String& in_name, const String& in_value) {
@@ -195,14 +199,14 @@ DispatchResponse V8DOMAgentImpl::setAttributesAsText(int in_nodeId, const String
 
             if (tc.HasCaught()) {
                 auto error = utils::Common::getJSCallErrorMessage(setAttributeAsTextFunctionString, tc.Message()->Get()).c_str();
-                return DispatchResponse::Error(error);
+                return DispatchResponse::ServerError(error);
             }
 
-            return DispatchResponse::OK();
+            return DispatchResponse::Success();
         }
     }
 
-    return DispatchResponse::Error("Couldn't change selected DOM node's attribute. Global Inspector object not found.");
+    return DispatchResponse::ServerError("Couldn't change selected DOM node's attribute. Global Inspector object not found.");
 }
 
 DispatchResponse V8DOMAgentImpl::removeAttribute(int in_nodeId, const String& in_name) {

@@ -5,6 +5,7 @@
 #include <sstream>
 #include <ArgConverter.h>
 #include <NativeScriptAssert.h>
+#include <v8_inspector/third_party/inspector_protocol/crdtp/json.h>
 #include "DOMDomainCallbackHandlers.h"
 
 using namespace tns;
@@ -41,14 +42,18 @@ void DOMDomainCallbackHandlers::ChildNodeInsertedCallback(const v8::FunctionCall
         auto node = args[2]->ToString(context).ToLocalChecked();
 
         auto resultString = V8DOMAgentImpl::AddBackendNodeIdProperty(isolate, node);
-        auto resultUtf16Data = resultString.data();
-
-        auto nodeJson = protocol::StringUtil::parseJSON(String16((const uint16_t*) resultUtf16Data));
+        auto nodeUtf16Data = resultString.data();
+        const String16& nodeString16 = String16((const uint16_t*) nodeUtf16Data);
+        std::vector<uint8_t> cbor;
+        v8_crdtp::json::ConvertJSONToCBOR(v8_crdtp::span<uint16_t>(nodeString16.characters16(), nodeString16.length()), &cbor);
+        std::unique_ptr<protocol::Value> protocolNodeJson = protocol::Value::parseBinary(cbor.data(), cbor.size());
 
         protocol::ErrorSupport errorSupport;
-        auto domNode = protocol::DOM::Node::fromValue(nodeJson.get(), &errorSupport);
+        auto domNode = protocol::DOM::Node::fromValue(protocolNodeJson.get(), &errorSupport);
 
-        auto errorSupportString = errorSupport.errors().utf8();
+        std::vector<uint8_t> json;
+        v8_crdtp::json::ConvertCBORToJSON(errorSupport.Errors(), &json);
+        auto errorSupportString = String16(reinterpret_cast<const char*>(json.data()), json.size()).utf8();
         if (!errorSupportString.empty()) {
             auto errorMessage = "Error while parsing debug `DOM Node` object. ";
             DEBUG_WRITE_FORCE("%s Error: %s", errorMessage, errorSupportString.c_str());

@@ -91,10 +91,7 @@ public:
     void setCssGridColor(std::unique_ptr<protocol::DOM::RGBA> value) { m_cssGridColor = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<HighlightConfig> clone() const;
 
     template<int STATE>
@@ -231,10 +228,7 @@ public:
     void setBackendNodeId(int value) { m_backendNodeId = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<InspectNodeRequestedNotification> clone() const;
 
     template<int STATE>
@@ -297,10 +291,7 @@ public:
     void setNodeId(int value) { m_nodeId = value; }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<NodeHighlightRequestedNotification> clone() const;
 
     template<int STATE>
@@ -363,10 +354,7 @@ public:
     void setViewport(std::unique_ptr<protocol::Page::Viewport> value) { m_viewport = std::move(value); }
 
     std::unique_ptr<protocol::DictionaryValue> toValue() const;
-    void AppendSerialized(std::vector<uint8_t>* out) const override {
-        toValue()->AppendSerialized(out);
-    }
-    String toJSON() const { return toValue()->toJSONString(); }
+    void AppendSerialized(std::vector<uint8_t>* out) const override;
     std::unique_ptr<ScreenshotRequestedNotification> clone() const;
 
     template<int STATE>
@@ -448,16 +436,16 @@ public:
 
 class  Frontend {
 public:
-    explicit Frontend(FrontendChannel* frontendChannel) : m_frontendChannel(frontendChannel) { }
+  explicit Frontend(FrontendChannel* frontend_channel) : frontend_channel_(frontend_channel) {}
     void inspectNodeRequested(int backendNodeId);
     void nodeHighlightRequested(int nodeId);
     void screenshotRequested(std::unique_ptr<protocol::Page::Viewport> viewport);
     void inspectModeCanceled();
 
-    void flush();
-    void sendRawCBORNotification(std::vector<uint8_t>);
-private:
-    FrontendChannel* m_frontendChannel;
+  void flush();
+  void sendRawNotification(std::unique_ptr<Serializable>);
+ private:
+  FrontendChannel* frontend_channel_;
 };
 
 // ------------- Dispatcher.
