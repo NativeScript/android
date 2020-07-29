@@ -367,6 +367,11 @@ public class Runtime {
     }
 
     private static class WorkerThreadHandler extends Handler {
+
+        WorkerThreadHandler(Looper looper){
+            super(looper);
+        }
+
         @Override
         public void handleMessage(Message msg) {
             Runtime currentRuntime = Runtime.getCurrentRuntime();
@@ -439,14 +444,14 @@ public class Runtime {
         }
 
         public void startRuntime() {
-            Handler handler = new Handler(this.getLooper());
+            final Handler handler = new Handler(this.getLooper());
 
             handler.post((new Runnable() {
                 @Override
                 public void run() {
                     Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND);
 
-                    WorkThreadScheduler workThreadScheduler = new WorkThreadScheduler(new WorkerThreadHandler());
+                    WorkThreadScheduler workThreadScheduler = new WorkThreadScheduler(new WorkerThreadHandler(handler.getLooper()));
 
                     DynamicConfiguration dynamicConfiguration = new DynamicConfiguration(workerId, workThreadScheduler, mainThreadScheduler, callingJsDir);
 
