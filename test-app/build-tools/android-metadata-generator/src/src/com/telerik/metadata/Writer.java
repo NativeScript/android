@@ -124,14 +124,16 @@ public class Writer {
             writeTreeNodeId(extensionFunction.declaringType, writer);
         }
 
-        int len = writeLength(n.instanceMethods.size(), writer);
+        List<MethodInfo> instanceMethods = n.getInstanceMethods();
+        int len = writeLength(instanceMethods.size(), writer);
         for (int i = 0; i < len; i++) {
-            writeMethodInfo(n.instanceMethods.get(i), stringsMap, writer);
+            writeMethodInfo(instanceMethods.get(i), stringsMap, writer);
         }
 
-        len = writeLength(n.instanceFields.size(), writer);
+        List<FieldInfo> instanceFields = n.getInstanceFields();
+        len = writeLength(instanceFields.size(), writer);
         for (int i = 0; i < len; i++) {
-            FieldInfo fi = n.instanceFields.get(i);
+            FieldInfo fi = instanceFields.get(i);
             int pos = stringsMap.get(fi.name).intValue(); // get start position
             // of the name
             writeInt(pos, writer); // write start position of the name of the
@@ -169,16 +171,18 @@ public class Writer {
             }
         }
 
-        len = writeLength(n.staticMethods.size(), writer);
+        List<MethodInfo> staticMethods = n.getStaticMethods();
+        len = writeLength(staticMethods.size(), writer);
         for (int i = 0; i < len; i++) {
-            MethodInfo mi = n.staticMethods.get(i);
+            MethodInfo mi = staticMethods.get(i);
             writeMethodInfo(mi, stringsMap, writer);
             writeTreeNodeId(mi.declaringType, writer);
         }
 
-        len = writeLength(n.staticFields.size(), writer);
+        List<FieldInfo> staticFields = n.getStaticFields();
+        len = writeLength(staticFields.size(), writer);
         for (int i = 0; i < len; i++) {
-            FieldInfo fi = n.staticFields.get(i);
+            FieldInfo fi = staticFields.get(i);
             int pos = stringsMap.get(fi.name).intValue();
             writeInt(pos, writer);
             writeTreeNodeId(fi.valueType, writer);
@@ -223,26 +227,30 @@ public class Writer {
 
             if (((n.nodeType & TreeNode.Interface) == TreeNode.Interface)
                     || ((n.nodeType & TreeNode.Class) == TreeNode.Class)) {
-                for (int i = 0; i < n.instanceMethods.size(); i++) {
-                    name = n.instanceMethods.get(i).name;
+                List<MethodInfo> instanceMethods = n.getInstanceMethods();
+                for (int i = 0; i < instanceMethods.size(); i++) {
+                    name = instanceMethods.get(i).name;
                     if (!uniqueStrings.containsKey(name)) {
                         writeUniqueName(name, uniqueStrings, outStringsStream);
                     }
                 }
-                for (int i = 0; i < n.staticMethods.size(); i++) {
-                    name = n.staticMethods.get(i).name;
+                List<MethodInfo> staticMethods = n.getStaticMethods();
+                for (int i = 0; i < staticMethods.size(); i++) {
+                    name = staticMethods.get(i).name;
                     if (!uniqueStrings.containsKey(name)) {
                         writeUniqueName(name, uniqueStrings, outStringsStream);
                     }
                 }
-                for (int i = 0; i < n.instanceFields.size(); i++) {
-                    name = n.instanceFields.get(i).name;
+                List<FieldInfo> instanceFields = n.getInstanceFields();
+                for (int i = 0; i < instanceFields.size(); i++) {
+                    name = instanceFields.get(i).name;
                     if (!uniqueStrings.containsKey(name)) {
                         writeUniqueName(name, uniqueStrings, outStringsStream);
                     }
                 }
-                for (int i = 0; i < n.staticFields.size(); i++) {
-                    name = n.staticFields.get(i).name;
+                List<FieldInfo> staticFields = n.getStaticFields();
+                for (int i = 0; i < staticFields.size(); i++) {
+                    name = staticFields.get(i).name;
                     if (!uniqueStrings.containsKey(name)) {
                         writeUniqueName(name, uniqueStrings, outStringsStream);
                     }

@@ -14,9 +14,12 @@ import java.security.InvalidParameterException;
 import java.util.ArrayList;
 import java.util.List;
 
+import static java.lang.System.exit;
+
 public class Generator {
 
     private static final String VERBOSE_FLAG_NAME = "verbose";
+    private static final String SKIP_FLAG_NAME = "skip";
     private static final String ANALYTICS_ARGUMENT_BEGINNING = "analyticsFilePath=";
     private static final String MDG_OUTPUT_DIR = "mdg-output-dir.txt";
     private static final String MDG_JAVA_DEPENDENCIES = "mdg-java-dependencies.txt";
@@ -61,7 +64,7 @@ public class Generator {
         } catch (Throwable ex) {
             System.err.println(String.format("Error executing Metadata Generator: %s", ex.getMessage()));
             ex.printStackTrace(System.out);
-            System.exit(1);
+            exit(1);
         }
     }
 
@@ -72,6 +75,9 @@ public class Generator {
                 AnalyticsConfiguration.enableAnalytics(filePath);
             } else if (VERBOSE_FLAG_NAME.equals(arg)) {
                 MetadataFilterConsoleLogger.INSTANCE.setEnabled(true);
+            } else if (SKIP_FLAG_NAME.equals(arg)) {
+                System.out.println("Skipping metadata generation: skip flag used.");
+                exit(0);
             }
         }
     }

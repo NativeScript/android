@@ -98,6 +98,14 @@ public class Builder {
             }
         }
 
+        System.out.println("Added   Properties "+TreeNode.addedProperties);
+        System.out.println("Ignored Properties "+TreeNode.skippedProperties+" duplicates.");
+        System.out.println("Added   Methods "+TreeNode.addedMethods);
+        System.out.println("Ignored Methods "+TreeNode.skippedMethods+" duplicates.");
+        System.out.println("Added   Fields "+TreeNode.addedFields);
+        System.out.println("Ignored Fields "+TreeNode.skippedFields+" duplicates.");
+
+
 
         return root;
     }
@@ -161,7 +169,7 @@ public class Builder {
         node.setWentThroughSettingMembers(true);
 
         Map<String, MethodInfo> existingMethods = new HashMap<>();
-        for (MethodInfo mi : node.instanceMethods) {
+        for (MethodInfo mi : node.getInstanceMethods()) {
             existingMethods.put(mi.name + mi.sig, mi);
         }
         NativeMethodDescriptor[] extensionFunctions = ExtensionFunctionsStorage.getInstance().retrieveFunctions(clazz.getClassName()).toArray(new NativeMethodDescriptor[0]);
@@ -228,7 +236,7 @@ public class Builder {
                     if (isStatic) {
                         if (!mi.isExtensionFunction) {
                             mi.declaringType = getOrCreateNode(root, clazz, null);
-                            node.staticMethods.add(mi);
+                            node.addStaticFunction(mi);
                         } else {
                             mi.declaringType = getOrCreateNode(root, ownMethod.getDeclaringClass(), null);
                             node.addExtensionFunction(mi);
@@ -238,13 +246,10 @@ public class Builder {
                         if (existingNodeMethods.containsKey(sig)) {
                             continue;
                         }
-                        node.instanceMethods.add(mi);
+                        node.addInstanceMethod(mi);
                     }
                 }
 
-                if (mi.isResolved) {
-                    node.resolvedMethods.add(mi);
-                }
             }
         }
 
@@ -301,9 +306,9 @@ public class Builder {
                     } else {
                         fi.declaringType = getOrCreateNode(root, clazz, null);
                     }
-                    node.staticFields.add(fi);
+                    node.addStaticField(fi);
                 } else {
-                    node.instanceFields.add(fi);
+                    node.addInstanceField(fi);
                 }
             }
         }
