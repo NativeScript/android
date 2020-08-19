@@ -529,15 +529,20 @@ vector<MetadataNode::MethodCallbackData *> MetadataNode::SetInstanceMethodsFromS
         auto entry = s_metadataReader.ReadExtensionFunctionEntry(&curPtr);
 
         if (entry.name != lastMethodName) {
-            callbackData = new MethodCallbackData(this);
-            auto funcData = External::New(isolate, callbackData);
-            auto funcTemplate = FunctionTemplate::New(isolate, MethodCallback, funcData);
-            auto funcName = ArgConverter::ConvertToV8String(isolate, entry.name);
-            prototypeTemplate->Set(funcName, funcTemplate);
+            //
+            callbackData = tryGetExtensionMethodCallbackData(collectedExtensionMethodDatas,
+                                                             entry.name);
+            if (callbackData == nullptr) {
+                callbackData = new MethodCallbackData(this);
+                auto funcData = External::New(isolate, callbackData);
+                auto funcTemplate = FunctionTemplate::New(isolate, MethodCallback, funcData);
+                auto funcName = ArgConverter::ConvertToV8String(isolate, entry.name);
+                prototypeTemplate->Set(funcName, funcTemplate);
 
-            lastMethodName = entry.name;
-            std::pair<std::string, MethodCallbackData *> p(entry.name, callbackData);
-            collectedExtensionMethodDatas.insert(p);
+                lastMethodName = entry.name;
+                std::pair<std::string, MethodCallbackData *> p(entry.name, callbackData);
+                collectedExtensionMethodDatas.insert(p);
+            }
         }
         callbackData->candidates.push_back(entry);
     }
@@ -552,10 +557,15 @@ vector<MetadataNode::MethodCallbackData *> MetadataNode::SetInstanceMethodsFromS
 
         // attach a function to the prototype of a javascript Object
         if (entry.name != lastMethodName) {
+            // See if we have tracked the callback data before (meaning another version of entry.name exists with different parameters)
             callbackData = tryGetExtensionMethodCallbackData(collectedExtensionMethodDatas,
                                                              entry.name);
             if (callbackData == nullptr) {
                 callbackData = new MethodCallbackData(this);
+
+                // If we have no tracking of this callback data, create tracking so that we can find it if need be for future itterations where the entry.name is the same...
+                std::pair<std::string, MethodCallbackData *> p(entry.name, callbackData);
+                collectedExtensionMethodDatas.insert(p);
             }
 
             instanceMethodData.push_back(callbackData);

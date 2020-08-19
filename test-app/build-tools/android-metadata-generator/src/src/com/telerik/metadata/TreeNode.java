@@ -10,6 +10,13 @@ import java.util.List;
 import java.util.Optional;
 
 public class TreeNode {
+    public static int skippedMethods=0;
+    public static int skippedProperties=0;
+    public static int skippedFields=0;
+    public static int addedMethods=0;
+    public static int addedProperties=0;
+    public static int addedFields=0;
+
     public static class MethodInfo {
         public MethodInfo(NativeMethodDescriptor m) {
             this.name = m.getName();
@@ -97,7 +104,7 @@ public class TreeNode {
         staticFields = new ArrayList<>();
         properties = new ArrayList<>();
         extensionFunctions = new ArrayList<>();
-        resolvedMethods = new ArrayList<>();
+        //resolvedMethods = new ArrayList<>();
     }
 
     public static final TreeNode BYTE = getPrimitive("B", (byte) 1);
@@ -222,40 +229,155 @@ public class TreeNode {
     //
     public TreeNode arrayElement;
     //
-    public ArrayList<MethodInfo> instanceMethods;
-    public ArrayList<MethodInfo> staticMethods;
-    public ArrayList<FieldInfo> instanceFields;
-    public ArrayList<FieldInfo> staticFields;
-    ArrayList<PropertyInfo> properties;
-    ArrayList<MethodInfo> extensionFunctions;
-    ArrayList<MethodInfo> resolvedMethods;
+    private ArrayList<MethodInfo> instanceMethods;
+    private ArrayList<MethodInfo> staticMethods;
+    private ArrayList<FieldInfo> instanceFields;
+    private ArrayList<FieldInfo> staticFields;
+    private ArrayList<PropertyInfo> properties;
+    private ArrayList<MethodInfo> extensionFunctions;
+    //private ArrayList<MethodInfo> resolvedMethods;
     public TreeNode baseClassNode;
     TreeNode parentNode;
     //
 
     void addProperty(PropertyInfo propertyInfo) {
+        for (int i=0;i<properties.size();i++) {
+            PropertyInfo pi = properties.get(i);
+            if (pi.propertyName.equals(propertyInfo.propertyName)) {
+                if (pi.getterMethod != null || propertyInfo.getterMethod != null) {
+                    if (pi.getterMethod != null && propertyInfo.getterMethod != null) {
+                        if (pi.getterMethod.sig != propertyInfo.getterMethod.sig) {
+                            continue;
+                        }
+                    } else {
+                        continue;
+                    }
+                }
+                if (pi.setterMethod != null || propertyInfo.setterMethod != null) {
+                    if (pi.setterMethod != null && propertyInfo.setterMethod != null) {
+                        if (pi.setterMethod.sig != propertyInfo.setterMethod.sig) {
+                            continue;
+                        }
+                    } else {
+                        continue;
+                    }
+                }
+                skippedProperties++;
+                return;
+            }
+        }
         properties.add(propertyInfo);
+        addedProperties++;
+    }
+
+    void addStaticField(FieldInfo fieldInfo) {
+        for (int i=0;i<staticFields.size();i++) {
+            FieldInfo fi = staticFields.get(i);
+            if (fi.name.equals(fieldInfo.name) && fi.isFinalType == fieldInfo.isFinalType) {
+                if (fi.declaringType == fieldInfo.declaringType && fi.valueType == fieldInfo.valueType) {
+                    skippedFields++;
+                    return;
+                }
+            }
+        }
+        staticFields.add(fieldInfo);
+        addedFields++;
+    }
+
+
+    void addInstanceField(FieldInfo fieldInfo) {
+        for (int i=0;i<instanceFields.size();i++) {
+            FieldInfo fi = instanceFields.get(i);
+            if (fi.name.equals(fieldInfo.name) && fi.isFinalType == fieldInfo.isFinalType) {
+                if (fi.declaringType == fieldInfo.declaringType && fi.valueType == fieldInfo.valueType) {
+                    skippedFields++;
+                    return;
+                }
+            }
+        }
+        instanceFields.add(fieldInfo);
+        addedFields++;
     }
 
     void addExtensionFunction(MethodInfo methodInfo) {
+        for (int i=0;i<extensionFunctions.size();i++) {
+            MethodInfo mi = extensionFunctions.get(i);
+            if (mi.name.equals(methodInfo.name) && mi.sig.equals(methodInfo.sig)) {
+                if (mi.isResolved == methodInfo.isResolved) {
+                    if (mi.declaringType == methodInfo.declaringType) {
+                        skippedMethods++;
+                        return;
+                    }
+                }
+            }
+        }
         extensionFunctions.add(methodInfo);
+        addedMethods++;
+    }
+
+    void addStaticFunction(MethodInfo methodInfo) {
+        for (int i=0;i<staticMethods.size();i++) {
+            MethodInfo mi = staticMethods.get(i);
+            if (mi.name.equals(methodInfo.name) && mi.sig.equals(methodInfo.sig)) {
+                if (mi.isResolved == methodInfo.isResolved) {
+                    if (mi.declaringType == methodInfo.declaringType) {
+                        skippedMethods++;
+                        return;
+                    }
+                }
+            }
+        }
+        this.staticMethods.add(methodInfo);
+        addedMethods++;
+    }
+
+    void addInstanceMethod(MethodInfo methodInfo) {
+        for (int i=0;i<instanceMethods.size();i++) {
+            MethodInfo mi = instanceMethods.get(i);
+            if (mi.name.equals(methodInfo.name) && mi.sig.equals(methodInfo.sig)) {
+                if (mi.isResolved == methodInfo.isResolved) {
+                    if (mi.declaringType == methodInfo.declaringType) {
+                        skippedMethods++;
+                        return;
+                    }
+                }
+            }
+        }
+        instanceMethods.add(methodInfo);
+        addedMethods++;
     }
 
     List<PropertyInfo> getProperties() {
         return properties;
     }
 
+    List<FieldInfo> getInstanceFields() {
+        return instanceFields;
+    }
+
+    List<FieldInfo> getStaticFields() {
+        return staticFields;
+    }
+
     List<MethodInfo> getExtensionFunctions() {
         return extensionFunctions;
     }
 
-    void addResolvedMethod(MethodInfo resolvedMethod) {
+    List<MethodInfo> getInstanceMethods() {
+        return instanceMethods;
+    }
+
+    List<MethodInfo> getStaticMethods() {
+        return staticMethods;
+    }
+
+/*    void addResolvedMethod(MethodInfo resolvedMethod) {
         resolvedMethods.add(resolvedMethod);
     }
 
     List<MethodInfo> getResolvedMethods() {
         return resolvedMethods;
-    }
+    } */
 
     private boolean wentThroughSettingMembers = false;
 
