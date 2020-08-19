@@ -76,7 +76,7 @@ public class Generator {
             } else if (VERBOSE_FLAG_NAME.equals(arg)) {
                 MetadataFilterConsoleLogger.INSTANCE.setEnabled(true);
             } else if (SKIP_FLAG_NAME.equals(arg)) {
-                System.out.println("Exiting");
+                System.out.println("Skipping metadata generation: skip flag used.");
                 exit(0);
             }
         }
