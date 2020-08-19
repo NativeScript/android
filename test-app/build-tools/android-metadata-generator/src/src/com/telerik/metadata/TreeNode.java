@@ -104,7 +104,6 @@ public class TreeNode {
         staticFields = new ArrayList<>();
         properties = new ArrayList<>();
         extensionFunctions = new ArrayList<>();
-        //resolvedMethods = new ArrayList<>();
     }
 
     public static final TreeNode BYTE = getPrimitive("B", (byte) 1);
@@ -235,7 +234,6 @@ public class TreeNode {
     private ArrayList<FieldInfo> staticFields;
     private ArrayList<PropertyInfo> properties;
     private ArrayList<MethodInfo> extensionFunctions;
-    //private ArrayList<MethodInfo> resolvedMethods;
     public TreeNode baseClassNode;
     TreeNode parentNode;
     //
@@ -370,14 +368,6 @@ public class TreeNode {
     List<MethodInfo> getStaticMethods() {
         return staticMethods;
     }
-
-/*    void addResolvedMethod(MethodInfo resolvedMethod) {
-        resolvedMethods.add(resolvedMethod);
-    }
-
-    List<MethodInfo> getResolvedMethods() {
-        return resolvedMethods;
-    } */
 
     private boolean wentThroughSettingMembers = false;
 

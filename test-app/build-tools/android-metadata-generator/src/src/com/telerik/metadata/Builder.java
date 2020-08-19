@@ -250,9 +250,6 @@ public class Builder {
                     }
                 }
 
-                /* if (mi.isResolved) {
-                    node.addResolvedMethod(mi);
-                } */
             }
         }
 
