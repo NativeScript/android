@@ -93,17 +93,17 @@ int Runtime::GetAndroidVersion() {
 }
 
 Runtime::Runtime(JNIEnv* env, jobject runtime, int id)
-    : m_env(env), m_id(id), m_isolate(nullptr), m_lastUsedMemory(0), m_gcFunc(nullptr), m_runGC(false) {
-    m_runtime = m_env.NewGlobalRef(runtime);
+    : m_id(id), m_isolate(nullptr), m_lastUsedMemory(0), m_gcFunc(nullptr), m_runGC(false) {
+    m_runtime = env->NewGlobalRef(runtime);
     m_objectManager = new ObjectManager(m_runtime);
     m_loopTimer = new MessageLoopTimer();
     s_id2RuntimeCache.insert(make_pair(id, this));
 
     if (GET_USED_MEMORY_METHOD_ID == nullptr) {
-        auto RUNTIME_CLASS = m_env.FindClass("com/tns/Runtime");
+        auto RUNTIME_CLASS = env->FindClass("com/tns/Runtime");
         assert(RUNTIME_CLASS != nullptr);
 
-        GET_USED_MEMORY_METHOD_ID = m_env.GetMethodID(RUNTIME_CLASS, "getUsedMemory", "()J");
+        GET_USED_MEMORY_METHOD_ID = env->GetMethodID(RUNTIME_CLASS, "getUsedMemory", "()J");
         assert(GET_USED_MEMORY_METHOD_ID != nullptr);
     }
 }
@@ -172,10 +172,10 @@ void Runtime::Init(JNIEnv* _env, jobject obj, int runtimeId, jstring filesPath, 
 
     auto enableLog = verboseLoggingEnabled == JNI_TRUE;
 
-    runtime->Init(filesPath, nativeLibDir, enableLog, isDebuggable, packageName, args, callingDir, maxLogcatObjectSize, forceLog);
+    runtime->Init(env, filesPath, nativeLibDir, enableLog, isDebuggable, packageName, args, callingDir, maxLogcatObjectSize, forceLog);
 }
 
-void Runtime::Init(jstring filesPath, jstring nativeLibDir, bool verboseLoggingEnabled, bool isDebuggable, jstring packageName, jobjectArray args, jstring callingDir, int maxLogcatObjectSize, bool forceLog) {
+void Runtime::Init(JNIEnv* env, jstring filesPath, jstring nativeLibDir, bool verboseLoggingEnabled, bool isDebuggable, jstring packageName, jobjectArray args, jstring callingDir, int maxLogcatObjectSize, bool forceLog) {
     LogEnabled = verboseLoggingEnabled;
 
     auto filesRoot = ArgConverter::jstringToString(filesPath);
@@ -185,15 +185,15 @@ void Runtime::Init(jstring filesPath, jstring nativeLibDir, bool verboseLoggingE
 
     Constants::APP_ROOT_FOLDER_PATH = filesRoot + "/app/";
     // read config options passed from Java
-    JniLocalRef v8Flags(m_env.GetObjectArrayElement(args, 0));
+    JniLocalRef v8Flags(env->GetObjectArrayElement(args, 0));
     Constants::V8_STARTUP_FLAGS = ArgConverter::jstringToString(v8Flags);
-    JniLocalRef cacheCode(m_env.GetObjectArrayElement(args, 1));
+    JniLocalRef cacheCode(env->GetObjectArrayElement(args, 1));
     Constants::V8_CACHE_COMPILED_CODE = (bool) cacheCode;
-    JniLocalRef snapshotScript(m_env.GetObjectArrayElement(args, 2));
+    JniLocalRef snapshotScript(env->GetObjectArrayElement(args, 2));
     Constants::V8_HEAP_SNAPSHOT_SCRIPT = ArgConverter::jstringToString(snapshotScript);
-    JniLocalRef snapshotBlob(m_env.GetObjectArrayElement(args, 3));
+    JniLocalRef snapshotBlob(env->GetObjectArrayElement(args, 3));
     Constants::V8_HEAP_SNAPSHOT_BLOB = ArgConverter::jstringToString(snapshotBlob);
-    JniLocalRef profilerOutputDir(m_env.GetObjectArrayElement(args, 4));
+    JniLocalRef profilerOutputDir(env->GetObjectArrayElement(args, 4));
 
     DEBUG_WRITE("Initializing Telerik NativeScript");
 
@@ -234,13 +234,15 @@ void Runtime::RunModule(JNIEnv* _env, jobject obj, jstring scriptFile) {
     JEnv env(_env);
 
     string filePath = ArgConverter::jstringToString(scriptFile);
-    m_module.Load(filePath);
+    auto context = this->GetContext();
+    m_module.Load(context, filePath);
 }
 
 void Runtime::RunWorker(jstring scriptFile) {
     // TODO: Pete: Why do I crash here with a JNI error (accessing bad jni)
     string filePath = ArgConverter::jstringToString(scriptFile);
-    m_module.LoadWorker(filePath);
+    auto context = this->GetContext();
+    m_module.LoadWorker(context, filePath);
 }
 
 jobject Runtime::RunScript(JNIEnv* _env, jobject obj, jstring scriptFile) {
@@ -248,7 +250,7 @@ jobject Runtime::RunScript(JNIEnv* _env, jobject obj, jstring scriptFile) {
     jobject res = nullptr;
 
     auto isolate = m_isolate;
-    auto context = isolate->GetCurrentContext();
+    auto context = this->GetContext();
 
     auto filename = ArgConverter::jstringToString(scriptFile);
     auto src = ReadFileText(filename);
@@ -358,7 +360,8 @@ jint Runtime::GenerateNewObjectId(JNIEnv* env, jobject obj) {
 }
 
 void Runtime::AdjustAmountOfExternalAllocatedMemory() {
-    int64_t usedMemory = m_env.CallLongMethod(m_runtime, GET_USED_MEMORY_METHOD_ID);
+    JEnv env;
+    int64_t usedMemory = env.CallLongMethod(m_runtime, GET_USED_MEMORY_METHOD_ID);
     int64_t changeInBytes = usedMemory - m_lastUsedMemory;
     int64_t externalMemory = 0;
 
@@ -588,6 +591,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
     isolateFrame.log("Isolate.New");
 
     s_isolate2RuntimesCache.insert(make_pair(isolate, this));
+    v8::Locker locker(isolate);
     Isolate::Scope isolate_scope(isolate);
     HandleScope handleScope(isolate);
 
@@ -700,7 +704,7 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
      */
     global->DefineOwnProperty(context, ArgConverter::ConvertToV8String(isolate, "console"), console, readOnlyFlags);
 
-    ArgConverter::Init(isolate);
+    ArgConverter::Init(context);
 
     CallbackHandlers::Init(isolate);
 
@@ -718,9 +722,11 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 
     ArrayHelper::Init(context);
 
-    m_arrayBufferHelper.CreateConvertFunctions(isolate, global, m_objectManager);
+    m_arrayBufferHelper.CreateConvertFunctions(context, global, m_objectManager);
 
     m_loopTimer->Init(context);
+
+    this->m_context = new Persistent<Context>(isolate, context);
 
     s_mainThreadInitialized = true;
 
@@ -728,7 +734,8 @@ Isolate* Runtime::PrepareV8Runtime(const string& filesPath, const string& native
 }
 
 jobject Runtime::ConvertJsValueToJavaObject(JEnv& env, const Local<Value>& value, int classReturnType) {
-    JsArgToArrayConverter argConverter(m_isolate, value, false/*is implementation object*/, classReturnType);
+    auto context = this->GetContext();
+    JsArgToArrayConverter argConverter(context, value, false/*is implementation object*/, classReturnType);
     jobject jr = argConverter.GetConvertedArg();
     jobject javaResult = nullptr;
     if (jr != nullptr) {
@@ -802,6 +809,14 @@ bool Runtime::RunExtraCode(Isolate* isolate, Local<Context> context, const char*
 void Runtime::DestroyRuntime() {
     s_id2RuntimeCache.erase(m_id);
     s_isolate2RuntimesCache.erase(m_isolate);
+}
+
+Local<Context> Runtime::GetContext() {
+    return this->m_context->Get(this->m_isolate);
+}
+
+int Runtime::GetId() {
+    return this->m_id;
 }
 
 JavaVM* Runtime::s_jvm = nullptr;

@@ -21,6 +21,7 @@ shared.runWeakRefTests();
 shared.runRuntimeTests();
 shared.runWorkerTests();
 require("./tests/testWebAssembly");
+require("./tests/testMultithreadedJavascript");
 require("./tests/testInterfaceDefaultMethods");
 require("./tests/testInterfaceStaticMethods");
 require("./tests/testMetadata");

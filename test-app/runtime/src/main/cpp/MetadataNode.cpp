@@ -77,7 +77,7 @@ Local<Object> MetadataNode::CreateExtendedJSWrapper(Isolate* isolate, ObjectMana
         extInstance = objectManager->GetEmptyObject(isolate);
         extInstance->SetInternalField(static_cast<int>(ObjectManager::MetadataNodeKeys::CallSuper), True(isolate));
         auto extdCtorFunc = Local<Function>::New(isolate, *cacheData.extendedCtorFunction);
-        auto context = isolate->GetCurrentContext();
+        auto context = Runtime::GetRuntime(isolate)->GetContext();
         extInstance->SetPrototype(context, extdCtorFunc->Get(context, V8StringConstants::GetPrototype(isolate)).ToLocalChecked());
         extInstance->Set(context, ArgConverter::ConvertToV8String(isolate, "constructor"), extdCtorFunc);
 
@@ -1248,10 +1248,11 @@ void MetadataNode::ArrayIndexedPropertyGetterCallback(uint32_t index, const Prop
     try {
         auto thiz = info.This();
         auto isolate = info.GetIsolate();
+        auto context = isolate->GetCurrentContext();
 
         auto node = GetNodeFromHandle(thiz);
 
-        auto element = CallbackHandlers::GetArrayElement(isolate, thiz, index, node->m_name);
+        auto element = CallbackHandlers::GetArrayElement(context, thiz, index, node->m_name);
 
         info.GetReturnValue().Set(element);
     } catch (NativeScriptException& e) {
@@ -1271,10 +1272,11 @@ void MetadataNode::ArrayIndexedPropertySetterCallback(uint32_t index, Local<Valu
     try {
         auto thiz = info.This();
         auto isolate = info.GetIsolate();
+        auto context = isolate->GetCurrentContext();
 
         auto node = GetNodeFromHandle(thiz);
 
-        CallbackHandlers::SetArrayElement(isolate, thiz, index, node->m_name, value);
+        CallbackHandlers::SetArrayElement(context, thiz, index, node->m_name, value);
 
         info.GetReturnValue().Set(value);
     } catch (NativeScriptException& e) {

@@ -9,7 +9,7 @@ namespace tns {
         public:
             ArrayBufferHelper();
 
-            void CreateConvertFunctions(v8::Isolate* isolate, const v8::Local<v8::Object>& global, ObjectManager* objectManager);
+            void CreateConvertFunctions(v8::Local<v8::Context> context, const v8::Local<v8::Object>& global, ObjectManager* objectManager);
 
         private:
 

@@ -60,6 +60,7 @@ void JsV8InspectorClient::disconnect() {
         return;
     }
 
+    v8::Locker locker(isolate_);
     Isolate::Scope isolate_scope(isolate_);
     v8::HandleScope handleScope(isolate_);
 
@@ -76,9 +77,11 @@ void JsV8InspectorClient::disconnect() {
 
 
 void JsV8InspectorClient::dispatchMessage(const std::string& message) {
+    v8::Locker locker(isolate_);
     Isolate::Scope isolate_scope(isolate_);
     v8::HandleScope handleScope(isolate_);
-    Context::Scope context_scope(isolate_->GetCurrentContext());
+    auto context = Runtime::GetRuntime(isolate_)->GetContext();
+    Context::Scope context_scope(context);
 
     this->doDispatchMessage(isolate_, message);
 }
@@ -177,9 +180,10 @@ void JsV8InspectorClient::init() {
         return;
     }
 
+    v8::Locker locker(isolate_);
+    v8::Isolate::Scope isolate_scope(isolate_);
     v8::HandleScope handle_scope(isolate_);
-
-    v8::Local<Context> context = isolate_->GetCurrentContext();
+    v8::Local<Context> context = Runtime::GetRuntime(isolate_)->GetContext();
 
     inspector_ = V8Inspector::create(isolate_, this);
 
