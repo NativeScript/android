@@ -14,7 +14,7 @@
     "babel-types": "6.26.0",
     "babylon": "6.18.0",
     "lazy": "1.0.11",
-    "lodash": "4.17.11"
+    "lodash": "4.17.19"
   },
   "devDependencies": {
     "jasmine": "3.1.0",
