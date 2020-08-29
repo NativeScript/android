@@ -22,7 +22,7 @@ class AppConfig {
         ForceLog("forceLog", false),
         DiscardUncaughtJsExceptions("discardUncaughtJsExceptions", false),
         EnableLineBreakpoins("enableLineBreakpoints", false),
-        EnableMultithreadedJavascript("enableMultithreadedJavascript", true);
+        EnableMultithreadedJavascript("enableMultithreadedJavascript", false);
 
         private final String name;
         private final Object defaultValue;
