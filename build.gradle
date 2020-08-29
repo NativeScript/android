@@ -109,7 +109,7 @@ task getCommitVersion {
             println "Using commit version property " + gitCommitVersion
             arVersion = gitCommitVersion
         } else if ("$System.env.GIT_COMMIT" != "null") {
-            println "Using commit version environment variable " + $System.env.GIT_COMMIT
+            println "Using commit version environment variable " + "$System.env.GIT_COMMIT"
             String content = "$System.env.GIT_COMMIT"
             arVersion = content.trim()
         }
