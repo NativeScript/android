@@ -367,14 +367,34 @@ dependencies {
         androidXLegacyVersion = androidXLegacy
     }
 
-    def androidXAppCompatVersion = "1.0.2"
+    def androidXAppCompatVersion = "1.1.0"
     if (project.hasProperty("androidXAppCompat")) {
         androidXAppCompatVersion = androidXAppCompat
     }
 
-    def androidXMaterialVersion = "1.0.0"
+    def androidXMaterialVersion = "1.1.0"
     if (project.hasProperty("androidXMaterial")) {
         androidXMaterialVersion = androidXMaterial
+    }
+
+    def androidXExifInterfaceVersion = "1.2.0"
+    if (project.hasProperty("androidXExifInterface")) {
+        androidxExifInterfaceVersion = androidXExifInterface
+    }
+
+    def androidXViewPagerVersion = "1.0.0"
+    if (project.hasProperty("androidXViewPager")) {
+        androidXViewPagerVersion = androidXViewPager
+    }
+
+    def androidXFragmentVersion = "1.2.5"
+    if (project.hasProperty("androidXFragment")) {
+        androidXFragmentVersion = androidXFragment
+    }
+
+    def androidXTransitionVersion = "1.3.1"
+    if (project.hasProperty("androidXTransition")) {
+        androidXTransitionVersion = androidXTransition
     }
 
     outLogger.withStyle(Style.SuccessHeader).println "\t + using android X library androidx.legacy:legacy-support-v4:$androidXLegacyVersion"
@@ -383,6 +403,10 @@ dependencies {
     implementation "androidx.legacy:legacy-support-v4:$androidXLegacyVersion"
     implementation "androidx.appcompat:appcompat:$androidXAppCompatVersion"
     implementation "com.google.android.material:material:$androidXMaterialVersion"
+    implementation "androidx.exifinterface:exifinterface:$androidXExifInterfaceVersion"
+    implementation "androidx.viewpager2:viewpager2:$androidXViewPagerVersion"
+    implementation "androidx.fragment:fragment:$androidXFragmentVersion"
+    implementation "androidx.transition:transition:$androidXTransitionVersion"
 
     def useV8Symbols = false
 

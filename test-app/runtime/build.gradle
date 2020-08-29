@@ -20,7 +20,7 @@ if (useCCache) {
     println "Use CCache build triggered."
 }
 
-project.ext._buildToolsVersion = "29.0.2"
+project.ext._buildToolsVersion = "30.0.1"
 
 android {
     sourceSets {
@@ -32,12 +32,12 @@ android {
             java.srcDirs = [bindingGeneratorSourcePath, defaultSrcPath]
         }
     }
-    compileSdkVersion 29
+    compileSdkVersion 30
     buildToolsVersion project.ext._buildToolsVersion
 
     defaultConfig {
         minSdkVersion 17
-        targetSdkVersion 29
+        targetSdkVersion 30
         versionCode 1
         versionName "1.0"
 
