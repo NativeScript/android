@@ -13,9 +13,9 @@ using namespace v8;
 using namespace std;
 using namespace tns;
 
-void ArgConverter::Init(Isolate* isolate) {
+void ArgConverter::Init(Local<Context> context) {
+    Isolate* isolate = context->GetIsolate();
     auto cache = GetTypeLongCache(isolate);
-    auto context = isolate->GetCurrentContext();
 
     auto ft = FunctionTemplate::New(isolate, ArgConverter::NativeScriptLongFunctionCallback);
     ft->SetClassName(V8StringConstants::GetLongNumber(isolate));
@@ -93,10 +93,11 @@ jstring ArgConverter::ObjectToString(jobject object) {
     return (jstring) object;
 }
 
-Local<Array> ArgConverter::ConvertJavaArgsToJsArgs(Isolate* isolate, jobjectArray args) {
+Local<Array> ArgConverter::ConvertJavaArgsToJsArgs(Local<Context> context, jobjectArray args) {
     JEnv env;
 
     int argc = env.GetArrayLength(args) / 3;
+    auto isolate = context->GetIsolate();
     Local<Array> arr(Array::New(isolate, argc));
 
     auto runtime = Runtime::GetRuntime(isolate);
@@ -155,7 +156,6 @@ Local<Array> ArgConverter::ConvertJavaArgsToJsArgs(Isolate* isolate, jobjectArra
             break;
         }
 
-        auto context = isolate->GetCurrentContext();
         arr->Set(context, i, jsArg);
     }
 

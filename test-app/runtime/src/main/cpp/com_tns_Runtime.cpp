@@ -75,8 +75,11 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_runModule(JNIEnv* _env, jobject o
     }
 
     auto isolate = runtime->GetIsolate();
+    v8::Locker locker(isolate);
     v8::Isolate::Scope isolate_scope(isolate);
     v8::HandleScope handleScope(isolate);
+    auto context = runtime->GetContext();
+    v8::Context::Scope context_scope(context);
 
     try {
         runtime->RunModule(_env, obj, scriptFile);
@@ -100,8 +103,11 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_runWorker(JNIEnv* _env, jobject o
     }
 
     auto isolate = runtime->GetIsolate();
+    v8::Locker locker(isolate);
     v8::Isolate::Scope isolate_scope(isolate);
     v8::HandleScope handleScope(isolate);
+    auto context = runtime->GetContext();
+    v8::Context::Scope context_scope(context);
 
     try {
         runtime->RunWorker(scriptFile);
@@ -127,8 +133,11 @@ extern "C" JNIEXPORT jobject Java_com_tns_Runtime_runScript(JNIEnv* _env, jobjec
     }
 
     auto isolate = runtime->GetIsolate();
+    v8::Locker locker(isolate);
     v8::Isolate::Scope isolate_scope(isolate);
     v8::HandleScope handleScope(isolate);
+    auto context = runtime->GetContext();
+    v8::Context::Scope context_scope(context);
 
     try {
         result = runtime->RunScript(_env, obj, scriptFile);
@@ -155,8 +164,11 @@ extern "C" JNIEXPORT jobject Java_com_tns_Runtime_callJSMethodNative(JNIEnv* _en
     }
 
     auto isolate = runtime->GetIsolate();
+    v8::Locker locker(isolate);
     v8::Isolate::Scope isolate_scope(isolate);
     v8::HandleScope handleScope(isolate);
+    auto context = runtime->GetContext();
+    v8::Context::Scope context_scope(context);
 
     try {
         result = runtime->CallJSMethodNative(_env, obj, javaObjectID, methodName, retType, isConstructor, packagedArgs);
@@ -181,8 +193,11 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_createJSInstanceNative(JNIEnv* _e
     }
 
     auto isolate = runtime->GetIsolate();
+    v8::Locker locker(isolate);
     v8::Isolate::Scope isolate_scope(isolate);
     v8::HandleScope handleScope(isolate);
+    auto context = runtime->GetContext();
+    v8::Context::Scope context_scope(context);
 
     try {
         runtime->CreateJSInstanceNative(_env, obj, javaObject, javaObjectID, className);
@@ -252,8 +267,11 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_passExceptionToJsNative(JNIEnv* e
     }
 
     auto isolate = runtime->GetIsolate();
+    v8::Locker locker(isolate);
     v8::Isolate::Scope isolate_scope(isolate);
     v8::HandleScope handleScope(isolate);
+    auto context = runtime->GetContext();
+    v8::Context::Scope context_scope(context);
 
     try {
         runtime->PassExceptionToJsNative(env, obj, exception, message, fullStackTrace, jsStackTrace, isDiscarded);
@@ -283,6 +301,17 @@ extern "C" JNIEXPORT jint Java_com_tns_Runtime_getPointerSize(JNIEnv* env, jobje
     return sizeof(void*);
 }
 
+extern "C" JNIEXPORT jint Java_com_tns_Runtime_getCurrentRuntimeId(JNIEnv* _env, jobject obj) {
+    Isolate* isolate = Isolate::GetCurrent();
+    if (isolate == nullptr) {
+        return -1;
+    }
+
+    Runtime* runtime = Runtime::GetRuntime(isolate);
+    int id = runtime->GetId();
+    return id;
+}
+
 extern "C" JNIEXPORT void Java_com_tns_Runtime_WorkerGlobalOnMessageCallback(JNIEnv* env, jobject obj, jint runtimeId, jstring msg) {
     // Worker Thread runtime
     auto runtime = TryGetRuntime(runtimeId);
@@ -292,8 +321,11 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_WorkerGlobalOnMessageCallback(JNI
 
     auto isolate = runtime->GetIsolate();
 
+    v8::Locker locker(isolate);
     v8::Isolate::Scope isolate_scope(isolate);
     v8::HandleScope handleScope(isolate);
+    auto context = runtime->GetContext();
+    v8::Context::Scope context_scope(context);
 
     CallbackHandlers::WorkerGlobalOnMessageCallback(isolate, msg);
 }
@@ -307,8 +339,11 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_WorkerObjectOnMessageCallback(JNI
 
     auto isolate = runtime->GetIsolate();
 
+    v8::Locker locker(isolate);
     v8::Isolate::Scope isolate_scope(isolate);
     v8::HandleScope handleScope(isolate);
+    auto context = runtime->GetContext();
+    v8::Context::Scope context_scope(context);
 
     CallbackHandlers::WorkerObjectOnMessageCallback(isolate, workerId, msg);
 }
@@ -323,6 +358,7 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_TerminateWorkerCallback(JNIEnv* e
     auto isolate = runtime->GetIsolate();
 
     {
+        v8::Locker locker(isolate);
         v8::Isolate::Scope isolate_scope(isolate);
         v8::HandleScope handleScope(isolate);
 
@@ -345,8 +381,11 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_ClearWorkerPersistent(JNIEnv* env
 
     auto isolate = runtime->GetIsolate();
 
+    v8::Locker locker(isolate);
     v8::Isolate::Scope isolate_scope(isolate);
     v8::HandleScope handleScope(isolate);
+    auto context = runtime->GetContext();
+    v8::Context::Scope context_scope(context);
 
     CallbackHandlers::ClearWorkerPersistent(workerId);
 }
@@ -359,8 +398,11 @@ extern "C" JNIEXPORT void Java_com_tns_Runtime_CallWorkerObjectOnErrorHandleMain
     }
 
     auto isolate = runtime->GetIsolate();
+    v8::Locker locker(isolate);
     v8::Isolate::Scope isolate_scope(isolate);
     v8::HandleScope handleScope(isolate);
+    auto context = runtime->GetContext();
+    v8::Context::Scope context_scope(context);
 
     try {
         CallbackHandlers::CallWorkerObjectOnErrorHandle(isolate, workerId, message, stackTrace, filename, lineno, threadName);

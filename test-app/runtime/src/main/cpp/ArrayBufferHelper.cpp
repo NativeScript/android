@@ -12,14 +12,13 @@ ArrayBufferHelper::ArrayBufferHelper()
           m_remainingMethodID(nullptr), m_getMethodID(nullptr) {
 }
 
-void ArrayBufferHelper::CreateConvertFunctions(Isolate* isolate, const Local<Object>& global, ObjectManager* objectManager) {
+void ArrayBufferHelper::CreateConvertFunctions(Local<Context> context, const Local<Object>& global, ObjectManager* objectManager) {
     m_objectManager = objectManager;
+    Isolate* isolate = context->GetIsolate();
     auto extData = External::New(isolate, this);
-    auto context = isolate->GetCurrentContext();
     auto fromFunc = FunctionTemplate::New(isolate, CreateFromCallbackStatic, extData)->GetFunction(context).ToLocalChecked();
-    auto ctx = isolate->GetCurrentContext();
     auto arrBufferCtorFunc = global->Get(context, ArgConverter::ConvertToV8String(isolate, "ArrayBuffer")).ToLocalChecked().As<Function>();
-    arrBufferCtorFunc->Set(ctx, ArgConverter::ConvertToV8String(isolate, "from"), fromFunc);
+    arrBufferCtorFunc->Set(context, ArgConverter::ConvertToV8String(isolate, "from"), fromFunc);
 }
 
 void ArrayBufferHelper::CreateFromCallbackStatic(const FunctionCallbackInfo<Value>& info) {

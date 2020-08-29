@@ -16,14 +16,14 @@ using namespace tns;
 /*
  * Converts a single JavaScript (V8) object to its respective Java representation
  */
-JsArgToArrayConverter::JsArgToArrayConverter(Isolate* isolate, const v8::Local<Value>& arg, bool isImplementationObject, int classReturnType)
-    : m_isolate(isolate), m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()), m_return_type(classReturnType) {
+JsArgToArrayConverter::JsArgToArrayConverter(Local<Context> context, const v8::Local<Value>& arg, bool isImplementationObject, int classReturnType)
+    : m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()), m_return_type(classReturnType) {
     if (!isImplementationObject) {
         m_argsLen = 1;
         m_argsAsObject = new jobject[m_argsLen];
         memset(m_argsAsObject, 0, m_argsLen * sizeof(jobject));
 
-        m_isValid = ConvertArg(arg, 0);
+        m_isValid = ConvertArg(context, arg, 0);
     }
 }
 
@@ -31,7 +31,7 @@ JsArgToArrayConverter::JsArgToArrayConverter(Isolate* isolate, const v8::Local<V
  * Converts an array of JavaScript (V8) objects to a Java array of objects
  */
 JsArgToArrayConverter::JsArgToArrayConverter(const v8::FunctionCallbackInfo<Value>& args, bool hasImplementationObject)
-    : m_isolate(args.GetIsolate()), m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()), m_return_type(static_cast<int>(Type::Null)) {
+    : m_arr(nullptr), m_argsAsObject(nullptr), m_argsLen(0), m_isValid(false), m_error(Error()), m_return_type(static_cast<int>(Type::Null)) {
     m_argsLen = !hasImplementationObject ? args.Length() : args.Length() - 2;
 
     bool success = true;
@@ -40,8 +40,9 @@ JsArgToArrayConverter::JsArgToArrayConverter(const v8::FunctionCallbackInfo<Valu
         m_argsAsObject = new jobject[m_argsLen];
         memset(m_argsAsObject, 0, m_argsLen * sizeof(jobject));
 
+        auto context = args.GetIsolate()->GetCurrentContext();
         for (int i = 0; i < m_argsLen; i++) {
-            success = ConvertArg(args[i], i);
+            success = ConvertArg(context, args[i], i);
 
             if (!success) {
                 break;
@@ -52,14 +53,14 @@ JsArgToArrayConverter::JsArgToArrayConverter(const v8::FunctionCallbackInfo<Valu
     m_isValid = success;
 }
 
-bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index) {
+bool JsArgToArrayConverter::ConvertArg(Local<Context> context, const Local<Value>& arg, int index) {
     bool success = false;
     stringstream s;
 
     JEnv env;
 
     Type returnType = JType::getClassType(m_return_type);
-    auto context = m_isolate->GetCurrentContext();
+    auto isolate = context->GetIsolate();
 
     if (arg.IsEmpty()) {
         s << "Cannot convert empty JavaScript object";
@@ -110,13 +111,13 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index) {
             success = true;
         }
     } else if (arg->IsBoolean()) {
-        jboolean value = arg->BooleanValue(m_isolate);
+        jboolean value = arg->BooleanValue(isolate);
         auto javaObject = JType::NewBoolean(env, value);
         SetConvertedObject(env, index, javaObject);
         success = true;
     } else if (arg->IsBooleanObject()) {
         auto boolObj = Local<BooleanObject>::Cast(arg);
-        jboolean value = boolObj->BooleanValue(m_isolate) ? JNI_TRUE : JNI_FALSE;
+        jboolean value = boolObj->BooleanValue(isolate) ? JNI_TRUE : JNI_FALSE;
         auto javaObject = JType::NewBoolean(env, value);
         SetConvertedObject(env, index, javaObject);
 
@@ -129,7 +130,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index) {
     } else if (arg->IsObject()) {
         auto jsObj = arg->ToObject(context).ToLocalChecked();
 
-        auto castType = NumericCasts::GetCastType(m_isolate, jsObj);
+        auto castType = NumericCasts::GetCastType(isolate, jsObj);
 
         Local<Value> castValue;
         jchar charValue;
@@ -141,7 +142,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index) {
         jobject javaObject;
         JniLocalRef obj;
 
-        auto runtime = Runtime::GetRuntime(m_isolate);
+        auto runtime = Runtime::GetRuntime(isolate);
         auto objectManager = runtime->GetObjectManager();
 
         switch (castType) {
@@ -230,7 +231,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index) {
         case CastType::None:
             obj = objectManager->GetJavaObjectByJsObject(jsObj);
 
-            V8GetPrivateValue(m_isolate, jsObj, V8StringConstants::GetNullNodeName(m_isolate), castValue);
+            V8GetPrivateValue(isolate, jsObj, V8StringConstants::GetNullNodeName(isolate), castValue);
 
             if (!castValue.IsEmpty()) {
                 auto node = reinterpret_cast<MetadataNode*>(castValue.As<External>()->Value());
@@ -264,7 +265,7 @@ bool JsArgToArrayConverter::ConvertArg(const Local<Value>& arg, int index) {
             if (success) {
                 SetConvertedObject(env, index, obj.Move(), obj.IsGlobal());
             } else {
-                String::Utf8Value jsObjStr(m_isolate, jsObj);
+                String::Utf8Value jsObjStr(isolate, jsObj);
                 s << "Cannot marshal JavaScript argument " << (*jsObjStr ? *jsObjStr : "<failed-to-string>") << " at index " << index << " to Java type.";
             }
             break;

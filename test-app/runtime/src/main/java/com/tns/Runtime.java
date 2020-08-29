@@ -62,6 +62,8 @@ public class Runtime {
 
     private native void clearStartupData(int runtimeId);
 
+    private static native int getCurrentRuntimeId();
+
     public static native int getPointerSize();
 
     public static native void SetManualInstrumentationMode(String mode);
@@ -175,6 +177,7 @@ public class Runtime {
     private final static ThreadLocal<Runtime> currentRuntime = new ThreadLocal<Runtime>();
     private final static Map<Integer, Runtime> runtimeCache = new ConcurrentHashMap<>();
     public static Map<Integer, ConcurrentLinkedQueue<Message>> pendingWorkerMessages = new ConcurrentHashMap<>();
+    public static boolean nativeLibraryLoaded;
 
     /*
         Holds reference to all Worker Threads' handlers
@@ -233,6 +236,13 @@ public class Runtime {
 
     public static Runtime getCurrentRuntime() {
         Runtime runtime = currentRuntime.get();
+
+        if (runtime == null && nativeLibraryLoaded) {
+            // Attempt to retrieve the runtime id from the currently
+            // entered V8 isolate
+            int runtimeId = getCurrentRuntimeId();
+            runtime = runtimeCache.get(runtimeId);
+        }
 
         return runtime;
     }
@@ -1284,8 +1294,9 @@ public class Runtime {
 
         final Object[] tmpArgs = extendConstructorArgs(methodName, isConstructor, args);
         final boolean discardUncaughtJsExceptions = this.config.appConfig.getDiscardUncaughtJsExceptions();
+        boolean enableMultithreadedJavascript = this.config.appConfig.getEnableMultithreadedJavascript();
 
-        if (isWorkThread) {
+        if (enableMultithreadedJavascript || isWorkThread) {
             Object[] packagedArgs = packageArgs(tmpArgs);
             try {
                 ret = callJSMethodNative(getRuntimeId(), javaObjectID, methodName, returnType, isConstructor, packagedArgs);

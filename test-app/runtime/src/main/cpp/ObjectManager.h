@@ -199,8 +199,6 @@ class ObjectManager {
 
         int m_numberOfGC;
 
-        JEnv m_env;
-
         v8::Isolate* m_isolate;
 
         std::stack<GarbageCollectionInfo> m_markedForGC;

@@ -13,8 +13,6 @@
 #include "File.h"
 #include <mutex>
 
-jobject ConvertJsValueToJavaObject(tns::JEnv& env, const v8::Local<v8::Value>& value, int classReturnType);
-
 namespace tns {
 class Runtime {
     public:
@@ -38,7 +36,7 @@ class Runtime {
 
         static void SetManualInstrumentationMode(jstring mode);
 
-        void Init(jstring filesPath, jstring nativeLibsDir, bool verboseLoggingEnabled, bool isDebuggable, jstring packageName, jobjectArray args, jstring callingDir, int maxLogcatObjectSize, bool forceLog);
+        void Init(JNIEnv* env, jstring filesPath, jstring nativeLibsDir, bool verboseLoggingEnabled, bool isDebuggable, jstring packageName, jobjectArray args, jstring callingDir, int maxLogcatObjectSize, bool forceLog);
 
         v8::Isolate* GetIsolate() const;
 
@@ -63,6 +61,10 @@ class Runtime {
         void Lock();
         void Unlock();
 
+        int GetId();
+
+        v8::Local<v8::Context> GetContext();
+
         static v8::Platform* platform;
 
         std::string ReadFileText(const std::string& filePath);
@@ -70,7 +72,6 @@ class Runtime {
     private:
         Runtime(JNIEnv* env, jobject runtime, int id);
 
-        JEnv m_env;
         int m_id;
         jobject m_runtime;
         v8::Isolate* m_isolate;
@@ -94,6 +95,8 @@ class Runtime {
 
         v8::Persistent<v8::Function>* m_gcFunc;
         volatile bool m_runGC;
+
+        v8::Persistent<v8::Context>* m_context;
 
         v8::Isolate* PrepareV8Runtime(const std::string& filesPath, const std::string& nativeLibsDir, const std::string& packageName, bool isDebuggable, const std::string& callingDir, const std::string& profilerOutputDir, const int maxLogcatObjectSize, const bool forceLog);
         jobject ConvertJsValueToJavaObject(JEnv& env, const v8::Local<v8::Value>& value, int classReturnType);
