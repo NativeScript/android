@@ -16,6 +16,8 @@
 *            -PandroidXLegacy=[androidx_legacy_version]
 *            -PandroidXAppCompat=[androidx_appcompat_version]
 *            -PandroidXMaterial=[androidx_material_version]
+*            -PappPath=[app_path]
+*            -PappResourcesPath=[app_resources_path]
 */
 
 
@@ -125,7 +127,11 @@ version of the {N} CLI install a previous version of the runtime package - 'tns 
                 nsConfig = new JsonSlurper().parseText(nsConfigFile.getText("UTF-8"))
             }
 
-            if (nsConfig != null && nsConfig.appPath != null) {
+            if (project.hasProperty("appPath")) {
+                // when appPath is passed through -PappPath=/path/to/app
+                // the path could be relative or absolute - either case will work
+                relativePathToApp = appPath
+            } else if (nsConfig != null && nsConfig.appPath != null) {
                 relativePathToApp = nsConfig.appPath
             }
 
@@ -144,7 +150,12 @@ version of the {N} CLI install a previous version of the runtime package - 'tns 
                 nsConfig = new JsonSlurper().parseText(nsConfigFile.getText("UTF-8"))
             }
 
-            if (nsConfig != null && nsConfig.appResourcesPath != null) {
+            if (project.hasProperty("appResourcesPath")) {
+                // when appResourcesPath is passed through -PappResourcesPath=/path/to/App_Resources
+                // the path could be relative or absolute - either case will work
+                relativePathToAppResources = appResourcesPath
+                absolutePathToAppResources = java.nio.file.Paths.get(USER_PROJECT_ROOT).resolve(relativePathToAppResources).toAbsolutePath()
+            } else if (nsConfig != null && nsConfig.appResourcesPath != null) {
                 relativePathToAppResources = nsConfig.appResourcesPath
                 absolutePathToAppResources = java.nio.file.Paths.get(USER_PROJECT_ROOT).resolve(relativePathToAppResources).toAbsolutePath()
             } else {

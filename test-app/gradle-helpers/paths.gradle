@@ -5,7 +5,11 @@ ext.getAppPath = { userDir ->
     def nsConfigFile = file("$userDir/nsconfig.json")
     def nsConfig
 
-    if (nsConfigFile.exists()) {
+    if (project.hasProperty("appPath")) {
+        // when appPath is passed through -PappPath=/path/to/app
+        // the path could be relative or absolute - either case will work
+        relativePathToApp = appPath
+    } else if (nsConfigFile.exists()) {
         nsConfig = new JsonSlurper().parseText(nsConfigFile.getText("UTF-8"))
     }
 
@@ -26,7 +30,12 @@ ext.getAppResourcesPath = { userDir ->
         nsConfig = new JsonSlurper().parseText(nsConfigFile.getText("UTF-8"))
     }
 
-    if (nsConfig != null && nsConfig.appResourcesPath != null) {
+    if (project.hasProperty("appResourcesPath")) {
+        // when appResourcesPath is passed through -PappResourcesPath=/path/to/App_Resources
+        // the path could be relative or absolute - either case will work
+        relativePathToAppResources = ext.appResourcesPath
+        absolutePathToAppResources = java.nio.file.Paths.get(userDir).resolve(relativePathToAppResources).toAbsolutePath()
+    } else if (nsConfig != null && nsConfig.appResourcesPath != null) {
         relativePathToAppResources = nsConfig.appResourcesPath
         absolutePathToAppResources = java.nio.file.Paths.get(userDir).resolve(relativePathToAppResources).toAbsolutePath()
     } else {
