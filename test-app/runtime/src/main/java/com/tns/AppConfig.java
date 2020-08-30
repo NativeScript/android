@@ -16,7 +16,7 @@ class AppConfig {
         MemoryCheckInterval("memoryCheckInterval", 0),
         FreeMemoryRatio("freeMemoryRatio", 0.0),
         Profiling("profiling", ""),
-        MarkingMode("markingMode", com.tns.MarkingMode.full),
+        MarkingMode("markingMode", com.tns.MarkingMode.none),
         HandleTimeZoneChanges("handleTimeZoneChanges", false),
         MaxLogcatObjectSize("maxLogcatObjectSize", 1024),
         ForceLog("forceLog", false),
