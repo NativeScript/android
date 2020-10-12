@@ -1923,7 +1923,6 @@ void DomainDispatcherImpl::getContentQuads(const v8_crdtp::Dispatchable& dispatc
     return;
 }
 
-//NOTE: dev4s - changed for now
 void DomainDispatcherImpl::getDocument(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
