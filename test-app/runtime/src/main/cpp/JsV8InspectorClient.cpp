@@ -44,9 +44,13 @@ void JsV8InspectorClient::connect(jobject connection) {
     this->isConnected = true;
 }
 
+//NOTE: dev4s - changed for now
 void JsV8InspectorClient::scheduleBreak() {
+    v8::Locker locker(isolate_);
     Isolate::Scope isolate_scope(isolate_);
     v8::HandleScope handleScope(isolate_);
+    auto context = Runtime::GetRuntime(isolate_)->GetContext();
+    Context::Scope context_scope(context);
 
     this->session_->schedulePauseOnNextStatement(v8_inspector::StringView(), v8_inspector::StringView());
 }

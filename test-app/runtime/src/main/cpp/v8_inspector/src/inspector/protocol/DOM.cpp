@@ -1923,6 +1923,7 @@ void DomainDispatcherImpl::getContentQuads(const v8_crdtp::Dispatchable& dispatc
     return;
 }
 
+//NOTE: dev4s - changed for now
 void DomainDispatcherImpl::getDocument(const v8_crdtp::Dispatchable& dispatchable, DictionaryValue* params, ErrorSupport* errors)
 {
     // Prepare input parameters.
@@ -1932,34 +1933,43 @@ void DomainDispatcherImpl::getDocument(const v8_crdtp::Dispatchable& dispatchabl
         errors->SetName("depth");
         in_depth = ValueConversions<int>::fromValue(depthValue, errors);
     }
+
     protocol::Value* pierceValue = params ? params->get("pierce") : nullptr;
     Maybe<bool> in_pierce;
     if (pierceValue) {
         errors->SetName("pierce");
         in_pierce = ValueConversions<bool>::fromValue(pierceValue, errors);
     }
+
     if (MaybeReportInvalidParams(dispatchable, *errors)) return;
     // Declare output parameters.
     std::unique_ptr<protocol::DOM::Node> out_root;
 
     std::unique_ptr<DomainDispatcher::WeakPtr> weak = weakPtr();
-    DispatchResponse response = m_backend->getDocument(std::move(in_depth), std::move(in_pierce), &out_root);
-    if (response.IsFallThrough()) {
-        channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.getDocument"), dispatchable.Serialized());
-        return;
-    }
-      if (weak->get()) {
-        std::vector<uint8_t> result;
-        if (response.IsSuccess()) {
-          v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
-          envelope_encoder.EncodeStart(&result);
-          result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
-            v8_crdtp::SerializeField(v8_crdtp::SpanFrom("root"), out_root, &result);
-          result.push_back(v8_crdtp::cbor::EncodeStop());
-          envelope_encoder.EncodeStop(&result);
+
+    if (depthValue && pierceValue) {
+        //NOTE: in_depth & in_pierce are not used in the method getDocument, see in v8-dom-agent-impl.cpp:63
+        DispatchResponse response = m_backend->getDocument(std::move(in_depth),
+                                                           std::move(in_pierce), &out_root);
+        if (response.IsFallThrough()) {
+            channel()->FallThrough(dispatchable.CallId(), v8_crdtp::SpanFrom("DOM.getDocument"),
+                                   dispatchable.Serialized());
+            return;
         }
-        weak->get()->sendResponse(dispatchable.CallId(), response, v8_crdtp::Serializable::From(std::move(result)));
-      }
+        if (weak->get()) {
+            std::vector<uint8_t> result;
+            if (response.IsSuccess()) {
+                v8_crdtp::cbor::EnvelopeEncoder envelope_encoder;
+                envelope_encoder.EncodeStart(&result);
+                result.push_back(v8_crdtp::cbor::EncodeIndefiniteLengthMapStart());
+                v8_crdtp::SerializeField(v8_crdtp::SpanFrom("root"), out_root, &result);
+                result.push_back(v8_crdtp::cbor::EncodeStop());
+                envelope_encoder.EncodeStop(&result);
+            }
+            weak->get()->sendResponse(dispatchable.CallId(), response,
+                                      v8_crdtp::Serializable::From(std::move(result)));
+        }
+    }
     return;
 }
 
