@@ -7,6 +7,13 @@ buildscript {
         apply from: "$rootDir/gradle-helpers/user_properties_reader.gradle"
         apply from: "$rootDir/gradle-helpers/paths.gradle"
         rootProject.ext.userDefinedGradleProperties = getUserProperties("${getAppResourcesPath(userDir)}/Android")
+        if (rootProject.hasProperty("userDefinedGradleProperties")) {
+            rootProject.ext.userDefinedGradleProperties.each { entry ->
+                def propertyName = entry.getKey()
+                def propertyValue = entry.getValue()
+                project.ext.set(propertyName, propertyValue)
+            }
+        }
     }
     initialize()
 
