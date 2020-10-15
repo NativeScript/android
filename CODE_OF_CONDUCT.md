@@ -4,7 +4,7 @@ Our community members come from all walks of life and are all at different stage
 
 Towards this end, certain behaviors and practices will not be tolerated.
 
-## tl;dr
+## Members
 
 - Be respectful. 
 - We're here to help.
