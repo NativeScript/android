@@ -1,3 +1,26 @@
+7.0.1
+==
+
+- [Gradle not respecting kotlinVersion (#1642)](https://github.com/NativeScript/android-runtime/pull/1642)
+- [--debug-brk crashing android runtime (#1641)](https://github.com/NativeScript/android-runtime/pull/1641)
+
+
+7.0.0
+==
+
+## Bug Fixes
+
+- [appPath & appResourcePath now passed in (#1635)](https://github.com/NativeScript/android-runtime/pull/1635)
+- [Kotlin extension overwriting metadata & metadata duplication (#1633)](https://github.com/NativeScript/android-runtime/pull/1633)
+- [Update gradle & kotlin dependancies (#1629)](https://github.com/NativeScript/android-runtime/pull/1629)
+
+
+6.5.3
+==
+- [Java 8 compatibility when build with Java 9 (#1625)](https://github.com/NativeScript/android-runtime/pull/1625)
+- [metadata crash on startup with Local Notification plugin (#1621)](https://github.com/NativeScript/android-runtime/pull/1621)
+
+
 6.5.1
 ==
 

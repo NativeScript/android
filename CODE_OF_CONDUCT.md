@@ -11,11 +11,9 @@ Towards this end, certain behaviors and practices will not be tolerated.
 - Abusive behavior is never tolerated. 
 - Violations of this code may result in swift and permanent expulsion from the NativeScript community channels. 
 
-## Administrators
+## Contact
 
-- Dan Wilson (@DanWilson on Slack)
-- Jen Looper (@jen.looper on Slack)
-- TJ VanToll (@tjvantoll on Slack)
+- support@nativescript.org
 
 ## Scope
 

@@ -29,7 +29,7 @@ if [ "$1" != 'unit_tests_only' ]; then
         ./gradlew -PpackageVersion=$ANDROID_PACKAGE_VERSION -PgitCommitVersion=$GIT_COMMIT
     fi
 
-    cp dist/tns-android-*.tgz dist/tns-android.tgz
+    cp dist/nativescript-android-*.tgz dist/nativescript-android.tgz
 else
     echo "Building Android Runtime for x86 unit tests with paramerter packageVersion: $ANDROID_PACKAGE_VERSION and commit: $GIT_COMMIT"
     if [ "$NO_CCACHE" == 'true' ]; then
@@ -37,7 +37,7 @@ else
     else
         ./gradlew -PpackageVersion=$ANDROID_PACKAGE_VERSION -PgitCommitVersion=$GIT_COMMIT -PskipUnoptimized -PonlyX86
     fi
-    cp dist/tns-android-*.tgz dist/tns-android.tgz
+    cp dist/nativescript-android-*.tgz dist/nativescript-android.tgz
 fi
 
 if [ "$2" != '' ]; then
