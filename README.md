@@ -20,7 +20,7 @@ Contains the source code for the NativeScript's Android Runtime. [NativeScript](
 Several Wiki pages describe some internal topics about the runtime [here](https://github.com/NativeScript/android-runtime/wiki)
 
 ## Main Projects
-The repo is structured in the following projects (ordered by dependencies):
+The repository is structured in the following projects (ordered by dependencies):
 
 * [**android-metadata-generator**](android-metadata-generator) - generates metadata necessary for the Android Runtime.
 * [**android-binding-generator**](test-app/runtime-binding-generator) - enables Java & Android types to be dynamically created at runtime. Needed by the `extend` routine.
