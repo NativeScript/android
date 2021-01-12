@@ -376,39 +376,44 @@ dependencies {
     def androidXLegacyVersion = "1.0.0"
     if (project.hasProperty("androidXLegacy")) {
         androidXLegacyVersion = androidXLegacy
+        outLogger.withStyle(Style.SuccessHeader).println "\t + using android X library androidx.legacy:legacy-support-v4:$androidXLegacyVersion"
     }
 
     def androidXAppCompatVersion = "1.1.0"
     if (project.hasProperty("androidXAppCompat")) {
         androidXAppCompatVersion = androidXAppCompat
+        outLogger.withStyle(Style.SuccessHeader).println "\t + using android X library androidx.appcompat:appcompat:$androidXAppCompatVersion"
     }
 
     def androidXMaterialVersion = "1.1.0"
     if (project.hasProperty("androidXMaterial")) {
         androidXMaterialVersion = androidXMaterial
+        outLogger.withStyle(Style.SuccessHeader).println "\t + using android X library com.google.android.material:material:$androidXMaterialVersion"
     }
 
     def androidXExifInterfaceVersion = "1.2.0"
     if (project.hasProperty("androidXExifInterface")) {
-        androidxExifInterfaceVersion = androidXExifInterface
+        androidXExifInterfaceVersion = androidXExifInterface
+        outLogger.withStyle(Style.SuccessHeader).println "\t + using android X library androidx.exifinterface:exifinterface:$androidXExifInterfaceVersion"
     }
 
     def androidXViewPagerVersion = "1.0.0"
     if (project.hasProperty("androidXViewPager")) {
         androidXViewPagerVersion = androidXViewPager
+        outLogger.withStyle(Style.SuccessHeader).println "\t + using android X library androidx.viewpager2:viewpager2:$androidXViewPagerVersion"
     }
 
     def androidXFragmentVersion = "1.2.5"
     if (project.hasProperty("androidXFragment")) {
         androidXFragmentVersion = androidXFragment
+        outLogger.withStyle(Style.SuccessHeader).println "\t + using android X library androidx.fragment:fragment:$androidXFragmentVersion"
     }
 
     def androidXTransitionVersion = "1.3.1"
     if (project.hasProperty("androidXTransition")) {
         androidXTransitionVersion = androidXTransition
+        outLogger.withStyle(Style.SuccessHeader).println "\t + using android X library androidx.transition:transition:$androidXTransitionVersion"
     }
-
-    outLogger.withStyle(Style.SuccessHeader).println "\t + using android X library androidx.legacy:legacy-support-v4:$androidXLegacyVersion"
 
     implementation "androidx.multidex:multidex:2.0.1"
     implementation "androidx.legacy:legacy-support-v4:$androidXLegacyVersion"
@@ -802,7 +807,7 @@ task buildMetadata(type: BuildToolTask) {
     description "builds metadata with provided jar dependencies"
 
     inputs.files("$MDG_JAVA_DEPENDENCIES")
-    
+
     // make MDG aware of whitelist.mdg and blacklist.mdg files
     inputs.files(project.fileTree(dir: "$rootDir", include: "**/*.mdg"))
 
