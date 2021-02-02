@@ -17,7 +17,7 @@ buildscript {
     }
     initialize()
 
-    def computeKotlinVersion = { -> project.hasProperty("kotlinVersion") ? kotlinVersion : "1.3.72"
+    def computeKotlinVersion = { -> project.hasProperty("kotlinVersion") ? kotlinVersion : "1.4.21"
     }
     def kotlinVersion = computeKotlinVersion()
 
@@ -26,7 +26,7 @@ buildscript {
         jcenter()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:3.6.4'
+        classpath 'com.android.tools.build:gradle:4.1.2'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
     }
 }

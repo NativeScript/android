@@ -41,7 +41,7 @@ def enableKotlin = (project.hasProperty("useKotlin") && project.useKotlin == "tr
 
 if (enableKotlin) {
     apply plugin: 'kotlin-android'
-    apply plugin: 'kotlin-android-extensions'
+    apply plugin: 'kotlin-parcelize'
 }
 
 def onlyX86 = project.hasProperty("onlyX86")
@@ -78,11 +78,11 @@ def METADATA_OUT_PATH = "$projectDir/src/main/assets/metadata"
 def pluginsJarLibraries = new LinkedList<String>()
 def allJarLibraries = new LinkedList<String>()
 
-def computeKotlinVersion = { -> project.hasProperty("kotlinVersion") ? kotlinVersion : "1.3.41" }
-def computeCompileSdkVersion = { -> project.hasProperty("compileSdk") ? compileSdk : 29 }
-def computeTargetSdkVersion = { -> project.hasProperty("targetSdk") ? targetSdk : 29 }
+def computeKotlinVersion = { -> project.hasProperty("kotlinVersion") ? kotlinVersion : "1.4.21" }
+def computeCompileSdkVersion = { -> project.hasProperty("compileSdk") ? compileSdk : 30 }
+def computeTargetSdkVersion = { -> project.hasProperty("targetSdk") ? targetSdk : 30 }
 def computeBuildToolsVersion = { ->
-    project.hasProperty("buildToolsVersion") ? buildToolsVersion : "29.0.2"
+    project.hasProperty("buildToolsVersion") ? buildToolsVersion : "30.0.2"
 }
 
 def enableAnalytics = (project.hasProperty("gatherAnalyticsData") && project.gatherAnalyticsData == "true")
@@ -135,7 +135,7 @@ version of the {N} CLI install a previous version of the runtime package - 'tns 
                 relativePathToApp = nsConfig.appPath
             }
 
-            project.ext.appPath = java.nio.file.Paths.get(USER_PROJECT_ROOT).resolve(relativePathToApp).toAbsolutePath()
+            project.ext.appPath = Paths.get(USER_PROJECT_ROOT).resolve(relativePathToApp).toAbsolutePath()
 
             return project.ext.appPath
         }
@@ -154,10 +154,10 @@ version of the {N} CLI install a previous version of the runtime package - 'tns 
                 // when appResourcesPath is passed through -PappResourcesPath=/path/to/App_Resources
                 // the path could be relative or absolute - either case will work
                 relativePathToAppResources = appResourcesPath
-                absolutePathToAppResources = java.nio.file.Paths.get(USER_PROJECT_ROOT).resolve(relativePathToAppResources).toAbsolutePath()
+                absolutePathToAppResources = Paths.get(USER_PROJECT_ROOT).resolve(relativePathToAppResources).toAbsolutePath()
             } else if (nsConfig != null && nsConfig.appResourcesPath != null) {
                 relativePathToAppResources = nsConfig.appResourcesPath
-                absolutePathToAppResources = java.nio.file.Paths.get(USER_PROJECT_ROOT).resolve(relativePathToAppResources).toAbsolutePath()
+                absolutePathToAppResources = Paths.get(USER_PROJECT_ROOT).resolve(relativePathToAppResources).toAbsolutePath()
             } else {
                 absolutePathToAppResources = "${getAppPath()}/App_Resources"
             }
@@ -378,17 +378,17 @@ dependencies {
         androidXLegacyVersion = androidXLegacy
     }
 
-    def androidXAppCompatVersion = "1.1.0"
+    def androidXAppCompatVersion = "1.2.0"
     if (project.hasProperty("androidXAppCompat")) {
         androidXAppCompatVersion = androidXAppCompat
     }
 
-    def androidXMaterialVersion = "1.1.0"
+    def androidXMaterialVersion = "1.2.1"
     if (project.hasProperty("androidXMaterial")) {
         androidXMaterialVersion = androidXMaterial
     }
 
-    def androidXExifInterfaceVersion = "1.2.0"
+    def androidXExifInterfaceVersion = "1.3.2"
     if (project.hasProperty("androidXExifInterface")) {
         androidxExifInterfaceVersion = androidXExifInterface
     }
@@ -416,6 +416,7 @@ dependencies {
     implementation "com.google.android.material:material:$androidXMaterialVersion"
     implementation "androidx.exifinterface:exifinterface:$androidXExifInterfaceVersion"
     implementation "androidx.viewpager2:viewpager2:$androidXViewPagerVersion"
+    //noinspection KtxExtensionAvailable
     implementation "androidx.fragment:fragment:$androidXFragmentVersion"
     implementation "androidx.transition:transition:$androidXTransitionVersion"
 
