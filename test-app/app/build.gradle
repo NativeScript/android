@@ -645,6 +645,11 @@ afterEvaluate { project ->
                 // if there's a project dependency search for its result jar file in the build/intermediates/runtime_library_classes folder
                 // this is the output folder in gradle 5.1.1, but it can be changed in the future versions of gradle
                 def jarDir = new File("${it.getBuildDir()}/intermediates/runtime_library_classes/${buildType.toLowerCase()}")
+
+                // gradle 6.5+
+                if(!jarDir.exists()){
+                    jarDir = new File("${it.getBuildDir()}/intermediates/runtime_library_classes_jar/${buildType.toLowerCase()}")
+                }
                 if (jarDir.exists()) {
                     jarDir.eachFileRecurse(FileType.FILES) { file ->
                         if (file.path.endsWith(".jar")) {
