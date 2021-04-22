@@ -1,6 +1,6 @@
 var es5_visitors = (function() {
 
-    var types = require("babel-types"),
+    var types = require("@babel/types"),
 
         defaultExtendDecoratorName = "JavaProxy",
         columnOffset = 1,

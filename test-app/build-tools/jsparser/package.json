@@ -10,9 +10,10 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "babel-traverse": "6.26.0",
-    "babel-types": "6.26.0",
-    "babylon": "6.18.0",
+    "@babel/traverse": "~7.13.17",
+    "@babel/types": "~7.13.17",
+    "@babel/parser": "7.13.16",
+    "@babel/plugin-proposal-decorators":"7.13.15",
     "split": "1.0.1"
   },
   "repository": "https://github.com/NativeScript/android-runtime",
