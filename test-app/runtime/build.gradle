@@ -35,6 +35,8 @@ android {
     compileSdkVersion 30
     buildToolsVersion project.ext._buildToolsVersion
 
+    ndkVersion '20.1.5948944'
+
     defaultConfig {
         minSdkVersion 17
         targetSdkVersion 30
