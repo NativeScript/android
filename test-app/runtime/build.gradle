@@ -22,6 +22,14 @@ if (useCCache) {
 
 project.ext._buildToolsVersion = "30.0.1"
 
+
+def hasNdkVersion = project.hasProperty("ndkVersion")
+if (hasNdkVersion) {
+    println "Runtime using NDK version " + ndkVersion
+}
+
+
+
 android {
     sourceSets {
         main {
@@ -34,6 +42,10 @@ android {
     }
     compileSdkVersion 30
     buildToolsVersion project.ext._buildToolsVersion
+
+    if (hasNdkVersion) {
+        ndkVersion ndkVersion
+    }
 
     defaultConfig {
         minSdkVersion 17
